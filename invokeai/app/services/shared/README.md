@@ -254,11 +254,11 @@ Checks a single prospective edge before insertion:
 After inserting an edge into `If.true_input` or `If.false_input`, or into a collector's `item` or `collection`,
 `add_edge` revalidates affected connections in both directions. Candidate collector checks validate local roots before
 insertion; after insertion, the walk checks upstream collectors against their updated downstream roots, then follows
-resolved If outputs and collector chains to check affected collectors and iterators once. Ordinary nodes end this
-dependency walk; unresolved If outputs and unrelated unfinished nodes are not revalidated. When a plain item is added
-to a collector whose concrete root is unchanged and whose only consumers are direct iterators, iterator output types
-are checked against that known root without resolving the same collector again. If a check fails, the new edge is
-removed and adjacency indexes are restored before the validation error is raised.
+resolved If outputs and collector chains to check affected collectors and iterators once. One operation-local cache
+shares resolved collector item types across this walk and strict graph validation. Upstream collectors without a
+resolvable item type, ordinary nodes, unresolved If outputs, and unrelated unfinished nodes end or leave the dependency
+walk untouched. If a check fails, the new edge is removed and adjacency indexes are restored before the validation
+error is raised.
 
 ### 3.4 Topology utilities
 
@@ -277,8 +277,9 @@ removed and adjacency indexes are restored before the validation error is raised
 Graph validation runs when a workflow is queued and when a persisted runtime session is hydrated. New inferred collector
 root checks can therefore reject an older saved workflow at enqueue time, or make a pending queue snapshot unreadable
 when the queue worker restores it. Unreadable pending snapshots are marked failed and retained for recovery by the
-queue's quarantine path; they are not silently executed. The workflow can be edited to make collector inputs and
-consumers agree with the inferred root before it is queued again.
+queue's quarantine path; they are not silently executed. Completed history entries with unreadable snapshots are shown
+as failed placeholders with the session and workflow data dropped. The workflow can be edited to make collector inputs
+and consumers agree with the inferred root before it is queued again.
 
 ## 4) GraphExecutionState (runtime)
 

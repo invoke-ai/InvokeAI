@@ -76,6 +76,7 @@ else:
 
 
 NoneType = type(None)
+_CollectorInputTypesCache = dict[str, set[Any]]
 
 _ACTIVE_FACADE_OVERRIDES: ContextVar[frozenset[str]] = ContextVar("active_facade_overrides", default=frozenset())
 
@@ -763,7 +764,9 @@ class Graph(BaseModel):
         else:
             raise InvalidEdgeError()
 
-    def _get_upstream_collector_ids(self, node: BaseInvocation) -> list[str]:
+    def _get_upstream_collector_ids(
+        self, node: BaseInvocation, collector_input_types_cache: _CollectorInputTypesCache
+    ) -> list[str]:
         """Find collectors whose inferred item types contribute to this node's input types."""
         if isinstance(node, CollectInvocation):
             input_edges = [
@@ -797,6 +800,9 @@ class Graph(BaseModel):
                 if source_node.id in visited_collectors:
                     continue
                 visited_collectors.add(source_node.id)
+                source_root_type = self._get_collector_input_root_type(source_node.id, collector_input_types_cache)
+                if source_root_type is None:
+                    continue
                 input_edges = [
                     *self._get_input_edges(source_node.id, ITEM_FIELD),
                     *self._get_input_edges(source_node.id, COLLECTION_FIELD),
@@ -813,73 +819,21 @@ class Graph(BaseModel):
 
         return upstream_collectors
 
-    def _get_unchanged_root_iterators(self, edge: Edge, node: BaseInvocation) -> set[str]:
-        """Return direct Iterate consumers safe to skip when a plain item leaves a collector root unchanged."""
-        if not isinstance(node, CollectInvocation) or edge.destination.field != ITEM_FIELD:
-            return set()
-
-        source_node = self.get_node(edge.source.node_id)
-        if isinstance(source_node, (CollectInvocation, IfInvocation, IterateInvocation)):
-            return set()
-
-        new_item_type = get_output_field_type(source_node, edge.source.field)
-        if new_item_type is Any or get_origin(new_item_type) is not None:
-            return set()
-
-        existing_item_edges = [
-            input_edge for input_edge in self._get_input_edges(node.id, ITEM_FIELD) if input_edge != edge
-        ]
-        if not existing_item_edges or self._get_input_edges(node.id, COLLECTION_FIELD):
-            return set()
-        for existing_edge in existing_item_edges:
-            existing_source = self.get_node(existing_edge.source.node_id)
-            if isinstance(existing_source, (CollectInvocation, IfInvocation, IterateInvocation)):
-                return set()
-            if get_output_field_type(existing_source, existing_edge.source.field) != new_item_type:
-                return set()
-
-        outputs = self._get_output_edges(node.id, COLLECTION_FIELD)
-        if not outputs:
-            return set()
-
-        unchanged_root_iterators: set[str] = set()
-        for output_edge in outputs:
-            iterator = self.get_node(output_edge.destination.node_id)
-            if (
-                not isinstance(iterator, IterateInvocation)
-                or output_edge.destination.field != COLLECTION_FIELD
-                or self._get_input_edges(iterator.id, COLLECTION_FIELD) != [output_edge]
-            ):
-                return set()
-
-            output_types = self._get_iterator_output_field_types(
-                [edge.destination for edge in self._get_output_edges(iterator.id, ITEM_FIELD)]
-            )
-            error = self._validate_iterator_output_types(list[new_item_type], output_types)
-            if error is not None:
-                raise InvalidEdgeError(
-                    f"Iterator input type does not match iterator output type ({iterator.id}): {error}"
-                )
-            unchanged_root_iterators.add(iterator.id)
-
-        return unchanged_root_iterators
-
     def _validate_type_dependents_after_edge(self, edge: Edge, node: BaseInvocation) -> None:
         """Revalidate affected upstream collectors and downstream collector/iterator contracts after edge changes."""
-        validate_start_node = True
         if isinstance(node, IfInvocation):
             if edge.destination.field not in ("true_input", "false_input"):
                 return
         elif isinstance(node, CollectInvocation):
             if edge.destination.field not in (ITEM_FIELD, COLLECTION_FIELD):
                 return
-            # _validate_edge checked the collector with the candidate input before insertion.
-            validate_start_node = False
         else:
             return
 
-        unchanged_root_iterators = self._get_unchanged_root_iterators(edge, node)
-        upstream_nodes = [self.get_node(node_id) for node_id in self._get_upstream_collector_ids(node)]
+        collector_input_types_cache: _CollectorInputTypesCache = {}
+        upstream_nodes = [
+            self.get_node(node_id) for node_id in self._get_upstream_collector_ids(node, collector_input_types_cache)
+        ]
         pending_nodes: list[IfInvocation | CollectInvocation | IterateInvocation] = [*upstream_nodes, node]
         pending_node_ids = {source_node.id for source_node in pending_nodes}
         validated_node_ids: set[str] = set()
@@ -890,21 +844,23 @@ class Graph(BaseModel):
             validated_node_ids.add(source_node.id)
 
             if isinstance(source_node, IterateInvocation):
-                if source_node.id not in unchanged_root_iterators:
-                    err = self._is_iterator_connection_valid(source_node.id)
-                    if err is not None:
-                        raise InvalidEdgeError(
-                            f"Iterator input type does not match iterator output type ({source_node.id}): {err}"
-                        )
+                err = self._is_iterator_connection_valid(
+                    source_node.id, collector_input_types_cache=collector_input_types_cache
+                )
+                if err is not None:
+                    raise InvalidEdgeError(
+                        f"Iterator input type does not match iterator output type ({source_node.id}): {err}"
+                    )
                 continue
 
             if isinstance(source_node, CollectInvocation):
-                if source_node.id != node.id or validate_start_node:
-                    err = self._is_collector_connection_valid(source_node.id)
-                    if err is not None:
-                        raise InvalidEdgeError(
-                            f"Collector output type does not match collector input type ({source_node.id}): {err}"
-                        )
+                err = self._is_collector_connection_valid(
+                    source_node.id, collector_input_types_cache=collector_input_types_cache
+                )
+                if err is not None:
+                    raise InvalidEdgeError(
+                        f"Collector output type does not match collector input type ({source_node.id}): {err}"
+                    )
                 output_field = COLLECTION_FIELD
             else:
                 if self._get_effective_output_connections(source_node.id, "value") is None:
@@ -913,7 +869,9 @@ class Graph(BaseModel):
 
             for output_edge in self._get_output_edges(source_node.id, output_field):
                 destination_node = self.get_node(output_edge.destination.node_id)
-                self._validate_edge_field_compatibility(output_edge, source_node, destination_node)
+                self._validate_edge_field_compatibility(
+                    output_edge, source_node, destination_node, collector_input_types_cache
+                )
 
                 if isinstance(destination_node, IfInvocation) and output_edge.destination.field in (
                     "true_input",
@@ -1000,7 +958,7 @@ class Graph(BaseModel):
         if not nx.is_directed_acyclic_graph(graph):
             raise CyclicalGraphError("Graph contains cycles")
 
-    def _validate_edge_type_compatibility(self) -> None:
+    def _validate_edge_type_compatibility(self, collector_input_types_cache: _CollectorInputTypesCache) -> None:
         for edge in self.edges:
             destination_node = self.get_node(edge.destination.node_id)
             if isinstance(destination_node, CallSavedWorkflowInvocation) and is_call_saved_workflow_dynamic_input(
@@ -1010,20 +968,24 @@ class Graph(BaseModel):
             self._validate_edge_not_to_direct_input(edge, destination_node)
             source_node = self.get_node(edge.source.node_id)
             if not self._are_effective_connections_compatible(
-                source_node, edge.source.field, destination_node, edge.destination.field
+                source_node, edge.source.field, destination_node, edge.destination.field, collector_input_types_cache
             ):
                 raise InvalidEdgeError(f"Edge source and target types do not match ({edge})")
 
-    def _validate_special_nodes(self) -> None:
+    def _validate_special_nodes(self, collector_input_types_cache: _CollectorInputTypesCache) -> None:
         # TODO: may need to validate all iterators & collectors in subgraphs so edge connections in parent graphs will be available
         self._validate_for_loop_linkages()
         for node in self.nodes.values():
             if isinstance(node, IterateInvocation):
-                err = self._is_iterator_connection_valid(node.id)
+                err = self._is_iterator_connection_valid(
+                    node.id, collector_input_types_cache=collector_input_types_cache
+                )
                 if err is not None:
                     raise InvalidEdgeError(f"Invalid iterator node ({node.id}): {err}")
             if isinstance(node, CollectInvocation):
-                err = self._is_collector_connection_valid(node.id)
+                err = self._is_collector_connection_valid(
+                    node.id, collector_input_types_cache=collector_input_types_cache
+                )
                 if err is not None:
                     raise InvalidEdgeError(f"Invalid collector node ({node.id}): {err}")
             if isinstance(node, ForInvocation):
@@ -1079,8 +1041,9 @@ class Graph(BaseModel):
         self._validate_node_id_mapping()
         self._validate_edge_nodes_and_fields()
         self._validate_graph_is_acyclic()
-        self._validate_edge_type_compatibility()
-        self._validate_special_nodes()
+        collector_input_types_cache: _CollectorInputTypesCache = {}
+        self._validate_edge_type_compatibility(collector_input_types_cache)
+        self._validate_special_nodes(collector_input_types_cache)
         return None
 
     def is_valid(self) -> bool:
@@ -1132,7 +1095,11 @@ class Graph(BaseModel):
             raise InvalidEdgeError(f"Edge creates a cycle in the graph ({edge})")
 
     def _validate_edge_field_compatibility(
-        self, edge: Edge, source_node: BaseInvocation, destination_node: BaseInvocation
+        self,
+        edge: Edge,
+        source_node: BaseInvocation,
+        destination_node: BaseInvocation,
+        collector_input_types_cache: _CollectorInputTypesCache | None = None,
     ) -> None:
         if isinstance(destination_node, CallSavedWorkflowInvocation) and is_call_saved_workflow_dynamic_input(
             edge.destination.field
@@ -1140,7 +1107,11 @@ class Graph(BaseModel):
             return
         self._validate_edge_not_to_direct_input(edge, destination_node)
         if not self._are_effective_connections_compatible(
-            source_node, edge.source.field, destination_node, edge.destination.field
+            source_node,
+            edge.source.field,
+            destination_node,
+            edge.destination.field,
+            collector_input_types_cache,
         ):
             raise InvalidEdgeError(f"Field types are incompatible ({edge})")
 
@@ -2004,6 +1975,7 @@ class Graph(BaseModel):
         node_id: str,
         new_input: Optional[EdgeConnection] = None,
         new_output: Optional[EdgeConnection] = None,
+        collector_input_types_cache: _CollectorInputTypesCache | None = None,
     ) -> str | None:
         inputs = [e.source for e in self._get_input_edges(node_id, COLLECTION_FIELD)]
         outputs = [e.destination for e in self._get_output_edges(node_id, ITEM_FIELD)]
@@ -2013,9 +1985,14 @@ class Graph(BaseModel):
         if new_output is not None:
             outputs.append(new_output)
 
-        return self._validate_iterator_connections(inputs, outputs)
+        return self._validate_iterator_connections(inputs, outputs, collector_input_types_cache)
 
-    def _validate_iterator_connections(self, inputs: list[EdgeConnection], outputs: list[EdgeConnection]) -> str | None:
+    def _validate_iterator_connections(
+        self,
+        inputs: list[EdgeConnection],
+        outputs: list[EdgeConnection],
+        collector_input_types_cache: _CollectorInputTypesCache | None = None,
+    ) -> str | None:
         presence_error = self._validate_iterator_input_presence(inputs)
         if presence_error is not None:
             return presence_error
@@ -2039,11 +2016,11 @@ class Graph(BaseModel):
                 return output_type_error
 
         if input_sources is None:
-            return self._validate_iterator_collector_input(input_node, output_field_types)
+            return self._validate_iterator_collector_input(input_node, output_field_types, collector_input_types_cache)
 
         for source in input_sources:
             collector_input_error = self._validate_iterator_collector_input(
-                self.get_node(source.node_id), output_field_types
+                self.get_node(source.node_id), output_field_types, collector_input_types_cache
             )
             if collector_input_error is not None:
                 return collector_input_error
@@ -2071,12 +2048,15 @@ class Graph(BaseModel):
         return None
 
     def _validate_iterator_collector_input(
-        self, input_node: BaseInvocation, output_field_types: list[Any]
+        self,
+        input_node: BaseInvocation,
+        output_field_types: list[Any],
+        collector_input_types_cache: _CollectorInputTypesCache | None = None,
     ) -> str | None:
         if not isinstance(input_node, CollectInvocation):
             return None
 
-        input_root_type = self._get_collector_input_root_type(input_node.id)
+        input_root_type = self._get_collector_input_root_type(input_node.id, collector_input_types_cache)
         if input_root_type is None:
             return "Iterator input collector must have at least one item or collection input edge"
         if not all(are_connection_types_compatible(input_root_type, t) for t in output_field_types):
@@ -2135,6 +2115,7 @@ class Graph(BaseModel):
         source_field: str,
         destination_node: BaseInvocation,
         destination_field: str,
+        collector_input_types_cache: _CollectorInputTypesCache | None = None,
     ) -> bool:
         """Checks each known branch of an If output against a target while preserving compatibility hooks."""
         if not isinstance(source_node, IfInvocation) or source_field != "value":
@@ -2156,15 +2137,24 @@ class Graph(BaseModel):
                 and isinstance(branch_node, CollectInvocation)
                 and source.field == COLLECTION_FIELD
             ):
-                branch_root_type = self._get_collector_input_root_type(branch_node.id)
+                branch_root_type = self._get_collector_input_root_type(branch_node.id, collector_input_types_cache)
                 if branch_root_type is not None and not any(
                     are_connection_types_compatible(branch_root_type, item_type) for item_type in destination_item_types
                 ):
                     return False
         return True
 
-    def _resolve_collector_input_types(self, node_id: str, visited: Optional[set[str]] = None) -> set[Any]:
+    def _resolve_collector_input_types(
+        self,
+        node_id: str,
+        visited: Optional[set[str]] = None,
+        collector_input_types_cache: _CollectorInputTypesCache | None = None,
+    ) -> set[Any]:
         """Resolves possible item types for a collector's inputs, recursively following chained collectors."""
+        if collector_input_types_cache is None:
+            collector_input_types_cache = {}
+        if node_id in collector_input_types_cache:
+            return set(collector_input_types_cache[node_id])
         if visited is None:
             visited = set()
         if node_id in visited:
@@ -2179,10 +2169,13 @@ class Graph(BaseModel):
 
         input_types.update(
             self._resolve_collection_input_types(
-                [edge.source for edge in self._get_input_edges(node_id, COLLECTION_FIELD)], visited
+                [edge.source for edge in self._get_input_edges(node_id, COLLECTION_FIELD)],
+                visited,
+                collector_input_types_cache,
             )
         )
 
+        collector_input_types_cache[node_id] = set(input_types)
         return input_types
 
     def _get_type_tree_root_types(self, input_types: set[Any]) -> list[Any]:
@@ -2192,8 +2185,12 @@ class Graph(BaseModel):
         type_degrees = type_tree.in_degree(type_tree.nodes)
         return [t[0] for t in type_degrees if t[1] == 0]  # type: ignore
 
-    def _get_collector_input_root_type(self, node_id: str) -> Any | None:
-        input_types = self._resolve_collector_input_types(node_id)
+    def _get_collector_input_root_type(
+        self, node_id: str, collector_input_types_cache: _CollectorInputTypesCache | None = None
+    ) -> Any | None:
+        input_types = self._resolve_collector_input_types(
+            node_id, collector_input_types_cache=collector_input_types_cache
+        )
         has_multiple_root_types, input_root_type = self._get_collector_input_root_type_from_resolved_types(input_types)
         if has_multiple_root_types:
             return Any
@@ -2256,9 +2253,14 @@ class Graph(BaseModel):
         }
 
     def _resolve_collection_input_types(
-        self, collection_inputs: list[EdgeConnection], visited_collectors: Optional[set[str]] = None
+        self,
+        collection_inputs: list[EdgeConnection],
+        visited_collectors: Optional[set[str]] = None,
+        collector_input_types_cache: _CollectorInputTypesCache | None = None,
     ) -> set[Any]:
         """Resolves collection item types, sharing visits across unioned branch sources."""
+        if collector_input_types_cache is None:
+            collector_input_types_cache = {}
         if visited_collectors is None:
             visited_collectors = set()
         input_field_types: set[Any] = set()
@@ -2277,9 +2279,14 @@ class Graph(BaseModel):
             for source in sources:
                 branch_source_node = self.get_node(source.node_id)
                 if isinstance(branch_source_node, CollectInvocation) and source.field == COLLECTION_FIELD:
-                    input_field_types.update(
-                        self._resolve_collector_input_types(branch_source_node.id, visited_collectors)
-                    )
+                    if branch_source_node.id in collector_input_types_cache:
+                        input_field_types.update(collector_input_types_cache[branch_source_node.id])
+                    else:
+                        input_field_types.update(
+                            self._resolve_collector_input_types(
+                                branch_source_node.id, visited_collectors, collector_input_types_cache
+                            )
+                        )
                 else:
                     output_field_type = get_output_field_type(branch_source_node, source.field)
                     input_field_types.update(extract_collection_item_types(output_field_type))
@@ -2322,13 +2329,16 @@ class Graph(BaseModel):
         return None
 
     def _validate_downstream_collector_outputs(
-        self, outputs: list[EdgeConnection], input_root_type: Any | None
+        self,
+        outputs: list[EdgeConnection],
+        input_root_type: Any | None,
+        collector_input_types_cache: _CollectorInputTypesCache | None = None,
     ) -> str | None:
         for output in outputs:
             output_node = self.get_node(output.node_id)
             if not isinstance(output_node, CollectInvocation) or output.field != COLLECTION_FIELD:
                 continue
-            output_root_type = self._get_collector_input_root_type(output_node.id)
+            output_root_type = self._get_collector_input_root_type(output_node.id, collector_input_types_cache)
             if output_root_type is None:
                 continue
             if input_root_type is None:
@@ -2346,6 +2356,7 @@ class Graph(BaseModel):
         new_input_field: Optional[str] = None,
         new_output: Optional[EdgeConnection] = None,
         validate_downstream_outputs: bool = True,
+        collector_input_types_cache: _CollectorInputTypesCache | None = None,
     ) -> str | None:
         item_inputs, collection_inputs, outputs = self._get_collector_connections(
             node_id, new_input=new_input, new_input_field=new_input_field, new_output=new_output
@@ -2363,7 +2374,11 @@ class Graph(BaseModel):
             return collection_input_error
 
         input_field_types = self._resolve_item_input_types(item_input_field_types)
-        input_field_types.update(self._resolve_collection_input_types(collection_inputs))
+        input_field_types.update(
+            self._resolve_collection_input_types(
+                collection_inputs, collector_input_types_cache=collector_input_types_cache
+            )
+        )
 
         has_multiple_root_types, input_root_type = self._get_collector_input_root_type_from_resolved_types(
             input_field_types
@@ -2371,12 +2386,17 @@ class Graph(BaseModel):
         if has_multiple_root_types:
             return "Collector input collection items must be of a single type"
 
+        if new_input is None and collector_input_types_cache is not None:
+            collector_input_types_cache[node_id] = set(input_field_types)
+
         output_type_error = self._validate_collector_output_types(output_field_types, input_root_type)
         if output_type_error is not None:
             return output_type_error
 
         if validate_downstream_outputs:
-            downstream_output_error = self._validate_downstream_collector_outputs(outputs, input_root_type)
+            downstream_output_error = self._validate_downstream_collector_outputs(
+                outputs, input_root_type, collector_input_types_cache
+            )
             if downstream_output_error is not None:
                 return downstream_output_error
 

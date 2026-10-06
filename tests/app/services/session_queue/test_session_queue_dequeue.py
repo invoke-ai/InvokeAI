@@ -9,7 +9,8 @@ from typing import Optional
 import pytest
 from pydantic_core import to_jsonable_python
 
-from invokeai.app.invocations.primitives import FloatInvocation, IntegerInvocation
+from invokeai.app.invocations.logic import IfInvocation
+from invokeai.app.invocations.primitives import IntegerInvocation, StringCollectionInvocation
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.events.events_common import QueueItemsRetriedEvent
 from invokeai.app.services.invoker import Invoker
@@ -204,12 +205,14 @@ def test_fifo_quarantines_unreadable_snapshot_and_dequeues_later_work(
     assert "Unable to load execution state" in error_message
 
 
-def test_fifo_quarantines_snapshot_with_invalid_collector_iterator_types(
+def test_fifo_quarantines_snapshot_with_invalid_if_collector_roots(
     session_queue_fifo: SqliteSessionQueue,
 ) -> None:
     nodes = [
         IntegerInvocation(id="integer", value=1),
-        FloatInvocation(id="float", value=2.5),
+        CollectInvocation(id="integer_collect"),
+        StringCollectionInvocation(id="string_collection", collection=["text"]),
+        IfInvocation(id="if"),
         CollectInvocation(id="collect"),
         IterateInvocation(id="iterate"),
         IntegerInvocation(id="sink", value=0),
@@ -219,11 +222,19 @@ def test_fifo_quarantines_snapshot_with_invalid_collector_iterator_types(
         edges=[
             Edge(
                 source=EdgeConnection(node_id="integer", field="value"),
-                destination=EdgeConnection(node_id="collect", field="item"),
+                destination=EdgeConnection(node_id="integer_collect", field="item"),
             ),
             Edge(
-                source=EdgeConnection(node_id="float", field="value"),
-                destination=EdgeConnection(node_id="collect", field="item"),
+                source=EdgeConnection(node_id="integer_collect", field="collection"),
+                destination=EdgeConnection(node_id="if", field="true_input"),
+            ),
+            Edge(
+                source=EdgeConnection(node_id="string_collection", field="collection"),
+                destination=EdgeConnection(node_id="if", field="false_input"),
+            ),
+            Edge(
+                source=EdgeConnection(node_id="if", field="value"),
+                destination=EdgeConnection(node_id="collect", field="collection"),
             ),
             Edge(
                 source=EdgeConnection(node_id="collect", field="collection"),
@@ -255,7 +266,23 @@ def test_fifo_quarantines_snapshot_with_invalid_collector_iterator_types(
         cursor.execute("SELECT status, error_message FROM session_queue WHERE item_id = ?", (invalid_item_id,))
         status, error_message = cursor.fetchone()
     assert status == "failed"
-    assert "Invalid iterator node" in error_message
+    assert "Invalid collector node" in error_message
+
+    completed_item_id = _insert_queue_item(
+        session_queue_fifo,
+        "default",
+        "history-user",
+        session_json=json.dumps(older_snapshot),
+    )
+    with session_queue_fifo._db.transaction() as cursor:
+        cursor.execute("UPDATE session_queue SET status = 'completed' WHERE item_id = ?", (completed_item_id,))
+
+    history_item = session_queue_fifo.get_queue_item_for_api(completed_item_id)
+
+    assert history_item.status == "failed"
+    assert history_item.session.graph.nodes == {}
+    assert history_item.field_values is None
+    assert history_item.workflow is None
 
 
 def test_affinity_quarantines_unreadable_snapshot_and_dequeues_valid_work(
