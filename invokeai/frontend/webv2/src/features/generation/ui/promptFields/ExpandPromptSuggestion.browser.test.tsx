@@ -370,34 +370,52 @@ it('closes an idle Expand Prompt popover on an outside click', async () => {
   expect(isPopoverOpen('widgets.generate.expand')).toBe(false);
 });
 
-it('keeps Expand Prompt open on an outside click while it runs', async () => {
+const trigger = (label: string) => host?.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`);
+const isSpinning = (button: HTMLButtonElement | null | undefined) =>
+  button?.querySelector('.chakra-spinner') !== null && button?.getAttribute('aria-busy') === 'true';
+
+it('lets Expand Prompt close while it runs and reopen to follow it, with a spinner on the button', async () => {
   const run = pendingRun();
   vi.mocked(expandPrompt).mockImplementationOnce(() => run.running.then(() => ({ expanded_prompt: 'x', seed: 1 })));
   await renderAndOpen(null);
 
   await act(() => expandButton()?.click());
   await clickOutside();
+  expect(isPopoverOpen('widgets.generate.expand')).toBe(false);
+  expect(trigger('widgets.generate.expandPrompt')?.disabled).toBe(false);
+  expect(isSpinning(trigger('widgets.generate.expandPrompt'))).toBe(true);
+
+  await act(() => trigger('widgets.generate.expandPrompt')?.click());
   expect(isPopoverOpen('widgets.generate.expand')).toBe(true);
+  expect(expandButton()?.dataset.loading).toBeDefined();
 
   await run.finish();
   expect(isPopoverOpen('widgets.generate.expand')).toBe(false);
+  expect(isSpinning(trigger('widgets.generate.expandPrompt'))).toBe(false);
 });
 
-it('keeps Image to Prompt open on an outside click while it runs', async () => {
+it('lets Image to Prompt close while it runs and reopen to follow it, with a spinner on the button', async () => {
   catalog = [VISION_A];
   const run = pendingRun();
   vi.mocked(imageToPrompt).mockImplementationOnce(() => run.running.then(() => ({ prompt: 'x' })));
   await renderAndOpen(null, undefined, 'widgets.generate.imageToPrompt');
+  const generateButton = () =>
+    [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.textContent === 'widgets.generate.generatePrompt'
+    );
 
-  await act(() =>
-    [...document.querySelectorAll<HTMLButtonElement>('button')]
-      .find((button) => button.textContent === 'widgets.generate.generatePrompt')
-      ?.click()
-  );
+  await act(() => generateButton()?.click());
   await clickOutside();
+  expect(isPopoverOpen('widgets.generate.generatePrompt')).toBe(false);
+  expect(trigger('widgets.generate.imageToPrompt')?.disabled).toBe(false);
+  expect(isSpinning(trigger('widgets.generate.imageToPrompt'))).toBe(true);
+
+  await act(() => trigger('widgets.generate.imageToPrompt')?.click());
   expect(isPopoverOpen('widgets.generate.generatePrompt')).toBe(true);
+  expect(generateButton()?.dataset.loading).toBeDefined();
 
   await run.finish();
+  expect(isSpinning(trigger('widgets.generate.imageToPrompt'))).toBe(false);
 });
 
 it('starts Image to Prompt from the first listed vision model and saves a different pick', async () => {

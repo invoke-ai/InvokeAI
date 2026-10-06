@@ -11,7 +11,19 @@ import type { DynamicPromptsFieldConfig } from '@features/generation/ui/promptFi
 import type { DroppedPromptImage } from '@features/generation/ui/promptFields/usePromptImageDrop';
 import type { ChangeEvent, MouseEvent } from 'react';
 
-import { Checkbox, HStack, Icon, Image, Input, Popover, Portal, Separator, Stack, Text } from '@chakra-ui/react';
+import {
+  Checkbox,
+  HStack,
+  Icon,
+  Image,
+  Input,
+  Popover,
+  Portal,
+  Separator,
+  Spinner,
+  Stack,
+  Text,
+} from '@chakra-ui/react';
 import { galleryImageUrls } from '@features/gallery/utility';
 import { filterPromptHistory } from '@features/generation/core/promptHistory';
 import { resolveSelectedSystemPromptId } from '@features/generation/core/systemPrompts';
@@ -546,15 +558,7 @@ const ExpandPromptButton = ({
       setExcludedImageName(event.checked === true ? null : suggestedImageName),
     [suggestedImageName]
   );
-  // The trigger is disabled mid-run, so a dismissed popover could not be reopened to follow progress.
-  const handleOpenChange = useCallback(
-    (event: { open: boolean }) => {
-      if (event.open || !isLoading) {
-        setIsOpen(event.open);
-      }
-    },
-    [isLoading]
-  );
+  const handleOpenChange = useCallback((event: { open: boolean }) => setIsOpen(event.open), []);
   const handleRunExpandPrompt = useCallback(() => void runExpandPrompt(), [runExpandPrompt]);
 
   return (
@@ -568,13 +572,15 @@ const ExpandPromptButton = ({
       {/* Always the feature name: the popover explains a missing model and offers the way out. */}
       <Tooltip content={t('widgets.generate.expandPrompt')} ids={popoverIds}>
         <Popover.Trigger asChild>
+          {/* Stays enabled mid-run so a dismissed popover can be reopened to follow progress. */}
           <IconButton
+            aria-busy={isLoading || undefined}
             aria-label={t('widgets.generate.expandPrompt')}
-            disabled={isDisabled || isLoading}
+            disabled={isDisabled}
             size="sm"
             variant="ghost"
           >
-            <PencilSparklesIcon />
+            {isLoading ? <Spinner /> : <PencilSparklesIcon />}
           </IconButton>
         </Popover.Trigger>
       </Tooltip>
@@ -788,17 +794,7 @@ const ImageToPromptButton = ({
   }, [close, image, notifications, onPositivePromptChange, projectId, selectedModel, t]);
 
   const popoverIds = useMemo(() => ({ trigger: triggerId }), [triggerId]);
-  // The trigger is disabled mid-run, so a dismissed popover could not be reopened to follow progress.
-  const handleOpenChange = useCallback(
-    (event: { open: boolean }) => {
-      if (event.open) {
-        setIsOpen(true);
-      } else if (!isLoading) {
-        close();
-      }
-    },
-    [close, isLoading]
-  );
+  const handleOpenChange = useCallback((event: { open: boolean }) => (event.open ? setIsOpen(true) : close()), [close]);
   const handleRunImageToPrompt = useCallback(() => void runImageToPrompt(), [runImageToPrompt]);
 
   return (
@@ -811,13 +807,15 @@ const ImageToPromptButton = ({
     >
       <Tooltip content={t('widgets.generate.imageToPrompt')} ids={popoverIds}>
         <Popover.Trigger asChild>
+          {/* Stays enabled mid-run so a dismissed popover can be reopened to follow progress. */}
           <IconButton
+            aria-busy={isLoading || undefined}
             aria-label={t('widgets.generate.imageToPrompt')}
-            disabled={isDisabled || isLoading}
+            disabled={isDisabled}
             size="sm"
             variant="ghost"
           >
-            <ImageUpIcon />
+            {isLoading ? <Spinner /> : <ImageUpIcon />}
           </IconButton>
         </Popover.Trigger>
       </Tooltip>
