@@ -253,6 +253,33 @@ describe('opacity input', () => {
     expect(commits[0]!.inverse).toMatchObject({ id: 'r1', patch: { opacity: 1 } });
   });
 
+  it('scrubs from its drag handle and records the result once when the mouse button lifts', async () => {
+    await mount();
+    // The scrubber locks the pointer once a real click has activated the page; the harness lock steals focus.
+    vi.spyOn(Element.prototype, 'requestPointerLock').mockImplementation(() => Promise.resolve());
+    const scrubber = host!.querySelector<HTMLElement>('[data-scope="number-input"][data-part="scrubber"]')!;
+    await act(() =>
+      scrubber.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: 100, clientY: 100 }))
+    );
+    for (let step = 1; step <= 5; step += 1) {
+      await act(() =>
+        document.dispatchEvent(
+          new MouseEvent('mousemove', { bubbles: true, clientX: 100 - step * 4, clientY: 100, movementX: -4 })
+        )
+      );
+    }
+
+    // Each step previews on the layer; nothing is recorded until the release.
+    expect(layer().opacity).toBeCloseTo(0.95, 5);
+    expect(commits).toHaveLength(0);
+    await act(() =>
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0, clientX: 80, clientY: 100 }))
+    );
+    expect(commits).toHaveLength(1);
+    expect(commits[0]!.forward).toMatchObject({ id: 'r1', patch: { opacity: 0.95 } });
+    expect(commits[0]!.inverse).toMatchObject({ id: 'r1', patch: { opacity: 1 } });
+  });
+
   it('previews a typed value and records it once on Enter', async () => {
     await mount();
     await userEvent.tripleClick(opacityInput());

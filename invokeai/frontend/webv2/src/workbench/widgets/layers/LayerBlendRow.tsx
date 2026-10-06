@@ -7,13 +7,14 @@ import type {
 import type { CanvasBlendMode, CanvasDocumentContractV3, CanvasNodeContract } from '@workbench/canvas-engine/api';
 import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
-import { createListCollection, Flex, HStack, NumberInput } from '@chakra-ui/react';
+import { createListCollection, Flex, HStack, Icon, InputGroup, NumberInput } from '@chakra-ui/react';
 import { Select } from '@platform/ui';
 import { getDocumentIndex, isGroupNode } from '@workbench/canvas-engine/api';
 import { useCanvasDocumentEditingLocked } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
 import { CANVAS_BLEND_MODES } from '@workbench/widgets/layers/layerOps';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import { MoveHorizontalIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -22,6 +23,8 @@ type LayerBlendRowEngine = Pick<CanvasEngineHandle, 'document' | 'exports' | 'in
 const SELECT_POSITIONING = { placement: 'bottom-start', sameWidth: true } as const;
 const BLEND_TRIGGER_PROPS = { fontSize: 'md', h: 'control.md', minH: 'control.md' } as const;
 const OPACITY_INPUT_PROPS = { fontSize: 'md', h: 'control.md' } as const;
+// The drag handle sits inside the field, as on the Transform pane's number fields.
+const SCRUB_HANDLE_PROPS = { color: 'fg.muted', pointerEvents: 'auto', ps: '1.5' } as const;
 
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
 
@@ -256,12 +259,42 @@ const OpacityRow = ({
     [commitPending]
   );
 
+  // A scrub ends with the mouse button rather than a key or blur, so the release records it.
+  const scrubRef = useRef<AbortController | null>(null);
+  const handleScrubStart = useCallback(() => {
+    scrubRef.current?.abort();
+    const scrub = new AbortController();
+    scrubRef.current = scrub;
+    window.addEventListener(
+      'mouseup',
+      () => {
+        scrub.abort();
+        scrubRef.current = null;
+        commitPending();
+      },
+      { signal: scrub.signal }
+    );
+  }, [commitPending]);
+
+  const scrubHandle = useMemo(
+    () => (
+      <NumberInput.Scrubber aria-hidden onMouseDownCapture={handleScrubStart}>
+        <Icon as={MoveHorizontalIcon} boxSize="3" />
+      </NumberInput.Scrubber>
+    ),
+    [handleScrubStart]
+  );
+
   // Flush a still-pending edit if the row unmounts mid-gesture (e.g. the panel
-  // closes right after a spinner click) so the edit is never lost to history.
+  // closes right after a spinner click or mid-scrub) so the edit is never lost to history.
   const flushOnUnmountRef = useCallback(
     (node: HTMLDivElement | null) => {
       if (node) {
-        return () => commitPending();
+        return () => {
+          scrubRef.current?.abort();
+          scrubRef.current = null;
+          commitPending();
+        };
       }
       return undefined;
     },
@@ -277,16 +310,18 @@ const OpacityRow = ({
         size="lg"
         step={1}
         value={opacityPercent}
-        w="16"
+        w="20"
         onValueChange={handleOpacityChange}
       >
         <NumberInput.Control onClick={commitPending} />
-        <NumberInput.Input
-          aria-label={t('widgets.layers.actions.opacity')}
-          css={OPACITY_INPUT_PROPS}
-          onBlur={commitPending}
-          onKeyUp={handleInputKeyUp}
-        />
+        <InputGroup startElement={scrubHandle} startElementProps={SCRUB_HANDLE_PROPS}>
+          <NumberInput.Input
+            aria-label={t('widgets.layers.actions.opacity')}
+            css={OPACITY_INPUT_PROPS}
+            onBlur={commitPending}
+            onKeyUp={handleInputKeyUp}
+          />
+        </InputGroup>
       </NumberInput.Root>
     </HStack>
   );
