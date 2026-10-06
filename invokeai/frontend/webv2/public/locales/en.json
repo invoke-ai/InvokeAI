@@ -4653,6 +4653,7 @@
     "updateConfirm": "Update template",
     "updateConfirmBody": "Replace the library template with the current graph, form, and input values of \"{{name}}\"?",
     "updateConfirmCallers": "Workflows that call this template will use the new version.",
+    "updateConfirmNamedBody": "Replace \"{{template}}\" in the library with the current graph, form, and input values of \"{{name}}\"?",
     "updateTemplate": "Update library template",
     "updateTemplateHint": "Writes this workflow over its library template",
     "updateTitle": "Update library template",

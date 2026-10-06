@@ -8,6 +8,7 @@ import { WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
 import { requestWorkflowPublication, workflowUiStore } from '@features/workflow/ui/workflowUiStore';
 import { createProjectGraph, serializeWorkflowJson } from '@features/workflow/utility';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -73,6 +74,8 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.updateConfirmBody':
     'Replace the library template with the current graph, form, and input values of "{{name}}"?',
   'workflowLibrary.updateConfirmCallers': 'Workflows that call this template will use the new version.',
+  'workflowLibrary.updateConfirmNamedBody':
+    'Replace "{{template}}" in the library with the current graph, form, and input values of "{{name}}"?',
   'workflowLibrary.updateTitle': 'Update library template',
 };
 
@@ -187,11 +190,13 @@ describe('WorkflowPublicationHost', () => {
     await act(async () => {
       root.render(
         <StrictMode>
-          <ChakraProvider value={system}>
-            <WorkflowUiProvider adapter={adapter}>
-              <WorkflowPublicationHost />
-            </WorkflowUiProvider>
-          </ChakraProvider>
+          <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+            <ChakraProvider value={system}>
+              <WorkflowUiProvider adapter={adapter}>
+                <WorkflowPublicationHost />
+              </WorkflowUiProvider>
+            </ChakraProvider>
+          </QueryClientProvider>
         </StrictMode>
       );
       await settleFrame();
@@ -295,6 +300,38 @@ describe('WorkflowPublicationHost', () => {
     );
     expect(notifications.success).toHaveBeenCalledWith('Workflow saved', 'Saved "Alpha, published" to the library.');
     expect(saveDialog()).toBeNull();
+  });
+
+  it('updates the template a save as new linked, naming it in the confirmation', async () => {
+    api.createLibraryWorkflowRecord.mockImplementation((workflow: Record<string, unknown>) =>
+      Promise.resolve(record({ name: String(workflow.name), revision: 1, workflow, workflow_id: 'lib-demo' }))
+    );
+    api.getLibraryWorkflowRecord.mockImplementation((id: string) =>
+      Promise.resolve(
+        record({ name: id === 'lib-demo' ? 'demo' : 'Library alpha', revision: id === 'lib-demo' ? 1 : 3 })
+      )
+    );
+    api.updateLibraryWorkflow.mockResolvedValue(record({ name: 'demo', revision: 2, workflow_id: 'lib-demo' }));
+    // Opened from a library template, then saved as a new one: the app re-links the copy to what was saved.
+    commands.setWorkflowSource.mockImplementation((_target, source: ProjectWorkflowEntry['source']) =>
+      project.setSnapshot(projectSnapshot([{ ...LINKED, source }]))
+    );
+
+    await renderHost([LINKED]);
+    await request('save-as-new');
+    await submitSaveAsNew('demo');
+    await request('update-source');
+    await flush();
+
+    const dialog = dialogTitled('Update library template');
+    expect(dialog?.textContent).toContain(
+      'Replace "demo" in the library with the current graph, form, and input values of "Alpha"?'
+    );
+    await confirmUpdate();
+
+    expect(api.updateLibraryWorkflow).toHaveBeenCalledTimes(1);
+    expect(api.updateLibraryWorkflow.mock.calls[0]![0]).toBe('lib-demo');
+    expect(api.updateLibraryWorkflow.mock.calls[0]![2]).toMatchObject({ expectedRevision: 1 });
   });
 
   it('updates the template at the revision the copy knows, after confirmation, keeping its own name', async () => {

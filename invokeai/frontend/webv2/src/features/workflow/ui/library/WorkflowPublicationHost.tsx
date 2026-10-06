@@ -3,6 +3,7 @@ import type { WorkflowRecordDTO } from '@features/workflow/queries';
 import type { FormEvent } from 'react';
 
 import { chakra, Input, Portal, Stack, Text } from '@chakra-ui/react';
+import { savedWorkflowDetailQueryOptions } from '@features/workflow/data/savedWorkflowQueries';
 import { getLibraryWorkflowRecord } from '@features/workflow/queries';
 import { useInvocationTemplatesSnapshot } from '@features/workflow/react';
 import { useWorkflowProjectSelector, useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
@@ -19,6 +20,7 @@ import { Button, CloseButton } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { Dialog } from '@platform/ui/Dialog';
 import { Field } from '@platform/ui/Field';
+import { useQuery } from '@tanstack/react-query';
 import { Suspense, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -382,16 +384,28 @@ export const WorkflowPublicationHost = () => {
     close();
   }, [activeStage, close]);
 
+  // The template an update replaces is the one the workflow is linked to now (a save as new re-links it), which
+  // need not share the workflow's name; the confirmation names both once the template's record is read.
+  const confirmTemplateId = activeStage.kind === 'confirm-update' ? activeStage.libraryWorkflowId : '';
+  const confirmTemplateName = useQuery({
+    ...savedWorkflowDetailQueryOptions(confirmTemplateId),
+    enabled: confirmTemplateId !== '',
+    select: (record) => record.name,
+  }).data;
   const updateConfirmBody = useMemo(
     () => (
       <Stack gap="2">
-        <Text>{t('workflowLibrary.updateConfirmBody', { name: workflowName })}</Text>
+        <Text>
+          {confirmTemplateName
+            ? t('workflowLibrary.updateConfirmNamedBody', { name: workflowName, template: confirmTemplateName })
+            : t('workflowLibrary.updateConfirmBody', { name: workflowName })}
+        </Text>
         <Text color="fg.muted" fontSize="md">
           {t('workflowLibrary.updateConfirmCallers')}
         </Text>
       </Stack>
     ),
-    [t, workflowName]
+    [confirmTemplateName, t, workflowName]
   );
   const conflictOptions = useMemo(
     () => [
