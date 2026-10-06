@@ -8,6 +8,7 @@ the queue's history keep queue_id off the listing index.
 
 import re
 from collections.abc import Callable
+from functools import partial
 
 import pytest
 
@@ -159,3 +160,40 @@ def test_batch_lookups_stay_on_the_batch_index(session_queue: SqliteSessionQueue
     owner_status = _plans(session_queue, lambda: session_queue.get_batch_status("default", "batch", user_id="alice"))
     assert len(owner_status) == 1
     assert "idx_session_queue_batch_id (batch_id=?)" in owner_status[0]
+
+
+def test_bulk_cancel_and_clear_find_their_rows_through_the_status_indexes(session_queue: SqliteSessionQueue) -> None:
+    """The rows a bulk cancel touches are the live ones, a handful next to the queue's history."""
+    status_seek = "idx_session_queue_round_robin_pending (status=?"
+    user_status_seek = "idx_session_queue_round_robin_pending (status=? AND user_id=?)"
+
+    # The live-row select, the bulk UPDATE, and the in-progress lookup for the per-item cancels.
+    whole_queue = _plans(session_queue, lambda: session_queue.cancel_by_queue_id("default"))
+    assert len(whole_queue) == 3, whole_queue
+    assert all(status_seek in plan for plan in whole_queue), whole_queue
+
+    # A user's filter must neither keep the statements on the listing index nor move them onto a
+    # user index that reads the user's whole history.
+    user_scoped = _plans(
+        session_queue,
+        lambda: session_queue.cancel_by_queue_id("default", user_id="alice", origin_prefix="webv2:p:1:q:"),
+    )
+    assert len(user_scoped) == 3, user_scoped
+    assert all(user_status_seek in plan for plan in user_scoped), user_scoped
+
+    # After the current chain lookup: the live-row select and the bulk UPDATE or DELETE.
+    for bulk in (session_queue.cancel_all_except_current, session_queue.delete_all_except_current):
+        plans = _plans(session_queue, partial(bulk, "default", user_id="alice"))
+        assert len(plans) == 4, plans
+        assert all(user_status_seek in plan for plan in plans[2:]), plans
+
+    # The in-progress lookup before the delete; the delete itself visits every row in scope.
+    cleared = _plans(session_queue, lambda: session_queue.clear("default", user_id="alice"))
+    assert len(cleared) == 2, cleared
+    assert user_status_seek in cleared[0], cleared
+
+    # The batch's rows come from the batch index; only the in-progress lookup seeks by status.
+    batch = _plans(session_queue, lambda: session_queue.cancel_by_batch_ids("default", ["batch"], user_id="alice"))
+    assert len(batch) == 3, batch
+    assert all("idx_session_queue_batch_id (batch_id=?)" in plan for plan in batch[:2]), batch
+    assert status_seek in batch[2], batch
