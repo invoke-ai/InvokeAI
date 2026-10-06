@@ -13,6 +13,7 @@ def _services(**overrides):
         "boards": object(),
         "bulk_download": object(),
         "configuration": object(),
+        "database": object(),
         "events": object(),
         "images": object(),
         "image_files": object(),

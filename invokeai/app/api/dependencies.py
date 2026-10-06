@@ -227,6 +227,7 @@ class ApiDependencies:
             boards=boards,
             bulk_download=bulk_download,
             configuration=configuration,
+            database=db,
             events=events,
             image_files=image_files,
             image_moves=image_moves,
@@ -285,7 +286,6 @@ class ApiDependencies:
             model_manager=model_manager,
             logger=logger,
         )
-        db.clean()
 
     @staticmethod
     def shutdown() -> None:
