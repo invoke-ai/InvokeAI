@@ -4514,7 +4514,7 @@
             "description": "No such job"
           },
           "409": {
-            "description": "The job has recovery data that must be preserved"
+            "description": "The job cannot be cancelled safely in its current state"
           },
           "422": {
             "description": "Validation Error",
@@ -4563,6 +4563,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "The job cannot be paused in its current state"
           },
           "415": {
             "description": "No such job"
@@ -4614,6 +4617,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "A previous download still owns the staging directory"
           },
           "415": {
             "description": "No such job"
@@ -4667,7 +4673,7 @@
             }
           },
           "409": {
-            "description": "The job has recovery data that must be preserved"
+            "description": "A prior download is active or recovery data must be preserved"
           },
           "415": {
             "description": "No such job"
@@ -4735,7 +4741,7 @@
             }
           },
           "409": {
-            "description": "The job has recovery data that must be preserved"
+            "description": "A prior download is active or recovery data must be preserved"
           },
           "415": {
             "description": "No such job"

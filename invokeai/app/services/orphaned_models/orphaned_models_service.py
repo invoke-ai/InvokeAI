@@ -13,7 +13,10 @@ from pydantic import BaseModel, Field
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.model_install.model_install_common import (
+    INSTALL_ACTIVE_SENTINEL,
     INSTALL_RECOVERY_SENTINEL,
+    create_active_install_sentinel,
+    delete_active_install_sentinel,
     is_recovery_protected_path,
 )
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
@@ -174,20 +177,33 @@ class OrphanedModelsService:
                     continue
 
                 if self._is_recovery_protected(full_path, models_path):
-                    results[rel_path] = "error: path is reserved for install recovery"
+                    results[rel_path] = "error: path is reserved by an active install or install recovery"
                     continue
 
                 if self._contains_recovery_sentinel(full_path):
                     results[rel_path] = "error: path contains install recovery data"
                     continue
 
+                if self._contains_active_install_sentinel(full_path):
+                    results[rel_path] = "error: path is reserved by an active install or install recovery"
+                    continue
+
                 if not full_path.exists():
                     results[rel_path] = "error: path does not exist"
                     continue
 
-                # Delete the directory
-                shutil.rmtree(full_path)
-                results[rel_path] = "deleted"
+                claim_root = models_path / full_path.relative_to(models_path).parts[0]
+                # Claim deletion atomically so a local install cannot start using this source after the marker check.
+                try:
+                    create_active_install_sentinel(claim_root)
+                except FileExistsError:
+                    results[rel_path] = "error: path is reserved by an active install or install recovery"
+                    continue
+                try:
+                    shutil.rmtree(full_path)
+                    results[rel_path] = "deleted"
+                finally:
+                    delete_active_install_sentinel(claim_root)
 
             except Exception as e:
                 results[rel_path] = f"error: {str(e)}"
@@ -201,6 +217,10 @@ class OrphanedModelsService:
     @staticmethod
     def _contains_recovery_sentinel(path: Path) -> bool:
         return path.is_dir() and any(path.rglob(f"*{INSTALL_RECOVERY_SENTINEL}"))
+
+    @staticmethod
+    def _contains_active_install_sentinel(path: Path) -> bool:
+        return path.is_dir() and any(path.rglob(f"*{INSTALL_ACTIVE_SENTINEL}"))
 
     def _get_registered_model_directories(self, models_dir: Path) -> Set[Path]:
         """Get the set of all model directories from the database."""

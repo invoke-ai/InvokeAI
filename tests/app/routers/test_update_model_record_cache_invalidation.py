@@ -52,6 +52,14 @@ def test_missing_default_settings_is_handled():
     assert _load_settings_changed(no_settings, _config(fp8=True)) is True
 
 
+def test_default_generation_steps_change_does_not_invalidate_model_cache():
+    """Generation defaults are read per invocation, not baked into the loaded model module."""
+    previous = SimpleNamespace(cpu_only=None, default_settings=SimpleNamespace(fp8_storage=None, steps=20))
+    updated = SimpleNamespace(cpu_only=None, default_settings=SimpleNamespace(fp8_storage=None, steps=40))
+
+    assert _load_settings_changed(previous, updated) is False
+
+
 @pytest.mark.parametrize("field", ["fp8_storage", "cpu_only"])
 def test_pydantic_nested_load_setting_changes_trigger_invalidation(field: str) -> None:
     from pydantic import BaseModel
@@ -75,15 +83,33 @@ def test_unrelated_field_does_not_trigger_invalidation():
     assert _load_settings_changed(bare_a, bare_b) is False
 
 
-@pytest.mark.parametrize("field", ["path", "base", "type", "format", "variant", "repo_variant"])
+@pytest.mark.parametrize("field", ["path", "base", "type", "format", "variant", "repo_variant", "hash", "file_size"])
 def test_model_identity_changes_trigger_invalidation(field: str):
-    """Fields exposed by ModelRecordChanges can change the module selected or its source path."""
+    """Loader identity or changed on-disk content must evict a module loaded from the previous record."""
     previous = _config(**{field: "old"})
     updated = _config(**{field: "new"})
     assert _load_settings_changed(previous, updated) is True
 
 
-@pytest.mark.parametrize("field", ["path", "base", "type", "format", "variant", "repo_variant", "name", "description"])
+@pytest.mark.parametrize(
+    "field",
+    [
+        "path",
+        "base",
+        "type",
+        "format",
+        "variant",
+        "repo_variant",
+        "name",
+        "description",
+        "cover_image",
+        "source",
+        "source_type",
+        "source_api_response",
+        "source_url",
+        "trigger_phrases",
+    ],
+)
 def test_update_only_evicts_caches_for_load_affecting_changes(field: str, monkeypatch: pytest.MonkeyPatch):
     previous = _config(**{field: "old"})
     updated = _config(**{field: "new"})
@@ -112,10 +138,56 @@ def test_update_only_evicts_caches_for_load_affecting_changes(field: str, monkey
     assert result is updated
 
     for cache in (cache_a, cache_b):
-        if field in {"name", "description"}:
+        if field in {
+            "name",
+            "description",
+            "cover_image",
+            "source",
+            "source_type",
+            "source_api_response",
+            "source_url",
+            "trigger_phrases",
+        }:
             cache.drop_model.assert_not_called()
         else:
             cache.drop_model.assert_called_once_with("model-key")
+
+
+def test_cache_invalidation_holds_model_load_write_lock(monkeypatch: pytest.MonkeyPatch) -> None:
+    from contextlib import contextmanager
+
+    previous = _config(path="old")
+    updated = _config(path="new")
+    inside_write_lock = False
+    observed_drop_under_lock: list[bool] = []
+
+    class TrackingModelLoadLock:
+        @contextmanager
+        def write_lock(self):
+            nonlocal inside_write_lock
+            inside_write_lock = True
+            try:
+                yield
+            finally:
+                inside_write_lock = False
+
+    def drop_model(_key: str) -> int:
+        observed_drop_under_lock.append(inside_write_lock)
+        return 1
+
+    cache = SimpleNamespace(drop_model=drop_model)
+    services = SimpleNamespace(
+        logger=MagicMock(),
+        model_manager=SimpleNamespace(load=SimpleNamespace(ram_caches={"cpu": cache})),
+    )
+    monkeypatch.setattr(model_manager_router, "MODEL_LOAD_LOCK", TrackingModelLoadLock())
+    monkeypatch.setattr(
+        model_manager_router.ApiDependencies, "invoker", SimpleNamespace(services=services), raising=False
+    )
+
+    model_manager_router._invalidate_model_load_caches("model-key", previous, updated)
+
+    assert observed_drop_under_lock == [True]
 
 
 @pytest.mark.parametrize(("field", "expected_eviction"), [("path", True), ("name", False), ("description", False)])

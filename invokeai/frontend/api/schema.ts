@@ -53414,7 +53414,7 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
-            /** @description The job has recovery data that must be preserved */
+            /** @description The job cannot be cancelled safely in its current state */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -53460,6 +53460,13 @@ export interface operations {
                     "application/json": components["schemas"]["ModelInstallJob"];
                 };
             };
+            /** @description The job cannot be paused in its current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description No such job */
             415: {
                 headers: {
@@ -53498,6 +53505,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ModelInstallJob"];
                 };
+            };
+            /** @description A previous download still owns the staging directory */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description No such job */
             415: {
@@ -53538,7 +53552,7 @@ export interface operations {
                     "application/json": components["schemas"]["ModelInstallJob"];
                 };
             };
-            /** @description The job has recovery data that must be preserved */
+            /** @description A prior download is active or recovery data must be preserved */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -53588,7 +53602,7 @@ export interface operations {
                     "application/json": components["schemas"]["ModelInstallJob"];
                 };
             };
-            /** @description The job has recovery data that must be preserved */
+            /** @description A prior download is active or recovery data must be preserved */
             409: {
                 headers: {
                     [name: string]: unknown;

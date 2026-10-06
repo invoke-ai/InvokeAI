@@ -29,7 +29,12 @@ from invokeai.app.services.model_images.model_images_common import (
     ModelImageFileDeleteException,
     ModelImageFileNotFoundException,
 )
-from invokeai.app.services.model_install.model_install_common import InstallRecoveryRequiredError, ModelInstallJob
+from invokeai.app.services.model_install.model_install_common import (
+    InstallCancellationConflictError,
+    InstallDownloadConflictError,
+    InstallRecoveryRequiredError,
+    ModelInstallJob,
+)
 from invokeai.app.services.model_records import (
     InvalidModelException,
     ModelRecordChanges,
@@ -704,13 +709,16 @@ _MODEL_METADATA_FIELDS: tuple[str, ...] = (
 
 
 def _model_load_fingerprint(config: AnyModelConfig) -> dict[str, Any]:
-    """Return persisted config values that can change the loaded model instance."""
+    """Return record values whose change can make a cached model instance stale."""
     if model_dump := getattr(config, "model_dump", None):
         fingerprint = model_dump(mode="python")
     else:
         fingerprint = vars(config).copy()
     for field in _MODEL_METADATA_FIELDS:
         fingerprint.pop(field, None)
+
+    # Keep hash and file_size: re-identification recomputes them from disk, and a changed value can mean
+    # the bytes at an unchanged path no longer match the loaded module.
 
     default_settings = fingerprint.pop("default_settings", None)
     fingerprint["default_settings"] = {
@@ -1289,7 +1297,7 @@ def get_model_install_job(
     responses={
         201: {"description": "The job was cancelled successfully"},
         415: {"description": "No such job"},
-        409: {"description": "The job has recovery data that must be preserved"},
+        409: {"description": "The job cannot be cancelled safely in its current state"},
     },
     status_code=201,
 )
@@ -1305,7 +1313,7 @@ def cancel_model_install_job(
         raise HTTPException(status_code=415, detail=str(e))
     try:
         installer.cancel_job(job)
-    except InstallRecoveryRequiredError as e:
+    except (InstallCancellationConflictError, InstallDownloadConflictError) as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
 
 
@@ -1314,6 +1322,7 @@ def cancel_model_install_job(
     operation_id="pause_model_install_job",
     responses={
         201: {"description": "The job was paused successfully"},
+        409: {"description": "The job cannot be paused in its current state"},
         415: {"description": "No such job"},
     },
     status_code=201,
@@ -1327,7 +1336,10 @@ def pause_model_install_job(
         job = installer.get_job_by_id(id)
     except ValueError as e:
         raise HTTPException(status_code=415, detail=str(e))
-    installer.pause_job(job)
+    try:
+        installer.pause_job(job)
+    except InstallDownloadConflictError as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
     return job
 
 
@@ -1336,6 +1348,7 @@ def pause_model_install_job(
     operation_id="resume_model_install_job",
     responses={
         201: {"description": "The job was resumed successfully"},
+        409: {"description": "A previous download still owns the staging directory"},
         415: {"description": "No such job"},
     },
     status_code=201,
@@ -1349,7 +1362,10 @@ def resume_model_install_job(
         job = installer.get_job_by_id(id)
     except ValueError as e:
         raise HTTPException(status_code=415, detail=str(e))
-    installer.resume_job(job)
+    try:
+        installer.resume_job(job)
+    except InstallDownloadConflictError as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
     return job
 
 
@@ -1358,7 +1374,7 @@ def resume_model_install_job(
     operation_id="restart_failed_model_install_job",
     responses={
         201: {"description": "Failed files restarted successfully"},
-        409: {"description": "The job has recovery data that must be preserved"},
+        409: {"description": "A prior download is active or recovery data must be preserved"},
         415: {"description": "No such job"},
     },
     status_code=201,
@@ -1374,7 +1390,7 @@ def restart_failed_model_install_job(
         raise HTTPException(status_code=415, detail=str(e))
     try:
         installer.restart_failed(job)
-    except InstallRecoveryRequiredError as e:
+    except (InstallDownloadConflictError, InstallRecoveryRequiredError) as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     return job
 
@@ -1384,7 +1400,7 @@ def restart_failed_model_install_job(
     operation_id="restart_model_install_file",
     responses={
         201: {"description": "File restarted successfully"},
-        409: {"description": "The job has recovery data that must be preserved"},
+        409: {"description": "A prior download is active or recovery data must be preserved"},
         415: {"description": "No such job"},
     },
     status_code=201,
@@ -1402,7 +1418,7 @@ def restart_model_install_file(
         raise HTTPException(status_code=415, detail=str(e))
     try:
         installer.restart_file(job, str(file_source))
-    except InstallRecoveryRequiredError as e:
+    except (InstallDownloadConflictError, InstallRecoveryRequiredError) as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     return job
 

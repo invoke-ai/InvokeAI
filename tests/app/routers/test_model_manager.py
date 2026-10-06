@@ -577,6 +577,56 @@ def test_restart_recovery_required_install_returns_conflict(monkeypatch: Any, op
     assert "requires recovery" in exc_info.value.detail
 
 
+@pytest.mark.parametrize("operation", ["cancel", "pause", "resume", "restart_failed", "restart_file"])
+def test_remote_download_replacement_returns_conflict(monkeypatch: Any, operation: str) -> None:
+    from types import SimpleNamespace
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager as model_manager_router
+    from invokeai.app.services.model_install.model_install_common import InstallDownloadConflictError
+
+    class Installer:
+        def get_job_by_id(self, job_id: int) -> object:
+            assert job_id == 42
+            return object()
+
+        def resume_job(self, _job: object) -> None:
+            raise InstallDownloadConflictError("A previous download is still active")
+
+        def pause_job(self, _job: object) -> None:
+            raise InstallDownloadConflictError("A previous download is still active")
+
+        def cancel_job(self, _job: object) -> None:
+            raise InstallDownloadConflictError("A previous download is still active")
+
+        def restart_failed(self, _job: object) -> None:
+            raise InstallDownloadConflictError("A previous download is still active")
+
+        def restart_file(self, _job: object, _source: str) -> None:
+            raise InstallDownloadConflictError("A previous download is still active")
+
+    services = SimpleNamespace(model_manager=SimpleNamespace(install=Installer()))
+    monkeypatch.setattr(model_manager_router, "ApiDependencies", MockApiDependencies(DummyInvoker(services)))
+
+    with pytest.raises(HTTPException) as exc_info:
+        if operation == "cancel":
+            model_manager_router.cancel_model_install_job(current_admin=None, id=42)
+        elif operation == "resume":
+            model_manager_router.resume_model_install_job(current_admin=None, id=42)
+        elif operation == "pause":
+            model_manager_router.pause_model_install_job(current_admin=None, id=42)
+        elif operation == "restart_failed":
+            model_manager_router.restart_failed_model_install_job(current_admin=None, id=42)
+        else:
+            model_manager_router.restart_model_install_file(
+                current_admin=None, id=42, file_source="https://example.com/model.safetensors"
+            )
+
+    assert exc_info.value.status_code == 409
+    assert "previous download" in exc_info.value.detail
+
+
 @pytest.mark.parametrize("install_fails", [False, True])
 def test_conversion_cleans_scratch_after_success_and_ordinary_failure(
     monkeypatch: Any, tmp_path: Path, install_fails: bool
@@ -695,6 +745,32 @@ def test_cancel_recovery_required_install_returns_conflict(monkeypatch: Any) -> 
 
     assert exc_info.value.status_code == 409
     assert "requires recovery" in exc_info.value.detail
+
+
+def test_cancel_active_install_returns_conflict(monkeypatch: Any) -> None:
+    from types import SimpleNamespace
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager as model_manager_router
+    from invokeai.app.services.model_install.model_install_common import InstallCancellationConflictError
+
+    class Installer:
+        def get_job_by_id(self, job_id: int) -> object:
+            assert job_id == 43
+            return object()
+
+        def cancel_job(self, _job: object) -> None:
+            raise InstallCancellationConflictError("Cannot cancel while install files are being moved")
+
+    services = SimpleNamespace(model_manager=SimpleNamespace(install=Installer()))
+    monkeypatch.setattr(model_manager_router, "ApiDependencies", MockApiDependencies(DummyInvoker(services)))
+
+    with pytest.raises(HTTPException) as exc_info:
+        model_manager_router.cancel_model_install_job(current_admin=None, id=43)
+
+    assert exc_info.value.status_code == 409
+    assert "being moved" in exc_info.value.detail
 
 
 def test_delete_is_refused_while_the_same_model_is_being_converted() -> None:
