@@ -34,7 +34,10 @@ export interface WorkflowUiSnapshot {
   isLibraryOpen: boolean;
   /** Which view the library dialog shows; remembered for the session. */
   libraryTab: WorkflowLibraryTab;
-  /** The project workflow selected on the This-project view; only meaningful for the project it was made in. */
+  /**
+   * The project workflow selected on the This-project view; only meaningful for the project it was made in, and only
+   * for the opening it was made in. Null shows the active workflow.
+   */
   librarySelection: { projectId: string; workflowId: string } | null;
   /** Bumped to ask the dialog host to open the JSON file picker. */
   importRequestCount: number;
@@ -101,8 +104,17 @@ registerAccountOwnedResource({
   name: 'workflow-ui',
 });
 
+/**
+ * Opens or closes the library. An opening that names no workflow starts This project on the active workflow: a
+ * selection left from an earlier opening would point the rail's actions (Update library template among them) at a
+ * workflow the user has since moved away from.
+ */
 export const setWorkflowLibraryOpen = (isOpen: boolean): void => {
-  workflowUiStore.patchSnapshot({ isLibraryOpen: isOpen });
+  const wasOpen = workflowUiStore.getSnapshot().isLibraryOpen;
+
+  workflowUiStore.patchSnapshot(
+    isOpen && !wasOpen ? { isLibraryOpen: true, librarySelection: null } : { isLibraryOpen: isOpen }
+  );
 };
 
 export const setWorkflowLibraryTab = (libraryTab: WorkflowLibraryTab): void => {
