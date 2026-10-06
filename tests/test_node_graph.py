@@ -1362,6 +1362,29 @@ def test_graph_add_edge_revalidates_upstream_collector_after_downstream_item_cha
     graph.validate_self()
 
 
+def test_graph_collector_rejects_item_that_invalidates_downstream_collector_connected_first():
+    integer_collection = IntegerCollectionInvocation(id="integer_collection", collection=[1])
+    iterate = IterateInvocation(id="iterate")
+    upstream_collector = CollectInvocation(id="upstream_collect")
+    downstream_collector = CollectInvocation(id="downstream_collect")
+    float_source = FloatInvocation(id="float", value=2.5)
+    nodes = (integer_collection, iterate, upstream_collector, downstream_collector, float_source)
+    graph = Graph(nodes={node.id: node for node in nodes})
+    graph.add_edge(create_edge(float_source.id, "value", downstream_collector.id, "item"))
+    graph.add_edge(create_edge(upstream_collector.id, "collection", downstream_collector.id, "collection"))
+    graph.add_edge(create_edge(integer_collection.id, "collection", iterate.id, "collection"))
+    invalid_edge = create_edge(iterate.id, "item", upstream_collector.id, "item")
+    invalid_graph = Graph(nodes=graph.nodes, edges=[*graph.edges, invalid_edge])
+
+    with pytest.raises(InvalidEdgeError, match="Invalid collector node .*matching type"):
+        invalid_graph.validate_self()
+
+    with pytest.raises(InvalidEdgeError, match="Collector output type does not match collector input type"):
+        graph.add_edge(invalid_edge)
+
+    assert invalid_edge not in graph.edges
+
+
 def test_graph_collector_edges_are_independent_of_add_order():
     integer_one = IntegerInvocation(id="integer_one", value=1)
     integer_two = IntegerInvocation(id="integer_two", value=2)
@@ -1394,6 +1417,26 @@ def test_graph_collector_edges_are_independent_of_add_order():
     assert "float_replacement" in second_order_graph.nodes
     assert create_edge("float_replacement", "value", first_collector.id, "item") in second_order_graph.edges
     second_order_graph.validate_self()
+
+
+def test_graph_update_node_reconnects_source_feeding_collector_chain():
+    value = IntegerInvocation(id="value", value=1)
+    first_collector = CollectInvocation(id="first_collect")
+    middle_collector = CollectInvocation(id="middle_collect")
+    last_collector = CollectInvocation(id="last_collect")
+    graph = Graph(nodes={node.id: node for node in (value, first_collector, middle_collector, last_collector)})
+    # The edge into last_collect comes first, so it is reconnected while first_collect still has no input.
+    graph.add_edge(create_edge(value.id, "value", last_collector.id, "item"))
+    graph.add_edge(create_edge(value.id, "value", first_collector.id, "item"))
+    graph.add_edge(create_edge(first_collector.id, "collection", middle_collector.id, "collection"))
+    graph.add_edge(create_edge(middle_collector.id, "collection", last_collector.id, "collection"))
+    graph.validate_self()
+
+    graph.update_node(value.id, IntegerInvocation(id="renamed_value", value=1))
+
+    assert create_edge("renamed_value", "value", last_collector.id, "item") in graph.edges
+    assert create_edge("renamed_value", "value", first_collector.id, "item") in graph.edges
+    graph.validate_self()
 
 
 def test_graph_add_collection_input_revalidates_iterator_consumers():
@@ -1449,6 +1492,25 @@ def test_graph_collector_edit_keeps_unresolved_if_paths_editable():
 
     assert second_edge in graph.edges
     assert false_branch_edge not in graph.edges
+
+
+def test_graph_collector_edit_ignores_incomplete_upstream_collector():
+    first_value = IntegerInvocation(id="first", value=1)
+    second_value = IntegerInvocation(id="second", value=2)
+    empty_collector = CollectInvocation(id="empty_collect")
+    middle_collector = CollectInvocation(id="middle_collect")
+    collector = CollectInvocation(id="collect")
+    nodes = (first_value, second_value, empty_collector, middle_collector, collector)
+    graph = Graph(nodes={node.id: node for node in nodes})
+    graph.add_edge(create_edge(empty_collector.id, "collection", middle_collector.id, "collection"))
+    graph.add_edge(create_edge(middle_collector.id, "collection", collector.id, "collection"))
+    item_edge = create_edge(first_value.id, "value", collector.id, "item")
+
+    graph.add_edge(item_edge)
+    graph.add_edge(create_edge(second_value.id, "value", empty_collector.id, "item"))
+
+    assert item_edge in graph.edges
+    graph.validate_self()
 
 
 def test_graph_validate_self_rejects_invalid_if_collector_iterator_graph():
