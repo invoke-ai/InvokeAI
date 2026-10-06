@@ -33,7 +33,7 @@ The tool strip on the left edge of the canvas holds the drawing and editing tool
 | **Text** | **T** | Add editable text. |
 | **Marquee select** / **Lasso select** | **U** / **L** | Select an area of pixels. Press **U** again to switch between rectangle and ellipse, or **L** again for freehand and polygon. |
 
-The Shape and Select buttons hold several tools. Click to use the current one, or press and hold (or right-click) the button to choose another. To pick a color from the canvas, hold **Alt** with any painting tool and click. While you pick, a round **loupe** follows the pointer: it magnifies the pixels around it, boxes the pixel that will be picked in the center, and shows that pixel's RGB values. The pointer itself is hidden, so aim with the boxed pixel. You can drag to sample as you go; the color is set when you release.
+The Shape and Select buttons hold several tools. Click to use the current one, or press and hold (or right-click, or press **→** on) the button to choose another from a menu that lists each tool with its shortcut. To pick a color from the canvas, hold **Alt** with any painting tool and click. While you pick, a round **loupe** follows the pointer: it magnifies the pixels around it, boxes the pixel that will be picked in the center, and shows that pixel's RGB values. The pointer itself is hidden, so aim with the boxed pixel. You can drag to sample as you go; the color is set when you release.
 
 ### Tool options
 
@@ -142,7 +142,7 @@ When the Canvas is the destination, results appear in the staging area at the bo
 * Step through the results with the arrows, or with **←** and **→**, and show or hide the result thumbnails.
 * **Accept to Layer** — add the current result as a new raster layer at the top of the raster layers and close the staging area.
   * A selected inpaint mask, regional guidance or control layer that you can still edit stays selected, so you can carry on painting it. Otherwise the new layer is selected.
-  * While the rest of the result's batch is still queued or generating, the button reads **Accept and Stop Batch** and also cancels those remaining images. The batch then shows as cancelled in the queue, and undoing the accepted layer does not restart it.
+  * While the rest of the result's batch is still queued or generating, accepting also cancels those remaining images. The batch then shows as cancelled in the queue, and undoing the accepted layer does not restart it.
   * The arrow next to it offers **Keep as Hidden Layer**, which adds the result as a disabled layer and keeps staging open and the batch running.
 * **Save to gallery** the current result, **Discard** it (**Delete**), or **Discard All**.
 * Hide the preview of the current result to compare it with the canvas underneath.
