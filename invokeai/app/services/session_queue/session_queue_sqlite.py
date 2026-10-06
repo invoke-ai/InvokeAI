@@ -1271,9 +1271,9 @@ class SqliteSessionQueue(SessionQueueBase):
             tuple(params),
         )
         item_ids_by_user: dict[str, list[int]] = {}
-        # Ascending ids, sorted here rather than in SQL: the bulk WHEREs are answered by a status or
-        # batch index, and an ORDER BY would move the plan onto an index that reads the scope's
-        # whole history.
+        # Ascending ids, sorted here rather than in SQL: the bulk WHEREs are answered by a status,
+        # batch or listing index as each caller chooses, and an ORDER BY would move the plan onto
+        # an index that reads the scope's whole history.
         for item_id, owner_user_id in sorted(tuple(row) for row in cursor.fetchall()):
             item_ids_by_user.setdefault(owner_user_id, []).append(item_id)
         return item_ids_by_user
