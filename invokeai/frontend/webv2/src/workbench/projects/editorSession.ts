@@ -17,6 +17,19 @@ export interface EditorSession {
 type AcquireLock = (name: string) => Promise<ExclusiveLockResult>;
 
 /**
+ * A reload may claim its session before the old document has let the lock go, and a duplicated tab (copied session
+ * storage) never gets it. The persisted id is retried this long before a session of its own is taken, so a reload
+ * keeps its session, and with it its own unload journal entries, at the cost of a short wait for a duplicated tab.
+ */
+const PERSISTED_CLAIM_RETRIES = 5;
+const PERSISTED_CLAIM_RETRY_MS = 100;
+
+const waitFor = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+/**
  * Whether a page still holds the editor session: its lock is released only when its last holder releases it or the
  * page goes away. False when it cannot be told (no Web Locks), so recovery then proceeds as if the page were gone.
  */
@@ -33,7 +46,8 @@ export const isEditorSessionLive = async (
 export const createEditorSessionProvider = (
   storage: SessionStoragePort,
   acquireLock: AcquireLock = acquireExclusiveLock,
-  createId: () => string = createUuid
+  createId: () => string = createUuid,
+  wait: (ms: number) => Promise<void> = waitFor
 ): (() => Promise<EditorSession>) => {
   let shared: { claim: Promise<{ id: string; release(): Promise<void> }>; holders: number } | null = null;
 
@@ -54,11 +68,17 @@ export const createEditorSessionProvider = (
     }
 
     let candidate = persistedId && persistedId.length <= 128 ? persistedId : createId();
+    let persistedRetries = candidate === persistedId ? PERSISTED_CLAIM_RETRIES : 0;
     for (;;) {
       const result = await acquireLock(`${EDITOR_SESSION_LOCK_PREFIX}${candidate}`);
       if (result.kind === 'acquired') {
         persist(candidate);
         return { id: candidate, release: result.release };
+      }
+      if (result.kind === 'contended' && persistedRetries > 0) {
+        persistedRetries -= 1;
+        await wait(PERSISTED_CLAIM_RETRY_MS);
+        continue;
       }
       candidate = createId();
       if (result.kind === 'unavailable') {
