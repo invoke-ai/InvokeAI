@@ -25,6 +25,7 @@ from invokeai.app.services.project_records.project_records_common import (
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.errors import UniqueViolation
 from invokeai.app.services.shared.database.queries import Queries
+from invokeai.app.services.shared.database.queries.locks import DatabaseLock
 from invokeai.app.services.shared.media_references import extract_media_references
 from invokeai.app.util.misc import uuid_string
 
@@ -129,6 +130,9 @@ class ProjectRecordsStorage(ProjectRecordsStorageBase):
         board_name = name[:BOARD_NAME_MAX_LENGTH]
 
         def insert(q: Queries) -> Optional[ProjectSummaryDTO]:
+            # Shared with every write that makes media protected, exclusive for the intermediates cleanup's check and
+            # delete: the media this names cannot be deleted between that check and this commit.
+            q.locks.acquire(DatabaseLock.MEDIA_PROTECTION, shared=True)
             if board_id is None:
                 project_board_id = uuid_string()
                 q.boards.insert(board_id=project_board_id, board_name=board_name, user_id=user_id)
@@ -192,6 +196,7 @@ class ProjectRecordsStorage(ProjectRecordsStorageBase):
         references = extract_media_references(data)
 
         def save(q: Queries) -> Optional[ProjectSummaryDTO]:
+            q.locks.acquire(DatabaseLock.MEDIA_PROTECTION, shared=True)
             # Locked before anything is checked, so the checks and the write apply to the same row, whatever other
             # transactions save, delete or create under this id meanwhile.
             project = q.projects.lock(user_id, project_id)

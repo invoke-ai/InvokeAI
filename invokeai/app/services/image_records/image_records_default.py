@@ -14,6 +14,7 @@ from invokeai.app.services.image_records.image_records_common import (
 )
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries import Queries
+from invokeai.app.services.shared.database.queries.locks import DatabaseLock
 from invokeai.app.services.shared.intermediate_delete import IntermediateDeleteGuard
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
@@ -111,9 +112,17 @@ class ImageRecordStorage(ImageRecordStorageBase):
         records survive because they are no longer intermediates, are both excluded -- the caller purges the files of
         exactly the returned names and touches nothing else.
 
-        ``guard`` narrows each chunk on this same transaction; see `IntermediateDeleteGuard`.
+        ``guard`` narrows the names on this same transaction; see `IntermediateDeleteGuard`.
         """
-        return self._queries.images.delete_intermediates(image_names, guard)
+
+        def delete(q: Queries) -> list[str]:
+            if guard is None:
+                return q.images.delete_intermediates(image_names)
+            # Held until the delete commits, so nothing becomes protected between the guard's answer and the delete.
+            q.locks.acquire(DatabaseLock.MEDIA_PROTECTION)
+            return q.images.delete_intermediates(guard(q, image_names))
+
+        return self._queries.run(delete)
 
     def save(
         self,

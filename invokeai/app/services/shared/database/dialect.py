@@ -1,7 +1,8 @@
 """SQL constructs that each backend spells differently, compiled for the backend in use."""
 
+import json
 import re
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from typing import Any
 
 from sqlalchemy import Boolean, FromClause, Insert, Integer, Join, String, Table, UniqueConstraint, literal_column
@@ -11,7 +12,11 @@ from sqlalchemy.sql.compiler import SQLCompiler
 from sqlalchemy.sql.elements import ColumnElement
 from sqlalchemy.sql.functions import FunctionElement
 
-from invokeai.app.services.shared.database.engines import SERVER_DIALECTS
+from invokeai.app.services.shared.database.engines import (
+    MARIADB_BINARY_COLLATION,
+    MYSQL_BINARY_COLLATION,
+    SERVER_DIALECTS,
+)
 
 _SIMPLE_JSON_PATH = re.compile(r"\$(\.[A-Za-z_][A-Za-z0-9_]*)+")
 _LIKE_ESCAPE = "\\"
@@ -77,6 +82,15 @@ def insert_ignore(dialect_name: str, table: Table) -> Insert:
     if dialect_name == "postgresql":
         return postgresql.insert(table).on_conflict_do_nothing(index_elements=list(table.primary_key.columns))
     raise ValueError(f"No insert_ignore for the {dialect_name} dialect")
+
+
+def sql_true() -> ColumnElement[bool]:
+    """TRUE as the predicates of SQLite's partial indexes spell it (`WHERE is_intermediate = TRUE`).
+
+    SQLAlchemy renders `true()` as 1 on SQLite, and SQLite's planner uses a partial index only for a query term
+    that matches its predicate as written: `is_intermediate = 1` leaves `WHERE is_intermediate = TRUE` unused.
+    """
+    return literal_column("TRUE", Boolean())
 
 
 def fixed_limit(count: int) -> ColumnElement[int]:
@@ -211,6 +225,86 @@ def _compile_case_insensitive_like_sqlite(element: CaseInsensitiveLike, compiler
 def _compile_case_insensitive_like(element: CaseInsensitiveLike, compiler: SQLCompiler, **kw: Any) -> str:
     expression, pattern = (compiler.process(clause, **kw) for clause in element.clauses)
     return f"lower({expression}) LIKE lower({pattern}) ESCAPE {_literal(compiler, _LIKE_ESCAPE)}"
+
+
+# The longest string a bound set holds on a server: media names are at most 255 characters.
+BOUND_SET_MAX_LENGTH = 255
+
+
+def bound_set(values: Iterable[str]) -> str:
+    """The parameter of an `InBoundSet`: the values as one JSON array."""
+    return json.dumps(sorted(set(values)))
+
+
+class InBoundSet(FunctionElement[bool]):
+    """`expression IN` the strings of a set bound as one parameter (`bound_set`), compared as stored, case and all.
+
+    A set of any size is one statement and one parameter, where an IN list would bind every value and be a
+    statement per length: for sets held in process memory, such as the media names of active queue items. Values
+    are at most `BOUND_SET_MAX_LENGTH` characters long. SQLite reads the array with `json_each()`, MySQL and
+    MariaDB with `JSON_TABLE()`, in the tables' binary collation.
+    """
+
+    inherit_cache = True
+    name = "in_bound_set"
+    _is_implicitly_boolean = True
+
+    def __init__(self, expression: ColumnElement[str], values: ColumnElement[str]) -> None:
+        super().__init__(expression, values)
+
+
+@compiles(InBoundSet, "sqlite")
+def _compile_in_bound_set_sqlite(element: InBoundSet, compiler: SQLCompiler, **kw: Any) -> str:
+    expression, values = (compiler.process(clause, **kw) for clause in element.clauses)
+    return f"{expression} IN (SELECT value FROM json_each({values}))"
+
+
+@compiles(InBoundSet, "mysql")
+@compiles(InBoundSet, "mariadb")
+def _compile_in_bound_set_server(element: InBoundSet, compiler: SQLCompiler, **kw: Any) -> str:
+    expression, values = (compiler.process(clause, **kw) for clause in element.clauses)
+    collation = MARIADB_BINARY_COLLATION if compiler.dialect.name == "mariadb" else MYSQL_BINARY_COLLATION
+    column = f"value VARCHAR({BOUND_SET_MAX_LENGTH}) CHARACTER SET utf8mb4 COLLATE {collation} PATH '$'"
+    return f"{expression} IN (SELECT bound.value FROM JSON_TABLE({values}, '$[*]' COLUMNS ({column})) AS bound)"
+
+
+@compiles(InBoundSet, "postgresql")
+def _compile_in_bound_set_postgresql(element: InBoundSet, compiler: SQLCompiler, **kw: Any) -> str:
+    expression, values = (compiler.process(clause, **kw) for clause in element.clauses)
+    return f"{expression} IN (SELECT jsonb_array_elements_text(CAST({values} AS JSONB)))"
+
+
+class KeysetAfter(FunctionElement[bool]):
+    """`(first, second) > (first_value, second_value)`: the rows after a keyset position, in that order.
+
+    A row value on SQLite, whose planner starts an index range at it; spelled out elsewhere, since MariaDB does
+    not start a range at a row value (`first > a OR (first = a AND second > b)`).
+    """
+
+    inherit_cache = True
+    name = "keyset_after"
+    _is_implicitly_boolean = True
+
+    def __init__(
+        self,
+        first: ColumnElement[Any],
+        second: ColumnElement[Any],
+        first_value: ColumnElement[Any],
+        second_value: ColumnElement[Any],
+    ) -> None:
+        super().__init__(first, second, first_value, second_value)
+
+
+@compiles(KeysetAfter, "sqlite")
+def _compile_keyset_after_sqlite(element: KeysetAfter, compiler: SQLCompiler, **kw: Any) -> str:
+    first, second, first_value, second_value = (compiler.process(clause, **kw) for clause in element.clauses)
+    return f"({first}, {second}) > ({first_value}, {second_value})"
+
+
+@compiles(KeysetAfter)
+def _compile_keyset_after(element: KeysetAfter, compiler: SQLCompiler, **kw: Any) -> str:
+    first, second, first_value, second_value = (compiler.process(clause, **kw) for clause in element.clauses)
+    return f"({first} > {first_value} OR ({first} = {first_value} AND {second} > {second_value}))"
 
 
 class CaseInsensitiveOrder(FunctionElement[str]):

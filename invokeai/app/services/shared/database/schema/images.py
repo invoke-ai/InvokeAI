@@ -40,25 +40,60 @@ Index("idx_images_image_category", images.c.image_category)
 # The primary key covers it. Only SQLite has it, where a migration created it.
 Index("idx_images_image_name", images.c.image_name, unique=True).ddl_if(dialect="sqlite")
 Index("idx_images_image_origin", images.c.image_origin)
-# The intermediates of a scope, and those whose size is still unknown, in insertion order. Partial indexes on
-# SQLite; a server has none, so its variants lead with the condition's columns instead, which narrows a query
-# with the same condition to the same rows.
+# The intermediates of a scope, all of them, and those whose size is still unknown, each in creation order (the
+# keyset of the cleanup's windows). Partial indexes on SQLite; a server has none, so its variants lead with the
+# condition's columns instead, which narrows a query with the same condition to the same rows.
 Index(
     "idx_images_intermediate_scope",
     images.c.user_id,
     images.c.project_id,
+    images.c.created_at,
+    images.c.image_name,
     sqlite_where=text("is_intermediate = TRUE"),
 ).ddl_if(dialect="sqlite")
-Index("idx_images_intermediate_scope", images.c.is_intermediate, images.c.user_id, images.c.project_id).ddl_if(
+Index(
+    "idx_images_intermediate_scope",
+    images.c.is_intermediate,
+    images.c.user_id,
+    images.c.project_id,
+    images.c.created_at,
+    images.c.image_name,
+).ddl_if(dialect=ON_SERVERS)
+Index(
+    "idx_images_intermediates_owner",
+    images.c.user_id,
+    images.c.created_at,
+    images.c.image_name,
+    sqlite_where=text("is_intermediate = TRUE"),
+).ddl_if(dialect="sqlite")
+Index(
+    "idx_images_intermediates_owner",
+    images.c.is_intermediate,
+    images.c.user_id,
+    images.c.created_at,
+    images.c.image_name,
+).ddl_if(dialect=ON_SERVERS)
+Index(
+    "idx_images_intermediates_created",
+    images.c.created_at,
+    images.c.image_name,
+    sqlite_where=text("is_intermediate = TRUE"),
+).ddl_if(dialect="sqlite")
+Index("idx_images_intermediates_created", images.c.is_intermediate, images.c.created_at, images.c.image_name).ddl_if(
     dialect=ON_SERVERS
 )
 Index("idx_images_starred", images.c.starred)
 Index(
     "idx_images_unmeasured_intermediates",
-    images.c.is_intermediate,
+    images.c.created_at,
+    images.c.image_name,
     sqlite_where=text("is_intermediate = TRUE AND file_size_bytes IS NULL"),
 ).ddl_if(dialect="sqlite")
 Index(
-    "idx_images_unmeasured_intermediates", images.c.is_intermediate, images.c.file_size_bytes, images.c.created_at
+    "idx_images_unmeasured_intermediates",
+    images.c.is_intermediate,
+    images.c.file_size_bytes,
+    images.c.created_at,
+    images.c.image_name,
 ).ddl_if(dialect=ON_SERVERS)
 Index("idx_images_user_id", images.c.user_id)

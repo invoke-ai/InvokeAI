@@ -44,19 +44,54 @@ Index(
     "idx_videos_intermediate_scope",
     videos.c.user_id,
     videos.c.project_id,
+    videos.c.created_at,
+    videos.c.video_name,
     sqlite_where=text("is_intermediate = TRUE"),
 ).ddl_if(dialect="sqlite")
-Index("idx_videos_intermediate_scope", videos.c.is_intermediate, videos.c.user_id, videos.c.project_id).ddl_if(
+Index(
+    "idx_videos_intermediate_scope",
+    videos.c.is_intermediate,
+    videos.c.user_id,
+    videos.c.project_id,
+    videos.c.created_at,
+    videos.c.video_name,
+).ddl_if(dialect=ON_SERVERS)
+Index(
+    "idx_videos_intermediates_owner",
+    videos.c.user_id,
+    videos.c.created_at,
+    videos.c.video_name,
+    sqlite_where=text("is_intermediate = TRUE"),
+).ddl_if(dialect="sqlite")
+Index(
+    "idx_videos_intermediates_owner",
+    videos.c.is_intermediate,
+    videos.c.user_id,
+    videos.c.created_at,
+    videos.c.video_name,
+).ddl_if(dialect=ON_SERVERS)
+Index(
+    "idx_videos_intermediates_created",
+    videos.c.created_at,
+    videos.c.video_name,
+    sqlite_where=text("is_intermediate = TRUE"),
+).ddl_if(dialect="sqlite")
+Index("idx_videos_intermediates_created", videos.c.is_intermediate, videos.c.created_at, videos.c.video_name).ddl_if(
     dialect=ON_SERVERS
 )
 Index("idx_videos_starred", videos.c.starred)
 Index(
     "idx_videos_unmeasured_intermediates",
-    videos.c.is_intermediate,
+    videos.c.created_at,
+    videos.c.video_name,
     sqlite_where=text("is_intermediate = TRUE AND file_size_bytes IS NULL"),
 ).ddl_if(dialect="sqlite")
 Index(
-    "idx_videos_unmeasured_intermediates", videos.c.is_intermediate, videos.c.file_size_bytes, videos.c.created_at
+    "idx_videos_unmeasured_intermediates",
+    videos.c.is_intermediate,
+    videos.c.file_size_bytes,
+    videos.c.created_at,
+    videos.c.video_name,
 ).ddl_if(dialect=ON_SERVERS)
 Index("idx_videos_user_id", videos.c.user_id)
 Index("idx_videos_video_category", videos.c.video_category)

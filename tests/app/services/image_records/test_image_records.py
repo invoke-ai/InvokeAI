@@ -4,7 +4,6 @@ Verifies that image_subfolder round-trips through save(), get(), get_many() and 
 get_many()/get_image_names() enforce per-user ownership isolation, and how intermediates are deleted.
 """
 
-import sqlite3
 from collections.abc import Sequence
 from typing import Any, Optional
 
@@ -433,7 +432,7 @@ class TestDeleteIntermediatesByNames:
         _save(store, "b.png", is_intermediate=True)
         asked: list[list[str]] = []
 
-        def guard(cursor: sqlite3.Cursor, names: Sequence[str]) -> list[str]:
+        def guard(q: Queries, names: Sequence[str]) -> list[str]:
             asked.append(list(names))
             return [name for name in names if name != "b.png"]
 

@@ -33,7 +33,6 @@ from invokeai.app.services.shared.database.dialect import (
 from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, mapped, read, write
 from invokeai.app.services.shared.database.schema.boards import board_videos
 from invokeai.app.services.shared.database.schema.videos import videos
-from invokeai.app.services.shared.intermediate_delete import IntermediateDeleteGuard
 from invokeai.app.services.video_records.video_records_common import (
     VideoRecord,
     VideoRecordChanges,
@@ -127,8 +126,8 @@ class _Shape(NamedTuple):
     """Which filters a listing has: never their values, which are bound, so that the shapes are few."""
 
     origin: bool
-    # The categories' values, sorted; None for no category filter. Each value is bound on its own, so that a list
-    # of a given length is one statement whatever it holds.
+    # The categories' values, sorted; None for no category filter. Each value is bound on its own: SQLAlchemy compiles
+    # lists of one length once, whatever they hold.
     categories: Optional[tuple[str, ...]]
     intermediate: bool
     # "any" (no board filter), "none" (on no board) or "one".
@@ -456,22 +455,11 @@ class VideoQueries(QueryModule):
             conn.execute(_DELETE_MANY, {"video_names": list(chunk)})
 
     @write
-    def delete_intermediates(
-        self, conn: Connection, video_names: Sequence[str], guard: Optional[IntermediateDeleteGuard]
-    ) -> list[str]:
-        """Deletes those of the named videos that are intermediates and, with `guard`, that it still lets go; the
-        names deleted, in the given order."""
+    def delete_intermediates(self, conn: Connection, video_names: Sequence[str]) -> list[str]:
+        """Deletes those of the named videos that are intermediates; the names deleted, in the given order."""
         deleted: list[str] = []
         for chunk in itertools.batched(video_names, IN_CHUNK):
-            names: list[str] = list(chunk)
-            if guard is not None:
-                # Transitional, until the intermediates storage is ported: it checks with SQL of its own, on the
-                # cursor of this very transaction.
-                driver = conn.connection.driver_connection
-                assert driver is not None
-                names = guard(driver.cursor(), names)
-                if not names:
-                    continue
+            names = list(chunk)
             locked: set[str] = set(conn.execute(_LOCK_INTERMEDIATES, {"video_names": names}).scalars())
             if locked:
                 conn.execute(_DELETE_INTERMEDIATES, {"video_names": sorted(locked)})

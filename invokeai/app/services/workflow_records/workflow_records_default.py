@@ -6,6 +6,7 @@ from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.errors import UniqueViolation
 from invokeai.app.services.shared.database.queries import Queries
+from invokeai.app.services.shared.database.queries.locks import DatabaseLock
 from invokeai.app.services.shared.media_references import extract_media_references_from_json
 from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
@@ -97,6 +98,9 @@ class WorkflowRecordsStorage(WorkflowRecordsStorageBase):
         references = extract_media_references_from_json(document_json)
 
         def insert(q: Queries) -> Optional[WorkflowRecordDTOBase]:
+            # Shared with every write that makes media protected, exclusive for the intermediates cleanup's check and
+            # delete: the media this names cannot be deleted between that check and this commit.
+            q.locks.acquire(DatabaseLock.MEDIA_PROTECTION, shared=True)
             try:
                 q.workflows.insert(
                     workflow_id=workflow_with_id.id, workflow=document_json, user_id=user_id, is_public=is_public
@@ -131,6 +135,7 @@ class WorkflowRecordsStorage(WorkflowRecordsStorageBase):
         references = extract_media_references_from_json(document_json)
 
         def save(q: Queries) -> Optional[WorkflowRecordDTOBase]:
+            q.locks.acquire(DatabaseLock.MEDIA_PROTECTION, shared=True)
             # Locked before anything is checked: the checks and the write apply to the same row. `category` is
             # generated from the stored JSON, so it still describes the record as it is, not as the request would
             # rewrite it.

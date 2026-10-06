@@ -21,30 +21,34 @@ class DatabaseLock(StrEnum):
 
     # Changes to who is an active administrator: counting them and changing one is one step.
     ADMIN_ACCOUNTS = "admin_accounts"
+    # What protects media from the intermediates cleanup: a cleanup takes it exclusively for its check and delete,
+    # a write that makes media protected (a reference, a hold) shares it.
+    MEDIA_PROTECTION = "media_protection"
 
 
 # In name order, so that two transactions that take several of the same locks take them in the same order.
-_LOCK = (
-    select(db_locks.c.name)
-    .where(db_locks.c.name.in_(bindparam("names", expanding=True)))
-    .order_by(db_locks.c.name)
-    .with_for_update()
+_LOCKS = (
+    select(db_locks.c.name).where(db_locks.c.name.in_(bindparam("names", expanding=True))).order_by(db_locks.c.name)
 )
+_LOCK = _LOCKS.with_for_update()
+_SHARE = _LOCKS.with_for_update(read=True)
 
 
 class LockQueries(QueryModule):
     @write
-    def acquire(self, conn: Connection, *locks: DatabaseLock) -> None:
+    def acquire(self, conn: Connection, *locks: DatabaseLock, shared: bool = False) -> None:
         """Holds `locks` until the transaction ends.
 
         It must be the first call of a `transaction()`: a lock taken outside one would be released at once, and
         one taken after other rows were read or locked would guard reads made without it and could deadlock
         against a transaction that holds it. Raises `RuntimeError` otherwise, and when a lock has no row:
         locking nothing would guard nothing, silently.
+
+        `shared` locks share with each other and wait only for, and hold off, an exclusive lock of the same name.
         """
         if not isinstance(self._scope, SharedTransaction) or self._scope.calls != 1:
             raise RuntimeError("Database locks are taken by the first call of a transaction, all at once")
         names = sorted({lock.value for lock in locks})
-        locked: set[str] = set(conn.execute(_LOCK, {"names": names}).scalars())
+        locked: set[str] = set(conn.execute(_SHARE if shared else _LOCK, {"names": names}).scalars())
         if missing := [name for name in names if name not in locked]:
             raise RuntimeError(f"No row in db_locks for {', '.join(missing)}: the migration that adds it has not run")

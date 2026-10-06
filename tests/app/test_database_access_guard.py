@@ -28,10 +28,7 @@ NOT_YET_PORTED: dict[str, int] = {
     "invokeai/app/services/gallery/gallery_default.py": 16,
     "invokeai/app/services/image_index/image_index_records_sqlite.py": 26,
     "invokeai/app/services/image_moves/image_moves_default.py": 58,
-    "invokeai/app/services/intermediates/intermediates_records_sqlite.py": 73,
     "invokeai/app/services/session_queue/session_queue_sqlite.py": 166,
-    "invokeai/app/services/shared/intermediate_delete.py": 1,
-    "invokeai/app/services/shared/media_references.py": 9,
     # The transitional cursor facade, removed once every service is ported.
     "invokeai/app/services/shared/sqlite/sqlite_database.py": 1,
     "invokeai/backend/util/gallery_maintenance.py": 8,

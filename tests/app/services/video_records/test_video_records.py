@@ -8,7 +8,6 @@ and /v1/videos/names, a non-admin caller saw every user's videos.
 """
 
 import json
-import sqlite3
 from collections.abc import Sequence
 from typing import Any
 
@@ -439,7 +438,7 @@ def test_a_guard_narrows_what_is_deleted(store: VideoRecordStorage) -> None:
     _save(store, "b.mp4", "alice", is_intermediate=True)
     asked: list[list[str]] = []
 
-    def guard(cursor: sqlite3.Cursor, names: Sequence[str]) -> list[str]:
+    def guard(q: Queries, names: Sequence[str]) -> list[str]:
         asked.append(list(names))
         return [name for name in names if name != "b.mp4"]
 

@@ -2,6 +2,7 @@ from invokeai.app.services.client_state_persistence.client_state_persistence_bas
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries import Queries
+from invokeai.app.services.shared.database.queries.locks import DatabaseLock
 from invokeai.app.services.shared.media_references import extract_media_references_from_json
 
 
@@ -25,6 +26,9 @@ class ClientStatePersistence(ClientStatePersistenceABC):
         references = extract_media_references_from_json(value)
 
         def save(q: Queries) -> None:
+            # Shared with every write that makes media protected, exclusive for the intermediates cleanup's check and
+            # delete: the media this names cannot be deleted between that check and this commit.
+            q.locks.acquire(DatabaseLock.MEDIA_PROTECTION, shared=True)
             q.client_state.set(user_id, key, value)
             q.media_references.replace(owner_kind="client_state", user_id=user_id, owner_id=key, references=references)
 

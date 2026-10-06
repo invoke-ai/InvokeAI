@@ -5,6 +5,7 @@ from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidato
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries import Queries
+from invokeai.app.services.shared.database.queries.locks import DatabaseLock
 from invokeai.app.services.shared.intermediate_delete import IntermediateDeleteGuard
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
@@ -39,7 +40,14 @@ class VideoRecordStorage(VideoRecordStorageBase):
     def delete_intermediates_by_names(
         self, video_names: list[str], guard: Optional[IntermediateDeleteGuard] = None
     ) -> list[str]:
-        return self._queries.videos.delete_intermediates(video_names, guard)
+        def delete(q: Queries) -> list[str]:
+            if guard is None:
+                return q.videos.delete_intermediates(video_names)
+            # Held until the delete commits, so nothing becomes protected between the guard's answer and the delete.
+            q.locks.acquire(DatabaseLock.MEDIA_PROTECTION)
+            return q.videos.delete_intermediates(guard(q, video_names))
+
+        return self._queries.run(delete)
 
     def set_file_size_bytes(self, video_name: str, file_size_bytes: Optional[int]) -> None:
         self._queries.videos.set_file_size(video_name, file_size_bytes)

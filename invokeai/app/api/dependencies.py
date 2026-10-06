@@ -32,7 +32,7 @@ from invokeai.app.services.image_moves.image_moves_default import ImageMoveServi
 from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
 from invokeai.app.services.intermediates.intermediates_default import IntermediatesService
-from invokeai.app.services.intermediates.intermediates_records_sqlite import IntermediatesRecordsSqlite
+from invokeai.app.services.intermediates.intermediates_records_default import IntermediatesRecords
 from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
@@ -208,7 +208,7 @@ class ApiDependencies:
         users = UserService(db.database)
         image_index_records = ImageIndexRecordsSqlite(db=db)
         image_index = ImageIndexService()
-        intermediates = IntermediatesService(records=IntermediatesRecordsSqlite(db=db), logger=logger)
+        intermediates = IntermediatesService(records=IntermediatesRecords(db.database), logger=logger)
         fonts = FontService(
             db=db,
             fonts_dir=configuration.fonts_path,

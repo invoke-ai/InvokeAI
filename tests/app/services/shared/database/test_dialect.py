@@ -1,11 +1,20 @@
 """Constructs of `dialect.py` beyond what the query modules exercise on every backend."""
 
 import pytest
-from sqlalchemy import Column, Index, Integer, MetaData, String, Table, bindparam, select
+from sqlalchemy import Column, Index, Integer, MetaData, String, Table, bindparam, insert, select
 from sqlalchemy.dialects import mysql, postgresql, sqlite
 
-from invokeai.app.services.shared.database.dialect import CaseInsensitiveLike, fixed_limit, insert_ignore, upsert
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.dialect import (
+    CaseInsensitiveLike,
+    InBoundSet,
+    bound_set,
+    fixed_limit,
+    insert_ignore,
+    upsert,
+)
 from invokeai.app.services.shared.database.schema.client_state import client_state
+from invokeai.app.services.shared.database.schema.images import images
 from invokeai.app.services.shared.database.schema.users import users
 
 
@@ -85,3 +94,26 @@ def test_an_insert_ignore_compiles_for_postgresql() -> None:
     sql = str(statement.compile(dialect=postgresql.dialect()))
 
     assert "ON CONFLICT (user_id, key) DO NOTHING" in sql
+
+
+def test_a_bound_set_matches_exactly_the_values_it_holds(database: Database) -> None:
+    quoted = 'it\'s "quoted" \\ here.png'
+    stored = ["a.png", "A.png", quoted, "ünïcode.png", "x" * 251 + ".png", "other.png"]
+    with database.begin(write=True) as conn:
+        conn.execute(
+            insert(images),
+            [
+                {"image_name": name, "image_origin": "internal", "image_category": "general", "width": 1, "height": 1}
+                for name in stored
+            ],
+        )
+    statement = select(images.c.image_name).where(InBoundSet(images.c.image_name, bindparam("names")))
+
+    def matching(values: list[str]) -> set[str]:
+        with database.begin(write=False) as conn:
+            return set(conn.execute(statement, {"names": bound_set(values)}).scalars())
+
+    # Compared as stored: case, quotes, backslashes and letters beyond ASCII, up to the longest name.
+    wanted = ["a.png", quoted, "ünïcode.png", "x" * 251 + ".png", "missing.png"]
+    assert matching(wanted) == set(wanted) - {"missing.png"}
+    assert matching([]) == set()
