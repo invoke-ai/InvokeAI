@@ -1,5 +1,6 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
 import type { GenerateModelConfig, GenerateSettings, Ideogram4SamplerPreset } from '@features/generation/core/types';
+import type { ReactNode } from 'react';
 
 import { Badge, Box, createListCollection, HStack, Image, Input, Separator, Stack, Text } from '@chakra-ui/react';
 import {
@@ -32,7 +33,12 @@ import { useTranslation } from 'react-i18next';
 
 import { GenerateConditioningRebalanceField } from './GenerateConditioningRebalanceField';
 import { type GenerateDraft, pickGenerateSettings } from './generateDebounce';
-import { type GenerationQueueInsights, useGenerationQueueInsights } from './GenerationUiContext';
+import {
+  type CanvasDenoisingStrength,
+  type GenerationQueueInsights,
+  useGenerationQueueInsights,
+  useGenerationUi,
+} from './GenerationUiContext';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 import { GenerateFieldContextMenu } from './shared/GenerateFieldContextMenu';
 import { GenerateToggleSwitch } from './shared/GenerateToggleSwitch';
@@ -323,6 +329,7 @@ export const GenerateRenderSection = ({
   selectedModel,
 }: GenerateRenderSectionProps) => {
   const { t } = useTranslation();
+  const { CanvasDenoisingStrength: CanvasDenoisingStrengthSlot, project } = useGenerationUi();
   const settings = useExternalStoreSelector(draft.subscribe, draft.getSnapshot, selectRenderSettings);
   const modelDefaults = selectedModel ? getDefaultGenerateSettings(selectedModel) : null;
   const uiPolicy = getGenerationUiPolicy(selectedModel);
@@ -342,117 +349,132 @@ export const GenerateRenderSection = ({
     onCommit({ [key]: value });
   };
 
-  const badges = (
+  const seedBadge = uiPolicy.seedVisible ? (
+    <Badge>
+      {settings.seedMode === 'random'
+        ? t('common.seedMode.random')
+        : settings.seedMode === 'fixed'
+          ? settings.seed
+          : t('widgets.generate.seedSummary', {
+              mode: t(`common.seedMode.${settings.seedMode}`),
+              seed: settings.seed,
+            })}
+    </Badge>
+  ) : null;
+
+  const renderFields = (strengthField: ReactNode) => (
     <>
-      <Badge>
-        {settings.steps} · {uiPolicy.guidanceLabel} {settings.cfgScale}
-      </Badge>
-      {uiPolicy.seedVisible ? (
-        <Badge>
-          {settings.seedMode === 'random'
-            ? t('common.seedMode.random')
-            : settings.seedMode === 'fixed'
-              ? settings.seed
-              : t('widgets.generate.seedSummary', {
-                  mode: t(`common.seedMode.${settings.seedMode}`),
-                  seed: settings.seed,
-                })}
-        </Badge>
+      <GenerateFieldContextMenu
+        copyValue={() => String(settings.steps)}
+        isAtDefault={modelDefaults !== null && settings.steps === modelDefaults.steps}
+        onReset={modelDefaults ? () => onCommit({ steps: modelDefaults.steps }) : undefined}
+      >
+        <ScrubberField
+          defaultValue={modelDefaults?.steps}
+          hint="steps"
+          inputMax={Number.MAX_SAFE_INTEGER}
+          label={t('widgets.generate.steps')}
+          marks={modelDefaults ? [modelDefaults.steps] : undefined}
+          max={STEPS_SLIDER_MAX}
+          min={1}
+          step={1}
+          value={settings.steps}
+          onChange={(steps) => commitNumber('steps', steps)}
+        />
+      </GenerateFieldContextMenu>
+      <GenerateFieldContextMenu
+        copyValue={() => String(settings.cfgScale)}
+        isAtDefault={modelDefaults !== null && settings.cfgScale === modelDefaults.cfgScale}
+        onReset={modelDefaults ? () => onCommit({ cfgScale: modelDefaults.cfgScale }) : undefined}
+      >
+        <ScrubberField
+          defaultValue={modelDefaults?.cfgScale}
+          error={guidanceError}
+          hint="guidance"
+          inputMax={guidanceInputMax}
+          label={uiPolicy.guidanceLabel}
+          marks={modelDefaults ? [modelDefaults.cfgScale] : undefined}
+          max={guidanceSliderMax}
+          min={uiPolicy.guidanceMin}
+          step={0.5}
+          value={settings.cfgScale}
+          onChange={(cfgScale) => commitNumber('cfgScale', cfgScale)}
+        />
+      </GenerateFieldContextMenu>
+      {strengthField}
+      {familyBase === 'krea-2' ? (
+        <>
+          <Separator borderColor="border.subtle" />
+          <GenerateConditioningRebalanceField
+            settings={settings}
+            onCommit={onCommit}
+            onCommitImmediate={onCommitImmediate}
+          />
+        </>
+      ) : null}
+      {familyBase === 'wan' ? <WanLowNoiseGuidanceField settings={settings} onCommit={onCommit} /> : null}
+      {uiPolicy.schedulerVisible ? (
+        <GenerateFieldContextMenu
+          copyValue={() => settings.scheduler}
+          isAtDefault={modelDefaults !== null && settings.scheduler === modelDefaults.scheduler}
+          onReset={modelDefaults ? () => onCommit({ scheduler: modelDefaults.scheduler }) : undefined}
+        >
+          <Field hint="scheduler" label={t('widgets.generate.scheduler')}>
+            <HStack gap="1">
+              <Combobox
+                aria-label={t('widgets.generate.scheduler')}
+                flex="1"
+                options={getSchedulerOptions(selectedModel, settings.scheduler)}
+                value={settings.scheduler}
+                onValueChange={(scheduler) => onCommit({ scheduler })}
+              />
+              {modelDefaults && settings.scheduler !== modelDefaults.scheduler ? (
+                <ModelDefaultButton
+                  label={t('widgets.generate.useModelDefaultScheduler')}
+                  onClick={() => onCommit({ scheduler: modelDefaults.scheduler })}
+                />
+              ) : null}
+            </HStack>
+          </Field>
+        </GenerateFieldContextMenu>
+      ) : null}
+      {familyBase === 'ideogram-4' ? <Ideogram4SamplingFields settings={settings} onCommit={onCommit} /> : null}
+      <Separator borderColor="border.subtle" />
+      {uiPolicy.seedVisible ? <SeedField settings={settings} onCommit={onCommit} /> : null}
+      {familyBase === 'krea-2' ? (
+        <>
+          <Separator borderColor="border.subtle" />
+          <Krea2SeedVarianceFields settings={settings} onCommit={onCommit} />
+        </>
       ) : null}
     </>
   );
 
-  return (
+  const renderSection = (canvas: CanvasDenoisingStrength | null) => (
     <GenerateCollapsibleSection
       label={t('widgets.generate.render')}
       defaultOpen={false}
-      badges={badges}
+      badges={
+        <>
+          <Badge>
+            {settings.steps} · {uiPolicy.guidanceLabel} {settings.cfgScale}
+          </Badge>
+          {canvas?.badges}
+          {seedBadge}
+        </>
+      }
       sectionId="render"
     >
       <Stack gap="2" p="2">
-        <GenerateFieldContextMenu
-          copyValue={() => String(settings.steps)}
-          isAtDefault={modelDefaults !== null && settings.steps === modelDefaults.steps}
-          onReset={modelDefaults ? () => onCommit({ steps: modelDefaults.steps }) : undefined}
-        >
-          <ScrubberField
-            defaultValue={modelDefaults?.steps}
-            hint="steps"
-            inputMax={Number.MAX_SAFE_INTEGER}
-            label={t('widgets.generate.steps')}
-            marks={modelDefaults ? [modelDefaults.steps] : undefined}
-            max={STEPS_SLIDER_MAX}
-            min={1}
-            step={1}
-            value={settings.steps}
-            onChange={(steps) => commitNumber('steps', steps)}
-          />
-        </GenerateFieldContextMenu>
-        <GenerateFieldContextMenu
-          copyValue={() => String(settings.cfgScale)}
-          isAtDefault={modelDefaults !== null && settings.cfgScale === modelDefaults.cfgScale}
-          onReset={modelDefaults ? () => onCommit({ cfgScale: modelDefaults.cfgScale }) : undefined}
-        >
-          <ScrubberField
-            defaultValue={modelDefaults?.cfgScale}
-            error={guidanceError}
-            hint="guidance"
-            inputMax={guidanceInputMax}
-            label={uiPolicy.guidanceLabel}
-            marks={modelDefaults ? [modelDefaults.cfgScale] : undefined}
-            max={guidanceSliderMax}
-            min={uiPolicy.guidanceMin}
-            step={0.5}
-            value={settings.cfgScale}
-            onChange={(cfgScale) => commitNumber('cfgScale', cfgScale)}
-          />
-        </GenerateFieldContextMenu>
-        {familyBase === 'krea-2' ? (
-          <>
-            <Separator borderColor="border.subtle" />
-            <GenerateConditioningRebalanceField
-              settings={settings}
-              onCommit={onCommit}
-              onCommitImmediate={onCommitImmediate}
-            />
-          </>
-        ) : null}
-        {familyBase === 'wan' ? <WanLowNoiseGuidanceField settings={settings} onCommit={onCommit} /> : null}
-        {uiPolicy.schedulerVisible ? (
-          <GenerateFieldContextMenu
-            copyValue={() => settings.scheduler}
-            isAtDefault={modelDefaults !== null && settings.scheduler === modelDefaults.scheduler}
-            onReset={modelDefaults ? () => onCommit({ scheduler: modelDefaults.scheduler }) : undefined}
-          >
-            <Field hint="scheduler" label={t('widgets.generate.scheduler')}>
-              <HStack gap="1">
-                <Combobox
-                  aria-label={t('widgets.generate.scheduler')}
-                  flex="1"
-                  options={getSchedulerOptions(selectedModel, settings.scheduler)}
-                  value={settings.scheduler}
-                  onValueChange={(scheduler) => onCommit({ scheduler })}
-                />
-                {modelDefaults && settings.scheduler !== modelDefaults.scheduler ? (
-                  <ModelDefaultButton
-                    label={t('widgets.generate.useModelDefaultScheduler')}
-                    onClick={() => onCommit({ scheduler: modelDefaults.scheduler })}
-                  />
-                ) : null}
-              </HStack>
-            </Field>
-          </GenerateFieldContextMenu>
-        ) : null}
-        {familyBase === 'ideogram-4' ? <Ideogram4SamplingFields settings={settings} onCommit={onCommit} /> : null}
-        <Separator borderColor="border.subtle" />
-        {uiPolicy.seedVisible ? <SeedField settings={settings} onCommit={onCommit} /> : null}
-        {familyBase === 'krea-2' ? (
-          <>
-            <Separator borderColor="border.subtle" />
-            <Krea2SeedVarianceFields settings={settings} onCommit={onCommit} />
-          </>
-        ) : null}
+        {renderFields(canvas?.field ?? null)}
       </Stack>
     </GenerateCollapsibleSection>
+  );
+
+  // Switching source remounts the section's subtree, as the Size section does.
+  return project.invocationSourceId === 'canvas' ? (
+    <CanvasDenoisingStrengthSlot>{renderSection}</CanvasDenoisingStrengthSlot>
+  ) : (
+    renderSection(null)
   );
 };

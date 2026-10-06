@@ -2291,7 +2291,6 @@
       "deletePresetNamed": "Delete preset {{name}}",
       "deletePromptHistoryItem": "Delete prompt history item",
       "denoisingStrength": "Denoising strength",
-      "strength": "Strength",
       "disableConcept": "Disable {{name}}",
       "disableReferenceImage": "Disable reference image",
       "dropImageToPrompt": "Describe this image",

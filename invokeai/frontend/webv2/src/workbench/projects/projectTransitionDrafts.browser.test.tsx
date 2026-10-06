@@ -73,7 +73,7 @@ const Harness = () => {
       <button onClick={() => void openProject(target.id, target.name)}>open</button>
       <button onClick={() => closeProject(harness.store.queries.getProject(target.id)!)}>close</button>
       <GenerationUiProvider adapter={generationUi}>
-        <GenerateDenoisingStrength />
+        <GenerateDenoisingStrength>{({ field }) => field}</GenerateDenoisingStrength>
       </GenerationUiProvider>
     </ChakraProvider>
   );
@@ -100,7 +100,7 @@ const strengthOf = (projectId: string): number =>
 
 const strengthSlider = (): HTMLElement => {
   const label = [...document.querySelectorAll('[data-scope="scrubber"] [data-part="label"]')].find(
-    (candidate) => candidate.textContent === 'widgets.generate.strength'
+    (candidate) => candidate.textContent === 'widgets.generate.denoisingStrength'
   );
   const slider = label?.closest('[data-scope="scrubber"]')?.querySelector<HTMLElement>('[role="slider"]');
   if (!slider) {

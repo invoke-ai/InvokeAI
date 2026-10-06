@@ -27,19 +27,21 @@ export const getDenoisingStrengthWavePath = (
 const WAVE_WIDTH = 100;
 const WAVE_HEIGHT = 14;
 const WAVE_SEGMENTS = 5;
+/** Drawn at the badge text's line height so it sits inside a header badge. */
+const WAVE_DISPLAY_HEIGHT = 10;
 
-/** A value-reactive replacement for the denoising slider's straight track. */
+/** A value-reactive wave whose amplitude shows the denoising strength. */
 export const DenoisingStrengthWave = ({ value }: { value: number }) => {
   const path = getDenoisingStrengthWavePath(value, WAVE_WIDTH, WAVE_HEIGHT, WAVE_SEGMENTS);
 
   return (
     <svg
       aria-hidden
-      height={WAVE_HEIGHT}
+      height={WAVE_DISPLAY_HEIGHT}
       preserveAspectRatio="none"
-      style={{ display: 'block', flexShrink: 0, marginLeft: 8, pointerEvents: 'none' }}
+      style={{ display: 'block', flexShrink: 0, pointerEvents: 'none' }}
       viewBox={`0 0 ${WAVE_WIDTH} ${WAVE_HEIGHT}`}
-      width={56}
+      width={40}
     >
       <path
         d={path}

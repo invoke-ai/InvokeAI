@@ -49,6 +49,9 @@ const GenerateCanvasSections = lazy(() =>
 const GenerateCanvasRenderSize = lazy(() =>
   loadCanvasGenerateSlots().then((module) => ({ default: module.GenerateCanvasRenderSize }))
 );
+const GenerateDenoisingStrength = lazy(() =>
+  loadCanvasGenerateSlots().then((module) => ({ default: module.GenerateDenoisingStrength }))
+);
 
 const RECENT_RUN_WINDOW = 10;
 const SEED_HISTORY_LIMIT = 6;
@@ -373,6 +376,7 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
 
   const adapter = useMemo<GenerationUiAdapter>(
     () => ({
+      CanvasDenoisingStrength: GenerateDenoisingStrength,
       CanvasGenerationSections: GenerateCanvasSections,
       CanvasRenderSize: GenerateCanvasRenderSize,
       account: accountGroup,

@@ -1,5 +1,7 @@
 export {
   GenerationUiProvider,
+  type CanvasDenoisingStrength,
+  type CanvasDenoisingStrengthProps,
   type CanvasRenderSize,
   type CanvasRenderSizeProps,
   type GenerationUiAdapter,

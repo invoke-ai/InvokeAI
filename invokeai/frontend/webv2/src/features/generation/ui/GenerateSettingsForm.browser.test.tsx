@@ -130,6 +130,7 @@ const NO_QUEUE_INSIGHTS = { secondsPerRun: null, seedHistory: [] };
 
 /** Groups shared by every adapter a test renders, as the app keeps them stable across renders. */
 const createStableGroups = () => ({
+  CanvasDenoisingStrength: () => null,
   CanvasGenerationSections: () => null,
   CanvasRenderSize: () => null,
   account: { currentUserId: null, multiuserEnabled: false },

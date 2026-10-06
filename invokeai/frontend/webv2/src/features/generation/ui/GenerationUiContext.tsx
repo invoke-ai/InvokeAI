@@ -65,8 +65,23 @@ export interface CanvasRenderSizeProps {
   frame: { height: number; width: number };
 }
 
+/** What the canvas adds to the Render section. */
+export interface CanvasDenoisingStrength {
+  /** The strength summary, shown with the section's header badges. */
+  badges: ReactNode;
+  /** The strength control, laid out under guidance. */
+  field: ReactNode;
+}
+
+export interface CanvasDenoisingStrengthProps {
+  /** Lays out the Render section around the canvas's denoising strength. */
+  children: (strength: CanvasDenoisingStrength) => ReactNode;
+}
+
 /** This port keeps Generation independent of Workbench. */
 export interface GenerationUiAdapter {
+  /** Wraps the Render section in canvas mode, which adds denoising strength to it. */
+  CanvasDenoisingStrength: ComponentType<CanvasDenoisingStrengthProps>;
   CanvasGenerationSections: ComponentType;
   /** Wraps the Size section in canvas mode, where the frame and the render size can differ. */
   CanvasRenderSize: ComponentType<CanvasRenderSizeProps>;

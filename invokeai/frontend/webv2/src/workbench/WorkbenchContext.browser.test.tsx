@@ -151,7 +151,7 @@ const mountEditor = async ({ strict = false, withStrength = false } = {}) => {
       {/* A real Generate control that holds its edits in a debounced draft. */}
       {withStrength ? (
         <GenerationUiProvider adapter={generationUi}>
-          <GenerateDenoisingStrength />
+          <GenerateDenoisingStrength>{({ field }) => field}</GenerateDenoisingStrength>
         </GenerationUiProvider>
       ) : null}
     </WorkbenchProvider>
