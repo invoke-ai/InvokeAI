@@ -27,6 +27,7 @@ const { operations, renderSharedLaunch } = vi.hoisted(() => ({
 const ENGINE = {
   document: { getDocument: vi.fn(() => ({ layers: [] })), model: () => null },
   exports: { hasExportableLayerContent: vi.fn(() => false) },
+  interaction: { get: () => false, subscribe: () => () => undefined },
 } as unknown as CanvasEngine;
 
 vi.mock('./LayerFilterOperationButton', () => ({

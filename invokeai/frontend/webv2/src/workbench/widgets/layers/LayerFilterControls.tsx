@@ -31,7 +31,7 @@ interface LayerFilterControlsProps {
 }
 
 /** The pane form is the one consumer left; the toolbar's horizontal variant died with it. */
-export const getLayerFilterControlPolicy = () =>
+const getLayerFilterControlPolicy = () =>
   ({
     controlMinH: undefined,
     controlSize: 'md',
@@ -135,6 +135,7 @@ const FilterParamField = ({ disabled, param, policy, settings, value, onChange }
   const label = t(`widgets.layers.control.filterParams.${param.key}`, param.key);
   // A number shows its scrub locally; settings change (and the filter reruns) once per gesture.
   const [draftNumber, setDraftNumber] = useState<number | null>(null);
+  const numberCurrent = typeof value === 'number' && Number.isFinite(value) ? value : param.default;
 
   const handleBoolean = useCallback(
     ({ checked }: { checked: boolean }) => onChange(param.key, checked),
@@ -151,9 +152,13 @@ const FilterParamField = ({ disabled, param, policy, settings, value, onChange }
   const handleNumberEnd = useCallback(
     (next: number) => {
       setDraftNumber(null);
-      onChange(param.key, param.kind === 'number' && param.integer ? Math.round(next) : next);
+      const settled = param.kind === 'number' && param.integer ? Math.round(next) : next;
+      // A drag that came back to where it began changes nothing, so the filter need not rerun.
+      if (settled !== numberCurrent) {
+        onChange(param.key, settled);
+      }
     },
-    [onChange, param]
+    [numberCurrent, onChange, param]
   );
   const handleModel = useCallback(
     (model: ModelConfig | null) => {
@@ -188,7 +193,6 @@ const FilterParamField = ({ disabled, param, policy, settings, value, onChange }
     : String(enumCurrent);
   const enumValue = useMemo(() => [String(enumCurrent)], [enumCurrent]);
   const enumTriggerProps = useMemo(() => ({ minH: policy.controlMinH }), [policy.controlMinH]);
-  const numberCurrent = typeof value === 'number' && Number.isFinite(value) ? value : param.default;
   const numberBounds = param.kind === 'number' ? getFilterNumberBounds(param, settings) : null;
 
   if (param.kind === 'boolean') {

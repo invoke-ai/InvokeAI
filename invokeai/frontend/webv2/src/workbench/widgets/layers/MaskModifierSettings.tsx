@@ -1,4 +1,4 @@
-import type { CanvasInpaintMaskLayerContract } from '@workbench/canvas-engine/api';
+import type { CanvasDocumentModel, CanvasInpaintMaskLayerContract } from '@workbench/canvas-engine/api';
 import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps';
 
 import { ScrubberField } from '@platform/ui/ScrubberField';
@@ -40,9 +40,17 @@ export const MaskModifierSettings = ({
   const { cancel: cancelPreview, commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const field = FIELD_OF[kind];
   const modifier = layer[field];
-  // Where a gesture started; outside render closures because a drag keeps the handlers it started with.
-  const beforeRef = useRef<MaskModifier | null>(null);
+  // The magnitude a gesture started from. Previews and commits set only the magnitude on the live modifier, so a
+  // toggle or other edit landing mid-gesture (a drag keeps the handlers it started with) survives it.
+  const startRef = useRef<number | null>(null);
 
+  const liveModifier = useCallback(
+    (model: CanvasDocumentModel | null | undefined): MaskModifier | null => {
+      const live = model?.getLayer(layer.id);
+      return live?.type === 'inpaint_mask' ? (live[field] ?? null) : null;
+    },
+    [field, layer.id]
+  );
   const configWith = useCallback(
     (base: MaskModifier, magnitude: number) =>
       ({
@@ -54,51 +62,49 @@ export const MaskModifierSettings = ({
 
   const handleChange = useCallback(
     (percent: number) => {
-      if (!modifier) {
+      const live = liveModifier(engine?.document.model());
+      if (!live) {
         return;
       }
       if (
-        previewStructural({
-          config: configWith(modifier, percent / 100),
-          id: layer.id,
-          type: 'updateCanvasLayerConfig',
-        })
+        previewStructural({ config: configWith(live, percent / 100), id: layer.id, type: 'updateCanvasLayerConfig' })
       ) {
-        beforeRef.current ??= modifier;
+        startRef.current ??= magnitudeOf(live);
       }
     },
-    [configWith, layer.id, modifier, previewStructural]
+    [configWith, engine, layer.id, liveModifier, previewStructural]
   );
 
   const handleChangeEnd = useCallback(
     (percent: number) => {
-      const before = beforeRef.current;
-      beforeRef.current = null;
-      if (!before) {
+      const start = startRef.current;
+      startRef.current = null;
+      if (start === null) {
         return;
       }
       const next = percent / 100;
-      if (next === magnitudeOf(before)) {
-        cancelPreview({
-          config: { layerType: 'inpaint_mask', [field]: before },
-          id: layer.id,
-          type: 'updateCanvasLayerConfig',
-        });
+      if (next === start) {
+        const live = liveModifier(engine?.document.model());
+        if (live) {
+          cancelPreview({ config: configWith(live, start), id: layer.id, type: 'updateCanvasLayerConfig' });
+        }
         return;
       }
-      // The commit changes only the magnitude: `isEnabled` stays live, so a
-      // toggle landing mid-gesture is not silently reverted.
-      const committed = { ...before, isEnabled: modifier?.isEnabled ?? before.isEnabled };
-      commitPrepared(t(LABEL_OF[kind]), (model) =>
-        model.prepare({
-          before: { layerType: 'inpaint_mask', [field]: committed },
-          config: configWith(committed, next),
+      commitPrepared(t(LABEL_OF[kind]), (model) => {
+        const live = liveModifier(model);
+        // Removed mid-gesture: committing would bring it back.
+        if (!live) {
+          return { ids: [layer.id], status: 'missing' };
+        }
+        return model.prepare({
+          before: configWith(live, start),
+          config: configWith(live, next),
           id: layer.id,
           type: 'patch-config',
-        })
-      );
+        });
+      });
     },
-    [cancelPreview, commitPrepared, configWith, field, kind, layer.id, modifier?.isEnabled, t]
+    [cancelPreview, commitPrepared, configWith, engine, kind, layer.id, liveModifier, t]
   );
 
   if (!modifier) {

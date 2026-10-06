@@ -2,6 +2,7 @@ import type { SelectValueChangeDetails, SliderValueChangeDetails } from '@chakra
 import type {
   CanvasAdjustmentCurves,
   CanvasAdjustmentEntry,
+  CanvasDocumentModel,
   CanvasRasterLayerContractV2,
 } from '@workbench/canvas-engine/api';
 import type { CanvasPreparedEngine } from '@workbench/widgets/canvas/useStructuralCommit';
@@ -63,6 +64,17 @@ const IDENTITY_CURVE: [number, number][] = [
   [255, 255],
 ];
 
+/** The fields a gesture changes on one entry. */
+type EntryPatch = Record<string, unknown>;
+
+const CURVES_FIELDS = ['curves'] as const;
+
+const withPatch = (entries: readonly CanvasAdjustmentEntry[], id: string, patch: EntryPatch): CanvasAdjustmentEntry[] =>
+  entries.map((candidate) => (candidate.id === id ? ({ ...candidate, ...patch } as CanvasAdjustmentEntry) : candidate));
+
+const fieldsOf = (entry: CanvasAdjustmentEntry, fields: readonly string[]): EntryPatch =>
+  Object.fromEntries(fields.map((field) => [field, (entry as unknown as EntryPatch)[field]]));
+
 /** An adjustment stack's owner: a raster layer or a raster-stack group. */
 export type AdjustmentOwner = Pick<CanvasRasterLayerContractV2, 'id' | 'adjustments'> & {
   type: 'raster' | 'group';
@@ -95,7 +107,9 @@ const AdjustmentEntryEditor = ({
 }) => {
   const { cancel: cancelPreview, commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const { t } = useTranslation();
-  const gestureBaselineRef = useRef<readonly CanvasAdjustmentEntry[] | null>(null);
+  // The entry as the gesture found it. Previews and commits patch only the gesture's fields onto the live stack, so
+  // a toggle, undo, or other edit landing mid-gesture survives it, and undo restores just those fields.
+  const gestureStartRef = useRef<CanvasAdjustmentEntry | null>(null);
   const configOf = useCallback(
     (adjustments: CanvasAdjustmentEntry[]) =>
       layer.type === 'group'
@@ -103,79 +117,87 @@ const AdjustmentEntryEditor = ({
         : { adjustments, layerType: 'raster' as const },
     [layer.type]
   );
+  const liveEntries = useCallback(
+    (model: CanvasDocumentModel | null | undefined): readonly CanvasAdjustmentEntry[] | null => {
+      const owner = model?.getNode(layer.id);
+      return owner && 'adjustments' in owner ? (owner.adjustments ?? []) : null;
+    },
+    [layer.id]
+  );
+  const currentEntries = useCallback(
+    () => liveEntries(engine?.document.model()) ?? layer.adjustments ?? [],
+    [engine, layer.adjustments, liveEntries]
+  );
 
   const patchLive = useCallback(
-    (next: CanvasAdjustmentEntry) => {
-      const entries = layer.adjustments ?? [];
-      gestureBaselineRef.current ??= entries;
+    (patch: EntryPatch) => {
+      const entries = currentEntries();
+      gestureStartRef.current ??= entries.find((candidate) => candidate.id === entry.id) ?? entry;
       previewStructural({
-        config: configOf(entries.map((candidate) => (candidate.id === next.id ? next : candidate))),
+        config: configOf(withPatch(entries, entry.id, patch)),
         id: layer.id,
         type: 'updateCanvasLayerConfig',
       });
     },
-    [configOf, previewStructural, layer.adjustments, layer.id]
+    [configOf, currentEntries, entry, layer.id, previewStructural]
   );
 
-  const cancelGesture = useCallback(() => {
-    const baseline = gestureBaselineRef.current;
-    gestureBaselineRef.current = null;
-    if (baseline) {
-      cancelPreview({ config: configOf([...baseline]), id: layer.id, type: 'updateCanvasLayerConfig' });
-    }
-  }, [cancelPreview, configOf, layer.id]);
+  const cancelGesture = useCallback(
+    (fields: readonly string[]) => {
+      const start = gestureStartRef.current;
+      gestureStartRef.current = null;
+      if (start) {
+        cancelPreview({
+          config: configOf(withPatch(currentEntries(), entry.id, fieldsOf(start, fields))),
+          id: layer.id,
+          type: 'updateCanvasLayerConfig',
+        });
+      }
+    },
+    [cancelPreview, configOf, currentEntries, entry.id, layer.id]
+  );
 
   const commitEntry = useCallback(
-    (label: string, next: CanvasAdjustmentEntry) => {
-      const entries = layer.adjustments ?? [];
-      const baseline = gestureBaselineRef.current ?? entries;
-      // The tree dot owns enablement; a toggle landing mid-gesture stays put.
-      const committed = { ...next, isEnabled: entry.isEnabled };
-      const before = baseline.find((candidate) => candidate.id === committed.id);
+    (label: string, patch: EntryPatch) => {
+      const fields = Object.keys(patch);
+      const start = gestureStartRef.current ?? entry;
       // A gesture that ends where it began records nothing and drops its previews.
-      if (before && JSON.stringify(before) === JSON.stringify(committed)) {
-        cancelGesture();
+      if (JSON.stringify(fieldsOf(start, fields)) === JSON.stringify(patch)) {
+        cancelGesture(fields);
         return;
       }
-      gestureBaselineRef.current = null;
-      commitPrepared(label, (model) =>
-        model.prepare({
-          before: configOf([...baseline]),
-          config: configOf(entries.map((candidate) => (candidate.id === committed.id ? committed : candidate))),
+      gestureStartRef.current = null;
+      commitPrepared(label, (model) => {
+        const entries = liveEntries(model);
+        // The entry was removed mid-gesture: committing would resurrect it.
+        if (!entries?.some((candidate) => candidate.id === entry.id)) {
+          return { ids: [entry.id], status: 'missing' };
+        }
+        return model.prepare({
+          before: configOf(withPatch(entries, entry.id, fieldsOf(start, fields))),
+          config: configOf(withPatch(entries, entry.id, patch)),
           id: layer.id,
           type: 'patch-config',
-        })
-      );
+        });
+      });
     },
-    [cancelGesture, commitPrepared, configOf, entry.isEnabled, layer.adjustments, layer.id]
+    [cancelGesture, commitPrepared, configOf, entry, layer.id, liveEntries]
   );
 
-  const handleScalarLive = useCallback(
-    (field: ScalarField, next: number) => patchLive({ ...entry, [field]: next } as CanvasAdjustmentEntry),
-    [entry, patchLive]
-  );
+  const handleScalarLive = useCallback((field: ScalarField, next: number) => patchLive({ [field]: next }), [patchLive]);
   const handleScalarCommit = useCallback(
-    (field: ScalarField, next: number) =>
-      commitEntry(t(SCALAR_SPECS[field].labelKey), { ...entry, [field]: next } as CanvasAdjustmentEntry),
-    [commitEntry, entry, t]
-  );
-  const handleLevelsLive = useCallback(
-    (patch: Partial<LevelsEntry>) => patchLive({ ...entry, ...patch } as CanvasAdjustmentEntry),
-    [entry, patchLive]
+    (field: ScalarField, next: number) => commitEntry(t(SCALAR_SPECS[field].labelKey), { [field]: next }),
+    [commitEntry, t]
   );
   const handleLevelsCommit = useCallback(
-    (patch: Partial<LevelsEntry>) =>
-      commitEntry(t('widgets.layers.adjustments.levels'), { ...entry, ...patch } as CanvasAdjustmentEntry),
-    [commitEntry, entry, t]
+    (patch: Partial<LevelsEntry>) => commitEntry(t('widgets.layers.adjustments.levels'), patch),
+    [commitEntry, t]
   );
-  const handleCurvesLive = useCallback(
-    (curves: CanvasAdjustmentCurves) => patchLive({ ...entry, curves } as CanvasAdjustmentEntry),
-    [entry, patchLive]
-  );
+  const handleCurvesLive = useCallback((curves: CanvasAdjustmentCurves) => patchLive({ curves }), [patchLive]);
+  const handleCurvesCancel = useCallback(() => cancelGesture(CURVES_FIELDS), [cancelGesture]);
   const handleCurvesCommit = useCallback(
-    (curves: CanvasAdjustmentCurves) =>
-      commitEntry(t('widgets.layers.adjustments.curves'), { ...entry, curves } as CanvasAdjustmentEntry),
-    [commitEntry, entry, t]
+    (curves: CanvasAdjustmentCurves) => commitEntry(t('widgets.layers.adjustments.curves'), { curves }),
+    [commitEntry, t]
   );
 
   switch (entry.type) {
@@ -219,7 +241,7 @@ const AdjustmentEntryEditor = ({
         />
       );
     case 'levels':
-      return <LevelsEditor entry={entry} onCommit={handleLevelsCommit} onLive={handleLevelsLive} />;
+      return <LevelsEditor entry={entry} onCommit={handleLevelsCommit} onLive={patchLive} />;
     case 'invert':
       return (
         <Text color="fg.muted" fontSize="md">
@@ -230,7 +252,7 @@ const AdjustmentEntryEditor = ({
       return (
         <CurvesEditor
           curves={entry.curves}
-          onCancel={cancelGesture}
+          onCancel={handleCurvesCancel}
           onCommit={handleCurvesCommit}
           onLive={handleCurvesLive}
         />

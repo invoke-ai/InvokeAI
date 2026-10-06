@@ -29,7 +29,7 @@ import { ScrubberField } from '@platform/ui/ScrubberField';
 import { getCanvasOperations, resolveDefaultFilterForModel } from '@workbench/canvas-operations/api';
 import { CONTROL_ADAPTER_DEFAULTS, CONTROL_KIND_BASE } from '@workbench/controlAdapters';
 import { describeControlLayerReason, getControlLayerReasonInSequence } from '@workbench/controlLayerChecks';
-import { useCanvasEngineRead } from '@workbench/widgets/canvas/engineStoreHooks';
+import { useCanvasDocumentEditingLocked, useCanvasEngineRead } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -69,6 +69,7 @@ interface ControlLayerSettingsProps {
 export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: ControlLayerSettingsProps) => {
   const { t } = useTranslation();
   const { cancel: cancelPreview, commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
+  const editingLocked = useCanvasDocumentEditingLocked(engine);
   const models = useModelsSelector((snapshot) => snapshot.models);
   const mainModel = useSelectedMainModel();
   const base = mainModel?.base ?? null;
@@ -245,7 +246,11 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
     (next: number) => {
       const before = weightBeforeRef.current;
       weightBeforeRef.current = null;
+      // Previews were refused (editing locked): a commit attempt reports why instead of dropping the value.
       if (before === null) {
+        if (next !== adapter.weight) {
+          commitAdapter({ weight: next }, { weight: adapter.weight }, t('widgets.layers.control.weight'));
+        }
         return;
       }
       if (next === before) {
@@ -258,7 +263,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
       }
       commitAdapter({ weight: next }, { weight: before }, t('widgets.layers.control.weight'));
     },
-    [cancelPreview, commitAdapter, layer.id, t]
+    [adapter.weight, cancelPreview, commitAdapter, layer.id, t]
   );
 
   const rangeBeforeRef = useRef<[number, number] | null>(null);
@@ -406,6 +411,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
       </Field>
       <ScrubberField
         defaultValue={CONTROL_ADAPTER_DEFAULTS[adapter.kind].weight}
+        disabled={editingLocked}
         formatValue={formatWeight}
         inputMax={CONTROL_WEIGHT_BOUNDS.inputMax}
         inputMin={weightInputMin}
@@ -420,6 +426,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
       <Field label={t('widgets.layers.control.stepRange')}>
         <Slider
           aria-label={rangeAria}
+          disabled={editingLocked}
           formatValue={formatUnitPercent}
           max={1}
           min={0}

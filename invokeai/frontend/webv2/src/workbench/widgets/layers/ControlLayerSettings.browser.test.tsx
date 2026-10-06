@@ -16,7 +16,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 import { ControlLayerSettings } from './ControlLayerSettings';
 import { createControlLayer } from './layerOps';
@@ -86,6 +86,12 @@ type Engine = NonNullable<Parameters<typeof ControlLayerSettings>[0]['engine']>;
 /** Committed document edits, in order; each carries the adapter patch the panel prepared. */
 const commits: { label: string; edit: unknown }[] = [];
 
+/** Live previews the panel sent, and the restores a cancelled gesture dispatched. */
+const previews: unknown[] = [];
+const restores: unknown[] = [];
+let editingLocked = false;
+let previewsRefused = false;
+
 /** Just enough engine for the panel's reads and commits: every layer has content and contributes, in order. */
 const engineWith = (layers: CanvasControlLayerContract[]): Engine => {
   const model = createDocumentModel(
@@ -95,9 +101,24 @@ const engineWith = (layers: CanvasControlLayerContract[]): Engine => {
   const engine = {
     document: { model: () => model },
     exports: { hasExportableLayerContent: () => true },
-    interaction: { subscribe: () => () => undefined },
+    interaction: { get: () => editingLocked, subscribe: () => () => undefined },
     layers: {
-      beginStructuralPreview: () => null,
+      beginStructuralPreview: () =>
+        previewsRefused
+          ? null
+          : {
+              apply: (action: unknown) => {
+                previews.push(action);
+                return true;
+              },
+              cancel: (restore?: unknown) => {
+                restores.push(restore);
+              },
+              commit: (label: string, edit: unknown) => {
+                commits.push({ edit, label });
+                return { status: 'committed' as const };
+              },
+            },
       commitPrepared: (label: string, edit: unknown) => {
         commits.push({ edit, label });
         return { status: 'committed' as const };
@@ -138,6 +159,11 @@ afterEach(async () => {
   root = null;
   getArchitectureCapabilities.mockReset();
   Object.assign(catalog, SD1_CATALOG);
+  commits.length = 0;
+  previews.length = 0;
+  restores.length = 0;
+  editingLocked = false;
+  previewsRefused = false;
   // Returns the capability store and the core registry to their unloaded state between tests.
   accountLifecycle.invalidate();
 });
@@ -365,5 +391,84 @@ describe('ControlLayerSettings on an Anima main model', () => {
 
     expect(offersKind('controlnet')).toBe(true);
     expect(offersKind('anima_lllite')).toBe(false);
+  });
+});
+
+describe('ControlLayerSettings weight', () => {
+  // A full document layer (the panel reads its leaf), weighted 1 so a drag can move either way.
+  const weighted = ((): CanvasControlLayerContract => {
+    const base = createControlLayer('Control 1', 'control-1', 'sd-1', 'sd1-controlnet');
+    return { ...base, adapter: { ...base.adapter, weight: 1 } };
+  })();
+  const weightSlider = () => page.getByRole('slider', { name: 'widgets.layers.control.weight' });
+  const weightOf = (edit: unknown, side: 'forward' | 'inverse') =>
+    (edit as Record<typeof side, { config: { adapter: { weight: number } } }>)[side].config.adapter.weight;
+  /** One drag on the weight scrubber through each offset (fractions of its 0–2 track), released at the last. */
+  const dragWeight = async (offsets: number[]) => {
+    const frame = weightSlider().element().closest<HTMLElement>('[data-scope="scrubber"]')!;
+    const rect = frame.getBoundingClientRect();
+    const startX = rect.left + rect.width / 2;
+    const xAt = (offset: number) => startX + offset * (rect.width - 20);
+    const pointer = (target: EventTarget, type: string, x: number) =>
+      settle(() =>
+        target.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, clientX: x, pointerId: 1 }))
+      );
+    await pointer(frame, 'pointerdown', startX);
+    for (const offset of offsets) {
+      await pointer(window, 'pointermove', xAt(offset));
+    }
+    await pointer(window, 'pointerup', xAt(offsets.at(-1) ?? 0));
+  };
+  const typeWeight = async (text: string) => {
+    await act(async () => {
+      (weightSlider().element() as HTMLElement).focus();
+      await userEvent.keyboard(`{Enter}${text}{Enter}`);
+    });
+  };
+
+  it('previews a drag and records it as one step from the weight it started at', async () => {
+    await render(weighted, engineWith([weighted]));
+    await dragWeight([0.1, 0.25]);
+
+    expect(previews.length).toBeGreaterThanOrEqual(2);
+    expect(commits).toHaveLength(1);
+    expect(weightOf(commits[0]!.edit, 'forward')).toBe(1.5);
+    expect(weightOf(commits[0]!.edit, 'inverse')).toBe(1);
+  });
+
+  it('records nothing and restores the weight when a drag returns to where it started', async () => {
+    await render(weighted, engineWith([weighted]));
+    await dragWeight([0.25, 0]);
+
+    expect(commits).toHaveLength(0);
+    expect(restores).toEqual([
+      { config: { adapter: { weight: 1 }, layerType: 'control' }, id: 'control-1', type: 'updateCanvasLayerConfig' },
+    ]);
+  });
+
+  it('clamps typed weights to the typed bounds, which reach past the track', async () => {
+    await render(weighted, engineWith([weighted]));
+    await typeWeight('-3');
+
+    expect(commits.map(({ edit }) => weightOf(edit, 'forward'))).toEqual([-1]);
+
+    await typeWeight('9');
+
+    expect(commits.map(({ edit }) => weightOf(edit, 'forward'))).toEqual([-1, 2]);
+  });
+
+  it('still attempts a typed weight when previews are refused, so the refusal is reported', async () => {
+    previewsRefused = true;
+    await render(weighted, engineWith([weighted]));
+    await typeWeight('0.5');
+
+    expect(commits.map(({ edit }) => weightOf(edit, 'forward'))).toEqual([0.5]);
+  });
+
+  it('disables the weight while document editing is locked', async () => {
+    editingLocked = true;
+    await render(weighted, engineWith([weighted]));
+
+    await expect.element(weightSlider()).toHaveAttribute('aria-disabled', 'true');
   });
 });

@@ -13,7 +13,7 @@ import { createDocumentModel } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { createEmptyCanvasDocument } from '@workbench/canvasMigration';
 import { createInstance } from 'i18next';
-import { act, useMemo, useState } from 'react';
+import { act, useSyncExternalStore } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -70,51 +70,61 @@ const createGroupOwner = () =>
     type: 'group',
   }) as unknown as CanvasRasterLayerContractV2;
 
-const Harness = ({ entryId, owner = 'raster' }: { entryId: string; owner?: 'raster' | 'group' }) => {
-  const [layer, setLayer] = useState(owner === 'group' ? createGroupOwner : createLayer);
+/** The document as the engine holds it: one stable engine reads it live, as the real engine's model does. */
+let documentLayer: CanvasRasterLayerContractV2 = createLayer();
+const layerListeners = new Set<() => void>();
+const subscribeLayer = (listener: () => void) => {
+  layerListeners.add(listener);
+  return () => layerListeners.delete(listener);
+};
+const publishLayer = (next: CanvasRasterLayerContractV2): void => {
+  documentLayer = next;
+  layerListeners.forEach((listener) => listener());
+};
 
-  const engine = useMemo(() => {
-    const apply = (mutation: CanvasProjectMutation): boolean => {
-      const candidate = mutation as { type: string; config?: { adjustments?: unknown } };
-      if (candidate.type === 'updateCanvasLayerConfig') {
-        latestAdjustments = candidate.config?.adjustments;
-        setLayer(
-          (current) => ({ ...current, adjustments: candidate.config?.adjustments }) as CanvasRasterLayerContractV2
-        );
-      }
-      return true;
-    };
+/** Lands an edit from elsewhere (a tree toggle, an undo) in the document mid-gesture. */
+const landConcurrentEdit = (update: (layer: CanvasRasterLayerContractV2) => CanvasRasterLayerContractV2) =>
+  settle(() => publishLayer(update(documentLayer)));
 
-    return {
-      document: {
-        model: () =>
-          createDocumentModel(
-            { ...createEmptyCanvasDocument(), stacks: stacksFrom([layer]), selectedLayerId: layer.id },
-            { editRevision: 0, projectId: 'test-project' }
-          ),
+const apply = (mutation: CanvasProjectMutation): boolean => {
+  const candidate = mutation as { type: string; config?: { adjustments?: CanvasAdjustmentEntry[] } };
+  if (candidate.type === 'updateCanvasLayerConfig') {
+    latestAdjustments = candidate.config?.adjustments;
+    publishLayer({ ...documentLayer, adjustments: candidate.config?.adjustments } as CanvasRasterLayerContractV2);
+  }
+  return true;
+};
+
+const engine = {
+  document: {
+    model: () =>
+      createDocumentModel(
+        { ...createEmptyCanvasDocument(), stacks: stacksFrom([documentLayer]), selectedLayerId: documentLayer.id },
+        { editRevision: 0, projectId: 'test-project' }
+      ),
+  },
+  layers: {
+    beginStructuralPreview: () => ({
+      apply,
+      cancel: (restore?: CanvasProjectMutation) => {
+        if (restore) {
+          apply(restore);
+        }
       },
-      layers: {
-        beginStructuralPreview: () => ({
-          apply,
-          cancel: (restore?: CanvasProjectMutation) => {
-            if (restore) {
-              apply(restore);
-            }
-          },
-          commit: (_label: string, edit: PreparedDocumentEdit) => {
-            commits.push(edit);
-            return { status: apply(edit.forward) ? ('committed' as const) : ('dispatch-rejected' as const) };
-          },
-        }),
-        commitPrepared: (_label: string, edit: PreparedDocumentEdit) => {
-          commits.push(edit);
-          return { status: apply(edit.forward) ? ('committed' as const) : ('dispatch-rejected' as const) };
-        },
+      commit: (_label: string, edit: PreparedDocumentEdit) => {
+        commits.push(edit);
+        return { status: apply(edit.forward) ? ('committed' as const) : ('dispatch-rejected' as const) };
       },
-    } as unknown as AdjustmentsEngine;
-    // Rebuilt per layer change so the stub's model reflects the previewed layer, as the engine's does.
-  }, [layer]);
+    }),
+    commitPrepared: (_label: string, edit: PreparedDocumentEdit) => {
+      commits.push(edit);
+      return { status: apply(edit.forward) ? ('committed' as const) : ('dispatch-rejected' as const) };
+    },
+  },
+} as unknown as AdjustmentsEngine;
 
+const Harness = ({ entryId }: { entryId: string }) => {
+  const layer = useSyncExternalStore(subscribeLayer, () => documentLayer);
   return <AdjustmentSettings engine={engine} entryId={entryId} layer={layer} />;
 };
 
@@ -132,12 +142,13 @@ const render = async (entryId = 'cv1', owner: 'raster' | 'group' = 'raster') => 
   host.style.width = '260px';
   document.body.append(host);
   root = createRoot(host);
+  documentLayer = owner === 'group' ? createGroupOwner() : createLayer();
 
   await settle(() => {
     root?.render(
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
-          <Harness entryId={entryId} owner={owner} />
+          <Harness entryId={entryId} />
         </ChakraProvider>
       </I18nextProvider>
     );
@@ -261,6 +272,42 @@ describe('scalar and levels editors', () => {
     expect(commits).toHaveLength(1);
     expect(forwardEntries(commits[0]!)[0]).toMatchObject({ brightness: 0.13, contrast: 0, id: 'bc1' });
     expect(inverseEntries(commits[0]!)).toEqual(initialEntries());
+  });
+
+  it('keeps an edit that lands mid-drag and undoes only the dragged field', async () => {
+    await render('hue1');
+    const hue = scrubber('widgets.layers.adjustments.hue');
+    const rect = hue.getBoundingClientRect();
+    const startX = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    const trackWidth = rect.width - 20;
+
+    await settle(() => pointer(hue, 'pointerdown', startX, y));
+    await settle(() => pointer(window, 'pointermove', startX + trackWidth * 0.1, y));
+    // The tree dot disables the entry and an unrelated entry changes while the drag is still held.
+    await landConcurrentEdit((layer) => ({
+      ...layer,
+      adjustments: layer.adjustments!.map((candidate) =>
+        candidate.id === 'hue1'
+          ? { ...candidate, isEnabled: false }
+          : candidate.id === 'bc1'
+            ? { ...candidate, contrast: 0.5 }
+            : candidate
+      ),
+    }));
+    await settle(() => pointer(window, 'pointermove', startX + trackWidth * 0.25, y));
+
+    expect((latestAdjustments as CanvasAdjustmentEntry[])[2]).toMatchObject({ isEnabled: false, rotation: 90 });
+
+    await settle(() => pointer(window, 'pointerup', startX + trackWidth * 0.25, y));
+
+    expect(commits).toHaveLength(1);
+    const forward = forwardEntries(commits[0]!);
+    expect(forward[2]).toMatchObject({ id: 'hue1', isEnabled: false, rotation: 90 });
+    expect(forward[0]).toMatchObject({ contrast: 0.5, id: 'bc1' });
+    const inverse = inverseEntries(commits[0]!) as CanvasAdjustmentEntry[];
+    expect(inverse[2]).toMatchObject({ id: 'hue1', isEnabled: false, rotation: 0 });
+    expect(inverse[0]).toMatchObject({ contrast: 0.5, id: 'bc1' });
   });
 
   it('records nothing and restores the stack when a scrub ends where it started', async () => {
