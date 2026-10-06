@@ -3,6 +3,7 @@ import type {
   InvocationTemplate,
   InvocationTemplates,
   ProjectGraphState,
+  WorkflowEdge,
   WorkflowNode,
 } from '@features/workflow/core/types';
 import type { WorkflowUiAdapter } from '@features/workflow/ui/WorkflowUiContext';
@@ -271,9 +272,11 @@ describe('CallSavedWorkflowSyncRuntime', () => {
     nodes: WorkflowNode[],
     withPicker = false,
     withRuntime = true,
-    withPickerVariants = false
+    withPickerVariants = false,
+    edges: WorkflowEdge[] = []
   ) => {
-    let graph: ProjectGraphState = { ...createProjectGraph('parent'), nodes };
+    let graph: ProjectGraphState = { ...createProjectGraph('parent'), edges, nodes };
+    const notifications = { error: vi.fn(), info: vi.fn(), success: vi.fn() };
     const listeners = new Set<() => void>();
     const snapshot = () => ({
       activeWorkflow: { document: graph },
@@ -300,7 +303,7 @@ describe('CallSavedWorkflowSyncRuntime', () => {
         undo: vi.fn(),
       },
       getProjectGraph: () => graph,
-      notifications: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
+      notifications,
       project: {
         getSnapshot: () => current,
         subscribe: (listener: () => void) => {
@@ -326,6 +329,7 @@ describe('CallSavedWorkflowSyncRuntime', () => {
     });
 
     return {
+      notifications,
       readGraph: () => graph,
       updateGraph: (nextGraph: ProjectGraphState) => {
         graph = nextGraph;
@@ -492,6 +496,70 @@ describe('CallSavedWorkflowSyncRuntime', () => {
       label: 'Negative prompt',
       value: 'initial negative prompt',
     });
+  });
+
+  it('keeps the connections a newly selected workflow still accepts and reports the ones it drops', async () => {
+    const stringSourceTemplate: InvocationTemplate = {
+      ...childInputTemplate,
+      inputs: {},
+      outputType: 'string_output',
+      outputs: {
+        value: {
+          description: '',
+          name: 'value',
+          title: 'Value',
+          type: { batch: false, cardinality: 'SINGLE', name: 'StringField' },
+        },
+      },
+      title: 'String',
+      type: 'string_source',
+    };
+    getInvocationTemplatesSnapshotMock.mockReturnValue({
+      error: null,
+      status: 'loaded',
+      templates: { [CHILD_INVOCATION_TYPE]: childInputTemplate, string_source: stringSourceTemplate },
+    });
+    // `child-b` was saved from `child-a`, so the prompt keeps its field identity; it no longer exposes the negative.
+    const library: Record<string, Record<string, unknown>> = {
+      'child-a': buildLibraryChildWorkflow('Prompt', 'Describe the image', true),
+      'child-b': buildLibraryChildWorkflow('Prompt', 'Describe the image', false),
+    };
+    getLibraryWorkflowRecordMock.mockImplementation((workflowId: string) =>
+      Promise.resolve({ name: workflowId, workflow: library[workflowId], workflow_id: workflowId })
+    );
+    const source = buildInvocationNode(stringSourceTemplate, { x: 0, y: 0 });
+    source.id = 'source-1';
+    const edges: WorkflowEdge[] = ['prompt', 'negative_prompt'].map((fieldName) => ({
+      id: `edge-${fieldName}`,
+      source: source.id,
+      sourceHandle: 'value',
+      target: 'call-1',
+      targetHandle: dynamicFieldName(fieldName),
+      type: 'default',
+    }));
+
+    const { notifications, readGraph, updateGraph } = await mountWith(
+      [source, buildCallNode('call-1', 'child-a')],
+      false,
+      true,
+      false,
+      edges
+    );
+    await settleUntilRequestsStop(() => getLibraryWorkflowRecordMock.mock.calls.length);
+
+    expect(readGraph().edges.map((edge) => edge.id)).toEqual(['edge-prompt', 'edge-negative_prompt']);
+
+    selectWorkflow(readGraph, updateGraph, 'child-b');
+    await settleUntilRequestsStop(() => getLibraryWorkflowRecordMock.mock.calls.length);
+
+    const callNode = readGraph().nodes.find((node) => node.id === 'call-1');
+    expect(callNode?.type === 'invocation' && callNode.data.callSavedWorkflowStatus).toBe('ready');
+    expect(callNode?.type === 'invocation' && Object.keys(callNode.data.dynamicInputTemplates ?? {})).toEqual([
+      dynamicFieldName('prompt'),
+    ]);
+    expect(readGraph().edges.map((edge) => edge.id)).toEqual(['edge-prompt']);
+    expect(notifications.info).toHaveBeenCalledTimes(1);
+    expect(notifications.info).toHaveBeenCalledWith(expect.stringContaining('savedWorkflowDroppedEdges'));
   });
 
   it('keeps an invalidation armed while an existing detail request settles', async () => {

@@ -23,6 +23,7 @@ import {
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export const createSavedWorkflowDocumentParser = (
   parse: (workflow: Record<string, unknown>) => ParsedWorkflow = parseWorkflowJson
@@ -149,7 +150,8 @@ const needsDynamicFieldSync = (
 /** Reconciles asynchronously loaded child workflow forms into the project document. */
 export const CallSavedWorkflowSyncRuntime = () => {
   const queryClient = useQueryClient();
-  const { commands, project: projectPort } = useWorkflowUi();
+  const { t } = useTranslation();
+  const { commands, notifications: notify, project: projectPort } = useWorkflowUi();
   const retryableDetailWorkflowIds = useRef(new Map<string, RetryableDetailWorkflowNode>());
   const retryableDetailWorkflowQueries = useRef(new Map<string, number>());
   const nextRetryToken = useRef(0);
@@ -370,6 +372,11 @@ export const CallSavedWorkflowSyncRuntime = () => {
           status: 'ready',
           type: 'syncCallSavedWorkflowFields',
         });
+
+        // Connections that fit the new signature stay; the ones that cannot are named rather than lost silently.
+        if (edgeIdsToRemove.length > 0) {
+          notify.info(t('nodes.savedWorkflowDroppedEdges', { count: edgeIdsToRemove.length }));
+        }
       }
     }
   };

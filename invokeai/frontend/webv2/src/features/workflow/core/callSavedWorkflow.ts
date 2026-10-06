@@ -286,7 +286,7 @@ export const syncCallSavedWorkflowFields = (
   };
 };
 
-/** Used when a call node is cleared or retargeted before the next child query resolves. */
+/** Used when a call node's selection is cleared: no child workflow means no dynamic inputs or connections to them. */
 export const clearSavedWorkflowDynamicFields = (document: ProjectGraphState, nodeId: string): ProjectGraphState => {
   const node = document.nodes.find((candidate) => candidate.id === nodeId);
 

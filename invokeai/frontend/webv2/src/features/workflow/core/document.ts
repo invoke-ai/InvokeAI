@@ -1002,23 +1002,19 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
     }
     case 'setFieldValue': {
       const node = document.nodes.find((candidate) => candidate.id === action.nodeId);
-      const shouldClearDynamicFields =
+      const isCallRetarget =
         action.fieldName === 'workflow_id' &&
-        node &&
+        node !== undefined &&
         isInvocationNode(node) &&
         node.data.type === 'call_saved_workflow' &&
         node.data.inputs.workflow_id?.value !== action.value;
-      const clearedDocument = shouldClearDynamicFields
-        ? clearSavedWorkflowDynamicFields(document, action.nodeId)
-        : document;
-      const nextDocument =
-        shouldClearDynamicFields && node && isInvocationNode(node) && node.data.type === 'call_saved_workflow'
-          ? setCallSavedWorkflowStatus(
-              clearedDocument,
-              action.nodeId,
-              typeof action.value === 'string' && action.value.trim() ? 'loading' : 'ready'
-            )
-          : clearedDocument;
+      // A cleared call exposes nothing, so its dynamic inputs and their connections go now. A newly selected workflow
+      // keeps them until its signature arrives; the sync then drops only the inputs and connections it lacks.
+      const nextDocument = !isCallRetarget
+        ? document
+        : typeof action.value === 'string' && action.value.trim()
+          ? setCallSavedWorkflowStatus(document, action.nodeId, 'loading')
+          : clearSavedWorkflowDynamicFields(document, action.nodeId);
 
       return setFieldInstance(nextDocument, action.nodeId, action.fieldName, (instance) => ({
         ...instance,

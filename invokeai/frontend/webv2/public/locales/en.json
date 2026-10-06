@@ -1549,6 +1549,8 @@
     "savedWorkflowDetailLoading": "Loading saved workflow…",
     "savedWorkflowNoExposedFields": "This workflow's form has no fields, so it takes no inputs here.",
     "savedWorkflowUpdating": "Updating saved workflows…",
+    "savedWorkflowDroppedEdges_one": "Removed {{count}} connection to an input the called workflow no longer has.",
+    "savedWorkflowDroppedEdges_other": "Removed {{count}} connections to inputs the called workflow no longer has.",
     "noMatchingWorkflows": "No matching saved workflows",
     "iterationOutputs": "Iteration outputs",
     "finalOutputs": "Final outputs",

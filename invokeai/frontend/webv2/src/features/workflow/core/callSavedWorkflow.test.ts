@@ -602,28 +602,71 @@ describe('Call Saved Workflow dynamic fields', () => {
     expect(readiness.reasons).toContain('"Call Saved Workflow" is missing required input "Left Addend".');
   });
 
-  it('clears dynamic state when the selected workflow changes', () => {
-    const callNode = buildInvocationNode(callSavedWorkflowTemplate, { x: 0, y: 0 });
+  /** A call to `child-1` with an upstream node wired into both of its exposed inputs. */
+  const buildConnectedCall = (): ProjectGraphState => {
+    const source = buildInvocationNode(addTemplate, { x: 0, y: 0 });
+    source.id = 'source-1';
+    const callNode = buildInvocationNode(callSavedWorkflowTemplate, { x: 100, y: 0 });
     callNode.id = 'call-1';
-    const fields = getSavedWorkflowDynamicFields(buildChildWorkflow(), templates);
-    const document = syncCallSavedWorkflowFields(
-      { ...createProjectGraph('parent'), nodes: [callNode] },
+    callNode.data.inputs.workflow_id = { label: '', name: 'workflow_id', value: 'child-1' };
+    let document = syncCallSavedWorkflowFields(
+      { ...createProjectGraph('parent'), nodes: [source, callNode] },
       callNode.id,
-      fields,
+      getSavedWorkflowDynamicFields(buildChildWorkflow(), templates),
       []
     );
+
+    for (const fieldName of ['a', 'b']) {
+      document = projectGraphReducer(document, {
+        edge: {
+          id: `edge-${fieldName}`,
+          source: source.id,
+          sourceHandle: 'value',
+          target: callNode.id,
+          targetHandle: dynamicFieldName(fieldName),
+          type: 'default',
+        },
+        type: 'addEdge',
+      });
+    }
+
+    return document;
+  };
+  const findCallNode = (document: ProjectGraphState) =>
+    document.nodes.find((candidate): candidate is WorkflowInvocationNode => candidate.id === 'call-1');
+
+  it('keeps dynamic inputs and their connections while a newly selected workflow loads', () => {
+    const document = buildConnectedCall();
     const changed = projectGraphReducer(document, {
       fieldName: 'workflow_id',
-      nodeId: callNode.id,
+      nodeId: 'call-1',
       type: 'setFieldValue',
       value: 'workflow-2',
     });
-    const node = changed.nodes.find((candidate): candidate is WorkflowInvocationNode => candidate.id === callNode.id);
+    const node = findCallNode(changed);
 
+    // Which connections still fit is only known once the new signature arrives; the sync decides then.
+    expect(changed.edges.map((edge) => edge.id)).toEqual(['edge-a', 'edge-b']);
+    expect(Object.keys(node?.data.dynamicInputTemplates ?? {})).toEqual([dynamicFieldName('a'), dynamicFieldName('b')]);
+    expect(node?.data.inputs.workflow_id?.value).toBe('workflow-2');
+    expect(node?.data.callSavedWorkflowStatus).toBe('loading');
+  });
+
+  it('removes dynamic inputs and their connections when the selection is cleared', () => {
+    const changed = projectGraphReducer(buildConnectedCall(), {
+      fieldName: 'workflow_id',
+      nodeId: 'call-1',
+      type: 'setFieldValue',
+      value: '',
+    });
+    const node = findCallNode(changed);
+
+    expect(changed.edges).toEqual([]);
     expect(node?.data.dynamicInputTemplates).toEqual({});
     expect(
       Object.keys(node?.data.inputs ?? {}).some((name) => name.startsWith(CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX))
     ).toBe(false);
+    expect(node?.data.callSavedWorkflowStatus).toBe('ready');
   });
 
   it('retries a failed selection when the same workflow is chosen again', () => {
