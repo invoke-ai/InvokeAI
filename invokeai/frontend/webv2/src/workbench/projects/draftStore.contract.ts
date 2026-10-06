@@ -55,6 +55,7 @@ export const createUnloadJournalEntry = (
     editorSessionId: 'session-a',
     generation: 2,
     journaledAt: 500,
+    ownerEditorSessionId: 'session-a',
     projectId: 'project-1',
     recordType: 'unload-journal',
     schemaVersion: 1,
@@ -742,12 +743,22 @@ export const testProjectDraftStoreContract = (createStore: () => Promise<Project
     store.close();
   });
 
-  it('leaves the entries of a live editor session in place, and reconciles them once it is gone', async () => {
+  it('leaves the entries written by a live page in place, and reconciles them once it is gone', async () => {
     const store = await createStore();
     journal(
       store,
+      // Written by page A under its own lineage.
       createUnloadJournalEntry(),
-      createUnloadJournalEntry({ editorSessionId: 'session-b', writerToken: 'writer-b' })
+      // Written by page B under a lineage named after page A, which the session blob handed on.
+      createUnloadJournalEntry({ editorSessionId: 'session-a:writer:w', ownerEditorSessionId: 'session-b' }),
+      // Written by page A under a lineage named after page B.
+      createUnloadJournalEntry({ editorSessionId: 'session-b', ownerEditorSessionId: 'session-a' }),
+      // Written before entries named their page.
+      createUnloadJournalEntry({
+        editorSessionId: 'session-c',
+        ownerEditorSessionId: undefined,
+        projectId: 'project-2',
+      })
     );
     const asked: string[] = [];
     const isEditorSessionLive = (editorSessionId: string) => {
@@ -759,17 +770,34 @@ export const testProjectDraftStoreContract = (createStore: () => Promise<Project
       kind: 'available',
       outcomes: [
         { editorSessionId: 'session-a', outcome: 'live', projectId: 'project-1' },
-        { editorSessionId: 'session-b', outcome: 'applied', projectId: 'project-1' },
+        { editorSessionId: 'session-a:writer:w', outcome: 'applied', projectId: 'project-1' },
+        { editorSessionId: 'session-b', outcome: 'live', projectId: 'project-1' },
+        { editorSessionId: 'session-c', outcome: 'applied', projectId: 'project-2' },
       ],
     });
+    // Asked once per page, never about a lineage.
     expect(asked).toEqual(['session-a', 'session-b']);
     await expect(store.get('project-1', 'session-a')).resolves.toEqual({ kind: 'missing' });
+    await expect(store.get('project-1', 'session-a:writer:w')).resolves.toMatchObject({ kind: 'found' });
+    // The peek skips the live page's entries the same way, and keeps looking past them.
     await expect(store.peekUnloadJournalProjectIds(1)).resolves.toEqual({
       kind: 'available',
       projectIds: ['project-1'],
     });
-    // The page is gone: its entry is recovery material now.
-    await expect(outcomesOf(store)).resolves.toEqual(['applied']);
+    journal(
+      store,
+      createUnloadJournalEntry({
+        editorSessionId: 'session-c',
+        ownerEditorSessionId: 'session-c',
+        projectId: 'project-3',
+      })
+    );
+    await expect(store.peekUnloadJournalProjectIds(2, { isEditorSessionLive })).resolves.toEqual({
+      kind: 'available',
+      projectIds: ['project-3'],
+    });
+    // The page is gone: its entries are recovery material now.
+    await expect(outcomesOf(store)).resolves.toEqual(['applied', 'applied', 'applied']);
     await expect(store.get('project-1', 'session-a')).resolves.toMatchObject({
       draft: { documentJson: createUnloadJournalEntry().documentJson, generation: 2 },
       kind: 'found',

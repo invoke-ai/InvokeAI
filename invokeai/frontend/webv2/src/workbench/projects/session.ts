@@ -6,6 +6,7 @@ import type { WorkbenchPreferences } from '@workbench/settings/contracts';
 import type { ProjectDraftStore } from './draftStore';
 
 import { getClientStateValue, setClientStateValue } from './api';
+import { EDITOR_SESSION_STORAGE_KEY, isEditorSessionLive } from './editorSession';
 
 /** Session tabs are separate from settings; legacy undefined openProjectIds means unknown/open-all. */
 
@@ -122,11 +123,22 @@ const listDurableRecoveryProjectIds = async (): Promise<DurableRecoveryProjectId
   }
 
   try {
+    // Another page's entry is that page's to settle while it runs; this page's own (the session it will reclaim, if it
+    // persisted one) becomes a draft when the editor loads.
+    let ownEditorSessionId: string | null = null;
+    try {
+      ownEditorSessionId = window.sessionStorage.getItem(EDITOR_SESSION_STORAGE_KEY);
+    } catch {
+      ownEditorSessionId = null;
+    }
     const [drafts, retargets, queueRuns, journal] = await Promise.all([
       draftStore.list({ limit: 1 }),
       draftStore.listRetargets({ limit: 1 }),
       queueRunJournal.listProjectIds(),
-      draftStore.peekUnloadJournalProjectIds(1),
+      draftStore.peekUnloadJournalProjectIds(1, {
+        isEditorSessionLive: (editorSessionId) =>
+          editorSessionId === ownEditorSessionId ? Promise.resolve(false) : isEditorSessionLive(editorSessionId),
+      }),
     ]);
     if (drafts.kind !== 'available' || retargets.kind !== 'available' || queueRuns.kind !== 'available') {
       return { kind: 'unavailable' };

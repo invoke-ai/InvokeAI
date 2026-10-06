@@ -169,6 +169,7 @@ export interface ProjectUnloadJournalEntry {
   documentByteSize: number;
   documentJson: string;
   documentSchemaVersion: number;
+  /** The lineage it is written under, which the session blob may have handed on from another page's session. */
   editorSessionId: string;
   /**
    * The draft generation the writer reserved for this document: above every generation it staged before and below
@@ -177,6 +178,11 @@ export interface ProjectUnloadJournalEntry {
    */
   generation: number;
   journaledAt: number;
+  /**
+   * The editor session of the page that wrote it, whose Web Lock tells whether that page still runs. Absent from
+   * entries written before it existed, which are treated as a gone page's.
+   */
+  ownerEditorSessionId?: string;
   projectId: string;
   recordType: 'unload-journal';
   schemaVersion: typeof PROJECT_UNLOAD_JOURNAL_SCHEMA_VERSION;
@@ -217,10 +223,11 @@ export interface ProjectUnloadJournalReconciliation {
 export type ProjectUnloadJournalReconcileResult =
   | { kind: 'available'; outcomes: ProjectUnloadJournalReconciliation[] }
   | { kind: 'unavailable' };
-export interface ProjectUnloadJournalReconcileOptions {
+export interface ProjectUnloadJournalLivenessOptions {
   /**
-   * True for a lineage whose editor session a page other than this one still holds. Its entries are that page's to
-   * settle (its save acknowledges or retires them) and are left in place, outcome `'live'`, until it is gone.
+   * True for an editor session a page other than this one still holds. The entries that page wrote (its
+   * `ownerEditorSessionId`) are its own to settle (its save acknowledges or retires them): reconciliation leaves them
+   * in place, outcome `'live'`, and the peek does not count them, until the page is gone.
    */
   isEditorSessionLive?: (editorSessionId: string) => Promise<boolean>;
 }
@@ -292,21 +299,22 @@ export interface ProjectDraftStore {
     after?: ProjectDraftRetargetCursor;
     limit?: number;
   }): Promise<ProjectDraftRetargetListResult>;
-  /** The projects with unload journal entries, for deciding whether anything would open. */
+  /** The projects with unload journal entries (of pages that are gone, given liveness), for whether anything would open. */
   peekUnloadJournalProjectIds(
-    limit: number
+    limit: number,
+    options?: ProjectUnloadJournalLivenessOptions
   ): Promise<{ kind: 'available'; projectIds: string[] } | { kind: 'unavailable' }>;
   /**
    * Turns each unload journal entry into its lineage's newest draft, or discards it, by `decideUnloadJournalEntry`:
    * one fenced draft transaction per entry, then the entry's removal. An entry left behind by a crash in between is
    * superseded by the draft it produced, so running again is safe. Run before any writer of this load claims a lineage.
-   * Entries of a lineage whose editor session is still live elsewhere are skipped: a page that is merely hidden is
-   * still writing that lineage, and staging its journal would hand another tab an edit it may yet undo.
+   * Entries written by a page that still runs elsewhere are skipped: a page that is merely hidden is still writing
+   * its lineages, and staging its journal would hand another tab an edit it may yet undo.
    */
   reconcileUnloadJournal(
     accountId: string,
     now: number,
-    options?: ProjectUnloadJournalReconcileOptions
+    options?: ProjectUnloadJournalLivenessOptions
   ): Promise<ProjectUnloadJournalReconcileResult>;
   reserveCopyIdentity(
     projectId: string,
@@ -696,6 +704,7 @@ const isProjectUnloadJournalEntry = (
     (entry.baseMinimumCanvasSchemaVersion === undefined || isPositiveInteger(entry.baseMinimumCanvasSchemaVersion)) &&
     isPositiveInteger(entry.documentSchemaVersion) &&
     isNonEmptyString(entry.editorSessionId) &&
+    (entry.ownerEditorSessionId === undefined || isNonEmptyString(entry.ownerEditorSessionId)) &&
     isPositiveInteger(entry.generation) &&
     typeof entry.journaledAt === 'number' &&
     Number.isFinite(entry.journaledAt) &&
@@ -707,6 +716,35 @@ const isProjectUnloadJournalEntry = (
     entry.documentByteSize <= maxDocumentBytes &&
     entry.documentByteSize === getUtf8ByteSize(entry.documentJson)
   );
+};
+
+/** The page that wrote a stored entry, read before the entry is validated; `null` when it does not name one. */
+export const getUnloadJournalOwnerEditorSessionId = (entry: unknown): string | null => {
+  const owner =
+    entry && typeof entry === 'object' ? (entry as Partial<ProjectUnloadJournalEntry>).ownerEditorSessionId : undefined;
+  return isNonEmptyString(owner) ? owner : null;
+};
+
+/**
+ * Whether the page that wrote an entry still runs, by `isEditorSessionLive`, asked once per page. An entry that names
+ * no page, or without a probe, counts as a gone page's.
+ */
+export const createUnloadJournalLivenessCheck = (
+  isEditorSessionLive: ProjectUnloadJournalLivenessOptions['isEditorSessionLive']
+): ((entry: unknown) => Promise<boolean>) => {
+  const liveEditorSessions = new Map<string, boolean>();
+  return async (entry) => {
+    const owner = isEditorSessionLive ? getUnloadJournalOwnerEditorSessionId(entry) : null;
+    if (owner === null) {
+      return false;
+    }
+    let isLive = liveEditorSessions.get(owner);
+    if (isLive === undefined) {
+      isLive = await isEditorSessionLive!(owner);
+      liveEditorSessions.set(owner, isLive);
+    }
+    return isLive;
+  };
 };
 
 /**
@@ -1140,14 +1178,21 @@ export const createMemoryProjectDraftStore = ({
         nextCursor: hasMore && last ? [last.projectId, last.editorSessionId, last.targetProjectId] : null,
       });
     },
-    peekUnloadJournalProjectIds(limit) {
+    async peekUnloadJournalProjectIds(limit, { isEditorSessionLive } = {}) {
       if (isClosed) {
-        return Promise.resolve({ kind: 'unavailable' });
+        return { kind: 'unavailable' };
       }
-      return Promise.resolve({
-        kind: 'available',
-        projectIds: [...new Set([...unloadJournal.values()].map((entry) => entry.projectId))].slice(0, limit),
-      });
+      const isLive = createUnloadJournalLivenessCheck(isEditorSessionLive);
+      const projectIds = new Set<string>();
+      for (const entry of unloadJournal.values()) {
+        if (projectIds.size === limit) {
+          break;
+        }
+        if (!(await isLive(entry))) {
+          projectIds.add(entry.projectId);
+        }
+      }
+      return { kind: 'available', projectIds: [...projectIds] };
     },
     async reconcileUnloadJournal(accountId, now, { isEditorSessionLive } = {}) {
       if (isClosed) {
@@ -1161,18 +1206,11 @@ export const createMemoryProjectDraftStore = ({
             rightKey.slice(0, rightKey.lastIndexOf('\u0000'))
           ) || left.generation - right.generation
       );
-      const liveEditorSessions = new Map<string, boolean>();
+      const isLive = createUnloadJournalLivenessCheck(isEditorSessionLive);
       for (const [entryKey, entry] of ordered) {
-        if (isEditorSessionLive) {
-          let isLive = liveEditorSessions.get(entry.editorSessionId);
-          if (isLive === undefined) {
-            isLive = await isEditorSessionLive(entry.editorSessionId);
-            liveEditorSessions.set(entry.editorSessionId, isLive);
-          }
-          if (isLive) {
-            outcomes.push({ editorSessionId: entry.editorSessionId, outcome: 'live', projectId: entry.projectId });
-            continue;
-          }
+        if (await isLive(entry)) {
+          outcomes.push({ editorSessionId: entry.editorSessionId, outcome: 'live', projectId: entry.projectId });
+          continue;
         }
         const key = draftKey(entry.projectId, entry.editorSessionId);
         const claim = writerClaims.get(key);

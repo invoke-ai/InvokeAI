@@ -715,10 +715,6 @@ export const createDurableSyncedWorkbenchPersistence = (
   const retargetHandoffKey = (handoff: Pick<ProjectDraftRetargetHandoff, 'editorSessionId' | 'projectId'>): string =>
     `${handoff.projectId}\u0000${handoff.editorSessionId}`;
 
-  /** The editor session whose page writes a lineage; an isolated lineage is named after its session and writer. */
-  const getLineageEditorSessionId = (lineageEditorSessionId: string): string =>
-    lineageEditorSessionId.split(':writer:', 1)[0]!;
-
   const isolateUnopenableDraft = (projectId: string, editorSessionId: string): string => {
     const preferred = `${editorSessionId}:writer:${writerToken}`;
     const isolated = draftEditorSessionIds.get(projectId) === preferred ? `${preferred}:${createUuid()}` : preferred;
@@ -2167,6 +2163,8 @@ export const createDurableSyncedWorkbenchPersistence = (
           generation:
             staging?.documentJson === serialized.documentJson ? staging.generation : nextGeneration(project.id),
           journaledAt,
+          // The lineage above may be named after another tab's session; this page is the one that must still run.
+          ownerEditorSessionId: target.editorSessionId,
           projectId: project.id,
           recordType: 'unload-journal',
           schemaVersion: PROJECT_UNLOAD_JOURNAL_SCHEMA_VERSION,
@@ -2267,12 +2265,8 @@ export const createDurableSyncedWorkbenchPersistence = (
           owner.accountId === null
             ? ({ kind: 'unavailable' } as const)
             : await store.reconcileUnloadJournal(owner.accountId, Date.parse(now()), {
-                isEditorSessionLive: (lineageEditorSessionId) => {
-                  const editorSessionId = getLineageEditorSessionId(lineageEditorSessionId);
-                  return editorSessionId === session.id
-                    ? Promise.resolve(false)
-                    : isOtherEditorSessionLive(editorSessionId);
-                },
+                isEditorSessionLive: (editorSessionId) =>
+                  editorSessionId === session.id ? Promise.resolve(false) : isOtherEditorSessionLive(editorSessionId),
               });
         assertOwner();
         unloadJournalTarget = { editorSessionId: session.id, store };

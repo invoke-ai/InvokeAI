@@ -10,6 +10,7 @@ import {
   clampProjectDraftLimit,
   combineProjectDraft,
   createUnavailableProjectDraftStore,
+  createUnloadJournalLivenessCheck,
   decideUnloadJournalEntry,
   doProjectDraftPartsMatch,
   getProjectDraftSummary,
@@ -49,6 +50,7 @@ import {
   type ProjectDraftStartWriterResult,
   type ProjectDraftStore,
   type ProjectDraftSummary,
+  type ProjectUnloadJournalEntry,
   type ProjectUnloadJournalKey,
   type ProjectUnloadJournalOutcome,
   type ProjectUnloadJournalReconcileResult,
@@ -74,6 +76,9 @@ type DraftTransform = (draft: ProjectDraft) => ProjectDraft;
 type ReadDraftResult =
   | ({ metadataRevision: number } & Extract<ProjectDraftGetResult, { kind: 'found' }>)
   | Exclude<ProjectDraftGetResult, { kind: 'found' }>;
+
+/** Entries the route peek reads per transaction; the journal holds at most one per lineage and writer. */
+const UNLOAD_JOURNAL_PEEK_PAGE = 16;
 
 const observeTransaction = <T extends { done: Promise<unknown> }>(transaction: T): T => {
   void transaction.done.catch(() => undefined);
@@ -734,13 +739,33 @@ export const createIndexedDbProjectDraftStore = (
         { kind: 'unavailable' }
       );
     },
-    async peekUnloadJournalProjectIds(limit) {
+    async peekUnloadJournalProjectIds(limit, { isEditorSessionLive } = {}) {
       if (!canUseJournal()) {
         return { kind: 'unavailable' };
       }
+      const isLive = createUnloadJournalLivenessCheck(isEditorSessionLive);
+      const projectIds = new Set<string>();
+      let after: ProjectUnloadJournalKey | null = null;
       try {
-        const keys = await journalDatabase!.getAllKeys(UNLOAD_JOURNAL_STORE, null, limit);
-        return { kind: 'available', projectIds: [...new Set(keys.map(([projectId]) => projectId))] };
+        for (;;) {
+          // Entries are read a page at a time and their pages probed between transactions: a lock query is not an
+          // IndexedDB request, and awaiting one inside the transaction would let it commit under the cursor.
+          const entries: ProjectUnloadJournalEntry[] = await journalDatabase!.getAll(
+            UNLOAD_JOURNAL_STORE,
+            after ? IDBKeyRange.lowerBound(after, true) : null,
+            UNLOAD_JOURNAL_PEEK_PAGE
+          );
+          for (const entry of entries) {
+            if (projectIds.size < limit && !(await isLive(entry))) {
+              projectIds.add(entry.projectId);
+            }
+          }
+          const last = entries.at(-1);
+          if (projectIds.size === limit || entries.length < UNLOAD_JOURNAL_PEEK_PAGE || !last) {
+            return { kind: 'available', projectIds: [...projectIds] };
+          }
+          after = [last.projectId, last.editorSessionId, last.writerToken, last.generation];
+        }
       } catch {
         return { kind: 'unavailable' };
       }
@@ -751,7 +776,7 @@ export const createIndexedDbProjectDraftStore = (
       { isEditorSessionLive } = {}
     ): Promise<ProjectUnloadJournalReconcileResult> {
       const outcomes: ProjectUnloadJournalReconciliation[] = [];
-      const liveEditorSessions = new Map<string, boolean>();
+      const isLive = createUnloadJournalLivenessCheck(isEditorSessionLive);
       let after: ProjectUnloadJournalKey | null = null;
       for (;;) {
         if (!canUseJournal() || !canUseDatabase()) {
@@ -768,17 +793,6 @@ export const createIndexedDbProjectDraftStore = (
           return { kind: 'unavailable' };
         }
         for (const journalKey of keys) {
-          if (isEditorSessionLive) {
-            let isLive = liveEditorSessions.get(journalKey[1]);
-            if (isLive === undefined) {
-              isLive = await isEditorSessionLive(journalKey[1]);
-              liveEditorSessions.set(journalKey[1], isLive);
-            }
-            if (isLive) {
-              outcomes.push({ editorSessionId: journalKey[1], outcome: 'live', projectId: journalKey[0] });
-              continue;
-            }
-          }
           let entry: unknown;
           try {
             entry = await journalDatabase!.get(UNLOAD_JOURNAL_STORE, journalKey);
@@ -787,6 +801,10 @@ export const createIndexedDbProjectDraftStore = (
           }
           if (entry === undefined) {
             // Another tab reconciled it, or its writer discarded it, since the keys were read.
+            continue;
+          }
+          if (await isLive(entry)) {
+            outcomes.push({ editorSessionId: journalKey[1], outcome: 'live', projectId: journalKey[0] });
             continue;
           }
           let replacedDraft: ProjectUnloadJournalReconciliation['replacedDraft'];

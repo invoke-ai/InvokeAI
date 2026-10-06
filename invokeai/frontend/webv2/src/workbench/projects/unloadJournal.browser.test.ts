@@ -1,6 +1,7 @@
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 import type * as projectsApi from '@workbench/projects/api';
 
+import { acquireExclusiveLock } from '@platform/browser/webLocks';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { createDraftProject } from '@workbench/workbenchState';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -8,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProjectDraftStore } from './draftStore';
 
 import { createDurableSyncedWorkbenchPersistence, type DurableProjectPersistenceApi } from './durableSyncedPersistence';
+import { EDITOR_SESSION_STORAGE_KEY } from './editorSession';
 import { createAccountOwnedProjectDraftStore } from './indexedDbDraftStore';
 import { serializeProjectDocumentV3 } from './projectDocument';
 import { peekOpenProjectIds } from './session';
@@ -206,6 +208,28 @@ describe('unload journal without its database', () => {
 });
 
 describe('unload journal and the editor route', () => {
+  it("does not count another running tab's journal as one that would open", async () => {
+    // Tab A still runs, holding its editor session, and journaled an edit while hidden.
+    const lock = await acquireExclusiveLock('invokeai:v7:webv2:editor-session:tab-a');
+    expect(lock.kind).toBe('acquired');
+    const tabA = openTab('tab-a', 'writer-a');
+    const loaded = await tabA.loadWorkbench();
+    expect(tabA.journalBeforeUnload(renamed(loaded.state, 'Typed in A'))).toMatchObject({ kind: 'journaled' });
+    guardSession.json = JSON.stringify({ account: loaded.state.account, activeProjectId: '', openProjectIds: [] });
+    window.sessionStorage.setItem(EDITOR_SESSION_STORAGE_KEY, 'tab-b');
+
+    await expect(peekOpenProjectIds()).resolves.toEqual([]);
+    // The tab that wrote it would reconcile it on its own reload.
+    window.sessionStorage.setItem(EDITOR_SESSION_STORAGE_KEY, 'tab-a');
+    await expect(peekOpenProjectIds()).resolves.toEqual([project.id]);
+    // Tab A is gone: any tab would recover it now.
+    window.sessionStorage.setItem(EDITOR_SESSION_STORAGE_KEY, 'tab-b');
+    if (lock.kind === 'acquired') {
+      await lock.release();
+    }
+    await expect(peekOpenProjectIds()).resolves.toEqual([project.id]);
+  });
+
   it('counts a project known only from its journal as one that would open', async () => {
     const tab = openTab('tab-a', 'writer-a1');
     const loaded = await tab.loadWorkbench();

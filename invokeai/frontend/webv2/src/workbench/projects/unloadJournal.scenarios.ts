@@ -303,6 +303,47 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
 
       expect(recovered.state.projects).toMatchObject([{ id: project.id, name: 'Typed before the reload' }]);
     });
+
+    describe('under a lineage named after another tab, which the session blob handed on', () => {
+      // Tab A isolated the project's lineage (an unopenable draft, say); every tab that loads the session inherits it.
+      const inheritedLineage = `tab-a:writer:writer-1`;
+      beforeEach(async () => {
+        await api.saveSession(stateWith([project]), 'tab-a', { [project.id]: inheritedLineage });
+      });
+
+      it("is recovered by a reload of the tab that wrote it while the lineage's tab lives on", async () => {
+        liveEditorSessionIds.add('tab-a');
+        const tab = openTab('tab-b');
+        const loaded = await tab.loadWorkbench();
+        expect(tab.journalBeforeUnload(named(loaded.state, 'Typed in the other tab'))).toMatchObject({
+          kind: 'journaled',
+        });
+
+        const recovered = await openTab('tab-b').loadWorkbench();
+
+        expect(recovered.state.projects).toMatchObject([{ id: project.id, name: 'Typed in the other tab' }]);
+        expect(recovered.conflicts).toEqual([]);
+        await expect(store.get(project.id, inheritedLineage)).resolves.toMatchObject({ kind: 'found' });
+      });
+
+      it('is left to the tab that wrote it while that tab lives, whichever tab the lineage is named after', async () => {
+        const tab = openTab();
+        const loaded = await tab.loadWorkbench();
+        tab.journalBeforeUnload(named(loaded.state, "Typed in the lineage's own tab"));
+
+        const other = await openTab('tab-b').loadWorkbench();
+
+        expect(other.state.projects).toMatchObject([{ id: project.id, name: project.name }]);
+        await expect(store.peekUnloadJournalProjectIds(1)).resolves.toEqual({
+          kind: 'available',
+          projectIds: [project.id],
+        });
+        // Gone now: the next load takes the entry.
+        unloadTab('tab-a');
+        const recovered = await openTab('tab-b').loadWorkbench();
+        expect(recovered.state.projects).toMatchObject([{ id: project.id, name: "Typed in the lineage's own tab" }]);
+      });
+    });
   });
 
   it('does not bring back an edit undone just before the page unloaded, with no save in between', async () => {
