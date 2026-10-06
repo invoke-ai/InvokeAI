@@ -257,10 +257,16 @@ describe('tool strip family slots', () => {
   it('opens from the keyboard with ArrowRight, navigates, selects, and ArrowLeft returns to the slot', async () => {
     const fake = await renderStrip();
     const shape = (await button('Shape').element()) as HTMLElement;
+    // Workbench hotkeys (ArrowRight nudges the selected layer) listen on window.
+    const windowKeys: string[] = [];
+    const recordKey = (event: KeyboardEvent) => windowKeys.push(event.key);
+    window.addEventListener('keydown', recordKey);
     await act(async () => {
       shape.focus();
       await userEvent.keyboard('{ArrowRight}');
     });
+    window.removeEventListener('keydown', recordKey);
+    expect(windowKeys).not.toContain('ArrowRight');
     await expect.element(menu()).toBeVisible();
     await expect.poll(() => document.activeElement?.getAttribute('role')).toBe('menu');
     await expect.element(entry('Rectangle')).toHaveAttribute('data-highlighted');

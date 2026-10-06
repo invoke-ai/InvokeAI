@@ -194,6 +194,8 @@ export const ToolFamilyButton = ({
     (event: KeyboardEvent<HTMLButtonElement>) => {
       if (event.key === 'ArrowRight' || event.key === 'ContextMenu') {
         event.preventDefault();
+        // Workbench hotkeys listen on window; the key that opens the menu must not also nudge the selected layer.
+        event.stopPropagation();
         openFromKeyboard();
       }
     },
