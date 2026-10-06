@@ -178,6 +178,44 @@ export const revealWidgetPlacement = ({
   return { ok: true, region };
 };
 
+/** Cycle docked panel views in their displayed order, leaving windows and toolbar/popover controls alone. */
+export const cycleRegionWidget = ({
+  direction,
+  getWidgetsForRegion,
+  project,
+  region,
+  widgets,
+}: {
+  direction: -1 | 1;
+  getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[];
+  project: WidgetPlacementProject;
+  region: WidgetRegion;
+  widgets: WorkbenchWidgetCommands;
+}): WidgetInstanceId | null => {
+  const available = new Set(
+    getWidgetsForRegion(region)
+      .filter(
+        (widget) =>
+          canRenderWidgetInRegion(widget, region) && !(region === 'bottom' && widget.manifest.bottomPanel === 'popover')
+      )
+      .map((widget) => widget.manifest.id)
+  );
+  const state = project.widgetRegions[region];
+  const ids = state.instanceIds.filter((id) => available.has(project.widgetInstances[id]?.typeId));
+  if (ids.length === 0) {
+    return null;
+  }
+  const current = ids.indexOf(state.activeInstanceId);
+  const next =
+    ids[current < 0 ? (direction > 0 ? 0 : ids.length - 1) : (current + direction + ids.length) % ids.length];
+  // Selecting the same side-panel tab toggles its collapse state.
+  if (next === state.activeInstanceId) {
+    return null;
+  }
+  revealWidgetPlacement({ instanceId: next, project, region, widgets });
+  return next;
+};
+
 /**
  * Activate a rail slot. A docked tab is revealed in its region. A floating window's marker brings the window
  * forward and expands it instead: docking is the window's own control and the marker's menu.

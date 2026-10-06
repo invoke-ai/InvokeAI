@@ -1,5 +1,7 @@
 import type { ControlLayerRejection } from '@workbench/widgets/canvas/invoke/prepareCanvasInvocation';
 
+import { FocusRegionProvider } from '@workbench/focusRegions';
+import { createTestFocusController } from '@workbench/focusRegions.testing';
 import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -38,6 +40,7 @@ vi.mock('@features/models', async (importOriginal) => ({
 }));
 
 const english = createInstance();
+const focus = createTestFocusController();
 await english.use(initReactI18next).init({
   initAsync: false,
   lng: 'en',
@@ -65,7 +68,9 @@ it('words a blocked control layer from the locale when Invoke runs from its hotk
   await act(() =>
     root?.render(
       <I18nextProvider i18n={english}>
-        <Commands />
+        <FocusRegionProvider controller={focus}>
+          <Commands />
+        </FocusRegionProvider>
       </I18nextProvider>
     )
   );

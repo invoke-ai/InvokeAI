@@ -158,8 +158,30 @@ export const OPEN_COMMAND_PALETTE_HOTKEY: HotkeyDefinition = {
   title: 'Open Command Palette',
 };
 
+export const regionFocusHotkeys = (['left', 'right', 'up', 'down'] as const).map((direction) => ({
+  ...hotkey('app', `focusRegion${direction[0].toUpperCase()}${direction.slice(1)}`, [`alt+shift+arrow${direction}`]),
+  allowInEditable: true,
+  direction,
+  implemented: true,
+}));
+
+export const widgetCycleHotkeys = (
+  [
+    { direction: -1, id: 'selectPreviousWidget', key: 'alt+pageup' },
+    { direction: 1, id: 'selectNextWidget', key: 'alt+pagedown' },
+  ] as const
+).map(({ direction, id, key }) => ({
+  ...hotkey('app', id, [key]),
+  allowInEditable: true,
+  direction,
+  implemented: true,
+  scope: { kind: 'focused-region' } as const,
+}));
+
 export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   OPEN_COMMAND_PALETTE_HOTKEY,
+  ...regionFocusHotkeys,
+  ...widgetCycleHotkeys,
   hotkey('app', 'invoke', ['mod+enter']),
   // Override the destination for one submission without changing the saved route.
   hotkey('app', 'invokeToOtherDestination', ['alt+mod+enter']),
