@@ -616,6 +616,7 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
   await saveDialog.getByRole('textbox').fill('Journey Saved');
   await saveDialog.getByRole('button', { exact: true, name: 'Save' }).click();
   await page.getByText('Workflow saved', { exact: true }).waitFor();
+  assert.equal(await currentWorkflowName(), 'Journey Saved');
 
   const libraryWrites = (await workflowRequests())
     .slice(requestsBefore)
@@ -630,7 +631,7 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
   assert.equal(saved.revision, 1);
   assert.equal(library.items.find((item) => item.workflow_id === template.workflow_id)?.name, 'Journey Template');
 
-  // The project keeps both workflows; the saved copy now targets the new template, and the name stayed the copy's.
+  // The project keeps both workflows; the saved copy now targets the new template and takes its name.
   const record = await waitForSavedWorkflows(
     projectId,
     (candidate) =>
@@ -642,7 +643,7 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
   assert.equal(record.data.documentSchemaVersion, 3);
   assert.deepEqual(
     record.data.workflows.entries.map((entry) => entry.document.name),
-    ['Empty Workflow', 'Journey Template edited']
+    ['Empty Workflow', 'Journey Saved']
   );
   assert.deepEqual(record.data.workflows.entries[1].source, { libraryWorkflowId: saved.workflow_id, revision: 1 });
   assert.equal(record.data.workflows.activeWorkflowId, record.data.workflows.entries[1].document.id);
@@ -651,7 +652,7 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('main', { exact: true, name: imported.name }).waitFor();
   await selectLayoutPreset(page, 'Automate', 'Workflow');
-  assert.equal(await currentWorkflowName(), 'Journey Template edited');
+  assert.equal(await currentWorkflowName(), 'Journey Saved');
   await openProjectWorkflows();
   assert.equal(await cards.count(), 2);
   await page.keyboard.press('Escape');
