@@ -2,8 +2,12 @@ import { captureAccountScope, isAccountScopeCurrent, type AccountScope } from '@
 
 import type { IdentityTokenAdapter } from './core/tokenStorage';
 
-import { browserIdentityTokenAdapter } from './core/tokenStorage';
-import { isNewEpochForCurrentSession, isPasswordChangePending, waitForPasswordChange } from './passwordChangeGate';
+import {
+  browserIdentityTokenAdapter,
+  isNewEpochForCurrentSession,
+  isPasswordChangePending,
+  waitForPasswordChange,
+} from './core/tokenStorage';
 import { handleUnauthorizedResponse } from './session';
 
 export interface IdentityTransportAuthAdapter {

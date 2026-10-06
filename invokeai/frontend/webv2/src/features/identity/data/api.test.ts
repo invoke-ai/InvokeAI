@@ -8,7 +8,7 @@ vi.mock('@platform/transport/http', () => ({
   getHttpAuthToken: mocks.getHttpAuthToken,
 }));
 
-import { isPasswordChangePending } from '@features/identity/passwordChangeGate';
+import { isPasswordChangePending } from '@features/identity/core/tokenStorage';
 
 import { createUser, deleteUser, updateUser } from './api';
 

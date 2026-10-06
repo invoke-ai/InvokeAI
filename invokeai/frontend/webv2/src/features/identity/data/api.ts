@@ -1,4 +1,4 @@
-import { beginPasswordChange, getTokenUserId } from '@features/identity/passwordChangeGate';
+import { beginPasswordChange, getTokenUserId } from '@features/identity/core/tokenStorage';
 import { apiFetch, apiFetchJson, getHttpAuthToken } from '@platform/transport/http';
 
 /** Keep auth transport DTO field names unchanged; session state and components own reshaping. */
