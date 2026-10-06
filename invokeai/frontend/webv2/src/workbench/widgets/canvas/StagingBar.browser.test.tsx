@@ -14,18 +14,10 @@ import { CanvasBottomOverlay } from './CanvasBottomOverlay';
 import { StagingBar } from './StagingBar';
 
 const contextMenu = vi.hoisted(() => ({
-  acceptLabels: [] as string[],
   targets: [] as { slotId: string; x: number; y: number }[],
 }));
 vi.mock('./StagingItemContextMenu', () => ({
-  StagingItemContextMenu: ({
-    acceptLabel,
-    target,
-  }: {
-    acceptLabel: string;
-    target: { slot: { id: string }; x: number; y: number };
-  }) => {
-    contextMenu.acceptLabels.push(acceptLabel);
+  StagingItemContextMenu: ({ target }: { target: { slot: { id: string }; x: number; y: number } }) => {
     contextMenu.targets.push({ slotId: target.slot.id, x: target.x, y: target.y });
     return <div data-testid="staging-context-menu" />;
   },
@@ -87,14 +79,12 @@ const renderStagingBar = async (
   onSelectImage: (index: number) => void = noop,
   slotAt: (index: number) => CanvasStagingSlot = makeSlot,
   {
-    acceptStopsBatch = false,
     canvasWidth = CANVAS_WIDTH,
     isGenerating = false,
     isSavingToGallery = false,
     onAccept = noop,
     onSaveToGallery = () => Promise.resolve(),
   }: {
-    acceptStopsBatch?: boolean;
     canvasWidth?: number;
     isGenerating?: boolean;
     isSavingToGallery?: boolean;
@@ -119,7 +109,6 @@ const renderStagingBar = async (
             <CanvasBottomOverlay.Root>
               <CanvasBottomOverlay.Staging>
                 <StagingBar
-                  acceptStopsBatch={acceptStopsBatch}
                   antialiasProgressImages={false}
                   areThumbnailsVisible
                   autoSwitchMode="off"
@@ -304,31 +293,14 @@ describe('StagingBar thumbnail strip', () => {
 
     expect(onSaveToLayerAndContinue).toHaveBeenCalledOnce();
   });
-  it('names the accept action for the batch it stops, in the bar and its menu, and keeps the hidden-layer alternative', async () => {
-    await renderStagingBar(1);
-    await expect.element(page.getByRole('button', { exact: true, name: 'Accept to Layer' })).toBeVisible();
-    const keptWidth = page
-      .getByRole('button', { exact: true, name: 'Accept to Layer' })
-      .element()
-      .getBoundingClientRect().width;
-
+  it('accepts from the bar and keeps the hidden-layer alternative', async () => {
     const onAccept = vi.fn();
     const onSaveToLayerAndContinue = vi.fn();
-    await renderStagingBar(1, 0, onSaveToLayerAndContinue, noop, noop, makeSlot, { acceptStopsBatch: true, onAccept });
-    const acceptAndStop = page.getByRole('button', { exact: true, name: 'Accept and Stop Batch' });
-    await expect.element(acceptAndStop).toBeVisible();
-    // The label swap does not resize the bar.
-    expect(acceptAndStop.element().getBoundingClientRect().width).toBe(keptWidth);
-    await acceptAndStop.click();
+    await renderStagingBar(1, 0, onSaveToLayerAndContinue, noop, noop, makeSlot, { onAccept });
+    const accept = page.getByRole('button', { exact: true, name: 'Accept to Layer' });
+    await expect.element(accept).toBeVisible();
+    await accept.click();
     expect(onAccept).toHaveBeenCalledOnce();
-
-    const thumbnail = page.getByRole('button', { name: 'Select staged candidate 1' }).element();
-    await interact(() =>
-      thumbnail.dispatchEvent(
-        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 50, clientY: 50 })
-      )
-    );
-    expect(contextMenu.acceptLabels.at(-1)).toBe('Accept and Stop Batch');
 
     await page.getByRole('button', { name: 'More accept options' }).click();
     const keepHidden = page.getByRole('menuitem', { name: 'Keep as Hidden Layer' });
@@ -348,10 +320,10 @@ describe('StagingBar thumbnail strip', () => {
         noop,
         noop,
         (index) => (index === 0 ? makeSlot(index) : makePlaceholder(index)),
-        { acceptStopsBatch: true, canvasWidth, isGenerating: true }
+        { canvasWidth, isGenerating: true }
       );
       const trigger = page.getByRole('button', { name: 'More accept options' }).element();
-      const accept = page.getByRole('button', { exact: true, name: 'Accept and Stop Batch' }).element();
+      const accept = page.getByRole('button', { exact: true, name: 'Accept to Layer' }).element();
       const bounds = overlay.getBoundingClientRect();
       expect(trigger.getBoundingClientRect().right).toBeLessThanOrEqual(bounds.right);
       expect(accept.getBoundingClientRect().left).toBeGreaterThanOrEqual(bounds.left);
@@ -369,7 +341,7 @@ describe('StagingBar thumbnail strip', () => {
         }
       }
       // The accept action keeps its full name, and Tooltip, however narrow the bar.
-      expect(accept.getAttribute('aria-label')).toBe('Accept and Stop Batch');
+      expect(accept.getAttribute('aria-label')).toBe('Accept to Layer');
       // Collapsed or not, Discard All and the generating status keep their names.
       await expect.element(page.getByRole('button', { name: 'Discard All' })).toBeVisible();
       expect(page.getByRole('status').element().textContent).toBe('Generating…');
@@ -379,7 +351,6 @@ describe('StagingBar thumbnail strip', () => {
   it('saves the selected candidate from an icon button that keeps its name inside a compact canvas', async () => {
     const onSaveToGallery = vi.fn(() => Promise.resolve());
     const { overlay } = await renderStagingBar(3, 1, noop, noop, noop, makeSlot, {
-      acceptStopsBatch: true,
       canvasWidth: 640,
       isGenerating: true,
       onSaveToGallery,

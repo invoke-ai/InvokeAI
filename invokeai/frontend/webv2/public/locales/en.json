@@ -3039,7 +3039,6 @@
       "showStagedResultPreview": "Show staged result preview",
       "showStagingThumbnails": "Show staging thumbnails",
       "staging": {
-        "acceptAndStopBatch": "Accept and Stop Batch",
         "acceptStopMessage": "Stopping the rest of its batch, which shows as cancelled in the queue.",
         "acceptStopTitle": "Result accepted",
         "autoSwitch": "Auto-switch",

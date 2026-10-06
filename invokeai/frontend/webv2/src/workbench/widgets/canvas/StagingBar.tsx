@@ -79,8 +79,6 @@ const NARROW_ONLY_CSS = { display: 'none', [NARROW]: { display: 'inline-flex' } 
 const NARROW_ICON_BUTTON_CSS = { [NARROW]: { minW: '8', px: '0' } } as const;
 
 interface StagingBarProps {
-  /** Accepting also stops the selected candidate's still-running batch. */
-  acceptStopsBatch: boolean;
   antialiasProgressImages: boolean;
   areThumbnailsVisible: boolean;
   autoSwitchMode: AutoSwitchMode;
@@ -114,7 +112,6 @@ interface StagingBarProps {
  * engine.previews; the parent positions this bar above tool options.
  */
 export const StagingBar = ({
-  acceptStopsBatch,
   antialiasProgressImages,
   areThumbnailsVisible,
   autoSwitchMode,
@@ -151,9 +148,7 @@ export const StagingBar = ({
   }
   const hasSlots = slots.length > 0;
   const cancelableQueueItemId = getCancelableCanvasStagingQueueItemId(selectedSlot);
-  const acceptLabel = t(
-    acceptStopsBatch ? 'widgets.canvas.staging.acceptAndStopBatch' : 'widgets.canvas.acceptToLayer'
-  );
+  const acceptLabel = t('widgets.canvas.acceptToLayer');
   const acceptMenuIds = useTooltipTriggerIds();
   const thumbnailsLabel = areThumbnailsVisible
     ? t('widgets.canvas.hideStagingThumbnails')
@@ -176,7 +171,6 @@ export const StagingBar = ({
     >
       {contextMenuTarget ? (
         <StagingItemContextMenu
-          acceptLabel={acceptLabel}
           canAccept={canAccept}
           target={contextMenuTarget}
           onAccept={onAccept}
@@ -392,12 +386,8 @@ export const StagingBar = ({
                         onClick={onAccept}
                       >
                         <CheckIcon />
-                        {/* Both labels share one cell, so the bar keeps its width when the batch finishes. */}
-                        <Box as="span" css={NARROW_SR_ONLY_CSS} display="inline-grid">
-                          <AcceptLabel visible={!acceptStopsBatch}>{t('widgets.canvas.acceptToLayer')}</AcceptLabel>
-                          <AcceptLabel visible={acceptStopsBatch}>
-                            {t('widgets.canvas.staging.acceptAndStopBatch')}
-                          </AcceptLabel>
+                        <Box as="span" css={NARROW_SR_ONLY_CSS}>
+                          {acceptLabel}
                         </Box>
                       </Button>
                     </Tooltip>
@@ -433,12 +423,6 @@ export const StagingBar = ({
     </Stack>
   );
 };
-
-const AcceptLabel = ({ children, visible }: { children: string; visible: boolean }) => (
-  <Box as="span" gridArea="1 / 1" visibility={visible ? 'visible' : 'hidden'}>
-    {children}
-  </Box>
-);
 
 const AutoSwitchMenu = ({ mode, onSelect }: { mode: AutoSwitchMode; onSelect: (mode: AutoSwitchMode) => void }) => {
   const { t } = useTranslation();

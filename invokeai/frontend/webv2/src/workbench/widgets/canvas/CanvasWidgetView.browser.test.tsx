@@ -149,7 +149,7 @@ describe('CanvasWidgetView accept and stop', () => {
   it('accepts the result, then cancels its batch through the workbench queue command with the accept notice', async () => {
     const { store } = await renderView('running');
 
-    await page.getByRole('button', { exact: true, name: 'Accept and Stop Batch' }).click();
+    await page.getByRole('button', { exact: true, name: 'Accept to Layer' }).click();
 
     const project = store.getState().projects[0]!;
     expect(project.canvas.document.stacks.raster).toHaveLength(1);

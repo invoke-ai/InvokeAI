@@ -41,7 +41,6 @@ const useStagedCandidateMeta = (projectId: string, backendItemId: number | undef
 };
 
 export const StagingItemContextMenu = ({
-  acceptLabel,
   canAccept,
   onAccept,
   onClose,
@@ -49,7 +48,6 @@ export const StagingItemContextMenu = ({
   onSaveToGallery,
   target,
 }: {
-  acceptLabel: string;
   canAccept: boolean;
   onAccept: () => void;
   onClose: () => void;
@@ -98,7 +96,7 @@ export const StagingItemContextMenu = ({
             <MenuActionItem
               disabled={!canAccept}
               icon={CheckIcon}
-              label={acceptLabel}
+              label={t('widgets.canvas.acceptToLayer')}
               value="accept"
               onSelect={onAccept}
             />

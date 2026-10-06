@@ -54,7 +54,7 @@ import { CanvasColorFeed } from './color-system/CanvasColorFeed';
 import { useActiveColorCommands } from './color-system/useActiveColors';
 import { useCanvasOperation } from './engineStoreHooks';
 import { executeCanvasImageDropImport } from './executeCanvasImageDropImport';
-import { acceptStagedCandidate, getStoppableCandidateBatch } from './stagedAcceptance';
+import { acceptStagedCandidate } from './stagedAcceptance';
 import { StagingBar } from './StagingBar';
 import { selectStagedPreviewSource, stagedPreviewKey } from './stagingPreview';
 import { INLINE_EDIT_SELECTOR } from './surfaceFocus';
@@ -149,9 +149,6 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     selectedCandidate?.imageName ?? null
   );
   const selectedPlaceholder = selectedSlot?.kind === 'placeholder' ? selectedSlot : null;
-  const acceptStopsBatch = selectedCandidate
-    ? getStoppableCandidateBatch(selectedCandidate, queueItems) !== null
-    : false;
   const hasStagingSlots = stagingSlots.length > 0;
   const hasMultipleStagingSlots = stagingSlots.length > 1;
   const isCanvasGenerationInFlight = queueItems.some(
@@ -545,7 +542,6 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
                 antialiasProgressImages={antialiasProgressImages}
                 areThumbnailsVisible={stagingArea.areThumbnailsVisible}
                 autoSwitchMode={stagingArea.autoSwitchMode}
-                acceptStopsBatch={acceptStopsBatch}
                 canAccept={interactionCapabilities.canAcceptStagedImage}
                 hasMultipleSlots={hasMultipleStagingSlots}
                 isGenerating={isCanvasGenerationInFlight}
