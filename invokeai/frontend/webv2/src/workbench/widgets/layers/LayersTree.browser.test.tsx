@@ -511,6 +511,21 @@ describe('LayersTree keyboard and accessibility', () => {
     expect(output('surface')).toBe('menu:top');
   });
 
+  it('frames the keyboard-focused row surface with its ring, not the gap below it', async () => {
+    await renderTree(nested());
+    treeitem('Top').focus();
+    await act(() => userEvent.keyboard('{ArrowDown}'));
+    const row = treeitem('Group');
+    expect(document.activeElement).toBe(row);
+
+    const ring = getComputedStyle(row, '::after');
+    const rowRect = row.getBoundingClientRect();
+    const surface = [...row.children].find((child) => child.textContent?.includes('Group'))!.getBoundingClientRect();
+    // The ring and the surface share their box, so the row's content sits centred inside the ring.
+    expect(rowRect.top + Number.parseFloat(ring.top)).toBeCloseTo(surface.top, 0);
+    expect(rowRect.bottom - Number.parseFloat(ring.bottom)).toBeCloseTo(surface.bottom, 0);
+  });
+
   it('keeps the focused row mounted and focused while scrolled far away', async () => {
     await renderTree(manyLayers(2000));
     treeitem('Layer 0').focus();
