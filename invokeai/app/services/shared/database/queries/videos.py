@@ -169,7 +169,8 @@ def _parameters(
         "video_origin": video_origin.value if video_origin is not None else None,
         "is_intermediate": is_intermediate,
         "board_id": board_id,
-        "pattern": like_contains(search_term) if search_term else None,
+        # Lowered here, as the legacy storage did: SQLite's LIKE folds the case of ASCII letters only.
+        "pattern": like_contains(search_term.lower()) if search_term else None,
         "user_id": user_id,
     }
 

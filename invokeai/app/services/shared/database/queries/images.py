@@ -3,7 +3,6 @@
 import functools
 import itertools
 from collections.abc import Sequence
-from datetime import date, timedelta
 from typing import Any, NamedTuple, Optional
 
 from sqlalchemy import (
@@ -39,7 +38,7 @@ from invokeai.app.services.shared.database.dialect import (
     insert_ignore,
     like_contains,
 )
-from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, mapped, read, write
+from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, day_after, mapped, read, write
 from invokeai.app.services.shared.database.schema.boards import board_images, boards, shared_boards
 from invokeai.app.services.shared.database.schema.images import images
 
@@ -167,17 +166,6 @@ def _shape(
     )
 
 
-def _day_after(day: str) -> str:
-    """The day after an ISO day (`YYYY-MM-DD`), as text that timestamps of that day sort before. An invalid day, or
-    the last one there is, gives the empty text, which no timestamp sorts before: SQLite's DATE() gave NULL for both,
-    which matched nothing."""
-    try:
-        parsed = date.fromisoformat(day)
-        return (parsed + timedelta(days=1)).isoformat() if parsed.isoformat() == day else ""
-    except (ValueError, OverflowError):
-        return ""
-
-
 def _parameters(
     *,
     image_origin: Optional[ResourceOrigin],
@@ -192,9 +180,10 @@ def _parameters(
         "image_origin": image_origin.value if image_origin is not None else None,
         "is_intermediate": is_intermediate,
         "board_id": board_id,
-        "pattern": like_contains(search_term) if search_term else None,
+        # Lowered here, as the legacy storage did: SQLite's LIKE folds the case of ASCII letters only.
+        "pattern": like_contains(search_term.lower()) if search_term else None,
         "created_from": created_from,
-        "created_before": _day_after(created_to) if created_to is not None else None,
+        "created_before": day_after(created_to) if created_to is not None else None,
         "user_id": user_id,
     }
 

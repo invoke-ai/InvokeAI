@@ -489,6 +489,13 @@ class TestSearch:
         assert store.get_many(limit=10, search_term="100% COTTON_").total == 1
 
 
+class TestSearchBeyondAscii:
+    def test_a_search_ignores_the_case_of_letters_beyond_ascii(self, store: ImageRecordStorage) -> None:
+        _save(store, "apples.png", metadata='{"prompt": "frische äpfel"}')
+
+        assert store.get_image_names(search_term="ÄPFEL").image_names == ["apples.png"]
+
+
 class TestOwnershipFilteringOmittedBoard:
     """get_many()/get_image_names() enforce per-user isolation when board_id is omitted.
 

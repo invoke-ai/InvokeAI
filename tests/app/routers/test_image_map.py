@@ -16,7 +16,7 @@ from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api_app import app
 from invokeai.app.services.board_video_records.board_video_records_default import BoardVideoRecordStorage
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
+from invokeai.app.services.gallery.gallery_default import GalleryService
 from invokeai.app.services.image_index.image_index_base import ImageIndexServiceBase
 from invokeai.app.services.image_index.image_index_common import (
     ImageIndexStatus,
@@ -247,7 +247,7 @@ def mock_services(
         video_files=None,  # type: ignore
         video_records=video_records,
         board_video_records=BoardVideoRecordStorage(db.database),
-        gallery=SqliteGalleryService(db=db),
+        gallery=GalleryService(db.database),
         image_index_records=(index_records := ImageIndexRecordsSqlite(db=db)),
         image_index=image_index_service,
         intermediates=None,  # type: ignore

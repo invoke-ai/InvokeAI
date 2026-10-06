@@ -19,7 +19,7 @@ from invokeai.app.services.bulk_download.bulk_download_default import BulkDownlo
 from invokeai.app.services.client_state_persistence.client_state_persistence_default import ClientStatePersistence
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.external_generation.external_generation_default import ExternalGenerationService
-from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
+from invokeai.app.services.gallery.gallery_default import GalleryService
 from invokeai.app.services.image_index.image_index_default import ImageIndexService
 from invokeai.app.services.image_index.image_index_records_sqlite import ImageIndexRecordsSqlite
 from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
@@ -137,7 +137,7 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
         board_video_records=BoardVideoRecordStorage(db.database),
         # Real SQLite-backed gallery service: the virtual-boards router reads dates and
         # per-date item names through it, and MagicMock cannot exercise the filter SQL.
-        gallery=SqliteGalleryService(db=db),
+        gallery=GalleryService(db.database),
         image_index_records=ImageIndexRecordsSqlite(db=db),
         image_index=ImageIndexService(),
         intermediates=IntermediatesService(records=IntermediatesRecords(db.database), logger=logger),

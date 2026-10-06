@@ -76,7 +76,7 @@ class Services:
         from invokeai.app.services.client_state_persistence.client_state_persistence_default import (
             ClientStatePersistence,
         )
-        from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
+        from invokeai.app.services.gallery.gallery_default import GalleryService
         from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
         from invokeai.app.services.model_records import ModelRecordServiceSQL
         from invokeai.app.services.project_records.project_records_default import ProjectRecordsStorage
@@ -95,7 +95,7 @@ class Services:
         self.board_records = BoardRecordStorage(db.database)
         self.board_image_records = BoardImageRecordStorage(db.database)
         self.board_video_records = BoardVideoRecordStorage(db.database)
-        self.gallery = SqliteGalleryService(db=db)
+        self.gallery = GalleryService(db.database)
         self.users = UserService(db.database)
         self.client_state = ClientStatePersistence(db.database)
         self.project_records = ProjectRecordsStorage(db.database)

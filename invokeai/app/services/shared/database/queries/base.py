@@ -2,6 +2,7 @@
 
 import functools
 from collections.abc import Callable
+from datetime import date, timedelta
 from typing import TYPE_CHECKING, Concatenate, ParamSpec, Protocol, TypeVar
 
 from sqlalchemy import Connection
@@ -141,3 +142,14 @@ def mapped(mapper: Callable[[T], R]) -> Callable[[Callable[Concatenate[M, P], T]
         return call
 
     return decorate
+
+
+def day_after(day: str) -> str:
+    """The day after an ISO day (`YYYY-MM-DD`), as text that timestamps of that day sort before. An invalid day, or
+    the last one there is, gives the empty text, which no timestamp sorts before: SQLite's DATE() gave NULL for both,
+    which matched nothing."""
+    try:
+        parsed = date.fromisoformat(day)
+        return (parsed + timedelta(days=1)).isoformat() if parsed.isoformat() == day else ""
+    except (ValueError, OverflowError):
+        return ""

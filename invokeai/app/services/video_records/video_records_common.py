@@ -26,19 +26,6 @@ class VideoRecordSaveException(Exception):
         super().__init__(message)
 
 
-# The `media_origin` marker, projected out of the `metadata` JSON blob. Kept as a bare
-# expression so the polymorphic gallery query can alias it into its own UNION half.
-#
-# The `json_valid` guard is not decoration: `json_extract` RAISES on unparseable text, and
-# this expression now runs on every row of every video listing. An unguarded call would let
-# a single malformed blob fail the whole page rather than one video -- and the column is
-# plain TEXT with no CHECK constraint, so nothing but convention keeps one out. Every
-# in-tree writer goes through `MetadataField`, so this is insurance, not a live bug.
-MEDIA_ORIGIN_JSON_EXPR = (
-    "CASE WHEN json_valid(videos.metadata) THEN json_extract(videos.metadata, '$.media_origin') END"
-)
-MEDIA_ORIGIN_SQL_EXPR = f"{MEDIA_ORIGIN_JSON_EXPR} AS media_origin"
-
 # The longest marker worth carrying. Only `audio_upload` has meaning today, but the field is
 # an open vocabulary, so this is a sanity bound rather than an allowlist. It matters because
 # upload metadata is client-supplied and unbounded, and this one key now rides EVERY row of
