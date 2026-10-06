@@ -719,6 +719,32 @@ describe('Call Saved Workflow dynamic fields', () => {
     expect(Object.keys(findCallNode(transient)?.data.dynamicInputTemplates ?? {})).toHaveLength(2);
   });
 
+  it("saves a node mid-switch as a fresh selection, not the previous workflow's inputs under the new id", () => {
+    const exposed = projectGraphReducer(buildConnectedCall(), {
+      fieldIdentifier: { fieldName: dynamicFieldName('a'), nodeId: 'call-1' },
+      type: 'exposeField',
+    });
+    const reloaded = parseWorkflowJson(serializeWorkflowJson(selectWorkflow(exposed, 'child-2'))).document;
+    const node = findCallNode(reloaded);
+
+    expect(node?.data.inputs.workflow_id?.value).toBe('child-2');
+    expect(node?.data.callSavedWorkflowStatus).toBe('loading');
+    expect(node?.data.callSavedWorkflowFieldsFrom).toBeUndefined();
+    expect(
+      Object.keys(node?.data.inputs ?? {}).filter((name) => name.startsWith(CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX))
+    ).toEqual([]);
+    expect(node?.data.dynamicInputTemplates ?? {}).toEqual({});
+    expect(reloaded.edges).toEqual([]);
+    expect(Object.values(reloaded.form.elements).filter((element) => element.type === 'node-field')).toEqual([]);
+
+    // The reopened node then takes the selected workflow's own values, as the switch would have.
+    expect(dynamicValues(syncWith(reloaded, copiedChildFields()))).toEqual([5, 7]);
+
+    // Inputs that belong to the selection survive a save unchanged.
+    const kept = findCallNode(parseWorkflowJson(serializeWorkflowJson(exposed)).document);
+    expect(Object.keys(kept?.data.dynamicInputTemplates ?? {})).toEqual([dynamicFieldName('a'), dynamicFieldName('b')]);
+  });
+
   it('removes connections from an unconnected connector into inputs the next signature lacks', () => {
     const connector = buildConnectorNode({ x: 50, y: 0 });
     connector.id = 'connector-1';
