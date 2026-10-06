@@ -385,9 +385,9 @@ class GalleryQueries(QueryModule):
         parameters = {"user_id": user_id}
         counts = [
             DateCounts(str(r[0]), int(r[1] or 0), int(r[2] or 0), int(r[3] or 0), int(r[4] or 0))
-            for r in conn.execute(_date_counts(scoped), parameters)
+            for r in conn.execute(_date_counts(scoped), parameters).all()
         ]
-        covers = {str(r[0]): (str(r[1]), str(r[2])) for r in conn.execute(_date_covers(scoped), parameters)}
+        covers = {str(r[0]): (str(r[1]), str(r[2])) for r in conn.execute(_date_covers(scoped), parameters).all()}
         return counts, covers
 
     @read
@@ -395,7 +395,7 @@ class GalleryQueries(QueryModule):
         """Counts and covers of the boards' items that are not intermediates; a board without any has no row."""
         summaries: list[BoardSummary] = []
         for chunk in itertools.batched(board_ids, IN_CHUNK // 2):
-            for r in conn.execute(_BOARD_SUMMARIES, {"board_ids": list(chunk)}):
+            for r in conn.execute(_BOARD_SUMMARIES, {"board_ids": list(chunk)}).all():
                 summaries.append(
                     BoardSummary(str(r[0]), int(r[1] or 0), int(r[2] or 0), int(r[3] or 0), int(r[4] or 0), r[5], r[6])
                 )

@@ -24,7 +24,6 @@ from sqlalchemy import (
     update,
 )
 
-from invokeai.app.services.board_records.board_records_common import BoardVisibility
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
     ImageRecord,
@@ -39,13 +38,13 @@ from invokeai.app.services.shared.database.dialect import (
     like_contains,
 )
 from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, day_after, mapped, read, write
-from invokeai.app.services.shared.database.schema.boards import board_images, boards, shared_boards
+from invokeai.app.services.shared.database.queries.board_access import readable_board
+from invokeai.app.services.shared.database.schema.boards import board_images, boards
 from invokeai.app.services.shared.database.schema.images import images
 
 _I = images.c
 _BI = board_images.c
 _B = boards.c
-_S = shared_boards.c
 
 # The columns of an `ImageRecord`, which has no metadata and no owner.
 _RECORD = (
@@ -67,7 +66,6 @@ _RECORD = (
     _I.file_size_bytes,
 )
 _RECORD_NAMES = tuple(column.name for column in _RECORD)
-_SHARED_VISIBILITIES = (literal(BoardVisibility.Shared.value), literal(BoardVisibility.Public.value))
 
 _GET = select(*_RECORD).where(_I.image_name == bindparam("image_name"))
 _GET_USER_ID = select(_I.user_id).where(_I.image_name == bindparam("image_name"))
@@ -193,13 +191,7 @@ def _listed_board(scoped: bool) -> list[ColumnElement[bool]]:
     (its own, shared with everyone, or shared with the account)."""
     if not scoped:
         return [_B.archived == false()]
-    shared_with_account = exists(
-        select(literal(1)).where(_S.board_id == _B.board_id, _S.user_id == bindparam("user_id"))
-    )
-    readable = or_(
-        _B.user_id == bindparam("user_id"), _B.board_visibility.in_(_SHARED_VISIBILITIES), shared_with_account
-    )
-    return [_B.archived == false(), readable]
+    return [_B.archived == false(), readable_board(bindparam("user_id"))]
 
 
 def _conditions(shape: _Shape, joined: bool) -> list[ColumnElement[bool]]:
@@ -327,7 +319,7 @@ class ImageQueries(QueryModule):
         """The subfolder of each named image that exists."""
         subfolders: dict[str, str] = {}
         for chunk in itertools.batched(image_names, IN_CHUNK):
-            subfolders.update((row[0], row[1]) for row in conn.execute(_SUBFOLDERS, {"image_names": list(chunk)}))
+            subfolders.update((row[0], row[1]) for row in conn.execute(_SUBFOLDERS, {"image_names": list(chunk)}).all())
         return subfolders
 
     @mapped(_record_or_none)
@@ -514,7 +506,7 @@ class ImageQueries(QueryModule):
         deleted: list[str] = []
         for chunk in itertools.batched(image_names, IN_CHUNK):
             names = list(chunk)
-            locked: set[str] = set(conn.execute(_LOCK_INTERMEDIATES, {"image_names": names}).scalars())
+            locked: set[str] = set(conn.execute(_LOCK_INTERMEDIATES, {"image_names": names}).scalars().all())
             if locked:
                 conn.execute(_DELETE_INTERMEDIATES, {"image_names": sorted(locked)})
                 deleted.extend(name for name in names if name in locked)

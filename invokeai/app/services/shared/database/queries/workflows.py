@@ -275,7 +275,7 @@ class WorkflowQueries(QueryModule):
         """The documents of those of these workflows that exist."""
         found: dict[str, str] = {}
         for chunk in itertools.batched(workflow_ids, IN_CHUNK):
-            found.update((row[0], row[1]) for row in conn.execute(_DOCUMENTS, {"workflow_ids": list(chunk)}))
+            found.update((row[0], row[1]) for row in conn.execute(_DOCUMENTS, {"workflow_ids": list(chunk)}).all())
         return found
 
     @read
@@ -381,7 +381,7 @@ class WorkflowQueries(QueryModule):
     ) -> list[str]:
         """The distinct comma-separated tags of the workflows the filters keep, of those that have tags."""
         shape, parameters = _where(categories=categories, user_id=user_id, is_public=is_public)
-        return list(conn.execute(_tag_lists(shape), parameters).scalars())
+        return list(conn.execute(_tag_lists(shape), parameters).scalars().all())
 
     @write
     def insert(self, conn: Connection, *, workflow_id: str, workflow: str, user_id: str, is_public: bool) -> None:

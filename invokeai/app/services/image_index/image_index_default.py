@@ -1386,7 +1386,7 @@ class ImageIndexService(ImageIndexServiceBase):
         terminal: /points answers `state: "empty", stale: false` (so the client
         stops asking) and every later job returns early (so the fit is never
         re-entered). The map stays blank until the accessible image set
-        changes, and the row is in SQLite, so restarting does not clear it.
+        changes, and the row is in the database, so restarting does not clear it.
 
         Retrying a failed scope once splits the difference the original code
         could not: a transient failure — a MemoryError while a generation holds

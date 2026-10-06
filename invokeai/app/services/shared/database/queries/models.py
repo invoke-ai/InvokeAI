@@ -84,22 +84,22 @@ class ModelQueries(QueryModule):
         values = (name, base, model_type, model_format)
         statement = _search(tuple(bool(value) for value in values), order_by, descending)
         parameters = {f"filter_{column.name}": value for column, value in zip(_FILTERS, values, strict=True) if value}
-        return list(conn.execute(statement, parameters).scalars())
+        return list(conn.execute(statement, parameters).scalars().all())
 
     @read
     def at_path(self, conn: Connection, path: str) -> list[str]:
         """The configs of the models at the path: none or one, since a path is unique."""
-        return list(conn.execute(_AT_PATH, {"path": path}).scalars())
+        return list(conn.execute(_AT_PATH, {"path": path}).scalars().all())
 
     @read
     def with_hash(self, conn: Connection, hash: str) -> list[str]:
         """The configs of the models whose file has the hash."""
-        return list(conn.execute(_WITH_HASH, {"hash": hash}).scalars())
+        return list(conn.execute(_WITH_HASH, {"hash": hash}).scalars().all())
 
     @read
     def paths(self, conn: Connection) -> list[str]:
         """The path of every model, also of one whose config no longer validates."""
-        return list(conn.execute(_PATHS).scalars())
+        return list(conn.execute(_PATHS).scalars().all())
 
     @write
     def insert(self, conn: Connection, key: str, config: str) -> None:

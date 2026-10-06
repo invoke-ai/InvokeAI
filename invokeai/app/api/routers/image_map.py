@@ -399,7 +399,7 @@ async def get_image_map_points(
 
     user_id, is_admin = _scope(current_user)
     kinds = _served_kinds(include_videos)
-    # Both reads are SQLite work under the process-wide database lock, and on a large gallery
+    # Both reads are database work (on SQLite under the process-wide lock), and on a large gallery
     # the accessible listing is the expensive one — so they run off the event loop, like the
     # clustering below.
     current_items, record = await asyncio.to_thread(
@@ -1055,7 +1055,7 @@ async def get_image_map_image_labels(
     if not vocabulary:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="The labeling vocabulary is empty")
 
-    # A BLOB read and a SQLite transaction; off the event loop like the
+    # A BLOB read and a database transaction; off the event loop like the
     # clustering endpoints, since this one fires per hovered point.
     #
     # A stored row whose blob length disagrees with its `dim` column raises out

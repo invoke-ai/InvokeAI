@@ -282,7 +282,7 @@ class VideoQueries(QueryModule):
         """The subfolder of each named video that exists."""
         subfolders: dict[str, str] = {}
         for chunk in itertools.batched(video_names, IN_CHUNK):
-            subfolders.update((row[0], row[1]) for row in conn.execute(_SUBFOLDERS, {"video_names": list(chunk)}))
+            subfolders.update((row[0], row[1]) for row in conn.execute(_SUBFOLDERS, {"video_names": list(chunk)}).all())
         return subfolders
 
     @mapped(_record_or_none)
@@ -461,7 +461,7 @@ class VideoQueries(QueryModule):
         deleted: list[str] = []
         for chunk in itertools.batched(video_names, IN_CHUNK):
             names = list(chunk)
-            locked: set[str] = set(conn.execute(_LOCK_INTERMEDIATES, {"video_names": names}).scalars())
+            locked: set[str] = set(conn.execute(_LOCK_INTERMEDIATES, {"video_names": names}).scalars().all())
             if locked:
                 conn.execute(_DELETE_INTERMEDIATES, {"video_names": sorted(locked)})
                 deleted.extend(name for name in names if name in locked)

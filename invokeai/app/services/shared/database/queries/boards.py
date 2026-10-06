@@ -18,7 +18,6 @@ from sqlalchemy import (
     func,
     insert,
     literal,
-    or_,
     select,
     update,
 )
@@ -31,6 +30,7 @@ from invokeai.app.services.board_records.board_records_common import (
 )
 from invokeai.app.services.shared.database.dialect import CaseInsensitiveOrder
 from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, locking, mapped, read, write
+from invokeai.app.services.shared.database.queries.board_access import readable_board
 from invokeai.app.services.shared.database.schema.boards import boards, shared_boards
 from invokeai.app.services.shared.database.schema.projects import projects
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
@@ -135,19 +135,9 @@ def _update(changes_owned_state: bool) -> Update:
     return statement.where(~_CLAIMED) if changes_owned_state else statement
 
 
-def _visible_to(user_id: ColumnElement[str]) -> ColumnElement[bool]:
-    """Boards a user who is not an administrator sees: their own, those shared with them, and shared or public ones."""
-    shared_with = exists().where(shared_boards.c.board_id == boards.c.board_id, shared_boards.c.user_id == user_id)
-    return or_(
-        boards.c.user_id == user_id,
-        shared_with,
-        boards.c.board_visibility.in_([literal(BoardVisibility.Shared.value), literal(BoardVisibility.Public.value)]),
-    )
-
-
 def _listing(statement: Select[Any], is_admin: bool, include_archived: bool) -> Select[Any]:
     if not is_admin:
-        statement = statement.where(_visible_to(bindparam("user_id")))
+        statement = statement.where(readable_board(bindparam("user_id")))
     if not include_archived:
         statement = statement.where(boards.c.archived == false())
     return statement
@@ -218,7 +208,7 @@ class BoardQueries(QueryModule):
         """The id of the project that claims each of these boards, for the boards a project claims."""
         claimed: dict[str, str] = {}
         for chunk in itertools.batched(board_ids, IN_CHUNK):
-            claimed.update((row[0], row[1]) for row in conn.execute(_PROJECT_IDS, {"board_ids": list(chunk)}))
+            claimed.update((row[0], row[1]) for row in conn.execute(_PROJECT_IDS, {"board_ids": list(chunk)}).all())
         return claimed
 
     @mapped(_boards_and_total)

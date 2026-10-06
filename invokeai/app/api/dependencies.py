@@ -27,7 +27,7 @@ from invokeai.app.services.fonts.fonts_default import FontService
 from invokeai.app.services.gallery.gallery_default import GalleryService
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.image_index.image_index_default import ImageIndexService, warm_up_attention
-from invokeai.app.services.image_index.image_index_records_sqlite import ImageIndexRecordsSqlite
+from invokeai.app.services.image_index.image_index_records_default import ImageIndexRecords
 from invokeai.app.services.image_moves.image_moves_default import ImageMoveService
 from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
@@ -206,7 +206,7 @@ class ApiDependencies:
         client_state_persistence = ClientStatePersistence(db.database)
         project_records = ProjectRecordsStorage(db.database)
         users = UserService(db.database)
-        image_index_records = ImageIndexRecordsSqlite(db=db)
+        image_index_records = ImageIndexRecords(db.database)
         image_index = ImageIndexService()
         intermediates = IntermediatesService(records=IntermediatesRecords(db.database), logger=logger)
         fonts = FontService(

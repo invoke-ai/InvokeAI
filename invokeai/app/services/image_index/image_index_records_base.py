@@ -17,10 +17,8 @@ class ImageIndexRecordsBase(ABC):
     embedding is deleted with its media by foreign key and eligibility and
     board access are answered from that kind's own tables.
 
-    Every method here is its own unit of work and must not be called from inside another
-    service's open transaction: a nested `SqliteDatabase.transaction()` joins the outer one, so the
-    method's work would commit or roll back with that transaction instead of on its own. No caller
-    in the tree nests these today; keep it that way.
+    Every method here runs in a transaction of its own, so none can be called inside another
+    transaction.
     """
 
     @abstractmethod

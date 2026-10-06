@@ -44,4 +44,4 @@ class ModelRelationshipQueries(QueryModule):
     @read
     def related(self, conn: Connection, model_key: str) -> list[str]:
         """The keys of the models related to this one, in order."""
-        return list(conn.execute(_RELATED, {"key": model_key}).scalars())
+        return list(conn.execute(_RELATED, {"key": model_key}).scalars().all())

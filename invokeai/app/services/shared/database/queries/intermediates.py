@@ -523,7 +523,7 @@ class IntermediateQueries(QueryModule):
     @read
     def active_items(self, conn: Connection) -> dict[int, int]:
         """The protected queue items, each with the revision of its stored session."""
-        return {int(row[0]): int(row[1]) for row in conn.execute(_ACTIVE_ITEMS)}
+        return {int(row[0]): int(row[1]) for row in conn.execute(_ACTIVE_ITEMS).all()}
 
     @read
     def sessions(self, conn: Connection, item_ids: Collection[int]) -> list[tuple[int, int, Optional[str]]]:
@@ -532,7 +532,7 @@ class IntermediateQueries(QueryModule):
         ordered = sorted(item_ids)
         for start in range(0, len(ordered), IN_CHUNK):
             chunk = ordered[start : start + IN_CHUNK]
-            rows.extend((int(r[0]), int(r[1]), r[2]) for r in conn.execute(_SESSIONS, {"item_ids": chunk}))
+            rows.extend((int(r[0]), int(r[1]), r[2]) for r in conn.execute(_SESSIONS, {"item_ids": chunk}).all())
         return rows
 
     @read
@@ -592,7 +592,7 @@ class IntermediateQueries(QueryModule):
     @read
     def leases(self, conn: Connection, user_id: str) -> list[tuple[str, str]]:
         """The account's leases, each with when it was last refreshed (its latest expiry)."""
-        return [(str(r[0]), str(r[1])) for r in conn.execute(_LEASES, {"user_id": user_id})]
+        return [(str(r[0]), str(r[1])) for r in conn.execute(_LEASES, {"user_id": user_id}).all()]
 
     @write
     def release_leases(self, conn: Connection, user_id: str, lease_ids: Sequence[str]) -> None:
@@ -618,7 +618,7 @@ class IntermediateQueries(QueryModule):
         parameters = {**_clock_parameters(now, recent_cutoff, active_names), **scope.parameters()}
         return [
             AggregateRow(str(r[0]), r[1], r[2], int(r[3]), int(r[4] or 0), int(r[5] or 0))
-            for r in conn.execute(_aggregate(kind, scope.shape), parameters)
+            for r in conn.execute(_aggregate(kind, scope.shape), parameters).all()
         ]
 
     @read
@@ -642,7 +642,7 @@ class IntermediateQueries(QueryModule):
         }
         return [
             PreviewRow(str(r[0]), r[1], r[2], bool(r[3]), int(r[4]), int(r[5] or 0), int(r[6] or 0))
-            for r in conn.execute(_preview(kind, scope.shape, mode, is_admin), parameters)
+            for r in conn.execute(_preview(kind, scope.shape, mode, is_admin), parameters).all()
         ]
 
     @read
@@ -666,7 +666,7 @@ class IntermediateQueries(QueryModule):
         }
         return [
             (str(r[0]), str(r[1]), str(r[2]), int(r[3]))
-            for r in conn.execute(_acknowledged(kind, scope.shape, is_admin), parameters)
+            for r in conn.execute(_acknowledged(kind, scope.shape, is_admin), parameters).all()
         ]
 
     @read
@@ -695,7 +695,7 @@ class IntermediateQueries(QueryModule):
         }
         return [
             WindowRow(str(r[0]), r[1], bool(r[2]), str(r[3]))
-            for r in conn.execute(_window(kind, scope.shape, mode, is_admin), parameters)
+            for r in conn.execute(_window(kind, scope.shape, mode, is_admin), parameters).all()
         ]
 
     @read
@@ -718,7 +718,7 @@ class IntermediateQueries(QueryModule):
             "names": bound_set(names),
             "caller_user_id": caller_user_id,
         }
-        return [(str(r[0]), str(r[1])) for r in conn.execute(_still_deletable(kind, mode, is_admin), parameters)]
+        return [(str(r[0]), str(r[1])) for r in conn.execute(_still_deletable(kind, mode, is_admin), parameters).all()]
 
     @read
     def reference_owners(
@@ -727,7 +727,7 @@ class IntermediateQueries(QueryModule):
         """(media, owner kind, owner account, owner id) of each document naming one of the named media."""
         return [
             (str(r[0]), str(r[1]), str(r[2]), str(r[3]))
-            for r in conn.execute(_reference_owners(kind), {"names": bound_set(names)})
+            for r in conn.execute(_reference_owners(kind), {"names": bound_set(names)}).all()
         ]
 
     # endregion
@@ -739,7 +739,7 @@ class IntermediateQueries(QueryModule):
         """(owner, project, name, cover) of the account's projects (None: everyone's); the cover is the newest image
         on the project's board that is not an intermediate."""
         statement = _OWNERS_PROJECTS if user_id is not None else _PROJECTS
-        return [(str(r[0]), str(r[1]), str(r[2]), r[3]) for r in conn.execute(statement, {"user_id": user_id})]
+        return [(str(r[0]), str(r[1]), str(r[2]), r[3]) for r in conn.execute(statement, {"user_id": user_id}).all()]
 
     @read
     def document_names(
@@ -749,7 +749,9 @@ class IntermediateQueries(QueryModule):
         rows: list[tuple[Optional[str], str, Optional[str]]] = []
         for start in range(0, len(ids), IN_CHUNK):
             chunk = list(ids[start : start + IN_CHUNK])
-            rows.extend((r[0], str(r[1]), r[2]) for r in conn.execute(_DOCUMENT_NAMES[owner_kind], {"ids": chunk}))
+            rows.extend(
+                (r[0], str(r[1]), r[2]) for r in conn.execute(_DOCUMENT_NAMES[owner_kind], {"ids": chunk}).all()
+            )
         return rows
 
     # endregion
@@ -767,7 +769,8 @@ class IntermediateQueries(QueryModule):
         """(name, subfolder) of unmeasured intermediates created by `created_before`, oldest first."""
         statement = _next_unmeasured(kind)
         return [
-            (str(r[0]), str(r[1])) for r in conn.execute(statement, {"limit": limit, "created_before": created_before})
+            (str(r[0]), str(r[1]))
+            for r in conn.execute(statement, {"limit": limit, "created_before": created_before}).all()
         ]
 
     @write

@@ -25,7 +25,7 @@ from invokeai.app.services.image_index.image_index_default import (
     _POLL_SECONDS,
     ImageIndexService,
 )
-from invokeai.app.services.image_index.image_index_records_sqlite import ImageIndexRecordsSqlite
+from invokeai.app.services.image_index.image_index_records_default import ImageIndexRecords
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.images.images_common import image_record_to_dto
@@ -97,8 +97,8 @@ def image_records(db: SqliteDatabase) -> ImageRecordStorage:
 
 
 @pytest.fixture
-def index_records(db: SqliteDatabase) -> ImageIndexRecordsSqlite:
-    return ImageIndexRecordsSqlite(db=db)
+def index_records(db: SqliteDatabase) -> ImageIndexRecords:
+    return ImageIndexRecords(db.database)
 
 
 @pytest.fixture
@@ -134,7 +134,7 @@ def videos_service(tmp_path: Path) -> VideoService:
 
 def _make_invoker(
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     enabled: bool = True,
     image_records: ImageRecordStorage | None = None,
     device: str | None = "cpu",
@@ -239,7 +239,7 @@ def test_constructor_requires_matched_test_seams() -> None:
 
 
 def test_disabled_service_is_inert(
-    images_service: ImageService, index_records: ImageIndexRecordsSqlite, service: ImageIndexService
+    images_service: ImageService, index_records: ImageIndexRecords, service: ImageIndexService
 ) -> None:
     invoker = _make_invoker(images_service, index_records, enabled=False)
     service.start(invoker)
@@ -253,7 +253,7 @@ def test_disabled_service_is_inert(
 def test_backfill_indexes_preexisting_eligible_images(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
 ) -> None:
     for i in range(6):
@@ -277,7 +277,7 @@ def test_backfill_indexes_preexisting_eligible_images(
 def test_on_changed_indexes_new_eligible_image_and_skips_ineligible(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
 ) -> None:
     invoker = _make_invoker(images_service, index_records)
@@ -297,7 +297,7 @@ def test_on_changed_indexes_new_eligible_image_and_skips_ineligible(
 def test_unloadable_image_is_skipped_and_backfill_completes(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
 ) -> None:
     _save_image(image_records, "good.png")
@@ -320,7 +320,7 @@ def test_unloadable_image_is_skipped_and_backfill_completes(
 def test_backfill_logs_what_it_indexed_and_that_it_finished(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -346,7 +346,7 @@ def test_backfill_logs_what_it_indexed_and_that_it_finished(
 def test_restart_over_an_indexed_gallery_logs_nothing(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -367,7 +367,7 @@ def test_restart_over_an_indexed_gallery_logs_nothing(
 def test_backfill_reports_images_it_could_not_embed(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -400,7 +400,7 @@ def test_backfill_reports_images_it_could_not_embed(
 def test_transient_encode_failure_is_retried_to_success(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
 ) -> None:
     calls = {"n": 0}
 
@@ -465,7 +465,7 @@ def test_model_not_installed_message_flags_same_name_wrong_type() -> None:
 
 def test_try_activate_picks_up_a_model_installed_after_startup(
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # The encoder is usually installed from the image map itself, long after
@@ -518,7 +518,7 @@ def test_try_activate_picks_up_a_model_installed_after_startup(
 
 def test_failed_late_activation_rolls_back_rather_than_wedging_the_service(
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # Publishing the model before the worker exists would leave the service
@@ -568,7 +568,7 @@ def test_failed_late_activation_rolls_back_rather_than_wedging_the_service(
 
 def test_late_activation_survives_a_model_store_failure(
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # These endpoints reported `model_missing` before they resolved anything;
@@ -591,7 +591,7 @@ def test_late_activation_survives_a_model_store_failure(
 def test_broken_encoder_leaves_images_pending_rather_than_quarantined(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
 ) -> None:
     service = ImageIndexService(encode_fn=lambda images: np.zeros((1,), dtype=np.float32), model_id=MODEL_ID)
     try:
@@ -613,7 +613,7 @@ def test_broken_encoder_leaves_images_pending_rather_than_quarantined(
 def test_status_event_reports_failures_so_a_settled_index_is_not_mistaken_for_complete(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
 ) -> None:
     """`pending` excludes failures, so on its own it cannot express "gave up on some".
 
@@ -647,7 +647,7 @@ def test_status_event_reports_failures_so_a_settled_index_is_not_mistaken_for_co
 def test_index_recovers_from_an_encoder_outage_without_a_restart(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
 ) -> None:
     """The point of separating systemic from per-image failure.
 
@@ -688,7 +688,7 @@ def test_index_recovers_from_an_encoder_outage_without_a_restart(
 def test_sustained_storage_failure_does_not_quarantine_images(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
 ) -> None:
     """A database that is down is no more the images' fault than a missing model is.
 
@@ -726,7 +726,7 @@ def test_sustained_storage_failure_does_not_quarantine_images(
 def test_batch_failure_is_charged_to_the_images_when_the_encoder_is_healthy(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
 ) -> None:
     """The other half: a poisonous image must still be quarantined so the backlog can advance.
 
@@ -771,7 +771,7 @@ def test_systemic_backoff_grows_and_is_capped(service: ImageIndexService) -> Non
 def test_zero_norm_embedding_fails_only_its_own_image(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
 ) -> None:
     """A degenerate encoder row must not cost the rest of its batch their embeddings.
 
@@ -803,7 +803,7 @@ def test_zero_norm_embedding_fails_only_its_own_image(
 def test_start_discards_only_other_models_embeddings(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
 ) -> None:
     """The one destructive operation in the service: prove what it does and does not delete.
 
@@ -830,7 +830,7 @@ def test_start_discards_only_other_models_embeddings(
 def test_disabled_service_does_not_discard_embeddings(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
 ) -> None:
     """Turning the feature off must not destroy an index built while it was on."""
     _save_image(image_records, "a.png")
@@ -847,7 +847,7 @@ def test_disabled_service_does_not_discard_embeddings(
 def test_worker_waits_for_generation_to_finish_when_not_on_cpu(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     accelerator_host: None,
 ) -> None:
     """The VRAM contract: off the CPU path, embedding must pause while a generation runs.
@@ -876,7 +876,7 @@ def test_worker_waits_for_generation_to_finish_when_not_on_cpu(
 def test_generation_wait_does_not_block_shutdown(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     accelerator_host: None,
 ) -> None:
     """A generation that never ends must not stop the worker from honouring stop()."""
@@ -896,7 +896,7 @@ def test_generation_wait_does_not_block_shutdown(
 def test_projection_does_not_wait_for_an_in_progress_generation(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     accelerator_host: None,
 ) -> None:
     """A projection reads stored embeddings only — no encoder, no GPU — so it has no
@@ -935,7 +935,7 @@ def test_projection_does_not_wait_for_an_in_progress_generation(
 def test_a_partially_stored_batch_does_not_escalate_the_backoff(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
 ) -> None:
     """A batch that stores ANYTHING resets the systemic-failure counter, even though the
     batch also failed.
@@ -981,7 +981,7 @@ def test_a_partially_stored_batch_does_not_escalate_the_backoff(
 def test_unparseable_device_is_ignored_rather_than_wedging_the_worker(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
 ) -> None:
     """`image_index_device` is free-form config with no validator.
 
@@ -1001,7 +1001,7 @@ def test_unparseable_device_is_ignored_rather_than_wedging_the_worker(
 
 def test_empty_model_name_does_not_resolve_to_an_arbitrary_model(
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
 ) -> None:
     """`search_by_attr` drops its name predicate for a falsy name.
 
@@ -1023,7 +1023,7 @@ def test_empty_model_name_does_not_resolve_to_an_arbitrary_model(
 
 def test_duplicate_model_names_resolve_deterministically(
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
 ) -> None:
     """Two models can share a name, and the pick must not move when one is reinstalled.
 
@@ -1047,7 +1047,7 @@ def test_duplicate_model_names_resolve_deterministically(
 def test_status_event_emitted(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
 ) -> None:
     _save_image(image_records, "a.png")
@@ -1070,7 +1070,7 @@ def _status_events(invoker) -> list[ImageIndexStatusEvent]:
 def test_on_changed_emits_pending_status_before_embedding(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
 ) -> None:
     invoker = _make_invoker(images_service, index_records)
@@ -1090,7 +1090,7 @@ def test_on_changed_emits_pending_status_before_embedding(
 def test_on_deleted_emits_status(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
 ) -> None:
     _save_image(image_records, "a.png")
@@ -1109,7 +1109,7 @@ def test_on_deleted_emits_status(
 def test_permanently_failed_image_still_reaches_quiescence(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
 ) -> None:
     """A permanently-failing image must not wedge pending above zero forever."""
@@ -1138,7 +1138,7 @@ def test_permanently_failed_image_still_reaches_quiescence(
 def test_upsert_failure_routes_through_retry_to_success(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
 ) -> None:
     """A raise while storing embeddings must feed the retry path, not strand the image."""
@@ -1167,7 +1167,7 @@ def test_upsert_failure_routes_through_retry_to_success(
 def test_upsert_value_error_also_routes_through_retry(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
 ) -> None:
     """ValueError must reach the retry path like any other raise.
@@ -1202,7 +1202,7 @@ def test_upsert_value_error_also_routes_through_retry(
 def test_normalizable_extreme_magnitudes_are_not_dropped(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
 ) -> None:
     """Tiny-but-normalizable vectors must not be misread as degenerate.
 
@@ -1230,7 +1230,7 @@ def test_normalizable_extreme_magnitudes_are_not_dropped(
 def test_ineligible_transition_clears_failure_bookkeeping(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
 ) -> None:
     """An image that leaves eligibility must stop counting against `failed`."""
@@ -1253,7 +1253,7 @@ def test_ineligible_transition_clears_failure_bookkeeping(
 def test_owner_poke_emitted_at_quiescence(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
 ) -> None:
     """Owners get a counts-free user-routed poke once their embeds settle."""
@@ -1272,7 +1272,7 @@ def test_owner_poke_emitted_at_quiescence(
 
 
 def test_stop_joins_worker(
-    images_service: ImageService, index_records: ImageIndexRecordsSqlite, service: ImageIndexService
+    images_service: ImageService, index_records: ImageIndexRecords, service: ImageIndexService
 ) -> None:
     service.start(_make_invoker(images_service, index_records))
     assert service._worker is not None and service._worker.is_alive()
@@ -1288,7 +1288,7 @@ def test_stop_joins_worker(
 def test_projection_job_computes_and_caches(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
 ) -> None:
     from invokeai.app.services.events.events_common import ImageMapProjectionReadyEvent
@@ -1320,7 +1320,7 @@ def test_projection_job_computes_and_caches(
 def test_projection_failure_caches_empty_result_instead_of_looping(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
     monkeypatch,
 ) -> None:
@@ -1359,7 +1359,7 @@ def test_projection_failure_caches_empty_result_instead_of_looping(
 def test_a_permanently_failing_projection_is_retried_once_not_every_request(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
     monkeypatch,
 ) -> None:
@@ -1395,7 +1395,7 @@ def test_a_permanently_failing_projection_is_retried_once_not_every_request(
 def test_a_cached_row_with_no_finite_points_is_a_failed_fit_not_a_result(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
     monkeypatch,
 ) -> None:
@@ -1452,7 +1452,7 @@ def test_a_cached_row_with_no_finite_points_is_a_failed_fit_not_a_result(
 def test_a_lost_projection_write_does_not_burn_the_retry(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
     monkeypatch,
 ) -> None:
@@ -1508,7 +1508,7 @@ def test_a_lost_projection_write_does_not_burn_the_retry(
 def test_an_explicit_refresh_restores_a_spent_retry(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
     monkeypatch,
 ) -> None:
@@ -1565,7 +1565,7 @@ def test_projection_request_dedup_is_last_writer_wins(service: ImageIndexService
 def test_systemic_embedding_outage_does_not_starve_projections(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
 ) -> None:
     """The emergent interaction between "never retire on a systemic failure" and
     "projections only at quiescence".
@@ -1611,7 +1611,7 @@ def test_systemic_embedding_outage_does_not_starve_projections(
 def test_search_similar_ranks_by_cosine_and_respects_scope(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
 ) -> None:
     service.start(_make_invoker(images_service, index_records))
@@ -1644,7 +1644,7 @@ def test_search_similar_ranks_by_cosine_and_respects_scope(
 
 
 def test_embed_image_normalizes_and_requires_running_service(
-    images_service: ImageService, index_records: ImageIndexRecordsSqlite, service: ImageIndexService
+    images_service: ImageService, index_records: ImageIndexRecords, service: ImageIndexService
 ) -> None:
     probe = Image.new("RGB", (4, 4))
 
@@ -1659,7 +1659,7 @@ def test_embed_image_normalizes_and_requires_running_service(
 
 
 def test_embed_image_retries_once_after_a_failed_encode(
-    images_service: ImageService, index_records: ImageIndexRecordsSqlite
+    images_service: ImageService, index_records: ImageIndexRecords
 ) -> None:
     # A failed load evicts the model from the RAM cache so the next attempt
     # rebuilds it from disk; embed_image must make that second attempt itself.
@@ -1694,7 +1694,7 @@ def test_embed_image_retries_once_after_a_failed_encode(
 def test_projection_request_is_requeued_when_the_database_read_fails(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
 ) -> None:
     """The job is popped from the dedup map before the work runs.
 
@@ -1732,7 +1732,7 @@ def test_projection_request_is_requeued_when_the_database_read_fails(
 def test_unchanged_scope_does_not_recompute_the_projection(
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
 ) -> None:
     """Repeat requests over an unchanged gallery must not re-run the fit.
 
@@ -1818,7 +1818,7 @@ def test_projection_job_is_popped_before_running(service: ImageIndexService) -> 
 
 
 def test_embed_text_unavailable_without_model_config(
-    images_service: ImageService, index_records: ImageIndexRecordsSqlite, service: ImageIndexService
+    images_service: ImageService, index_records: ImageIndexRecords, service: ImageIndexService
 ) -> None:
     from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
 
@@ -2089,7 +2089,7 @@ def test_search_similar_scopes_to_the_requesting_user(
     db: SqliteDatabase,
     image_records: ImageRecordStorage,
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
 ) -> None:
     from invokeai.app.services.users.users_common import UserCreateRequest
@@ -2555,7 +2555,7 @@ def test_invalidate_vocab_never_blocks_on_an_in_flight_build(tmp_path, monkeypat
 
 def test_invalidate_vocab_rebuilds_with_the_new_terms_on_the_worker(
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
@@ -2589,7 +2589,7 @@ def test_invalidate_vocab_rebuilds_with_the_new_terms_on_the_worker(
 
 def test_invalidate_vocab_retries_a_failed_build(
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
@@ -2652,7 +2652,7 @@ def test_a_cache_with_a_mismatched_row_count_is_discarded_and_re_embedded(
 
 def test_a_transient_custom_terms_read_failure_keeps_the_rebuild_queued(
     images_service: ImageService,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
@@ -2694,7 +2694,7 @@ def test_backfill_indexes_preexisting_videos(
     images_service: ImageService,
     videos_service: VideoService,
     video_records: VideoRecordStorage,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
 ) -> None:
     _save_image(image_records, "img.png")
@@ -2715,7 +2715,7 @@ def test_new_video_is_indexed_from_its_thumbnail(
     images_service: ImageService,
     videos_service: VideoService,
     video_records: VideoRecordStorage,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
 ) -> None:
     invoker = _make_invoker(images_service, index_records, videos_service=videos_service, video_records=video_records)
@@ -2736,7 +2736,7 @@ def test_video_thumbnail_is_what_gets_embedded(
     images_service: ImageService,
     videos_service: VideoService,
     video_records: VideoRecordStorage,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
 ) -> None:
     # The embedding must come from the video's own thumbnail, not from the image service (which
     # here returns a different colour) — a wrong source would still produce a plausible vector.
@@ -2774,7 +2774,7 @@ def test_unreadable_video_thumbnail_is_charged_to_the_video(
     images_service: ImageService,
     videos_service: VideoService,
     video_records: VideoRecordStorage,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
 ) -> None:
     # A video whose thumbnail never got written must not stall the backfill; it retires after
@@ -2794,7 +2794,7 @@ def test_deleted_video_is_forgotten(
     images_service: ImageService,
     videos_service: VideoService,
     video_records: VideoRecordStorage,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
 ) -> None:
     invoker = _make_invoker(images_service, index_records, videos_service=videos_service, video_records=video_records)
@@ -2823,7 +2823,7 @@ def test_video_owner_is_poked_when_its_embedding_lands(
     videos_service: VideoService,
     video_records: VideoRecordStorage,
     image_records: ImageRecordStorage,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
 ) -> None:
     # The status event is admin-only, so this per-user poke is the only signal a non-admin
@@ -2854,7 +2854,7 @@ def test_video_leaving_eligibility_clears_its_failure_bookkeeping(
     images_service: ImageService,
     videos_service: VideoService,
     video_records: VideoRecordStorage,
-    index_records: ImageIndexRecordsSqlite,
+    index_records: ImageIndexRecords,
     service: ImageIndexService,
 ) -> None:
     # A video that stops being a gallery item must stop counting against `failed`, or it skews

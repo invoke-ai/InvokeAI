@@ -21,6 +21,8 @@ class DatabaseLock(StrEnum):
 
     # Changes to who is an active administrator: counting them and changing one is one step.
     ADMIN_ACCOUNTS = "admin_accounts"
+    # A replace of the image index's custom vocabulary: deleting every term and inserting the new ones is one step.
+    IMAGE_INDEX_VOCABULARY = "image_index_vocabulary"
     # What protects media from the intermediates cleanup: a cleanup takes it exclusively for its check and delete,
     # a write that makes media protected (a reference, a hold) shares it.
     MEDIA_PROTECTION = "media_protection"
@@ -49,6 +51,6 @@ class LockQueries(QueryModule):
         if not isinstance(self._scope, SharedTransaction) or self._scope.calls != 1:
             raise RuntimeError("Database locks are taken by the first call of a transaction, all at once")
         names = sorted({lock.value for lock in locks})
-        locked: set[str] = set(conn.execute(_SHARE if shared else _LOCK, {"names": names}).scalars())
+        locked: set[str] = set(conn.execute(_SHARE if shared else _LOCK, {"names": names}).scalars().all())
         if missing := [name for name in names if name not in locked]:
             raise RuntimeError(f"No row in db_locks for {', '.join(missing)}: the migration that adds it has not run")
