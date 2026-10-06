@@ -1786,7 +1786,6 @@
       "loadFailed": "Could not load the vocabulary."
     },
     "databaseMaintenance": {
-      "menuLabel": "Database maintenance",
       "runVacuum": "Run VACUUM",
       "confirmTitle": "Run database VACUUM?",
       "confirmBody": "VACUUM can take a long time for large databases and pauses database activity while it runs.",
@@ -1893,7 +1892,7 @@
       },
       "workspaceActions": {
         "label": "Data & workspace",
-        "description": "Reset the layout, manage intermediates, or permanently delete saved projects and settings."
+        "description": "Reset the layout, manage intermediates, or permanently delete saved projects and settings. Administrators can also run database maintenance."
       },
       "about": {
         "label": "About InvokeAI",

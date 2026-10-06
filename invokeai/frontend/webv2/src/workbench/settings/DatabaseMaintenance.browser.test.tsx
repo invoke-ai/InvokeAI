@@ -1,5 +1,7 @@
 import type * as IdentityModule from '@features/identity';
+import type * as ConnectionStoreModule from '@platform/transport/connectionStore';
 import type * as HttpModule from '@platform/transport/http';
+import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
 
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop */
 import { ChakraProvider } from '@chakra-ui/react';
@@ -9,6 +11,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
+
+import type * as SettingsStoreModule from './store';
 
 const mocks = vi.hoisted(() => ({
   apiFetch: vi.fn(),
@@ -32,60 +36,72 @@ vi.mock('@platform/transport/http', async (importOriginal) => ({
   ...(await importOriginal<typeof HttpModule>()),
   apiFetch: (...args: unknown[]) => mocks.apiFetch(...args),
 }));
-vi.mock('@tanstack/react-router', () => ({ useNavigate: () => vi.fn() }));
-vi.mock('@workbench/WorkbenchContext', () => ({
+vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
+  ...(await importOriginal<typeof WorkbenchContextModule>()),
   useActiveProjectId: () => null,
   useActiveProjectSelector: (selector: (project: { queue: { items: never[] } }) => unknown) =>
     selector({ queue: { items: [] } }),
+  useOptionalWorkbenchCommands: () => null,
+  useOptionalWorkbenchPersistenceService: () => null,
 }));
+vi.mock('@platform/transport/connectionStore', async (importOriginal) => ({
+  ...(await importOriginal<typeof ConnectionStoreModule>()),
+  useConnectionStatusSelector: (selector: (snapshot: never) => unknown) => selector({ status: 'connected' } as never),
+}));
+vi.mock('@tanstack/react-router', () => ({ useNavigate: () => vi.fn() }));
+vi.mock('@workbench/palette/PaletteButton', () => ({ PaletteButton: () => null }));
 vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: () => vi.fn() }));
+vi.mock('@workbench/shell/topbar/useTopbarShortcut', () => ({ useTopbarShortcut: () => null }));
+vi.mock('./store', async (importOriginal) => ({
+  ...(await importOriginal<typeof SettingsStoreModule>()),
+  useWorkbenchSettingsSelector: (selector: (snapshot: never) => unknown) => selector({ scope: 'user' } as never),
+}));
 vi.mock('@workbench/useNotify', () => ({
   useNotify: () => ({ error: mocks.notifyError, success: mocks.notifySuccess }),
 }));
-vi.mock('./useTopbarShortcut', () => ({ useTopbarShortcut: () => null }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 
-import { DatabaseMaintenanceMenu } from '@workbench/launchpad/LaunchpadTopBar';
+import { LaunchpadTopBar } from '@workbench/launchpad/LaunchpadTopBar';
 import { AppMenu } from '@workbench/shell/topbar/AppMenu';
+
+import { WorkspaceSettings } from './CustomSettingsEditors';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-describe('database maintenance menu', () => {
+describe('database maintenance in Data & workspace settings', () => {
   let host: HTMLDivElement;
   let root: Root;
 
-  const renderMenu = async (variant: 'launchpad' | 'app-menu' = 'launchpad') => {
+  const renderSettings = async () => {
     await act(() =>
       root.render(
         <ChakraProvider value={system}>
-          {variant === 'app-menu' ? <AppMenu /> : <DatabaseMaintenanceMenu />}
+          <WorkspaceSettings />
         </ChakraProvider>
       )
     );
   };
 
-  const openLaunchpadMenu = async () => {
-    const trigger = document.querySelector<HTMLElement>('[aria-label="settings.databaseMaintenance.menuLabel"]');
-    expect(trigger).not.toBeNull();
-    await act(() => userEvent.click(trigger!));
-    await expect.poll(() => document.querySelector('[role="menu"][data-state="open"]')).not.toBeNull();
+  const renderTopBars = async () => {
+    await act(() =>
+      root.render(
+        <ChakraProvider value={system}>
+          <LaunchpadTopBar />
+          <AppMenu />
+        </ChakraProvider>
+      )
+    );
   };
 
-  const openAppMenuVacuumAction = async () => {
-    await act(() => userEvent.click(document.querySelector<HTMLElement>('[aria-label="topbar.appMenu.open"]')!));
-    await expect.poll(() => document.querySelector('[role="menu"][data-state="open"]')).not.toBeNull();
-    const submenu = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find((item) =>
-      item.textContent?.includes('settings.databaseMaintenance.menuLabel')
+  const getVacuumButton = () =>
+    Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((button) =>
+      button.textContent?.includes('settings.databaseMaintenance.runVacuum')
     );
-    expect(submenu).toBeDefined();
-    await act(() => userEvent.click(submenu!));
-    await expect.poll(() => document.querySelector('[role="menuitem"][data-value="run-vacuum"]')).not.toBeNull();
-  };
 
   const openConfirmation = async () => {
-    const item = document.querySelector<HTMLElement>('[role="menuitem"][data-value="run-vacuum"]');
-    expect(item).not.toBeNull();
-    await act(() => userEvent.click(item!));
+    const button = getVacuumButton();
+    expect(button).toBeDefined();
+    await act(() => userEvent.click(button!));
     await expect.poll(() => document.querySelector('[role="alertdialog"]')).not.toBeNull();
   };
 
@@ -94,16 +110,15 @@ describe('database maintenance menu', () => {
       button.textContent?.includes('settings.databaseMaintenance.runVacuum')
     );
 
-  beforeEach(async () => {
+  beforeEach(() => {
     mocks.canManageAppConfig = true;
     mocks.apiFetch.mockReset().mockResolvedValue(new Response(null, { status: 204 }));
     mocks.notifyError.mockReset();
     mocks.notifySuccess.mockReset();
-    accountLifecycle.activate('database-maintenance-test', ':user:database-maintenance-test');
+    accountLifecycle.activate('database-maintenance-settings-test', ':user:database-maintenance-settings-test');
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
-    await renderMenu();
   });
 
   afterEach(async () => {
@@ -112,37 +127,29 @@ describe('database maintenance menu', () => {
     accountLifecycle.invalidate();
   });
 
-  it('hides maintenance controls when the session cannot manage app configuration', async () => {
-    mocks.canManageAppConfig = false;
-    await renderMenu();
+  it('shows one Run VACUUM button to admins and hides it from non-admins', async () => {
+    await renderSettings();
+    expect(getVacuumButton()).toBeDefined();
 
+    mocks.canManageAppConfig = false;
+    await renderSettings();
+    expect(getVacuumButton()).toBeUndefined();
+    expect(host.textContent).toContain('Clear saved data');
+  });
+
+  it('keeps maintenance out of both top-bar menus', async () => {
+    await renderTopBars();
     expect(document.querySelector('[aria-label="settings.databaseMaintenance.menuLabel"]')).toBeNull();
-    await renderMenu('app-menu');
+
     await act(() => userEvent.click(document.querySelector<HTMLElement>('[aria-label="topbar.appMenu.open"]')!));
     await expect.poll(() => document.querySelector('[role="menu"][data-state="open"]')).not.toBeNull();
-    expect(
-      Array.from(document.querySelectorAll('[role="menuitem"]')).some((item) =>
-        item.textContent?.includes('settings.databaseMaintenance.menuLabel')
-      )
-    ).toBe(false);
-  });
-
-  it('shows only the VACUUM action in the launchpad menu', async () => {
-    await openLaunchpadMenu();
-
     const items = Array.from(document.querySelectorAll('[role="menuitem"]'));
-    expect(items).toHaveLength(1);
-    expect(items[0]?.textContent).toContain('settings.databaseMaintenance.runVacuum');
-  });
-
-  it('adds the single VACUUM action to the AppMenu Manage submenu', async () => {
-    await renderMenu('app-menu');
-    await openAppMenuVacuumAction();
-    expect(document.querySelectorAll('[role="menuitem"][data-value="run-vacuum"]')).toHaveLength(1);
+    expect(items.some((item) => item.textContent?.includes('settings.databaseMaintenance.menuLabel'))).toBe(false);
+    expect(document.querySelector('[role="menuitem"][data-value="run-vacuum"]')).toBeNull();
   });
 
   it('requires confirmation and sends no request when canceled', async () => {
-    await openLaunchpadMenu();
+    await renderSettings();
     await openConfirmation();
 
     await act(() => userEvent.click(document.querySelector<HTMLElement>('[role="alertdialog"] button')!));
@@ -151,13 +158,13 @@ describe('database maintenance menu', () => {
     expect(mocks.apiFetch).not.toHaveBeenCalled();
   });
 
-  it('sends one POST, disables confirmation while pending, and reports completion after 204', async () => {
+  it('posts once, disables confirmation while pending, and reports completion', async () => {
     let resolveRequest!: (response: Response) => void;
     const pendingRequest = new Promise<Response>((resolve) => {
       resolveRequest = resolve;
     });
     mocks.apiFetch.mockReturnValueOnce(pendingRequest);
-    await openLaunchpadMenu();
+    await renderSettings();
     await openConfirmation();
 
     const confirmButton = getConfirmButton();
@@ -177,38 +184,15 @@ describe('database maintenance menu', () => {
     expect(mocks.notifySuccess).toHaveBeenCalledWith('settings.databaseMaintenance.completed');
   });
 
-  it('supports keyboard activation and Escape dismissal of the confirmation', async () => {
-    const trigger = document.querySelector<HTMLElement>('[aria-label="settings.databaseMaintenance.menuLabel"]');
-    expect(trigger).not.toBeNull();
-    await act(async () => {
-      trigger!.focus();
-      await userEvent.keyboard('{Enter}');
-    });
-    await expect.poll(() => document.querySelector('[role="menu"][data-state="open"]')).not.toBeNull();
-
-    const item = document.querySelector<HTMLElement>('[role="menuitem"][data-value="run-vacuum"]');
-    expect(item).not.toBeNull();
-    await act(async () => {
-      item!.focus();
-      await userEvent.keyboard('{Enter}');
-    });
-    await expect.poll(() => document.querySelector('[role="alertdialog"]')).not.toBeNull();
-    await act(() => userEvent.keyboard('{Escape}'));
-
-    await expect.poll(() => document.querySelector('[role="alertdialog"]')).toBeNull();
-    expect(mocks.apiFetch).not.toHaveBeenCalled();
-  });
-
   it('reports failures and permits retry', async () => {
     mocks.apiFetch.mockRejectedValueOnce(new Error('Database vacuum failed'));
-    await openLaunchpadMenu();
+    await renderSettings();
     await openConfirmation();
     await act(() => userEvent.click(getConfirmButton()!));
 
     await expect.poll(() => document.querySelector('[role="alertdialog"]')).toBeNull();
     expect(mocks.notifyError).toHaveBeenCalledWith('settings.databaseMaintenance.failed', 'Database vacuum failed');
 
-    await openLaunchpadMenu();
     await openConfirmation();
     await act(() => userEvent.click(getConfirmButton()!));
 
