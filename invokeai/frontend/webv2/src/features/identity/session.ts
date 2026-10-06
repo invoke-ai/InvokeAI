@@ -2,8 +2,8 @@ import { createExternalStore } from '@platform/state/externalStore';
 import { ApiError, type HttpAuthAdapter, type HttpCredential } from '@platform/transport/http';
 
 import { shouldExpireUnauthorizedSession } from './core/sessionPolicy';
-import { classifyStoredCredential } from './core/storedCredential';
-import { browserIdentityTokenAdapter } from './core/tokenStorage';
+import { classifyStoredCredential, readTokenUserId } from './core/storedCredential';
+import { browserIdentityTokenAdapter, type CredentialRotationMarker } from './core/tokenStorage';
 import {
   getAuthStatus,
   getCurrentUser,
@@ -219,6 +219,8 @@ const renewMediaCookie = (): void => {
 };
 
 interface CredentialRotation {
+  /** True while the marker in shared storage is this rotation's to withdraw. */
+  announced: boolean;
   deferredStorageSync: boolean;
   deferredUnauthorized: HttpCredential | null;
   readonly scope: LifetimeScope;
@@ -230,6 +232,71 @@ let rotationQueue: Promise<unknown> = Promise.resolve();
 /** The own-credential rotation in flight for the current lifetime; one started by an ended lifetime no longer counts. */
 const getPendingRotation = (): CredentialRotation | null =>
   rotation?.scope === getAccountLifecycle().capture() ? rotation : null;
+
+/**
+ * How long another tab's announced rotation keeps a rejected token waiting for its replacement. A password change
+ * hashes twice and round-trips once; a marker older than this was left by a tab that unloaded mid-change.
+ */
+const ANNOUNCED_ROTATION_WAIT_MS = 30_000;
+
+/** The rotation another tab has announced for `userId`'s credential, if it is still within its wait. */
+const readAnnouncedRotation = (userId: string | null): CredentialRotationMarker | null => {
+  const marker = userId === null ? null : tokenStore.readRotation();
+
+  return marker !== null &&
+    marker !== undefined &&
+    marker.userId === userId &&
+    Date.now() - marker.at < ANNOUNCED_ROTATION_WAIT_MS
+    ? marker
+    : null;
+};
+
+/** Resolves once `marker` is no longer announced for `userId`: when it is cleared or when its wait ends. */
+const untilAnnouncedRotationSettles = (marker: CredentialRotationMarker): Promise<void> =>
+  new Promise((resolve) => {
+    const settle = (): void => {
+      clearTimeout(timer);
+      unsubscribe();
+      resolve();
+    };
+    const timer = setTimeout(settle, marker.at + ANNOUNCED_ROTATION_WAIT_MS - Date.now());
+    const unsubscribe = tokenStore.subscribe(() => {
+      if (readAnnouncedRotation(marker.userId) === null) {
+        settle();
+      }
+    });
+  });
+
+/** The rejected credential already waiting on an announced rotation; a second 401 for it adds nothing. */
+let awaitingRotation: HttpCredential | null = null;
+
+/**
+ * A 401 for the current token while another tab has announced it is rotating that principal's credential is most
+ * likely the revocation that change caused. Wait for the replacement to be stored (adopted as a renewal) before
+ * treating the rejection as the end of the session.
+ */
+const deferUnauthorizedToAnnouncedRotation = (credential: HttpCredential, marker: CredentialRotationMarker): void => {
+  if (awaitingRotation?.token === credential.token) {
+    return;
+  }
+
+  awaitingRotation = credential;
+  void untilAnnouncedRotationSettles(marker).then(() => {
+    if (awaitingRotation?.token === credential.token) {
+      awaitingRotation = null;
+    }
+
+    if (!isCredentialCurrent(credential)) {
+      return;
+    }
+
+    syncStoredCredential();
+
+    if (isCredentialCurrent(credential)) {
+      handleUnauthorizedResponse();
+    }
+  });
+};
 
 const acceptRefreshedToken = (credential: HttpCredential, token: string): void => {
   // A rotation adopts only its own replacement; a renewal minted before it would carry the revoked epoch.
@@ -264,9 +331,21 @@ const handleTransportUnauthorized = (credential: HttpCredential): void => {
   // The rejection may race another tab's replacement of the shared token.
   syncStoredCredential();
 
-  if (isCredentialCurrent(credential)) {
-    handleUnauthorizedResponse();
+  if (!isCredentialCurrent(credential)) {
+    return;
   }
+
+  // Before the session resolves, the token's own claim names the principal; it only decides whether to wait.
+  const announced = readAnnouncedRotation(
+    store.getSnapshot().user?.user_id ?? (credential.token === null ? null : readTokenUserId(credential.token))
+  );
+
+  if (announced !== null) {
+    deferUnauthorizedToAnnouncedRotation(credential, announced);
+    return;
+  }
+
+  handleUnauthorizedResponse();
 };
 
 const subscribeCredential = (listener: () => void): (() => void) => {
@@ -288,18 +367,29 @@ export const identityTransportAuthAdapter: HttpAuthAdapter = {
 /**
  * Run a request that rotates this tab's own credential: an own password change revokes every earlier token and
  * returns the only replacement that survives. Until it settles, other replacements are ignored, and a 401 for the
- * current token or another tab's renewal or sign-out waits for its outcome. The rotation belongs to the lifetime that
- * started it and is aborted with it. Rotations run one at a time so each sends the credential its predecessor
- * delivered.
+ * current token or another tab's renewal waits for its outcome; another tab's sign-out applies at once and discards
+ * the replacement. The rotation is announced in storage so other tabs hold the 401 the revocation causes until the
+ * replacement reaches them. It belongs to the lifetime that started it and is aborted with it. Rotations run one at a
+ * time so each sends the credential its predecessor delivered.
  */
 const rotateOwnCredential = <Result extends { refreshedToken: string | null }>(
   request: (signal: AbortSignal) => Promise<Result>
 ): Promise<Result> => {
   const run = async (): Promise<Result> => {
     const scope = getAccountLifecycle().capture();
-    const pending: CredentialRotation = { deferredStorageSync: false, deferredUnauthorized: null, scope };
+    const userId = store.getSnapshot().user?.user_id ?? null;
+    const pending: CredentialRotation = {
+      announced: userId !== null,
+      deferredStorageSync: false,
+      deferredUnauthorized: null,
+      scope,
+    };
 
     rotation = pending;
+
+    if (userId !== null) {
+      tokenStore.writeRotation({ at: Date.now(), userId });
+    }
 
     try {
       // The transport captures the same credential synchronously when `request` starts.
@@ -320,6 +410,7 @@ const rotateOwnCredential = <Result extends { refreshedToken: string | null }>(
       return result;
     } finally {
       rotation = null;
+      withdrawAnnouncedRotation(pending);
 
       if (pending.deferredStorageSync) {
         syncStoredCredential();
@@ -389,10 +480,31 @@ const activateAccount = (user: UserDTO, token: string): number => {
   return epoch;
 };
 
+/** Withdrawn once the replacement is stored, so a waiting tab adopts the replacement before its wait ends. */
+const withdrawAnnouncedRotation = (pending: CredentialRotation): void => {
+  if (pending.announced) {
+    pending.announced = false;
+    tokenStore.clearRotation();
+  }
+};
+
+/** End the current lifetime; a rotation it announced is abandoned with it, so no other tab keeps waiting on it. */
+const endLifetime = (): number => {
+  const pendingRotation = getPendingRotation();
+
+  if (pendingRotation !== null) {
+    withdrawAnnouncedRotation(pendingRotation);
+  }
+
+  const { epoch } = getAccountLifecycle().invalidate();
+
+  return epoch;
+};
+
 /** End the authenticated lifetime locally; `forget` decides what happens to the stored token. */
 const signOut = (sessionExpired: boolean, forget: (token: string | null) => void): void => {
   const token = getHeldToken();
-  const accountEpoch = getAccountLifecycle().invalidate().epoch;
+  const accountEpoch = endLifetime();
 
   heldCredential = null;
   forget(token);
@@ -403,7 +515,7 @@ const signOut = (sessionExpired: boolean, forget: (token: string | null) => void
 const publishUnavailableSession = (): AuthSession => {
   cancelTransition();
   setActiveUserScope(null);
-  const accountEpoch = getAccountLifecycle().invalidate().epoch;
+  const accountEpoch = endLifetime();
   store.patchSnapshot({
     accountEpoch,
     multiuserEnabled: false,
@@ -450,6 +562,15 @@ const resolveSession = async (): Promise<AuthSession> => {
   let sessionExpired = false;
 
   if (status.multiuser_enabled) {
+    const stored = tokenStore.read();
+    // Another tab may be replacing the stored token right now; its revocation would reject the old one.
+    const announced =
+      authenticates && typeof stored === 'string' ? readAnnouncedRotation(readTokenUserId(stored)) : null;
+
+    if (announced !== null) {
+      await untilAnnouncedRotationSettles(announced);
+    }
+
     observedStoredToken = tokenStore.read();
     token = authenticates ? (observedStoredToken ?? null) : null;
   }
@@ -484,7 +605,7 @@ const resolveSession = async (): Promise<AuthSession> => {
   } else if (user !== null && token !== null) {
     accountEpoch = activateAccount(user, token);
   } else {
-    accountEpoch = getAccountLifecycle().invalidate().epoch;
+    accountEpoch = endLifetime();
     setActiveUserScope(null);
   }
 
@@ -526,11 +647,22 @@ export const ensureAuthSession = (): Promise<AuthSession> => {
  */
 const followStoredPrincipal = async (token: string): Promise<void> => {
   const transition = beginTransition();
-  const invalidatedEpoch = getAccountLifecycle().invalidate().epoch;
+  const invalidatedEpoch = endLifetime();
 
   setActiveUserScope(null);
   bindHeldToken(token);
   store.patchSnapshot({ accountEpoch: invalidatedEpoch, sessionExpired: false, user: null });
+
+  const announced = readAnnouncedRotation(readTokenUserId(token));
+
+  if (announced !== null) {
+    // The token is about to be revoked by its own principal; let the replacement arrive and win instead.
+    await untilAnnouncedRotationSettles(announced);
+
+    if (!isCurrentTransition(transition)) {
+      return;
+    }
+  }
 
   const principal = await resolvePrincipal(transition.controller.signal);
 
@@ -573,9 +705,9 @@ const syncStoredCredential = (): void => {
   const change = classifyStoredCredential(stored, getHeldToken(), session.user?.user_id ?? null);
   const pendingRotation = getPendingRotation();
 
-  // A rotation's replacement supersedes another tab's renewal of the revoked token, and its sign-out after a 401
-  // that the rotation caused. Another account applies at once.
-  if ((change === 'renewed' || change === 'removed') && pendingRotation !== null) {
+  // A rotation's replacement supersedes another tab's renewal of the revoked token. A sign-out or another account
+  // applies at once: storage cannot say whether a sign-out was deliberate, and a deliberate one must end every tab.
+  if (change === 'renewed' && pendingRotation !== null) {
     pendingRotation.deferredStorageSync = true;
     return;
   }
@@ -692,11 +824,11 @@ export const loginWithCredentials = async (email: string, password: string, reme
 
   const attempt = beginTransition();
 
-  // Invalidate the old epoch before touching its token. This also protects a
-  // same-user reauthentication from completions started by the prior login.
-  const invalidatedEpoch = getAccountLifecycle().invalidate().epoch;
+  // Invalidate the old epoch before touching its token. This also protects a same-user reauthentication from
+  // completions started by the prior login. Storage is left alone until the attempt succeeds: a mistyped password
+  // must not sign out the tabs that share it.
+  const invalidatedEpoch = endLifetime();
   heldCredential = null;
-  persistToken(null);
   setActiveUserScope(null);
   store.patchSnapshot({ accountEpoch: invalidatedEpoch, sessionExpired: false, user: null });
 

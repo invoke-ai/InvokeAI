@@ -8,6 +8,7 @@ const testState = vi.hoisted(() => {
   const events: string[] = [];
   const listeners = new Set<() => void>();
   let stored: string | null = null;
+  let rotation: { at: number; userId: string } | null = null;
   let blocked = false;
 
   const tokenAdapter = {
@@ -17,7 +18,11 @@ const testState = vi.hoisted(() => {
         stored = null;
       }
     }),
+    clearRotation: () => {
+      rotation = null;
+    },
     read: vi.fn(() => (blocked ? undefined : stored)),
+    readRotation: () => (blocked ? undefined : rotation),
     subscribe: (listener: () => void) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -28,6 +33,11 @@ const testState = vi.hoisted(() => {
         stored = nextToken;
       }
     }),
+    writeRotation: (marker: { at: number; userId: string }) => {
+      if (!blocked) {
+        rotation = marker;
+      }
+    },
   };
 
   return {
@@ -47,6 +57,7 @@ const testState = vi.hoisted(() => {
       events.length = 0;
       listeners.clear();
       stored = null;
+      rotation = null;
       blocked = false;
       tokenAdapter.clear.mockClear();
       tokenAdapter.read.mockClear();
@@ -204,7 +215,6 @@ describe('identity account transitions', () => {
     expect(testState.events).toEqual([
       'lifecycle.invalidate',
       'cache.clear',
-      'token.clear',
       expect.stringMatching(/^publish:signed-out:\d+$/),
       'api.login',
       'token.set:token-a',

@@ -11,6 +11,7 @@ import type * as sessionModule from './session';
  */
 
 const TOKEN_KEY = 'auth_token';
+const ROTATION_KEY = 'auth_token_rotation';
 
 const userFor = (userId: string) => ({
   created_at: '2026-07-25T12:00:00Z',
@@ -67,6 +68,8 @@ const backend = (request: SentRequest): Response | Promise<Response> => {
       return json({ expires_in: 86400, token: tokenFor('user-a', 'login'), user: userFor('user-a') });
     case '/api/v1/auth/me':
       return principal ? json(userFor(principal)) : json({ detail: 'Not authenticated' }, { status: 401 });
+    case '/api/v1/boards/revoked':
+      return json({ detail: 'revoked' }, { status: 401 });
     case '/api/v1/client_state/default/set_by_key':
       if (pendingWrite === null) {
         return json({});
@@ -85,6 +88,7 @@ const writeClientState = (): Promise<Response> =>
 beforeEach(async () => {
   vi.resetModules();
   window.localStorage.removeItem(TOKEN_KEY);
+  window.localStorage.removeItem(ROTATION_KEY);
   sent = [];
   pendingWrite = null;
   vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => {
@@ -113,6 +117,7 @@ afterEach(() => {
   stopSync();
   otherTab.remove();
   window.localStorage.removeItem(TOKEN_KEY);
+  window.localStorage.removeItem(ROTATION_KEY);
   vi.unstubAllGlobals();
 });
 
@@ -193,4 +198,37 @@ it('adopts another tab’s renewal of the same user without starting a new lifet
   expect(session.getAuthSession()).toMatchObject({ accountEpoch, user: { user_id: 'user-a' } });
   expect(sent.at(-1)!.authorization).toBe(`Bearer ${renewed}`);
   expect(sent.some((request) => request.path === '/api/v1/auth/me')).toBe(false);
+});
+
+it('holds a 401 while another tab announces a password change, then adopts the replacement it stores', async () => {
+  const { accountEpoch } = session.getAuthSession();
+  const replacement = tokenFor('user-a', 'epoch-2');
+
+  otherTabStorage().setItem(ROTATION_KEY, JSON.stringify({ at: Date.now(), userId: 'user-a' }));
+  await expect(http.apiFetch('/api/v1/boards/revoked')).rejects.toMatchObject({ status: 401 });
+
+  expect(session.getAuthSession()).toMatchObject({ accountEpoch, sessionExpired: false, user: { user_id: 'user-a' } });
+
+  otherTabStorage().setItem(TOKEN_KEY, replacement);
+  otherTabStorage().removeItem(ROTATION_KEY);
+  await vi.waitFor(() => {
+    expect(session.identityTransportAuthAdapter.capture().token).toBe(replacement);
+  }, CROSS_DOCUMENT);
+  await writeClientState();
+
+  expect(session.getAuthSession()).toMatchObject({ accountEpoch, sessionExpired: false, user: { user_id: 'user-a' } });
+  expect(sent.at(-1)!.authorization).toBe(`Bearer ${replacement}`);
+});
+
+it('expires the held 401 once the announcing tab withdraws without a replacement', async () => {
+  otherTabStorage().setItem(ROTATION_KEY, JSON.stringify({ at: Date.now(), userId: 'user-a' }));
+  await expect(http.apiFetch('/api/v1/boards/revoked')).rejects.toMatchObject({ status: 401 });
+  expect(session.getAuthSession().user?.user_id).toBe('user-a');
+
+  otherTabStorage().removeItem(ROTATION_KEY);
+
+  await vi.waitFor(() => {
+    expect(session.getAuthSession()).toMatchObject({ sessionExpired: true, user: null });
+  }, CROSS_DOCUMENT);
+  expect(window.localStorage.getItem(TOKEN_KEY)).toBeNull();
 });
