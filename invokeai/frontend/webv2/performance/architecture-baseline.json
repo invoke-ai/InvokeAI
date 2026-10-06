@@ -2,13 +2,13 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 791732,
+        "brotliBytes": 793351,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 791023,
+        "gzipBytes": 792436,
         "imageRawBytes": 44398,
-        "initialRawBytes": 2034997,
-        "largestAssetRawBytes": 749011,
+        "initialRawBytes": 2039244,
+        "largestAssetRawBytes": 749029,
         "otherAssetRawBytes": 0,
         "ownedRawBytes": 98108,
         "requestCount": 36,
@@ -184,6 +184,7 @@
           "source:src/platform/browser/knownBrowserIssues.ts",
           "source:src/platform/browser/randomUuid.ts",
           "source:src/platform/browser/sha256.ts",
+          "source:src/platform/browser/webLocks.ts",
           "source:src/platform/core/concurrency.ts",
           "source:src/platform/core/outputImages.ts",
           "source:src/platform/core/seed.ts",
@@ -315,6 +316,7 @@
           "source:src/workbench/projects/api.ts",
           "source:src/workbench/projects/components/ProjectFileOptionsProvider.tsx",
           "source:src/workbench/projects/covers.ts",
+          "source:src/workbench/projects/editorSession.ts",
           "source:src/workbench/projects/ids.ts",
           "source:src/workbench/projects/invk/format.ts",
           "source:src/workbench/projects/library.ts",
@@ -343,15 +345,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1160461,
+        "brotliBytes": 1163132,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1154273,
+        "gzipBytes": 1156783,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3175605,
-        "largestAssetRawBytes": 749011,
+        "initialRawBytes": 3183475,
+        "largestAssetRawBytes": 749029,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 148621,
+        "ownedRawBytes": 149407,
         "requestCount": 73,
         "scriptRequestCount": 57,
         "sourceOwners": [
@@ -1085,7 +1087,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-10-05",
+  "capturedAt": "2026-10-06",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",
