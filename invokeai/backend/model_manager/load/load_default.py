@@ -13,7 +13,7 @@ from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.model_manager.configs.base import Diffusers_Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load.fp8_capability import fp8_storage_verdict
-from invokeai.backend.model_manager.load.load_base import LoadedModel, ModelLoaderBase
+from invokeai.backend.model_manager.load.load_base import LoadedModel, ModelLoaderBase, StaleModelConfigError
 from invokeai.backend.model_manager.load.memory_snapshot import GB, MemorySnapshot
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
 from invokeai.backend.model_manager.load.model_cache.model_cache import (
@@ -248,6 +248,12 @@ def _model_declared_skip_patterns(model: torch.nn.Module) -> tuple[str, ...]:
 class ModelLoader(ModelLoaderBase):
     """Default implementation of ModelLoaderBase."""
 
+    # Optionally set on an instance before `load_model()`: called with the caller's config while
+    # construction is serialized against cache invalidation; False rejects the load with
+    # StaleModelConfigError. An attribute rather than a constructor argument so that registered
+    # loaders overriding `__init__` keep working.
+    config_is_current: Optional[Callable[[AnyModelConfig], bool]] = None
+
     def __init__(
         self,
         app_config: InvokeAIAppConfig,
@@ -369,6 +375,15 @@ class ModelLoader(ModelLoaderBase):
                 return self._ram_cache.get_with_first_use_claim(key=cache_key, stats_name=stats_name)
             except IndexError:
                 pass
+
+            # The caller read `config` before taking this lock. A record edit commits first and then
+            # invalidates the cache under this lock, so an edit that has committed by now has either
+            # dropped this model already or will drop whatever this load admits; building from the
+            # superseded record in the first case would re-admit what that edit evicted.
+            if self.config_is_current is not None and not self.config_is_current(config):
+                raise StaleModelConfigError(
+                    f"Model '{config.name}' was modified while it was being loaded; retry with the updated model."
+                )
 
             config.path = str(self._get_model_path(config))
             self._report_inert_fp8_request(config, submodel_type)

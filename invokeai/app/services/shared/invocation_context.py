@@ -25,7 +25,7 @@ from invokeai.app.services.wildcard_records.wildcard_records_common import build
 from invokeai.app.util.step_callback import diffusion_step_callback
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
-from invokeai.backend.model_manager.load.load_base import LoadedModel, LoadedModelWithoutConfig
+from invokeai.backend.model_manager.load.load_base import LoadedModel, LoadedModelWithoutConfig, StaleModelConfigError
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
@@ -601,7 +601,7 @@ class ModelsInterface(InvocationContextInterface):
         if submodel_type:
             message += f" ({submodel_type.value})"
         self._util.signal_progress(message)
-        return self._services.model_manager.load.load_model(model, submodel_type, user_id=self._data.queue_item.user_id)
+        return self._load_current(model, submodel_type)
 
     def load_by_attrs(
         self, name: str, base: BaseModelType, type: ModelType, submodel_type: Optional[SubModelType] = None
@@ -631,9 +631,20 @@ class ModelsInterface(InvocationContextInterface):
         if submodel_type:
             message += f" ({submodel_type.value})"
         self._util.signal_progress(message)
-        return self._services.model_manager.load.load_model(
-            configs[0], submodel_type, user_id=self._data.queue_item.user_id
-        )
+        return self._load_current(configs[0], submodel_type)
+
+    def _load_current(self, model: AnyModelConfig, submodel_type: Optional[SubModelType]) -> LoadedModel:
+        """Load `model`, re-reading its record once if a load-affecting edit superseded it mid-load."""
+        load = self._services.model_manager.load
+        user_id = self._data.queue_item.user_id
+        try:
+            return load.load_model(model, submodel_type, user_id=user_id)
+        except StaleModelConfigError:
+            # The edit has already invalidated the cache; loading what the record says now is what
+            # this call would have done had it been made a moment later.
+            model = self._services.model_manager.store.get_model(model.key)
+            self._raise_if_external(model)
+            return load.load_model(model, submodel_type, user_id=user_id)
 
     def offload_from_vram(self, identifier: Union[str, "ModelIdentifierField"]) -> int:
         """Move a model (and all of its submodels) from VRAM to RAM, freeing its VRAM but keeping it cached.

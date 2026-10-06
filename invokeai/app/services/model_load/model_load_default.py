@@ -10,10 +10,13 @@ from torch import load as torch_load
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_load.model_load_base import ModelLoadServiceBase
+from invokeai.app.services.model_load.model_load_common import load_settings_changed
+from invokeai.app.services.model_records import UnknownModelException
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load import (
     LoadedModel,
     LoadedModelWithoutConfig,
+    ModelLoader,
     ModelLoaderRegistry,
     ModelLoaderRegistryBase,
 )
@@ -92,16 +95,33 @@ class ModelLoadService(ModelLoadServiceBase):
             self._invoker.services.events.emit_model_load_started(model_config, submodel_type, user_id or "system")
 
         implementation, model_config, submodel_type = self._registry.get_implementation(model_config, submodel_type)  # type: ignore
-        loaded_model: LoadedModel = implementation(
+        loader = implementation(
             app_config=self._app_config,
             logger=self._logger,
             ram_cache=self.ram_cache,
-        ).load_model(model_config, submodel_type)
+        )
+        if hasattr(self, "_invoker") and isinstance(loader, ModelLoader):
+            loader.config_is_current = self._config_is_current
+        loaded_model: LoadedModel = loader.load_model(model_config, submodel_type)
 
         if hasattr(self, "_invoker"):
             self._invoker.services.events.emit_model_load_complete(model_config, submodel_type, user_id or "system")
 
         return loaded_model
+
+    def _config_is_current(self, config: AnyModelConfig) -> bool:
+        """Whether `config` still loads the same model as the stored record for its key.
+
+        Runs under the MODEL_LOAD_LOCK write lock, which is what makes it a fence, so the record read
+        cannot move ahead of the lock. A long DB transaction (e.g. compaction) therefore stalls every
+        MODEL_LOAD_LOCK user process-wide, not just this cold load, until it finishes.
+        """
+        try:
+            current = self._invoker.services.model_manager.store.get_model(config.key)
+        except UnknownModelException:
+            # Nothing newer to load instead, and the key can no longer be requested.
+            return True
+        return not load_settings_changed(config, current)
 
     def load_model_from_path(
         self, model_path: Path, loader: Optional[Callable[[Path], AnyModel]] = None

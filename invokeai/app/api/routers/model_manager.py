@@ -29,6 +29,7 @@ from invokeai.app.services.model_images.model_images_common import (
     ModelImageFileNotFoundException,
 )
 from invokeai.app.services.model_install.model_install_common import ModelInstallJob
+from invokeai.app.services.model_load.model_load_common import load_settings_changed
 from invokeai.app.services.model_records import (
     InvalidModelException,
     ModelRecordChanges,
@@ -643,7 +644,7 @@ def _update_model_record(key: str, changes: ModelRecordChanges) -> AnyModelConfi
             # Settings that change how the model loads (e.g. fp8_storage, cpu_only) are baked into the cached
             # nn.Module at load time, so toggling them on a cached model is otherwise silently a no-op until
             # the entry is evicted. Drop any unlocked cached entries for this model so the next load rebuilds.
-            if _load_settings_changed(previous_config, config):
+            if load_settings_changed(previous_config, config):
                 # Drop the model from every per-device cache so the next load on any GPU rebuilds it.
                 # Hold the model-load write lock so no worker is mid-construction while we invalidate:
                 # a concurrent load could otherwise peek the old shared CPU weights before the drop and
@@ -696,26 +697,6 @@ async def update_model_record(
     if "key" in changes.model_fields_set and changes.key != key:
         raise HTTPException(status_code=422, detail="A model's key cannot be changed")
     return await asyncio.to_thread(_update_model_record, key, changes)
-
-
-_LOAD_AFFECTING_SETTINGS: tuple[str, ...] = ("fp8_storage", "cpu_only")
-
-
-def _load_settings_changed(previous: AnyModelConfig, updated: AnyModelConfig) -> bool:
-    """Return True if any setting that influences how the model is loaded changed.
-
-    Such settings are read by the loader during `_load_model` and baked into the resulting
-    nn.Module, so a cached entry built under the old value must be evicted for the change
-    to take effect.
-    """
-    if getattr(previous, "cpu_only", None) != getattr(updated, "cpu_only", None):
-        return True
-    previous_settings = getattr(previous, "default_settings", None)
-    updated_settings = getattr(updated, "default_settings", None)
-    for field in _LOAD_AFFECTING_SETTINGS:
-        if getattr(previous_settings, field, None) != getattr(updated_settings, field, None):
-            return True
-    return False
 
 
 @model_manager_router.get(
