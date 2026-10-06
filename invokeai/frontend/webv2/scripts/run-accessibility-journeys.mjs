@@ -898,7 +898,10 @@ const runLayersPanesJourney = async (browser) => {
     // Tool switching swaps the Tool section's rows in place.
     const tools = page.getByRole('toolbar', { exact: true, name: 'Tools' });
     await tools.getByRole('button', { exact: true, name: 'Brush' }).click();
-    await page.getByRole('tabpanel', { exact: true, name: 'Properties' }).getByText('Size', { exact: true }).waitFor();
+    await page
+      .getByRole('tabpanel', { exact: true, name: 'Properties' })
+      .getByRole('slider', { exact: true, name: 'Brush size' })
+      .waitFor();
     await tools.getByRole('button', { exact: true, name: 'View' }).click();
     await page.getByRole('tabpanel', { exact: true, name: 'Properties' }).waitFor();
 
