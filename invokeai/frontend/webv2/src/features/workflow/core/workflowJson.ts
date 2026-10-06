@@ -420,7 +420,12 @@ export const parseWorkflowJson = (raw: unknown): ParsedWorkflow => {
 };
 
 const serializeInvocationNode = (node: Extract<WorkflowNode, { type: 'invocation' }>) => {
-  const { callSavedWorkflowStatus: _callSavedWorkflowStatus, ...data } = structuredClone(node.data);
+  // Editor reconciliation state stays with the project; a portable document starts from its current selection.
+  const {
+    callSavedWorkflowFieldsFrom: _callSavedWorkflowFieldsFrom,
+    callSavedWorkflowStatus: _callSavedWorkflowStatus,
+    ...data
+  } = structuredClone(node.data);
 
   return {
     data: { ...data, id: node.id },

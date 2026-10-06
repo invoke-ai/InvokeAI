@@ -61,10 +61,15 @@ The callable-workflow feature provides:
 - Only one `workflow_return` node is allowed per workflow, enforced in both frontend validation and Python validation.
 - The frontend provides a saved-workflow picker using a reusable `SavedWorkflowField` UI type.
 - The node redraws dynamically based on the selected saved workflow's exposed form fields.
-- Dynamic field values persist with the parent workflow.
+- Dynamic field values persist with the parent workflow. A refresh of the selected workflow keeps compatible values
+  and the user's label and description overrides; selecting a different workflow takes that workflow's own values,
+  even where the two share exposed field identities.
 - Compatible inbound edges are preserved when switching between workflows with matching exposed field identities and
-  compatible types.
-- Incompatible or no-longer-exposed inbound edges are removed in the editor.
+  compatible types. The previous workflow's inputs and edges stay while the new selection loads.
+- Incompatible or no-longer-exposed inbound edges are removed in the editor, with a notice naming how many. An edge
+  from a connector with nothing upstream stays while its input still exists.
+- If a newly selected workflow cannot be loaded, the previous workflow's inputs and their edges are removed. Inputs
+  that belong to the selected workflow itself stay through a load failure.
 - Backend validation exists for `workflow_id` existence and access rights.
 
 The runtime uses an additive execution-effects seam:

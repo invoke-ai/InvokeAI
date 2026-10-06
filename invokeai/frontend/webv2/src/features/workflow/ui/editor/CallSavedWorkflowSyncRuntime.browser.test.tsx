@@ -498,7 +498,8 @@ describe('CallSavedWorkflowSyncRuntime', () => {
     });
   });
 
-  it('keeps the connections a newly selected workflow still accepts and reports the ones it drops', async () => {
+  /** A string source wired into both of `child-a`'s inputs; `child-b` was saved from it without the negative prompt. */
+  const mountConnectedCall = async () => {
     const stringSourceTemplate: InvocationTemplate = {
       ...childInputTemplate,
       inputs: {},
@@ -525,7 +526,9 @@ describe('CallSavedWorkflowSyncRuntime', () => {
       'child-b': buildLibraryChildWorkflow('Prompt', 'Describe the image', false),
     };
     getLibraryWorkflowRecordMock.mockImplementation((workflowId: string) =>
-      Promise.resolve({ name: workflowId, workflow: library[workflowId], workflow_id: workflowId })
+      library[workflowId]
+        ? Promise.resolve({ name: workflowId, workflow: library[workflowId], workflow_id: workflowId })
+        : Promise.reject(new Error('not found'))
     );
     const source = buildInvocationNode(stringSourceTemplate, { x: 0, y: 0 });
     source.id = 'source-1';
@@ -538,28 +541,46 @@ describe('CallSavedWorkflowSyncRuntime', () => {
       type: 'default',
     }));
 
-    const { notifications, readGraph, updateGraph } = await mountWith(
-      [source, buildCallNode('call-1', 'child-a')],
-      false,
-      true,
-      false,
-      edges
-    );
+    const mounted = await mountWith([source, buildCallNode('call-1', 'child-a')], false, true, false, edges);
     await settleUntilRequestsStop(() => getLibraryWorkflowRecordMock.mock.calls.length);
 
-    expect(readGraph().edges.map((edge) => edge.id)).toEqual(['edge-prompt', 'edge-negative_prompt']);
+    // Syncing a signature that accepts every connection removes nothing and says nothing.
+    expect(mounted.readGraph().edges.map((edge) => edge.id)).toEqual(['edge-prompt', 'edge-negative_prompt']);
+    expect(mounted.notifications.info).not.toHaveBeenCalled();
+
+    return mounted;
+  };
+  const readCallNode = (graph: ProjectGraphState) => {
+    const node = graph.nodes.find((candidate) => candidate.id === 'call-1');
+
+    return node?.type === 'invocation' ? node : undefined;
+  };
+
+  it('keeps the connections a newly selected workflow still accepts and reports the ones it drops', async () => {
+    const { notifications, readGraph, updateGraph } = await mountConnectedCall();
 
     selectWorkflow(readGraph, updateGraph, 'child-b');
     await settleUntilRequestsStop(() => getLibraryWorkflowRecordMock.mock.calls.length);
 
-    const callNode = readGraph().nodes.find((node) => node.id === 'call-1');
-    expect(callNode?.type === 'invocation' && callNode.data.callSavedWorkflowStatus).toBe('ready');
-    expect(callNode?.type === 'invocation' && Object.keys(callNode.data.dynamicInputTemplates ?? {})).toEqual([
+    expect(readCallNode(readGraph())?.data.callSavedWorkflowStatus).toBe('ready');
+    expect(Object.keys(readCallNode(readGraph())?.data.dynamicInputTemplates ?? {})).toEqual([
       dynamicFieldName('prompt'),
     ]);
     expect(readGraph().edges.map((edge) => edge.id)).toEqual(['edge-prompt']);
     expect(notifications.info).toHaveBeenCalledTimes(1);
     expect(notifications.info).toHaveBeenCalledWith(expect.stringContaining('savedWorkflowDroppedEdges'));
+  });
+
+  it("removes the previous workflow's inputs and reports their connections when the new selection fails", async () => {
+    const { notifications, readGraph, updateGraph } = await mountConnectedCall();
+
+    selectWorkflow(readGraph, updateGraph, 'missing-child');
+    await settleUntilRequestsStop(() => getLibraryWorkflowRecordMock.mock.calls.length);
+
+    expect(readCallNode(readGraph())?.data.callSavedWorkflowStatus).toBe('error');
+    expect(readCallNode(readGraph())?.data.dynamicInputTemplates).toEqual({});
+    expect(readGraph().edges).toEqual([]);
+    expect(notifications.info).toHaveBeenCalledTimes(1);
   });
 
   it('keeps an invalidation armed while an existing detail request settles', async () => {

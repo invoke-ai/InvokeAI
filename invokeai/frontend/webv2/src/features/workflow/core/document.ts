@@ -23,6 +23,7 @@ import type {
 
 import { isWorkflowGeneratorVariant } from './batch';
 import {
+  beginCallSavedWorkflowSwitch,
   CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX,
   clearSavedWorkflowDynamicFields,
   setCallSavedWorkflowStatus,
@@ -1009,11 +1010,11 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
         node.data.type === 'call_saved_workflow' &&
         node.data.inputs.workflow_id?.value !== action.value;
       // A cleared call exposes nothing, so its dynamic inputs and their connections go now. A newly selected workflow
-      // keeps them until its signature arrives; the sync then drops only the inputs and connections it lacks.
+      // keeps them until its signature arrives; the sync then keeps only the connections that signature accepts.
       const nextDocument = !isCallRetarget
         ? document
         : typeof action.value === 'string' && action.value.trim()
-          ? setCallSavedWorkflowStatus(document, action.nodeId, 'loading')
+          ? beginCallSavedWorkflowSwitch(document, action.nodeId, action.value)
           : clearSavedWorkflowDynamicFields(document, action.nodeId);
 
       return setFieldInstance(nextDocument, action.nodeId, action.fieldName, (instance) => ({
