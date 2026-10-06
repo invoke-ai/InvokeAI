@@ -30,7 +30,7 @@ export const DatabaseMaintenanceDialog = ({ isOpen, onClose }: { isOpen: boolean
     <ConfirmDialog
       body={t('settings.databaseMaintenance.confirmBody')}
       confirmLabel={t('settings.databaseMaintenance.compactDatabase')}
-      isDestructive={false}
+      isDestructive
       isOpen={isOpen}
       title={t('settings.databaseMaintenance.confirmTitle')}
       onClose={onClose}
