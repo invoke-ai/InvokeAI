@@ -88,6 +88,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   await Promise.all(releases.splice(0).map((release) => release()));
+  window.sessionStorage.removeItem(EDITOR_SESSION_STORAGE_KEY);
   // Clearing the account lifetime deletes its database, as signing out does.
   accountLifecycle.invalidate();
 });
