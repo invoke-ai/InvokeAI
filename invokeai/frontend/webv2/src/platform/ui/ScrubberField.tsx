@@ -57,9 +57,9 @@ type OwnProps = {
   inputMin?: number;
   inputMax?: number;
   /**
-   * How values spread along the track. `'log'` gives equal travel to equal ratios (it requires `min > 0`), so small
-   * values get room; the thumb, stops, drags (Shift-fine included) and Alt-snap follow it, while `value`, typing,
-   * keys and bounds stay in real units.
+   * How values spread along the track. `'log'` gives equal travel to equal ratios, so small values get room; the
+   * thumb, stops, drags (Shift-fine included) and Alt-snap follow it, while `value`, typing, keys and bounds stay in
+   * real units. It needs `min > 0` and positive typed values; with `min <= 0` the track stays linear.
    */
   scale?: 'linear' | 'log';
   /** The keyboard step from `value` in `direction`, for steps that grow with the value. Shift/Page keys ×10. */
@@ -285,15 +285,17 @@ export const ScrubberField = ({
     [measureText]
   );
 
-  const isLog = scale === 'log';
+  // A log track needs a positive minimum; without one it falls back to linear rather than produce NaN.
+  const isLog = scale === 'log' && min > 0;
   // Track length in scale units: value units, or natural-log ratio units.
   const span = isLog ? Math.log(max / min) : max - min;
   const decimals = Math.max(countDecimals(step), countDecimals(min));
   const typedMin = inputMin ?? min;
   const typedMax = inputMax ?? max;
   const snapToStep = useCallback(
-    (raw: number): number => clamp(roundTo(min + Math.round((raw - min) / step) * step, decimals), min, max),
-    [decimals, max, min, step]
+    (raw: number, lower: number, upper: number): number =>
+      clamp(roundTo(min + Math.round((raw - min) / step) * step, decimals), lower, upper),
+    [decimals, min, step]
   );
   // Unclamped, so a drag anchored beyond either end still moves relative to the real value.
   const toTrack = useCallback(
@@ -302,7 +304,11 @@ export const ScrubberField = ({
         return 0;
       }
 
-      return isLog ? Math.log(target / min) / span : (target - min) / span;
+      if (isLog) {
+        return target > 0 ? Math.log(target / min) / span : Number.NEGATIVE_INFINITY;
+      }
+
+      return (target - min) / span;
     },
     [isLog, min, span]
   );
@@ -447,6 +453,10 @@ export const ScrubberField = ({
       let moved = false;
       // Re-anchor on sensitivity changes so toggling Shift mid-drag does not jump.
       let anchor = { clientX: event.clientX, ratio: event.shiftKey ? FINE_DRAG_RATIO : 1, track: toTrack(value) };
+      // A value typed or stepped beyond the track stays reachable: dragging toward the track moves smoothly from it,
+      // dragging away holds it, instead of snapping onto the track's end.
+      const lower = Math.min(min, value);
+      const upper = Math.max(max, value);
       const drag: Gesture = {
         kind: 'drag',
         latest: value,
@@ -484,7 +494,7 @@ export const ScrubberField = ({
 
         return pointer.altKey && markValues?.length
           ? nearestMark(rawTrack, markValues, toTrack)
-          : snapToStep(fromTrack(rawTrack));
+          : snapToStep(fromTrack(rawTrack), lower, upper);
       };
       // Only the initiating pointer may move or end this gesture.
       const apply = (pointer: PointerSample) => {
@@ -518,7 +528,7 @@ export const ScrubberField = ({
       window.addEventListener('pointerup', end, { signal: session.signal });
       window.addEventListener('pointercancel', end, { signal: session.signal });
     },
-    [disabled, edit, fromTrack, markValues, onChange, onChangeEnd, snapToStep, toTrack, value]
+    [disabled, edit, fromTrack, markValues, max, min, onChange, onChangeEnd, snapToStep, toTrack, value]
   );
 
   const handleDoubleClick = useCallback(

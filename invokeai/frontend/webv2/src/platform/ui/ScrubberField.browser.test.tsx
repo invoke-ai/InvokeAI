@@ -680,6 +680,41 @@ describe('ScrubberField log scale and value-dependent steps', () => {
     expect(slider.getAttribute('aria-valuemax')).toBe('500');
   });
 
+  it.each([
+    // Back toward the track by 0.1 of it (10 units) on linear 0–100, by a quarter (÷10^0.5) on log 1–100.
+    ['linear', { inputMax: 1000, value: 150 }, 0.4, 140],
+    ['log', { ...LOG, inputMax: 1000, value: 500 }, 0.25, 158],
+  ] as const)(
+    'drags a %s value beyond the track from where it is: away holds, toward moves smoothly',
+    async (_scale, props, backTo, toward) => {
+      const { frame, onChange } = await mount(props);
+
+      await pointer(frame, 'pointerdown', { clientX: trackX(frame, 0.5) });
+      await pointer(window, 'pointermove', { clientX: trackX(frame, 0.51) });
+      await pointer(window, 'pointermove', { clientX: trackX(frame, 0.9) });
+
+      // Not snapped back onto the track's end, which would shrink the value.
+      expect(onChange).not.toHaveBeenCalled();
+
+      await pointer(window, 'pointermove', { clientX: trackX(frame, backTo) });
+
+      expect(onChange).toHaveBeenLastCalledWith(toward);
+      await pointer(window, 'pointerup', { clientX: trackX(frame, backTo) });
+    }
+  );
+
+  it('falls back to a linear track when a log scale has no positive minimum', async () => {
+    const { frame, onChange, slider } = await mount({ max: 100, min: 0, scale: 'log', value: 50 });
+
+    expect(trackFraction(frame, frame.querySelector('[data-part="thumb"]')!)).toBeCloseTo(0.5, 1);
+    await pointer(frame, 'pointerdown', { clientX: trackX(frame, 0.5) });
+    await pointer(window, 'pointermove', { clientX: trackX(frame, 0.6) });
+
+    expect(onChange).toHaveBeenLastCalledWith(60);
+    expect(slider.getAttribute('aria-valuenow')).toBe('50');
+    await pointer(window, 'pointerup', { clientX: trackX(frame, 0.6) });
+  });
+
   it('scrubs along the track by ratio, finely with Shift, snapped to the step in real units', async () => {
     const { frame, onChange } = await mount(LOG);
 
