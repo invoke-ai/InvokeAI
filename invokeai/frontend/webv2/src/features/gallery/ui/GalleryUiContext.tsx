@@ -102,6 +102,8 @@ export interface GalleryUiAdapter {
   notifications: GalleryNotificationsPort;
   projectId: string;
   projectName: string;
+  /** Deleting a board with its media keeps starred items, which move to Uncategorized. */
+  protectStarredMedia: boolean;
   /**
    * Export a project as an `.invk`, reporting progress itself. Keyed by project rather than
    * board because a board menu can offer this for any project's board, not only the open one.

@@ -240,6 +240,7 @@ def create_image_upload_entry(
 def delete_image(
     current_user: CurrentUserOrDefault,
     image_name: str = Path(description="The name of the image to delete"),
+    delete_starred: bool = Query(default=True, description="Whether to allow deletion of starred images"),
 ) -> DeleteImagesResult:
     """Deletes an image"""
     _assert_image_owner(image_name, current_user)
@@ -260,7 +261,7 @@ def delete_image(
 
     board_id = image_dto.board_id or "none"
     try:
-        ApiDependencies.invoker.services.images.delete(image_name)
+        was_deleted = ApiDependencies.invoker.services.images.delete(image_name, delete_starred=delete_starred)
     except ImageRecordNotFoundException:
         # Another request deleted the image between the lookup above and the service call. The
         # image is gone, which is what the client asked for — answer as the lookup would have.
@@ -269,11 +270,12 @@ def delete_image(
         raise HTTPException(status_code=500, detail="Failed to delete image")
 
     return DeleteImagesResult(
-        deleted_images=[image_name],
+        deleted_images=[image_name] if was_deleted else [],
         # Every failure path above raises, so a returned result always describes a completed
-        # delete; nothing can land in ``failed_images``.
+        # delete or a protected starred image; nothing can land in ``failed_images``.
         failed_images=[],
-        affected_boards=[board_id],
+        affected_boards=[board_id] if was_deleted else [],
+        starred_skipped=[] if was_deleted else [image_name],
     )
 
 
@@ -572,6 +574,7 @@ def delete_images_from_list(
     image_names: list[ImageName] = Body(
         description="The list of names of images to delete", embed=True, max_length=MAX_IMAGE_BATCH_SIZE
     ),
+    delete_starred: bool = Body(default=True, description="Whether to allow deletion of starred images"),
 ) -> DeleteImagesResult:
     try:
         assert_image_move_maintenance_inactive()
@@ -588,6 +591,7 @@ def delete_images_from_list(
         deleted_images: set[str] = set()
         failed_images: set[str] = set()
         affected_boards: set[str] = set()
+        starred_skipped: set[str] = set()
         # Dedup while preserving order: a name repeated in the request would otherwise
         # be processed twice, and the second pass's not-found error would land the same
         # name in both deleted_images and failed_images.
@@ -603,9 +607,11 @@ def delete_images_from_list(
                 _assert_image_owner(image_name, current_user)
                 image_dto = ApiDependencies.invoker.services.images.get_dto(image_name)
                 board_id = image_dto.board_id or "none"
-                ApiDependencies.invoker.services.images.delete(image_name)
-                deleted_images.add(image_name)
-                affected_boards.add(board_id)
+                if ApiDependencies.invoker.services.images.delete(image_name, delete_starred=delete_starred):
+                    deleted_images.add(image_name)
+                    affected_boards.add(board_id)
+                else:
+                    starred_skipped.add(image_name)
             except HTTPException:
                 continue
             except ImageRecordNotFoundException:
@@ -643,6 +649,7 @@ def delete_images_from_list(
             deleted_images=list(deleted_images),
             failed_images=list(failed_images),
             affected_boards=list(affected_boards),
+            starred_skipped=list(starred_skipped),
         )
     except HTTPException:
         raise
@@ -653,6 +660,7 @@ def delete_images_from_list(
 @images_router.delete("/uncategorized", operation_id="delete_uncategorized_images", response_model=DeleteImagesResult)
 def delete_uncategorized_images(
     current_user: CurrentUserOrDefault,
+    delete_starred: bool = Query(default=True, description="Whether to allow deletion of starred images"),
 ) -> DeleteImagesResult:
     """Deletes all uncategorized images owned by the current user (or all if admin)"""
     assert_image_move_maintenance_inactive()
@@ -665,12 +673,15 @@ def delete_uncategorized_images(
         deleted_images: set[str] = set()
         failed_images: set[str] = set()
         affected_boards: set[str] = set()
+        starred_skipped: set[str] = set()
         for image_name in image_names:
             try:
                 _assert_image_owner(image_name, current_user)
-                ApiDependencies.invoker.services.images.delete(image_name)
-                deleted_images.add(image_name)
-                affected_boards.add("none")
+                if ApiDependencies.invoker.services.images.delete(image_name, delete_starred=delete_starred):
+                    deleted_images.add(image_name)
+                    affected_boards.add("none")
+                else:
+                    starred_skipped.add(image_name)
             except HTTPException:
                 # Skip images not owned by the current user
                 pass
@@ -680,6 +691,7 @@ def delete_uncategorized_images(
             deleted_images=list(deleted_images),
             failed_images=list(failed_images),
             affected_boards=list(affected_boards),
+            starred_skipped=list(starred_skipped),
         )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to delete images")

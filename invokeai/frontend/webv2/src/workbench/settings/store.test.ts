@@ -379,6 +379,14 @@ describe('normalizeWorkbenchPreferences prompt editing', () => {
   });
 });
 
+describe('normalizeWorkbenchPreferences starred media protection', () => {
+  it('is off unless explicitly enabled', () => {
+    expect(store.normalizeWorkbenchPreferences({}).protectStarredMedia).toBe(false);
+    expect(store.normalizeWorkbenchPreferences({ protectStarredMedia: 1 as never }).protectStarredMedia).toBe(false);
+    expect(store.normalizeWorkbenchPreferences({ protectStarredMedia: true }).protectStarredMedia).toBe(true);
+  });
+});
+
 describe('normalizeWorkbenchPreferences appearance', () => {
   it('keeps high contrast off unless explicitly enabled', () => {
     expect(store.normalizeWorkbenchPreferences({}).highContrast).toBe(false);

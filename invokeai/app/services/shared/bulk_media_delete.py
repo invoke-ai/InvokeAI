@@ -7,12 +7,17 @@ adapter is the seam between that policy and the two storage implementations.
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Generic, TypeVar
+
+RecordT = TypeVar("RecordT")
 
 
 @dataclass(frozen=True)
-class StagedMediaDeleteAdapter:
+class StagedMediaDeleteAdapter(Generic[RecordT]):
     kind: str
-    stage: Callable[[str], object]
+    load: Callable[[str], RecordT]
+    is_starred: Callable[[RecordT], bool]
+    stage: Callable[[str, RecordT], object]
     delete_records: Callable[[list[str]], None]
     rollback: Callable[[object], None]
     commit: Callable[[object], None]
@@ -20,15 +25,26 @@ class StagedMediaDeleteAdapter:
     log_error: Callable[[str], None]
 
 
-def delete_media_by_names(names: list[str], adapter: StagedMediaDeleteAdapter) -> tuple[list[str], list[str]]:
-    """Delete exactly ``names``, preserving records whenever their files cannot be staged."""
+def delete_media_by_names(
+    names: list[str], adapter: StagedMediaDeleteAdapter[RecordT], delete_starred: bool = True
+) -> tuple[list[str], list[str], list[str]]:
+    """Delete exactly ``names``, preserving records whenever their files cannot be staged.
+
+    Returns ``(deleted, failed, starred_skipped)``. With ``delete_starred=False`` starred items are
+    left untouched and reported in ``starred_skipped``.
+    """
     deleted: list[str] = []
     failed: list[str] = []
+    starred_skipped: list[str] = []
     staged: list[tuple[str, object]] = []
 
     for name in names:
         try:
-            token = adapter.stage(name)
+            record = adapter.load(name)
+            if not delete_starred and adapter.is_starred(record):
+                starred_skipped.append(name)
+                continue
+            token = adapter.stage(name, record)
             staged.append((name, token))
             deleted.append(name)
         except Exception as error:
@@ -54,4 +70,4 @@ def delete_media_by_names(names: list[str], adapter: StagedMediaDeleteAdapter) -
     for name in deleted:
         adapter.notify_deleted(name)
 
-    return deleted, failed
+    return deleted, failed, starred_skipped

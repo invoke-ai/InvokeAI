@@ -1,7 +1,8 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 import { ChakraProvider } from '@chakra-ui/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
-import { act } from 'react';
+import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
@@ -9,7 +10,17 @@ import { userEvent } from 'vitest/browser';
 import type { GalleryWidgetContextValue } from './GalleryWidgetContext';
 
 import { GalleryBoardMenu } from './GalleryBoardMenu';
+import { GalleryUiProvider, type GalleryUiAdapter } from './GalleryUiContext';
 import { GalleryWidgetContext } from './GalleryWidgetContext';
+
+const mocks = vi.hoisted(() => ({ starredCount: 0 }));
+
+vi.mock('@features/gallery/data/queries', () => ({
+  galleryBoardStarredCountOptions: (boardId: string) => ({
+    queryFn: () => Promise.resolve(mocks.starredCount),
+    queryKey: ['board-starred-count', boardId],
+  }),
+}));
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -25,6 +36,7 @@ vi.mock('react-i18next', () => ({
         'widgets.gallery.deleteBoardDescription': 'Choose whether the board media moves or is deleted.',
         'widgets.gallery.deleteBoardOnly': 'Delete Board Only',
         'widgets.gallery.deleteBoardQuestion': `Delete board "${String(values?.name)}"?`,
+        'widgets.gallery.deleteBoardStarredNotice': `${String(values?.count)} starred kept`,
         'widgets.gallery.downloadBoardWithOmission': `Download Board (${String(values?.count)} video omitted)`,
         'widgets.gallery.imageCount': `${String(values?.count)} images`,
         'widgets.gallery.videoCount': `${String(values?.count)} videos`,
@@ -70,21 +82,50 @@ let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+const adapters = {
+  protected: { protectStarredMedia: true } as unknown as GalleryUiAdapter,
+  unprotected: { protectStarredMedia: false } as unknown as GalleryUiAdapter,
+};
+
+const renderMenu = async (widgetContext: GalleryWidgetContextValue, protectStarredMedia = false) => {
+  const adapter = adapters[protectStarredMedia ? 'protected' : 'unprotected'];
+  const queryClient = new QueryClient();
+  const tree: ReactNode = (
+    <QueryClientProvider client={queryClient}>
+      <GalleryUiProvider adapter={adapter}>
+        <ChakraProvider value={system}>
+          <GalleryWidgetContext value={widgetContext}>
+            <GalleryBoardMenu target={target} onClose={noop} />
+          </GalleryWidgetContext>
+        </ChakraProvider>
+      </GalleryUiProvider>
+    </QueryClientProvider>
+  );
+
+  await act(async () => {
+    root?.render(tree);
+    await Promise.resolve();
+  });
+};
+
+const openDeleteDialog = async () => {
+  const deleteItem = Array.from(document.querySelectorAll('[role="menuitem"]')).find(
+    (element) => element.textContent === 'Delete Board'
+  );
+
+  await act(() => userEvent.click(deleteItem as HTMLElement));
+  await vi.waitFor(() => {
+    expect(document.body.textContent).toContain('Delete Board and Media');
+  });
+};
+
 beforeEach(async () => {
+  mocks.starredCount = 0;
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
 
-  await act(async () => {
-    root?.render(
-      <ChakraProvider value={system}>
-        <GalleryWidgetContext value={context}>
-          <GalleryBoardMenu target={target} onClose={noop} />
-        </GalleryWidgetContext>
-      </ChakraProvider>
-    );
-    await Promise.resolve();
-  });
+  await renderMenu(context);
 });
 
 afterEach(async () => {
@@ -122,16 +163,7 @@ it('makes the board the auto-add destination', async () => {
 });
 
 it('hands results back to the selected board from the auto-add board itself', async () => {
-  await act(async () => {
-    root?.render(
-      <ChakraProvider value={system}>
-        <GalleryWidgetContext value={targetContext}>
-          <GalleryBoardMenu target={target} onClose={noop} />
-        </GalleryWidgetContext>
-      </ChakraProvider>
-    );
-    await Promise.resolve();
-  });
+  await renderMenu(targetContext);
 
   const item = document.querySelector<HTMLElement>('[role="menuitem"][data-value="auto-add-board"]');
 
@@ -139,4 +171,30 @@ it('hands results back to the selected board from the auto-add board itself', as
   await act(() => userEvent.click(item!));
 
   expect(context.actions.updateSettings).toHaveBeenLastCalledWith({ autoAddBoardId: 'follow' });
+});
+
+it('says how many starred items stay when starred media is protected', async () => {
+  mocks.starredCount = 3;
+  await renderMenu(context, true);
+  await openDeleteDialog();
+
+  await vi.waitFor(() => {
+    expect(document.body.textContent).toContain('3 starred kept');
+  });
+});
+
+it('adds nothing to the dialog when starred media is not protected', async () => {
+  mocks.starredCount = 3;
+  await renderMenu(context, false);
+  await openDeleteDialog();
+
+  expect(document.body.textContent).not.toContain('starred kept');
+});
+
+it('adds nothing to the dialog when the board has no starred items', async () => {
+  await renderMenu(context, true);
+  await openDeleteDialog();
+  await act(() => Promise.resolve());
+
+  expect(document.body.textContent).not.toContain('starred kept');
 });

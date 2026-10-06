@@ -49,7 +49,10 @@ export interface GalleryItemsPage {
 export interface GalleryItemMutationResult {
   /** Boards whose contents/counts changed for at least one confirmed success. */
   affectedBoardIds?: string[];
+  /** Every requested item that was not changed, `starredSkipped` included. */
   failed: GalleryItemRef[];
+  /** Starred items a delete left alone because protection was on. They still exist; this is not a failure. */
+  starredSkipped?: GalleryItemRef[];
   succeeded: GalleryItemRef[];
 }
 

@@ -498,7 +498,7 @@ class ImageService(ImageServiceABC):
             self.__invoker.services.logger.error("Problem getting paginated image DTOs")
             raise e
 
-    def delete(self, image_name: str):
+    def delete(self, image_name: str, delete_starred: bool = True) -> bool:
         # Record first, files second, with a durable journal spanning the two. Deleting the record
         # first means a database failure leaves the image completely intact, and the only state
         # that can outlive this call is a file nothing references — which the journal lets startup
@@ -509,6 +509,8 @@ class ImageService(ImageServiceABC):
         with self._image_mutation_lock():
             try:
                 record = self.__invoker.services.image_records.get(image_name)
+                if not delete_starred and record.starred:
+                    return False
                 token = self.__invoker.services.image_files.begin_delete([(image_name, record.image_subfolder)])
                 try:
                     self.__invoker.services.image_records.delete(image_name)
@@ -528,6 +530,7 @@ class ImageService(ImageServiceABC):
                     # behind and startup recovery purges the leftover files.
                     self.__invoker.services.logger.error(f"Failed to purge deleted image files: {cleanup_error}")
                 self._on_deleted(image_name)
+                return True
             except ImageRecordNotFoundException:
                 # Already deleted by another request; nothing here failed, so nothing to log.
                 raise
@@ -541,7 +544,9 @@ class ImageService(ImageServiceABC):
                 self.__invoker.services.logger.error("Problem deleting image record and file")
                 raise e
 
-    def delete_images_on_board(self, board_id: str, user_id: Optional[str] = None) -> tuple[list[str], list[str]]:
+    def delete_images_on_board(
+        self, board_id: str, user_id: Optional[str] = None, delete_starred: bool = True
+    ) -> tuple[list[str], list[str], list[str]]:
         # The mutation lock spans the enumeration through the purges and rollbacks so a subfolder
         # move cannot relocate files between a record read and its stage or commit.
         with self._image_mutation_lock():
@@ -553,10 +558,12 @@ class ImageService(ImageServiceABC):
                 is_intermediate=None,
                 user_id=user_id,
             )
-            return self.delete_images_by_names(image_names)
+            return self.delete_images_by_names(image_names, delete_starred=delete_starred)
 
-    def delete_images_by_names(self, image_names: list[str]) -> tuple[list[str], list[str]]:
-        """Delete exactly these images, returning ``(deleted, failed)``.
+    def delete_images_by_names(
+        self, image_names: list[str], delete_starred: bool = True
+    ) -> tuple[list[str], list[str], list[str]]:
+        """Delete exactly these images, returning ``(deleted, failed, starred_skipped)``.
 
         Split from ``delete_images_on_board`` so a caller that must decide whether the board may go
         *before* destroying anything can enumerate first and delete second. Records whose file
@@ -572,13 +579,16 @@ class ImageService(ImageServiceABC):
                     image_names,
                     StagedMediaDeleteAdapter(
                         kind="image",
-                        stage=lambda name: files.stage_delete(name, image_subfolder=records.get(name).image_subfolder),
+                        load=records.get,
+                        is_starred=lambda record: record.starred,
+                        stage=lambda name, record: files.stage_delete(name, image_subfolder=record.image_subfolder),
                         delete_records=records.delete_many,
                         rollback=files.rollback_delete,
                         commit=files.commit_delete,
                         notify_deleted=self._on_deleted,
                         log_error=self.__invoker.services.logger.error,
                     ),
+                    delete_starred=delete_starred,
                 )
             except ImageRecordDeleteException:
                 self.__invoker.services.logger.error("Failed to delete image records")

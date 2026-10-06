@@ -24,6 +24,7 @@ import {
 
 import {
   type GalleryItemNames,
+  countGalleryBoardStarredItems,
   fetchImageIndexAvailability,
   hydrateGalleryDateBoardItemPage,
   isDateBoardId,
@@ -187,6 +188,8 @@ export const galleryKeys = {
   itemNames: (owner: AccountScope, filter: CanonicalGalleryItemsFilter) =>
     [...galleryKeys.itemNamesForAccount(owner), filter] as const,
   imageIndexAvailability: (owner: AccountScope) => [...galleryKeys.all, 'image-index', getAccountKey(owner)] as const,
+  boardStarredCount: (owner: AccountScope, boardId: string) =>
+    [...galleryKeys.all, 'board-starred-count', getAccountKey(owner), boardId] as const,
 };
 
 const galleryItemNamesOptionsForOwner = (owner: AccountScope, filter: CanonicalGalleryItemsFilter) =>
@@ -352,6 +355,27 @@ export const imageIndexAvailabilityOptions = () => {
         ? IMAGE_INDEX_UNAVAILABLE_POLL_MS
         : false,
     staleTime: IMAGE_INDEX_STALE_MS,
+  });
+};
+
+/**
+ * Starred items on one board. Always refetched and never kept: stars change outside the gallery caches, and the
+ * answer is only read while a delete confirmation is open.
+ */
+export const galleryBoardStarredCountOptions = (boardId: string) => {
+  const owner = captureAccountScope();
+
+  return queryOptions({
+    gcTime: 0,
+    queryFn: async ({ signal }) => {
+      const count = await countGalleryBoardStarredItems(boardId, AbortSignal.any([signal, owner.signal]));
+
+      assertAccountScopeCurrent(owner);
+
+      return count;
+    },
+    queryKey: galleryKeys.boardStarredCount(owner, boardId),
+    staleTime: 0,
   });
 };
 

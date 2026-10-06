@@ -144,6 +144,10 @@ class VideoNamesBatch(BaseModel):
     )
 
 
+class DeleteVideosBatch(VideoNamesBatch):
+    delete_starred: bool = Field(default=True, description="Whether to allow deletion of starred videos")
+
+
 def _get_video_cache_control() -> str:
     if ApiDependencies.invoker.services.configuration.multiuser:
         return "private, no-store"
@@ -621,6 +625,7 @@ async def upload_video(
 def delete_video(
     current_user: CurrentUserOrDefault,
     video_name: str = PathParam(description="The name of the video to delete"),
+    delete_starred: bool = Query(default=True, description="Whether to allow deletion of starred videos"),
 ) -> DeleteVideosResult:
     _assert_video_owner(video_name, current_user)
 
@@ -636,21 +641,22 @@ def delete_video(
 
     board_id = video_dto.board_id or "none"
     try:
-        ApiDependencies.invoker.services.videos.delete(video_name)
+        was_deleted = ApiDependencies.invoker.services.videos.delete(video_name, delete_starred=delete_starred)
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to delete video")
 
     return DeleteVideosResult(
-        deleted_videos=[video_name],
+        deleted_videos=[video_name] if was_deleted else [],
         failed_videos=[],
-        affected_boards=[board_id],
+        affected_boards=[board_id] if was_deleted else [],
+        starred_skipped=[] if was_deleted else [video_name],
     )
 
 
 @videos_router.post("/delete", operation_id="delete_videos_from_list", response_model=DeleteVideosResult)
 def delete_videos_from_list(
     current_user: CurrentUserOrDefault,
-    batch: VideoNamesBatch,
+    batch: DeleteVideosBatch,
 ) -> DeleteVideosResult:
     # Skip — but do not re-raise — auth failures so a foreign name mid-batch doesn't
     # discard the response payload for items the caller had already legitimately deleted.
@@ -664,6 +670,7 @@ def delete_videos_from_list(
     deleted_videos: set[str] = set()
     failed_videos: set[str] = set()
     affected_boards: set[str] = set()
+    starred_skipped: set[str] = set()
     # Dedup while preserving order: a name repeated in the request would otherwise be
     # processed twice, and the second pass's not-found error would land the same name
     # in both deleted_videos and failed_videos.
@@ -672,9 +679,11 @@ def delete_videos_from_list(
             _assert_video_owner(video_name, current_user)
             video_dto = ApiDependencies.invoker.services.videos.get_dto(video_name)
             board_id = video_dto.board_id or "none"
-            ApiDependencies.invoker.services.videos.delete(video_name)
-            deleted_videos.add(video_name)
-            affected_boards.add(board_id)
+            if ApiDependencies.invoker.services.videos.delete(video_name, delete_starred=batch.delete_starred):
+                deleted_videos.add(video_name)
+                affected_boards.add(board_id)
+            else:
+                starred_skipped.add(video_name)
         except HTTPException:
             continue
         except Exception:
@@ -683,12 +692,14 @@ def delete_videos_from_list(
         deleted_videos=list(deleted_videos),
         failed_videos=list(failed_videos),
         affected_boards=list(affected_boards),
+        starred_skipped=list(starred_skipped),
     )
 
 
 @videos_router.delete("/uncategorized", operation_id="delete_uncategorized_videos", response_model=DeleteVideosResult)
 def delete_uncategorized_videos(
     current_user: CurrentUserOrDefault,
+    delete_starred: bool = Query(default=True, description="Whether to allow deletion of starred videos"),
 ) -> DeleteVideosResult:
     """Deletes all uncategorized videos owned by the current user (or all if admin).
 
@@ -703,12 +714,15 @@ def delete_uncategorized_videos(
     deleted_videos: set[str] = set()
     failed_videos: set[str] = set()
     affected_boards: set[str] = set()
+    starred_skipped: set[str] = set()
     for video_name in names_result.video_names:
         try:
             _assert_video_owner(video_name, current_user)
-            ApiDependencies.invoker.services.videos.delete(video_name)
-            deleted_videos.add(video_name)
-            affected_boards.add("none")
+            if ApiDependencies.invoker.services.videos.delete(video_name, delete_starred=delete_starred):
+                deleted_videos.add(video_name)
+                affected_boards.add("none")
+            else:
+                starred_skipped.add(video_name)
         except HTTPException:
             # Skip videos not owned by the current user — an intentional skip, not a
             # failed deletion, so it must not be reported (and toasted) as one.
@@ -719,6 +733,7 @@ def delete_uncategorized_videos(
         deleted_videos=list(deleted_videos),
         failed_videos=list(failed_videos),
         affected_boards=list(affected_boards),
+        starred_skipped=list(starred_skipped),
     )
 
 

@@ -18,6 +18,7 @@ vi.mock('@platform/transport/http', () => ({
 
 import {
   addImagesToGalleryBoard,
+  countGalleryBoardStarredItems,
   deleteGalleryBoard,
   deleteGalleryImages,
   downloadGalleryArchive,
@@ -65,6 +66,42 @@ describe('deleteGalleryBoard outcomes', () => {
       deletedVideoNames: ['gone.mp4'],
       failedImageNames: ['locked.png'],
       failedVideoNames: ['locked.mp4'],
+      protectedImageNames: [],
+      protectedVideoNames: [],
+    });
+  });
+
+  it('asks the backend to keep starred media and maps what it kept', async () => {
+    mocks.apiFetchJson.mockResolvedValue({
+      board_id: 'board-1',
+      deleted_board_images: [],
+      deleted_board_videos: [],
+      deleted_images: ['gone.png'],
+      deleted_videos: [],
+      failed_images: [],
+      failed_videos: [],
+      starred_images_skipped: ['star.png'],
+      starred_videos_skipped: ['star.mp4'],
+    });
+
+    await expect(deleteGalleryBoard('board-1', true, undefined, { deleteStarred: false })).resolves.toMatchObject({
+      protectedImageNames: ['star.png'],
+      protectedVideoNames: ['star.mp4'],
+    });
+    expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/boards/board-1?delete_starred=false&include_images=true', {
+      method: 'DELETE',
+      signal: undefined,
+    });
+  });
+
+  it('leaves the request unchanged when starred media is not protected', async () => {
+    mocks.apiFetchJson.mockResolvedValue({ board_id: 'board-1', deleted_board_images: [], deleted_images: [] });
+
+    await deleteGalleryBoard('board-1', true, undefined, { deleteStarred: true });
+
+    expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/boards/board-1?include_images=true', {
+      method: 'DELETE',
+      signal: undefined,
     });
   });
 
@@ -87,6 +124,8 @@ describe('deleteGalleryBoard outcomes', () => {
       deletedVideoNames: [],
       failedImageNames: [],
       failedVideoNames: [],
+      protectedImageNames: [],
+      protectedVideoNames: [],
     });
     expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/boards/board-1?include_images=false', {
       method: 'DELETE',
@@ -940,5 +979,34 @@ describe('fetchImageIndexAvailability', () => {
     mocks.apiFetchJson.mockResolvedValue(body);
 
     await expect(fetchImageIndexAvailability(new AbortController().signal)).resolves.toEqual(availability);
+  });
+});
+
+describe('countGalleryBoardStarredItems', () => {
+  beforeEach(() => {
+    accountLifecycle.activate('user-a');
+    mocks.apiFetchJson.mockReset();
+  });
+
+  it('adds the starred items of both gallery views on the board', async () => {
+    mocks.apiFetchJson
+      .mockResolvedValueOnce({ items: [], limit: 0, offset: 0, total: 2 })
+      .mockResolvedValueOnce({ items: [], limit: 0, offset: 0, total: 1 });
+
+    await expect(countGalleryBoardStarredItems('board-1')).resolves.toBe(3);
+
+    const urls = mocks.apiFetchJson.mock.calls.map(([url]) => new URL(String(url), 'https://api.test'));
+
+    expect(urls).toHaveLength(2);
+    for (const url of urls) {
+      expect(url.pathname).toBe('/api/v1/gallery/items/');
+      expect(url.searchParams.get('limit')).toBe('0');
+      expect(url.searchParams.get('board_id')).toBe('board-1');
+      expect(url.searchParams.get('starred')).toBe('true');
+    }
+    expect(urls.map((url) => url.searchParams.getAll('categories'))).toEqual([
+      ['general'],
+      ['control', 'mask', 'user'],
+    ]);
   });
 });

@@ -202,6 +202,7 @@ export const useImageActions = ({
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const confirmImageDeletion = useWorkbenchPreferenceSelector((preferences) => preferences.confirmImageDeletion);
+  const protectStarredMedia = useWorkbenchPreferenceSelector((preferences) => preferences.protectStarredMedia);
   const models = useModelsSelector((snapshot) => snapshot.models);
   const supportedModels = useMemo(() => models.filter(isSupportedGenerateModel), [models]);
   const vaeModels = useMemo(() => models.filter(isVaeModelConfig).map((model) => model as VaeModelConfig), [models]);
@@ -288,20 +289,48 @@ export const useImageActions = ({
       action: 'delete' | 'move' | 'star' | 'unstar',
       requestedCount: number,
       result: GalleryItemMutationResult,
-      boardId?: string
+      boardId?: string,
+      /** Starred items withheld from the request before it was sent. */
+      withheldStarredCount = 0
     ) => {
-      if (result.failed.length > 0) {
+      // The backend lists the starred items it kept in `failed` too, so that rollback restores them.
+      const keptStarredCount = result.starredSkipped?.length ?? 0;
+      const failedCount = result.failed.length - keptStarredCount;
+      const skippedStarredCount = keptStarredCount + withheldStarredCount;
+
+      if (failedCount > 0) {
         recordError(
           new Error(
             t(`widgets.gallery.itemActions.${action}.${result.succeeded.length > 0 ? 'partial' : 'failure'}`, {
               board: boardId ? getBoardName(boardId) : undefined,
-              count: requestedCount,
-              failed: result.failed.length,
+              count: requestedCount + withheldStarredCount - skippedStarredCount,
+              failed: failedCount,
               succeeded: result.succeeded.length,
             })
           )
         );
         return;
+      }
+
+      // Protection is a deliberate choice, so it is reported only where deletion is confirmed; otherwise it stays
+      // silent and the starred items simply remain.
+      if (skippedStarredCount > 0) {
+        if (confirmImageDeletion) {
+          notifications.add({
+            kind: 'info',
+            title: t(
+              result.succeeded.length > 0
+                ? 'widgets.gallery.itemActions.delete.starredKept'
+                : 'widgets.gallery.itemActions.delete.starredOnly',
+              { count: skippedStarredCount, succeeded: result.succeeded.length }
+            ),
+          });
+          return;
+        }
+
+        if (result.succeeded.length === 0) {
+          return;
+        }
       }
 
       recordSuccess(
@@ -318,12 +347,15 @@ export const useImageActions = ({
       mutate,
       requested,
       rollback,
+      withheldStarredCount,
     }: {
       action: 'delete' | 'move' | 'star' | 'unstar';
       applyConfirmed: (result: GalleryItemMutationResult, signal: AbortSignal) => Promise<void> | void;
       boardId?: string;
       mutate: (signal: AbortSignal) => Promise<GalleryItemMutationResult>;
       requested: GalleryItemRef[];
+      /** Starred items a delete left out of `requested` because starred media is protected. */
+      withheldStarredCount?: number;
       /** Undo the optimistic apply. Runs once, only when the account scope that requested
        *  it is still current, before the (likely also-failing) trailing invalidation. */
       rollback?: () => void;
@@ -364,9 +396,9 @@ export const useImageActions = ({
         return;
       }
 
-      reportMutationOutcome(action, requested.length, result, boardId);
+      reportMutationOutcome(action, requested.length, result, boardId, withheldStarredCount);
     };
-    const deleteItemsConfirmed = (items: GalleryItemRef[]): Promise<void> => {
+    const deleteItemsConfirmed = (items: GalleryItemRef[], withheldStarredCount = 0): Promise<void> => {
       // Capture successor context before optimistic removal. Partial failures reconcile via invalidation; total
       // failures restore widget snapshots directly.
       const deletionContext = getItemActionContext?.() ?? null;
@@ -411,6 +443,8 @@ export const useImageActions = ({
           }
 
           if (result.succeeded.length === 0) {
+            // Nothing went away (every item was refused or kept), so the widget values cleared up front come back too.
+            restoreGalleryItemRemoval(galleryWidgetSnapshot);
             return;
           }
 
@@ -485,7 +519,8 @@ export const useImageActions = ({
           }
 
           signal.throwIfAborted();
-          return galleryItemOrganization.delete(items, signal);
+          // The listing the user sees may be stale about stars, so the backend enforces protection too.
+          return galleryItemOrganization.delete(items, signal, { deleteStarred: !protectStarredMedia });
         },
         requested: items,
         rollback: () => {
@@ -496,12 +531,46 @@ export const useImageActions = ({
           rollbackCachesOnce();
           restoreGalleryItemRemoval(galleryWidgetSnapshot);
         },
+        withheldStarredCount,
       });
     };
-    const deleteItems = (items: GalleryItemRef[]): Promise<void> =>
-      confirmImageDeletion
-        ? requestDeletionConfirmation(items, () => deleteItemsConfirmed(items))
-        : deleteItemsConfirmed(items);
+    const deleteItems = (items: GalleryItemRef[]): Promise<void> => {
+      let deletable = items;
+
+      if (protectStarredMedia) {
+        // Items known to be starred never leave the grid or reach the confirmation; stale knowledge is caught by the
+        // backend.
+        const starredByKey = new Map<GalleryItemKey, boolean>(
+          [...collectGalleryStoreKnownItemFields(queries.getSnapshot().projects, items)].map(([key, fields]) => [
+            key,
+            fields.starred,
+          ])
+        );
+
+        for (const [key, cachedStarred] of getGalleryItemStarredFromCaches(queryClient, items)) {
+          starredByKey.set(key, cachedStarred);
+        }
+
+        deletable = items.filter((item) => starredByKey.get(toGalleryItemKey(item)) !== true);
+      }
+
+      const withheldStarredCount = items.length - deletable.length;
+
+      if (deletable.length === 0) {
+        if (withheldStarredCount > 0 && confirmImageDeletion) {
+          notifications.add({
+            kind: 'info',
+            title: t('widgets.gallery.itemActions.delete.starredOnly', { count: withheldStarredCount }),
+          });
+        }
+
+        return Promise.resolve();
+      }
+
+      return confirmImageDeletion
+        ? requestDeletionConfirmation(deletable, () => deleteItemsConfirmed(deletable, withheldStarredCount))
+        : deleteItemsConfirmed(deletable, withheldStarredCount);
+    };
     const moveItemsToBoard = (items: GalleryItemRef[], boardId: string): Promise<void> => {
       // On partial move failure, restore then reapply confirmed items. Capture prior boards from cache and store,
       // preferring cache; invalidation reconciles conflicts.
@@ -1161,6 +1230,7 @@ export const useImageActions = ({
     onImagesDeleted,
     openWorkbenchWidget,
     projectId,
+    protectStarredMedia,
     queryClient,
     queries,
     requestDeletionConfirmation,

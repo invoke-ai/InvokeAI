@@ -1487,7 +1487,7 @@ def test_video_cleanup_cannot_purge_files_during_staged_deletion(
 
     def delete_video():
         if bulk:
-            assert invoker.services.videos.delete_videos_by_names(["racy.mp4"]) == (["racy.mp4"], [])
+            assert invoker.services.videos.delete_videos_by_names(["racy.mp4"]) == (["racy.mp4"], [], [])
         else:
             invoker.services.videos.delete("racy.mp4")
 
