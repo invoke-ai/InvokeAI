@@ -1,7 +1,7 @@
 import type { GalleryItem } from '@features/gallery/core/items';
 import type { GalleryItemsFilter } from '@features/gallery/data/queries';
 
-import { toGalleryItemRef } from '@features/gallery/core/items';
+import { toGalleryItemKey, toGalleryItemRef } from '@features/gallery/core/items';
 import { getBoundedRecentImages } from '@features/gallery/core/recentImages';
 import { getGallerySettings } from '@features/gallery/core/settings';
 import { GALLERY_PAGE_SIZE, galleryItemNamesOptions } from '@features/gallery/data/queries';
@@ -14,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 import type { GalleryStateView } from './galleryStateView';
 
 import { GalleryBoardDragMonitor } from './GalleryBoardDragMonitor';
-import { mergeGalleryLoadedItems } from './galleryGridLayout';
+import { getGallerySparseSelectionPages, mergeGalleryLoadedItems } from './galleryGridLayout';
 import { GalleryLayout } from './GalleryLayout';
 import {
   getGalleryAnchoredWindowPage,
@@ -136,6 +136,20 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     () => mergeGalleryLoadedItems(starredStrip.items, gallery.items),
     [gallery.items, starredStrip.items]
   );
+  const sparseSelectionPages = useMemo(
+    () =>
+      data.sparseListing
+        ? getGallerySparseSelectionPages({
+            itemSlots: data.sparseListing.itemSlots,
+            pageOffset: settings.paginationMode === 'paginated' ? page * GALLERY_PAGE_SIZE : 0,
+          })
+        : null,
+    [data.sparseListing, page, settings.paginationMode]
+  );
+  const getItemSelectionPage = useCallback(
+    (item: GalleryItem) => sparseSelectionPages?.get(toGalleryItemKey(item)) ?? page,
+    [page, sparseSelectionPages]
+  );
   const lastPublishedTotalRef = useRef<number | null>(null);
   const itemActionFilterIdentity = useMemo(() => JSON.stringify(data.filter), [data.filter]);
   const loadOrderedItemRefs = useCallback(
@@ -156,6 +170,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
   // eslint-disable-next-line react/refs
   itemActionContextRef.current = {
     filterIdentity: itemActionFilterIdentity,
+    getItemSelectionPage,
     items: gallery.items,
     loadOrderedRefs: loadOrderedItemRefs,
     selectedItemKey: gallery.selectedItemKey,

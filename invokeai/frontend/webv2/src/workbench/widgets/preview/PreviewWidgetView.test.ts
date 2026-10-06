@@ -4,7 +4,62 @@ import { GALLERY_MAX_ROWS } from '@features/gallery/queries';
 import { describe, expect, it } from 'vitest';
 
 import { getVideoFrameCopyNotice } from './PreviewWidgetView';
-import { mergePreviewBoardItems } from './usePreviewNavigation';
+import { getPreviewSelectedPage, mergePreviewBoardItems } from './usePreviewNavigation';
+
+describe('getPreviewSelectedPage', () => {
+  const selectedImageQuery = {
+    boardId: 'none',
+    galleryView: 'images' as const,
+    imageOrderDir: 'DESC' as const,
+    page: 3,
+    paginationMode: 'infinite' as const,
+    searchTerm: '',
+    semanticKey: 'text:sunset',
+    starredOnly: false,
+  };
+
+  it('centers matching semantic navigation on the selected result page', () => {
+    expect(
+      getPreviewSelectedPage({
+        galleryPage: 0,
+        navigationBoardId: 'none',
+        navigationSemanticKey: 'text:sunset',
+        selectedImageQuery,
+      })
+    ).toBe(3);
+  });
+
+  it('does not reuse a result position after the semantic query changes', () => {
+    expect(
+      getPreviewSelectedPage({
+        galleryPage: 0,
+        navigationBoardId: 'none',
+        navigationSemanticKey: 'text:dawn',
+        selectedImageQuery,
+      })
+    ).toBe(0);
+
+    expect(
+      getPreviewSelectedPage({
+        galleryPage: 0,
+        navigationBoardId: 'different-board',
+        navigationSemanticKey: 'text:sunset',
+        selectedImageQuery,
+      })
+    ).toBe(0);
+  });
+
+  it('does not reinterpret a semantic result page as an ordinary board page', () => {
+    expect(
+      getPreviewSelectedPage({
+        galleryPage: 0,
+        navigationBoardId: 'none',
+        navigationSemanticKey: '',
+        selectedImageQuery,
+      })
+    ).toBe(0);
+  });
+});
 
 describe('mergePreviewBoardItems', () => {
   const item = (kind: GalleryItem['kind'], name: string, createdAt: string, starred = false): GalleryItem => {

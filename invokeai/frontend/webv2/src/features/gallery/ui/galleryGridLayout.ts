@@ -175,6 +175,23 @@ export const getGallerySparseRowIndexForItemKey = (
   return -1;
 };
 
+/** Resolves loaded sparse items to the backend page that owns their absolute ranking position. */
+export const getGallerySparseSelectionPages = ({
+  itemSlots,
+  pageOffset,
+}: {
+  itemSlots: ReadonlyMap<number, GalleryItem>;
+  pageOffset: number;
+}): ReadonlyMap<GalleryItemKey, number> => {
+  const pages = new Map<GalleryItemKey, number>();
+
+  for (const [itemIndex, item] of itemSlots) {
+    pages.set(toGalleryItemKey(item), Math.floor((pageOffset + itemIndex) / GALLERY_PAGE_SIZE));
+  }
+
+  return pages;
+};
+
 /** Stable identities follow absolute listing positions while a page moves between loading, error, and ready. */
 export const getGallerySparseRowKey = (rowIndex: number): string => `listing-row:${rowIndex}`;
 export const getGallerySparseSlotKey = (itemIndex: number): string => `listing-slot:${itemIndex}`;

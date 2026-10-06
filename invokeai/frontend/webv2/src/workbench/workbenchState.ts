@@ -4633,13 +4633,23 @@ export const __workbenchReducerInternal = (
                 ? Math.max(0, Math.floor(values.galleryPage))
                 : 0;
           const settings = getGallerySettings(values);
+          const semanticKey = gallerySemanticReferenceKey(parseGallerySemanticReference(values.semanticImageQuery));
           const existingNavigationQuery =
             values.selectedImageQuery && typeof values.selectedImageQuery === 'object'
               ? (values.selectedImageQuery as Record<string, unknown>)
               : null;
           const selectedImageQuery =
             action.preserveNavigationQuery && existingNavigationQuery
-              ? { ...existingNavigationQuery, page: selectedImagePage }
+              ? {
+                  ...existingNavigationQuery,
+                  ...(semanticKey
+                    ? {
+                        boardId: typeof values.selectedBoardId === 'string' ? values.selectedBoardId : 'none',
+                        semanticKey,
+                      }
+                    : { semanticKey: null }),
+                  page: selectedImagePage,
+                }
               : {
                   boardId: typeof values.selectedBoardId === 'string' ? values.selectedBoardId : 'none',
                   galleryView: values.galleryView === 'assets' ? 'assets' : 'images',
@@ -4647,6 +4657,7 @@ export const __workbenchReducerInternal = (
                   page: selectedImagePage,
                   paginationMode: settings.paginationMode,
                   searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
+                  ...(semanticKey ? { semanticKey } : {}),
                   starredOnly: values.starredOnly === true,
                 };
           const itemKey = toGalleryItemKey(action.item);
@@ -4673,6 +4684,7 @@ export const __workbenchReducerInternal = (
 
           if (!selectedItemKeys.includes(itemKey)) {
             const settings = getGallerySettings(values);
+            const semanticKey = gallerySemanticReferenceKey(parseGallerySemanticReference(values.semanticImageQuery));
             const selectedImagePage =
               typeof values.galleryPage === 'number' && Number.isFinite(values.galleryPage)
                 ? Math.max(0, Math.floor(values.galleryPage))
@@ -4692,6 +4704,7 @@ export const __workbenchReducerInternal = (
                 page: selectedImagePage,
                 paginationMode: settings.paginationMode,
                 searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
+                ...(semanticKey ? { semanticKey } : {}),
                 starredOnly: values.starredOnly === true,
               },
             };
@@ -4739,6 +4752,7 @@ export const __workbenchReducerInternal = (
         state,
         (values) => {
           const settings = getGallerySettings(values);
+          const semanticKey = gallerySemanticReferenceKey(parseGallerySemanticReference(values.semanticImageQuery));
           const hasSelectionPage = typeof action.selectionPage === 'number' && Number.isFinite(action.selectionPage);
           const selectedImagePage = hasSelectionPage
             ? Math.max(0, Math.floor(action.selectionPage as number))
@@ -4760,7 +4774,16 @@ export const __workbenchReducerInternal = (
             // An explicit host page belongs to the selection's query, matching preserveNavigationQuery.
             selectedImageQuery:
               hasSelectionPage && existingNavigationQuery
-                ? { ...existingNavigationQuery, page: selectedImagePage }
+                ? {
+                    ...existingNavigationQuery,
+                    ...(semanticKey
+                      ? {
+                          boardId: typeof values.selectedBoardId === 'string' ? values.selectedBoardId : 'none',
+                          semanticKey,
+                        }
+                      : { semanticKey: null }),
+                    page: selectedImagePage,
+                  }
                 : {
                     boardId: typeof values.selectedBoardId === 'string' ? values.selectedBoardId : 'none',
                     galleryView: values.galleryView === 'assets' ? 'assets' : 'images',
@@ -4768,6 +4791,7 @@ export const __workbenchReducerInternal = (
                     page: selectedImagePage,
                     paginationMode: settings.paginationMode,
                     searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
+                    ...(semanticKey ? { semanticKey } : {}),
                     starredOnly: values.starredOnly === true,
                   },
           };

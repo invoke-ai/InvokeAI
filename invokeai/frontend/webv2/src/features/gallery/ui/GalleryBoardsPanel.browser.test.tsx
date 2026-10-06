@@ -79,6 +79,7 @@ const createGallery = (settings: Partial<GallerySettings> = {}): GalleryStateVie
     items: [],
     page: 0,
     pendingPlaceholders: [],
+    primarySelectedItemKey: null,
     projectBoardId: null,
     revealTargetPage: null,
     searchTerm: '',

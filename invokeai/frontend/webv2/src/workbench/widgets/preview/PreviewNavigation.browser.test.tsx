@@ -1867,7 +1867,7 @@ describe('preview keyboard navigation boundary', () => {
     expect(mocks.galleryItemFilters.at(-1)).not.toHaveProperty('semanticQuery');
   });
 
-  it('stamps the top of the board listing for a ranked pick even when the footer paginates the ranking', async () => {
+  it('stamps the selected ranking page when the footer paginates semantic results', async () => {
     const filler = {
       ...mocks.recentImages[0],
       boardId: 'none',
@@ -1905,8 +1905,8 @@ describe('preview keyboard navigation boundary', () => {
       width: image.width,
     });
 
-    // Rank pages are not board pages; ranked picks return board page zero rather than the current ranking or stale
-    // selection page.
+    // The ranking page centers Preview subscriptions while semantic search remains active. Its semantic identity
+    // prevents the position from becoming an ordinary board page after the search ends.
     galleryValues.galleryPage = 1;
     galleryValues.paginationMode = 'paginated';
     galleryValues.recentImages = [];
@@ -1917,9 +1917,10 @@ describe('preview keyboard navigation boundary', () => {
       boardId: 'none',
       galleryView: 'images',
       imageOrderDir: 'DESC',
-      page: 30,
+      page: 1,
       paginationMode: 'paginated',
       searchTerm: '',
+      semanticKey: 'text:sunset',
     };
     mocks.galleryItemPages = [
       { items: [filler].map(toItem), total: 3 },
@@ -1932,7 +1933,7 @@ describe('preview keyboard navigation boundary', () => {
     expect(mocks.commands.gallery.selectItem).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'image', name: neighbor.imageName }),
       undefined,
-      0,
+      1,
       true
     );
   });

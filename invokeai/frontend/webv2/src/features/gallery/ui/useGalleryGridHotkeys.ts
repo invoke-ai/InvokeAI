@@ -36,6 +36,7 @@ export const useGalleryGridHotkeys = ({
   loadedItems,
   navigationSections,
   navigateToUnloadedSlot,
+  getSelectionPage,
   scrollToEntry,
 }: {
   actionSelectionRefs: GalleryItemRef[];
@@ -48,6 +49,8 @@ export const useGalleryGridHotkeys = ({
   navigationSections: readonly (readonly GalleryNavigationEntry[])[];
   /** Loads a sparse absolute slot; it becomes selectable after its page hydrates. */
   navigateToUnloadedSlot?: (absoluteIndex: number) => void;
+  /** The sparse page stamp for a loaded listing item. */
+  getSelectionPage?: (item: GalleryItem) => number | undefined;
   scrollToEntry: (entry: GalleryNavigationEntry) => void;
 }) => {
   const { t } = useTranslation();
@@ -72,7 +75,13 @@ export const useGalleryGridHotkeys = ({
     if (entry.kind === 'session') {
       followProgressSession(entry.id, { revealPreview: false });
     } else {
-      actions.selectItem(entry.item);
+      const selectionPage = getSelectionPage?.(entry.item);
+
+      if (selectionPage === undefined) {
+        actions.selectItem(entry.item);
+      } else {
+        actions.selectItem(entry.item, selectionPage);
+      }
     }
 
     scrollToEntry(entry);

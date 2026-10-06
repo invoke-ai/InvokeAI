@@ -5042,6 +5042,53 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(values.galleryPage).toBe(0);
   });
 
+  it('ties a selected semantic result page to the active ranking', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: { semanticImageQuery: { kind: 'text', query: 'sunset' } },
+      widgetId: 'gallery',
+    });
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('ranked.png'),
+      selectionPage: 3,
+      type: 'selectGalleryItem',
+    });
+
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageQuery).toMatchObject({
+      page: 3,
+      semanticKey: 'text:sunset',
+    });
+  });
+
+  it('retires a semantic page stamp when Preview resumes ordinary listing navigation', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: { semanticImageQuery: { kind: 'text', query: 'sunset' } },
+      widgetId: 'gallery',
+    });
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('ranked.png'),
+      selectionPage: 3,
+      type: 'selectGalleryItem',
+    });
+    state = workbenchReducer(state, { type: 'clearGallerySearch' });
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('ordinary.png'),
+      preserveNavigationQuery: true,
+      selectionPage: 1,
+      type: 'selectGalleryItem',
+    });
+
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageQuery).toMatchObject({
+      page: 1,
+      semanticKey: null,
+    });
+  });
+
   it('pauses live-follow for saved Gallery multi-selection and comparison intents', () => {
     const primaryImage = createGalleryImageItem('primary.png');
     const compareImage = createGalleryImageItem('compare.png');

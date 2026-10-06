@@ -15,6 +15,7 @@ import {
   getGalleryGridRowIndexForItemKey,
   getGallerySparseRowIndexForItemKey,
   getGallerySparseRowKey,
+  getGallerySparseSelectionPages,
   getGallerySparseSlotKey,
   getGalleryPinnedHeightPx,
   getGalleryStarredLayout,
@@ -193,6 +194,24 @@ describe('getGalleryGridRowIndexForItemKey', () => {
 });
 
 describe('sparse gallery geometry', () => {
+  it('maps loaded sparse items to their absolute selection pages', () => {
+    const infiniteItem = createImageItem('infinite');
+    const paginatedItem = createImageItem('paginated');
+
+    expect(
+      getGallerySparseSelectionPages({
+        itemSlots: new Map([[180, infiniteItem]]),
+        pageOffset: 0,
+      }).get('image:infinite')
+    ).toBe(3);
+    expect(
+      getGallerySparseSelectionPages({
+        itemSlots: new Map([[5, paginatedItem]]),
+        pageOffset: GALLERY_PAGE_SIZE * 2,
+      }).get('image:paginated')
+    ).toBe(2);
+  });
+
   it('maps distant item positions to absolute rows and uses position-stable identities', () => {
     const first = createImageItem('first');
     const third = createImageItem('third');

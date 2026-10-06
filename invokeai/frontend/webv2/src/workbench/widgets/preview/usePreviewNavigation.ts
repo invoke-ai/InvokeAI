@@ -40,6 +40,25 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 
 const EMPTY_PREVIEW_ITEMS: GalleryItem[] = [];
 
+export const getPreviewSelectedPage = ({
+  galleryPage,
+  navigationBoardId,
+  navigationSemanticKey,
+  selectedImageQuery,
+}: {
+  galleryPage: number;
+  navigationBoardId: string;
+  navigationSemanticKey: string;
+  selectedImageQuery: ReturnType<typeof getGallerySelectedImageQuery>;
+}): number =>
+  navigationSemanticKey === ''
+    ? selectedImageQuery.semanticKey === null
+      ? selectedImageQuery.page
+      : 0
+    : selectedImageQuery.boardId === navigationBoardId && selectedImageQuery.semanticKey === navigationSemanticKey
+      ? selectedImageQuery.page
+      : galleryPage;
+
 const getOrderedPreviewItems = (
   items: GalleryItem[],
   imageOrderDir: 'ASC' | 'DESC',
@@ -210,8 +229,12 @@ export const usePreviewNavigation = ({
   const navigationSemanticKey = gallerySemanticReferenceKey(navigationSemanticQuery);
   const navigationPaginationMode =
     navigationSemanticQuery === null ? selectedImageQuery.paginationMode : galleryPaginationMode;
-  // Semantic pages follow Gallery's current ranking page; ordinary pages follow the selected item's page stamp.
-  const selectedPage = navigationSemanticQuery === null ? selectedImageQuery.page : galleryPage;
+  const selectedPage = getPreviewSelectedPage({
+    galleryPage,
+    navigationBoardId,
+    navigationSemanticKey,
+    selectedImageQuery,
+  });
   // Following live has a cursor too, so the listing loads for the step off it.
   const hasNavigationContext = selectedItem !== null || followedSessionId !== null;
   const navigationContextKey = `${accountScope.epoch}:${followedSessionId ?? ''}:${selectedItemKey ?? ''}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationPaginationMode}:${selectedPage}:${selectedImageQuery.searchTerm}:${navigationStarredOnly}:${navigationSemanticKey}`;
@@ -326,10 +349,10 @@ export const usePreviewNavigation = ({
       const itemKey = toGalleryItemKey(item);
       const page = pages.find(({ data }) => data.items.some((candidate) => toGalleryItemKey(candidate) === itemKey));
 
-      // Ranked picks retain their board-top stamp. Ordinary picks use their exact shared page; local anchors fall
+      // Ranked picks retain their exact result page. Ordinary picks use their exact shared page; local anchors fall
       // back to the selected page in paginated mode or the board top for recent items outside this page set.
       if (navigationSemanticQuery !== null) {
-        return 0;
+        return page === undefined ? selectedPage : page.offset / GALLERY_PAGE_SIZE;
       }
 
       return page === undefined
@@ -343,12 +366,9 @@ export const usePreviewNavigation = ({
   const stampSelection = useCallback(
     (item: GalleryItem, pages: typeof boardPageResults) => {
       if (isAccountScopeCurrent(accountScope)) {
-        const page =
-          navigationSemanticQuery === null
-            ? pages.find(({ data }) =>
-                data.items.some((candidate) => toGalleryItemKey(candidate) === toGalleryItemKey(item))
-              )
-            : undefined;
+        const page = pages.find(({ data }) =>
+          data.items.some((candidate) => toGalleryItemKey(candidate) === toGalleryItemKey(item))
+        );
         const itemIndex = page?.data.items.findIndex(
           (candidate) => toGalleryItemKey(candidate) === toGalleryItemKey(item)
         );
@@ -367,7 +387,7 @@ export const usePreviewNavigation = ({
         selectGalleryItem(item, getSelectionPageIn(item, pages), absoluteIndex);
       }
     },
-    [accountScope, getSelectionPageIn, navigationSemanticQuery, selectGalleryItem]
+    [accountScope, getSelectionPageIn, selectGalleryItem]
   );
   const getSelectionPage = useCallback(
     (item: GalleryItem) => getSelectionPageIn(item, boardPageResults),

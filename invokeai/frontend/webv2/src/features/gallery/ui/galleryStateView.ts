@@ -55,6 +55,8 @@ export interface GalleryStateView {
   revealTargetPage: number | null;
   searchTerm: string;
   selectedBoardId: string;
+  /** The persisted primary selection, retained while its sparse page is not loaded. */
+  primarySelectedItemKey: GalleryItemKey | null;
   selectedItemKey: GalleryItemKey | null;
   selectedItemKeys: GalleryItemKey[];
   /** Active image-similarity query, rendered as a chip in place of the search text. */
@@ -151,6 +153,8 @@ export interface GallerySelectedImageQuery {
   page: number;
   paginationMode: 'infinite' | 'paginated';
   searchTerm: string;
+  /** Ranking identity for a semantic result page; null for ordinary listings and legacy state. */
+  semanticKey: string | null;
   starredOnly: boolean;
 }
 
@@ -185,6 +189,7 @@ export const getGallerySelectedImageQuery = (values: Record<string, unknown>): G
         ? query.paginationMode
         : settings.paginationMode,
     searchTerm: query && typeof query.searchTerm === 'string' ? query.searchTerm : String(values.searchTerm ?? ''),
+    semanticKey: query && typeof query.semanticKey === 'string' && query.semanticKey ? query.semanticKey : null,
     starredOnly: query && typeof query.starredOnly === 'boolean' ? query.starredOnly : getGalleryStarredOnly(values),
   };
 };
@@ -287,6 +292,7 @@ export const getGalleryStateView = (
     revealTargetPage,
     searchTerm,
     selectedBoardId,
+    primarySelectedItemKey: persistedSelectedItemKey,
     selectedItemKey: visibleSelectedItemKey,
     selectedItemKeys:
       visibleSelectedItemKey && !selectedItemKeys.includes(visibleSelectedItemKey)

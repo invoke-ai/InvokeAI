@@ -286,6 +286,9 @@ describe('gallery state view', () => {
     const values = { selectedImageName: 'image:starred.png' };
 
     expect(getGalleryStateView(values, boards, [createImageItem('regular.png')], false).selectedItemKey).toBeNull();
+    expect(getGalleryStateView(values, boards, [createImageItem('regular.png')], false).primarySelectedItemKey).toBe(
+      'image:starred.png'
+    );
     expect(
       getGalleryStateView(values, boards, [createImageItem('regular.png')], false, [starred]).selectedItemKey
     ).toBe('image:starred.png');

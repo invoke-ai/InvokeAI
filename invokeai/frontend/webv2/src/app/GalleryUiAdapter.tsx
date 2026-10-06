@@ -55,6 +55,12 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
       exportProject,
       gallery: {
         ...gallery,
+        selectItem: (item, selectionPage) =>
+          selectionPage === undefined ? gallery.selectItem(item) : gallery.selectItem(item, undefined, selectionPage),
+        setItemMultiSelection: (itemKeys, primaryItem, selectionPage) =>
+          selectionPage === undefined
+            ? gallery.setItemMultiSelection(itemKeys, primaryItem)
+            : gallery.setItemMultiSelection(itemKeys, primaryItem, undefined, selectionPage),
         updateSettings: (settings) => {
           if (isAccountScopeCurrent(accountScope) && queries.isActiveProject(projectId)) {
             gallery.updateSettings(settings, projectId);

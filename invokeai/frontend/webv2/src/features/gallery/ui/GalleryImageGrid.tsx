@@ -43,6 +43,7 @@ import {
   getGalleryGridRowIndexForItemKey,
   getGallerySparseRowIndexForItemKey,
   getGallerySparseRowKey,
+  getGallerySparseSelectionPages,
   getGallerySparseSlotKey,
   getGalleryPinnedHeightPx,
   getGalleryProgressLayout,
@@ -445,6 +446,17 @@ export const GalleryImageGrid = () => {
     followedProgressSessionId !== null
       ? getGallerySessionNavigationKey(followedProgressSessionId)
       : gallery.selectedItemKey;
+  const sparseSelectionPages = useMemo(
+    () =>
+      sparseListing
+        ? getGallerySparseSelectionPages({ itemSlots: sparseListing.itemSlots, pageOffset: sparsePageOffset })
+        : new Map<GalleryItemKey, number>(),
+    [sparseListing, sparsePageOffset]
+  );
+  const getSelectionPage = useCallback(
+    (item: GalleryItem) => sparseSelectionPages.get(toGalleryItemKey(item)),
+    [sparseSelectionPages]
+  );
 
   const backendRowCount = usesSparseListing ? Math.ceil(sparseBackendItemCount / columnCount) : rows.length;
   const rowCount = usesSparseListing ? backendRowCount + sparseRecentRowCount : rows.length;
@@ -740,6 +752,7 @@ export const GalleryImageGrid = () => {
     loadedItems,
     navigationSections,
     navigateToUnloadedSlot: handleNavigateToUnloadedSlot,
+    getSelectionPage,
     scrollToEntry,
   });
 
@@ -759,7 +772,7 @@ export const GalleryImageGrid = () => {
 
     if (item) {
       pendingSparseNavigationRef.current = null;
-      actions.selectItem(item);
+      actions.selectItem(item, Math.floor(pending.index / GALLERY_PAGE_SIZE));
     }
   });
 
@@ -1074,7 +1087,7 @@ export const GalleryImageGrid = () => {
   const handleReturnToBoardTop = useCallback(() => galleryCommands.setPage(0), [galleryCommands]);
 
   const renderCell = useCallback(
-    (item: GalleryItem, slotKey: string = toGalleryItemKey(item)) => {
+    (item: GalleryItem, slotKey: string = toGalleryItemKey(item), selectionPage?: number) => {
       const itemKey = toGalleryItemKey(item);
 
       return (
@@ -1098,6 +1111,7 @@ export const GalleryImageGrid = () => {
           onClick={handleThumbnailClick}
           onContextMenu={handleThumbnailContextMenu}
           onToggleStarred={handleToggleStarred}
+          selectionPage={selectionPage}
         />
       );
     },
@@ -1283,7 +1297,11 @@ export const GalleryImageGrid = () => {
                             const absoluteItemIndex = sparsePageOffset + itemIndex;
 
                             if (item) {
-                              return renderCell(item, getGallerySparseSlotKey(absoluteItemIndex));
+                              return renderCell(
+                                item,
+                                getGallerySparseSlotKey(absoluteItemIndex),
+                                Math.floor(absoluteItemIndex / GALLERY_PAGE_SIZE)
+                              );
                             }
 
                             const pageOffset = Math.floor(absoluteItemIndex / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE;

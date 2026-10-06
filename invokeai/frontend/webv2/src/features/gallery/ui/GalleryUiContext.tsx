@@ -51,11 +51,11 @@ export interface GalleryCommandsPort {
   clearSelection(): void;
   reconcileDeletedBoardOutcome(outcome: GalleryBoardDeletionResult): void;
   selectBoard(boardId: string): void;
-  selectItem(item: GalleryItem): void;
+  selectItem(item: GalleryItem, selectionPage?: number): void;
   selectImage(image: GalleryImage): void;
   setCompareItem(image: GalleryImageItem | null): void;
   setCompareImage(image: GalleryImage | null): void;
-  setItemMultiSelection(itemKeys: GalleryItemKey[], primaryItem: GalleryItem): void;
+  setItemMultiSelection(itemKeys: GalleryItemKey[], primaryItem: GalleryItem, selectionPage?: number): void;
   setPage(page: number): void;
   setPageInfo(totalImages: number): void;
   setSearchTerm(searchTerm: string): void;

@@ -26,8 +26,8 @@ export interface GalleryActions {
   refresh: () => void;
   renameBoard: (boardId: string, boardName: string) => Promise<void>;
   selectBoard: (boardId: string) => void;
-  selectItem: (item: GalleryItem) => void;
-  selectItemRange: (items: GalleryItemRef[], primaryItem: GalleryItem) => void;
+  selectItem: (item: GalleryItem, selectionPage?: number) => void;
+  selectItemRange: (items: GalleryItemRef[], primaryItem: GalleryItem, selectionPage?: number) => void;
   setCompareItem: (image: GalleryImageItem | null) => void;
   setSearchTerm: (searchTerm: string) => void;
   /** Restricts (or releases) the listing to starred items; resets the page like a search. */

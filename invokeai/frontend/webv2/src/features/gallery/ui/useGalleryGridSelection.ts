@@ -49,15 +49,18 @@ export const useGalleryGridSelection = () => {
   const selectedItemRefs = useMemo(() => gallery.selectedItemKeys.map(parseGalleryItemKey), [gallery.selectedItemKeys]);
 
   const filterIdentity = useMemo(() => JSON.stringify(filter), [filter]);
-  const rangeInteractionContextRef = useRef({ filterIdentity, selectedItemKey: gallery.selectedItemKey });
+  const rangeInteractionContextRef = useRef({
+    filterIdentity,
+    selectedItemKey: gallery.primarySelectedItemKey,
+  });
 
   const syncRangeInteractionContext = useCallback(
     (node: HTMLDivElement | null) => {
       if (node) {
-        rangeInteractionContextRef.current = { filterIdentity, selectedItemKey: gallery.selectedItemKey };
+        rangeInteractionContextRef.current = { filterIdentity, selectedItemKey: gallery.primarySelectedItemKey };
       }
     },
-    [filterIdentity, gallery.selectedItemKey]
+    [filterIdentity, gallery.primarySelectedItemKey]
   );
 
   const activeContextMenuTarget = useMemo(() => {
@@ -73,14 +76,21 @@ export const useGalleryGridSelection = () => {
   }, [contextMenuTarget, loadedItems]);
 
   const selectItemRange = useCallback(
-    async (item: GalleryItem) => {
+    async (item: GalleryItem, selectionPage?: number) => {
       const owner = captureAccountScope();
       const capturedContext = rangeInteractionContextRef.current;
       const anchorItemKey = capturedContext.selectedItemKey;
       const targetItemKey = toGalleryItemKey(item);
+      const selectSingleItem = () => {
+        if (selectionPage === undefined) {
+          actions.selectItem(item);
+        } else {
+          actions.selectItem(item, selectionPage);
+        }
+      };
 
       if (!anchorItemKey) {
-        actions.selectItem(item);
+        selectSingleItem();
         return;
       }
 
@@ -95,7 +105,11 @@ export const useGalleryGridSelection = () => {
           return false;
         }
 
-        actions.selectItemRange(range, item);
+        if (selectionPage === undefined) {
+          actions.selectItemRange(range, item);
+        } else {
+          actions.selectItemRange(range, item, selectionPage);
+        }
         return true;
       };
       const materializedRefs = gallery.items.map(toGalleryItemRef);
@@ -122,16 +136,16 @@ export const useGalleryGridSelection = () => {
       // The names list describes the listing only; a range inside the strip
       // resolves against the strip's own order.
       if (!selectFromRefs(materializedRefs) && !selectFromRefs(starredStrip.items.map(toGalleryItemRef))) {
-        actions.selectItem(item);
+        selectSingleItem();
       }
     },
     [actions, filter, gallery.items, queryClient, starredStrip.items]
   );
 
   const handleThumbnailClick = useCallback(
-    (item: GalleryItem, event: MouseEvent) => {
+    (item: GalleryItem, event: MouseEvent, selectionPage?: number) => {
       if (event.shiftKey) {
-        void selectItemRange(item);
+        void selectItemRange(item, selectionPage);
         return;
       }
 
@@ -152,7 +166,11 @@ export const useGalleryGridSelection = () => {
 
         actions.toggleItemInSelection(item, nextPrimaryItem);
       } else {
-        actions.selectItem(item);
+        if (selectionPage === undefined) {
+          actions.selectItem(item);
+        } else {
+          actions.selectItem(item, selectionPage);
+        }
       }
     },
     [actions, gallery.selectedItemKey, gallery.selectedItemKeys, loadedItems, selectItemRange]

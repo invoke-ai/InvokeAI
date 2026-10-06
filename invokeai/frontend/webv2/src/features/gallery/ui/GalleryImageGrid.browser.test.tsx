@@ -288,6 +288,7 @@ const createGallery = (overrides: Partial<GalleryStateView> = {}): GalleryStateV
     isLoading: false,
     items,
     page: 0,
+    primarySelectedItemKey: 'image:first.png',
     revealTargetPage: null,
     projectBoardId: null,
     searchTerm: '',
@@ -1336,6 +1337,23 @@ describe('GalleryImageGrid range selection', () => {
     expect(mocks.fetchNames).toHaveBeenCalledOnce();
   });
 
+  it('keeps the persisted primary selection as the range anchor after its sparse page leaves the viewport', async () => {
+    mocks.fetchNames.mockResolvedValue({ items: orderedRefs, total: orderedRefs.length });
+    const target = rangeItems[2]!;
+    const gallery = createGallery({
+      items: [target],
+      primarySelectedItemKey: 'image:first.png',
+      selectedItemKey: null,
+      selectedItemKeys: ['image:first.png'],
+    });
+
+    await renderGallery(gallery);
+    await click(getButton('Select last.png for preview'), { shiftKey: true });
+
+    await vi.waitFor(() => expect(actionMocks.selectItemRange).toHaveBeenCalledWith(orderedRefs, target));
+    expect(actionMocks.selectItem).not.toHaveBeenCalled();
+  });
+
   it('reuses the date board name list already in the query cache', async () => {
     const gallery = createGallery({
       boards: [{ ...board, id: 'by_date:2026-07-30', kind: 'date' }],
@@ -1730,6 +1748,27 @@ describe('GalleryImageGrid reveal requests', () => {
 });
 
 describe('GalleryImageGrid virtualization', () => {
+  it('stamps a selected semantic result with its absolute sparse page', async () => {
+    const result = createItem('image', 'semantic-180.png');
+    currentSparseListing = {
+      itemSlots: new Map([[180, result]]),
+      pageStates: new Map([[180, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }]]),
+      recentItems: [],
+      total: 181,
+    };
+
+    await renderGallery(
+      createGallery({
+        items: [result],
+        semanticImageQuery: { kind: 'text', query: 'sunset' },
+        settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' },
+      })
+    );
+    await click(getButton('Select semantic-180.png for preview'));
+
+    expect(actionMocks.selectItem).toHaveBeenCalledWith(result, 3);
+  });
+
   it('keeps hydration gaps inside the selected paginated page', async () => {
     const first = createItem('image', 'page-2-first.png');
     const third = createItem('image', 'page-2-third.png');
@@ -1918,7 +1957,7 @@ describe('GalleryImageGrid virtualization', () => {
       total: 120,
     };
     await renderGallery({ ...currentGallery, items: [lastInPage, firstNextPage] });
-    expect(actionMocks.selectItem).toHaveBeenLastCalledWith(firstNextPage);
+    expect(actionMocks.selectItem).toHaveBeenLastCalledWith(firstNextPage, 1);
     expect(document.activeElement).toBe(lastTile);
 
     registeredCommands.get('gallery.selectAllOnPage')?.();
