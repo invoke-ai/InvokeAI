@@ -16,7 +16,7 @@ import {
   registerAccountOwnedResource,
 } from '@platform/state/accountLifecycle';
 import { createKeyedTransientStore } from '@platform/state/externalStore';
-import { createActionToast, toaster, type ToastAction } from '@platform/ui/toaster';
+import { createActionToast, toaster, type ActionToastOptions, type ToastAction } from '@platform/ui/toaster';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   retryStagedResultBoard,
@@ -98,6 +98,24 @@ interface SaveOrigin {
 }
 
 /**
+ * Report to the account that saved. The toast names that account's image and board, so it leaves with the account's
+ * scope rather than outlive it with buttons that would act for nobody.
+ */
+const announce = (owner: AccountScope, options: ActionToastOptions): void => {
+  const shown = new AbortController();
+  const id = createActionToast({
+    ...options,
+    onStatusChange: ({ status }) => {
+      if (status === 'unmounted') {
+        shown.abort();
+      }
+    },
+  });
+
+  owner.signal.addEventListener('abort', () => toaster.dismiss(id), { once: true, signal: shown.signal });
+};
+
+/**
  * Save a staged canvas result to the Gallery and say where it went. The account and project are captured when the
  * save starts and every toast action is fenced to them: nothing runs for an account that has since signed out, and
  * "Show in Gallery" acts only while the project is still open. It reveals the item in a Gallery panel and leaves
@@ -157,33 +175,25 @@ export const useStagedResultGallerySave = (
               ? t('widgets.canvas.staging.savedToBoard', { board: board.label })
               : t('widgets.canvas.staging.saved');
 
-          if (showActions.length > 0) {
-            createActionToast({
-              actions: showActions,
-              description,
-              duration: ACTION_TOAST_DURATION_MS,
-              title,
-              type: 'success',
-            });
-          } else {
-            toaster.create({ description, title, type: 'success' });
-          }
+          announce(owner, {
+            actions: showActions,
+            description,
+            ...(showActions.length > 0 ? { duration: ACTION_TOAST_DURATION_MS } : {}),
+            title,
+            type: 'success',
+          });
           return;
         }
 
         if (board.kind === 'missing') {
           // Retrying cannot bring a deleted board back.
-          const toast = {
+          announce(owner, {
+            actions: showActions,
             description: t('widgets.canvas.staging.boardMissingDescription', { name }),
+            ...(showActions.length > 0 ? { duration: ACTION_TOAST_DURATION_MS } : {}),
             title: t('widgets.canvas.staging.boardMissing'),
             type: 'warning',
-          } as const;
-
-          if (showActions.length > 0) {
-            createActionToast({ ...toast, actions: showActions, duration: ACTION_TOAST_DURATION_MS });
-          } else {
-            toaster.create(toast);
-          }
+          });
           return;
         }
 
@@ -195,7 +205,7 @@ export const useStagedResultGallerySave = (
             ),
         };
 
-        createActionToast({
+        announce(owner, {
           actions: [retry, ...showActions],
           description: t('widgets.canvas.staging.boardFailedDescription', { name }),
           duration: ACTION_TOAST_DURATION_MS,
@@ -207,7 +217,7 @@ export const useStagedResultGallerySave = (
         });
       } catch {
         if (isAccountScopeCurrent(owner)) {
-          toaster.create({ title: t('widgets.canvas.staging.saveError'), type: 'error' });
+          announce(owner, { actions: [], title: t('widgets.canvas.staging.saveError'), type: 'error' });
         }
       } finally {
         savingImages.delete(name);

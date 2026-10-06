@@ -241,7 +241,7 @@ describe('saving a staged result to the Gallery', () => {
     await until(() => expect(toastText()).toContain('Saved to Board A'));
   });
 
-  it('does nothing from a toast once the account that saved has signed out', async () => {
+  it('takes its toast away with the account that saved, and does nothing from it meanwhile', async () => {
     mocks.save.mockResolvedValue({ boardId: 'board-a', imageName: 'staged.png', status: 'board-failed' });
 
     await act(() => saveRef.current!.save('staged.png'));
@@ -251,15 +251,35 @@ describe('saving a staged result to the Gallery', () => {
     mocks.invalidateGallery.mockClear();
     await act(() => accountLifecycle.activate('another-user'));
 
+    // The toast names the previous account's image and board: it is leaving, and its buttons act for nobody.
+    expect(toastRoot()?.getAttribute('data-state')).toBe('closed');
     await act(() => show.click());
     await act(() => retry.click());
 
     expect(mocks.findGalleryItem).not.toHaveBeenCalled();
     expect(mocks.retry).not.toHaveBeenCalled();
     expect(mocks.invalidateGallery).not.toHaveBeenCalled();
-    // The one toast is the failure being dismissed; nothing new was announced.
-    expect(document.querySelectorAll('[data-part="root"][data-scope="toast"]')).toHaveLength(1);
+    await until(() => expect(toastRoot()).toBeNull());
     expect(document.body.textContent).not.toContain('Saved to Board A');
+  });
+
+  it('takes a plain report away with the account too', async () => {
+    const pending = deferred<SaveStagedResultOutcome>();
+    mocks.save.mockReturnValue(pending.promise);
+
+    let saving!: Promise<void>;
+    await act(() => {
+      saving = saveRef.current!.save('staged.png');
+    });
+    mocks.activeProjectId = 'project-2';
+    pending.resolve(saved('board-a'));
+    await act(() => saving);
+    await until(() => expect(toastText()).toContain('Saved to Board A'));
+    expect(toastButton('Show in Gallery')).toBeNull();
+
+    await act(() => accountLifecycle.activate('another-user'));
+
+    await until(() => expect(toastRoot()).toBeNull());
   });
 
   it('says a board that no longer exists is gone, without a retry that cannot succeed', async () => {
