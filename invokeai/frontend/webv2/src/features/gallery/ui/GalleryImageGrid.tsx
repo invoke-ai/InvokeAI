@@ -4,6 +4,7 @@ import { toGalleryItemKey, type GalleryItem, type GalleryItemKey } from '@featur
 import {
   getGalleryRevealRequest,
   getGallerySessionNavigationKey,
+  getSelectedGalleryItemFromValues,
   subscribeGalleryRevealRequests,
   type GalleryNavigationEntry,
   type GalleryRevealRequest,
@@ -275,6 +276,7 @@ export const GalleryImageGrid = () => {
     useGalleryWidget();
   const {
     gallery: galleryCommands,
+    galleryValues,
     getItemLabel,
     ImageContextMenu,
     followedProgressSessionId,
@@ -339,13 +341,24 @@ export const GalleryImageGrid = () => {
   // step out.
   const isProgressOpen = showPendingItems && !progressSectionCollapsed;
   const shownStripItems = isStarredOpen ? starredCells : NO_ITEMS;
-  const navigationSections = useMemo((): GalleryNavigationEntry[][] => {
-    const selectedKey = gallery.selectedItemKey;
+  // A starred selection no tile shows still belongs to the strip: one under the collapsed disclosure or past the
+  // shown rows, which the strip holds, or — as in Preview — one beyond the strip's bound, which the view names no
+  // visible key for and only the persisted selection holds (the listing is unstarred). Either way the arrows step
+  // from it rather than from the first tile.
+  const hiddenStripSelection = useMemo((): GalleryItem | null => {
+    const selectedItem = getSelectedGalleryItemFromValues(galleryValues);
+    const selectedKey = gallery.selectedItemKey ?? (selectedItem ? toGalleryItemKey(selectedItem) : null);
     const isSelected = (item: GalleryItem) => toGalleryItemKey(item) === selectedKey;
-    const hiddenStripSelection =
-      selectedKey !== null && !shownStripItems.some(isSelected) && !gallery.items.some(isSelected)
-        ? starredStrip.items.find(isSelected)
-        : undefined;
+
+    if (selectedKey === null || shownStripItems.some(isSelected) || gallery.items.some(isSelected)) {
+      return null;
+    }
+
+    return (
+      starredStrip.items.find(isSelected) ?? (selectedItem?.starred && isSelected(selectedItem) ? selectedItem : null)
+    );
+  }, [gallery.items, gallery.selectedItemKey, galleryValues, shownStripItems, starredStrip.items]);
+  const navigationSections = useMemo((): GalleryNavigationEntry[][] => {
     const stripEntries: GalleryNavigationEntry[] = shownStripItems.map((item) => ({ item, kind: 'item' }));
 
     if (hiddenStripSelection) {
@@ -363,7 +376,7 @@ export const GalleryImageGrid = () => {
         : [],
       gallery.items.map((item) => ({ item, kind: 'item' })),
     ];
-  }, [gallery.items, gallery.selectedItemKey, isProgressOpen, progressSessions, shownStripItems, starredStrip.items]);
+  }, [gallery.items, hiddenStripSelection, isProgressOpen, progressSessions, shownStripItems]);
 
   // Thumbnails in visual order, strip first. They share one thumbnail Tab stop: the tile focus was last on, else the
   // selection, else the tile that took the focused one's place in the same scope (after a deletion, the neighbour
@@ -516,11 +529,12 @@ export const GalleryImageGrid = () => {
 
     return sessionId ? getGallerySessionNavigationKey(sessionId) : getTileItemKey(active);
   };
-  // A followed session the grid does not show (its section collapsed) gives way to the selection.
+  // A followed session the grid does not show (its section collapsed) gives way to the selection, which a starred
+  // item beyond the strip's bound is too, though the view names no visible key for it.
   const getCursorCandidates = () => [
     getFocusedTileKey(),
     followedProgressSessionId === null ? null : getGallerySessionNavigationKey(followedProgressSessionId),
-    gallery.selectedItemKey,
+    hiddenStripSelection ? toGalleryItemKey(hiddenStripSelection) : gallery.selectedItemKey,
   ];
   /** The first thumbnail in view, where the arrows start when no cursor is on screen. */
   const getFirstVisibleTileKey = (): string | null => {

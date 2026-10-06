@@ -145,6 +145,7 @@ const adapter = {
   getItemLabel: () => Promise.resolve(null),
   followProgressSession: vi.fn(),
   antialiasProgressImages: false,
+  galleryValues: {},
   widgets: { openGallery: vi.fn(() => true), patchGalleryValues: vi.fn() },
 } as unknown as GalleryUiAdapter;
 

@@ -182,6 +182,8 @@ interface HarnessState {
   galleryMounted: boolean;
   followedSessionId: string | null;
   gallery: GalleryStateView;
+  /** The widget's persisted values; the selection as the workbench keeps it. */
+  galleryValues: Record<string, unknown>;
   listing: GalleryListingState;
   sessions: QueueProgressSession[];
   strip: GalleryItem[];
@@ -302,7 +304,7 @@ const createGalleryRuntime = (extensions: ExtensionRegistry) => ({
 const noop = () => {};
 
 const GalleryRegion = ({ runtime }: { runtime: ReturnType<typeof createGalleryRuntime> }) => {
-  const { followedSessionId, gallery, galleryMounted, listing, sessions, strip } = useSyncExternalStore(
+  const { followedSessionId, gallery, galleryMounted, galleryValues, listing, sessions, strip } = useSyncExternalStore(
     subscribe,
     getState
   );
@@ -315,6 +317,7 @@ const GalleryRegion = ({ runtime }: { runtime: ReturnType<typeof createGalleryRu
     followProgressSession: (id: string) => setState({ followedSessionId: id }),
     followedProgressSessionId: followedSessionId,
     gallery: { clearSelection: () => select(null), setPage: noop },
+    galleryValues,
     getItemLabel: () => Promise.resolve(null),
     liveFollowEnabled: followedSessionId !== null,
     pinnedProgressSessionId: followedSessionId,
@@ -421,6 +424,7 @@ const renderGrid = async (
     followedSessionId: null,
     gallery: { ...gallery, settings: { ...gallery.settings, ...settings } },
     galleryMounted: true,
+    galleryValues: {},
     listing: READY_LISTING,
     sessions: [],
     strip: [],
@@ -634,6 +638,21 @@ describe('Gallery grid keyboard focus', () => {
 
     expect(focusedThumbnail()).toBe('image-2.png');
     expect(document.activeElement?.closest('[data-gallery-section="starred"]')).not.toBeNull();
+    expect(selectedKey()).toBe('image:image-0.png');
+  });
+
+  it('steps from a starred selection beyond the strip, as Preview does, not from the first starred tile', async () => {
+    const strip = [0, 1, 2].map((index) => createItem(`starred-${index}.png`, { starred: true }));
+    const beyond = createItem('starred-40.png', { starred: true });
+    const items = createItems(6);
+    // The strip's bound left the selection out, and the listing holds unstarred items only: no tile shows it.
+    await renderGrid(items, { galleryValues: { selectedImage: beyond }, selected: null, strip });
+    expect(thumbnail('starred-40.png')).toBeNull();
+    button('Elsewhere').focus();
+
+    await act(() => runtimeMocks.extensions.commands.executeForSource('gallery.galleryNavRight', gallerySource));
+    await settle();
+
     expect(selectedKey()).toBe('image:image-0.png');
   });
 
