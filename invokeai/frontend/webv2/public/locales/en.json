@@ -1821,6 +1821,14 @@
       "saveFailed": "Could not save the vocabulary.",
       "loadFailed": "Could not load the vocabulary."
     },
+    "databaseMaintenance": {
+      "compactDatabase": "Compact database",
+      "confirmTitle": "Run database VACUUM?",
+      "confirmBody": "VACUUM can take a long time for large databases and pauses database activity while it runs.",
+      "completed": "Database VACUUM completed.",
+      "failed": "Database VACUUM failed.",
+      "requestFailed": "The database could not be vacuumed."
+    },
     "catalog": {
       "themeId": {
         "label": "Theme",
@@ -1920,7 +1928,7 @@
       },
       "workspaceActions": {
         "label": "Data & workspace",
-        "description": "Reset the layout, manage intermediates, or permanently delete saved projects and settings."
+        "description": "Reset the layout, manage intermediates, or permanently delete saved projects and settings. Administrators can also run database maintenance."
       },
       "about": {
         "label": "About InvokeAI",
