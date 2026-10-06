@@ -139,6 +139,21 @@ describe('ScrubberField', () => {
     expect(valueButton()?.getAttribute('aria-label')).toBe('Edit Steps');
   });
 
+  it('fills the frame at the maximum and still frames the thumb at the minimum', async () => {
+    const part = (frame: HTMLElement, name: string) =>
+      frame.querySelector<HTMLElement>(`[data-part="${name}"]`)!.getBoundingClientRect();
+
+    const full = await mount({ value: 100 });
+    const fullFrame = full.frame.getBoundingClientRect();
+    // Only the border and the fill's clearance separate a full fill from the frame's edge.
+    expect(fullFrame.right - part(full.frame, 'fill').right).toBeLessThanOrEqual(3);
+    await act(() => root?.unmount());
+    host?.remove();
+
+    const empty = await mount({ value: 0 });
+    expect(part(empty.frame, 'fill').right).toBeGreaterThan(part(empty.frame, 'thumb').right);
+  });
+
   it('scrubs relative to the current value from wherever the press lands, snapped to the step', async () => {
     const { frame, onChange } = await mount({ step: 5 });
 

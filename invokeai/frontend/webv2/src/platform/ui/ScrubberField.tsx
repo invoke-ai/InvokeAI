@@ -17,7 +17,7 @@ import { useTranslation } from 'react-i18next';
 
 /** Track inset from the frame edge; the text padding clears it so the thumb never crosses a glyph. */
 const TRACK_INSET_PX = 10;
-/** The fill runs this far past the thumb so its rounded end frames it. */
+/** At the track's start the fill runs this far past the thumb so its rounded end frames it. */
 const FILL_OVERHANG_PX = 6;
 /** Clearance between the fill and the frame's border. */
 const FILL_INSET_PX = 1.5;
@@ -322,7 +322,11 @@ export const ScrubberField = ({
 
     return x < textExtents.labelEnd + TEXT_CLEARANCE_PX || x > textExtents.valueStart - TEXT_CLEARANCE_PX;
   };
-  const thumbPosition = trackPosition(fractionOf(value));
+  const valueFraction = fractionOf(value);
+  const thumbPosition = trackPosition(valueFraction);
+  // The overhang grows along the track so a full value fills the frame instead of stopping at the inset thumb.
+  const fillOverhang =
+    FILL_OVERHANG_PX - FILL_INSET_PX + valueFraction * (TRACK_INSET_PX - FILL_INSET_PX - FILL_OVERHANG_PX);
   const formatted = formatValue ? formatValue(value) : String(value);
   const markEpsilon = step * MARK_EPSILON_RATIO;
   const markValues = useMemo(() => {
@@ -685,7 +689,7 @@ export const ScrubberField = ({
         onDoubleClick={handleDoubleClick}
         onPointerDown={handlePointerDown}
       >
-        <div data-part="fill" style={{ width: `calc(${thumbPosition} + ${FILL_OVERHANG_PX - FILL_INSET_PX}px)` }} />
+        <div data-part="fill" style={{ width: `calc(${thumbPosition} + ${fillOverhang}px)` }} />
         {markEntries?.map(({ mark, state }) => (
           <div
             key={mark}
