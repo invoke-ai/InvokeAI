@@ -1786,7 +1786,7 @@
       "loadFailed": "Could not load the vocabulary."
     },
     "databaseMaintenance": {
-      "runVacuum": "Run VACUUM",
+      "compactDatabase": "Compact database",
       "confirmTitle": "Run database VACUUM?",
       "confirmBody": "VACUUM can take a long time for large databases and pauses database activity while it runs.",
       "completed": "Database VACUUM completed.",

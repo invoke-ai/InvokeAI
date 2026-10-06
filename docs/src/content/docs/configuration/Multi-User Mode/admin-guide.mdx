@@ -616,9 +616,9 @@ WHERE email = 'admin@example.com';
 
 - Limit concurrent generations
 - Increase hardware resources
-- Click Run VACUUM in Settings > Data & workspace in webv2. This admin-only action can take a long time on large
+- Click Compact database in Settings > Data & workspace in webv2. This admin-only action can take a long time on large
   databases and holds the shared SQLite lock until it completes.
-- Use `ANALYZE` only when SQLite query-planning diagnostics call for it; the Run VACUUM action does not expose this
+- Use `ANALYZE` only when SQLite query-planning diagnostics call for it; the Compact database action does not expose this
   operation.
 - Add indexes for slow queries
 - Consider load balancing

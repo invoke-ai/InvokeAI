@@ -217,7 +217,7 @@ export const WorkspaceSettings = ({ onReveal }: Pick<SettingFieldProps, 'onRevea
         {canManageAppConfig ? (
           <Button size="lg" variant="outline" onClick={openDatabaseConfirmation}>
             <DatabaseIcon />
-            {t('settings.databaseMaintenance.runVacuum')}
+            {t('settings.databaseMaintenance.compactDatabase')}
           </Button>
         ) : null}
         <Button

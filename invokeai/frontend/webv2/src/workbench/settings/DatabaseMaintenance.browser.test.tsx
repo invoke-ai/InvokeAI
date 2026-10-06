@@ -95,7 +95,7 @@ describe('database maintenance in Data & workspace settings', () => {
 
   const getVacuumButton = () =>
     Array.from(host.querySelectorAll<HTMLButtonElement>('button')).find((button) =>
-      button.textContent?.includes('settings.databaseMaintenance.runVacuum')
+      button.textContent?.includes('settings.databaseMaintenance.compactDatabase')
     );
 
   const openConfirmation = async () => {
@@ -107,7 +107,7 @@ describe('database maintenance in Data & workspace settings', () => {
 
   const getConfirmButton = () =>
     Array.from(document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button')).find((button) =>
-      button.textContent?.includes('settings.databaseMaintenance.runVacuum')
+      button.textContent?.includes('settings.databaseMaintenance.compactDatabase')
     );
 
   beforeEach(() => {
@@ -127,7 +127,7 @@ describe('database maintenance in Data & workspace settings', () => {
     accountLifecycle.invalidate();
   });
 
-  it('shows one Run VACUUM button to admins and hides it from non-admins', async () => {
+  it('shows one Compact database button to admins and hides it from non-admins', async () => {
     await renderSettings();
     expect(getVacuumButton()).toBeDefined();
 
