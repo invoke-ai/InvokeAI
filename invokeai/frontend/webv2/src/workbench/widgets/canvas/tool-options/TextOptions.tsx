@@ -200,6 +200,21 @@ const AlignButton = ({
   );
 };
 
+/** A text style edit: a patch, or one derived from the owner's style as it is when the edit is written. */
+type TextEdit = Partial<TextSource> | ((style: TextToolOptions) => Partial<TextSource>);
+
+/** The style an edit builds on: the owner's (live session or selected text) when there is one, else the defaults. */
+const textStyleOf = (options: TextToolOptions, owner: TextSource | null): TextToolOptions => ({
+  align: owner?.align ?? options.align,
+  fontFamily: owner?.fontFamily ?? options.fontFamily,
+  fontRef: owner ? owner.fontRef : options.fontRef,
+  fontSize: owner?.fontSize ?? options.fontSize,
+  fontStyle: (owner ? owner.fontStyle : options.fontStyle) ?? 'normal',
+  fontVariations: (owner ? owner.fontVariations : options.fontVariations) ?? EMPTY_FONT_VARIATIONS,
+  fontWeight: owner?.fontWeight ?? options.fontWeight,
+  lineHeight: owner?.lineHeight ?? options.lineHeight,
+});
+
 /**
  * Prefer live text session, selected text, then defaults. Style edits update defaults and the current owner;
  * unowned color edits change the foreground pair.
@@ -238,32 +253,36 @@ const useTextEditor = (engine: ToolFormProps['engine']) => {
     () => ({ align, color, fontFamily, fontRef, fontSize, fontStyle, fontVariations, fontWeight, lineHeight }),
     [align, color, fontFamily, fontRef, fontSize, fontStyle, fontVariations, fontWeight, lineHeight]
   );
+  const selectedId = selected?.id ?? null;
+  // Scrubbers keep the handler a gesture started with, so everything an edit builds on is read when it is written:
+  // an undo, hotkey or session change landing mid-gesture survives the release.
   const applyEdit = useCallback(
-    (patch: Partial<TextSource>, commit: boolean) => {
+    (edit: TextEdit, commit: boolean) => {
+      const liveSession = engine.interaction.get('textEditSession');
+      const liveSelected = (): TextSource | null => {
+        const layer = selectedId ? engine.document.model()?.getLayer(selectedId) : null;
+        return layer?.type === 'raster' && layer.source.type === 'text' ? layer.source : null;
+      };
+      const style = textStyleOf(engine.interaction.get('textOptions'), liveSession?.source ?? liveSelected());
+      const patch = typeof edit === 'function' ? edit(style) : edit;
       const { color: colorPatch, ...stylePatch } = patch;
       if (Object.keys(stylePatch).length > 0) {
-        engine.interaction.set('textOptions', {
-          align,
-          fontFamily,
-          fontRef,
-          fontSize,
-          fontStyle,
-          fontVariations,
-          fontWeight,
-          lineHeight,
-          ...stylePatch,
-        });
+        engine.interaction.set('textOptions', { ...style, ...stylePatch });
       }
-      if (session) {
+      if (liveSession) {
         engine.layers.updateTextEditStyle(patch);
         return;
       }
-      if (selected) {
+      if (selectedId) {
         if (commit) {
-          const after = canonicalizeSelectedTextSource({ ...selected.source, ...patch });
-          commitPrepared(t('widgets.canvas.toolOptions.textEdit'), (model) =>
-            model.prepare({ id: selected.id, source: after, type: 'patch-source' })
-          );
+          commitPrepared(t('widgets.canvas.toolOptions.textEdit'), (model) => {
+            const layer = model.getLayer(selectedId);
+            if (layer?.type !== 'raster' || layer.source.type !== 'text') {
+              return { ids: [selectedId], status: 'missing' };
+            }
+            const after = canonicalizeSelectedTextSource({ ...layer.source, ...patch });
+            return model.prepare({ id: selectedId, source: after, type: 'patch-source' });
+          });
         }
         return;
       }
@@ -271,22 +290,7 @@ const useTextEditor = (engine: ToolFormProps['engine']) => {
         colorCommands.setPairColor('foreground', colorPatch);
       }
     },
-    [
-      align,
-      colorCommands,
-      commitPrepared,
-      engine,
-      fontFamily,
-      fontRef,
-      fontSize,
-      fontStyle,
-      fontVariations,
-      fontWeight,
-      lineHeight,
-      selected,
-      session,
-      t,
-    ]
+    [colorCommands, commitPrepared, engine, selectedId, t]
   );
   // Name the actual edit target: live session, selected text layer, or defaults.
   const sessionLayerName = useActiveProjectSelector((project): string | null => {
@@ -333,7 +337,7 @@ const AxisControl = ({
   axis,
 }: {
   activeVariations: Readonly<Record<string, number>>;
-  applyEdit: (patch: Partial<TextSource>, commit: boolean) => void;
+  applyEdit: (edit: TextEdit, commit: boolean) => void;
   axis: FontAxis;
 }) => {
   const committed = clampFontAxisValue(activeVariations[axis.tag] ?? axis.default, axis);
@@ -342,9 +346,10 @@ const AxisControl = ({
   const setValue = useCallback(
     (value: number, commit: boolean) => {
       const next = clampFontAxisValue(value, axis);
-      applyEdit({ fontVariations: { ...activeVariations, [axis.tag]: next } }, commit);
+      // The other axes come from the style at write time, so one changed mid-drag is kept.
+      applyEdit((style) => ({ fontVariations: { ...style.fontVariations, [axis.tag]: next } }), commit);
     },
-    [activeVariations, applyEdit, axis]
+    [applyEdit, axis]
   );
   const previewValue = useCallback((value: number) => setValue(value, false), [setValue]);
   const commitValue = useCallback((value: number) => setValue(value, true), [setValue]);
@@ -379,7 +384,7 @@ const FontAxisSettings = ({
   font,
 }: {
   activeVariations: Readonly<Record<string, number>>;
-  applyEdit: (patch: Partial<TextSource>, commit: boolean) => void;
+  applyEdit: (edit: TextEdit, commit: boolean) => void;
   font?: FontRecord;
 }) => {
   const { t } = useTranslation();

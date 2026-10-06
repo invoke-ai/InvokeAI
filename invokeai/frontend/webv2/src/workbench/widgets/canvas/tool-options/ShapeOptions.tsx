@@ -58,25 +58,32 @@ const useShapeEditor = (engine: ToolFormProps['engine']) => {
   const stroke = selected ? selected.source.stroke : options.strokeEnabled ? pair.background : null;
   const strokeWidth = selected ? selected.source.strokeWidth : options.strokeWidth;
 
+  const selectedId = selected?.id ?? null;
+  // Scrubbers keep the handler a gesture started with, so writes patch the live source and options: an undo or
+  // hotkey landing mid-drag survives the release.
   const commitSource = useCallback(
     (patch: Partial<ShapeSource>) => {
-      if (!selected) {
+      if (!selectedId) {
         return;
       }
-      // Vertices belong to polygons only; a box kind never carries stale ones.
-      const { points, ...merged } = { ...selected.source, ...patch };
-      const after: ShapeSource = merged.kind === 'polygon' ? { ...merged, points } : merged;
-      commitPrepared(t('widgets.canvas.toolOptions.shapeEdit'), (model) =>
-        model.prepare({ id: selected.id, source: after, type: 'patch-source' })
-      );
+      commitPrepared(t('widgets.canvas.toolOptions.shapeEdit'), (model) => {
+        const layer = model.getLayer(selectedId);
+        if (layer?.type !== 'raster' || layer.source.type !== 'shape') {
+          return { ids: [selectedId], status: 'missing' };
+        }
+        // Vertices belong to polygons only; a box kind never carries stale ones.
+        const { points, ...merged } = { ...layer.source, ...patch };
+        const after: ShapeSource = merged.kind === 'polygon' ? { ...merged, points } : merged;
+        return model.prepare({ id: selectedId, source: after, type: 'patch-source' });
+      });
     },
-    [commitPrepared, selected, t]
+    [commitPrepared, selectedId, t]
   );
   const setOptions = useCallback(
     (patch: Partial<ShapeToolOptions>) => {
-      engine.interaction.set('shapeOptions', { ...options, ...patch });
+      engine.interaction.set('shapeOptions', { ...engine.interaction.get('shapeOptions'), ...patch });
     },
-    [engine, options]
+    [engine]
   );
   const setKind = useCallback(
     (next: ShapeKind) => {

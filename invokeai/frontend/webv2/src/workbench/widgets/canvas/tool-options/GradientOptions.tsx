@@ -26,6 +26,14 @@ import { insertStopAt, moveStop, recolorStop, removeStop, stopsToCssGradient } f
 
 type GradientSource = Extract<CanvasLayerSourceContract, { type: 'gradient' }>;
 type GradientKind = GradientToolOptions['kind'];
+type GradientPatch = Partial<Pick<GradientSource, 'angle' | 'kind' | 'stops'>>;
+/** Derives the next stops from the owner's stops as they are when the edit is written; null changes nothing. */
+type StopsUpdate = (stops: readonly GradientStop[]) => GradientStop[] | null;
+
+const pairStopsOf = (pair: { background: string; foreground: string }): GradientStop[] => [
+  { color: `${pair.foreground}ff`, offset: 0 },
+  { color: `${pair.background}ff`, offset: 1 },
+];
 
 const formatDegrees = (value: number): string => `${value}°`;
 const formatPercent = (value: number): string => `${value}%`;
@@ -58,31 +66,36 @@ const useGradientEditor = (engine: ToolFormProps['engine']) => {
   const kind: GradientKind = selected ? selected.source.kind : options.kind;
   const angle = selected ? selected.source.angle : options.angle;
   const pairStops = useMemo<GradientStop[]>(
-    () => [
-      { color: `${pair.foreground}ff`, offset: 0 },
-      { color: `${pair.background}ff`, offset: 1 },
-    ],
+    () => pairStopsOf({ background: pair.background, foreground: pair.foreground }),
     [pair.background, pair.foreground]
   );
   const stops = selected ? selected.source.stops : options.preset === 'pair' ? pairStops : options.stops;
 
+  const selectedId = selected?.id ?? null;
+  // Scrubbers keep the handler a gesture started with, so writes patch the live options and source: an undo or
+  // edit landing mid-drag survives the release.
   const apply = useCallback(
-    (next: { angle: number; kind: GradientKind; stops: GradientStop[] }, commit: boolean) => {
-      engine.interaction.set('gradientOptions', { ...options, angle: next.angle, kind: next.kind });
-      if (selected && commit) {
-        const after: GradientSource = { ...selected.source, ...next };
-        commitPrepared(t('widgets.canvas.toolOptions.gradientEdit'), (model) =>
-          model.prepare({ id: selected.id, source: after, type: 'patch-source' })
-        );
+    (patch: GradientPatch, commit: boolean) => {
+      const layer = selectedId ? engine.document.model()?.getLayer(selectedId) : null;
+      const owner = layer?.type === 'raster' && layer.source.type === 'gradient' ? layer.source : null;
+      const live = engine.interaction.get('gradientOptions');
+      // The defaults follow the angle and kind the form shows: the selected gradient's, else their own.
+      engine.interaction.set('gradientOptions', {
+        ...live,
+        angle: patch.angle ?? owner?.angle ?? live.angle,
+        kind: patch.kind ?? owner?.kind ?? live.kind,
+      });
+      if (selectedId && commit) {
+        commitPrepared(t('widgets.canvas.toolOptions.gradientEdit'), (model) => {
+          const current = model.getLayer(selectedId);
+          if (current?.type !== 'raster' || current.source.type !== 'gradient') {
+            return { ids: [selectedId], status: 'missing' };
+          }
+          return model.prepare({ id: selectedId, source: { ...current.source, ...patch }, type: 'patch-source' });
+        });
       }
     },
-    [commitPrepared, engine, options, selected, t]
-  );
-  const setCustomStops = useCallback(
-    (nextStops: GradientStop[]) => {
-      engine.interaction.set('gradientOptions', { ...options, preset: 'custom', stops: nextStops });
-    },
-    [engine, options]
+    [commitPrepared, engine, selectedId, t]
   );
   const setPreset = useCallback(
     (preset: 'pair' | 'custom') => {
@@ -96,17 +109,34 @@ const useGradientEditor = (engine: ToolFormProps['engine']) => {
     },
     [engine, options, pairStops]
   );
-  /** Routes a settled stop list to its owner: the selected layer (one entry) or the custom defaults. */
-  const commitStops = useCallback(
-    (nextStops: GradientStop[]) => {
-      if (selected) {
-        apply({ angle, kind, stops: nextStops }, true);
+  /**
+   * Routes a settled stop edit to its owner: the selected layer (one entry) or the custom defaults. The update runs
+   * against the owner's stops at write time, so a stop edit landing mid-gesture is kept.
+   */
+  const updateStops = useCallback(
+    (update: StopsUpdate) => {
+      if (selectedId) {
+        commitPrepared(t('widgets.canvas.toolOptions.gradientEdit'), (model) => {
+          const current = model.getLayer(selectedId);
+          if (current?.type !== 'raster' || current.source.type !== 'gradient') {
+            return { ids: [selectedId], status: 'missing' };
+          }
+          const next = update(current.source.stops);
+          return next
+            ? model.prepare({ id: selectedId, source: { ...current.source, stops: next }, type: 'patch-source' })
+            : { status: 'unchanged' };
+        });
         return;
       }
-      setCustomStops(nextStops);
+      const live = engine.interaction.get('gradientOptions');
+      const next = update(live.preset === 'pair' ? pairStopsOf(engine.interaction.get('colorPair')) : live.stops);
+      if (next) {
+        engine.interaction.set('gradientOptions', { ...live, preset: 'custom', stops: next });
+      }
     },
-    [angle, apply, kind, selected, setCustomStops]
+    [commitPrepared, engine, selectedId, t]
   );
+  const commitStops = useCallback((nextStops: GradientStop[]) => updateStops(() => nextStops), [updateStops]);
   return {
     angle,
     apply,
@@ -116,6 +146,7 @@ const useGradientEditor = (engine: ToolFormProps['engine']) => {
     selectedName: selected?.name ?? null,
     setPreset,
     stops,
+    updateStops,
   };
 };
 
@@ -334,19 +365,10 @@ const GradientSettings = ({ engine }: ToolFormProps) => {
     ],
     [t]
   );
-  const setKind = useCallback(
-    (next: GradientKind) => editor.apply({ angle: editor.angle, kind: next, stops: [...editor.stops] }, true),
-    [editor]
-  );
+  const setKind = useCallback((next: GradientKind) => editor.apply({ kind: next }, true), [editor]);
   // Ticks preview through the options store; ONE document commit lands on release.
-  const previewAngle = useCallback(
-    (value: number) => editor.apply({ angle: Math.round(value), kind: editor.kind, stops: [...editor.stops] }, false),
-    [editor]
-  );
-  const setAngle = useCallback(
-    (value: number) => editor.apply({ angle: Math.round(value), kind: editor.kind, stops: [...editor.stops] }, true),
-    [editor]
-  );
+  const previewAngle = useCallback((value: number) => editor.apply({ angle: Math.round(value) }, false), [editor]);
+  const setAngle = useCallback((value: number) => editor.apply({ angle: Math.round(value) }, true), [editor]);
   const angleGesture = useSliderGesture(Math.round(editor.angle), setAngle, previewAngle);
   return (
     <>
@@ -396,13 +418,22 @@ const GradientStopsSettings = ({ engine }: ToolFormProps) => {
     (hex: string) => editor.commitStops(recolorStop(editor.stops, stopIndex, hex)),
     [editor, stopIndex]
   );
+  // Moves the stop the gesture started on — found by identity, else by position — within the stops as they are
+  // on release, so another stop's edit landing mid-drag is kept.
   const setOffset = useCallback(
     (value: number) => {
-      const moved = moveStop(editor.stops, stopIndex, value / 100);
-      editor.commitStops(moved.stops);
-      setSelectedIndex(moved.index);
+      editor.updateStops((current) => {
+        const found = stop ? current.indexOf(stop) : -1;
+        const index = found >= 0 ? found : stopIndex;
+        if (index >= current.length) {
+          return null;
+        }
+        const moved = moveStop(current, index, value / 100);
+        setSelectedIndex(moved.index);
+        return moved.stops;
+      });
     },
-    [editor, stopIndex]
+    [editor, stop, stopIndex]
   );
   // The offset settles once per gesture: a stop that crosses a neighbour reorders, so ticks only move the draft.
   const offsetGesture = useSliderGesture(stop ? Math.round(stop.offset * 100) : 0, setOffset);

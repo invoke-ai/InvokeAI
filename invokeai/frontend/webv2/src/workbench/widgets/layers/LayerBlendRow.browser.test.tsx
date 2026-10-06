@@ -161,6 +161,8 @@ afterEach(async () => {
   previews.length = 0;
   commits.length = 0;
   vi.clearAllMocks();
+  // Prototype spies (pointer lock) must not leak into later tests or files sharing the browser.
+  vi.restoreAllMocks();
 });
 
 describe('blend mode preview', () => {

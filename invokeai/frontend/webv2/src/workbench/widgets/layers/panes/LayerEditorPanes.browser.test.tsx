@@ -1,6 +1,10 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 import type * as fonts from '@features/fonts';
-import type { CanvasLayerSourceContract } from '@workbench/canvas-engine/api';
+import type {
+  CanvasDocumentContractV3,
+  CanvasLayerSourceContract,
+  PreparedDocumentEdit,
+} from '@workbench/canvas-engine/api';
 import type { CanvasOperationState } from '@workbench/canvas-operations/api';
 import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import type { FilterOperationSessionState } from '@workbench/canvas-operations/filterOperationSession';
@@ -10,6 +14,7 @@ import type { Project } from '@workbench/projectContracts';
 import { Box, ChakraProvider } from '@chakra-ui/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
+import { createDocumentModel } from '@workbench/canvas-engine/api';
 import {
   groupContract,
   layerContract,
@@ -194,7 +199,7 @@ const settle = () =>
 
 const IDENTITY = { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 };
 
-type Selection = 'none' | 'layer' | 'group' | 'mask' | 'shape' | 'gradient' | 'text';
+type Selection = 'none' | 'layer' | 'group' | 'mask' | 'shape' | 'stroked-shape' | 'gradient' | 'text';
 
 const SHAPE_SOURCE = {
   fill: '#ff0000',
@@ -234,8 +239,13 @@ const mount = async (View: typeof PropertiesPane, selection: Selection = 'none')
       ? []
       : selection === 'layer'
         ? [layerContract('l0', 'raster', { name: 'Paint', transform: { ...IDENTITY, rotation: 0.5, x: 10.4 } })]
-        : selection === 'shape'
-          ? [layerContract('l0', 'raster', { name: 'My Shape', source: SHAPE_SOURCE })]
+        : selection === 'shape' || selection === 'stroked-shape'
+          ? [
+              layerContract('l0', 'raster', {
+                name: 'My Shape',
+                source: selection === 'shape' ? SHAPE_SOURCE : { ...SHAPE_SOURCE, stroke: '#00ff00', strokeWidth: 4 },
+              }),
+            ]
           : selection === 'gradient'
             ? [layerContract('l0', 'raster', { name: 'My Gradient', source: GRADIENT_SOURCE })]
             : selection === 'text'
@@ -565,6 +575,181 @@ describe('Properties pane', () => {
     await act(() => operations!.start(false));
     await settle();
     expect(host!.querySelector('[inert]')).toBeNull();
+  });
+});
+
+describe('Tool property scrubbers', () => {
+  beforeEach(() => resetPropertyGroupCollapse());
+  afterEach(() => resetPropertyGroupCollapse());
+
+  const scrubber = (name: string) => page.getByRole('slider', { exact: true, name }).element() as HTMLElement;
+
+  /** Presses the scrubber at `from` and moves through `to`; the gesture continues with `move` and ends on `release`. */
+  const drag = async (slider: HTMLElement, from: number, ...to: number[]) => {
+    const frame = slider.closest<HTMLElement>('[data-scope="scrubber"]')!;
+    const { left, width } = frame.getBoundingClientRect();
+    let last = from;
+    const fire = (target: EventTarget, type: string, fraction: number) => {
+      last = fraction;
+      return act(() =>
+        target.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, clientX: left + width * fraction }))
+      );
+    };
+    const move = async (...fractions: number[]) => {
+      for (const fraction of fractions) {
+        await fire(window, 'pointermove', fraction);
+      }
+    };
+    await fire(frame, 'pointerdown', from);
+    await move(...to);
+    return { move, release: () => fire(window, 'pointerup', last) };
+  };
+
+  /** Holds `key` through `repeats` key-downs; resolves to the release. */
+  const holdKey = async (slider: HTMLElement, key: string, repeats: number) => {
+    for (let index = 0; index < repeats; index += 1) {
+      await act(() => slider.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key, repeat: index > 0 })));
+    }
+    return () => act(() => slider.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key })));
+  };
+
+  /**
+   * Routes commits through a model over `live`, a document the test can change mid-gesture the way an undo or a
+   * concurrent edit would, and records every write to `optionsKey`.
+   */
+  const observe = (optionsKey: 'gradientOptions' | 'shapeOptions' | 'textOptions') => {
+    let live: CanvasDocumentContractV3 = harness.project!.canvas.document;
+    vi.spyOn(engine!.document, 'model').mockImplementation(() =>
+      createDocumentModel(live, { editRevision: 0, projectId: 'p' })
+    );
+    const commits: PreparedDocumentEdit[] = [];
+    vi.spyOn(engine!.layers, 'commitPrepared').mockImplementation((_label, edit) => {
+      commits.push(edit);
+      return { status: 'committed' };
+    });
+    const set = vi.spyOn(engine!.interaction, 'set');
+    return {
+      commits,
+      /** Sources the commits wrote, in order. */
+      committedSources: () =>
+        commits.map(
+          (edit) => (edit.forward as { source: CanvasLayerSourceContract }).source as Record<string, unknown>
+        ),
+      previews: () => set.mock.calls.filter(([key]) => key === optionsKey).length,
+      setLiveSource: (source: CanvasLayerSourceContract) => {
+        live = applyCanvasProjectMutation(harness.project!, { id: 'l0', source, type: 'updateCanvasLayerSource' })
+          .canvas.document;
+      },
+    };
+  };
+
+  it.each([
+    ['text', 'Font size', 'textOptions'],
+    ['text', 'Line height', 'textOptions'],
+    ['stroked-shape', 'Stroke width', 'shapeOptions'],
+    ['gradient', 'Angle', 'gradientOptions'],
+  ] as const)(
+    'previews every step and commits once per drag or held key (%s, %s)',
+    async (selection, name, optionsKey) => {
+      await mount(PropertiesPane, selection);
+      await act(() => engine!.tools.setTool(selection === 'stroked-shape' ? 'shape' : selection));
+      await settle();
+      const { commits, previews } = observe(optionsKey);
+      const slider = scrubber(name);
+
+      const gesture = await drag(slider, 0.5, 0.55, 0.6);
+      expect(previews()).toBe(2);
+      expect(commits).toHaveLength(0);
+      await gesture.release();
+      expect(commits).toHaveLength(1);
+
+      // The settle writes the defaults too; count the key steps from there.
+      const settled = previews();
+      const releaseKey = await holdKey(slider, 'ArrowRight', 3);
+      expect(previews() - settled).toBe(3);
+      expect(commits).toHaveLength(1);
+      await releaseKey();
+      expect(commits).toHaveLength(2);
+    }
+  );
+
+  it('keeps a kind hotkey and a document edit that land mid stroke-width drag', async () => {
+    await mount(PropertiesPane, 'stroked-shape');
+    await act(() => engine!.tools.setTool('shape'));
+    await settle();
+    const { committedSources, setLiveSource } = observe('shapeOptions');
+
+    const gesture = await drag(scrubber('Stroke width'), 0.5, 0.6);
+    await act(() =>
+      engine!.interaction.set('shapeOptions', { ...engine!.interaction.get('shapeOptions'), kind: 'star' })
+    );
+    setLiveSource({ ...SHAPE_SOURCE, fill: '#0000ff', stroke: '#00ff00', strokeWidth: 4 });
+    await gesture.move(0.65);
+    expect(engine!.interaction.get('shapeOptions').kind).toBe('star');
+    await gesture.release();
+
+    expect(engine!.interaction.get('shapeOptions').kind).toBe('star');
+    const [committed] = committedSources();
+    expect(committed?.fill).toBe('#0000ff');
+    expect(committed?.strokeWidth).not.toBe(4);
+  });
+
+  it('keeps an undone colour in the font-size commit when the undo lands mid-drag', async () => {
+    await mount(PropertiesPane, 'text');
+    await act(() => engine!.tools.setTool('text'));
+    await settle();
+    const { committedSources, setLiveSource } = observe('textOptions');
+
+    const { release } = await drag(scrubber('Font size'), 0.5, 0.6);
+    setLiveSource({ ...TEXT_SOURCE, color: '#abcdef' });
+    await release();
+
+    const [committed] = committedSources();
+    expect(committed?.color).toBe('#abcdef');
+    expect(committed?.fontSize).toBeGreaterThan(TEXT_SOURCE.fontSize);
+    expect(committed?.content).toBe(TEXT_SOURCE.content);
+  });
+
+  it('keeps stops and defaults edited mid angle drag', async () => {
+    await mount(PropertiesPane, 'gradient');
+    await act(() => engine!.tools.setTool('gradient'));
+    await settle();
+    const { committedSources, setLiveSource } = observe('gradientOptions');
+    const stops = [
+      { color: '#ff0000ff', offset: 0 },
+      { color: '#00ff00ff', offset: 0.5 },
+      { color: '#ffffffff', offset: 1 },
+    ];
+
+    const { release } = await drag(scrubber('Angle'), 0.5, 0.6);
+    setLiveSource({ ...GRADIENT_SOURCE, stops });
+    await act(() =>
+      engine!.interaction.set('gradientOptions', { ...engine!.interaction.get('gradientOptions'), preset: 'custom' })
+    );
+    await release();
+
+    const [committed] = committedSources();
+    expect(committed?.stops).toEqual(stops);
+    expect(committed?.angle).not.toBe(0);
+    expect(engine!.interaction.get('gradientOptions').preset).toBe('custom');
+  });
+
+  it('moves the dragged stop within the stops as they are on release, keeping one added mid-drag', async () => {
+    await mount(PropertiesPane, 'gradient');
+    await act(() => engine!.tools.setTool('gradient'));
+    await settle();
+    const { commits, committedSources, setLiveSource } = observe('gradientOptions');
+    const added = { color: '#00ff00ff', offset: 0.5 };
+
+    const { release } = await drag(scrubber('Offset'), 0.1, 0.3, 0.35);
+    setLiveSource({ ...GRADIENT_SOURCE, stops: [GRADIENT_SOURCE.stops[0], added, GRADIENT_SOURCE.stops[1]] });
+    await release();
+
+    expect(commits).toHaveLength(1);
+    const stops = committedSources()[0]?.stops as { color: string; offset: number }[];
+    expect(stops.map((stop) => stop.color)).toEqual(['#000000ff', '#00ff00ff', '#ffffffff']);
+    expect(stops[0]!.offset).toBeGreaterThan(0);
+    expect(stops[0]!.offset).toBeLessThan(0.5);
   });
 });
 
