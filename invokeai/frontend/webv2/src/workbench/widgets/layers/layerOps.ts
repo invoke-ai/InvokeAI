@@ -245,6 +245,9 @@ export const createIdentityAdjustment = (type: CanvasAdjustmentEntry['type']): C
   }
 };
 
+/** A new regional IP-Adapter reference's weight. */
+export const DEFAULT_REGIONAL_REFERENCE_WEIGHT = 1;
+
 /**
  * Create shared regional-reference defaults: FLUX uses Redux, other bases IP-Adapter. Users choose models and
  * assign images via drop/upload.
@@ -268,7 +271,7 @@ export const createRegionalReferenceImage = (
       method: 'full',
       model: null,
       type: 'ip_adapter',
-      weight: 1,
+      weight: DEFAULT_REGIONAL_REFERENCE_WEIGHT,
     },
     id,
     isEnabled: true,
@@ -300,6 +303,9 @@ export const CONTROL_WEIGHT_BOUNDS = {
 } as const;
 
 export const DEFAULT_CONTROL_ADAPTER = CONTROL_ADAPTER_DEFAULTS.controlnet;
+
+/** A new mask modifier's magnitude (legacy defaults): noise level and denoise limit. */
+export const MASK_MODIFIER_DEFAULTS = { denoise: 0.8, noise: 0.25 } as const;
 
 /** The next free "Control Layer N" name given the existing layer names (N ≥ 1, first gap). */
 export const nextControlLayerName = (existingNames: readonly string[]): string => {

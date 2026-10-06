@@ -106,6 +106,7 @@ import {
   fitLayerTransformToBbox,
   getControlTransparencyEffectPatch,
   getRegionalGuidanceAutoNegativePatch,
+  MASK_MODIFIER_DEFAULTS,
 } from './layerOps';
 import { requestLayerProperties } from './layerPropertiesRequestStore';
 import { RunLayerWorkflowDialog, useLayerWorkflowAvailability } from './RunLayerWorkflowDialog';
@@ -759,8 +760,10 @@ const LayerMenu = ({
       if (layer[field] !== undefined) {
         return;
       }
-      // Legacy defaults: noise starts at 25%, the denoise limit at 80%.
-      const value = field === 'noise' ? { isEnabled: true, level: 0.25 } : { isEnabled: true, limit: 0.8 };
+      const value =
+        field === 'noise'
+          ? { isEnabled: true, level: MASK_MODIFIER_DEFAULTS.noise }
+          : { isEnabled: true, limit: MASK_MODIFIER_DEFAULTS.denoise };
       commitPrepared(
         t(field === 'noise' ? 'widgets.layers.actions.addNoise' : 'widgets.layers.actions.addDenoiseLimit'),
         (model) =>

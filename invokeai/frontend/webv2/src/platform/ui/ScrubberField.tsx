@@ -36,6 +36,12 @@ const TOUCH_INTENT_PX = 8;
 
 type ScrubberMarkState = 'at-value' | 'over-value' | 'under-value';
 
+/** A drag or held-key run of `onChange` calls; settling ends it and reports its final value once. */
+type Gesture = { readonly kind: 'drag' | 'keys'; latest: number; settle: () => void };
+
+/** Keys that step the value; holding one repeats within a single gesture. */
+const STEP_KEYS = new Set(['ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'End', 'Home', 'PageDown', 'PageUp']);
+
 /** Where the label ends and the value begins, in px from the frame's left edge. */
 type TextExtents = { labelEnd: number; valueStart: number; width: number };
 
@@ -61,6 +67,12 @@ type OwnProps = {
   formatValue?: (value: number) => string;
   /** Fires per step of a gesture. A drag keeps the handler it started with, so patch-style handlers only. */
   onChange: (value: number) => void;
+  /**
+   * Fires once with the final value after every gesture that called `onChange`: a drag's release, a held step key's
+   * release or blur, a typed commit, a reset, or unmounting mid-gesture. Pair it with `onChange` previews to record
+   * one undo step per gesture; a drag or held key keeps the handler it started with.
+   */
+  onChangeEnd?: (value: number) => void;
 };
 
 export type ScrubberFieldProps = OwnProps & Omit<StackProps, keyof OwnProps | 'children' | 'defaultValue' | 'onChange'>;
@@ -202,7 +214,7 @@ const isSameExtents = (a: TextExtents | null, b: TextExtents): boolean =>
 
 /**
  * Relative drag; Shift fine, Alt stops. Click the value to edit; arrows step, Shift/Page keys ×10, Home/End
- * bounds. Double-click or Backspace/Delete resets. Caller owns debouncing.
+ * bounds. Double-click or Backspace/Delete resets. Caller owns debouncing or per-gesture commits (`onChangeEnd`).
  */
 export const ScrubberField = ({
   defaultValue,
@@ -218,6 +230,7 @@ export const ScrubberField = ({
   max,
   min,
   onChange,
+  onChangeEnd,
   step,
   value,
   ...stackProps
@@ -227,14 +240,14 @@ export const ScrubberField = ({
   const labelId = `${id}-label`;
   const messageId = `${id}-message`;
   const sliderRef = useRef<HTMLDivElement>(null);
-  const pointerSessionRef = useRef<AbortController | null>(null);
+  const gestureRef = useRef<Gesture | null>(null);
   // `finished` guards the editor's blur, which fires while focus returns to the slider.
   const editSessionRef = useRef<{ finished: boolean } | null>(null);
   const [edit, setEdit] = useState<{ draft: string; selectAll: boolean } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [textExtents, setTextExtents] = useState<TextExtents | null>(null);
 
-  useMountEffect(() => () => pointerSessionRef.current?.abort());
+  useMountEffect(() => () => gestureRef.current?.settle());
 
   // Track label/value bounds so stops stay hidden beneath changing text.
   const measureText = useCallback((root: HTMLElement) => {
@@ -305,13 +318,51 @@ export const ScrubberField = ({
     [markEpsilon, markValues, max, min, value]
   );
 
-  const emit = useCallback(
+  // A typed value or reset is a whole gesture: it settles any open one first.
+  const commitValue = useCallback(
     (next: number) => {
-      if (next !== value) {
-        onChange(next);
+      if (next === value) {
+        return;
       }
+      gestureRef.current?.settle();
+      onChange(next);
+      onChangeEnd?.(next);
     },
-    [onChange, value]
+    [onChange, onChangeEnd, value]
+  );
+
+  // Key repeats extend one gesture until the key is released or focus leaves.
+  const stepTo = useCallback(
+    (next: number) => {
+      if (next === value) {
+        return;
+      }
+
+      const current = gestureRef.current;
+
+      if (current?.kind === 'keys') {
+        current.latest = next;
+        onChange(next);
+        return;
+      }
+
+      current?.settle();
+      onChange(next);
+
+      const keys: Gesture = {
+        kind: 'keys',
+        latest: next,
+        settle: () => {
+          if (gestureRef.current === keys) {
+            gestureRef.current = null;
+          }
+          onChangeEnd?.(keys.latest);
+        },
+      };
+
+      gestureRef.current = keys;
+    },
+    [onChange, onChangeEnd, value]
   );
 
   const startEditing = useCallback((draft: string, selectAll: boolean) => {
@@ -339,11 +390,11 @@ export const ScrubberField = ({
         const parsed = Number(edit.draft.trim());
 
         if (edit.draft.trim() !== '' && Number.isFinite(parsed)) {
-          emit(clamp(parsed, typedMin, typedMax));
+          commitValue(clamp(parsed, typedMin, typedMax));
         }
       }
     },
-    [edit, emit, typedMax, typedMin]
+    [commitValue, edit, typedMax, typedMin]
   );
 
   const handlePointerDown = useCallback(
@@ -354,7 +405,7 @@ export const ScrubberField = ({
 
       event.preventDefault();
       sliderRef.current?.focus({ preventScroll: true });
-      pointerSessionRef.current?.abort();
+      gestureRef.current?.settle();
 
       const root = event.currentTarget;
       const rect = root.getBoundingClientRect();
@@ -363,12 +414,26 @@ export const ScrubberField = ({
       // Unclamped, so a press left of the thumb can still be dragged past the track's end to max.
       const valueAt = (clientX: number): number => min + ((clientX - trackLeft) / trackWidth) * range;
       const session = new AbortController();
-      let latest = value;
       let isPendingTouch = event.pointerType === 'touch';
+      let moved = false;
       // Re-anchor on sensitivity changes so toggling Shift mid-drag does not jump.
       let anchor = { clientX: event.clientX, ratio: event.shiftKey ? FINE_DRAG_RATIO : 1, value };
+      const drag: Gesture = {
+        kind: 'drag',
+        latest: value,
+        settle: () => {
+          session.abort();
+          if (gestureRef.current === drag) {
+            gestureRef.current = null;
+          }
+          setIsDragging(false);
+          if (moved) {
+            onChangeEnd?.(drag.latest);
+          }
+        },
+      };
 
-      pointerSessionRef.current = session;
+      gestureRef.current = drag;
       setIsDragging(true);
 
       // Pointer capture preserves drag cursor/hover isolation; window listeners cover capture failure.
@@ -383,7 +448,7 @@ export const ScrubberField = ({
         const ratio = pointer.shiftKey ? FINE_DRAG_RATIO : 1;
 
         if (anchor.ratio !== ratio) {
-          anchor = { clientX: pointer.clientX, ratio, value: latest };
+          anchor = { clientX: pointer.clientX, ratio, value: drag.latest };
         }
 
         const raw = anchor.value + (valueAt(pointer.clientX) - valueAt(anchor.clientX)) * ratio;
@@ -406,35 +471,32 @@ export const ScrubberField = ({
 
         const next = resolve(pointer);
 
-        if (next !== latest) {
-          latest = next;
+        if (next !== drag.latest) {
+          drag.latest = next;
+          moved = true;
           onChange(next);
         }
       };
       const end = (pointer: PointerEvent) => {
-        if (pointer.pointerId !== event.pointerId) {
-          return;
+        if (pointer.pointerId === event.pointerId) {
+          drag.settle();
         }
-
-        session.abort();
-        pointerSessionRef.current = null;
-        setIsDragging(false);
       };
 
       window.addEventListener('pointermove', apply, { signal: session.signal });
       window.addEventListener('pointerup', end, { signal: session.signal });
       window.addEventListener('pointercancel', end, { signal: session.signal });
     },
-    [disabled, edit, markValues, min, onChange, range, snapToStep, value]
+    [disabled, edit, markValues, min, onChange, onChangeEnd, range, snapToStep, value]
   );
 
   const handleDoubleClick = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
       if (!disabled && defaultValue !== undefined && !isValueTarget(event.target)) {
-        emit(defaultValue);
+        commitValue(defaultValue);
       }
     },
-    [defaultValue, disabled, emit]
+    [commitValue, defaultValue, disabled]
   );
 
   // Consume handled keys so the window hotkey runtime cannot also treat editor-opening digits as commands.
@@ -482,7 +544,7 @@ export const ScrubberField = ({
           event.stopPropagation();
 
           if (defaultValue !== undefined) {
-            emit(defaultValue);
+            commitValue(defaultValue);
           }
           return;
         default:
@@ -497,9 +559,23 @@ export const ScrubberField = ({
 
       event.preventDefault();
       event.stopPropagation();
-      emit(clamp(roundTo(next, decimals), typedMin, typedMax));
+      stepTo(clamp(roundTo(next, decimals), typedMin, typedMax));
     },
-    [decimals, defaultValue, disabled, emit, max, min, startEditing, step, typedMax, typedMin, value]
+    [commitValue, decimals, defaultValue, disabled, max, min, startEditing, step, stepTo, typedMax, typedMin, value]
+  );
+
+  const settleKeys = useCallback(() => {
+    if (gestureRef.current?.kind === 'keys') {
+      gestureRef.current.settle();
+    }
+  }, []);
+  const handleSliderKeyUp = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (STEP_KEYS.has(event.key)) {
+        settleKeys();
+      }
+    },
+    [settleKeys]
   );
 
   const handleValueClick = useCallback(() => {
@@ -594,7 +670,9 @@ export const ScrubberField = ({
           data-part="slider"
           role="slider"
           tabIndex={disabled ? -1 : 0}
+          onBlur={settleKeys}
           onKeyDown={handleSliderKeyDown}
+          onKeyUp={handleSliderKeyUp}
         />
         <span ref={observeText} data-part="label" id={labelId}>
           {labelContent}

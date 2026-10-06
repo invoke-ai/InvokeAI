@@ -1,16 +1,17 @@
-import type { SliderValueChangeDetails } from '@chakra-ui/react';
 import type { CanvasInpaintMaskLayerContract } from '@workbench/canvas-engine/api';
 import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps';
 
-import { Stack, Text } from '@chakra-ui/react';
-import { Field, Slider } from '@platform/ui';
+import { ScrubberField } from '@platform/ui/ScrubberField';
 import { type CanvasPreparedEngine, useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { MASK_MODIFIER_DEFAULTS } from './layerOps';
 
 /** Edit modifier magnitude here with one commit per gesture; tree rows own enabling and removal. */
 
 type MaskModifierKind = 'mask-noise' | 'mask-denoise';
+type MaskModifier = NonNullable<CanvasInpaintMaskLayerContract['noise' | 'denoise']>;
 
 const FIELD_OF: Record<MaskModifierKind, 'noise' | 'denoise'> = { 'mask-denoise': 'denoise', 'mask-noise': 'noise' };
 const LABEL_OF: Record<MaskModifierKind, string> = {
@@ -22,7 +23,9 @@ const HELP_OF: Record<MaskModifierKind, string> = {
   'mask-noise': 'widgets.layers.modifiers.noiseHelp',
 };
 
-const formatUnitPercent = (value: number): string => `${Math.round(value * 100)}%`;
+const formatPercent = (value: number): string => `${value}%`;
+
+const magnitudeOf = (modifier: MaskModifier): number => ('level' in modifier ? modifier.level : modifier.limit);
 
 export const MaskModifierSettings = ({
   engine,
@@ -34,81 +37,85 @@ export const MaskModifierSettings = ({
   layer: CanvasInpaintMaskLayerContract;
 }) => {
   const { t } = useTranslation();
-  const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
+  const { cancel: cancelPreview, commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const field = FIELD_OF[kind];
   const modifier = layer[field];
-  const beforeRef = useRef<typeof modifier | null>(null);
+  // Where a gesture started; outside render closures because a drag keeps the handlers it started with.
+  const beforeRef = useRef<MaskModifier | null>(null);
+
+  const configWith = useCallback(
+    (base: MaskModifier, magnitude: number) =>
+      ({
+        layerType: 'inpaint_mask',
+        [field]: field === 'noise' ? { ...base, level: magnitude } : { ...base, limit: magnitude },
+      }) as const,
+    [field]
+  );
 
   const handleChange = useCallback(
-    ({ value }: SliderValueChangeDetails) => {
-      const next = value[0];
-      if (next === undefined || !Number.isFinite(next) || !modifier) {
+    (percent: number) => {
+      if (!modifier) {
         return;
       }
-      const config = {
-        layerType: 'inpaint_mask',
-        [field]: field === 'noise' ? { ...modifier, level: next } : { ...modifier, limit: next },
-      } as const;
-      if (previewStructural({ config, id: layer.id, type: 'updateCanvasLayerConfig' })) {
+      if (
+        previewStructural({
+          config: configWith(modifier, percent / 100),
+          id: layer.id,
+          type: 'updateCanvasLayerConfig',
+        })
+      ) {
         beforeRef.current ??= modifier;
       }
     },
-    [previewStructural, field, layer.id, modifier]
+    [configWith, layer.id, modifier, previewStructural]
   );
 
   const handleChangeEnd = useCallback(
-    ({ value }: SliderValueChangeDetails) => {
-      const next = value[0];
-      const before = beforeRef.current ?? modifier;
+    (percent: number) => {
+      const before = beforeRef.current;
       beforeRef.current = null;
-      if (next === undefined || !Number.isFinite(next) || !before || !modifier) {
+      if (!before) {
+        return;
+      }
+      const next = percent / 100;
+      if (next === magnitudeOf(before)) {
+        cancelPreview({
+          config: { layerType: 'inpaint_mask', [field]: before },
+          id: layer.id,
+          type: 'updateCanvasLayerConfig',
+        });
         return;
       }
       // The commit changes only the magnitude: `isEnabled` stays live, so a
       // toggle landing mid-gesture is not silently reverted.
-      const committed = { ...before, isEnabled: modifier.isEnabled };
+      const committed = { ...before, isEnabled: modifier?.isEnabled ?? before.isEnabled };
       commitPrepared(t(LABEL_OF[kind]), (model) =>
         model.prepare({
           before: { layerType: 'inpaint_mask', [field]: committed },
-          config: {
-            layerType: 'inpaint_mask',
-            [field]: field === 'noise' ? { ...committed, level: next } : { ...committed, limit: next },
-          },
+          config: configWith(committed, next),
           id: layer.id,
           type: 'patch-config',
         })
       );
     },
-    [commitPrepared, field, kind, layer.id, modifier, t]
+    [cancelPreview, commitPrepared, configWith, field, kind, layer.id, modifier?.isEnabled, t]
   );
-
-  const sliderValue = useMemo(
-    () => [modifier ? ('level' in modifier ? modifier.level : modifier.limit) : 0],
-    [modifier]
-  );
-  const sliderAria = useMemo(() => [t(LABEL_OF[kind])], [kind, t]);
 
   if (!modifier) {
     return null;
   }
   return (
-    <Stack gap="2">
-      <Field label={t(LABEL_OF[kind])}>
-        <Slider
-          aria-label={sliderAria}
-          formatValue={formatUnitPercent}
-          max={1}
-          min={0}
-          step={0.01}
-          value={sliderValue}
-          withThumbTooltip
-          onValueChange={handleChange}
-          onValueChangeEnd={handleChangeEnd}
-        />
-      </Field>
-      <Text color="fg.muted" fontSize="xs">
-        {t(HELP_OF[kind])}
-      </Text>
-    </Stack>
+    <ScrubberField
+      defaultValue={Math.round(MASK_MODIFIER_DEFAULTS[field] * 100)}
+      formatValue={formatPercent}
+      helpText={t(HELP_OF[kind])}
+      label={t(LABEL_OF[kind])}
+      max={100}
+      min={0}
+      step={1}
+      value={Math.round(magnitudeOf(modifier) * 100)}
+      onChange={handleChange}
+      onChangeEnd={handleChangeEnd}
+    />
   );
 };

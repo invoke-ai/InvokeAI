@@ -1,7 +1,7 @@
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
 import i18next from 'i18next';
-import { act } from 'react';
+import { act, useCallback, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -70,6 +70,56 @@ const pointer = (
   type: 'pointercancel' | 'pointerdown' | 'pointermove' | 'pointerup',
   init: PointerEventInit
 ) => act(() => target.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, ...init })));
+
+/** A caller that owns the value, so repeated keys step from what the previous step produced. */
+const ControlledScrubber = (props: Omit<ScrubberFieldProps, 'value'> & { initial: number }) => {
+  const { initial, onChange, ...rest } = props;
+  const [value, setValue] = useState(initial);
+  const handleChange = useCallback(
+    (next: number) => {
+      setValue(next);
+      onChange(next);
+    },
+    [onChange]
+  );
+
+  return <ScrubberField {...rest} value={value} onChange={handleChange} />;
+};
+
+const mountControlled = async (initial: number) => {
+  const events: string[] = [];
+  const onChange = vi.fn((value: number) => events.push(`change:${value}`));
+  const onChangeEnd = vi.fn((value: number) => events.push(`end:${value}`));
+
+  host = document.createElement('div');
+  host.style.width = `${HOST_WIDTH_PX}px`;
+  document.body.append(host);
+  root = createRoot(host);
+
+  await act(() => {
+    root?.render(
+      <I18nextProvider i18n={i18n}>
+        <ChakraProvider value={system}>
+          <ControlledScrubber
+            defaultValue={50}
+            initial={initial}
+            label="Steps"
+            max={100}
+            min={0}
+            step={1}
+            onChange={onChange}
+            onChangeEnd={onChangeEnd}
+          />
+        </ChakraProvider>
+      </I18nextProvider>
+    );
+  });
+
+  const frame = host.querySelector<HTMLDivElement>('[data-scope="scrubber"]')!;
+  const slider = host.querySelector<HTMLDivElement>('[role="slider"]')!;
+
+  return { events, frame, onChangeEnd, slider };
+};
 
 const valueButton = () => host?.querySelector<HTMLButtonElement>('button[data-part="value"]') ?? null;
 const editor = () => host?.querySelector<HTMLInputElement>('input[data-part="value"]') ?? null;
@@ -487,5 +537,100 @@ describe('ScrubberField', () => {
     expect(described?.textContent).toBe('Too high');
     expect(described?.getAttribute('role')).toBe('alert');
     expect(frame.hasAttribute('data-invalid')).toBe(true);
+  });
+
+  describe('gesture end', () => {
+    it('ends a drag once with its final value on release, and not for a press that never moved', async () => {
+      const { events, frame } = await mountControlled(30);
+
+      await pointer(frame, 'pointerdown', { clientX: trackX(frame, 0.5) });
+      await pointer(window, 'pointerup', { clientX: trackX(frame, 0.5) });
+
+      expect(events).toEqual([]);
+
+      await pointer(frame, 'pointerdown', { clientX: trackX(frame, 0.5) });
+      await pointer(window, 'pointermove', { clientX: trackX(frame, 0.6) });
+      await pointer(window, 'pointermove', { clientX: trackX(frame, 0.7) });
+
+      expect(events).toEqual(['change:40', 'change:50']);
+
+      await pointer(window, 'pointercancel', { clientX: trackX(frame, 0.7) });
+
+      expect(events).toEqual(['change:40', 'change:50', 'end:50']);
+    });
+
+    it('still ends a drag that came back to where it started, so a preview can be reverted', async () => {
+      const { events, frame } = await mountControlled(30);
+
+      await pointer(frame, 'pointerdown', { clientX: trackX(frame, 0.5) });
+      await pointer(window, 'pointermove', { clientX: trackX(frame, 0.6) });
+      await pointer(window, 'pointermove', { clientX: trackX(frame, 0.5) });
+      await pointer(window, 'pointerup', { clientX: trackX(frame, 0.5) });
+
+      expect(events).toEqual(['change:40', 'change:30', 'end:30']);
+    });
+
+    it('ends a held step key once on release, and a tapped key per tap', async () => {
+      const { events, slider } = await mountControlled(30);
+
+      await act(async () => {
+        slider.focus();
+        await userEvent.keyboard('{ArrowRight>3/}');
+      });
+
+      expect(events).toEqual(['change:31', 'change:32', 'change:33', 'end:33']);
+
+      events.length = 0;
+      await act(() => userEvent.keyboard('{ArrowLeft}{ArrowLeft}'));
+
+      expect(events).toEqual(['change:32', 'end:32', 'change:31', 'end:31']);
+    });
+
+    it('ends a held key when focus leaves before the key is released', async () => {
+      const { events, slider } = await mountControlled(30);
+
+      await act(async () => {
+        slider.focus();
+        await userEvent.keyboard('{ArrowUp>2}');
+      });
+
+      expect(events).toEqual(['change:31', 'change:32']);
+
+      await act(() => slider.blur());
+
+      expect(events).toEqual(['change:31', 'change:32', 'end:32']);
+      await act(() => userEvent.keyboard('{/ArrowUp}'));
+      expect(events).toHaveLength(3);
+    });
+
+    it('ends typed values and resets immediately, and nothing that changed no value', async () => {
+      const { events, frame, slider } = await mountControlled(30);
+
+      await act(async () => {
+        slider.focus();
+        await userEvent.keyboard('{Enter}');
+      });
+      await act(() => userEvent.keyboard('75{Enter}'));
+      await act(() => frame.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, clientX: trackX(frame, 0.5) })));
+      await act(() => userEvent.keyboard('{Backspace}{Enter}50{Enter}'));
+
+      expect(events).toEqual(['change:75', 'end:75', 'change:50', 'end:50']);
+    });
+
+    it('ends an unfinished drag when the field unmounts', async () => {
+      const { events, frame } = await mountControlled(30);
+
+      await pointer(frame, 'pointerdown', { clientX: trackX(frame, 0.5) });
+      await pointer(window, 'pointermove', { clientX: trackX(frame, 0.75) });
+      await act(() => root?.unmount());
+      root = null;
+
+      expect(events).toEqual(['change:55', 'end:55']);
+
+      await pointer(window, 'pointermove', { clientX: trackX(frame, 0.9) });
+      await pointer(window, 'pointerup', { clientX: trackX(frame, 0.9) });
+
+      expect(events).toEqual(['change:55', 'end:55']);
+    });
   });
 });

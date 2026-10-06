@@ -1,24 +1,27 @@
-import type { NumberInput as ChakraNumberInput, SelectValueChangeDetails } from '@chakra-ui/react';
+import type { SelectHighlightChangeDetails, SelectOpenChangeDetails, SelectValueChangeDetails } from '@chakra-ui/react';
 import type { CanvasBlendMode, CanvasDocumentContractV3, CanvasNodeContract } from '@workbench/canvas-engine/api';
 import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
-import { createListCollection, Flex, HStack, NumberInput } from '@chakra-ui/react';
+import { createListCollection, Flex } from '@chakra-ui/react';
 import { Select } from '@platform/ui';
+import { ScrubberField } from '@platform/ui/ScrubberField';
 import { getDocumentIndex, isGroupNode } from '@workbench/canvas-engine/api';
 import { useCanvasDocumentEditingLocked } from '@workbench/widgets/canvas/engineStoreHooks';
-import { usePreparedCommit, useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
+import { useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
 import { CANVAS_BLEND_MODES } from '@workbench/widgets/layers/layerOps';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type LayerBlendRowEngine = Pick<CanvasEngineHandle, 'document' | 'exports' | 'interaction' | 'layers' | 'projectId'>;
 
 const SELECT_POSITIONING = { placement: 'bottom-start', sameWidth: true } as const;
 const BLEND_TRIGGER_PROPS = { fontSize: 'md', h: 'control.md', minH: 'control.md' } as const;
-const OPACITY_INPUT_PROPS = { fontSize: 'md', h: 'control.md' } as const;
+// The controls share a row only when each keeps this width: a narrower scrubber would run its thumb through its
+// label and value, so typical panel widths give opacity its own full-width row.
+const CONTROL_FLEX = '1 1 11rem';
 
-const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
+const formatPercent = (value: number): string => `${value}%`;
 
 // Reference equality is exact: the document index hands back the same node
 // object until the node itself changes. A raster-stack GROUP is a valid target
@@ -45,9 +48,10 @@ export const LayerBlendRow = ({ engine }: { engine: LayerBlendRowEngine | null }
   const editingLocked = useCanvasDocumentEditingLocked(engine);
 
   return (
-    <Flex align="center" flexShrink={0} gap="1.5" mx="1.5">
-      <BlendModeControl editingLocked={editingLocked} engine={engine} layer={layer} />
-      <OpacityRow editingLocked={editingLocked} engine={engine} layer={layer} />
+    <Flex align="center" columnGap="1.5" flexShrink={0} flexWrap="wrap" mx="1.5" rowGap="1">
+      {/* Keyed by layer: a selection change closes the menu and ends the outgoing layer's preview. */}
+      <BlendModeControl key={layer?.id ?? ''} editingLocked={editingLocked} engine={engine} layer={layer} />
+      <OpacityField editingLocked={editingLocked} engine={engine} layer={layer} />
     </Flex>
   );
 };
@@ -57,6 +61,19 @@ interface BlendModeOption {
   value: CanvasBlendMode;
 }
 
+/** An open menu's preview: its layer, the mode the menu opened on, and whether a preview has been applied. */
+interface BlendPreview {
+  readonly id: string;
+  readonly original: CanvasBlendMode;
+  previewed: boolean;
+}
+
+const blendModeOf = (layer: CanvasNodeContract | null): CanvasBlendMode => layer?.blendMode ?? 'normal';
+
+/**
+ * Highlighting an option (hover or arrow keys) previews its mode unrecorded. Choosing one records a single step from
+ * the mode the menu opened on; closing without a choice or unmounting restores that mode.
+ */
 const BlendModeControl = ({
   editingLocked,
   engine,
@@ -66,10 +83,14 @@ const BlendModeControl = ({
   engine: LayerBlendRowEngine | null;
   layer: CanvasNodeContract | null;
 }) => {
-  const commitPrepared = usePreparedCommit(engine);
+  const { cancel: cancelPreview, commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const { t } = useTranslation();
+  // The ref serves handlers within one event; the state pins what the closed trigger and checked item show.
+  const previewRef = useRef<BlendPreview | null>(null);
+  const [openedOn, setOpenedOn] = useState<CanvasBlendMode | null>(null);
   const disabled = isLayerEditingDisabled(layer, editingLocked);
-  const blendMode = layer?.blendMode ?? 'normal';
+  // While open the document carries the previewed mode; the control keeps naming the committed one.
+  const shownMode = openedOn ?? blendModeOf(layer);
   const blendCollection = useMemo(
     () =>
       createListCollection<BlendModeOption>({
@@ -77,39 +98,97 @@ const BlendModeControl = ({
       }),
     [t]
   );
-  const blendValue = useMemo(() => [blendMode], [blendMode]);
+  const blendValue = useMemo(() => [shownMode], [shownMode]);
+
+  const endPreview = useCallback(() => {
+    const session = previewRef.current;
+    previewRef.current = null;
+    if (session?.previewed) {
+      cancelPreview({ id: session.id, patch: { blendMode: session.original }, type: 'updateCanvasLayer' });
+    }
+  }, [cancelPreview]);
+
+  const handleOpenChange = useCallback(
+    ({ open }: SelectOpenChangeDetails) => {
+      endPreview();
+      if (open && layer) {
+        previewRef.current = { id: layer.id, original: blendModeOf(layer), previewed: false };
+      }
+      setOpenedOn(open && layer ? blendModeOf(layer) : null);
+    },
+    [endPreview, layer]
+  );
+
+  // Leaving every option clears the highlight, which shows the original again.
+  const handleHighlightChange = useCallback(
+    ({ highlightedValue }: SelectHighlightChangeDetails<BlendModeOption>) => {
+      const session = previewRef.current;
+      if (!session) {
+        return;
+      }
+      const mode = (highlightedValue as CanvasBlendMode | null) ?? session.original;
+      if (!session.previewed && mode === session.original) {
+        return;
+      }
+      if (previewStructural({ id: session.id, patch: { blendMode: mode }, type: 'updateCanvasLayer' })) {
+        session.previewed = true;
+      }
+    },
+    [previewStructural]
+  );
 
   const handleBlendChange = useCallback(
     ({ value }: SelectValueChangeDetails<BlendModeOption>) => {
       const mode = value[0] as CanvasBlendMode | undefined;
-      if (!layer || !mode || mode === (layer.blendMode ?? 'normal')) {
+      const session = previewRef.current;
+      const id = session?.id ?? layer?.id;
+      const original = session ? session.original : blendModeOf(layer);
+      if (!id || !mode || mode === original) {
+        endPreview();
         return;
       }
+      previewRef.current = null;
       commitPrepared(t('widgets.layers.actions.blendMode'), (model) =>
-        model.prepare({ id: layer.id, patch: { blendMode: mode }, type: 'patch' })
+        model.prepare({ before: { blendMode: original }, id, patch: { blendMode: mode }, type: 'patch' })
       );
     },
-    [commitPrepared, layer, t]
+    [commitPrepared, endPreview, layer, t]
+  );
+
+  const endPreviewOnUnmount = useCallback(
+    (node: HTMLDivElement | null) => (node ? endPreview : undefined),
+    [endPreview]
   );
 
   return (
-    <Select
-      aria-label={t('widgets.layers.actions.blendMode')}
-      collection={blendCollection}
-      disabled={disabled}
-      flex="1"
-      itemsMaxH="16rem"
-      minW="0"
-      positioning={SELECT_POSITIONING}
-      triggerProps={BLEND_TRIGGER_PROPS}
-      value={blendValue}
-      valueText={t(`widgets.layers.blendModes.${blendMode}`)}
-      onValueChange={handleBlendChange}
-    />
+    <Flex ref={endPreviewOnUnmount} flex={CONTROL_FLEX} minW="0">
+      <Select
+        aria-label={t('widgets.layers.actions.blendMode')}
+        collection={blendCollection}
+        disabled={disabled}
+        flex="1"
+        itemsMaxH="16rem"
+        minW="0"
+        positioning={SELECT_POSITIONING}
+        triggerProps={BLEND_TRIGGER_PROPS}
+        value={blendValue}
+        valueText={t(`widgets.layers.blendModes.${shownMode}`)}
+        onHighlightChange={handleHighlightChange}
+        onOpenChange={handleOpenChange}
+        onValueChange={handleBlendChange}
+      />
+    </Flex>
   );
 };
 
-const OpacityRow = ({
+/** Where an opacity gesture started and the latest value it previewed; it records one step when it ends. */
+interface OpacityGesture {
+  readonly id: string;
+  readonly before: number;
+  latest: number;
+}
+
+const OpacityField = ({
   editingLocked,
   engine,
   layer,
@@ -118,102 +197,68 @@ const OpacityRow = ({
   engine: LayerBlendRowEngine | null;
   layer: CanvasNodeContract | null;
 }) => {
-  const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
+  const { cancel: cancelPreview, commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const { t } = useTranslation();
-  // Capture original opacity once and track latest writes outside render closures so same-event commits record
-  // current values.
-  const pendingRef = useRef<{ id: string; before: number; latest: number } | null>(null);
+  // Outside render closures: a drag keeps the handlers it started with.
+  const gestureRef = useRef<OpacityGesture | null>(null);
   const disabled = isLayerEditingDisabled(layer, editingLocked);
-  const opacityPercent = useMemo(() => String(Math.round((layer?.opacity ?? 1) * 100)), [layer?.opacity]);
+  const opacityPercent = Math.round((layer?.opacity ?? 1) * 100);
 
-  // Record one history entry per completed opacity gesture.
-  const commitPending = useCallback(() => {
-    const pending = pendingRef.current;
-    pendingRef.current = null;
-    if (!pending || pending.before === pending.latest) {
+  const settleGesture = useCallback(() => {
+    const gesture = gestureRef.current;
+    gestureRef.current = null;
+    if (!gesture) {
+      return;
+    }
+    if (gesture.before === gesture.latest) {
+      cancelPreview({ id: gesture.id, patch: { opacity: gesture.before }, type: 'updateCanvasLayer' });
       return;
     }
     commitPrepared(t('widgets.layers.actions.opacity'), (model) =>
       model.prepare({
-        before: { opacity: pending.before },
-        id: pending.id,
-        patch: { opacity: pending.latest },
+        before: { opacity: gesture.before },
+        id: gesture.id,
+        patch: { opacity: gesture.latest },
         type: 'patch',
       })
     );
-  }, [commitPrepared, t]);
+  }, [cancelPreview, commitPrepared, t]);
 
   const handleOpacityChange = useCallback(
-    ({ valueAsNumber }: ChakraNumberInput.ValueChangeDetails) => {
-      if (!layer || !Number.isFinite(valueAsNumber)) {
+    (percent: number) => {
+      if (!layer) {
         return;
       }
-      // If a pending edit belongs to a previously selected layer, flush it first
-      // so its history entry is never attributed to the new layer.
-      if (pendingRef.current && pendingRef.current.id !== layer.id) {
-        commitPending();
+      // A gesture still open on a previously selected layer lands there before this one starts.
+      if (gestureRef.current && gestureRef.current.id !== layer.id) {
+        settleGesture();
       }
-      const next = clamp01(valueAsNumber / 100);
-      if (
-        !previewStructural({
-          id: layer.id,
-          patch: { opacity: next },
-          type: 'updateCanvasLayer',
-        })
-      ) {
+      const next = percent / 100;
+      if (!previewStructural({ id: layer.id, patch: { opacity: next }, type: 'updateCanvasLayer' })) {
         return;
       }
-      if (pendingRef.current === null) {
-        pendingRef.current = { before: layer.opacity ?? 1, id: layer.id, latest: next };
+      if (gestureRef.current === null) {
+        gestureRef.current = { before: layer.opacity ?? 1, id: layer.id, latest: next };
       } else {
-        pendingRef.current.latest = next;
+        gestureRef.current.latest = next;
       }
     },
-    [commitPending, previewStructural, layer]
-  );
-
-  // Commit on spinner release, arrow/page-key release, Enter, or typed-value blur.
-  const handleInputKeyUp = useCallback(
-    (event: { key: string }) => {
-      if (['ArrowDown', 'ArrowUp', 'End', 'Enter', 'Home', 'PageDown', 'PageUp'].includes(event.key)) {
-        commitPending();
-      }
-    },
-    [commitPending]
-  );
-
-  // Flush a still-pending edit if the row unmounts mid-gesture (e.g. the panel
-  // closes right after a spinner click) so the edit is never lost to history.
-  const flushOnUnmountRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      if (node) {
-        return () => commitPending();
-      }
-      return undefined;
-    },
-    [commitPending]
+    [layer, previewStructural, settleGesture]
   );
 
   return (
-    <HStack ref={flushOnUnmountRef} flexShrink={0} gap="2">
-      <NumberInput.Root
-        disabled={disabled}
-        max={100}
-        min={0}
-        size="lg"
-        step={1}
-        value={opacityPercent}
-        w="16"
-        onValueChange={handleOpacityChange}
-      >
-        <NumberInput.Control onClick={commitPending} />
-        <NumberInput.Input
-          aria-label={t('widgets.layers.actions.opacity')}
-          css={OPACITY_INPUT_PROPS}
-          onBlur={commitPending}
-          onKeyUp={handleInputKeyUp}
-        />
-      </NumberInput.Root>
-    </HStack>
+    <ScrubberField
+      defaultValue={100}
+      disabled={disabled}
+      flex={CONTROL_FLEX}
+      formatValue={formatPercent}
+      label={t('widgets.layers.actions.opacity')}
+      max={100}
+      min={0}
+      step={1}
+      value={opacityPercent}
+      onChange={handleOpacityChange}
+      onChangeEnd={settleGesture}
+    />
   );
 };

@@ -1,4 +1,4 @@
-import type { SelectValueChangeDetails, SliderValueChangeDetails } from '@chakra-ui/react';
+import type { SelectValueChangeDetails } from '@chakra-ui/react';
 import type { ModelConfig } from '@features/models';
 import type {
   CanvasRegionalGuidanceLayerContract,
@@ -21,7 +21,8 @@ import {
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
-import { Button, DropZone, Field, Select, Slider } from '@platform/ui';
+import { Button, DropZone, Field, Select } from '@platform/ui';
+import { ScrubberField } from '@platform/ui/ScrubberField';
 import { useQueryClient } from '@tanstack/react-query';
 import { type CanvasPreparedEngine, usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useWorkbenchCommands } from '@workbench/WorkbenchContext';
@@ -29,6 +30,7 @@ import { ImageIcon, UploadIcon, XIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { DEFAULT_REGIONAL_REFERENCE_WEIGHT } from './layerOps';
 import { useSelectedModelBase } from './useSelectedModelBase';
 
 /**
@@ -295,24 +297,15 @@ const ReferenceImageEditor = ({
     [config, referenceImage, replaceRef]
   );
 
+  // The weight is not previewed on the canvas, so a gesture shows locally and records once when it ends.
   const [liveWeight, setLiveWeight] = useState<number | null>(null);
 
-  const handleWeight = useCallback(({ value }: SliderValueChangeDetails) => {
-    const next = value[0];
-    if (next === undefined || !Number.isFinite(next)) {
-      return;
-    }
-    setLiveWeight(next);
-  }, []);
-
   const handleWeightEnd = useCallback(
-    ({ value }: SliderValueChangeDetails) => {
-      const next = value[0];
+    (next: number) => {
       setLiveWeight(null);
-      if (config.type !== 'ip_adapter' || next === undefined || !Number.isFinite(next)) {
-        return;
+      if (config.type === 'ip_adapter' && next !== config.weight) {
+        replaceRef({ ...referenceImage, config: { ...config, weight: next } });
       }
-      replaceRef({ ...referenceImage, config: { ...config, weight: next } });
     },
     [config, referenceImage, replaceRef]
   );
@@ -331,11 +324,7 @@ const ReferenceImageEditor = ({
     [config]
   );
   const methodValue = useMemo(() => (config.type === 'ip_adapter' ? [config.method] : []), [config]);
-  const weightValue = useMemo(
-    () => (liveWeight !== null ? [liveWeight] : config.type === 'ip_adapter' ? [config.weight] : [1]),
-    [config, liveWeight]
-  );
-  const weightAria = useMemo(() => [t('widgets.layers.regionalGuidance.weight')], [t]);
+  const weight = liveWeight ?? (config.type === 'ip_adapter' ? config.weight : DEFAULT_REGIONAL_REFERENCE_WEIGHT);
 
   const image = config.image;
   const modelName =
@@ -427,19 +416,17 @@ const ReferenceImageEditor = ({
               onValueChange={handleMethod}
             />
           </Field>
-          <Field label={t('widgets.layers.regionalGuidance.weight')}>
-            <Slider
-              aria-label={weightAria}
-              formatValue={formatWeight}
-              max={2}
-              min={-1}
-              step={0.01}
-              value={weightValue}
-              withThumbTooltip
-              onValueChange={handleWeight}
-              onValueChangeEnd={handleWeightEnd}
-            />
-          </Field>
+          <ScrubberField
+            defaultValue={DEFAULT_REGIONAL_REFERENCE_WEIGHT}
+            formatValue={formatWeight}
+            label={t('widgets.layers.regionalGuidance.weight')}
+            max={2}
+            min={-1}
+            step={0.01}
+            value={weight}
+            onChange={setLiveWeight}
+            onChangeEnd={handleWeightEnd}
+          />
         </>
       ) : config.type === 'flux_redux' ? (
         <FluxReduxControls config={config} disabled={false} onChange={handleFluxReduxConfig} />

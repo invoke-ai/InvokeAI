@@ -1,8 +1,4 @@
-import type {
-  NumberInput as ChakraNumberInput,
-  SelectValueChangeDetails,
-  SliderValueChangeDetails,
-} from '@chakra-ui/react';
+import type { SelectValueChangeDetails, SliderValueChangeDetails } from '@chakra-ui/react';
 import type { ArchitectureCapabilitiesSnapshot } from '@features/generation/runtime';
 import type {
   CanvasControlAdapterContract,
@@ -12,7 +8,7 @@ import type {
 import type { LayerFilterOperationEngine } from '@workbench/widgets/layers/LayerFilterOperationButton';
 import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps';
 
-import { createListCollection, HStack, NumberInput, Stack, Switch, Text } from '@chakra-ui/react';
+import { createListCollection, HStack, Stack, Switch, Text } from '@chakra-ui/react';
 import {
   CONTROL_ADAPTER_KINDS,
   getControlModelUnusableReason,
@@ -29,8 +25,9 @@ import { useModelsSelector } from '@features/models';
 import { focusFirstOperable } from '@platform/react/focusIfUnclaimed';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Button, Field, Select, Slider } from '@platform/ui';
+import { ScrubberField } from '@platform/ui/ScrubberField';
 import { getCanvasOperations, resolveDefaultFilterForModel } from '@workbench/canvas-operations/api';
-import { CONTROL_KIND_BASE } from '@workbench/controlAdapters';
+import { CONTROL_ADAPTER_DEFAULTS, CONTROL_KIND_BASE } from '@workbench/controlAdapters';
 import { describeControlLayerReason, getControlLayerReasonInSequence } from '@workbench/controlLayerChecks';
 import { useCanvasEngineRead } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
@@ -71,7 +68,7 @@ interface ControlLayerSettingsProps {
 /** Edit adapters through canvas undo; utility-queue filter previews leave the document untouched until Apply. */
 export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: ControlLayerSettingsProps) => {
   const { t } = useTranslation();
-  const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
+  const { cancel: cancelPreview, commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const models = useModelsSelector((snapshot) => snapshot.models);
   const mainModel = useSelectedMainModel();
   const base = mainModel?.base ?? null;
@@ -228,52 +225,40 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
     [adapter.controlMode, commitAdapter, t]
   );
 
+  // Where a weight gesture started; outside render closures because a drag keeps the handlers it started with.
   const weightBeforeRef = useRef<number | null>(null);
   const handleWeightChange = useCallback(
-    ({ value }: SliderValueChangeDetails) => {
-      const next = value[0];
-      if (next === undefined || !Number.isFinite(next)) {
-        return;
-      }
+    (next: number) => {
       if (
-        !previewStructural({
+        previewStructural({
           config: { adapter: { weight: next }, layerType: 'control' },
           id: layer.id,
           type: 'updateCanvasLayerConfig',
         })
       ) {
-        return;
-      }
-      if (weightBeforeRef.current === null) {
-        weightBeforeRef.current = adapter.weight;
+        weightBeforeRef.current ??= adapter.weight;
       }
     },
     [adapter.weight, previewStructural, layer.id]
   );
   const handleWeightChangeEnd = useCallback(
-    ({ value }: SliderValueChangeDetails) => {
-      const next = value[0];
-      const before = weightBeforeRef.current ?? adapter.weight;
+    (next: number) => {
+      const before = weightBeforeRef.current;
       weightBeforeRef.current = null;
-      if (next === undefined || !Number.isFinite(next)) {
+      if (before === null) {
+        return;
+      }
+      if (next === before) {
+        cancelPreview({
+          config: { adapter: { weight: before }, layerType: 'control' },
+          id: layer.id,
+          type: 'updateCanvasLayerConfig',
+        });
         return;
       }
       commitAdapter({ weight: next }, { weight: before }, t('widgets.layers.control.weight'));
     },
-    [adapter.weight, commitAdapter, t]
-  );
-  const handleWeightInputChange = useCallback(
-    ({ valueAsNumber }: ChakraNumberInput.ValueChangeDetails) => {
-      if (
-        !Number.isFinite(valueAsNumber) ||
-        valueAsNumber < weightInputMin ||
-        valueAsNumber > CONTROL_WEIGHT_BOUNDS.inputMax
-      ) {
-        return;
-      }
-      commitAdapter({ weight: valueAsNumber }, { weight: adapter.weight }, t('widgets.layers.control.weight'));
-    },
-    [adapter.weight, commitAdapter, t, weightInputMin]
+    [cancelPreview, commitAdapter, layer.id, t]
   );
 
   const rangeBeforeRef = useRef<[number, number] | null>(null);
@@ -338,13 +323,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
   const kindValue = useMemo(() => [adapter.kind], [adapter.kind]);
   const modelValue = useMemo(() => (adapter.model ? [adapter.model] : []), [adapter.model]);
   const controlModeValue = useMemo(() => [adapter.controlMode ?? 'balanced'], [adapter.controlMode]);
-  const weightValue = useMemo(
-    () => [Math.min(CONTROL_WEIGHT_BOUNDS.sliderMax, Math.max(CONTROL_WEIGHT_BOUNDS.sliderMin, adapter.weight))],
-    [adapter.weight]
-  );
-  const weightInputValue = String(adapter.weight);
   const rangeValue = useMemo(() => [...adapter.beginEndStepPct], [adapter.beginEndStepPct]);
-  const weightAria = useMemo(() => [t('widgets.layers.control.weight')], [t]);
   const rangeAria = useMemo(() => [t('widgets.layers.control.beginStep'), t('widgets.layers.control.endStep')], [t]);
 
   // The catalog name, not the filtered options: an unusable model still needs a name for the alert to refer to.
@@ -425,33 +404,19 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
           onValueChange={handleModelChange}
         />
       </Field>
-      <Field label={t('widgets.layers.control.weight')}>
-        <HStack gap="2">
-          <Slider
-            aria-label={weightAria}
-            flex="1"
-            formatValue={formatWeight}
-            max={CONTROL_WEIGHT_BOUNDS.sliderMax}
-            min={CONTROL_WEIGHT_BOUNDS.sliderMin}
-            step={CONTROL_WEIGHT_BOUNDS.step}
-            value={weightValue}
-            withThumbTooltip
-            onValueChange={handleWeightChange}
-            onValueChangeEnd={handleWeightChangeEnd}
-          />
-          <NumberInput.Root
-            max={CONTROL_WEIGHT_BOUNDS.inputMax}
-            min={weightInputMin}
-            step={CONTROL_WEIGHT_BOUNDS.step}
-            value={weightInputValue}
-            w="20"
-            onValueChange={handleWeightInputChange}
-          >
-            <NumberInput.Control />
-            <NumberInput.Input aria-label={t('widgets.layers.control.weight')} />
-          </NumberInput.Root>
-        </HStack>
-      </Field>
+      <ScrubberField
+        defaultValue={CONTROL_ADAPTER_DEFAULTS[adapter.kind].weight}
+        formatValue={formatWeight}
+        inputMax={CONTROL_WEIGHT_BOUNDS.inputMax}
+        inputMin={weightInputMin}
+        label={t('widgets.layers.control.weight')}
+        max={CONTROL_WEIGHT_BOUNDS.sliderMax}
+        min={CONTROL_WEIGHT_BOUNDS.sliderMin}
+        step={CONTROL_WEIGHT_BOUNDS.step}
+        value={adapter.weight}
+        onChange={handleWeightChange}
+        onChangeEnd={handleWeightChangeEnd}
+      />
       <Field label={t('widgets.layers.control.stepRange')}>
         <Slider
           aria-label={rangeAria}

@@ -17,6 +17,7 @@ import { act, useMemo, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import { type AdjustmentsEngine, AdjustmentSettings } from './AdjustmentSettings';
 import { CURVE_SIZE } from './curveEditorMath';
@@ -152,7 +153,7 @@ const centreOf = (element: Element): { x: number; y: number } => {
   return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
 };
 
-const pointer = (target: Element, type: string, x: number, y: number): void => {
+const pointer = (target: EventTarget, type: string, x: number, y: number): void => {
   target.dispatchEvent(
     new PointerEvent(type, { bubbles: true, button: 0, clientX: x, clientY: y, isPrimary: true, pointerId: 1 })
   );
@@ -178,37 +179,96 @@ const pressTrack = async (track: HTMLElement, fraction: number): Promise<void> =
   await settle(() => pointer(track, 'pointerup', x, y));
 };
 
+/** The scrubber whose visible label reads `label` (the harness renders raw i18n keys). */
+const scrubber = (label: string): HTMLElement => {
+  const frame = [...host!.querySelectorAll<HTMLElement>('[data-scope="scrubber"]')].find(
+    (candidate) => candidate.querySelector('[data-part="label"]')?.textContent === label
+  );
+  if (!frame) {
+    throw new Error(`No scrubber labelled ${label}`);
+  }
+  return frame;
+};
+
+/** One drag on a scrubber through each offset (fractions of its track), released at the last. */
+const scrub = async (frame: HTMLElement, offsets: number[]): Promise<void> => {
+  const rect = frame.getBoundingClientRect();
+  const startX = rect.left + rect.width / 2;
+  const y = rect.top + rect.height / 2;
+  // The track is inset 10px from each edge of the frame.
+  const xAt = (offset: number): number => startX + offset * (rect.width - 20);
+  await settle(() => pointer(frame, 'pointerdown', startX, y));
+  for (const offset of offsets) {
+    await settle(() => pointer(window, 'pointermove', xAt(offset), y));
+  }
+  await settle(() => pointer(window, 'pointerup', xAt(offsets.at(-1) ?? 0), y));
+};
+
+const inverseEntries = (edit: PreparedDocumentEdit): unknown =>
+  (edit.inverse as unknown as { config: { adjustments?: unknown } }).config.adjustments;
+
 const forwardEntries = (edit: PreparedDocumentEdit): CanvasAdjustmentEntry[] =>
   (edit.forward as unknown as { config: { adjustments: CanvasAdjustmentEntry[] } }).config.adjustments;
 
 describe('group-owned adjustment editors', () => {
   it('previews and commits through the group config arm', async () => {
     await render('hue1', 'group');
-    const [track] = sliderTracks();
-    expect(track).toBeDefined();
-    await pressTrack(track!, 0.75);
+    await scrub(scrubber('widgets.layers.adjustments.hue'), [0.25]);
 
     expect(commits).toHaveLength(1);
     const forward = commits[0]!.forward as unknown as { config: { layerType: string }; id: string };
     expect(forward.config.layerType).toBe('group');
     expect(forward.id).toBe('group-1');
-    expect((forwardEntries(commits[0]!)[2] as { rotation: number }).rotation).toBeCloseTo(90, -1);
+    expect((forwardEntries(commits[0]!)[2] as { rotation: number }).rotation).toBe(90);
   });
 });
 
-describe('hue and levels editors', () => {
-  it('commits a hue rotation as one whole-stack patch', async () => {
+describe('scalar and levels editors', () => {
+  it('previews every step of a hue drag and records the drag as one whole-stack patch', async () => {
     await render('hue1');
-    const [track] = sliderTracks();
-    expect(track).toBeDefined();
-    await pressTrack(track!, 0.75);
+    const hue = scrubber('widgets.layers.adjustments.hue');
+    const rect = hue.getBoundingClientRect();
+    const startX = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    const trackWidth = rect.width - 20;
+
+    await settle(() => pointer(hue, 'pointerdown', startX, y));
+    await settle(() => pointer(window, 'pointermove', startX + trackWidth * 0.1, y));
+    await settle(() => pointer(window, 'pointermove', startX + trackWidth * 0.25, y));
+
+    expect(commits).toHaveLength(0);
+    expect((latestAdjustments as CanvasAdjustmentEntry[])[2]).toMatchObject({ id: 'hue1', rotation: 90 });
+
+    await settle(() => pointer(window, 'pointerup', startX + trackWidth * 0.25, y));
 
     expect(commits).toHaveLength(1);
     const forward = forwardEntries(commits[0]!);
-    expect(forward[2]).toMatchObject({ id: 'hue1', type: 'hue' });
-    expect((forward[2] as { rotation: number }).rotation).toBeCloseTo(90, -1);
-    // Untouched siblings ride along unchanged.
+    expect(forward[2]).toMatchObject({ id: 'hue1', rotation: 90, type: 'hue' });
+    // Untouched siblings ride along unchanged, and undo returns to the stack before the drag.
     expect(forward[0]).toEqual(initialEntries()[0]);
+    expect(inverseEntries(commits[0]!)).toEqual(initialEntries());
+  });
+
+  it('records a held arrow key as one step in stored units', async () => {
+    await render('bc1');
+    const slider = scrubber('widgets.layers.adjustments.brightness').querySelector<HTMLElement>('[role="slider"]')!;
+
+    await act(async () => {
+      slider.focus();
+      await userEvent.keyboard('{ArrowRight>3/}');
+    });
+
+    expect(commits).toHaveLength(1);
+    expect(forwardEntries(commits[0]!)[0]).toMatchObject({ brightness: 0.13, contrast: 0, id: 'bc1' });
+    expect(inverseEntries(commits[0]!)).toEqual(initialEntries());
+  });
+
+  it('records nothing and restores the stack when a scrub ends where it started', async () => {
+    await render('hue1');
+    await scrub(scrubber('widgets.layers.adjustments.hue'), [0.25, 0]);
+
+    expect(commits).toHaveLength(0);
+    expect(latestAdjustments).toEqual(initialEntries());
   });
 
   it('commits a channel scope change as one whole-stack patch keeping the remap values', async () => {
@@ -230,8 +290,9 @@ describe('hue and levels editors', () => {
 
   it('commits a levels input-range change while the other fields keep their values', async () => {
     await render('lv1');
+    // Input and output ranges keep two-thumb sliders; gamma is a scrubber.
     const tracks = sliderTracks();
-    expect(tracks).toHaveLength(3);
+    expect(tracks).toHaveLength(2);
     await pressTrack(tracks[0]!, 0.25);
 
     expect(commits).toHaveLength(1);
