@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { firstPartyHotkeyCatalog, OPEN_COMMAND_PALETTE_HOTKEY } from './catalog';
+import {
+  firstPartyHotkeyCatalog,
+  getRegionFocusDefaultKey,
+  OPEN_COMMAND_PALETTE_HOTKEY,
+  regionFocusHotkeys,
+} from './catalog';
+import { IS_MAC_OS } from './keys';
 
 describe('firstPartyHotkeyCatalog', () => {
   it('keeps legacy default hotkey parity', () => {
@@ -46,6 +52,16 @@ describe('firstPartyHotkeyCatalog', () => {
     const saveLayout = firstPartyHotkeyCatalog.find((hotkey) => hotkey.id === 'app.saveLayoutPreset');
 
     expect(saveLayout).toMatchObject({ allowInEditable: false, defaultKeys: [] });
+  });
+
+  // Option+Shift+Arrow selects by word or paragraph in macOS text fields, where region focus must still be reachable.
+  it('moves region focus with Control+Shift+Arrow on macOS and Alt+Shift+Arrow elsewhere', () => {
+    expect(getRegionFocusDefaultKey('left', true)).toBe('ctrl+shift+arrowleft');
+    expect(getRegionFocusDefaultKey('down', false)).toBe('alt+shift+arrowdown');
+    expect(regionFocusHotkeys.map((hotkey) => hotkey.defaultKeys)).toEqual(
+      (['left', 'right', 'up', 'down'] as const).map((direction) => [getRegionFocusDefaultKey(direction, IS_MAC_OS)])
+    );
+    expect(regionFocusHotkeys.every((hotkey) => hotkey.allowInEditable)).toBe(true);
   });
 
   // Cmd+Space is Spotlight on macOS; a modified Space on the focused thumbnail toggles it without a hotkey.

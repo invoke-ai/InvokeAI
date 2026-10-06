@@ -48,6 +48,7 @@ vi.mock('@workbench/projects/api', async (importOriginal) => ({
   setClientStateValue: () => Promise.resolve(),
 }));
 
+import { IS_MAC_OS } from './keys';
 import { WorkbenchHotkeyRuntime } from './WorkbenchHotkeyRuntime';
 
 const positions = {
@@ -104,6 +105,9 @@ let queryClient: QueryClient;
 const project = () => runtime.store.getSnapshot().activeProject;
 const regionElement = (region: WidgetRegion) => host.querySelector<HTMLElement>(`[data-focus-region="${region}"]`)!;
 const press = (keys: string) => act(() => userEvent.keyboard(keys));
+/** The default region-focus chord: Control+Shift+Arrow on macOS, Alt+Shift+Arrow elsewhere. */
+const regionChord = (arrow: string) =>
+  IS_MAC_OS ? `{Control>}{Shift>}{${arrow}}{/Shift}{/Control}` : `{Alt>}{Shift>}{${arrow}}{/Shift}{/Alt}`;
 const focusRegion = (region: WidgetRegion) => act(() => regionElement(region).focus());
 const expectFocusedRegion = (region: WidgetRegion) =>
   vi.waitFor(() => {
@@ -169,28 +173,28 @@ afterEach(async () => {
 it('moves between visible regions in all four directions, preserving widget selections', async () => {
   const before = project();
   await focusRegion('left');
-  await press('{Alt>}{Shift>}{ArrowRight}{/Shift}{/Alt}');
+  await press(regionChord('ArrowRight'));
   await expectFocusedRegion('center');
   expect(getComputedStyle(regionElement('center')).outlineStyle).toBe('none');
-  await press('{Alt>}{Shift>}{ArrowRight}{/Shift}{/Alt}');
+  await press(regionChord('ArrowRight'));
   await expectFocusedRegion('right');
-  await press('{Alt>}{Shift>}{ArrowLeft}{/Shift}{/Alt}');
+  await press(regionChord('ArrowLeft'));
   await expectFocusedRegion('center');
-  await press('{Alt>}{Shift>}{ArrowDown}{/Shift}{/Alt}');
+  await press(regionChord('ArrowDown'));
   await expectFocusedRegion('bottom');
-  await press('{Alt>}{Shift>}{ArrowUp}{/Shift}{/Alt}');
+  await press(regionChord('ArrowUp'));
   await expectFocusedRegion('center');
   expect(project()).toBe(before);
 });
 
 it('skips hidden regions, stops at edges, and enters the center without an initial target', async () => {
-  await press('{Alt>}{Shift>}{ArrowLeft}{/Shift}{/Alt}');
+  await press(regionChord('ArrowLeft'));
   await expectFocusedRegion('center');
   regionElement('center').style.display = 'none';
   await focusRegion('left');
-  await press('{Alt>}{Shift>}{ArrowRight}{/Shift}{/Alt}');
+  await press(regionChord('ArrowRight'));
   await expectFocusedRegion('right');
-  await press('{Alt>}{Shift>}{ArrowRight}{/Shift}{/Alt}');
+  await press(regionChord('ArrowRight'));
   await expectFocusedRegion('right');
 });
 
@@ -223,7 +227,7 @@ it('leaves normal Tab and arrow editing intact and navigates out of editable fie
   await press('{Shift>}{Tab}{/Shift}');
   expect(document.activeElement).toBe(textarea);
   expect(getComputedStyle(textarea).outlineStyle).not.toBe('none');
-  await press('{Alt>}{Shift>}{ArrowRight}{/Shift}{/Alt}');
+  await press(regionChord('ArrowRight'));
   await expectFocusedRegion('center');
   await act(() => patchWorkbenchPreferences({ showFocusRegionHighlight: false }));
   expect(getComputedStyle(regionElement('center')).outlineStyle).not.toBe('none');
@@ -233,7 +237,7 @@ it('respects modal suspension and custom bindings', async () => {
   await focusRegion('left');
   const release = registerModalPresence();
   try {
-    await press('{Alt>}{Shift>}{ArrowRight}{/Shift}{/Alt}');
+    await press(regionChord('ArrowRight'));
     await press('{Alt>}{PageDown}{/Alt}');
     await expectFocusedRegion('left');
     expect(project().widgetRegions.left.activeInstanceId).toBe('generate');
@@ -250,7 +254,7 @@ it('respects modal suspension and custom bindings', async () => {
   await press('{Alt>}{Shift>}w{/Shift}{/Alt}');
   expect(project().widgetRegions.left.activeInstanceId).toBe('generate-second');
   await expectFocusedRegion('left');
-  await press('{Alt>}{Shift>}{ArrowRight}{/Shift}{/Alt}');
+  await press(regionChord('ArrowRight'));
   await expectFocusedRegion('left');
   await press('{Alt>}{Shift>}n{/Shift}{/Alt}');
   await expectFocusedRegion('center');
@@ -263,7 +267,7 @@ it('does not cycle a floating window and can move from it to a docked region', a
   await press('{Alt>}{PageDown}{/Alt}');
   expect(project()).toBe(before);
   expect(document.activeElement).toBe(window);
-  await press('{Alt>}{Shift>}{ArrowRight}{/Shift}{/Alt}');
+  await press(regionChord('ArrowRight'));
   await expectFocusedRegion('right');
 });
 
@@ -273,10 +277,10 @@ it('can leave a floating window overlapping every visible docked region', async 
   window.style.width = '520px';
   regionElement('bottom').style.display = 'none';
   await act(() => window.focus());
-  await press('{Alt>}{Shift>}{ArrowRight}{/Shift}{/Alt}');
+  await press(regionChord('ArrowRight'));
   await expectFocusedRegion('right');
   await act(() => window.focus());
-  await press('{Alt>}{Shift>}{ArrowLeft}{/Shift}{/Alt}');
+  await press(regionChord('ArrowLeft'));
   await expectFocusedRegion('left');
 });
 
@@ -287,7 +291,7 @@ it('returns to the underlying dock when there is no region beyond the floating w
   }
   for (const key of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']) {
     await act(() => window.focus());
-    await press(`{Alt>}{Shift>}{${key}}{/Shift}{/Alt}`);
+    await press(regionChord(key));
     await expectFocusedRegion('center');
   }
 });
