@@ -3958,8 +3958,9 @@
         "moveUp": "Move up",
         "removeAdjustment": "Remove adjustment",
         "reorderAdjustment": "Reorder adjustment",
+        "moveAdjustment": "Move adjustment",
         "moveReferenceImage": "Move reference image",
-        "moveToLayer": "Move to “{{name}}”"
+        "moveToLayer": "Move to layer"
       }
     },
     "gallery": {

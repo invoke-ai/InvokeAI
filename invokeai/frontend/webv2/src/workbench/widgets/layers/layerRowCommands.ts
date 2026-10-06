@@ -43,7 +43,10 @@ export interface LayerRowCommands {
   renameChild(child: ProjectedChildRow, name: string | null): void;
   /** Ordered kinds only (adjustment entries): swap with the neighbour in `direction`. */
   moveChild(child: ProjectedChildRow, direction: -1 | 1): void;
-  /** Reference images only: append the item to another regional layer as one atomic edit. */
+  /**
+   * Reference images and adjustment entries: append the item to another layer holding its kind as one atomic edit;
+   * the item stays sub-selected and focused at its new row.
+   */
   moveChildToLayer(child: ProjectedChildRow, layerId: string): void;
   /** Ordered kinds only: insert a copy directly after the entry. */
   duplicateChild(child: ProjectedChildRow): void;
