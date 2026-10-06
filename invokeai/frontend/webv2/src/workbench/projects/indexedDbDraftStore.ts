@@ -93,7 +93,6 @@ export const createIndexedDbProjectDraftStore = (
 ): ProjectDraftStore => {
   let isClosed = false;
   let isUnavailable = false;
-  let isJournalUnavailable = false;
 
   const markUnavailable = (): void => {
     isUnavailable = true;
@@ -127,8 +126,12 @@ export const createIndexedDbProjectDraftStore = (
       false,
       exclusive
     );
+  /**
+   * Only a connection closed from outside is unavailable for good. Any other failure is the one operation's: the next
+   * journal operation tries again, so one aborted deletion does not switch reload protection off for the session.
+   */
   const canUseJournal = (): boolean =>
-    journalDatabase !== null && !isClosed && !isJournalUnavailable && isWorkbenchDatabaseAvailable(journalDatabase);
+    journalDatabase !== null && !isClosed && isWorkbenchDatabaseAvailable(journalDatabase);
   /** Reads nothing first, so it never waits on a renderer round trip that an unloading page cannot make. */
   const deleteJournalKeys = async (query: IDBKeyRange | ProjectUnloadJournalKey): Promise<boolean> => {
     if (!canUseJournal()) {
@@ -141,7 +144,6 @@ export const createIndexedDbProjectDraftStore = (
       await transaction.done;
       return true;
     } catch {
-      isJournalUnavailable = true;
       return false;
     }
   };
@@ -758,7 +760,6 @@ export const createIndexedDbProjectDraftStore = (
             PROJECT_DRAFT_PAGE_LIMIT
           );
         } catch {
-          isJournalUnavailable = true;
           return { kind: 'unavailable' };
         }
         for (const journalKey of keys) {
@@ -766,7 +767,6 @@ export const createIndexedDbProjectDraftStore = (
           try {
             entry = await journalDatabase!.get(UNLOAD_JOURNAL_STORE, journalKey);
           } catch {
-            isJournalUnavailable = true;
             return { kind: 'unavailable' };
           }
           if (entry === undefined) {

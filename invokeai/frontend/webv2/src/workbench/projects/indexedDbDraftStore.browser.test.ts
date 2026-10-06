@@ -852,6 +852,36 @@ describe('IndexedDB unload journal', () => {
     await expect(store.reconcileUnloadJournal('account-a', 1_000)).resolves.toEqual({ kind: 'unavailable' });
   });
 
+  it('journals again after one journal transaction could not be opened', async () => {
+    const suffix = createSuffix();
+    const database = await openWorkbenchDatabase(suffix);
+    const journalDatabase = await openUnloadJournalDatabase(suffix);
+    stores.push(database, journalDatabase);
+    let failuresLeft = 1;
+    const flaky = new Proxy(journalDatabase, {
+      get(target, property) {
+        if (property === 'transaction' && failuresLeft > 0) {
+          return () => {
+            failuresLeft -= 1;
+            throw new DOMException('closing', 'InvalidStateError');
+          };
+        }
+        const value = Reflect.get(target, property, target) as unknown;
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+    const store = createIndexedDbProjectDraftStore(database, { journalDatabase: flaky });
+    stores.push(store);
+
+    await expect(store.discardUnloadJournal('project-1', 'session-a', 'writer-a')).resolves.toEqual({
+      kind: 'unavailable',
+    });
+    const write = store.journalBeforeUnload({ entries: [createUnloadJournalEntry()], retired: [] });
+    expect(write.kind).toBe('started');
+    await expect(write.kind === 'started' ? write.written : null).resolves.toBe(true);
+    await expect(outcomesOf(store)).resolves.toEqual(['applied']);
+  });
+
   it('reports a blind write that committed', async () => {
     const { store } = await createJournaledStore();
     const write = store.journalBeforeUnload({ entries: [createUnloadJournalEntry()], retired: [] });
