@@ -716,7 +716,9 @@ export type ProjectGraphAction =
   | { type: 'setNodeFieldShowDescription'; elementId: string; showDescription: boolean }
   | { type: 'setNodeFieldShowShuffle'; elementId: string; showShuffle: boolean }
   | { type: 'setContainerLayout'; elementId: string; layout: 'row' | 'column' }
-  | { type: 'setMetadata'; patch: Partial<WorkflowMetadata> };
+  | { type: 'setMetadata'; patch: Partial<WorkflowMetadata> }
+  /** A committed rename (a dialog, an adopted template name): one undo step of its own, unlike typing a name. */
+  | { type: 'renameWorkflow'; name: string };
 
 const undoLabels: Partial<Record<ProjectGraphAction['type'], string>> = {
   addEdge: 'Connect workflow fields',
@@ -731,6 +733,7 @@ const undoLabels: Partial<Record<ProjectGraphAction['type'], string>> = {
   removeEdges: 'Disconnect workflow fields',
   removeFormElement: 'Edit workflow form',
   removeNodes: 'Delete workflow nodes',
+  renameWorkflow: 'Rename workflow',
   setContainerLayout: 'Edit workflow form',
   setFieldDescription: 'Edit workflow field description',
   setFieldLabel: 'Rename workflow field',
@@ -1194,6 +1197,9 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
     }
     case 'setMetadata': {
       return { ...document, ...action.patch };
+    }
+    case 'renameWorkflow': {
+      return document.name === action.name ? document : { ...document, name: action.name };
     }
   }
 };

@@ -865,6 +865,22 @@ describe('createWorkbenchStore', () => {
     expect(getActiveProjectGraph(store.getSnapshot().activeProject).name).toBe('Command-owned workflow');
   });
 
+  it('undoes a committed rename as its own step, apart from the typed name edits before it', () => {
+    const store = createWorkbenchStore();
+    const workflowId = store.getSnapshot().activeProject.workflows.activeWorkflowId;
+
+    store.commands.workflows.editGraph({ patch: { name: 'Alph' }, type: 'setMetadata' });
+    store.commands.workflows.editGraph({ patch: { name: 'Alpha' }, type: 'setMetadata' });
+    expect(store.commands.workflows.rename(workflowId, 'Alpha, published')).toEqual({ ok: true });
+    expect(getActiveProjectGraph(store.getSnapshot().activeProject).name).toBe('Alpha, published');
+
+    store.commands.workflows.undo();
+    expect(getActiveProjectGraph(store.getSnapshot().activeProject).name).toBe('Alpha');
+
+    store.commands.workflows.undo();
+    expect(getActiveProjectGraph(store.getSnapshot().activeProject).name).toBe('Untitled Workflow');
+  });
+
   it('keeps placement selectors stable across generate and settings changes', () => {
     const store = createWorkbenchStore();
     const placementWatcher = watchSelector(

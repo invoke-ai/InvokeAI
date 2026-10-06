@@ -304,6 +304,33 @@ describe('WorkflowPublicationHost', () => {
     expect(saveDialog()).toBeNull();
   });
 
+  it('keeps a rename made while the save was in flight instead of adopting the template name', async () => {
+    const pending = deferred<WorkflowRecordDTO>();
+    api.createLibraryWorkflowRecord.mockReturnValueOnce(pending.promise);
+
+    await renderHost([UNLINKED]);
+    await request('save-as-new');
+    await submitSaveAsNew('Alpha, published');
+    expect(api.createLibraryWorkflowRecord).toHaveBeenCalledTimes(1);
+
+    const renamed: ProjectWorkflowEntry = { ...UNLINKED, document: { ...UNLINKED.document, name: 'Alpha, renamed' } };
+    await act(() => project.setSnapshot(projectSnapshot([renamed])));
+
+    await act(async () => {
+      pending.resolve(record({ name: 'Alpha, published', revision: 1, workflow_id: 'lib-new' }));
+      await settleFrame();
+    });
+    await flush();
+
+    // The copy still links to the template it created; the name chosen meanwhile stands.
+    expect(commands.setWorkflowSource).toHaveBeenCalledWith(
+      { projectId: PROJECT_ID, workflowId: WORKFLOW_ID },
+      { libraryWorkflowId: 'lib-new', revision: 1 }
+    );
+    expect(commands.renameWorkflow).not.toHaveBeenCalled();
+    expect(notifications.success).toHaveBeenCalledWith('Workflow saved', 'Saved "Alpha, published" to the library.');
+  });
+
   it('updates the template a save as new linked, naming it in the confirmation', async () => {
     api.createLibraryWorkflowRecord.mockImplementation((workflow: Record<string, unknown>) =>
       Promise.resolve(record({ name: String(workflow.name), revision: 1, workflow, workflow_id: 'lib-demo' }))

@@ -96,9 +96,12 @@ export interface WorkflowPublication {
   isPublishing: (workflowId: string) => boolean;
 }
 
-/** Where a settled publication lands; `adoptName` renames the workflow after the template it created. */
+/**
+ * Where a settled publication lands. `adoptNameFrom` is the workflow's name when a save as new started: the workflow
+ * takes the created template's name only while it still has that one.
+ */
 interface PublicationTarget {
-  adoptName?: boolean;
+  adoptNameFrom?: string;
   name: string;
   projectId: string;
   updateSource: boolean;
@@ -136,9 +139,18 @@ export const useWorkflowPublication = (): WorkflowPublication => {
         }
 
         // A save as new turns the workflow into the template it created, so it takes that template's name; the
-        // header and a later update confirmation then name the template the workflow is linked to.
-        if (target.adoptName && result.kind === 'created') {
-          commands.renameWorkflow(target.workflowId, result.name, target.projectId);
+        // header and a later update confirmation then name the template the workflow is linked to. A name the user
+        // chose meanwhile stands, and so does one that cannot be checked because another project is active now.
+        if (target.adoptNameFrom !== undefined && result.kind === 'created') {
+          const snapshot = project.getSnapshot();
+          const current =
+            snapshot.id === target.projectId
+              ? snapshot.workflows.find((candidate) => candidate.document.id === target.workflowId)
+              : undefined;
+
+          if (current?.document.name === target.adoptNameFrom) {
+            commands.renameWorkflow(target.workflowId, result.name, target.projectId);
+          }
         }
 
         notify.success(
@@ -155,7 +167,7 @@ export const useWorkflowPublication = (): WorkflowPublication => {
 
       return result;
     },
-    [commands, notify, t]
+    [commands, notify, project, t]
   );
 
   // A retry settles against the same target, so a save that lands on the second attempt still links the copy.
@@ -198,7 +210,13 @@ export const useWorkflowPublication = (): WorkflowPublication => {
         return { message: rejection, status: 'rejected' };
       }
 
-      const target = { adoptName: true, name, projectId: snapshot.id, updateSource: true, workflowId };
+      const target = {
+        adoptNameFrom: entry.document.name,
+        name,
+        projectId: snapshot.id,
+        updateSource: true,
+        workflowId,
+      };
       const result = await publicationController.publish({
         destination: { kind: 'create', name },
         owner: captureAccountScope(),

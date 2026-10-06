@@ -576,7 +576,7 @@ const createCommands = (
           return { ok: false, reason: 'invalid-name' };
         }
         dispatch({
-          action: { patch: { name: name.trim() }, type: 'setMetadata' },
+          action: { name: name.trim(), type: 'renameWorkflow' },
           projectId,
           type: 'applyWorkflowAction',
           workflowId,
