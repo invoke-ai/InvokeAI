@@ -408,7 +408,8 @@ export interface CanvasStructuralEngine {
  * session, a commit from elsewhere, a history replay or disposal ends the session first, restoring its baseline and
  * dropping pending previews, so the previewed values never land over a replayed document or inside another step;
  * later calls on an ended session are refused (`commit` reports `busy`). While edits are locked, `apply` and
- * `commit` refuse.
+ * `commit` refuse. A session previews one mutation kind on one node; its baseline holds every field it previewed, and
+ * a commit records from that baseline narrowed to the fields its edit names.
  */
 export interface StructuralPreviewSession {
   apply(action: CanvasLayerPreviewMutation): boolean;
@@ -416,7 +417,7 @@ export interface StructuralPreviewSession {
   baseline(): CanvasLayerPreviewMutation | null;
   cancel(): void;
   commit(label: string, edit: PreparedDocumentEdit): StructuralCommitResult;
-  /** False once something other than its own commit or cancel ended it. */
+  /** True until the session ends: its own commit or cancel, a newer session, a commit from elsewhere or a replay. */
   isActive(): boolean;
 }
 

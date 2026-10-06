@@ -129,7 +129,7 @@ export class StructuralLayerController {
   private burst: NudgeBurst | null = null;
   private disposed = false;
   private readonly now: () => number;
-  private preview: { session: StructuralPreviewSession; end(): void } | null = null;
+  private preview: { session: StructuralPreviewSession; drop(): void; end(): void } | null = null;
 
   constructor(private readonly deps: StructuralLayerControllerOptions) {
     this.now = deps.now ?? Date.now;
@@ -209,10 +209,13 @@ export class StructuralLayerController {
         this.deps.ctx.dispatch(baseline, 'system');
       }
     };
-    const end = (): void => {
+    const drop = (): void => {
       cancelFlush?.();
       cancelFlush = null;
       pending = null;
+    };
+    const end = (): void => {
+      drop();
       restore();
     };
     const session: StructuralPreviewSession = {
@@ -273,7 +276,7 @@ export class StructuralLayerController {
       },
       isActive: owns,
     };
-    this.preview = { end, session };
+    this.preview = { drop, end, session };
     return session;
   }
 
@@ -287,8 +290,20 @@ export class StructuralLayerController {
     preview.end();
   }
 
+  /** Forgets an open preview session without restoring it: the document it previewed on is gone. */
+  dropPreview(): void {
+    const preview = this.preview;
+    if (!preview) {
+      return;
+    }
+    this.preview = null;
+    preview.drop();
+  }
+
   nudge(dx: number, dy: number): StructuralCommitResult {
     const { ctx } = this.deps;
+    // The nudge is prepared from the committed document, like any other edit.
+    this.endPreview();
     const document = ctx.getDocument();
     if (this.disposed || !document?.selectedLayerId) {
       return { status: this.disposed ? 'not-ready' : 'dispatch-rejected' };
@@ -303,7 +318,6 @@ export class StructuralLayerController {
     if (prepared.edit.touchedIds.some((id) => !leaves.find((leaf) => leaf.id === id)?.contributionEnabled)) {
       return { status: 'dispatch-rejected' };
     }
-    this.endPreview();
     const selectionKey = prepared.edit.touchedIds.join('\0');
     const now = this.now();
     // Coalesce only into the step this burst recorded: any interleaved entry starts a fresh one.
@@ -334,7 +348,7 @@ export class StructuralLayerController {
   dispose(): void {
     this.disposed = true;
     this.burst = null;
-    this.endPreview();
+    this.dropPreview();
   }
 
   private staleRevision(expectedRevision: number | undefined): StructuralCommitResult | null {

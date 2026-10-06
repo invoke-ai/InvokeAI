@@ -79,13 +79,9 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
   // A previewed gesture records from where its preview started; any other change from the live adapter.
   const commitAdapter = useCallback(
     (next: Partial<CanvasControlAdapterContract>, label: string) => {
+      const config = { adapter: next, layerType: 'control' } as const;
       commitPrepared(label, (model, baseline) =>
-        model.prepare({
-          before: baselineConfig(baseline),
-          config: { adapter: next, layerType: 'control' },
-          id: layer.id,
-          type: 'patch-config',
-        })
+        model.prepare({ before: baselineConfig(baseline, config), config, id: layer.id, type: 'patch-config' })
       );
     },
     [commitPrepared, layer.id]

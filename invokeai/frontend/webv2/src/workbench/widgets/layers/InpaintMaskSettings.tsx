@@ -57,13 +57,9 @@ export const InpaintMaskSettings = ({ engine, layer }: InpaintMaskSettingsProps)
   // A previewed color records from where its preview started; a style change from the live fill.
   const commitFill = useCallback(
     (next: CanvasMaskFillContract) => {
+      const config = { layerType: 'inpaint_mask', mask: { fill: next } } as const;
       commitPrepared(t('widgets.layers.maskFill.fill'), (model, baseline) =>
-        model.prepare({
-          before: baselineConfig(baseline),
-          config: { layerType: 'inpaint_mask', mask: { fill: next } },
-          id: layer.id,
-          type: 'patch-config',
-        })
+        model.prepare({ before: baselineConfig(baseline, config), config, id: layer.id, type: 'patch-config' })
       );
     },
     [commitPrepared, layer.id, t]

@@ -1,13 +1,20 @@
-import type { StructuralCommitResult } from '@workbench/canvas-engine/api';
+import type { CanvasLayerConfigPatch, StructuralCommitResult } from '@workbench/canvas-engine/api';
 import type { TFunction } from 'i18next';
 
 import { createDocumentModel } from '@workbench/canvas-engine/api';
-import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { createStructuralEngineStub } from '@workbench/canvas-engine/controllers/structuralEngine.testStub';
+import { layerContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { createEmptyCanvasDocument } from '@workbench/canvasMigration';
 import { createEmptyPaintLayer } from '@workbench/widgets/layers/layerOps';
 import { describe, expect, it, vi } from 'vitest';
 
-import { commitPreparedEdit, reportPreparedCommit, reportStructuralCommit } from './useStructuralCommit';
+import {
+  baselineConfig,
+  baselinePatch,
+  commitPreparedEdit,
+  reportPreparedCommit,
+  reportStructuralCommit,
+} from './useStructuralCommit';
 
 const t = ((key: string) => key) as unknown as TFunction;
 
@@ -109,5 +116,46 @@ describe('reportPreparedCommit', () => {
     const reportError = vi.fn();
     reportPreparedCommit({ status: 'stale', actualRevision: 2, expectedRevision: 1 }, reportError, t);
     expect(reportError).toHaveBeenCalledWith('widgets.canvas.structural.failed', 'widgets.canvas.structural.stale');
+  });
+});
+
+describe('baseline narrowing', () => {
+  it('records from the baseline fields the edit names, so a session that previewed more fields still commits', () => {
+    const stub = createStructuralEngineStub({ layers: [layerContract('c', 'control')] });
+    const session = stub.controller.beginPreview()!;
+    session.apply({
+      config: { adapter: { weight: 0.5 }, layerType: 'control' },
+      id: 'c',
+      type: 'updateCanvasLayerConfig',
+    });
+    session.apply({
+      config: { adapter: { beginEndStepPct: [0.2, 0.8] }, layerType: 'control' },
+      id: 'c',
+      type: 'updateCanvasLayerConfig',
+    });
+    const config: CanvasLayerConfigPatch = { adapter: { beginEndStepPct: [0.2, 0.9] }, layerType: 'control' };
+
+    const before = baselineConfig(session.baseline(), config);
+    expect(before).toEqual({ adapter: { beginEndStepPct: [0, 1] }, layerType: 'control' });
+    const result = stub.engine.document.model().prepare({ before, config, id: 'c', type: 'patch-config' });
+    expect(result.status).toBe('prepared');
+    if (result.status !== 'prepared') {
+      throw new Error(result.status);
+    }
+    expect(result.edit.inverse).toMatchObject({ config: { adapter: { beginEndStepPct: [0, 1] } } });
+  });
+
+  it('yields nothing for a field the gesture never previewed, leaving the inverse to the live document', () => {
+    const baseline = { id: 'c', patch: { name: 'c', opacity: 1 }, type: 'updateCanvasLayer' } as const;
+
+    expect(baselinePatch(baseline, { opacity: 0.5 })).toEqual({ opacity: 1 });
+    expect(baselinePatch(baseline, { blendMode: 'screen' })).toBeUndefined();
+    expect(baselinePatch(null, { opacity: 0.5 })).toBeUndefined();
+    expect(
+      baselineConfig(
+        { config: { adapter: { weight: 1 }, layerType: 'control' }, id: 'c', type: 'updateCanvasLayerConfig' },
+        { adapter: { model: null }, layerType: 'control' }
+      )
+    ).toBeUndefined();
   });
 });

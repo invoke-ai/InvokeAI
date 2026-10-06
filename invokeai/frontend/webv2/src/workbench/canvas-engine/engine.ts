@@ -789,6 +789,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     history,
     installPrepared: (prepared, persist) => installGeneratedPaintCache(prepared, persist),
     isGestureActive: () => pipeline.isGestureActive(),
+    endStructuralPreview: () => structuralController.endPreview(),
     isGuardCurrent: (guard) => isLayerExportGuardCurrent(guard),
     preparePixels: (layerId, rect, pixels) => prepareGeneratedPaintCache(layerId, rect, pixels),
     refreshMirror: () => mirror.refresh(),
@@ -1477,6 +1478,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       // Drop document-scoped selection/lasso state and cancel outgoing floats; committing would target a replaced
       // layer.
       cleanup.run(() => floatingSelection.cancel());
+      // A structural preview belongs to the outgoing document too; its baseline must not land on the new one.
+      cleanup.run(() => structuralController.dropPreview());
       cleanup.run(() => editingController.discardSelection());
       cleanup.run(() => stores.lassoPreview.set(null));
       cleanup.run(() => stores.marqueePreview.set(null));

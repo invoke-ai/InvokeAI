@@ -63,6 +63,21 @@ const createHarness = (overrides: Partial<CanvasMutationContextDeps> = {}) => {
 };
 
 describe('createCanvasMutationContext', () => {
+  it('ends an open structural preview before handing out the document an edit starts from', () => {
+    const endStructuralPreview = vi.fn();
+    const document = { selectedLayerId: null } as unknown as CanvasDocumentContractV3;
+    const { context } = createHarness({
+      endStructuralPreview,
+      getDocument: () => document,
+      getReducerDocument: () => document,
+    });
+
+    expect(context.getReducerDocument()).toBe(document);
+    expect(endStructuralPreview).not.toHaveBeenCalled();
+    expect(context.getDocument()).toBe(document);
+    expect(endStructuralPreview).toHaveBeenCalledOnce();
+  });
+
   describe('document edit permits', () => {
     it('exposes the engine project id on the concurrency surface', () => {
       const { context } = createHarness();

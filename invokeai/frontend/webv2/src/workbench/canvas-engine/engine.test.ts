@@ -7238,6 +7238,48 @@ describe('mergeVisibleRasterLayers', () => {
     };
   };
 
+  it('ends a hovered preview before a merge down, so undoing the merge restores the committed blend mode', async () => {
+    const { engine, raf } = setup(interleavedDoc());
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    const blendModeOf = (id: string) =>
+      getDocumentLeaves(engine.document.getDocument()!).find((layer) => layer.id === id)?.blendMode;
+    const session = engine.layers.beginStructuralPreview()!;
+    expect(session.apply({ id: 'upper', patch: { blendMode: 'screen' }, type: 'updateCanvasLayer' })).toBe(true);
+    raf.flush();
+    expect(blendModeOf('upper')).toBe('screen');
+
+    expect(engine.layers.mergeLayerDown('upper')).toBe('merged');
+
+    expect(session.isActive()).toBe(false);
+    expect(await engine.history.undo()).toBe('applied');
+    expect(blendModeOf('upper')).toBe('multiply');
+    engine.lifecycle.dispose();
+  });
+
+  it('ends a hovered preview before a duplicate, so neither the source nor its copy keeps the hovered mode', async () => {
+    const { engine, raf } = setup(interleavedDoc());
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    const session = engine.layers.beginStructuralPreview()!;
+    expect(session.apply({ id: 'upper', patch: { blendMode: 'screen' }, type: 'updateCanvasLayer' })).toBe(true);
+    raf.flush();
+
+    const result = await engine.layers.duplicateLayers(['upper']);
+
+    expect(result.status).toBe('duplicated');
+    if (result.status !== 'duplicated') {
+      throw new Error(result.status);
+    }
+    const leaves = getDocumentLeaves(engine.document.getDocument()!);
+    expect(leaves.find((layer) => layer.id === 'upper')?.blendMode).toBe('multiply');
+    expect(leaves.find((layer) => layer.id === result.duplicateIds[0])?.blendMode).toBe('multiply');
+    expect(session.isActive()).toBe(false);
+    engine.lifecycle.dispose();
+  });
+
   it('duplicates a selected batch directly above each source with live caches and one undo step', async () => {
     const { engine, getPanelSelectedIds, raf, setPanelSelectedIds } = setup(interleavedDoc());
     raf.flush();
@@ -13051,6 +13093,49 @@ describe('guarded filter previews', () => {
     expect(engine.stores.canUndo.get()).toBe(false);
     engine.tools.handleEscapePriority({ gestureWasActive: false });
     expect(getCanvasOperations(engine).stores.filterSession.get()).toBeNull();
+    engine.lifecycle.dispose();
+  });
+
+  it('puts a structural preview back before a replay lands, and forgets it when the document is replaced', async () => {
+    const layer = guardableLayer('L');
+    const document = { ...emptyDoc(), stacks: stacksFrom([layer]), selectedLayerId: layer.id };
+    const { projectId, store } = createReducerBackedStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const nameOf = () => getDocumentLeaves(engine.document.getDocument()!)[0]!.name;
+    expect(
+      engine.layers.commitStructural(
+        'Rename',
+        { id: 'L', patch: { name: 'Renamed' }, type: 'updateCanvasLayer' },
+        { id: 'L', patch: { name: 'L' }, type: 'updateCanvasLayer' }
+      )
+    ).toEqual({ status: 'committed' });
+    const session = engine.layers.beginStructuralPreview()!;
+    expect(session.apply({ id: 'L', patch: { name: 'Hovered' }, type: 'updateCanvasLayer' })).toBe(true);
+    expect(nameOf()).toBe('Hovered');
+
+    expect(await engine.history.undo()).toBe('applied');
+
+    expect(nameOf()).toBe('L');
+    expect(session.isActive()).toBe(false);
+    session.cancel();
+    expect(nameOf()).toBe('L');
+    expect(engine.stores.canRedo.get()).toBe(true);
+
+    const replaced = engine.layers.beginStructuralPreview()!;
+    expect(replaced.apply({ id: 'L', patch: { name: 'Hovered again' }, type: 'updateCanvasLayer' })).toBe(true);
+    store.dispatch({
+      document: { ...document, stacks: stacksFrom([{ ...layer, name: 'Swapped' }]) },
+      type: 'replaceCanvasDocument',
+    });
+
+    expect(replaced.isActive()).toBe(false);
+    replaced.cancel();
+    expect(nameOf()).toBe('Swapped');
     engine.lifecycle.dispose();
   });
 

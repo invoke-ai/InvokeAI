@@ -4,7 +4,12 @@ import type {
   SelectOpenChangeDetails,
   SelectValueChangeDetails,
 } from '@chakra-ui/react';
-import type { CanvasBlendMode, CanvasDocumentContractV3, CanvasNodeContract } from '@workbench/canvas-engine/api';
+import type {
+  CanvasBlendMode,
+  CanvasDocumentContractV3,
+  CanvasLayerPreviewMutation,
+  CanvasNodeContract,
+} from '@workbench/canvas-engine/api';
 import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
 import { createListCollection, Flex, HStack, Icon, InputGroup, NumberInput } from '@chakra-ui/react';
@@ -75,6 +80,13 @@ interface BlendPreview {
 
 const blendModeOf = (layer: CanvasNodeContract | null): CanvasBlendMode => layer?.blendMode ?? 'normal';
 
+/** The mode `layer`'s open preview replaced, while one is open on it. */
+const pinnedBlendMode = (
+  baseline: CanvasLayerPreviewMutation | null,
+  layer: CanvasNodeContract | null
+): CanvasBlendMode | undefined =>
+  layer && baseline?.id === layer.id ? baselinePatch(baseline, { blendMode: 'normal' })?.blendMode : undefined;
+
 /**
  * Highlighting an option (hover or arrow keys) previews its mode unrecorded. Choosing one records a single step from
  * the mode the preview started on; closing without a choice or unmounting restores that mode. An undo or an edit
@@ -90,14 +102,21 @@ const BlendModeControl = ({
   engine: LayerBlendRowEngine | null;
   layer: CanvasNodeContract | null;
 }) => {
-  const { cancel: cancelPreview, commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
+  const {
+    baseline: previewBaseline,
+    cancel: cancelPreview,
+    commit: commitPrepared,
+    preview: previewStructural,
+  } = useStructuralPreview(engine);
   const { t } = useTranslation();
-  // The ref serves handlers within one event; the state pins what the closed trigger and checked item show.
+  // The ref serves handlers within one event: the layer the menu opened for and the mode it opened on.
   const previewRef = useRef<BlendPreview | null>(null);
-  const [openedOn, setOpenedOn] = useState<CanvasBlendMode | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
   const disabled = isLayerEditingDisabled(layer, editingLocked);
-  // While open the document carries the previewed mode; the control keeps naming the committed one.
-  const shownMode = openedOn ?? blendModeOf(layer);
+  // While the menu is open the document carries the previewed mode and the control keeps naming the one the preview
+  // replaced; every preview re-renders through the layer. Once the engine ended the preview (an undo landed under
+  // the menu) the document's mode is the committed one again, and a choice records from it.
+  const shownMode = (isOpen ? pinnedBlendMode(previewBaseline(), layer) : undefined) ?? blendModeOf(layer);
   const blendCollection = useMemo(
     () =>
       createListCollection<BlendModeOption>({
@@ -118,7 +137,7 @@ const BlendModeControl = ({
       if (open && layer) {
         previewRef.current = { id: layer.id, original: blendModeOf(layer), previewed: false };
       }
-      setOpenedOn(open && layer ? blendModeOf(layer) : null);
+      setIsOpen(open && layer !== null);
     },
     [endPreview, layer]
   );
@@ -151,8 +170,9 @@ const BlendModeControl = ({
         return;
       }
       // Choosing the mode the preview started on prepares nothing, which drops the previews.
+      const patch = { blendMode: mode };
       commitPrepared(t('widgets.layers.actions.blendMode'), (model, baseline) =>
-        model.prepare({ before: baselinePatch(baseline), id, patch: { blendMode: mode }, type: 'patch' })
+        model.prepare({ before: baselinePatch(baseline, patch), id, patch, type: 'patch' })
       );
     },
     [cancelPreview, commitPrepared, layer, t]
@@ -207,13 +227,9 @@ const OpacityRow = ({
     if (!pending) {
       return;
     }
+    const patch = { opacity: pending.latest };
     commitPrepared(t('widgets.layers.actions.opacity'), (model, baseline) =>
-      model.prepare({
-        before: baselinePatch(baseline),
-        id: pending.id,
-        patch: { opacity: pending.latest },
-        type: 'patch',
-      })
+      model.prepare({ before: baselinePatch(baseline, patch), id: pending.id, patch, type: 'patch' })
     );
   }, [commitPrepared, t]);
 

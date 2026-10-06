@@ -207,13 +207,52 @@ export type PreviewCommit = (
   prepare: (model: CanvasDocumentModel, baseline: CanvasLayerPreviewMutation | null) => PrepareEditResult
 ) => PreparedCommitOutcome;
 
-/** The base fields a gesture's baseline holds, as a `patch` command's `before`. */
-export const baselinePatch = (baseline: CanvasLayerPreviewMutation | null): CanvasLayerBasePatch | undefined =>
-  baseline?.type === 'updateCanvasLayer' ? baseline.patch : undefined;
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 
-/** The config a gesture's baseline holds, as a `patch-config` command's `before`. */
-export const baselineConfig = (baseline: CanvasLayerPreviewMutation | null): CanvasLayerConfigPatch | undefined =>
-  baseline?.type === 'updateCanvasLayerConfig' ? baseline.config : undefined;
+/**
+ * `source` narrowed to the fields `shape` names, record by record, or undefined when `shape` names a field `source`
+ * does not hold: the model refuses a `before` whose fields differ from the edit's.
+ */
+const narrowTo = (
+  source: Record<string, unknown>,
+  shape: Record<string, unknown>
+): Record<string, unknown> | undefined => {
+  const narrowed: Record<string, unknown> = {};
+  for (const key of Object.keys(shape)) {
+    if (!(key in source)) {
+      return undefined;
+    }
+    const have = source[key];
+    const want = shape[key];
+    if (isRecord(have) && isRecord(want)) {
+      const nested = narrowTo(have, want);
+      if (!nested) {
+        return undefined;
+      }
+      narrowed[key] = nested;
+    } else {
+      narrowed[key] = have;
+    }
+  }
+  return narrowed;
+};
+
+/** The baseline's values for the fields `patch` names, as a `patch` command's `before`; undefined without them. */
+export const baselinePatch = (
+  baseline: CanvasLayerPreviewMutation | null,
+  patch: CanvasLayerBasePatch
+): CanvasLayerBasePatch | undefined =>
+  baseline?.type === 'updateCanvasLayer' ? (narrowTo(baseline.patch, patch) as CanvasLayerBasePatch) : undefined;
+
+/** The baseline's values for the fields `config` names, as a `patch-config` command's `before`; undefined without them. */
+export const baselineConfig = (
+  baseline: CanvasLayerPreviewMutation | null,
+  config: CanvasLayerConfigPatch
+): CanvasLayerConfigPatch | undefined =>
+  baseline?.type === 'updateCanvasLayerConfig'
+    ? (narrowTo(baseline.config, config) as CanvasLayerConfigPatch | undefined)
+    : undefined;
 
 export interface StructuralPreview {
   /** Previews `action` live, at most once per frame; false while edits are refused. */
@@ -222,6 +261,11 @@ export interface StructuralPreview {
   commit: PreviewCommit;
   /** Ends the gesture unrecorded, restoring what it previewed. */
   cancel(): void;
+  /**
+   * What the gesture's open preview session replaced, while the document carries its previews; null before the first
+   * preview and once the engine ended the session.
+   */
+  baseline(): CanvasLayerPreviewMutation | null;
 }
 
 /** A live-preview gesture backed by one engine preview session, committed or cancelled as a whole. */
@@ -235,11 +279,14 @@ export const useStructuralPreview = (engine: CanvasPreviewEngine | null): Struct
       if (!engine) {
         return false;
       }
-      if (sessionRef.current?.apply(action)) {
+      const session = sessionRef.current;
+      if (session?.apply(action)) {
         return true;
       }
-      // No session yet, or the engine ended it: the next session starts from the document as it is now.
-      sessionRef.current = engine.layers.beginStructuralPreview();
+      // No session yet, or the engine ended it: the next session starts from the document as it is now. A session
+      // that only refused this preview (edits locked mid-gesture) stays the gesture's, holding its previews and
+      // baseline for the commit or cancel to come.
+      sessionRef.current = engine.layers.beginStructuralPreview() ?? (session?.isActive() ? session : null);
       return sessionRef.current?.apply(action) ?? false;
     },
     [engine]
@@ -249,8 +296,9 @@ export const useStructuralPreview = (engine: CanvasPreviewEngine | null): Struct
     (label, prepare) => {
       const session = sessionRef.current;
       sessionRef.current = null;
-      // A document change that ended the gesture (an undo removing its target) is not the user's commit to explain.
-      const endedByDocument = session !== null && !session.isActive();
+      // The engine ended the gesture (a replay or an edit from elsewhere landed): its edit commits like any prepared
+      // edit, and a target that vanished with that document change is not the user's commit to explain.
+      const sessionEnded = session !== null && !session.isActive();
       const model = engine?.document.model() ?? null;
       let outcome: PreparedCommitOutcome;
       if (!engine || !model) {
@@ -260,15 +308,13 @@ export const useStructuralPreview = (engine: CanvasPreviewEngine | null): Struct
         const result = prepare(model, session?.baseline() ?? null);
         if (result.status === 'prepared') {
           const committed = session?.commit(label, result.edit);
-          // A session the engine ended commits like any prepared edit, from the live document.
-          outcome =
-            committed && committed.status !== 'busy' ? committed : engine.layers.commitPrepared(label, result.edit);
+          outcome = committed && !sessionEnded ? committed : engine.layers.commitPrepared(label, result.edit);
         } else {
           session?.cancel();
           outcome = result.status === 'unchanged' ? result : { refusal: result, status: 'refused' };
         }
       }
-      if (!(endedByDocument && outcome.status === 'refused' && outcome.refusal.status === 'missing')) {
+      if (!(sessionEnded && outcome.status === 'refused' && outcome.refusal.status === 'missing')) {
         reportPreparedCommit(outcome, notify.error, t);
       }
       return outcome;
@@ -282,5 +328,7 @@ export const useStructuralPreview = (engine: CanvasPreviewEngine | null): Struct
     session?.cancel();
   }, []);
 
-  return { cancel, commit, preview };
+  const baseline = useCallback((): CanvasLayerPreviewMutation | null => sessionRef.current?.baseline() ?? null, []);
+
+  return { baseline, cancel, commit, preview };
 };

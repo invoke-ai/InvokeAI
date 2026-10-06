@@ -239,6 +239,24 @@ describe('blend mode preview', () => {
     expect(layer().blendMode).toBe('normal');
   });
 
+  it('names the mode an undo landed on under the open menu, and records a choice of the pre-undo mode from it', async () => {
+    commitBlendMode('r1', 'screen');
+    await mount();
+    await userEvent.click(trigger());
+    await expect.element(trigger()).toHaveTextContent('Screen');
+    await userEvent.hover(option('Multiply'));
+    await expect.poll(() => layer().blendMode).toBe('multiply');
+    await act(() => stub.engine.history.undo());
+
+    await expect.element(trigger()).toHaveTextContent('Normal');
+    await expect.element(option('Normal')).toHaveAttribute('aria-selected', 'true');
+
+    await userEvent.click(option('Screen'));
+
+    expect(layer().blendMode).toBe('screen');
+    expect(commits().at(-1)!.inverse).toMatchObject({ id: 'r1', patch: { blendMode: 'normal' } });
+  });
+
   it('ends a hovered preview before a delete from elsewhere, so undoing the delete restores the committed mode', async () => {
     await mount();
     await userEvent.click(trigger());

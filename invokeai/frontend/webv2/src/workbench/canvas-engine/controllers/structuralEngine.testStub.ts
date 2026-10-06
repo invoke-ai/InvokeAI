@@ -81,6 +81,7 @@ export const createStructuralEngineStub = (options: StructuralEngineStubOptions 
     getReducerDocument: () => project.canvas.document,
     history,
     installPrepared: () => undefined,
+    endStructuralPreview: () => controller.endPreview(),
     isGestureActive,
     isGuardCurrent: () => true,
     preparePixels: () => ({}) as never,

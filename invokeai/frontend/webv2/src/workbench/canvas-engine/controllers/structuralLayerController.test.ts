@@ -507,6 +507,29 @@ describe('preview sessions ended by the engine', () => {
     expect(session.isActive()).toBe(false);
   });
 
+  it('restores a previewed value before a nudge moves the selection', () => {
+    const { controller, document } = createHarness();
+    const session = controller.beginPreview()!;
+    session.apply(rename('layer', 'Hovered'));
+
+    expect(controller.nudge(2, 0)).toEqual({ status: 'committed' });
+
+    expect(getDocumentLayer(document(), 'layer')).toMatchObject({ name: 'Layer', transform: { x: 2 } });
+    expect(session.isActive()).toBe(false);
+  });
+
+  it('forgets a preview without restoring it once the document it previewed on is gone', () => {
+    const { controller, document } = createHarness();
+    const session = controller.beginPreview()!;
+    session.apply(rename('layer', 'Hovered'));
+
+    controller.dropPreview();
+
+    expect(session.isActive()).toBe(false);
+    session.cancel();
+    expect(layerName(document())).toBe('Hovered');
+  });
+
   it('refuses to preview a node the document does not hold', () => {
     const { controller, dispatched } = createHarness();
     const session = controller.beginPreview()!;

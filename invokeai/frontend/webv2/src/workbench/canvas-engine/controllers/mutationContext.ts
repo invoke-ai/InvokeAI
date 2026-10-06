@@ -94,7 +94,12 @@ export interface EditTransaction {
 
 /** The engine's single edit protocol: permits, admission, verified steps, history publication and cleanup. */
 export interface CanvasMutationContext extends CanvasEditConcurrency {
+  /**
+   * The mirror document an edit starts from. An open structural preview ends first, restoring its baseline, so a
+   * snapshot taken here (and the step or inverse built from it) never carries previewed values.
+   */
   getDocument(): CanvasDocumentContractV3 | null;
+  /** The reducer document as it is, previews included; for postconditions and preview baselines. */
   getReducerDocument(): CanvasDocumentContractV3 | null;
   /** Where a new `stack` layer lands: above `aboveId` when it belongs to the stack, else the stack top. */
   captureInsertionAnchor(stack: LayerStackKind, aboveId: string | null): CanvasNodeInsertionAnchor;
@@ -140,6 +145,8 @@ export interface CanvasMutationContextDeps {
   readonly installPrepared: (prepared: PreparedLayerCacheReplacement, persist?: boolean) => void;
   readonly reserveRaster: (bytes: number) => RasterMemoryReservationResult;
   readonly isGestureActive: () => boolean;
+  /** Ends an open structural preview, restoring its baseline; see {@link CanvasMutationContext.getDocument}. */
+  readonly endStructuralPreview?: () => void;
   readonly createLayerId: () => string;
   readonly report?: (error: EditStepError, label: string) => void;
 }
@@ -413,7 +420,10 @@ export const createCanvasMutationContext = (
       unsubscribeDocumentEditingLock();
       unsubscribeReducer();
     },
-    getDocument: () => deps.getDocument(),
+    getDocument: () => {
+      deps.endStructuralPreview?.();
+      return deps.getDocument();
+    },
     getEditRevision,
     getReducerDocument: () => deps.getReducerDocument(),
     historyTop: () => deps.history.top(),

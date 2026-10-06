@@ -5,12 +5,19 @@ import type {
   StructuralPreviewSession,
 } from '@workbench/canvas-engine/api';
 
+import { createStructuralEngineStub } from '@workbench/canvas-engine/controllers/structuralEngine.testStub';
+import { getDocumentLayer } from '@workbench/canvas-engine/document/documentIndex';
 import { act, createRef, type Ref, useImperativeHandle } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CanvasEditRefusalNotices } from './CanvasEditRefusalNotices';
-import { type CanvasPreviewEngine, type StructuralPreview, useStructuralPreview } from './useStructuralCommit';
+import {
+  baselinePatch,
+  type CanvasPreviewEngine,
+  type StructuralPreview,
+  useStructuralPreview,
+} from './useStructuralCommit';
 
 const notify = vi.hoisted(() => ({ error: vi.fn(), info: vi.fn(), success: vi.fn() }));
 vi.mock('@workbench/useNotify', () => ({ useNotify: () => notify }));
@@ -107,8 +114,8 @@ describe('useStructuralPreview', () => {
     expect(outcome).toEqual({ status: 'committed' });
   });
 
-  it('commits as a plain prepared edit when another gesture took its session', () => {
-    const engine = createEngine(createSession('busy'));
+  it('commits as a plain prepared edit when the engine ended its session', () => {
+    const engine = createEngine(createSession('busy', false));
     const preview = renderPreview(engine);
     preview.preview(opacity(0.5));
 
@@ -168,6 +175,42 @@ describe('useStructuralPreview', () => {
       'widgets.canvas.structural.failed',
       'widgets.canvas.structural.refusedMissing'
     );
+  });
+});
+
+describe('useStructuralPreview over the engine', () => {
+  it('keeps a gesture whose later previews were refused, so its release restores the baseline rather than recording the previewed value', () => {
+    const locked = { value: false };
+    const stub = createStructuralEngineStub({
+      locked,
+      schedulePreview: (flush) => {
+        flush();
+        return () => undefined;
+      },
+    });
+    const preview = renderPreview(stub.engine as unknown as CanvasPreviewEngine);
+    const opacityOf = () => getDocumentLayer(stub.document(), 'layer')?.opacity;
+
+    expect(preview.preview(opacity(0.5))).toBe(true);
+    expect(opacityOf()).toBe(0.5);
+    locked.value = true;
+    expect(preview.preview(opacity(0.3))).toBe(false);
+    expect(preview.baseline()).toEqual(opacity(1));
+
+    const outcome = preview.commit('Opacity', (model, baseline) =>
+      model.prepare({
+        before: baselinePatch(baseline, { opacity: 0.3 }),
+        id: 'layer',
+        patch: { opacity: 0.3 },
+        type: 'patch',
+      })
+    );
+
+    expect(outcome).toEqual({ status: 'busy' });
+    expect(opacityOf()).toBe(1);
+    expect(stub.history.canUndo()).toBe(false);
+    expect(preview.baseline()).toBeNull();
+    expect(notify.error).not.toHaveBeenCalled();
   });
 });
 

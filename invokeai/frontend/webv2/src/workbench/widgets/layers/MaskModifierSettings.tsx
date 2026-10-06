@@ -81,12 +81,8 @@ export const MaskModifierSettings = ({
         if (!live) {
           return { ids: [layer.id], status: 'missing' };
         }
-        return model.prepare({
-          before: baselineConfig(baseline),
-          config: configWith(live, percent / 100),
-          id: layer.id,
-          type: 'patch-config',
-        });
+        const config = configWith(live, percent / 100);
+        return model.prepare({ before: baselineConfig(baseline, config), config, id: layer.id, type: 'patch-config' });
       });
     },
     [commitPrepared, configWith, kind, layer.id, liveModifier, t]

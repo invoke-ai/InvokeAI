@@ -144,12 +144,8 @@ const AdjustmentEntryEditor = ({
         if (!entries?.some((candidate) => candidate.id === entry.id)) {
           return { ids: [entry.id], status: 'missing' };
         }
-        return model.prepare({
-          before: baselineConfig(baseline),
-          config: configOf(withPatch(entries, entry.id, patch)),
-          id: layer.id,
-          type: 'patch-config',
-        });
+        const config = configOf(withPatch(entries, entry.id, patch));
+        return model.prepare({ before: baselineConfig(baseline, config), config, id: layer.id, type: 'patch-config' });
       });
     },
     [commitPrepared, configOf, entry.id, layer.id, liveEntries]

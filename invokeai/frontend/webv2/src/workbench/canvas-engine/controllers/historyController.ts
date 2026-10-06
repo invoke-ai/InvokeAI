@@ -86,6 +86,10 @@ export class HistoryController {
     if (this.disposed || !this.canEdit() || this.isGestureActive()) {
       return { status: 'refused' };
     }
+    // Nothing to replay disturbs nothing: live state is put back only for a step that will land.
+    if (!(direction === 'undo' ? this.history.canUndo() : this.history.canRedo())) {
+      return { status: 'empty' };
+    }
     this.options.beforeReplay?.();
     const result = await (direction === 'undo' ? this.history.undo() : this.history.redo());
     if (result.status === 'failed') {

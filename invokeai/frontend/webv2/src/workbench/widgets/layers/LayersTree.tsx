@@ -403,8 +403,14 @@ export const LayersTree = ({
   // opening the groups and child rows that would hide it. The row exists only after the commit renders, so the
   // focus effect scrolls to and focuses it then.
   const commitChildMove = useCallback(
-    (child: ProjectedChildRow, layerId: string, command: DocumentCommand) => {
-      const outcome = runStructural(t(layerChildMoveLabelKey(child, layerId)), command);
+    (child: ProjectedChildRow, target: LayerChildDropTarget) => {
+      const { commitPrepared: commit } = latest.current;
+      const { layerId } = target;
+      // Built from the engine's document inside the commit, like the other child-row commands.
+      const outcome = commit(t(layerChildMoveLabelKey(child, layerId)), (model) => {
+        const command = layerChildDropCommand(model.document, child, target);
+        return command ? model.prepare(command) : { status: 'unchanged' };
+      });
       if (outcome.status !== 'committed' || layerId === child.layerId) {
         return;
       }
@@ -420,7 +426,7 @@ export const LayersTree = ({
       }
       pendingFocus.current = key;
     },
-    [runStructural, selectChildRow, t]
+    [selectChildRow, t]
   );
 
   // After deletion, focus the nearest surviving row below, otherwise above.
@@ -625,12 +631,7 @@ export const LayersTree = ({
         }),
       moveChild: (child, direction) =>
         runChildStructural(t('widgets.layers.modifiers.reorderAdjustment'), child, { direction, type: 'move' }),
-      moveChildToLayer: (child, layerId) => {
-        const command = layerChildDropCommand(latest.current.document, child, { beforeItemId: null, layerId });
-        if (command) {
-          commitChildMove(child, layerId, command);
-        }
-      },
+      moveChildToLayer: (child, layerId) => commitChildMove(child, { beforeItemId: null, layerId }),
       openChildMenu: (child, anchor: LayerSurfaceAnchor) => setSurface({ anchor, child, kind: 'child-menu' }),
       openMenu: (id, anchor: LayerSurfaceAnchor) => setSurface({ anchor, id, kind: 'menu' }),
       openStackMenu: (stack, anchor: LayerSurfaceAnchor) => setSurface({ anchor, kind: 'stack-menu', stack }),
@@ -1072,7 +1073,7 @@ export const LayersTree = ({
       }
       if (draggedChild) {
         if (childLanding) {
-          commitChildMove(draggedChild, childLanding.dropTarget.layerId, childLanding.command);
+          commitChildMove(draggedChild, childLanding.dropTarget);
         }
         return;
       }
