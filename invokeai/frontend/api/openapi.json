@@ -11191,6 +11191,32 @@
         ]
       }
     },
+    "/api/v1/app/database/vacuum": {
+      "post": {
+        "tags": ["app"],
+        "summary": "Vacuum Database",
+        "operationId": "vacuum_database",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Admin privileges required"
+          },
+          "500": {
+            "description": "Database vacuum failed"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/app/generation_device_options": {
       "get": {
         "tags": ["app"],
