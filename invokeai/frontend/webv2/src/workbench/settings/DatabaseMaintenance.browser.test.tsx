@@ -48,7 +48,10 @@ vi.mock('@platform/transport/connectionStore', async (importOriginal) => ({
   ...(await importOriginal<typeof ConnectionStoreModule>()),
   useConnectionStatusSelector: (selector: (snapshot: never) => unknown) => selector({ status: 'connected' } as never),
 }));
-vi.mock('@tanstack/react-router', () => ({ useNavigate: () => vi.fn() }));
+vi.mock('@tanstack/react-router', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useNavigate: () => vi.fn(),
+}));
 vi.mock('@workbench/palette/PaletteButton', () => ({ PaletteButton: () => null }));
 vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: () => vi.fn() }));
 vi.mock('@workbench/shell/topbar/useTopbarShortcut', () => ({ useTopbarShortcut: () => null }));
