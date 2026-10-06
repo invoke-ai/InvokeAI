@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 
 import { getGalleryAutoAddBoardId, toGalleryItemKey } from '@features/gallery/contracts';
 import { invalidateGallery } from '@features/gallery/queries';
-import { VideoUiProvider } from '@features/video';
+import { createDefaultVideoWidgetValues, normalizeVideoWidgetValues, VideoUiProvider } from '@features/video';
 import { useQueryClient } from '@tanstack/react-query';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
@@ -51,7 +51,15 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
   // Key actions by project, not values, to preserve callback identity while typing.
   const { projectId } = project;
   const patchValues = useCallback<VideoUiAdapter['patchValues']>(
-    (values, origin) => commands.widgets.patchValues('video', values, projectId, origin),
+    (values, origin) =>
+      commands.widgets.patchValues(
+        'video',
+        typeof values === 'function'
+          ? (current) => values(normalizeVideoWidgetValues(current) ?? createDefaultVideoWidgetValues())
+          : values,
+        projectId,
+        origin
+      ),
     [commands, projectId]
   );
   const reportError = useCallback<VideoUiAdapter['reportError']>(

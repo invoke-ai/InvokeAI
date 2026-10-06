@@ -24,7 +24,7 @@ import { useTranslation } from 'react-i18next';
 const MAX_PREVIEW_ROWS = 200;
 const TABULAR_NUMS = { fontVariantNumeric: 'tabular-nums' } as const;
 // Use a hover fill distinct from the popover's muted surface.
-const PROMPT_ROW_HOVER_PROPS = { bg: 'bg.emphasized/60' } as const;
+const PROMPT_ROW_HOVER_PROPS = { bg: 'bg.hover' } as const;
 // Keep preview text readable while interactions are disabled.
 const DISABLED_PROMPT_ROW_PROPS = { cursor: 'default', opacity: 1 } as const;
 const NO_HOVER_PROPS = { bg: 'transparent' } as const;
@@ -103,7 +103,7 @@ export const DynamicPromptsPanel = ({
           color="fg.muted"
           css={TABULAR_NUMS}
           fontFamily="mono"
-          fontSize="2xs"
+          fontSize="xs"
           fontWeight="500"
           h={PANEL_HEADER_CONTROL_HEIGHT}
           px="1.5"
@@ -128,7 +128,6 @@ export const DynamicPromptsPanel = ({
                 aria-labelledby={modeLabelledBy}
                 justifyContent="space-between"
                 minW="0"
-                size="xs"
                 variant="outline"
                 w="full"
               >
@@ -160,7 +159,6 @@ export const DynamicPromptsPanel = ({
             allowMouseWheel
             max={DYNAMIC_PROMPTS_MAX_PROMPTS}
             min={DYNAMIC_PROMPTS_MIN_PROMPTS}
-            size="xs"
             value={String(config.maxPrompts)}
             onValueChange={handleMaxPromptsChange}
           >
@@ -172,7 +170,6 @@ export const DynamicPromptsPanel = ({
         <Tooltip content={t('widgets.generate.dynamicPrompts.shuffle')}>
           <IconButton
             aria-label={t('widgets.generate.dynamicPrompts.shuffle')}
-            size="xs"
             variant="ghost"
             visibility={config.combinatorial ? 'hidden' : 'visible'}
             onClick={handleShuffle}
@@ -186,29 +183,28 @@ export const DynamicPromptsPanel = ({
         checked={config.seedBehaviour === 'per-image'}
         disabled={config.isSeedFixed}
         ids={seedSwitchIds}
-        size="sm"
         onCheckedChange={handleSeedBehaviourChange}
       >
         <Switch.HiddenInput aria-describedby={config.isSeedFixed ? seedHeldNoteId : undefined} />
         <Switch.Control _checked={SWITCH_CHECKED}>
           <Switch.Thumb />
         </Switch.Control>
-        <Switch.Label color="fg.muted" fontSize="2xs">
+        <Switch.Label color="fg.muted" fontSize="xs">
           {t('widgets.generate.dynamicPrompts.newSeedPerImage')}
         </Switch.Label>
       </Switch.Root>
       {config.isSeedFixed ? (
-        <Text color="fg.subtle" fontSize="2xs" id={seedHeldNoteId} mt="-1">
+        <Text color="fg.subtle" fontSize="xs" id={seedHeldNoteId} mt="-1">
           {t('widgets.generate.dynamicPrompts.seedHeldForEveryImage')}
         </Text>
       ) : null}
 
       {expansion.isError ? (
-        <Text color="fg.error" fontSize="2xs">
+        <Text color="fg.error" fontSize="xs">
           {t('widgets.generate.dynamicPrompts.problemGeneratingPrompts')}
         </Text>
       ) : expansion.error ? (
-        <Text color="fg.error" fontSize="2xs" wordBreak="break-word">
+        <Text color="fg.error" fontSize="xs" wordBreak="break-word">
           {expansion.error}
         </Text>
       ) : null}
@@ -227,7 +223,7 @@ export const DynamicPromptsPanel = ({
             />
           ))}
           {hiddenPromptCount > 0 ? (
-            <Text color="fg.subtle" fontSize="2xs" px="2" py="1.5">
+            <Text color="fg.subtle" fontSize="xs" px="2" py="1.5">
               {t('widgets.generate.dynamicPrompts.andMore', { count: hiddenPromptCount })}
             </Text>
           ) : null}
@@ -265,14 +261,14 @@ const DynamicPromptRow = ({
       justifyContent="start"
       px="2"
       py="1.5"
-      textStyle="xs"
+      textStyle="md"
       title={isDisabled ? undefined : t('widgets.generate.dynamicPrompts.usePrompt')}
       whiteSpace="nowrap"
       _disabled={DISABLED_PROMPT_ROW_PROPS}
       _hover={isDisabled ? NO_HOVER_PROPS : PROMPT_ROW_HOVER_PROPS}
     >
       <button disabled={isDisabled} type="button" onClick={handleClick}>
-        <Text as="span" color="fg.subtle" css={TABULAR_NUMS} fontSize="2xs">
+        <Text as="span" color="fg.subtle" css={TABULAR_NUMS} fontSize="xs">
           {index + 1}
         </Text>
         <Text as="span" color="fg" fontFamily="mono" fontSize="0.72rem" textAlign="start" wordBreak="break-word">

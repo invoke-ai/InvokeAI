@@ -42,7 +42,7 @@ const GROUP_LABEL_KEY: Record<Exclude<LaunchpadNavGroupId, 'footer'>, string> = 
 /** Use fg.muted for rail-heading contrast; the menu label's fg.subtle falls below 4.5:1 here. */
 const GROUP_LABEL_SX: SystemStyleObject = {
   color: 'fg.muted',
-  fontSize: '2xs',
+  fontSize: 'xs',
   fontWeight: '600',
   letterSpacing: '0.02em',
   pb: '1',
@@ -54,7 +54,7 @@ const GROUP_LABEL_SX: SystemStyleObject = {
 const NAV_SX: SystemStyleObject = { '& > section ~ section': { pt: '2' } };
 
 /** Rail entries match the settings dialog's navigation items: ghost buttons, subtle for the current page. */
-const NAV_ITEM_PROPS = { justifyContent: 'start', size: 'sm', w: 'full' } as const;
+const NAV_ITEM_PROPS = { justifyContent: 'start', size: 'lg', w: 'full' } as const;
 
 const NavLink = ({ isActive, item }: { isActive: boolean; item: LaunchpadNavItem }) => (
   <Button
@@ -77,7 +77,7 @@ const WhatsNewButton = () => {
   const { t } = useTranslation();
 
   return (
-    <Button color="fg.muted" css={WHATS_NEW_JUSTIFY} size="xs" variant="ghost" w="full" onClick={openWhatsNew}>
+    <Button color="fg.muted" css={WHATS_NEW_JUSTIFY} variant="ghost" w="full" onClick={openWhatsNew}>
       <Icon as={LightbulbFilamentIcon} boxSize="3.5" />
       <Text flex="1" textAlign="start" truncate>
         {t('whatsNew.whatsNewInInvoke')}

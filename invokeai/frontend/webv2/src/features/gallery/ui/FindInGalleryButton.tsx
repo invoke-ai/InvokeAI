@@ -24,7 +24,7 @@ export const FindInGalleryButton = ({ name, onFind, ...buttonProps }: FindInGall
 
   return (
     <Tooltip content={label}>
-      <IconButton aria-label={label} size="2xs" {...buttonProps} onClick={onFind}>
+      <IconButton aria-label={label} size="sm" {...buttonProps} onClick={onFind}>
         <CrosshairIcon />
       </IconButton>
     </Tooltip>

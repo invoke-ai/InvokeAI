@@ -20,7 +20,7 @@ const WidgetLoadingHeader = ({ label, widget }: { label: string; widget: Registe
     <HStack borderBottomWidth="1px" h="10" justify="space-between" pe="2" ps="3">
       <HStack flex="1" gap="1.5" minW="0">
         <WidgetIdentityIcon icon={widget.manifest.icon} isLoading />
-        <Text data-widget-identity-label="" fontSize="xs" fontWeight="700">
+        <Text data-widget-identity-label="" fontSize="md" fontWeight="700">
           {label}
         </Text>
       </HStack>
@@ -83,7 +83,7 @@ const TooltipWidgetLoadingFallback = ({
 }) => (
   <Box aria-atomic="true" aria-busy="true" aria-label={loadingLabel} aria-live="polite" role="status">
     <WidgetTooltipFrame icon={widget.manifest.icon} isLoading>
-      <Text data-widget-identity-label="" fontSize="xs" fontWeight="700">
+      <Text data-widget-identity-label="" fontSize="md" fontWeight="700">
         {label}
       </Text>
     </WidgetTooltipFrame>
@@ -114,7 +114,7 @@ const InlineWidgetLoadingFallback = ({
     w="full"
   >
     <WidgetIdentityIcon icon={widget.manifest.icon} isLoading />
-    <Text data-widget-identity-label="" fontSize="xs" fontWeight="700">
+    <Text data-widget-identity-label="" fontSize="md" fontWeight="700">
       {label}
     </Text>
   </Flex>

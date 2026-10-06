@@ -1,7 +1,7 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
 import type { GenerateModelConfig, GenerateSettings, Ideogram4SamplerPreset } from '@features/generation/core/types';
 
-import { Badge, Box, createListCollection, HStack, Image, Input, Stack, Text } from '@chakra-ui/react';
+import { Badge, Box, createListCollection, HStack, Image, Input, Separator, Stack, Text } from '@chakra-ui/react';
 import {
   getDefaultGenerateSettings,
   getGenerationModelPolicy,
@@ -73,7 +73,6 @@ const Ideogram4SamplingFields = ({ onCommit, settings }: Pick<GenerateRenderSect
         <Select
           aria-label={t('widgets.generate.ideogram4SamplerPreset')}
           collection={IDEOGRAM4_PRESET_COLLECTION}
-          size="xs"
           value={[settings.ideogram4SamplerPreset]}
           onValueChange={({ value }) => {
             const preset = value[0];
@@ -144,7 +143,6 @@ const Ideogram4SamplingFields = ({ onCommit, settings }: Pick<GenerateRenderSect
       </Field>
       <Field label={t('widgets.generate.ideogram4ColorPalette')} helpText={t('widgets.generate.ideogram4ColorHelp')}>
         <Input
-          size="xs"
           value={settings.ideogram4ColorPalette.join(', ')}
           onChange={(event) =>
             onCommit({
@@ -195,13 +193,18 @@ const Krea2SeedVarianceFields = ({ onCommit, settings }: Pick<GenerateRenderSect
 
   return (
     <>
-      <Field label={t('widgets.generate.krea2SeedVariance')} helpText={t('widgets.generate.krea2SeedVarianceHelp')}>
-        <GenerateToggleSwitch
-          checked={settings.krea2SeedVarianceEnabled}
-          label={t('widgets.generate.enabled')}
-          labelVisible
-          onCheckedChange={(checked) => onCommit({ krea2SeedVarianceEnabled: checked })}
-        />
+      <Field
+        helpText={t('widgets.generate.krea2SeedVarianceHelp')}
+        label={t('widgets.generate.krea2SeedVariance')}
+        labelEnd={
+          <GenerateToggleSwitch
+            checked={settings.krea2SeedVarianceEnabled}
+            label={t('widgets.generate.krea2SeedVariance')}
+            onCheckedChange={(checked) => onCommit({ krea2SeedVarianceEnabled: checked })}
+          />
+        }
+      >
+        {null}
       </Field>
       {settings.krea2SeedVarianceEnabled ? (
         <>
@@ -247,7 +250,7 @@ const SeedField = ({ onCommit, settings }: Pick<GenerateRenderSectionProps, 'onC
     >
       {seedHistory.length > 0 ? (
         <HStack gap="1" pt="0.5">
-          <Text color="fg.subtle" fontSize="2xs">
+          <Text color="fg.subtle" fontSize="xs">
             {t('widgets.generate.recentSeeds')}
           </Text>
           {seedHistory.map((item) => (
@@ -304,11 +307,11 @@ export const GenerateRenderSection = ({
 
   const badges = (
     <>
-      <Badge size="xs">
+      <Badge>
         {settings.steps} · {policy.ui.guidanceLabel} {settings.cfgScale}
       </Badge>
       {policy.ui.seedVisible ? (
-        <Badge size="xs">
+        <Badge>
           {settings.seedMode === 'random'
             ? t('common.seedMode.random')
             : settings.seedMode === 'fixed'
@@ -368,11 +371,14 @@ export const GenerateRenderSection = ({
           />
         </GenerateFieldContextMenu>
         {familyBase === 'krea-2' ? (
-          <GenerateConditioningRebalanceField
-            settings={settings}
-            onCommit={onCommit}
-            onCommitImmediate={onCommitImmediate}
-          />
+          <>
+            <Separator borderColor="border.subtle" />
+            <GenerateConditioningRebalanceField
+              settings={settings}
+              onCommit={onCommit}
+              onCommitImmediate={onCommitImmediate}
+            />
+          </>
         ) : null}
         {familyBase === 'wan' ? <WanLowNoiseGuidanceField settings={settings} onCommit={onCommit} /> : null}
         {policy.ui.schedulerVisible ? (
@@ -387,7 +393,6 @@ export const GenerateRenderSection = ({
                   aria-label={t('widgets.generate.scheduler')}
                   flex="1"
                   options={policy.scheduler.options}
-                  size="xs"
                   value={settings.scheduler}
                   onValueChange={(scheduler) => onCommit({ scheduler })}
                 />
@@ -402,8 +407,14 @@ export const GenerateRenderSection = ({
           </GenerateFieldContextMenu>
         ) : null}
         {familyBase === 'ideogram-4' ? <Ideogram4SamplingFields settings={settings} onCommit={onCommit} /> : null}
+        <Separator borderColor="border.subtle" />
         {policy.ui.seedVisible ? <SeedField settings={settings} onCommit={onCommit} /> : null}
-        {familyBase === 'krea-2' ? <Krea2SeedVarianceFields settings={settings} onCommit={onCommit} /> : null}
+        {familyBase === 'krea-2' ? (
+          <>
+            <Separator borderColor="border.subtle" />
+            <Krea2SeedVarianceFields settings={settings} onCommit={onCommit} />
+          </>
+        ) : null}
       </Stack>
     </GenerateCollapsibleSection>
   );

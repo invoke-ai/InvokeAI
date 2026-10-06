@@ -156,13 +156,12 @@ export const InstallQueueBar = () => {
           ms="-2"
           ps="2"
           pe="3"
-          size="xs"
           variant="ghost"
           _hover={TOGGLE_HOVER}
           onClick={() => setQueueExpanded(!queueExpanded)}
         >
           <Icon as={queueExpanded ? ChevronDownIcon : ChevronUpIcon} boxSize="3.5" />
-          <Text color="fg" fontSize="xs" fontWeight="700">
+          <Text color="fg" fontWeight="700">
             {t('models.installQueue')}
           </Text>
         </Button>
@@ -180,7 +179,7 @@ export const InstallQueueBar = () => {
                 {pausedJobs.length > 0 ? (
                   <Button
                     loading={isResumingAll}
-                    size="2xs"
+                    size="sm"
                     variant="ghost"
                     onClick={() => void runBulk(runResumeAll, resumeModelInstall, pausedJobs)}
                   >
@@ -191,7 +190,7 @@ export const InstallQueueBar = () => {
                   <Button
                     disabled={pausableJobs.length === 0}
                     loading={isPausingAll}
-                    size="2xs"
+                    size="sm"
                     variant="ghost"
                     onClick={() => void runBulk(runPauseAll, pauseModelInstall, pausableJobs)}
                   >
@@ -202,7 +201,7 @@ export const InstallQueueBar = () => {
                 <Menu.Root ids={bulkMenuIds} positioning={BULK_MENU_POSITIONING}>
                   <Tooltip content={t('models.moreQueueActions')} ids={bulkMenuIds}>
                     <Menu.Trigger asChild>
-                      <IconButton aria-label={t('models.moreQueueActions')} size="2xs" variant="ghost">
+                      <IconButton aria-label={t('models.moreQueueActions')} size="sm" variant="ghost">
                         <Icon as={ChevronDownIcon} boxSize="3" />
                       </IconButton>
                     </Menu.Trigger>
@@ -227,16 +226,16 @@ export const InstallQueueBar = () => {
             {pausableJobs.length + pausedJobs.length + cancellableJobs.length > 0 ? (
               <Separator h="4" mx="1" orientation="vertical" />
             ) : null}
-            <Button loading={isRefreshing} size="2xs" variant="ghost" onClick={() => runRefresh(refreshInstalls)}>
+            <Button loading={isRefreshing} size="sm" variant="ghost" onClick={() => runRefresh(refreshInstalls)}>
               <Icon as={RefreshCcwIcon} boxSize="3" />
               {t('common.refresh')}
             </Button>
-            <Button disabled={finishedCount === 0} loading={isPruning} size="2xs" variant="ghost" onClick={handlePrune}>
+            <Button disabled={finishedCount === 0} loading={isPruning} size="sm" variant="ghost" onClick={handlePrune}>
               <Icon as={Trash2Icon} boxSize="3" />
               {t('models.clearFinished')}
             </Button>
             <Tooltip content={queueMaximized ? t('models.restoreQueueTooltip') : t('models.maximizeQueueTooltip')}>
-              <Button size="2xs" variant="ghost" onClick={() => setQueueMaximized(!queueMaximized)}>
+              <Button size="sm" variant="ghost" onClick={() => setQueueMaximized(!queueMaximized)}>
                 <Icon as={queueMaximized ? Minimize2Icon : Maximize2Icon} boxSize="3" />
                 {queueMaximized ? t('models.restoreQueue') : t('models.maximizeQueue')}
               </Button>
@@ -251,7 +250,7 @@ export const InstallQueueBar = () => {
                 <IconButton
                   aria-label={t('models.clearFinished')}
                   loading={isPruning}
-                  size="2xs"
+                  size="sm"
                   variant="ghost"
                   onClick={handlePrune}
                 >
@@ -296,7 +295,7 @@ const CountChip = ({
   }
 
   return (
-    <Badge colorPalette={palette} flexShrink={0} fontSize="2xs" gap="1.5" rounded="full" size="sm" variant="surface">
+    <Badge colorPalette={palette} flexShrink={0} fontSize="xs" gap="1.5" rounded="full" size="lg" variant="surface">
       {icon === 'dot' ? <Box bg="colorPalette.solid" boxSize="1.5" rounded="full" /> : null}
       {icon === 'alert' ? <Icon as={TriangleAlertIcon} boxSize="3" /> : null}
       {t(labelKey, { count })}
@@ -333,7 +332,7 @@ const CollapsedSummary = ({
       {featured ? (
         <FeaturedJob row={featured} />
       ) : (
-        <Text color="fg.muted" flex="1 1 10rem" fontSize="xs" minW="0" truncate>
+        <Text color="fg.muted" flex="1 1 10rem" minW="0" truncate>
           {summary.paused > 0
             ? t('models.queuePausedCount', { count: summary.paused })
             : jobCount > 0
@@ -366,7 +365,7 @@ const FeaturedJob = ({ row }: { row: InstallQueueRow }) => {
       <Spinner borderWidth="1.5px" boxSize="3.5" color="accent.solid" flexShrink={0} />
       <MiddleTruncate
         flexShrink={1}
-        fontSize="xs"
+        fontSize="md"
         fontWeight="600"
         maxW="18rem"
         minW="5rem"
@@ -375,7 +374,7 @@ const FeaturedJob = ({ row }: { row: InstallQueueRow }) => {
       <Box flexShrink={1} maxW="10rem" minW="3rem" w="full">
         <InstallProgressBar label={t('models.downloadProgress')} progress={progress} status={row.status} />
       </Box>
-      <Text color="fg.muted" flexShrink={3} fontFamily="mono" fontSize="2xs" minW="0" truncate>
+      <Text color="fg.muted" flexShrink={3} fontFamily="mono" fontSize="xs" minW="0" truncate>
         {caption}
       </Text>
     </HStack>
@@ -393,7 +392,7 @@ const FeaturedActions = ({ row }: { row: InstallQueueRow }) => {
           <IconButton
             aria-label={t('models.pauseDownload')}
             disabled={actions.isBusy}
-            size="2xs"
+            size="sm"
             variant="ghost"
             onClick={actions.pause}
           >
@@ -406,7 +405,7 @@ const FeaturedActions = ({ row }: { row: InstallQueueRow }) => {
           aria-label={t('models.cancelInstall')}
           colorPalette="danger"
           disabled={actions.isBusy}
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={actions.cancel}
         >

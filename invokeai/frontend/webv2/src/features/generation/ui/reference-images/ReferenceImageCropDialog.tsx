@@ -170,11 +170,14 @@ export const ReferenceImageCropDialog = ({
   isOpen,
   onApply,
   onClose,
+  onExitComplete,
 }: {
   image: GenerateReferenceImageAsset;
   isOpen: boolean;
   onApply: (image: GenerateReferenceImageAsset) => void;
   onClose: () => void;
+  /** After the close animation; the host releases the retained dialog here. */
+  onExitComplete?: () => void;
 }) => {
   const { t } = useTranslation();
   const { gallery, notifications } = useGenerationUi();
@@ -298,7 +301,14 @@ export const ReferenceImageCropDialog = ({
   }, [close, cropBox, gallery, image, notifications, onApply, onClose]);
 
   return (
-    <Dialog.Root lazyMount open={isOpen} size="lg" unmountOnExit onOpenChange={handleOpenChange}>
+    <Dialog.Root
+      lazyMount
+      open={isOpen}
+      size="lg"
+      unmountOnExit
+      onExitComplete={onExitComplete}
+      onOpenChange={handleOpenChange}
+    >
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
@@ -311,7 +321,7 @@ export const ReferenceImageCropDialog = ({
             </Dialog.CloseTrigger>
             <Dialog.Body>
               <Stack gap="3">
-                <Text color="fg.muted" fontSize="xs">
+                <Text color="fg.muted" fontSize="md">
                   {t('widgets.generate.cropReferenceImageHelp')}
                 </Text>
                 <Box
@@ -385,7 +395,7 @@ export const ReferenceImageCropDialog = ({
                     ))}
                   </Box>
                 </Box>
-                <Text color="fg.muted" fontFamily="mono" fontSize="2xs">
+                <Text color="fg.muted" fontFamily="mono" fontSize="xs">
                   {cropWidthPx} × {cropHeightPx} px
                 </Text>
               </Stack>
@@ -393,16 +403,15 @@ export const ReferenceImageCropDialog = ({
             <Dialog.Footer>
               <Button
                 disabled={isApplying || isFullReferenceImageCropBox(cropBox)}
-                size="xs"
                 variant="outline"
                 onClick={resetCrop}
               >
                 {t('common.reset')}
               </Button>
-              <Button disabled={isApplying} size="xs" variant="ghost" onClick={close}>
+              <Button disabled={isApplying} variant="ghost" onClick={close}>
                 {t('common.cancel')}
               </Button>
-              <Button loading={isApplying} size="xs" onClick={applyCrop}>
+              <Button loading={isApplying} onClick={applyCrop}>
                 {t('common.apply')}
               </Button>
             </Dialog.Footer>

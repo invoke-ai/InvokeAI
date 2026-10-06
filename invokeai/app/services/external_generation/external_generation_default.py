@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import math
 import time
 from logging import Logger
 from typing import TYPE_CHECKING
@@ -225,9 +226,6 @@ class ExternalGenerationService(ExternalGenerationServiceBase):
         if aspect_ratio in capabilities.allowed_aspect_ratios:
             return request
 
-        if not capabilities.aspect_ratio_sizes:
-            return request
-
         closest = _select_closest_ratio(
             request.width,
             request.height,
@@ -235,6 +233,14 @@ class ExternalGenerationService(ExternalGenerationServiceBase):
         )
         if closest is None:
             return request
+
+        if not capabilities.aspect_ratio_sizes:
+            # Without per-ratio sizes (models sized by a resolution preset), keep the requested pixel
+            # area and only correct the ratio, which validation would otherwise reject.
+            snapped = _size_for_ratio(closest, request.width * request.height)
+            if snapped is None:
+                return request
+            return self._bucket_to_size(request, snapped[0], snapped[1], closest)
 
         size = capabilities.aspect_ratio_sizes.get(closest)
         if size is None:
@@ -292,6 +298,16 @@ def _select_closest_ratio(width: int, height: int, ratios: list[str]) -> str | N
     if not parsed:
         return None
     return min(parsed, key=lambda item: abs(item[1] - ratio))[0]
+
+
+def _size_for_ratio(ratio: str, area: int) -> tuple[int, int] | None:
+    """The exact-ratio size whose pixel area is closest to `area`, for a ratio of whole numbers."""
+    left_text, _, right_text = ratio.partition(":")
+    if not (left_text.isdigit() and right_text.isdigit()) or int(left_text) == 0 or int(right_text) == 0:
+        return None
+    left, right = int(left_text), int(right_text)
+    scale = max(1, round(math.sqrt(area / (left * right))))
+    return left * scale, right * scale
 
 
 def _ratio_for_size(width: int, height: int, sizes: dict[str, ExternalImageSize]) -> str | None:

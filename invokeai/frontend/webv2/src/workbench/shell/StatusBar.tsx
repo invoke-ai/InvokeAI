@@ -48,7 +48,7 @@ const BOTTOM_MENU_POSITIONING = { placement: 'top-end' } as const;
 const WIDGET_POPOVER_POSITIONING = { placement: 'top-end' } as const;
 const BOTTOM_MENU_TRIGGER = { kind: 'bottom' } as const;
 /** Use content color for active brand accents; background tint is indistinguishable on the light theme. */
-const COMPACT_ROW_HOVER_PROPS = { bg: 'bg.emphasized', color: 'fg' };
+const COMPACT_ROW_HOVER_PROPS = { bg: 'bg.hover', color: 'fg' };
 
 /** Size drop overlays per cluster so one strip-wide curtain cannot cover the other target. */
 const ClusterDropRing = ({ dropState, isOver }: { dropState: WidgetRegionDropState; isOver: boolean }) => (

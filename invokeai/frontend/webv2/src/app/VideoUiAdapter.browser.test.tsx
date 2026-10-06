@@ -35,7 +35,8 @@ const revealGalleryItem = vi.fn(
 /** The regions the project's single gallery instance occupies. */
 let galleryRegions: string[] = ['right'];
 
-vi.mock('@features/video', () => ({
+vi.mock('@features/video', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   VideoUiProvider: ({ adapter: next, children }: { adapter: VideoUiAdapter; children: ReactNode }) => {
     adapter = next;
     return children;

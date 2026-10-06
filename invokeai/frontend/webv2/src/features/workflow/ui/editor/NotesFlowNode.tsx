@@ -23,13 +23,13 @@ const NotesSnapshotNode = ({ data }: NodeProps<NotesFlowNodeType>) => {
     >
       <MiddleTruncate
         data-workflow-export-node-title="true"
-        fontSize="2xs"
+        fontSize="xs"
         fontWeight="700"
         mb="1.5"
         text={node.data.label}
       />
       {node.data.notes ? (
-        <Text fontSize="2xs" overflowWrap="anywhere" whiteSpace="pre-wrap">
+        <Text fontSize="xs" overflowWrap="anywhere" whiteSpace="pre-wrap">
           {node.data.notes}
         </Text>
       ) : null}
@@ -66,7 +66,6 @@ const NotesEditorNode = ({ data, selected }: NodeProps<NotesFlowNodeType>) => {
         className="nodrag"
         fontWeight="700"
         mb="1.5"
-        size="2xs"
         value={node.data.label}
         variant="flushed"
         onChange={onLabelChange}
@@ -74,11 +73,10 @@ const NotesEditorNode = ({ data, selected }: NodeProps<NotesFlowNodeType>) => {
       <Textarea
         aria-label="Note text"
         className="nodrag nowheel"
-        fontSize="2xs"
+        fontSize="xs"
         minH="5rem"
         placeholder="Write a note…"
         resize="vertical"
-        size="xs"
         value={node.data.notes}
         onChange={onNotesChange}
       />

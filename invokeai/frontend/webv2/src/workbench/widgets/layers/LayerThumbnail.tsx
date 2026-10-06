@@ -112,7 +112,6 @@ const LayerThumbnailContent = ({
           onClick={retry}
           onPointerDown={stopPropagation}
           position="absolute"
-          size="xs"
           variant="surface"
         >
           <RefreshCwIcon />

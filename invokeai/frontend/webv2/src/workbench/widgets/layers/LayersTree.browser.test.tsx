@@ -71,7 +71,10 @@ vi.mock('./LayerStackHeader', () => ({
 }));
 vi.mock('./LayerSurfaceHost', () => ({
   LayerSurfaceHost: ({ surface }: { surface: { kind: string; id?: string; child?: { key: string } } | null }) => (
-    <output data-testid="surface">{surface ? `${surface.kind}:${surface.child?.key ?? surface.id}` : 'none'}</output>
+    // Hidden like the harness outputs so the tree's scroll geometry doesn't depend on this stand-in's line height.
+    <output data-testid="surface" style={{ display: 'none' }}>
+      {surface ? `${surface.kind}:${surface.child?.key ?? surface.id}` : 'none'}
+    </output>
   ),
 }));
 

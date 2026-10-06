@@ -275,3 +275,16 @@ def test_qwen_image_edit_max_enforces_three_reference_images() -> None:
         service.generate(request)
 
     assert provider.last_request is None
+
+
+def test_generate_snaps_unlisted_ratio_when_model_has_no_bucket_sizes() -> None:
+    """Models sized by resolution preset list ratios but no sizes; an off-ratio request keeps its area."""
+    model = _build_model(ExternalModelCapabilities(modes=["txt2img"], allowed_aspect_ratios=["1:1", "16:9"]))
+    request = _build_request(model=model, width=1368, height=768)
+    provider = DummyProvider("openai", configured=True, result=ExternalGenerationResult(images=[]))
+    service = ExternalGenerationService({"openai": provider}, logging.getLogger("test"))
+
+    service.generate(request)
+
+    assert provider.last_request is not None
+    assert (provider.last_request.width, provider.last_request.height) == (1360, 765)

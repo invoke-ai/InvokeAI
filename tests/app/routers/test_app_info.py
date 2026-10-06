@@ -41,6 +41,112 @@ def _non_admin_user() -> Mock:
     return Mock(user_id="user-1", email="user@example.com", is_admin=False, is_active=True, token_epoch=0)
 
 
+def _patch_database_cleaner(mock_invoker: Invoker, monkeypatch: Any) -> Mock:
+    database = mock_invoker.services.database
+    clean = Mock()
+    monkeypatch.setattr(database, "clean", clean)
+    return clean
+
+
+def _authenticate_vacuum_user(monkeypatch: Any, mock_invoker: Invoker, is_admin: bool) -> None:
+    monkeypatch.setattr(mock_invoker.services.configuration, "multiuser", True)
+    monkeypatch.setattr(
+        "invokeai.app.api.auth_dependencies.verify_token",
+        lambda _: TokenData(user_id="user-1", email="user@example.com", is_admin=not is_admin),
+    )
+    monkeypatch.setattr(
+        mock_invoker.services.users,
+        "get",
+        Mock(
+            return_value=Mock(
+                user_id="user-1", email="user@example.com", is_admin=is_admin, is_active=True, token_epoch=0
+            )
+        ),
+    )
+
+
+def _patch_vacuum_dependencies(monkeypatch: Any, mock_invoker: Invoker) -> None:
+    mock_deps = MockApiDependencies(mock_invoker)
+    monkeypatch.setattr("invokeai.app.api.routers.app_info.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
+
+
+def test_vacuum_database_openapi_contract() -> None:
+    operation = app.openapi()["paths"]["/api/v1/app/database/vacuum"]["post"]
+
+    assert operation["operationId"] == "vacuum_database"
+    assert operation["security"] == [{"HTTPBearer": []}]
+    assert {"204", "401", "403", "500"}.issubset(operation["responses"])
+    assert "content" not in operation["responses"]["204"]
+
+
+def test_vacuum_database_allows_multiuser_admin(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+    clean = _patch_database_cleaner(mock_invoker, monkeypatch)
+    _patch_vacuum_dependencies(monkeypatch, mock_invoker)
+    _authenticate_vacuum_user(monkeypatch, mock_invoker, is_admin=True)
+
+    response = client.post("/api/v1/app/database/vacuum", headers={"Authorization": "Bearer admin-token"})
+
+    assert response.status_code == 204
+    assert response.content == b""
+    clean.assert_called_once_with()
+
+
+def test_vacuum_database_uses_single_user_admin_fallback(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    clean = _patch_database_cleaner(mock_invoker, monkeypatch)
+    _patch_vacuum_dependencies(monkeypatch, mock_invoker)
+    monkeypatch.setattr(mock_invoker.services.configuration, "multiuser", False)
+
+    response = client.post("/api/v1/app/database/vacuum")
+
+    assert response.status_code == 204
+    assert response.content == b""
+    clean.assert_called_once_with()
+
+
+def test_vacuum_database_rejects_non_admin_without_cleaning(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    clean = _patch_database_cleaner(mock_invoker, monkeypatch)
+    _patch_vacuum_dependencies(monkeypatch, mock_invoker)
+    _authenticate_vacuum_user(monkeypatch, mock_invoker, is_admin=False)
+
+    response = client.post("/api/v1/app/database/vacuum", headers={"Authorization": "Bearer user-token"})
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Admin privileges required"
+    clean.assert_not_called()
+
+
+def test_vacuum_database_rejects_unauthenticated_multiuser_request(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    clean = _patch_database_cleaner(mock_invoker, monkeypatch)
+    _patch_vacuum_dependencies(monkeypatch, mock_invoker)
+    monkeypatch.setattr(mock_invoker.services.configuration, "multiuser", True)
+
+    response = client.post("/api/v1/app/database/vacuum")
+
+    assert response.status_code == 401
+    clean.assert_not_called()
+
+
+def test_vacuum_database_sanitizes_clean_failure(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+    clean = _patch_database_cleaner(mock_invoker, monkeypatch)
+    clean.side_effect = RuntimeError("sensitive sqlite path")
+    _patch_vacuum_dependencies(monkeypatch, mock_invoker)
+    monkeypatch.setattr(mock_invoker.services.configuration, "multiuser", False)
+
+    response = client.post("/api/v1/app/database/vacuum")
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Database vacuum failed"}
+    assert "sensitive sqlite path" not in response.text
+    clean.assert_called_once_with()
+
+
 def test_get_external_provider_statuses(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
     statuses = {
         "gemini": ExternalProviderStatus(provider_id="gemini", configured=True, message=None),

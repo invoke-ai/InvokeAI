@@ -368,7 +368,7 @@ const DRAG_OVERLAY_STYLE = { pointerEvents: 'none' } as const;
 const WidgetDragPreview = ({ activeDrag }: { activeDrag: ActiveWidgetDrag }) => (
   <HStack bg="bg" borderWidth="1px" gap="2" px="3" py="2" rounded="md" shadow="lg">
     <WidgetIcon icon={activeDrag.icon} boxSize="4" />
-    <Text fontSize="xs" fontWeight="700">
+    <Text fontSize="md" fontWeight="700">
       {activeDrag.label}
     </Text>
   </HStack>
