@@ -2838,6 +2838,7 @@
       "itemJsonLabel": "Queue item {{id}} JSON",
       "itemProgress": "Queue item progress",
       "itemTitle": "Queue item #{{id}}",
+      "items": "Queue items",
       "loadSettingsIntoGenerate": "Load these settings into Generate",
       "loading": "Loading queue…",
       "modelCache": {
