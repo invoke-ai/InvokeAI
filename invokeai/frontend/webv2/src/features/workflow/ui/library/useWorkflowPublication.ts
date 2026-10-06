@@ -96,6 +96,15 @@ export interface WorkflowPublication {
   isPublishing: (workflowId: string) => boolean;
 }
 
+/** Where a settled publication lands; `adoptName` renames the workflow after the template it created. */
+interface PublicationTarget {
+  adoptName?: boolean;
+  name: string;
+  projectId: string;
+  updateSource: boolean;
+  workflowId: string;
+}
+
 export const useWorkflowPublication = (): WorkflowPublication => {
   const { t } = useTranslation();
   const { commands, project } = useWorkflowUi();
@@ -117,16 +126,19 @@ export const useWorkflowPublication = (): WorkflowPublication => {
 
   /** Applies a settled publication to the originating project workflow; a later project or account never sees it. */
   const settle = useCallback(
-    (
-      result: WorkflowPublicationResult,
-      target: { projectId: string; workflowId: string; updateSource: boolean; name: string }
-    ): WorkflowPublicationOutcome => {
+    (result: WorkflowPublicationResult, target: PublicationTarget): WorkflowPublicationOutcome => {
       if (result.status === 'published') {
         if (target.updateSource) {
           commands.setWorkflowSource(
             { projectId: target.projectId, workflowId: target.workflowId },
             { libraryWorkflowId: result.libraryWorkflowId, revision: result.revision }
           );
+        }
+
+        // A save as new turns the workflow into the template it created, so it takes that template's name; the
+        // header and a later update confirmation then name the template the workflow is linked to.
+        if (target.adoptName && result.kind === 'created') {
+          commands.renameWorkflow(target.workflowId, result.name, target.projectId);
         }
 
         notify.success(
@@ -148,10 +160,7 @@ export const useWorkflowPublication = (): WorkflowPublication => {
 
   // A retry settles against the same target, so a save that lands on the second attempt still links the copy.
   const settleWithRetry = useCallback(
-    function settleWithRetry(
-      result: WorkflowPublicationResult,
-      target: { projectId: string; workflowId: string; updateSource: boolean; name: string }
-    ): WorkflowPublicationOutcome {
+    function settleWithRetry(result: WorkflowPublicationResult, target: PublicationTarget): WorkflowPublicationOutcome {
       const key = unresolvedKey(target.projectId, target.workflowId);
 
       if (result.status === 'failed') {
@@ -189,7 +198,7 @@ export const useWorkflowPublication = (): WorkflowPublication => {
         return { message: rejection, status: 'rejected' };
       }
 
-      const target = { name, projectId: snapshot.id, updateSource: true, workflowId };
+      const target = { adoptName: true, name, projectId: snapshot.id, updateSource: true, workflowId };
       const result = await publicationController.publish({
         destination: { kind: 'create', name },
         owner: captureAccountScope(),

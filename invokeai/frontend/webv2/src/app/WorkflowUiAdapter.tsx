@@ -268,8 +268,8 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
         editGraph: commands.workflows.editGraph,
         redo: commands.workflows.redo,
         removeWorkflow: (workflowId) => commands.workflows.remove(workflowId),
-        renameWorkflow: (workflowId, name) => {
-          commands.workflows.rename(workflowId, name);
+        renameWorkflow: (workflowId, name, projectId) => {
+          commands.workflows.rename(workflowId, name, projectId);
         },
         replaceWorkflow: (target, document, options) => commands.workflows.replaceDocument(target, document, options),
         selectWorkflow: (workflowId) => commands.workflows.select(workflowId),

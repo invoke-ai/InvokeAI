@@ -72,10 +72,10 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.untitled': 'Untitled Workflow',
   'workflowLibrary.updateConfirm': 'Update template',
   'workflowLibrary.updateConfirmBody':
-    'Replace the library template with the current graph, form, and input values of "{{name}}"?',
+    "Replace this workflow's library template with its current graph, form, and input values?",
   'workflowLibrary.updateConfirmCallers': 'Workflows that call this template will use the new version.',
   'workflowLibrary.updateConfirmNamedBody':
-    'Replace "{{template}}" in the library with the current graph, form, and input values of "{{name}}"?',
+    'Replace the library template "{{template}}" with this workflow\'s current graph, form, and input values?',
   'workflowLibrary.updateTitle': 'Update library template',
 };
 
@@ -158,7 +158,7 @@ describe('WorkflowPublicationHost', () => {
   let host: HTMLDivElement;
   let root: Root;
   let project: ReturnType<typeof createMutablePort<ReturnType<typeof projectSnapshot>>>;
-  let commands: { setWorkflowSource: ReturnType<typeof vi.fn> };
+  let commands: { renameWorkflow: ReturnType<typeof vi.fn>; setWorkflowSource: ReturnType<typeof vi.fn> };
   let notifications: {
     error: ReturnType<typeof vi.fn>;
     info: ReturnType<typeof vi.fn>;
@@ -259,7 +259,7 @@ describe('WorkflowPublicationHost', () => {
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
-    commands = { setWorkflowSource: vi.fn() };
+    commands = { renameWorkflow: vi.fn(), setWorkflowSource: vi.fn() };
     notifications = { error: vi.fn(), info: vi.fn(), success: vi.fn() };
     api.createLibraryWorkflowRecord.mockReset();
     api.getLibraryWorkflowRecord.mockReset();
@@ -298,6 +298,8 @@ describe('WorkflowPublicationHost', () => {
       { projectId: PROJECT_ID, workflowId: WORKFLOW_ID },
       { libraryWorkflowId: 'lib-new', revision: 1 }
     );
+    // It is now that template's working copy, so it takes the template's name.
+    expect(commands.renameWorkflow).toHaveBeenCalledWith(WORKFLOW_ID, 'Alpha, published', PROJECT_ID);
     expect(notifications.success).toHaveBeenCalledWith('Workflow saved', 'Saved "Alpha, published" to the library.');
     expect(saveDialog()).toBeNull();
   });
@@ -324,9 +326,11 @@ describe('WorkflowPublicationHost', () => {
     await flush();
 
     const dialog = dialogTitled('Update library template');
+    // Only the template being replaced is named, never the one the workflow was first opened from.
     expect(dialog?.textContent).toContain(
-      'Replace "demo" in the library with the current graph, form, and input values of "Alpha"?'
+      'Replace the library template "demo" with this workflow\'s current graph, form, and input values?'
     );
+    expect(dialog?.textContent).not.toContain('Alpha');
     await confirmUpdate();
 
     expect(api.updateLibraryWorkflow).toHaveBeenCalledTimes(1);
@@ -342,7 +346,8 @@ describe('WorkflowPublicationHost', () => {
     await request('update-source');
 
     const dialog = dialogTitled('Update library template');
-    expect(dialog?.textContent).toContain('input values of "Alpha"?');
+    await flush();
+    expect(dialog?.textContent).toContain('Replace the library template "Library alpha" with');
     expect(api.updateLibraryWorkflow).not.toHaveBeenCalled();
 
     await confirmUpdate();

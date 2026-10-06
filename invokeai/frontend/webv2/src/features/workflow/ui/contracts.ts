@@ -57,7 +57,8 @@ export interface WorkflowCommands {
   editGraph(action: ProjectGraphAction, target?: WorkflowTarget): void;
   redo(target?: WorkflowTarget): void;
   removeWorkflow(workflowId: string): void;
-  renameWorkflow(workflowId: string, name: string): void;
+  /** Renames a workflow of the active project, or of `projectId` when given; ignored once it no longer exists. */
+  renameWorkflow(workflowId: string, name: string, projectId?: string): void;
   /** Replaces a copy's document (keeping its id and name) as one undo step, and activates it. */
   replaceWorkflow(
     target: WorkflowTarget,

@@ -385,7 +385,7 @@ export const WorkflowPublicationHost = () => {
   }, [activeStage, close]);
 
   // The template an update replaces is the one the workflow is linked to now (a save as new re-links it), which
-  // need not share the workflow's name; the confirmation names both once the template's record is read.
+  // need not share the workflow's name; the confirmation names only that template, once its record is read.
   const confirmTemplateId = activeStage.kind === 'confirm-update' ? activeStage.libraryWorkflowId : '';
   const confirmTemplateName = useQuery({
     ...savedWorkflowDetailQueryOptions(confirmTemplateId),
@@ -397,15 +397,15 @@ export const WorkflowPublicationHost = () => {
       <Stack gap="2">
         <Text>
           {confirmTemplateName
-            ? t('workflowLibrary.updateConfirmNamedBody', { name: workflowName, template: confirmTemplateName })
-            : t('workflowLibrary.updateConfirmBody', { name: workflowName })}
+            ? t('workflowLibrary.updateConfirmNamedBody', { template: confirmTemplateName })
+            : t('workflowLibrary.updateConfirmBody')}
         </Text>
         <Text color="fg.muted" fontSize="md">
           {t('workflowLibrary.updateConfirmCallers')}
         </Text>
       </Stack>
     ),
-    [confirmTemplateName, t, workflowName]
+    [confirmTemplateName, t]
   );
   const conflictOptions = useMemo(
     () => [
