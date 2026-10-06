@@ -843,4 +843,16 @@ describe('cross-tab credential reconciliation', () => {
     expect(session.getAuthSession().user).toEqual(user);
     expect(heldToken()).toBe('token-a');
   });
+
+  it('keeps an own password change working when storage is unavailable', async () => {
+    testState.blockStorage();
+    await signInAsUserA();
+    const { accountEpoch } = session.getAuthSession();
+    api.updateCurrentUser.mockResolvedValueOnce({ refreshedToken: 'token-a-epoch-2', user });
+
+    await session.updateOwnProfile({ current_password: 'old', new_password: 'new' });
+
+    expect(session.getAuthSession()).toMatchObject({ accountEpoch, sessionExpired: false, user });
+    expect(heldToken()).toBe('token-a-epoch-2');
+  });
 });

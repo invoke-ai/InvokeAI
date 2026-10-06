@@ -219,8 +219,8 @@ const renewMediaCookie = (): void => {
 };
 
 interface CredentialRotation {
-  /** True while the marker in shared storage is this rotation's to withdraw. */
-  announced: boolean;
+  /** The marker this rotation wrote to shared storage, until it withdraws it. */
+  announced: CredentialRotationMarker | null;
   deferredStorageSync: boolean;
   deferredUnauthorized: HttpCredential | null;
   readonly scope: LifetimeScope;
@@ -239,16 +239,20 @@ const getPendingRotation = (): CredentialRotation | null =>
  */
 const ANNOUNCED_ROTATION_WAIT_MS = 30_000;
 
-/** The rotation another tab has announced for `userId`'s credential, if it is still within its wait. */
+/**
+ * The rotation another tab has announced for `userId`'s credential, if it is still within its wait. A marker dated in
+ * the future (a clock step, or not written by this app) counts from now, so it can never hold longer than the wait.
+ */
 const readAnnouncedRotation = (userId: string | null): CredentialRotationMarker | null => {
   const marker = userId === null ? null : tokenStore.readRotation();
 
-  return marker !== null &&
-    marker !== undefined &&
-    marker.userId === userId &&
-    Date.now() - marker.at < ANNOUNCED_ROTATION_WAIT_MS
-    ? marker
-    : null;
+  if (marker === null || marker === undefined || marker.userId !== userId) {
+    return null;
+  }
+
+  const at = Math.min(marker.at, Date.now());
+
+  return Date.now() - at < ANNOUNCED_ROTATION_WAIT_MS ? { at, userId: marker.userId } : null;
 };
 
 /** Resolves once `marker` is no longer announced for `userId`: when it is cleared or when its wait ends. */
@@ -259,7 +263,7 @@ const untilAnnouncedRotationSettles = (marker: CredentialRotationMarker): Promis
       unsubscribe();
       resolve();
     };
-    const timer = setTimeout(settle, marker.at + ANNOUNCED_ROTATION_WAIT_MS - Date.now());
+    const timer = setTimeout(settle, Math.max(0, marker.at + ANNOUNCED_ROTATION_WAIT_MS - Date.now()));
     const unsubscribe = tokenStore.subscribe(() => {
       if (readAnnouncedRotation(marker.userId) === null) {
         settle();
@@ -341,7 +345,11 @@ const handleTransportUnauthorized = (credential: HttpCredential): void => {
   );
 
   if (announced !== null) {
-    deferUnauthorizedToAnnouncedRotation(credential, announced);
+    // A restore or follow in progress decides what its own rejection means once the announcement settles.
+    if (store.getSnapshot().phase === 'ready' && activeTransition === null) {
+      deferUnauthorizedToAnnouncedRotation(credential, announced);
+    }
+
     return;
   }
 
@@ -379,7 +387,7 @@ const rotateOwnCredential = <Result extends { refreshedToken: string | null }>(
     const scope = getAccountLifecycle().capture();
     const userId = store.getSnapshot().user?.user_id ?? null;
     const pending: CredentialRotation = {
-      announced: userId !== null,
+      announced: userId === null ? null : { at: Date.now(), userId },
       deferredStorageSync: false,
       deferredUnauthorized: null,
       scope,
@@ -387,8 +395,8 @@ const rotateOwnCredential = <Result extends { refreshedToken: string | null }>(
 
     rotation = pending;
 
-    if (userId !== null) {
-      tokenStore.writeRotation({ at: Date.now(), userId });
+    if (pending.announced !== null) {
+      tokenStore.writeRotation(pending.announced);
     }
 
     try {
@@ -480,10 +488,21 @@ const activateAccount = (user: UserDTO, token: string): number => {
   return epoch;
 };
 
-/** Withdrawn once the replacement is stored, so a waiting tab adopts the replacement before its wait ends. */
+/**
+ * Withdrawn once the replacement is stored, so a waiting tab adopts the replacement before its wait ends. Only this
+ * rotation's own marker is cleared; another tab of the same user may have announced its own meanwhile.
+ */
 const withdrawAnnouncedRotation = (pending: CredentialRotation): void => {
-  if (pending.announced) {
-    pending.announced = false;
+  const { announced } = pending;
+
+  if (announced === null) {
+    return;
+  }
+
+  pending.announced = null;
+  const stored = tokenStore.readRotation();
+
+  if (stored === undefined || (stored !== null && stored.at === announced.at && stored.userId === announced.userId)) {
     tokenStore.clearRotation();
   }
 };
@@ -545,6 +564,43 @@ const resolvePrincipal = async (signal?: AbortSignal): Promise<PrincipalResoluti
   }
 };
 
+/**
+ * Resolve who a stored token belongs to. A rejection while another tab has announced a rotation of that principal's
+ * credential is most likely the revocation the change caused, so the restore waits for the announcement to settle
+ * and continues from whatever storage holds then: the replacement, the same token (the change failed), or nothing
+ * (another tab signed out meanwhile).
+ */
+const resolveStoredPrincipal = async (
+  token: string
+): Promise<{ principal: PrincipalResolution | null; token: string | null }> => {
+  bindHeldToken(token);
+  const principal = await resolvePrincipal();
+  const announced = principal.kind === 'rejected' ? readAnnouncedRotation(readTokenUserId(token)) : null;
+
+  if (announced === null) {
+    return { principal, token };
+  }
+
+  await untilAnnouncedRotationSettles(announced);
+  const stored = tokenStore.read();
+
+  if (stored === null) {
+    heldCredential = null;
+    observedStoredToken = null;
+
+    return { principal: null, token: null };
+  }
+
+  if (typeof stored !== 'string' || stored === token) {
+    return { principal, token };
+  }
+
+  observedStoredToken = stored;
+  bindHeldToken(stored);
+
+  return { principal: await resolvePrincipal(), token: stored };
+};
+
 const resolveSession = async (): Promise<AuthSession> => {
   let status: AuthStatus;
 
@@ -562,31 +618,23 @@ const resolveSession = async (): Promise<AuthSession> => {
   let sessionExpired = false;
 
   if (status.multiuser_enabled) {
-    const stored = tokenStore.read();
-    // Another tab may be replacing the stored token right now; its revocation would reject the old one.
-    const announced =
-      authenticates && typeof stored === 'string' ? readAnnouncedRotation(readTokenUserId(stored)) : null;
-
-    if (announced !== null) {
-      await untilAnnouncedRotationSettles(announced);
-    }
-
     observedStoredToken = tokenStore.read();
     token = authenticates ? (observedStoredToken ?? null) : null;
   }
 
   if (token !== null) {
-    bindHeldToken(token);
-    const principal = await resolvePrincipal();
+    const restored = await resolveStoredPrincipal(token);
 
-    if (principal.kind === 'unavailable') {
+    token = restored.token;
+
+    if (restored.principal?.kind === 'unavailable') {
       // Unknown principal remains unavailable rather than signed out, preventing access to unscoped storage.
       return publishUnavailableSession();
     }
 
-    if (principal.kind === 'user') {
-      user = principal.user;
-    } else {
+    if (restored.principal?.kind === 'user') {
+      user = restored.principal.user;
+    } else if (restored.principal?.kind === 'rejected') {
       heldCredential = null;
       forgetStoredToken(token);
       sessionExpired = true;
@@ -653,21 +701,22 @@ const followStoredPrincipal = async (token: string): Promise<void> => {
   bindHeldToken(token);
   store.patchSnapshot({ accountEpoch: invalidatedEpoch, sessionExpired: false, user: null });
 
-  const announced = readAnnouncedRotation(readTokenUserId(token));
+  const principal = await resolvePrincipal(transition.controller.signal);
+
+  if (!isCurrentTransition(transition)) {
+    return;
+  }
+
+  const announced = principal.kind === 'rejected' ? readAnnouncedRotation(readTokenUserId(token)) : null;
 
   if (announced !== null) {
-    // The token is about to be revoked by its own principal; let the replacement arrive and win instead.
+    // The rejection is most likely the revocation an announced change caused. Its replacement, once stored, starts
+    // a newer transition that supersedes this one; only an announcement withdrawn without one rejects the token.
     await untilAnnouncedRotationSettles(announced);
 
     if (!isCurrentTransition(transition)) {
       return;
     }
-  }
-
-  const principal = await resolvePrincipal(transition.controller.signal);
-
-  if (!isCurrentTransition(transition)) {
-    return;
   }
 
   endTransition(transition);
@@ -739,14 +788,24 @@ export const startIdentityCredentialSync = (): (() => void) => {
       syncStoredCredential();
     }
   };
+  // A tab leaving mid-change cannot store its replacement, so other tabs should stop waiting for one at once.
+  const onPageHide = (): void => {
+    const pendingRotation = getPendingRotation();
+
+    if (pendingRotation !== null) {
+      withdrawAnnouncedRotation(pendingRotation);
+    }
+  };
   const unsubscribeStorage = tokenStore.subscribe(syncStoredCredential);
 
   window.addEventListener('pageshow', onPageShow);
+  window.addEventListener('pagehide', onPageHide);
   document.addEventListener('visibilitychange', onVisibilityChange);
 
   return () => {
     unsubscribeStorage();
     window.removeEventListener('pageshow', onPageShow);
+    window.removeEventListener('pagehide', onPageHide);
     document.removeEventListener('visibilitychange', onVisibilityChange);
   };
 };

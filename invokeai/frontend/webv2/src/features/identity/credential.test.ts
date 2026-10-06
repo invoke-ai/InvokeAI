@@ -14,6 +14,7 @@ const storage = vi.hoisted(() => {
   const listeners = new Set<() => void>();
   let stored: string | null = null;
   let rotation: { at: number; userId: string } | null = null;
+  const log: string[] = [];
   const notify = (): void => {
     for (const listener of listeners) {
       listener();
@@ -26,6 +27,7 @@ const storage = vi.hoisted(() => {
         stored = null;
       },
       clearRotation: () => {
+        log.push('clearRotation');
         rotation = null;
       },
       read: () => stored,
@@ -35,14 +37,18 @@ const storage = vi.hoisted(() => {
         return () => listeners.delete(listener);
       },
       write: (token: string) => {
+        log.push(`write:${token}`);
         stored = token;
       },
       writeRotation: (marker: { at: number; userId: string }) => {
+        log.push('writeRotation');
         rotation = marker;
       },
     },
     get: () => stored,
     getRotation: () => rotation,
+    /** This tab's own writes, in order. */
+    log,
     /** Another tab announced or withdrew a credential rotation; this tab hears about it through a storage event. */
     otherTabAnnouncesRotation: (marker: { at: number; userId: string } | null) => {
       rotation = marker;
@@ -55,6 +61,7 @@ const storage = vi.hoisted(() => {
     },
     reset: () => {
       listeners.clear();
+      log.length = 0;
       stored = null;
       rotation = null;
     },
@@ -418,11 +425,54 @@ describe('own password change', () => {
 
     expect(storage.getRotation()).toMatchObject({ userId: user.user_id });
 
+    storage.log.length = 0;
     change.resolve(json(user, { refreshedToken: 'token-a-epoch-2' }));
     await pendingChange;
 
+    // A waiting tab adopts whatever is stored when the announcement is withdrawn, so the replacement comes first.
+    expect(storage.log).toEqual(['write:token-a-epoch-2', 'clearRotation']);
     expect(storage.getRotation()).toBeNull();
-    expect(storage.get()).toBe('token-a-epoch-2');
+  });
+
+  it('withdraws only its own announcement, not one another tab of the same user made meanwhile', async () => {
+    const change = createDeferredResponse();
+    route = (request) =>
+      request.path === '/api/v1/auth/me' && request.method === 'PATCH' ? change.promise : authRoutes(request);
+    const otherTabMarker = { at: Date.now() + 5, userId: user.user_id };
+
+    const pendingChange = changePassword();
+    await untilPatchSent('/api/v1/auth/me');
+    storage.otherTabAnnouncesRotation(otherTabMarker);
+    change.resolve(json(user, { refreshedToken: 'token-a-epoch-2' }));
+    await pendingChange;
+
+    expect(storage.getRotation()).toBe(otherTabMarker);
+  });
+
+  it('withdraws the announcement when this tab leaves or signs out mid-change', async () => {
+    // The change never answers; only the abort that ends its lifetime releases it.
+    route = (request) =>
+      request.path === '/api/v1/auth/me' && request.method === 'PATCH'
+        ? new Promise<Response>((_resolve, reject) => {
+            request.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+          })
+        : authRoutes(request);
+
+    void changePassword().catch(() => undefined);
+    await untilPatchSent('/api/v1/auth/me');
+    expect(storage.getRotation()).not.toBeNull();
+    window.dispatchEvent(new Event('pagehide'));
+    expect(storage.getRotation()).toBeNull();
+
+    await session.logoutSession();
+    await signIn();
+    void changePassword().catch(() => undefined);
+    await vi.waitFor(() => {
+      expect(storage.getRotation()).not.toBeNull();
+    });
+    await session.logoutSession();
+    expect(storage.getRotation()).toBeNull();
+    expect(storage.get()).toBeNull();
   });
 
   it('withdraws the announcement when the change fails', async () => {
@@ -571,6 +621,46 @@ describe("another tab's password change", () => {
     }
   });
 
+  it('adopts the replacement over a renewal of the revoked token that lands during the hold', async () => {
+    const renewal = createDeferredResponse();
+    const replacement = tokenFor(user.user_id, 'epoch-2');
+    route = (request) => (request.path === '/api/v1/boards/renew' ? renewal.promise : revokedRoute(request));
+
+    // Sent before the change committed; its renewal still carries the revoked epoch.
+    const renewing = http.apiFetch('/api/v1/boards/renew', { method: 'POST' });
+    storage.otherTabAnnouncesRotation({ at: Date.now(), userId: user.user_id });
+    await expect(http.apiFetch('/api/v1/boards/revoked')).rejects.toMatchObject({ status: 401 });
+    renewal.resolve(json({}, { refreshedToken: 'token-a-epoch-1-renewed' }));
+    await renewing;
+    await expect(http.apiFetch('/api/v1/boards/revoked')).rejects.toMatchObject({ status: 401 });
+
+    storage.otherTabStores(replacement);
+    storage.otherTabAnnouncesRotation(null);
+    route = authRoutes;
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+
+    expect(session.getAuthSession()).toMatchObject({ sessionExpired: false, user });
+    expect(storage.get()).toBe(replacement);
+    expect(await nextRequestToken()).toBe(replacement);
+  });
+
+  it('holds an announcement dated in the future no longer than the wait', async () => {
+    vi.useFakeTimers();
+    try {
+      route = revokedRoute;
+
+      storage.otherTabAnnouncesRotation({ at: Date.now() + 600_000, userId: user.user_id });
+      await expect(http.apiFetch('/api/v1/boards/revoked')).rejects.toMatchObject({ status: 401 });
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      expect(session.getAuthSession()).toMatchObject({ sessionExpired: true, user: null });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('ignores an announcement for another principal or one older than the wait', async () => {
     route = revokedRoute;
 
@@ -632,15 +722,18 @@ describe('signing in', () => {
   it('leaves the stored token alone while an attempt is pending and when it fails', async () => {
     await session.ensureAuthSession();
     const otherTabToken = tokenFor(userB.user_id, 'login');
+    const attempt = createDeferredResponse();
     storage.seed(otherTabToken);
-    route = (request) =>
-      request.path === '/api/v1/auth/login'
-        ? json({ detail: 'Invalid credentials' }, { status: 401 })
-        : authRoutes(request);
+    route = (request) => (request.path === '/api/v1/auth/login' ? attempt.promise : authRoutes(request));
 
-    await expect(session.loginWithCredentials(user.email, 'wrong-password', false)).rejects.toMatchObject({
-      status: 401,
+    const pendingLogin = session.loginWithCredentials(user.email, 'wrong-password', false);
+    await vi.waitFor(() => {
+      expect(sentTo('/api/v1/auth/login', 'POST')).toHaveLength(1);
     });
+    expect(storage.get()).toBe(otherTabToken);
+
+    attempt.resolve(json({ detail: 'Invalid credentials' }, { status: 401 }));
+    await expect(pendingLogin).rejects.toMatchObject({ status: 401 });
 
     expect(storage.get()).toBe(otherTabToken);
     expect(session.getAuthSession().user).toBeNull();
@@ -648,26 +741,101 @@ describe('signing in', () => {
 });
 
 describe('restoring and following sessions through the transport', () => {
-  it('restores a stored token only after an announced rotation of it settles', async () => {
+  it('restores from the replacement when the stored token is rejected under an announced rotation', async () => {
     const original = tokenFor(user.user_id, 'epoch-1');
     const replacement = tokenFor(user.user_id, 'epoch-2');
     storage.seed(original);
     storage.otherTabAnnouncesRotation({ at: Date.now(), userId: user.user_id });
+    route = (request) =>
+      request.authorization === `Bearer ${original}`
+        ? json({ detail: 'revoked' }, { status: 401 })
+        : authRoutes(request);
 
     const restoring = session.ensureAuthSession();
     await vi.waitFor(() => {
-      expect(sentTo('/api/v1/auth/status')).toHaveLength(1);
+      expect(sentTo('/api/v1/auth/me')).toHaveLength(1);
     });
     await new Promise((resolve) => {
       setTimeout(resolve, 0);
     });
-    expect(sentTo('/api/v1/auth/me')).toHaveLength(0);
+    expect(storage.get()).toBe(original);
 
     storage.otherTabStores(replacement);
     storage.otherTabAnnouncesRotation(null);
 
-    expect((await restoring).user).toEqual(user);
-    expect(sentTo('/api/v1/auth/me')[0]?.authorization).toBe(`Bearer ${replacement}`);
+    expect(await restoring).toMatchObject({ phase: 'ready', sessionExpired: false, user });
+    expect(sentTo('/api/v1/auth/me').map((request) => request.authorization)).toEqual([
+      `Bearer ${original}`,
+      `Bearer ${replacement}`,
+    ]);
+    expect(await nextRequestToken()).toBe(replacement);
+  });
+
+  it('expires a rejected stored token once its announced rotation is withdrawn without a replacement', async () => {
+    const original = tokenFor(user.user_id, 'epoch-1');
+    storage.seed(original);
+    storage.otherTabAnnouncesRotation({ at: Date.now(), userId: user.user_id });
+    route = (request) =>
+      request.path === '/api/v1/auth/me' ? json({ detail: 'revoked' }, { status: 401 }) : authRoutes(request);
+
+    const restoring = session.ensureAuthSession();
+    await vi.waitFor(() => {
+      expect(sentTo('/api/v1/auth/me')).toHaveLength(1);
+    });
+    storage.otherTabAnnouncesRotation(null);
+
+    expect(await restoring).toMatchObject({ phase: 'ready', sessionExpired: true, user: null });
+    expect(storage.get()).toBeNull();
+    expect(await nextRequestToken()).toBeNull();
+  });
+
+  it('stays signed out, not expired, when another tab signs out during the announced rotation', async () => {
+    const original = tokenFor(user.user_id, 'epoch-1');
+    storage.seed(original);
+    storage.otherTabAnnouncesRotation({ at: Date.now(), userId: user.user_id });
+    route = (request) =>
+      request.path === '/api/v1/auth/me' ? json({ detail: 'revoked' }, { status: 401 }) : authRoutes(request);
+
+    const restoring = session.ensureAuthSession();
+    await vi.waitFor(() => {
+      expect(sentTo('/api/v1/auth/me')).toHaveLength(1);
+    });
+    storage.otherTabStores(null);
+    storage.otherTabAnnouncesRotation(null);
+
+    expect(await restoring).toMatchObject({ phase: 'ready', sessionExpired: false, user: null });
+    expect(storage.get()).toBeNull();
+  });
+
+  it('follows a stored token rejected under an announced rotation only once the announcement settles', async () => {
+    await signIn();
+    const original = tokenFor(userB.user_id, 'epoch-1');
+    const replacement = tokenFor(userB.user_id, 'epoch-2');
+    route = (request) => {
+      if (request.authorization === `Bearer ${original}`) {
+        return json({ detail: 'revoked' }, { status: 401 });
+      }
+      return request.path === '/api/v1/auth/me' && request.authorization === `Bearer ${replacement}`
+        ? json(userB)
+        : authRoutes(request);
+    };
+
+    storage.otherTabAnnouncesRotation({ at: Date.now(), userId: userB.user_id });
+    storage.otherTabStores(original);
+    await vi.waitFor(() => {
+      expect(sentTo('/api/v1/auth/me')).toHaveLength(1);
+    });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    expect(storage.get()).toBe(original);
+    expect(session.getAuthSession()).toMatchObject({ sessionExpired: false, user: null });
+
+    storage.otherTabStores(replacement);
+    storage.otherTabAnnouncesRotation(null);
+    await vi.waitFor(() => {
+      expect(session.getAuthSession().user).toEqual(userB);
+    });
     expect(await nextRequestToken()).toBe(replacement);
   });
 
