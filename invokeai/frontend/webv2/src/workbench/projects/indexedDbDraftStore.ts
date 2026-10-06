@@ -745,8 +745,13 @@ export const createIndexedDbProjectDraftStore = (
         return { kind: 'unavailable' };
       }
     },
-    async reconcileUnloadJournal(accountId, now): Promise<ProjectUnloadJournalReconcileResult> {
+    async reconcileUnloadJournal(
+      accountId,
+      now,
+      { isEditorSessionLive } = {}
+    ): Promise<ProjectUnloadJournalReconcileResult> {
       const outcomes: ProjectUnloadJournalReconciliation[] = [];
+      const liveEditorSessions = new Map<string, boolean>();
       let after: ProjectUnloadJournalKey | null = null;
       for (;;) {
         if (!canUseJournal() || !canUseDatabase()) {
@@ -763,6 +768,17 @@ export const createIndexedDbProjectDraftStore = (
           return { kind: 'unavailable' };
         }
         for (const journalKey of keys) {
+          if (isEditorSessionLive) {
+            let isLive = liveEditorSessions.get(journalKey[1]);
+            if (isLive === undefined) {
+              isLive = await isEditorSessionLive(journalKey[1]);
+              liveEditorSessions.set(journalKey[1], isLive);
+            }
+            if (isLive) {
+              outcomes.push({ editorSessionId: journalKey[1], outcome: 'live', projectId: journalKey[0] });
+              continue;
+            }
+          }
           let entry: unknown;
           try {
             entry = await journalDatabase!.get(UNLOAD_JOURNAL_STORE, journalKey);

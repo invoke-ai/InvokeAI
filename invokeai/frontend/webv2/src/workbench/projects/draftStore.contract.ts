@@ -742,6 +742,41 @@ export const testProjectDraftStoreContract = (createStore: () => Promise<Project
     store.close();
   });
 
+  it('leaves the entries of a live editor session in place, and reconciles them once it is gone', async () => {
+    const store = await createStore();
+    journal(
+      store,
+      createUnloadJournalEntry(),
+      createUnloadJournalEntry({ editorSessionId: 'session-b', writerToken: 'writer-b' })
+    );
+    const asked: string[] = [];
+    const isEditorSessionLive = (editorSessionId: string) => {
+      asked.push(editorSessionId);
+      return Promise.resolve(editorSessionId === 'session-a');
+    };
+
+    await expect(store.reconcileUnloadJournal('account-a', 1_000, { isEditorSessionLive })).resolves.toEqual({
+      kind: 'available',
+      outcomes: [
+        { editorSessionId: 'session-a', outcome: 'live', projectId: 'project-1' },
+        { editorSessionId: 'session-b', outcome: 'applied', projectId: 'project-1' },
+      ],
+    });
+    expect(asked).toEqual(['session-a', 'session-b']);
+    await expect(store.get('project-1', 'session-a')).resolves.toEqual({ kind: 'missing' });
+    await expect(store.peekUnloadJournalProjectIds(1)).resolves.toEqual({
+      kind: 'available',
+      projectIds: ['project-1'],
+    });
+    // The page is gone: its entry is recovery material now.
+    await expect(outcomesOf(store)).resolves.toEqual(['applied']);
+    await expect(store.get('project-1', 'session-a')).resolves.toMatchObject({
+      draft: { documentJson: createUnloadJournalEntry().documentJson, generation: 2 },
+      kind: 'found',
+    });
+    store.close();
+  });
+
   it("discards one writer's journal of a lineage through a generation, blind", async () => {
     const store = await createStore();
     journal(

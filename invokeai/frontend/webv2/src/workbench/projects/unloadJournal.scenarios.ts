@@ -128,13 +128,19 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
   let copyGate: Promise<void> | null;
   let copiesStarted: number;
 
-  const openTab = () => {
+  /** The editor sessions of pages that are still running, as the Web Lock each page holds would show. */
+  let liveEditorSessionIds: Set<string>;
+
+  /** A page of the tab `editorSessionId`; it stays live until `unloadTab`, and a reload reuses the same id. */
+  const openTab = (editorSessionId = 'tab-a') => {
     writer += 1;
+    liveEditorSessionIds.add(editorSessionId);
     return createDurableSyncedWorkbenchPersistence(captureAccountScope(), {
       api,
       deleteDatabase: () => Promise.resolve({ kind: 'deleted' }),
       draftStore: Promise.resolve(store),
-      editorSession: Promise.resolve({ id: 'tab-a', release: () => Promise.resolve() }),
+      editorSession: Promise.resolve({ id: editorSessionId, release: () => Promise.resolve() }),
+      isEditorSessionLive: (candidate) => Promise.resolve(liveEditorSessionIds.has(candidate)),
       now: () => now,
       projectMutationLock: () => Promise.resolve({ kind: 'acquired', release: () => Promise.resolve() }),
       queueRunJournal: emptyQueueRunJournal,
@@ -154,6 +160,9 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
       writerToken: `writer-${writer}`,
     });
   };
+  const unloadTab = (editorSessionId: string) => {
+    liveEditorSessionIds.delete(editorSessionId);
+  };
   const named = (state: WorkbenchState, name: string): WorkbenchState =>
     stateWith(state.projects.map((candidate) => (candidate.id === project.id ? { ...candidate, name } : candidate)));
   const serverName = () => server.records.get(project.id)?.name;
@@ -172,6 +181,7 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
     ({ api, server } = createUnloadJournalServer());
     const backing = await createStore();
     written = [];
+    liveEditorSessionIds = new Set();
     settleGate = null;
     settlesStarted = 0;
     copyGate = null;
@@ -227,6 +237,72 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
     expect(server.updates).toBe(0);
     expect(server.records.get(project.id)?.revision).toBe(1);
     await expect(store.listForProject(project.id)).resolves.toMatchObject({ items: [] });
+  });
+
+  describe('a journal of a tab that is still running', () => {
+    it('is left to that tab: another tab neither adopts it nor brings back the edit once it is undone', async () => {
+      const tab = openTab();
+      const loaded = await tab.loadWorkbench();
+      expect(tab.journalBeforeUnload(named(loaded.state, 'Typed, then undone'))).toMatchObject({ kind: 'journaled' });
+
+      const other = await openTab('tab-b').loadWorkbench();
+
+      expect(other.state.projects).toMatchObject([{ id: project.id, name: project.name }]);
+      expect(other.conflicts).toEqual([]);
+      // Shown again and undone: the save settles the journal, and nothing holds the undone edit any more.
+      await tab.saveWorkbench(loaded.state);
+      const recovered = await openTab().loadWorkbench();
+
+      expect(recovered.state.projects).toMatchObject([{ id: project.id, name: project.name }]);
+      expect(recovered.conflicts).toEqual([]);
+      expect(server.updates).toBe(0);
+      await expect(store.listForProject(project.id)).resolves.toMatchObject({ items: [] });
+    });
+
+    it('does not come back through another tab when it was written during a save and then undone', async () => {
+      const tab = openTab();
+      const loaded = await tab.loadWorkbench();
+      let release!: () => void;
+      server.gate = new Promise((resolve) => {
+        release = resolve;
+      });
+      const saved = named(loaded.state, 'Saved');
+      const saving = tab.saveWorkbench(saved);
+      await vi.waitFor(() => expect(server.updates).toBe(1));
+      tab.journalBeforeUnload(named(loaded.state, 'Typed while it saved, then undone'));
+      const other = await openTab('tab-b').loadWorkbench();
+      server.gate = null;
+      release();
+      await saving;
+      await tab.saveWorkbench(saved);
+
+      expect(JSON.stringify(other.state)).not.toContain('then undone');
+      const recovered = await openTab().loadWorkbench();
+      expect(JSON.stringify(recovered.state)).not.toContain('then undone');
+      expect(server.records.get(project.id)).toMatchObject({ name: 'Saved', revision: 2 });
+    });
+
+    it('is recovered by another tab once the page that wrote it is gone', async () => {
+      const tab = openTab();
+      const loaded = await tab.loadWorkbench();
+      tab.journalBeforeUnload(named(loaded.state, 'Typed before the crash'));
+      unloadTab('tab-a');
+
+      const recovered = await openTab('tab-b').loadWorkbench();
+
+      expect(recovered.state.projects).toMatchObject([{ id: project.id, name: 'Typed before the crash' }]);
+      expect(recovered.conflicts).toEqual([]);
+    });
+
+    it('is still recovered by a reload of that tab, which holds the same editor session', async () => {
+      const tab = openTab();
+      const loaded = await tab.loadWorkbench();
+      tab.journalBeforeUnload(named(loaded.state, 'Typed before the reload'));
+
+      const recovered = await openTab().loadWorkbench();
+
+      expect(recovered.state.projects).toMatchObject([{ id: project.id, name: 'Typed before the reload' }]);
+    });
   });
 
   it('does not bring back an edit undone just before the page unloaded, with no save in between', async () => {

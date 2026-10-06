@@ -1,5 +1,5 @@
 import { createUuid } from '@platform/browser/randomUuid';
-import { acquireExclusiveLock, type ExclusiveLockResult } from '@platform/browser/webLocks';
+import { acquireExclusiveLock, isLockHeld, type ExclusiveLockResult } from '@platform/browser/webLocks';
 
 export const EDITOR_SESSION_STORAGE_KEY = 'invokeai:v7:webv2:editor-session';
 const EDITOR_SESSION_LOCK_PREFIX = 'invokeai:v7:webv2:editor-session:';
@@ -15,6 +15,15 @@ export interface EditorSession {
 }
 
 type AcquireLock = (name: string) => Promise<ExclusiveLockResult>;
+
+/**
+ * Whether a page still holds the editor session: its lock is released only when its last holder releases it or the
+ * page goes away. False when it cannot be told (no Web Locks), so recovery then proceeds as if the page were gone.
+ */
+export const isEditorSessionLive = async (
+  editorSessionId: string,
+  queryLock: (name: string) => Promise<boolean | null> = isLockHeld
+): Promise<boolean> => (await queryLock(`${EDITOR_SESSION_LOCK_PREFIX}${editorSessionId}`)) === true;
 
 /**
  * Each call is one holder of the tab's editor session; the lock is given back when the last holder releases. A

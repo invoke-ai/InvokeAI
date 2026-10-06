@@ -60,7 +60,7 @@ import {
   toDirtyProjectDraft,
   toSchemaRefusedProjectDraft,
 } from './draftStore';
-import { getEditorSession } from './editorSession';
+import { getEditorSession, isEditorSessionLive } from './editorSession';
 import { createDeterministicProjectId } from './ids';
 import { createAccountOwnedProjectDraftStore } from './indexedDbDraftStore';
 import { seedProjectLibrary, upsertProjectSummary } from './library';
@@ -265,6 +265,8 @@ interface DurableSyncedPersistenceDependencies {
   deleteDatabase?: typeof deleteWorkbenchDatabase;
   draftStore?: Promise<ProjectDraftStore>;
   editorSession?: Promise<EditorSession>;
+  /** Whether another page still holds the editor session, so its unload journal is left for it to settle. */
+  isEditorSessionLive?: (editorSessionId: string) => Promise<boolean>;
   now?: () => string;
   projectMutationLock?: (projectId: string) => ReturnType<typeof acquireProjectMutationLock>;
   queueRunJournal?: typeof createAccountOwnedQueueRunJournal;
@@ -461,6 +463,7 @@ export const createDurableSyncedWorkbenchPersistence = (
   const getDraftStore = () =>
     (draftStorePromise ??= dependencies.draftStore ?? createAccountOwnedProjectDraftStore(owner));
   const getEditorSessionForService = () => (editorSessionPromise ??= dependencies.editorSession ?? getEditorSession());
+  const isOtherEditorSessionLive = dependencies.isEditorSessionLive ?? isEditorSessionLive;
   const now = dependencies.now ?? (() => new Date().toISOString());
   const getProjectMutationLock =
     dependencies.projectMutationLock ??
@@ -708,6 +711,10 @@ export const createDurableSyncedWorkbenchPersistence = (
 
   const retargetHandoffKey = (handoff: Pick<ProjectDraftRetargetHandoff, 'editorSessionId' | 'projectId'>): string =>
     `${handoff.projectId}\u0000${handoff.editorSessionId}`;
+
+  /** The editor session whose page writes a lineage; an isolated lineage is named after its session and writer. */
+  const getLineageEditorSessionId = (lineageEditorSessionId: string): string =>
+    lineageEditorSessionId.split(':writer:', 1)[0]!;
 
   const isolateUnopenableDraft = (projectId: string, editorSessionId: string): string => {
     const preferred = `${editorSessionId}:writer:${writerToken}`;
@@ -2251,11 +2258,19 @@ export const createDurableSyncedWorkbenchPersistence = (
         const session = await getEditorSessionForService();
         assertOwner();
         // Before this writer claims any lineage, so a journal is judged against the lineage its writer left behind;
-        // before the backend is asked, so a journaled document can be exported even when it is unreachable.
+        // before the backend is asked, so a journaled document can be exported even when it is unreachable. A journal
+        // of a page that still runs (hidden, not unloaded) is left to that page, which settles it with its own saves.
         const reconciledJournal =
           owner.accountId === null
             ? ({ kind: 'unavailable' } as const)
-            : await store.reconcileUnloadJournal(owner.accountId, Date.parse(now()));
+            : await store.reconcileUnloadJournal(owner.accountId, Date.parse(now()), {
+                isEditorSessionLive: (lineageEditorSessionId) => {
+                  const editorSessionId = getLineageEditorSessionId(lineageEditorSessionId);
+                  return editorSessionId === session.id
+                    ? Promise.resolve(false)
+                    : isOtherEditorSessionLive(editorSessionId);
+                },
+              });
         assertOwner();
         unloadJournalTarget = { editorSessionId: session.id, store };
         let summaries: ProjectSummaryDTO[];

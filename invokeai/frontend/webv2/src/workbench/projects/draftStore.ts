@@ -203,6 +203,7 @@ export type ProjectUnloadJournalOutcome =
   | 'fenced'
   | 'foreign-account'
   | 'invalid'
+  | 'live'
   | 'quota'
   | 'settled'
   | 'superseded';
@@ -216,6 +217,13 @@ export interface ProjectUnloadJournalReconciliation {
 export type ProjectUnloadJournalReconcileResult =
   | { kind: 'available'; outcomes: ProjectUnloadJournalReconciliation[] }
   | { kind: 'unavailable' };
+export interface ProjectUnloadJournalReconcileOptions {
+  /**
+   * True for a lineage whose editor session a page other than this one still holds. Its entries are that page's to
+   * settle (its save acknowledges or retires them) and are left in place, outcome `'live'`, until it is gone.
+   */
+  isEditorSessionLive?: (editorSessionId: string) => Promise<boolean>;
+}
 export type ProjectUnloadJournalSettleResult = { kind: 'corrupt' | 'fenced' | 'quota' | 'settled' | 'unavailable' };
 export type ProjectUnloadJournalDecision =
   | { draft: ProjectDraft; kind: 'apply' }
@@ -292,8 +300,14 @@ export interface ProjectDraftStore {
    * Turns each unload journal entry into its lineage's newest draft, or discards it, by `decideUnloadJournalEntry`:
    * one fenced draft transaction per entry, then the entry's removal. An entry left behind by a crash in between is
    * superseded by the draft it produced, so running again is safe. Run before any writer of this load claims a lineage.
+   * Entries of a lineage whose editor session is still live elsewhere are skipped: a page that is merely hidden is
+   * still writing that lineage, and staging its journal would hand another tab an edit it may yet undo.
    */
-  reconcileUnloadJournal(accountId: string, now: number): Promise<ProjectUnloadJournalReconcileResult>;
+  reconcileUnloadJournal(
+    accountId: string,
+    now: number,
+    options?: ProjectUnloadJournalReconcileOptions
+  ): Promise<ProjectUnloadJournalReconcileResult>;
   reserveCopyIdentity(
     projectId: string,
     editorSessionId: string,
@@ -1135,9 +1149,9 @@ export const createMemoryProjectDraftStore = ({
         projectIds: [...new Set([...unloadJournal.values()].map((entry) => entry.projectId))].slice(0, limit),
       });
     },
-    reconcileUnloadJournal(accountId, now) {
+    async reconcileUnloadJournal(accountId, now, { isEditorSessionLive } = {}) {
       if (isClosed) {
-        return Promise.resolve({ kind: 'unavailable' });
+        return { kind: 'unavailable' };
       }
       const outcomes: ProjectUnloadJournalReconciliation[] = [];
       const ordered = [...unloadJournal].sort(
@@ -1147,7 +1161,19 @@ export const createMemoryProjectDraftStore = ({
             rightKey.slice(0, rightKey.lastIndexOf('\u0000'))
           ) || left.generation - right.generation
       );
+      const liveEditorSessions = new Map<string, boolean>();
       for (const [entryKey, entry] of ordered) {
+        if (isEditorSessionLive) {
+          let isLive = liveEditorSessions.get(entry.editorSessionId);
+          if (isLive === undefined) {
+            isLive = await isEditorSessionLive(entry.editorSessionId);
+            liveEditorSessions.set(entry.editorSessionId, isLive);
+          }
+          if (isLive) {
+            outcomes.push({ editorSessionId: entry.editorSessionId, outcome: 'live', projectId: entry.projectId });
+            continue;
+          }
+        }
         const key = draftKey(entry.projectId, entry.editorSessionId);
         const claim = writerClaims.get(key);
         const record = records.get(key);
@@ -1193,7 +1219,7 @@ export const createMemoryProjectDraftStore = ({
         }
         outcomes.push(outcome);
       }
-      return Promise.resolve({ kind: 'available', outcomes });
+      return { kind: 'available', outcomes };
     },
     reserveCopyIdentity(projectId, editorSessionId, writerToken, proposed, replaceCopyProjectId) {
       if (isClosed) {

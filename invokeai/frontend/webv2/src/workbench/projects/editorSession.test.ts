@@ -2,7 +2,7 @@ import type { ExclusiveLockResult } from '@platform/browser/webLocks';
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { createEditorSessionProvider, EDITOR_SESSION_STORAGE_KEY } from './editorSession';
+import { createEditorSessionProvider, EDITOR_SESSION_STORAGE_KEY, isEditorSessionLive } from './editorSession';
 
 const createStorage = (initial?: string) => {
   const values = new Map<string, string>();
@@ -133,5 +133,18 @@ describe('editor session identity', () => {
     finishRelease();
     await releasing;
     await replacement.release();
+  });
+
+  it('reads whether a page still holds a session from its lock, and assumes none when it cannot tell', async () => {
+    const queried: string[] = [];
+    const queryLock = (name: string) => {
+      queried.push(name);
+      return Promise.resolve(name.endsWith(':held') ? true : name.endsWith(':free') ? false : null);
+    };
+
+    await expect(isEditorSessionLive('held', queryLock)).resolves.toBe(true);
+    await expect(isEditorSessionLive('free', queryLock)).resolves.toBe(false);
+    await expect(isEditorSessionLive('unknown', queryLock)).resolves.toBe(false);
+    expect(queried).toEqual(['held', 'free', 'unknown'].map((id) => `invokeai:v7:webv2:editor-session:${id}`));
   });
 });
