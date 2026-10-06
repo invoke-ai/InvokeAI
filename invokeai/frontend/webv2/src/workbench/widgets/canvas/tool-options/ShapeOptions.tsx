@@ -4,15 +4,11 @@ import type { ToolFormProps, ToolPropertyForm } from '@workbench/widgets/canvas/
 import { Text } from '@chakra-ui/react';
 import { ToggleIconButton } from '@platform/ui/Button';
 import { ColorPicker } from '@platform/ui/ColorPicker';
-import { MAX_SHAPE_STROKE_WIDTH, getDocumentLayer } from '@workbench/canvas-engine/api';
+import { ScrubberField } from '@platform/ui/ScrubberField';
+import { DEFAULT_SHAPE_OPTIONS, MAX_SHAPE_STROKE_WIDTH, getDocumentLayer } from '@workbench/canvas-engine/api';
 import { useActiveColorCommands, useActiveColorPair } from '@workbench/widgets/canvas/color-system/useActiveColors';
 import { useShapeOptions } from '@workbench/widgets/canvas/engineStoreHooks';
-import {
-  FormNumberField,
-  FormSlider,
-  useNumberCommit,
-  useSliderGesture,
-} from '@workbench/widgets/canvas/tool-presentation/FormControls';
+import { useSliderGesture } from '@workbench/widgets/canvas/tool-presentation/FormControls';
 import {
   EditTargetChip,
   PropertyControlRow,
@@ -35,6 +31,7 @@ interface SelectedShape {
 }
 
 const FALLBACK_COLOR = '#000000';
+const formatPx = (value: number): string => `${value}px`;
 
 /**
  * Edit selected shape content or tool defaults with pair colors. Color gestures commit once; without a selected
@@ -204,7 +201,6 @@ const ShapeSettings = ({ engine }: ToolFormProps) => {
   );
   const setWidth = useCallback((value: number) => editor.setStrokeWidth(Math.max(0, Math.round(value))), [editor]);
   const widthGesture = useSliderGesture(Math.round(editor.strokeWidth), setWidth, previewWidth);
-  const onWidthCommit = useNumberCommit(setWidth);
   return (
     <>
       <EditTargetChip layerName={editor.selectedName} />
@@ -260,26 +256,18 @@ const ShapeSettings = ({ engine }: ToolFormProps) => {
           onCheckedChange={editor.setStrokeEnabled}
         />
       </PropertyControlRow>
-      <PropertyControlRow label={t('widgets.properties.rows.width')}>
-        <FormSlider
-          aria-label={t('widgets.canvas.toolOptions.shapeStrokeWidth')}
-          disabled={editor.stroke === null}
-          max={MAX_SHAPE_STROKE_WIDTH}
-          min={0}
-          value={widthGesture.value}
-          onValueChange={widthGesture.onChange}
-          onValueChangeEnd={widthGesture.onChangeEnd}
-        />
-        <FormNumberField
-          aria-label={t('widgets.canvas.toolOptions.shapeStrokeWidth')}
-          disabled={editor.stroke === null}
-          max={MAX_SHAPE_STROKE_WIDTH}
-          min={0}
-          suffix="px"
-          value={String(Math.round(editor.strokeWidth))}
-          onValueCommit={onWidthCommit}
-        />
-      </PropertyControlRow>
+      <ScrubberField
+        defaultValue={DEFAULT_SHAPE_OPTIONS.strokeWidth}
+        disabled={editor.stroke === null}
+        formatValue={formatPx}
+        label={t('widgets.canvas.toolOptions.shapeStrokeWidth')}
+        max={MAX_SHAPE_STROKE_WIDTH}
+        min={0}
+        step={1}
+        value={widthGesture.value}
+        onChange={widthGesture.onChange}
+        onChangeEnd={widthGesture.onChangeEnd}
+      />
       <Text color="fg.muted" fontSize="xs">
         {t(
           editor.toolKind === 'polygon'

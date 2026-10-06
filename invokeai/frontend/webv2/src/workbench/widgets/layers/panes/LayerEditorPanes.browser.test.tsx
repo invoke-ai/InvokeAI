@@ -324,19 +324,15 @@ describe('Properties pane', () => {
     expect(host!.textContent).toContain('Hold Space');
   });
 
-  it('keeps a slider and its number field on one grid row and shares row identity brush↔eraser', async () => {
+  it('follows size changes from outside the field and shares row identity brush↔eraser', async () => {
     await mount(PropertiesPane);
     await act(() => engine!.tools.setTool('brush'));
     await settle();
     const slider = page.getByRole('slider', { exact: true, name: 'Brush size' }).element() as HTMLElement;
-    const field = page.getByRole('spinbutton', { exact: true, name: 'Brush size' }).element() as HTMLElement;
-    // One grid row: the slider and its field never wrap apart (compare row
-    // centers; the two controls have different heights).
-    const centerOf = (el: HTMLElement) => {
-      const rect = el.getBoundingClientRect();
-      return rect.top + rect.height / 2;
-    };
-    expect(Math.abs(centerOf(slider) - centerOf(field))).toBeLessThan(8);
+    // `[` / `]` and canvas gestures write the store; the scrubber shows what they wrote.
+    await act(() => engine!.interaction.set('brushOptions', { ...engine!.interaction.get('brushOptions'), size: 80 }));
+    await settle();
+    expect(slider.getAttribute('aria-valuetext')).toBe('80px');
 
     await act(() => engine!.tools.setTool('eraser'));
     await settle();
@@ -364,7 +360,7 @@ describe('Properties pane', () => {
     // The fixture shape has no stroke, so the width slider is disabled in place.
     const width = page.getByRole('slider', { exact: true, name: 'Stroke width' });
     await expect.element(width).toBeVisible();
-    expect(width.element().getAttribute('data-disabled')).not.toBeNull();
+    await expect.element(width).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('previews the selected text layer above its form and offers style and weight on one row', async () => {
@@ -384,9 +380,9 @@ describe('Properties pane', () => {
     const style = page.getByRole('combobox', { exact: true, name: 'Style' }).element();
     const weight = page.getByRole('combobox', { exact: true, name: 'Weight' }).element();
     expect(Math.abs(style.getBoundingClientRect().top - weight.getBoundingClientRect().top)).toBeLessThan(2);
-    expect((page.getByRole('spinbutton', { exact: true, name: 'Font size' }).element() as HTMLInputElement).value).toBe(
-      '72'
-    );
+    await expect
+      .element(page.getByRole('slider', { exact: true, name: 'Font size' }))
+      .toHaveAttribute('aria-valuetext', '72px');
   });
 
   it('steps the log-scaled text size slider by whole pixels from the keyboard', async () => {
@@ -395,9 +391,14 @@ describe('Properties pane', () => {
     await settle();
     const slider = page.getByRole('slider', { exact: true, name: 'Font size' });
     await expect.element(slider).toBeVisible();
-    const field = () =>
-      (page.getByRole('spinbutton', { exact: true, name: 'Font size' }).element() as HTMLInputElement).value;
+    const field = () => slider.element().getAttribute('aria-valuenow');
     expect(field()).toBe('48');
+    // The log track spends its middle on the sizes text is set at.
+    const frame = slider.element().closest<HTMLElement>('[data-scope="scrubber"]')!.getBoundingClientRect();
+    const thumb = slider.element().parentElement!.querySelector('[data-part="thumb"]')!.getBoundingClientRect();
+    const thumbFraction = (thumb.left + thumb.width / 2 - frame.left - 10) / (frame.width - 20);
+    expect(thumbFraction).toBeGreaterThan(0.4);
+    expect(thumbFraction).toBeLessThan(0.6);
     await act(() => (slider.element() as HTMLElement).focus());
     await act(() => userEvent.keyboard('{ArrowRight}'));
     expect(field()).toBe('49');
@@ -429,6 +430,35 @@ describe('Properties pane', () => {
     await act(() => userEvent.keyboard('{ArrowRight}'));
     await settle();
     await expect.element(page.getByRole('button', { exact: true, name: 'Gradient stop at 1%' })).toBeVisible();
+  });
+
+  it('moves a gradient stop once when its offset scrub is released', async () => {
+    await mount(PropertiesPane);
+    await act(() => engine!.tools.setTool('gradient'));
+    await settle();
+    const offset = page.getByRole('slider', { exact: true, name: 'Offset' });
+    await expect.element(offset).toHaveAttribute('aria-valuetext', '0%');
+    const frame = offset.element().closest<HTMLElement>('[data-scope="scrubber"]')!;
+    const set = vi.spyOn(engine!.interaction, 'set');
+    const pointer = (target: EventTarget, type: 'pointerdown' | 'pointermove' | 'pointerup', clientX: number) =>
+      act(() => target.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, clientX })));
+    const { left, width } = frame.getBoundingClientRect();
+
+    await pointer(frame, 'pointerdown', left + width * 0.1);
+    await pointer(window, 'pointermove', left + width * 0.3);
+    await pointer(window, 'pointermove', left + width * 0.5);
+    // Mid-scrub the field follows the pointer while the stop itself stays put.
+    expect(offset.element().getAttribute('aria-valuetext')).not.toBe('0%');
+    expect(set.mock.calls.filter(([key]) => key === 'gradientOptions')).toHaveLength(0);
+    await expect.element(page.getByRole('button', { exact: true, name: 'Gradient stop at 0%' })).toBeVisible();
+
+    await pointer(window, 'pointerup', left + width * 0.5);
+    await settle();
+    expect(set.mock.calls.filter(([key]) => key === 'gradientOptions')).toHaveLength(1);
+    const moved = Math.round(engine!.interaction.get('gradientOptions').stops[0]!.offset * 100);
+    expect(moved).toBeGreaterThan(0);
+    expect(offset.element().getAttribute('aria-valuetext')).toBe(`${moved}%`);
+    await expect.element(page.getByRole('button', { exact: true, name: `Gradient stop at ${moved}%` })).toBeVisible();
   });
 
   it('keeps the Position row identity across move, frame and transform, with the transform footer live', async () => {

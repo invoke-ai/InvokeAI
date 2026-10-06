@@ -2,16 +2,18 @@ import type { SelectValueChangeDetails } from '@chakra-ui/react';
 import type { CanvasTextFontRef, TextToolOptions } from '@workbench/canvas-engine/api';
 import type { TextSource } from '@workbench/widgets/canvas/textFontStyle';
 import type { ToolFormProps, ToolPreviewProps } from '@workbench/widgets/canvas/tool-presentation/toolFormContracts';
-import type { CSSProperties, KeyboardEvent } from 'react';
+import type { CSSProperties } from 'react';
 
 import { Box, createListCollection, HStack, Spinner, Stack, Text } from '@chakra-ui/react';
 import { fontsInfiniteQueryOptions, type FontAxis, type FontRecord } from '@features/fonts';
 import { Button, IconButton, ToggleIconButton } from '@platform/ui/Button';
 import { ColorPicker } from '@platform/ui/ColorPicker';
+import { ScrubberField } from '@platform/ui/ScrubberField';
 import { Select } from '@platform/ui/Select';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import {
+  DEFAULT_TEXT_OPTIONS,
   MAX_TEXT_FONT_SIZE,
   MIN_TEXT_FONT_SIZE,
   TEXT_FONT_FAMILIES,
@@ -26,12 +28,7 @@ import {
   textFontVariationSettings,
   useResolvedTextFontFamily,
 } from '@workbench/widgets/canvas/textFontStyle';
-import {
-  FormNumberField,
-  FormSlider,
-  useNumberCommit,
-  useSliderGesture,
-} from '@workbench/widgets/canvas/tool-presentation/FormControls';
+import { useSliderGesture } from '@workbench/widgets/canvas/tool-presentation/FormControls';
 import { EditTargetChip, PropertyControlRow } from '@workbench/widgets/canvas/tool-presentation/PropertyPrimitives';
 import { useColorSampler } from '@workbench/widgets/canvas/useColorSampler';
 import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
@@ -67,29 +64,21 @@ const ALIGN_VALUES: readonly TextAlign[] = ['left', 'center', 'right'];
 const EMPTY_FONT_VARIATIONS: Readonly<Record<string, number>> = {};
 const EMPTY_FONT_RECORDS: readonly FontRecord[] = [];
 
-/** The slider covers the sizes text is actually set at; the field still reaches the document limits. */
-const SIZE_SLIDER_MIN_PX = 4;
-const SIZE_SLIDER_MAX_PX = 600;
-const SIZE_SLIDER_POSITIONS = 1000;
-const SIZE_LOG_RANGE = Math.log(SIZE_SLIDER_MAX_PX / SIZE_SLIDER_MIN_PX);
+/** The log track covers the sizes text is actually set at; typing and keys still reach the document limits. */
+const SIZE_TRACK_MIN_PX = 4;
+const SIZE_TRACK_MAX_PX = 600;
 const SPECIMEN_MAX_CHARS = 40;
 const SPECIMEN_FALLBACK = 'Aa';
 /** The canvas surround's checker, so any text color reads the way it does over a transparent document. */
 const SPECIMEN_CHECKER =
   'conic-gradient({colors.bg.subtle} 25%, transparent 0 50%, {colors.bg.subtle} 0 75%, transparent 0)';
 
+const formatLineHeight = (value: number): string => value.toFixed(1);
+
 const clampTextSize = (value: number): number =>
   Math.min(MAX_TEXT_FONT_SIZE, Math.max(MIN_TEXT_FONT_SIZE, Math.round(value)));
 
-export const textSizeToSliderPosition = (size: number): number => {
-  const clamped = Math.min(SIZE_SLIDER_MAX_PX, Math.max(SIZE_SLIDER_MIN_PX, size));
-  return (Math.log(clamped / SIZE_SLIDER_MIN_PX) / SIZE_LOG_RANGE) * SIZE_SLIDER_POSITIONS;
-};
-
-export const sliderPositionToTextSize = (position: number): number => {
-  const clamped = Math.min(SIZE_SLIDER_POSITIONS, Math.max(0, position));
-  return clampTextSize(SIZE_SLIDER_MIN_PX * Math.exp((clamped / SIZE_SLIDER_POSITIONS) * SIZE_LOG_RANGE));
-};
+const formatTextSize = (size: number): string => `${size}px`;
 
 /** Whole pixels below 100, tens above: a log track's own step is sub-pixel at small sizes. */
 export const textSizeKeyboardStep = (size: number, direction: -1 | 1): number =>
@@ -360,30 +349,20 @@ const AxisControl = ({
   const previewValue = useCallback((value: number) => setValue(value, false), [setValue]);
   const commitValue = useCallback((value: number) => setValue(value, true), [setValue]);
   const gesture = useSliderGesture(committed, commitValue, previewValue);
-  const onNumber = useNumberCommit(commitValue);
-  const displayedValue = gesture.value.toFixed(precision);
-  const ariaLabel = `${axis.label} (${axis.tag})`;
+  const formatValue = useCallback((value: number) => value.toFixed(precision), [precision]);
 
   return (
-    <PropertyControlRow label={axis.label}>
-      <FormSlider
-        aria-label={ariaLabel}
-        max={axis.maximum}
-        min={axis.minimum}
-        step={step}
-        value={gesture.value}
-        onValueChange={gesture.onChange}
-        onValueChangeEnd={gesture.onChangeEnd}
-      />
-      <FormNumberField
-        aria-label={ariaLabel}
-        max={axis.maximum}
-        min={axis.minimum}
-        step={step}
-        value={displayedValue}
-        onValueCommit={onNumber}
-      />
-    </PropertyControlRow>
+    <ScrubberField
+      defaultValue={clampFontAxisValue(axis.default, axis)}
+      formatValue={formatValue}
+      label={axis.label}
+      max={axis.maximum}
+      min={axis.minimum}
+      step={step}
+      value={gesture.value}
+      onChange={gesture.onChange}
+      onChangeEnd={gesture.onChangeEnd}
+    />
   );
 };
 
@@ -730,50 +709,6 @@ export const TextFontSettings = ({ engine }: ToolFormProps) => {
   const previewSize = useCallback((value: number) => applyEdit({ fontSize: clampTextSize(value) }, false), [applyEdit]);
   const setSize = useCallback((value: number) => applyEdit({ fontSize: clampTextSize(value) }, true), [applyEdit]);
   const sizeGesture = useSliderGesture(Math.round(active.fontSize), setSize, previewSize);
-  const { onChange: onSizeGesture, onChangeEnd: onSizeGestureEnd } = sizeGesture;
-  const onSizeSlider = useCallback(
-    (position: number) => onSizeGesture(sliderPositionToTextSize(position)),
-    [onSizeGesture]
-  );
-  const onSizeSliderEnd = useCallback(
-    (position: number) => onSizeGestureEnd(sliderPositionToTextSize(position)),
-    [onSizeGestureEnd]
-  );
-  const onSizeSliderKeyDownCapture = useCallback(
-    (event: KeyboardEvent<HTMLDivElement>) => {
-      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
-        return;
-      }
-      const increase = event.key === 'ArrowUp' || event.key === 'ArrowRight' || event.key === 'PageUp';
-      const decrease = event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'PageDown';
-      if (!increase && !decrease) {
-        return;
-      }
-      event.preventDefault();
-      event.stopPropagation();
-      const direction = increase ? 1 : -1;
-      const size = Math.round(active.fontSize);
-      if ((size > SIZE_SLIDER_MAX_PX && direction > 0) || (size < SIZE_SLIDER_MIN_PX && direction < 0)) {
-        return;
-      }
-      const multiplier = event.key === 'PageUp' || event.key === 'PageDown' ? 10 : 1;
-      const next =
-        size > SIZE_SLIDER_MAX_PX
-          ? SIZE_SLIDER_MAX_PX
-          : size < SIZE_SLIDER_MIN_PX
-            ? SIZE_SLIDER_MIN_PX
-            : Math.min(
-                SIZE_SLIDER_MAX_PX,
-                Math.max(SIZE_SLIDER_MIN_PX, size + direction * multiplier * textSizeKeyboardStep(size, direction))
-              );
-      if (next !== size) {
-        setSize(next);
-      }
-    },
-    [active.fontSize, setSize]
-  );
-  const formatSize = useCallback(() => `${sizeGesture.value}px`, [sizeGesture.value]);
-  const onSize = useNumberCommit(setSize);
   const previewLineHeight = useCallback(
     (value: number) => applyEdit({ lineHeight: Math.max(0.5, Math.round(value * 10) / 10) }, false),
     [applyEdit]
@@ -783,7 +718,6 @@ export const TextFontSettings = ({ engine }: ToolFormProps) => {
     [applyEdit]
   );
   const lineHeightGesture = useSliderGesture(active.lineHeight, setLineHeight, previewLineHeight);
-  const onLineHeight = useNumberCommit(setLineHeight);
   const showStyle = !hasStyleAxis;
   const showWeight = !hasWeightAxis;
   return (
@@ -842,47 +776,32 @@ export const TextFontSettings = ({ engine }: ToolFormProps) => {
           ) : null}
         </PropertyControlRow>
       ) : null}
-      <PropertyControlRow label={t('widgets.properties.rows.size')}>
-        <FormSlider
-          aria-label={t('widgets.canvas.toolOptions.textSize')}
-          formatValue={formatSize}
-          getAriaValueText={formatSize}
-          max={SIZE_SLIDER_POSITIONS}
-          min={0}
-          step={1}
-          value={textSizeToSliderPosition(sizeGesture.value)}
-          onKeyDownCapture={onSizeSliderKeyDownCapture}
-          onValueChange={onSizeSlider}
-          onValueChangeEnd={onSizeSliderEnd}
-        />
-        <FormNumberField
-          aria-label={t('widgets.canvas.toolOptions.textSize')}
-          max={MAX_TEXT_FONT_SIZE}
-          min={MIN_TEXT_FONT_SIZE}
-          suffix="px"
-          value={String(sizeGesture.value)}
-          onValueCommit={onSize}
-        />
-      </PropertyControlRow>
-      <PropertyControlRow label={t('widgets.properties.rows.lineHeight')}>
-        <FormSlider
-          aria-label={t('widgets.canvas.toolOptions.textLineHeight')}
-          max={4}
-          min={0.5}
-          step={0.1}
-          value={lineHeightGesture.value}
-          onValueChange={lineHeightGesture.onChange}
-          onValueChangeEnd={lineHeightGesture.onChangeEnd}
-        />
-        <FormNumberField
-          aria-label={t('widgets.canvas.toolOptions.textLineHeight')}
-          max={4}
-          min={0.5}
-          step={0.1}
-          value={lineHeightGesture.value.toFixed(1)}
-          onValueCommit={onLineHeight}
-        />
-      </PropertyControlRow>
+      <ScrubberField
+        defaultValue={DEFAULT_TEXT_OPTIONS.fontSize}
+        formatValue={formatTextSize}
+        inputMax={MAX_TEXT_FONT_SIZE}
+        inputMin={MIN_TEXT_FONT_SIZE}
+        label={t('widgets.canvas.toolOptions.textSize')}
+        max={SIZE_TRACK_MAX_PX}
+        min={SIZE_TRACK_MIN_PX}
+        scale="log"
+        step={1}
+        stepFor={textSizeKeyboardStep}
+        value={sizeGesture.value}
+        onChange={sizeGesture.onChange}
+        onChangeEnd={sizeGesture.onChangeEnd}
+      />
+      <ScrubberField
+        defaultValue={DEFAULT_TEXT_OPTIONS.lineHeight}
+        formatValue={formatLineHeight}
+        label={t('widgets.canvas.toolOptions.textLineHeight')}
+        max={4}
+        min={0.5}
+        step={0.1}
+        value={lineHeightGesture.value}
+        onChange={lineHeightGesture.onChange}
+        onChangeEnd={lineHeightGesture.onChangeEnd}
+      />
       <FontAxisSettings activeVariations={active.fontVariations} applyEdit={applyEdit} font={activeFont} />
     </>
   );

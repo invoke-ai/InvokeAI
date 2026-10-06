@@ -4,15 +4,11 @@ import type { KeyboardEvent, PointerEvent as ReactPointerEvent } from 'react';
 
 import { Box, chakra, Flex, IconButton as ChakraIconButton, Icon } from '@chakra-ui/react';
 import { ColorPicker } from '@platform/ui/ColorPicker';
-import { getDocumentLayer } from '@workbench/canvas-engine/api';
+import { ScrubberField } from '@platform/ui/ScrubberField';
+import { DEFAULT_GRADIENT_OPTIONS, getDocumentLayer } from '@workbench/canvas-engine/api';
 import { useActiveColorPair } from '@workbench/widgets/canvas/color-system/useActiveColors';
 import { useGradientOptions } from '@workbench/widgets/canvas/engineStoreHooks';
-import {
-  FormNumberField,
-  FormSlider,
-  useNumberCommit,
-  useSliderGesture,
-} from '@workbench/widgets/canvas/tool-presentation/FormControls';
+import { useSliderGesture } from '@workbench/widgets/canvas/tool-presentation/FormControls';
 import {
   EditTargetChip,
   PropertyControlRow,
@@ -30,6 +26,9 @@ import { insertStopAt, moveStop, recolorStop, removeStop, stopsToCssGradient } f
 
 type GradientSource = Extract<CanvasLayerSourceContract, { type: 'gradient' }>;
 type GradientKind = GradientToolOptions['kind'];
+
+const formatDegrees = (value: number): string => `${value}°`;
+const formatPercent = (value: number): string => `${value}%`;
 
 interface SelectedGradient {
   id: string;
@@ -349,7 +348,6 @@ const GradientSettings = ({ engine }: ToolFormProps) => {
     [editor]
   );
   const angleGesture = useSliderGesture(Math.round(editor.angle), setAngle, previewAngle);
-  const onAngleCommit = useNumberCommit(setAngle);
   return (
     <>
       <EditTargetChip layerName={editor.selectedName} />
@@ -359,26 +357,18 @@ const GradientSettings = ({ engine }: ToolFormProps) => {
         value={editor.kind}
         onValueChange={setKind}
       />
-      <PropertyControlRow label={t('widgets.properties.rows.angle')}>
-        <FormSlider
-          aria-label={t('widgets.canvas.toolOptions.gradientAngle')}
-          disabled={editor.kind === 'radial'}
-          max={360}
-          min={-360}
-          value={angleGesture.value}
-          onValueChange={angleGesture.onChange}
-          onValueChangeEnd={angleGesture.onChangeEnd}
-        />
-        <FormNumberField
-          aria-label={t('widgets.canvas.toolOptions.gradientAngle')}
-          disabled={editor.kind === 'radial'}
-          max={360}
-          min={-360}
-          suffix="°"
-          value={String(Math.round(editor.angle))}
-          onValueCommit={onAngleCommit}
-        />
-      </PropertyControlRow>
+      <ScrubberField
+        defaultValue={DEFAULT_GRADIENT_OPTIONS.angle}
+        disabled={editor.kind === 'radial'}
+        formatValue={formatDegrees}
+        label={t('widgets.canvas.toolOptions.gradientAngle')}
+        max={360}
+        min={-360}
+        step={1}
+        value={angleGesture.value}
+        onChange={angleGesture.onChange}
+        onChangeEnd={angleGesture.onChangeEnd}
+      />
     </>
   );
 };
@@ -414,7 +404,8 @@ const GradientStopsSettings = ({ engine }: ToolFormProps) => {
     },
     [editor, stopIndex]
   );
-  const onOffsetCommit = useNumberCommit(setOffset);
+  // The offset settles once per gesture: a stop that crosses a neighbour reorders, so ticks only move the draft.
+  const offsetGesture = useSliderGesture(stop ? Math.round(stop.offset * 100) : 0, setOffset);
   const onRemove = useCallback(() => {
     editor.commitStops(removeStop(editor.stops, stopIndex));
     setSelectedIndex(Math.max(0, stopIndex - 1));
@@ -450,24 +441,14 @@ const GradientStopsSettings = ({ engine }: ToolFormProps) => {
       />
       {stop ? (
         <PropertyControlRow label={t('widgets.properties.rows.stop')}>
-          <Flex align="center" gap="2" minW="0">
-            <ColorPicker
-              aria-label={t('widgets.canvas.toolOptions.gradientStopColor')}
-              value={stop.color}
-              withAlpha
-              onSampleColor={sampleColor}
-              onValueChange={onColorChange}
-              onValueChangeEnd={onColorChangeEnd}
-            />
-            <FormNumberField
-              aria-label={t('widgets.properties.rows.offset')}
-              max={100}
-              min={0}
-              suffix="%"
-              value={String(Math.round(stop.offset * 100))}
-              onValueCommit={onOffsetCommit}
-            />
-          </Flex>
+          <ColorPicker
+            aria-label={t('widgets.canvas.toolOptions.gradientStopColor')}
+            value={stop.color}
+            withAlpha
+            onSampleColor={sampleColor}
+            onValueChange={onColorChange}
+            onValueChangeEnd={onColorChangeEnd}
+          />
           <Flex gap="0.5">
             <ChakraIconButton
               aria-label={t('widgets.canvas.toolOptions.gradientAddStop')}
@@ -488,6 +469,18 @@ const GradientStopsSettings = ({ engine }: ToolFormProps) => {
             </ChakraIconButton>
           </Flex>
         </PropertyControlRow>
+      ) : null}
+      {stop ? (
+        <ScrubberField
+          formatValue={formatPercent}
+          label={t('widgets.properties.rows.offset')}
+          max={100}
+          min={0}
+          step={1}
+          value={offsetGesture.value}
+          onChange={offsetGesture.onChange}
+          onChangeEnd={offsetGesture.onChangeEnd}
+        />
       ) : null}
     </>
   );
