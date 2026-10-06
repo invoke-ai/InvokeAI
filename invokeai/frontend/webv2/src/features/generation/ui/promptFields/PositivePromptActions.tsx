@@ -546,7 +546,15 @@ const ExpandPromptButton = ({
       setExcludedImageName(event.checked === true ? null : suggestedImageName),
     [suggestedImageName]
   );
-  const handleOpenChange = useCallback((event: { open: boolean }) => setIsOpen(event.open), []);
+  // The trigger is disabled mid-run, so a dismissed popover could not be reopened to follow progress.
+  const handleOpenChange = useCallback(
+    (event: { open: boolean }) => {
+      if (event.open || !isLoading) {
+        setIsOpen(event.open);
+      }
+    },
+    [isLoading]
+  );
   const handleRunExpandPrompt = useCallback(() => void runExpandPrompt(), [runExpandPrompt]);
 
   return (
@@ -780,7 +788,17 @@ const ImageToPromptButton = ({
   }, [close, image, notifications, onPositivePromptChange, projectId, selectedModel, t]);
 
   const popoverIds = useMemo(() => ({ trigger: triggerId }), [triggerId]);
-  const handleOpenChange = useCallback((event: { open: boolean }) => (event.open ? setIsOpen(true) : close()), [close]);
+  // The trigger is disabled mid-run, so a dismissed popover could not be reopened to follow progress.
+  const handleOpenChange = useCallback(
+    (event: { open: boolean }) => {
+      if (event.open) {
+        setIsOpen(true);
+      } else if (!isLoading) {
+        close();
+      }
+    },
+    [close, isLoading]
+  );
   const handleRunImageToPrompt = useCallback(() => void runImageToPrompt(), [runImageToPrompt]);
 
   return (
