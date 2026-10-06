@@ -51,6 +51,9 @@ vi.mock('react-i18next', () => ({
         'widgets.gallery.deleteBoardMoveOutcome': `Moved ${String(values?.images)} and ${String(
           values?.videos
         )} to Uncategorized.`,
+        'widgets.gallery.deleteBoardStarredKept': `${String(values?.images)} and ${String(
+          values?.videos
+        )} starred kept in Uncategorized.`,
         'widgets.gallery.deleteBoardPartialTitle': `Deleted board "${String(values?.name)}" with partial media cleanup`,
         'widgets.gallery.deleteBoardSuccessTitle': `Deleted board "${String(values?.name)}"`,
         'widgets.gallery.downloadReady': 'Download ready',
@@ -193,6 +196,7 @@ const adapter: GalleryUiAdapter = {
   projectName: 'Project',
   projects: [],
   ensureProjectOnServer: () => mocks.ensureProjectOnServer(),
+  protectStarredMedia: false,
   widgets: { openGallery: () => true, patchGalleryValues },
 };
 
@@ -242,6 +246,8 @@ describe('deleteBoard', () => {
       deletedVideoNames: [],
       failedImageNames: [],
       failedVideoNames: [],
+      protectedImageNames: [],
+      protectedVideoNames: [],
     };
     mocks.deleteGalleryBoard.mockResolvedValue(outcome);
 
@@ -267,6 +273,8 @@ describe('deleteBoard', () => {
       deletedVideoNames: ['one.mp4'],
       failedImageNames: ['locked.png'],
       failedVideoNames: ['locked.mp4'],
+      protectedImageNames: [],
+      protectedVideoNames: [],
     });
 
     await act(async () => {
@@ -277,6 +285,57 @@ describe('deleteBoard', () => {
       kind: 'success',
       message: 'Deleted 2 images and 1 videos; 1 images and 1 videos failed.',
       title: 'Deleted board "Board 1" with partial media cleanup',
+    });
+  });
+});
+
+describe('deleteBoard with starred media protection', () => {
+  const outcome = {
+    boardId: 'board-1',
+    deletedBoardImageNames: [],
+    deletedBoardVideoNames: [],
+    deletedImageNames: ['plain.png'],
+    deletedVideoNames: [],
+    failedImageNames: [],
+    failedVideoNames: [],
+    protectedImageNames: ['starred.png', 'starred-too.png'],
+    protectedVideoNames: ['starred.mp4'],
+  };
+
+  afterEach(() => {
+    adapter.protectStarredMedia = false;
+  });
+
+  it('asks the backend to keep starred media and reports what stayed', async () => {
+    adapter.protectStarredMedia = true;
+    mocks.deleteGalleryBoard.mockResolvedValue(outcome);
+    await renderProbe();
+
+    await act(async () => {
+      await actionsRef.current?.deleteBoard('board-1', true);
+    });
+
+    expect(mocks.deleteGalleryBoard).toHaveBeenCalledWith('board-1', true, expect.any(AbortSignal), {
+      deleteStarred: false,
+    });
+    expect(reconcileDeletedBoardOutcome).toHaveBeenCalledWith(outcome);
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith({
+      kind: 'success',
+      message:
+        'Deleted 1 images and 0 videos; 0 images and 0 videos failed. 2 images and 1 videos starred kept in Uncategorized.',
+      title: 'Deleted board "Board 1"',
+    });
+  });
+
+  it('deletes starred media with the board when protection is off', async () => {
+    mocks.deleteGalleryBoard.mockResolvedValue({ ...outcome, protectedImageNames: [], protectedVideoNames: [] });
+
+    await act(async () => {
+      await actionsRef.current?.deleteBoard('board-1', true);
+    });
+
+    expect(mocks.deleteGalleryBoard).toHaveBeenCalledWith('board-1', true, expect.any(AbortSignal), {
+      deleteStarred: true,
     });
   });
 });

@@ -56,5 +56,5 @@ it('suspends shortcuts from the moment the palette opens, while its module is st
   });
   await expect.poll(() => host.querySelector('[data-testid="palette"]')).not.toBeNull();
   // The stand-in steps aside for the loaded dialog, which this test replaces with one that announces nothing.
-  expect(isModalPresent()).toBe(false);
+  await expect.poll(() => isModalPresent()).toBe(false);
 });

@@ -15,7 +15,7 @@ from invokeai.app.services.videos.videos_default import VideoService
 from invokeai.app.util.misc import get_iso_timestamp
 
 
-def _make_record(video_name: str = "abc.mp4", video_subfolder: str = "") -> VideoRecord:
+def _make_record(video_name: str = "abc.mp4", video_subfolder: str = "", starred: bool = False) -> VideoRecord:
     now = get_iso_timestamp()
     return VideoRecord(
         video_name=video_name,
@@ -28,7 +28,7 @@ def _make_record(video_name: str = "abc.mp4", video_subfolder: str = "") -> Vide
         created_at=now,
         updated_at=now,
         is_intermediate=False,
-        starred=False,
+        starred=starred,
         has_workflow=False,
         video_subfolder=video_subfolder,
     )
@@ -60,7 +60,7 @@ class TestDeleteVideosOnBoardContract:
         ]
         invoker.services.video_files.stage_delete.side_effect = [object(), Exception("disk error")]
 
-        deleted, failed = video_service.delete_videos_on_board("board-1")
+        deleted, failed, starred_skipped = video_service.delete_videos_on_board("board-1")
 
         # Only the video whose file we successfully removed should have its record deleted.
         invoker.services.video_records.delete_many.assert_called_once_with(["good.mp4"])
@@ -80,7 +80,7 @@ class TestDeleteVideosOnBoardContract:
         invoker.services.video_files.stage_delete.side_effect = Exception("permission denied")
 
         # Should not raise
-        deleted, failed = video_service.delete_videos_on_board("board-1")
+        deleted, failed, starred_skipped = video_service.delete_videos_on_board("board-1")
 
         # And the failing video's record must be preserved.
         invoker.services.video_records.delete_many.assert_called_once_with([])
@@ -99,7 +99,7 @@ class TestDeleteVideosOnBoardContract:
         ]
         invoker.services.video_files.stage_delete.side_effect = [object(), object()]
 
-        deleted, failed = video_service.delete_videos_on_board("board-1")
+        deleted, failed, starred_skipped = video_service.delete_videos_on_board("board-1")
 
         invoker.services.video_records.delete_many.assert_called_once_with(["a.mp4", "b.mp4"])
         assert deleted == ["a.mp4", "b.mp4"]
@@ -112,7 +112,7 @@ class TestDeleteVideosOnBoardContract:
         invoker.services.video_files.stage_delete.return_value = object()
         invoker.services.video_files.commit_delete.side_effect = OSError("staging directory busy")
 
-        deleted, failed = video_service.delete_videos_on_board("board-1")
+        deleted, failed, starred_skipped = video_service.delete_videos_on_board("board-1")
 
         assert deleted == ["v.mp4"]
         assert failed == []
@@ -190,6 +190,63 @@ class TestCopy:
         assert create_args["metadata"] == '{"seed": 12345}'
         assert create_args["workflow"] == "{}"
         assert create_args["move_source"] is False
+
+
+class TestStarredProtection:
+    def test_starred_video_is_deleted_by_default(self, video_service: VideoService):
+        invoker = video_service._VideoService__invoker  # type: ignore[attr-defined]
+        invoker.services.video_records.get.return_value = _make_record(starred=True)
+
+        assert video_service.delete("starred.mp4") is True
+
+        invoker.services.video_files.stage_delete.assert_called_once_with("starred.mp4", video_subfolder="")
+        invoker.services.video_records.delete.assert_called_once_with("starred.mp4")
+        invoker.services.video_files.commit_delete.assert_called_once()
+
+    def test_starred_video_is_preserved_when_protected(self, video_service: VideoService):
+        invoker = video_service._VideoService__invoker  # type: ignore[attr-defined]
+        invoker.services.video_records.get.return_value = _make_record(starred=True)
+
+        assert video_service.delete("starred.mp4", delete_starred=False) is False
+
+        invoker.services.video_files.stage_delete.assert_not_called()
+        invoker.services.video_records.delete.assert_not_called()
+
+    def test_unstarred_video_is_deleted_when_protected(self, video_service: VideoService):
+        invoker = video_service._VideoService__invoker  # type: ignore[attr-defined]
+        invoker.services.video_records.get.return_value = _make_record(starred=False)
+
+        assert video_service.delete("normal.mp4", delete_starred=False) is True
+
+        invoker.services.video_records.delete.assert_called_once_with("normal.mp4")
+
+    def test_board_delete_reports_protected_starred_videos(self, video_service: VideoService):
+        invoker = video_service._VideoService__invoker  # type: ignore[attr-defined]
+        invoker.services.board_video_records.get_all_board_video_names_for_board.return_value = [
+            "starred.mp4",
+            "normal.mp4",
+        ]
+        invoker.services.video_records.get.side_effect = [
+            _make_record(video_name="starred.mp4", starred=True),
+            _make_record(video_name="normal.mp4", starred=False),
+        ]
+
+        deleted, failed, starred_skipped = video_service.delete_videos_on_board("board-1", delete_starred=False)
+
+        assert deleted == ["normal.mp4"]
+        assert failed == []
+        assert starred_skipped == ["starred.mp4"]
+        invoker.services.video_records.delete_many.assert_called_once_with(["normal.mp4"])
+        invoker.services.video_files.stage_delete.assert_called_once_with("normal.mp4", video_subfolder="")
+
+    def test_board_delete_removes_starred_videos_by_default(self, video_service: VideoService):
+        invoker = video_service._VideoService__invoker  # type: ignore[attr-defined]
+        invoker.services.board_video_records.get_all_board_video_names_for_board.return_value = ["starred.mp4"]
+        invoker.services.video_records.get.return_value = _make_record(video_name="starred.mp4", starred=True)
+
+        deleted, failed, starred_skipped = video_service.delete_videos_on_board("board-1")
+
+        assert (deleted, failed, starred_skipped) == (["starred.mp4"], [], [])
 
 
 class TestCreateRollback:

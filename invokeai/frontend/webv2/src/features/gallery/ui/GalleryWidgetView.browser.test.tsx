@@ -124,6 +124,7 @@ const adapter: GalleryUiAdapter = {
   progressSessions: [],
   projectId: 'project-1',
   projectName: 'Project',
+  protectStarredMedia: false,
   projects: [],
   widgets: { openGallery: () => true, patchGalleryValues: noop },
 };

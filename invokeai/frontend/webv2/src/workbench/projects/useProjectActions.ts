@@ -37,6 +37,8 @@ const NO_MEDIA_DELETED: Omit<GalleryBoardDeletionResult, 'boardId'> = {
   deletedVideoNames: [],
   failedImageNames: [],
   failedVideoNames: [],
+  protectedImageNames: [],
+  protectedVideoNames: [],
 };
 
 /**
