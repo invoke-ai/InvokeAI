@@ -55,8 +55,8 @@ describe('firstPartyHotkeyCatalog', () => {
   });
 
   // Option+Shift+Arrow selects by word or paragraph in macOS text fields, where region focus must still be reachable.
-  it('moves region focus with Control+Shift+Arrow on macOS and Alt+Shift+Arrow elsewhere', () => {
-    expect(getRegionFocusDefaultKey('left', true)).toBe('ctrl+shift+arrowleft');
+  it('moves region focus with Control+Option+Arrow on macOS and Alt+Shift+Arrow elsewhere', () => {
+    expect(getRegionFocusDefaultKey('left', true)).toBe('ctrl+alt+arrowleft');
     expect(getRegionFocusDefaultKey('down', false)).toBe('alt+shift+arrowdown');
     expect(regionFocusHotkeys.map((hotkey) => hotkey.defaultKeys)).toEqual(
       (['left', 'right', 'up', 'down'] as const).map((direction) => [getRegionFocusDefaultKey(direction, IS_MAC_OS)])

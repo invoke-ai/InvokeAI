@@ -164,11 +164,12 @@ export type RegionFocusDirection = 'down' | 'left' | 'right' | 'up';
 
 /**
  * Region focus stays reachable from text fields, so its chord must be one no text field binds: Alt+Shift+Arrow,
- * except on macOS, where Option+Shift+Arrow selects by word or paragraph and Control+Shift+Arrow is free (it is word
- * selection everywhere else).
+ * except on macOS, where Option+Shift+Arrow selects by word or paragraph. Control+Option+Arrow is bound by no macOS
+ * text field, browser or stock system shortcut (Control+Arrow and Control+Shift+Arrow are Mission Control's, and
+ * never reach the page).
  */
 export const getRegionFocusDefaultKey = (direction: RegionFocusDirection, isMacOs = IS_MAC_OS): string =>
-  `${isMacOs ? 'ctrl' : 'alt'}+shift+arrow${direction}`;
+  `${isMacOs ? 'ctrl+alt' : 'alt+shift'}+arrow${direction}`;
 
 export const regionFocusHotkeys = (['left', 'right', 'up', 'down'] as const).map((direction) => ({
   ...hotkey('app', `focusRegion${direction[0].toUpperCase()}${direction.slice(1)}`, [

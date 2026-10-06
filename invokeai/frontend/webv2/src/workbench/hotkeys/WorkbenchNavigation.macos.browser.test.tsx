@@ -127,7 +127,7 @@ afterEach(async () => {
   accountLifecycle.invalidate();
 });
 
-it('leaves Option+Shift+Arrow to the text field on macOS and moves between regions with Control+Shift+Arrow', async () => {
+it('leaves Option+Shift+Arrow to the text field on macOS and moves between regions with Control+Option+Arrow', async () => {
   expect(IS_MAC_OS).toBe(true);
   const textarea = host.querySelector<HTMLTextAreaElement>('[aria-label="left text"]')!;
   const claimed: string[] = [];
@@ -145,8 +145,8 @@ it('leaves Option+Shift+Arrow to the text field on macOS and moves between regio
     expect(claimed).toEqual([]);
     expect(document.activeElement).toBe(textarea);
 
-    await press('{Control>}{Shift>}{ArrowRight}{/Shift}{/Control}');
-    expect(claimed).toEqual(['ctrl+ArrowRight']);
+    await press('{Control>}{Alt>}{ArrowRight}{/Alt}{/Control}');
+    expect(claimed).toEqual(['alt+ctrl+ArrowRight']);
     await vi.waitFor(() => expect(focusedRegion()).toBe(regionElement('center')));
     expect(textarea.value).toBe('two words');
   } finally {
