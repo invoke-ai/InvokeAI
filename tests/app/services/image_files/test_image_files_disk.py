@@ -199,6 +199,30 @@ def test_generate_thumbnail_if_missing_does_not_publish_partial_file(tmp_path: P
     assert not thumbnail_path.exists()
 
 
+def test_generate_thumbnail_if_missing_fsyncs_a_writable_temporary_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    storage = DiskImageFileStorage(tmp_path)
+    image_path = storage.get_path("writable-fsync.png")
+    with Image.new("RGB", (8, 8), (20, 40, 60)) as source:
+        source.save(image_path, format="PNG")
+    real_fsync = os.fsync
+
+    def require_writable_file_and_fsync(descriptor: int) -> None:
+        file_stat = os.fstat(descriptor)
+        if stat.S_ISREG(file_stat.st_mode):
+            original_size = file_stat.st_size
+            os.lseek(descriptor, 0, os.SEEK_END)
+            os.write(descriptor, b"x")
+            os.ftruncate(descriptor, original_size)
+        real_fsync(descriptor)
+
+    monkeypatch.setattr("invokeai.app.services.image_files.image_files_disk.os.fsync", require_writable_file_and_fsync)
+
+    assert storage.generate_thumbnail_if_missing(image_path.name) is True
+    assert storage.get_path(image_path.name, thumbnail=True).is_file()
+
+
 @posix_only
 def test_generate_thumbnail_if_missing_removes_thumbnail_if_directory_fsync_fails(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch

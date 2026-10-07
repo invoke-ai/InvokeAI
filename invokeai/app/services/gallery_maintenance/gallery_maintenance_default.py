@@ -822,13 +822,16 @@ class GalleryMaintenanceService:
             with open(source, "rb") as source_file, os.fdopen(temporary_fd, "wb") as destination_file:
                 temporary_fd = None
                 before = os.fstat(source_file.fileno())
-                if GalleryMaintenanceService._signature(before) != expected:
+                # Windows may report ctime differently through fstat() and path-based stat().
+                # Device, inode, type, size, and mtime remain stable identity/content checks;
+                # the full path signature (including ctime) is checked before source removal.
+                if GalleryMaintenanceService._signature(before)[:5] != expected[:5]:
                     raise OSError("Source changed after preview validation")
                 shutil.copyfileobj(source_file, destination_file, length=1024 * 1024)
                 destination_file.flush()
                 os.fsync(destination_file.fileno())
                 after = os.fstat(source_file.fileno())
-                if GalleryMaintenanceService._signature(after) != expected:
+                if GalleryMaintenanceService._signature(after)[:5] != expected[:5]:
                     raise OSError("Source changed while archiving")
             os.link(temporary, destination)
             temporary.unlink()

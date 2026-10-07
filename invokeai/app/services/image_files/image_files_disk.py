@@ -333,7 +333,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
             os.close(descriptor)
             temporary_path = Path(temporary_name)
             thumbnail.save(temporary_path, format="WEBP")
-            with open(temporary_path, "rb") as completed_file:
+            with open(temporary_path, "rb+") as completed_file:
                 os.fsync(completed_file.fileno())
             temporary_stat = temporary_path.stat()
             temporary_identity = (temporary_stat.st_dev, temporary_stat.st_ino)

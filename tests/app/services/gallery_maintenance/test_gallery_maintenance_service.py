@@ -2,6 +2,7 @@ import os
 import shutil
 from contextlib import contextmanager
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -550,6 +551,38 @@ def test_archive_file_preserves_replacement_after_signature_check(maintenance, t
 
     assert source.read_bytes() == replacement_bytes
     assert destination.read_bytes() == original_bytes
+
+
+def test_archive_file_tolerates_ctime_difference_between_path_and_open_file(
+    maintenance, tmp_path: Path, monkeypatch
+) -> None:
+    service, _db, _records, _files = maintenance
+    source = tmp_path / "source.png"
+    destination = tmp_path / "archive" / "source.png"
+    source_bytes = b"confirmed source bytes"
+    source.write_bytes(source_bytes)
+    expected = service._signature(source.lstat())
+    real_fstat = os.fstat
+
+    def fstat_with_different_ctime(descriptor: int):
+        result = real_fstat(descriptor)
+        return SimpleNamespace(
+            st_dev=result.st_dev,
+            st_ino=result.st_ino,
+            st_mode=result.st_mode,
+            st_size=result.st_size,
+            st_mtime_ns=result.st_mtime_ns,
+            st_ctime_ns=result.st_ctime_ns + 1,
+        )
+
+    monkeypatch.setattr(
+        "invokeai.app.services.gallery_maintenance.gallery_maintenance_default.os.fstat", fstat_with_different_ctime
+    )
+
+    service._archive_file(source, destination, expected)
+
+    assert destination.read_bytes() == source_bytes
+    assert not source.exists()
 
 
 def test_preview_rejects_symlinked_record_subfolder(maintenance, tmp_path: Path) -> None:
