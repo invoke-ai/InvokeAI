@@ -1674,7 +1674,10 @@ def test_image_labels_rank_the_vocabulary_for_one_image(mock_invoker: Invoker, c
 
     assert body["label"] == "beta"
     assert body["alternates"] == ["alpha", "gamma"]
-    assert body["score"] == pytest.approx(0.8 / float(np.linalg.norm(vector)))
+    stored_vector = (vector / np.linalg.norm(vector)).astype("<f2")
+    expected_embedding = stored_vector.astype(np.float32)
+    expected_embedding /= np.linalg.norm(expected_embedding.astype(np.float64))
+    assert body["score"] == pytest.approx(float(expected_embedding[1]))
 
     # top_k bounds the total label count (best + alternates).
     body = client.get("/api/v1/image_map/image_labels", params={"image_name": "leaning.png", "top_k": 1}).json()
