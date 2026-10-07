@@ -248,7 +248,7 @@ def get_queue_item_for_mutation(queue_id: str, item_id: int, current_user: Curre
 )
 async def enqueue_batch(
     current_user: CurrentUserOrDefault,
-    queue_id: str = Path(description="The queue id to perform this operation on"),
+    queue_id: str = Path(description="The queue id to perform this operation on", max_length=255),
     batch: Batch = Body(description="Batch to process"),
     prepend: bool = Body(default=False, description="Whether or not to prepend this batch in the queue"),
 ) -> EnqueueBatchResult:

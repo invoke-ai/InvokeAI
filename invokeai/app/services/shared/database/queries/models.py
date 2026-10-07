@@ -11,6 +11,10 @@ from invokeai.app.services.shared.database.schema.models import models
 
 _M = models.c
 
+# The longest key and path a model can have: a server stores no longer one in their columns.
+MAX_KEY_LENGTH: int = _M.id.type.length
+MAX_PATH_LENGTH: int = _M.path.type.length
+
 _GET = select(_M.config).where(_M.id == bindparam("key"))
 _LOCK = _GET.with_for_update()
 _EXISTS = select(literal(1)).where(_M.id == bindparam("key"))

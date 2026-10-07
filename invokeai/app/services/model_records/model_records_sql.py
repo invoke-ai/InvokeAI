@@ -46,6 +46,7 @@ from invokeai.app.services.model_records.model_records_base import (
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.errors import UniqueViolation
 from invokeai.app.services.shared.database.queries import Queries
+from invokeai.app.services.shared.database.queries.models import MAX_KEY_LENGTH, MAX_PATH_LENGTH
 from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
@@ -76,6 +77,11 @@ def _construct_config_for_type(fields: dict, target_type: ModelType) -> AnyModel
     )
 
 
+def _check_path_length(path: str) -> None:
+    if len(path) > MAX_PATH_LENGTH:
+        raise ValueError(f"A model's path can be at most {MAX_PATH_LENGTH} characters long")
+
+
 def _parse(config: str) -> AnyModelConfig:
     return ModelConfigFactory.from_dict(json.loads(config))
 
@@ -94,8 +100,12 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
         :param config: Model configuration record; its key becomes the record's key.
 
-        Raises DuplicateModelException when a model with the same path or key is installed.
+        Raises DuplicateModelException when a model with the same path or key is installed, and ValueError when
+        its key or path is longer than a record holds.
         """
+        if len(config.key) > MAX_KEY_LENGTH:
+            raise ValueError(f"A model's key can be at most {MAX_KEY_LENGTH} characters long")
+        _check_path_length(config.path)
         stored = config.model_dump_json()
         try:
             self._queries.models.insert(config.key, stored)
@@ -164,6 +174,8 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                     setattr(record, field_name, getattr(changes, field_name))
 
             # If we get this far, the updated model config is valid, so we can save it to the database.
+            if "path" in changes.model_fields_set:
+                _check_path_length(record.path)
             updated = record.model_dump_json()
             q.models.save(key, updated)
             return updated

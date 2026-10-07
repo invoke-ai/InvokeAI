@@ -3,6 +3,7 @@
 import threading
 
 import pytest
+from pydantic import ValidationError
 from sqlalchemy import insert, select, update
 
 from invokeai.app.services.shared.database.database import Database
@@ -10,7 +11,12 @@ from invokeai.app.services.shared.database.queries.base import IN_CHUNK
 from invokeai.app.services.shared.database.schema.media_references import media_references
 from invokeai.app.services.shared.database.schema.users import users as users_table
 from invokeai.app.services.users import users_default
-from invokeai.app.services.users.users_common import SYSTEM_USER_ID, UserCreateRequest, UserUpdateRequest
+from invokeai.app.services.users.users_common import (
+    MAX_EMAIL_LENGTH,
+    SYSTEM_USER_ID,
+    UserCreateRequest,
+    UserUpdateRequest,
+)
 from invokeai.app.services.users.users_default import UserService
 
 
@@ -435,3 +441,12 @@ def test_get_many_chunks_beyond_sqlite_parameter_limit(user_service: UserService
     users = user_service.get_many(ids)
 
     assert set(users) == {user.user_id}
+
+
+def test_an_address_at_a_special_use_domain_is_accepted_up_to_the_longest_address() -> None:
+    domain = "@studio.local"
+    longest = "a" * (MAX_EMAIL_LENGTH - len(domain)) + domain
+
+    assert UserCreateRequest(email=longest, password="TestPassword123").email == longest
+    with pytest.raises(ValidationError, match=f"at most {MAX_EMAIL_LENGTH} characters"):
+        UserCreateRequest(email="a" + longest, password="TestPassword123")

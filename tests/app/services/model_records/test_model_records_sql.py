@@ -19,7 +19,7 @@ from invokeai.app.services.model_records import (
 )
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.app.services.shared.database.database import Database
-from invokeai.app.services.shared.database.queries.models import ModelQueries
+from invokeai.app.services.shared.database.queries.models import MAX_KEY_LENGTH, MAX_PATH_LENGTH, ModelQueries
 from invokeai.app.services.shared.database.schema.models import models
 from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefaultSettings
@@ -637,3 +637,19 @@ def test_the_oldest_model_of_a_file_comes_first(store: ModelRecordServiceBase, d
             conn.execute(insert(models).values(id=key, config=config, created_at=added, updated_at=added))
 
     assert [model.key for model in store.search_by_hash("ABC123")] == ["k2", "k1"]
+
+
+def test_a_key_or_path_longer_than_a_record_holds_is_refused(store: ModelRecordServiceBase) -> None:
+    # SQLite would hold them, a server would not: every backend refuses them alike.
+    with pytest.raises(ValueError, match="key"):
+        store.add_model(_embedding("k" * (MAX_KEY_LENGTH + 1)))
+    too_long_path = "/" + "p" * MAX_PATH_LENGTH
+    with pytest.raises(ValueError, match="path"):
+        store.add_model(_embedding("key1").model_copy(update={"path": too_long_path}))
+
+    longest_path = "/" + "p" * (MAX_PATH_LENGTH - 1)
+    store.add_model(_embedding("k" * MAX_KEY_LENGTH).model_copy(update={"path": longest_path}))
+    store.add_model(_embedding("key1"))
+    with pytest.raises(ValueError, match="path"):
+        store.update_model("key1", ModelRecordChanges(path=too_long_path))
+    assert store.get_model("key1").path == "/tmp/key1.bin"

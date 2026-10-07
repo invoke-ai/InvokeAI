@@ -10146,7 +10146,8 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "integer"
+                  "type": "integer",
+                  "minimum": 0
                 },
                 {
                   "type": "null"
@@ -10164,7 +10165,9 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "integer"
+                  "type": "integer",
+                  "maximum": 1000,
+                  "minimum": 0
                 },
                 {
                   "type": "null"
@@ -11627,6 +11630,7 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 255,
               "description": "The queue id to perform this operation on",
               "title": "Queue Id"
             },
@@ -13465,6 +13469,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "minimum": 0,
               "description": "The page to get",
               "default": 0,
               "title": "Page"
@@ -13478,16 +13483,18 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "integer"
+                  "type": "integer",
+                  "maximum": 1000,
+                  "minimum": 0
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "The number of workflows per page",
+              "description": "The number of workflows per page; all of them when omitted",
               "title": "Per Page"
             },
-            "description": "The number of workflows per page"
+            "description": "The number of workflows per page; all of them when omitted"
           },
           {
             "name": "order_by",
@@ -15053,6 +15060,7 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 255,
               "description": "Key to set",
               "title": "Key"
             },
@@ -19644,6 +19652,7 @@
         "properties": {
           "batch_id": {
             "type": "string",
+            "maxLength": 255,
             "title": "Batch Id",
             "description": "The ID of the batch"
           },
@@ -20205,7 +20214,8 @@
           "cover_image_name": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 255
               },
               {
                 "type": "null"
@@ -20610,7 +20620,8 @@
           "workflow_id": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 36
               },
               {
                 "type": "null"
@@ -85904,6 +85915,7 @@
         "properties": {
           "model_key_1": {
             "type": "string",
+            "maxLength": 255,
             "title": "Model Key 1",
             "description": "The key of the first model in the relationship",
             "examples": [
@@ -85917,6 +85929,7 @@
           },
           "model_key_2": {
             "type": "string",
+            "maxLength": 255,
             "title": "Model Key 2",
             "description": "The key of the second model in the relationship",
             "examples": [
@@ -89291,7 +89304,8 @@
           "project_id": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 255
               },
               {
                 "type": "null"
