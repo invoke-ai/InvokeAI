@@ -275,15 +275,6 @@ const ShapeSettings = ({ engine }: ToolFormProps) => {
         onChange={widthGesture.onChange}
         onChangeEnd={widthGesture.onChangeEnd}
       />
-      <Text color="fg.muted" fontSize="xs">
-        {t(
-          editor.toolKind === 'polygon'
-            ? 'widgets.canvas.toolOptions.shapePolygonHint'
-            : editor.toolKind === 'freehand'
-              ? 'widgets.canvas.toolOptions.shapeFreehandHint'
-              : 'widgets.canvas.toolOptions.shapeHint'
-        )}
-      </Text>
     </>
   );
 };

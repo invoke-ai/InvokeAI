@@ -1337,6 +1337,7 @@ const createWidgetInstance = (
 });
 
 const defaultWidgetInstanceTypes: Record<WidgetInstanceId, WidgetTypeId> = {
+  shortcuts: 'shortcuts',
   'autosave-status': 'autosave-status',
   canvas: 'canvas',
   diagnostics: 'diagnostics',

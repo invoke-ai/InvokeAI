@@ -172,16 +172,3 @@ export const EditTargetChip = ({ layerName }: { layerName: string | null }) => {
     </Flex>
   );
 };
-
-export const HintCard = ({ rows }: { rows: readonly { gesture: string; effect: string }[] }) => (
-  <Stack gap="1">
-    {rows.map((row) => (
-      <Grid key={row.gesture} alignItems="baseline" columnGap="2" gridTemplateColumns="auto minmax(0, 1fr)">
-        <Badge colorPalette="gray" fontFamily="mono" size="lg" variant="surface">
-          {row.gesture}
-        </Badge>
-        <Text color="fg.muted">{row.effect}</Text>
-      </Grid>
-    ))}
-  </Stack>
-);

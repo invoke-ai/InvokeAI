@@ -1,6 +1,12 @@
 // Each registration holds its own token, so a release runs once however often it is called and never releases a
 // registration that replaced it (StrictMode's mount, unmount, mount).
 const presentModals = new Set<symbol>();
+const listeners = new Set<() => void>();
+
+export const subscribeModalPresence = (listener: () => void): (() => void) => {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+};
 
 // A dialog consumes the key that closes it (Escape) in a document capture listener, and releases its presence before
 // the same press reaches bubble-phase listeners. Key presses that began under a modal are remembered at window capture,
@@ -18,10 +24,14 @@ export const registerModalPresence = (): (() => void) => {
     window.addEventListener('keydown', rememberKeyDown, true);
   }
   presentModals.add(token);
+  listeners.forEach((listener) => listener());
 
   return () => {
-    if (presentModals.delete(token) && presentModals.size === 0 && typeof window !== 'undefined') {
-      window.removeEventListener('keydown', rememberKeyDown, true);
+    if (presentModals.delete(token)) {
+      if (presentModals.size === 0 && typeof window !== 'undefined') {
+        window.removeEventListener('keydown', rememberKeyDown, true);
+      }
+      listeners.forEach((listener) => listener());
     }
   };
 };

@@ -2138,7 +2138,6 @@
       "noCanvas": "Open a canvas to edit its properties.",
       "groups": {
         "settings": "Settings",
-        "gestures": "Gestures",
         "input": "Input",
         "stroke": "Stroke",
         "dynamics": "Dynamics",
@@ -2151,32 +2150,6 @@
         "selection": "Selection"
       },
       "foreground": "Foreground",
-      "gestures": {
-        "click": "Click",
-        "drag": "Drag",
-        "scroll": "Scroll",
-        "shiftClick": "Shift+Click",
-        "clickPoint": "Click a point",
-        "holdAlt": "Hold Alt",
-        "holdSpace": "Hold Space"
-      },
-      "hints": {
-        "view": {
-          "drag": "Pan the canvas.",
-          "scroll": "Zoom in and out.",
-          "hold": "Pan from any tool; release to return."
-        },
-        "colorPicker": {
-          "click": "Sample the color under the cursor into the active color target.",
-          "hold": "Sample from any tool; release to keep painting with the picked color."
-        },
-        "sam": {
-          "click": "Place a point with the current label.",
-          "shiftClick": "Place a point with the opposite label.",
-          "clickPoint": "Remove that point.",
-          "drag": "Draw or adjust the search box."
-        }
-      },
       "target": {
         "defaults": "Defaults",
         "editing": "Editing: {{name}}",
@@ -3113,12 +3086,9 @@
         "gradientStops": "Stops",
         "invertSelection": "Invert",
         "lassoFreehand": "Freehand",
-        "lassoHint": "Draw a shape to select. Shift adds, Alt subtracts.",
         "lassoPolygon": "Polygon",
-        "lassoPolygonHint": "Click to place points. Double-click, Enter, or click the first point to close.",
         "lassoShape": "Lasso mode",
         "liftSelectionToLayer": "New layer",
-        "marqueeHint": "Drag to select a region. Shift adds, Alt subtracts; press them mid-drag to constrain or draw from center.",
         "marqueeKind": "Marquee shape",
         "movePosition": "Move layer",
         "opacity": "Opacity",
@@ -3143,11 +3113,8 @@
         "shapeEllipse": "Ellipse",
         "shapeFill": "Fill",
         "shapeFreehand": "Freehand",
-        "shapeFreehandHint": "Drag to draw a freeform shape.",
-        "shapeHint": "Drag to draw a shape.",
         "shapeMaskHint": "Shapes add to the selected mask; fill and stroke set which parts, not their colors.",
         "shapePolygon": "Polygon",
-        "shapePolygonHint": "Click to place points. Double-click, Enter, or click the first point to close.",
         "shapeRect": "Rectangle",
         "shapeStar": "Star",
         "shapeTarget": "Place on",
@@ -4868,5 +4835,59 @@
     "readReleaseNotes": "Read Release Notes",
     "readTheDocs": "Read the Docs",
     "whatsNewInInvoke": "What's New in Invoke"
+  },
+  "workbench": {
+    "shortcuts": {
+      "title": "Shortcuts",
+      "empty": "No keyboard shortcuts are assigned for this context.",
+      "settings": "Keyboard shortcut settings",
+      "global": "Workbench",
+      "onCanvas": "On Canvas · {{tool}}",
+      "pointer": {
+        "click": "Click",
+        "drag": "Drag",
+        "scroll": "Scroll",
+        "point": "Click point",
+        "handleDrag": "Drag handle"
+      },
+      "actions": {
+        "pan": "Pan",
+        "zoom": "Zoom",
+        "sample": "Sample color",
+        "cancel": "Cancel gesture",
+        "apply": "Apply transform",
+        "placePoint": "Place point",
+        "closePolygon": "Close polygon",
+        "samPoint": "Place labelled point",
+        "samOppositePoint": "Opposite label",
+        "samRemovePoint": "Remove point",
+        "samBox": "Draw / adjust search box",
+        "constrainTransform": "Constrain move / scale; snap rotation",
+        "scaleCenter": "Scale from center",
+        "select": "Select region",
+        "addBeforeDrag": "Add (hold before drag)",
+        "subtractBeforeDrag": "Subtract (hold before drag)",
+        "constrainDuringDrag": "Constrain (press during drag)",
+        "centerDuringDrag": "From center (press during drag)",
+        "addSelection": "Add (hold at completion)",
+        "subtractSelection": "Subtract (hold at completion)",
+        "draw": "Draw shape",
+        "constrain": "Constrain proportions",
+        "smaller": "Smaller brush",
+        "larger": "Larger brush",
+        "deselect": "Deselect",
+        "undo": "Undo",
+        "commandPalette": "Command palette",
+        "nextImage": "Next image",
+        "extendSelection": "Extend selection",
+        "selectPage": "Select page",
+        "addNode": "Add node",
+        "selectNodes": "Select nodes",
+        "comparison": "Comparison mode",
+        "swapImages": "Swap images",
+        "invoke": "Invoke",
+        "cancelGeneration": "Cancel generation"
+      }
+    }
   }
 }

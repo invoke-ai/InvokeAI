@@ -93,15 +93,14 @@ export const toTinykeysBinding = (hotkey: string): string => {
 /** The `mod` key's platform name; a bare modifier normalizes to nothing, so use this rather than formatting 'mod'. */
 export const MOD_KEY_LABEL = IS_MAC_OS ? 'cmd' : 'ctrl';
 
-export const formatHotkeyForPlatform = (hotkey: string): string[] =>
-  normalizeHotkeyString(hotkey)
-    .split('+')
-    .filter(Boolean)
-    .map((part) => {
-      const named = part.replace('mod', MOD_KEY_LABEL);
+/** Fixed pointer gestures may use a bare modifier instead of a complete hotkey chord. */
+export const formatHotkeyPartForPlatform = (part: string): string => {
+  const named = part.trim().toLowerCase().replace('mod', MOD_KEY_LABEL);
+  return IS_MAC_OS ? named.replace('alt', 'option') : named;
+};
 
-      return IS_MAC_OS ? named.replace('alt', 'option') : named;
-    });
+export const formatHotkeyForPlatform = (hotkey: string): string[] =>
+  normalizeHotkeyString(hotkey).split('+').filter(Boolean).map(formatHotkeyPartForPlatform);
 
 /** Inputs that take no typed text: a switch or checkbox owning focus has no native undo/shortcut to protect. */
 const NON_TEXT_INPUT_TYPES = new Set([

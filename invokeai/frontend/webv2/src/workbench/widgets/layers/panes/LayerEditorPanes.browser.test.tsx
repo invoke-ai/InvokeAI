@@ -329,9 +329,11 @@ describe('Properties pane', () => {
     await act(() => engine!.tools.setTool('view'));
     await settle();
     expect(page.getByRole('slider', { exact: true, name: 'Brush size' }).query()).toBeNull();
-    // Hint-only tools show a gesture card now, not a single sentence.
-    expect(host!.textContent).toContain('Pan the canvas.');
-    expect(host!.textContent).toContain('Hold Space');
+    // Gesture guidance lives in the status widget; an empty tool section takes no pane space.
+    expect(host!.textContent).not.toContain('Pan the canvas.');
+    expect(host!.textContent).not.toContain('Hold Space');
+    expect(host!.textContent).not.toContain('Tool');
+    expect(host!.textContent).toContain('Layer');
   });
 
   it('follows size changes from outside the field and shares row identity brush↔eraser', async () => {
@@ -529,19 +531,25 @@ describe('Properties pane', () => {
     });
   });
 
-  it('keeps the Tool section mounted with stable geometry across every tool switch', async () => {
+  it('keeps form sections stable across tools with properties and omits instruction-only sections', async () => {
     await mount(PropertiesPane);
     await act(() => engine!.tools.setTool('brush'));
     await settle();
     const section = host!.querySelector<HTMLElement>('[role="group"][aria-label="Tool"]')!;
     const { left, top } = section.getBoundingClientRect();
-    for (const tool of ['eraser', 'view', 'move', 'shape'] as const) {
+    for (const tool of ['eraser', 'move', 'shape'] as const) {
       await act(() => engine!.tools.setTool(tool));
       await settle();
       expect(host!.querySelector('[role="group"][aria-label="Tool"]')).toBe(section);
       const rect = section.getBoundingClientRect();
       expect(rect.left).toBe(left);
       expect(rect.top).toBe(top);
+    }
+    for (const tool of ['view', 'colorPicker', 'sam'] as const) {
+      await act(() => engine!.tools.setTool(tool));
+      await settle();
+      expect(host!.querySelector('[role="group"][aria-label="Tool"]')).toBeNull();
+      expect(host!.querySelector('[role="group"][aria-label="Layer"]')).not.toBeNull();
     }
   });
 

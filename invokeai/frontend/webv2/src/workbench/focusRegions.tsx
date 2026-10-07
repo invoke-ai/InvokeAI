@@ -377,6 +377,12 @@ export const useWorkbenchFocusTarget = (): (() => WorkbenchFocusTarget | null) =
   return controller.getTarget;
 };
 
+/** Live target for contextual guidance; unlike the highlight it does not depend on appearance preferences. */
+export const useCurrentWorkbenchFocusTarget = (): WorkbenchFocusTarget | null => {
+  const controller = use(FocusRegionContext);
+  return useSyncExternalStore(controller?.subscribe ?? subscribeToNothing, () => controller?.getTarget() ?? null);
+};
+
 /**
  * The region whose outline is showing, if any. Borders the outline is drawn over hide while it shows, so a shared
  * edge draws one line at any display scale. No region is outlined while a floating window holds focus.
@@ -401,10 +407,16 @@ export const useFocusRegionProps = (region: WidgetRegion) => {
     css: HIGHLIGHT_STYLES[region],
     'data-focus-region': region,
     'data-highlighted': isHighlighted,
-    onFocusCapture: (_event: FocusEvent<HTMLElement>) => {
+    onFocusCapture: (event: FocusEvent<HTMLElement>) => {
+      if (event.target.closest('[data-workbench-focus-preserve]')) {
+        return;
+      }
       controller.activate({ kind: 'region', region });
     },
     onPointerDownCapture: (event: PointerEvent<HTMLElement>) => {
+      if (event.target instanceof Element && event.target.closest('[data-workbench-focus-preserve]')) {
+        return;
+      }
       const container = event.currentTarget;
 
       controller.activate({ kind: 'region', region }, { byPointer: true });

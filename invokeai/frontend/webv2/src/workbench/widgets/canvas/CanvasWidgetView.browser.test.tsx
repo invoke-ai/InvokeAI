@@ -37,7 +37,8 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(activeProject()),
   useOptionalWorkbenchCommands: () => harness.store!.commands,
   useWorkbenchCommands: () => harness.store!.commands,
-  useWorkbenchQueries: () => ({ getSnapshot: () => ({ activeProject: activeProject() }) }),
+  useWorkbenchQueries: () => harness.store!.queries,
+  useWorkbenchSubscription: () => harness.store!.subscribe,
 }));
 vi.mock('@workbench/useCanvasProjectMutationDispatch', () => ({
   useCanvasProjectMutationDispatch: () => () => undefined,
@@ -137,7 +138,9 @@ const renderView = async (status: QueueItem['status']) => {
     root!.render(
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
-          <CanvasWidgetView {...({ runtime } as unknown as WidgetViewProps)} />
+          <CanvasWidgetView
+            {...({ instance: activeProject().widgetInstances.canvas, runtime } as unknown as WidgetViewProps)}
+          />
         </ChakraProvider>
       </I18nextProvider>
     )

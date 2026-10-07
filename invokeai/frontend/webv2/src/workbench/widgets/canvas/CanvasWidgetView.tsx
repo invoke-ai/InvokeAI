@@ -7,8 +7,9 @@ import { useQueueItemProgressImage } from '@features/queue/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { preloadCanvasInvocation } from '@workbench/activeInvocationSubmission';
 import { getCanvasImportNotice } from '@workbench/canvas-operations/api';
-import { useCanvasEngine } from '@workbench/canvas-operations/react';
+import { useCanvasEngine, type CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import { getCanvasStagingSlots } from '@workbench/canvasStagingView';
+import { useRegisterShortcutHintSource } from '@workbench/hotkeys/hintSources';
 import { recordCanvasImportError } from '@workbench/image-actions/canvasImportError';
 import { readLayerPanelState } from '@workbench/layerPanelState';
 import { useWorkbenchSettingsSelector } from '@workbench/settings/store';
@@ -21,6 +22,7 @@ import {
   useActiveProjectSelector,
   useWorkbenchCommands,
   useWorkbenchQueries,
+  useWorkbenchSubscription,
 } from '@workbench/WorkbenchContext';
 import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -39,7 +41,7 @@ import { CanvasGlobalContextMenu } from './CanvasGlobalContextMenu';
 import { executeCanvasHotkeyCommand } from './canvasHotkeyCommands';
 import { resolveCanvasImageDrop } from './canvasImageDnd';
 import { CanvasImageDropOverlay } from './CanvasImageDropOverlay';
-import { getCanvasInteractionCapabilities } from './canvasInteractionLock';
+import { createCanvasInteractionLockReader, getCanvasInteractionCapabilities } from './canvasInteractionLock';
 import { CanvasSaveToGallerySubmenu } from './CanvasSaveToGallerySubmenu';
 import {
   CANVAS_SETTINGS,
@@ -54,6 +56,7 @@ import { CanvasColorFeed } from './color-system/CanvasColorFeed';
 import { useActiveColorCommands } from './color-system/useActiveColors';
 import { useCanvasOperation } from './engineStoreHooks';
 import { executeCanvasImageDropImport } from './executeCanvasImageDropImport';
+import { createCanvasShortcutHintSource } from './shortcutHints';
 import { acceptStagedCandidate } from './stagedAcceptance';
 import { StagingBar } from './StagingBar';
 import { selectStagedPreviewSource, stagedPreviewKey } from './stagingPreview';
@@ -68,11 +71,43 @@ const MissingFontsDialog = lazy(() =>
   import('./MissingFontsDialog').then((module) => ({ default: module.MissingFontsDialog }))
 );
 
+/** The shared engine stays stable for this keyed project/instance lease; lock changes are source notifications. */
+const CanvasShortcutHintRegistration = ({
+  engine,
+  projectId,
+  instanceId,
+}: {
+  engine: CanvasEngineHandle;
+  projectId: string;
+  instanceId: string;
+}) => {
+  const queries = useWorkbenchQueries();
+  const subscribe = useWorkbenchSubscription();
+  const [source] = useState(() => {
+    const getLocked = createCanvasInteractionLockReader(() => queries.getProject(projectId));
+    return createCanvasShortcutHintSource(engine, projectId, instanceId, {
+      getSnapshot: getLocked,
+      subscribe: (listener) => {
+        let previous = getLocked();
+        return subscribe(() => {
+          const next = getLocked();
+          if (next !== previous) {
+            previous = next;
+            listener();
+          }
+        });
+      },
+    });
+  });
+  useRegisterShortcutHintSource(source);
+  return null;
+};
+
 /**
  * Wire reducer chrome, commands, settings, and staging around the pixel/input engine. Properties owns tool
  * settings; {@link CanvasHeaderActions} owns view controls.
  */
-export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
+export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   const { t } = useTranslation();
   const notify = useNotify();
   const { canvas: canvasCommands, notifications, queue } = useWorkbenchCommands();
@@ -503,6 +538,14 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       role="region"
       w="full"
     >
+      {engine ? (
+        <CanvasShortcutHintRegistration
+          key={`${projectId}:${instance.id}`}
+          engine={engine}
+          projectId={projectId}
+          instanceId={instance.id}
+        />
+      ) : null}
       <CanvasColorFeed engine={engine} />
       {engine ? <CanvasEditRefusalNotices key={projectId} engine={engine} /> : null}
       {engine && fontReferences.length > 0 ? (

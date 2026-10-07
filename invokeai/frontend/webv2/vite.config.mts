@@ -115,6 +115,11 @@ const ROUTE_SHARED_MODULES = [
 const EDITOR_BOOT_SHARED_MODULES = [
   // Shell regions, their hotkeys and every control that opens a widget read it; alone it cost a boot request.
   '/workbench/focusRegions.tsx',
+  // The shell and lazy guide share hint resources and target resolution without extra boot requests.
+  '/workbench/hotkeys/hintSources.tsx',
+  '/workbench/hotkeys/shortcutHints.ts',
+  '/workbench/hotkeys/targetWidget.ts',
+  '/workbench/widget-frame/compactWidgetCapacity.tsx',
   '/features/gallery/ui/GalleryItemSearch.tsx',
   '/app/GalleryUiAdapter.tsx',
   '/features/generation/core/prompt/ast.ts',
@@ -280,6 +285,8 @@ const getLegacyChunkName = (id: string): string | null => {
   if (
     matchesAnySuffix(id, [
       '/platform/state/selectors.ts',
+      // Eager query stores and lazy runtimes share single-flight scheduling; avoid its standalone boot request.
+      '/platform/state/singleFlight.ts',
       '/workbench/palette/paletteStore.ts',
       '/platform/search/dateTokens.ts',
       '/platform/performance/semanticReady.ts',
@@ -296,6 +303,8 @@ const getLegacyChunkName = (id: string): string | null => {
       '/platform/i18n/languages.ts',
       '/platform/react/useMountEffect.ts',
       '/platform/ui/theme/system.ts',
+      // Editor hints and the lazy Launchpad palette/settings share keycaps without loading editor runtime.
+      '/workbench/hotkeys/keyGlyphs.tsx',
       '/workbench/hotkeys/resolve.ts',
       '/workbench/settings/settingsDialogStore.ts',
     ])

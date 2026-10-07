@@ -510,6 +510,23 @@ describe('generation-device orchestration metadata', () => {
 });
 
 describe('workbench hydration invariants', () => {
+  it('preserves saved status placements and does not re-enable a removed shortcuts widget on hydration', () => {
+    const initial = createInitialWorkbenchState();
+    const project = getActiveProject(initial);
+    const bottom = {
+      ...project.widgetRegions.bottom,
+      instanceIds: ['autosave-status', 'server-status', 'notifications'],
+      alignEndInstanceIds: ['notifications'],
+    };
+    const stored = {
+      ...initial,
+      projects: [{ ...project, widgetRegions: { ...project.widgetRegions, bottom } }],
+    };
+    const hydrated = workbenchReducer(initial, { state: stored, type: 'hydrateWorkbench' });
+    expect(getActiveProject(hydrated).widgetRegions.bottom.instanceIds).toEqual(bottom.instanceIds);
+    expect(getActiveProject(hydrated).widgetRegions.bottom.alignEndInstanceIds).toEqual(['notifications']);
+  });
+
   it('seeds a draft when a projectless session hydrates', () => {
     const initial = createInitialWorkbenchState();
     // Model the projectless cache written after closing the last tab.
@@ -577,6 +594,7 @@ describe('workbench widget region defaults', () => {
       'server-status',
       'queue-status',
       'gallery:bottom',
+      'shortcuts',
       'notifications',
       'autosave-status',
     ]);
@@ -1625,7 +1643,7 @@ describe('workbench layout presets', () => {
     });
     expect(project.widgetRegions.bottom).toMatchObject({
       activeInstanceId: 'gallery:bottom',
-      instanceIds: ['server-status', 'queue-status', 'gallery:bottom', 'notifications', 'autosave-status'],
+      instanceIds: ['server-status', 'queue-status', 'gallery:bottom', 'shortcuts', 'notifications', 'autosave-status'],
       isCollapsed: true,
       sizePx: 180,
     });
