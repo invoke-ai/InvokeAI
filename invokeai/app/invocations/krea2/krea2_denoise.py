@@ -51,7 +51,7 @@ from invokeai.backend.krea2.sampling_utils import (
     unpack_latents,
 )
 from invokeai.backend.krea2.style_reference_extension import Krea2StyleReferenceExtension
-from invokeai.backend.model_manager.taxonomy import BaseModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.krea2_lora_constants import KREA2_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -357,7 +357,10 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         self._validate_inputs()
 
         device = TorchDevice.choose_torch_device()
-        inference_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
+        transformer_config = context.models.get_config(self.transformer.transformer)
+        inference_dtype = TorchDevice.choose_krea2_transformer_dtype(
+            is_gguf=transformer_config.format is ModelFormat.GGUFQuantized, device=device
+        )
 
         transformer_info = context.models.load(self.transformer.transformer)
 
@@ -544,7 +547,6 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             ),
         )
 
-        transformer_config = context.models.get_config(self.transformer.transformer)
         num_train_timesteps = scheduler.config.num_train_timesteps
 
         # Estimate the peak working memory (activations) the transformer forward needs and ask the model
@@ -567,6 +569,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             style_reference_kv_bytes=(
                 style_extension.kv_cache_bytes(inference_dtype) if style_extension is not None else 0
             ),
+            dtype=inference_dtype,
         )
         # The activation estimate assumes a fused kernel. Where the build has none for this attention -- ROCm on
         # Windows, MPS -- the score matrix is built as well (chunked on ROCm, see `install_rocm_sdpa_guard`).
@@ -848,6 +851,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         num_loras: int,
         regional_attention_mask_bytes: int = 0,
         style_reference_kv_bytes: int = 0,
+        dtype: torch.dtype = torch.bfloat16,
     ) -> int:
         """Estimate peak transformer activation memory (bytes) so the model cache reserves enough headroom.
 
@@ -865,10 +869,14 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         on the longer text sequence rather than their sum. A fixed base covers resolution-independent overhead
         (transient fp8->bf16 layerwise weight casts and allocator/reserved-memory slack). LoRA sidecar
         patches add a small extra activation branch per patched layer, so we add a per-LoRA margin.
+
+        The activation terms were measured in bf16 and scale with ``dtype``'s width: a GGUF transformer on MPS
+        runs in float32 and holds twice the activations.
         """
         GB = 1024**3
         MB = 1024**2
-        per_token_bytes = int(0.5 * MB)
+        activation_scale = torch.empty((), dtype=dtype).element_size() / 2
+        per_token_bytes = int(0.5 * MB * activation_scale)
         text_seq_len = max(positive_text_seq_len, negative_text_seq_len or 0)
         estimated = (image_seq_len + text_seq_len) * per_token_bytes
         estimated += int(1.5 * GB)
@@ -889,7 +897,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             estimated = int(estimated * 1.35)
             estimated += style_reference_kv_bytes
         if num_loras > 0:
-            estimated += int(0.5 * num_loras * GB)
+            estimated += int(0.5 * num_loras * GB * activation_scale)
         return estimated
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
