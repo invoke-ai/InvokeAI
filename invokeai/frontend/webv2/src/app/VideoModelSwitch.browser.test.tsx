@@ -276,16 +276,27 @@ describe('video model switch confirmation', () => {
     expect(modelSelect().value).toBe(ltxDev.key);
 
     await choose(wanT2v.key);
-    await act(async () => {
-      await userEvent.click(dialogButton('Switch model'));
+    const confirmingDialog = dialog()!;
+    let closingText: string | null | undefined;
+    // A browser click can return after the exit ends; inspect the text when the dialog actually starts closing.
+    const observer = new MutationObserver(() => {
+      if (confirmingDialog.getAttribute('data-state') === 'closed') {
+        closingText = confirmingDialog.textContent;
+      }
     });
+    observer.observe(confirmingDialog, { attributes: true, attributeFilter: ['data-state'] });
+    try {
+      await act(async () => {
+        await userEvent.click(dialogButton('Switch model'));
+      });
 
-    // The store has switched, but the dialog animates out still showing what was confirmed.
-    expect(stored().modelKey).toBe(wanT2v.key);
-    expect(dialog()?.textContent).toContain(confirmedList);
-
-    await waitForDialogToClose();
-
+      // The store has switched, but the closing render still shows exactly what was confirmed.
+      expect(stored().modelKey).toBe(wanT2v.key);
+      await waitForDialogToClose();
+      expect(closingText).toContain(confirmedList);
+    } finally {
+      observer.disconnect();
+    }
     expect(stored()).toMatchObject({
       lastFrameImage: null,
       loras: [],
