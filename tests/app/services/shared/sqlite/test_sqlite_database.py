@@ -1,8 +1,7 @@
 """Regression test: clean() must serialize with transaction() users.
 
-Startup runs VACUUM after services (and their worker threads) are already
-live; an unserialized VACUUM intermittently fails the whole boot with
-"cannot VACUUM - SQL statements in progress".
+Manual VACUUM may run while services and their worker threads are live; without
+the shared lock it can fail with "cannot VACUUM - SQL statements in progress".
 """
 
 import threading

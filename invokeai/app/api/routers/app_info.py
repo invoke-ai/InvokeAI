@@ -77,6 +77,23 @@ def get_patchmatch_status(current_user: CurrentUserOrDefault) -> bool:
     return PatchMatch.patchmatch_available()
 
 
+@app_router.post(
+    "/database/vacuum",
+    operation_id="vacuum_database",
+    status_code=204,
+    responses={
+        401: {"description": "Authentication required"},
+        403: {"description": "Admin privileges required"},
+        500: {"description": "Database vacuum failed"},
+    },
+)
+def vacuum_database(_: AdminUserOrDefault) -> None:
+    try:
+        ApiDependencies.invoker.services.database.clean()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Database vacuum failed") from e
+
+
 class InvokeAIAppConfigWithSetFields(BaseModel):
     """InvokeAI App Config with model fields set"""
 
