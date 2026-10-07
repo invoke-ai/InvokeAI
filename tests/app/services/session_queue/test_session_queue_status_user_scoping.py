@@ -239,11 +239,11 @@ def test_get_queue_item_summaries_by_ids_returns_only_requested_queue_items_in_o
     assert summaries[0].status == "pending"
 
 
-def test_get_queue_item_summaries_by_ids_chunks_past_the_sqlite_bind_limit(
+def test_get_queue_item_summaries_by_ids_takes_more_ids_than_sqlite_binds(
     session_queue: SqliteSessionQueue,
 ) -> None:
-    """Every id becomes one bind parameter, so a single IN (...) would raise OperationalError once
-    the list outgrows SQLite's per-statement variable limit. The query is chunked instead."""
+    """A list longer than SQLite's per-statement variable limit is answered, in the caller's order:
+    an IN (...) binding every id would raise OperationalError past that limit."""
     real_ids = [_insert_queue_item(session_queue, user_id="user-a") for _ in range(3)]
 
     # Size the request off the limit this SQLite build actually enforces (999 on builds older than

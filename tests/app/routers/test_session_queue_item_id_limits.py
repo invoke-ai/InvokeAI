@@ -1,11 +1,8 @@
 """Guards the batch bound on the queue summary route.
 
-`item_summaries_by_ids` takes a client-supplied list of ids and the SQLite layer binds one
-parameter per id. Unbounded, a client could post tens of thousands of ids: past SQLite's
-per-statement variable limit the query raises `OperationalError`, which the route reports as a
-generic HTTP 500, and even below that limit it is an invitation to make the server do arbitrary
-work per request. The route caps the list so oversized requests are rejected by validation
-instead.
+`item_summaries_by_ids` takes a client-supplied list of ids. Unbounded, a client could post tens
+of thousands of ids and make the server do arbitrary work per request. The route caps the list so
+oversized requests are rejected by validation instead.
 """
 
 from unittest.mock import MagicMock

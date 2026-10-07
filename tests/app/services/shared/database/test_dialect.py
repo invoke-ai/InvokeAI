@@ -15,6 +15,7 @@ from invokeai.app.services.shared.database.dialect import (
 )
 from invokeai.app.services.shared.database.schema.client_state import client_state
 from invokeai.app.services.shared.database.schema.images import images
+from invokeai.app.services.shared.database.schema.session_queue import session_queue
 from invokeai.app.services.shared.database.schema.users import users
 
 
@@ -117,3 +118,28 @@ def test_a_bound_set_matches_exactly_the_values_it_holds(database: Database) -> 
     wanted = ["a.png", quoted, "ünïcode.png", "x" * 251 + ".png", "missing.png"]
     assert matching(wanted) == set(wanted) - {"missing.png"}
     assert matching([]) == set()
+
+
+def test_a_bound_set_of_an_integer_column_matches_its_integers(database: Database) -> None:
+    # Beyond 32 bits, so that reading the set as INT would miss it.
+    large = 2**40
+    with database.begin(write=True) as conn:
+        for item_id in (large, large + 1, large + 2):
+            conn.execute(
+                insert(session_queue).values(
+                    item_id=item_id, queue_id="q", batch_id="b", session_id=f"s{item_id}", session="{}"
+                )
+            )
+    statement = select(session_queue.c.item_id).where(InBoundSet(session_queue.c.item_id, bindparam("ids")))
+
+    with database.begin(write=False) as conn:
+        found = set(conn.execute(statement, {"ids": bound_set([large, large + 2, 7])}).scalars())
+
+    assert found == {large, large + 2}
+
+
+def test_a_bound_set_of_an_integer_column_is_read_as_integers_on_every_server() -> None:
+    statement = select(session_queue.c.item_id).where(InBoundSet(session_queue.c.item_id, bindparam("ids")))
+
+    assert "value BIGINT PATH '$'" in str(statement.compile(dialect=mysql.dialect()))
+    assert "CAST(value AS BIGINT)" in str(statement.compile(dialect=postgresql.dialect()))

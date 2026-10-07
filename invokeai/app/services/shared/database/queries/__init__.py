@@ -37,6 +37,7 @@ from invokeai.app.services.shared.database.queries.media_references import Media
 from invokeai.app.services.shared.database.queries.model_relationships import ModelRelationshipQueries
 from invokeai.app.services.shared.database.queries.models import ModelQueries
 from invokeai.app.services.shared.database.queries.projects import ProjectQueries
+from invokeai.app.services.shared.database.queries.session_queue import SessionQueueQueries
 from invokeai.app.services.shared.database.queries.style_presets import StylePresetQueries
 from invokeai.app.services.shared.database.queries.system_prompts import SystemPromptQueries
 from invokeai.app.services.shared.database.queries.users import UserQueries
@@ -117,6 +118,10 @@ class Queries:
     @cached_property
     def projects(self) -> ProjectQueries:
         return ProjectQueries(self._scope)
+
+    @cached_property
+    def session_queue(self) -> SessionQueueQueries:
+        return SessionQueueQueries(self._scope)
 
     @cached_property
     def style_presets(self) -> StylePresetQueries:

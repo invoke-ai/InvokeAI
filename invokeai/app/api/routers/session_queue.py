@@ -43,9 +43,9 @@ from invokeai.app.services.video_records.video_records_common import VideoRecord
 session_queue_router = APIRouter(prefix="/v1/queue", tags=["queue"])
 
 # Upper bound on the number of item ids a client may ask about in one request. Without it a
-# caller can post tens of thousands of ids, which the SQLite layer would either expand past the
-# per-statement bind limit or grind through in a long-running query. The list is meant to cover
-# the rows a client actually has on screen, so this is far above any legitimate use.
+# caller can post tens of thousands of ids and make the database grind through a long-running
+# query. The list is meant to cover the rows a client actually has on screen, so this is far
+# above any legitimate use.
 MAX_QUEUE_ITEM_IDS_PER_REQUEST = 1000
 
 

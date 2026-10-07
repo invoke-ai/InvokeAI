@@ -11,6 +11,7 @@ from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.compiler import SQLCompiler
 from sqlalchemy.sql.elements import ColumnElement
 from sqlalchemy.sql.functions import FunctionElement
+from sqlalchemy.types import TypeDecorator
 
 from invokeai.app.services.shared.database.engines import (
     MARIADB_BINARY_COLLATION,
@@ -231,26 +232,35 @@ def _compile_case_insensitive_like(element: CaseInsensitiveLike, compiler: SQLCo
 BOUND_SET_MAX_LENGTH = 255
 
 
-def bound_set(values: Iterable[str]) -> str:
+def bound_set(values: Iterable[str] | Iterable[int]) -> str:
     """The parameter of an `InBoundSet`: the values as one JSON array."""
     return json.dumps(sorted(set(values)))
 
 
 class InBoundSet(FunctionElement[bool]):
-    """`expression IN` the strings of a set bound as one parameter (`bound_set`), compared as stored, case and all.
+    """`expression IN` the strings or integers of a set bound as one parameter (`bound_set`), strings compared as
+    stored, case and all.
 
     A set of any size is one statement and one parameter, where an IN list would bind every value and be a
-    statement per length: for sets held in process memory, such as the media names of active queue items. Values
-    are at most `BOUND_SET_MAX_LENGTH` characters long. SQLite reads the array with `json_each()`, MySQL and
-    MariaDB with `JSON_TABLE()`, in the tables' binary collation.
+    statement per length: for sets held in process memory, such as the media names of active queue items, and long
+    lists a caller passes. Strings are at most `BOUND_SET_MAX_LENGTH` characters long. SQLite reads the array with
+    `json_each()`, MySQL and MariaDB with `JSON_TABLE()`, strings in the tables' binary collation; an integer
+    expression reads integers.
     """
 
     inherit_cache = True
     name = "in_bound_set"
     _is_implicitly_boolean = True
 
-    def __init__(self, expression: ColumnElement[str], values: ColumnElement[str]) -> None:
+    def __init__(self, expression: ColumnElement[Any], values: ColumnElement[str]) -> None:
         super().__init__(expression, values)
+
+
+def _of_integers(element: InBoundSet) -> bool:
+    column_type = next(iter(element.clauses)).type
+    if isinstance(column_type, TypeDecorator):
+        column_type = column_type.impl_instance
+    return isinstance(column_type, Integer)
 
 
 @compiles(InBoundSet, "sqlite")
@@ -263,15 +273,19 @@ def _compile_in_bound_set_sqlite(element: InBoundSet, compiler: SQLCompiler, **k
 @compiles(InBoundSet, "mariadb")
 def _compile_in_bound_set_server(element: InBoundSet, compiler: SQLCompiler, **kw: Any) -> str:
     expression, values = (compiler.process(clause, **kw) for clause in element.clauses)
-    collation = MARIADB_BINARY_COLLATION if compiler.dialect.name == "mariadb" else MYSQL_BINARY_COLLATION
-    column = f"value VARCHAR({BOUND_SET_MAX_LENGTH}) CHARACTER SET utf8mb4 COLLATE {collation} PATH '$'"
+    if _of_integers(element):
+        column = "value BIGINT PATH '$'"
+    else:
+        collation = MARIADB_BINARY_COLLATION if compiler.dialect.name == "mariadb" else MYSQL_BINARY_COLLATION
+        column = f"value VARCHAR({BOUND_SET_MAX_LENGTH}) CHARACTER SET utf8mb4 COLLATE {collation} PATH '$'"
     return f"{expression} IN (SELECT bound.value FROM JSON_TABLE({values}, '$[*]' COLUMNS ({column})) AS bound)"
 
 
 @compiles(InBoundSet, "postgresql")
 def _compile_in_bound_set_postgresql(element: InBoundSet, compiler: SQLCompiler, **kw: Any) -> str:
     expression, values = (compiler.process(clause, **kw) for clause in element.clauses)
-    return f"{expression} IN (SELECT jsonb_array_elements_text(CAST({values} AS JSONB)))"
+    value = "CAST(value AS BIGINT)" if _of_integers(element) else "value"
+    return f"{expression} IN (SELECT {value} FROM jsonb_array_elements_text(CAST({values} AS JSONB)) AS value)"
 
 
 class KeysetAfter(FunctionElement[bool]):

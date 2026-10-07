@@ -3,7 +3,7 @@ import hashlib
 import json
 import sqlite3
 import threading
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, Literal, Optional, Union, cast
 
 from pydantic_core import to_jsonable_python
@@ -53,10 +53,6 @@ from invokeai.app.services.shared.pagination import CursorPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
-# Maximum number of ids bound into a single `IN (...)` clause. SQLite's compile-time bind limit is
-# 999 on builds older than 3.32 and 32766 on newer ones; staying under the lower figure (leaving
-# room for the other bind params in the statement) keeps the queries portable across both.
-SQLITE_MAX_BIND_PARAMS_PER_CHUNK = 900
 MAX_UNACKNOWLEDGED_ENQUEUE_RECEIPTS_PER_OWNER = 10_000
 MAX_UNACKNOWLEDGED_ENQUEUE_RECEIPT_BYTES_PER_OWNER = 64 * 1024 * 1024
 MAX_ENQUEUE_RECEIPTS_PER_OWNER = 100_000
@@ -175,6 +171,7 @@ class SqliteSessionQueue(SessionQueueBase):
     def __init__(self, db: SqliteDatabase) -> None:
         super().__init__()
         self._db = db
+        self._queries = db.database.queries
 
     def _set_in_progress_to_canceled(self) -> None:
         """
@@ -310,20 +307,11 @@ class SqliteSessionQueue(SessionQueueBase):
     def get_enqueue_receipt(
         self, queue_id: str, idempotency_key: str, user_id: str = "system"
     ) -> EnqueueBatchReceipt | None:
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT batch_id, requested, enqueued, item_ids
-                FROM session_queue_enqueue_receipts
-                WHERE queue_id = ? AND user_id = ? AND idempotency_key = ?
-                """,
-                (queue_id, user_id, idempotency_key),
-            )
-            receipt = cursor.fetchone()
-        return self._decode_enqueue_receipt(receipt) if receipt is not None else None
+        receipt = self._queries.session_queue.enqueue_receipt(queue_id, user_id, idempotency_key)
+        return self._decode_enqueue_receipt(receipt._asdict()) if receipt is not None else None
 
     @staticmethod
-    def _decode_enqueue_receipt(receipt: sqlite3.Row) -> EnqueueBatchReceipt:
+    def _decode_enqueue_receipt(receipt: Mapping[str, Any] | sqlite3.Row) -> EnqueueBatchReceipt:
         item_ids = json.loads(receipt["item_ids"])
         if not isinstance(item_ids, list) or not all(isinstance(item_id, int) for item_id in item_ids):
             raise RuntimeError("Stored queue enqueue receipt contains invalid item ids")
@@ -647,27 +635,25 @@ class SqliteSessionQueue(SessionQueueBase):
     ) -> SessionQueueItem:
         """Read queue metadata and response results without rebuilding execution runtime state."""
         if cursor is None:
-            with self._db.transaction() as transaction_cursor:
-                return self._get_queue_item_for_read(
-                    item_id, cursor=transaction_cursor, hydrate_runtime=hydrate_runtime
-                )
-
-        cursor.execute(
-            """--sql
-            SELECT
-                sq.*,
-                u.display_name AS user_display_name,
-                u.email AS user_email
-            FROM session_queue sq
-            LEFT JOIN users u ON sq.user_id = u.user_id
-            WHERE sq.item_id = ?
-            """,
-            (item_id,),
-        )
-        result = cast(Union[sqlite3.Row, None], cursor.fetchone())
-        if result is None:
+            raw_queue_item = self._queries.session_queue.item(item_id)
+        else:
+            # A retry reads inside its own legacy transaction, until the queue's writes are ported.
+            cursor.execute(
+                """--sql
+                SELECT
+                    sq.*,
+                    u.display_name AS user_display_name,
+                    u.email AS user_email
+                FROM session_queue sq
+                LEFT JOIN users u ON sq.user_id = u.user_id
+                WHERE sq.item_id = ?
+                """,
+                (item_id,),
+            )
+            result = cast(Union[sqlite3.Row, None], cursor.fetchone())
+            raw_queue_item = dict(result) if result is not None else None
+        if raw_queue_item is None:
             raise SessionQueueItemNotFoundError(f"No queue item with id {item_id}")
-        raw_queue_item = dict(result)
         if hydrate_runtime:
             return self._hydrate_queue_item(raw_queue_item, quarantine=False)[0]
         return self._project_queue_item_for_read(raw_queue_item)
@@ -770,91 +756,18 @@ class SqliteSessionQueue(SessionQueueBase):
             return set()
 
     def get_next(self, queue_id: str, origin_prefix: Optional[str] = None) -> Optional[SessionQueueItem]:
-        with self._db.transaction() as cursor:
-            query = """--sql
-                SELECT
-                    sq.*,
-                    u.display_name as user_display_name,
-                    u.email as user_email
-                FROM session_queue sq
-                LEFT JOIN users u ON sq.user_id = u.user_id
-                WHERE
-                    sq.queue_id = ?
-                    AND sq.status = 'pending'
-                """
-            params = [queue_id]
-            if origin_prefix is not None:
-                query += """--sql
-                    AND sq.origin LIKE ?
-                    """
-                params.append(f"{origin_prefix}%")
-            query += """--sql
-                ORDER BY
-                    sq.priority DESC,
-                    sq.created_at ASC
-                LIMIT 1
-                """
-            cursor.execute(query, params)
-            result = cast(Union[sqlite3.Row, None], cursor.fetchone())
-        if result is None:
-            return None
-        return self._hydrate_queue_item(dict(result), quarantine=False)[0]
+        raw_queue_item = self._queries.session_queue.item_by_status(queue_id, "pending", origin_prefix)
+        return self._hydrate_queue_item(raw_queue_item, quarantine=False)[0] if raw_queue_item is not None else None
 
     def get_current(self, queue_id: str, origin_prefix: Optional[str] = None) -> Optional[SessionQueueItem]:
-        with self._db.transaction() as cursor:
-            query = """--sql
-                SELECT
-                    sq.*,
-                    u.display_name as user_display_name,
-                    u.email as user_email
-                FROM session_queue sq
-                LEFT JOIN users u ON sq.user_id = u.user_id
-                WHERE
-                    sq.queue_id = ?
-                    AND sq.status = 'in_progress'
-                """
-            params = [queue_id]
-            if origin_prefix is not None:
-                query += """--sql
-                    AND sq.origin LIKE ?
-                    """
-                params.append(f"{origin_prefix}%")
-            query += """--sql
-                LIMIT 1
-                """
-            cursor.execute(query, params)
-            result = cast(Union[sqlite3.Row, None], cursor.fetchone())
-        if result is None:
-            return None
-        return self._hydrate_queue_item(dict(result), quarantine=False)[0]
+        raw_queue_item = self._queries.session_queue.item_by_status(queue_id, "in_progress", origin_prefix)
+        return self._hydrate_queue_item(raw_queue_item, quarantine=False)[0] if raw_queue_item is not None else None
 
     def _get_queue_item_by_status_for_api(
         self, queue_id: str, status: Literal["pending", "in_progress"], origin_prefix: Optional[str]
     ) -> Optional[SessionQueueItem]:
-        query = """--sql
-            SELECT
-                sq.*,
-                u.display_name as user_display_name,
-                u.email as user_email
-            FROM session_queue sq
-            LEFT JOIN users u ON sq.user_id = u.user_id
-            WHERE
-                sq.queue_id = ?
-                AND sq.status = ?
-            """
-        params: list[str] = [queue_id, status]
-        if origin_prefix is not None:
-            query += " AND sq.origin LIKE ?"
-            params.append(f"{origin_prefix}%")
-        if status == "pending":
-            query += " ORDER BY sq.priority DESC, sq.created_at ASC"
-        query += " LIMIT 1"
-        with self._db.transaction() as cursor:
-            cursor.execute(query, params)
-            result = cast(Union[sqlite3.Row, None], cursor.fetchone())
-        if result is None:
-            return None
-        return self._project_queue_item_for_read(dict(result))
+        raw_queue_item = self._queries.session_queue.item_by_status(queue_id, status, origin_prefix)
+        return self._project_queue_item_for_read(raw_queue_item) if raw_queue_item is not None else None
 
     def get_current_for_api(self, queue_id: str, origin_prefix: Optional[str] = None) -> Optional[SessionQueueItem]:
         return self._get_queue_item_by_status_for_api(queue_id, "in_progress", origin_prefix)
@@ -978,60 +891,14 @@ class SqliteSessionQueue(SessionQueueBase):
         self.__invoker.services.events.emit_queue_item_status_changed(queue_item, batch_status, queue_status)
         return queue_item, True
 
-    def _get_workflow_call_child_ids(self, item_id: int) -> list[int]:
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT item_id
-                FROM session_queue
-                WHERE parent_item_id = ?
-                ORDER BY item_id ASC
-                """,
-                (item_id,),
-            )
-            rows = cast(list[sqlite3.Row], cursor.fetchall())
-        return [row[0] for row in rows]
-
     def _get_workflow_call_descendant_ids(self, item_id: int) -> list[int]:
-        descendant_ids: list[int] = []
-        queue: list[int] = [item_id]
-        while queue:
-            current_item_id = queue.pop(0)
-            child_ids = self._get_workflow_call_child_ids(current_item_id)
-            descendant_ids.extend(child_ids)
-            queue.extend(child_ids)
-        return descendant_ids
-
-    def _get_workflow_call_ancestor_ids(self, item_id: int) -> list[int]:
-        ancestor_ids: list[int] = []
-        current_item_id = item_id
-        while True:
-            with self._db.transaction() as cursor:
-                cursor.execute(
-                    """--sql
-                    SELECT parent_item_id
-                    FROM session_queue
-                    WHERE item_id = ?
-                    """,
-                    (current_item_id,),
-                )
-                row = cursor.fetchone()
-            if row is None:
-                raise SessionQueueItemNotFoundError(f"No queue item with id {current_item_id}")
-            parent_item_id = row[0]
-            if parent_item_id is None:
-                break
-            ancestor_ids.append(parent_item_id)
-            current_item_id = parent_item_id
-        return ancestor_ids
+        return self._queries.session_queue.descendant_ids(item_id)
 
     def _get_workflow_call_chain_item_ids(self, item_id: int) -> list[int]:
-        ancestor_ids = self._get_workflow_call_ancestor_ids(item_id)
-        root_item_id = ancestor_ids[-1] if ancestor_ids else item_id
-        descendant_ids = self._get_workflow_call_descendant_ids(root_item_id)
-        chain_item_ids = ancestor_ids + [item_id] + descendant_ids
-        deduped_chain_item_ids = list(dict.fromkeys(chain_item_ids))
-        return deduped_chain_item_ids
+        chain_item_ids = self._queries.session_queue.chain_item_ids(item_id)
+        if chain_item_ids is None:
+            raise SessionQueueItemNotFoundError(f"No queue item with id {item_id}, or one of its ancestors")
+        return chain_item_ids
 
     def _get_current_workflow_call_chain_item_ids(self, queue_id: str) -> set[int]:
         """Item ids in the workflow-call chains of every currently executing item.
@@ -1040,75 +907,16 @@ class SqliteSessionQueue(SessionQueueBase):
         "current": the "except current" operations must leave each active worker's complete
         ancestor/descendant chain intact, not just the chain of one arbitrarily selected item.
         Waiting chains with no in-progress item remain cancellable backlog, exactly as in
-        single-worker mode.
+        single-worker mode, except the chain of the child that runs next while its parent waits.
         """
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT item_id
-                FROM session_queue
-                WHERE queue_id = ? AND status = 'in_progress'
-                ORDER BY item_id ASC
-                """,
-                (queue_id,),
-            )
-            in_progress_ids = [cast(int, row[0]) for row in cursor.fetchall()]
-
-        if in_progress_ids:
-            chain_item_ids: set[int] = set()
-            for item_id in in_progress_ids:
-                chain_item_ids.update(self._get_workflow_call_chain_item_ids(item_id))
-            return chain_item_ids
-
-        # Nothing is in progress. A chain can still be mid-execution in the gap between one child
-        # finishing and the next being dequeued (parent 'waiting', next child 'pending'); protect
-        # the chain of the next item that would be dequeued, as before.
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT child.item_id
-                FROM session_queue child
-                JOIN session_queue parent ON parent.item_id = child.parent_item_id
-                WHERE
-                    child.queue_id = ?
-                    AND child.status = 'pending'
-                    AND parent.status = 'waiting'
-                ORDER BY child.priority DESC, child.created_at ASC, child.item_id ASC
-                LIMIT 1
-                """,
-                (queue_id,),
-            )
-            row = cursor.fetchone()
-        if row is None:
-            return set()
-        return set(self._get_workflow_call_chain_item_ids(cast(int, row[0])))
+        return self._queries.session_queue.current_chain_item_ids(queue_id)
 
     def is_empty(self, queue_id: str) -> IsEmptyResult:
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT count(*)
-                FROM session_queue
-                WHERE queue_id = ?
-                """,
-                (queue_id,),
-            )
-            is_empty = cast(int, cursor.fetchone()[0]) == 0
-        return IsEmptyResult(is_empty=is_empty)
+        return IsEmptyResult(is_empty=self._queries.session_queue.count(queue_id) == 0)
 
     def is_full(self, queue_id: str) -> IsFullResult:
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT count(*)
-                FROM session_queue
-                WHERE queue_id = ?
-                """,
-                (queue_id,),
-            )
-            max_queue_size = self.__invoker.services.configuration.max_queue_size
-            is_full = cast(int, cursor.fetchone()[0]) >= max_queue_size
-        return IsFullResult(is_full=is_full)
+        max_queue_size = self.__invoker.services.configuration.max_queue_size
+        return IsFullResult(is_full=self._queries.session_queue.count(queue_id) >= max_queue_size)
 
     def clear(self, queue_id: str, user_id: Optional[str] = None) -> ClearResult:
         user_filter = "AND user_id = ?" if user_id is not None else ""
@@ -1561,23 +1369,10 @@ class SqliteSessionQueue(SessionQueueBase):
         return CancelAllExceptCurrentResult(canceled=count)
 
     def _get_queue_item_with_load_status(self, item_id: int) -> tuple[SessionQueueItem, bool]:
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT
-                    sq.*,
-                    u.display_name as user_display_name,
-                    u.email as user_email
-                FROM session_queue sq
-                LEFT JOIN users u ON sq.user_id = u.user_id
-                WHERE sq.item_id = ?
-                """,
-                (item_id,),
-            )
-            result = cast(Union[sqlite3.Row, None], cursor.fetchone())
-        if result is None:
+        raw_queue_item = self._queries.session_queue.item(item_id)
+        if raw_queue_item is None:
             raise SessionQueueItemNotFoundError(f"No queue item with id {item_id}")
-        return self._hydrate_queue_item(dict(result), quarantine=False)
+        return self._hydrate_queue_item(raw_queue_item, quarantine=False)
 
     def get_queue_item(self, item_id: int) -> SessionQueueItem:
         return self._get_queue_item_with_load_status(item_id)[0]
@@ -1586,17 +1381,7 @@ class SqliteSessionQueue(SessionQueueBase):
         return self._get_queue_item_for_api(item_id)
 
     def get_queue_item_workflow_json(self, item_id: int) -> str | None:
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT workflow
-                FROM session_queue
-                WHERE item_id = ?
-                """,
-                (item_id,),
-            )
-            result = cast(Union[sqlite3.Row, None], cursor.fetchone())
-        return cast(str | None, result["workflow"]) if result is not None else None
+        return self._queries.session_queue.workflow(item_id)
 
     def save_queue_item_session(self, item_id: int, session: GraphExecutionState) -> None:
         with self._db.transaction() as cursor:
@@ -1966,81 +1751,16 @@ class SqliteSessionQueue(SessionQueueBase):
         status: Optional[QUEUE_ITEM_STATUS] = None,
         destination: Optional[str] = None,
     ) -> CursorPaginatedResults[SessionQueueItem]:
-        with self._db.transaction() as cursor_:
-            item_id = cursor
-            query = """--sql
-                SELECT *
-                FROM session_queue
-                WHERE queue_id = ?
-            """
-            params: list[Union[str, int]] = [queue_id]
-
-            if status is not None:
-                query += """--sql
-                    AND status = ?
-                    """
-                params.append(status)
-
-            if destination is not None:
-                query += """---sql
-                    AND destination = ?
-                """
-                params.append(destination)
-
-            if item_id is not None:
-                query += """--sql
-                    AND (priority < ?) OR (priority = ? AND item_id > ?)
-                    """
-                params.extend([priority, priority, item_id])
-
-            query += """--sql
-                ORDER BY
-                    priority DESC,
-                    item_id ASC
-                LIMIT ?
-                """
-            params.append(limit + 1)
-            cursor_.execute(query, params)
-            results = cast(list[sqlite3.Row], cursor_.fetchall())
-        items = [self._hydrate_queue_item(dict(result), quarantine=False)[0] for result in results]
-        has_more = False
-        if len(items) > limit:
-            # remove the extra item
-            items.pop()
-            has_more = True
-        return CursorPaginatedResults(items=items, limit=limit, has_more=has_more)
-
-    def _list_all_queue_item_rows(
-        self,
-        queue_id: str,
-        destination: Optional[str] = None,
-    ) -> list[sqlite3.Row]:
-        with self._db.transaction() as cursor:
-            query = """--sql
-                SELECT
-                    sq.*,
-                    u.display_name as user_display_name,
-                    u.email as user_email
-                FROM session_queue sq
-                LEFT JOIN users u ON sq.user_id = u.user_id
-                WHERE sq.queue_id = ?
-            """
-            params: list[Union[str, int]] = [queue_id]
-
-            if destination is not None:
-                query += """---sql
-                    AND sq.destination = ?
-                """
-                params.append(destination)
-
-            query += """--sql
-                ORDER BY
-                    sq.priority DESC,
-                    sq.item_id ASC
-                ;
-                """
-            cursor.execute(query, params)
-            return cast(list[sqlite3.Row], cursor.fetchall())
+        raw_queue_items = self._queries.session_queue.page(
+            queue_id,
+            limit=limit + 1,
+            after=(priority, cursor) if cursor is not None else None,
+            status=status,
+            destination=destination,
+        )
+        items = [self._hydrate_queue_item(raw_queue_item, quarantine=False)[0] for raw_queue_item in raw_queue_items]
+        has_more = len(items) > limit
+        return CursorPaginatedResults(items=items[:limit], limit=limit, has_more=has_more)
 
     def list_all_queue_items(
         self,
@@ -2048,8 +1768,8 @@ class SqliteSessionQueue(SessionQueueBase):
         destination: Optional[str] = None,
     ) -> list[SessionQueueItem]:
         """Gets all queue items with fully rehydrated runtime sessions."""
-        results = self._list_all_queue_item_rows(queue_id=queue_id, destination=destination)
-        return [self._hydrate_queue_item(dict(result), quarantine=False)[0] for result in results]
+        raw_queue_items = self._queries.session_queue.all_items(queue_id, destination)
+        return [self._hydrate_queue_item(raw_queue_item, quarantine=False)[0] for raw_queue_item in raw_queue_items]
 
     def list_all_queue_items_for_api(
         self,
@@ -2057,8 +1777,8 @@ class SqliteSessionQueue(SessionQueueBase):
         destination: Optional[str] = None,
     ) -> list[SessionQueueItem]:
         """Gets response-shaped queue items without rebuilding runtime execution state."""
-        results = self._list_all_queue_item_rows(queue_id=queue_id, destination=destination)
-        return [self._project_queue_item_for_read(dict(result)) for result in results]
+        raw_queue_items = self._queries.session_queue.all_items(queue_id, destination)
+        return [self._project_queue_item_for_read(raw_queue_item) for raw_queue_item in raw_queue_items]
 
     def get_queue_item_ids(
         self,
@@ -2067,69 +1787,20 @@ class SqliteSessionQueue(SessionQueueBase):
         user_id: Optional[str] = None,
         origin_prefix: Optional[str] = None,
     ) -> ItemIdsResult:
-        with self._db.transaction() as cursor_:
-            query = """--sql
-                SELECT item_id
-                FROM session_queue
-                WHERE queue_id = ?
-                """
-            query_params: list[str] = [queue_id]
-
-            if user_id is not None:
-                query += " AND user_id = ?"
-                query_params.append(user_id)
-
-            if origin_prefix is not None:
-                query += " AND origin LIKE ?"
-                query_params.append(f"{origin_prefix}%")
-
-            query += f" ORDER BY created_at {order_dir.value}"
-
-            cursor_.execute(query, query_params)
-            result = cast(list[sqlite3.Row], cursor_.fetchall())
-        item_ids = [row[0] for row in result]
-
+        item_ids = self._queries.session_queue.item_ids(
+            queue_id,
+            descending=order_dir == SQLiteDirection.Descending,
+            user_id=user_id,
+            origin_prefix=origin_prefix,
+        )
         return ItemIdsResult(item_ids=item_ids, total_count=len(item_ids))
 
     def get_queue_item_summaries_by_ids(self, queue_id: str, item_ids: list[int]) -> list[SessionQueueItemSummary]:
         if not item_ids:
             return []
-
-        rows: list[sqlite3.Row] = []
-        with self._db.transaction() as cursor:
-            # Each id becomes one bind parameter, so a single IN (...) would blow past SQLite's
-            # per-statement variable limit for large id lists. Query in chunks instead - callers
-            # are bounded at the API layer, but this keeps any caller from hitting that ceiling.
-            for chunk_start in range(0, len(item_ids), SQLITE_MAX_BIND_PARAMS_PER_CHUNK):
-                chunk = item_ids[chunk_start : chunk_start + SQLITE_MAX_BIND_PARAMS_PER_CHUNK]
-                placeholders = ", ".join("?" for _ in chunk)
-                cursor.execute(
-                    f"""--sql
-                    SELECT
-                        sq.item_id,
-                        sq.created_at,
-                        sq.status,
-                        sq.device,
-                        sq.started_at,
-                        sq.completed_at,
-                        sq.origin,
-                        sq.destination,
-                        sq.batch_id,
-                        sq.user_id,
-                        u.display_name AS user_display_name,
-                        u.email AS user_email,
-                        sq.field_values,
-                        sq.parent_item_id
-                    FROM session_queue sq
-                    LEFT JOIN users u ON sq.user_id = u.user_id
-                    WHERE sq.queue_id = ? AND sq.item_id IN ({placeholders})
-                    """,
-                    (queue_id, *chunk),
-                )
-                rows.extend(cast(list[sqlite3.Row], cursor.fetchall()))
-
         summaries_by_id = {
-            row["item_id"]: SessionQueueItemSummary.queue_item_summary_from_dict(dict(row)) for row in rows
+            raw_summary["item_id"]: SessionQueueItemSummary.queue_item_summary_from_dict(raw_summary)
+            for raw_summary in self._queries.session_queue.summaries(queue_id, item_ids)
         }
         return [summaries_by_id[item_id] for item_id in item_ids if item_id in summaries_by_id]
 
@@ -2141,73 +1812,18 @@ class SqliteSessionQueue(SessionQueueBase):
         origin_prefix: Optional[str] = None,
         is_admin: bool = False,
     ) -> SessionQueueStatus:
-        with self._db.transaction() as cursor:
-            # Aggregate counts are global across all users within the requested scope.
-            query = """--sql
-                SELECT status, count(*)
-                FROM session_queue
-                WHERE queue_id = ?
-                """
-            params: list[str] = [queue_id]
-
-            if origin_prefix is not None:
-                query += " AND origin LIKE ?"
-                params.append(f"{origin_prefix}%")
-
-            query += " GROUP BY status"
-            cursor.execute(query, params)
-            counts_result = cast(list[sqlite3.Row], cursor.fetchall())
-
-            # When user_id is provided, additionally compute that user's own counts so the
-            # caller can render the per-user portion of the badge. These are returned in the
-            # separate user_pending/user_in_progress fields and never replace the global counts.
-            user_counts_result: list[sqlite3.Row] = []
-            if user_id is not None:
-                user_query = """--sql
-                    SELECT status, count(*)
-                    FROM session_queue
-                    WHERE queue_id = ? AND user_id = ?
-                    """
-                user_params = [queue_id, user_id]
-
-                if origin_prefix is not None:
-                    user_query += " AND origin LIKE ?"
-                    user_params.append(f"{origin_prefix}%")
-
-                user_query += """--sql
-                    GROUP BY status
-                    """
-                cursor.execute(user_query, user_params)
-                user_counts_result = cast(list[sqlite3.Row], cursor.fetchall())
-
-            # Only the four identifier columns, not a full SessionQueueItem: this runs on
-            # every status poll, and hydrating the item would deserialize its whole session
-            # graph. The origin filter mirrors the aggregate-count queries above so a
-            # scoped caller never sees another scope's current item.
-            current_item_query = """--sql
-                SELECT item_id, session_id, batch_id, user_id
-                FROM session_queue
-                WHERE queue_id = ? AND status = 'in_progress'
-                """
-            current_item_params: list[str] = [queue_id]
-
-            if origin_prefix is not None:
-                current_item_query += " AND origin LIKE ?"
-                current_item_params.append(f"{origin_prefix}%")
-
-            current_item_query += " LIMIT 1"
-            cursor.execute(current_item_query, current_item_params)
-            current_item = cast(Union[sqlite3.Row, None], cursor.fetchone())
-
-        total = sum(row[1] or 0 for row in counts_result)
-        counts: dict[str, int] = {row[0]: row[1] for row in counts_result}
+        # Aggregate counts are global across all users within the requested scope. With user_id, the
+        # same snapshot also yields that user's own counts, for the per-user portion of the badge;
+        # they are returned in separate fields and never replace the global counts. Only the current
+        # item's identifiers are read, not a full SessionQueueItem: this runs on every status poll and
+        # every status change, and hydrating the item would deserialize its whole session graph.
+        counts, own_counts, current_item = self._queries.session_queue.status_counts(queue_id, user_id, origin_prefix)
 
         user_pending: Optional[int] = None
         user_in_progress: Optional[int] = None
         if user_id is not None:
-            user_counts: dict[str, int] = {row[0]: row[1] for row in user_counts_result}
-            user_pending = user_counts.get("pending", 0)
-            user_in_progress = user_counts.get("in_progress", 0)
+            user_pending = own_counts.get("pending", 0)
+            user_in_progress = own_counts.get("in_progress", 0)
 
         # Redaction is decided from the same current_item snapshot used to embed identifiers,
         # so a concurrent transition (e.g. B finishing while A's status changes) cannot leave
@@ -2221,10 +1837,10 @@ class SqliteSessionQueue(SessionQueueBase):
         current_item_id = None
         current_session_id = None
         current_batch_id = None
-        if current_item is not None and (is_admin or owner_user_id is None or current_item["user_id"] == owner_user_id):
-            current_item_id = current_item["item_id"]
-            current_session_id = current_item["session_id"]
-            current_batch_id = current_item["batch_id"]
+        if current_item is not None and (is_admin or owner_user_id is None or current_item.user_id == owner_user_id):
+            current_item_id = current_item.item_id
+            current_session_id = current_item.session_id
+            current_batch_id = current_item.batch_id
 
         return SessionQueueStatus(
             queue_id=queue_id,
@@ -2237,30 +1853,13 @@ class SqliteSessionQueue(SessionQueueBase):
             completed=counts.get("completed", 0),
             failed=counts.get("failed", 0),
             canceled=counts.get("canceled", 0),
-            total=total,
+            total=sum(counts.values()),
             user_pending=user_pending,
             user_in_progress=user_in_progress,
         )
 
     def get_batch_status(self, queue_id: str, batch_id: str, user_id: Optional[str] = None) -> BatchStatus:
-        with self._db.transaction() as cursor:
-            query = """--sql
-                SELECT status, count(*), origin, destination
-                FROM session_queue
-                WHERE queue_id = ? AND batch_id = ?
-                """
-            params: list[str] = [queue_id, batch_id]
-            if user_id is not None:
-                query += " AND user_id = ?"
-                params.append(user_id)
-            query += " GROUP BY status"
-            cursor.execute(query, params)
-            result = cast(list[sqlite3.Row], cursor.fetchall())
-        total = sum(row[1] or 0 for row in result)
-        counts: dict[str, int] = {row[0]: row[1] for row in result}
-        origin = result[0]["origin"] if result else None
-        destination = result[0]["destination"] if result else None
-
+        counts, origin, destination = self._queries.session_queue.batch_counts(queue_id, batch_id, user_id)
         return BatchStatus(
             batch_id=batch_id,
             origin=origin,
@@ -2272,29 +1871,13 @@ class SqliteSessionQueue(SessionQueueBase):
             completed=counts.get("completed", 0),
             failed=counts.get("failed", 0),
             canceled=counts.get("canceled", 0),
-            total=total,
+            total=sum(counts.values()),
         )
 
     def get_counts_by_destination(
         self, queue_id: str, destination: str, user_id: Optional[str] = None
     ) -> SessionQueueCountsByDestination:
-        with self._db.transaction() as cursor:
-            query = """--sql
-                SELECT status, count(*)
-                FROM session_queue
-                WHERE queue_id = ? AND destination = ?
-                """
-            params: list[str] = [queue_id, destination]
-            if user_id is not None:
-                query += " AND user_id = ?"
-                params.append(user_id)
-            query += " GROUP BY status"
-            cursor.execute(query, params)
-            counts_result = cast(list[sqlite3.Row], cursor.fetchall())
-
-        total = sum(row[1] or 0 for row in counts_result)
-        counts: dict[str, int] = {row[0]: row[1] for row in counts_result}
-
+        counts = self._queries.session_queue.destination_counts(queue_id, destination, user_id)
         return SessionQueueCountsByDestination(
             queue_id=queue_id,
             destination=destination,
@@ -2304,7 +1887,7 @@ class SqliteSessionQueue(SessionQueueBase):
             completed=counts.get("completed", 0),
             failed=counts.get("failed", 0),
             canceled=counts.get("canceled", 0),
-            total=total,
+            total=sum(counts.values()),
         )
 
     def retry_items_by_id(self, queue_id: str, item_ids: list[int]) -> RetryItemsResult:
