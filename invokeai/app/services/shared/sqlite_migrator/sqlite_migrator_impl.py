@@ -4,7 +4,7 @@ import sqlite3
 import tempfile
 from collections import Counter
 from collections.abc import Iterator
-from contextlib import closing, contextmanager
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import NoReturn, Optional
@@ -117,9 +117,14 @@ class Migrator:
         if db_path is not None:
             timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
             self._backup_path = db_path.parent / f"{db_path.stem}_backup_{timestamp}.db"
+            # A backup of the same second exists when the database was migrated again right away, e.g. on a restart
+            # after a failed migration: keep it, and number this one.
+            attempt = 1
+            while self._backup_path.exists():
+                self._backup_path = db_path.parent / f"{db_path.stem}_backup_{timestamp}-{attempt}.db"
+                attempt += 1
             self._logger.info(f"Backing up database to {str(self._backup_path)}")
-            with closing(sqlite3.connect(self._backup_path)) as backup_conn:
-                self._database.sqlite.conn.backup(backup_conn)
+            self._database.backup(self._backup_path)
         else:
             self._logger.info("Using in-memory database, no backup needed")
 

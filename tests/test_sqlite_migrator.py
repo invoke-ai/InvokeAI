@@ -1,5 +1,6 @@
 import sqlite3
 from contextlib import closing
+from datetime import datetime
 from logging import Logger
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -8,6 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.shared.sqlite_migrator import sqlite_migrator_impl
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import (
     MigrateCallback,
     Migration,
@@ -812,3 +814,29 @@ def test_migration_27_without_client_state_data_column(logger: Logger) -> None:
     assert cursor.fetchone()[0] == 0
 
     db._conn.close()
+
+
+def test_a_backup_of_the_same_second_is_kept_and_the_next_one_numbered(
+    tmp_path: Path, logger: Logger, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Migrating a database again right away, as on a restart after a failed migration, must not fail on, or
+    # replace, the backup the first run made.
+    class SameSecond(datetime):
+        @classmethod
+        def now(cls, tz: object = None) -> "SameSecond":
+            return cls(2026, 10, 7, 12, 0, 0)
+
+    monkeypatch.setattr(sqlite_migrator_impl, "datetime", SameSecond)
+    db = SqliteDatabase(db_path=tmp_path / "invokeai.db", logger=logger, verbose=False)
+    db._conn.execute("CREATE TABLE test (id INTEGER PRIMARY KEY);")
+    db._conn.commit()
+
+    first = Migrator(db.database)
+    first._backup_db()
+    second = Migrator(db.database)
+    second._backup_db()
+
+    assert first._backup_path == tmp_path / "invokeai_backup_20261007-120000.db"
+    assert second._backup_path == tmp_path / "invokeai_backup_20261007-120000-1.db"
+    assert first._backup_path.is_file() and second._backup_path.is_file()
+    db.database.dispose()

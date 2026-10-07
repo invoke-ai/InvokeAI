@@ -3,7 +3,7 @@ import sqlite3
 import threading
 import time
 from collections.abc import Callable, Iterator
-from contextlib import AbstractContextManager, contextmanager, nullcontext
+from contextlib import AbstractContextManager, closing, contextmanager, nullcontext
 from dataclasses import dataclass
 from logging import Logger
 from pathlib import Path
@@ -338,6 +338,23 @@ class Database:
         except Exception as e:
             self._logger.error(f"Error cleaning database: {e}")
             raise
+
+    def backup(self, destination: Path) -> None:
+        """Copies a SQLite database into the file `destination` with SQLite's online backup, which is consistent
+        while the database is in use and includes what its write-ahead log holds. (A copy of the database file is
+        not.) A server database is backed up by its operator; this raises there.
+
+        It holds the database's lock while it copies, so it is for startup and for tools, not for a running app's
+        requests. It refuses a destination that exists, and a caller inside a transaction of its own, whose
+        uncommitted changes the copy would hold."""
+        sqlite = self.sqlite
+        if destination.exists():
+            raise FileExistsError(f"Backup destination {destination} exists")
+        with sqlite.lock:
+            if sqlite.conn.in_transaction:
+                raise NestedTransactionError("A backup cannot be taken inside a transaction")
+            with closing(sqlite3.connect(destination)) as target:
+                sqlite.conn.backup(target)
 
     def dispose(self) -> None:
         """Closes every connection; transactions begun afterwards are refused. Safe to call more than once.

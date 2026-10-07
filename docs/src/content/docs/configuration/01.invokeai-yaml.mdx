@@ -248,7 +248,7 @@ Running the database on a network share is not a supported configuration -- SQLi
 
 The safeguard exists anyway, because WAL needs shared memory and a few setups cannot provide it: a database on a network share, some container volume drivers, and SQLite builds compiled without WAL all leave a rollback journal in place instead — and on a rollback journal, `normal` *can* corrupt the database on power loss. InvokeAI reads back the journal mode it actually got, so in that case it ignores `normal`, uses `full`, and logs a warning naming the mode. An in-memory database (`use_memory_db`) has no durability to trade and is unaffected.
 
-`db_synchronous` applies to the application's own database connection. The standalone scripts that open the database directly — `scripts/gallery_maintenance.py` and `invokeai/frontend/install/import_images.py` — leave SQLite's own default in place, so the measurements below describe the running app, not those scripts.
+`db_synchronous` applies to the application's own database connection, and to the standalone scripts that open the database themselves — `scripts/gallery_maintenance.py` and `invokeai/frontend/install/import_images.py` — which read the same `invokeai.yaml`. The measurements below describe the running app.
 
 Measured on a copy of a real library, 300 single-row inserts each committed on its own:
 

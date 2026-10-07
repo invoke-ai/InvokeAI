@@ -436,8 +436,10 @@ class ImageQueries(QueryModule):
         user_id: str,
         image_subfolder: str,
         project_id: Optional[str],
+        created_at: Optional[str] = None,
     ) -> None:
-        """Adds the image, unless an image of that name exists."""
+        """Adds the image, unless an image of that name exists. It was created now, unless `created_at` (a timestamp
+        text, see `types.timestamp_text`) says when."""
         conn.execute(
             _insert(conn.dialect.name),
             {
@@ -455,6 +457,7 @@ class ImageQueries(QueryModule):
                 "user_id": user_id,
                 "image_subfolder": image_subfolder,
                 "project_id": project_id,
+                **({"created_at": created_at} if created_at is not None else {}),
             },
         )
 

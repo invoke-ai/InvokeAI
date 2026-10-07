@@ -4,7 +4,8 @@ import logging
 import sqlite3
 import threading
 from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
+from pathlib import Path
 from typing import Any, Optional
 
 import pytest
@@ -182,6 +183,13 @@ def test_queries_of_an_ended_transaction_are_refused(probe: ProbeQueries) -> Non
         q.items.names()
 
 
+@server_only
+def test_a_server_database_is_left_to_its_operator_to_back_up(empty_database: Database, tmp_path: Path) -> None:
+    with pytest.raises(RuntimeError, match="no SQLite connection"):
+        empty_database.backup(tmp_path / "backup.db")
+    assert not (tmp_path / "backup.db").exists()
+
+
 def test_a_disposed_database_refuses_further_work(empty_database: Database) -> None:
     empty_database.dispose()
     empty_database.dispose()  # Repeating it is harmless.
@@ -238,6 +246,35 @@ class TestSqlite:
             assert q.items.names() == []
 
         assert queries.items.names() == ["other"]
+
+    def test_a_backup_holds_what_only_the_write_ahead_log_holds(
+        self, sqlite_file_database: Database, tmp_path: Path
+    ) -> None:
+        ProbeQueries(sqlite_file_database).items.add(1, "logged")
+        live = sqlite_file_database.sqlite.path
+        assert live is not None
+        # Not checkpointed yet: a copy of the database file alone would miss the row.
+        assert live.with_name(live.name + "-wal").stat().st_size > 0
+
+        sqlite_file_database.backup(tmp_path / "backup.db")
+
+        with closing(sqlite3.connect(tmp_path / "backup.db")) as copy:
+            assert copy.execute("SELECT name FROM probe_items").fetchall() == [("logged",)]
+
+    def test_a_backup_never_replaces_a_file_nor_copies_a_transaction_in_flight(
+        self, sqlite_file_database: Database, tmp_path: Path
+    ) -> None:
+        earlier = tmp_path / "earlier.db"
+        earlier.write_bytes(b"an earlier backup")
+        with pytest.raises(FileExistsError):
+            sqlite_file_database.backup(earlier)
+        assert earlier.read_bytes() == b"an earlier backup"
+
+        with ProbeQueries(sqlite_file_database).transaction() as q:
+            q.items.add(1, "uncommitted")
+            with pytest.raises(NestedTransactionError):
+                sqlite_file_database.backup(tmp_path / "during.db")
+        assert not (tmp_path / "during.db").exists()
 
     def _commit_elsewhere(self, other_process: sqlite3.Connection) -> None:
         other_process.execute("BEGIN IMMEDIATE")

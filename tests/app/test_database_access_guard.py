@@ -26,9 +26,6 @@ DATABASE_LAYER = (
 NOT_YET_PORTED: dict[str, int] = {
     # The transitional cursor facade, removed once every service is ported.
     "invokeai/app/services/shared/sqlite/sqlite_database.py": 1,
-    "invokeai/backend/util/gallery_maintenance.py": 8,
-    "invokeai/frontend/install/import_images.py": 13,
-    "scripts/remove_orphaned_models.py": 3,
 }
 
 _DRIVER_MODULES = ("sqlite3", "sqlalchemy", "alembic", "pymysql")

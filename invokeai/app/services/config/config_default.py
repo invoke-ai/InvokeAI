@@ -725,6 +725,17 @@ def ensure_fonts_dir(fonts_path: Path) -> None:
         logger.warning("Unable to initialize fonts directory at %s", fonts_path, exc_info=True)
 
 
+def load_config_from_root(root: Path) -> InvokeAIAppConfig:
+    """The config of the install at `root`, from the environment and its `invokeai.yaml` as `get_config` reads them,
+    for the maintenance scripts. Unlike `get_config` it writes no example or default config file and copies no
+    legacy model configs; like it, it migrates an `invokeai.yaml` of an older schema."""
+    config = InvokeAIAppConfig()
+    config._root = root
+    if config.config_file_path.exists():
+        config.update_config(load_and_migrate_config(config.config_file_path), clobber=False)
+    return config
+
+
 @lru_cache(maxsize=1)
 def get_config() -> InvokeAIAppConfig:
     """Get the global singleton app config.
