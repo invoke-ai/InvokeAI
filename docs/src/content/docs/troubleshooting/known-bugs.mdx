@@ -1,9 +1,19 @@
 ---
 title: Known Bugs
 description: Places where the current release does not yet behave as the documentation describes, with workarounds.
-lastUpdated: 2026-10-05
+lastUpdated: 2026-10-07
 ---
 
-This page lists known cases where InvokeAI does not yet behave as this documentation describes. Each entry explains what happens instead and how to work around it. Entries are removed once the fix is released.
+This page lists known cases where InvokeAI does not yet behave as this documentation describes, or no longer behaves as v6 did. Each entry explains what happens instead and how to work around it. Entries are removed once the fix is released.
 
-There are currently no known bugs of this kind.
+## v7.0.0-alpha
+
+### Multi-user mode: boards and workflows cannot be shared
+
+**Documented behavior:** In multi-user mode, a board's owner can set it to **Shared** or **Public** so that other users can view it, and a workflow's owner can mark it as shared so that it appears in every user's workflow library. See [Working with Your Content in Multi-User Mode](/configuration/multi-user-mode/user-guide/#working-with-your-content-in-multi-user-mode).
+
+**Current behavior:** v7 has no controls for changing a board's visibility or sharing a workflow. Boards and workflows you create stay private: only you and administrators can see them.
+
+**Workaround:** None in the v7 interface. Administrators can still view and manage all users' boards, images, and workflows.
+
+**Tracking:** [invoke-ai/InvokeAI#9673](https://github.com/invoke-ai/InvokeAI/issues/9673)
