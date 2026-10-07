@@ -4,15 +4,20 @@ import os
 import platform
 import shutil
 import stat
+import threading
 import zlib
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 from invokeai.app.api.extract_metadata import extract_metadata_from_image
-from invokeai.app.services.image_files.image_files_common import ImageFileDeleteException, ImageFileSaveException
+from invokeai.app.services.image_files.image_files_common import (
+    ImageFileDeleteException,
+    ImageFileNotFoundException,
+    ImageFileSaveException,
+)
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage, _should_use_png_rle
 from invokeai.app.util.thumbnails import get_thumbnail_name
 
@@ -97,6 +102,351 @@ def test_image_paths_relative_to_storage_dir(tmp_path: Path):
     image_files_disk = DiskImageFileStorage(tmp_path)
     path = image_files_disk.get_path("foo.png")
     assert path.is_relative_to(tmp_path)
+
+
+def test_iter_image_and_thumbnail_paths_is_sorted_nested_and_excludes_reserved_trees(tmp_path: Path):
+    storage = DiskImageFileStorage(tmp_path)
+    (tmp_path / "z.png").write_bytes(b"z")
+    (tmp_path / "a" / "nested.png").parent.mkdir(parents=True)
+    (tmp_path / "a" / "nested.png").write_bytes(b"a")
+    (tmp_path / "thumbnails" / "a").mkdir(parents=True)
+    (tmp_path / "thumbnails" / "a" / "nested.webp").write_bytes(b"t")
+    (tmp_path / ".delete_pending").mkdir()
+    (tmp_path / ".delete_pending" / "journal.png").write_bytes(b"j")
+    (tmp_path / "clip.mp4").write_bytes(b"v")
+
+    assert [path.relative_to(tmp_path).as_posix() for path in storage.iter_image_paths()] == ["z.png", "a/nested.png"]
+    assert [path.relative_to(storage.thumbnail_root).as_posix() for path in storage.iter_thumbnail_paths()] == [
+        "a/nested.webp"
+    ]
+
+
+def test_iter_image_paths_streams_directory_entries_in_deterministic_order(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    storage = DiskImageFileStorage(tmp_path)
+    names = [f"image-{index:04d}.png" for index in reversed(range(1024))]
+    names.append("invalid-byte-\udcff.png")
+
+    class Entry:
+        active = 0
+        peak_active = 0
+
+        def __init__(self, name: str):
+            self.name = name
+            self.path = str(tmp_path / name)
+            type(self).active += 1
+            type(self).peak_active = max(type(self).peak_active, type(self).active)
+
+        def __del__(self):
+            type(self).active -= 1
+
+        def is_symlink(self) -> bool:
+            return False
+
+        def is_dir(self, *, follow_symlinks: bool = True) -> bool:
+            return False
+
+        def is_file(self, *, follow_symlinks: bool = True) -> bool:
+            return True
+
+    class Scan:
+        def __enter__(self):
+            return iter(Entry(name) for name in names)
+
+        def __exit__(self, *_exc_info):
+            return False
+
+    real_scandir = os.scandir
+    monkeypatch.setattr(
+        "invokeai.app.services.image_files.image_files_disk.os.scandir",
+        lambda path: Scan() if not isinstance(path, int) and Path(path) == tmp_path else real_scandir(path),
+    )
+
+    paths = list(storage.iter_image_paths())
+
+    assert [path.name for path in paths] == sorted(names)
+    assert Entry.peak_active <= 2
+
+
+def test_generate_thumbnail_if_missing_preserves_source_and_never_overwrites(tmp_path: Path):
+    storage = DiskImageFileStorage(tmp_path)
+    image_path = storage.get_path("test.png", image_subfolder="sub")
+    image_path.parent.mkdir(parents=True)
+    image = Image.new("RGBA", (12, 8), (20, 40, 60, 80))
+    image.save(image_path, format="PNG")
+    image.close()
+    original_bytes = image_path.read_bytes()
+    thumbnail_path = storage.get_path("test.png", thumbnail=True, image_subfolder="sub")
+
+    assert storage.generate_thumbnail_if_missing("test.png", image_subfolder="sub") is True
+    first_thumbnail = thumbnail_path.read_bytes()
+    assert first_thumbnail
+    assert image_path.read_bytes() == original_bytes
+    assert storage.generate_thumbnail_if_missing("test.png", image_subfolder="sub") is False
+    assert thumbnail_path.read_bytes() == first_thumbnail
+
+
+def test_generate_thumbnail_if_missing_does_not_publish_partial_file(tmp_path: Path):
+    storage = DiskImageFileStorage(tmp_path)
+    image_path = storage.get_path("broken.png")
+    image_path.write_bytes(b"not an image")
+    thumbnail_path = storage.get_path("broken.png", thumbnail=True)
+
+    with pytest.raises(UnidentifiedImageError):
+        storage.generate_thumbnail_if_missing("broken.png")
+
+    assert not thumbnail_path.exists()
+
+
+@posix_only
+def test_generate_thumbnail_if_missing_removes_thumbnail_if_directory_fsync_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    storage = DiskImageFileStorage(tmp_path)
+    image_path = storage.get_path("fsync-failure.png")
+    with Image.new("RGB", (8, 8), (20, 40, 60)) as source:
+        source.save(image_path, format="PNG")
+    original_bytes = image_path.read_bytes()
+    thumbnail_path = storage.get_path("fsync-failure.png", thumbnail=True)
+
+    def fail_directory_fsync(_directory: Path) -> None:
+        raise OSError("directory fsync failed")
+
+    monkeypatch.setattr(storage, "_DiskImageFileStorage__fsync_directory", fail_directory_fsync)
+
+    with pytest.raises(OSError, match="directory fsync failed"):
+        storage.generate_thumbnail_if_missing("fsync-failure.png")
+
+    assert image_path.read_bytes() == original_bytes
+    assert not thumbnail_path.exists()
+
+
+def test_cache_eviction_prevents_inflight_read_from_repopulating_stale_image(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    storage = DiskImageFileStorage(tmp_path)
+    invoker = MagicMock()
+    invoker.services.configuration.pil_compress_level = 6
+    storage._DiskImageFileStorage__invoker = invoker  # type: ignore
+    image_path = storage.get_path("raced-cache.png")
+    storage.save(image=Image.new("RGB", (8, 8), (220, 10, 10)), image_name=image_path.name)
+    storage.evict_cache_paths([image_path])
+
+    cache_write_started = threading.Event()
+    allow_cache_write = threading.Event()
+    loaded_images: list[Image.Image] = []
+    errors: list[BaseException] = []
+    set_cache = storage._DiskImageFileStorage__set_cache
+
+    def pause_before_cache_write(path: Path, image: Image.Image, generation: int | None = None) -> None:
+        if path == image_path:
+            cache_write_started.set()
+            if not allow_cache_write.wait(timeout=5):
+                raise TimeoutError("test did not release the in-flight cache write")
+        if generation is None:
+            set_cache(path, image)
+        else:
+            set_cache(path, image, generation)
+
+    monkeypatch.setattr(storage, "_DiskImageFileStorage__set_cache", pause_before_cache_write)
+
+    def read_image() -> None:
+        try:
+            loaded_images.append(storage.get(image_path.name))
+        except BaseException as e:
+            errors.append(e)
+
+    reader = threading.Thread(target=read_image)
+    reader.start()
+    try:
+        assert cache_write_started.wait(timeout=5)
+        with Image.new("RGB", (8, 8), (10, 20, 220)) as replacement:
+            replacement.save(image_path, format="PNG")
+        storage.evict_cache_paths([image_path])
+    finally:
+        allow_cache_write.set()
+        reader.join(timeout=5)
+
+    assert not reader.is_alive()
+    assert not errors
+    try:
+        assert storage.get(image_path.name).getpixel((0, 0)) == (10, 20, 220)
+    finally:
+        for image in loaded_images:
+            image.close()
+
+
+def test_stage_delete_and_commit_prevent_inflight_read_from_caching_deleted_image(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    storage = DiskImageFileStorage(tmp_path)
+    invoker = MagicMock()
+    invoker.services.configuration.pil_compress_level = 6
+    storage._DiskImageFileStorage__invoker = invoker  # type: ignore
+    image_name = "staged-race.png"
+    image_path = storage.get_path(image_name)
+    with Image.new("RGB", (8, 8), (220, 10, 10)) as source:
+        storage.save(image=source, image_name=image_name)
+    storage.evict_cache_paths([image_path])
+
+    cache_write_started = threading.Event()
+    allow_cache_write = threading.Event()
+    purge_finished = threading.Event()
+    allow_commit = threading.Event()
+    loaded_images: list[Image.Image] = []
+    errors: list[BaseException] = []
+    set_cache = storage._DiskImageFileStorage__set_cache
+
+    def pause_before_cache_write(path: Path, image: Image.Image, generation: int | None = None) -> None:
+        if path == image_path:
+            cache_write_started.set()
+            if not allow_cache_write.wait(timeout=5):
+                raise TimeoutError("test did not release the in-flight cache write")
+        if generation is None:
+            set_cache(path, image)
+        else:
+            set_cache(path, image, generation)
+
+    monkeypatch.setattr(storage, "_DiskImageFileStorage__set_cache", pause_before_cache_write)
+
+    def read_image() -> None:
+        try:
+            loaded_images.append(storage.get(image_name))
+        except BaseException as e:
+            errors.append(e)
+
+    reader = threading.Thread(target=read_image)
+    reader.start()
+    commit_errors: list[BaseException] = []
+    committer: threading.Thread | None = None
+    try:
+        assert cache_write_started.wait(timeout=5)
+        token = storage.stage_delete(image_name)
+        purge = storage._DiskImageFileStorage__purge_files
+
+        def pause_after_purge(name: str, subfolder: str) -> None:
+            purge(name, subfolder)
+            purge_finished.set()
+            if not allow_commit.wait(timeout=5):
+                raise TimeoutError("test did not release staged deletion")
+
+        monkeypatch.setattr(storage, "_DiskImageFileStorage__purge_files", pause_after_purge)
+
+        def commit() -> None:
+            try:
+                storage.commit_delete(token)
+            except BaseException as e:
+                commit_errors.append(e)
+
+        committer = threading.Thread(target=commit)
+        committer.start()
+        assert purge_finished.wait(timeout=5)
+        allow_cache_write.set()
+        reader.join(timeout=5)
+        allow_commit.set()
+        committer.join(timeout=5)
+
+        assert not reader.is_alive()
+        assert not committer.is_alive()
+        assert not errors
+        assert not commit_errors
+        with pytest.raises(ImageFileNotFoundException):
+            storage.get(image_name)
+    finally:
+        allow_cache_write.set()
+        allow_commit.set()
+        reader.join(timeout=5)
+        if committer is not None:
+            committer.join(timeout=5)
+        for image in loaded_images:
+            image.close()
+
+
+def test_pending_delete_purge_prevents_inflight_read_from_caching_deleted_image(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    storage = DiskImageFileStorage(tmp_path)
+    invoker = MagicMock()
+    invoker.services.configuration.pil_compress_level = 6
+    storage._DiskImageFileStorage__invoker = invoker  # type: ignore
+    image_name = "purged-race.png"
+    image_path = storage.get_path(image_name)
+    with Image.new("RGB", (8, 8), (220, 10, 10)) as source:
+        storage.save(image=source, image_name=image_name)
+    storage.evict_cache_paths([image_path])
+    token = storage.begin_delete([(image_name, "")])
+
+    cache_write_started = threading.Event()
+    allow_cache_write = threading.Event()
+    purge_finished = threading.Event()
+    allow_persist = threading.Event()
+    loaded_images: list[Image.Image] = []
+    errors: list[BaseException] = []
+    set_cache = storage._DiskImageFileStorage__set_cache
+
+    def pause_before_cache_write(path: Path, image: Image.Image, generation: int | None = None) -> None:
+        if path == image_path:
+            cache_write_started.set()
+            if not allow_cache_write.wait(timeout=5):
+                raise TimeoutError("test did not release the in-flight cache write")
+        if generation is None:
+            set_cache(path, image)
+        else:
+            set_cache(path, image, generation)
+
+    monkeypatch.setattr(storage, "_DiskImageFileStorage__set_cache", pause_before_cache_write)
+
+    def read_image() -> None:
+        try:
+            loaded_images.append(storage.get(image_name))
+        except BaseException as e:
+            errors.append(e)
+
+    reader = threading.Thread(target=read_image)
+    reader.start()
+    commit_errors: list[BaseException] = []
+    committer: threading.Thread | None = None
+    try:
+        assert cache_write_started.wait(timeout=5)
+        persist = storage._DiskImageFileStorage__persist_purges
+
+        def pause_after_purge(images: list[tuple[str, str]]) -> None:
+            purge_finished.set()
+            if not allow_persist.wait(timeout=5):
+                raise TimeoutError("test did not release pending deletion")
+            persist(images)
+
+        monkeypatch.setattr(storage, "_DiskImageFileStorage__persist_purges", pause_after_purge)
+
+        def commit() -> None:
+            try:
+                storage.commit_delete(token)
+            except BaseException as e:
+                commit_errors.append(e)
+
+        committer = threading.Thread(target=commit)
+        committer.start()
+        assert purge_finished.wait(timeout=5)
+        allow_cache_write.set()
+        reader.join(timeout=5)
+        allow_persist.set()
+        committer.join(timeout=5)
+
+        assert not reader.is_alive()
+        assert not committer.is_alive()
+        assert not errors
+        assert not commit_errors
+        with pytest.raises(ImageFileNotFoundException):
+            storage.get(image_name)
+    finally:
+        allow_cache_write.set()
+        allow_persist.set()
+        reader.join(timeout=5)
+        if committer is not None:
+            committer.join(timeout=5)
+        for image in loaded_images:
+            image.close()
 
 
 @pytest.mark.parametrize(

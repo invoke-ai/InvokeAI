@@ -1528,7 +1528,7 @@ def test_on_deleted_emits_status(
     _wait_until(lambda: index_records.count_index_status(MODEL_ID).embedded == 1)
 
     image_records.delete("a.png")
-    images_service._on_deleted("a.png")
+    images_service.notify_deleted("a.png")
 
     # Deletions give the worker nothing to embed; the dirty flag set by the
     # callback is the only path to this emit, within one poll interval.

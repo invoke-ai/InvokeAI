@@ -11,6 +11,10 @@ import { closingFrames, recordDialogExit } from './dialogExit.testing';
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const noop = () => undefined;
+let confirmCalls = 0;
+const handleConfirm = () => {
+  confirmCalls += 1;
+};
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -24,7 +28,7 @@ afterEach(async () => {
 
 describe('ConfirmDialog', () => {
   it('keeps confirmation disabled until its owner has a valid preview', async () => {
-    let confirmCalls = 0;
+    confirmCalls = 0;
     const renderDialog = async (isConfirmDisabled: boolean) => {
       await act(() =>
         root?.render(
@@ -36,9 +40,7 @@ describe('ConfirmDialog', () => {
               isOpen
               title="Confirm maintenance"
               onClose={noop}
-              onConfirm={() => {
-                confirmCalls += 1;
-              }}
+              onConfirm={handleConfirm}
             />
           </ChakraProvider>
         )
