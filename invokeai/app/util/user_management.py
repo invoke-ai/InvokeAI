@@ -41,7 +41,7 @@ def _prepare_deleted_user_fonts(config: Any, db: Any, user_id: str, logger: Any)
         from invokeai.app.services.fonts.fonts_default import FontService
 
         fonts = FontService(
-            db.database,
+            db,
             fonts_dir=config.fonts_path,
             storage_dir=config.fonts_storage_path,
             logger=logger,
@@ -73,7 +73,7 @@ def _add_user_interactive() -> bool:
     """Add a user interactively by prompting for details."""
     from invokeai.app.services.auth.password_utils import validate_password_strength
     from invokeai.app.services.config import get_config
-    from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+    from invokeai.app.services.shared.database.database import Database
     from invokeai.app.services.users.users_common import UserCreateRequest
     from invokeai.app.services.users.users_default import UserService
     from invokeai.backend.util.logging import InvokeAILogger
@@ -107,8 +107,8 @@ def _add_user_interactive() -> bool:
 
     try:
         config = get_config()
-        db = SqliteDatabase(config.db_path, InvokeAILogger.get_logger(), synchronous=config.db_synchronous)
-        user_service = UserService(db.database)
+        db = Database.open_sqlite(config.db_path, InvokeAILogger.get_logger(), synchronous=config.db_synchronous)
+        user_service = UserService(db)
 
         user_data = UserCreateRequest(email=email, display_name=display_name, password=password, is_admin=is_admin)
         user = user_service.create(user_data)
@@ -136,7 +136,7 @@ def _add_user_cli(email: str, password: str, display_name: str | None = None, is
     """Add a user via CLI arguments."""
     from invokeai.app.services.auth.password_utils import validate_password_strength
     from invokeai.app.services.config import get_config
-    from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+    from invokeai.app.services.shared.database.database import Database
     from invokeai.app.services.users.users_common import UserCreateRequest
     from invokeai.app.services.users.users_default import UserService
     from invokeai.backend.util.logging import InvokeAILogger
@@ -148,8 +148,8 @@ def _add_user_cli(email: str, password: str, display_name: str | None = None, is
 
     try:
         config = get_config()
-        db = SqliteDatabase(config.db_path, InvokeAILogger.get_logger(), synchronous=config.db_synchronous)
-        user_service = UserService(db.database)
+        db = Database.open_sqlite(config.db_path, InvokeAILogger.get_logger(), synchronous=config.db_synchronous)
+        user_service = UserService(db)
 
         user_data = UserCreateRequest(email=email, display_name=display_name, password=password, is_admin=is_admin)
         user = user_service.create(user_data)
@@ -210,7 +210,7 @@ def useradd() -> None:
 def _delete_user_interactive() -> bool:
     """Delete a user interactively by prompting for email."""
     from invokeai.app.services.config import get_config
-    from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+    from invokeai.app.services.shared.database.database import Database
     from invokeai.app.services.users.users_default import UserService
     from invokeai.backend.util.logging import InvokeAILogger
 
@@ -224,8 +224,8 @@ def _delete_user_interactive() -> bool:
     try:
         config = get_config()
         logger = InvokeAILogger.get_logger(config=config)
-        db = SqliteDatabase(config.db_path, logger, synchronous=config.db_synchronous)
-        user_service = UserService(db.database)
+        db = Database.open_sqlite(config.db_path, logger, synchronous=config.db_synchronous)
+        user_service = UserService(db)
 
         user = user_service.get_by_email(email)
         if not user:
@@ -265,15 +265,15 @@ def _delete_user_interactive() -> bool:
 def _delete_user_cli(email: str, force: bool = False) -> bool:
     """Delete a user via CLI arguments."""
     from invokeai.app.services.config import get_config
-    from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+    from invokeai.app.services.shared.database.database import Database
     from invokeai.app.services.users.users_default import UserService
     from invokeai.backend.util.logging import InvokeAILogger
 
     try:
         config = get_config()
         logger = InvokeAILogger.get_logger(config=config)
-        db = SqliteDatabase(config.db_path, logger, synchronous=config.db_synchronous)
-        user_service = UserService(db.database)
+        db = Database.open_sqlite(config.db_path, logger, synchronous=config.db_synchronous)
+        user_service = UserService(db)
 
         user = user_service.get_by_email(email)
         if not user:
@@ -342,14 +342,14 @@ def userdel() -> None:
 def _list_users_table() -> bool:
     """List all users in a formatted table."""
     from invokeai.app.services.config import get_config
-    from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+    from invokeai.app.services.shared.database.database import Database
     from invokeai.app.services.users.users_default import UserService
     from invokeai.backend.util.logging import InvokeAILogger
 
     config = get_config()
     logger = InvokeAILogger.get_logger(config=config)
-    db = SqliteDatabase(config.db_path, logger, synchronous=config.db_synchronous)
-    user_service = UserService(db.database)
+    db = Database.open_sqlite(config.db_path, logger, synchronous=config.db_synchronous)
+    user_service = UserService(db)
 
     try:
         users = user_service.list_users()
@@ -382,14 +382,14 @@ def _list_users_table() -> bool:
 def _list_users_json() -> bool:
     """List all users in JSON format."""
     from invokeai.app.services.config import get_config
-    from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+    from invokeai.app.services.shared.database.database import Database
     from invokeai.app.services.users.users_default import UserService
     from invokeai.backend.util.logging import InvokeAILogger
 
     config = get_config()
     logger = InvokeAILogger.get_logger(config=config)
-    db = SqliteDatabase(config.db_path, logger, synchronous=config.db_synchronous)
-    user_service = UserService(db.database)
+    db = Database.open_sqlite(config.db_path, logger, synchronous=config.db_synchronous)
+    user_service = UserService(db)
 
     try:
         users = user_service.list_users()
@@ -449,7 +449,7 @@ def _modify_user_interactive() -> bool:
     """Modify a user interactively by prompting for details."""
     from invokeai.app.services.auth.password_utils import validate_password_strength
     from invokeai.app.services.config import get_config
-    from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+    from invokeai.app.services.shared.database.database import Database
     from invokeai.app.services.users.users_common import UserUpdateRequest
     from invokeai.app.services.users.users_default import UserService
     from invokeai.backend.util.logging import InvokeAILogger
@@ -463,8 +463,8 @@ def _modify_user_interactive() -> bool:
 
     try:
         config = get_config()
-        db = SqliteDatabase(config.db_path, InvokeAILogger.get_logger(), synchronous=config.db_synchronous)
-        user_service = UserService(db.database)
+        db = Database.open_sqlite(config.db_path, InvokeAILogger.get_logger(), synchronous=config.db_synchronous)
+        user_service = UserService(db)
 
         user = user_service.get_by_email(email)
         if not user:
@@ -551,7 +551,7 @@ def _modify_user_cli(
     """Modify a user via CLI arguments."""
     from invokeai.app.services.auth.password_utils import validate_password_strength
     from invokeai.app.services.config import get_config
-    from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+    from invokeai.app.services.shared.database.database import Database
     from invokeai.app.services.users.users_common import UserUpdateRequest
     from invokeai.app.services.users.users_default import UserService
     from invokeai.backend.util.logging import InvokeAILogger
@@ -564,8 +564,8 @@ def _modify_user_cli(
 
     try:
         config = get_config()
-        db = SqliteDatabase(config.db_path, InvokeAILogger.get_logger(), synchronous=config.db_synchronous)
-        user_service = UserService(db.database)
+        db = Database.open_sqlite(config.db_path, InvokeAILogger.get_logger(), synchronous=config.db_synchronous)
+        user_service = UserService(db)
 
         user = user_service.get_by_email(email)
         if not user:

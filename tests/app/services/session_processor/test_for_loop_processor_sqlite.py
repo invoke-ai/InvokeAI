@@ -22,6 +22,7 @@ from invokeai.app.services.session_processor.session_processor_default import (
     DefaultSessionRunner,
 )
 from invokeai.app.services.session_queue.session_queue_default import SessionQueue
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.execution_effects import ExecutionEffectsRecorder, ExecutionInterface
 from invokeai.app.services.shared.execution_state_migration import dump_execution_state
 from invokeai.app.services.shared.graph import (
@@ -33,8 +34,7 @@ from invokeai.app.services.shared.graph import (
     _GenericGraphSchedulerAdapter,
 )
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
-from tests.fixtures.sqlite_database import legacy_cursor_of
+from tests.fixtures.sqlite_database import sqlite_cursor_of
 from tests.test_nodes import create_edge, create_loop_linkage
 
 
@@ -277,7 +277,7 @@ def _insert_session(queue: SessionQueue, graph: Graph, *, versioned: bool = Fals
         if versioned
         else session.model_dump_json(warnings=False, exclude_none=True)
     )
-    with legacy_cursor_of(queue) as cursor:
+    with sqlite_cursor_of(queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -333,7 +333,7 @@ class _Stats:
 def test_processor_sqlite_queue_nested_iterate_for_cleanup(
     monkeypatch: pytest.MonkeyPatch,
     mock_invoker: Invoker,
-    mock_sqlite_database: SqliteDatabase,
+    mock_sqlite_database: Database,
     registered_event_bus: _RecordingRegisteredEventService,
     outcome: str,
 ) -> None:
@@ -343,7 +343,7 @@ def test_processor_sqlite_queue_nested_iterate_for_cleanup(
         _build_test_invocation_context,
     )
 
-    queue = SessionQueue(mock_sqlite_database.database)
+    queue = SessionQueue(mock_sqlite_database)
     mock_invoker.services.events = registered_event_bus
     mock_invoker.services.session_queue = queue
     mock_invoker.services.performance_statistics = _Stats()
@@ -418,7 +418,7 @@ def test_processor_sqlite_queue_nested_iterate_for_cleanup(
 def test_processor_sqlite_nested_iterate_for_cancel_retry_reloads_fresh_stream_state(
     monkeypatch: pytest.MonkeyPatch,
     mock_invoker: Invoker,
-    mock_sqlite_database: SqliteDatabase,
+    mock_sqlite_database: Database,
     registered_event_bus: _RecordingRegisteredEventService,
 ) -> None:
     monkeypatch.setattr(
@@ -426,7 +426,7 @@ def test_processor_sqlite_nested_iterate_for_cancel_retry_reloads_fresh_stream_s
         _build_test_invocation_context,
     )
 
-    queue = SessionQueue(mock_sqlite_database.database)
+    queue = SessionQueue(mock_sqlite_database)
     mock_invoker.services.events = registered_event_bus
     mock_invoker.services.session_queue = queue
     mock_invoker.services.performance_statistics = _Stats()
@@ -467,9 +467,9 @@ def test_processor_sqlite_nested_iterate_for_cancel_retry_reloads_fresh_stream_s
 
     # Simulate an interrupted process after the partial state was persisted. Startup must cancel
     # the stale row while preserving the nested frame/stream snapshot for inspection or retry.
-    with legacy_cursor_of(queue) as cursor:
+    with sqlite_cursor_of(queue) as cursor:
         cursor.execute("UPDATE session_queue SET status = 'in_progress' WHERE item_id = ?", (item_id,))
-    restarted_queue = SessionQueue(mock_sqlite_database.database)
+    restarted_queue = SessionQueue(mock_sqlite_database)
     restarted_queue.start(mock_invoker)
     reloaded_canceled_item = restarted_queue.get_queue_item(item_id)
     assert reloaded_canceled_item.status == "canceled"
@@ -524,7 +524,7 @@ def test_processor_sqlite_nested_iterate_for_cancel_retry_reloads_fresh_stream_s
 def test_processor_sqlite_three_level_nested_for_cancel_restart_retry_isolates_execution_state(
     monkeypatch: pytest.MonkeyPatch,
     mock_invoker: Invoker,
-    mock_sqlite_database: SqliteDatabase,
+    mock_sqlite_database: Database,
     registered_event_bus: _RecordingRegisteredEventService,
 ) -> None:
     monkeypatch.setattr(
@@ -532,7 +532,7 @@ def test_processor_sqlite_three_level_nested_for_cancel_restart_retry_isolates_e
         _build_test_invocation_context,
     )
 
-    queue = SessionQueue(mock_sqlite_database.database)
+    queue = SessionQueue(mock_sqlite_database)
     mock_invoker.services.events = registered_event_bus
     mock_invoker.services.session_queue = queue
     mock_invoker.services.performance_statistics = _Stats()
@@ -592,9 +592,9 @@ def test_processor_sqlite_three_level_nested_for_cancel_restart_retry_isolates_e
         for reference in canceled_item.session.execution_refs.values()
     )
 
-    with legacy_cursor_of(queue) as cursor:
+    with sqlite_cursor_of(queue) as cursor:
         cursor.execute("UPDATE session_queue SET status = 'in_progress' WHERE item_id = ?", (item_id,))
-    restarted_queue = SessionQueue(mock_sqlite_database.database)
+    restarted_queue = SessionQueue(mock_sqlite_database)
     restarted_queue.start(mock_invoker)
     mock_invoker.services.session_queue = restarted_queue
     reloaded_canceled_item = restarted_queue.get_queue_item(item_id)
@@ -672,7 +672,7 @@ def test_processor_sqlite_three_level_nested_for_cancel_restart_retry_isolates_e
 def test_processor_sqlite_four_level_nested_for_cancel_restart_retry_isolates_execution_state(
     monkeypatch: pytest.MonkeyPatch,
     mock_invoker: Invoker,
-    mock_sqlite_database: SqliteDatabase,
+    mock_sqlite_database: Database,
     registered_event_bus: _RecordingRegisteredEventService,
 ) -> None:
     monkeypatch.setattr(
@@ -680,7 +680,7 @@ def test_processor_sqlite_four_level_nested_for_cancel_restart_retry_isolates_ex
         _build_test_invocation_context,
     )
 
-    queue = SessionQueue(mock_sqlite_database.database)
+    queue = SessionQueue(mock_sqlite_database)
     mock_invoker.services.events = registered_event_bus
     mock_invoker.services.session_queue = queue
     mock_invoker.services.performance_statistics = _Stats()
@@ -741,9 +741,9 @@ def test_processor_sqlite_four_level_nested_for_cancel_restart_retry_isolates_ex
         for reference in canceled_item.session.execution_refs.values()
     )
 
-    with legacy_cursor_of(queue) as cursor:
+    with sqlite_cursor_of(queue) as cursor:
         cursor.execute("UPDATE session_queue SET status = 'in_progress' WHERE item_id = ?", (item_id,))
-    restarted_queue = SessionQueue(mock_sqlite_database.database)
+    restarted_queue = SessionQueue(mock_sqlite_database)
     restarted_queue.start(mock_invoker)
     mock_invoker.services.session_queue = restarted_queue
     reloaded_canceled_item = restarted_queue.get_queue_item(item_id)
@@ -826,7 +826,7 @@ def test_processor_sqlite_four_level_nested_for_cancel_restart_retry_isolates_ex
 def test_processor_sqlite_two_sibling_nested_for_cancel_root_retry_cleans_identity(
     monkeypatch: pytest.MonkeyPatch,
     mock_invoker: Invoker,
-    mock_sqlite_database: SqliteDatabase,
+    mock_sqlite_database: Database,
     registered_event_bus: _RecordingRegisteredEventService,
 ) -> None:
     test_timeout = 30
@@ -835,7 +835,7 @@ def test_processor_sqlite_two_sibling_nested_for_cancel_root_retry_cleans_identi
         _build_test_invocation_context,
     )
 
-    queue = SessionQueue(mock_sqlite_database.database)
+    queue = SessionQueue(mock_sqlite_database)
     mock_invoker.services.events = registered_event_bus
     mock_invoker.services.session_queue = queue
     mock_invoker.services.performance_statistics = _Stats()
@@ -892,9 +892,9 @@ def test_processor_sqlite_two_sibling_nested_for_cancel_root_retry_cleans_identi
         for reference in canceled_item.session.execution_refs.values()
     )
 
-    with legacy_cursor_of(queue) as cursor:
+    with sqlite_cursor_of(queue) as cursor:
         cursor.execute("UPDATE session_queue SET status = 'in_progress' WHERE item_id = ?", (item_id,))
-    restarted_queue = SessionQueue(mock_sqlite_database.database)
+    restarted_queue = SessionQueue(mock_sqlite_database)
     restarted_queue.start(mock_invoker)
     mock_invoker.services.session_queue = restarted_queue
     reloaded_canceled_item = restarted_queue.get_queue_item(item_id)
@@ -970,7 +970,7 @@ def test_processor_sqlite_two_sibling_nested_for_cancel_root_retry_cleans_identi
 def test_processor_sqlite_two_sibling_nested_for_failure_cleans_runtime(
     monkeypatch: pytest.MonkeyPatch,
     mock_invoker: Invoker,
-    mock_sqlite_database: SqliteDatabase,
+    mock_sqlite_database: Database,
     registered_event_bus: _RecordingRegisteredEventService,
 ) -> None:
     monkeypatch.setattr(
@@ -978,7 +978,7 @@ def test_processor_sqlite_two_sibling_nested_for_failure_cleans_runtime(
         _build_test_invocation_context,
     )
 
-    queue = SessionQueue(mock_sqlite_database.database)
+    queue = SessionQueue(mock_sqlite_database)
     mock_invoker.services.events = registered_event_bus
     mock_invoker.services.session_queue = queue
     mock_invoker.services.performance_statistics = _Stats()
@@ -1051,7 +1051,7 @@ def test_processor_sqlite_two_sibling_nested_for_failure_cleans_runtime(
 def test_processor_sqlite_three_level_nested_for_failure_cleans_runtime(
     monkeypatch: pytest.MonkeyPatch,
     mock_invoker: Invoker,
-    mock_sqlite_database: SqliteDatabase,
+    mock_sqlite_database: Database,
     registered_event_bus: _RecordingRegisteredEventService,
 ) -> None:
     monkeypatch.setattr(
@@ -1059,7 +1059,7 @@ def test_processor_sqlite_three_level_nested_for_failure_cleans_runtime(
         _build_test_invocation_context,
     )
 
-    queue = SessionQueue(mock_sqlite_database.database)
+    queue = SessionQueue(mock_sqlite_database)
     mock_invoker.services.events = registered_event_bus
     mock_invoker.services.session_queue = queue
     mock_invoker.services.performance_statistics = _Stats()
@@ -1128,7 +1128,7 @@ def test_processor_sqlite_three_level_nested_for_failure_cleans_runtime(
     assert failed_item.error_message == "Refusing loop value 1"
     assert queue.get_current("default") is None
 
-    reloaded_queue = SessionQueue(mock_sqlite_database.database)
+    reloaded_queue = SessionQueue(mock_sqlite_database)
     reloaded_queue.start(mock_invoker)
     reloaded_item = reloaded_queue.get_queue_item(item_id)
     assert reloaded_item.status == "failed"
@@ -1158,7 +1158,7 @@ def test_processor_sqlite_three_level_nested_for_failure_cleans_runtime(
 def test_processor_sqlite_four_level_nested_for_failure_cleans_runtime(
     monkeypatch: pytest.MonkeyPatch,
     mock_invoker: Invoker,
-    mock_sqlite_database: SqliteDatabase,
+    mock_sqlite_database: Database,
     registered_event_bus: _RecordingRegisteredEventService,
 ) -> None:
     monkeypatch.setattr(
@@ -1166,7 +1166,7 @@ def test_processor_sqlite_four_level_nested_for_failure_cleans_runtime(
         _build_test_invocation_context,
     )
 
-    queue = SessionQueue(mock_sqlite_database.database)
+    queue = SessionQueue(mock_sqlite_database)
     mock_invoker.services.events = registered_event_bus
     mock_invoker.services.session_queue = queue
     mock_invoker.services.performance_statistics = _Stats()
@@ -1235,7 +1235,7 @@ def test_processor_sqlite_four_level_nested_for_failure_cleans_runtime(
     assert failed_item.error_message == "Refusing loop value 1"
     assert queue.get_current("default") is None
 
-    reloaded_queue = SessionQueue(mock_sqlite_database.database)
+    reloaded_queue = SessionQueue(mock_sqlite_database)
     reloaded_queue.start(mock_invoker)
     reloaded_item = reloaded_queue.get_queue_item(item_id)
     assert reloaded_item.status == "failed"
@@ -1300,7 +1300,7 @@ def test_processor_sqlite_four_level_nested_for_failure_cleans_runtime(
 def test_processor_sqlite_queue_nested_for_cleanup(
     monkeypatch: pytest.MonkeyPatch,
     mock_invoker: Invoker,
-    mock_sqlite_database: SqliteDatabase,
+    mock_sqlite_database: Database,
     registered_event_bus: _RecordingRegisteredEventService,
     outcome: str,
 ) -> None:
@@ -1310,7 +1310,7 @@ def test_processor_sqlite_queue_nested_for_cleanup(
         _build_test_invocation_context,
     )
 
-    queue = SessionQueue(mock_sqlite_database.database)
+    queue = SessionQueue(mock_sqlite_database)
     mock_invoker.services.events = registered_event_bus
     mock_invoker.services.session_queue = queue
     mock_invoker.services.performance_statistics = _Stats()
@@ -1413,7 +1413,7 @@ def test_processor_sqlite_queue_nested_for_cleanup(
 def test_processor_sqlite_iterate_collect_cancel_retry_does_not_leak_stream_state(
     monkeypatch: pytest.MonkeyPatch,
     mock_invoker: Invoker,
-    mock_sqlite_database: SqliteDatabase,
+    mock_sqlite_database: Database,
     registered_event_bus: _RecordingRegisteredEventService,
 ) -> None:
     test_timeout = 30
@@ -1422,7 +1422,7 @@ def test_processor_sqlite_iterate_collect_cancel_retry_does_not_leak_stream_stat
         _build_test_invocation_context,
     )
 
-    queue = SessionQueue(mock_sqlite_database.database)
+    queue = SessionQueue(mock_sqlite_database)
     mock_invoker.services.events = registered_event_bus
     mock_invoker.services.session_queue = queue
     mock_invoker.services.performance_statistics = _Stats()
@@ -1520,7 +1520,7 @@ def test_processor_sqlite_iterate_collect_cancel_retry_does_not_leak_stream_stat
 def test_processor_sqlite_direct_planner_cancel_retry_isolates_execution_state(
     monkeypatch: pytest.MonkeyPatch,
     mock_invoker: Invoker,
-    mock_sqlite_database: SqliteDatabase,
+    mock_sqlite_database: Database,
     registered_event_bus: _RecordingRegisteredEventService,
     cancel_after: str,
 ) -> None:
@@ -1530,7 +1530,7 @@ def test_processor_sqlite_direct_planner_cancel_retry_isolates_execution_state(
         _build_test_invocation_context,
     )
 
-    queue = SessionQueue(mock_sqlite_database.database)
+    queue = SessionQueue(mock_sqlite_database)
     mock_invoker.services.events = registered_event_bus
     mock_invoker.services.session_queue = queue
     mock_invoker.services.performance_statistics = _Stats()
@@ -1653,7 +1653,7 @@ def test_processor_sqlite_direct_planner_cancel_retry_isolates_execution_state(
 def test_processor_sqlite_flat_for_cancel_retry_isolates_execution_state(
     monkeypatch: pytest.MonkeyPatch,
     mock_invoker: Invoker,
-    mock_sqlite_database: SqliteDatabase,
+    mock_sqlite_database: Database,
     registered_event_bus: _RecordingRegisteredEventService,
     force_compatibility_scheduler: bool,
 ) -> None:
@@ -1664,7 +1664,7 @@ def test_processor_sqlite_flat_for_cancel_retry_isolates_execution_state(
     if force_compatibility_scheduler:
         monkeypatch.setattr(GraphExecutionState, "_can_use_generic_for_scheduler", lambda self: False)
 
-    queue = SessionQueue(mock_sqlite_database.database)
+    queue = SessionQueue(mock_sqlite_database)
     mock_invoker.services.events = registered_event_bus
     mock_invoker.services.session_queue = queue
     mock_invoker.services.performance_statistics = _Stats()

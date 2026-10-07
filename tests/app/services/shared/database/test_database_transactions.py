@@ -234,6 +234,30 @@ class TestSqlite:
             with pytest.raises(sqlite3.OperationalError, match="locked"):
                 other_process.execute("BEGIN IMMEDIATE")
 
+    def test_a_write_left_uncommitted_on_the_raw_connection_is_reported_and_kept(
+        self, sqlite_file_database: Database
+    ) -> None:
+        # The migrator writes through the raw connection; a write it left uncommitted would otherwise fail the next
+        # transaction's BEGIN obscurely, and that transaction's rollback would discard the write.
+        queries = ProbeQueries(sqlite_file_database)
+        raw = sqlite_file_database.sqlite.conn
+        raw.execute("INSERT INTO probe_items (id, name, size) VALUES (1, 'raw', 0)")
+
+        with pytest.raises(RuntimeError, match="raw connection without being committed"):
+            queries.items.names()
+
+        raw.commit()
+        assert queries.items.names() == ["raw"]
+
+    def test_raw_cursors_read_rows_by_name_after_a_transaction(self, sqlite_file_database: Database) -> None:
+        # Queries read their rows without the driver's `sqlite3.Row`; the migrator's raw cursors keep it.
+        queries = ProbeQueries(sqlite_file_database)
+        queries.items.add(1, "a")
+
+        row = sqlite_file_database.sqlite.conn.execute("SELECT name FROM probe_items").fetchone()
+
+        assert row["name"] == "a"
+
     def test_a_read_transaction_leaves_other_processes_free_to_write(
         self, sqlite_file_database: Database, other_process: sqlite3.Connection
     ) -> None:
@@ -382,8 +406,8 @@ class TestSqlite:
                 refused.append(error)
             attempted.set()
 
-        with sqlite_file_database.legacy_cursor() as cursor:
-            cursor.execute("INSERT INTO probe_items (id, name, size) VALUES (1, 'a', 0)")
+        with sqlite_file_database.begin(write=True) as conn:
+            conn.exec_driver_sql("INSERT INTO probe_items (id, name, size) VALUES (1, 'a', 0)")
             intruder = threading.Thread(target=connect_meanwhile)
             intruder.start()
             assert attempted.wait(10)

@@ -5,7 +5,7 @@ from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.gallery.gallery_common import GalleryItemNamesResult
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ImageNamesResult
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.services.virtual_boards.virtual_boards_common import VirtualSubBoardDTO
 
 virtual_boards_router = APIRouter(prefix="/v1/virtual_boards", tags=["virtual_boards"])

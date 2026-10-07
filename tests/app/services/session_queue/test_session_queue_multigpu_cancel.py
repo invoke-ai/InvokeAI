@@ -13,16 +13,16 @@ from invokeai.app.services.events.events_common import QueueItemStatusChangedEve
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItemNotFoundError
 from invokeai.app.services.session_queue.session_queue_default import SessionQueue
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
-from tests.fixtures.sqlite_database import legacy_cursor_of
+from tests.fixtures.sqlite_database import sqlite_cursor_of
 from tests.test_nodes import PromptTestInvocation, TestEventService
 
 
 @pytest.fixture
-def session_queue(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SessionQueue:
+def session_queue(mock_invoker: Invoker, mock_sqlite_database: Database) -> SessionQueue:
     db = mock_sqlite_database
-    queue = SessionQueue(db.database)
+    queue = SessionQueue(db)
     queue.start(mock_invoker)
     return queue
 
@@ -40,7 +40,7 @@ def _insert(
     graph.add_node(PromptTestInvocation(id="prompt", prompt="test"))
     session = GraphExecutionState(graph=graph)
     session_json = session.model_dump_json(warnings=False, exclude_none=True)
-    with legacy_cursor_of(session_queue) as cursor:
+    with sqlite_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -150,7 +150,7 @@ def _make_workflow_chain(session_queue: SessionQueue, device: str) -> tuple[int,
     # Insert directly as in_progress with the device, rather than via dequeue(): dequeue picks the
     # globally best pending item, which in multi-chain setups may belong to another chain.
     running_child_id = _insert(session_queue, batch_id=str(uuid.uuid4()), parent_item_id=parent_id)
-    with legacy_cursor_of(session_queue) as cursor:
+    with sqlite_cursor_of(session_queue) as cursor:
         cursor.execute(
             "UPDATE session_queue SET status = 'in_progress', device = ? WHERE item_id = ?",
             (device, running_child_id),
@@ -212,7 +212,7 @@ def test_bulk_cancel_tolerates_rows_deleted_mid_cancel(
 
     def delete_then_transition(item_id: int, status: str, **kwargs):
         # Simulate the concurrent deletion landing just before the per-item cancel.
-        with legacy_cursor_of(session_queue) as cursor:
+        with sqlite_cursor_of(session_queue) as cursor:
             cursor.execute("DELETE FROM session_queue WHERE item_id = ?", (item_id,))
         return original_transition(item_id, status, **kwargs)
 

@@ -22,16 +22,16 @@ import pytest
 
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.session_queue.session_queue_default import SessionQueue
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
-from tests.fixtures.sqlite_database import legacy_cursor_of
+from tests.fixtures.sqlite_database import sqlite_cursor_of
 from tests.test_nodes import PromptTestInvocation
 
 
 @pytest.fixture
-def session_queue(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SessionQueue:
+def session_queue(mock_invoker: Invoker, mock_sqlite_database: Database) -> SessionQueue:
     db = mock_sqlite_database
-    queue = SessionQueue(db.database)
+    queue = SessionQueue(db)
     queue.start(mock_invoker)
     return queue
 
@@ -42,7 +42,7 @@ def _insert_queue_item(session_queue: SessionQueue, user_id: str, origin: str | 
     session = GraphExecutionState(graph=graph)
     session_json = session.model_dump_json(warnings=False, exclude_none=True)
     batch_id = str(uuid.uuid4())
-    with legacy_cursor_of(session_queue) as cursor:
+    with sqlite_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -208,7 +208,7 @@ def test_get_queue_item_summaries_by_ids_returns_only_requested_queue_items_in_o
 ) -> None:
     first_id = _insert_queue_item(session_queue, user_id="user-a")
     second_id = _insert_queue_item(session_queue, user_id="user-b")
-    with legacy_cursor_of(session_queue) as cursor:
+    with sqlite_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             UPDATE session_queue
@@ -249,7 +249,7 @@ def test_get_queue_item_summaries_by_ids_takes_more_ids_than_sqlite_binds(
 
     # Size the request off the limit this SQLite build actually enforces (999 on builds older than
     # 3.32, 32766 since), so the test stays meaningful wherever it runs.
-    with legacy_cursor_of(session_queue) as cursor:
+    with sqlite_cursor_of(session_queue) as cursor:
         bind_limit = cursor.connection.getlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER)
 
     # Padding ids do not exist, which also covers chunks that match nothing at all.

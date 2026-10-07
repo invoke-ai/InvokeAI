@@ -29,7 +29,7 @@ from invokeai.app.services.shared.database.dialect import CaseInsensitiveLike, l
 from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, locking, mapped, read, write
 from invokeai.app.services.shared.database.schema.workflows import workflow_library
 from invokeai.app.services.shared.database.types import now_text
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.services.workflow_records.workflow_records_common import (
     WorkflowCategory,
     WorkflowRecordDTO,

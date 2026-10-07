@@ -77,7 +77,7 @@ The callback changes the schema with Alembic's operations (`context.op.add_colum
 
 - **Create tables with `context.create_table()`**, not `op.create_table`. It creates a table exactly as the schema metadata does: InnoDB, the binary collation and DYNAMIC rows on a server whatever its defaults, and each backend's rules for defaults, generated columns and indexes. A foreign key names a table in `context.metadata`: one created earlier in the migration, or an existing one loaded with `Table(name, context.metadata, autoload_with=context.conn)`.
 - **Make it idempotent.** On SQLite the migration runs in a transaction that a failure rolls back, DDL included. On MySQL and MariaDB every DDL statement commits as it runs, so a migration that failed halfway runs again from the start at the next startup and finds part of its work done. Check what is there before changing it (`inspect(context.conn)`).
-- **Mind foreign keys and triggers on SQLite.** There a portable migration runs with foreign keys off, so that rebuilding a table with `op.batch_alter_table` (SQLite's only way to alter most columns) does not delete, by cascade, the rows of the tables that reference it. They are checked before the migration commits: a migration that leaves rows referencing nothing fails, so one that deletes rows others reference deletes those itself. (Rows that referenced nothing before it ran do not count.) A rebuild also drops the table's triggers; a migration that rebuilds a table with triggers creates them again, and `test_schema_parity.py` fails when one is missing.
+- **Mind foreign keys on SQLite, and create no triggers.** There a portable migration runs with foreign keys off, so that rebuilding a table with `op.batch_alter_table` (SQLite's only way to alter most columns) does not delete, by cascade, the rows of the tables that reference it. They are checked before the migration commits: a migration that leaves rows referencing nothing fails, so one that deletes rows others reference deletes those itself. (Rows that referenced nothing before it ran do not count.) No database has triggers (`2026_10_07_drop_sqlite_triggers` dropped the last): the application sets what a trigger would, on every backend, and `test_schema_parity.py` fails when a migration creates one.
 - **Spell out what Alembic does not know.** `op.add_column` applies none of the metadata's rules for a backend: a column that the metadata gives a SQLite-only default (`inserted_at()`, `updated_at()`) or a generated `NOT NULL` column needs its DDL written per backend (`context.conn.dialect.name`).
 - **Change the schema metadata in the same commit.** New server databases are created from the metadata, so it must describe what the migration makes. `test_schema_parity.py` holds it to the migrated SQLite schema, and `test_portable_migrations.py` takes a server database from the cutover through every portable migration and compares it with one created from the metadata.
 
@@ -108,7 +108,7 @@ A new MySQL or MariaDB database is not migrated: it is created at the newest sch
 
 ## Registration
 
-Do not manually import or register migrations in `sqlite_util.py`.
+Do not manually import or register migrations in `services/shared/database/startup.py`.
 
 Database initialization builds a `MigrationBuildContext`, discovers migration modules, calls their builders, and registers the resulting migrations with the `Migrator`.
 

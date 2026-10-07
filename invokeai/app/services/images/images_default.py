@@ -32,8 +32,7 @@ from invokeai.app.services.shared.intermediate_delete import (
     JournaledDeleteAdapter,
     delete_journaled_intermediates,
 )
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults, SQLiteDirection
 
 
 class ImageService(ImageServiceABC):

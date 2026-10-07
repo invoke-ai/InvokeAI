@@ -19,8 +19,7 @@ from invokeai.app.services.shared.intermediate_delete import (
     JournaledDeleteAdapter,
     delete_journaled_intermediates,
 )
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults, SQLiteDirection
 from invokeai.app.services.video_files.video_files_common import (
     VideoFileDeleteException,
     VideoFileNotFoundException,

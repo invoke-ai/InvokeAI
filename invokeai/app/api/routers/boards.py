@@ -15,8 +15,7 @@ from invokeai.app.services.board_records.board_records_common import (
 )
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.image_records.image_records_common import ImageCategory
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults, SQLiteDirection
 
 boards_router = APIRouter(prefix="/v1/boards", tags=["boards"])
 

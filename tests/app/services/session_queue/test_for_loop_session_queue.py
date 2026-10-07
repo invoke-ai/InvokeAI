@@ -13,15 +13,15 @@ from invokeai.app.invocations.loops import (
 )
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.session_queue.session_queue_default import SessionQueue
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
-from tests.fixtures.sqlite_database import legacy_cursor_of
+from tests.fixtures.sqlite_database import sqlite_cursor_of
 from tests.test_nodes import AnyTypeTestInvocation, create_edge, create_loop_linkage
 
 
 @pytest.fixture
-def session_queue(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SessionQueue:
-    queue = SessionQueue(mock_sqlite_database.database)
+def session_queue(mock_invoker: Invoker, mock_sqlite_database: Database) -> SessionQueue:
+    queue = SessionQueue(mock_sqlite_database)
     queue.start(mock_invoker)
     return queue
 
@@ -94,7 +94,7 @@ def _insert_session(queue: SessionQueue, state: GraphExecutionState) -> int:
     session_id = str(uuid.uuid4())
     batch_id = str(uuid.uuid4())
     session_json = state.model_dump_json(warnings=False, exclude_none=True)
-    with legacy_cursor_of(queue) as cursor:
+    with sqlite_cursor_of(queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (

@@ -32,7 +32,7 @@ from invokeai.app.services.image_records.image_records_common import (
 from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
 from invokeai.app.services.shared.database.errors import LockTimeoutError
-from invokeai.app.services.shared.sqlite.sqlite_util import init_db
+from invokeai.app.services.shared.database.startup import init_database
 from invokeai.app.util.misc import get_iso_timestamp
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
@@ -86,8 +86,8 @@ def real_image_service(tmp_path: Path) -> tuple[ImageService, ImageRecordStorage
     invoker = MagicMock()
     invoker.services.configuration.pil_compress_level = 6
     storage.start(invoker)
-    db = init_db(config=config, logger=logger, image_files=storage)
-    records = ImageRecordStorage(db.database)
+    db = init_database(config=config, logger=logger, image_files=storage)
+    records = ImageRecordStorage(db)
 
     invoker.services.configuration.image_subfolder_strategy = "flat"
     invoker.services.names.create_image_name.return_value = "uploaded.png"
@@ -423,7 +423,7 @@ def wired(tmp_path: Path) -> tuple[ImageService, ImageRecordStorage, DiskImageFi
     """ImageService wired to a real record store and a real disk store — no stub decides anything."""
     config = InvokeAIAppConfig(use_memory_db=True)
     logger = InvokeAILogger.get_logger(config=config)
-    records = ImageRecordStorage(create_mock_sqlite_database(config, logger).database)
+    records = ImageRecordStorage(create_mock_sqlite_database(config, logger))
     storage = DiskImageFileStorage(tmp_path / "outputs")
 
     svc = ImageService()
@@ -445,9 +445,9 @@ def wired_with_move_service(
     config = InvokeAIAppConfig(use_memory_db=True, image_subfolder_strategy="flat")
     logger = InvokeAILogger.get_logger(config=config)
     db = create_mock_sqlite_database(config, logger)
-    records = ImageRecordStorage(db.database)
+    records = ImageRecordStorage(db)
     storage = DiskImageFileStorage(tmp_path / "outputs")
-    moves = ImageMoveService(db.database, image_files=storage, config=config, logger=logger)
+    moves = ImageMoveService(db, image_files=storage, config=config, logger=logger)
 
     svc = ImageService()
     invoker = MagicMock()

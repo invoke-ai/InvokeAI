@@ -30,7 +30,7 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.images.images_common import image_record_to_dto
 from invokeai.app.services.images.images_default import ImageService
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.video_records.video_records_default import VideoRecordStorage
 from invokeai.app.services.videos.videos_common import VideoDTO, video_record_to_dto
 from invokeai.app.services.videos.videos_default import VideoService
@@ -86,19 +86,19 @@ def _fake_encode(images: list[Image.Image]) -> np.ndarray:
 
 
 @pytest.fixture
-def db() -> SqliteDatabase:
+def db() -> Database:
     config = InvokeAIAppConfig(use_memory_db=True)
     return create_mock_sqlite_database(config=config, logger=InvokeAILogger.get_logger())
 
 
 @pytest.fixture
-def image_records(db: SqliteDatabase) -> ImageRecordStorage:
-    return ImageRecordStorage(db.database)
+def image_records(db: Database) -> ImageRecordStorage:
+    return ImageRecordStorage(db)
 
 
 @pytest.fixture
-def index_records(db: SqliteDatabase) -> ImageIndexRecords:
-    return ImageIndexRecords(db.database)
+def index_records(db: Database) -> ImageIndexRecords:
+    return ImageIndexRecords(db)
 
 
 @pytest.fixture
@@ -110,8 +110,8 @@ def images_service() -> ImageService:
 
 
 @pytest.fixture
-def video_records(db: SqliteDatabase) -> VideoRecordStorage:
-    return VideoRecordStorage(db.database)
+def video_records(db: Database) -> VideoRecordStorage:
+    return VideoRecordStorage(db)
 
 
 @pytest.fixture
@@ -2086,7 +2086,7 @@ def test_search_similar_returns_empty_when_not_running(service: ImageIndexServic
 
 
 def test_search_similar_scopes_to_the_requesting_user(
-    db: SqliteDatabase,
+    db: Database,
     image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecords,
@@ -2095,7 +2095,7 @@ def test_search_similar_scopes_to_the_requesting_user(
     from invokeai.app.services.users.users_common import UserCreateRequest
     from invokeai.app.services.users.users_default import UserService
 
-    other_user = UserService(db.database).create(
+    other_user = UserService(db).create(
         UserCreateRequest(email="scoped@example.com", display_name="Scoped", password="TestPass123", is_admin=False)
     )
     service.start(_make_invoker(images_service, index_records))

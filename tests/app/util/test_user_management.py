@@ -10,7 +10,7 @@ from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.fonts.fonts_common import FontScope
 from invokeai.app.services.fonts.fonts_default import FontService
 from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
-from invokeai.app.services.shared.sqlite.sqlite_util import init_db
+from invokeai.app.services.shared.database.startup import init_database
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.users.users_default import UserService
 from invokeai.app.util import user_management
@@ -26,14 +26,14 @@ def deletion_fixture(tmp_path: Path):
     )
     config._root = tmp_path
     logger = logging.getLogger("user-management-font-tests")
-    db = init_db(config, logger, Mock(spec=ImageFileStorageBase))
+    db = init_database(config, logger, Mock(spec=ImageFileStorageBase))
     fonts = FontService(
-        db.database,
+        db,
         fonts_dir=config.fonts_path,
         storage_dir=config.fonts_storage_path,
         logger=logger,
     )
-    users = UserService(db.database)
+    users = UserService(db)
     users.create(UserCreateRequest(email="delete-admin@test.com", password="AdminPass123", is_admin=True))
     owner = users.create(UserCreateRequest(email="delete-owner@test.com", password="OwnerPass123"))
     font_bytes = (

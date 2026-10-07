@@ -22,7 +22,7 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries import Queries
 from invokeai.app.services.shared.database.schema.videos import videos
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.users.users_default import UserService
 from invokeai.app.services.video_records.video_records_common import VideoRecordChanges, VideoRecordNotFoundException

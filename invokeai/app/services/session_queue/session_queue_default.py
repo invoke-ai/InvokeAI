@@ -49,8 +49,7 @@ from invokeai.app.services.shared.database.queries.locks import DatabaseLock
 from invokeai.app.services.shared.database.queries.session_queue import Scope, SettledReceipt
 from invokeai.app.services.shared.execution_state_migration import dump_execution_state
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
-from invokeai.app.services.shared.pagination import CursorPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import CursorPaginatedResults, SQLiteDirection
 
 MAX_UNACKNOWLEDGED_ENQUEUE_RECEIPTS_PER_OWNER = 10_000
 MAX_UNACKNOWLEDGED_ENQUEUE_RECEIPT_BYTES_PER_OWNER = 64 * 1024 * 1024

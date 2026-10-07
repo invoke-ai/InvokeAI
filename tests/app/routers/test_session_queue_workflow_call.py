@@ -15,11 +15,11 @@ from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
 from invokeai.app.services.session_queue.session_queue_default import SessionQueue
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
-from tests.fixtures.sqlite_database import legacy_cursor_of
+from tests.fixtures.sqlite_database import sqlite_cursor_of
 
 
 class MockApiDependencies(ApiDependencies):
@@ -42,7 +42,7 @@ def client():
 
 
 @pytest.fixture
-def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
+def mock_services(mock_sqlite_database: Database) -> InvocationServices:
     from invokeai.app.services.board_image_records.board_image_records_default import BoardImageRecordStorage
     from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
     from invokeai.app.services.board_video_records.board_video_records_default import BoardVideoRecordStorage
@@ -65,15 +65,15 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
     db = mock_sqlite_database
 
     return InvocationServices(
-        board_image_records=BoardImageRecordStorage(db.database),
+        board_image_records=BoardImageRecordStorage(db),
         board_images=None,  # type: ignore
-        board_records=BoardRecordStorage(db.database),
+        board_records=BoardRecordStorage(db),
         boards=BoardService(),
         bulk_download=BulkDownloadService(),
         configuration=configuration,
         events=TestEventService(),
         image_files=None,  # type: ignore
-        image_records=ImageRecordStorage(db.database),
+        image_records=ImageRecordStorage(db),
         images=ImageService(),
         invocation_cache=MemoryInvocationCache(max_cache_size=0),
         logger=logging,  # type: ignore
@@ -85,7 +85,7 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
         session_processor=None,  # type: ignore
         session_queue=None,  # type: ignore
         urls=None,  # type: ignore
-        workflow_records=WorkflowRecordsStorage(db.database),
+        workflow_records=WorkflowRecordsStorage(db),
         tensors=None,  # type: ignore
         conditioning=None,  # type: ignore
         style_preset_records=None,  # type: ignore
@@ -93,16 +93,16 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
         workflow_thumbnails=None,  # type: ignore
         model_relationship_records=None,  # type: ignore
         model_relationships=None,  # type: ignore
-        client_state_persistence=ClientStatePersistence(db.database),
-        project_records=ProjectRecordsStorage(db.database),
-        users=UserService(db.database),
-        wildcard_records=WildcardRecordsStorage(db.database),
+        client_state_persistence=ClientStatePersistence(db),
+        project_records=ProjectRecordsStorage(db),
+        users=UserService(db),
+        wildcard_records=WildcardRecordsStorage(db),
         external_generation=None,  # type: ignore
         system_prompt_records=None,  # type: ignore
         videos=None,  # type: ignore
         video_files=None,  # type: ignore
-        video_records=VideoRecordStorage(db.database),
-        board_video_records=BoardVideoRecordStorage(db.database),
+        video_records=VideoRecordStorage(db),
+        board_video_records=BoardVideoRecordStorage(db),
         gallery=None,  # type: ignore
         image_index_records=None,  # type: ignore
         image_index=None,  # type: ignore
@@ -111,9 +111,9 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
 
 
 @pytest.fixture
-def mock_invoker(mock_services: InvocationServices, mock_sqlite_database: SqliteDatabase) -> Invoker:
+def mock_invoker(mock_services: InvocationServices, mock_sqlite_database: Database) -> Invoker:
     invoker = Invoker(services=mock_services)
-    queue = SessionQueue(mock_sqlite_database.database)
+    queue = SessionQueue(mock_sqlite_database)
     mock_services.session_queue = queue
     mock_services.session_processor = MagicMock()
     mock_services.session_processor.get_status.return_value = SessionProcessorStatus(
@@ -182,7 +182,7 @@ def _insert_queue_item(
     workflow_call_depth: int | None = None,
 ) -> int:
     session = session or GraphExecutionState(graph=Graph())
-    with legacy_cursor_of(session_queue) as cursor:
+    with sqlite_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (

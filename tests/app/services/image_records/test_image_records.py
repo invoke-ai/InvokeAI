@@ -29,9 +29,10 @@ from invokeai.app.services.shared.database.queries import images as image_querie
 from invokeai.app.services.shared.database.schema.boards import shared_boards
 from invokeai.app.services.shared.database.schema.images import images
 from invokeai.app.services.shared.database.schema.users import users
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from tests.fixtures.database import capture_statements, explain_query_plan
 from tests.fixtures.races import while_in_flight
+from tests.fixtures.sqlite_database import sqlite_cursor
 
 Stores = tuple[ImageRecordStorage, BoardRecordStorage, BoardImageRecordStorage]
 
@@ -743,15 +744,13 @@ class TestAllReadableBoardsFiltering:
         _save(image_store, "dangling.png", user_id="user1")
         # Production foreign keys prevent this state, but imported/legacy DBs
         # may contain it. Seed it deliberately to lock down fail-closed reads.
-        # (A PRAGMA takes effect only outside a transaction, so each statement has a block of its own.)
-        with database.legacy_cursor() as cursor:
-            cursor.execute("PRAGMA foreign_keys = OFF")
-        with database.legacy_cursor() as cursor:
+        # (A PRAGMA takes effect only outside a transaction, so it goes to the connection itself.)
+        database.sqlite.conn.execute("PRAGMA foreign_keys = OFF")
+        with sqlite_cursor(database) as cursor:
             cursor.execute(
                 "INSERT INTO board_images (board_id, image_name) VALUES (?, ?)", ("deleted-board", "dangling.png")
             )
-        with database.legacy_cursor() as cursor:
-            cursor.execute("PRAGMA foreign_keys = ON")
+        database.sqlite.conn.execute("PRAGMA foreign_keys = ON")
 
         dtos = image_store.get_many(limit=100, board_id="all", user_id=user_id, is_admin=is_admin)
         names = image_store.get_image_names(board_id="all", user_id=user_id, is_admin=is_admin)

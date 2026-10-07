@@ -1,4 +1,4 @@
-"""Regression test: clean() must serialize with transaction() users.
+"""Regression test: clean() must serialize with transactions.
 
 Startup runs VACUUM after services (and their worker threads) are already
 live; an unserialized VACUUM intermittently fails the whole boot with
@@ -7,18 +7,19 @@ live; an unserialized VACUUM intermittently fails the whole boot with
 
 import threading
 
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.shared.database.database import Database
 from invokeai.backend.util.logging import InvokeAILogger
+from tests.fixtures.sqlite_database import sqlite_cursor
 
 
 def test_clean_waits_for_in_flight_transactions(tmp_path) -> None:
-    db = SqliteDatabase(db_path=tmp_path / "test.db", logger=InvokeAILogger.get_logger())
+    db = Database.open_sqlite(tmp_path / "test.db", InvokeAILogger.get_logger())
     in_transaction = threading.Event()
     release = threading.Event()
     errors: list[Exception] = []
 
     def hold_transaction() -> None:
-        with db.transaction() as cursor:
+        with sqlite_cursor(db) as cursor:
             cursor.execute("CREATE TABLE t (x INTEGER);")
             cursor.execute("INSERT INTO t VALUES (1);")
             in_transaction.set()

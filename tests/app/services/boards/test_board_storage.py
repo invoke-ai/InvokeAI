@@ -1,7 +1,7 @@
 """Board records and board memberships on every database backend."""
 
 import pytest
-from sqlalchemy import insert
+from sqlalchemy import insert, select
 
 from invokeai.app.services.board_image_records.board_image_records_default import BoardImageRecordStorage
 from invokeai.app.services.board_records.board_records_common import (
@@ -15,14 +15,18 @@ from invokeai.app.services.board_records.board_records_default import BoardRecor
 from invokeai.app.services.board_video_records.board_video_records_default import BoardVideoRecordStorage
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.queries import board_images as board_image_queries
+from invokeai.app.services.shared.database.queries import board_videos as board_video_queries
 from invokeai.app.services.shared.database.queries import boards as board_queries
+from invokeai.app.services.shared.database.schema.boards import board_images as board_images_table
+from invokeai.app.services.shared.database.schema.boards import board_videos as board_videos_table
 from invokeai.app.services.shared.database.schema.boards import boards as boards_table
 from invokeai.app.services.shared.database.schema.boards import shared_boards
 from invokeai.app.services.shared.database.schema.images import images
 from invokeai.app.services.shared.database.schema.projects import projects
 from invokeai.app.services.shared.database.schema.users import users
 from invokeai.app.services.shared.database.schema.videos import videos
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 
 ALICE = "alice"
 BOB = "bob"
@@ -299,6 +303,34 @@ def test_an_image_is_on_one_board_at_a_time(
     assert board_images.remove_image_from_board(image, first) == 0
     assert board_images.remove_image_from_board(image, second) == 1
     assert board_images.get_board_for_image(image) is None
+
+
+def test_moving_to_another_board_renews_when_the_membership_was_updated(
+    database: Database,
+    board_records: BoardRecordStorage,
+    board_images: BoardImageRecordStorage,
+    board_videos: BoardVideoRecordStorage,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first = board_records.save("First", ALICE).board_id
+    second = board_records.save("Second", ALICE).board_id
+    image = _image(database, "moved.png")
+    video = _video(database, "moved.mp4")
+    for module in (board_image_queries, board_video_queries):
+        monkeypatch.setattr(module, "now_text", lambda: "2030-01-01 00:00:00.000")
+    board_images.add_image_to_board(first, image)
+    board_videos.add_video_to_board(first, video)
+
+    for module in (board_image_queries, board_video_queries):
+        monkeypatch.setattr(module, "now_text", lambda: "2030-01-02 00:00:00.000")
+    board_images.add_image_to_board(second, image)
+    board_videos.add_video_to_board(second, video)
+
+    with database.begin(write=False) as conn:
+        image_row = conn.execute(select(board_images_table.c.board_id, board_images_table.c.updated_at)).one()
+        video_row = conn.execute(select(board_videos_table.c.board_id, board_videos_table.c.updated_at)).one()
+    assert tuple(image_row) == (second, "2030-01-02 00:00:00.000")
+    assert tuple(video_row) == (second, "2030-01-02 00:00:00.000")
 
 
 def test_image_names_and_counts_follow_the_filters(

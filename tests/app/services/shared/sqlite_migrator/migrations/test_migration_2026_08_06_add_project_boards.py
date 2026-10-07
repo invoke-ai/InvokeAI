@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.sqlite_migrator.migration_loader import MigrationBuildContext, build_migrations
 from invokeai.app.services.shared.sqlite_migrator.migrations.migration_2026_08_06_add_project_boards import (
     AddProjectBoardsMigrationCallback,
@@ -531,29 +531,29 @@ def test_it_runs_once_through_the_real_migrator_and_is_not_reapplied(tmp_path: P
     context = MigrationBuildContext(app_config=MagicMock(), logger=logger, image_files=MagicMock())
     all_migrations = build_migrations(context)
 
-    db = SqliteDatabase(db_path=tmp_path / "projects.db", logger=logger, verbose=False)
+    db = Database.open_sqlite(tmp_path / "projects.db", logger)
 
-    before = Migrator(db.database)
+    before = Migrator(db)
     for migration in all_migrations:
         if migration.id == MIGRATION_ID:
             break
         before.register_migration(migration)
     before.run_migrations()
 
-    cursor = db._conn.cursor()
+    cursor = db.sqlite.conn.cursor()
     cursor.execute("INSERT INTO boards (board_id, board_name, user_id) VALUES ('b1', 'Old name', 'system');")
     cursor.execute(
         "INSERT INTO projects (project_id, user_id, name, data) VALUES ('p1', 'system', 'Kept', ?);",
         (_gallery_document("b1"),),
     )
-    db._conn.commit()
+    db.sqlite.conn.commit()
 
-    full = Migrator(db.database)
+    full = Migrator(db)
     for migration in all_migrations:
         full.register_migration(migration)
     assert full.run_migrations() is True
 
-    # SqliteDatabase sets row_factory = sqlite3.Row, which does not compare equal to a tuple.
+    # Database sets row_factory = sqlite3.Row, which does not compare equal to a tuple.
     cursor.execute("SELECT name, board_id FROM projects WHERE project_id = 'p1';")
     assert tuple(cursor.fetchone()) == ("Kept", "b1")
     cursor.execute("SELECT board_name FROM boards WHERE board_id = 'b1';")
@@ -562,7 +562,7 @@ def test_it_runs_once_through_the_real_migrator_and_is_not_reapplied(tmp_path: P
     assert cursor.fetchall() == []
 
     # Migration tracking, not idempotent DDL, is what stops a second run rebuilding the table again.
-    again = Migrator(db.database)
+    again = Migrator(db)
     for migration in all_migrations:
         again.register_migration(migration)
     assert again.run_migrations() is False
@@ -576,13 +576,13 @@ def test_it_runs_through_the_real_migrator_on_a_database_with_no_projects(tmp_pa
     context = MigrationBuildContext(app_config=MagicMock(), logger=logger, image_files=MagicMock())
     all_migrations = build_migrations(context)
 
-    db = SqliteDatabase(db_path=tmp_path / "projects.db", logger=logger, verbose=False)
-    migrator = Migrator(db.database)
+    db = Database.open_sqlite(tmp_path / "projects.db", logger)
+    migrator = Migrator(db)
     for migration in all_migrations:
         migrator.register_migration(migration)
     assert migrator.run_migrations() is True
 
-    cursor = db._conn.cursor()
+    cursor = db.sqlite.conn.cursor()
     columns = {row[1] for row in cursor.execute("PRAGMA table_info(projects);").fetchall()}
     assert "board_id" in columns
     cursor.execute("SELECT COUNT(*) FROM projects;")

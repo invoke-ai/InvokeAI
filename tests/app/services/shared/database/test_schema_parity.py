@@ -30,14 +30,14 @@ def migrated(tmp_path_factory: pytest.TempPathFactory) -> Iterator[sqlite3.Conne
     config = DefaultInvokeAIAppConfig(use_memory_db=True)
     config._root = tmp_path_factory.mktemp("root")
     db = create_mock_sqlite_database(config, InvokeAILogger.get_logger("test_schema_parity"))
-    conn = db.database.sqlite.conn
+    conn = db.sqlite.conn
     # Created by the project boards migration only when it has projects to rescue, which a new database has not.
     AddProjectBoardsMigrationCallback(InvokeAILogger.get_logger("test_schema_parity"))._create_quarantine_table(
         conn.cursor()
     )
     conn.commit()
     yield conn
-    db.database.dispose()
+    db.dispose()
 
 
 @pytest.fixture(scope="module")
@@ -65,7 +65,7 @@ def test_the_metadata_creates_the_migrated_schema(created: sqlite3.Connection, m
 
 
 def test_neither_schema_has_triggers(created: sqlite3.Connection, migrated: sqlite3.Connection) -> None:
-    # The application sets what the triggers of the earlier migrations set; the last migrations drop them.
+    # The application sets what the triggers of the earlier migrations set; 2026_10_07_drop_sqlite_triggers drops them.
     assert _names(migrated, "trigger") == set()
     assert _names(created, "trigger") == set()
     assert _names(created, "view") == _names(migrated, "view") == set()

@@ -7,17 +7,17 @@ import pytest
 from invokeai.app.services.events.events_common import QueueClearedEvent, QueueItemStatusChangedEvent
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.session_queue.session_queue_default import SessionQueue
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
-from tests.fixtures.sqlite_database import legacy_cursor_of
+from tests.fixtures.sqlite_database import sqlite_cursor_of
 from tests.test_nodes import PromptTestInvocation
 
 
 @pytest.fixture
-def session_queue(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SessionQueue:
+def session_queue(mock_invoker: Invoker, mock_sqlite_database: Database) -> SessionQueue:
     """Create a SessionQueue backed by the mock invoker's in-memory database."""
     db = mock_sqlite_database
-    queue = SessionQueue(db.database)
+    queue = SessionQueue(db)
     queue.start(mock_invoker)
     return queue
 
@@ -32,7 +32,7 @@ def _insert_queue_item(session_queue: SessionQueue, queue_id: str, user_id: str,
     graph.add_node(PromptTestInvocation(id="prompt", prompt="test"))
     session = GraphExecutionState(graph=graph)
     batch_id = str(uuid.uuid4())
-    with legacy_cursor_of(session_queue) as cursor:
+    with sqlite_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority, workflow, origin, destination, retried_from_item_id, user_id, status)
@@ -59,7 +59,7 @@ def _insert_queue_item(session_queue: SessionQueue, queue_id: str, user_id: str,
 
 def _count_items(session_queue: SessionQueue, queue_id: str, user_id: str | None = None) -> int:
     """Count items in the queue, optionally filtered by user_id."""
-    with legacy_cursor_of(session_queue) as cursor:
+    with sqlite_cursor_of(session_queue) as cursor:
         if user_id is not None:
             cursor.execute(
                 "SELECT COUNT(*) FROM session_queue WHERE queue_id = ? AND user_id = ?",
@@ -133,7 +133,7 @@ def test_clear_returns_zero_when_no_matching_items(session_queue: SessionQueue) 
 
 
 def _status_of(session_queue: SessionQueue, item_id: int) -> str | None:
-    with legacy_cursor_of(session_queue) as cursor:
+    with sqlite_cursor_of(session_queue) as cursor:
         cursor.execute("SELECT status FROM session_queue WHERE item_id = ?", (item_id,))
         row = cursor.fetchone()
     return row[0] if row is not None else None

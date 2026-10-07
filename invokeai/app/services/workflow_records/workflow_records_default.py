@@ -8,8 +8,7 @@ from invokeai.app.services.shared.database.errors import UniqueViolation
 from invokeai.app.services.shared.database.queries import Queries
 from invokeai.app.services.shared.database.queries.locks import DatabaseLock
 from invokeai.app.services.shared.media_references import extract_media_references_from_json
-from invokeai.app.services.shared.pagination import PaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import PaginatedResults, SQLiteDirection
 from invokeai.app.services.workflow_records.workflow_records_base import WorkflowRecordsStorageBase
 from invokeai.app.services.workflow_records.workflow_records_common import (
     WORKFLOW_LIBRARY_DEFAULT_USER_ID,

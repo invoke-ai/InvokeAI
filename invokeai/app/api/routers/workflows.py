@@ -10,8 +10,7 @@ from PIL import Image
 
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.services.shared.pagination import PaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import PaginatedResults, SQLiteDirection
 from invokeai.app.services.shared.workflow_call_compatibility import get_workflow_call_compatibility
 from invokeai.app.services.workflow_records.workflow_records_common import (
     Workflow,

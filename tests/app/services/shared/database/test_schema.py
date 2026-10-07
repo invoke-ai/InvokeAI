@@ -310,6 +310,18 @@ def test_an_update_sets_updated_at(empty_database: Database) -> None:
     assert isinstance(updated_at, str) and updated_at > long_ago
 
 
+def test_every_updated_at_column_is_set_by_updates() -> None:
+    # No trigger keeps `updated_at` current on any backend: an `update()` of its table must set it. (Fonts set
+    # theirs where a directory font changes; the quarantine table of old projects keeps theirs as found.)
+    set_elsewhere = {"fonts", "orphaned_projects_2026_08_06"}
+    without = [
+        name
+        for name, table in metadata.tables.items()
+        if "updated_at" in table.c and name not in set_elsewhere and table.c.updated_at.onupdate is None
+    ]
+    assert without == []
+
+
 def test_columns_hold_long_and_large_values(empty_database: Database) -> None:
     _create(empty_database, models, images, image_embeddings, videos)
     # A model name is indexed by its first characters on a server; a path, which is unique, is limited to

@@ -14,17 +14,17 @@ import pytest
 from invokeai.app.services.events.events_common import QueueItemsCanceledEvent
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.session_queue.session_queue_default import SessionQueue
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
-from tests.fixtures.sqlite_database import legacy_cursor_of
+from tests.fixtures.sqlite_database import sqlite_cursor_of
 from tests.test_nodes import PromptTestInvocation
 
 
 @pytest.fixture
-def session_queue(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SessionQueue:
+def session_queue(mock_invoker: Invoker, mock_sqlite_database: Database) -> SessionQueue:
     """Create a SessionQueue backed by the mock invoker's in-memory database."""
     db = mock_sqlite_database
-    queue = SessionQueue(db.database)
+    queue = SessionQueue(db)
     queue.start(mock_invoker)
     return queue
 
@@ -40,7 +40,7 @@ def _insert_queue_item(
     """Directly insert a minimal pending queue item for the given user and return its item_id."""
     session_id = str(uuid.uuid4())
     batch_id = batch_id or str(uuid.uuid4())
-    with legacy_cursor_of(session_queue) as cursor:
+    with sqlite_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority, workflow, origin, destination, retried_from_item_id, user_id)
@@ -64,7 +64,7 @@ def _insert_dequeueable_queue_item(
     session = GraphExecutionState(graph=graph)
     session_json = session.model_dump_json(warnings=False, exclude_none=True)
     batch_id = str(uuid.uuid4())
-    with legacy_cursor_of(session_queue) as cursor:
+    with sqlite_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority, workflow, origin, destination, retried_from_item_id, user_id)
@@ -78,7 +78,7 @@ def _insert_dequeueable_queue_item(
 
 def _status_of(session_queue: SessionQueue, item_id: int) -> str:
     """Reads an item's status directly; the minimal inserted rows carry no parseable session."""
-    with legacy_cursor_of(session_queue) as cursor:
+    with sqlite_cursor_of(session_queue) as cursor:
         cursor.execute("SELECT status FROM session_queue WHERE item_id = ?", (item_id,))
         return str(cursor.fetchone()[0])
 

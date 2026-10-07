@@ -5,7 +5,7 @@ dedicated "touch" method/endpoint, never as a side effect of `get`/`create`/`upd
 the frontend show "Your last run · 2 days ago" on library cards.
 """
 
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.services.workflow_records.workflow_records_common import (
     WorkflowCategory,
     WorkflowMeta,

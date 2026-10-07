@@ -13,19 +13,20 @@ from invokeai.app.services.session_queue.session_queue_common import (
     EnqueueReceiptLimitError,
 )
 from invokeai.app.services.session_queue.session_queue_default import SessionQueue
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.graph import Graph
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from tests.fixtures.sqlite_database import sqlite_cursor
 from tests.test_nodes import PromptTestInvocation
 
 
 @pytest.fixture
-def session_queue(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SessionQueue:
-    with mock_sqlite_database.transaction() as cursor:
+def session_queue(mock_invoker: Invoker, mock_sqlite_database: Database) -> SessionQueue:
+    with sqlite_cursor(mock_sqlite_database) as cursor:
         cursor.executemany(
             "INSERT INTO users (user_id, email, password_hash) VALUES (?, ?, ?);",
             [("user-1", "user-1@example.com", "test"), ("user-2", "user-2@example.com", "test")],
         )
-    queue = SessionQueue(mock_sqlite_database.database)
+    queue = SessionQueue(mock_sqlite_database)
     queue.start(mock_invoker)
     return queue
 
@@ -188,12 +189,12 @@ def test_enqueue_receipt_survives_queue_item_deletion(session_queue: SessionQueu
 
 
 def test_enqueue_receipt_does_not_expire_while_unacknowledged(
-    session_queue: SessionQueue, mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase
+    session_queue: SessionQueue, mock_invoker: Invoker, mock_sqlite_database: Database
 ) -> None:
     batch = _batch()
     first = asyncio.run(session_queue.enqueue_batch("default", batch, False, "user-1"))
     session_queue.delete_queue_items_by_id(first.item_ids)
-    with mock_sqlite_database.transaction() as cursor:
+    with sqlite_cursor(mock_sqlite_database) as cursor:
         cursor.execute("UPDATE session_queue_enqueue_receipts SET created_at = '2000-01-01';")
 
     retry = asyncio.run(session_queue.enqueue_batch("default", batch, False, "user-1"))
@@ -250,12 +251,12 @@ def test_acknowledge_enqueue_is_scoped_by_user_and_queue(
 
 
 def test_expired_acknowledged_receipts_are_collected_on_admission(
-    session_queue: SessionQueue, mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase
+    session_queue: SessionQueue, mock_invoker: Invoker, mock_sqlite_database: Database
 ) -> None:
     first = _batch(idempotency_key="first")
     asyncio.run(session_queue.enqueue_batch("default", first, False, "user-1"))
     session_queue.acknowledge_enqueue("default", "first", "user-1")
-    with mock_sqlite_database.transaction() as cursor:
+    with sqlite_cursor(mock_sqlite_database) as cursor:
         cursor.execute(
             "UPDATE session_queue_enqueue_receipts SET acknowledged_at = '2000-01-01' WHERE idempotency_key = 'first';"
         )
@@ -266,12 +267,12 @@ def test_expired_acknowledged_receipts_are_collected_on_admission(
 
 
 def test_acknowledged_receipts_are_retained_for_seven_days(
-    session_queue: SessionQueue, mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase
+    session_queue: SessionQueue, mock_invoker: Invoker, mock_sqlite_database: Database
 ) -> None:
     first = _batch(idempotency_key="first")
     asyncio.run(session_queue.enqueue_batch("default", first, False, "user-1"))
     session_queue.acknowledge_enqueue("default", "first", "user-1")
-    with mock_sqlite_database.transaction() as cursor:
+    with sqlite_cursor(mock_sqlite_database) as cursor:
         cursor.execute(
             """--sql
             UPDATE session_queue_enqueue_receipts

@@ -17,7 +17,7 @@ from invokeai.app.services.shared.database.schema.session_queue import session_q
 from invokeai.app.services.shared.database.schema.users import users
 from invokeai.app.services.shared.execution_state_migration import dump_execution_state
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 
 QUEUE = "default"
 

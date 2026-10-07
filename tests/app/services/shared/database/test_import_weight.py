@@ -9,7 +9,7 @@ def test_the_layer_does_not_load_torch_or_the_invocations() -> None:
     probe = (
         "import sys\n"
         "import invokeai.app.services.shared.database.database\n"
-        "import invokeai.app.services.shared.sqlite.sqlite_database\n"
+        "import invokeai.app.services.shared.database.startup\n"
         "print(sorted(m for m in ('torch', 'invokeai.app.invocations') if m in sys.modules))\n"
     )
 

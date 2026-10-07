@@ -10,8 +10,8 @@ from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.errors import LockTimeoutError
 from invokeai.app.services.shared.database.queries.boards import BoardQueries
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.shared.pagination import SQLiteDirection
+from tests.fixtures.sqlite_database import sqlite_cursor
 
 
 def test_board_cover_uses_gallery_tie_breakers(mock_invoker: Invoker) -> None:
@@ -136,10 +136,10 @@ def test_non_admin_board_listing_skips_owner_lookup(mock_invoker: Invoker) -> No
     mock_invoker.services.users.get_many.assert_not_called()  # type: ignore[attr-defined]
 
 
-def test_a_board_dto_counts_each_kind_of_media(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> None:
+def test_a_board_dto_counts_each_kind_of_media(mock_invoker: Invoker, mock_sqlite_database: Database) -> None:
     services = mock_invoker.services
     board_id = services.board_records.save("Board", "system").board_id
-    with mock_sqlite_database.transaction() as cursor:
+    with sqlite_cursor(mock_sqlite_database) as cursor:
         cursor.executemany(
             "INSERT INTO images (image_name, image_origin, image_category, width, height) VALUES (?, 'internal', ?, 1, 1)",
             [("general.png", "general"), ("control.png", "control"), ("mask.png", "mask")],

@@ -4,7 +4,6 @@ from pathlib import Path
 import pytest
 
 from invokeai.app.services.shared.database.database import Database
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.fixtures.database_probe import ProbeQueries, create_probe_tables
 
@@ -25,14 +24,3 @@ def sqlite_file_database(tmp_path: Path) -> Iterator[Database]:
         yield database
     finally:
         database.dispose()
-
-
-@pytest.fixture
-def facade(tmp_path: Path) -> Iterator[SqliteDatabase]:
-    """The transitional cursor facade over a SQLite database file with the probe tables."""
-    facade = SqliteDatabase(tmp_path / "facade.db", InvokeAILogger.get_logger("test_database"))
-    create_probe_tables(facade.database)
-    try:
-        yield facade
-    finally:
-        facade.database.dispose()

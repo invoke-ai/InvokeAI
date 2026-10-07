@@ -9,7 +9,7 @@ from sqlalchemy import update
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries import workflows as workflow_queries
 from invokeai.app.services.shared.database.schema.workflows import workflow_library
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.services.workflow_records import workflow_records_default
 from invokeai.app.services.workflow_records.workflow_records_common import (
     Workflow,

@@ -13,8 +13,7 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries.gallery import Filters
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults, SQLiteDirection
 from invokeai.app.services.video_records.video_records_common import coerce_media_origin
 from invokeai.app.services.virtual_boards.virtual_boards_common import VirtualSubBoardDTO
 

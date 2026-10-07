@@ -21,7 +21,7 @@ from invokeai.app.services.model_records.model_records_base import ModelRecordCh
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries.models import ModelQueries
 from invokeai.app.services.shared.database.schema.models import models
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefaultSettings
 from invokeai.backend.model_manager.configs.lora import LoRA_LyCORIS_SDXL_Config
 from invokeai.backend.model_manager.configs.main import (

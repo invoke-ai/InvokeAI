@@ -36,7 +36,7 @@ from invokeai.app.services.model_records import (
     UnknownModelException,
 )
 from invokeai.app.services.orphaned_models import CONVERSION_SCRATCH_DIRNAME, OrphanedModelInfo
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.util.path_safety import is_plain_filename
 from invokeai.app.util.suppress_output import SuppressOutput
 from invokeai.backend.architectures import ArchitectureCapabilities, architecture_capabilities

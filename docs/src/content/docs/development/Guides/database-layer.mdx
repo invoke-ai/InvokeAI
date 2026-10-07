@@ -7,10 +7,6 @@ Every SQL statement of the application belongs in `invokeai/app/services/shared/
 
 Queries are written with SQLAlchemy Core, which compiles each statement for the backend in use. SQLite is the default backend. The layer and its tests also run on MySQL 8.4 and MariaDB 10.11; configuring InvokeAI itself to use one of them is not available yet.
 
-:::note
-The layer is being introduced service by service. Services not yet ported still use the transitional cursor facade, `SqliteDatabase.transaction()`, and are listed in the guard test's `NOT_YET_PORTED`. Do not add SQL to them; that list only shrinks.
-:::
-
 ## Query modules
 
 Each domain gets a query module as it is ported: a `QueryModule` subclass in `queries/`, attached to `Queries` as a cached property, whose methods take the connection right after `self` and are decorated with `@read` or `@write`. The decorators supply the connection, so callers never see one.
@@ -69,7 +65,7 @@ A server indexes the whole value of a primary key, a unique constraint or a fore
 
 A timestamp is UTC text that sorts and compares as text. Ported queries write it as `YYYY-MM-DD HH:MM:SS.fff` with `now_text()`. Rows also hold whole seconds and ISO 8601 text, at most 32 characters, written before the layer and its last migration. Columns made with `inserted_at()` and `updated_at()` get `now_text()` on insert; `updated_at()` columns also get it in an `update()` statement. An upsert must set `updated_at` in its own update values, because SQLAlchemy does not apply it to `ON CONFLICT DO UPDATE` or `ON DUPLICATE KEY UPDATE`. The SQL defaults of these columns exist only on SQLite, because the migrated schema has them.
 
-No database has triggers: queries set `updated_at` and the queue's `started_at`, `completed_at` and `session_revision` themselves. (The SQLite migrations created triggers for these; the last of them drops them.)
+No database has triggers: queries set `updated_at` and the queue's `started_at`, `completed_at` and `session_revision` themselves. (The SQLite migrations created triggers for these; `2026_10_07_drop_sqlite_triggers` drops them.)
 
 Some DDL differs between backends:
 
@@ -111,7 +107,7 @@ with db.queries.transaction() as q:
     q.media_references.replace(owner_kind="client_state", user_id=user_id, owner_id=key, references=references)
 ```
 
-- A thread has at most one transaction open per database. Opening another one, including a call on `db.queries` inside a transaction, raises `NestedTransactionError`. Pass `q` to helpers instead. (A nested cursor transaction of the transitional facade joins the outer one.)
+- A thread has at most one transaction open per database. Opening another one, including a call on `db.queries` inside a transaction, raises `NestedTransactionError`. Pass `q` to helpers instead.
 - `transaction(read_only=True)` reads one consistent snapshot and refuses writes.
 - A single call that loses a race (`ConflictError`: a deadlock) is run again from the start, three attempts in all. A `transaction()` block is not retried. Work that has no effects outside the database runs as `db.queries.run(work)` instead, which passes `work` the queries of one transaction and retries it the same way: on a server, transactions that write the same rows deadlock now and then. A lock held too long elsewhere (`LockTimeoutError`) is never retried, because the call has already waited for it.
 

@@ -46,7 +46,7 @@ from invokeai.app.services.model_records.model_records_base import (
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.errors import UniqueViolation
 from invokeai.app.services.shared.database.queries import Queries
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType

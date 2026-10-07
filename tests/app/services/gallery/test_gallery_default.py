@@ -34,7 +34,7 @@ from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries import gallery as gallery_queries
 from invokeai.app.services.shared.database.schema.images import images
 from invokeai.app.services.shared.database.schema.videos import videos
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.services.urls.urls_default import LocalUrlService
 from invokeai.app.services.video_records.video_records_default import VideoRecordStorage
 from tests.fixtures.database import capture_statements, explain_query_plan
@@ -751,7 +751,7 @@ class TestOrderingTieBreakers:
         ]
 
     def test_ascending_is_mirror_of_descending(self, services) -> None:
-        from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+        from invokeai.app.services.shared.pagination import SQLiteDirection
 
         self._seed_same_timestamp(services)
         gallery = services["gallery"]

@@ -54,7 +54,7 @@ from invokeai.app.services.session_processor.session_processor_default import (
     DefaultSessionRunner,
 )
 from invokeai.app.services.session_queue.session_queue_default import SessionQueue
-from invokeai.app.services.shared.sqlite.sqlite_util import init_db
+from invokeai.app.services.shared.database.startup import init_database
 from invokeai.app.services.style_preset_images.style_preset_images_disk import StylePresetImageFileStorageDisk
 from invokeai.app.services.style_preset_records.style_preset_records_default import StylePresetRecordsStorage
 from invokeai.app.services.system_prompt_records.system_prompt_records_default import SystemPromptRecordsStorage
@@ -127,10 +127,10 @@ class ApiDependencies:
         style_presets_folder = config.style_presets_path
         workflow_thumbnails_folder = config.workflow_thumbnails_path
 
-        db = init_db(config=config, logger=logger, image_files=image_files)
+        database = init_database(config=config, logger=logger, image_files=image_files)
 
         # Initialize JWT secret from database
-        app_settings = AppSettingsService(db.database)
+        app_settings = AppSettingsService(database)
         jwt_secret = app_settings.get_jwt_secret()
         set_jwt_secret(jwt_secret)
         logger.info("JWT secret loaded from database")
@@ -138,19 +138,19 @@ class ApiDependencies:
         configuration = config
         logger = logger
 
-        board_image_records = BoardImageRecordStorage(db.database)
+        board_image_records = BoardImageRecordStorage(database)
         board_images = BoardImagesService()
-        board_records = BoardRecordStorage(db.database)
+        board_records = BoardRecordStorage(database)
         boards = BoardService()
         events = FastAPIEventService(event_handler_id, loop=loop)
         bulk_download = BulkDownloadService()
-        image_records = ImageRecordStorage(db.database)
-        image_moves = ImageMoveService(db.database, image_files=image_files, config=configuration, logger=logger)
+        image_records = ImageRecordStorage(database)
+        image_moves = ImageMoveService(database, image_files=image_files, config=configuration, logger=logger)
         images = ImageService()
-        video_records = VideoRecordStorage(db.database)
+        video_records = VideoRecordStorage(database)
         videos = VideoService()
-        board_video_records = BoardVideoRecordStorage(db.database)
-        gallery = GalleryService(db.database)
+        board_video_records = BoardVideoRecordStorage(database)
+        gallery = GalleryService(database)
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
         tensors = ObjectSerializerForwardCache(
             ObjectSerializerDisk[torch.Tensor](
@@ -172,7 +172,7 @@ class ApiDependencies:
             ),
         )
         download_queue_service = DownloadQueueService(app_config=configuration, event_bus=events)
-        model_record_service = ModelRecordServiceSQL(db.database, logger=logger)
+        model_record_service = ModelRecordServiceSQL(database, logger=logger)
         model_manager = ModelManagerService.build_model_manager(
             app_config=configuration,
             model_record_service=model_record_service,
@@ -191,26 +191,26 @@ class ApiDependencies:
         )
         model_images_service = ModelImageFileStorageDisk(model_images_folder / "model_images")
         model_relationships = ModelRelationshipsService()
-        model_relationship_records = ModelRelationshipRecordStorage(db.database)
+        model_relationship_records = ModelRelationshipRecordStorage(database)
         names = SimpleNameService()
         performance_statistics = InvocationStatsService()
         session_processor = DefaultSessionProcessor(session_runner=DefaultSessionRunner())
-        session_queue = SessionQueue(db.database)
+        session_queue = SessionQueue(database)
         urls = LocalUrlService()
-        workflow_records = WorkflowRecordsStorage(db.database)
-        style_preset_records = StylePresetRecordsStorage(db.database)
-        wildcard_records = WildcardRecordsStorage(db.database)
+        workflow_records = WorkflowRecordsStorage(database)
+        style_preset_records = StylePresetRecordsStorage(database)
+        wildcard_records = WildcardRecordsStorage(database)
         style_preset_image_files = StylePresetImageFileStorageDisk(style_presets_folder / "images")
-        system_prompt_records = SystemPromptRecordsStorage(db.database)
+        system_prompt_records = SystemPromptRecordsStorage(database)
         workflow_thumbnails = WorkflowThumbnailFileStorageDisk(workflow_thumbnails_folder)
-        client_state_persistence = ClientStatePersistence(db.database)
-        project_records = ProjectRecordsStorage(db.database)
-        users = UserService(db.database)
-        image_index_records = ImageIndexRecords(db.database)
+        client_state_persistence = ClientStatePersistence(database)
+        project_records = ProjectRecordsStorage(database)
+        users = UserService(database)
+        image_index_records = ImageIndexRecords(database)
         image_index = ImageIndexService()
-        intermediates = IntermediatesService(records=IntermediatesRecords(db.database), logger=logger)
+        intermediates = IntermediatesService(records=IntermediatesRecords(database), logger=logger)
         fonts = FontService(
-            db.database,
+            database,
             fonts_dir=configuration.fonts_path,
             storage_dir=configuration.fonts_storage_path,
             logger=logger,
@@ -283,7 +283,7 @@ class ApiDependencies:
             model_manager=model_manager,
             logger=logger,
         )
-        db.clean()
+        database.clean()
 
     @staticmethod
     def shutdown() -> None:

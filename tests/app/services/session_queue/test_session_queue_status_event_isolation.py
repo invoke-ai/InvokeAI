@@ -14,16 +14,16 @@ from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvoca
 from invokeai.app.services.events.events_common import QueueItemStatusChangedEvent
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.session_queue.session_queue_default import SessionQueue
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
-from tests.fixtures.sqlite_database import legacy_cursor_of
+from tests.fixtures.sqlite_database import sqlite_cursor_of
 from tests.test_nodes import PromptTestInvocation, TestEventService
 
 
 @pytest.fixture
-def session_queue(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SessionQueue:
+def session_queue(mock_invoker: Invoker, mock_sqlite_database: Database) -> SessionQueue:
     db = mock_sqlite_database
-    queue = SessionQueue(db.database)
+    queue = SessionQueue(db)
     queue.start(mock_invoker)
     return queue
 
@@ -34,7 +34,7 @@ def _insert_queue_item(session_queue: SessionQueue, user_id: str) -> int:
     session = GraphExecutionState(graph=graph)
     session_json = session.model_dump_json(warnings=False, exclude_none=True)
     batch_id = str(uuid.uuid4())
-    with legacy_cursor_of(session_queue) as cursor:
+    with sqlite_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -61,7 +61,7 @@ def _insert_waiting_workflow_call_parent(session_queue: SessionQueue, user_id: s
     parent_session.attach_waiting_workflow_call_child_session(child_session)
 
     batch_id = str(uuid.uuid4())
-    with legacy_cursor_of(session_queue) as cursor:
+    with sqlite_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (

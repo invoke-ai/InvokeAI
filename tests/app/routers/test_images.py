@@ -16,8 +16,8 @@ from invokeai.app.services.board_records.board_records_common import BoardRecord
 from invokeai.app.services.image_records.image_records_common import ImageNamesResult, ImageRecordNotFoundException
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -470,7 +470,7 @@ def test_delete_image_lookup_failure_returns_500_not_404(
 
 
 def test_delete_image_db_fault_during_lookup_returns_500_not_404(
-    monkeypatch: Any, mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase, tmp_path: Path, client: TestClient
+    monkeypatch: Any, mock_invoker: Invoker, mock_sqlite_database: Database, tmp_path: Path, client: TestClient
 ) -> None:
     """A database fault while reading the record is a 500, driven through the real record store.
 
@@ -484,11 +484,11 @@ def test_delete_image_db_fault_during_lookup_returns_500_not_404(
 
     # Break the table out from under the query. Any database error would do; this one is deterministic.
     records = mock_invoker.services.image_records
-    mock_sqlite_database._conn.execute("ALTER TABLE images RENAME TO images_moved;")
+    mock_sqlite_database.sqlite.conn.execute("ALTER TABLE images RENAME TO images_moved;")
     try:
         response = client.delete("/api/v1/images/i/del.png")
     finally:
-        mock_sqlite_database._conn.execute("ALTER TABLE images_moved RENAME TO images;")
+        mock_sqlite_database.sqlite.conn.execute("ALTER TABLE images_moved RENAME TO images;")
 
     assert response.status_code == 500
     assert response.json()["detail"] == "Failed to delete image"

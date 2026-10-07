@@ -12,7 +12,8 @@ from PIL import Image
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.shared.database.database import Database
+from tests.fixtures.sqlite_database import sqlite_cursor
 
 
 @pytest.fixture
@@ -37,7 +38,7 @@ def _user_id(mock_invoker: Invoker, email: str) -> str:
     return user.user_id
 
 
-def _seed_intermediate(mock_invoker: Invoker, database: SqliteDatabase, name: str, user_id: str) -> None:
+def _seed_intermediate(mock_invoker: Invoker, database: Database, name: str, user_id: str) -> None:
     mock_invoker.services.image_records.save(
         image_name=name,
         image_origin=ResourceOrigin.INTERNAL,
@@ -48,7 +49,7 @@ def _seed_intermediate(mock_invoker: Invoker, database: SqliteDatabase, name: st
         is_intermediate=True,
         user_id=user_id,
     )
-    with database.transaction() as cursor:
+    with sqlite_cursor(database) as cursor:
         cursor.execute("UPDATE images SET created_at = '2020-01-01 00:00:00.000' WHERE image_name = ?;", (name,))
     mock_invoker.services.image_files.save(image=Image.new("RGB", (8, 8)), image_name=name)
 
@@ -86,7 +87,7 @@ def test_every_route_requires_authentication(enable_multiuser: Any, client: Test
 def test_non_admins_see_only_their_rows_and_cannot_widen_scope(
     storage_ready: None,
     mock_invoker: Invoker,
-    mock_sqlite_database: SqliteDatabase,
+    mock_sqlite_database: Database,
     client: TestClient,
     user1_token: str,
     user2_token: str,
@@ -125,7 +126,7 @@ def test_non_admins_see_only_their_rows_and_cannot_widen_scope(
 def test_preview_operation_and_list_flow(
     storage_ready: None,
     mock_invoker: Invoker,
-    mock_sqlite_database: SqliteDatabase,
+    mock_sqlite_database: Database,
     client: TestClient,
     user1_token: str,
     user2_token: str,
@@ -198,7 +199,7 @@ def test_mutations_are_refused_during_image_storage_maintenance(
 def test_hold_is_account_scoped_at_the_http_boundary(
     storage_ready: None,
     mock_invoker: Invoker,
-    mock_sqlite_database: SqliteDatabase,
+    mock_sqlite_database: Database,
     client: TestClient,
     user1_token: str,
     user2_token: str,
@@ -233,7 +234,7 @@ def test_hold_lease_ids_are_single_tokens(storage_ready: None, client: TestClien
 def test_legacy_clear_keeps_its_shape_and_the_safety_policy(
     storage_ready: None,
     mock_invoker: Invoker,
-    mock_sqlite_database: SqliteDatabase,
+    mock_sqlite_database: Database,
     client: TestClient,
     user1_token: str,
     admin_token: str,

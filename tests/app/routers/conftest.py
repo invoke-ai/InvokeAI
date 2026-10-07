@@ -31,7 +31,7 @@ from fastapi.testclient import TestClient
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api_app import app
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.users.users_common import UserCreateRequest
 
 
@@ -107,7 +107,7 @@ def _create_board(client: TestClient, token: str, name: str = "Loose+Board") -> 
 
 
 @pytest.fixture
-def enable_multiuser(monkeypatch: Any, mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase):
+def enable_multiuser(monkeypatch: Any, mock_invoker: Invoker, mock_sqlite_database: Database):
     """Enable multiuser mode and patch ApiDependencies across the routers covered by router-level tests.
 
     Replaces None-valued services with MagicMocks so that routes can run end-to-end.
@@ -127,7 +127,7 @@ def enable_multiuser(monkeypatch: Any, mock_invoker: Invoker, mock_sqlite_databa
     # Style preset records uses a real SQLite-backed storage on the same in-memory
     # database that image_records was wired up against. This lets cross-user tests
     # exercise the actual filter SQL instead of asserting on MagicMock calls.
-    mock_invoker.services.style_preset_records = StylePresetRecordsStorage(mock_sqlite_database.database)
+    mock_invoker.services.style_preset_records = StylePresetRecordsStorage(mock_sqlite_database)
 
     # Required by board_image_records-touching helpers in some tests.
     if mock_invoker.services.board_images is None:

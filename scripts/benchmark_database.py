@@ -89,21 +89,22 @@ class Services:
         from invokeai.app.services.wildcard_records.wildcard_records_default import WildcardRecordsStorage
         from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
 
-        self.database = db.database
-        self.image_records = ImageRecordStorage(db.database)
-        self.video_records = VideoRecordStorage(db.database)
-        self.board_records = BoardRecordStorage(db.database)
-        self.board_image_records = BoardImageRecordStorage(db.database)
-        self.board_video_records = BoardVideoRecordStorage(db.database)
-        self.gallery = GalleryService(db.database)
-        self.users = UserService(db.database)
-        self.client_state = ClientStatePersistence(db.database)
-        self.project_records = ProjectRecordsStorage(db.database)
-        self.workflow_records = WorkflowRecordsStorage(db.database)
-        self.style_preset_records = StylePresetRecordsStorage(db.database)
-        self.system_prompt_records = SystemPromptRecordsStorage(db.database)
-        self.wildcard_records = WildcardRecordsStorage(db.database)
-        self.model_records = ModelRecordServiceSQL(db.database, logging.getLogger("benchmark_database.quiet"))
+        # A `Database`, or the cursor facade of a base from before it was removed.
+        self.database = getattr(db, "database", db)
+        self.image_records = ImageRecordStorage(self.database)
+        self.video_records = VideoRecordStorage(self.database)
+        self.board_records = BoardRecordStorage(self.database)
+        self.board_image_records = BoardImageRecordStorage(self.database)
+        self.board_video_records = BoardVideoRecordStorage(self.database)
+        self.gallery = GalleryService(self.database)
+        self.users = UserService(self.database)
+        self.client_state = ClientStatePersistence(self.database)
+        self.project_records = ProjectRecordsStorage(self.database)
+        self.workflow_records = WorkflowRecordsStorage(self.database)
+        self.style_preset_records = StylePresetRecordsStorage(self.database)
+        self.system_prompt_records = SystemPromptRecordsStorage(self.database)
+        self.wildcard_records = WildcardRecordsStorage(self.database)
+        self.model_records = ModelRecordServiceSQL(self.database, logging.getLogger("benchmark_database.quiet"))
         # Listing gallery items builds their URLs through the invoker's URL service.
         from invokeai.app.services.urls.urls_default import LocalUrlService
 
@@ -308,7 +309,11 @@ def _operations(
     from invokeai.app.services.board_records.board_records_common import BoardRecordOrderBy
     from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
     from invokeai.app.services.model_records import ModelRecordChanges
-    from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+
+    try:
+        from invokeai.app.services.shared.pagination import SQLiteDirection
+    except ImportError:  # A base from before it moved there.
+        from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection  # type: ignore[no-redef]
     from invokeai.app.services.style_preset_records.style_preset_records_common import StylePresetChanges
     from invokeai.app.services.system_prompt_records.system_prompt_records_common import SystemPromptChanges
     from invokeai.app.services.wildcard_records.wildcard_records_common import WildcardWithoutId
@@ -529,8 +534,19 @@ def run(images: int, boards: int, seed: int) -> dict[str, Any]:
     import invokeai.app
     from invokeai.app.services.config.config_default import InvokeAIAppConfig
     from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
-    from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
-    from invokeai.app.services.shared.sqlite.sqlite_util import init_db
+
+    try:
+        from invokeai.app.services.shared.database.database import Database
+        from invokeai.app.services.shared.database.startup import init_database
+
+        def open_database(path: Path, logger: logging.Logger, verbose: bool = False) -> Any:
+            return Database.open_sqlite(path, logger, verbose=verbose)
+
+    except ImportError:  # A base from before the cursor facade was removed.
+        from invokeai.app.services.shared.sqlite.sqlite_database import (  # type: ignore[no-redef]
+            SqliteDatabase as open_database,
+        )
+        from invokeai.app.services.shared.sqlite.sqlite_util import init_db as init_database
 
     quiet = logging.getLogger("benchmark_database.quiet")
     quiet.setLevel(logging.WARNING)
@@ -548,14 +564,14 @@ def run(images: int, boards: int, seed: int) -> dict[str, Any]:
         config = InvokeAIAppConfig(db_dir=Path(tmp), db_synchronous="normal")
         # The migrations clean up files under the root (legacy caches and models): never a real install's.
         config._root = Path(tmp)
-        seeding_db = init_db(config=config, logger=quiet, image_files=mock.Mock(spec=ImageFileStorageBase))
+        seeding_db = init_database(config=config, logger=quiet, image_files=mock.Mock(spec=ImageFileStorageBase))
         rng = random.Random(seed)
         started = time.perf_counter()
         names = _seed(Services(seeding_db), images, boards, rng)
         seeded_in = time.perf_counter() - started
 
-        timed_db = SqliteDatabase(config.db_path, quiet)
-        counted_db = SqliteDatabase(config.db_path, counting, verbose=True)
+        timed_db = open_database(config.db_path, quiet)
+        counted_db = open_database(config.db_path, counting, verbose=True)
         timed = _operations(Services(timed_db), names, random.Random(seed + 1))
         counted = _operations(Services(counted_db), names, random.Random(seed + 1))
 
@@ -569,8 +585,8 @@ def run(images: int, boards: int, seed: int) -> dict[str, Any]:
             results[name] = {"median_ms": median_ms, "p95_ms": p95_ms, "statements": counter.count, "calls": repeats}
 
         for db in (seeding_db, timed_db, counted_db):
-            database = getattr(db, "database", None)
-            if database is not None:
+            database = getattr(db, "database", db)
+            if hasattr(database, "dispose"):
                 database.dispose()
 
     return {

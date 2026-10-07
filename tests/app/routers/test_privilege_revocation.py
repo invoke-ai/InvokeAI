@@ -23,7 +23,7 @@ from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.events.events_common import UserAccessChangedEvent
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
 
@@ -48,7 +48,7 @@ def client():
 
 
 @pytest.fixture
-def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
+def mock_services(mock_sqlite_database: Database) -> InvocationServices:
     from invokeai.app.services.board_image_records.board_image_records_default import BoardImageRecordStorage
     from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
     from invokeai.app.services.board_video_records.board_video_records_default import BoardVideoRecordStorage
@@ -72,15 +72,15 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
     db = mock_sqlite_database
 
     return InvocationServices(
-        board_image_records=BoardImageRecordStorage(db.database),
+        board_image_records=BoardImageRecordStorage(db),
         board_images=None,  # type: ignore
-        board_records=BoardRecordStorage(db.database),
+        board_records=BoardRecordStorage(db),
         boards=BoardService(),
         bulk_download=BulkDownloadService(),
         configuration=configuration,
         events=TestEventService(),
         image_files=None,  # type: ignore
-        image_records=ImageRecordStorage(db.database),
+        image_records=ImageRecordStorage(db),
         images=ImageService(),
         invocation_cache=MemoryInvocationCache(max_cache_size=0),
         logger=logging,  # type: ignore
@@ -92,22 +92,22 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
         session_processor=None,  # type: ignore
         session_queue=None,  # type: ignore
         urls=None,  # type: ignore
-        workflow_records=WorkflowRecordsStorage(db.database),
+        workflow_records=WorkflowRecordsStorage(db),
         tensors=None,  # type: ignore
         conditioning=None,  # type: ignore
         style_preset_records=None,  # type: ignore
         style_preset_image_files=None,  # type: ignore
-        system_prompt_records=SystemPromptRecordsStorage(db.database),
+        system_prompt_records=SystemPromptRecordsStorage(db),
         workflow_thumbnails=None,  # type: ignore
         model_relationship_records=None,  # type: ignore
         model_relationships=None,  # type: ignore
-        client_state_persistence=ClientStatePersistence(db.database),
-        users=UserService(db.database),
+        client_state_persistence=ClientStatePersistence(db),
+        users=UserService(db),
         external_generation=None,  # type: ignore
         videos=None,  # type: ignore
         video_files=None,  # type: ignore
-        video_records=VideoRecordStorage(db.database),
-        board_video_records=BoardVideoRecordStorage(db.database),
+        video_records=VideoRecordStorage(db),
+        board_video_records=BoardVideoRecordStorage(db),
         gallery=None,  # type: ignore
         wildcard_records=None,  # type: ignore
         project_records=None,  # type: ignore

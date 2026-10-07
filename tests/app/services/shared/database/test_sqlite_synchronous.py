@@ -14,20 +14,20 @@ import pytest
 from pydantic import ValidationError
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
-from invokeai.app.services.shared.sqlite.sqlite_util import init_db
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.startup import init_database
 from invokeai.backend.util.logging import InvokeAILogger
 
 # What `PRAGMA synchronous` reports back, as documented by SQLite.
 PRAGMA_VALUES = {"off": 0, "normal": 1, "full": 2, "extra": 3}
 
 
-def _synchronous_of(db: SqliteDatabase) -> int:
-    return int(db._conn.execute("PRAGMA synchronous;").fetchone()[0])
+def _synchronous_of(db: Database) -> int:
+    return int(db.sqlite.conn.execute("PRAGMA synchronous;").fetchone()[0])
 
 
-def _journal_mode_of(db: SqliteDatabase) -> str:
-    return str(db._conn.execute("PRAGMA journal_mode;").fetchone()[0]).lower()
+def _journal_mode_of(db: Database) -> str:
+    return str(db.sqlite.conn.execute("PRAGMA journal_mode;").fetchone()[0]).lower()
 
 
 def _warnings_about_durability(caplog: pytest.LogCaptureFixture) -> list[str]:
@@ -42,7 +42,7 @@ def sqlite_cannot_use_wal(monkeypatch: pytest.MonkeyPatch) -> None:
 
     SQLite refuses to move a transient database into WAL mode, so the connection opened here answers
     `PRAGMA journal_mode = WAL;` with a rollback-journal mode instead -- a real refusal from real
-    SQLite. The interception is at the `sqlite3.connect` boundary; everything `SqliteDatabase` does
+    SQLite. The interception is at the `sqlite3.connect` boundary; everything `Database` does
     after it is the production path.
     """
     real_connect = sqlite3.connect
@@ -71,7 +71,7 @@ class TestTheConfigField:
 
 
 class TestTheConstructorValidatesTheSetting:
-    """`SqliteDatabase` is a public constructor -- `user_management.py` and tests call it directly --
+    """`Database` is a public constructor -- `user_management.py` and tests call it directly --
     and the value ends up interpolated into a PRAGMA statement, which takes no bind parameters. The
     `Literal` annotation is checked by a type checker, not at runtime, so the constructor checks it."""
 
@@ -80,7 +80,7 @@ class TestTheConstructorValidatesTheSetting:
         db_path = tmp_path / "rejected.db"
 
         with pytest.raises(ValueError, match="synchronous"):
-            SqliteDatabase(db_path=db_path, logger=InvokeAILogger.get_logger(), synchronous=value)
+            Database.open_sqlite(db_path, InvokeAILogger.get_logger(), synchronous=value)
 
         # Rejected before anything was opened, so there is nothing for the statement to have run against.
         assert not db_path.exists()
@@ -88,14 +88,14 @@ class TestTheConstructorValidatesTheSetting:
 
 class TestThePragmaIsApplied:
     def test_the_default_setting_uses_full(self, tmp_path):
-        db = SqliteDatabase(db_path=tmp_path / "default.db", logger=InvokeAILogger.get_logger())
+        db = Database.open_sqlite(tmp_path / "default.db", InvokeAILogger.get_logger())
         assert _synchronous_of(db) == PRAGMA_VALUES["full"]
 
     @pytest.mark.parametrize("setting", ["full", "normal"])
     def test_each_setting_reaches_the_connection(self, tmp_path, setting):
-        db = SqliteDatabase(
-            db_path=tmp_path / f"{setting}.db",
-            logger=InvokeAILogger.get_logger(),
+        db = Database.open_sqlite(
+            tmp_path / f"{setting}.db",
+            InvokeAILogger.get_logger(),
             synchronous=setting,
         )
         assert _synchronous_of(db) == PRAGMA_VALUES[setting]
@@ -104,7 +104,7 @@ class TestThePragmaIsApplied:
         """An in-memory database reports journal mode `memory`, never `wal`, but it has no durability
         to trade away in the first place -- so the WAL requirement below must not reach it. The
         migrator and several tests run on this path."""
-        db = SqliteDatabase(db_path=None, logger=InvokeAILogger.get_logger(), synchronous="normal")
+        db = Database.open_sqlite(None, InvokeAILogger.get_logger(), synchronous="normal")
 
         assert _journal_mode_of(db) != "wal"
         assert _synchronous_of(db) == PRAGMA_VALUES["normal"]
@@ -113,7 +113,7 @@ class TestThePragmaIsApplied:
         """`normal` is only safe against corruption *because* of WAL. If journal mode ever stopped
         being WAL for an ordinary database file, this setting would become a different trade than the
         one documented."""
-        db = SqliteDatabase(db_path=tmp_path / "wal.db", logger=InvokeAILogger.get_logger(), synchronous="normal")
+        db = Database.open_sqlite(tmp_path / "wal.db", InvokeAILogger.get_logger(), synchronous="normal")
         assert _journal_mode_of(db) == "wal"
 
     def test_normal_is_refused_when_wal_did_not_engage(self, tmp_path, caplog, sqlite_cannot_use_wal):
@@ -124,7 +124,7 @@ class TestThePragmaIsApplied:
         logger = InvokeAILogger.get_logger()
 
         with caplog.at_level(logging.WARNING):
-            db = SqliteDatabase(db_path=tmp_path / "no-wal.db", logger=logger, synchronous="normal")
+            db = Database.open_sqlite(tmp_path / "no-wal.db", logger, synchronous="normal")
 
         journal_mode = _journal_mode_of(db)
         assert journal_mode != "wal"
@@ -136,7 +136,7 @@ class TestThePragmaIsApplied:
         logger = InvokeAILogger.get_logger()
 
         with caplog.at_level(logging.WARNING):
-            db = SqliteDatabase(db_path=tmp_path / "no-wal-full.db", logger=logger)
+            db = Database.open_sqlite(tmp_path / "no-wal-full.db", logger)
 
         assert _synchronous_of(db) == PRAGMA_VALUES["full"]
         assert _warnings_about_durability(caplog) == []
@@ -149,15 +149,15 @@ class TestTheSettingReachesTheDatabase:
     boots, every other test passes, and the setting simply does nothing. This happened once during
     development, which is why it is pinned rather than assumed.
 
-    Driven through the real `init_db` against an in-memory database, migrations and all, so what is
-    asserted is the connection the app ends up with. Stubbing `SqliteDatabase` here and checking the
+    Driven through the real `init_database` against an in-memory database, migrations and all, so what is
+    asserted is the connection the app ends up with. Stubbing `Database` here and checking the
     keyword arrived would pin the argument's *name* instead: an implementation that accepts it and
     then applies it conditionally would still pass, which is the regression worth catching.
     """
 
     @pytest.mark.parametrize("setting", ["full", "normal"])
     def test_init_db_carries_the_configured_value_to_the_connection(self, setting):
-        db = init_db(
+        db = init_database(
             config=InvokeAIAppConfig(use_memory_db=True, db_synchronous=setting),
             logger=InvokeAILogger.get_logger(),
             image_files=Mock(),

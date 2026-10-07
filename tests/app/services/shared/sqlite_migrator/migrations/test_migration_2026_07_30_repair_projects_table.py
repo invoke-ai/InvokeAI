@@ -3,7 +3,7 @@ from logging import Logger
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.sqlite_migrator.migration_loader import MigrationBuildContext, build_migrations
 from invokeai.app.services.shared.sqlite_migrator.migrations.migration_34 import build_migration_34
 from invokeai.app.services.shared.sqlite_migrator.migrations.migration_2026_07_30_repair_projects_table import (
@@ -66,10 +66,10 @@ def test_repairs_a_database_that_came_from_an_upstream_build(tmp_path: Path) -> 
     context = MigrationBuildContext(app_config=MagicMock(), logger=logger, image_files=MagicMock())
     all_migrations = build_migrations(context)
 
-    db = SqliteDatabase(db_path=tmp_path / "upstream.db", logger=logger, verbose=False)
+    db = Database.open_sqlite(tmp_path / "upstream.db", logger)
 
     # 1. Bring the database to legacy version 32 using only the migrations at or below 32.
-    to_v32 = Migrator(db.database)
+    to_v32 = Migrator(db)
     for migration in all_migrations:
         if migration.to_version is not None and migration.to_version <= 32:
             to_v32.register_migration(migration)
@@ -77,15 +77,15 @@ def test_repairs_a_database_that_came_from_an_upstream_build(tmp_path: Path) -> 
 
     # 2. Simulate UPSTREAM's migration_33 having run. Its body is what this fork carries as
     #    migration_34, so run that and stamp the legacy version/id upstream would have recorded.
-    cursor = db._conn.cursor()
+    cursor = db.sqlite.conn.cursor()
     build_migration_34().callback(cursor)
     cursor.execute("INSERT INTO migrations (version) VALUES (33);")
     cursor.execute("INSERT INTO applied_migrations (migration_id, legacy_version) VALUES ('migration_33', 33);")
-    db._conn.commit()
+    db.sqlite.conn.commit()
     assert not _table_exists(cursor, "projects")
 
     # 3. Open it with the full fork migrator, as the app does on startup.
-    full = Migrator(db.database)
+    full = Migrator(db)
     for migration in all_migrations:
         full.register_migration(migration)
     full.run_migrations()

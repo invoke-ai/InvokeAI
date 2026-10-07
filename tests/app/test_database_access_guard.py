@@ -19,15 +19,6 @@ DATABASE_LAYER = (
     "invokeai/app/services/shared/sqlite_migrator/",
 )
 
-# Code that held SQL before the database layer existed, with how many violations each file still has.
-# Porting a domain lowers or removes its entries, and a file that ends up with fewer violations than
-# allowed fails the test until its number is lowered, so the amount of SQL outside the layer only shrinks.
-# Do not raise a number or add a file.
-NOT_YET_PORTED: dict[str, int] = {
-    # The transitional cursor facade, removed once every service is ported.
-    "invokeai/app/services/shared/sqlite/sqlite_database.py": 1,
-}
-
 _DRIVER_MODULES = ("sqlite3", "sqlalchemy", "alembic", "pymysql")
 _EXECUTE_METHODS = {"execute", "executemany", "executescript", "exec_driver_sql"}
 # Internals of the database layer that only it may import.
@@ -137,21 +128,9 @@ def test_only_the_database_layer_touches_the_database() -> None:
     offending: list[str] = []
     for path, relative in _scanned_files():
         violations = scan(path, relative)
-        allowed = NOT_YET_PORTED.get(relative, 0)
-        if len(violations) > allowed:
-            offending.append(f"{relative}: {len(violations)} violations, {allowed} allowed")
+        if violations:
+            offending.append(f"{relative}: {len(violations)} violations")
             offending.extend(f"  {violation}" for violation in violations)
     assert not offending, "Database access outside the database layer; add a query module instead:\n" + "\n".join(
         offending
     )
-
-
-def test_the_not_yet_ported_allowance_only_shrinks() -> None:
-    scanned = {relative: path for path, relative in _scanned_files()}
-    stale: list[str] = []
-    for relative, allowed in NOT_YET_PORTED.items():
-        remaining = len(scan(scanned[relative], relative)) if relative in scanned else 0
-        if remaining < allowed:
-            action = "remove the entry" if remaining == 0 else f"lower it to {remaining}"
-            stale.append(f"{relative}: {remaining} violations left, {allowed} allowed -- {action}")
-    assert not stale, "NOT_YET_PORTED allows more than is left:\n" + "\n".join(stale)

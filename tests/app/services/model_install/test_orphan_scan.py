@@ -43,7 +43,7 @@ def test_startup_scan_skips_a_checkpoint_it_cannot_register(
     logger = InvokeAILogger.get_logger()
     installer = ModelInstallService(
         app_config=mm2_app_config,
-        record_store=ModelRecordServiceSQL(create_mock_sqlite_database(mm2_app_config, logger).database, logger),
+        record_store=ModelRecordServiceSQL(create_mock_sqlite_database(mm2_app_config, logger), logger),
         download_queue=mm2_download_queue,
         event_bus=TestEventService(),
         session=mm2_session,

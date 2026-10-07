@@ -109,11 +109,11 @@ class Database:
             logger.info(f"Initializing database at {db_path}")
 
         conn = sqlite3.connect(database=db_path or ":memory:", check_same_thread=False)
-        # Rows of the transitional cursor API; queries get plain tuples (see `_begin_sqlite`).
+        # Rows of the raw cursors (the migrator's); queries get plain tuples (see `_begin_sqlite`).
         conn.row_factory = sqlite3.Row
 
         if verbose:
-            # On the connection rather than the engine, so it also covers the transitional cursor API.
+            # On the connection rather than the engine, so it also covers the migrator's raw cursors.
             conn.set_trace_callback(logger.debug)
 
         conn.execute("PRAGMA foreign_keys = ON;")
@@ -185,7 +185,7 @@ class Database:
 
     @property
     def sqlite(self) -> SqliteConnection:
-        """Transitional: the raw SQLite connection, its lock and its file, for the migrator and the cursor facade.
+        """The raw SQLite connection, its lock and its file: for the migrator, whose older migrations take a cursor.
 
         Raises on any other backend.
         """
@@ -203,7 +203,7 @@ class Database:
 
         :param write: Whether the transaction may write. On SQLite a writer begins with BEGIN IMMEDIATE.
         """
-        self._claim_thread("query")
+        self._claim_thread()
         try:
             with self._exclusive():
                 with self._connection() as conn:
@@ -239,7 +239,7 @@ class Database:
         _refuse_stray_transaction(self._sqlite)
         self._sqlite.conn.execute("BEGIN IMMEDIATE" if write else "BEGIN")
         # SQLAlchemy builds its own rows; the driver need not build `sqlite3.Row` objects first. (A third
-        # of the time of a large fetch, measured.) The lock is held, so no cursor of the facade runs meanwhile.
+        # of the time of a large fetch, measured.) The lock is held, so no raw cursor runs meanwhile.
         self._sqlite.conn.row_factory = None
 
     def _end_sqlite(self) -> None:
@@ -278,42 +278,6 @@ class Database:
                 )
                 time.sleep(_CONFLICT_BASE_DELAY_SECONDS * attempt * random.uniform(0.5, 1.5))
                 attempt += 1
-
-    @contextmanager
-    def legacy_cursor(self) -> Iterator[sqlite3.Cursor]:
-        """Transitional: a raw cursor in a transaction, for services not yet ported to `queries`.
-
-        The transaction begins as the driver begins it, implicitly before the first data-modifying
-        statement, so the reads before it take no lock and see the latest committed data -- as they always
-        have. Code that must hold the write lock from its first read issues BEGIN IMMEDIATE itself.
-
-        A legacy transaction opened on a thread that already has one open joins it: the inner block neither
-        commits nor rolls back, so it no longer commits the outer block's work early. Nesting a legacy
-        transaction with a `queries` transaction, in either order, raises `NestedTransactionError`.
-        """
-        sqlite = self.sqlite
-        with sqlite.lock:
-            if getattr(self._thread_state, "open", None) == "legacy":
-                joined = sqlite.conn.cursor()
-                try:
-                    yield joined
-                finally:
-                    joined.close()
-                return
-            self._claim_thread("legacy")
-            try:
-                _refuse_stray_transaction(sqlite)
-                cursor = sqlite.conn.cursor()
-                try:
-                    yield cursor
-                    sqlite.conn.commit()
-                except BaseException:
-                    sqlite.conn.rollback()
-                    raise
-                finally:
-                    cursor.close()
-            finally:
-                self._release_thread()
 
     def clean(self) -> None:
         """Reclaims the free pages of a SQLite database file, reporting the freed space.
@@ -378,16 +342,15 @@ class Database:
             return nullcontext(self._sqlite_connection)
         return self._engine.connect()
 
-    def _claim_thread(self, kind: str) -> None:
+    def _claim_thread(self) -> None:
         if self._disposed:
             raise RuntimeError("The database has been closed")
-        open_kind = getattr(self._thread_state, "open", None)
-        if open_kind is not None:
+        if getattr(self._thread_state, "open", False):
             raise NestedTransactionError(
-                f"This thread already has a {open_kind} transaction open on this database; "
+                "This thread already has a transaction open on this database; "
                 "run the work on that transaction instead of opening another"
             )
-        self._thread_state.open = kind
+        self._thread_state.open = True
 
     def _release_thread(self) -> None:
-        self._thread_state.open = None
+        self._thread_state.open = False

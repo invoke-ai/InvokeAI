@@ -14,32 +14,32 @@ from invokeai.app.services.events.events_common import QueueItemsRetriedEvent
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.session_queue.session_queue_common import get_session_for_queue_read
 from invokeai.app.services.session_queue.session_queue_default import AFFINITY_MAX_LOOKAHEAD, SessionQueue
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.execution_state_migration import (
     CURRENT_EXECUTION_STATE_VERSION,
     dump_execution_state,
     load_execution_state,
 )
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from tests.fixtures.database import capture_statements, explain_query_plan
-from tests.fixtures.sqlite_database import legacy_cursor_of
+from tests.fixtures.sqlite_database import sqlite_cursor_of
 from tests.test_nodes import TestEventService
 
 _EMPTY_SESSION_JSON = json.dumps(to_jsonable_python(GraphExecutionState(graph=Graph()).model_dump()))
 
 
 @pytest.fixture
-def session_queue_fifo(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SessionQueue:
+def session_queue_fifo(mock_invoker: Invoker, mock_sqlite_database: Database) -> SessionQueue:
     """Queue backed by a single-user (FIFO) invoker."""
     # Default config has multiuser=False, so FIFO is always used.
     db = mock_sqlite_database
-    queue = SessionQueue(db.database)
+    queue = SessionQueue(db)
     queue.start(mock_invoker)
     return queue
 
 
 @pytest.fixture
-def session_queue_round_robin(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SessionQueue:
+def session_queue_round_robin(mock_invoker: Invoker, mock_sqlite_database: Database) -> SessionQueue:
     """Queue backed by a multiuser invoker with round_robin mode."""
     mock_invoker.services.configuration = InvokeAIAppConfig(
         use_memory_db=True,
@@ -48,7 +48,7 @@ def session_queue_round_robin(mock_invoker: Invoker, mock_sqlite_database: Sqlit
         session_queue_mode="round_robin",
     )
     db = mock_sqlite_database
-    queue = SessionQueue(db.database)
+    queue = SessionQueue(db)
     queue.start(mock_invoker)
     return queue
 
@@ -74,7 +74,7 @@ def _insert_queue_item(
     """
     session_id = str(uuid.uuid4())
     batch_id = str(uuid.uuid4())
-    with legacy_cursor_of(session_queue) as cursor:
+    with sqlite_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (item_id, queue_id, session, session_id, batch_id, field_values, priority, workflow, origin, destination, retried_from_item_id, user_id)
@@ -158,7 +158,7 @@ def test_fifo_quarantines_future_snapshot_and_dequeues_later_work(
 
     assert dequeued is not None
     assert dequeued.item_id == valid_item_id
-    with legacy_cursor_of(session_queue_fifo) as cursor:
+    with sqlite_cursor_of(session_queue_fifo) as cursor:
         cursor.execute(
             "SELECT status, error_type, error_message FROM session_queue WHERE item_id = ?",
             (future_item_id,),
@@ -188,7 +188,7 @@ def test_fifo_quarantines_unreadable_snapshot_and_dequeues_later_work(
 
     assert dequeued is not None
     assert dequeued.item_id == valid_item_id
-    with legacy_cursor_of(session_queue_fifo) as cursor:
+    with sqlite_cursor_of(session_queue_fifo) as cursor:
         cursor.execute("SELECT status, error_message FROM session_queue WHERE item_id = ?", (bad_item_id,))
         status, error_message = cursor.fetchone()
     assert status == "failed"
@@ -213,7 +213,7 @@ def test_affinity_quarantines_unreadable_snapshot_and_dequeues_valid_work(
 
     assert dequeued is not None
     assert dequeued.item_id == cold_id
-    with legacy_cursor_of(session_queue_round_robin) as cursor:
+    with sqlite_cursor_of(session_queue_round_robin) as cursor:
         cursor.execute("SELECT status FROM session_queue WHERE item_id = ?", (future_id,))
         assert cursor.fetchone()[0] == "failed"
 
@@ -257,7 +257,7 @@ def test_unreadable_terminal_snapshot_is_not_reported_as_completed(
         "bad-user",
         session_json=json.dumps(future_session),
     )
-    with legacy_cursor_of(session_queue_fifo) as cursor:
+    with sqlite_cursor_of(session_queue_fifo) as cursor:
         cursor.execute("UPDATE session_queue SET status = 'completed' WHERE item_id = ?", (bad_id,))
 
     detail = session_queue_fifo.get_queue_item(bad_id)
@@ -272,7 +272,7 @@ def test_unreadable_field_values_are_safe_for_summary(
     session_queue_fifo: SessionQueue,
 ) -> None:
     item_id = _insert_queue_item(session_queue_fifo, "default", "summary-user")
-    with legacy_cursor_of(session_queue_fifo) as cursor:
+    with sqlite_cursor_of(session_queue_fifo) as cursor:
         cursor.execute(
             "UPDATE session_queue SET field_values = ? WHERE item_id = ?",
             ("{not valid json", item_id),
@@ -344,7 +344,7 @@ def test_retry_read_hydrates_runtime_once_per_queue_item(
     session_queue_fifo: SessionQueue, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     item_id = _insert_queue_item(session_queue_fifo, "default", "retry-user")
-    with legacy_cursor_of(session_queue_fifo) as cursor:
+    with sqlite_cursor_of(session_queue_fifo) as cursor:
         cursor.execute("UPDATE session_queue SET status = 'failed' WHERE item_id = ?", (item_id,))
 
     from invokeai.app.services.session_queue import session_queue_common
@@ -379,7 +379,7 @@ def test_retry_read_rejects_malformed_execution_state(
         "retry-user",
         session_json=json.dumps(malformed_session),
     )
-    with legacy_cursor_of(session_queue_fifo) as cursor:
+    with sqlite_cursor_of(session_queue_fifo) as cursor:
         cursor.execute("UPDATE session_queue SET status = 'failed' WHERE item_id = ?", (item_id,))
 
     retry_result = session_queue_fifo.retry_items_by_id("default", [item_id])
@@ -399,7 +399,7 @@ def test_retry_read_rejects_unknown_persisted_effect(
         "retry-user",
         session_json=json.dumps(malformed_session),
     )
-    with legacy_cursor_of(session_queue_fifo) as cursor:
+    with sqlite_cursor_of(session_queue_fifo) as cursor:
         cursor.execute("UPDATE session_queue SET status = 'failed' WHERE item_id = ?", (item_id,))
 
     retry_result = session_queue_fifo.retry_items_by_id("default", [item_id])
@@ -413,7 +413,7 @@ def test_api_item_reads_use_projection_without_runtime_rehydration(
     current_id = _insert_queue_item(session_queue_fifo, "default", "api-user")
     _insert_queue_item(session_queue_fifo, "default", "api-user")
     next_id = _insert_queue_item(session_queue_fifo, "default", "api-user", priority=10)
-    with legacy_cursor_of(session_queue_fifo) as cursor:
+    with sqlite_cursor_of(session_queue_fifo) as cursor:
         cursor.execute("UPDATE session_queue SET status = 'in_progress' WHERE item_id = ?", (current_id,))
 
     def fail_runtime_hydration(_queue_item_dict: dict) -> GraphExecutionState:
@@ -460,7 +460,7 @@ def test_nested_persisted_effects_are_validated_on_queue_reads(
         "retry-user",
         session_json=json.dumps(snapshot),
     )
-    with legacy_cursor_of(session_queue_fifo) as cursor:
+    with sqlite_cursor_of(session_queue_fifo) as cursor:
         cursor.execute("UPDATE session_queue SET status = 'failed' WHERE item_id = ?", (item_id,))
 
     retry_result = session_queue_fifo.retry_items_by_id("default", [item_id])
@@ -479,7 +479,7 @@ def test_queue_read_benchmark(iteration_count: int, session_queue_fifo: SessionQ
     session_json = json.dumps(snapshot, default=to_jsonable_python)
     detail_id = _insert_queue_item(session_queue_fifo, "default", "benchmark-user", session_json=session_json)
     retry_id = _insert_queue_item(session_queue_fifo, "default", "benchmark-user", session_json=session_json)
-    with legacy_cursor_of(session_queue_fifo) as cursor:
+    with sqlite_cursor_of(session_queue_fifo) as cursor:
         cursor.execute("UPDATE session_queue SET status = 'failed' WHERE item_id = ?", (retry_id,))
 
     tracemalloc.start()
@@ -549,7 +549,7 @@ def test_unreadable_child_retries_readable_root(session_queue_fifo: SessionQueue
         "workflow-user",
         session_json=json.dumps(future_session),
     )
-    with legacy_cursor_of(session_queue_fifo) as cursor:
+    with sqlite_cursor_of(session_queue_fifo) as cursor:
         cursor.execute(
             "UPDATE session_queue SET status = 'failed' WHERE item_id = ?",
             (root_id,),
@@ -651,7 +651,7 @@ def _seed_completed_history(
     count: int,
 ) -> None:
     """Insert `count` completed items (with started_at set) for a user, simulating retained history."""
-    with legacy_cursor_of(session_queue) as cursor:
+    with sqlite_cursor_of(session_queue) as cursor:
         for i in range(count):
             session_id = str(uuid.uuid4())
             batch_id = str(uuid.uuid4())
@@ -681,7 +681,7 @@ def _seed_completed_history(
 
 
 def test_round_robin_dequeue_does_not_scan_full_history(
-    session_queue_round_robin: SessionQueue, mock_sqlite_database: SqliteDatabase
+    session_queue_round_robin: SessionQueue, mock_sqlite_database: Database
 ) -> None:
     """Round-robin dequeue cost must scale with active users, not retained queue history.
 
@@ -699,7 +699,7 @@ def test_round_robin_dequeue_does_not_scan_full_history(
         _seed_completed_history(session_queue_round_robin, queue_id, u, count=500)
         _insert_queue_item(session_queue_round_robin, queue_id, u)
 
-    database = mock_sqlite_database.database
+    database = mock_sqlite_database
     with capture_statements(database) as statements:
         item = session_queue_round_robin.dequeue()
     statement, parameters = next((sql, parameters) for sql, parameters in statements if "user_next_item" in sql)
@@ -723,7 +723,7 @@ def test_round_robin_dequeue_does_not_scan_full_history(
     assert item.user_id == "user_a"
 
 
-def test_round_robin_ignored_in_single_user_mode(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> None:
+def test_round_robin_ignored_in_single_user_mode(mock_invoker: Invoker, mock_sqlite_database: Database) -> None:
     """When multiuser=False, round_robin config is ignored and FIFO is used."""
     mock_invoker.services.configuration = InvokeAIAppConfig(
         use_memory_db=True,
@@ -732,7 +732,7 @@ def test_round_robin_ignored_in_single_user_mode(mock_invoker: Invoker, mock_sql
         session_queue_mode="round_robin",
     )
     db = mock_sqlite_database
-    queue = SessionQueue(db.database)
+    queue = SessionQueue(db)
     queue.start(mock_invoker)
 
     queue_id = "default"
@@ -848,7 +848,7 @@ def test_affinity_applies_in_fifo_mode(session_queue_fifo: SessionQueue) -> None
     assert second is not None and second.item_id == cold_id
 
 
-def test_affinity_disabled_by_explicit_fifo_mode(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> None:
+def test_affinity_disabled_by_explicit_fifo_mode(mock_invoker: Invoker, mock_sqlite_database: Database) -> None:
     """An admin who explicitly sets session_queue_mode=FIFO is promised strict insertion
     order, so affinity reordering must not apply."""
     mock_invoker.services.configuration = InvokeAIAppConfig(
@@ -857,7 +857,7 @@ def test_affinity_disabled_by_explicit_fifo_mode(mock_invoker: Invoker, mock_sql
         session_queue_mode="FIFO",
     )
     db = mock_sqlite_database
-    queue = SessionQueue(db.database)
+    queue = SessionQueue(db)
     queue.start(mock_invoker)
     _install_fake_cache(mock_invoker, "cuda:0", {_WARM_MODEL_KEY})
 

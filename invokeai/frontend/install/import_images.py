@@ -28,7 +28,7 @@ from invokeai.app.services.image_records.image_records_default import ImageRecor
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.errors import DatabaseError
 from invokeai.app.services.shared.database.types import timestamp_text
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.backend.util.logging import InvokeAILogger
 
 app_config = get_config()

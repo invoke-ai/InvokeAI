@@ -33,7 +33,7 @@ from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryMo
 from invokeai.app.services.shared.database.queries.board_access import readable_board
 from invokeai.app.services.shared.database.schema.boards import boards, shared_boards
 from invokeai.app.services.shared.database.schema.projects import projects
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 
 _BOARD_COLUMNS = (
     boards.c.board_id,
