@@ -28,7 +28,7 @@ def deletion_fixture(tmp_path: Path):
     logger = logging.getLogger("user-management-font-tests")
     db = init_db(config, logger, Mock(spec=ImageFileStorageBase))
     fonts = FontService(
-        db=db,
+        db.database,
         fonts_dir=config.fonts_path,
         storage_dir=config.fonts_storage_path,
         logger=logger,

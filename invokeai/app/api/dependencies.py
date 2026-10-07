@@ -210,7 +210,7 @@ class ApiDependencies:
         image_index = ImageIndexService()
         intermediates = IntermediatesService(records=IntermediatesRecords(db.database), logger=logger)
         fonts = FontService(
-            db=db,
+            db.database,
             fonts_dir=configuration.fonts_path,
             storage_dir=configuration.fonts_storage_path,
             logger=logger,

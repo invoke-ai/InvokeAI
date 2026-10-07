@@ -15,7 +15,7 @@ from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 @pytest.fixture
 def font_service(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase, tmp_path: Path) -> FontService:
     service = FontService(
-        db=mock_sqlite_database,
+        mock_sqlite_database.database,
         fonts_dir=tmp_path / "fonts",
         storage_dir=tmp_path / "uploaded-fonts",
     )

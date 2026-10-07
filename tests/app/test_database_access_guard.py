@@ -24,7 +24,6 @@ DATABASE_LAYER = (
 # allowed fails the test until its number is lowered, so the amount of SQL outside the layer only shrinks.
 # Do not raise a number or add a file.
 NOT_YET_PORTED: dict[str, int] = {
-    "invokeai/app/services/fonts/fonts_default.py": 32,
     # The transitional cursor facade, removed once every service is ported.
     "invokeai/app/services/shared/sqlite/sqlite_database.py": 1,
     "invokeai/backend/util/gallery_maintenance.py": 8,

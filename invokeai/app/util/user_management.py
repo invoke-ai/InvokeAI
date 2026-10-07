@@ -41,7 +41,7 @@ def _prepare_deleted_user_fonts(config: Any, db: Any, user_id: str, logger: Any)
         from invokeai.app.services.fonts.fonts_default import FontService
 
         fonts = FontService(
-            db=db,
+            db.database,
             fonts_dir=config.fonts_path,
             storage_dir=config.fonts_storage_path,
             logger=logger,
