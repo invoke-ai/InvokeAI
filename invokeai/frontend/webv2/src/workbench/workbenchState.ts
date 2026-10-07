@@ -132,6 +132,7 @@ import {
   addPromptHistoryItem,
   applyProjectPromptDraft,
   cloneGenerateWidgetValues,
+  createDynamicPromptsSampleSeed,
   getEffectivePrompts,
   getGenerationModelAvailabilityReasons,
   getPromptDraftFromValues,
@@ -3579,9 +3580,26 @@ const enqueueCompiledSnapshot = (
       : compiled.workflow && compiled.workflow.seedAdvances.length > 0 && compiled.projectWorkflowId
         ? advanceWorkflowSeeds(project, compiled.projectWorkflowId, compiled.workflow.seedAdvances)
         : project;
+  // The queued item carries the previewed draw; rotating afterward makes the preview show the next one.
+  const dynamicPromptsSettings = canvasGenerateSettings ?? generateSettings;
+  const resampledProject =
+    expandedPositivePrompts &&
+    dynamicPromptsSettings &&
+    dynamicPromptsSettings.dynamicPromptsCombinatorial === false &&
+    dynamicPromptsSettings.dynamicPromptsResample
+      ? updateProjectWidgetValues(
+          advancedProject,
+          route.sourceId === 'canvas' ? 'generate' : route.sourceId,
+          (values) =>
+            values.dynamicPromptsSampleSeed === dynamicPromptsSettings.dynamicPromptsSampleSeed &&
+            values.dynamicPromptsCombinatorial === false
+              ? { ...values, dynamicPromptsSampleSeed: createDynamicPromptsSampleSeed() }
+              : values
+        )
+      : advancedProject;
 
   return {
-    ...advancedProject,
+    ...resampledProject,
     events: prependProjectEvent(project.events, {
       createdAt: submittedAt,
       id: createId('event'),

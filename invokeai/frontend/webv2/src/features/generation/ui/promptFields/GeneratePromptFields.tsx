@@ -36,6 +36,7 @@ interface GeneratePromptValues {
 const DYNAMIC_PROMPT_SETTING_KEYS = {
   combinatorial: 'dynamicPromptsCombinatorial',
   maxPrompts: 'dynamicPromptsMaxPrompts',
+  resample: 'dynamicPromptsResample',
   sampleSeed: 'dynamicPromptsSampleSeed',
   seedBehaviour: 'dynamicPromptsSeedBehaviour',
 } as const satisfies Record<keyof DynamicPromptsConfig, keyof GenerateSettings>;
@@ -53,6 +54,7 @@ const getPromptValues = (values: Record<string, unknown>): GeneratePromptValues 
 const selectPromptSettings = pickGenerateSettings([
   'dynamicPromptsCombinatorial',
   'dynamicPromptsMaxPrompts',
+  'dynamicPromptsResample',
   'dynamicPromptsSampleSeed',
   'dynamicPromptsSeedBehaviour',
   'expandPromptModelKey',
@@ -155,6 +157,7 @@ export const GeneratePromptFields = ({
       isSeedFixed: settings.seedMode === 'fixed',
       maxPrompts: settings.dynamicPromptsMaxPrompts,
       onChange: handleDynamicPromptsChange,
+      resample: settings.dynamicPromptsResample,
       sampleSeed: settings.dynamicPromptsSampleSeed,
       seedBehaviour: settings.dynamicPromptsSeedBehaviour,
     }),
@@ -162,6 +165,7 @@ export const GeneratePromptFields = ({
       handleDynamicPromptsChange,
       settings.dynamicPromptsCombinatorial,
       settings.dynamicPromptsMaxPrompts,
+      settings.dynamicPromptsResample,
       settings.dynamicPromptsSampleSeed,
       settings.dynamicPromptsSeedBehaviour,
       settings.seedMode,

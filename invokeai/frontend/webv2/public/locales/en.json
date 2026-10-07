@@ -2314,6 +2314,7 @@
         "resizeWildcardValues": "Resize wildcard values",
         "mode": "Mode",
         "newSeedPerImage": "New seed for every image",
+        "newSampleEveryInvoke": "New sample for every Invoke",
         "seedHeldForEveryImage": "A fixed seed is used for every image.",
         "import": "Import",
         "export": "Export",

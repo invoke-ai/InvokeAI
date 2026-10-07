@@ -435,6 +435,7 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     dynamicPromptsCombinatorial: true,
     dynamicPromptsMaxPrompts: DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS,
     dynamicPromptsSampleSeed: 0,
+    dynamicPromptsResample: true,
     dynamicPromptsSeedBehaviour: 'per-iteration',
     clipEmbedModel: null,
     clipGEmbedModel: null,

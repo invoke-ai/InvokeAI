@@ -67,6 +67,7 @@ const selectRenderSettings = pickGenerateSettings([
   'cfgScale',
   'dynamicPromptsCombinatorial',
   'dynamicPromptsMaxPrompts',
+  'dynamicPromptsResample',
   'dynamicPromptsSampleSeed',
   'dynamicPromptsSeedBehaviour',
   'ideogram4ColorPalette',

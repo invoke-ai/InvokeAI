@@ -217,6 +217,7 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   dynamicPromptsCombinatorial: true,
   dynamicPromptsMaxPrompts: 100,
   dynamicPromptsSampleSeed: 0,
+  dynamicPromptsResample: true,
   dynamicPromptsSeedBehaviour: 'per-iteration',
   componentSourceModel: null,
   height: 1024,
@@ -3975,6 +3976,8 @@ describe('workbenchReducer Phase 5 generation flow', () => {
   describe('seed modes on the compiled submission', () => {
     const SEED_MAX = 4_294_967_295;
     const readSeed = (state: WorkbenchState) => getProjectWidgetValues(getActiveProject(state), 'generate').seed;
+    const readSampleSeed = (state: WorkbenchState) =>
+      getProjectWidgetValues(getActiveProject(state), 'generate').dynamicPromptsSampleSeed;
     const readSubmission = (state: WorkbenchState) =>
       getActiveProject(state).queue.items[0]?.snapshot.backendSubmission;
     const submitWithPrompts = (state: WorkbenchState, positivePrompts?: string[]) =>
@@ -4059,6 +4062,67 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
       expect(getActiveProject(next).queue.items).toEqual([]);
       expect(readSeed(next)).toBe(42);
+    });
+
+    describe('dynamic prompts sample seed', () => {
+      const RANDOM_SAMPLE = {
+        dynamicPromptsCombinatorial: false,
+        dynamicPromptsResample: true,
+        dynamicPromptsSampleSeed: 7,
+        positivePrompt: 'a {red|green} cat',
+      } satisfies Partial<GenerateWidgetValues>;
+
+      it('draws a new sample after queueing the previewed one, alongside the image seed advance', () => {
+        const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+        try {
+          const state = submitWithPrompts(
+            primeGenerate(undefined, { ...RANDOM_SAMPLE, batchCount: 1, seed: 42, seedMode: 'increment' }),
+            ['a green cat']
+          );
+
+          expect(readSubmission(state)).toMatchObject({ positivePrompts: ['a green cat'], seed: 42 });
+          expect(readSampleSeed(state)).toBe(Math.floor(0.5 * SEED_MAX));
+          expect(readSeed(state)).toBe(43);
+        } finally {
+          random.mockRestore();
+        }
+      });
+
+      it('keeps the sample when resampling is off', () => {
+        const state = submitWithPrompts(primeGenerate(undefined, { ...RANDOM_SAMPLE, dynamicPromptsResample: false }), [
+          'a green cat',
+        ]);
+
+        expect(readSubmission(state)).toMatchObject({ positivePrompts: ['a green cat'] });
+        expect(readSampleSeed(state)).toBe(7);
+      });
+
+      it('keeps the sample in All combinations mode', () => {
+        const state = submitWithPrompts(
+          primeGenerate(undefined, { ...RANDOM_SAMPLE, dynamicPromptsCombinatorial: true }),
+          ['a red cat', 'a green cat']
+        );
+
+        expect(readSubmission(state)).toMatchObject({ positivePrompts: ['a red cat', 'a green cat'] });
+        expect(readSampleSeed(state)).toBe(7);
+      });
+
+      it('keeps the sample when the submission expanded nothing', () => {
+        const state = submitWithPrompts(primeGenerate(undefined, { ...RANDOM_SAMPLE, positivePrompt: 'a plain cat' }));
+
+        expect(getActiveProject(state).queue.items).toHaveLength(1);
+        expect(readSampleSeed(state)).toBe(7);
+      });
+
+      it('keeps the sample when the submission is rejected', () => {
+        const state = submitWithPrompts(primeGenerate(undefined, { ...RANDOM_SAMPLE, steps: Number.NaN }), [
+          'a green cat',
+        ]);
+
+        expect(getActiveProject(state).queue.items).toEqual([]);
+        expect(readSampleSeed(state)).toBe(7);
+      });
     });
 
     it('advances Upscale and Video seeds through the same boundary', () => {

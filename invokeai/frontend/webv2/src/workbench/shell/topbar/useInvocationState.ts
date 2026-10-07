@@ -73,6 +73,7 @@ const areTypeIdSetsEqual = (left: ReadonlySet<WidgetTypeId>, right: ReadonlySet<
 const readDynamicPromptsConfig = (values: Record<string, unknown>) => ({
   combinatorial: values.dynamicPromptsCombinatorial,
   maxPrompts: values.dynamicPromptsMaxPrompts,
+  resample: values.dynamicPromptsResample,
   sampleSeed: values.dynamicPromptsSampleSeed,
   seedBehaviour: values.dynamicPromptsSeedBehaviour,
 });
