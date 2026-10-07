@@ -1705,10 +1705,8 @@ class ModelInstallService(ModelInstallServiceBase):
                 self._signal_job_cancelled(job)
                 return
             except InstallRecoveryRequiredError:
-                job._recovery_required = job._install_tmpdir is not None or (
-                    job._source_protection_root is not None and self._has_recovery_sentinel(job._source_protection_root)
-                )
-                if job._recovery_required:
+                job._recovery_required = True
+                if job._install_tmpdir is not None:
                     try:
                         self._write_install_marker(job, status=job.status)
                     except Exception as marker_error:

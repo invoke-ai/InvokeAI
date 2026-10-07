@@ -574,6 +574,54 @@ def test_directory_install_preserves_collision_during_rollback(
     assert mm2_installer._has_recovery_sentinel(recovery_dest)
 
 
+def test_queued_local_import_rejects_cancel_after_partial_transfer_requires_recovery(
+    mm2_installer: ModelInstallServiceBase,
+    embedding_file: Path,
+    mm2_app_config: InvokeAIAppConfig,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    installer = mm2_installer
+    source_path = tmp_path / embedding_file.name
+    shutil.copy2(embedding_file, source_path)
+    original_source_bytes = source_path.read_bytes()
+    partial_destination_bytes = original_source_bytes[: max(1, len(original_source_bytes) // 2)]
+    existing_model_paths = set(mm2_app_config.models_path.iterdir())
+
+    def partial_copy_then_fail(src: Path, dst: Path) -> None:
+        assert src == source_path
+        dst.write_bytes(partial_destination_bytes)
+        raise OSError(errno.ENOSPC, "simulated disk full")
+
+    monkeypatch.setattr(model_install_default, "move", partial_copy_then_fail)
+
+    job = installer.import_model(LocalModelSource(path=source_path, inplace=False))
+    installer.wait_for_job(job, timeout=10)
+
+    assert job.errored
+    assert job.error_type == "InstallRecoveryRequiredError"
+    recovery_destinations = [
+        path
+        for path in set(mm2_app_config.models_path.iterdir()) - existing_model_paths
+        if path.is_dir() and installer._has_recovery_sentinel(path)
+    ]
+    assert len(recovery_destinations) == 1
+    recovery_file = recovery_destinations[0] / source_path.name
+    assert recovery_file.read_bytes() == partial_destination_bytes
+    assert source_path.read_bytes() == original_source_bytes
+
+    with pytest.raises(InstallRecoveryRequiredError, match="requires recovery"):
+        installer.cancel_job(job)
+
+    assert job.status is InstallStatus.ERROR
+    assert job.errored
+    assert not job.cancelled
+    assert installer._has_recovery_sentinel(recovery_destinations[0])
+    assert recovery_file.read_bytes() == partial_destination_bytes
+    assert source_path.read_bytes() == original_source_bytes
+
+
 def test_directory_install_rollback_race_preserves_both_source_artifacts(
     mm2_installer: ModelInstallServiceBase,
     diffusers_dir: Path,
