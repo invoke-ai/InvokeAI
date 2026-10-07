@@ -62,6 +62,7 @@ def mock_services() -> InvocationServices:
         boards=BoardService(),
         bulk_download=BulkDownloadService(),
         configuration=configuration,
+        database=db,
         events=TestEventService(),
         image_files=None,  # type: ignore
         image_records=SqliteImageRecordStorage(db=db),
