@@ -339,18 +339,3 @@ def test_late_bad_video_rolls_back_schema_and_prior_updates_then_retries(tmp_pat
         "SELECT migration_id FROM applied_migrations WHERE migration_id = ?;", (MIGRATION_ID,)
     ).fetchone()
     db._conn.close()
-
-
-def test_direct_callback_starts_transaction_before_alter(tmp_path: Path) -> None:
-    connection = sqlite3.connect(tmp_path / "direct.db")
-    _create_schema(connection)
-
-    build_migration(logger=logging.getLogger(__name__)).callback(connection.cursor())
-
-    assert connection.in_transaction
-    assert _has_encoding(connection, "image_embeddings")
-    assert _has_encoding(connection, "video_embeddings")
-    connection.rollback()
-    assert not _has_encoding(connection, "image_embeddings")
-    assert not _has_encoding(connection, "video_embeddings")
-    connection.close()

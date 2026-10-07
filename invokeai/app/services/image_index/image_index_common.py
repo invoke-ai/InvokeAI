@@ -1,5 +1,6 @@
 """Common types and helpers for the semantic image index services."""
 
+from collections.abc import Sequence
 from typing import Literal, NamedTuple
 
 import numpy as np
@@ -7,6 +8,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 EMBEDDING_DTYPE = np.float32
 EMBEDDING_STORAGE_DTYPE = np.dtype("<f2")
+_ENCODING_DTYPES = {"float32": np.dtype(EMBEDDING_DTYPE), "float16": EMBEDDING_STORAGE_DTYPE}
+_DECODE_CHUNK_ROWS = 4096
 
 MediaKind = Literal["image", "video"]
 
@@ -88,39 +91,63 @@ def embedding_to_blob(embedding: np.ndarray) -> bytes:
     return narrowed.tobytes()
 
 
-def blob_to_embedding(blob: bytes, dim: int, encoding: str) -> np.ndarray:
-    """Deserialize an explicitly encoded embedding BLOB, validating its dimension and contents.
+def blobs_to_embeddings(blobs: Sequence[bytes], encodings: Sequence[str], dim: int) -> np.ndarray:
+    """Deserialize explicitly encoded embedding BLOBs into one float32 matrix, validating every row.
 
-    Returns a read-only float32 vector. Legacy float32 rows retain their stored values. Float16
-    rows decode to float32 and are renormalized after quantization.
+    Rows keep the order of `blobs`. Legacy float32 rows retain their stored values. Float16 rows
+    are renormalized in float64 after quantization, then narrowed to float32.
     """
     if isinstance(dim, (bool, np.bool_)) or not isinstance(dim, (int, np.integer)) or dim <= 0:
         raise ValueError(f"Embedding dimension must be a positive integer, got {dim!r}")
-    if encoding == "float32":
-        dtype = EMBEDDING_DTYPE
-    elif encoding == "float16":
-        dtype = EMBEDDING_STORAGE_DTYPE
-    else:
-        raise ValueError(f"Unsupported embedding encoding: {encoding!r}")
+    dim = int(dim)
+    if len(blobs) != len(encodings):
+        raise ValueError(f"Got {len(blobs)} embedding blobs but {len(encodings)} encodings")
+    unsupported = set(encodings) - _ENCODING_DTYPES.keys()
+    if unsupported:
+        raise ValueError(f"Unsupported embedding encoding: {min(unsupported)!r}")
 
-    expected = int(dim) * np.dtype(dtype).itemsize
-    if len(blob) != expected:
-        raise ValueError(f"Embedding blob is {len(blob)} bytes; expected {expected} for {encoding} dimension {dim}")
+    # Each encoding is decoded as one buffer, then validated and renormalized in row chunks that
+    # bound the float64 temporaries: per-row decoding dominated reads of a full gallery, which
+    # happen whenever the accessible item set changes.
+    matrix = np.empty((len(blobs), dim), dtype=EMBEDDING_DTYPE)
+    for encoding, dtype in _ENCODING_DTYPES.items():
+        rows = [index for index, row_encoding in enumerate(encodings) if row_encoding == encoding]
+        if not rows:
+            continue
+        expected = dim * dtype.itemsize
+        for index in rows:
+            if len(blobs[index]) != expected:
+                raise ValueError(
+                    f"Embedding blob is {len(blobs[index])} bytes; expected {expected} for {encoding} dimension {dim}"
+                )
+        decoded = np.frombuffer(b"".join(blobs[index] for index in rows), dtype=dtype).reshape(len(rows), dim)
+        for start in range(0, len(rows), _DECODE_CHUNK_ROWS):
+            stop = start + _DECODE_CHUNK_ROWS
+            chunk = decoded[start:stop]
+            if encoding == "float16":
+                # Exact widening, done before validating because numpy's float16 kernels are slow.
+                chunk = chunk.astype(np.float64)
+            if not np.isfinite(chunk).all():
+                raise ValueError("Embedding contains NaN or infinite values")
+            if not chunk.any(axis=1).all():
+                raise ValueError("Refusing to read an all-zero embedding; it cannot be L2-normalized")
+            if encoding == "float16":
+                chunk /= np.sqrt(np.einsum("ij,ij->i", chunk, chunk))[:, None]
+            if len(rows) == len(blobs):
+                matrix[start:stop] = chunk
+            else:
+                matrix[rows[start:stop]] = chunk
+    return matrix
 
-    decoded = np.frombuffer(blob, dtype=dtype)
-    if encoding == "float16":
-        decoded = decoded.astype(EMBEDDING_DTYPE)
-    if not np.isfinite(decoded).all():
-        raise ValueError("Embedding contains NaN or infinite values")
-    if not decoded.any():
-        raise ValueError("Refusing to read an all-zero embedding; it cannot be L2-normalized")
 
-    if encoding == "float16":
-        values64 = decoded.astype(np.float64)
-        norm = np.sqrt(np.sum(values64 * values64, dtype=np.float64))
-        decoded = (values64 / norm).astype(EMBEDDING_DTYPE)
-    decoded.setflags(write=False)
-    return decoded
+def blob_to_embedding(blob: bytes, dim: int, encoding: str) -> np.ndarray:
+    """Deserialize one explicitly encoded embedding BLOB; see `blobs_to_embeddings`.
+
+    Returns a read-only float32 vector.
+    """
+    vector = blobs_to_embeddings([blob], [encoding], dim)[0]
+    vector.setflags(write=False)
+    return vector
 
 
 def coords_to_blob(coords: np.ndarray) -> bytes:

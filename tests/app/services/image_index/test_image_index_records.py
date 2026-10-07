@@ -10,10 +10,12 @@ from invokeai.app.services.board_records.board_records_common import BoardChange
 from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
 from invokeai.app.services.board_video_records.board_video_records_sqlite import SqliteBoardVideoRecordStorage
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.image_index import image_index_common
 from invokeai.app.services.image_index.image_index_common import (
     IndexedItem,
     blob_to_coords,
     blob_to_embedding,
+    blobs_to_embeddings,
     coords_to_blob,
     embedding_to_blob,
 )
@@ -908,6 +910,36 @@ def test_records_read_mixed_legacy_and_fp16_encodings_across_media_kinds(
     assert matrix.dtype == np.float32
     np.testing.assert_allclose(matrix[0], _expected_fp16_roundtrip(half), rtol=0, atol=1e-7)
     assert np.array_equal(matrix[1], legacy)
+
+
+def test_embedding_matrix_decode_keeps_rows_aligned_across_encodings_and_chunks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(image_index_common, "_DECODE_CHUNK_ROWS", 2)
+    vectors = [_vec(seed) for seed in range(7)]
+    encodings = ["float16", "float32", "float32", "float16", "float16", "float32", "float16"]
+    blobs = [embedding_to_blob(v) if e == "float16" else v.tobytes() for v, e in zip(vectors, encodings, strict=True)]
+
+    matrix = blobs_to_embeddings(blobs, encodings, DIM)
+
+    assert matrix.shape == (7, DIM)
+    for row, vector, encoding in zip(matrix, vectors, encodings, strict=True):
+        if encoding == "float32":
+            assert np.array_equal(row, vector)
+        else:
+            np.testing.assert_allclose(row, _expected_fp16_roundtrip(vector), rtol=0, atol=1e-7)
+
+    uniform = blobs_to_embeddings([embedding_to_blob(v) for v in vectors], ["float16"] * len(vectors), DIM)
+    np.testing.assert_allclose(uniform, np.stack([_expected_fp16_roundtrip(v) for v in vectors]), rtol=0, atol=1e-7)
+
+    # A degenerate row in an encoding group's last, partial chunk must still be rejected: row 5 is
+    # the third float32 row, and row 4 the third float16 row once row 6 is dropped.
+    zero_last = [*blobs[:5], np.zeros(DIM, np.float32).tobytes(), blobs[6]]
+    with pytest.raises(ValueError, match="all-zero"):
+        blobs_to_embeddings(zero_last, encodings, DIM)
+    nan_last = [*blobs[:4], np.full(DIM, np.nan, "<f2").tobytes(), blobs[5]]
+    with pytest.raises(ValueError, match="NaN or infinite"):
+        blobs_to_embeddings(nan_last, encodings[:6], DIM)
 
 
 def test_image_and_video_upserts_set_fp16_encoding(

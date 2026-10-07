@@ -25,9 +25,6 @@ class StoreEmbeddingsFp16Callback:
         started_at = time.perf_counter()
         self._logger.info("Starting image and video embedding fp16 migration")
 
-        if not cursor.connection.in_transaction:
-            cursor.execute("BEGIN;")
-
         converted_by_table: dict[str, int] = {}
         converted_total = 0
         try:
