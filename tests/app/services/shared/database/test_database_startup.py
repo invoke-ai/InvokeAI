@@ -112,16 +112,16 @@ def test_a_server_without_room_for_large_projects_or_too_old_is_refused(
 
     monkeypatch.setattr(startup, "MINIMUM_MAX_ALLOWED_PACKET", packet)
     monkeypatch.setitem(startup.MINIMUM_SERVER_VERSIONS, empty_database.dialect_name, (8, 0))
-    startup._check_server(empty_database)
+    startup.check_server(empty_database)
 
     monkeypatch.setattr(startup, "MINIMUM_MAX_ALLOWED_PACKET", packet + 1)
     with pytest.raises(DatabaseSetupError, match="max_allowed_packet"):
-        startup._check_server(empty_database)
+        startup.check_server(empty_database)
 
     monkeypatch.setattr(startup, "MINIMUM_MAX_ALLOWED_PACKET", packet)
     monkeypatch.setitem(startup.MINIMUM_SERVER_VERSIONS, empty_database.dialect_name, (99, 0))
     with pytest.raises(DatabaseSetupError, match="too old"):
-        startup._check_server(empty_database)
+        startup.check_server(empty_database)
 
 
 @server_only

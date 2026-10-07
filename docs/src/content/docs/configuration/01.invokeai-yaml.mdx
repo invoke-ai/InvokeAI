@@ -229,6 +229,8 @@ If you serve InvokeAI through nginx, Caddy, or similar, set `http_compression_le
 
 #### Database Durability
 
+This section concerns the default SQLite database. A [MySQL or MariaDB database](/configuration/external-database/), set with `db_url`, has its durability set on the server.
+
 Every write to InvokeAI's SQLite database is committed to disk before the request returns. How hard that commit is pushed to the physical disk is controlled by `db_synchronous`:
 
 ```yaml

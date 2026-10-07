@@ -44,7 +44,7 @@ def init_database(config: InvokeAIAppConfig, logger: Logger, image_files: ImageF
     database = open_database(config, logger)
     try:
         if database.dialect_name != "sqlite":
-            _check_server(database)
+            check_server(database)
             database.hold_instance_lock()
             _warn_when_new_beside_sqlite(database, config, logger)
         _migrator(database, config, logger, image_files).run_migrations()
@@ -73,6 +73,25 @@ def open_migrated_database(config: InvokeAIAppConfig, logger: Logger) -> Databas
     return database
 
 
+def open_copy_target(url: str, logger: Logger) -> tuple[Database, int]:
+    """Opens the server database `invoke-db-copy` fills: checked as the app checks it, held as the app holds it,
+    and empty. Also its `max_allowed_packet`."""
+    database = Database.open_url(url, logger)
+    try:
+        max_allowed_packet = check_server(database)
+        database.hold_instance_lock()
+        with database.begin(write=False) as conn:
+            if inspect(conn).get_table_names():
+                raise DatabaseSetupError(
+                    "The target database is not empty: copy into a new, empty database, so nothing in it is mixed "
+                    "with or overwritten by the copy"
+                )
+    except BaseException:
+        database.dispose()
+        raise
+    return database, max_allowed_packet
+
+
 def redacted_database_url(url: Optional[str]) -> Optional[str]:
     """The URL with its password masked, for logs and the runtime config."""
     if not url:
@@ -93,7 +112,8 @@ def _migrator(
     return migrator
 
 
-def _check_server(database: Database) -> None:
+def check_server(database: Database) -> int:
+    """Refuses a server too old, or one that takes too small a statement; its `max_allowed_packet`."""
     with database.begin(write=False) as conn:
         version_text = str(conn.exec_driver_sql("SELECT VERSION()").scalar_one())
         max_allowed_packet = int(conn.exec_driver_sql("SELECT @@max_allowed_packet").scalar_one())
@@ -110,6 +130,7 @@ def _check_server(database: Database) -> None:
             f"{MINIMUM_MAX_ALLOWED_PACKET // (1024 * 1024)} MiB to store large projects. Set it in the server's "
             "configuration, e.g. `max_allowed_packet=64M` under [mysqld], and restart the server."
         )
+    return max_allowed_packet
 
 
 def _version_of(version_text: str) -> tuple[int, int]:

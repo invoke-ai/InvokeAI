@@ -1,0 +1,89 @@
+---
+title: MySQL and MariaDB
+sidebar:
+  order: 3
+---
+
+InvokeAI keeps its boards, image records, workflows, projects, queue and accounts in a database. By default that is a SQLite file in `db_dir`, which needs no setup. On a server that hosts InvokeAI for several people, the database can be a MySQL or MariaDB database instead, run and backed up alongside the server's other databases.
+
+## Requirements
+
+- MySQL 8.4 or newer, or MariaDB 10.11 or newer, with the InnoDB storage engine.
+- `max_allowed_packet` of at least 64 MiB on the server. MariaDB's default is 16 MiB; InvokeAI refuses to start below 64 MiB, because a large project is stored in one statement. Set it in the server's configuration and restart the server:
+
+  ```ini
+  [mysqld]
+  max_allowed_packet=64M
+  ```
+
+- The `mysql` extra of the `invokeai` package, which installs the PyMySQL driver: `pip install "invokeai[mysql]"`, or `uv sync --extra mysql` in a source checkout. The Docker image includes it.
+
+## Creating the database
+
+Create an empty database and an account for InvokeAI. InvokeAI creates its tables, each with the character set and collations it needs, when it first starts.
+
+MySQL:
+
+```sql
+CREATE DATABASE invokeai CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin;
+CREATE USER 'invokeai'@'%' IDENTIFIED BY 'a-strong-password';
+GRANT ALL PRIVILEGES ON invokeai.* TO 'invokeai'@'%';
+```
+
+MariaDB:
+
+```sql
+CREATE DATABASE invokeai CHARACTER SET utf8mb4 COLLATE utf8mb4_nopad_bin;
+CREATE USER 'invokeai'@'%' IDENTIFIED BY 'a-strong-password';
+GRANT ALL PRIVILEGES ON invokeai.* TO 'invokeai'@'%';
+```
+
+## Configuring InvokeAI
+
+Set `db_url` in `invokeai.yaml`, or the `INVOKEAI_DB_URL` environment variable:
+
+```yaml
+db_url: mariadb+pymysql://invokeai:a-strong-password@db.example:3306/invokeai
+```
+
+Use `mysql+pymysql://` for MySQL and `mariadb+pymysql://` for MariaDB. Characters in the password that have a meaning in a URL (`@`, `:`, `/`, `%`, `#`) must be percent-encoded, e.g. `@` as `%40`. InvokeAI reads `db_url` when it starts, and shows it without the password in its settings. `db_dir` and `db_synchronous` apply to a SQLite database only.
+
+On its first start InvokeAI creates the tables. On later starts it updates them to its version, as it does a SQLite database. It makes no backup of a server database before an update: back the database up yourself, e.g. with `mysqldump` or `mariadb-dump`, before upgrading InvokeAI.
+
+## Moving an existing install
+
+`invoke-db-copy` copies an install's SQLite database into a new, empty server database. The SQLite database is not changed.
+
+1. Stop InvokeAI. What it writes during the copy is not copied.
+2. Check the copy, which copies nothing yet:
+
+   ```bash
+   invoke-db-copy --target mariadb+pymysql://invokeai:a-strong-password@db.example/invokeai --check
+   ```
+
+3. Copy:
+
+   ```bash
+   invoke-db-copy --target mariadb+pymysql://invokeai:a-strong-password@db.example/invokeai
+   ```
+
+4. Set `db_url` in `invokeai.yaml` to the same URL, and start InvokeAI.
+
+`invoke-db-copy` takes the install it runs in, or the one `--root` names. It copies from a snapshot of the SQLite database, which it brings to no newer version: if InvokeAI has not started since an upgrade, start it once first. It stops before copying anything when the server would refuse a row:
+
+- **Rows whose foreign keys name a row that is gone**, which a SQLite database can hold and a server refuses. `--orphans skip` leaves them out, together with what the database deletes with them.
+- **Values longer than the server's column holds**, or larger than half of `max_allowed_packet`.
+
+Two kinds of value are copied in the form a server stores:
+
+- **Vocabulary terms of the image index that differ only in the case of a letter outside A-Z** (`Äpfel` and `äpfel`), which the server compares as equal: it keeps one of them.
+- **A model's file size stored with a fraction**, which is written as a whole number of bytes.
+
+After copying, `invoke-db-copy` compares every table of the copy with its source, row by row, and reports whether they match.
+
+## Limits
+
+- **One InvokeAI process per database.** At startup a process cancels the queue items left running and updates its bundled workflows and style presets, which a second process would undo. The first process holds a lock on the database; a second one refuses to start.
+- **One database server.** Setups with several writing servers (Galera, group replication with several primaries) are not supported.
+- **Busy database.** When a request waits too long for a lock held by another, it fails with HTTP 503 and `Retry-After: 1`, and can be repeated. If this happens often, the server is overloaded or another program holds locks in InvokeAI's database.
+- **Command-line tools.** The account commands (`invoke-useradd`, `invoke-userdel`, `invoke-usermod`, `invoke-userlist`) and the maintenance scripts use the database `invokeai.yaml` names. They refuse a database InvokeAI has not updated to their version: start InvokeAI once after an upgrade before using them.
