@@ -51,7 +51,7 @@ What backends spell differently comes from `dialect.py`:
 
 The tables are SQLAlchemy `Table`s in `schema/`, one module per domain, all in `schema.metadata`. They are the one definition of the schema: query modules build their statements from them, and a server database is created from them.
 
-The metadata is the schema the SQLite migrations build, apart from their triggers. `tests/app/services/shared/database/test_schema_parity.py` migrates one database, creates another from the metadata and compares them column by column: declared type, NOT NULL, default, collation and generation expression. It compares every constraint and index the same way. A schema change is therefore a migration together with the same change to the metadata.
+The metadata is the schema the SQLite migrations build. `tests/app/services/shared/database/test_schema_parity.py` migrates one database, creates another from the metadata and compares them column by column: declared type, NOT NULL, default, collation and generation expression. It compares every constraint and index the same way. A schema change is therefore a migration together with the same change to the metadata.
 
 Column types come from `types.py`. Each one renders the migrations' declared type on SQLite and its equivalent on a server:
 
@@ -67,9 +67,9 @@ Column types come from `types.py`. Each one renders the migrations' declared typ
 
 A server indexes the whole value of a primary key, a unique constraint or a foreign key, and one index holds at most 768 characters there. Such text, and text in indexes on identifiers, is a `Key`; a server refuses a longer value. All other text is `LongText`. An index on free text, such as a name, covers only a prefix of it on a server. `test_schema.py` holds the columns to this rule.
 
-A timestamp is UTC text that sorts and compares as text. Ported queries write it as `YYYY-MM-DD HH:MM:SS.fff` with `now_text()`. Rows also hold whole seconds and ISO 8601 text, at most 32 characters, from code not ported yet and from two SQLite triggers. Columns made with `inserted_at()` and `updated_at()` get `now_text()` on insert; `updated_at()` columns also get it in an `update()` statement. An upsert must set `updated_at` in its own update values, because SQLAlchemy does not apply it to `ON CONFLICT DO UPDATE` or `ON DUPLICATE KEY UPDATE`. The SQL defaults of these columns exist only on SQLite, because the migrated schema has them.
+A timestamp is UTC text that sorts and compares as text. Ported queries write it as `YYYY-MM-DD HH:MM:SS.fff` with `now_text()`. Rows also hold whole seconds and ISO 8601 text, at most 32 characters, written before the layer and its last migration. Columns made with `inserted_at()` and `updated_at()` get `now_text()` on insert; `updated_at()` columns also get it in an `update()` statement. An upsert must set `updated_at` in its own update values, because SQLAlchemy does not apply it to `ON CONFLICT DO UPDATE` or `ON DUPLICATE KEY UPDATE`. The SQL defaults of these columns exist only on SQLite, because the migrated schema has them.
 
-The triggers of the migrated schema keep `updated_at` and the queue's `started_at`, `completed_at` and `session_revision` current on SQLite. Nothing does on a server, so ported queries set these values themselves. Until a migration drops the triggers, both write them on SQLite.
+No database has triggers: queries set `updated_at` and the queue's `started_at`, `completed_at` and `session_revision` themselves. (The SQLite migrations created triggers for these; the last of them drops them.)
 
 Some DDL differs between backends:
 

@@ -305,8 +305,8 @@ class BatchCounts(NamedTuple):
 # --- Writes ---------------------------------------------------------------------------------------------------------
 #
 # A status change is one conditional UPDATE: it applies only to an item that is not finished, and its row count says
-# whether this call made it. The triggers of a migrated SQLite database also stamp `updated_at`, `started_at`,
-# `completed_at` and `session_revision`; nothing does on a server, so these statements set them themselves.
+# whether this call made it. These statements also set `updated_at`, `started_at`, `completed_at` and
+# `session_revision`: no database trigger does.
 
 _TERMINAL = ("completed", "failed", "canceled")
 # Statuses of an item that has not finished; the intermediates cleanup protects their media.

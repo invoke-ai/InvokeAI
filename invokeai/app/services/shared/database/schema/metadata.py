@@ -126,8 +126,7 @@ def updated_at(name: str = "updated_at", *, sqlite_default: str = STRFTIME_NOW) 
     """A timestamp the application sets when it inserts the row, and when an `update()` statement changes it.
 
     An upsert does not set it: SQLAlchemy leaves `onupdate` out of `ON CONFLICT DO UPDATE` and `ON DUPLICATE KEY
-    UPDATE`, so an upsert names it in its update values. On SQLite, an `AFTER UPDATE` trigger of the migrated
-    schema sets it as well, until the triggers are dropped.
+    UPDATE`, so an upsert names it in its update values.
     """
     return Column(
         name,

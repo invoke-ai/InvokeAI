@@ -1,4 +1,4 @@
-"""The schema metadata describes the schema the SQLite migrations build, exactly, apart from their triggers.
+"""The schema metadata describes the schema the SQLite migrations build, exactly.
 
 Server databases are created from the metadata, and queries are compiled against it, so a difference here
 would be a difference between backends: a missing index, a cascade that does not happen, a default that is
@@ -22,31 +22,6 @@ from invokeai.app.services.shared.sqlite_migrator.migrations.migration_2026_08_0
 )
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
-
-# The migrated schema's triggers. The metadata has none: the application sets what they set, and a migration
-# drops them once no service relies on them.
-LEGACY_TRIGGERS = {
-    "models_updated_at",
-    "style_presets",
-    "tg_app_settings_updated_at",
-    "tg_board_images_updated_at",
-    "tg_board_videos_updated_at",
-    "tg_boards_updated_at",
-    "tg_client_state_updated_at",
-    "tg_image_projections_updated_at",
-    "tg_image_subfolder_move_jobs_updated_at",
-    "tg_images_updated_at",
-    "tg_projects_updated_at",
-    "tg_session_queue_completed_at",
-    "tg_session_queue_session_revision",
-    "tg_session_queue_started_at",
-    "tg_session_queue_updated_at",
-    "tg_system_prompts_updated_at",
-    "tg_users_updated_at",
-    "tg_videos_updated_at",
-    "tg_wildcards_updated_at",
-    "tg_workflow_library_updated_at",
-}
 
 
 @pytest.fixture(scope="module")
@@ -89,8 +64,9 @@ def test_the_metadata_creates_the_migrated_schema(created: sqlite3.Connection, m
     assert differences == []
 
 
-def test_only_the_migrated_schema_has_triggers(created: sqlite3.Connection, migrated: sqlite3.Connection) -> None:
-    assert _names(migrated, "trigger") == LEGACY_TRIGGERS
+def test_neither_schema_has_triggers(created: sqlite3.Connection, migrated: sqlite3.Connection) -> None:
+    # The application sets what the triggers of the earlier migrations set; the last migrations drop them.
+    assert _names(migrated, "trigger") == set()
     assert _names(created, "trigger") == set()
     assert _names(created, "view") == _names(migrated, "view") == set()
 

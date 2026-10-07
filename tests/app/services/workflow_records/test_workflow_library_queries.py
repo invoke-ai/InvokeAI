@@ -45,15 +45,6 @@ def _set(database: Database, workflow_id: str, **values: Any) -> None:
         conn.execute(update(workflow_library).where(workflow_library.c.workflow_id == workflow_id).values(**values))
 
 
-@pytest.fixture
-def without_trigger(database: Database) -> None:
-    """Drops SQLite's `updated_at` trigger from this test's database. It renews `updated_at` after every UPDATE, a
-    test's own included; without it the application alone sets it, as on a server."""
-    if database.dialect_name == "sqlite":
-        with database.begin(write=True) as conn:
-            conn.exec_driver_sql("DROP TRIGGER tg_workflow_library_updated_at")
-
-
 def _names(
     records: WorkflowRecordsStorage,
     *,
@@ -186,7 +177,6 @@ def test_pages_of_equal_names_keep_one_order(
     assert [(page.total, page.pages, page.per_page) for page in pages] == [(5, 3, 2)] * 3
 
 
-@pytest.mark.usefixtures("without_trigger")
 @pytest.mark.parametrize("order_by", list(WorkflowRecordOrderBy))
 def test_each_order_key_sorts_by_its_column(
     workflow_records: WorkflowRecordsStorage, database: Database, order_by: WorkflowRecordOrderBy
@@ -273,7 +263,6 @@ def test_all_tags_are_split_trimmed_and_sorted(workflow_records: WorkflowRecords
     assert workflow_records.get_all_tags(categories=[WorkflowCategory.User], user_id=USER) == ["alpha", "beta", "gamma"]
 
 
-@pytest.mark.usefixtures("without_trigger")
 @pytest.mark.parametrize("write", ["save", "open", "run", "share"])
 def test_every_write_renews_when_the_workflow_was_updated(
     workflow_records: WorkflowRecordsStorage, database: Database, write: str

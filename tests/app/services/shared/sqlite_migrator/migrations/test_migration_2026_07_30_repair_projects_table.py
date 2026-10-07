@@ -90,10 +90,9 @@ def test_repairs_a_database_that_came_from_an_upstream_build(tmp_path: Path) -> 
         full.register_migration(migration)
     full.run_migrations()
 
-    # Without the repair migration the fork's migration_33 stays skipped and this is still missing.
+    # Without the repair migration the fork's migration_33 stays skipped and this is still missing. (The trigger the
+    # repair creates is gone again: a later migration drops every trigger.)
     assert _table_exists(cursor, "projects")
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='trigger' AND name='tg_projects_updated_at';")
-    assert cursor.fetchone() is not None
 
 
 def test_migration_has_a_dated_id_so_it_cannot_collide_with_an_upstream_number() -> None:

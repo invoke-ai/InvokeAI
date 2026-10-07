@@ -890,8 +890,10 @@ def test_inputs_added_to_an_active_session_after_it_was_scanned_are_protected(
     assert first.impact.delete_images == 1
 
     with legacy_cursor_of(invoker.services.session_queue) as cursor:
+        # Every write of a session counts its revision, which tells the scan to read it again.
         cursor.execute(
-            "UPDATE session_queue SET session = ?, status = 'pending' WHERE item_id = ?;",
+            "UPDATE session_queue SET session = ?, session_revision = session_revision + 1, status = 'pending' "
+            "WHERE item_id = ?;",
             ('{"results": {"n": {"image": {"image_name": "child-output.png"}}}}', item_id),
         )
 

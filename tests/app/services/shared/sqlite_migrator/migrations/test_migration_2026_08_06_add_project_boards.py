@@ -587,10 +587,9 @@ def test_it_runs_through_the_real_migrator_on_a_database_with_no_projects(tmp_pa
     assert "board_id" in columns
     cursor.execute("SELECT COUNT(*) FROM projects;")
     assert cursor.fetchone()[0] == 0
-    # The scratch table must not outlive the rebuild, and the trigger must be back.
+    # The scratch table must not outlive the rebuild. (The trigger it puts back, a later migration drops with the
+    # others; `test_the_rebuilt_table_keeps_its_key_columns_ordering_and_trigger` covers this migration alone.)
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='projects_with_boards';")
     assert cursor.fetchone() is None
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='trigger' AND name='tg_projects_updated_at';")
-    assert cursor.fetchone() is not None
     cursor.execute("PRAGMA foreign_key_check;")
     assert cursor.fetchall() == []
