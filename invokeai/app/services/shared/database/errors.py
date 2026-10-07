@@ -60,9 +60,10 @@ class LockTimeoutError(TransientDatabaseError):
 
 
 class DatabaseUnavailableError(TransientDatabaseError):
-    """The database server could not be reached, its connection was lost, or no connection came free in time.
+    """No connection to the database server could be made, or none came free in time. Not retried automatically.
 
-    Not retried automatically. A transaction whose connection was lost while it committed may have taken effect.
+    A connection lost during a statement is not this: the server also closes the connection of a statement larger
+    than it takes, which no retry would change.
     """
 
 
@@ -129,8 +130,6 @@ _MYSQL_ERRORS: dict[int, type[DatabaseError]] = {
     1213: ConflictError,  # ER_LOCK_DEADLOCK
     1205: LockTimeoutError,  # ER_LOCK_WAIT_TIMEOUT
     2003: DatabaseUnavailableError,  # CR_CONN_HOST_ERROR
-    2006: DatabaseUnavailableError,  # CR_SERVER_GONE_ERROR
-    2013: DatabaseUnavailableError,  # CR_SERVER_LOST
 }
 
 

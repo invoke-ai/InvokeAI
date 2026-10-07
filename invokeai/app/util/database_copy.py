@@ -90,9 +90,13 @@ def copy(target_url: Optional[str], *, root: Optional[Path], check_only: bool, s
         return 1
 
     try:
-        # A consistent snapshot to work from, beside the database, which it is as large as: orphans can be left out of
-        # it, and the source stays as it is.
-        snapshot_dir = Path(tempfile.mkdtemp(prefix="invoke-db-copy-", dir=source_config.db_path.parent))
+        try:
+            # A consistent snapshot to work from, beside the database, which it is as large as: orphans can be left
+            # out of it, and the source stays as it is.
+            snapshot_dir = Path(tempfile.mkdtemp(prefix="invoke-db-copy-", dir=source_config.db_path.parent))
+        except BaseException:
+            source.dispose()
+            raise
         try:
             snapshot_path = snapshot_dir / "snapshot.db"
             try:
@@ -110,6 +114,10 @@ def copy(target_url: Optional[str], *, root: Optional[Path], check_only: bool, s
                 print(
                     f"\nCould not delete the snapshot at {snapshot_dir}, which holds a copy of the database: delete it."
                 )
+    except Exception as e:
+        # Before anything is copied (the copy reports its own failures): the snapshot, or a check of it.
+        print(f"\nCannot copy: {e}\nNothing was copied.")
+        return 1
     finally:
         target.dispose()
 

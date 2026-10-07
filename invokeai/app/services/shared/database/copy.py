@@ -161,7 +161,8 @@ def find_oversized(database: Database, max_allowed_packet: int) -> list[Problem]
                 too_long = select(func.count()).select_from(table).where(func.length(column) > length)
                 count = conn.execute(too_long).scalar_one()
                 if count:
-                    what = f"with a {column.name} longer than {length} characters"
+                    article = "an" if column.name[0] in "aeiou" else "a"
+                    what = f"with {article} {column.name} longer than {length} characters"
                     problems.append(Problem(table.name, int(count), what))
             sizes = [func.coalesce(func.length(cast(column, LargeBinary)), 0) for column in _stored_columns(table)]
             too_large = (
@@ -261,7 +262,11 @@ def _folded_terms(database: Database) -> set[str]:
     # The case and compatibility forms that the servers' case-insensitive collations equate.
     with database.begin(write=False) as conn:
         terms = conn.execute(select(image_index_vocab_terms.c.term)).scalars().all()
-    return {unicodedata.normalize("NFKC", term).casefold() for term in terms}
+    # Ignorable code points (a soft hyphen, a zero-width space) are format characters, which they ignore.
+    return {
+        "".join(c for c in unicodedata.normalize("NFKC", term).casefold() if unicodedata.category(c) != "Cf")
+        for term in terms
+    }
 
 
 def _row_digests(

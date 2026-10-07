@@ -129,8 +129,8 @@ def test_values_a_server_cannot_store_are_found(tmp_path: Path) -> None:
         found = find_oversized(database, max_allowed_packet=64 * 1024 * 1024)
         assert sorted(found) == [
             Problem("image_index_vocab_terms", 1, "with a term longer than 255 characters"),
-            Problem("models", 1, "with a id longer than 255 characters"),
             Problem("models", 1, "with a path longer than 768 characters"),
+            Problem("models", 1, "with an id longer than 255 characters"),
         ]
 
         # A row is sent in one statement: it must fit half a packet, which leaves room for escaping.
@@ -165,10 +165,15 @@ def test_a_merged_table_holds_one_of_each_set_of_equal_rows_and_nothing_else(tmp
     source = _open(tmp_path)
     target = Database.open_sqlite(tmp_path / "target.db", LOGGER)
     try:
+        with source.begin(write=True) as conn:
+            # Equal to "beach" on a server, whose collations ignore a soft hyphen.
+            conn.execute(insert(image_index_vocab_terms).values(term="bea\u00adch"))
         copy_database(source, target)
         # As a server merges them.
         with target.begin(write=True) as conn:
-            conn.execute(delete(image_index_vocab_terms).where(image_index_vocab_terms.c.term == "äpfel"))
+            conn.execute(
+                delete(image_index_vocab_terms).where(image_index_vocab_terms.c.term.in_(["äpfel", "bea\u00adch"]))
+            )
         assert verify_copy(source, target) == []
 
         with target.begin(write=True) as conn:
