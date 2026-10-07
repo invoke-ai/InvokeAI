@@ -23,6 +23,48 @@ afterEach(async () => {
 });
 
 describe('ConfirmDialog', () => {
+  it('keeps confirmation disabled until its owner has a valid preview', async () => {
+    let confirmCalls = 0;
+    const renderDialog = async (isConfirmDisabled: boolean) => {
+      await act(() =>
+        root?.render(
+          <ChakraProvider value={system}>
+            <ConfirmDialog
+              body="Preview is still loading."
+              confirmLabel="Proceed"
+              isConfirmDisabled={isConfirmDisabled}
+              isOpen
+              title="Confirm maintenance"
+              onClose={noop}
+              onConfirm={() => {
+                confirmCalls += 1;
+              }}
+            />
+          </ChakraProvider>
+        )
+      );
+    };
+
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await renderDialog(true);
+
+    const confirm = [...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button')].find(
+      (button) => button.textContent === 'Proceed'
+    )!;
+    expect(confirm.disabled).toBe(true);
+    expect(confirmCalls).toBe(0);
+
+    await renderDialog(false);
+    const enabledConfirm = [...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button')].find(
+      (button) => button.textContent === 'Proceed'
+    )!;
+    expect(enabledConfirm.disabled).toBe(false);
+    await act(() => userEvent.click(enabledConfirm));
+    expect(confirmCalls).toBe(1);
+  });
+
   it('keeps the text it showed while it animates out after its host clears the subject', async () => {
     // The usual host shape: the subject drives the copy and is cleared the moment the dialog closes.
     const Host = () => {
