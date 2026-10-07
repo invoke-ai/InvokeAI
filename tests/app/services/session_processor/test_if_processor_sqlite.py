@@ -17,9 +17,10 @@ from invokeai.app.services.session_processor.session_processor_default import (
     DefaultSessionProcessor,
     DefaultSessionRunner,
 )
-from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
+from invokeai.app.services.session_queue.session_queue_default import SessionQueue
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from tests.fixtures.sqlite_database import legacy_cursor_of
 from tests.test_nodes import create_edge
 
 
@@ -73,9 +74,9 @@ def _build_if_graph(*, condition: bool = True) -> Graph:
     return graph
 
 
-def _insert_session(queue: SqliteSessionQueue, graph: Graph) -> int:
+def _insert_session(queue: SessionQueue, graph: Graph) -> int:
     session = GraphExecutionState(graph=graph)
-    with queue._db.transaction() as cursor:
+    with legacy_cursor_of(queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -156,7 +157,7 @@ def test_if_cancellation_preserves_activation_and_never_resumes_unselected_branc
     selected_field: str,
 ) -> None:
     test_timeout = 30
-    queue = SqliteSessionQueue(db=mock_sqlite_database)
+    queue = SessionQueue(mock_sqlite_database.database)
     mock_invoker.services.events = registered_event_bus
     mock_invoker.services.session_queue = queue
     mock_invoker.services.performance_statistics = _Stats()
@@ -225,7 +226,7 @@ def test_if_retry_starts_fresh_and_preserves_selected_output_without_stale_activ
     sink_value: int,
     cancel_after_source: str,
 ) -> None:
-    queue = SqliteSessionQueue(db=mock_sqlite_database)
+    queue = SessionQueue(mock_sqlite_database.database)
     mock_invoker.services.events = registered_event_bus
     mock_invoker.services.session_queue = queue
     mock_invoker.services.performance_statistics = _Stats()
@@ -297,7 +298,7 @@ def test_if_early_cancellation_before_resolution_does_not_run_any_branch_continu
     unselected_branch: str,
     selected_field: str,
 ) -> None:
-    queue = SqliteSessionQueue(db=mock_sqlite_database)
+    queue = SessionQueue(mock_sqlite_database.database)
     mock_invoker.services.events = registered_event_bus
     mock_invoker.services.session_queue = queue
     mock_invoker.services.performance_statistics = _Stats()

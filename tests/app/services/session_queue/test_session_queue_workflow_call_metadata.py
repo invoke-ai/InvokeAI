@@ -24,19 +24,20 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueItemNotFoundError,
     TooManySessionsError,
 )
-from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
+from invokeai.app.services.session_queue.session_queue_default import SessionQueue
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from invokeai.app.services.shared.invocation_context import ImagesInterface, InvocationContextData
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.urls.urls_default import LocalUrlService
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowMeta, WorkflowWithoutID
+from tests.fixtures.sqlite_database import legacy_cursor_of
 from tests.test_nodes import TestEventService
 
 
 @pytest.fixture
-def session_queue(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SqliteSessionQueue:
+def session_queue(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SessionQueue:
     db = mock_sqlite_database
-    queue = SqliteSessionQueue(db=db)
+    queue = SessionQueue(db.database)
     queue.start(mock_invoker)
     return queue
 
@@ -48,7 +49,7 @@ def event_bus(mock_invoker: Invoker) -> TestEventService:
 
 
 def _insert_queue_item(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
     *,
     session: GraphExecutionState,
     status: str,
@@ -64,7 +65,7 @@ def _insert_queue_item(
     workflow_call_depth: int | None = None,
     workflow: WorkflowWithoutID | None = None,
 ) -> int:
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -131,7 +132,7 @@ def _workflow_without_id() -> WorkflowWithoutID:
 
 
 def _build_waiting_workflow_call_parent(
-    session_queue: SqliteSessionQueue, child_count: int, project_id: str | None = None
+    session_queue: SessionQueue, child_count: int, project_id: str | None = None
 ) -> tuple[int, GraphExecutionState, list[GraphExecutionState]]:
     graph = Graph()
     graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a"))
@@ -148,11 +149,11 @@ def _build_waiting_workflow_call_parent(
     return parent_item_id, parent_session, child_sessions
 
 
-def test_get_queue_item_round_trips_workflow_call_metadata(session_queue: SqliteSessionQueue) -> None:
+def test_get_queue_item_round_trips_workflow_call_metadata(session_queue: SessionQueue) -> None:
     session = GraphExecutionState(graph=Graph())
     session_json = session.model_dump_json(warnings=False)
 
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -206,7 +207,7 @@ def test_get_queue_item_round_trips_workflow_call_metadata(session_queue: Sqlite
 
 
 def test_save_queue_item_session_does_not_reload_full_queue_item(
-    session_queue: SqliteSessionQueue, monkeypatch: pytest.MonkeyPatch
+    session_queue: SessionQueue, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     session = GraphExecutionState(graph=Graph())
     item_id = _insert_queue_item(session_queue, session=session, status="pending")
@@ -219,7 +220,7 @@ def test_save_queue_item_session_does_not_reload_full_queue_item(
 
     session_queue.save_queue_item_session(item_id, session)
 
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute("SELECT session FROM session_queue WHERE item_id = ?", (item_id,))
         row = cursor.fetchone()
     assert row is not None
@@ -227,7 +228,7 @@ def test_save_queue_item_session_does_not_reload_full_queue_item(
     assert persisted.errors == {"node": "updated"}
 
 
-def test_active_save_queue_item_session_does_not_overwrite_terminal_item(session_queue: SqliteSessionQueue) -> None:
+def test_active_save_queue_item_session_does_not_overwrite_terminal_item(session_queue: SessionQueue) -> None:
     session = GraphExecutionState(graph=Graph())
     item_id = _insert_queue_item(session_queue, session=session, status="pending")
     stale_session = session_queue.get_queue_item(item_id).session
@@ -241,9 +242,7 @@ def test_active_save_queue_item_session_does_not_overwrite_terminal_item(session
     assert persisted.session.errors == {}
 
 
-def test_failed_child_transitions_sqlite_parent_to_failed(
-    session_queue: SqliteSessionQueue, mock_invoker: Invoker
-) -> None:
+def test_failed_child_transitions_sqlite_parent_to_failed(session_queue: SessionQueue, mock_invoker: Invoker) -> None:
     parent_item_id, _parent_session, _child_sessions = _build_waiting_workflow_call_parent(session_queue, child_count=1)
     mock_invoker.services.session_queue = session_queue
     runner = DefaultSessionRunner()
@@ -259,7 +258,7 @@ def test_failed_child_transitions_sqlite_parent_to_failed(
 
 
 def test_enqueue_workflow_call_children_rejects_stale_parent_session(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
 ) -> None:
     parent_item_id, _parent_session, child_sessions = _build_waiting_workflow_call_parent(session_queue, child_count=2)
     stale_parent = session_queue.get_queue_item(parent_item_id)
@@ -277,13 +276,13 @@ def test_enqueue_workflow_call_children_rejects_stale_parent_session(
     assert persisted_parent.status == "in_progress"
     assert persisted_parent.session.errors == {"sibling": "newer parent state"}
     assert [item.item_id for item in session_queue.list_all_queue_items("default")] == [parent_item_id]
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute("SELECT COUNT(*) FROM session_queue")
         assert cursor.fetchone()[0] == 1
 
 
 def test_status_transition_reuses_loaded_queue_item(
-    session_queue: SqliteSessionQueue, monkeypatch: pytest.MonkeyPatch
+    session_queue: SessionQueue, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     session = GraphExecutionState(graph=Graph())
     item_id = _insert_queue_item(session_queue, session=session, status="in_progress")
@@ -302,7 +301,7 @@ def test_status_transition_reuses_loaded_queue_item(
 
 
 def test_enqueue_workflow_call_child_inherits_workflow_for_image_metadata(
-    session_queue: SqliteSessionQueue, mock_invoker: Invoker, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    session_queue: SessionQueue, mock_invoker: Invoker, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     parent_graph = Graph()
     parent_graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a"))
@@ -315,7 +314,7 @@ def test_enqueue_workflow_call_child_inherits_workflow_for_image_metadata(
     parent_session.begin_waiting_on_workflow_call(frame)
     parent_session.attach_waiting_workflow_call_child_session(child_session)
 
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -408,7 +407,7 @@ def test_enqueue_workflow_call_child_inherits_workflow_for_image_metadata(
 
 
 def test_enqueue_workflow_call_child_rejects_canceled_stale_parent(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
 ) -> None:
     parent_graph = Graph()
     parent_graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a"))
@@ -421,7 +420,7 @@ def test_enqueue_workflow_call_child_rejects_canceled_stale_parent(
     parent_session.begin_waiting_on_workflow_call(frame)
     parent_session.attach_waiting_workflow_call_child_session(child_session)
 
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -452,13 +451,13 @@ def test_enqueue_workflow_call_child_rejects_canceled_stale_parent(
     with pytest.raises(ValueError, match="terminal parent"):
         session_queue.enqueue_workflow_call_child(stale_parent, child_session)
 
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute("SELECT COUNT(*) FROM session_queue WHERE parent_item_id = ?", (parent_item_id,))
         assert cursor.fetchone()[0] == 0
 
 
 def test_enqueue_workflow_call_children_publishes_parent_state_before_children(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
 ) -> None:
     parent_item_id, _parent_session, child_sessions = _build_waiting_workflow_call_parent(
         session_queue, child_count=2, project_id="project-1"
@@ -489,7 +488,7 @@ def test_enqueue_workflow_call_children_publishes_parent_state_before_children(
 
 
 def test_concurrent_workflow_call_child_completions_preserve_both_siblings(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
 ) -> None:
     parent_item_id, _parent_session, child_sessions = _build_waiting_workflow_call_parent(session_queue, child_count=2)
     child_queue_items = session_queue.enqueue_workflow_call_children(
@@ -564,7 +563,7 @@ def test_history_pruning_retains_children_until_their_root_ends(session_queue, l
     assert prune() == 3
 
 
-def test_enqueue_workflow_call_child_rejects_full_pending_queue(session_queue: SqliteSessionQueue) -> None:
+def test_enqueue_workflow_call_child_rejects_full_pending_queue(session_queue: SessionQueue) -> None:
     parent_graph = Graph()
     parent_graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a"))
     parent_session = GraphExecutionState(graph=parent_graph)
@@ -579,7 +578,7 @@ def test_enqueue_workflow_call_child_rejects_full_pending_queue(session_queue: S
     parent_item_id = _insert_queue_item(session_queue, session=parent_session, status="waiting")
     _insert_queue_item(session_queue, session=GraphExecutionState(graph=Graph()), status="pending")
     parent_queue_item = session_queue.get_queue_item(parent_item_id)
-    session_queue._SqliteSessionQueue__invoker.services.configuration.max_queue_size = 1
+    session_queue._SessionQueue__invoker.services.configuration.max_queue_size = 1
 
     with pytest.raises(TooManySessionsError, match="remaining queue capacity"):
         session_queue.enqueue_workflow_call_child(parent_queue_item, child_session)
@@ -588,7 +587,7 @@ def test_enqueue_workflow_call_child_rejects_full_pending_queue(session_queue: S
 
 
 def test_enqueue_workflow_call_child_preserves_workflow_through_nested_calls(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
 ) -> None:
     workflow = _workflow_without_id()
 
@@ -636,7 +635,7 @@ def test_enqueue_workflow_call_child_preserves_workflow_through_nested_calls(
     assert session_queue.get_queue_item_workflow_json(root_item_id) == workflow.model_dump_json()
 
 
-def test_enqueue_workflow_call_child_persists_batch_field_values(session_queue: SqliteSessionQueue) -> None:
+def test_enqueue_workflow_call_child_persists_batch_field_values(session_queue: SessionQueue) -> None:
     parent_graph = Graph()
     parent_graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a"))
     parent_session = GraphExecutionState(graph=parent_graph)
@@ -648,7 +647,7 @@ def test_enqueue_workflow_call_child_persists_batch_field_values(session_queue: 
     parent_session.begin_waiting_on_workflow_call(frame)
     parent_session.attach_waiting_workflow_call_child_session(child_session)
 
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -694,7 +693,7 @@ def test_enqueue_workflow_call_child_persists_batch_field_values(session_queue: 
 
 
 def test_suspend_and_enqueue_child_emit_waiting_then_pending_status_events(
-    session_queue: SqliteSessionQueue, event_bus: TestEventService
+    session_queue: SessionQueue, event_bus: TestEventService
 ) -> None:
     parent_graph = Graph()
     parent_graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a"))
@@ -707,7 +706,7 @@ def test_suspend_and_enqueue_child_emit_waiting_then_pending_status_events(
     parent_session.begin_waiting_on_workflow_call(frame)
     parent_session.attach_waiting_workflow_call_child_session(child_session)
 
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -765,11 +764,11 @@ def test_suspend_and_enqueue_child_emit_waiting_then_pending_status_events(
     assert child_pending_event.queue_status.item_id is None
 
 
-def test_get_queue_status_counts_waiting_items(session_queue: SqliteSessionQueue) -> None:
+def test_get_queue_status_counts_waiting_items(session_queue: SessionQueue) -> None:
     session = GraphExecutionState(graph=Graph())
     session_json = session.model_dump_json(warnings=False)
 
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -810,13 +809,13 @@ def test_get_queue_status_counts_waiting_items(session_queue: SqliteSessionQueue
     assert queue_status.total == 1
 
 
-def test_startup_cancellation_cancels_waiting_workflow_call_chain(session_queue: SqliteSessionQueue) -> None:
+def test_startup_cancellation_cancels_waiting_workflow_call_chain(session_queue: SessionQueue) -> None:
     parent_session = GraphExecutionState(graph=Graph())
     child_session = GraphExecutionState(graph=Graph())
     sibling_session = GraphExecutionState(graph=Graph())
     batch_id = str(uuid.uuid4())
 
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -899,7 +898,7 @@ def test_startup_cancellation_cancels_waiting_workflow_call_chain(session_queue:
     session_queue._set_in_progress_to_canceled()
 
     assert session_queue.get_queue_item(parent_item_id).status == "canceled"
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             SELECT status
@@ -913,12 +912,12 @@ def test_startup_cancellation_cancels_waiting_workflow_call_chain(session_queue:
     assert child_statuses == ["canceled", "canceled"]
 
 
-def test_cancel_queue_item_cascades_from_waiting_parent_to_child_chain(session_queue: SqliteSessionQueue) -> None:
+def test_cancel_queue_item_cascades_from_waiting_parent_to_child_chain(session_queue: SessionQueue) -> None:
     parent_session = GraphExecutionState(graph=Graph())
     child_session = GraphExecutionState(graph=Graph())
     grandchild_session = GraphExecutionState(graph=Graph())
 
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -994,7 +993,7 @@ def test_cancel_queue_item_cascades_from_waiting_parent_to_child_chain(session_q
 
 
 def test_cancel_child_uses_metadata_chain_walk_and_hydrates_each_item_once(
-    session_queue: SqliteSessionQueue, monkeypatch: pytest.MonkeyPatch
+    session_queue: SessionQueue, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     parent_item_id, parent_session, child_sessions = _build_waiting_workflow_call_parent(session_queue, child_count=1)
     child_item_id = _insert_queue_item(
@@ -1025,11 +1024,11 @@ def test_cancel_child_uses_metadata_chain_walk_and_hydrates_each_item_once(
     assert hydrate_calls == 2
 
 
-def test_cancel_queue_item_cascades_from_child_to_waiting_parents(session_queue: SqliteSessionQueue) -> None:
+def test_cancel_queue_item_cascades_from_child_to_waiting_parents(session_queue: SessionQueue) -> None:
     parent_session = GraphExecutionState(graph=Graph())
     child_session = GraphExecutionState(graph=Graph())
 
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -1079,12 +1078,12 @@ def test_cancel_queue_item_cascades_from_child_to_waiting_parents(session_queue:
     assert session_queue.get_queue_item(parent_item_id).status == "canceled"
 
 
-def test_delete_queue_item_removes_entire_workflow_call_chain(session_queue: SqliteSessionQueue) -> None:
+def test_delete_queue_item_removes_entire_workflow_call_chain(session_queue: SessionQueue) -> None:
     parent_session = GraphExecutionState(graph=Graph())
     child_session = GraphExecutionState(graph=Graph())
     grandchild_session = GraphExecutionState(graph=Graph())
 
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -1163,12 +1162,12 @@ def test_delete_queue_item_removes_entire_workflow_call_chain(session_queue: Sql
 
 
 def test_delete_queue_item_cancels_active_workflow_call_chain_before_deleting(
-    session_queue: SqliteSessionQueue, event_bus: TestEventService
+    session_queue: SessionQueue, event_bus: TestEventService
 ) -> None:
     parent_session = GraphExecutionState(graph=Graph())
     child_session = GraphExecutionState(graph=Graph())
 
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -1224,12 +1223,12 @@ def test_delete_queue_item_cancels_active_workflow_call_chain_before_deleting(
 
 
 def test_cancel_queue_item_cascade_emits_canceled_events_for_waiting_parent_and_running_child(
-    session_queue: SqliteSessionQueue, event_bus: TestEventService
+    session_queue: SessionQueue, event_bus: TestEventService
 ) -> None:
     parent_session = GraphExecutionState(graph=Graph())
     child_session = GraphExecutionState(graph=Graph())
 
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -1284,7 +1283,7 @@ def test_cancel_queue_item_cascade_emits_canceled_events_for_waiting_parent_and_
     assert canceled_events[-1].queue_status.in_progress == 0
 
 
-def test_cancel_workflow_call_children_cancels_nested_descendants(session_queue: SqliteSessionQueue) -> None:
+def test_cancel_workflow_call_children_cancels_nested_descendants(session_queue: SessionQueue) -> None:
     root_session = GraphExecutionState(graph=Graph())
     waiting_child_session = GraphExecutionState(graph=Graph())
     nested_child_session = GraphExecutionState(graph=Graph())
@@ -1331,7 +1330,7 @@ def test_cancel_workflow_call_children_cancels_nested_descendants(session_queue:
 
 
 def test_cancel_all_except_current_cancels_waiting_chains_outside_current_chain(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
 ) -> None:
     current_parent_session = GraphExecutionState(graph=Graph())
     current_child_session = GraphExecutionState(graph=Graph())
@@ -1371,7 +1370,7 @@ def test_cancel_all_except_current_cancels_waiting_chains_outside_current_chain(
 
 
 def test_delete_all_except_current_deletes_waiting_chains_outside_current_chain(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
 ) -> None:
     current_parent_session = GraphExecutionState(graph=Graph())
     current_child_session = GraphExecutionState(graph=Graph())
@@ -1413,7 +1412,7 @@ def test_delete_all_except_current_deletes_waiting_chains_outside_current_chain(
 
 
 def test_cancel_all_except_current_preserves_waiting_chain_during_pending_child_handoff(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
 ) -> None:
     parent_session = GraphExecutionState(graph=Graph())
     child_session = GraphExecutionState(graph=Graph())
@@ -1441,7 +1440,7 @@ def test_cancel_all_except_current_preserves_waiting_chain_during_pending_child_
 
 
 def test_delete_all_except_current_preserves_waiting_chain_during_pending_child_handoff(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
 ) -> None:
     parent_session = GraphExecutionState(graph=Graph())
     child_session = GraphExecutionState(graph=Graph())
@@ -1469,7 +1468,7 @@ def test_delete_all_except_current_preserves_waiting_chain_during_pending_child_
         session_queue.get_queue_item(unrelated_item_id)
 
 
-def test_cancel_by_queue_id_cancels_current_workflow_call_descendants(session_queue: SqliteSessionQueue) -> None:
+def test_cancel_by_queue_id_cancels_current_workflow_call_descendants(session_queue: SessionQueue) -> None:
     parent_session = GraphExecutionState(graph=Graph())
     child_session = GraphExecutionState(graph=Graph())
     nested_child_session = GraphExecutionState(graph=Graph())
@@ -1504,7 +1503,7 @@ def test_cancel_by_queue_id_cancels_current_workflow_call_descendants(session_qu
 
 
 def test_cancel_by_batch_ids_cancels_waiting_parent_and_in_progress_child(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
 ) -> None:
     batch_id = str(uuid.uuid4())
     parent_session = GraphExecutionState(graph=Graph())
@@ -1535,7 +1534,7 @@ def test_cancel_by_batch_ids_cancels_waiting_parent_and_in_progress_child(
 
 
 def test_cancel_by_destination_cancels_waiting_parent_and_in_progress_child(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
 ) -> None:
     destination = "gallery"
     parent_session = GraphExecutionState(graph=Graph())
@@ -1565,11 +1564,11 @@ def test_cancel_by_destination_cancels_waiting_parent_and_in_progress_child(
     assert session_queue.get_queue_item(child_item_id).status == "canceled"
 
 
-def test_retry_items_by_id_retries_root_once_for_child_chain_item(session_queue: SqliteSessionQueue) -> None:
+def test_retry_items_by_id_retries_root_once_for_child_chain_item(session_queue: SessionQueue) -> None:
     root_session = GraphExecutionState(graph=Graph())
     child_session = GraphExecutionState(graph=Graph())
 
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -1627,13 +1626,13 @@ def test_retry_items_by_id_retries_root_once_for_child_chain_item(session_queue:
 
 
 def test_retry_items_by_id_emits_root_only_retry_event_for_nested_failure_chain(
-    session_queue: SqliteSessionQueue, event_bus: TestEventService
+    session_queue: SessionQueue, event_bus: TestEventService
 ) -> None:
     root_session = GraphExecutionState(graph=Graph())
     child_session = GraphExecutionState(graph=Graph())
     grandchild_session = GraphExecutionState(graph=Graph())
 
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -1710,11 +1709,11 @@ def test_retry_items_by_id_emits_root_only_retry_event_for_nested_failure_chain(
     assert retry_events[0].retried_item_ids == [root_item_id]
 
 
-def test_retry_items_by_id_respects_remaining_queue_capacity(session_queue: SqliteSessionQueue) -> None:
+def test_retry_items_by_id_respects_remaining_queue_capacity(session_queue: SessionQueue) -> None:
     root_session = GraphExecutionState(graph=Graph())
     pending_session = GraphExecutionState(graph=Graph())
 
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -1751,7 +1750,7 @@ def test_retry_items_by_id_respects_remaining_queue_capacity(session_queue: Sqli
         )
         root_item_id = cursor.lastrowid
 
-    session_queue._SqliteSessionQueue__invoker.services.configuration.max_queue_size = 1
+    session_queue._SessionQueue__invoker.services.configuration.max_queue_size = 1
     retry_result = session_queue.retry_items_by_id("default", [root_item_id])
 
     assert retry_result.retried_item_ids == []

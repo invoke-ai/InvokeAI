@@ -51,6 +51,7 @@ from invokeai.app.services.shared.database.dialect import (
     upsert,
 )
 from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, read, write
+from invokeai.app.services.shared.database.queries.session_queue import ACTIVE_QUEUE_STATUSES
 from invokeai.app.services.shared.database.schema.boards import board_images
 from invokeai.app.services.shared.database.schema.images import images
 from invokeai.app.services.shared.database.schema.intermediates import (
@@ -68,7 +69,6 @@ MediaKind = Literal["image", "video"]
 Classification = Literal["safe", "referenced", "active", "recent"]
 CleanupMode = Literal["safe", "force"]
 
-ACTIVE_QUEUE_STATUSES = ("pending", "in_progress", "waiting")
 # The selected rows of a preview, per statement. A statement has a power of two of slots, the spare ones bound to
 # NULL, so that a few statements serve every selection while each row is checked against few slots.
 TARGET_SLOTS = 32

@@ -6,16 +6,17 @@ import pytest
 
 from invokeai.app.services.events.events_common import QueueItemsRetriedEvent
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
+from invokeai.app.services.session_queue.session_queue_default import SessionQueue
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from tests.fixtures.sqlite_database import legacy_cursor_of
 from tests.test_nodes import TestEventService
 
 
 @pytest.fixture
-def session_queue(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SqliteSessionQueue:
+def session_queue(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SessionQueue:
     db = mock_sqlite_database
-    queue = SqliteSessionQueue(db=db)
+    queue = SessionQueue(db.database)
     queue.start(mock_invoker)
     return queue
 
@@ -27,7 +28,7 @@ def event_bus(mock_invoker: Invoker) -> TestEventService:
 
 
 def _insert_queue_item(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
     *,
     session: GraphExecutionState,
     status: str,
@@ -36,7 +37,7 @@ def _insert_queue_item(
     project_id: str | None = None,
     queue_id: str = "default",
 ) -> int:
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -86,7 +87,7 @@ def _insert_queue_item(
 
 
 def test_retry_items_by_id_retries_root_once_for_child_chain_item(
-    session_queue: SqliteSessionQueue, event_bus: TestEventService
+    session_queue: SessionQueue, event_bus: TestEventService
 ) -> None:
     root_session = GraphExecutionState(graph=Graph())
     child_session = GraphExecutionState(graph=Graph())
@@ -120,7 +121,7 @@ def test_retry_items_by_id_retries_root_once_for_child_chain_item(
 
 
 def test_retry_items_by_id_emits_unique_owner_ids_for_multiple_roots(
-    session_queue: SqliteSessionQueue, event_bus: TestEventService
+    session_queue: SessionQueue, event_bus: TestEventService
 ) -> None:
     first_root_item_id = _insert_queue_item(
         session_queue, session=GraphExecutionState(graph=Graph()), user_id="user-1", status="failed"
@@ -143,7 +144,7 @@ def test_retry_items_by_id_emits_unique_owner_ids_for_multiple_roots(
 
 
 def test_retried_items_inherit_the_project_of_the_root(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
 ) -> None:
     root_item_id = _insert_queue_item(
         session_queue,

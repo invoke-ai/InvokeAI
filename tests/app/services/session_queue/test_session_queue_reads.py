@@ -5,21 +5,19 @@ service with only its database: its reads need nothing else.
 """
 
 import json
-from types import SimpleNamespace
-from typing import Any, Optional, cast
+from typing import Any, Optional
 
 import pytest
 from pydantic_core import to_jsonable_python
 from sqlalchemy import insert
 
-from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
+from invokeai.app.services.session_queue.session_queue_default import SessionQueue
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.schema.session_queue import session_queue, session_queue_enqueue_receipts
 from invokeai.app.services.shared.database.schema.users import users
 from invokeai.app.services.shared.execution_state_migration import dump_execution_state
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
 QUEUE = "default"
 
@@ -37,8 +35,8 @@ def accounts(database: Database) -> None:
 
 
 @pytest.fixture
-def service(database: Database) -> SqliteSessionQueue:
-    return SqliteSessionQueue(cast(SqliteDatabase, SimpleNamespace(database=database)))
+def service(database: Database) -> SessionQueue:
+    return SessionQueue(database)
 
 
 def _item(
@@ -346,7 +344,7 @@ class TestWorkflowCallChains:
 class TestServiceReads:
     """The DTOs the service builds from these rows, on every backend."""
 
-    def test_an_item_reads_whole_and_for_the_api(self, database: Database, service: SqliteSessionQueue) -> None:
+    def test_an_item_reads_whole_and_for_the_api(self, database: Database, service: SessionQueue) -> None:
         item_id = _item(database, origin="canvas", destination="gallery")
 
         item = service.get_queue_item(item_id)
@@ -356,7 +354,7 @@ class TestServiceReads:
         assert (item.item_id, item.user_display_name, item.field_values[0].value) == (item_id, "Alice", 7)  # type: ignore[index]
         assert (for_api.status, for_api.origin, for_api.destination) == ("pending", "canvas", "gallery")
 
-    def test_summaries_follow_the_callers_order(self, database: Database, service: SqliteSessionQueue) -> None:
+    def test_summaries_follow_the_callers_order(self, database: Database, service: SessionQueue) -> None:
         item_ids = [_item(database) for _ in range(3)]
         child = _item(database, parent_item_id=item_ids[0])
 
@@ -365,7 +363,7 @@ class TestServiceReads:
         assert [summary.item_id for summary in summaries] == [child, *reversed(item_ids)]
         assert (summaries[0].parent_item_id, summaries[0].user_email) == (item_ids[0], "alice@example.com")
 
-    def test_batch_status_and_destination_counts(self, database: Database, service: SqliteSessionQueue) -> None:
+    def test_batch_status_and_destination_counts(self, database: Database, service: SessionQueue) -> None:
         _item(database, batch_id="b", status="pending", origin="canvas", destination="gallery")
         _item(database, batch_id="b", status="completed", origin="canvas", destination="gallery")
 
@@ -381,9 +379,7 @@ class TestServiceReads:
         )
         assert (destination.pending, destination.completed, destination.total) == (1, 1, 2)
 
-    def test_queue_status_hides_another_accounts_current_item(
-        self, database: Database, service: SqliteSessionQueue
-    ) -> None:
+    def test_queue_status_hides_another_accounts_current_item(self, database: Database, service: SessionQueue) -> None:
         bobs = _item(database, status="in_progress", user_id="bob")
         _item(database, status="pending")
 
@@ -393,7 +389,7 @@ class TestServiceReads:
         assert (as_alice.item_id, as_alice.user_pending, as_alice.in_progress) == (None, 1, 1)
         assert (as_bob.item_id, as_bob.user_in_progress, as_bob.total) == (bobs, 1, 2)
 
-    def test_current_next_and_ids(self, database: Database, service: SqliteSessionQueue) -> None:
+    def test_current_next_and_ids(self, database: Database, service: SessionQueue) -> None:
         running = _item(database, status="in_progress", created_at="2026-01-01 00:00:00.000")
         waiting = _item(database, status="pending", created_at="2026-01-02 00:00:00.000")
 
@@ -403,7 +399,7 @@ class TestServiceReads:
         assert (current and current.item_id, next_item and next_item.item_id) == (running, waiting)
         assert (ids.item_ids, ids.total_count) == ([waiting, running], 2)
 
-    def test_list_queue_items_pages_by_its_cursor(self, database: Database, service: SqliteSessionQueue) -> None:
+    def test_list_queue_items_pages_by_its_cursor(self, database: Database, service: SessionQueue) -> None:
         item_ids = [_item(database, priority=1) for _ in range(3)]
 
         first = service.list_queue_items(QUEUE, limit=2, priority=0)

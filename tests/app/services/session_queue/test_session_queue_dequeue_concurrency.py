@@ -6,27 +6,28 @@ import uuid
 import pytest
 
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
+from invokeai.app.services.session_queue.session_queue_default import SessionQueue
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from tests.fixtures.sqlite_database import legacy_cursor_of
 from tests.test_nodes import PromptTestInvocation
 
 
 @pytest.fixture
-def session_queue(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SqliteSessionQueue:
+def session_queue(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SessionQueue:
     db = mock_sqlite_database
-    queue = SqliteSessionQueue(db=db)
+    queue = SessionQueue(db.database)
     queue.start(mock_invoker)
     return queue
 
 
-def _insert_queue_item(session_queue: SqliteSessionQueue, user_id: str = "system") -> int:
+def _insert_queue_item(session_queue: SessionQueue, user_id: str = "system") -> int:
     graph = Graph()
     graph.add_node(PromptTestInvocation(id="prompt", prompt="test"))
     session = GraphExecutionState(graph=graph)
     session_json = session.model_dump_json(warnings=False, exclude_none=True)
     batch_id = str(uuid.uuid4())
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -40,7 +41,7 @@ def _insert_queue_item(session_queue: SqliteSessionQueue, user_id: str = "system
         return cursor.lastrowid
 
 
-def test_concurrent_dequeue_never_claims_same_item_twice(session_queue: SqliteSessionQueue) -> None:
+def test_concurrent_dequeue_never_claims_same_item_twice(session_queue: SessionQueue) -> None:
     item_count = 50
     worker_count = 8
     for _ in range(item_count):
@@ -71,7 +72,7 @@ def test_concurrent_dequeue_never_claims_same_item_twice(session_queue: SqliteSe
     assert len(set(claimed_ids)) == item_count
 
 
-def test_dequeue_records_processing_device(session_queue: SqliteSessionQueue) -> None:
+def test_dequeue_records_processing_device(session_queue: SessionQueue) -> None:
     _insert_queue_item(session_queue)
 
     item = session_queue.dequeue(device="cuda:1")
@@ -83,7 +84,7 @@ def test_dequeue_records_processing_device(session_queue: SqliteSessionQueue) ->
     assert completed.device == "cuda:1"
 
 
-def test_dequeue_without_device_leaves_device_unset(session_queue: SqliteSessionQueue) -> None:
+def test_dequeue_without_device_leaves_device_unset(session_queue: SessionQueue) -> None:
     _insert_queue_item(session_queue)
 
     item = session_queue.dequeue()

@@ -40,6 +40,7 @@ from invokeai.app.services.shared.database.queries.intermediates import (
     WindowRow,
 )
 from invokeai.app.services.shared.database.queries.locks import DatabaseLock
+from invokeai.app.services.shared.database.types import timestamp_text
 from invokeai.app.services.shared.intermediate_delete import IntermediateDeleteGuard
 from invokeai.app.services.shared.media_references import IMAGE_NAME_KEYS, VIDEO_NAME_KEYS, MediaReferences
 
@@ -62,11 +63,6 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _sql_timestamp(moment: datetime) -> str:
-    """The canonical text of an instant, so that bound instants compare with stored ones as strings."""
-    return moment.strftime("%Y-%m-%d %H:%M:%S.") + f"{moment.microsecond // 1000:03d}"
-
-
 class _Clock(NamedTuple):
     """One instant for every statement of a classification."""
 
@@ -77,8 +73,8 @@ class _Clock(NamedTuple):
 def _clock(recent_cutoff: Optional[str] = None) -> _Clock:
     """The live clock, or the live clock judging recency as of an earlier preview."""
     now = _utc_now()
-    live_cutoff = _sql_timestamp(now - timedelta(seconds=RECENT_GRACE_SECONDS))
-    return _Clock(_sql_timestamp(now), min(live_cutoff, recent_cutoff) if recent_cutoff is not None else live_cutoff)
+    live_cutoff = timestamp_text(now - timedelta(seconds=RECENT_GRACE_SECONDS))
+    return _Clock(timestamp_text(now), min(live_cutoff, recent_cutoff) if recent_cutoff is not None else live_cutoff)
 
 
 @dataclass(frozen=True)
@@ -257,9 +253,9 @@ class IntermediatesRecords:
         def replace(q: Queries) -> None:
             q.locks.acquire(DatabaseLock.MEDIA_PROTECTION, shared=True)
             now = _utc_now()
-            q.intermediates.sweep_browser_holds(_sql_timestamp(now))
+            q.intermediates.sweep_browser_holds(timestamp_text(now))
             q.intermediates.release_lease(user_id, lease_id)
-            expires_at = _sql_timestamp(now + timedelta(seconds=BROWSER_HOLD_TTL_SECONDS))
+            expires_at = timestamp_text(now + timedelta(seconds=BROWSER_HOLD_TTL_SECONDS))
             for kind, names in held_by_kind:
                 if names:
                     q.intermediates.hold_for_lease(
@@ -325,7 +321,7 @@ class IntermediatesRecords:
         A row is written before its file, so a brand-new one would measure as missing. Failures are marked
         (`mark_unmeasurable`) rather than skipped by a bounded list, so later rows remain reachable.
         """
-        created_before = _sql_timestamp(_utc_now() - timedelta(seconds=min_age_seconds))
+        created_before = timestamp_text(_utc_now() - timedelta(seconds=min_age_seconds))
         return self._queries.intermediates.next_unmeasured(kind, limit=limit, created_before=created_before)
 
     def mark_unmeasurable(self, kind: MediaKind, names: Sequence[str]) -> None:

@@ -199,6 +199,31 @@ class CaseInsensitiveLike(FunctionElement[bool]):
         super().__init__(expression, pattern)
 
 
+class ContainsText(FunctionElement[bool]):
+    """Whether `haystack` contains `needle` as written, case and all; NULL for a NULL needle. `instr()` on SQLite,
+    MySQL and MariaDB, `strpos()` on Postgres: a substring test that needs no pattern escaping."""
+
+    inherit_cache = True
+    type = Boolean()
+    name = "contains_text"
+    _is_implicitly_boolean = True
+
+    def __init__(self, haystack: ColumnElement[str], needle: ColumnElement[str]) -> None:
+        super().__init__(haystack, needle)
+
+
+@compiles(ContainsText)
+def _compile_contains_text(element: ContainsText, compiler: SQLCompiler, **kw: Any) -> str:
+    haystack, needle = (compiler.process(clause, **kw) for clause in element.clauses)
+    return f"(instr({haystack}, {needle}) > 0)"
+
+
+@compiles(ContainsText, "postgresql")
+def _compile_contains_text_postgresql(element: ContainsText, compiler: SQLCompiler, **kw: Any) -> str:
+    haystack, needle = (compiler.process(clause, **kw) for clause in element.clauses)
+    return f"(strpos({haystack}, {needle}) > 0)"
+
+
 def _escape_like(text: str) -> str:
     escaped = text.replace(_LIKE_ESCAPE, _LIKE_ESCAPE * 2)
     return escaped.replace("%", _LIKE_ESCAPE + "%").replace("_", _LIKE_ESCAPE + "_")

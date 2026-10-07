@@ -12,15 +12,16 @@ from invokeai.app.invocations.loops import (
     StateSetInvocation,
 )
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
+from invokeai.app.services.session_queue.session_queue_default import SessionQueue
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from tests.fixtures.sqlite_database import legacy_cursor_of
 from tests.test_nodes import AnyTypeTestInvocation, create_edge, create_loop_linkage
 
 
 @pytest.fixture
-def session_queue(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SqliteSessionQueue:
-    queue = SqliteSessionQueue(db=mock_sqlite_database)
+def session_queue(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SessionQueue:
+    queue = SessionQueue(mock_sqlite_database.database)
     queue.start(mock_invoker)
     return queue
 
@@ -89,11 +90,11 @@ def _empty_for_missing_state_graph() -> Graph:
     return graph
 
 
-def _insert_session(queue: SqliteSessionQueue, state: GraphExecutionState) -> int:
+def _insert_session(queue: SessionQueue, state: GraphExecutionState) -> int:
     session_id = str(uuid.uuid4())
     batch_id = str(uuid.uuid4())
     session_json = state.model_dump_json(warnings=False, exclude_none=True)
-    with queue._db.transaction() as cursor:
+    with legacy_cursor_of(queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -106,7 +107,7 @@ def _insert_session(queue: SqliteSessionQueue, state: GraphExecutionState) -> in
         return cursor.lastrowid  # type: ignore[return-value]
 
 
-def test_sqlite_queue_resumes_partial_stateful_for_loop(session_queue: SqliteSessionQueue) -> None:
+def test_sqlite_queue_resumes_partial_stateful_for_loop(session_queue: SessionQueue) -> None:
     item_id = _insert_session(session_queue, GraphExecutionState(graph=_stateful_for_graph()))
 
     queue_item = session_queue.dequeue()
@@ -169,7 +170,7 @@ def test_sqlite_queue_resumes_partial_stateful_for_loop(session_queue: SqliteSes
 
 
 def test_sqlite_queue_round_trips_a_checkpoint_before_each_next_node(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
 ) -> None:
     """Every manually persisted node boundary must survive a process restart before the next node.
 
@@ -221,7 +222,7 @@ def test_sqlite_queue_round_trips_a_checkpoint_before_each_next_node(
     assert final_item.session.is_complete()
 
 
-def test_sqlite_queue_round_trips_empty_for_final_output(session_queue: SqliteSessionQueue) -> None:
+def test_sqlite_queue_round_trips_empty_for_final_output(session_queue: SessionQueue) -> None:
     item_id = _insert_session(session_queue, GraphExecutionState(graph=_empty_for_graph()))
 
     queue_item = session_queue.dequeue()
@@ -242,7 +243,7 @@ def test_sqlite_queue_round_trips_empty_for_final_output(session_queue: SqliteSe
 
 
 def test_sqlite_queue_round_trips_missing_loop_state_value_after_empty_for(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
 ) -> None:
     item_id = _insert_session(session_queue, GraphExecutionState(graph=_empty_for_missing_state_graph()))
 
@@ -264,7 +265,7 @@ def test_sqlite_queue_round_trips_missing_loop_state_value_after_empty_for(
 
 
 def test_sqlite_queue_resumes_nested_for_after_first_outer_iteration(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
 ) -> None:
     item_id = _insert_session(session_queue, GraphExecutionState(graph=_nested_for_graph()))
 

@@ -21,27 +21,28 @@ import uuid
 import pytest
 
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
+from invokeai.app.services.session_queue.session_queue_default import SessionQueue
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from tests.fixtures.sqlite_database import legacy_cursor_of
 from tests.test_nodes import PromptTestInvocation
 
 
 @pytest.fixture
-def session_queue(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SqliteSessionQueue:
+def session_queue(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SessionQueue:
     db = mock_sqlite_database
-    queue = SqliteSessionQueue(db=db)
+    queue = SessionQueue(db.database)
     queue.start(mock_invoker)
     return queue
 
 
-def _insert_queue_item(session_queue: SqliteSessionQueue, user_id: str, origin: str | None = None) -> int:
+def _insert_queue_item(session_queue: SessionQueue, user_id: str, origin: str | None = None) -> int:
     graph = Graph()
     graph.add_node(PromptTestInvocation(id="prompt", prompt="test"))
     session = GraphExecutionState(graph=graph)
     session_json = session.model_dump_json(warnings=False, exclude_none=True)
     batch_id = str(uuid.uuid4())
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -55,7 +56,7 @@ def _insert_queue_item(session_queue: SqliteSessionQueue, user_id: str, origin: 
         return cursor.lastrowid  # type: ignore[return-value]
 
 
-def test_status_aggregate_counts_are_global_with_user_subcounts(session_queue: SqliteSessionQueue) -> None:
+def test_status_aggregate_counts_are_global_with_user_subcounts(session_queue: SessionQueue) -> None:
     """A non-admin caller (user_id set) sees global aggregate counts plus their own subcounts."""
     user_a = "user-a"
     user_b = "user-b"
@@ -73,7 +74,7 @@ def test_status_aggregate_counts_are_global_with_user_subcounts(session_queue: S
     assert status.user_in_progress == 0
 
 
-def test_status_admin_global_call_omits_user_subcounts(session_queue: SqliteSessionQueue) -> None:
+def test_status_admin_global_call_omits_user_subcounts(session_queue: SessionQueue) -> None:
     """An admin/global caller (user_id=None) gets global counts and no per-user subcounts."""
     _insert_queue_item(session_queue, user_id="user-a")
     _insert_queue_item(session_queue, user_id="user-b")
@@ -86,7 +87,7 @@ def test_status_admin_global_call_omits_user_subcounts(session_queue: SqliteSess
     assert status.user_in_progress is None
 
 
-def test_status_current_item_redacted_for_non_owner_but_counts_global(session_queue: SqliteSessionQueue) -> None:
+def test_status_current_item_redacted_for_non_owner_but_counts_global(session_queue: SessionQueue) -> None:
     """When the in-progress item belongs to another user, its identifiers are hidden from a
     non-owner, but the aggregate counts (and the user's own subcounts) remain populated."""
     user_a = "user-a"
@@ -110,7 +111,7 @@ def test_status_current_item_redacted_for_non_owner_but_counts_global(session_qu
 
 
 def test_status_admin_caller_gets_user_subcounts_and_current_item_identifiers(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
 ) -> None:
     """An admin caller (user_id set, is_admin=True) gets their own subcounts - so personal UI
     like the progress bar can distinguish the admin's own activity from other users' - while
@@ -136,7 +137,7 @@ def test_status_admin_caller_gets_user_subcounts_and_current_item_identifiers(
 
 
 def test_status_origin_scope_preserves_admin_subcounts_and_current_item_visibility(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
 ) -> None:
     """Origin scoping applies consistently to aggregate counts, personal counts, and the
     current-item snapshot without hiding another owner's identifiers from an admin."""
@@ -164,7 +165,7 @@ def test_status_origin_scope_preserves_admin_subcounts_and_current_item_visibili
     assert status.user_in_progress == 0
 
 
-def test_status_origin_scope_excludes_out_of_scope_current_item(session_queue: SqliteSessionQueue) -> None:
+def test_status_origin_scope_excludes_out_of_scope_current_item(session_queue: SessionQueue) -> None:
     """The current-item snapshot must honour origin_prefix, not just the aggregate counts.
 
     get_queue_status reads the in-progress item with a lightweight 4-column query rather than
@@ -190,7 +191,7 @@ def test_status_origin_scope_excludes_out_of_scope_current_item(session_queue: S
     assert status.total == 1
 
 
-def test_get_queue_item_ids_returns_all_users_ids(session_queue: SqliteSessionQueue) -> None:
+def test_get_queue_item_ids_returns_all_users_ids(session_queue: SessionQueue) -> None:
     """get_queue_item_ids returns ids for every user so the virtualized list can show the
     (redacted) entries belonging to other users. Redaction happens at hydration time."""
     a_item_id = _insert_queue_item(session_queue, user_id="user-a")
@@ -203,11 +204,11 @@ def test_get_queue_item_ids_returns_all_users_ids(session_queue: SqliteSessionQu
 
 
 def test_get_queue_item_summaries_by_ids_returns_only_requested_queue_items_in_order(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
 ) -> None:
     first_id = _insert_queue_item(session_queue, user_id="user-a")
     second_id = _insert_queue_item(session_queue, user_id="user-b")
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             UPDATE session_queue
@@ -240,7 +241,7 @@ def test_get_queue_item_summaries_by_ids_returns_only_requested_queue_items_in_o
 
 
 def test_get_queue_item_summaries_by_ids_takes_more_ids_than_sqlite_binds(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
 ) -> None:
     """A list longer than SQLite's per-statement variable limit is answered, in the caller's order:
     an IN (...) binding every id would raise OperationalError past that limit."""
@@ -248,7 +249,7 @@ def test_get_queue_item_summaries_by_ids_takes_more_ids_than_sqlite_binds(
 
     # Size the request off the limit this SQLite build actually enforces (999 on builds older than
     # 3.32, 32766 since), so the test stays meaningful wherever it runs.
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         bind_limit = cursor.connection.getlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER)
 
     # Padding ids do not exist, which also covers chunks that match nothing at all.

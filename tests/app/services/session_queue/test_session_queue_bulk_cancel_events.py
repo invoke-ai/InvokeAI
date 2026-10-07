@@ -13,23 +13,24 @@ import pytest
 
 from invokeai.app.services.events.events_common import QueueItemsCanceledEvent
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
+from invokeai.app.services.session_queue.session_queue_default import SessionQueue
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from tests.fixtures.sqlite_database import legacy_cursor_of
 from tests.test_nodes import PromptTestInvocation
 
 
 @pytest.fixture
-def session_queue(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SqliteSessionQueue:
-    """Create a SqliteSessionQueue backed by the mock invoker's in-memory database."""
+def session_queue(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SessionQueue:
+    """Create a SessionQueue backed by the mock invoker's in-memory database."""
     db = mock_sqlite_database
-    queue = SqliteSessionQueue(db=db)
+    queue = SessionQueue(db.database)
     queue.start(mock_invoker)
     return queue
 
 
 def _insert_queue_item(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
     queue_id: str,
     user_id: str,
     batch_id: str | None = None,
@@ -39,7 +40,7 @@ def _insert_queue_item(
     """Directly insert a minimal pending queue item for the given user and return its item_id."""
     session_id = str(uuid.uuid4())
     batch_id = batch_id or str(uuid.uuid4())
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority, workflow, origin, destination, retried_from_item_id, user_id)
@@ -52,7 +53,7 @@ def _insert_queue_item(
 
 
 def _insert_dequeueable_queue_item(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
     queue_id: str,
     user_id: str,
     destination: str | None = None,
@@ -63,7 +64,7 @@ def _insert_dequeueable_queue_item(
     session = GraphExecutionState(graph=graph)
     session_json = session.model_dump_json(warnings=False, exclude_none=True)
     batch_id = str(uuid.uuid4())
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority, workflow, origin, destination, retried_from_item_id, user_id)
@@ -75,9 +76,9 @@ def _insert_dequeueable_queue_item(
         return cursor.lastrowid
 
 
-def _status_of(session_queue: SqliteSessionQueue, item_id: int) -> str:
+def _status_of(session_queue: SessionQueue, item_id: int) -> str:
     """Reads an item's status directly; the minimal inserted rows carry no parseable session."""
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute("SELECT status FROM session_queue WHERE item_id = ?", (item_id,))
         return str(cursor.fetchone()[0])
 
@@ -87,7 +88,7 @@ def _canceled_events(mock_invoker: Invoker) -> list[QueueItemsCanceledEvent]:
 
 
 def test_cancel_all_except_current_emits_queue_items_canceled_grouped_by_owner(
-    session_queue: SqliteSessionQueue, mock_invoker: Invoker
+    session_queue: SessionQueue, mock_invoker: Invoker
 ) -> None:
     """An admin cancel (no user_id) affects every user's pending items; each owner's client needs
     its own item ids so its queue list and badge counts refetch."""
@@ -108,7 +109,7 @@ def test_cancel_all_except_current_emits_queue_items_canceled_grouped_by_owner(
 
 
 def test_cancel_all_except_current_scoped_to_user_only_names_their_items(
-    session_queue: SqliteSessionQueue, mock_invoker: Invoker
+    session_queue: SessionQueue, mock_invoker: Invoker
 ) -> None:
     """A non-admin cancel is scoped to the caller; other users' items are untouched and must not
     appear in the event."""
@@ -124,7 +125,7 @@ def test_cancel_all_except_current_scoped_to_user_only_names_their_items(
 
 
 def test_cancel_all_except_current_scoped_to_origin_prefix_leaves_other_origins(
-    session_queue: SqliteSessionQueue, mock_invoker: Invoker
+    session_queue: SessionQueue, mock_invoker: Invoker
 ) -> None:
     """A project-scoped cancel-all (the webv2 queue widget's default scope) must only sweep items whose
     origin carries that project's prefix; the prefix is a plain prefix, not a pattern."""
@@ -148,7 +149,7 @@ def test_cancel_all_except_current_scoped_to_origin_prefix_leaves_other_origins(
 
 
 def test_cancel_by_queue_id_scoped_to_origin_prefix_and_user(
-    session_queue: SqliteSessionQueue, mock_invoker: Invoker
+    session_queue: SessionQueue, mock_invoker: Invoker
 ) -> None:
     """The scoped cancel-all behind the webv2 queue widget's "Cancel All Items": pending items in the
     prefix are swept in one statement, other origins and other users' items stay untouched."""
@@ -165,7 +166,7 @@ def test_cancel_by_queue_id_scoped_to_origin_prefix_and_user(
 
 
 def test_delete_all_except_current_emits_queue_items_canceled(
-    session_queue: SqliteSessionQueue, mock_invoker: Invoker
+    session_queue: SessionQueue, mock_invoker: Invoker
 ) -> None:
     """Bulk delete removes rows entirely — same notification requirement as bulk cancel."""
     a1 = _insert_queue_item(session_queue, "default", "user_a")
@@ -179,7 +180,7 @@ def test_delete_all_except_current_emits_queue_items_canceled(
     assert events[0].canceled_item_ids_by_user == {"user_a": [a1], "user_b": [b1]}
 
 
-def test_no_event_when_nothing_was_canceled(session_queue: SqliteSessionQueue, mock_invoker: Invoker) -> None:
+def test_no_event_when_nothing_was_canceled(session_queue: SessionQueue, mock_invoker: Invoker) -> None:
     """An empty result must not broadcast a pointless refetch signal to every client."""
     result = session_queue.cancel_all_except_current("default")
 
@@ -187,9 +188,7 @@ def test_no_event_when_nothing_was_canceled(session_queue: SqliteSessionQueue, m
     assert _canceled_events(mock_invoker) == []
 
 
-def test_cancel_by_batch_ids_emits_queue_items_canceled(
-    session_queue: SqliteSessionQueue, mock_invoker: Invoker
-) -> None:
+def test_cancel_by_batch_ids_emits_queue_items_canceled(session_queue: SessionQueue, mock_invoker: Invoker) -> None:
     """Canceling batches bulk-updates pending rows with no per-item events; other clients need
     the bulk event to learn the items left the queue."""
     batch_id = str(uuid.uuid4())
@@ -205,9 +204,7 @@ def test_cancel_by_batch_ids_emits_queue_items_canceled(
     assert events[0].canceled_item_ids_by_user == {"user_a": [a1, a2]}
 
 
-def test_cancel_by_destination_emits_queue_items_canceled(
-    session_queue: SqliteSessionQueue, mock_invoker: Invoker
-) -> None:
+def test_cancel_by_destination_emits_queue_items_canceled(session_queue: SessionQueue, mock_invoker: Invoker) -> None:
     """Discarding a canvas staging area cancels by destination; the bulk event keeps other
     clients' queue badges in sync."""
     a1 = _insert_queue_item(session_queue, "default", "user_a", destination="canvas:sess-1")
@@ -222,9 +219,7 @@ def test_cancel_by_destination_emits_queue_items_canceled(
     assert events[0].canceled_item_ids_by_user == {"user_a": [a1], "user_b": [b1]}
 
 
-def test_delete_by_destination_emits_queue_items_canceled(
-    session_queue: SqliteSessionQueue, mock_invoker: Invoker
-) -> None:
+def test_delete_by_destination_emits_queue_items_canceled(session_queue: SessionQueue, mock_invoker: Invoker) -> None:
     """Bulk delete by destination removes rows entirely - same notification requirement."""
     a1 = _insert_queue_item(session_queue, "default", "user_a", destination="canvas:sess-1")
     _insert_queue_item(session_queue, "default", "user_a", destination="other")
@@ -238,7 +233,7 @@ def test_delete_by_destination_emits_queue_items_canceled(
 
 
 def test_delete_by_destination_excludes_separately_canceled_current_item(
-    session_queue: SqliteSessionQueue, mock_invoker: Invoker
+    session_queue: SessionQueue, mock_invoker: Invoker
 ) -> None:
     """The in-progress current item matching the destination is canceled via cancel_queue_item,
     which emits its own per-item queue_item_status_changed - the bulk event must not signal the
@@ -257,9 +252,7 @@ def test_delete_by_destination_excludes_separately_canceled_current_item(
     assert events[0].canceled_item_ids_by_user == {"user_a": [pending_id]}
 
 
-def test_cancel_by_queue_id_emits_queue_items_canceled(
-    session_queue: SqliteSessionQueue, mock_invoker: Invoker
-) -> None:
+def test_cancel_by_queue_id_emits_queue_items_canceled(session_queue: SessionQueue, mock_invoker: Invoker) -> None:
     """Canceling a whole queue bulk-updates every user's non-terminal items."""
     a1 = _insert_queue_item(session_queue, "default", "user_a")
     b1 = _insert_queue_item(session_queue, "default", "user_b")

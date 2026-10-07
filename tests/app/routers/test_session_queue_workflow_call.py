@@ -14,11 +14,12 @@ from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
-from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
+from invokeai.app.services.session_queue.session_queue_default import SessionQueue
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
+from tests.fixtures.sqlite_database import legacy_cursor_of
 
 
 class MockApiDependencies(ApiDependencies):
@@ -112,7 +113,7 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
 @pytest.fixture
 def mock_invoker(mock_services: InvocationServices, mock_sqlite_database: SqliteDatabase) -> Invoker:
     invoker = Invoker(services=mock_services)
-    queue = SqliteSessionQueue(db=mock_sqlite_database)
+    queue = SessionQueue(mock_sqlite_database.database)
     mock_services.session_queue = queue
     mock_services.session_processor = MagicMock()
     mock_services.session_processor.get_status.return_value = SessionProcessorStatus(
@@ -168,7 +169,7 @@ def user2_token(enable_multiuser: Any, mock_invoker: Invoker, client: TestClient
 
 
 def _insert_queue_item(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
     *,
     queue_id: str = "default",
     user_id: str,
@@ -181,7 +182,7 @@ def _insert_queue_item(
     workflow_call_depth: int | None = None,
 ) -> int:
     session = session or GraphExecutionState(graph=Graph())
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (

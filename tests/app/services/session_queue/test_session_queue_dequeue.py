@@ -13,11 +13,7 @@ from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.events.events_common import QueueItemsRetriedEvent
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.session_queue.session_queue_common import get_session_for_queue_read
-from invokeai.app.services.session_queue.session_queue_sqlite import (
-    AFFINITY_MAX_LOOKAHEAD,
-    ROUND_ROBIN_DEQUEUE_QUERY,
-    SqliteSessionQueue,
-)
+from invokeai.app.services.session_queue.session_queue_default import AFFINITY_MAX_LOOKAHEAD, SessionQueue
 from invokeai.app.services.shared.execution_state_migration import (
     CURRENT_EXECUTION_STATE_VERSION,
     dump_execution_state,
@@ -25,23 +21,25 @@ from invokeai.app.services.shared.execution_state_migration import (
 )
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from tests.fixtures.database import capture_statements, explain_query_plan
+from tests.fixtures.sqlite_database import legacy_cursor_of
 from tests.test_nodes import TestEventService
 
 _EMPTY_SESSION_JSON = json.dumps(to_jsonable_python(GraphExecutionState(graph=Graph()).model_dump()))
 
 
 @pytest.fixture
-def session_queue_fifo(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SqliteSessionQueue:
+def session_queue_fifo(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SessionQueue:
     """Queue backed by a single-user (FIFO) invoker."""
     # Default config has multiuser=False, so FIFO is always used.
     db = mock_sqlite_database
-    queue = SqliteSessionQueue(db=db)
+    queue = SessionQueue(db.database)
     queue.start(mock_invoker)
     return queue
 
 
 @pytest.fixture
-def session_queue_round_robin(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SqliteSessionQueue:
+def session_queue_round_robin(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SessionQueue:
     """Queue backed by a multiuser invoker with round_robin mode."""
     mock_invoker.services.configuration = InvokeAIAppConfig(
         use_memory_db=True,
@@ -50,7 +48,7 @@ def session_queue_round_robin(mock_invoker: Invoker, mock_sqlite_database: Sqlit
         session_queue_mode="round_robin",
     )
     db = mock_sqlite_database
-    queue = SqliteSessionQueue(db=db)
+    queue = SessionQueue(db.database)
     queue.start(mock_invoker)
     return queue
 
@@ -62,7 +60,7 @@ def event_bus(mock_invoker: Invoker) -> TestEventService:
 
 
 def _insert_queue_item(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
     queue_id: str,
     user_id: str,
     priority: int = 0,
@@ -76,7 +74,7 @@ def _insert_queue_item(
     """
     session_id = str(uuid.uuid4())
     batch_id = str(uuid.uuid4())
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (item_id, queue_id, session, session_id, batch_id, field_values, priority, workflow, origin, destination, retried_from_item_id, user_id)
@@ -87,7 +85,7 @@ def _insert_queue_item(
         return cursor.lastrowid  # type: ignore[return-value]
 
 
-def _dequeue_user_ids(session_queue: SqliteSessionQueue, count: int) -> list[Optional[str]]:
+def _dequeue_user_ids(session_queue: SessionQueue, count: int) -> list[Optional[str]]:
     """Dequeue `count` items and return the list of user_ids in dequeue order."""
     result = []
     for _ in range(count):
@@ -101,7 +99,7 @@ def _dequeue_user_ids(session_queue: SqliteSessionQueue, count: int) -> list[Opt
 # ---------------------------------------------------------------------------
 
 
-def test_fifo_single_user_order(session_queue_fifo: SqliteSessionQueue) -> None:
+def test_fifo_single_user_order(session_queue_fifo: SessionQueue) -> None:
     """FIFO: items from a single user are dequeued in insertion order."""
     queue_id = "default"
     _insert_queue_item(session_queue_fifo, queue_id, "user_a")
@@ -112,7 +110,7 @@ def test_fifo_single_user_order(session_queue_fifo: SqliteSessionQueue) -> None:
     assert user_ids == ["user_a", "user_a", "user_a"]
 
 
-def test_fifo_multi_user_preserves_insertion_order(session_queue_fifo: SqliteSessionQueue) -> None:
+def test_fifo_multi_user_preserves_insertion_order(session_queue_fifo: SessionQueue) -> None:
     """FIFO: jobs from multiple users are dequeued in strict insertion order, not interleaved."""
     queue_id = "default"
     # Insert A1, A2, B1, C1, C2, A3 – FIFO should preserve this exact order.
@@ -127,7 +125,7 @@ def test_fifo_multi_user_preserves_insertion_order(session_queue_fifo: SqliteSes
     assert user_ids == ["user_a", "user_a", "user_b", "user_c", "user_c", "user_a"]
 
 
-def test_fifo_priority_respected(session_queue_fifo: SqliteSessionQueue) -> None:
+def test_fifo_priority_respected(session_queue_fifo: SessionQueue) -> None:
     """FIFO: higher-priority items are dequeued before lower-priority ones."""
     queue_id = "default"
     _insert_queue_item(session_queue_fifo, queue_id, "user_a", priority=0)
@@ -138,13 +136,13 @@ def test_fifo_priority_respected(session_queue_fifo: SqliteSessionQueue) -> None
     assert user_ids == ["user_a", "user_a"]
 
 
-def test_fifo_returns_none_when_empty(session_queue_fifo: SqliteSessionQueue) -> None:
+def test_fifo_returns_none_when_empty(session_queue_fifo: SessionQueue) -> None:
     """FIFO: dequeue returns None when the queue is empty."""
     assert session_queue_fifo.dequeue() is None
 
 
 def test_fifo_quarantines_future_snapshot_and_dequeues_later_work(
-    session_queue_fifo: SqliteSessionQueue,
+    session_queue_fifo: SessionQueue,
 ) -> None:
     future_session = json.loads(_EMPTY_SESSION_JSON)
     future_session["execution_state_version"] = CURRENT_EXECUTION_STATE_VERSION + 1
@@ -160,7 +158,7 @@ def test_fifo_quarantines_future_snapshot_and_dequeues_later_work(
 
     assert dequeued is not None
     assert dequeued.item_id == valid_item_id
-    with session_queue_fifo._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue_fifo) as cursor:
         cursor.execute(
             "SELECT status, error_type, error_message FROM session_queue WHERE item_id = ?",
             (future_item_id,),
@@ -180,7 +178,7 @@ def test_fifo_quarantines_future_snapshot_and_dequeues_later_work(
     ],
 )
 def test_fifo_quarantines_unreadable_snapshot_and_dequeues_later_work(
-    session_queue_fifo: SqliteSessionQueue,
+    session_queue_fifo: SessionQueue,
     session_json: str,
 ) -> None:
     bad_item_id = _insert_queue_item(session_queue_fifo, "default", "bad-user", session_json=session_json)
@@ -190,7 +188,7 @@ def test_fifo_quarantines_unreadable_snapshot_and_dequeues_later_work(
 
     assert dequeued is not None
     assert dequeued.item_id == valid_item_id
-    with session_queue_fifo._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue_fifo) as cursor:
         cursor.execute("SELECT status, error_message FROM session_queue WHERE item_id = ?", (bad_item_id,))
         status, error_message = cursor.fetchone()
     assert status == "failed"
@@ -198,9 +196,9 @@ def test_fifo_quarantines_unreadable_snapshot_and_dequeues_later_work(
 
 
 def test_affinity_quarantines_unreadable_snapshot_and_dequeues_valid_work(
-    session_queue_round_robin: SqliteSessionQueue,
+    session_queue_round_robin: SessionQueue,
 ) -> None:
-    _install_fake_cache(session_queue_round_robin._SqliteSessionQueue__invoker, "cuda:0", {_WARM_MODEL_KEY})
+    _install_fake_cache(session_queue_round_robin._SessionQueue__invoker, "cuda:0", {_WARM_MODEL_KEY})
     cold_id = _insert_queue_item(session_queue_round_robin, "default", "user_a")
     future_session = json.loads(_session_with_model_key(_WARM_MODEL_KEY))
     future_session["execution_state_version"] = CURRENT_EXECUTION_STATE_VERSION + 1
@@ -215,13 +213,13 @@ def test_affinity_quarantines_unreadable_snapshot_and_dequeues_valid_work(
 
     assert dequeued is not None
     assert dequeued.item_id == cold_id
-    with session_queue_round_robin._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue_round_robin) as cursor:
         cursor.execute("SELECT status FROM session_queue WHERE item_id = ?", (future_id,))
         assert cursor.fetchone()[0] == "failed"
 
 
 def test_unreadable_snapshot_is_safe_for_detail_list_and_retry(
-    session_queue_fifo: SqliteSessionQueue,
+    session_queue_fifo: SessionQueue,
 ) -> None:
     future_session = json.loads(_EMPTY_SESSION_JSON)
     future_session["execution_state_version"] = CURRENT_EXECUTION_STATE_VERSION + 1
@@ -249,7 +247,7 @@ def test_unreadable_snapshot_is_safe_for_detail_list_and_retry(
 
 
 def test_unreadable_terminal_snapshot_is_not_reported_as_completed(
-    session_queue_fifo: SqliteSessionQueue,
+    session_queue_fifo: SessionQueue,
 ) -> None:
     future_session = json.loads(_EMPTY_SESSION_JSON)
     future_session["execution_state_version"] = CURRENT_EXECUTION_STATE_VERSION + 1
@@ -259,7 +257,7 @@ def test_unreadable_terminal_snapshot_is_not_reported_as_completed(
         "bad-user",
         session_json=json.dumps(future_session),
     )
-    with session_queue_fifo._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue_fifo) as cursor:
         cursor.execute("UPDATE session_queue SET status = 'completed' WHERE item_id = ?", (bad_id,))
 
     detail = session_queue_fifo.get_queue_item(bad_id)
@@ -271,10 +269,10 @@ def test_unreadable_terminal_snapshot_is_not_reported_as_completed(
 
 
 def test_unreadable_field_values_are_safe_for_summary(
-    session_queue_fifo: SqliteSessionQueue,
+    session_queue_fifo: SessionQueue,
 ) -> None:
     item_id = _insert_queue_item(session_queue_fifo, "default", "summary-user")
-    with session_queue_fifo._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue_fifo) as cursor:
         cursor.execute(
             "UPDATE session_queue SET field_values = ? WHERE item_id = ?",
             ("{not valid json", item_id),
@@ -289,7 +287,7 @@ def test_unreadable_field_values_are_safe_for_summary(
 
 
 def test_summary_read_does_not_hydrate_runtime_session(
-    session_queue_fifo: SqliteSessionQueue, monkeypatch: pytest.MonkeyPatch
+    session_queue_fifo: SessionQueue, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     item_id = _insert_queue_item(session_queue_fifo, "default", "summary-user")
 
@@ -307,7 +305,7 @@ def test_summary_read_does_not_hydrate_runtime_session(
 
 
 def test_queue_list_api_read_does_not_hydrate_runtime_session(
-    session_queue_fifo: SqliteSessionQueue, monkeypatch: pytest.MonkeyPatch
+    session_queue_fifo: SessionQueue, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     item_id = _insert_queue_item(session_queue_fifo, "default", "list-user")
 
@@ -325,7 +323,7 @@ def test_queue_list_api_read_does_not_hydrate_runtime_session(
 
 
 def test_queue_list_service_read_preserves_full_runtime_hydration(
-    session_queue_fifo: SqliteSessionQueue, monkeypatch: pytest.MonkeyPatch
+    session_queue_fifo: SessionQueue, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     item_id = _insert_queue_item(session_queue_fifo, "default", "list-user")
 
@@ -343,10 +341,10 @@ def test_queue_list_service_read_preserves_full_runtime_hydration(
 
 
 def test_retry_read_hydrates_runtime_once_per_queue_item(
-    session_queue_fifo: SqliteSessionQueue, monkeypatch: pytest.MonkeyPatch
+    session_queue_fifo: SessionQueue, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     item_id = _insert_queue_item(session_queue_fifo, "default", "retry-user")
-    with session_queue_fifo._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue_fifo) as cursor:
         cursor.execute("UPDATE session_queue SET status = 'failed' WHERE item_id = ?", (item_id,))
 
     from invokeai.app.services.session_queue import session_queue_common
@@ -371,7 +369,7 @@ def test_retry_read_hydrates_runtime_once_per_queue_item(
 
 
 def test_retry_read_rejects_malformed_execution_state(
-    session_queue_fifo: SqliteSessionQueue,
+    session_queue_fifo: SessionQueue,
 ) -> None:
     malformed_session = json.loads(_EMPTY_SESSION_JSON)
     malformed_session["executed"] = 42
@@ -381,7 +379,7 @@ def test_retry_read_rejects_malformed_execution_state(
         "retry-user",
         session_json=json.dumps(malformed_session),
     )
-    with session_queue_fifo._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue_fifo) as cursor:
         cursor.execute("UPDATE session_queue SET status = 'failed' WHERE item_id = ?", (item_id,))
 
     retry_result = session_queue_fifo.retry_items_by_id("default", [item_id])
@@ -390,7 +388,7 @@ def test_retry_read_rejects_malformed_execution_state(
 
 
 def test_retry_read_rejects_unknown_persisted_effect(
-    session_queue_fifo: SqliteSessionQueue,
+    session_queue_fifo: SessionQueue,
 ) -> None:
     malformed_session = json.loads(_EMPTY_SESSION_JSON)
     malformed_session["execution_state_version"] = CURRENT_EXECUTION_STATE_VERSION
@@ -401,7 +399,7 @@ def test_retry_read_rejects_unknown_persisted_effect(
         "retry-user",
         session_json=json.dumps(malformed_session),
     )
-    with session_queue_fifo._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue_fifo) as cursor:
         cursor.execute("UPDATE session_queue SET status = 'failed' WHERE item_id = ?", (item_id,))
 
     retry_result = session_queue_fifo.retry_items_by_id("default", [item_id])
@@ -410,12 +408,12 @@ def test_retry_read_rejects_unknown_persisted_effect(
 
 
 def test_api_item_reads_use_projection_without_runtime_rehydration(
-    session_queue_fifo: SqliteSessionQueue, monkeypatch: pytest.MonkeyPatch
+    session_queue_fifo: SessionQueue, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     current_id = _insert_queue_item(session_queue_fifo, "default", "api-user")
     _insert_queue_item(session_queue_fifo, "default", "api-user")
     next_id = _insert_queue_item(session_queue_fifo, "default", "api-user", priority=10)
-    with session_queue_fifo._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue_fifo) as cursor:
         cursor.execute("UPDATE session_queue SET status = 'in_progress' WHERE item_id = ?", (current_id,))
 
     def fail_runtime_hydration(_queue_item_dict: dict) -> GraphExecutionState:
@@ -446,7 +444,7 @@ def test_queue_read_projection_preserves_nested_runtime_field_exclusions() -> No
 
 
 def test_nested_persisted_effects_are_validated_on_queue_reads(
-    session_queue_fifo: SqliteSessionQueue,
+    session_queue_fifo: SessionQueue,
 ) -> None:
     child_snapshot = dump_execution_state(GraphExecutionState(graph=Graph()))
     child_snapshot["execution_effects"] = {"unknown-reference": [{"kind": "unknown-effect"}]}
@@ -462,7 +460,7 @@ def test_nested_persisted_effects_are_validated_on_queue_reads(
         "retry-user",
         session_json=json.dumps(snapshot),
     )
-    with session_queue_fifo._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue_fifo) as cursor:
         cursor.execute("UPDATE session_queue SET status = 'failed' WHERE item_id = ?", (item_id,))
 
     retry_result = session_queue_fifo.retry_items_by_id("default", [item_id])
@@ -472,7 +470,7 @@ def test_nested_persisted_effects_are_validated_on_queue_reads(
 
 @pytest.mark.slow
 @pytest.mark.parametrize("iteration_count", [100, 3000])
-def test_queue_read_benchmark(iteration_count: int, session_queue_fifo: SqliteSessionQueue, capsys) -> None:
+def test_queue_read_benchmark(iteration_count: int, session_queue_fifo: SessionQueue, capsys) -> None:
     """Record representative queue read costs without making machine-sensitive timing claims."""
     from tests.app.services.shared.test_execution_state_migration import _make_completed_iterate_state
 
@@ -481,7 +479,7 @@ def test_queue_read_benchmark(iteration_count: int, session_queue_fifo: SqliteSe
     session_json = json.dumps(snapshot, default=to_jsonable_python)
     detail_id = _insert_queue_item(session_queue_fifo, "default", "benchmark-user", session_json=session_json)
     retry_id = _insert_queue_item(session_queue_fifo, "default", "benchmark-user", session_json=session_json)
-    with session_queue_fifo._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue_fifo) as cursor:
         cursor.execute("UPDATE session_queue SET status = 'failed' WHERE item_id = ?", (retry_id,))
 
     tracemalloc.start()
@@ -541,9 +539,7 @@ def test_queue_read_benchmark(iteration_count: int, session_queue_fifo: SqliteSe
         )
 
 
-def test_unreadable_child_retries_readable_root(
-    session_queue_fifo: SqliteSessionQueue, event_bus: TestEventService
-) -> None:
+def test_unreadable_child_retries_readable_root(session_queue_fifo: SessionQueue, event_bus: TestEventService) -> None:
     root_id = _insert_queue_item(session_queue_fifo, "default", "workflow-user")
     future_session = json.loads(_EMPTY_SESSION_JSON)
     future_session["execution_state_version"] = CURRENT_EXECUTION_STATE_VERSION + 1
@@ -553,7 +549,7 @@ def test_unreadable_child_retries_readable_root(
         "workflow-user",
         session_json=json.dumps(future_session),
     )
-    with session_queue_fifo._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue_fifo) as cursor:
         cursor.execute(
             "UPDATE session_queue SET status = 'failed' WHERE item_id = ?",
             (root_id,),
@@ -577,7 +573,7 @@ def test_unreadable_child_retries_readable_root(
 # ---------------------------------------------------------------------------
 
 
-def test_round_robin_interleaves_users(session_queue_round_robin: SqliteSessionQueue) -> None:
+def test_round_robin_interleaves_users(session_queue_round_robin: SessionQueue) -> None:
     """Round-robin: jobs from multiple users are interleaved one per user per round.
 
     Queue insertion order (matching the issue example):
@@ -598,7 +594,7 @@ def test_round_robin_interleaves_users(session_queue_round_robin: SqliteSessionQ
     assert user_ids == ["user_a", "user_b", "user_c", "user_a", "user_c", "user_a"]
 
 
-def test_round_robin_single_user_behaves_like_fifo(session_queue_round_robin: SqliteSessionQueue) -> None:
+def test_round_robin_single_user_behaves_like_fifo(session_queue_round_robin: SessionQueue) -> None:
     """Round-robin with only one user produces the same order as FIFO."""
     queue_id = "default"
     _insert_queue_item(session_queue_round_robin, queue_id, "user_a")
@@ -609,7 +605,7 @@ def test_round_robin_single_user_behaves_like_fifo(session_queue_round_robin: Sq
     assert user_ids == ["user_a", "user_a", "user_a"]
 
 
-def test_round_robin_handles_user_joining_mid_queue(session_queue_round_robin: SqliteSessionQueue) -> None:
+def test_round_robin_handles_user_joining_mid_queue(session_queue_round_robin: SessionQueue) -> None:
     """Round-robin: a user who joins later is correctly interleaved."""
     queue_id = "default"
     _insert_queue_item(session_queue_round_robin, queue_id, "user_a")
@@ -622,12 +618,12 @@ def test_round_robin_handles_user_joining_mid_queue(session_queue_round_robin: S
     assert user_ids == ["user_a", "user_b", "user_a"]
 
 
-def test_round_robin_returns_none_when_empty(session_queue_round_robin: SqliteSessionQueue) -> None:
+def test_round_robin_returns_none_when_empty(session_queue_round_robin: SessionQueue) -> None:
     """Round-robin: dequeue returns None when the queue is empty."""
     assert session_queue_round_robin.dequeue() is None
 
 
-def test_round_robin_priority_within_user_respected(session_queue_round_robin: SqliteSessionQueue) -> None:
+def test_round_robin_priority_within_user_respected(session_queue_round_robin: SessionQueue) -> None:
     """Round-robin: within a single user's items, higher priority is dequeued first."""
     queue_id = "default"
     # Insert low-priority item first, then high-priority for same user.
@@ -649,13 +645,13 @@ def test_round_robin_priority_within_user_respected(session_queue_round_robin: S
 
 
 def _seed_completed_history(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
     queue_id: str,
     user_id: str,
     count: int,
 ) -> None:
     """Insert `count` completed items (with started_at set) for a user, simulating retained history."""
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         for i in range(count):
             session_id = str(uuid.uuid4())
             batch_id = str(uuid.uuid4())
@@ -684,7 +680,9 @@ def _seed_completed_history(
             )
 
 
-def test_round_robin_dequeue_does_not_scan_full_history(session_queue_round_robin: SqliteSessionQueue) -> None:
+def test_round_robin_dequeue_does_not_scan_full_history(
+    session_queue_round_robin: SessionQueue, mock_sqlite_database: SqliteDatabase
+) -> None:
     """Round-robin dequeue cost must scale with active users, not retained queue history.
 
     Regression guard for the scaling concern: the per-user "last served" lookup must be an
@@ -701,9 +699,11 @@ def test_round_robin_dequeue_does_not_scan_full_history(session_queue_round_robi
         _seed_completed_history(session_queue_round_robin, queue_id, u, count=500)
         _insert_queue_item(session_queue_round_robin, queue_id, u)
 
-    with session_queue_round_robin._db.transaction() as cursor:
-        plan_rows = cursor.execute("EXPLAIN QUERY PLAN " + ROUND_ROBIN_DEQUEUE_QUERY).fetchall()
-    details = [row["detail"] for row in plan_rows]
+    database = mock_sqlite_database.database
+    with capture_statements(database) as statements:
+        item = session_queue_round_robin.dequeue()
+    statement, parameters = next((sql, parameters) for sql, parameters in statements if "user_next_item" in sql)
+    details = explain_query_plan(database, statement, parameters)
 
     # No step may scan the session_queue base table — that is the full-history scan we are
     # eliminating. (CTE result scans like "SCAN uni" / "SCAN (subquery-N)" are fine; those are
@@ -719,7 +719,6 @@ def test_round_robin_dequeue_does_not_scan_full_history(session_queue_round_robi
     # And the dequeue must still return the least-recently-served user (correctness under history).
     # user_a's history ends earliest only if seeded first; all three were seeded equal counts with
     # identical timestamps, so item_id ASC tie-breaks to the first-inserted pending item (user_a).
-    item = session_queue_round_robin.dequeue()
     assert item is not None
     assert item.user_id == "user_a"
 
@@ -733,7 +732,7 @@ def test_round_robin_ignored_in_single_user_mode(mock_invoker: Invoker, mock_sql
         session_queue_mode="round_robin",
     )
     db = mock_sqlite_database
-    queue = SqliteSessionQueue(db=db)
+    queue = SessionQueue(db.database)
     queue.start(mock_invoker)
 
     queue_id = "default"
@@ -775,10 +774,10 @@ def _install_fake_cache(invoker: Invoker, device: str, resident_keys: set[str]) 
     invoker.services.model_manager = model_manager
 
 
-def test_affinity_prefers_warm_model_within_user(session_queue_round_robin: SqliteSessionQueue) -> None:
+def test_affinity_prefers_warm_model_within_user(session_queue_round_robin: SessionQueue) -> None:
     """Among one user's equal-priority items, the item whose model is warm on the claiming
     device is dequeued first, ahead of an older item that would need a model load."""
-    _install_fake_cache(session_queue_round_robin._SqliteSessionQueue__invoker, "cuda:0", {_WARM_MODEL_KEY})
+    _install_fake_cache(session_queue_round_robin._SessionQueue__invoker, "cuda:0", {_WARM_MODEL_KEY})
     queue_id = "default"
     cold_id = _insert_queue_item(session_queue_round_robin, queue_id, "user_a")
     warm_id = _insert_queue_item(
@@ -791,10 +790,10 @@ def test_affinity_prefers_warm_model_within_user(session_queue_round_robin: Sqli
     assert second is not None and second.item_id == cold_id
 
 
-def test_affinity_never_overrides_round_robin_user_choice(session_queue_round_robin: SqliteSessionQueue) -> None:
+def test_affinity_never_overrides_round_robin_user_choice(session_queue_round_robin: SessionQueue) -> None:
     """Affinity must not steal the turn from the fairness-chosen user, even when another
     user's pending item has a warm model."""
-    _install_fake_cache(session_queue_round_robin._SqliteSessionQueue__invoker, "cuda:0", {_WARM_MODEL_KEY})
+    _install_fake_cache(session_queue_round_robin._SessionQueue__invoker, "cuda:0", {_WARM_MODEL_KEY})
     queue_id = "default"
     a_id = _insert_queue_item(session_queue_round_robin, queue_id, "user_a")
     _insert_queue_item(
@@ -806,9 +805,9 @@ def test_affinity_never_overrides_round_robin_user_choice(session_queue_round_ro
     assert first is not None and first.item_id == a_id
 
 
-def test_affinity_never_overrides_priority(session_queue_round_robin: SqliteSessionQueue) -> None:
+def test_affinity_never_overrides_priority(session_queue_round_robin: SessionQueue) -> None:
     """A warm low-priority item must not jump ahead of a cold higher-priority item."""
-    _install_fake_cache(session_queue_round_robin._SqliteSessionQueue__invoker, "cuda:0", {_WARM_MODEL_KEY})
+    _install_fake_cache(session_queue_round_robin._SessionQueue__invoker, "cuda:0", {_WARM_MODEL_KEY})
     queue_id = "default"
     hi_id = _insert_queue_item(session_queue_round_robin, queue_id, "user_a", priority=10)
     _insert_queue_item(
@@ -819,9 +818,9 @@ def test_affinity_never_overrides_priority(session_queue_round_robin: SqliteSess
     assert first is not None and first.item_id == hi_id
 
 
-def test_affinity_noop_without_device_or_matching_cache(session_queue_round_robin: SqliteSessionQueue) -> None:
+def test_affinity_noop_without_device_or_matching_cache(session_queue_round_robin: SessionQueue) -> None:
     """With no device, or a device with no registered cache, ordering is unchanged."""
-    _install_fake_cache(session_queue_round_robin._SqliteSessionQueue__invoker, "cuda:0", {_WARM_MODEL_KEY})
+    _install_fake_cache(session_queue_round_robin._SessionQueue__invoker, "cuda:0", {_WARM_MODEL_KEY})
     queue_id = "default"
     first_id = _insert_queue_item(session_queue_round_robin, queue_id, "user_a")
     _insert_queue_item(
@@ -833,10 +832,10 @@ def test_affinity_noop_without_device_or_matching_cache(session_queue_round_robi
     assert first is not None and first.item_id == first_id
 
 
-def test_affinity_applies_in_fifo_mode(session_queue_fifo: SqliteSessionQueue) -> None:
+def test_affinity_applies_in_fifo_mode(session_queue_fifo: SessionQueue) -> None:
     """Single-user installs (FIFO query, but default session_queue_mode=round_robin) also
     benefit: warm items are preferred within the same priority."""
-    _install_fake_cache(session_queue_fifo._SqliteSessionQueue__invoker, "cuda:1", {_WARM_MODEL_KEY})
+    _install_fake_cache(session_queue_fifo._SessionQueue__invoker, "cuda:1", {_WARM_MODEL_KEY})
     queue_id = "default"
     cold_id = _insert_queue_item(session_queue_fifo, queue_id, "user_a")
     warm_id = _insert_queue_item(
@@ -858,7 +857,7 @@ def test_affinity_disabled_by_explicit_fifo_mode(mock_invoker: Invoker, mock_sql
         session_queue_mode="FIFO",
     )
     db = mock_sqlite_database
-    queue = SqliteSessionQueue(db=db)
+    queue = SessionQueue(db.database)
     queue.start(mock_invoker)
     _install_fake_cache(mock_invoker, "cuda:0", {_WARM_MODEL_KEY})
 
@@ -872,11 +871,11 @@ def test_affinity_disabled_by_explicit_fifo_mode(mock_invoker: Invoker, mock_sql
     assert second is not None and second.item_id == warm_id
 
 
-def test_affinity_prefers_more_matching_keys(session_queue_round_robin: SqliteSessionQueue) -> None:
+def test_affinity_prefers_more_matching_keys(session_queue_round_robin: SessionQueue) -> None:
     """An item matching two resident models outranks an older item matching one — this also
     exercises the multi-key score expression and its parameter binding order."""
     other_key = "bbbbbbbb-5555-6666-7777-888888888888"
-    _install_fake_cache(session_queue_round_robin._SqliteSessionQueue__invoker, "cuda:0", {_WARM_MODEL_KEY, other_key})
+    _install_fake_cache(session_queue_round_robin._SessionQueue__invoker, "cuda:0", {_WARM_MODEL_KEY, other_key})
     queue_id = "default"
     one_match_id = _insert_queue_item(
         session_queue_round_robin, queue_id, "user_a", session_json=_session_with_model_key(_WARM_MODEL_KEY)
@@ -894,10 +893,10 @@ def test_affinity_prefers_more_matching_keys(session_queue_round_robin: SqliteSe
     assert second is not None and second.item_id == one_match_id
 
 
-def test_affinity_lookahead_window_bounds_deferral(session_queue_round_robin: SqliteSessionQueue) -> None:
+def test_affinity_lookahead_window_bounds_deferral(session_queue_round_robin: SessionQueue) -> None:
     """A warm item further than AFFINITY_MAX_LOOKAHEAD past the fairness candidate must not be
     swapped in — this is the bound that prevents unbounded starvation of cold items."""
-    _install_fake_cache(session_queue_round_robin._SqliteSessionQueue__invoker, "cuda:0", {_WARM_MODEL_KEY})
+    _install_fake_cache(session_queue_round_robin._SessionQueue__invoker, "cuda:0", {_WARM_MODEL_KEY})
     queue_id = "default"
     cold_id = _insert_queue_item(session_queue_round_robin, queue_id, "user_a", item_id=100)
     in_window_id = _insert_queue_item(
@@ -925,9 +924,9 @@ def test_affinity_lookahead_window_bounds_deferral(session_queue_round_robin: Sq
     assert second is not None and second.item_id == cold_id
 
 
-def test_affinity_does_not_scan_older_history(session_queue_round_robin: SqliteSessionQueue) -> None:
+def test_affinity_does_not_scan_older_history(session_queue_round_robin: SessionQueue) -> None:
     """The affinity window must be bounded on both sides of the fairness candidate."""
-    _install_fake_cache(session_queue_round_robin._SqliteSessionQueue__invoker, "cuda:0", {_WARM_MODEL_KEY})
+    _install_fake_cache(session_queue_round_robin._SessionQueue__invoker, "cuda:0", {_WARM_MODEL_KEY})
     old_warm_id = _insert_queue_item(
         session_queue_round_robin,
         "default",

@@ -61,14 +61,19 @@ def _per_backend(load: _Load) -> _Load:
     return cast(_Load, cached)
 
 
-def now_text() -> str:
-    """The current UTC time as the canonical timestamp text, 'YYYY-MM-DD HH:MM:SS.fff'.
+def timestamp_text(moment: datetime) -> str:
+    """A UTC moment as the canonical timestamp text, 'YYYY-MM-DD HH:MM:SS.fff'.
 
     The format of SQLite's `STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')`, the schema's column default: timestamps
     sort and compare as text, on every backend. The application is the only clock, so a server's clock and
     time zone never enter a timestamp.
     """
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")[:23]
+    return moment.strftime("%Y-%m-%d %H:%M:%S.%f")[:23]
+
+
+def now_text() -> str:
+    """The current UTC time as the canonical timestamp text (see `timestamp_text`)."""
+    return timestamp_text(datetime.now(timezone.utc))
 
 
 class _Declared(UserDefinedType[str]):

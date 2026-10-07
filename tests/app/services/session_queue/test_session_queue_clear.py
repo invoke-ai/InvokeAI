@@ -6,22 +6,23 @@ import pytest
 
 from invokeai.app.services.events.events_common import QueueClearedEvent, QueueItemStatusChangedEvent
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
+from invokeai.app.services.session_queue.session_queue_default import SessionQueue
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from tests.fixtures.sqlite_database import legacy_cursor_of
 from tests.test_nodes import PromptTestInvocation
 
 
 @pytest.fixture
-def session_queue(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SqliteSessionQueue:
-    """Create a SqliteSessionQueue backed by the mock invoker's in-memory database."""
+def session_queue(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SessionQueue:
+    """Create a SessionQueue backed by the mock invoker's in-memory database."""
     db = mock_sqlite_database
-    queue = SqliteSessionQueue(db=db)
+    queue = SessionQueue(db.database)
     queue.start(mock_invoker)
     return queue
 
 
-def _insert_queue_item(session_queue: SqliteSessionQueue, queue_id: str, user_id: str, status: str = "pending") -> int:
+def _insert_queue_item(session_queue: SessionQueue, queue_id: str, user_id: str, status: str = "pending") -> int:
     """Directly insert a minimal queue item for the given user; returns its item_id.
 
     The session payload must be a valid GraphExecutionState: canceling an in-progress item
@@ -31,7 +32,7 @@ def _insert_queue_item(session_queue: SqliteSessionQueue, queue_id: str, user_id
     graph.add_node(PromptTestInvocation(id="prompt", prompt="test"))
     session = GraphExecutionState(graph=graph)
     batch_id = str(uuid.uuid4())
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority, workflow, origin, destination, retried_from_item_id, user_id, status)
@@ -56,9 +57,9 @@ def _insert_queue_item(session_queue: SqliteSessionQueue, queue_id: str, user_id
         return cursor.lastrowid
 
 
-def _count_items(session_queue: SqliteSessionQueue, queue_id: str, user_id: str | None = None) -> int:
+def _count_items(session_queue: SessionQueue, queue_id: str, user_id: str | None = None) -> int:
     """Count items in the queue, optionally filtered by user_id."""
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         if user_id is not None:
             cursor.execute(
                 "SELECT COUNT(*) FROM session_queue WHERE queue_id = ? AND user_id = ?",
@@ -72,7 +73,7 @@ def _count_items(session_queue: SqliteSessionQueue, queue_id: str, user_id: str 
         return cursor.fetchone()[0]
 
 
-def test_clear_with_user_id_only_deletes_own_items(session_queue: SqliteSessionQueue) -> None:
+def test_clear_with_user_id_only_deletes_own_items(session_queue: SessionQueue) -> None:
     """Non-admin clear (user_id provided) should only remove that user's items."""
     queue_id = "default"
     user_a = "user_a"
@@ -89,7 +90,7 @@ def test_clear_with_user_id_only_deletes_own_items(session_queue: SqliteSessionQ
     assert _count_items(session_queue, queue_id, user_b) == 1
 
 
-def test_clear_without_user_id_deletes_all_items(session_queue: SqliteSessionQueue) -> None:
+def test_clear_without_user_id_deletes_all_items(session_queue: SessionQueue) -> None:
     """Admin clear (no user_id) should remove all items in the queue."""
     queue_id = "default"
 
@@ -103,7 +104,7 @@ def test_clear_without_user_id_deletes_all_items(session_queue: SqliteSessionQue
     assert _count_items(session_queue, queue_id) == 0
 
 
-def test_clear_with_user_id_does_not_affect_other_queues(session_queue: SqliteSessionQueue) -> None:
+def test_clear_with_user_id_does_not_affect_other_queues(session_queue: SessionQueue) -> None:
     """Clearing one queue should not affect items in another queue."""
     queue_a = "queue_a"
     queue_b = "queue_b"
@@ -119,7 +120,7 @@ def test_clear_with_user_id_does_not_affect_other_queues(session_queue: SqliteSe
     assert _count_items(session_queue, queue_b) == 1
 
 
-def test_clear_returns_zero_when_no_matching_items(session_queue: SqliteSessionQueue) -> None:
+def test_clear_returns_zero_when_no_matching_items(session_queue: SessionQueue) -> None:
     """Clear should return 0 deleted when there are no items for the given user."""
     queue_id = "default"
 
@@ -131,15 +132,15 @@ def test_clear_returns_zero_when_no_matching_items(session_queue: SqliteSessionQ
     assert _count_items(session_queue, queue_id) == 1
 
 
-def _status_of(session_queue: SqliteSessionQueue, item_id: int) -> str | None:
-    with session_queue._db.transaction() as cursor:
+def _status_of(session_queue: SessionQueue, item_id: int) -> str | None:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute("SELECT status FROM session_queue WHERE item_id = ?", (item_id,))
         row = cursor.fetchone()
     return row[0] if row is not None else None
 
 
 def test_user_scoped_clear_cancels_only_that_users_in_progress_items(
-    session_queue: SqliteSessionQueue, mock_invoker: Invoker
+    session_queue: SessionQueue, mock_invoker: Invoker
 ) -> None:
     """With multiple workers, several items can be in_progress at once — one per user here.
     Alice's clear must cancel ALL of Alice's running items (each via its own status-changed
@@ -172,7 +173,7 @@ def test_user_scoped_clear_cancels_only_that_users_in_progress_items(
     assert [(e.queue_id, e.user_id) for e in cleared_events] == [(queue_id, "alice")]
 
 
-def test_admin_clear_cancels_all_in_progress_items(session_queue: SqliteSessionQueue, mock_invoker: Invoker) -> None:
+def test_admin_clear_cancels_all_in_progress_items(session_queue: SessionQueue, mock_invoker: Invoker) -> None:
     """An unscoped (admin) clear cancels every running item before deleting the rows."""
     queue_id = "default"
     alice_running = _insert_queue_item(session_queue, queue_id, "alice", status="in_progress")

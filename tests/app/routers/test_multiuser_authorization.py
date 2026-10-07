@@ -27,6 +27,7 @@ from invokeai.app.services.session_queue.session_queue_common import SessionQueu
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
+from tests.fixtures.sqlite_database import legacy_cursor_of
 
 
 class MockApiDependencies(ApiDependencies):
@@ -277,7 +278,7 @@ def _insert_pending_queue_item(session_queue: Any, user_id: str, queue_id: str =
     graph.add_node(PromptTestInvocation(id="prompt", prompt="test"))
     session = GraphExecutionState(graph=graph)
     session_json = session.model_dump_json(warnings=False, exclude_none=True)
-    with session_queue._db.transaction() as cursor:
+    with legacy_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -2392,9 +2393,9 @@ class TestQueueStatusScoping:
         from unittest.mock import MagicMock
 
         from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
-        from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
+        from invokeai.app.services.session_queue.session_queue_default import SessionQueue
 
-        queue = SqliteSessionQueue(db=db)
+        queue = SessionQueue(db.database)
         queue.start(mock_invoker)
         mock_invoker.services.session_queue = queue
 
