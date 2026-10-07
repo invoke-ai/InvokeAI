@@ -208,7 +208,7 @@ const InlineLabelInput = ({
   onEnd,
 }: {
   ariaLabel: string;
-  fontSize?: '2xs';
+  fontSize?: 'xs';
   initialValue: string;
   onCommit: (value: string) => void;
   onEnd: () => void;
@@ -226,7 +226,6 @@ const InlineLabelInput = ({
         flex="1"
         fontSize={fontSize}
         minW="0"
-        size="2xs"
         value={draft}
         onBlur={() => {
           if (!isCancelled.current && draft.trim() !== initialValue) {
@@ -276,6 +275,7 @@ const NodeTitle = ({
       <MiddleTruncate
         data-workflow-export-node-title="true"
         data-workflow-export-static-node-content="true"
+        fontSize="lg"
         fontWeight="700"
         minW="0"
         text={title}
@@ -297,6 +297,7 @@ const NodeTitle = ({
 
   return (
     <MiddleTruncate
+      fontSize="lg"
       fontWeight="700"
       minW="0"
       text={title}
@@ -396,7 +397,7 @@ const BatchGroupSuffix = ({ node }: { node: WorkflowInvocationNode }) => {
   const groupId = getWorkflowBatchGroupId(node);
 
   return (
-    <Text color={BATCH_GROUP_COLORS[groupId] ?? 'fg.subtle'} flexShrink={0} fontSize="2xs" fontWeight="600">
+    <Text color={BATCH_GROUP_COLORS[groupId] ?? 'fg.subtle'} flexShrink={0} fontSize="xs" fontWeight="600">
       ({groupId === 'None' ? t('nodes.noBatchGroup') : groupId})
     </Text>
   );
@@ -486,27 +487,27 @@ const NodeFooter = ({ canUseCache, node }: { canUseCache: boolean; node: Workflo
           <Checkbox.Root
             checked={node.data.useCache}
             colorPalette="accent"
-            size="xs"
+            size="sm"
             onCheckedChange={(event) =>
               editGraph({ nodeId: node.id, type: 'setNodeUseCache', useCache: event.checked === true })
             }
           >
             <Checkbox.HiddenInput />
             <Checkbox.Control />
-            <Checkbox.Label fontSize="2xs">Use Cache</Checkbox.Label>
+            <Checkbox.Label fontSize="xs">Use Cache</Checkbox.Label>
           </Checkbox.Root>
         ) : null}
         <Checkbox.Root
           checked={!node.data.isIntermediate}
           colorPalette="accent"
-          size="xs"
+          size="sm"
           onCheckedChange={(event) =>
             editGraph({ isIntermediate: event.checked !== true, nodeId: node.id, type: 'setNodeIsIntermediate' })
           }
         >
           <Checkbox.HiddenInput />
           <Checkbox.Control />
-          <Checkbox.Label fontSize="2xs">Save to Gallery</Checkbox.Label>
+          <Checkbox.Label fontSize="xs">Save to Gallery</Checkbox.Label>
         </Checkbox.Root>
       </HStack>
     </Flex>
@@ -518,7 +519,7 @@ const ProvidedByConnectionNote = () => {
   const { t } = useTranslation();
 
   return (
-    <Text color="fg.subtle" fontSize="2xs" mt="0.5">
+    <Text color="fg.subtle" fontSize="xs" mt="0.5">
       {t('nodes.providedByConnection')}
     </Text>
   );
@@ -559,7 +560,7 @@ const InputFieldRow = ({
     <Text
       color={showInvalid ? 'fg.error' : isConnected ? 'fg.muted' : 'fg'}
       data-node-input-field-title="true"
-      fontSize="2xs"
+      fontSize="xs"
       lineHeight="shorter"
       minW="0"
       truncate
@@ -621,7 +622,7 @@ const InputFieldRow = ({
           ) : isEditingLabel ? (
             <InlineLabelInput
               ariaLabel="Field label"
-              fontSize="2xs"
+              fontSize="xs"
               initialValue={label}
               // The template title is the unset label, so renaming back to it follows template changes again.
               onCommit={(next) =>
@@ -657,7 +658,7 @@ const InputFieldRow = ({
                   aria-label={`Reset ${label} to default value`}
                   className="nodrag"
                   color="fg.subtle"
-                  size="2xs"
+                  size="sm"
                   title="Reset to default value"
                   variant="ghost"
                   onClick={() =>
@@ -686,7 +687,7 @@ const InputFieldRow = ({
                 aria-label={isExposed ? `Remove ${label} from Linear UI` : `Expose ${label} in Linear UI`}
                 className="nodrag"
                 color={isExposed ? 'accent.solid' : 'fg.subtle'}
-                size="2xs"
+                size="sm"
                 title={isExposed ? 'Remove from Linear UI form' : 'Expose in Linear UI form'}
                 variant="ghost"
                 onClick={() => editGraph({ fieldIdentifier, type: isExposed ? 'unexposeField' : 'exposeField' })}
@@ -725,7 +726,7 @@ const InputFieldRow = ({
           <ProvidedByConnectionNote />
         ) : null}
         {invalidReason && !isWorkflowImageExport ? (
-          <Field.ErrorText fontSize="2xs">{invalidReason}</Field.ErrorText>
+          <Field.ErrorText fontSize="xs">{invalidReason}</Field.ErrorText>
         ) : null}
       </Field.Root>
     </Box>
@@ -773,7 +774,7 @@ const OutputFieldRow = ({
             <Text
               color="fg.muted"
               data-workflow-export-output-title="true"
-              fontSize="2xs"
+              fontSize="xs"
               lineHeight="shorter"
               maxW="full"
               overflowWrap="anywhere"
@@ -789,7 +790,7 @@ const OutputFieldRow = ({
               <Tooltip content={value.full} positioning={{ placement: 'top-end' }}>
                 <Text
                   color="fg.subtle"
-                  fontSize="2xs"
+                  fontSize="xs"
                   lineHeight="shorter"
                   minW="0"
                   overflow="hidden"
@@ -805,7 +806,7 @@ const OutputFieldRow = ({
                 <MiddleTruncate
                   as="span"
                   color="fg.muted"
-                  fontSize="2xs"
+                  fontSize="xs"
                   justifyContent="flex-end"
                   lineHeight="shorter"
                   maxW="full"
@@ -825,7 +826,7 @@ const OutputScopeHeader = ({ scope }: { scope: 'iteration' | 'final' }) => {
 
   return (
     <Box px={WORKFLOW_NODE_DENSITY.rowPaddingX} py={WORKFLOW_NODE_DENSITY.rowPaddingY}>
-      <Text color="fg.subtle" fontSize="2xs" fontWeight="600" textAlign="end">
+      <Text color="fg.subtle" fontSize="xs" fontWeight="600" textAlign="end">
         {scope === 'iteration' ? t('nodes.iterationOutputs') : t('nodes.finalOutputs')}
       </Text>
     </Box>
@@ -890,7 +891,7 @@ const CompactNodeBody = ({ inputCount, outputCount }: { inputCount: number; outp
   <Flex
     align="center"
     color="fg.muted"
-    fontSize="2xs"
+    fontSize="xs"
     gap="2"
     px={WORKFLOW_NODE_DENSITY.rowPaddingX}
     {...getWorkflowNodeBodyProps()}
@@ -924,7 +925,7 @@ const CompactInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNodeT
       selected={selected ?? false}
     >
       <Flex {...getWorkflowNodeHeaderProps()}>
-        <MiddleTruncate fontSize="sm" fontWeight="700" minW="0" text={title} />
+        <MiddleTruncate fontSize="lg" fontWeight="700" minW="0" text={title} />
         <BatchGroupSuffix node={node} />
         <Box flex="1" />
         <NodeOutcomeIcon execution={execution} node={node} />
@@ -933,7 +934,7 @@ const CompactInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNodeT
       {templateView ? (
         <CompactNodeBody inputCount={inputTemplates.length} outputCount={outputTemplates.length} />
       ) : (
-        <Text color="fg.subtle" fontSize="2xs" px="3" {...getWorkflowNodeBodyProps()} py="2">
+        <Text color="fg.subtle" fontSize="xs" px="3" {...getWorkflowNodeBodyProps()} py="2">
           Unknown node type. Select for details.
         </Text>
       )}
@@ -966,15 +967,18 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
               <MiddleTruncate
                 data-workflow-export-node-title="true"
                 data-workflow-export-static-node-content="true"
+                fontSize="lg"
                 fontWeight="700"
                 minW="0"
                 text={node.data.label || node.data.type}
               />
             ) : (
-              <Text fontWeight="700">{node.data.label || node.data.type}</Text>
+              <Text fontSize="lg" fontWeight="700">
+                {node.data.label || node.data.type}
+              </Text>
             )}
             {!isWorkflowImageExport ? (
-              <Text color="fg.subtle" fontSize="2xs">
+              <Text color="fg.subtle" fontSize="xs">
                 Unknown node type "{node.data.type}". It cannot run on this backend.
               </Text>
             ) : null}
@@ -1018,7 +1022,7 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
           <IconButton
             aria-label={isOpen ? 'Collapse node' : 'Expand node'}
             className="nodrag"
-            size="2xs"
+            size="sm"
             variant="ghost"
             onClick={() => editGraph({ isOpen: !isOpen, nodeId: node.id, type: 'setNodeIsOpen' })}
           >
@@ -1026,7 +1030,7 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
           </IconButton>
         ) : null}
         {isZoomedOut ? (
-          <MiddleTruncate fontSize="sm" fontWeight="700" minW="0" text={node.data.label || template.title} />
+          <MiddleTruncate fontSize="lg" fontWeight="700" minW="0" text={node.data.label || template.title} />
         ) : (
           <>
             <NodeTitle
@@ -1073,11 +1077,11 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
             />
           ))}
           {!isWorkflowImageExport && shouldShowCallSavedWorkflowLoadingHint(node) ? (
-            <Text color="fg.subtle" fontSize="2xs" px={WORKFLOW_NODE_DENSITY.rowPaddingX} py="1">
+            <Text color="fg.subtle" fontSize="xs" px={WORKFLOW_NODE_DENSITY.rowPaddingX} py="1">
               {t('nodes.savedWorkflowDetailLoading')}
             </Text>
           ) : !isWorkflowImageExport && shouldShowCallSavedWorkflowNoExposedFieldsHint(node) ? (
-            <Text color="fg.subtle" fontSize="2xs" px={WORKFLOW_NODE_DENSITY.rowPaddingX} py="1">
+            <Text color="fg.subtle" fontSize="xs" px={WORKFLOW_NODE_DENSITY.rowPaddingX} py="1">
               {t('nodes.savedWorkflowNoExposedFields')}
             </Text>
           ) : null}

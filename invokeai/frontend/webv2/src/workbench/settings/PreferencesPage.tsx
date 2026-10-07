@@ -144,7 +144,7 @@ export const PreferencesPage = () => {
     >
       <ManagerColumn title={t('launchpad.sections.preferences')}>
         <Box p="3">
-          <SettingsSearchField size="xs" value={query} onChange={changeQuery} />
+          <SettingsSearchField size="md" value={query} onChange={changeQuery} />
         </Box>
         <List
           activeKey={searching ? (searchSection ?? ALL_RESULTS_KEY) : active.id}
@@ -159,7 +159,7 @@ export const PreferencesPage = () => {
         <ManagerDetailHeader>
           <HStack alignSelf="stretch" gap="2" px="1">
             <Icon as={searching ? SearchIcon : active.icon} boxSize="4" />
-            <Text as="h2" fontSize="sm" fontWeight="700">
+            <Text as="h2" fontSize="lg" fontWeight="700">
               {searching ? t('settingsDialog.results') : resolveSettingsText(active.label, t)}
             </Text>
           </HStack>

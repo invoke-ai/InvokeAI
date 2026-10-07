@@ -35,11 +35,18 @@ const loraModel = {
   type: 'lora',
 } as ModelConfig;
 const secondSdxlModel = { ...model, key: 'sdxl-other', name: 'Another SDXL' } as ModelConfig;
-const MODELS_UI_ADAPTER = { enableModelDescriptions: true, managerProjectId: null };
+const MODELS_UI_ADAPTER = {
+  canManageModels: true,
+  enableModelDescriptions: true,
+  isProjectActive: () => true,
+  managerProjectId: null,
+};
 const MAIN_MODEL_TYPES: ['main'] = ['main'];
 const CROSS_TYPE_MODEL_TYPES: ['main', 'lora'] = ['main', 'lora'];
 
 const CONTROLNET_TYPES = ['controlnet'] as const;
+const LORA_TYPES = ['lora'] as const;
+const ADDED_LORA_KEYS: ReadonlySet<string> = new Set(['sd1-lora']);
 
 describe('ModelSelect loading states', () => {
   let host: HTMLDivElement;
@@ -74,6 +81,31 @@ describe('ModelSelect loading states', () => {
     await act(() => host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')?.click());
 
     await expect.poll(() => document.querySelector('[role="option"]')?.textContent).toContain('SDXL Main');
+  });
+
+  it('says every compatible model is already added rather than that none are installed', async () => {
+    setModelsSnapshotForTests({ error: null, models: [loraModel], status: 'loaded' });
+
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <ModelsUiProvider adapter={MODELS_UI_ADAPTER}>
+            <ModelSelect
+              excludeKeys={ADDED_LORA_KEYS}
+              modelTypes={LORA_TYPES}
+              scopeLabel="concepts"
+              showManagerButton={false}
+              value={null}
+              onChange={vi.fn()}
+            />
+          </ModelsUiProvider>
+        </ChakraProvider>
+      );
+    });
+
+    const trigger = host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')!;
+    expect(trigger.disabled).toBe(true);
+    expect(trigger.textContent).toContain('models.scopeAllAdded');
   });
 
   it('disables the trigger instead of opening an empty list when nothing compatible is installed', async () => {

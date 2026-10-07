@@ -1,6 +1,7 @@
 import type * as LayoutPresetActivationModule from '@workbench/layoutPresetActivation';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
 import { system } from '@theme/system';
 import { createWorkbenchStore, type WorkbenchInternalStore } from '@workbench/workbenchStore';
 import { act, useSyncExternalStore } from 'react';
@@ -167,6 +168,29 @@ describe('LayoutPresetStrip', () => {
   });
 
   // The menu's layer must be gone before an admin dialog mounts, or zag dismisses the dialog as nested above it.
+  it.each(['save-as', 'edit'] as const)(
+    'animates the %s dialog out instead of unmounting it on close',
+    async (kind) => {
+      await renderStrip({ withAdminDialogs: true });
+
+      if (kind === 'save-as') {
+        await act(() =>
+          userEvent.click(document.querySelector<HTMLElement>('[aria-label="Save this layout as a new preset"]')!)
+        );
+      } else {
+        await openPresetMenuItem('custom-1', 'edit-preset');
+      }
+      await expect.poll(() => document.querySelector('[role="dialog"]')?.getAttribute('data-state')).toBe('open');
+      const dialog = document.querySelector('[role="dialog"]')!;
+
+      const frames = await recordDialogExit(dialog, () => act(() => userEvent.keyboard('{Escape}')));
+
+      // An unmounted dialog never reaches its closed state, so it cannot animate out; a retained one does, then leaves.
+      expect(closingFrames(frames)).not.toHaveLength(0);
+      await expect.poll(() => document.querySelector('[role="dialog"]')).toBeNull();
+    }
+  );
+
   it('keeps the edit and delete dialogs opened from a preset menu', async () => {
     await renderStrip({ withAdminDialogs: true });
 

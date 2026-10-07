@@ -1227,7 +1227,7 @@ export const LayersTree = ({
                   <Text
                     bg="bg.panel"
                     color="fg.error"
-                    fontSize="2xs"
+                    fontSize="xs"
                     left="0"
                     maxW="full"
                     position="absolute"

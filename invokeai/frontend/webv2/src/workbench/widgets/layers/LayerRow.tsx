@@ -419,7 +419,6 @@ const LayerRowComponent = ({
               ref={focusOnMount}
               aria-label={t('widgets.layers.actions.rename')}
               defaultValue={node.name}
-              size="2xs"
               userSelect="text"
               onBlur={handleNameBlur}
               onClick={stopPropagation}
@@ -429,7 +428,7 @@ const LayerRowComponent = ({
           ) : (
             <MiddleTruncate
               color={vm.contributionEnabled ? undefined : 'fg.muted'}
-              fontSize="2xs"
+              fontSize="xs"
               fontWeight="700"
               text={node.name}
             />
@@ -449,7 +448,7 @@ const LayerRowComponent = ({
                 aria-pressed={!ownHidden}
                 color={vm.documentHidden ? 'fg.muted' : 'fg'}
                 disabled={editingLocked || hiddenByAncestor}
-                size="2xs"
+                size="sm"
                 tabIndex={-1}
                 variant="ghost"
                 onClick={handleToggleHidden}
@@ -470,7 +469,7 @@ const LayerRowComponent = ({
               aria-label={t('widgets.layers.actions.toggleLock')}
               color={node.isLocked ? 'fg' : 'fg.muted'}
               disabled={editingLocked || lockedByAncestor}
-              size="2xs"
+              size="sm"
               tabIndex={-1}
               variant="ghost"
               onClick={handleToggleLock}
@@ -576,11 +575,11 @@ export const LayerDragGhost = ({ count, vm }: { count: number; vm: SemanticNode 
     rounded="sm"
   >
     {vm.kind === 'group' ? <Icon as={FolderIcon} boxSize="3.5" color="fg.muted" flexShrink={0} /> : null}
-    <Text flex="1" fontSize="2xs" fontWeight="700" truncate>
+    <Text flex="1" fontSize="xs" fontWeight="700" truncate>
       {vm.node.name}
     </Text>
     {count > 1 ? (
-      <Badge colorPalette="accent" size="xs" variant="solid">
+      <Badge colorPalette="accent" variant="solid">
         {count}
       </Badge>
     ) : null}

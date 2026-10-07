@@ -50,16 +50,16 @@ export const ListSelectionBar = ({
       checked={checked}
       colorPalette="accent"
       disabled={isDisabled}
-      size="xs"
+      size="sm"
       onCheckedChange={onCheckedChange}
     >
       <Checkbox.HiddenInput />
       <Checkbox.Control />
-      <Checkbox.Label color="fg.muted" fontSize="2xs" fontWeight="600">
+      <Checkbox.Label color="fg.muted" fontSize="xs" fontWeight="600">
         {label}
       </Checkbox.Label>
     </Checkbox.Root>
-    <Text color="fg.muted" flex="1" fontSize="2xs" id={summaryId} minW="0" textAlign="end" truncate>
+    <Text color="fg.muted" flex="1" fontSize="xs" id={summaryId} minW="0" textAlign="end" truncate>
       {summary}
     </Text>
     {Children.toArray(children).length > 0 ? (

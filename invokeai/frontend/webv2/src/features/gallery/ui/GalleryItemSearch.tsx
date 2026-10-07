@@ -281,7 +281,7 @@ export const GalleryItemSearch = () => {
         {isSemanticMode || gallery.searchTerm ? (
           <CloseButton
             aria-label={isSemanticMode ? t('widgets.gallery.clearSemanticSearch') : t('common.clearSearch')}
-            size="2xs"
+            size="sm"
             onClick={handleClearSearch}
           />
         ) : null}
@@ -338,7 +338,7 @@ export const GalleryItemSearch = () => {
       {hint ? (
         <Text
           color={invalidHint ? 'fg.error' : 'fg.warning'}
-          fontSize="2xs"
+          fontSize="xs"
           id={SEARCH_HINT_ID}
           insetInlineStart="0"
           // Out of flow and inert: it must never shift the header row, nor
@@ -386,7 +386,7 @@ const GallerySemanticChip = ({
                 ? t('widgets.gallery.clearClusterSearch')
                 : t('widgets.gallery.clearImageSearch')
           }
-          size="2xs"
+          size="sm"
           onClick={onClear}
         />
       </HStack>
@@ -407,7 +407,7 @@ const GallerySemanticChip = ({
 
   return (
     <InputShell endElement={endElement} startElement={kindIcon} title={getSemanticReferenceTitle(reference)}>
-      <Text color="fg.muted" flex="1" fontSize="xs" minW="0" truncate>
+      <Text color="fg.muted" flex="1" fontSize="md" minW="0" truncate>
         {isText
           ? t('widgets.gallery.semanticTextSearch', { name })
           : isCluster

@@ -37,9 +37,9 @@ interface LayerFilterControlsProps {
 export const getLayerFilterControlPolicy = () =>
   ({
     controlMinH: undefined,
-    controlSize: 'xs',
+    controlSize: 'md',
     fieldOrientation: 'vertical',
-    modelSize: 'xs',
+    modelSize: 'md',
     positioning: SELECT_POSITIONING_DOWN,
     showFilterLabel: true,
     showNumberStepper: true,
@@ -215,7 +215,7 @@ const FilterParamField = ({ disabled, param, policy, settings, value, onChange }
         colorPalette="accent"
         disabled={disabled}
         minH={policy.controlMinH}
-        size="xs"
+        size="sm"
         onCheckedChange={handleBoolean}
       >
         <Switch.HiddenInput />
@@ -223,7 +223,7 @@ const FilterParamField = ({ disabled, param, policy, settings, value, onChange }
           <Switch.Thumb />
         </Switch.Control>
         <Switch.Label>
-          <Text fontSize="xs">{label}</Text>
+          <Text fontSize="md">{label}</Text>
         </Switch.Label>
       </Switch.Root>
     );
@@ -292,7 +292,6 @@ const FilterParamField = ({ disabled, param, policy, settings, value, onChange }
           max={numberBounds.sliderMax}
           minH={policy.controlMinH}
           min={numberBounds.sliderMin}
-          size="sm"
           step={numberBounds.step}
           value={numberValue}
           withThumbTooltip

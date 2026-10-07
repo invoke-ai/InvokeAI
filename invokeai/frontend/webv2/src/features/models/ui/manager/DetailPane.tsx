@@ -5,12 +5,13 @@ import { AddModelsView } from '@features/models/ui/add-models/AddModelsView';
 import { ApiKeysSection } from '@features/models/ui/credentials/ApiKeysSection';
 import { ModelDetail } from '@features/models/ui/detail/ModelDetail';
 import { InstallQueueBar } from '@features/models/ui/install-queue/InstallQueueBar';
+import { ModelActionConfirmDialog, type PendingModelAction } from '@features/models/ui/shared/ModelActionsMenu';
 import { updateModelsUi, useModelsUiSelector, type ModelManagerTab } from '@features/models/ui/uiStore';
 import { Scrollable, Tabs } from '@platform/ui';
 import { ManagerDetailHeader } from '@platform/ui/ManagerLayout';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { BoxIcon, KeyRoundIcon, PlusIcon } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /** The tabbed detail pane: selected model, Add Models, API Keys, and queue footer. */
@@ -39,7 +40,7 @@ export const DetailPane = () => {
         flexDirection="column"
         minH="0"
         minW="0"
-        size="sm"
+        size="xl"
         value={activeTab}
         onValueChange={(event) => updateModelsUi({ activeTab: event.value as ModelManagerTab })}
       >
@@ -84,25 +85,32 @@ export const DetailPane = () => {
 
 const DetailTab = ({ modelKey }: { modelKey: string | null }) => {
   const { t } = useTranslation();
+  // Owned above the keyed detail: a delete unmounts it while this dialog is still animating out.
+  const [pendingAction, setPendingAction] = useState<PendingModelAction>(null);
   const handleDeleted = useCallback(() => updateModelsUi({ activeModelKey: null }), []);
 
-  if (modelKey === null) {
-    return (
-      <Flex align="center" direction="column" gap="2" h="full" justify="center" p="6">
-        <Icon as={BoxIcon} boxSize="8" color="fg.subtle" />
-        <Text color="fg.muted" fontSize="sm" fontWeight="600">
-          {t('models.selectModel')}
-        </Text>
-        <Text color="fg.subtle" fontSize="xs" maxW="22rem" textAlign="center">
-          {t('models.selectModelDescription')}
-        </Text>
-      </Flex>
-    );
-  }
-
   return (
-    <Scrollable h="full" label={t('models.details')} minH="0" p="3">
-      <ModelDetail key={modelKey} modelKey={modelKey} onDeleted={handleDeleted} />
-    </Scrollable>
+    <>
+      {modelKey === null ? (
+        <Flex align="center" direction="column" gap="2" h="full" justify="center" p="6">
+          <Icon as={BoxIcon} boxSize="8" color="fg.subtle" />
+          <Text color="fg.muted" fontSize="lg" fontWeight="600">
+            {t('models.selectModel')}
+          </Text>
+          <Text color="fg.subtle" fontSize="md" maxW="22rem" textAlign="center">
+            {t('models.selectModelDescription')}
+          </Text>
+        </Flex>
+      ) : (
+        <Scrollable h="full" label={t('models.details')} minH="0" p="3">
+          <ModelDetail key={modelKey} modelKey={modelKey} onRequestConfirm={setPendingAction} />
+        </Scrollable>
+      )}
+      <ModelActionConfirmDialog
+        pending={pendingAction}
+        onClose={() => setPendingAction(null)}
+        onDeleted={handleDeleted}
+      />
+    </>
   );
 };

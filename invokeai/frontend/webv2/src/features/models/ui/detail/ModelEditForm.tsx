@@ -159,7 +159,7 @@ export const ModelEditForm = ({
       <Field error={form.errors.name} label={t('common.name')}>
         <Input
           aria-invalid={form.errors.name ? true : undefined}
-          size="sm"
+          size="lg"
           value={form.values.name}
           onChange={(event) => form.setValue('name', event.currentTarget.value)}
         />
@@ -167,7 +167,7 @@ export const ModelEditForm = ({
       <Field error={form.errors.description} label={t('models.description')}>
         <Textarea
           rows={2}
-          size="sm"
+          size="lg"
           value={form.values.description}
           onChange={(event) => form.setValue('description', event.currentTarget.value)}
         />
@@ -177,7 +177,7 @@ export const ModelEditForm = ({
           <Select
             aria-label={t('models.base')}
             collection={baseCollection}
-            size="sm"
+            size="lg"
             value={[form.values.base]}
             onValueChange={({ value }) => {
               const base = value[0];
@@ -192,7 +192,7 @@ export const ModelEditForm = ({
           <Select
             aria-label={t('models.type')}
             collection={MODEL_TYPE_COLLECTION}
-            size="sm"
+            size="lg"
             value={[form.values.type]}
             onValueChange={({ value }) => {
               const type = value[0];
@@ -210,7 +210,7 @@ export const ModelEditForm = ({
             <Select
               aria-label={t('models.variant')}
               collection={variantCollection}
-              size="sm"
+              size="lg"
               value={[form.values.variant]}
               onValueChange={({ value }) => {
                 const variant = value[0];
@@ -222,7 +222,7 @@ export const ModelEditForm = ({
             />
           ) : (
             <Input
-              size="sm"
+              size="lg"
               value={form.values.variant}
               onChange={(event) => form.setValue('variant', event.currentTarget.value)}
             />
@@ -232,7 +232,7 @@ export const ModelEditForm = ({
           <Select
             aria-label={t('models.predictionType')}
             collection={predictionTypeCollection}
-            size="sm"
+            size="lg"
             value={[form.values.predictionType]}
             onValueChange={({ value }) => {
               const predictionType = value[0];
@@ -249,7 +249,7 @@ export const ModelEditForm = ({
           <Select
             aria-label={t('models.format')}
             collection={formatCollection}
-            size="sm"
+            size="lg"
             value={[form.values.format]}
             onValueChange={({ value }) => {
               const format = value[0];
@@ -263,7 +263,7 @@ export const ModelEditForm = ({
         {hasConfigPath ? (
           <Field error={form.errors.configPath} helpText={t('models.configPathHelp')} label={t('models.configPath')}>
             <Input
-              size="sm"
+              size="lg"
               value={form.values.configPath}
               onChange={(event) => form.setValue('configPath', event.currentTarget.value)}
             />
@@ -274,21 +274,21 @@ export const ModelEditForm = ({
         <Input
           aria-invalid={form.errors.sourceUrl ? true : undefined}
           placeholder="https://…"
-          size="sm"
+          size="lg"
           value={form.values.sourceUrl}
           onChange={(event) => form.setValue('sourceUrl', event.currentTarget.value)}
         />
       </Field>
       {form.formError ? (
-        <Text color="fg.error" fontSize="2xs" role="alert">
+        <Text color="fg.error" fontSize="xs" role="alert">
           {form.formError}
         </Text>
       ) : null}
       <HStack gap="2" justify="flex-end">
-        <Button disabled={form.isSubmitting} size="xs" variant="ghost" onClick={onCancel}>
+        <Button disabled={form.isSubmitting} variant="ghost" onClick={onCancel}>
           {t('common.cancel')}
         </Button>
-        <Button loading={form.isSubmitting} size="xs" variant="solid" onClick={() => void handleSave()}>
+        <Button loading={form.isSubmitting} variant="solid" onClick={() => void handleSave()}>
           {t('users.saveChanges')}
         </Button>
       </HStack>

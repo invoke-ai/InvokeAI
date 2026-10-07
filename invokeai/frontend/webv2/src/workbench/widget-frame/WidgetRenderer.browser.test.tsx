@@ -90,10 +90,10 @@ const TestIcon = (props: SVGProps<SVGSVGElement>) => <svg {...props} />;
 const TestView = () => <div data-testid="loaded" />;
 const TooltipView = () => (
   <Stack data-testid="loaded" gap="2">
-    <Text data-widget-identity-label="" fontSize="xs" fontWeight="700">
+    <Text data-widget-identity-label="" fontSize="md" fontWeight="700">
       Test widget
     </Text>
-    <Text color="fg.subtle" fontSize="2xs">
+    <Text color="fg.subtle" fontSize="xs">
       Ready
     </Text>
   </Stack>
@@ -104,7 +104,7 @@ const CompactView = () => (
   </StatusWidgetChip>
 );
 const CustomHeaderLabel = () => (
-  <Text data-widget-identity-label="" fontSize="xs" fontWeight="700">
+  <Text data-widget-identity-label="" fontSize="md" fontWeight="700">
     Custom widget label
   </Text>
 );

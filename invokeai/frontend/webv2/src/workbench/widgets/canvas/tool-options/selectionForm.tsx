@@ -84,7 +84,7 @@ const SelectionModeSettings = ({ engine, isSurfaceInteractionLocked }: ToolFormP
         <SelectionOpModeButtons mode={mode} onModeChange={onModeChange} />
       </PropertyControlRow>
       {hasSelection ? null : (
-        <Text color="fg.muted" fontSize="2xs">
+        <Text color="fg.muted" fontSize="xs">
           {t(hintKey)}
         </Text>
       )}

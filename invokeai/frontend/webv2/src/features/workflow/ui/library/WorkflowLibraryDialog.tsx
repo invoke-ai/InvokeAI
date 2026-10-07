@@ -322,8 +322,8 @@ export const WorkflowLibraryDialog = ({
                   role="status"
                   zIndex="modal"
                 >
-                  <Spinner color="accent.solid" size="lg" />
-                  <Text fontSize="xs" fontWeight="600">
+                  <Spinner color="accent.solid" size="2xl" />
+                  <Text fontSize="md" fontWeight="600">
                     {loadPhase === 'fetching' ? t('workflowLibrary.fetching') : t('workflowLibrary.applying')}
                   </Text>
                 </Stack>
@@ -333,7 +333,7 @@ export const WorkflowLibraryDialog = ({
                   <HStack gap="3" minW="0">
                     <Dialog.Title flexShrink={0}>{t('workflowLibrary.title')}</Dialog.Title>
                     {isProjectTab ? (
-                      <Text color="fg.subtle" flex="1" fontSize="xs" minW="0" truncate>
+                      <Text color="fg.subtle" flex="1" fontSize="md" minW="0" truncate>
                         {t('workflowLibrary.thisProjectHint')}
                       </Text>
                     ) : (
@@ -342,7 +342,6 @@ export const WorkflowLibraryDialog = ({
                         flex="1"
                         minW="0"
                         placeholder={t('workflowLibrary.searchPlaceholder')}
-                        size="xs"
                         type="search"
                         value={searchInput}
                         onChange={handleSearchChange}
