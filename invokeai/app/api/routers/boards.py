@@ -43,6 +43,14 @@ class DeleteBoardResult(BaseModel):
         default_factory=list,
         description="The names of videos that could not be deleted and became uncategorized.",
     )
+    starred_images_skipped: list[str] = Field(
+        default_factory=list,
+        description="The names of starred images that were protected and became uncategorized.",
+    )
+    starred_videos_skipped: list[str] = Field(
+        default_factory=list,
+        description="The names of starred videos that were protected and became uncategorized.",
+    )
 
 
 @boards_router.post(
@@ -136,6 +144,7 @@ def delete_board(
     include_images: Optional[bool] = Query(
         description="Permanently delete all images and videos on the board", default=False
     ),
+    delete_starred: bool = Query(default=True, description="Whether to allow deletion of starred media"),
 ) -> DeleteBoardResult:
     """Deletes a board (user must have access to it)"""
     try:
@@ -198,11 +207,19 @@ def delete_board(
             # as failures. This is the ground truth — reconstructing failures by diffing a
             # router-side board listing against the deleted names would double the DB work and
             # misreport items moved or deleted concurrently between the two queries.
-            deleted_images, failed_images = ApiDependencies.invoker.services.images.delete_images_by_names(
-                board_image_names
+            (
+                deleted_images,
+                failed_images,
+                starred_images_skipped,
+            ) = ApiDependencies.invoker.services.images.delete_images_by_names(
+                board_image_names, delete_starred=delete_starred
             )
-            deleted_videos, failed_videos = ApiDependencies.invoker.services.videos.delete_videos_by_names(
-                board_video_names
+            (
+                deleted_videos,
+                failed_videos,
+                starred_videos_skipped,
+            ) = ApiDependencies.invoker.services.videos.delete_videos_by_names(
+                board_video_names, delete_starred=delete_starred
             )
             return DeleteBoardResult(
                 board_id=board_id,
@@ -212,6 +229,8 @@ def delete_board(
                 deleted_videos=deleted_videos,
                 failed_images=failed_images,
                 failed_videos=failed_videos,
+                starred_images_skipped=starred_images_skipped,
+                starred_videos_skipped=starred_videos_skipped,
             )
 
         return DeleteBoardResult(

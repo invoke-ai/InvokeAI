@@ -85,6 +85,12 @@ export interface GalleryDeletionResult {
   failedImageNames: string[];
 }
 
+/** Options shared by every media deletion. */
+export interface GalleryDeleteOptions {
+  /** `false` has the backend keep starred media instead of deleting it. Absent means delete everything requested. */
+  deleteStarred?: boolean;
+}
+
 /**
  * Authoritative outcome of deleting a board. Deleting the board with its
  * contents reports deleted/failed media; retaining its contents reports the
@@ -98,6 +104,9 @@ export interface GalleryBoardDeletionResult {
   deletedVideoNames: string[];
   failedImageNames: string[];
   failedVideoNames: string[];
+  /** Starred media kept when protection was on; like the board's other survivors it is now uncategorized. */
+  protectedImageNames: string[];
+  protectedVideoNames: string[];
 }
 
 export interface GalleryImagesPage {

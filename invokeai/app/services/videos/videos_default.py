@@ -370,12 +370,14 @@ class VideoService(VideoServiceABC):
             self.__invoker.services.logger.error("Problem getting paginated video DTOs")
             raise e
 
-    def delete(self, video_name: str) -> None:
+    def delete(self, video_name: str, delete_starred: bool = True) -> bool:
         with self._delete_lock:
             token: object | None = None
             record_deleted = False
             try:
                 record = self.__invoker.services.video_records.get(video_name)
+                if not delete_starred and record.starred:
+                    return False
                 token = self.__invoker.services.video_files.stage_delete(
                     video_name, video_subfolder=record.video_subfolder
                 )
@@ -386,6 +388,7 @@ class VideoService(VideoServiceABC):
                 except Exception as cleanup_error:
                     self.__invoker.services.logger.error(f"Failed to purge staged video files: {cleanup_error}")
                 self._on_deleted(video_name)
+                return True
             except VideoRecordDeleteException:
                 if token is not None:
                     self.__invoker.services.video_files.rollback_delete(token)
@@ -403,13 +406,15 @@ class VideoService(VideoServiceABC):
                 self.__invoker.services.logger.error("Problem deleting video record and file")
                 raise e
 
-    def delete_videos_on_board(self, board_id: str, user_id: Optional[str] = None) -> tuple[list[str], list[str]]:
+    def delete_videos_on_board(
+        self, board_id: str, user_id: Optional[str] = None, delete_starred: bool = True
+    ) -> tuple[list[str], list[str], list[str]]:
         # When ``user_id`` is set the lookup filters to videos owned by that user so the
         # cascade doesn't destroy other users' contributions to a public/shared board.
         video_names = self.__invoker.services.board_video_records.get_all_board_video_names_for_board(
             board_id, categories=None, is_intermediate=None, user_id=user_id
         )
-        return self.delete_videos_by_names(video_names)
+        return self.delete_videos_by_names(video_names, delete_starred=delete_starred)
 
     def delete_intermediates_by_names(
         self, video_names: list[str], guard: Optional[IntermediateDeleteGuard] = None
@@ -434,8 +439,10 @@ class VideoService(VideoServiceABC):
                 ),
             )
 
-    def delete_videos_by_names(self, video_names: list[str]) -> tuple[list[str], list[str]]:
-        """Delete exactly these videos, returning ``(deleted, failed)``.
+    def delete_videos_by_names(
+        self, video_names: list[str], delete_starred: bool = True
+    ) -> tuple[list[str], list[str], list[str]]:
+        """Delete exactly these videos, returning ``(deleted, failed, starred_skipped)``.
 
         Split from ``delete_videos_on_board`` so a caller that must decide whether the board may go
         *before* destroying anything can enumerate first and delete second.
@@ -448,13 +455,16 @@ class VideoService(VideoServiceABC):
                     video_names,
                     StagedMediaDeleteAdapter(
                         kind="video",
-                        stage=lambda name: files.stage_delete(name, video_subfolder=records.get(name).video_subfolder),
+                        load=records.get,
+                        is_starred=lambda record: record.starred,
+                        stage=lambda name, record: files.stage_delete(name, video_subfolder=record.video_subfolder),
                         delete_records=records.delete_many,
                         rollback=files.rollback_delete,
                         commit=files.commit_delete,
                         notify_deleted=self._on_deleted,
                         log_error=self.__invoker.services.logger.error,
                     ),
+                    delete_starred=delete_starred,
                 )
             except VideoRecordDeleteException:
                 self.__invoker.services.logger.error("Failed to delete video records")

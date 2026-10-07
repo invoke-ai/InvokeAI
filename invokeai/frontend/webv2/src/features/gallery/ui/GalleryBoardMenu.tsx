@@ -2,8 +2,10 @@ import type { GalleryBoard } from '@features/gallery/core/types';
 
 import { Dialog, HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import { GALLERY_AUTO_ADD_FOLLOW } from '@features/gallery/core/settings';
+import { galleryBoardStarredCountOptions } from '@features/gallery/data/queries';
 import { Button } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
+import { useQuery } from '@tanstack/react-query';
 import {
   ArchiveIcon,
   DownloadIcon,
@@ -16,6 +18,7 @@ import {
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useOptionalGalleryUi } from './GalleryUiContext';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 export interface GalleryBoardMenuTarget {
@@ -34,6 +37,7 @@ export const GalleryBoardMenu = ({
 }) => {
   const { t } = useTranslation();
   const { actions, gallery } = useGalleryWidget();
+  const protectStarredMedia = useOptionalGalleryUi()?.protectStarredMedia ?? false;
   const [renameTarget, setRenameTarget] = useState<GalleryBoard | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<GalleryBoard | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -219,6 +223,7 @@ export const GalleryBoardMenu = ({
                       videos: t('widgets.gallery.videoCount', { count: deleteTarget?.videoCount ?? 0 }),
                     })}
                   </Text>
+                  {protectStarredMedia && deleteTarget && <BoardStarredNotice boardId={deleteTarget.id} />}
                 </Stack>
               </Dialog.Body>
               <Dialog.Footer>
@@ -237,6 +242,22 @@ export const GalleryBoardMenu = ({
         </Portal>
       </Dialog.Root>
     </>
+  );
+};
+
+/** Says how many starred items a "Delete Board and Media" keeps; silent until the count is known and non-zero. */
+const BoardStarredNotice = ({ boardId }: { boardId: string }) => {
+  const { t } = useTranslation();
+  const { data: starredCount } = useQuery(galleryBoardStarredCountOptions(boardId));
+
+  if (!starredCount) {
+    return null;
+  }
+
+  return (
+    <Text color="fg.warning" fontSize="xs" role="status">
+      {t('widgets.gallery.deleteBoardStarredNotice', { count: starredCount })}
+    </Text>
   );
 };
 

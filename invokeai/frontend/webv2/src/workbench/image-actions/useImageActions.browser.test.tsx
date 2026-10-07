@@ -62,7 +62,7 @@ const mocks = vi.hoisted(() => ({
   resolveItem: vi.fn(),
   setStarred: vi.fn(),
 }));
-const preferences = vi.hoisted(() => ({ confirmImageDeletion: false }));
+const preferences = vi.hoisted(() => ({ confirmImageDeletion: false, protectStarredMedia: false }));
 
 vi.mock('@features/gallery', () => ({
   galleryImages: {
@@ -190,6 +190,9 @@ vi.mock('react-i18next', () => ({
       if (key === 'widgets.gallery.itemActions.move.success') {
         return `Moved to ${String(values?.board)}`;
       }
+      if (key.startsWith('widgets.gallery.itemActions.delete.starred')) {
+        return `${key}:${String(values?.count)}:${String(values?.succeeded)}`;
+      }
       if (key === 'widgets.gallery.itemActions.loadWorkflow.loadedLabel') {
         return `${key}:${String(values?.name)}`;
       }
@@ -266,6 +269,7 @@ const Probe = ({ modelKey = 'sd-1-model', ref }: { modelKey?: string; ref: Ref<I
 beforeEach(() => {
   vi.clearAllMocks();
   preferences.confirmImageDeletion = false;
+  preferences.protectStarredMedia = false;
   mocks.requestDeletionConfirmation.mockImplementation(
     (_itemRefs: readonly GalleryItemRef[], executeDeletion: () => Promise<void>) => executeDeletion()
   );
@@ -642,7 +646,7 @@ describe('mixed item mutation outcomes', () => {
     await act(async () => {
       await executeDeletion?.();
     });
-    expect(mocks.itemDelete).toHaveBeenCalledWith(refs, expect.any(AbortSignal));
+    expect(mocks.itemDelete).toHaveBeenCalledWith(refs, expect.any(AbortSignal), { deleteStarred: true });
   });
 
   it('deletes immediately without opening confirmation when the preference is disabled', async () => {
@@ -654,7 +658,7 @@ describe('mixed item mutation outcomes', () => {
     });
 
     expect(mocks.requestDeletionConfirmation).not.toHaveBeenCalled();
-    expect(mocks.itemDelete).toHaveBeenCalledWith(refs, expect.any(AbortSignal));
+    expect(mocks.itemDelete).toHaveBeenCalledWith(refs, expect.any(AbortSignal), { deleteStarred: true });
   });
 
   it('uses the localized Uncategorized label in move notifications', async () => {
@@ -781,6 +785,131 @@ describe('mixed item mutation outcomes', () => {
   });
 });
 
+describe('starred media protection', () => {
+  const plain = { kind: 'image' as const, name: 'plain.png' };
+  const starred = { kind: 'image' as const, name: 'starred.png' };
+  const starredVideo = { kind: 'video' as const, name: 'starred.mp4' };
+  const rerenderProbe = () =>
+    act(() => {
+      root?.render(
+        <QueryClientProvider client={new QueryClient()}>
+          <Probe ref={actionsRef} />
+        </QueryClientProvider>
+      );
+    });
+
+  beforeEach(async () => {
+    preferences.protectStarredMedia = true;
+    mocks.getItemStarred.mockReturnValue(
+      new Map([
+        ['image:starred.png', true],
+        ['video:starred.mp4', true],
+      ])
+    );
+    await rerenderProbe();
+  });
+
+  it('has the backend keep starred items, in case the listing is stale about a star', async () => {
+    mocks.itemDelete.mockResolvedValue({ affectedBoardIds: ['none'], failed: [], succeeded: [plain] });
+
+    await act(async () => {
+      await getItemActions().deleteItems([plain]);
+    });
+
+    expect(mocks.itemDelete).toHaveBeenCalledWith([plain], expect.any(AbortSignal), { deleteStarred: false });
+  });
+
+  it('keeps known starred items out of the confirmation and the request, and says how many stayed', async () => {
+    preferences.confirmImageDeletion = true;
+    mocks.itemDelete.mockResolvedValue({ affectedBoardIds: ['none'], failed: [], succeeded: [plain] });
+    await rerenderProbe();
+
+    await act(async () => {
+      await getItemActions().deleteItems([plain, starred, starredVideo]);
+    });
+
+    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith([plain], expect.any(Function));
+    expect(mocks.itemDelete).toHaveBeenCalledWith([plain], expect.any(AbortSignal), { deleteStarred: false });
+    expect(mocks.galleryRemoveItems).toHaveBeenCalledWith(['image:plain.png']);
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith({
+      kind: 'info',
+      title: 'widgets.gallery.itemActions.delete.starredKept:2:1',
+    });
+  });
+
+  it('only tells the user when everything selected is starred, and sends nothing', async () => {
+    preferences.confirmImageDeletion = true;
+    await rerenderProbe();
+
+    await act(async () => {
+      await getItemActions().deleteItems([starred, starredVideo]);
+    });
+
+    expect(mocks.requestDeletionConfirmation).not.toHaveBeenCalled();
+    expect(mocks.itemDelete).not.toHaveBeenCalled();
+    expect(mocks.patchGalleryItemCaches).not.toHaveBeenCalled();
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith({
+      kind: 'info',
+      title: 'widgets.gallery.itemActions.delete.starredOnly:2:undefined',
+    });
+  });
+
+  it('stays silent about protection when deletion is not confirmed', async () => {
+    mocks.itemDelete.mockResolvedValue({ affectedBoardIds: ['none'], failed: [], succeeded: [plain] });
+
+    await act(async () => {
+      await getItemActions().deleteItems([starred]);
+    });
+    await act(async () => {
+      await getItemActions().deleteItems([plain, starred]);
+    });
+
+    expect(mocks.itemDelete).toHaveBeenCalledOnce();
+    expect(mocks.notificationsAdd).toHaveBeenCalledOnce();
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith({
+      kind: 'success',
+      message: undefined,
+      title: 'widgets.gallery.itemActions.delete.success',
+    });
+  });
+
+  it('restores an item the backend kept as starred and reports protection rather than failure', async () => {
+    preferences.confirmImageDeletion = true;
+    mocks.getItemStarred.mockReturnValue(new Map());
+    await rerenderProbe();
+    const result = { affectedBoardIds: [], failed: [plain], starredSkipped: [plain], succeeded: [] };
+    mocks.itemDelete.mockResolvedValue(result);
+
+    await act(async () => {
+      await getItemActions().deleteItems([plain]);
+    });
+
+    expect(mocks.patchGalleryItemCaches.mock.results[0]?.value).toHaveBeenCalledOnce();
+    expect(mocks.reportError).not.toHaveBeenCalled();
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith({
+      kind: 'info',
+      title: 'widgets.gallery.itemActions.delete.starredOnly:1:0',
+    });
+  });
+
+  it('still reports a real failure alongside kept starred items', async () => {
+    mocks.getItemStarred.mockReturnValue(new Map());
+    const locked = { kind: 'image' as const, name: 'locked.png' };
+    mocks.itemDelete.mockResolvedValue({
+      affectedBoardIds: [],
+      failed: [plain, locked],
+      starredSkipped: [plain],
+      succeeded: [],
+    });
+
+    await act(async () => {
+      await getItemActions().deleteItems([plain, locked]);
+    });
+
+    expect(mocks.reportError).toHaveBeenCalledOnce();
+  });
+});
+
 describe('total transport failure rollback', () => {
   const recentImageFixture = {
     height: 512,
@@ -828,6 +957,29 @@ describe('total transport failure rollback', () => {
     });
     mocks.itemDelete.mockRejectedValue(new Error('network down'));
     mocks.invalidateGallery.mockRejectedValue(new Error('network down'));
+
+    await act(async () => {
+      await getItemActions().deleteItems(refs);
+    });
+
+    expect(mocks.galleryWidgetsPatchValues).toHaveBeenCalledWith(
+      'gallery',
+      { recentImages: [recentImageFixture] },
+      'project-1',
+      'system'
+    );
+  });
+
+  it('restores the gallery widget store when the backend keeps every requested item', async () => {
+    const refs = [{ kind: 'image' as const, name: 'kept.png' }];
+    const before = makeMockProject('project-1', { recentImages: [recentImageFixture] });
+    const afterRemoval = makeMockProject('project-1', { recentImages: [] });
+
+    mocks.getSnapshot.mockReturnValueOnce({ activeProject: before, projects: [before] }).mockReturnValue({
+      activeProject: afterRemoval,
+      projects: [afterRemoval],
+    });
+    mocks.itemDelete.mockResolvedValue({ affectedBoardIds: [], failed: refs, starredSkipped: refs, succeeded: [] });
 
     await act(async () => {
       await getItemActions().deleteItems(refs);

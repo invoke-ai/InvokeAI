@@ -81,6 +81,7 @@ export const projectSettings = section('project', 'Project', [
 ]);
 export const galleryPreferenceSettings = section('gallery', 'Gallery', [
   preference('confirmImageDeletion', 'Confirm image deletion', 'delete safety'),
+  preference('protectStarredMedia', 'Protect starred media', 'delete safety star favorite keep'),
 ]);
 export const previewProjectSettings = section('preview', 'Preview', [
   {

@@ -102,6 +102,7 @@ const adapter: GalleryUiAdapter = {
   },
   projectId: 'project-1',
   projectName: 'Project',
+  protectStarredMedia: false,
   widgets: { openGallery: () => true, patchGalleryValues: noop },
 };
 

@@ -97,6 +97,133 @@ def prepare_image_maintenance_test(monkeypatch: Any, mock_invoker: Invoker) -> N
     monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
 
 
+def prepare_starred_delete_test(
+    monkeypatch: Any,
+    mock_invoker: Invoker,
+    starred_names: set[str],
+    board_ids: dict[str, str | None],
+) -> None:
+    mock_deps = MockApiDependencies(mock_invoker)
+    mock_invoker.services.image_moves = MagicMock()
+    mock_invoker.services.image_moves.is_maintenance_active.return_value = False
+    mock_invoker.services.board_images = MagicMock()
+    mock_invoker.services.images = MagicMock()
+    mock_invoker.services.images.get_dto.side_effect = lambda image_name: MagicMock(board_id=board_ids[image_name])
+    mock_invoker.services.images.delete.side_effect = (
+        lambda image_name, delete_starred=True: delete_starred or image_name not in starred_names
+    )
+    monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers._access.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers.image_move_maintenance.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
+
+
+def test_delete_starred_image_is_skipped_when_protected(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    image_name = "starred.png"
+    prepare_starred_delete_test(
+        monkeypatch, mock_invoker, starred_names={image_name}, board_ids={image_name: "board-id"}
+    )
+
+    response = client.delete(f"/api/v1/images/i/{image_name}", params={"delete_starred": False})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "deleted_images": [],
+        "failed_images": [],
+        "affected_boards": [],
+        "starred_skipped": [image_name],
+    }
+    mock_invoker.services.images.delete.assert_called_once_with(image_name, delete_starred=False)
+
+
+def test_delete_starred_image_is_deleted_by_default(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    image_name = "starred.png"
+    prepare_starred_delete_test(
+        monkeypatch, mock_invoker, starred_names={image_name}, board_ids={image_name: "board-id"}
+    )
+
+    response = client.delete(f"/api/v1/images/i/{image_name}")
+
+    assert response.status_code == 200
+    assert response.json()["deleted_images"] == [image_name]
+    assert response.json()["starred_skipped"] == []
+    mock_invoker.services.images.delete.assert_called_once_with(image_name, delete_starred=True)
+
+
+def test_bulk_delete_only_deletes_unstarred_images_when_protected(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    starred_name = "starred.png"
+    unstarred_name = "unstarred.png"
+    prepare_starred_delete_test(
+        monkeypatch,
+        mock_invoker,
+        starred_names={starred_name},
+        board_ids={starred_name: "board-id", unstarred_name: "board-id"},
+    )
+
+    response = client.post(
+        "/api/v1/images/delete",
+        json={"image_names": [starred_name, unstarred_name], "delete_starred": False},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "deleted_images": [unstarred_name],
+        "failed_images": [],
+        "affected_boards": ["board-id"],
+        "starred_skipped": [starred_name],
+    }
+    mock_invoker.services.images.delete.assert_any_call(starred_name, delete_starred=False)
+    mock_invoker.services.images.delete.assert_any_call(unstarred_name, delete_starred=False)
+
+
+def test_bulk_delete_without_flag_keeps_deleting_starred_images(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    starred_name = "starred.png"
+    prepare_starred_delete_test(
+        monkeypatch, mock_invoker, starred_names={starred_name}, board_ids={starred_name: "board-id"}
+    )
+
+    response = client.post("/api/v1/images/delete", json={"image_names": [starred_name]})
+
+    assert response.status_code == 200
+    assert response.json()["deleted_images"] == [starred_name]
+    assert response.json()["starred_skipped"] == []
+
+
+def test_delete_uncategorized_only_deletes_unstarred_images_when_protected(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    starred_name = "starred.png"
+    unstarred_name = "unstarred.png"
+    prepare_starred_delete_test(
+        monkeypatch,
+        mock_invoker,
+        starred_names={starred_name},
+        board_ids={starred_name: None, unstarred_name: None},
+    )
+    mock_invoker.services.board_images.get_all_board_image_names_for_board.return_value = [
+        starred_name,
+        unstarred_name,
+    ]
+
+    response = client.delete("/api/v1/images/uncategorized", params={"delete_starred": False})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "deleted_images": [unstarred_name],
+        "failed_images": [],
+        "affected_boards": ["none"],
+        "starred_skipped": [starred_name],
+    }
+
+
 @pytest.mark.parametrize(
     ("method", "path", "json_body"),
     [
@@ -661,9 +788,11 @@ def test_delete_skips_names_deleted_mid_batch(
         dto.board_id = "board-2" if image_name == "vanished.png" else "board-1"
         return dto
 
-    def delete(image_name: str) -> None:
+    def delete(image_name: str, delete_starred: bool = True) -> bool:
+        del delete_starred
         if image_name == "vanished.png" and raise_from == "delete":
             raise ImageRecordNotFoundException
+        return True
 
     images_service.get_dto.side_effect = get_dto
     images_service.delete.side_effect = delete
@@ -747,9 +876,11 @@ def test_delete_still_reports_a_genuine_storage_failure(
     dto.board_id = "board-1"
     images_service.get_dto.return_value = dto
 
-    def delete(image_name: str) -> None:
+    def delete(image_name: str, delete_starred: bool = True) -> bool:
+        del delete_starred
         if image_name == "broken.png":
             raise RuntimeError("storage is on fire")
+        return True
 
     images_service.delete.side_effect = delete
 

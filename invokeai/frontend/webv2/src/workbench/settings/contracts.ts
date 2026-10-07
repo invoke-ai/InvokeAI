@@ -52,6 +52,8 @@ export interface WorkbenchPreferences {
   reduceMotion: boolean;
   showFocusRegionHighlight: boolean;
   confirmImageDeletion: boolean;
+  /** Starred images and videos are skipped by every delete, and a board delete moves them to Uncategorized. */
+  protectStarredMedia: boolean;
   /** Auto-switch the Invoke source/destination to match the surface being edited; locks always win. */
   autoSwitchInvocationRoute: boolean;
   queueJobsScope: 'active-project' | 'all';

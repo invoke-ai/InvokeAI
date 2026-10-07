@@ -141,6 +141,7 @@
         "developerLogEnabled": "Developer Logging",
         "enableInformationalPopovers": "Informational Popovers",
         "enableModelDescriptions": "Model Descriptions",
+        "protectStarredMedia": "Protect Starred Media",
         "reduceMotion": "Reduce Motion",
         "showFocusRegionHighlight": "Show Focus Region Highlight",
         "workflowShowMinimap": "Show Workflow Minimap",
@@ -1845,6 +1846,10 @@
       "confirmImageDeletion": {
         "label": "Confirm image deletion",
         "description": "Ask for confirmation before permanently deleting images."
+      },
+      "protectStarredMedia": {
+        "label": "Protect starred media",
+        "description": "Deleting from the Gallery skips starred images and videos. Deleting a board with its media moves starred items to Uncategorized instead."
       },
       "antialiasProgressImages": {
         "label": "Antialias progress images",
@@ -3883,6 +3888,9 @@
       "deleteBoardOnly": "Delete Board Only",
       "deleteBoardPartialTitle": "Deleted board \"{{name}}\" with partial media cleanup",
       "deleteBoardQuestion": "Delete board \"{{name}}\"?",
+      "deleteBoardStarredKept": "{{images}} and {{videos}} starred kept in Uncategorized.",
+      "deleteBoardStarredNotice_one": "Starred media is protected: {{count}} starred item on this board will move to Uncategorized instead of being deleted.",
+      "deleteBoardStarredNotice_other": "Starred media is protected: {{count}} starred items on this board will move to Uncategorized instead of being deleted.",
       "deleteBoardSuccessTitle": "Deleted board \"{{name}}\"",
       "deleteConfirmLabel": "Delete",
       "deleteImagesConfirmBody_one": "This permanently deletes the image from every board and from disk. This cannot be undone. You can disable this confirmation in Settings.",
@@ -3924,6 +3932,10 @@
           "failure_one": "Could not delete {{count}} item.",
           "failure_other": "Could not delete {{count}} items.",
           "partial": "{{succeeded}} of {{count}} items were deleted; {{failed}} failed.",
+          "starredKept_one": "{{succeeded}} deleted; {{count}} starred item kept because starred media is protected.",
+          "starredKept_other": "{{succeeded}} deleted; {{count}} starred items kept because starred media is protected.",
+          "starredOnly_one": "Starred media is protected; the starred item was not deleted.",
+          "starredOnly_other": "Starred media is protected; {{count}} starred items were not deleted.",
           "success_one": "Deleted {{count}} item.",
           "success_other": "Deleted {{count}} items."
         },

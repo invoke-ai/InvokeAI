@@ -64,6 +64,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   notifyOnEnqueue: true,
   preferNumericAttentionStyle: false,
   promptFontSize: 'default',
+  protectStarredMedia: false,
   queueJobsScope: 'all',
   reduceMotion: false,
   showPromptSyntaxHighlighting: true,
@@ -331,6 +332,10 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
   promptFontSize: isPromptFontSize(preferences?.promptFontSize)
     ? preferences.promptFontSize
     : DEFAULT_PREFERENCES.promptFontSize,
+  protectStarredMedia:
+    typeof preferences?.protectStarredMedia === 'boolean'
+      ? preferences.protectStarredMedia
+      : DEFAULT_PREFERENCES.protectStarredMedia,
   queueJobsScope:
     preferences?.queueJobsScope === 'all-projects'
       ? 'all'

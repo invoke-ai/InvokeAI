@@ -4973,6 +4973,8 @@ export const __workbenchReducerInternal = (
         ...outcome.deletedBoardVideoNames.map((name) => toGalleryItemKey({ kind: 'video', name })),
         ...outcome.failedImageNames.map((name) => toGalleryItemKey({ kind: 'image', name })),
         ...outcome.failedVideoNames.map((name) => toGalleryItemKey({ kind: 'video', name })),
+        ...outcome.protectedImageNames.map((name) => toGalleryItemKey({ kind: 'image', name })),
+        ...outcome.protectedVideoNames.map((name) => toGalleryItemKey({ kind: 'video', name })),
       ]);
 
       // Failed and otherwise unconfirmed local items survive. The reconciler
