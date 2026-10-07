@@ -153,6 +153,7 @@ def _copy(
         if not mismatches:
             copy_records(snapshot, target)
             mismatches = verify_copy(snapshot, target, records=True)
+        merged = merged_rows(snapshot, target)
     except Exception as e:
         print(f"\nThe copy failed: {e}\n{_START_AGAIN}")
         return 1
@@ -162,9 +163,9 @@ def _copy(
             print(f"  {mismatch}")
         print(_START_AGAIN)
         return 1
-    for table, fewer in merged_rows(snapshot, target).items():
+    for table, fewer in merged.items():
         print(f"  {table}: {_rows(fewer)} the target treats as equal to others were merged.")
-    print("\nDone: every table matches its source. Set db_url in invokeai.yaml to the target to use it.")
+    print("\nDone: every table matches its source. InvokeAI uses the target once db_url names it.")
     return 0
 
 
