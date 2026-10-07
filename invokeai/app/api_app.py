@@ -51,6 +51,7 @@ from invokeai.app.api.routers import (
 )
 from invokeai.app.api.sockets import SocketIO
 from invokeai.app.services.config.config_default import get_config
+from invokeai.app.services.shared.database.errors import TransientDatabaseError
 from invokeai.app.util.custom_openapi import get_openapi_func
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.frontend.cli.arg_parser import InvokeAIArgs
@@ -107,6 +108,16 @@ app = FastAPI(
     separate_input_output_schemas=False,
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(TransientDatabaseError)
+async def database_busy(request: Request, error: TransientDatabaseError) -> JSONResponse:
+    # A lock held too long elsewhere, or a race the call lost on every attempt: the same request can succeed in a
+    # moment, so it is a busy server rather than a failed request.
+    logger.warning(f"{request.method} {request.url.path}: the database is busy: {error}")
+    return JSONResponse(
+        status_code=503, content={"detail": "The database is busy; try again"}, headers={"Retry-After": "1"}
+    )
 
 
 class SlidingWindowTokenMiddleware(BaseHTTPMiddleware):

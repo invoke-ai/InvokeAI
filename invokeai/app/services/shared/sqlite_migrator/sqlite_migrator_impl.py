@@ -430,6 +430,15 @@ class Migrator:
             return None
         return Counter((str(row[0]), str(row[2])) for row in rows)
 
+    def has_pending_migrations(self) -> bool:
+        """Whether the database lacks a registered migration, without changing it. A database without the migrator's
+        records (a new one, or one from before them) lacks them all."""
+        with self._database.begin(write=False) as conn:
+            if not inspect(conn).has_table(applied_migrations.name):
+                return self._migration_set.count > 0
+            applied = set(conn.execute(select(applied_migrations.c.migration_id)).scalars())
+        return bool(self._migration_set.get_migration_plan(applied_migration_ids=applied))
+
     def _run_server_migrations(self) -> bool:
         with self._server_migration_lock() as lock:
             bootstrapped = False
@@ -500,7 +509,7 @@ class Migrator:
             reference = Database.open_sqlite(None, quiet)
             try:
                 reference_migrator = Migrator(reference)
-                context = MigrationBuildContext(app_config=config, logger=quiet, image_files=_NoImageFiles())
+                context = MigrationBuildContext(app_config=config, logger=quiet, image_files=NoImageFiles())
                 for migration in build_migrations(context):
                     reference_migrator.register_migration(migration)
                 reference_migrator.run_migrations()
@@ -517,12 +526,13 @@ class Migrator:
 
 
 def _no_image_files(*args: object, **kwargs: object) -> NoReturn:
-    raise RuntimeError("The reference database of a bootstrap has no image files")
+    raise RuntimeError("No image files were given: a migration that reads them cannot run here")
 
 
-# For the migrations that read image files: the reference database has no images, so none of them does.
-_NoImageFiles = type(
-    "_NoImageFiles",
+# For the migrations that read image files, where none runs or there are no images: the reference database of a
+# bootstrap, and the check for pending migrations.
+NoImageFiles = type(
+    "NoImageFiles",
     (ImageFileStorageBase,),
     dict.fromkeys(ImageFileStorageBase.__abstractmethods__, _no_image_files),
 )

@@ -19,6 +19,7 @@ import PIL.PngImagePlugin
 from invokeai.app.services.config.config_default import InvokeAIAppConfig, load_config_from_root
 from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.startup import open_migrated_database, redacted_database_url
 from invokeai.backend.util.logging import InvokeAILogger
 
 
@@ -50,11 +51,13 @@ class ConfigMapper:
         self.thumbnails_path = os.path.join(self.outputs_path, "thumbnails")
         self.thumbnails_archive_path = os.path.join(self.archive_path, "thumbnails")
 
-        db_exists = os.path.exists(self.database_path)
+        # A server database is checked when it is opened.
+        db_exists = bool(self.config.db_url) or os.path.exists(self.database_path)
         outdir_exists = os.path.exists(self.outputs_path)
+        database = redacted_database_url(self.config.db_url) or self.database_path
 
         text = f"Found invokeai.yaml file at {self.config.config_file_path}:"
-        text += f"\n  Database : {self.database_path} - {'Exists!' if db_exists else 'Not Found!'}"
+        text += f"\n  Database : {database} - {'Exists!' if db_exists else 'Not Found!'}"
         text += f"\n  Outputs  : {self.outputs_path}- {'Exists!' if outdir_exists else 'Not Found!'}"
         print(text)
 
@@ -97,10 +100,9 @@ class MaintenanceStats:
 class DatabaseMapper:
     """The script's work on the database, through the app's image records."""
 
-    def __init__(self, database_path, database_backup_dir, synchronous="full"):  # noqa D107
-        self.database_path = database_path
+    def __init__(self, config: InvokeAIAppConfig, database_backup_dir):  # noqa D107
+        self.config = config
         self.database_backup_dir = database_backup_dir
-        self.synchronous = synchronous
         self.database: Optional[Database] = None
         self.records: Optional[ImageRecordStorage] = None
         self.backed_up = False
@@ -109,14 +111,18 @@ class DatabaseMapper:
         """Take a backup of the database, once per run: a later one would hold what the run changed already."""
         if self.backed_up:
             return
+        self.connect()
+        assert self.database is not None
+        if self.database.dialect_name != "sqlite":
+            print("The database is a server database: take a backup of it with the server's tools before going on.")
+            self.backed_up = True
+            return
         if not os.path.exists(self.database_backup_dir):
             print(f"Database backup directory {self.database_backup_dir} does not exist -> creating...", end="")
             os.makedirs(self.database_backup_dir)
             print("Done!")
         database_backup_path = os.path.join(self.database_backup_dir, f"backup-{timestamp_string}-invokeai.db")
         print(f"Making DB Backup at {database_backup_path}...", end="")
-        self.connect()
-        assert self.database is not None
         self.database.backup(Path(database_backup_path))
         self.backed_up = True
         print("Done!")
@@ -125,7 +131,7 @@ class DatabaseMapper:
         """Open the database, once."""
         if self.database is None:
             logger = InvokeAILogger.get_logger("gallery_maintenance")
-            self.database = Database.open_sqlite(Path(self.database_path), logger, synchronous=self.synchronous)
+            self.database = open_migrated_database(self.config, logger)
             self.records = ImageRecordStorage(self.database)
 
     def get_all_image_files(self):
@@ -495,11 +501,7 @@ class InvokeAIDatabaseMaintenanceApp:
             config_mapper.archive_path,
             config_mapper.thumbnails_archive_path,
         )
-        db_mapper = DatabaseMapper(
-            config_mapper.database_path,
-            config_mapper.database_backup_dir,
-            synchronous=config_mapper.config.db_synchronous,
-        )
+        db_mapper = DatabaseMapper(config_mapper.config, config_mapper.database_backup_dir)
 
         op = self._operation
         operations_to_perform = []

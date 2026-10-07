@@ -22,11 +22,12 @@ from prompt_toolkit.shortcuts import message_dialog
 from invokeai.app.services.board_image_records.board_image_records_default import BoardImageRecordStorage
 from invokeai.app.services.board_records.board_records_common import BoardRecordOrderBy
 from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
-from invokeai.app.services.config.config_default import get_config, load_config_from_root
+from invokeai.app.services.config.config_default import InvokeAIAppConfig, get_config, load_config_from_root
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.errors import DatabaseError
+from invokeai.app.services.shared.database.startup import open_migrated_database, redacted_database_url
 from invokeai.app.services.shared.database.types import timestamp_text
 from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.backend.util.logging import InvokeAILogger
@@ -60,6 +61,8 @@ class Config:
     outputs_path = None
     thumbnail_path = None
     synchronous = "full"
+    # The install's config, when its paths are used rather than ones the user gave.
+    app_config: Optional[InvokeAIAppConfig] = None
 
     def find_and_load(self):
         """Find the yaml config file and load"""
@@ -80,11 +83,12 @@ class Config:
             database_path = str(config.db_path)
             outputs_path = str(config.outputs_path / "images")
 
-            db_exists = os.path.exists(database_path)
+            # A server database is checked when it is opened.
+            db_exists = bool(config.db_url) or os.path.exists(database_path)
             outdir_exists = os.path.exists(outputs_path)
 
             text = f"Found {self.YAML_FILENAME} file at {yaml_path}:"
-            text += f"\n  Database : {database_path}"
+            text += f"\n  Database : {redacted_database_url(config.db_url) or database_path}"
             text += f"\n  Outputs  : {outputs_path}"
             text += "\n\nUse these paths for import (yes) or choose different ones (no) [Yn]: "
 
@@ -92,6 +96,7 @@ class Config:
                 if (prompt(text).strip() or "Y").upper().startswith("Y"):
                     self.database_path = database_path
                     self.outputs_path = outputs_path
+                    self.app_config = config
                     return True
                 else:
                     return False
@@ -367,16 +372,22 @@ class DatabaseMapper:
     # The account that owns what the import adds, as for a single-user install.
     OWNER = "system"
 
-    def __init__(self, database_path, database_backup_dir, synchronous="full"):
+    def __init__(
+        self, database_path, database_backup_dir, synchronous="full", app_config: Optional[InvokeAIAppConfig] = None
+    ):
         self.database_path = database_path
         self.database_backup_dir = database_backup_dir
         self.synchronous = synchronous
+        self.app_config = app_config
         self.database: Optional[Database] = None
 
     def connect(self):
-        """Open the database."""
+        """Open the database: the install's, as its config names it, or the SQLite file the user gave."""
         logger = InvokeAILogger.get_logger("import_images")
-        self.database = Database.open_sqlite(Path(self.database_path), logger, synchronous=self.synchronous)
+        if self.app_config is not None:
+            self.database = open_migrated_database(self.app_config, logger)
+        else:
+            self.database = Database.open_sqlite(Path(self.database_path), logger, synchronous=self.synchronous)
 
     def _boards(self):
         assert self.database is not None
@@ -440,6 +451,9 @@ class DatabaseMapper:
     def backup(self, timestamp_string):
         """Take a backup of the database."""
         assert self.database is not None
+        if self.database.dialect_name != "sqlite":
+            print("The database is a server database: take a backup of it with the server's tools before going on.")
+            return
         if not os.path.exists(self.database_backup_dir):
             print(f"Database backup directory {self.database_backup_dir} does not exist -> creating...", end="")
             os.makedirs(self.database_backup_dir)
@@ -692,7 +706,12 @@ class MediaImportProcessor:
 
         config = Config()
         config.find_and_load()
-        db_mapper = DatabaseMapper(config.database_path, config.database_backup_dir, synchronous=config.synchronous)
+        db_mapper = DatabaseMapper(
+            config.database_path,
+            config.database_backup_dir,
+            synchronous=config.synchronous,
+            app_config=config.app_config,
+        )
         db_mapper.connect()
         try:
             self._import(config, db_mapper)

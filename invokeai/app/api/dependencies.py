@@ -1,5 +1,6 @@
 import asyncio
 from logging import Logger
+from typing import Optional
 
 import torch
 
@@ -54,6 +55,7 @@ from invokeai.app.services.session_processor.session_processor_default import (
     DefaultSessionRunner,
 )
 from invokeai.app.services.session_queue.session_queue_default import SessionQueue
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.startup import init_database
 from invokeai.app.services.style_preset_images.style_preset_images_disk import StylePresetImageFileStorageDisk
 from invokeai.app.services.style_preset_records.style_preset_records_default import StylePresetRecordsStorage
@@ -96,6 +98,7 @@ class ApiDependencies:
     """Contains and initializes all dependencies for the API"""
 
     invoker: Invoker
+    database: Optional[Database] = None
 
     @staticmethod
     def initialize(
@@ -284,8 +287,13 @@ class ApiDependencies:
             logger=logger,
         )
         database.clean()
+        ApiDependencies.database = database
 
     @staticmethod
     def shutdown() -> None:
         if ApiDependencies.invoker:
             ApiDependencies.invoker.stop()
+        if ApiDependencies.database is not None:
+            # Releases a server database's instance lock, and checkpoints a SQLite database's write-ahead log.
+            ApiDependencies.database.dispose()
+            ApiDependencies.database = None

@@ -14,6 +14,7 @@ from invokeai.app.services.config.config_default import get_config, load_and_mig
 from invokeai.app.services.external_generation.external_generation_common import ExternalProviderStatus
 from invokeai.app.services.image_files.image_subfolder_strategy import DateStrategy, create_subfolder_strategy
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.shared.database.errors import LockTimeoutError
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig, ExternalModelCapabilities
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 
@@ -463,3 +464,18 @@ def test_reset_external_provider_config_rejects_non_admin_users(
 
 def _get_provider_config(payload: list[dict[str, Any]], provider_id: str) -> dict[str, Any]:
     return next(item for item in payload if item["provider_id"] == provider_id)
+
+
+def test_a_busy_database_answers_503_with_a_retry_hint(client: TestClient) -> None:
+    def busy() -> None:
+        raise LockTimeoutError("lock wait timeout exceeded")
+
+    app.add_api_route("/api/v1/test/busy", busy)
+    try:
+        response = client.get("/api/v1/test/busy")
+    finally:
+        app.router.routes.pop()
+
+    assert response.status_code == 503
+    assert response.headers["Retry-After"] == "1"
+    assert response.json() == {"detail": "The database is busy; try again"}

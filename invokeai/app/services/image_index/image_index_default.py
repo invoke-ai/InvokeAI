@@ -24,6 +24,7 @@ from invokeai.app.services.image_index.projection import compute_umap, projectio
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.session_queue.session_queue_common import DEFAULT_QUEUE_ID
+from invokeai.app.services.shared.database.errors import TransientDatabaseError
 from invokeai.app.services.videos.videos_common import VideoDTO
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
@@ -1426,15 +1427,15 @@ class ImageIndexService(ImageIndexServiceBase):
             items = records.list_accessible_embedded_items(scope_user, self._model_id)
             current_hash = scope_hash(self._model_id, items)
             cached = records.get_projection(user_id, self._model_id)
-        except Exception:
+        except Exception as e:
             # The DB reads are as failure-prone as the fit ("database is
             # locked" is a designed-for condition here), and the job was
             # already popped from the dedup map. Re-queue it rather than let
             # the generic worker handler swallow it: /refresh has already
             # answered `enqueued: true`, and a client waiting on
             # image_map_projection_ready would otherwise wait forever.
-            logger.exception(f"Image map: could not read the projection scope for user '{user_id}'; re-queueing")
-            self._requeue_projection(user_id, all_images)
+            logger.exception(f"Image map: could not read the projection scope for user '{user_id}'")
+            self._retry_projection_or_give_up(e, user_id, all_images, point_count=0)
             return
 
         retrying_failed_scope = (
@@ -1469,9 +1470,11 @@ class ImageIndexService(ImageIndexServiceBase):
             # accessible embedding (hundreds of MB on a large gallery), which is
             # pure waste on the no-op path that /points and /refresh drive.
             found_items, matrix = records.get_embeddings(items, self._model_id)
-        except Exception:
-            logger.exception(f"Image map: could not read embeddings for user '{user_id}'; re-queueing")
-            self._requeue_projection(user_id, all_images)
+        except Exception as e:
+            logger.exception(f"Image map: could not read embeddings for user '{user_id}'")
+            self._retry_projection_or_give_up(
+                e, user_id, all_images, point_count=cached.point_count if cached is not None else 0
+            )
             return
 
         if self._stop_event.is_set():
@@ -1512,11 +1515,13 @@ class ImageIndexService(ImageIndexServiceBase):
                 found_items,
                 coords,
             )
-        except Exception:
+        except Exception as e:
             # Same reasoning as the read above: the fit is done but unsaved, so
             # re-queue rather than drop it and leave /refresh's promise unmet.
-            logger.exception(f"Image map: could not cache the projection for user '{user_id}'; re-queueing")
-            self._requeue_projection(user_id, all_images)
+            logger.exception(f"Image map: could not cache the projection for user '{user_id}'")
+            self._retry_projection_or_give_up(
+                e, user_id, all_images, point_count=cached.point_count if cached is not None else 0
+            )
             return
 
         # The budget moves only once the outcome is durable. Spending it before
@@ -1544,6 +1549,18 @@ class ImageIndexService(ImageIndexServiceBase):
             # the generic worker handler, which would re-sweep the backfill for
             # what is purely a delivery failure.
             logger.exception(f"Image map: could not emit projection_ready for user '{user_id}'")
+
+    def _retry_projection_or_give_up(self, error: Exception, user_id: str, all_images: bool, point_count: int) -> None:
+        """Re-queues a projection whose database work failed for the moment (the database was busy, or the call lost
+        a race); gives up on one whose work failed for good, which would fail again on every retry, forever (a
+        projection larger than a server takes in one statement, for one). Giving up still tells a waiting client that
+        nothing newer is coming: `point_count` is what it is served."""
+        assert self._invoker is not None
+        if isinstance(error, TransientDatabaseError):
+            self._invoker.services.logger.info(f"Image map: re-queueing the projection for user '{user_id}'")
+            self._requeue_projection(user_id, all_images)
+            return
+        self._invoker.services.events.emit_image_map_projection_ready(user_id=user_id, point_count=point_count)
 
     def _requeue_projection(self, user_id: str, all_images: bool) -> None:
         """Put a popped job back, without clobbering a newer request for that user."""

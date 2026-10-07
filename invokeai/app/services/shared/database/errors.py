@@ -68,6 +68,14 @@ class NestedTransactionError(DatabaseError):
     """
 
 
+class DatabaseInUseError(DatabaseError):
+    """Another InvokeAI process uses this server database.
+
+    One process at a time serves a database: at startup a process cancels the queue items left running, and
+    syncs its bundled workflows and style presets, which would undo or collide with another process's work.
+    """
+
+
 class ReadOnlyTransactionError(DatabaseError):
     """A write was attempted inside a read-only transaction."""
 

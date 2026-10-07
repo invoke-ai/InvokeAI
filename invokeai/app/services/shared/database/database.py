@@ -1,3 +1,4 @@
+import hashlib
 import random
 import sqlite3
 import threading
@@ -19,7 +20,12 @@ from invokeai.app.services.shared.database.engines import (
     create_mysql_engine,
     create_sqlite_engine,
 )
-from invokeai.app.services.shared.database.errors import ConflictError, NestedTransactionError, translate_error
+from invokeai.app.services.shared.database.errors import (
+    ConflictError,
+    DatabaseInUseError,
+    NestedTransactionError,
+    translate_error,
+)
 from invokeai.app.services.shared.database.queries import Queries
 
 R = TypeVar("R")
@@ -79,6 +85,8 @@ class Database:
         self._sqlite_connection: Optional[Connection] = engine.connect() if sqlite is not None else None
         self._thread_state = threading.local()
         self._disposed = False
+        # The connection whose session holds the instance lock of a server database (see `hold_instance_lock`).
+        self._instance_lock: Optional[Connection] = None
         self.queries = Queries(self)
 
     @classmethod
@@ -320,13 +328,44 @@ class Database:
             with closing(sqlite3.connect(destination)) as target:
                 sqlite.conn.backup(target)
 
+    def hold_instance_lock(self) -> None:
+        """Takes the lock of a server database that one process at a time holds, for as long as this database is
+        open; raises `DatabaseInUseError` when another process holds it. A no-op on SQLite.
+
+        The lock belongs to the session of a connection of its own, which the server ends, and the lock with it,
+        when the process does.
+        """
+        if self._sqlite is not None or self._instance_lock is not None:
+            return
+        conn = self._engine.connect()
+        try:
+            database_name = str(conn.exec_driver_sql("SELECT DATABASE()").scalar_one())
+            # Lock names are server-wide and at most 64 characters long.
+            name = f"invokeai.instance.{hashlib.sha1(database_name.encode()).hexdigest()}"
+            held = conn.exec_driver_sql("SELECT GET_LOCK(%s, 0)", (name,)).scalar()
+            conn.commit()
+        except BaseException:
+            conn.close()
+            raise
+        if held != 1:
+            conn.close()
+            raise DatabaseInUseError(
+                f"Another InvokeAI process uses the database {database_name!r}. Stop it first: one process at a "
+                "time serves a database."
+            )
+        self._instance_lock = conn
+
     def dispose(self) -> None:
-        """Closes every connection; transactions begun afterwards are refused. Safe to call more than once.
+        """Closes every connection, the instance lock's included; transactions begun afterwards are refused. Safe to
+        call more than once.
 
         Closing a SQLite connection also checkpoints its write-ahead log into the database file.
         """
         with self._exclusive():
             self._disposed = True
+            if self._instance_lock is not None:
+                self._instance_lock.close()
+                self._instance_lock = None
             if self._sqlite_connection is not None:
                 self._sqlite_connection.close()
             self._engine.dispose()

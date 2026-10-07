@@ -31,6 +31,7 @@ from invokeai.app.services.image_records.image_records_default import ImageRecor
 from invokeai.app.services.images.images_common import image_record_to_dto
 from invokeai.app.services.images.images_default import ImageService
 from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.errors import LockTimeoutError
 from invokeai.app.services.video_records.video_records_default import VideoRecordStorage
 from invokeai.app.services.videos.videos_common import VideoDTO, video_record_to_dto
 from invokeai.app.services.videos.videos_default import VideoService
@@ -1490,7 +1491,7 @@ def test_a_lost_projection_write_does_not_burn_the_retry(
     def failing_set_projection(*args, **kwargs):
         writes["n"] += 1
         if writes["n"] == 1:
-            raise RuntimeError("database is locked")
+            raise LockTimeoutError("database is locked")
         return real_set_projection(*args, **kwargs)
 
     monkeypatch.setattr(index_records, "set_projection", failing_set_projection)
@@ -1691,6 +1692,45 @@ def test_embed_image_retries_once_after_a_failed_encode(
         service.stop()
 
 
+def test_a_projection_whose_database_work_fails_for_good_is_given_up_once(
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+) -> None:
+    """A failure that is not the database being busy (a statement the server refuses, say) fails the same way on
+    every retry: re-queueing it would spin the worker forever. The waiting client still hears that nothing newer is
+    coming."""
+    from invokeai.app.services.events.events_common import ImageMapProjectionReadyEvent
+
+    calls = {"n": 0}
+
+    def refused(*args, **kwargs):
+        calls["n"] += 1
+        raise RuntimeError("the server refused the statement")
+
+    index_records.list_accessible_embedded_items = refused  # type: ignore[method-assign]
+
+    service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    invoker = _make_invoker(images_service, index_records)
+    try:
+        _save_image(image_records, "img-0.png")
+        service.start(invoker)
+        _wait_until(lambda: not service._backfill_pending.is_set())
+
+        service.request_projection("system")
+
+        _wait_until(
+            lambda: any(isinstance(e, ImageMapProjectionReadyEvent) for e in invoker.services.events.events),
+            timeout=30.0,
+        )
+        time.sleep(0.5)
+        assert calls["n"] == 1
+        ready = [e for e in invoker.services.events.events if isinstance(e, ImageMapProjectionReadyEvent)]
+        assert [(e.user_id, e.point_count) for e in ready] == [("system", 0)]
+    finally:
+        service.stop()
+
+
 def test_projection_request_is_requeued_when_the_database_read_fails(
     image_records: ImageRecordStorage,
     images_service: ImageService,
@@ -1708,7 +1748,7 @@ def test_projection_request_is_requeued_when_the_database_read_fails(
     def flaky_list(user_id, model_id):
         calls["n"] += 1
         if calls["n"] == 1:
-            raise RuntimeError("database is locked")
+            raise LockTimeoutError("database is locked")
         return real_list(user_id, model_id)
 
     index_records.list_accessible_embedded_items = flaky_list  # type: ignore[method-assign]
