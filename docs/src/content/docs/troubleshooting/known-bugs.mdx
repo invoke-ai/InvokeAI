@@ -1,10 +1,10 @@
 ---
 title: Known Bugs
 description: Places where the current release does not yet behave as the documentation describes, with workarounds.
-lastUpdated: 2026-09-30
+lastUpdated: 2026-10-04
 ---
 
-This page lists known cases where InvokeAI does not yet behave as this documentation describes. Each entry explains what happens instead and how to work around it. Entries are removed once the fix is released.
+This page lists known cases where InvokeAI does not yet behave as this documentation describes, or no longer behaves as v6 did. Each entry explains what happens instead and how to work around it. Entries are removed once the fix is released.
 
 ## v7.0.0-alpha
 
@@ -16,4 +16,24 @@ This page lists known cases where InvokeAI does not yet behave as this documenta
 
 **Workaround:** Paint masks and regions with the **Brush** (**B**). If a Shape layer was created by mistake, delete it or undo with **Ctrl+Z**.
 
-**Tracking:** [invoke-ai/InvokeAI-7#386](https://github.com/invoke-ai/InvokeAI-7/issues/386)
+**Tracking:** [invoke-ai/InvokeAI#9616](https://github.com/invoke-ai/InvokeAI/issues/9616)
+
+### Multi-user mode: boards and workflows cannot be shared
+
+**Documented behavior:** In multi-user mode, a board's owner can set it to **Shared** or **Public** so that other users can view it, and a workflow's owner can mark it as shared so that it appears in every user's workflow library. See [Working with Your Content in Multi-User Mode](/configuration/multi-user-mode/user-guide/#working-with-your-content-in-multi-user-mode).
+
+**Current behavior:** v7 has no controls for changing a board's visibility or sharing a workflow. Boards and workflows you create stay private: only you and administrators can see them.
+
+**Workaround:** None in the v7 interface. Administrators can still view and manage all users' boards, images, and workflows.
+
+**Tracking:** [invoke-ai/InvokeAI#9673](https://github.com/invoke-ai/InvokeAI/issues/9673)
+
+### Gallery: the delete confirmation has no "Don't ask me again" option
+
+**Previous behavior (v6):** The confirmation that appears before deleting an image included a **Don't ask me again** switch, so you could turn the confirmation off from the dialog itself.
+
+**Current behavior:** The v7 confirmation has no such switch. The confirmation can still be turned off, but only in Settings.
+
+**Workaround:** Open **Settings → Gallery** and turn off **Confirm image deletion**. See [Deleting media](/users-guide/gallery/introduction/#deleting-media).
+
+**Tracking:** [invoke-ai/InvokeAI#9676](https://github.com/invoke-ai/InvokeAI/issues/9676)
