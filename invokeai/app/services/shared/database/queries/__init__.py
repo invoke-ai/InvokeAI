@@ -30,6 +30,7 @@ from invokeai.app.services.shared.database.queries.boards import BoardQueries
 from invokeai.app.services.shared.database.queries.client_state import ClientStateQueries
 from invokeai.app.services.shared.database.queries.gallery import GalleryQueries
 from invokeai.app.services.shared.database.queries.image_index import ImageIndexQueries
+from invokeai.app.services.shared.database.queries.image_moves import ImageMoveQueries
 from invokeai.app.services.shared.database.queries.images import ImageQueries
 from invokeai.app.services.shared.database.queries.intermediates import IntermediateQueries
 from invokeai.app.services.shared.database.queries.locks import LockQueries
@@ -90,6 +91,10 @@ class Queries:
     @cached_property
     def image_index(self) -> ImageIndexQueries:
         return ImageIndexQueries(self._scope)
+
+    @cached_property
+    def image_moves(self) -> ImageMoveQueries:
+        return ImageMoveQueries(self._scope)
 
     @cached_property
     def images(self) -> ImageQueries:

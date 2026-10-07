@@ -145,7 +145,7 @@ class ApiDependencies:
         events = FastAPIEventService(event_handler_id, loop=loop)
         bulk_download = BulkDownloadService()
         image_records = ImageRecordStorage(db.database)
-        image_moves = ImageMoveService(db=db, image_files=image_files, config=configuration, logger=logger)
+        image_moves = ImageMoveService(db.database, image_files=image_files, config=configuration, logger=logger)
         images = ImageService()
         video_records = VideoRecordStorage(db.database)
         videos = VideoService()

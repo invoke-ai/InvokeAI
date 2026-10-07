@@ -447,7 +447,7 @@ def wired_with_move_service(
     db = create_mock_sqlite_database(config, logger)
     records = ImageRecordStorage(db.database)
     storage = DiskImageFileStorage(tmp_path / "outputs")
-    moves = ImageMoveService(db=db, image_files=storage, config=config, logger=logger)
+    moves = ImageMoveService(db.database, image_files=storage, config=config, logger=logger)
 
     svc = ImageService()
     invoker = MagicMock()
@@ -1263,8 +1263,7 @@ class TestDeleteVersusSubfolderMove:
         new_thumbnail.parent.mkdir(parents=True, exist_ok=True)
         old_image.replace(new_image)
         old_thumbnail.replace(new_thumbnail)
-        with moves._db.transaction() as cursor:
-            cursor.execute("UPDATE images SET image_subfolder = '' WHERE image_name = 'failed.png';")
+        moves._queries.image_moves.repoint_image("failed.png", "old", "")
         assert records.get("failed.png").image_subfolder == ""
 
         # The failed save's cleanup still holds the subfolder the save captured.

@@ -6,10 +6,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from PIL import Image
+from sqlalchemy import select, update
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.image_moves.image_moves_default import (
+    ImageMoveJob,
     ImageMoveQueueActive,
     ImageMoveService,
     UnreadableImageError,
@@ -17,21 +19,17 @@ from invokeai.app.services.image_moves.image_moves_default import (
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.session_queue.session_queue_common import DEFAULT_QUEUE_ID, SessionQueueStatus
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
-from invokeai.app.services.shared.sqlite.sqlite_util import init_db
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.schema.image_moves import (
+    image_subfolder_move_items,
+    image_subfolder_move_jobs,
+)
+from invokeai.app.services.shared.database.schema.images import images
 from invokeai.backend.util.logging import InvokeAILogger
 
 
-def _build_db(tmp_path: Path) -> SqliteDatabase:
-    logger = InvokeAILogger.get_logger()
-    config = InvokeAIAppConfig(use_memory_db=True)
-    config._root = tmp_path
-    image_files = DiskImageFileStorage(tmp_path / "images")
-    return init_db(config=config, logger=logger, image_files=image_files)
-
-
 def _save_record(
-    service: ImageMoveService,
+    database: Database,
     records: ImageRecordStorage,
     image_name: str,
     subfolder: str,
@@ -48,11 +46,16 @@ def _save_record(
         is_intermediate=is_intermediate,
         image_subfolder=subfolder,
     )
-    with service._db.transaction() as cursor:
-        cursor.execute("UPDATE images SET created_at = ? WHERE image_name = ?;", (created_at, image_name))
+    _set_record(database, image_name, created_at=created_at)
+
+
+def _set_record(database: Database, image_name: str, **values: str) -> None:
+    with database.begin(write=True) as conn:
+        conn.execute(update(images).where(images.c.image_name == image_name).values(**values))
 
 
 def _save_image(
+    database: Database,
     service: ImageMoveService,
     records: ImageRecordStorage,
     image_name: str,
@@ -62,7 +65,7 @@ def _save_image(
     is_intermediate: bool = False,
 ) -> None:
     _save_record(
-        service,
+        database,
         records,
         image_name=image_name,
         subfolder=subfolder,
@@ -79,38 +82,35 @@ def _corrupt_png_idat(path: Path) -> None:
     path.write_bytes(data)
 
 
-def _service(tmp_path: Path, strategy: str = "date") -> tuple[ImageMoveService, ImageRecordStorage]:
-    db = _build_db(tmp_path)
-    records = ImageRecordStorage(db.database)
+def _service(tmp_path: Path, database: Database, strategy: str = "date") -> tuple[ImageMoveService, ImageRecordStorage]:
+    records = ImageRecordStorage(database)
     storage = DiskImageFileStorage(tmp_path / "images")
     invoker = MagicMock()
     invoker.services.configuration.pil_compress_level = 6
     storage.start(invoker)
     config = InvokeAIAppConfig(use_memory_db=True, image_subfolder_strategy=strategy)
     config._root = tmp_path
-    service = ImageMoveService(db=db, image_files=storage, config=config, logger=InvokeAILogger.get_logger())
+    service = ImageMoveService(database, image_files=storage, config=config, logger=InvokeAILogger.get_logger())
     return service, records
 
 
-def _job_item_states(service: ImageMoveService, job_id: int) -> dict[str, str]:
-    with service._db.transaction() as cursor:
-        cursor.execute(
-            "SELECT image_name, state FROM image_subfolder_move_items WHERE job_id = ? ORDER BY image_name;",
-            (job_id,),
-        )
-        return {row["image_name"]: row["state"] for row in cursor.fetchall()}
+def _job_item_states(database: Database, job_id: int) -> dict[str, str]:
+    items = image_subfolder_move_items.c
+    statement = select(items.image_name, items.state).where(items.job_id == job_id).order_by(items.image_name)
+    with database.begin(write=False) as conn:
+        return dict(conn.execute(statement).all())
 
 
-def _job_states(service: ImageMoveService) -> dict[int, str]:
-    with service._db.transaction() as cursor:
-        cursor.execute("SELECT id, state FROM image_subfolder_move_jobs ORDER BY id;")
-        return {row["id"]: row["state"] for row in cursor.fetchall()}
+def _job_states(database: Database) -> dict[int, str]:
+    jobs = image_subfolder_move_jobs.c
+    with database.begin(write=False) as conn:
+        return dict(conn.execute(select(jobs.id, jobs.state).order_by(jobs.id)).all())
 
 
-def test_move_all_images_uses_created_at_for_date_strategy(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_move_all_images_uses_created_at_for_date_strategy(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "image-a.png"
-    _save_record(service, records, image_name=image_name, subfolder="", created_at="2024-02-03 04:05:06.000")
+    _save_record(database, records, image_name=image_name, subfolder="", created_at="2024-02-03 04:05:06.000")
     service.image_files.save(Image.new("RGB", (16, 16), "red"), image_name=image_name)
 
     result = service.move_all_images()
@@ -123,11 +123,11 @@ def test_move_all_images_uses_created_at_for_date_strategy(tmp_path: Path) -> No
     assert not service.image_files.get_path(image_name, image_subfolder="").exists()
 
 
-def test_missing_intermediate_source_file_is_treated_as_success(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_missing_intermediate_source_file_is_treated_as_success(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "missing-intermediate.png"
     _save_record(
-        service,
+        database,
         records,
         image_name=image_name,
         subfolder="",
@@ -145,11 +145,12 @@ def test_missing_intermediate_source_file_is_treated_as_success(tmp_path: Path) 
     assert service.get_latest_job().state == "committed"
 
 
-def test_missing_intermediate_source_file_removes_orphaned_thumbnail(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_missing_intermediate_source_file_removes_orphaned_thumbnail(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "missing-intermediate-with-thumbnail.png"
     old_subfolder = "old/intermediate"
     _save_image(
+        database,
         service,
         records,
         image_name=image_name,
@@ -170,11 +171,11 @@ def test_missing_intermediate_source_file_removes_orphaned_thumbnail(tmp_path: P
     assert records.get(image_name).image_subfolder == "2024/02/04"
 
 
-def test_missing_non_intermediate_source_file_still_fails(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_missing_non_intermediate_source_file_still_fails(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "missing-general.png"
     _save_record(
-        service,
+        database,
         records,
         image_name=image_name,
         subfolder="",
@@ -186,19 +187,21 @@ def test_missing_non_intermediate_source_file_still_fails(tmp_path: Path) -> Non
         service.plan_batch(last_image_name="", limit=100)
 
 
-def test_move_all_images_continues_after_missing_non_intermediate_source_file(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_move_all_images_continues_after_missing_non_intermediate_source_file(
+    tmp_path: Path, database: Database
+) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     missing_image_name = "missing-general.png"
     valid_image_name = "valid-general.png"
     _save_record(
-        service,
+        database,
         records,
         image_name=missing_image_name,
         subfolder="",
         created_at="2024-02-04 04:05:06.000",
         is_intermediate=False,
     )
-    _save_image(service, records, valid_image_name, "", "2024-02-05 04:05:06.000", "blue")
+    _save_image(database, service, records, valid_image_name, "", "2024-02-05 04:05:06.000", "blue")
 
     result = service.move_all_images()
 
@@ -206,14 +209,14 @@ def test_move_all_images_continues_after_missing_non_intermediate_source_file(tm
     assert result.committed == 1
     assert records.get(missing_image_name).image_subfolder == ""
     assert records.get(valid_image_name).image_subfolder == "2024/02/05"
-    assert "error" in _job_states(service).values()
-    assert "committed" in _job_states(service).values()
+    assert "error" in _job_states(database).values()
+    assert "committed" in _job_states(database).values()
 
 
-def test_move_recovers_existing_16_bit_destination_without_thumbnail(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_move_recovers_existing_16_bit_destination_without_thumbnail(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "large-16-bit.png"
-    _save_record(service, records, image_name=image_name, subfolder="", created_at="2024-02-04 04:05:06.000")
+    _save_record(database, records, image_name=image_name, subfolder="", created_at="2024-02-04 04:05:06.000")
     old_path = service.image_files.get_path(image_name)
     old_path.parent.mkdir(parents=True, exist_ok=True)
     image = Image.new("I;16", (1024, 1024), 32768)
@@ -237,8 +240,8 @@ def test_move_recovers_existing_16_bit_destination_without_thumbnail(tmp_path: P
         image.close()
 
 
-def test_regenerate_thumbnail_closes_temp_file_before_writing(tmp_path: Path) -> None:
-    service, _records = _service(tmp_path, strategy="date")
+def test_regenerate_thumbnail_closes_temp_file_before_writing(tmp_path: Path, database: Database) -> None:
+    service, _records = _service(tmp_path, database, strategy="date")
 
     class TrackingTempFile:
         name = str(tmp_path / "thumbnail.tmp")
@@ -277,10 +280,10 @@ def test_regenerate_thumbnail_closes_temp_file_before_writing(tmp_path: Path) ->
     assert temp_file.closed
 
 
-def test_move_does_not_relocate_source_when_thumbnail_generation_fails(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_move_does_not_relocate_source_when_thumbnail_generation_fails(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "thumbnail-retry.png"
-    _save_record(service, records, image_name=image_name, subfolder="", created_at="2024-02-05 04:05:06.000")
+    _save_record(database, records, image_name=image_name, subfolder="", created_at="2024-02-05 04:05:06.000")
     old_path = service.image_files.get_path(image_name)
     old_path.parent.mkdir(parents=True, exist_ok=True)
     Image.new("RGB", (32, 32), "red").save(old_path, format="PNG")
@@ -306,11 +309,11 @@ def test_move_does_not_relocate_source_when_thumbnail_generation_fails(tmp_path:
     assert service.get_job(job_id).state == "committed"
 
 
-def test_recovery_treats_missing_intermediate_source_file_as_success(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_recovery_treats_missing_intermediate_source_file_as_success(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "missing-intermediate-recovery.png"
     _save_record(
-        service,
+        database,
         records,
         image_name=image_name,
         subfolder="",
@@ -326,13 +329,13 @@ def test_recovery_treats_missing_intermediate_source_file_as_success(tmp_path: P
     assert recovered.errors == 0
     assert records.get(image_name).image_subfolder == "2024/02/05"
     assert service.get_job(job_id).state == "committed"
-    assert _job_item_states(service, job_id) == {image_name: "committed"}
+    assert _job_item_states(database, job_id) == {image_name: "committed"}
 
 
-def test_startup_recovery_commits_after_files_moved_but_db_not_updated(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_startup_recovery_commits_after_files_moved_but_db_not_updated(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "image-b.png"
-    _save_record(service, records, image_name=image_name, subfolder="", created_at="2025-06-07 08:09:10.000")
+    _save_record(database, records, image_name=image_name, subfolder="", created_at="2025-06-07 08:09:10.000")
     service.image_files.save(Image.new("RGB", (16, 16), "blue"), image_name=image_name)
 
     moves = service.plan_batch(last_image_name="", limit=100)
@@ -348,10 +351,10 @@ def test_startup_recovery_commits_after_files_moved_but_db_not_updated(tmp_path:
     assert service.get_job(job_id).state == "committed"
 
 
-def test_status_reports_unplanned_images_after_recovery(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
-    _save_image(service, records, "image-recovered.png", "", "2024-02-03 04:05:06.000", "red")
-    _save_image(service, records, "image-unplanned.png", "", "2024-02-04 04:05:06.000", "blue")
+def test_status_reports_unplanned_images_after_recovery(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
+    _save_image(database, service, records, "image-recovered.png", "", "2024-02-03 04:05:06.000", "red")
+    _save_image(database, service, records, "image-unplanned.png", "", "2024-02-04 04:05:06.000", "blue")
     moves = service.plan_batch(last_image_name="", limit=1)
     job_id = service.create_move_job(moves)
     service.perform_filesystem_moves(job_id)
@@ -368,11 +371,13 @@ def test_status_reports_unplanned_images_after_recovery(tmp_path: Path) -> None:
     assert status.needs_move_count == 1
 
 
-def test_cleanup_empty_source_directories_after_move(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_cleanup_empty_source_directories_after_move(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "image-c.png"
     old_subfolder = "old/nested"
-    _save_record(service, records, image_name=image_name, subfolder=old_subfolder, created_at="2024-11-12 01:02:03.000")
+    _save_record(
+        database, records, image_name=image_name, subfolder=old_subfolder, created_at="2024-11-12 01:02:03.000"
+    )
     service.image_files.save(Image.new("RGB", (16, 16), "green"), image_name=image_name, image_subfolder=old_subfolder)
     old_parent = service.image_files.get_path(image_name, image_subfolder=old_subfolder).parent
     old_thumb_parent = service.image_files.get_path(image_name, thumbnail=True, image_subfolder=old_subfolder).parent
@@ -386,8 +391,8 @@ def test_cleanup_empty_source_directories_after_move(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(not hasattr(os, "symlink"), reason="symlinks are not supported on this platform")
-def test_cleanup_empty_source_directories_stays_within_symlinked_root(tmp_path: Path) -> None:
-    service, _records = _service(tmp_path, strategy="date")
+def test_cleanup_empty_source_directories_stays_within_symlinked_root(tmp_path: Path, database: Database) -> None:
+    service, _records = _service(tmp_path, database, strategy="date")
     real_root = tmp_path / "real-root"
     linked_root = tmp_path / "linked-root"
     sibling = tmp_path / "sibling"
@@ -408,11 +413,11 @@ def test_cleanup_empty_source_directories_stays_within_symlinked_root(tmp_path: 
     assert not (real_root / "old").exists()
 
 
-def test_startup_recovery_cleans_empty_source_directories(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_startup_recovery_cleans_empty_source_directories(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "image-recovery-cleanup.png"
     old_subfolder = "old/recovery"
-    _save_image(service, records, image_name, old_subfolder, "2024-11-13 01:02:03.000", "green")
+    _save_image(database, service, records, image_name, old_subfolder, "2024-11-13 01:02:03.000", "green")
     moves = service.plan_batch(last_image_name="", limit=100)
     job_id = service.create_move_job(moves)
     move = moves[0]
@@ -432,10 +437,10 @@ def test_startup_recovery_cleans_empty_source_directories(tmp_path: Path) -> Non
     assert service.get_job(job_id).state == "committed"
 
 
-def test_preflight_rejects_active_uncommitted_job_for_same_image(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_preflight_rejects_active_uncommitted_job_for_same_image(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "image-d.png"
-    _save_record(service, records, image_name=image_name, subfolder="", created_at="2024-01-02 03:04:05.000")
+    _save_record(database, records, image_name=image_name, subfolder="", created_at="2024-01-02 03:04:05.000")
     service.image_files.save(Image.new("RGB", (16, 16), "yellow"), image_name=image_name)
 
     moves = service.plan_batch(last_image_name="", limit=100)
@@ -445,10 +450,10 @@ def test_preflight_rejects_active_uncommitted_job_for_same_image(tmp_path: Path)
         service.plan_batch(last_image_name="", limit=100)
 
 
-def test_create_move_job_rejects_second_active_job_from_stale_plan(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_create_move_job_rejects_second_active_job_from_stale_plan(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "image-active-race.png"
-    _save_image(service, records, image_name, "", "2024-01-03 03:04:05.000", "yellow")
+    _save_image(database, service, records, image_name, "", "2024-01-03 03:04:05.000", "yellow")
 
     stale_plan_a = service.plan_batch(last_image_name="", limit=100)
     stale_plan_b = service.plan_batch(last_image_name="", limit=100)
@@ -458,10 +463,10 @@ def test_create_move_job_rejects_second_active_job_from_stale_plan(tmp_path: Pat
         service.create_move_job(stale_plan_b)
 
 
-def test_startup_recovery_completes_planned_job_before_any_file_move(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_startup_recovery_completes_planned_job_before_any_file_move(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "image-e.png"
-    _save_image(service, records, image_name, "", "2024-03-04 05:06:07.000", "purple")
+    _save_image(database, service, records, image_name, "", "2024-03-04 05:06:07.000", "purple")
 
     moves = service.plan_batch(last_image_name="", limit=100)
     job_id = service.create_move_job(moves)
@@ -475,13 +480,13 @@ def test_startup_recovery_completes_planned_job_before_any_file_move(tmp_path: P
     assert recovered_twice.errors == 0
     assert records.get(image_name).image_subfolder == "2024/03/04"
     assert service.get_job(job_id).state == "committed"
-    assert _job_item_states(service, job_id) == {image_name: "committed"}
+    assert _job_item_states(database, job_id) == {image_name: "committed"}
 
 
-def test_background_recovery_can_start_when_journal_job_is_active(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_background_recovery_can_start_when_journal_job_is_active(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "image-background-recovery.png"
-    _save_image(service, records, image_name, "", "2024-03-05 05:06:07.000", "purple")
+    _save_image(database, service, records, image_name, "", "2024-03-05 05:06:07.000", "purple")
     job_id = service.create_move_job(service.plan_batch(last_image_name="", limit=100))
 
     status = service.start_background_recovery()
@@ -497,10 +502,10 @@ def test_background_recovery_can_start_when_journal_job_is_active(tmp_path: Path
     assert service.get_job(job_id).state == "committed"
 
 
-def test_start_runs_recovery_before_normal_operation(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_start_runs_recovery_before_normal_operation(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "image-startup-recovery.png"
-    _save_image(service, records, image_name, "", "2024-03-05 05:06:07.000", "purple")
+    _save_image(database, service, records, image_name, "", "2024-03-05 05:06:07.000", "purple")
     job_id = service.create_move_job(service.plan_batch(last_image_name="", limit=100))
     service.perform_filesystem_moves(job_id)
 
@@ -511,10 +516,10 @@ def test_start_runs_recovery_before_normal_operation(tmp_path: Path) -> None:
     assert service.is_maintenance_active() is False
 
 
-def test_start_leaves_maintenance_active_when_recovery_remains_incomplete(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_start_leaves_maintenance_active_when_recovery_remains_incomplete(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "image-startup-recovery-retry.png"
-    _save_image(service, records, image_name, "", "2024-03-05 05:06:07.000", "purple")
+    _save_image(database, service, records, image_name, "", "2024-03-05 05:06:07.000", "purple")
     service.create_move_job(service.plan_batch(last_image_name="", limit=100))
 
     with patch.object(service, "complete_partial_filesystem_moves", side_effect=OSError("temporary failure")):
@@ -525,8 +530,10 @@ def test_start_leaves_maintenance_active_when_recovery_remains_incomplete(tmp_pa
 
 
 @pytest.mark.parametrize(("pending", "in_progress"), [(1, 0), (0, 1)])
-def test_background_move_rejects_active_queue_work(tmp_path: Path, pending: int, in_progress: int) -> None:
-    service, _records = _service(tmp_path, strategy="date")
+def test_background_move_rejects_active_queue_work(
+    tmp_path: Path, database: Database, pending: int, in_progress: int
+) -> None:
+    service, _records = _service(tmp_path, database, strategy="date")
     invoker = MagicMock()
     invoker.services.session_queue.get_queue_status.return_value = SessionQueueStatus(
         queue_id=DEFAULT_QUEUE_ID,
@@ -547,8 +554,8 @@ def test_background_move_rejects_active_queue_work(tmp_path: Path, pending: int,
         service.start_background_move_all()
 
 
-def test_background_move_is_reserved_before_queue_check(tmp_path: Path) -> None:
-    service, _records = _service(tmp_path, strategy="date")
+def test_background_move_is_reserved_before_queue_check(tmp_path: Path, database: Database) -> None:
+    service, _records = _service(tmp_path, database, strategy="date")
     invoker = MagicMock()
 
     def get_queue_status(queue_id: str) -> SessionQueueStatus:
@@ -577,10 +584,12 @@ def test_background_move_is_reserved_before_queue_check(tmp_path: Path) -> None:
     assert service.is_maintenance_active() is False
 
 
-def test_maintenance_is_active_while_background_job_or_uncommitted_journal_exists(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_maintenance_is_active_while_background_job_or_uncommitted_journal_exists(
+    tmp_path: Path, database: Database
+) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "image-maintenance-active.png"
-    _save_image(service, records, image_name, "", "2024-03-05 05:06:07.000", "purple")
+    _save_image(database, service, records, image_name, "", "2024-03-05 05:06:07.000", "purple")
     service.create_move_job(service.plan_batch(last_image_name="", limit=100))
 
     assert service.is_maintenance_active() is True
@@ -599,8 +608,8 @@ def test_maintenance_is_active_while_background_job_or_uncommitted_journal_exist
         service._future.result(timeout=5)
 
 
-def test_background_worker_error_is_exposed_in_status(tmp_path: Path) -> None:
-    service, _records = _service(tmp_path, strategy="date")
+def test_background_worker_error_is_exposed_in_status(tmp_path: Path, database: Database) -> None:
+    service, _records = _service(tmp_path, database, strategy="date")
     started_worker = threading.Event()
     release_worker = threading.Event()
 
@@ -623,10 +632,10 @@ def test_background_worker_error_is_exposed_in_status(tmp_path: Path) -> None:
     assert status.last_error == "background failed"
 
 
-def test_stop_waits_for_active_background_job_without_recording_error(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_stop_waits_for_active_background_job_without_recording_error(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "image-background-stop.png"
-    _save_image(service, records, image_name, "", "2024-03-05 05:06:07.000", "purple")
+    _save_image(database, service, records, image_name, "", "2024-03-05 05:06:07.000", "purple")
     job_id = service.create_move_job(service.plan_batch(last_image_name="", limit=100))
     release_worker = threading.Event()
 
@@ -647,10 +656,10 @@ def test_stop_waits_for_active_background_job_without_recording_error(tmp_path: 
     assert service.get_background_status().last_error is None
 
 
-def test_startup_recovery_completes_partial_multi_image_move(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
-    _save_image(service, records, "image-f.png", "", "2024-04-05 06:07:08.000", "orange")
-    _save_image(service, records, "image-g.png", "", "2024-04-06 06:07:08.000", "cyan")
+def test_startup_recovery_completes_partial_multi_image_move(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
+    _save_image(database, service, records, "image-f.png", "", "2024-04-05 06:07:08.000", "orange")
+    _save_image(database, service, records, "image-g.png", "", "2024-04-06 06:07:08.000", "cyan")
 
     moves = service.plan_batch(last_image_name="", limit=100)
     job_id = service.create_move_job(moves)
@@ -670,22 +679,20 @@ def test_startup_recovery_completes_partial_multi_image_move(tmp_path: Path) -> 
     assert records.get("image-f.png").image_subfolder == "2024/04/05"
     assert records.get("image-g.png").image_subfolder == "2024/04/06"
     assert service.get_job(job_id).state == "committed"
-    assert _job_item_states(service, job_id) == {"image-f.png": "committed", "image-g.png": "committed"}
+    assert _job_item_states(database, job_id) == {"image-f.png": "committed", "image-g.png": "committed"}
 
 
-def test_startup_recovery_marks_committed_after_db_update_but_before_journal_commit(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_startup_recovery_marks_committed_after_db_update_but_before_journal_commit(
+    tmp_path: Path, database: Database
+) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "image-h.png"
-    _save_image(service, records, image_name, "", "2024-05-06 07:08:09.000", "pink")
+    _save_image(database, service, records, image_name, "", "2024-05-06 07:08:09.000", "pink")
     moves = service.plan_batch(last_image_name="", limit=100)
     job_id = service.create_move_job(moves)
     service.perform_filesystem_moves(job_id)
 
-    with service._db.transaction() as cursor:
-        cursor.execute(
-            "UPDATE images SET image_subfolder = ? WHERE image_name = ?;",
-            ("2024/05/06", image_name),
-        )
+    _set_record(database, image_name, image_subfolder="2024/05/06")
 
     recovered_once = service.startup_recovery()
     recovered_twice = service.startup_recovery()
@@ -696,13 +703,15 @@ def test_startup_recovery_marks_committed_after_db_update_but_before_journal_com
     assert recovered_twice.errors == 0
     assert records.get(image_name).image_subfolder == "2024/05/06"
     assert service.get_job(job_id).state == "committed"
-    assert _job_item_states(service, job_id) == {image_name: "committed"}
+    assert _job_item_states(database, job_id) == {image_name: "committed"}
 
 
-def test_startup_recovery_marks_error_when_both_old_and_new_full_size_files_exist(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_startup_recovery_marks_error_when_both_old_and_new_full_size_files_exist(
+    tmp_path: Path, database: Database
+) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "image-i.png"
-    _save_image(service, records, image_name, "", "2024-07-08 09:10:11.000", "red")
+    _save_image(database, service, records, image_name, "", "2024-07-08 09:10:11.000", "red")
     moves = service.plan_batch(last_image_name="", limit=100)
     job_id = service.create_move_job(moves)
     move = moves[0]
@@ -715,13 +724,15 @@ def test_startup_recovery_marks_error_when_both_old_and_new_full_size_files_exis
     assert recovered.errors == 1
     assert records.get(image_name).image_subfolder == ""
     assert service.get_job(job_id).state == "error"
-    assert _job_item_states(service, job_id) == {image_name: "error"}
+    assert _job_item_states(database, job_id) == {image_name: "error"}
 
 
-def test_startup_recovery_marks_error_when_neither_old_nor_new_full_size_file_exists(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_startup_recovery_marks_error_when_neither_old_nor_new_full_size_file_exists(
+    tmp_path: Path, database: Database
+) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "image-j.png"
-    _save_image(service, records, image_name, "", "2024-08-09 10:11:12.000", "blue")
+    _save_image(database, service, records, image_name, "", "2024-08-09 10:11:12.000", "blue")
     moves = service.plan_batch(last_image_name="", limit=100)
     job_id = service.create_move_job(moves)
     moves[0].old_path.unlink()
@@ -732,15 +743,15 @@ def test_startup_recovery_marks_error_when_neither_old_nor_new_full_size_file_ex
     assert recovered.errors == 1
     assert records.get(image_name).image_subfolder == ""
     assert service.get_job(job_id).state == "error"
-    assert _job_item_states(service, job_id) == {image_name: "error"}
+    assert _job_item_states(database, job_id) == {image_name: "error"}
 
 
-def test_startup_recovery_isolates_corrupt_image_and_commits_other_items(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_startup_recovery_isolates_corrupt_image_and_commits_other_items(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     good_image_name = "image-a-good.png"
     corrupt_image_name = "image-b-corrupt.png"
-    _save_image(service, records, good_image_name, "", "2024-09-10 11:12:13.000", "white")
-    _save_image(service, records, corrupt_image_name, "", "2024-09-11 11:12:13.000", "black")
+    _save_image(database, service, records, good_image_name, "", "2024-09-10 11:12:13.000", "white")
+    _save_image(database, service, records, corrupt_image_name, "", "2024-09-11 11:12:13.000", "black")
 
     moves = service.plan_batch(last_image_name="", limit=100)
     corrupt_move = next(move for move in moves if move.image_name == corrupt_image_name)
@@ -755,7 +766,7 @@ def test_startup_recovery_isolates_corrupt_image_and_commits_other_items(tmp_pat
     assert service.is_maintenance_active() is False
     assert service.get_job(job_id).state == "error"
     assert corrupt_image_name in (service.get_job(job_id).error_message or "")
-    assert _job_item_states(service, job_id) == {
+    assert _job_item_states(database, job_id) == {
         good_image_name: "committed",
         corrupt_image_name: "error",
     }
@@ -767,10 +778,12 @@ def test_startup_recovery_isolates_corrupt_image_and_commits_other_items(tmp_pat
     assert not corrupt_move.new_path.exists()
 
 
-def test_startup_recovery_marks_truncated_image_error_without_retrying_forever(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_startup_recovery_marks_truncated_image_error_without_retrying_forever(
+    tmp_path: Path, database: Database
+) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "image-truncated.png"
-    _save_image(service, records, image_name, "", "2024-09-12 11:12:13.000", "white")
+    _save_image(database, service, records, image_name, "", "2024-09-12 11:12:13.000", "white")
     move = service.plan_batch(last_image_name="", limit=100)[0]
     move.old_thumbnail_path.unlink()
     job_id = service.create_move_job([move])
@@ -786,16 +799,16 @@ def test_startup_recovery_marks_truncated_image_error_without_retrying_forever(t
     assert recovered.errors == 1
     assert service.is_maintenance_active() is False
     assert service.get_job(job_id).state == "error"
-    assert _job_item_states(service, job_id) == {image_name: "error"}
+    assert _job_item_states(database, job_id) == {image_name: "error"}
     assert records.get(image_name).image_subfolder == ""
     assert move.old_path.exists()
     assert not move.new_path.exists()
 
 
-def test_move_all_images_marks_corrupt_idat_as_unrecoverable(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_move_all_images_marks_corrupt_idat_as_unrecoverable(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "image-corrupt-idat.png"
-    _save_image(service, records, image_name, "", "2024-09-16 11:12:13.000", "white")
+    _save_image(database, service, records, image_name, "", "2024-09-16 11:12:13.000", "white")
     move = service.plan_batch(last_image_name="", limit=100)[0]
     move.old_thumbnail_path.unlink()
     _corrupt_png_idat(move.old_path)
@@ -811,11 +824,12 @@ def test_move_all_images_marks_corrupt_idat_as_unrecoverable(tmp_path: Path) -> 
     assert not move.new_path.exists()
 
 
-def test_move_all_images_counts_and_reports_each_unrecoverable_item(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_move_all_images_counts_and_reports_each_unrecoverable_item(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_names = ["image-corrupt-a.png", "image-corrupt-b.png"]
     for index, image_name in enumerate(image_names):
         _save_image(
+            database,
             service,
             records,
             image_name,
@@ -838,10 +852,12 @@ def test_move_all_images_counts_and_reports_each_unrecoverable_item(tmp_path: Pa
     assert all(records.get(image_name).image_subfolder == "" for image_name in image_names)
 
 
-def test_startup_recovery_keeps_db_consistent_when_thumbnail_regeneration_fails(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_startup_recovery_keeps_db_consistent_when_thumbnail_regeneration_fails(
+    tmp_path: Path, database: Database
+) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "image-thumbnail-recovery.png"
-    _save_image(service, records, image_name, "", "2024-09-13 11:12:13.000", "white")
+    _save_image(database, service, records, image_name, "", "2024-09-13 11:12:13.000", "white")
     move = service.plan_batch(last_image_name="", limit=100)[0]
     move.new_thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
     copy2(move.old_thumbnail_path, move.new_thumbnail_path)
@@ -862,15 +878,21 @@ def test_startup_recovery_keeps_db_consistent_when_thumbnail_regeneration_fails(
     assert not move.new_path.exists()
 
 
-def test_startup_recovery_reconciles_db_after_destination_thumbnail_failure(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+@pytest.mark.parametrize(("repointed_meanwhile", "expected_subfolder"), [(False, "2024/09/15"), (True, "elsewhere")])
+def test_startup_recovery_reconciles_db_after_destination_thumbnail_failure(
+    tmp_path: Path, database: Database, repointed_meanwhile: bool, expected_subfolder: str
+) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "image-destination-recovery.png"
-    _save_image(service, records, image_name, "", "2024-09-15 11:12:13.000", "white")
+    _save_image(database, service, records, image_name, "", "2024-09-15 11:12:13.000", "white")
     move = service.plan_batch(last_image_name="", limit=100)[0]
     move.old_thumbnail_path.unlink()
     move.new_path.parent.mkdir(parents=True, exist_ok=True)
     move.old_path.replace(move.new_path)
     job_id = service.create_move_job([move])
+    if repointed_meanwhile:
+        # Reconciling repoints a record only while it still names the old subfolder.
+        _set_record(database, image_name, image_subfolder="elsewhere")
 
     with patch.object(
         service,
@@ -883,16 +905,16 @@ def test_startup_recovery_reconciles_db_after_destination_thumbnail_failure(tmp_
     assert recovered.errors == 1
     assert service.is_maintenance_active() is False
     assert service.get_job(job_id).state == "error"
-    assert _job_item_states(service, job_id) == {image_name: "error"}
-    assert records.get(image_name).image_subfolder == "2024/09/15"
+    assert _job_item_states(database, job_id) == {image_name: "error"}
+    assert records.get(image_name).image_subfolder == expected_subfolder
     assert not move.old_path.exists()
     assert move.new_path.exists()
 
 
-def test_startup_recovery_finalizes_job_after_item_error_was_recorded(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_startup_recovery_finalizes_job_after_item_error_was_recorded(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "image-recorded-error.png"
-    _save_image(service, records, image_name, "", "2024-09-14 11:12:13.000", "white")
+    _save_image(database, service, records, image_name, "", "2024-09-14 11:12:13.000", "white")
     move = service.plan_batch(last_image_name="", limit=100)[0]
     job_id = service.create_move_job([move])
     service.mark_item_unrecoverable(job_id, image_name, "image is corrupt")
@@ -903,13 +925,13 @@ def test_startup_recovery_finalizes_job_after_item_error_was_recorded(tmp_path: 
     assert recovered.errors == 1
     assert service.is_maintenance_active() is False
     assert service.get_job(job_id).state == "error"
-    assert _job_item_states(service, job_id) == {image_name: "error"}
+    assert _job_item_states(database, job_id) == {image_name: "error"}
 
 
-def test_startup_recovery_keeps_job_recoverable_after_ordinary_exception(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_startup_recovery_keeps_job_recoverable_after_ordinary_exception(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "image-k.png"
-    _save_image(service, records, image_name, "", "2024-09-10 11:12:13.000", "white")
+    _save_image(database, service, records, image_name, "", "2024-09-10 11:12:13.000", "white")
     job_id = service.create_move_job(service.plan_batch(last_image_name="", limit=100))
 
     with patch.object(service, "complete_partial_filesystem_moves", side_effect=OSError("temporary failure")):
@@ -929,10 +951,12 @@ def test_startup_recovery_keeps_job_recoverable_after_ordinary_exception(tmp_pat
     assert service.get_job(job_id).state == "committed"
 
 
-def test_startup_recovery_regenerates_thumbnail_when_old_and_new_thumbnails_exist(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_startup_recovery_regenerates_thumbnail_when_old_and_new_thumbnails_exist(
+    tmp_path: Path, database: Database
+) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "image-l.png"
-    _save_image(service, records, image_name, "", "2024-10-11 12:13:14.000", "black")
+    _save_image(database, service, records, image_name, "", "2024-10-11 12:13:14.000", "black")
     moves = service.plan_batch(last_image_name="", limit=100)
     job_id = service.create_move_job(moves)
     move = moves[0]
@@ -951,19 +975,19 @@ def test_startup_recovery_regenerates_thumbnail_when_old_and_new_thumbnails_exis
     assert service.get_job(job_id).state == "committed"
 
 
-def test_preflight_rejects_duplicate_thumbnail_destination_paths(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
-    _save_image(service, records, "same-name.jpg", "", "2024-12-13 14:15:16.000", "red")
-    _save_image(service, records, "same-name.png", "", "2024-12-13 14:15:16.000", "green")
+def test_preflight_rejects_duplicate_thumbnail_destination_paths(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
+    _save_image(database, service, records, "same-name.jpg", "", "2024-12-13 14:15:16.000", "red")
+    _save_image(database, service, records, "same-name.png", "", "2024-12-13 14:15:16.000", "green")
 
     with pytest.raises(ValueError, match="Duplicate destination thumbnail path"):
         service.plan_batch(last_image_name="", limit=100)
 
 
-def test_successful_filesystem_move_fsyncs_files_and_directories(tmp_path: Path) -> None:
-    service, records = _service(tmp_path, strategy="date")
+def test_successful_filesystem_move_fsyncs_files_and_directories(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
     image_name = "image-m.png"
-    _save_image(service, records, image_name, "", "2025-01-02 03:04:05.000", "blue")
+    _save_image(database, service, records, image_name, "", "2025-01-02 03:04:05.000", "blue")
     job_id = service.create_move_job(service.plan_batch(last_image_name="", limit=100))
 
     with (
@@ -981,8 +1005,8 @@ def test_successful_filesystem_move_fsyncs_files_and_directories(tmp_path: Path)
     fsync_dir.assert_any_call(moved.old_thumbnail_path.parent)
 
 
-def test_fsync_dir_ignores_platform_close_failures(tmp_path: Path) -> None:
-    service, _records = _service(tmp_path, strategy="date")
+def test_fsync_dir_ignores_platform_close_failures(tmp_path: Path, database: Database) -> None:
+    service, _records = _service(tmp_path, database, strategy="date")
 
     with (
         patch("invokeai.app.services.image_moves.image_moves_default.os.open", return_value=123),
@@ -998,8 +1022,8 @@ def test_fsync_dir_ignores_platform_close_failures(tmp_path: Path) -> None:
         service._fsync_dir(tmp_path)
 
 
-def test_fsync_file_ignores_platform_fsync_failures(tmp_path: Path) -> None:
-    service, _records = _service(tmp_path, strategy="date")
+def test_fsync_file_ignores_platform_fsync_failures(tmp_path: Path, database: Database) -> None:
+    service, _records = _service(tmp_path, database, strategy="date")
     path = tmp_path / "image.png"
     path.write_bytes(b"test")
 
@@ -1008,3 +1032,126 @@ def test_fsync_file_ignores_platform_fsync_failures(tmp_path: Path) -> None:
         side_effect=OSError(9, "Bad file descriptor"),
     ):
         service._fsync_file(path)
+
+
+def test_commit_rolls_back_every_repoint_when_a_record_was_repointed_meanwhile(
+    tmp_path: Path, database: Database
+) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
+    # The same day, so that one statement repoints both.
+    _save_image(database, service, records, "image-kept.png", "", "2024-03-01 01:02:03.000", "red")
+    _save_image(database, service, records, "image-raced.png", "", "2024-03-01 04:05:06.000", "blue")
+    moves = service.plan_batch(last_image_name="", limit=100)
+    job_id = service.create_move_job(moves)
+    service.perform_filesystem_moves(job_id)
+    _set_record(database, "image-raced.png", image_subfolder="elsewhere")
+
+    with pytest.raises(RuntimeError, match="failed commit validation"):
+        service.commit_database_updates(job_id)
+
+    # The commit repoints a record only while it still names the old subfolder, and validates the job as a whole.
+    assert records.get("image-raced.png").image_subfolder == "elsewhere"
+    assert records.get("image-kept.png").image_subfolder == ""
+    assert _job_item_states(database, job_id) == {"image-kept.png": "moved", "image-raced.png": "moved"}
+    # Records and files disagree until the job is finished, so it stays active.
+    assert service.get_job(job_id).state == "moved"
+    assert service.is_maintenance_active()
+    with pytest.raises(ValueError, match="active image move job"):
+        service.create_move_job(moves)
+
+
+def test_commit_repoints_each_image_to_its_own_subfolder(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
+    _save_image(database, service, records, "image-1.png", "", "2024-03-01 01:02:03.000", "red")
+    _save_image(database, service, records, "image-2.png", "", "2024-03-01 04:05:06.000", "blue")
+    _save_image(database, service, records, "image-3.png", "old", "2024-03-01 07:08:09.000", "green")
+    _save_image(database, service, records, "image-4.png", "", "2024-03-02 01:02:03.000", "pink")
+    _save_image(database, service, records, "image-5.png", "2024/03/03", "2024-03-03 01:02:03.000", "gray")
+    job_id = service.create_move_job(service.plan_batch(last_image_name="", limit=100))
+    service.perform_filesystem_moves(job_id)
+
+    assert service.commit_database_updates(job_id) == 4
+
+    names = [f"image-{i}.png" for i in range(1, 6)]
+    assert {name: records.get(name).image_subfolder for name in names} == {
+        "image-1.png": "2024/03/01",
+        "image-2.png": "2024/03/01",
+        "image-3.png": "2024/03/01",
+        "image-4.png": "2024/03/02",
+        "image-5.png": "2024/03/03",
+    }
+
+
+def test_commit_rejects_a_moved_image_whose_record_was_deleted(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
+    _save_image(database, service, records, "image-deleted.png", "", "2024-03-03 01:02:03.000", "red")
+    job_id = service.create_move_job(service.plan_batch(last_image_name="", limit=100))
+    service.perform_filesystem_moves(job_id)
+    _set_record(database, "image-deleted.png", deleted_at="2024-03-04 00:00:00.000")
+
+    with pytest.raises(RuntimeError, match="failed commit validation"):
+        service.commit_database_updates(job_id)
+
+    assert service.get_job(job_id).state == "moved"
+
+
+def test_deleted_records_are_neither_counted_nor_planned(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
+    _save_image(database, service, records, "a-deleted.png", "", "2024-03-05 01:02:03.000", "red")
+    _save_image(database, service, records, "b-live.png", "", "2024-03-06 01:02:03.000", "blue")
+    _set_record(database, "a-deleted.png", deleted_at="2024-03-07 00:00:00.000")
+
+    assert service.count_images_needing_move() == 1
+    assert [move.image_name for move in service.plan_batch(last_image_name="", limit=100)] == ["b-live.png"]
+    assert database.queries.image_moves.next_image_name("") == "b-live.png"
+
+
+def test_finished_jobs_are_not_recovered(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
+    _save_image(database, service, records, "image-f.png", "", "2024-03-08 01:02:03.000", "red")
+    move = service.plan_batch(last_image_name="", limit=100)[0]
+    failed_job_id = service.create_error_move_job(move, "source vanished")
+
+    assert database.queries.image_moves.recoverable_job_ids() == []
+    job_id = service.create_move_job([move])
+    assert database.queries.image_moves.recoverable_job_ids() == [job_id]
+    assert service.get_latest_job() == ImageMoveJob(id=job_id, state="planned", error_message=None)
+
+    service.record_job_error_message(job_id, "temporary failure")
+    service.move_all_images()
+
+    assert database.queries.image_moves.recoverable_job_ids() == []
+    assert service.get_job(failed_job_id).error_message == "source vanished"
+    # A committed job no longer reports what went wrong before.
+    assert service.get_job(job_id) == ImageMoveJob(id=job_id, state="committed", error_message=None)
+
+
+def test_unrecoverable_job_fails_every_item_and_releases_its_images(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
+    _save_image(database, service, records, "image-g.png", "", "2024-03-09 01:02:03.000", "red")
+    _save_image(database, service, records, "image-h.png", "", "2024-03-10 01:02:03.000", "blue")
+    job_id = service.create_move_job(service.plan_batch(last_image_name="", limit=100))
+
+    service.mark_job_unrecoverable(job_id, "disk gone")
+
+    assert service.get_job(job_id) == ImageMoveJob(id=job_id, state="error", error_message="disk gone")
+    assert _job_item_states(database, job_id) == {"image-g.png": "error", "image-h.png": "error"}
+    assert not service.is_maintenance_active()
+    assert len(service.plan_batch(last_image_name="", limit=100)) == 2
+
+
+def test_commit_reports_item_errors_in_image_name_order(tmp_path: Path, database: Database) -> None:
+    service, records = _service(tmp_path, database, strategy="date")
+    _save_image(database, service, records, "image-i.png", "", "2024-03-11 01:02:03.000", "red")
+    _save_image(database, service, records, "image-j.png", "", "2024-03-12 01:02:03.000", "blue")
+    # Journaled out of name order, so that only the commit's ordering puts the messages in it.
+    job_id = service.create_move_job(list(reversed(service.plan_batch(last_image_name="", limit=100))))
+    service.mark_item_unrecoverable(job_id, "image-j.png", "second")
+    service.mark_item_unrecoverable(job_id, "image-i.png", "first")
+
+    assert service.commit_database_updates(job_id) == 0
+
+    assert service.get_job(job_id) == ImageMoveJob(id=job_id, state="error", error_message="first\nsecond")
+    # Failed items moved nothing, so their records stay where they were.
+    assert records.get("image-i.png").image_subfolder == ""
+    assert records.get("image-j.png").image_subfolder == ""

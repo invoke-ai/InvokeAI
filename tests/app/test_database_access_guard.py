@@ -25,7 +25,6 @@ DATABASE_LAYER = (
 # Do not raise a number or add a file.
 NOT_YET_PORTED: dict[str, int] = {
     "invokeai/app/services/fonts/fonts_default.py": 32,
-    "invokeai/app/services/image_moves/image_moves_default.py": 58,
     # The transitional cursor facade, removed once every service is ported.
     "invokeai/app/services/shared/sqlite/sqlite_database.py": 1,
     "invokeai/backend/util/gallery_maintenance.py": 8,
