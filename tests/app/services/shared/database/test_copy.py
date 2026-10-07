@@ -106,7 +106,7 @@ def test_ids_continue_after_the_highest_the_source_issued(source: Database, empt
 def test_a_table_is_copied_in_batches(
     source: Database, empty_database: Database, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(copy_module, "_BATCH_SIZE", 2)
+    monkeypatch.setattr(copy_module, "_BATCH_ROWS", 2)
     item = {"batch_id": "b", "queue_id": "default", "session": "{}"}
     with source.begin(write=True) as conn:
         conn.execute(insert(session_queue), [{**item, "session_id": f"s{n}"} for n in range(5)])

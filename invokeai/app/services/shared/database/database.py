@@ -1,4 +1,3 @@
-import hashlib
 import random
 import sqlite3
 import threading
@@ -10,8 +9,9 @@ from logging import Logger
 from pathlib import Path
 from typing import Optional, TypeVar, get_args
 
-from sqlalchemy import Connection, Engine, make_url
+from sqlalchemy import URL, Connection, Engine, make_url
 from sqlalchemy.exc import DBAPIError
+from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 
 from invokeai.app.services.config.config_default import DB_SYNCHRONOUS
 from invokeai.app.services.shared.database.engines import (
@@ -22,11 +22,12 @@ from invokeai.app.services.shared.database.engines import (
 )
 from invokeai.app.services.shared.database.errors import (
     ConflictError,
-    DatabaseInUseError,
+    DatabaseUnavailableError,
     NestedTransactionError,
     translate_error,
 )
 from invokeai.app.services.shared.database.queries import Queries
+from invokeai.app.services.shared.database.session_lock import InstanceLock
 
 R = TypeVar("R")
 
@@ -37,6 +38,21 @@ _CONFLICT_BASE_DELAY_SECONDS = 0.05
 
 # The one server driver, whose error numbers `translate_error` reads.
 _SUPPORTED_SERVER_DRIVER = "pymysql"
+
+
+def parse_database_url(url: str) -> URL:
+    """The parts of a database URL; raises `ValueError` without repeating the URL, which holds a password."""
+    try:
+        parsed = make_url(url)
+    except Exception:
+        parsed = None
+    # An `@` in the password that is not percent-encoded ends up in the host.
+    if parsed is None or "@" in (parsed.host or ""):
+        raise ValueError(
+            "The database URL cannot be read. Percent-encode the characters @ : / % # in its user name and password, "
+            "e.g. @ as %40."
+        )
+    return parsed
 
 
 @dataclass(frozen=True)
@@ -85,8 +101,8 @@ class Database:
         self._sqlite_connection: Optional[Connection] = engine.connect() if sqlite is not None else None
         self._thread_state = threading.local()
         self._disposed = False
-        # The connection whose session holds the instance lock of a server database (see `hold_instance_lock`).
-        self._instance_lock: Optional[Connection] = None
+        # The instance lock of a server database (see `hold_instance_lock`).
+        self._instance_lock: Optional[InstanceLock] = None
         self.queries = Queries(self)
 
     @classmethod
@@ -164,14 +180,23 @@ class Database:
     @classmethod
     def open_url(cls, url: str, logger: Logger) -> "Database":
         """Opens a MySQL or MariaDB database through PyMySQL, e.g. `mariadb+pymysql://user:password@host/invokeai`."""
-        parsed = make_url(url)
+        parsed = parse_database_url(url)
         if parsed.get_backend_name() not in SERVER_DIALECTS or parsed.get_driver_name() != _SUPPORTED_SERVER_DRIVER:
             raise ValueError(
                 f"Unsupported database URL scheme '{parsed.drivername}', expected "
                 f"{' or '.join(f'{backend}+{_SUPPORTED_SERVER_DRIVER}' for backend in SERVER_DIALECTS)}"
             )
         logger.info(f"Connecting to database {parsed.render_as_string(hide_password=True)}")
-        return cls(create_mysql_engine(parsed), logger)
+        try:
+            engine = create_mysql_engine(parsed)
+        except ModuleNotFoundError as e:
+            if e.name != _SUPPORTED_SERVER_DRIVER:
+                raise
+            raise ValueError(
+                "The MySQL and MariaDB driver is not installed: install InvokeAI with its `mysql` extra, e.g. "
+                'pip install "invokeai[mysql]"'
+            ) from None
+        return cls(engine, logger)
 
     @property
     def dialect_name(self) -> str:
@@ -214,24 +239,28 @@ class Database:
         self._claim_thread()
         try:
             with self._exclusive():
-                with self._connection() as conn:
-                    began_sqlite = False
-                    try:
-                        if self._sqlite is not None:
-                            self._begin_sqlite(write)
-                            began_sqlite = True
-                        else:
-                            conn.execution_options(**{WRITE_INTENT: write})
-                        with conn.begin():
-                            yield conn
-                    except (DBAPIError, sqlite3.Error) as error:
-                        translated = translate_error(error, self.dialect_name)
-                        if translated is None:
-                            raise
-                        raise translated from error
-                    finally:
-                        if began_sqlite:
-                            self._end_sqlite()
+                # Translated here, around the checkout too: a server that cannot be reached fails it.
+                try:
+                    with self._connection() as conn:
+                        began_sqlite = False
+                        try:
+                            if self._sqlite is not None:
+                                self._begin_sqlite(write)
+                                began_sqlite = True
+                            else:
+                                conn.execution_options(**{WRITE_INTENT: write})
+                            with conn.begin():
+                                yield conn
+                        finally:
+                            if began_sqlite:
+                                self._end_sqlite()
+                except (DBAPIError, sqlite3.Error) as error:
+                    translated = translate_error(error, self.dialect_name)
+                    if translated is None:
+                        raise
+                    raise translated from error
+                except PoolTimeoutError as error:
+                    raise DatabaseUnavailableError(f"No database connection came free in time: {error}") from error
         finally:
             self._release_thread()
 
@@ -333,27 +362,10 @@ class Database:
         open; raises `DatabaseInUseError` when another process holds it. A no-op on SQLite.
 
         The lock belongs to the session of a connection of its own, which the server ends, and the lock with it,
-        when the process does.
+        when the process does. A thread checks it and takes it again should the server end that session sooner.
         """
-        if self._sqlite is not None or self._instance_lock is not None:
-            return
-        conn = self._engine.connect()
-        try:
-            database_name = str(conn.exec_driver_sql("SELECT DATABASE()").scalar_one())
-            # Lock names are server-wide and at most 64 characters long.
-            name = f"invokeai.instance.{hashlib.sha1(database_name.encode()).hexdigest()}"
-            held = conn.exec_driver_sql("SELECT GET_LOCK(%s, 0)", (name,)).scalar()
-            conn.commit()
-        except BaseException:
-            conn.close()
-            raise
-        if held != 1:
-            conn.close()
-            raise DatabaseInUseError(
-                f"Another InvokeAI process uses the database {database_name!r}. Stop it first: one process at a "
-                "time serves a database."
-            )
-        self._instance_lock = conn
+        if self._sqlite is None and self._instance_lock is None:
+            self._instance_lock = InstanceLock(self._engine, self._logger)
 
     def dispose(self) -> None:
         """Closes every connection, the instance lock's included; transactions begun afterwards are refused. Safe to

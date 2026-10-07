@@ -17,6 +17,7 @@ from invokeai.app.services.image_records.image_records_common import ImageNamesR
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.errors import LockTimeoutError
 from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults
 
 
@@ -497,24 +498,35 @@ def test_delete_image_db_fault_during_lookup_returns_500_not_404(
     assert storage.get_path("del.png").exists()
 
 
-def test_delete_image_db_failure_returns_500_and_restores_files(
-    monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
+@pytest.mark.parametrize(
+    ("failure", "status", "detail"),
+    [
+        (LockTimeoutError("database is locked"), 503, "The database is busy; try again"),
+        (RuntimeError("disk I/O error"), 500, "Failed to delete image"),
+    ],
+)
+def test_delete_image_db_failure_is_reported_and_restores_files(
+    monkeypatch: Any,
+    mock_invoker: Invoker,
+    tmp_path: Path,
+    client: TestClient,
+    failure: Exception,
+    status: int,
+    detail: str,
 ) -> None:
-    from invokeai.app.services.shared.database.errors import LockTimeoutError
-
     storage = prepare_delete_image_test(monkeypatch, mock_invoker, tmp_path)
     _save_deletable_image(mock_invoker, storage, "del.png")
 
     def failing_delete(image_name: str) -> None:
-        raise LockTimeoutError("database is locked")
+        raise failure
 
     monkeypatch.setattr(mock_invoker.services.image_records, "delete", failing_delete)
 
     response = client.delete("/api/v1/images/i/del.png")
 
-    # The route must report the failure, not a success-shaped empty payload.
-    assert response.status_code == 500
-    assert response.json()["detail"] == "Failed to delete image"
+    # The route must report the failure, not a success-shaped empty payload; a busy database as such.
+    assert response.status_code == status
+    assert response.json()["detail"] == detail
     # The staged files must be rolled back: image and thumbnail restored, record intact.
     assert storage.get_path("del.png").exists()
     assert storage.get_path("del.png", thumbnail=True).exists()

@@ -1,4 +1,3 @@
-import hashlib
 import logging
 import sqlite3
 import tempfile
@@ -20,6 +19,7 @@ from invokeai.app.services.shared.database.copy import copy_rows
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.schema import metadata
 from invokeai.app.services.shared.database.schema.migrator import applied_migrations, migrations
+from invokeai.app.services.shared.database.session_lock import SessionLock
 from invokeai.app.services.shared.sqlite_migrator.migration_loader import MigrationBuildContext, build_migrations
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import (
     Migration,
@@ -432,7 +432,11 @@ class Migrator:
 
     def has_pending_migrations(self) -> bool:
         """Whether the database lacks a registered migration, without changing it. A database without the migrator's
-        records (a new one, or one from before them) lacks them all."""
+        records (a new one, or one from before them) lacks them all. Raises for a server database with tables but
+        no records, which the app refuses as well."""
+        if self._database.dialect_name != "sqlite" and self._server_has_tables():
+            applied_ids = self._server_applied_migration_ids()
+            return bool(self._migration_set.get_migration_plan(applied_migration_ids=applied_ids))
         with self._database.begin(write=False) as conn:
             if not inspect(conn).has_table(applied_migrations.name):
                 return self._migration_set.count > 0
@@ -466,13 +470,13 @@ class Migrator:
     @contextmanager
     def _server_migration_lock(self) -> Iterator["_ServerMigrationLock"]:
         """Holds a lock that one process at a time can hold for this database, on a connection of its own."""
-        with self._database.engine.connect() as conn:
-            lock = _ServerMigrationLock(conn)
+        session_lock = SessionLock(self._database.engine, "migrate")
+        try:
+            lock = _ServerMigrationLock(session_lock)
             lock.acquire(self._logger)
-            try:
-                yield lock
-            finally:
-                lock.release(self._logger)
+            yield lock
+        finally:
+            session_lock.close()
 
     def _server_has_tables(self) -> bool:
         with self._database.begin(write=False) as conn:
@@ -544,51 +548,27 @@ _LOCK_LOST = (
 
 
 class _ServerMigrationLock:
-    """A server-wide lock on migrating one database, held by one connection's session.
+    """The lock on migrating one server database, which one process at a time holds. It is verified before each
+    migration rather than assumed: the server releases it with its connection, even one cut off while idle."""
 
-    The server releases it when that connection ends, even one cut off while idle, so the lock is verified
-    before each migration rather than assumed.
-    """
-
-    def __init__(self, conn: Connection) -> None:
-        self._conn = conn
-        database_name = str(conn.exec_driver_sql("SELECT DATABASE()").scalar_one())
-        # Lock names are server-wide and at most 64 characters long.
-        self._name = f"invokeai.migrate.{hashlib.sha1(database_name.encode()).hexdigest()}"
+    def __init__(self, lock: SessionLock) -> None:
+        self._lock = lock
 
     def acquire(self, logger: logging.Logger) -> None:
-        acquired = self._get_lock(0)
-        if acquired == 0:
+        try:
+            if self._lock.take(0):
+                return
             logger.info("Waiting for another process to finish migrating the database")
-            acquired = self._get_lock(MIGRATION_LOCK_TIMEOUT_SECONDS)
-        if acquired == 0:
-            raise MigrationError(
-                f"Another process has been migrating this database for {MIGRATION_LOCK_TIMEOUT_SECONDS} s; "
-                "let it finish before starting again"
-            )
-        if acquired != 1:
-            raise MigrationError("The database server could not take the migration lock")
+            if self._lock.take(MIGRATION_LOCK_TIMEOUT_SECONDS):
+                return
+        except RuntimeError as e:
+            raise MigrationError(str(e)) from e
+        raise MigrationError(
+            f"Another process has been migrating this database for {MIGRATION_LOCK_TIMEOUT_SECONDS} s; "
+            "let it finish before starting again"
+        )
 
     def verify(self) -> None:
-        """Raises if this connection no longer holds the lock; also keeps the connection from going idle."""
-        try:
-            held = self._conn.exec_driver_sql("SELECT IS_USED_LOCK(%s) = CONNECTION_ID()", (self._name,)).scalar()
-            self._conn.commit()
-        except DBAPIError as e:
-            raise MigrationError(_LOCK_LOST) from e
-        if held != 1:
+        """Raises if the lock is no longer held."""
+        if not self._lock.held():
             raise MigrationError(_LOCK_LOST)
-
-    def release(self, logger: logging.Logger) -> None:
-        # Best effort: a lost connection has released the lock already, and an error here must not hide the
-        # outcome of the migration.
-        try:
-            self._conn.exec_driver_sql("SELECT RELEASE_LOCK(%s)", (self._name,))
-            self._conn.commit()
-        except DBAPIError as e:
-            logger.warning(f"Could not release the migration lock, which ends with the connection: {e}")
-
-    def _get_lock(self, timeout_seconds: int) -> object:
-        acquired = self._conn.exec_driver_sql("SELECT GET_LOCK(%s, %s)", (self._name, timeout_seconds)).scalar()
-        self._conn.commit()
-        return acquired

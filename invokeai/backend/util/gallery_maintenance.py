@@ -69,6 +69,16 @@ class ConfigMapper:
         )
         return False
 
+    def print_database(self) -> None:
+        """Names the database and its backup, before the user is asked to go on."""
+        assert self.config is not None
+        if self.config.db_url:
+            print(f"Database                         : {redacted_database_url(self.config.db_url)}")
+            print("Database backup                  : none is taken of a server database; back it up first")
+        else:
+            print(f"Database File Path               : {self.database_path}")
+            print(f"Database backup will be taken at : {self.database_backup_dir}")
+
 
 class MaintenanceStats:
     """DTO for tracking work progress."""
@@ -332,8 +342,7 @@ class InvokeAIDatabaseMaintenanceApp:
             print("in the app gallery, or images that only show an enlarged version of the")
             print("thumbnail.")
             print()
-            print(f"Database File Path               : {config.database_path}")
-            print(f"Database backup will be taken at : {config.database_backup_dir}")
+            config.print_database()
             print(f"Outputs/Images Directory         : {config.outputs_path}")
             print(f"Outputs/Images Archive Directory : {config.archive_path}")
 
@@ -389,8 +398,7 @@ class InvokeAIDatabaseMaintenanceApp:
             print("archive these files so you can choose to delete them or re-import using the")
             print("official import script.")
             print()
-            print(f"Database File Path               : {config.database_path}")
-            print(f"Database backup will be taken at : {config.database_backup_dir}")
+            config.print_database()
             print(f"Outputs/Images Directory         : {config.outputs_path}")
             print(f"Outputs/Images Archive Directory : {config.archive_path}")
 

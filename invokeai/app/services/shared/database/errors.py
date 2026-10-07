@@ -59,6 +59,13 @@ class LockTimeoutError(TransientDatabaseError):
     """
 
 
+class DatabaseUnavailableError(TransientDatabaseError):
+    """The database server could not be reached, its connection was lost, or no connection came free in time.
+
+    Not retried automatically. A transaction whose connection was lost while it committed may have taken effect.
+    """
+
+
 class NestedTransactionError(DatabaseError):
     """A transaction was opened on a thread that already has one open on the same database.
 
@@ -121,6 +128,9 @@ _MYSQL_ERRORS: dict[int, type[DatabaseError]] = {
     1364: NotNullViolation,  # ER_NO_DEFAULT_FOR_FIELD
     1213: ConflictError,  # ER_LOCK_DEADLOCK
     1205: LockTimeoutError,  # ER_LOCK_WAIT_TIMEOUT
+    2003: DatabaseUnavailableError,  # CR_CONN_HOST_ERROR
+    2006: DatabaseUnavailableError,  # CR_SERVER_GONE_ERROR
+    2013: DatabaseUnavailableError,  # CR_SERVER_LOST
 }
 
 

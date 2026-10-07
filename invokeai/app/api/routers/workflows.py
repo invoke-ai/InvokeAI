@@ -198,7 +198,7 @@ def create_workflow(
     workflow_id: Optional[str] = Body(
         default=None,
         embed=True,
-        max_length=36,
+        max_length=255,
         description="A client-reserved UUID for the new record. Retrying the same creation with the same id returns "
         "the record already created for it; another owner's record or different content under that id is a 409.",
     ),

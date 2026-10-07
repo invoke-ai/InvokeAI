@@ -1,6 +1,7 @@
 """Opening the database a config names, and what a server database is checked for before the app uses it."""
 
 import logging
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -8,10 +9,12 @@ import pytest
 from sqlalchemy import URL, delete
 
 from invokeai.app.services.config.config_default import DefaultInvokeAIAppConfig, InvokeAIAppConfig
+from invokeai.app.services.shared.database import database as database_module
 from invokeai.app.services.shared.database import startup
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.errors import DatabaseInUseError
 from invokeai.app.services.shared.database.schema.migrator import applied_migrations
+from invokeai.app.services.shared.database.session_lock import InstanceLock, SessionLock
 from invokeai.app.services.shared.database.startup import (
     DatabaseSetupError,
     init_database,
@@ -138,3 +141,84 @@ def test_a_new_server_database_beside_a_sqlite_one_is_pointed_out(
     [warning] = [record.getMessage() for record in caplog.records if record.levelno == logging.WARNING]
     assert "invoke-db-copy" in warning
     assert "secret" not in warning
+
+
+def test_a_url_that_cannot_be_read_is_refused_without_repeating_its_password() -> None:
+    # An `@` in the password that is not percent-encoded.
+    url = "mariadb+pymysql://invokeai:se@cret@db.example/invokeai"
+
+    assert redacted_database_url(url) == "***"
+    with pytest.raises(ValueError, match="Percent-encode") as refused:
+        Database.open_url(url, LOGGER)
+    assert "cret" not in str(refused.value)
+
+
+def test_a_missing_driver_is_named_with_the_extra_that_installs_it(monkeypatch: pytest.MonkeyPatch) -> None:
+    def no_driver(_url: object) -> None:
+        raise ModuleNotFoundError("No module named 'pymysql'", name="pymysql")
+
+    monkeypatch.setattr(database_module, "create_mysql_engine", no_driver)
+
+    with pytest.raises(ValueError, match=r"invokeai\[mysql\]"):
+        Database.open_url("mariadb+pymysql://invokeai:secret@db.example/invokeai", LOGGER)
+
+
+@server_only
+def test_the_app_refuses_a_server_database_another_process_holds(
+    _external_test_schema: Optional[URL], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert _external_test_schema is not None
+    # The test servers keep their own defaults; what is checked here is the lock.
+    monkeypatch.setattr(startup, "MINIMUM_MAX_ALLOWED_PACKET", 1)
+    url = _external_test_schema.render_as_string(hide_password=False)
+    holder = Database.open_url(url, LOGGER)
+    try:
+        holder.hold_instance_lock()
+        with pytest.raises(DatabaseInUseError, match="IS_USED_LOCK"):
+            init_database(_config(tmp_path, db_url=url), LOGGER, NoImageFiles())
+    finally:
+        holder.dispose()
+
+
+@server_only
+def test_a_lock_the_server_released_is_taken_again(
+    _external_test_schema: Optional[URL], caplog: pytest.LogCaptureFixture
+) -> None:
+    assert _external_test_schema is not None
+    url = _external_test_schema.render_as_string(hide_password=False)
+    database, other = Database.open_url(url, LOGGER), Database.open_url(url, LOGGER)
+    lock = InstanceLock(database.engine, LOGGER)
+    try:
+        # The server ends the session that holds the lock, as after an idle timeout or a network failure.
+        probe = SessionLock(other.engine, "instance")
+        probe.close()
+        with other.begin(write=False) as conn:
+            holder = conn.exec_driver_sql("SELECT IS_USED_LOCK(%s)", (probe.name,)).scalar_one()
+            conn.exec_driver_sql(f"KILL {int(holder)}")
+
+        # Another process takes it meanwhile: two serve the database, which is reported.
+        rival = _take_when_free(other)
+        with caplog.at_level(logging.ERROR):
+            lock.check()
+        assert any("two processes now serve it" in record.getMessage() for record in caplog.records)
+
+        rival.close()
+        lock.check()
+        with pytest.raises(DatabaseInUseError):
+            InstanceLock(other.engine, LOGGER)
+    finally:
+        lock.close()
+        database.dispose()
+        other.dispose()
+
+
+def _take_when_free(database: Database) -> InstanceLock:
+    # A killed session releases its locks as the server gets to it.
+    deadline = time.monotonic() + 5
+    while True:
+        try:
+            return InstanceLock(database.engine, LOGGER)
+        except DatabaseInUseError:
+            if time.monotonic() > deadline:
+                raise
+            time.sleep(0.05)

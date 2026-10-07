@@ -1,6 +1,7 @@
 """`invoke-db-copy`: copies an install's SQLite database into a new MySQL or MariaDB database."""
 
 import argparse
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -9,14 +10,14 @@ from typing import Optional
 from invokeai.app.services.config.config_default import InvokeAIAppConfig, load_config_from_root
 from invokeai.app.services.shared.database.copy import (
     Problem,
-    checksums,
     copy_database,
+    copy_records,
     count_normalized,
     delete_orphans,
     find_orphans,
     find_oversized,
-    merged_tables,
-    normalize_for_a_server,
+    merged_rows,
+    verify_copy,
 )
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.startup import (
@@ -26,17 +27,27 @@ from invokeai.app.services.shared.database.startup import (
 )
 from invokeai.backend.util.logging import InvokeAILogger
 
+_START_AGAIN = (
+    "The target holds part of the copy, which InvokeAI refuses. Drop the target database, create it again empty, and "
+    "run invoke-db-copy again."
+)
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="invoke-db-copy",
         description="Copy an InvokeAI install's SQLite database into a new, empty MySQL or MariaDB database.",
         epilog=(
-            "Stop InvokeAI first: what it writes during the copy is not copied. The SQLite database is not changed; "
-            "set `db_url` in invokeai.yaml to the target afterwards to use it."
+            "Stop InvokeAI first: what it writes during the copy is not copied. The SQLite database is not changed. "
+            "The target is the database `db_url` names in invokeai.yaml or INVOKEAI_DB_URL, unless --target names "
+            "another; InvokeAI uses the copy once db_url names it."
         ),
     )
-    parser.add_argument("--target", required=True, help="URL of the target, e.g. mariadb+pymysql://user:pw@host/db")
+    parser.add_argument(
+        "--target",
+        help="URL of the target, e.g. mariadb+pymysql://user:pw@host/db (default: db_url). A URL here is visible to "
+        "other users of this computer and kept in the shell's history; prefer db_url",
+    )
     parser.add_argument("--root", type=Path, help="InvokeAI root directory (default: as InvokeAI finds it)")
     parser.add_argument(
         "--check", action="store_true", help="Check the source and the target and report, without copying"
@@ -51,14 +62,23 @@ def main() -> None:
     sys.exit(copy(args.target, root=args.root, check_only=args.check, skip_orphans=args.orphans == "skip"))
 
 
-def copy(target_url: str, *, root: Optional[Path], check_only: bool, skip_orphans: bool) -> int:
-    """Runs the copy and reports on it; the process's exit code."""
-    config = _source_config(root)
+def copy(target_url: Optional[str], *, root: Optional[Path], check_only: bool, skip_orphans: bool) -> int:
+    """Runs the copy and reports on it; the process's exit code.
+
+    :param target_url: The target; by default, the database the install's config names.
+    """
+    config = _install_config(root)
+    target_url = target_url or config.db_url
+    if not target_url:
+        print("Name the target: set db_url in invokeai.yaml or INVOKEAI_DB_URL, or pass --target.")
+        return 1
+    # The source is the install's SQLite database, whatever db_url says.
+    source_config = config.model_copy(update={"db_url": None, "use_memory_db": False})
     logger = InvokeAILogger.get_logger("invoke-db-copy")
-    print(f"Source: {config.db_path}")
+    print(f"Source: {source_config.db_path}")
     print(f"Target: {redacted_database_url(target_url)}")
     try:
-        source = open_migrated_database(config, logger)
+        source = open_migrated_database(source_config, logger)
         try:
             target, max_allowed_packet = open_copy_target(target_url, logger)
         except BaseException:
@@ -69,19 +89,29 @@ def copy(target_url: str, *, root: Optional[Path], check_only: bool, skip_orphan
         print(f"\nCannot copy: {e}")
         return 1
 
-    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
-        # A consistent snapshot to work from: orphans can be left out of it, and the source stays as it is.
-        snapshot_path = Path(tmp) / "snapshot.db"
+    try:
+        # A consistent snapshot to work from, beside the database, which it is as large as: orphans can be left out of
+        # it, and the source stays as it is.
+        snapshot_dir = Path(tempfile.mkdtemp(prefix="invoke-db-copy-", dir=source_config.db_path.parent))
         try:
-            source.backup(snapshot_path)
+            snapshot_path = snapshot_dir / "snapshot.db"
+            try:
+                source.backup(snapshot_path)
+            finally:
+                source.dispose()
+            snapshot = Database.open_sqlite(snapshot_path, logger)
+            try:
+                return _copy(snapshot, target, max_allowed_packet, check_only=check_only, skip_orphans=skip_orphans)
+            finally:
+                snapshot.dispose()
         finally:
-            source.dispose()
-        snapshot = Database.open_sqlite(snapshot_path, logger)
-        try:
-            return _copy(snapshot, target, max_allowed_packet, check_only=check_only, skip_orphans=skip_orphans)
-        finally:
-            snapshot.dispose()
-            target.dispose()
+            shutil.rmtree(snapshot_dir, ignore_errors=True)
+            if snapshot_dir.exists():
+                print(
+                    f"\nCould not delete the snapshot at {snapshot_dir}, which holds a copy of the database: delete it."
+                )
+    finally:
+        target.dispose()
 
 
 def _copy(
@@ -89,14 +119,14 @@ def _copy(
 ) -> int:
     blocking: list[Problem] = []
     orphans = find_orphans(snapshot)
-    _report("Rows whose foreign keys name no row", orphans)
+    _report("Rows whose foreign keys name a missing row", orphans)
     if orphans and skip_orphans:
-        print(f"  Left out: {delete_orphans(snapshot)} rows, and what the database deletes with them.")
+        _report("Left out of the copy", delete_orphans(snapshot))
     elif orphans:
         blocking.extend(orphans)
         print("  Copy with --orphans skip to leave them out.")
     oversized = find_oversized(snapshot, max_allowed_packet)
-    _report("Values the target cannot store", oversized)
+    _report("Rows the target cannot store", oversized)
     blocking.extend(oversized)
     _report("Values the copy changes", count_normalized(snapshot))
 
@@ -108,36 +138,34 @@ def _copy(
         return 0
 
     print("\nCopying...")
-    copied = copy_database(snapshot, target)
-    print(f"Copied {sum(copied.values())} rows of {len(copied)} tables. Verifying...")
-    expected = checksums(snapshot, normalize_for_a_server)
-    actual = checksums(target)
-    mismatches: list[str] = []
-    for table, sums in expected.items():
-        got = actual.get(table)
-        if table in merged_tables():
-            if got is None or got.rows > sums.rows:
-                mismatches.append(f"{table}: {sums.rows} rows, the target holds {got.rows if got else 0}")
-            elif got.rows < sums.rows:
-                print(f"  {table}: {sums.rows - got.rows} rows the target treats as equal to others were merged.")
-        elif got != sums:
-            mismatches.append(f"{table}: rows or contents differ ({sums.rows} copied, {got.rows if got else 0} held)")
+    try:
+        copied = copy_database(snapshot, target, progress=lambda table: print(f"  {table}", flush=True))
+        print(f"Copied {_rows(sum(copied.values()))} of {len(copied)} tables. Verifying...")
+        mismatches = verify_copy(snapshot, target)
+        if not mismatches:
+            copy_records(snapshot, target)
+            mismatches = verify_copy(snapshot, target, records=True)
+    except Exception as e:
+        print(f"\nThe copy failed: {e}\n{_START_AGAIN}")
+        return 1
     if mismatches:
-        print("\nThe copy does not match its source; do not use the target:")
+        print("\nThe copy does not match its source:")
         for mismatch in mismatches:
             print(f"  {mismatch}")
+        print(_START_AGAIN)
         return 1
+    for table, fewer in merged_rows(snapshot, target).items():
+        print(f"  {table}: {_rows(fewer)} the target treats as equal to others were merged.")
     print("\nDone: every table matches its source. Set db_url in invokeai.yaml to the target to use it.")
     return 0
 
 
-def _source_config(root: Optional[Path]) -> InvokeAIAppConfig:
+def _install_config(root: Optional[Path]) -> InvokeAIAppConfig:
     if root is None:
         from invokeai.app.services.config import get_config
 
         root = get_config().root_path
-    # The source is the install's SQLite database, whatever db_url says.
-    return load_config_from_root(root).model_copy(update={"db_url": None, "use_memory_db": False})
+    return load_config_from_root(root)
 
 
 def _report(heading: str, problems: list[Problem]) -> None:
@@ -145,7 +173,11 @@ def _report(heading: str, problems: list[Problem]) -> None:
         return
     print(f"\n{heading}:")
     for problem in problems:
-        print(f"  {problem.table}: {problem.count} rows {problem.what}")
+        print(f"  {problem.table}: {_rows(problem.count)} {problem.what}")
+
+
+def _rows(count: int) -> str:
+    return f"{count} row" if count == 1 else f"{count} rows"
 
 
 if __name__ == "__main__":

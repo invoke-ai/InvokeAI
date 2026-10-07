@@ -1,13 +1,12 @@
 """`invoke-db-copy`: an install's SQLite database into a new server database, checked before and verified after."""
 
 import json
-import logging
 from pathlib import Path
 from typing import Optional
 from unittest.mock import Mock
 
 import pytest
-from sqlalchemy import URL, insert, select
+from sqlalchemy import URL, delete, func, insert, select, update
 
 from invokeai.app.services.board_image_records.board_image_records_default import BoardImageRecordStorage
 from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
@@ -16,14 +15,24 @@ from invokeai.app.services.image_files.image_files_base import ImageFileStorageB
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.shared.database import startup
-from invokeai.app.services.shared.database.copy import count_normalized, delete_orphans, find_orphans
+from invokeai.app.services.shared.database.copy import (
+    Problem,
+    copy_database,
+    copy_records,
+    count_normalized,
+    delete_orphans,
+    find_orphans,
+    find_oversized,
+    verify_copy,
+)
 from invokeai.app.services.shared.database.database import Database
-from invokeai.app.services.shared.database.schema.boards import board_images
+from invokeai.app.services.shared.database.schema.boards import board_images, boards
 from invokeai.app.services.shared.database.schema.image_index import image_index_vocab_terms
 from invokeai.app.services.shared.database.schema.models import models
 from invokeai.app.services.shared.database.startup import init_database, open_migrated_database
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.users.users_default import UserService
+from invokeai.app.util import database_copy
 from invokeai.app.util.database_copy import copy
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.fixtures.database import external_test_db_url
@@ -46,9 +55,10 @@ MODEL_CONFIG = {
 }
 
 
-def _install(root: Path, *, orphan: bool) -> None:
+def _install(root: Path, *, orphans: bool) -> None:
     """An install whose SQLite database holds an account, a board with an image, a model, two vocabulary terms a
-    server treats as one, and (with `orphan`) an image membership of a board that is gone."""
+    server treats as one, and (with `orphans`) an image membership of a board that is gone and a board whose cover
+    image is gone."""
     (root / "invokeai.yaml").write_text('schema_version: "4.0.3"\n')
     database = init_database(load_config_from_root(root), LOGGER, Mock(spec=ImageFileStorageBase))
     try:
@@ -67,29 +77,124 @@ def _install(root: Path, *, orphan: bool) -> None:
         with database.begin(write=True) as conn:
             conn.execute(insert(models).values(id="model-1", config=json.dumps(MODEL_CONFIG)))
             conn.execute(insert(image_index_vocab_terms), [{"term": "Äpfel"}, {"term": "äpfel"}, {"term": "beach"}])
-        if orphan:
+        if orphans:
             raw = database.sqlite.conn
             raw.execute("PRAGMA foreign_keys = OFF")
             raw.execute("DELETE FROM board_images")
             raw.execute("INSERT INTO board_images (board_id, image_name) VALUES ('gone', 'beach.png')")
+            raw.execute("UPDATE boards SET cover_image_name = 'gone.png'")
             raw.commit()
             raw.execute("PRAGMA foreign_keys = ON")
     finally:
         database.dispose()
 
 
-def test_the_check_finds_orphans_and_what_the_copy_changes(tmp_path: Path) -> None:
-    _install(tmp_path, orphan=True)
-    database = open_migrated_database(load_config_from_root(tmp_path), LOGGER)
+def _open(root: Path) -> Database:
+    return open_migrated_database(load_config_from_root(root), LOGGER)
+
+
+def test_orphans_are_found_and_left_out_or_cleared(tmp_path: Path) -> None:
+    _install(tmp_path, orphans=True)
+    database = _open(tmp_path)
     try:
-        orphans = find_orphans(database)
-        assert [(problem.table, problem.count) for problem in orphans] == [("board_images", 1)]
+        assert [(problem.table, problem.count) for problem in find_orphans(database)] == [
+            ("board_images", 1),
+            ("boards", 1),
+        ]
         assert [(problem.table, problem.count) for problem in count_normalized(database)] == [("models", 1)]
 
-        assert delete_orphans(database) == 1
+        assert delete_orphans(database) == [
+            Problem("board_images", 1, "left out"),
+            Problem("boards", 1, "with a reference to a missing row, which was cleared"),
+        ]
         assert find_orphans(database) == []
+        # The board stays, without the cover the database would have cleared itself.
+        with database.begin(write=False) as conn:
+            assert conn.execute(select(boards.c.board_name, boards.c.cover_image_name)).all() == [("Holiday", None)]
     finally:
         database.dispose()
+
+
+def test_values_a_server_cannot_store_are_found(tmp_path: Path) -> None:
+    _install(tmp_path, orphans=False)
+    database = _open(tmp_path)
+    try:
+        assert find_oversized(database, max_allowed_packet=64 * 1024 * 1024) == []
+
+        with database.begin(write=True) as conn:
+            conn.execute(insert(image_index_vocab_terms).values(term="t" * 256))
+            # The server computes `path` from the config, into a column of 768 characters.
+            config = {**MODEL_CONFIG, "path": "p" * 769}
+            conn.execute(insert(models).values(id="m" * 256, config=json.dumps(config)))
+        found = find_oversized(database, max_allowed_packet=64 * 1024 * 1024)
+        assert sorted(found) == [
+            Problem("image_index_vocab_terms", 1, "with a term longer than 255 characters"),
+            Problem("models", 1, "with a id longer than 255 characters"),
+            Problem("models", 1, "with a path longer than 768 characters"),
+        ]
+
+        # A row is sent in one statement: it must fit half a packet, which leaves room for escaping.
+        assert Problem("models", 1, "larger than half the server's max_allowed_packet") in find_oversized(
+            database, max_allowed_packet=1600
+        )
+    finally:
+        database.dispose()
+
+
+def test_a_copy_is_verified_row_by_row(tmp_path: Path) -> None:
+    _install(tmp_path, orphans=False)
+    source = _open(tmp_path)
+    target = Database.open_sqlite(tmp_path / "target.db", LOGGER)
+    try:
+        copy_database(source, target)
+        assert verify_copy(source, target) == []
+        copy_records(source, target)
+        assert verify_copy(source, target, records=True) == []
+
+        with target.begin(write=True) as conn:
+            conn.execute(update(boards).values(board_name="Renamed"))
+            conn.execute(delete(board_images))
+        assert [mismatch.split(":")[0] for mismatch in verify_copy(source, target)] == ["boards", "board_images"]
+    finally:
+        source.dispose()
+        target.dispose()
+
+
+def test_a_merged_table_holds_one_of_each_set_of_equal_rows_and_nothing_else(tmp_path: Path) -> None:
+    _install(tmp_path, orphans=False)
+    source = _open(tmp_path)
+    target = Database.open_sqlite(tmp_path / "target.db", LOGGER)
+    try:
+        copy_database(source, target)
+        # As a server merges them.
+        with target.begin(write=True) as conn:
+            conn.execute(delete(image_index_vocab_terms).where(image_index_vocab_terms.c.term == "äpfel"))
+        assert verify_copy(source, target) == []
+
+        with target.begin(write=True) as conn:
+            conn.execute(delete(image_index_vocab_terms).where(image_index_vocab_terms.c.term == "beach"))
+        assert verify_copy(source, target) == ["image_index_vocab_terms: rows or contents differ"]
+
+        with target.begin(write=True) as conn:
+            conn.execute(insert(image_index_vocab_terms).values(term="beach", created_at="2000-01-01 00:00:00.000"))
+        assert verify_copy(source, target) == ["image_index_vocab_terms: rows or contents differ"]
+    finally:
+        source.dispose()
+        target.dispose()
+
+
+def test_without_a_target_the_copy_asks_for_one(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    _install(tmp_path, orphans=False)
+
+    assert copy(None, root=tmp_path, check_only=True, skip_orphans=False) == 1
+    assert "Name the target" in capsys.readouterr().out
+
+
+def test_the_copy_reports_a_target_it_cannot_use(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    _install(tmp_path, orphans=False)
+
+    assert copy("postgresql://u:p@localhost/db", root=tmp_path, check_only=True, skip_orphans=False) == 1
+    assert "Cannot copy" in capsys.readouterr().out
 
 
 @server_only
@@ -103,42 +208,71 @@ def test_a_copy_holds_every_row_of_its_source(
     assert _external_test_schema is not None
     # The test servers keep their own defaults; what is checked here is the copy.
     monkeypatch.setattr(startup, "MINIMUM_MAX_ALLOWED_PACKET", 1)
-    _install(tmp_path, orphan=True)
+    _install(tmp_path, orphans=True)
     url = _external_test_schema.render_as_string(hide_password=False)
+    # The target is the database the install's config names.
+    (tmp_path / "invokeai.yaml").write_text(f'schema_version: "4.0.3"\ndb_url: "{url}"\n')
 
-    assert copy(url, root=tmp_path, check_only=False, skip_orphans=False) == 1
+    assert copy(None, root=tmp_path, check_only=False, skip_orphans=False) == 1
     assert "--orphans skip" in capsys.readouterr().out
 
-    assert copy(url, root=tmp_path, check_only=True, skip_orphans=True) == 0
+    assert copy(None, root=tmp_path, check_only=True, skip_orphans=True) == 0
     assert "Nothing was copied" in capsys.readouterr().out
 
-    assert copy(url, root=tmp_path, check_only=False, skip_orphans=True) == 0
+    assert copy(None, root=tmp_path, check_only=False, skip_orphans=True) == 0
     output = capsys.readouterr().out
+    assert "board_images: 1 row left out" in output
     assert "every table matches its source" in output
-    assert "image_index_vocab_terms: 1 rows the target treats as equal to others were merged" in output
+    assert "image_index_vocab_terms: 1 row the target treats as equal to others were merged" in output
+
+    # The install's own database keeps what the copy left out.
+    source = open_migrated_database(load_config_from_root(tmp_path).model_copy(update={"db_url": None}), LOGGER)
+    try:
+        assert [(problem.table, problem.count) for problem in find_orphans(source)] == [
+            ("board_images", 1),
+            ("boards", 1),
+        ]
+    finally:
+        source.dispose()
 
     # The app takes the copy as it takes a database it created.
-    config = load_config_from_root(tmp_path).model_copy(update={"db_url": url})
-    target = open_migrated_database(config, LOGGER)
+    target = open_migrated_database(load_config_from_root(tmp_path), LOGGER)
     try:
         [user] = [user for user in UserService(target).list_users() if user.email == "alice@test.com"]
         [board] = BoardRecordStorage(target).get_all(user.user_id, False, "board_name", "ASC")  # type: ignore[arg-type]
-        assert board.board_name == "Holiday"
+        assert (board.board_name, board.cover_image_name) == ("Holiday", None)
         assert ImageRecordStorage(target).exists("beach.png")
         with target.begin(write=False) as conn:
             assert conn.execute(select(models.c.file_size)).scalar_one() == round(MODEL_CONFIG["file_size"])
-            assert conn.execute(select(board_images)).all() == []
+            assert conn.execute(select(func.count()).select_from(board_images)).scalar_one() == 0
     finally:
         target.dispose()
 
     # A database is copied once: into a new, empty one.
-    assert copy(url, root=tmp_path, check_only=False, skip_orphans=True) == 1
+    assert copy(None, root=tmp_path, check_only=False, skip_orphans=True) == 1
     assert "not empty" in capsys.readouterr().out
 
 
-def test_the_copy_reports_a_target_it_cannot_reach(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    _install(tmp_path, orphan=False)
-    logging.getLogger("invoke-db-copy").setLevel(logging.CRITICAL)
+@server_only
+def test_a_failed_copy_leaves_a_target_the_app_refuses_and_says_how_to_start_again(
+    tmp_path: Path,
+    empty_database: Database,
+    _external_test_schema: Optional[URL],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert _external_test_schema is not None
+    monkeypatch.setattr(startup, "MINIMUM_MAX_ALLOWED_PACKET", 1)
+    _install(tmp_path, orphans=False)
+    url = _external_test_schema.render_as_string(hide_password=False)
 
-    assert copy("postgresql://u:p@localhost/db", root=tmp_path, check_only=True, skip_orphans=False) == 1
-    assert "Cannot copy" in capsys.readouterr().out
+    def lost(source: Database, target: Database) -> None:
+        raise ConnectionError("the connection to the server was lost")
+
+    monkeypatch.setattr(database_copy, "copy_records", lost)
+
+    assert copy(url, root=tmp_path, check_only=False, skip_orphans=False) == 1
+    assert "Drop the target database" in capsys.readouterr().out
+    config = load_config_from_root(tmp_path).model_copy(update={"db_url": url})
+    with pytest.raises(Exception, match="no record of the migrations"):
+        open_migrated_database(config, LOGGER).dispose()

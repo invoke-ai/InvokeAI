@@ -52,38 +52,43 @@ On its first start InvokeAI creates the tables. On later starts it updates them 
 
 ## Moving an existing install
 
-`invoke-db-copy` copies an install's SQLite database into a new, empty server database. The SQLite database is not changed.
+`invoke-db-copy` copies an install's SQLite database into a new, empty server database. It copies the database only: images, models and the other files stay where they are, in the root directory. The SQLite database is not changed.
 
 1. Stop InvokeAI. What it writes during the copy is not copied.
-2. Check the copy, which copies nothing yet:
+2. Set `db_url` in `invokeai.yaml` (or `INVOKEAI_DB_URL`) to the new database. Do not start InvokeAI yet: it would start the new database empty.
+3. Check the copy, which copies nothing yet:
 
    ```bash
-   invoke-db-copy --target mariadb+pymysql://invokeai:a-strong-password@db.example/invokeai --check
+   invoke-db-copy --check
    ```
 
-3. Copy:
+4. Copy:
 
    ```bash
-   invoke-db-copy --target mariadb+pymysql://invokeai:a-strong-password@db.example/invokeai
+   invoke-db-copy
    ```
 
-4. Set `db_url` in `invokeai.yaml` to the same URL, and start InvokeAI.
+5. Start InvokeAI.
 
-`invoke-db-copy` takes the install it runs in, or the one `--root` names. It copies from a snapshot of the SQLite database, which it brings to no newer version: if InvokeAI has not started since an upgrade, start it once first. It stops before copying anything when the server would refuse a row:
+`invoke-db-copy` takes the install it runs in, or the one `--root` names, and copies into the database its `db_url` names. `--target URL` names another one; a password on the command line is visible to the other users of the computer and stays in the shell's history.
 
-- **Rows whose foreign keys name a row that is gone**, which a SQLite database can hold and a server refuses. `--orphans skip` leaves them out, together with what the database deletes with them.
-- **Values longer than the server's column holds**, or larger than half of `max_allowed_packet`.
+It copies from a snapshot of the SQLite database, which it makes in the database's directory and deletes afterwards: that needs free space as large as the database. It brings the snapshot to no newer version: if InvokeAI has not started since an upgrade, start it once first. The target must be empty, for the check too, and no InvokeAI process may use it.
+
+It stops before copying anything when the server would refuse a row:
+
+- **Rows whose foreign keys name a row that is gone**, which a SQLite database can hold and a server refuses. `--orphans skip` copies them without the reference where the database would clear it anyway (a board whose cover image is gone keeps no cover), and leaves out the others, together with what the database deletes with them. The report lists what it left out, per table.
+- **Values longer than the server's column holds**, and rows larger than half of `max_allowed_packet`.
 
 Two kinds of value are copied in the form a server stores:
 
 - **Vocabulary terms of the image index that differ only in the case of a letter outside A-Z** (`Äpfel` and `äpfel`), which the server compares as equal: it keeps one of them.
 - **A model's file size stored with a fraction**, which is written as a whole number of bytes.
 
-After copying, `invoke-db-copy` compares every table of the copy with its source, row by row, and reports whether they match.
+After copying, `invoke-db-copy` compares every table of the copy with its source, row by row, and only then writes the records that make it a database InvokeAI takes. If the copy fails or does not match, InvokeAI refuses the target: drop the database, create it again empty, and run `invoke-db-copy` again.
 
 ## Limits
 
-- **One InvokeAI process per database.** At startup a process cancels the queue items left running and updates its bundled workflows and style presets, which a second process would undo. The first process holds a lock on the database; a second one refuses to start.
+- **One InvokeAI process per database.** At startup a process cancels the queue items left running and updates its bundled workflows and style presets, which a second process would undo. The first process holds a lock on the database; a second one refuses to start. If a process ends without closing its connection, because its computer crashed or lost the network, the server releases its lock within ten minutes; the refusal names the query that finds the connection to end sooner with `KILL`.
 - **One database server.** Setups with several writing servers (Galera, group replication with several primaries) are not supported.
-- **Busy database.** When a request waits too long for a lock held by another, it fails with HTTP 503 and `Retry-After: 1`, and can be repeated. If this happens often, the server is overloaded or another program holds locks in InvokeAI's database.
+- **Busy database.** When a request waits too long for a lock held by another, finds no free connection, or loses its connection to the server, it fails with HTTP 503 and `Retry-After: 1`, and can be repeated. If this happens often, the server is overloaded or another program holds locks in InvokeAI's database.
 - **Command-line tools.** The account commands (`invoke-useradd`, `invoke-userdel`, `invoke-usermod`, `invoke-userlist`) and the maintenance scripts use the database `invokeai.yaml` names. They refuse a database InvokeAI has not updated to their version: start InvokeAI once after an upgrade before using them.

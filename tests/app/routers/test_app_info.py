@@ -1,9 +1,11 @@
 import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock
 
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from invokeai.app.api.dependencies import ApiDependencies
@@ -466,11 +468,21 @@ def _get_provider_config(payload: list[dict[str, Any]], provider_id: str) -> dic
     return next(item for item in payload if item["provider_id"] == provider_id)
 
 
-def test_a_busy_database_answers_503_with_a_retry_hint(client: TestClient) -> None:
-    def busy() -> None:
-        raise LockTimeoutError("lock wait timeout exceeded")
+def _busy() -> None:
+    raise LockTimeoutError("lock wait timeout exceeded")
 
-    app.add_api_route("/api/v1/test/busy", busy)
+
+def _busy_behind_a_routes_own_error() -> None:
+    # As many routes do: every exception becomes an answer of their own.
+    try:
+        _busy()
+    except Exception:
+        raise HTTPException(status_code=404, detail="Board not found")
+
+
+@pytest.mark.parametrize("route", [_busy, _busy_behind_a_routes_own_error])
+def test_a_busy_database_answers_503_with_a_retry_hint(client: TestClient, route: Callable[[], None]) -> None:
+    app.add_api_route("/api/v1/test/busy", route)
     try:
         response = client.get("/api/v1/test/busy")
     finally:
@@ -479,3 +491,17 @@ def test_a_busy_database_answers_503_with_a_retry_hint(client: TestClient) -> No
     assert response.status_code == 503
     assert response.headers["Retry-After"] == "1"
     assert response.json() == {"detail": "The database is busy; try again"}
+
+
+def test_a_routes_own_error_is_answered_as_it_is(client: TestClient) -> None:
+    def missing() -> None:
+        raise HTTPException(status_code=404, detail="Board not found")
+
+    app.add_api_route("/api/v1/test/missing", missing)
+    try:
+        response = client.get("/api/v1/test/missing")
+    finally:
+        app.router.routes.pop()
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Board not found"}
