@@ -92,6 +92,10 @@ const Floating = () => {
       data-hotkey-widget-region="floating"
       data-hotkey-widget-type-id="image-map"
       onFocusCapture={() => activate()}
+      onPointerDownCapture={(event) => {
+        activate({ byPointer: true });
+        event.currentTarget.focus({ preventScroll: true });
+      }}
       style={{ height: 180, left: 250, position: 'absolute', top: 80, width: 200 }}
       tabIndex={-1}
     />
@@ -279,7 +283,15 @@ it('can leave a floating window overlapping every visible docked region', async 
   await act(() => window.focus());
   await press(regionChord('ArrowRight'));
   await expectFocusedRegion('right');
-  await act(() => window.focus());
+  await act(() => userEvent.click(window));
+  // A pending dock-focus settle must not reclaim the window the user deliberately returned to.
+  await act(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      })
+  );
+  expect(document.activeElement).toBe(window);
   await press(regionChord('ArrowLeft'));
   await expectFocusedRegion('left');
 });
@@ -290,7 +302,8 @@ it('returns to the underlying dock when there is no region beyond the floating w
     regionElement(region).style.display = 'none';
   }
   for (const key of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']) {
-    await act(() => window.focus());
+    await act(() => userEvent.click(window));
+    expect(document.activeElement).toBe(window);
     await press(regionChord(key));
     await expectFocusedRegion('center');
   }
