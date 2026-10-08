@@ -4,8 +4,8 @@ sidebar:
   order: 1
 ---
 
-import { FileTree } from '@astrojs/starlight/components'
-import SettingsDocs from '@lib/components/SettingsDocs.astro'
+import { FileTree } from '@astrojs/starlight/components';
+import SettingsDocs from '@lib/components/SettingsDocs.astro';
 
 Runtime settings, including the location of files and directories, memory usage, and performance, are managed via the `invokeai.yaml` config file or environment variables. A subset of settings may be set via commandline arguments.
 
@@ -21,15 +21,25 @@ Settings sources are used in this order:
 On startup, InvokeAI searches for its "root" directory. This is the directory that contains models, images, the database, and so on. It also contains a configuration file called `invokeai.yaml`.
 
 <FileTree>
-  - models/
-  - outputs/
-  - databases/
-  - workflow_thumbnails/
-  - style_presets/
-  - nodes/
-  - configs/
-  - invokeai.example.yaml
-  - **invokeai.yaml**
+
+- models/
+
+- outputs/
+
+- databases/
+
+- workflow_thumbnails/
+
+- style_presets/
+
+- nodes/
+
+- configs/
+
+- invokeai.example.yaml
+
+- **invokeai.yaml**
+
 </FileTree>
 
 InvokeAI searches for the root directory in this order:
@@ -134,11 +144,11 @@ This is controlled by the `generation_devices` setting:
 generation_devices: auto # default value
 ```
 
-| Value                      | Behavior                                                                                                                |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `auto`                          | Use every available CUDA GPU, running one generation session per GPU concurrently. This is the default. Exception: if the legacy `device` setting is pinned to a specific device, `auto` uses only that device (see Notes below). |
-| `[cuda:0,cuda:1]`         | Use the specific devices listed, one session per device. Useful for reserving a GPU for other work.                 |
-| `[cuda:0]`                | Use a single specific device. Generation runs serially, as it did before multi-GPU support.                                 |
+| Value             | Behavior                                                                                                                                                                                                                          |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auto`            | Use every available CUDA GPU, running one generation session per GPU concurrently. This is the default. Exception: if the legacy `device` setting is pinned to a specific device, `auto` uses only that device (see Notes below). |
+| `[cuda:0,cuda:1]` | Use the specific devices listed, one session per device. Useful for reserving a GPU for other work.                                                                                                                               |
+| `[cuda:0]`        | Use a single specific device. Generation runs serially, as it did before multi-GPU support.                                                                                                                                       |
 
 Each entry in the list must be one of `cpu`, `cuda`, `mps`, or `cuda:N`, where `N` is a zero-based device number (`cuda:0` is the first GPU, `cuda:1` the second, and so on). The list may not be empty — use `auto` (or a single-device list) instead.
 
@@ -168,10 +178,10 @@ This is controlled by the `offload_text_encoders_to_idle_gpus` setting:
 offload_text_encoders_to_idle_gpus: true # default value
 ```
 
-| Value   | Behavior                                                                                                          |
+| Value   | Behavior                                                                                                         |
 | ------- | ---------------------------------------------------------------------------------------------------------------- |
-| `true`  | Run text encoders on an idle GPU when one is available. This is the default.                                      |
-| `false` | Always run text encoders on the same GPU as the rest of the pipeline (the behavior before this feature existed).  |
+| `true`  | Run text encoders on an idle GPU when one is available. This is the default.                                     |
+| `false` | Always run text encoders on the same GPU as the rest of the pipeline (the behavior before this feature existed). |
 
 Notes:
 
@@ -208,25 +218,25 @@ Changing this setting only affects newly-created images. Existing images remain 
 
 API responses (JSON, HTML, JS, CSS, SVG) are gzipped before being sent. Already-compressed responses — PNG, WebP, JPEG, MP4 — are passed through untouched, since compressing them costs CPU and returns a body no smaller than the original.
 
-Compression runs on the server's event loop, which means it blocks *everything else* for its duration: no other request is served and no progress event is delivered while it runs. The `http_compression_level` setting controls that trade-off:
+Compression runs on the server's event loop, which means it blocks _everything else_ for its duration: no other request is served and no progress event is delivered while it runs. The `http_compression_level` setting controls that trade-off:
 
 ```yaml
 http_compression_level: 9 # default value
 ```
 
-| Value  | Behavior                                                                                       |
-| ------ | ---------------------------------------------------------------------------------------------- |
-| `0`    | No compression. Responses are sent as-is and the compression middleware is not installed.       |
-| `1`    | Fastest compression, slightly larger output.                                                    |
-| `2`–`8` | Progressively slower, marginally smaller.                                                      |
-| `9`    | Smallest output, by far the slowest. This is the default.                                       |
+| Value   | Behavior                                                                                  |
+| ------- | ----------------------------------------------------------------------------------------- |
+| `0`     | No compression. Responses are sent as-is and the compression middleware is not installed. |
+| `1`     | Fastest compression, slightly larger output.                                              |
+| `2`–`8` | Progressively slower, marginally smaller.                                                 |
+| `9`     | Smallest output, by far the slowest. This is the default.                                 |
 
 The setting can also be given as the `INVOKEAI_HTTP_COMPRESSION_LEVEL` environment variable.
 
 If the UI feels sluggish while a large library is being browsed, lowering this is one of the cheapest wins available. Measured on the image-name list of a 200,000-image library (8.48 MB of JSON):
 
-| Level | Time    | Output    |
-| ----- | ------: | --------: |
+| Level |    Time |        Output |
+| ----- | ------: | ------------: |
 | `1`   | 16.4 ms | 6.1% of input |
 | `6`   | 36.1 ms | 5.9% of input |
 | `9`   | 90.2 ms | 5.7% of input |
@@ -245,20 +255,20 @@ Every write to InvokeAI's SQLite database is committed to disk before the reques
 db_synchronous: full # default value
 ```
 
-| Value    | Behavior                                                                                                    |
-| -------- | ----------------------------------------------------------------------------------------------------------- |
+| Value    | Behavior                                                                                                                           |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `full`   | Every commit is flushed to disk before it is acknowledged. What InvokeAI has always used, and SQLite's default on standard builds. |
-| `normal` | Commits are acknowledged without waiting for the flush. Much faster; a power loss may lose the last few.       |
+| `normal` | Commits are acknowledged without waiting for the flush. Much faster; a power loss may lose the last few.                           |
 
 The setting can also be given as the `INVOKEAI_DB_SYNCHRONOUS` environment variable.
 
-**`normal` cannot corrupt the database, as long as WAL is in effect.** InvokeAI runs SQLite in WAL mode, and WAL guarantees a consistent database either way. What `normal` gives up is the *most recent transactions* if the machine loses power or the OS crashes mid-write — a just-written image record or a queue status. The image file itself survives on disk, but nothing rebuilds the row, and the gallery is driven by the database: the image is simply gone from it. The gallery orphan scan does not heal this — it *archives* record-less files out of `outputs/` so you can delete them or re-import them, which takes the separate `invokeai/frontend/install/import_images.py` script.
+**`normal` cannot corrupt the database, as long as WAL is in effect.** InvokeAI runs SQLite in WAL mode, and WAL guarantees a consistent database either way. What `normal` gives up is the _most recent transactions_ if the machine loses power or the OS crashes mid-write — a just-written image record or a queue status. The image file itself survives on disk, but nothing rebuilds the row, and the gallery is driven by the database: the image is simply gone from it. An administrator can use **Settings > Data & workspace > Gallery maintenance** to review and remove database records whose image files are missing, or archive untracked image files for later review. Maintenance does not import archived files; use the separate `invokeai/frontend/install/import_images.py` script to import images.
 
 Running the database on a network share is not a supported configuration -- SQLite's locking is unreliable over NFS and SMB, and this is worth avoiding for reasons well beyond durability. Keep `db_dir` on local storage.
 
-The safeguard exists anyway, because WAL needs shared memory and a few setups cannot provide it: a database on a network share, some container volume drivers, and SQLite builds compiled without WAL all leave a rollback journal in place instead — and on a rollback journal, `normal` *can* corrupt the database on power loss. InvokeAI reads back the journal mode it actually got, so in that case it ignores `normal`, uses `full`, and logs a warning naming the mode. An in-memory database (`use_memory_db`) has no durability to trade and is unaffected.
+The safeguard exists anyway, because WAL needs shared memory and a few setups cannot provide it: a database on a network share, some container volume drivers, and SQLite builds compiled without WAL all leave a rollback journal in place instead — and on a rollback journal, `normal` _can_ corrupt the database on power loss. InvokeAI reads back the journal mode it actually got, so in that case it ignores `normal`, uses `full`, and logs a warning naming the mode. An in-memory database (`use_memory_db`) has no durability to trade and is unaffected.
 
-`db_synchronous` applies to the application's own database connection. The standalone scripts that open the database directly — `scripts/gallery_maintenance.py` and `invokeai/frontend/install/import_images.py` — leave SQLite's own default in place, so the measurements below describe the running app, not those scripts.
+`db_synchronous` applies to the application's own database connection. Gallery maintenance is an administrator action in Settings and uses that same application database connection, so its database work follows this setting. The image import script, `invokeai/frontend/install/import_images.py`, still opens the database independently and leaves SQLite's own default in place; the measurements below describe the running app, not that script.
 
 Measured on a copy of a real library, 300 single-row inserts each committed on its own:
 

@@ -10040,6 +10040,242 @@
         }
       }
     },
+    "/api/v1/app/gallery/maintenance/preview": {
+      "post": {
+        "tags": ["gallery_maintenance"],
+        "summary": "Preview Gallery Maintenance",
+        "operationId": "preview_gallery_maintenance",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GalleryMaintenancePreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GalleryMaintenancePreview"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Admin privileges required"
+          },
+          "409": {
+            "description": "Gallery maintenance is already active"
+          },
+          "500": {
+            "description": "Gallery maintenance preview failed"
+          },
+          "503": {
+            "description": "Gallery maintenance unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/app/gallery/maintenance/remove-missing": {
+      "post": {
+        "tags": ["gallery_maintenance"],
+        "summary": "Remove Missing Images",
+        "operationId": "remove_missing_images",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GalleryMaintenanceExecuteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GalleryMaintenanceResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Admin privileges required"
+          },
+          "409": {
+            "description": "Preview is stale or image storage is busy"
+          },
+          "500": {
+            "description": "Gallery maintenance failed"
+          },
+          "503": {
+            "description": "Gallery maintenance unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/app/gallery/maintenance/archive-untracked": {
+      "post": {
+        "tags": ["gallery_maintenance"],
+        "summary": "Archive Untracked Images",
+        "operationId": "archive_untracked_images",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GalleryMaintenanceExecuteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GalleryMaintenanceResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Admin privileges required"
+          },
+          "409": {
+            "description": "Preview is stale or image storage is busy"
+          },
+          "500": {
+            "description": "Gallery maintenance failed"
+          },
+          "503": {
+            "description": "Gallery maintenance unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/app/gallery/maintenance/regenerate-thumbnails": {
+      "post": {
+        "tags": ["gallery_maintenance"],
+        "summary": "Regenerate Missing Thumbnails",
+        "operationId": "regenerate_missing_thumbnails",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GalleryMaintenanceExecuteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GalleryMaintenanceResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Admin privileges required"
+          },
+          "409": {
+            "description": "Preview is stale or image storage is busy"
+          },
+          "500": {
+            "description": "Gallery maintenance failed"
+          },
+          "503": {
+            "description": "Gallery maintenance unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/boards/": {
       "post": {
         "tags": ["boards"],
@@ -40389,6 +40625,183 @@
         "required": ["kind", "name"],
         "title": "GalleryItemRef",
         "description": "A thin reference to a gallery item \u2014 used for ordered name lists."
+      },
+      "GalleryMaintenanceExecuteRequest": {
+        "properties": {
+          "fingerprint": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64,
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Fingerprint"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["fingerprint"],
+        "title": "GalleryMaintenanceExecuteRequest"
+      },
+      "GalleryMaintenanceOperation": {
+        "type": "string",
+        "enum": ["remove_missing", "archive_untracked", "regenerate_thumbnails"],
+        "title": "GalleryMaintenanceOperation"
+      },
+      "GalleryMaintenancePreview": {
+        "properties": {
+          "operation": {
+            "$ref": "#/components/schemas/GalleryMaintenanceOperation"
+          },
+          "fingerprint": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64,
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Fingerprint"
+          },
+          "examined_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Examined Count"
+          },
+          "affected_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Affected Count"
+          },
+          "skipped_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Skipped Count"
+          },
+          "error_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Error Count"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Errors"
+          },
+          "archive_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archive Path"
+          }
+        },
+        "type": "object",
+        "required": ["operation", "fingerprint", "examined_count", "affected_count", "skipped_count", "error_count"],
+        "title": "GalleryMaintenancePreview"
+      },
+      "GalleryMaintenancePreviewRequest": {
+        "properties": {
+          "operation": {
+            "$ref": "#/components/schemas/GalleryMaintenanceOperation"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["operation"],
+        "title": "GalleryMaintenancePreviewRequest"
+      },
+      "GalleryMaintenanceResult": {
+        "properties": {
+          "operation": {
+            "$ref": "#/components/schemas/GalleryMaintenanceOperation"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["completed", "partial", "no_op", "failed"],
+            "title": "Status"
+          },
+          "examined_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Examined Count"
+          },
+          "skipped_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Skipped Count"
+          },
+          "failed_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Failed Count"
+          },
+          "records_removed": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Records Removed"
+          },
+          "images_archived": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Images Archived"
+          },
+          "thumbnails_archived": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Thumbnails Archived"
+          },
+          "thumbnails_regenerated": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Thumbnails Regenerated"
+          },
+          "archive_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archive Path"
+          },
+          "backup_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backup Path"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "operation",
+          "status",
+          "examined_count",
+          "skipped_count",
+          "failed_count",
+          "records_removed",
+          "images_archived",
+          "thumbnails_archived",
+          "thumbnails_regenerated"
+        ],
+        "title": "GalleryMaintenanceResult"
       },
       "GeminiImageGenerationInvocation": {
         "category": "image",
