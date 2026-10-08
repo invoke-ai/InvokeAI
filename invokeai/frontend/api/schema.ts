@@ -4172,7 +4172,8 @@ export type paths = {
          * Recall Conditioning Video
          * @description Set a gallery video as the current user's conditioning clip (models that take one, e.g. LTX-2).
          *
-         *     The clip replaces the panel's other conditioning media: frames, initial video and references.
+         *     The clip replaces the panel's initial video and references, and in the `video` role its first and last frames;
+         *     in the `audio` role the frames stay, anchoring the picture generated for the soundtrack.
          */
         post: operations["recall_conditioning_video"];
         delete?: never;

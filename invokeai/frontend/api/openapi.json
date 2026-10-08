@@ -16240,7 +16240,7 @@
       "post": {
         "tags": ["recall"],
         "summary": "Recall Conditioning Video",
-        "description": "Set a gallery video as the current user's conditioning clip (models that take one, e.g. LTX-2).\n\nThe clip replaces the panel's other conditioning media: frames, initial video and references.",
+        "description": "Set a gallery video as the current user's conditioning clip (models that take one, e.g. LTX-2).\n\nThe clip replaces the panel's initial video and references, and in the `video` role its first and last frames;\nin the `audio` role the frames stay, anchoring the picture generated for the soundtrack.",
         "operationId": "recall_conditioning_video",
         "security": [
           {
