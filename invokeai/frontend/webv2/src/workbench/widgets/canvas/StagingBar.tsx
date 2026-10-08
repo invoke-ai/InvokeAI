@@ -3,6 +3,7 @@ import type { CanvasStagingAreaContractV2, CanvasStagingCandidateContract } from
 import type { CanvasStagingSlot } from '@workbench/canvasStagingView';
 
 import {
+  Box,
   Flex,
   HStack,
   Menu,
@@ -14,10 +15,9 @@ import {
   Stack,
   Text,
 } from '@chakra-ui/react';
-import { galleryDurability } from '@features/gallery';
 import { galleryImageUrls } from '@features/gallery/utility';
 import { useQueueItemProgress, useQueueItemProgressImage } from '@features/queue/react';
-import { Button, Group, IconButton, MenuContent, toaster, Tooltip } from '@platform/ui';
+import { Button, Group, IconButton, MenuContent, Tooltip, useTooltipTriggerIds } from '@platform/ui';
 import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
 import { progressImageToStreamingSource } from '@platform/ui/streaming-image/streamingImageSource';
 import { wheelScrollsHorizontally } from '@platform/ui/wheelScrollsHorizontally';
@@ -47,6 +47,36 @@ type AutoSwitchMode = CanvasStagingAreaContractV2['autoSwitchMode'];
 const THUMBNAIL_STRIP_HEIGHT = '5rem';
 const AUTO_SWITCH_MODES: AutoSwitchMode[] = ['off', 'progress', 'latest'];
 const MENU_POSITIONING = { placement: 'top-end' } as const;
+/**
+ * Below this bar width the "Generating" text and "Discard All" collapse to icons, so the accept split button (the
+ * only pointer path to "Keep as Hidden Layer") stays inside the canvas. Measured on the staging slot itself.
+ */
+const COMPACT = '@container staging-bar (width < 48rem)';
+/**
+ * Below this the remaining text goes too (the candidate counter, the auto-switch mode, Cancel and the accept label),
+ * leaving icons whose names and tooltips carry the words, so the bar fits a canvas down to about 360px.
+ */
+const NARROW = '@container staging-bar (width < 36rem)';
+const STAGING_ROOT_CSS = { containerName: 'staging-bar', containerType: 'inline-size' } as const;
+const WIDE_ONLY_CSS = { [COMPACT]: { display: 'none' } } as const;
+const COMPACT_ONLY_CSS = { display: 'none', [COMPACT]: { display: 'inline-flex' } } as const;
+const SR_ONLY = {
+  clipPath: 'inset(50%)',
+  height: '1px',
+  overflow: 'hidden',
+  position: 'absolute',
+  whiteSpace: 'nowrap',
+  width: '1px',
+} as const;
+/** Visually hidden while compact, still read as the status text. */
+const COMPACT_SR_ONLY_CSS = { [COMPACT]: SR_ONLY } as const;
+/** Visually hidden while narrow; still the element's text for assistive technology. */
+const NARROW_SR_ONLY_CSS = { [NARROW]: SR_ONLY } as const;
+/** Gone while narrow: group rules (the icons' spacing still separates the groups) and labelled buttons. */
+const NARROW_HIDDEN_CSS = { [NARROW]: { display: 'none' } } as const;
+const NARROW_ONLY_CSS = { display: 'none', [NARROW]: { display: 'inline-flex' } } as const;
+/** Buttons whose text goes while narrow keep a square icon footprint. */
+const NARROW_ICON_BUTTON_CSS = { [NARROW]: { minW: '8', px: '0' } } as const;
 
 interface StagingBarProps {
   antialiasProgressImages: boolean;
@@ -55,6 +85,8 @@ interface StagingBarProps {
   canAccept: boolean;
   hasMultipleSlots: boolean;
   isGenerating: boolean;
+  /** A gallery save of the selected candidate is in flight. */
+  isSavingToGallery: boolean;
   isVisible: boolean;
   selectedCandidate: CanvasStagingCandidateContract | undefined;
   selectedImageIndex: number;
@@ -67,6 +99,8 @@ interface StagingBarProps {
   onDiscardSelected: () => void;
   onPreloadCandidate: (imageName: string) => void;
   onSelectImage: (imageIndex: number) => void;
+  /** Saves the candidate to the Gallery and reports where it went. */
+  onSaveToGallery: (imageName: string) => Promise<void>;
   onSaveToLayerAndContinue: () => void;
   onSetAutoSwitch: (mode: AutoSwitchMode) => void;
   onToggleThumbnails: () => void;
@@ -84,6 +118,7 @@ export const StagingBar = ({
   canAccept,
   hasMultipleSlots,
   isGenerating,
+  isSavingToGallery,
   isVisible,
   selectedCandidate,
   selectedImageIndex,
@@ -96,13 +131,13 @@ export const StagingBar = ({
   onDiscardSelected,
   onPreloadCandidate,
   onSelectImage,
+  onSaveToGallery,
   onSaveToLayerAndContinue,
   onSetAutoSwitch,
   onToggleThumbnails,
   onToggleVisibility,
 }: StagingBarProps) => {
   const { t } = useTranslation();
-  const [isSaving, setIsSaving] = useState(false);
   const [contextMenuTarget, setContextMenuTarget] = useState<StagingItemContextMenuTarget | null>(null);
   const closeContextMenu = useCallback(() => setContextMenuTarget(null), []);
   // The menu's candidate actions act on the selection, so it only stays open
@@ -113,28 +148,27 @@ export const StagingBar = ({
   }
   const hasSlots = slots.length > 0;
   const cancelableQueueItemId = getCancelableCanvasStagingQueueItemId(selectedSlot);
+  const acceptLabel = t('widgets.canvas.acceptToLayer');
+  const acceptMenuIds = useTooltipTriggerIds();
+  const thumbnailsLabel = areThumbnailsVisible
+    ? t('widgets.canvas.hideStagingThumbnails')
+    : t('widgets.canvas.showStagingThumbnails');
 
-  const handleSaveToGallery = async () => {
-    if (!selectedCandidate || isSaving) {
-      return;
-    }
-    setIsSaving(true);
-    try {
-      await galleryDurability.save(selectedCandidate.imageName);
-      toaster.create({
-        description: t('widgets.canvas.staging.savedDescription', { name: selectedCandidate.imageName }),
-        title: t('widgets.canvas.staging.saved'),
-        type: 'success',
-      });
-    } catch {
-      toaster.create({ title: t('widgets.canvas.staging.saveError'), type: 'error' });
-    } finally {
-      setIsSaving(false);
+  const handleSaveToGallery = () => {
+    if (selectedCandidate && !isSavingToGallery) {
+      void onSaveToGallery(selectedCandidate.imageName);
     }
   };
 
   return (
-    <Stack align="center" animationDuration="moderate" animationName="slide-from-bottom, fade-in" gap="2" w="full">
+    <Stack
+      align="center"
+      animationDuration="moderate"
+      animationName="slide-from-bottom, fade-in"
+      css={STAGING_ROOT_CSS}
+      gap="2"
+      w="full"
+    >
       {contextMenuTarget ? (
         <StagingItemContextMenu
           canAccept={canAccept}
@@ -142,7 +176,7 @@ export const StagingBar = ({
           onAccept={onAccept}
           onClose={closeContextMenu}
           onDiscard={onDiscardSelected}
-          onSaveToGallery={() => void handleSaveToGallery()}
+          onSaveToGallery={handleSaveToGallery}
         />
       ) : null}
       {hasSlots ? (
@@ -203,62 +237,87 @@ export const StagingBar = ({
 
       <CanvasOptionsBar>
         {isGenerating ? (
-          <HStack color="fg.muted" gap="1.5" px="1">
-            <Spinner />
-            <Text fontSize="md" fontWeight="600">
-              {t('widgets.canvas.staging.generating')}
-            </Text>
-          </HStack>
+          <Tooltip content={t('widgets.canvas.staging.generating')}>
+            <HStack color="fg.muted" flexShrink="0" gap="1.5" position="relative" px="1" role="status">
+              <Spinner />
+              <Text css={COMPACT_SR_ONLY_CSS} fontSize="md" fontWeight="600" whiteSpace="nowrap">
+                {t('widgets.canvas.staging.generating')}
+              </Text>
+            </HStack>
+          </Tooltip>
         ) : null}
 
         {hasSlots && selectedSlot ? (
           <>
-            <IconButton
-              aria-label={
-                areThumbnailsVisible
-                  ? t('widgets.canvas.hideStagingThumbnails')
-                  : t('widgets.canvas.showStagingThumbnails')
-              }
-              variant="ghost"
-              onClick={onToggleThumbnails}
-            >
-              {areThumbnailsVisible ? <ChevronDownIcon /> : <ChevronUpIcon />}
-            </IconButton>
+            <Tooltip content={thumbnailsLabel}>
+              <IconButton aria-label={thumbnailsLabel} variant="ghost" onClick={onToggleThumbnails}>
+                {areThumbnailsVisible ? <ChevronDownIcon /> : <ChevronUpIcon />}
+              </IconButton>
+            </Tooltip>
 
             <HStack gap="0.5">
-              <IconButton
-                aria-label={t('widgets.canvas.previousStagedCandidate')}
-                disabled={!hasMultipleSlots}
-                variant="ghost"
-                onClick={() => onCycle(-1)}
+              <Tooltip content={t('widgets.canvas.previousStagedCandidate')}>
+                <IconButton
+                  aria-label={t('widgets.canvas.previousStagedCandidate')}
+                  disabled={!hasMultipleSlots}
+                  variant="ghost"
+                  onClick={() => onCycle(-1)}
+                >
+                  <ChevronLeftIcon />
+                </IconButton>
+              </Tooltip>
+              <Text
+                css={NARROW_SR_ONLY_CSS}
+                fontSize="md"
+                fontVariantNumeric="tabular-nums"
+                minW="3.5rem"
+                px="1"
+                textAlign="center"
               >
-                <ChevronLeftIcon />
-              </IconButton>
-              <Text fontSize="md" fontVariantNumeric="tabular-nums" minW="3.5rem" px="1" textAlign="center">
                 {t('widgets.canvas.candidateCount', {
                   current: selectedImageIndex + 1,
                   total: slots.length,
                 })}
               </Text>
-              <IconButton
-                aria-label={t('widgets.canvas.nextStagedCandidate')}
-                disabled={!hasMultipleSlots}
-                variant="ghost"
-                onClick={() => onCycle(1)}
-              >
-                <ChevronRightIcon />
-              </IconButton>
+              <Tooltip content={t('widgets.canvas.nextStagedCandidate')}>
+                <IconButton
+                  aria-label={t('widgets.canvas.nextStagedCandidate')}
+                  disabled={!hasMultipleSlots}
+                  variant="ghost"
+                  onClick={() => onCycle(1)}
+                >
+                  <ChevronRightIcon />
+                </IconButton>
+              </Tooltip>
             </HStack>
 
-            <CanvasFloatingBarDivider />
+            <CanvasFloatingBarDivider css={NARROW_HIDDEN_CSS} />
 
             <AutoSwitchMenu mode={autoSwitchMode} onSelect={onSetAutoSwitch} />
 
             {cancelableQueueItemId ? (
-              <Button variant="ghost" onClick={() => onCancelQueueItem(cancelableQueueItemId)}>
-                <XIcon />
-                {t('common.cancel')}
-              </Button>
+              <>
+                {/* Labelled while there is room; an icon with the tooltip once narrow, as Discard All does. */}
+                <Button
+                  css={NARROW_HIDDEN_CSS}
+                  flexShrink="0"
+                  variant="ghost"
+                  onClick={() => onCancelQueueItem(cancelableQueueItemId)}
+                >
+                  <XIcon />
+                  {t('common.cancel')}
+                </Button>
+                <Tooltip content={t('common.cancel')}>
+                  <IconButton
+                    aria-label={t('common.cancel')}
+                    css={NARROW_ONLY_CSS}
+                    variant="ghost"
+                    onClick={() => onCancelQueueItem(cancelableQueueItemId)}
+                  >
+                    <XIcon />
+                  </IconButton>
+                </Tooltip>
+              </>
             ) : null}
 
             {selectedCandidate ? (
@@ -286,11 +345,11 @@ export const StagingBar = ({
                 <Tooltip content={t('widgets.canvas.staging.saveToGallery')}>
                   <IconButton
                     aria-label={t('widgets.canvas.staging.saveToGallery')}
-                    disabled={isSaving}
+                    disabled={isSavingToGallery}
                     variant="ghost"
                     onClick={handleSaveToGallery}
                   >
-                    {isSaving ? <Spinner /> : <SaveIcon />}
+                    {isSavingToGallery ? <Spinner /> : <SaveIcon />}
                   </IconButton>
                 </Tooltip>
 
@@ -300,29 +359,50 @@ export const StagingBar = ({
                   </IconButton>
                 </Tooltip>
 
-                <CanvasFloatingBarDivider />
+                <CanvasFloatingBarDivider css={NARROW_HIDDEN_CSS} />
 
-                <Button variant="ghost" onClick={onDiscardAll}>
+                <Button css={WIDE_ONLY_CSS} flexShrink="0" variant="ghost" onClick={onDiscardAll}>
                   <Trash2Icon />
                   {t('common.discardAll')}
                 </Button>
+                <Tooltip content={t('common.discardAll')}>
+                  <IconButton
+                    aria-label={t('common.discardAll')}
+                    css={COMPACT_ONLY_CSS}
+                    variant="ghost"
+                    onClick={onDiscardAll}
+                  >
+                    <Trash2Icon />
+                  </IconButton>
+                </Tooltip>
 
-                <Menu.Root positioning={MENU_POSITIONING}>
-                  <Group attached>
-                    <Button disabled={!canAccept} onClick={onAccept}>
-                      <CheckIcon />
-                      {t('widgets.canvas.acceptToLayer')}
-                    </Button>
-                    <Menu.Trigger asChild>
-                      <IconButton
-                        aria-label={t('widgets.canvas.staging.moreAcceptOptions')}
+                <Menu.Root ids={acceptMenuIds} positioning={MENU_POSITIONING}>
+                  <Group attached flexShrink="0">
+                    <Tooltip content={acceptLabel}>
+                      <Button
+                        aria-label={acceptLabel}
+                        css={NARROW_ICON_BUTTON_CSS}
                         disabled={!canAccept}
-                        minW="0"
-                        w="6"
+                        onClick={onAccept}
                       >
-                        <ChevronDownIcon />
-                      </IconButton>
-                    </Menu.Trigger>
+                        <CheckIcon />
+                        <Box as="span" css={NARROW_SR_ONLY_CSS}>
+                          {acceptLabel}
+                        </Box>
+                      </Button>
+                    </Tooltip>
+                    <Tooltip content={t('widgets.canvas.staging.moreAcceptOptions')} ids={acceptMenuIds}>
+                      <Menu.Trigger asChild>
+                        <IconButton
+                          aria-label={t('widgets.canvas.staging.moreAcceptOptions')}
+                          disabled={!canAccept}
+                          minW="0"
+                          w="6"
+                        >
+                          <ChevronDownIcon />
+                        </IconButton>
+                      </Menu.Trigger>
+                    </Tooltip>
                   </Group>
                   <Portal>
                     <Menu.Positioner>
@@ -360,9 +440,17 @@ const AutoSwitchMenu = ({ mode, onSelect }: { mode: AutoSwitchMode; onSelect: (m
       <Tooltip content={t('widgets.canvas.staging.autoSwitch')}>
         <span style={{ display: 'inline-flex' }}>
           <Menu.Trigger asChild>
-            <Button minW="unset" px="2" variant="ghost">
+            <Button
+              aria-label={`${t('widgets.canvas.staging.autoSwitch')}: ${label(mode)}`}
+              css={NARROW_ICON_BUTTON_CSS}
+              minW="unset"
+              px="2"
+              variant="ghost"
+            >
               <SparklesIcon size={13} />
-              <Text fontSize="md">{label(mode)}</Text>
+              <Text css={NARROW_SR_ONLY_CSS} fontSize="md">
+                {label(mode)}
+              </Text>
             </Button>
           </Menu.Trigger>
         </span>

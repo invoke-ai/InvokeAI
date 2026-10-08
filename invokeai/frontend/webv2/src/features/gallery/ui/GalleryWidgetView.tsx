@@ -1,5 +1,6 @@
 import type { GalleryItem } from '@features/gallery/core/items';
 import type { GalleryItemsFilter } from '@features/gallery/data/queries';
+import type { TFunction } from 'i18next';
 
 import { toGalleryItemRef } from '@features/gallery/core/items';
 import { getBoundedRecentImages } from '@features/gallery/core/recentImages';
@@ -7,15 +8,16 @@ import { getGallerySettings } from '@features/gallery/core/settings';
 import { GALLERY_PAGE_SIZE, galleryItemNamesOptions } from '@features/gallery/data/queries';
 import { StatusWidgetChip } from '@platform/ui';
 import { useQueryClient } from '@tanstack/react-query';
-import { ImageIcon } from 'lucide-react';
+import { ImageIcon, TriangleAlertIcon } from 'lucide-react';
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { GalleryStateView } from './galleryStateView';
+import type { GalleryReadState, GalleryReadStatus, GalleryStateView } from './galleryStateView';
 
 import { GalleryBoardDragMonitor } from './GalleryBoardDragMonitor';
 import { mergeGalleryLoadedItems } from './galleryGridLayout';
 import { GalleryLayout } from './GalleryLayout';
+import { GalleryAnnouncer } from './GalleryLoadError';
 import {
   getGalleryAnchoredWindowPage,
   getGalleryPage,
@@ -42,7 +44,7 @@ import {
   type GalleryWidgetContextValue,
 } from './GalleryWidgetContext';
 import { useGalleryActions } from './useGalleryActions';
-import { useGalleryData } from './useGalleryData';
+import { useGalleryData, type GalleryListingState } from './useGalleryData';
 import { useGalleryStarredStrip } from './useGalleryStarredStrip';
 
 export const shouldPublishGalleryTotal = ({
@@ -56,14 +58,27 @@ export const shouldPublishGalleryTotal = ({
 }): boolean =>
   typeof total === 'number' && Number.isFinite(total) && total !== knownTotalImages && total !== lastPublishedTotal;
 
-export const GalleryStatusChip = ({ count }: { count: number }) => {
+/** `count` is null while the total is not known; a failed listing says so instead of counting nothing. */
+export const GalleryStatusChip = ({
+  count,
+  isUnavailable = false,
+}: {
+  count: number | null;
+  isUnavailable?: boolean;
+}) => {
   const { t } = useTranslation();
+
+  if (isUnavailable) {
+    return (
+      <StatusWidgetChip icon={TriangleAlertIcon} tone="error">
+        {t('widgets.gallery.statusChipUnavailable')}
+      </StatusWidgetChip>
+    );
+  }
 
   return (
     <StatusWidgetChip icon={ImageIcon}>
-      {t('widgets.gallery.statusChip', {
-        count,
-      })}
+      {count === null ? t('widgets.gallery.statusChipUnknown') : t('widgets.gallery.statusChip', { count })}
     </StatusWidgetChip>
   );
 };
@@ -77,7 +92,6 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     gallery: galleryCommands,
     galleryValues,
     generateValues,
-    notifications,
     projectId,
     projectName,
     ItemActionsProvider,
@@ -104,21 +118,6 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     starred: starredOnly,
   });
 
-  // Report semantic failures separately so failed searches cannot masquerade as empty results.
-  const semanticError = semanticQuery ? data.queryError : null;
-
-  useEffect(() => {
-    if (!semanticError) {
-      return;
-    }
-
-    notifications.reportError({
-      area: 'gallery-semantic-search',
-      message: semanticError.message,
-      namespace: 'gallery',
-    });
-  }, [notifications, semanticError]);
-
   const { loadMore, selectedBoardId, total } = data;
   // No strip under a ranked result (no starred filter applies), under the
   // starred-only listing (it would repeat the grid), or in a window anchored
@@ -128,8 +127,8 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     filter: data.filter,
   });
   const gallery = useMemo(
-    () => getGalleryStateView(galleryValues, data.boards, data.items, data.isLoadingItems, starredStrip.items),
-    [data.boards, data.isLoadingItems, data.items, galleryValues, starredStrip.items]
+    () => getGalleryStateView(galleryValues, data.boards, data.items, starredStrip.items),
+    [data.boards, data.items, galleryValues, starredStrip.items]
   );
   const loadedItems = useMemo(
     () => mergeGalleryLoadedItems(starredStrip.items, gallery.items),
@@ -208,8 +207,12 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
   }, [galleryCommands, page, total]);
 
   if (region === 'bottom' && presentation !== 'expanded') {
-    // The listing total is unstarred-only; the strip's total is the rest.
-    return <GalleryStatusChip count={(total ?? gallery.items.length) + starredStrip.total} />;
+    // The listing total is unstarred-only; the strip's total is the rest. Either one unknown leaves no count to state.
+    const stripStatus = starredStrip.state.status;
+    const count =
+      total === null || stripStatus === 'loading' || stripStatus === 'error' ? null : total + starredStrip.total;
+
+    return <GalleryStatusChip count={count} isUnavailable={data.listing.status === 'error'} />;
   }
 
   return (
@@ -221,9 +224,11 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     >
       <GalleryWidgetContent
         actions={actions}
+        boardsState={data.boardsState}
         filter={data.filter}
         gallery={gallery}
         isWindowTruncated={data.isWindowTruncated}
+        listing={data.listing}
         loadedItems={loadedItems}
         projectName={projectName}
         region={region}
@@ -234,11 +239,43 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
   );
 };
 
+const LISTING_NOTICES: Partial<Record<GalleryReadStatus, string>> = {
+  'more-error': 'widgets.gallery.listingLoadMoreFailed',
+  'stale-error': 'widgets.gallery.listingRefreshFailed',
+};
+const BOARD_NOTICES: Partial<Record<GalleryReadStatus, string>> = {
+  error: 'widgets.gallery.boardsLoadFailed',
+  'stale-error': 'widgets.gallery.boardsRefreshFailed',
+};
+const STARRED_NOTICES: Partial<Record<GalleryReadStatus, string>> = {
+  error: 'widgets.gallery.starredLoadFailed',
+  'stale-error': 'widgets.gallery.starredRefreshFailed',
+};
+
+/**
+ * What the non-blocking notices say, for the widget's live region. A failed listing is left out: its error state is
+ * an alert of its own.
+ */
+const getGalleryFailureAnnouncement = (
+  {
+    boardsState,
+    listing,
+    starredStrip,
+  }: { boardsState: GalleryReadState; listing: GalleryListingState; starredStrip: GalleryStarredStrip },
+  t: TFunction
+): string =>
+  [LISTING_NOTICES[listing.status], BOARD_NOTICES[boardsState.status], STARRED_NOTICES[starredStrip.state.status]]
+    .filter((key) => key !== undefined)
+    .map((key) => t(key))
+    .join(' ');
+
 const GalleryWidgetContent = ({
   actions,
+  boardsState,
   filter,
   gallery,
   isWindowTruncated,
+  listing,
   loadedItems,
   projectName,
   region,
@@ -246,36 +283,55 @@ const GalleryWidgetContent = ({
   starredStrip,
 }: {
   actions: GalleryActions;
+  boardsState: GalleryReadState;
   filter: GalleryItemsFilter;
   gallery: GalleryStateView;
   isWindowTruncated: boolean;
+  listing: GalleryListingState;
   loadedItems: GalleryItem[];
   projectName: string;
   region: GalleryWidgetProps['region'];
   runtime: GalleryWidgetRuntime;
   starredStrip: GalleryStarredStrip;
 }) => {
+  const { t } = useTranslation();
   const itemActions = useGalleryItemActions();
   const contextValue = useMemo<GalleryWidgetContextValue>(
     () => ({
       actions,
+      boardsState,
       filter,
       gallery,
       isWindowTruncated,
       itemActions,
+      listing,
       loadedItems,
       projectName,
       region,
       runtime,
       starredStrip,
     }),
-    [actions, filter, gallery, isWindowTruncated, itemActions, loadedItems, projectName, region, runtime, starredStrip]
+    [
+      actions,
+      boardsState,
+      filter,
+      gallery,
+      isWindowTruncated,
+      itemActions,
+      listing,
+      loadedItems,
+      projectName,
+      region,
+      runtime,
+      starredStrip,
+    ]
   );
 
   return (
     <GalleryWidgetContext value={contextValue}>
       <GalleryBoardDragMonitor />
       <GalleryLayout region={region} />
+      <GalleryAnnouncer message={getGalleryFailureAnnouncement({ boardsState, listing, starredStrip }, t)} />
     </GalleryWidgetContext>
   );
 };

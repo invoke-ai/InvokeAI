@@ -2,11 +2,16 @@ import type { AccountScope } from '@platform/state/accountLifecycle';
 
 import { createUuid } from '@platform/browser/randomUuid';
 
-import { acquireAccountOwnedWorkbenchDatabase } from './accountOwnedWorkbenchDatabase';
+import {
+  acquireAccountOwnedUnloadJournalDatabase,
+  acquireAccountOwnedWorkbenchDatabase,
+} from './accountOwnedWorkbenchDatabase';
 import {
   clampProjectDraftLimit,
   combineProjectDraft,
   createUnavailableProjectDraftStore,
+  createUnloadJournalLivenessCheck,
+  decideUnloadJournalEntry,
   doProjectDraftPartsMatch,
   getProjectDraftSummary,
   getUtf8ByteSize,
@@ -25,6 +30,7 @@ import {
   toProjectDraftBody,
   toProjectDraftMetadata,
   toSchemaRefusedProjectDraft,
+  withUnloadJournalSettled,
   type ProjectDraft,
   type ProjectDraftAdoptionResult,
   type ProjectDraftClaimResult,
@@ -44,13 +50,21 @@ import {
   type ProjectDraftStartWriterResult,
   type ProjectDraftStore,
   type ProjectDraftSummary,
+  type ProjectUnloadJournalEntry,
+  type ProjectUnloadJournalKey,
+  type ProjectUnloadJournalOutcome,
+  type ProjectUnloadJournalReconcileResult,
+  type ProjectUnloadJournalReconciliation,
+  type ProjectUnloadJournalSettleResult,
   type RetargetAcknowledgedCopyOptions,
 } from './draftStore';
 import {
   isWorkbenchDatabaseAvailable,
+  UNLOAD_JOURNAL_STORE,
   WORKBENCH_DRAFT_BODY_STORE,
   WORKBENCH_DRAFT_STORE,
   WORKBENCH_DRAFT_WRITER_STORE,
+  type UnloadJournalDatabase,
   type WorkbenchDatabase,
 } from './workbenchDatabase';
 
@@ -63,6 +77,9 @@ type ReadDraftResult =
   | ({ metadataRevision: number } & Extract<ProjectDraftGetResult, { kind: 'found' }>)
   | Exclude<ProjectDraftGetResult, { kind: 'found' }>;
 
+/** Entries the route peek reads per transaction; the journal holds at most one per lineage and writer. */
+const UNLOAD_JOURNAL_PEEK_PAGE = 16;
+
 const observeTransaction = <T extends { done: Promise<unknown> }>(transaction: T): T => {
   void transaction.done.catch(() => undefined);
   return transaction;
@@ -70,7 +87,14 @@ const observeTransaction = <T extends { done: Promise<unknown> }>(transaction: T
 
 export const createIndexedDbProjectDraftStore = (
   database: WorkbenchDatabase,
-  { maxDraftBytes = PROJECT_DRAFT_MAX_BYTES }: { maxDraftBytes?: number } = {}
+  {
+    journalDatabase = null,
+    maxDraftBytes = PROJECT_DRAFT_MAX_BYTES,
+  }: {
+    /** Where unload journal entries live; without it, journaling and reconciliation report unavailable. */
+    journalDatabase?: UnloadJournalDatabase | null;
+    maxDraftBytes?: number;
+  } = {}
 ): ProjectDraftStore => {
   let isClosed = false;
   let isUnavailable = false;
@@ -91,6 +115,41 @@ export const createIndexedDbProjectDraftStore = (
       }
       markUnavailable();
       return unavailable;
+    }
+  };
+  /** One writer's entries for a lineage through `generation`, or below it when `exclusive`. */
+  const writerJournalRange = (
+    projectId: string,
+    editorSessionId: string,
+    writerToken: string,
+    generation: number,
+    exclusive: boolean
+  ): IDBKeyRange =>
+    IDBKeyRange.bound(
+      [projectId, editorSessionId, writerToken, Number.NEGATIVE_INFINITY],
+      [projectId, editorSessionId, writerToken, generation],
+      false,
+      exclusive
+    );
+  /**
+   * Only a connection closed from outside is unavailable for good. Any other failure is the one operation's: the next
+   * journal operation tries again, so one aborted deletion does not switch reload protection off for the session.
+   */
+  const canUseJournal = (): boolean =>
+    journalDatabase !== null && !isClosed && isWorkbenchDatabaseAvailable(journalDatabase);
+  /** Reads nothing first, so it never waits on a renderer round trip that an unloading page cannot make. */
+  const deleteJournalKeys = async (query: IDBKeyRange | ProjectUnloadJournalKey): Promise<boolean> => {
+    if (!canUseJournal()) {
+      return false;
+    }
+    try {
+      const transaction = observeTransaction(journalDatabase!.transaction(UNLOAD_JOURNAL_STORE, 'readwrite'));
+      void transaction.store.delete(query).catch(() => undefined);
+      transaction.commit();
+      await transaction.done;
+      return true;
+    } catch {
+      return false;
     }
   };
   const readDraft = (projectId: string, editorSessionId: string): Promise<ReadDraftResult> =>
@@ -439,7 +498,7 @@ export const createIndexedDbProjectDraftStore = (
     close() {
       isClosed = true;
     },
-    delete(projectId, editorSessionId, writerToken) {
+    delete(projectId, editorSessionId, writerToken, settledThroughGeneration) {
       return mutate<ProjectDraftDeleteResult>(
         async () => {
           const transaction = observeTransaction(database.transaction(DRAFT_STORES, 'readwrite'));
@@ -471,11 +530,12 @@ export const createIndexedDbProjectDraftStore = (
           await metadataStore.delete(key);
           await bodyStore.delete(key);
           if (isProjectDraftWriterClaim(claim)) {
-            await writerStore.put({
-              ...claim,
-              metadataRevision: claim.metadataRevision + 1,
-              updatedAt: Date.now(),
-            });
+            const bumped = { ...claim, metadataRevision: claim.metadataRevision + 1, updatedAt: Date.now() };
+            await writerStore.put(
+              settledThroughGeneration === undefined
+                ? bumped
+                : withUnloadJournalSettled(bumped, settledThroughGeneration)
+            );
           }
           await transaction.done;
           return { kind: 'deleted' };
@@ -548,9 +608,47 @@ export const createIndexedDbProjectDraftStore = (
         { kind: 'unavailable' }
       );
     },
+    async discardUnloadJournal(projectId, editorSessionId, writerToken, throughGeneration = Number.MAX_VALUE) {
+      const deleted = await deleteJournalKeys(
+        writerJournalRange(projectId, editorSessionId, writerToken, throughGeneration, false)
+      );
+      return { kind: deleted ? 'deleted' : 'unavailable' };
+    },
     async get(projectId, editorSessionId): Promise<ProjectDraftGetResult> {
       const result = await readDraft(projectId, editorSessionId);
       return result.kind === 'found' ? { draft: result.draft, kind: 'found' } : result;
+    },
+    journalBeforeUnload({ entries, retired }) {
+      if (!canUseJournal()) {
+        return { kind: 'unavailable' };
+      }
+      try {
+        const transaction = journalDatabase!.transaction(UNLOAD_JOURNAL_STORE, 'readwrite');
+        const written = transaction.done.then(
+          () => true,
+          () => false
+        );
+        for (const [projectId, editorSessionId, writerToken, generation] of retired) {
+          void transaction.store
+            .delete(writerJournalRange(projectId, editorSessionId, writerToken, generation, false))
+            .catch(() => undefined);
+        }
+        for (const entry of entries) {
+          // Each entry replaces its writer's earlier ones for the lineage, so they stay one per lineage and writer.
+          void transaction.store
+            .delete(
+              writerJournalRange(entry.projectId, entry.editorSessionId, entry.writerToken, entry.generation, true)
+            )
+            .catch(() => undefined);
+          void transaction.store.put(entry).catch(() => undefined);
+        }
+        // An unloading document aborts transactions still waiting on it; one committed now outlives it. Nothing is
+        // read first, because a read's callback never runs during unload.
+        transaction.commit();
+        return { kind: 'started', written };
+      } catch {
+        return { kind: 'unavailable' };
+      }
     },
     list({ after, limit: requestedLimit } = {}): Promise<ProjectDraftPageResult> {
       return mutate<ProjectDraftPageResult>(
@@ -640,6 +738,159 @@ export const createIndexedDbProjectDraftStore = (
         },
         { kind: 'unavailable' }
       );
+    },
+    async peekUnloadJournalProjectIds(limit, { isEditorSessionLive } = {}) {
+      if (!canUseJournal()) {
+        return { kind: 'unavailable' };
+      }
+      const isLive = createUnloadJournalLivenessCheck(isEditorSessionLive);
+      const projectIds = new Set<string>();
+      let after: ProjectUnloadJournalKey | null = null;
+      try {
+        for (;;) {
+          // Entries are read a page at a time and their pages probed between transactions: a lock query is not an
+          // IndexedDB request, and awaiting one inside the transaction would let it commit under the cursor.
+          const entries: ProjectUnloadJournalEntry[] = await journalDatabase!.getAll(
+            UNLOAD_JOURNAL_STORE,
+            after ? IDBKeyRange.lowerBound(after, true) : null,
+            UNLOAD_JOURNAL_PEEK_PAGE
+          );
+          for (const entry of entries) {
+            if (projectIds.size < limit && !(await isLive(entry))) {
+              projectIds.add(entry.projectId);
+            }
+          }
+          const last = entries.at(-1);
+          if (projectIds.size === limit || entries.length < UNLOAD_JOURNAL_PEEK_PAGE || !last) {
+            return { kind: 'available', projectIds: [...projectIds] };
+          }
+          after = [last.projectId, last.editorSessionId, last.writerToken, last.generation];
+        }
+      } catch {
+        return { kind: 'unavailable' };
+      }
+    },
+    async reconcileUnloadJournal(
+      accountId,
+      now,
+      { isEditorSessionLive } = {}
+    ): Promise<ProjectUnloadJournalReconcileResult> {
+      const outcomes: ProjectUnloadJournalReconciliation[] = [];
+      const isLive = createUnloadJournalLivenessCheck(isEditorSessionLive);
+      let after: ProjectUnloadJournalKey | null = null;
+      for (;;) {
+        if (!canUseJournal() || !canUseDatabase()) {
+          return { kind: 'unavailable' };
+        }
+        let keys: ProjectUnloadJournalKey[];
+        try {
+          keys = await journalDatabase!.getAllKeys(
+            UNLOAD_JOURNAL_STORE,
+            after ? IDBKeyRange.lowerBound(after, true) : null,
+            PROJECT_DRAFT_PAGE_LIMIT
+          );
+        } catch {
+          return { kind: 'unavailable' };
+        }
+        for (const journalKey of keys) {
+          let entry: unknown;
+          try {
+            entry = await journalDatabase!.get(UNLOAD_JOURNAL_STORE, journalKey);
+          } catch {
+            return { kind: 'unavailable' };
+          }
+          if (entry === undefined) {
+            // Another tab reconciled it, or its writer discarded it, since the keys were read.
+            continue;
+          }
+          if (await isLive(entry)) {
+            outcomes.push({ editorSessionId: journalKey[1], outcome: 'live', projectId: journalKey[0] });
+            continue;
+          }
+          let replacedDraft: ProjectUnloadJournalReconciliation['replacedDraft'];
+          const outcome = await mutate<ProjectUnloadJournalOutcome | 'unavailable'>(
+            async () => {
+              const transaction = observeTransaction(database.transaction(DRAFT_STORES, 'readwrite'));
+              const metadataStore = transaction.objectStore(WORKBENCH_DRAFT_STORE);
+              const bodyStore = transaction.objectStore(WORKBENCH_DRAFT_BODY_STORE);
+              const writerStore = transaction.objectStore(WORKBENCH_DRAFT_WRITER_STORE);
+              const key: ProjectDraftKey = [journalKey[0], journalKey[1]];
+              const [metadata, body, claim] = await Promise.all([
+                metadataStore.get(key),
+                bodyStore.get(key),
+                writerStore.get(key),
+              ]);
+              const validClaim = claim === undefined || isProjectDraftWriterClaim(claim) ? claim : 'corrupt';
+              const draft = metadata === undefined ? null : combineProjectDraft(metadata, body);
+              const isCurrentConsistent =
+                draft !== null &&
+                validClaim !== undefined &&
+                validClaim !== 'corrupt' &&
+                validClaim.state === 'active' &&
+                validClaim.writerToken === draft.writerToken &&
+                validClaim.metadataRevision === (metadata as ProjectDraftMetadata).metadataRevision;
+              const decision = decideUnloadJournalEntry({
+                accountId,
+                claim: validClaim,
+                current:
+                  metadata === undefined
+                    ? body === undefined
+                      ? null
+                      : 'corrupt'
+                    : isCurrentConsistent
+                      ? draft
+                      : 'corrupt',
+                entry,
+                maxDocumentBytes: maxDraftBytes,
+                now,
+              });
+              if (decision.kind === 'apply') {
+                const activeClaim = validClaim === 'corrupt' ? undefined : validClaim;
+                const nextMetadataRevision = (activeClaim?.metadataRevision ?? 0) + 1;
+                await writerStore.put(
+                  activeClaim
+                    ? { ...activeClaim, metadataRevision: nextMetadataRevision, updatedAt: decision.draft.updatedAt }
+                    : {
+                        editorSessionId: decision.draft.editorSessionId,
+                        metadataRevision: nextMetadataRevision,
+                        projectId: decision.draft.projectId,
+                        state: 'active',
+                        updatedAt: decision.draft.updatedAt,
+                        writerToken: decision.draft.writerToken,
+                      }
+                );
+                await metadataStore.put(toProjectDraftMetadata(decision.draft, nextMetadataRevision));
+                await bodyStore.put(toProjectDraftBody(decision.draft));
+                if (isCurrentConsistent) {
+                  replacedDraft = { documentJson: draft.documentJson, generation: draft.generation };
+                }
+              }
+              await transaction.done;
+              return decision.kind === 'apply' ? 'applied' : decision.reason;
+            },
+            'unavailable',
+            'quota'
+          );
+          if (outcome === 'unavailable') {
+            return { kind: 'unavailable' };
+          }
+          // A retained or unwritten entry waits for a later load; the rest are done. Removing an entry after its
+          // draft committed is safe to repeat: a second pass finds that draft and discards the entry as superseded.
+          if (outcome !== 'corrupt' && outcome !== 'quota' && !(await deleteJournalKeys(journalKey))) {
+            return { kind: 'unavailable' };
+          }
+          outcomes.push({
+            editorSessionId: journalKey[1],
+            outcome,
+            projectId: journalKey[0],
+            ...(replacedDraft ? { replacedDraft } : {}),
+          });
+        }
+        if (keys.length < PROJECT_DRAFT_PAGE_LIMIT) {
+          return { kind: 'available', outcomes };
+        }
+        after = keys.at(-1)!;
+      }
     },
     reserveCopyIdentity(projectId, editorSessionId, writerToken, proposed, replaceCopyProjectId) {
       return mutate<ProjectDraftCopyReservationResult>(
@@ -870,6 +1121,10 @@ export const createIndexedDbProjectDraftStore = (
           const key: ProjectDraftKey = [projectId, editorSessionId];
           const [metadata, claim] = await Promise.all([metadataStore.get(key), writerStore.get(key)]);
           if (metadata === undefined) {
+            // Nothing to settle, but the writer's journal through this generation is obsolete all the same.
+            if (isProjectDraftWriterClaim(claim) && claim.state === 'active' && claim.writerToken === writerToken) {
+              await writerStore.put(withUnloadJournalSettled(claim, sentGeneration));
+            }
             await transaction.done;
             return { kind: 'missing' };
           }
@@ -893,11 +1148,12 @@ export const createIndexedDbProjectDraftStore = (
             return { kind: 'corrupt' };
           }
           if (metadata.generation <= sentGeneration) {
-            await writerStore.put({
-              ...claim,
-              metadataRevision: claim.metadataRevision + 1,
-              updatedAt: Date.now(),
-            });
+            await writerStore.put(
+              withUnloadJournalSettled(
+                { ...claim, metadataRevision: claim.metadataRevision + 1, updatedAt: Date.now() },
+                sentGeneration
+              )
+            );
             await metadataStore.delete(key);
             await bodyStore.delete(key);
             await transaction.done;
@@ -911,7 +1167,12 @@ export const createIndexedDbProjectDraftStore = (
             baseRevision: acknowledgedRevision,
             metadataRevision: nextMetadataRevision,
           });
-          await writerStore.put({ ...claim, metadataRevision: nextMetadataRevision, updatedAt: Date.now() });
+          await writerStore.put(
+            withUnloadJournalSettled(
+              { ...claim, metadataRevision: nextMetadataRevision, updatedAt: Date.now() },
+              sentGeneration
+            )
+          );
           await transaction.done;
           return { kind: 'read-rebased' };
         },
@@ -946,6 +1207,48 @@ export const createIndexedDbProjectDraftStore = (
         (draft) => toSchemaRefusedProjectDraft(draft, refusal),
         'marked'
       );
+    },
+    async settleUnloadJournal(projectId, editorSessionId, writerToken, throughGeneration) {
+      const settled = await mutate<ProjectUnloadJournalSettleResult>(
+        async () => {
+          const transaction = observeTransaction(database.transaction(DRAFT_STORES, 'readwrite'));
+          const writerStore = transaction.objectStore(WORKBENCH_DRAFT_WRITER_STORE);
+          const key: ProjectDraftKey = [projectId, editorSessionId];
+          const [metadataKey, claim] = await Promise.all([
+            transaction.objectStore(WORKBENCH_DRAFT_STORE).getKey(key),
+            writerStore.get(key),
+          ]);
+          if (claim === undefined ? metadataKey !== undefined : !isProjectDraftWriterClaim(claim)) {
+            await transaction.done;
+            return { kind: 'corrupt' };
+          }
+          if (claim && (claim.state !== 'active' || claim.writerToken !== writerToken)) {
+            await transaction.done;
+            return { kind: 'fenced' };
+          }
+          await writerStore.put(
+            withUnloadJournalSettled(
+              claim ?? {
+                editorSessionId,
+                metadataRevision: 1,
+                projectId,
+                state: 'active',
+                updatedAt: Date.now(),
+                writerToken,
+              },
+              throughGeneration
+            )
+          );
+          await transaction.done;
+          return { kind: 'settled' };
+        },
+        { kind: 'unavailable' },
+        { kind: 'quota' }
+      );
+      if (settled.kind === 'settled') {
+        await deleteJournalKeys(writerJournalRange(projectId, editorSessionId, writerToken, throughGeneration, false));
+      }
+      return settled;
     },
     async stage(input): Promise<ProjectDraftStageResult> {
       if (!canUseDatabase()) {
@@ -1109,13 +1412,31 @@ export const createIndexedDbProjectDraftStore = (
 
 export const createAccountOwnedProjectDraftStore = async (
   owner: AccountScope,
-  dependencies: Parameters<typeof acquireAccountOwnedWorkbenchDatabase>[1] = {}
+  dependencies: NonNullable<Parameters<typeof acquireAccountOwnedWorkbenchDatabase>[1]> & {
+    openJournalDatabase?: (storageSuffix: string) => Promise<UnloadJournalDatabase>;
+  } = {}
 ): Promise<ProjectDraftStore> => {
-  const lease = await acquireAccountOwnedWorkbenchDatabase(owner, dependencies);
+  // Without its own database, recovery works as before; only the unload journal is unavailable.
+  const [leaseResult, journalLeaseResult] = await Promise.allSettled([
+    acquireAccountOwnedWorkbenchDatabase(owner, dependencies),
+    acquireAccountOwnedUnloadJournalDatabase(owner, {
+      ...(dependencies.deleteDatabase ? { deleteDatabase: dependencies.deleteDatabase } : {}),
+      ...(dependencies.openJournalDatabase ? { openDatabase: dependencies.openJournalDatabase } : {}),
+    }),
+  ]);
+  const journalLease = journalLeaseResult.status === 'fulfilled' ? journalLeaseResult.value : null;
+  if (leaseResult.status === 'rejected') {
+    journalLease?.release();
+    throw leaseResult.reason;
+  }
+  const lease = leaseResult.value;
   if (!lease) {
+    journalLease?.release();
     return createUnavailableProjectDraftStore();
   }
-  const ownedStore = createIndexedDbProjectDraftStore(lease.database);
+  const ownedStore = createIndexedDbProjectDraftStore(lease.database, {
+    journalDatabase: journalLease?.database ?? null,
+  });
   const wrapStore = (): ProjectDraftStore => {
     let isReleased = false;
     return {
@@ -1130,6 +1451,7 @@ export const createAccountOwnedProjectDraftStore = async (
         isReleased = true;
         ownedStore.close();
         lease.release();
+        journalLease?.release();
       },
     };
   };

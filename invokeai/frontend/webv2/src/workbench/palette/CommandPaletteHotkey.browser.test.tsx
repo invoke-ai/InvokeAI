@@ -201,7 +201,11 @@ describe('PaletteButton hotkey tooltip', () => {
 
     await act(async () => {
       await userEvent.hover(button);
-      await vi.waitFor(() => expect(document.body.textContent).toContain('Command palette (alt+p)'));
+      await vi.waitFor(() =>
+        expect(document.body.textContent).toContain(
+          `Command palette (${navigator.platform.toLowerCase().includes('mac') ? '⌥P' : 'Alt+P'})`
+        )
+      );
     });
   });
 

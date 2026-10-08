@@ -150,6 +150,7 @@ interface HarnessOptions {
   models?: RunCanvasInvocationDeps['models'];
   outputOnlyMaskedRegions?: boolean;
   scaling?: RunCanvasInvocationDeps['scaling'];
+  generateValues?: Record<string, unknown>;
 }
 
 const makeHarness = (options: HarnessOptions = {}): Harness => {
@@ -273,7 +274,10 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
       } as WorkbenchCommands['notifications'],
     },
     flushPendingUploads: flushPendingUploads as () => Promise<void>,
-    generateValues: generateValuesFor(model),
+    // Production words rejections from the locale; the harness records the structured rejection it was handed.
+    formatControlLayerError: ({ code, layerName, suggestedKind }) =>
+      `${layerName}: ${code}${suggestedKind ? ` -> ${suggestedKind}` : ''}`,
+    generateValues: { ...generateValuesFor(model), ...options.generateValues },
     inFlight: options.inFlight ?? new Set<string>(),
     models: options.models,
     projectId: options.projectId ?? 'project-1',
@@ -353,6 +357,7 @@ describe('prepareCanvasInvocation generation-device boundary', () => {
 
     await prepareCanvasInvocation({
       commands: harness.deps.commands,
+      formatControlLayerError: harness.deps.formatControlLayerError,
       compositing: harness.deps.compositing,
       destination: harness.deps.destination,
       generateValues: harness.deps.generateValues,
@@ -367,6 +372,33 @@ describe('prepareCanvasInvocation generation-device boundary', () => {
     const metadata = Object.values(nodes).find((node) => node.type === 'core_metadata');
 
     expect(metadata?.rand_device).toBe('xpu');
+  });
+
+  it("submits the caller's prompt expansion with the sample seed it drew", async () => {
+    const harness = makeHarness({ document: makeDoc([]) });
+    canvasBoundaryMocks.getCanvasEngine.mockReturnValue({
+      lifecycle: { flushPendingUploads: harness.flushPendingUploads },
+    });
+    canvasBoundaryMocks.getCanvasOperations.mockReturnValue({
+      composeForGeneration: (options: Parameters<typeof composeForGeneration>[1]) =>
+        composeForGeneration(harness.host, options),
+    });
+
+    await prepareCanvasInvocation({
+      commands: harness.deps.commands,
+      destination: harness.deps.destination,
+      expansion: { positivePrompts: ['a green cat'], positivePromptsSampleSeed: 7 },
+      formatControlLayerError: harness.deps.formatControlLayerError,
+      generateValues: harness.deps.generateValues,
+      models: harness.deps.models,
+      projectId: harness.deps.projectId,
+      projectSettings: { useCpuNoise: false },
+      strength: harness.deps.strength,
+    });
+
+    expect(harness.submittedGraphs()).toEqual([
+      expect.objectContaining({ positivePrompts: ['a green cat'], positivePromptsSampleSeed: 7 }),
+    ]);
   });
 });
 
@@ -795,23 +827,11 @@ describe('runCanvasInvocation', () => {
     expect(harness.releaseRasterSnapshot).toHaveBeenCalledTimes(1);
   });
 
-  it('blocks invocation with a human-readable notice when a nonempty control layer has no model', async () => {
+  it('blocks invocation and hands a nonempty model-less control layer to the formatter', async () => {
     const harness = makeHarness({ document: docWithLayers([controlLayer('control')]) });
     await runCanvasInvocation(harness.deps);
     expect(harness.submittedGraphs()).toHaveLength(0);
-    expect(harness.notices()).toHaveLength(1);
-    expect(harness.notices()[0]?.message).toBe('Control layer "control" has no control model selected.');
-    expect(harness.notices()[0]?.message).not.toContain('[missing_model]');
-  });
-
-  it('prefers the injected control-layer error formatter', async () => {
-    const harness = makeHarness({ document: docWithLayers([controlLayer('control')]) });
-    const formatControlLayerError = vi.fn((code: string, layerName: string) => `localized ${code} for ${layerName}`);
-
-    await runCanvasInvocation({ ...harness.deps, formatControlLayerError });
-
-    expect(formatControlLayerError).toHaveBeenCalledWith('missing_model', 'control');
-    expect(harness.notices()[0]?.message).toBe('localized missing_model for control');
+    expect(harness.notices().map((notice) => notice.message)).toEqual(['control: missing_model']);
   });
 
   it('blocks invocation when a nonempty control layer has malformed numeric settings', async () => {
@@ -835,7 +855,7 @@ describe('runCanvasInvocation', () => {
     await runCanvasInvocation(harness.deps);
 
     expect(harness.submittedGraphs()).toHaveLength(0);
-    expect(harness.notices()[0]?.message).toBe('Control layer "control" has invalid control adapter settings.');
+    expect(harness.notices()[0]?.message).toBe('control: invalid_adapter_values');
   });
 
   it('ignores an empty control layer with no model', async () => {
@@ -878,7 +898,7 @@ describe('runCanvasInvocation', () => {
     });
     await runCanvasInvocation(harness.deps);
     expect(harness.submittedGraphs()).toHaveLength(0);
-    expect(harness.notices()[0]?.message).toBe('Only one Control LoRA can be used at a time.');
+    expect(harness.notices()[0]?.message).toBe('second: control_lora_limit');
   });
 
   it('prepares a Z-Image control with exact adapter and model configuration', async () => {
@@ -967,7 +987,79 @@ describe('runCanvasInvocation', () => {
     await runCanvasInvocation(harness.deps);
 
     expect(harness.submittedGraphs()).toHaveLength(0);
-    expect(harness.notices()[0]?.message).toBe('Only one Z-Image control layer can be used at a time.');
+    expect(harness.notices()[0]?.message).toBe('second: z_image_control_limit');
+  });
+
+  describe('Anima ControlNet-LLLite', () => {
+    const anima = { ...sd1Model, base: 'anima' as const, key: 'anima', name: 'Anima' };
+    const installed = (key: string, base: string, type: string, extra: Record<string, unknown> = {}) => ({
+      base,
+      file_size: 1,
+      format: 'checkpoint',
+      hash: `${key}-hash`,
+      key,
+      name: key,
+      path: key,
+      source: key,
+      source_type: 'path' as const,
+      type,
+      ...extra,
+    });
+    const components = [
+      installed('qwen3', 'any', 'qwen3_encoder', { variant: 'qwen3_06b' }),
+      installed('anima-vae', 'anima', 'vae'),
+    ];
+    const sketch = installed('sketch', 'anima', 'controlnet', { cond_in_channels: 3 });
+    const depth = installed('depth', 'anima', 'controlnet', { cond_in_channels: 3 });
+    const inpainting = installed('inpainting', 'anima', 'controlnet', { cond_in_channels: 4 });
+    const lllite = (id: string, model: string, weight = 1) =>
+      controlLayer(id, { beginEndStepPct: [0.1, 0.9], controlMode: null, kind: 'anima_lllite', model, weight });
+    const run = async (layers: CanvasLayerContract[]) => {
+      const harness = makeHarness({
+        document: docWithLayers(layers),
+        // Generate keeps component selections; the canvas does not pick them from the catalog.
+        generateValues: { qwen3EncoderModel: components[0], vae: components[1] },
+        model: anima,
+        models: [...components, sketch, depth, inpainting],
+      });
+      await runCanvasInvocation(harness.deps);
+      return harness;
+    };
+
+    it('submits each adapter with its resolved model through the control_lllite collector', async () => {
+      const harness = await run([lllite('a', sketch.key, 0.6), lllite('b', depth.key)]);
+
+      expect(harness.notices()).toEqual([]);
+      const graph = harness.submittedGraphs()[0]?.graph.backendGraph;
+      expect(graph?.nodes.anima_lllite_a).toMatchObject({
+        begin_step_percent: 0.1,
+        control_model: { base: 'anima', hash: 'sketch-hash', key: 'sketch', name: 'sketch', type: 'controlnet' },
+        end_step_percent: 0.9,
+        type: 'anima_lllite',
+        weight: 0.6,
+      });
+      expect(graph?.nodes.anima_lllite_b).toMatchObject({ control_model: { key: 'depth' }, weight: 1 });
+      // The identifier is the backend's model field; channel facts stay on the frontend.
+      expect(graph?.nodes.anima_lllite_a?.control_model).not.toHaveProperty('cond_in_channels');
+      expect(
+        graph?.edges.filter((edge) => edge.destination.field === 'control_lllite').map((edge) => edge.source.node_id)
+      ).toEqual(['control_lllite_collector']);
+    });
+
+    it.each([
+      ['the same model twice', () => [lllite('a', sketch.key), lllite('b', sketch.key)], 'b: duplicate_lllite_model'],
+      ['an inpainting adapter', () => [lllite('a', inpainting.key)], 'a: lllite_inpaint_adapter'],
+      [
+        'a layer saved as ControlNet before LLLite was supported, naming the kind to switch to',
+        () => [controlLayer('old', { kind: 'controlnet', model: sketch.key })],
+        'old: switch_adapter_kind -> anima_lllite',
+      ],
+    ])('blocks %s before submitting', async (_label, layers, message) => {
+      const harness = await run(layers());
+
+      expect(harness.submittedGraphs()).toHaveLength(0);
+      expect(harness.notices()[0]?.message).toBe(message);
+    });
   });
 
   it('ignores a concurrent invoke while a prior prepare for the same project is in flight', async () => {

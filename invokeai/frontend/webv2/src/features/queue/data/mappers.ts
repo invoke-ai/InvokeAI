@@ -63,7 +63,6 @@ export const mapQueueBackendItemDTO = (dto: QueueServerItemDTO): QueueBackendIte
 
 export const mapQueueItemIdsDTO = (dto: QueueItemIdsResultDTO): QueueItemIdsReadModel => ({
   itemIds: dto.item_ids,
-  totalCount: dto.total_count,
 });
 
 export const mapQueueStatusDTO = (dto: QueueAndProcessorStatusDTO): QueueStatusReadModel => ({

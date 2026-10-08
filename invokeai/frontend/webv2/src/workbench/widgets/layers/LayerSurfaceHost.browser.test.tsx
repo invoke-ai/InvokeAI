@@ -26,7 +26,9 @@ import { page, userEvent } from 'vitest/browser';
 import type { LayerRowCommands } from './layerRowCommands';
 import type * as RunLayerWorkflowDialogModule from './RunLayerWorkflowDialog';
 
+import { projectLayerChildRows } from './layerChildRows';
 import { LayerSurfaceHost, type LayerSurfaceEngine, type LayerSurfaceRequest } from './LayerSurfaceHost';
+import { buildLayerStackRows } from './layerTreeRows';
 
 const PROJECT_ID = 'surface-project';
 const mocks = vi.hoisted(() => ({
@@ -78,7 +80,7 @@ const engine = {
   },
   exports: { hasExportableLayerContent: () => true },
   interaction: { get: () => false, subscribe: () => () => undefined },
-  layers: { commitPrepared: () => ({ status: 'committed' as const }) },
+  layers: { commitPrepared: () => ({ status: 'committed' as const }), endStructuralPreview: () => undefined },
   projectId: PROJECT_ID,
 } as unknown as LayerSurfaceEngine;
 const anchor = { height: 10, width: 10, x: 40, y: 40 };
@@ -230,4 +232,43 @@ it('starts each Run workflow open from a fresh form', async () => {
 
   await openRunWorkflow();
   await expect.element(destination).toHaveTextContent('Gallery');
+});
+
+it('offers an adjustment every other raster layer and group the model accepts under Move to layer', async () => {
+  const initial = { ...createInitialWorkbenchState().projects[0]!, id: PROJECT_ID };
+  mocks.project = applyCanvasProjectMutation(initial, {
+    document: {
+      ...createEmptyCanvasDocument(),
+      selectedLayerId: null,
+      stacks: stacksFrom([
+        layerContract('source', 'raster', {
+          adjustments: [{ id: 'a1', isEnabled: true, type: 'invert' }],
+          name: 'Source',
+        }),
+        layerContract('target', 'raster', { name: 'Target' }),
+        layerContract('locked', 'raster', { isLocked: true, name: 'Locked' }),
+        groupContract('group', [layerContract('member', 'raster', { name: 'Member' })], { name: 'Group' }),
+        layerContract('control', 'control', { name: 'Control' }),
+      ]),
+    },
+    type: 'replaceCanvasDocument',
+  });
+  const moveChildToLayer = vi.fn();
+  rowCommands.moveChildToLayer = moveChildToLayer;
+  const source = buildLayerStackRows(mocks.project.canvas.document.stacks, new Set()).raster.rows.find(
+    (row) => row.id === 'source'
+  )!;
+  const child = projectLayerChildRows(source.vm)[0]!;
+
+  await act(() => openSurface({ anchor, child, kind: 'child-menu' }));
+  await act(() => page.getByRole('menuitem', { name: 'Move to layer', exact: true }).click());
+  await expect.element(page.getByRole('menuitem', { name: 'Target', exact: true })).toBeVisible();
+  const offered = Array.from(document.querySelectorAll('[role="menuitem"][data-value^="move-to:"]')).map(
+    (item) => item.textContent
+  );
+  // The locked layer and the control layer cannot take the entry; the source is where it already is.
+  expect(offered).toEqual(['Target', 'Group', 'Member']);
+
+  await act(() => page.getByRole('menuitem', { name: 'Group', exact: true }).click());
+  expect(moveChildToLayer).toHaveBeenCalledWith(child, 'group');
 });

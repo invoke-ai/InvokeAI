@@ -191,7 +191,10 @@ export const WorkflowLibraryDetailPanel = ({
     setIsDuplicatePending(true);
 
     try {
-      const raw = await getLibraryWorkflowCached(entry.item.workflow_id, owner.signal);
+      const raw = await getLibraryWorkflowCached(entry.item.workflow_id, {
+        expectedRevision: entry.item.revision,
+        signal: owner.signal,
+      });
 
       assertAccountScopeCurrent(owner);
 
@@ -271,7 +274,10 @@ export const WorkflowLibraryDetailPanel = ({
     const owner = captureAccountScope();
 
     try {
-      const record = await getLibraryWorkflowRecordCached(entry.item.workflow_id, owner.signal);
+      const record = await getLibraryWorkflowRecordCached(entry.item.workflow_id, {
+        expectedRevision: entry.item.revision,
+        signal: owner.signal,
+      });
 
       assertAccountScopeCurrent(owner);
 
@@ -300,7 +306,10 @@ export const WorkflowLibraryDetailPanel = ({
     const owner = captureAccountScope();
 
     try {
-      const raw = await getLibraryWorkflowCached(entry.item.workflow_id, owner.signal);
+      const raw = await getLibraryWorkflowCached(entry.item.workflow_id, {
+        expectedRevision: entry.item.revision,
+        signal: owner.signal,
+      });
 
       assertAccountScopeCurrent(owner);
       downloadText(JSON.stringify(raw, null, 2), `${toFileSlug(entry.item.name)}.json`, 'application/json');

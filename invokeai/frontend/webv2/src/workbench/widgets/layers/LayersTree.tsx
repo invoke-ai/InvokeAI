@@ -14,6 +14,7 @@ import { Scrollable } from '@platform/ui/Scrollable';
 import { getDocumentIndex, getDocumentNode, lookupDocumentNodeState } from '@workbench/canvas-engine/api';
 import {
   publishLayerPanelSelection,
+  readLayerPanelState,
   selectLayerInPanel,
   setLayerChildrenCollapsed,
   setLayerGroupExpanded,
@@ -32,13 +33,16 @@ import type { LayerStackActionsEngine } from './useLayerStackActions';
 
 import { ChildDragGhost, isRenameableChildKind, LayerChildRow } from './LayerChildRow';
 import {
+  isOrderedChildKind,
   layerChildDropCommand,
+  layerChildMoveLabelKey,
   layerChildRemoveLabelKey,
   layerChildRenameLabelKey,
   layerChildRowCommand,
   layerChildRowKey,
   projectLayerChildRows,
   type LayerChildDropTarget,
+  type LayerChildRowAction,
   type ProjectedChildRow,
 } from './layerChildRows';
 import { clearLayerChildSelection, selectLayerChild, useLayerChildSelection } from './layerChildSelection';
@@ -356,19 +360,73 @@ export const LayersTree = ({
     const { commitPrepared: commit } = latest.current;
     return commit(label, (model) => model.prepare(command));
   }, []);
+  // A child row's command is built from the engine's document inside the commit: a preview gesture open
+  // elsewhere has ended and been restored by then, so the row's siblings carry committed values, not previewed ones.
+  const runChildStructural = useCallback((label: string, child: ProjectedChildRow, action: LayerChildRowAction) => {
+    const { commitPrepared: commit } = latest.current;
+    return commit(label, (model) => {
+      const command = layerChildRowCommand(model.document, child, action);
+      return command ? model.prepare(command) : { status: 'unchanged' };
+    });
+  }, []);
   const removeChildRow = useCallback(
     (child: ProjectedChildRow) => {
-      const command = layerChildRowCommand(latest.current.document, child, { type: 'remove' });
-      if (!command) {
-        return;
-      }
       const { panel: current, projectId: project } = latest.current;
-      const outcome = runStructural(t(layerChildRemoveLabelKey(child.kind)), command);
+      const outcome = runChildStructural(t(layerChildRemoveLabelKey(child.kind)), child, { type: 'remove' });
       if (outcome.status === 'committed' && current.focusId === child.key) {
         setLayerPanelFocus(project, current.primaryId, child.layerId);
       }
     },
-    [runStructural, t]
+    [runChildStructural, t]
+  );
+
+  const selectChildRow = useCallback(
+    (child: Pick<ProjectedChildRow, 'itemId' | 'key' | 'layerId'>, reveal: boolean) => {
+      const { dispatch: send, panel: current, projectId: project } = latest.current;
+      // The owner becomes the single selected layer, published before the
+      // dispatch so reconciliation keeps it.
+      publishLayerPanelSelection({ primaryId: child.layerId, projectId: project, selectedIds: [child.layerId] });
+      panelSelectedPrimary.current = child.layerId;
+      if (current.primaryId !== child.layerId) {
+        send({ id: child.layerId, type: 'setCanvasSelectedLayer' });
+      }
+      selectLayerChild(project, child.layerId, child.itemId);
+      setLayerPanelFocus(project, child.layerId, child.key);
+      if (reveal) {
+        latest.current.onRevealProperties(child.layerId);
+      }
+    },
+    []
+  );
+
+  // A drop or menu move; one that changes owner carries the sub-selection and focus to the item's new row,
+  // opening the groups and child rows that would hide it. The row exists only after the commit renders, so the
+  // focus effect scrolls to and focuses it then.
+  const commitChildMove = useCallback(
+    (child: ProjectedChildRow, target: LayerChildDropTarget) => {
+      const { commitPrepared: commit } = latest.current;
+      const { layerId } = target;
+      // Built from the engine's document inside the commit, like the other child-row commands.
+      const outcome = commit(t(layerChildMoveLabelKey(child, layerId)), (model) => {
+        const command = layerChildDropCommand(model.document, child, target);
+        return command ? model.prepare(command) : { status: 'unchanged' };
+      });
+      if (outcome.status !== 'committed' || layerId === child.layerId) {
+        return;
+      }
+      const { document: currentDocument, projectId: project } = latest.current;
+      const key = layerChildRowKey(layerId, child.itemId);
+      selectChildRow({ itemId: child.itemId, key, layerId }, false);
+      const parentIds = lookupDocumentNodeState(currentDocument, layerId)?.parentIds ?? [];
+      if (parentIds.length > 0) {
+        setLayerGroupExpanded(project, layerId, [...parentIds], true);
+      }
+      if (readLayerPanelState(project, layerId).collapsedChildLayerIds.includes(layerId)) {
+        setLayerChildrenCollapsed(project, layerId, layerId, false);
+      }
+      pendingFocus.current = key;
+    },
+    [selectChildRow, t]
   );
 
   // After deletion, focus the nearest surviving row below, otherwise above.
@@ -566,38 +624,21 @@ export const LayersTree = ({
         }
         focusItem(navigation.focus);
       },
-      duplicateChild: (child) => {
-        const command = layerChildRowCommand(latest.current.document, child, {
+      duplicateChild: (child) =>
+        runChildStructural(t('widgets.layers.modifiers.duplicateAdjustment'), child, {
           newId: createAdjustmentId(),
           type: 'duplicate',
-        });
-        if (command) {
-          runStructural(t('widgets.layers.modifiers.duplicateAdjustment'), command);
-        }
-      },
-      moveChild: (child, direction) => {
-        const command = layerChildRowCommand(latest.current.document, child, { direction, type: 'move' });
-        if (command) {
-          runStructural(t('widgets.layers.modifiers.reorderAdjustment'), command);
-        }
-      },
-      moveChildToLayer: (child, layerId) => {
-        const command = layerChildDropCommand(latest.current.document, child, { beforeItemId: null, layerId });
-        if (command) {
-          runStructural(t('widgets.layers.modifiers.moveReferenceImage'), command);
-        }
-      },
+        }),
+      moveChild: (child, direction) =>
+        runChildStructural(t('widgets.layers.modifiers.reorderAdjustment'), child, { direction, type: 'move' }),
+      moveChildToLayer: (child, layerId) => commitChildMove(child, { beforeItemId: null, layerId }),
       openChildMenu: (child, anchor: LayerSurfaceAnchor) => setSurface({ anchor, child, kind: 'child-menu' }),
       openMenu: (id, anchor: LayerSurfaceAnchor) => setSurface({ anchor, id, kind: 'menu' }),
       openStackMenu: (stack, anchor: LayerSurfaceAnchor) => setSurface({ anchor, kind: 'stack-menu', stack }),
       removeChild: (child) => removeChildRow(child),
       rename: (id, name) => runStructural(t('widgets.layers.actions.rename'), { id, patch: { name }, type: 'patch' }),
-      renameChild: (child, name) => {
-        const command = layerChildRowCommand(latest.current.document, child, { name, type: 'rename' });
-        if (command) {
-          runStructural(t(layerChildRenameLabelKey(child.kind)), command);
-        }
-      },
+      renameChild: (child, name) =>
+        runChildStructural(t(layerChildRenameLabelKey(child.kind)), child, { name, type: 'rename' }),
       select: (id, modifiers: LayerSelectionModifiers) => {
         const {
           allNodeIds: all,
@@ -615,27 +656,9 @@ export const LayersTree = ({
           send({ id: next.primaryId, type: 'setCanvasSelectedLayer' });
         }
       },
-      selectChild: (child, options) => {
-        const { dispatch: send, panel: current, projectId: project } = latest.current;
-        // The owner becomes the single selected layer, published before the
-        // dispatch so reconciliation keeps it.
-        publishLayerPanelSelection({ primaryId: child.layerId, projectId: project, selectedIds: [child.layerId] });
-        panelSelectedPrimary.current = child.layerId;
-        if (current.primaryId !== child.layerId) {
-          send({ id: child.layerId, type: 'setCanvasSelectedLayer' });
-        }
-        selectLayerChild(project, child.layerId, child.itemId);
-        setLayerPanelFocus(project, child.layerId, child.key);
-        if (options?.reveal !== false) {
-          latest.current.onRevealProperties(child.layerId);
-        }
-      },
-      setChildEnabled: (child, isEnabled) => {
-        const command = layerChildRowCommand(latest.current.document, child, { isEnabled, type: 'set-enabled' });
-        if (command) {
-          runStructural(t('widgets.layers.modifiers.toggleActive'), command);
-        }
-      },
+      selectChild: (child, options) => selectChildRow(child, options?.reveal !== false),
+      setChildEnabled: (child, isEnabled) =>
+        runChildStructural(t('widgets.layers.modifiers.toggleActive'), child, { isEnabled, type: 'set-enabled' }),
       setEnabled: (id, isEnabled) =>
         runStructural(t('widgets.layers.actions.toggleActive'), {
           type: 'set-enabled',
@@ -661,7 +684,17 @@ export const LayersTree = ({
         }
       },
     }),
-    [focusItem, movingIds, removeChildRow, removeRows, runStructural, t]
+    [
+      commitChildMove,
+      focusItem,
+      movingIds,
+      removeChildRow,
+      removeRows,
+      runChildStructural,
+      runStructural,
+      selectChildRow,
+      t,
+    ]
   );
 
   const closeSurface = useCallback(() => {
@@ -727,6 +760,11 @@ export const LayersTree = ({
       return;
     }
     if (pendingFocus.current) {
+      // A row that only just joined the list (a moved child) is mounted as the focused item but may sit offscreen.
+      const index = rowIndexByKey.get(pendingFocus.current);
+      if (index !== undefined) {
+        virtualizerRef.current.scrollToIndex(index);
+      }
       const target = host.querySelector<HTMLElement>(`[data-layer-row-id="${CSS.escape(pendingFocus.current)}"]`);
       if (target) {
         target.focus();
@@ -742,7 +780,7 @@ export const LayersTree = ({
         clearLayerPropertiesRequest(pending.token);
       }
     }
-  }, [onRevealProperties, panelRows, virtualItems]);
+  }, [onRevealProperties, panelRows, rowIndexByKey, virtualItems]);
 
   // Repair focus after row unmount only if the actual tree DOM owned it; portaled focus does not count.
   const handleFocusCapture = useCallback((event: FocusEvent<HTMLElement>) => {
@@ -788,7 +826,7 @@ export const LayersTree = ({
   const dragDisabled = editingLocked || degraded || panel.filter.trim() !== '';
   const collisionDetection = useCallback<CollisionDetection>((args) => {
     const stack = args.active.data.current?.stack as LayerStackKind | undefined;
-    const { childRowByKey: childRows } = latest.current;
+    const { childRowByKey: childRows, document: currentDocument } = latest.current;
     const dragChild = childRows.get(String(args.active.id));
     if (dragChild) {
       return pointerWithin({
@@ -804,7 +842,16 @@ export const LayersTree = ({
               ? overChild.kind === 'reference-image'
               : container.data.current?.stack === 'regional_guidance';
           }
-          return overChild ? overChild.layerId === dragChild.layerId : id === dragChild.layerId;
+          // Adjustments land among any raster owner's adjustment rows (below its region row), or on a raster
+          // layer or group row to append; the drop plan asks the model about locks.
+          if (overChild) {
+            return isOrderedChildKind(overChild.kind) || overChild.kind === 'layer-region';
+          }
+          if (container.data.current?.stack !== 'raster') {
+            return false;
+          }
+          const node = getDocumentNode(currentDocument, id);
+          return node?.type === 'raster' || node?.type === 'group';
         }),
       });
     }
@@ -1019,18 +1066,14 @@ export const LayersTree = ({
       const landing = target;
       const refused = refusal;
       const childLanding = childDragRef.current ? childDropPlan : null;
-      const childKind = childDragRef.current?.child.kind;
+      const draggedChild = childDragRef.current?.child;
       finishDrag();
       if (dragDisabled) {
         return;
       }
-      if (childKind) {
+      if (draggedChild) {
         if (childLanding) {
-          const label =
-            childKind === 'reference-image'
-              ? t('widgets.layers.modifiers.moveReferenceImage')
-              : t('widgets.layers.modifiers.reorderAdjustment');
-          commitPrepared(label, (model) => model.prepare(childLanding.command));
+          commitChildMove(draggedChild, childLanding.dropTarget);
         }
         return;
       }
@@ -1041,7 +1084,7 @@ export const LayersTree = ({
         model.prepare({ beforeId: landing.beforeId, ids: landing.ids, parentId: landing.parentId, type: 'reparent' })
       );
     },
-    [childDropPlan, commitPrepared, dragDisabled, finishDrag, refusal, t, target]
+    [childDropPlan, commitChildMove, commitPrepared, dragDisabled, finishDrag, refusal, t, target]
   );
 
   const indicator = useMemo(() => {

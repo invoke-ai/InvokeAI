@@ -1,4 +1,3 @@
-import type { ModelConfig, ModelTaxonomyType } from '@features/models';
 import type {
   VideoConditioningClip,
   VideoReferenceItem,
@@ -8,9 +7,8 @@ import type {
 
 import { createListCollection, HStack, Stack, Switch, Text } from '@chakra-ui/react';
 import { GenerationSettingsSection, SeedField } from '@features/generation/components';
-import { isMainModelConfig, sanitizeBatchCount } from '@features/generation/settings';
+import { sanitizeBatchCount } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
-import { ModelSelect } from '@features/models/react';
 import {
   getVideoDurationSeconds,
   invertVideoAspectRatioId,
@@ -39,10 +37,8 @@ import {
   getAutoDurationBounds,
   getVideoExpandPromptSuggestion,
   getVideoModelPolicy,
-  getVideoModelSelectionResult,
   isAutoDurationActive,
   isAutoDurationSupportedForMode,
-  isVideoModelSelectable,
 } from '@features/video/core/videoPolicies';
 import { createDefaultVideoWidgetValues, syncVideoWidgetValuesWithModels } from '@features/video/core/widgetValues';
 import { useMountEffect } from '@platform/react/useMountEffect';
@@ -61,13 +57,13 @@ import { VideoConditioningClipField } from './VideoConditioningClipField';
 import { VideoPromptFields } from './VideoFormFields';
 import { VideoFrameImageField } from './VideoFrameImageField';
 import { VideoLengthControls } from './VideoLengthControls';
+import { VideoModelField } from './VideoModelField';
 import { VideoReferenceListField } from './VideoReferenceListField';
 import { VideoSourceClipField } from './VideoSourceClipField';
 import { useVideoUi, useVideoUiActions } from './VideoUiContext';
 
 /** Keep section props stable: project patches rerender this widget on every keystroke. */
 
-const MAIN_MODEL_TYPES: readonly ModelTaxonomyType[] = ['main'];
 const SWITCH_CHECKED_PROPS = { bg: 'accent.solid' };
 
 const ASPECT_RATIO_COLLECTION = createListCollection({
@@ -190,29 +186,6 @@ export const VideoWidgetView = () => {
   useMountEffect(() => {
     void ensureModelsLoaded();
   });
-
-  const selectMainModel = useCallback(
-    (model: ModelConfig | null) => {
-      if (!isMainModelConfig(model) || !isVideoModelSelectable(model)) {
-        return;
-      }
-
-      const result = getVideoModelSelectionResult({ currentSettings: values, model, models });
-
-      patch({ ...result.settings, model });
-
-      if (result.clearedLabels.length > 0) {
-        toaster.create({
-          description: t('widgets.video.settingsAdjustedDescription', {
-            labels: result.clearedLabels.join(', '),
-          }),
-          title: t('widgets.video.settingsAdjusted'),
-          type: 'info',
-        });
-      }
-    },
-    [models, patch, t, values]
-  );
 
   const toggleAccelerator = useCallback(
     (details: { checked: boolean }) => {
@@ -520,20 +493,12 @@ export const VideoWidgetView = () => {
       />
 
       <Stack gap="1" px="2" py="1">
-        <Field
-          error={values.model ? undefined : t('widgets.video.modelRequired')}
-          hint="model"
-          label={t('widgets.video.mainModel')}
-        >
-          <ModelSelect
-            filter={isVideoModelSelectable}
-            invalid={!values.model}
-            modelTypes={MAIN_MODEL_TYPES}
-            placeholder={t('widgets.video.selectModel')}
-            value={values.model?.key ?? null}
-            onChange={selectMainModel}
-          />
-        </Field>
+        <VideoModelField
+          models={models}
+          modelsLoaded={modelsStatus === 'loaded'}
+          projectId={projectId}
+          values={values}
+        />
       </Stack>
 
       <VideoPromptFields

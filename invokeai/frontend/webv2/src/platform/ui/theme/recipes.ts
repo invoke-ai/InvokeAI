@@ -54,6 +54,14 @@ export const tooltipSlotRecipe = defineSlotRecipe({
       ...chakraSlotRecipes.tooltip.base?.arrowTip,
       borderColor: 'border.emphasized',
     },
+    positioner: {
+      ...chakraSlotRecipes.tooltip.base?.positioner,
+      // Zag translates the positioner by `--x`/`--y`, which it sets inline a frame after opening. Unset, they leave it
+      // at the page's origin, where a tooltip closed within that frame (focus, then a click that disables the trigger)
+      // would fade out. Default off-screen, as Zag does for a positioner with no placement.
+      '--x': '0px',
+      '--y': '-100vh',
+    },
   },
 });
 
@@ -111,8 +119,24 @@ export const toastSlotRecipe = defineSlotRecipe({
     ...chakraSlotRecipes.toast.base,
     root: {
       ...chakraSlotRecipes.toast.base?.root,
-      '&[data-type=success]': { ...chakraSlotRecipes.toast.base?.root?.['&[data-type=success]'], bg: 'green.700' },
-      '&[data-type=warning]': { ...chakraSlotRecipes.toast.base?.root?.['&[data-type=warning]'], bg: 'orange.700' },
+      // Chakra's `*.contrast` text is black on these fills in dark color modes; the 700 steps need white. Its
+      // lightening trigger hover drops white text below AA on red, so status toasts darken on hover instead.
+      '&[data-type=error]': {
+        ...chakraSlotRecipes.toast.base?.root?.['&[data-type=error]'],
+        '--toast-trigger-bg': '{black/20}',
+      },
+      '&[data-type=success]': {
+        ...chakraSlotRecipes.toast.base?.root?.['&[data-type=success]'],
+        bg: 'green.700',
+        color: 'white',
+        '--toast-trigger-bg': '{black/20}',
+      },
+      '&[data-type=warning]': {
+        ...chakraSlotRecipes.toast.base?.root?.['&[data-type=warning]'],
+        bg: 'orange.700',
+        color: 'white',
+        '--toast-trigger-bg': '{black/20}',
+      },
     },
     description: { ...chakraSlotRecipes.toast.base?.description, opacity: 1 },
   },

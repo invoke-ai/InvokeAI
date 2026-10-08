@@ -338,28 +338,82 @@ describe('ImageContextMenu starred state', () => {
   });
 });
 
-describe('ImageContextMenu new canvas from image', () => {
-  it.each([1, 3])('opens a new canvas from the %s targeted image(s)', async (count) => {
+describe('ImageContextMenu canvas destinations', () => {
+  const menuItemLabels = () =>
+    Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).map(
+      (candidate) => candidate.textContent?.trim() || candidate.getAttribute('aria-label')
+    );
+
+  /** Top-level menu entries in order, with separators as `—`, so a position within its group is observable. */
+  const menuSequence = () =>
+    Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"], [role="separator"]')).map((candidate) =>
+      candidate.getAttribute('role') === 'separator'
+        ? '—'
+        : candidate.textContent?.trim() || candidate.getAttribute('aria-label')
+    );
+  const ADD = 'widgets.canvas.import.addToCurrentCanvas';
+  const NEW_PROJECT = 'widgets.canvas.import.newProjectFromImage';
+
+  it('leads the single-image actions group, right after Recall Metadata, with the two canvas destinations', async () => {
+    await renderMenu(createActions(vi.fn()), [image('image-0.png')]);
+    const sequence = menuSequence();
+    const recallIndex = sequence.indexOf('Recall Metadata');
+
+    expect(sequence.slice(recallIndex, recallIndex + 5)).toEqual([
+      'Recall Metadata',
+      '—',
+      ADD,
+      NEW_PROJECT,
+      'Send to Upscale',
+    ]);
+  });
+
+  it('opens the multi-image menu, below its header, with the two canvas destinations in a group of their own', async () => {
+    await renderMenu(
+      createActions(vi.fn()),
+      Array.from({ length: 3 }, (_, index) => image(`image-${index}.png`))
+    );
+
+    expect(menuSequence().slice(0, 5)).toEqual(['—', ADD, NEW_PROJECT, '—', 'Star All']);
+  });
+
+  it.each([1, 3])('adds the %s targeted image(s) to the current canvas as the chosen layer', async (count) => {
     const actions = createActions(vi.fn());
     const images = Array.from({ length: count }, (_, index) => image(`image-${index}.png`));
     await renderMenu(actions, images);
 
     // A nested menu opens from a real hover on its trigger item, after zag's open delay, so the open is waited for
     // rather than slept through.
-    await hoverItem(getMenuItem('widgets.canvas.import.newFromImage'));
+    await hoverItem(getMenuItem('widgets.canvas.import.addToCurrentCanvas'));
     await settleUntil(
-      () =>
-        Array.from(document.querySelectorAll('[role="menuitem"]')).some(
-          (candidate) => candidate.textContent?.trim() === 'widgets.canvas.import.newCanvasFromImage'
-        ),
-      'the new-from-image submenu to open',
+      () => menuItemLabels().includes('widgets.canvas.import.inpaintMask'),
+      'the add-to-current-canvas submenu to open',
       5000
     );
-    await interact(() => getMenuItem('widgets.canvas.import.newCanvasFromImage').click());
+    // Raster leads the destinations, as the drop zones and Preview's Edit menu order them.
+    expect(menuItemLabels().indexOf('widgets.canvas.import.raster')).toBeLessThan(
+      menuItemLabels().indexOf('widgets.canvas.import.control')
+    );
+    await interact(() => getMenuItem('widgets.canvas.import.inpaintMask').click());
+
+    const calls = vi.mocked(actions.sendToCanvas).mock.calls;
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.[0].map((entry) => entry.imageName)).toEqual(images.map((entry) => entry.imageName));
+    expect(calls[0]?.[1]).toBe('inpaint-mask');
+    expect(actions.createCanvasFromImages).not.toHaveBeenCalled();
+  });
+
+  it.each([1, 3])('starts a new project from the %s targeted image(s) in one step', async (count) => {
+    const actions = createActions(vi.fn());
+    const images = Array.from({ length: count }, (_, index) => image(`image-${index}.png`));
+    await renderMenu(actions, images);
+
+    await interact(() => getMenuItem('widgets.canvas.import.newProjectFromImage').click());
 
     const calls = vi.mocked(actions.createCanvasFromImages).mock.calls;
     expect(calls).toHaveLength(1);
     expect(calls[0]?.[0].map((entry) => entry.imageName)).toEqual(images.map((entry) => entry.imageName));
+    expect(actions.sendToCanvas).not.toHaveBeenCalled();
   });
 });
 
@@ -462,7 +516,8 @@ describe('ImageContextMenu mixed-media action visibility', () => {
     expect(document.body.textContent).toContain('Recall Metadata');
     expect(document.body.textContent).not.toContain('Send to Upscale');
     expect(document.body.textContent).not.toContain('Select for Compare');
-    expect(document.body.textContent).not.toContain('widgets.canvas.import.newFromImage');
+    expect(document.body.textContent).not.toContain('widgets.canvas.import.addToCurrentCanvas');
+    expect(document.body.textContent).not.toContain('widgets.canvas.import.newProjectFromImage');
   });
 
   it('shows frame copy and Details only when a Preview host opts a single video into them', async () => {
@@ -546,7 +601,8 @@ describe('ImageContextMenu mixed-media action visibility', () => {
     expect(document.body.textContent).not.toContain('Copy to clipboard');
     expect(document.body.textContent).not.toContain('Recall Metadata');
     expect(document.body.textContent).not.toContain('Select for Compare');
-    expect(document.body.textContent).not.toContain('widgets.canvas.import.newFromImage');
+    expect(document.body.textContent).not.toContain('widgets.canvas.import.addToCurrentCanvas');
+    expect(document.body.textContent).not.toContain('widgets.canvas.import.newProjectFromImage');
   });
 
   it('keeps complete mixed refs for common bulk actions and hides image-only bulk actions when a ref is unresolved', async () => {
@@ -568,7 +624,8 @@ describe('ImageContextMenu mixed-media action visibility', () => {
     expect(document.body.textContent).toContain('Download Selection');
     expect(document.body.textContent).toContain('Change Board');
     expect(document.body.textContent).toContain('Delete Selection');
-    expect(document.body.textContent).not.toContain('widgets.canvas.import.newFromImage');
+    expect(document.body.textContent).not.toContain('widgets.canvas.import.addToCurrentCanvas');
+    expect(document.body.textContent).not.toContain('widgets.canvas.import.newProjectFromImage');
     await pickQuickItem('Open in new tab');
     await interact(() => root?.unmount());
     host?.remove();
