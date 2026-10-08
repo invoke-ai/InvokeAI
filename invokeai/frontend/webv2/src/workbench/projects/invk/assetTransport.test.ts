@@ -24,6 +24,7 @@ import {
   fetchImageThumbnail,
   fetchVideoBytes,
   findExistingVideoNames,
+  placeBoardInProject,
   starImages,
   starVideos,
   uploadArchiveImage,
@@ -229,6 +230,19 @@ describe('board media transport', () => {
 
     expect(new URLSearchParams(url.split('?')[1]).get('board_name')).toBe('x'.repeat(300));
     expect(options.method).toBe('POST');
+  });
+
+  it('moves a staging board into a project, archiving it only when the source had', async () => {
+    mocks.apiFetchJson.mockResolvedValue({});
+
+    await placeBoardInProject('staged', 'project-1', false);
+    await placeBoardInProject('staged', 'project-1', true);
+
+    expect(mocks.apiFetchJson.mock.calls.map(([url, options]) => [url, (options as { body: string }).body])).toEqual([
+      ['/api/v1/boards/staged', '{"project_id":"project-1"}'],
+      ['/api/v1/boards/staged', '{"project_id":"project-1","archived":true}'],
+    ]);
+    expect((mocks.apiFetchJson.mock.calls[0]![1] as { method: string }).method).toBe('PATCH');
   });
 
   /** Untracked media that landed on the board while the import ran must survive as Uncategorized. */

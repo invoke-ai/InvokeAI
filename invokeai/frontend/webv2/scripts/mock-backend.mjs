@@ -1068,9 +1068,28 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
       if (method === 'GET' && boardSnapshotMatch) {
         const project = state.projects.get(decodeURIComponent(boardSnapshotMatch[1]));
 
-        return project
-          ? json(200, { items: boardSnapshotItems(state, project.board_id) })
-          : json(404, { detail: 'Project not found' });
+        if (!project) {
+          return json(404, { detail: 'Project not found' });
+        }
+
+        // The inbox first, then the project's other boards in creation order — as the backend lists them.
+        const members = [...state.boards.values()]
+          .filter((board) => (board.project_id ?? null) === project.project_id && board.board_id !== project.board_id)
+          .sort(
+            (left, right) =>
+              left.created_at.localeCompare(right.created_at) || left.board_id.localeCompare(right.board_id)
+          );
+        const boards = [state.boards.get(project.board_id), ...members]
+          .filter((board) => board !== undefined)
+          .map((board) => ({
+            archived: board.archived,
+            board_id: board.board_id,
+            is_inbox: board.board_id === project.board_id,
+            items: boardSnapshotItems(state, board.board_id),
+            name: board.board_name,
+          }));
+
+        return json(200, { boards });
       }
 
       if (path.startsWith('/api/v1/client_state/')) {

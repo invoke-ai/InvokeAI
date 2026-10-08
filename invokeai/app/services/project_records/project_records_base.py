@@ -118,11 +118,11 @@ class ProjectRecordsStorageBase(ABC):
 
     @abstractmethod
     def get_board_snapshot(self, user_id: str, project_id: str) -> ProjectBoardSnapshotDTO:
-        """Enumerate everything on the project's inbox that the gallery would show.
+        """Enumerate everything on the project's boards that the gallery would show, inbox first.
 
-        Excludes intermediates and the canvas's private `other` category, so the result is exactly
-        the board as the user sees it. Exports use this to carry a project's whole workspace rather
-        than only the media its document references.
+        Excludes intermediates and the canvas's private `other` category, so each board is exactly
+        what the user sees on it. Exports use this to carry a project's whole workspace rather than
+        only the media its document references.
 
         Raises:
             ProjectRecordNotFoundError: No such project for this user.

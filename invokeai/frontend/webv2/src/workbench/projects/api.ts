@@ -51,8 +51,17 @@ export interface ProjectBoardItemDTO {
   starred: boolean;
 }
 
-export interface ProjectBoardSnapshotDTO {
+export interface ProjectBoardSnapshotBoardDTO {
+  archived: boolean;
+  board_id: string;
+  is_inbox: boolean;
   items: ProjectBoardItemDTO[];
+  name: string;
+}
+
+export interface ProjectBoardSnapshotDTO {
+  /** The inbox first, then the project's other boards in creation order. */
+  boards: ProjectBoardSnapshotBoardDTO[];
 }
 
 export interface ProjectUpdateRequest {
@@ -209,7 +218,7 @@ export const deleteProject = async (
   await apiFetch(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}${query}`, { method: 'DELETE', signal });
 };
 
-/** Includes unreferenced visible board media; excludes intermediate/other categories. */
+/** Every board of the project with its visible media; excludes intermediate/other categories. */
 export const getProjectBoardSnapshot = (projectId: string, signal?: AbortSignal): Promise<ProjectBoardSnapshotDTO> =>
   apiFetchJson<ProjectBoardSnapshotDTO>(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}/board-snapshot`, {
     signal,

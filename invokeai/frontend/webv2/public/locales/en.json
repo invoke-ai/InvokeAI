@@ -489,6 +489,8 @@
       "legacyCanvasProject": "This is a canvas project from an earlier version of Invoke, which cannot be opened here.",
       "missingBoardItems_one": "1 board item could not be included.",
       "missingBoardItems_other": "{{count}} board items could not be included.",
+      "unplacedBoards_one": "1 board could not be moved into the project and is in the Library.",
+      "unplacedBoards_other": "{{count}} boards could not be moved into the project and are in the Library.",
       "missingReferences_one": "1 project reference could not be included.",
       "missingReferences_other": "{{count}} project references could not be included.",
       "notAProject": "This file is not an Invoke project.",

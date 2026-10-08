@@ -14,6 +14,7 @@ import {
   MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME,
   PROJECT_FILE_BOARD,
   PROJECT_FILE_BOARD_ID,
+  PROJECT_FILE_MEMBER_BOARD,
 } from './mock-backend-fixtures.mjs';
 import { startMockBackend } from './mock-backend.mjs';
 import { killPreview, spawnPreview } from './preview-server.mjs';
@@ -159,7 +160,10 @@ const EXPECTED_BOARD_SHAPE = [
   'video:general:false',
 ].sort();
 
-/** The archived names of everything on the source board, for proving none of them is reused. */
+/** The source's other board, as it must travel: two plain generated images. */
+const EXPECTED_MEMBER_BOARD_SHAPE = ['image:general:false', 'image:general:false'];
+
+/** The archived names of everything on the source's boards, for proving none of them is reused. */
 const ARCHIVED_BOARD_NAMES = [
   PROJECT_FILE_BOARD.referencedImage,
   PROJECT_FILE_BOARD.unreferencedImage,
@@ -167,7 +171,11 @@ const ARCHIVED_BOARD_NAMES = [
   PROJECT_FILE_BOARD.userAsset,
   PROJECT_FILE_BOARD.maskAsset,
   PROJECT_FILE_BOARD.video,
+  ...PROJECT_FILE_BOARD.memberImages,
 ];
+
+/** Every item of every board of a snapshot, with the board each came from. */
+const snapshotItems = (snapshot) => snapshot.boards.flatMap((board) => board.items);
 
 const readArchiveEntries = async (archivePath) => unzipSync(new Uint8Array(await readFile(archivePath)));
 
@@ -267,7 +275,8 @@ const importArchive = async ({ archivePath, browser, contexts, errors, phase }) 
 const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory }) => {
   const sourceBoard = await getBoardSnapshot(sourceProjectId);
 
-  assert.deepEqual(boardShape(sourceBoard.items), EXPECTED_BOARD_SHAPE);
+  assert.deepEqual(boardShape(sourceBoard.boards[0].items), EXPECTED_BOARD_SHAPE);
+  assert.deepEqual(boardShape(sourceBoard.boards[1].items), EXPECTED_MEMBER_BOARD_SHAPE);
 
   const exportContext = await browser.newContext({ acceptDownloads: true });
 
@@ -315,10 +324,22 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
 
   assert.equal(manifest.version, 2);
   assert.equal(manifest.contents, 'workbench-project');
-  assert.equal(archivedBoard.version, 1);
-  assert.deepEqual(boardShape(archivedBoard.items), EXPECTED_BOARD_SHAPE);
-  assert.deepEqual(archivedBoard.items.map((item) => item.name).sort(), [...ARCHIVED_BOARD_NAMES].sort());
-  // Expect five board items plus three external images and one external video, deduplicated across references.
+  assert.equal(archivedBoard.version, 2);
+  // The inbox leads, then the project's other board, each with its own media.
+  assert.deepEqual(
+    archivedBoard.boards.map((board) => [board.name, board.isInbox, board.archived]),
+    [
+      [sourceProjectName, true, false],
+      [PROJECT_FILE_MEMBER_BOARD.name, false, false],
+    ]
+  );
+  assert.deepEqual(boardShape(archivedBoard.boards[0].items), EXPECTED_BOARD_SHAPE);
+  assert.deepEqual(boardShape(archivedBoard.boards[1].items), EXPECTED_MEMBER_BOARD_SHAPE);
+  assert.deepEqual(
+    archivedBoard.boards.flatMap((board) => board.items.map((item) => item.name)).sort(),
+    [...ARCHIVED_BOARD_NAMES].sort()
+  );
+  // Expect the board items plus three external images and one external video, deduplicated across references.
   assert.deepEqual(
     bundledImages.sort(),
     [...ARCHIVED_BOARD_NAMES.filter((name) => name.endsWith('.png')), ...PROJECT_FILE_BOARD.externalImages]
@@ -366,10 +387,20 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
 
   const imported = await fetchJson(`/api/v1/projects/${encodeURIComponent(summary.project_id)}`);
   const importedBoard = await getBoardSnapshot(summary.project_id);
-  const importedBoardNames = importedBoard.items.map((item) => item.name);
+  const importedBoardNames = snapshotItems(importedBoard).map((item) => item.name);
 
   assert.equal(imported.data.id, summary.project_id);
-  assert.deepEqual(boardShape(importedBoard.items), EXPECTED_BOARD_SHAPE);
+  // The project's other board came across as a board of its own, under its name, with its media.
+  assert.deepEqual(
+    importedBoard.boards.map((board) => [board.is_inbox, board.name]),
+    [
+      [true, summary.name],
+      [false, PROJECT_FILE_MEMBER_BOARD.name],
+    ]
+  );
+  assert.notEqual(importedBoard.boards[1].board_id, PROJECT_FILE_MEMBER_BOARD.id);
+  assert.deepEqual(boardShape(importedBoard.boards[0].items), EXPECTED_BOARD_SHAPE);
+  assert.deepEqual(boardShape(importedBoard.boards[1].items), EXPECTED_MEMBER_BOARD_SHAPE);
 
   for (const name of importedBoardNames) {
     assert.equal(ARCHIVED_BOARD_NAMES.includes(name), false, `${name} was adopted from the archive instead of copied.`);
@@ -408,7 +439,7 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
     assert.equal(response.status, 404, `${hidden} must not exist on the destination.`);
   }
 
-  for (const item of importedBoard.items) {
+  for (const item of snapshotItems(importedBoard)) {
     const base = item.kind === 'image' ? '/api/v1/images' : '/api/v1/videos';
 
     await assertAssetRoute(base, item.name, ['full', 'thumbnail']);
@@ -436,7 +467,7 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
   await runMissingBinaryImport({ browser, contexts, entries, errors, tempDirectory });
 
   return {
-    boardItemCount: importedBoard.items.length,
+    boardItemCount: snapshotItems(importedBoard).length,
     coverImageName,
     imageNames: [...importedBoardNames].sort(),
     projectId: summary.project_id,
@@ -476,9 +507,18 @@ const runDuplication = async ({ browser, contexts, errors, imported, importedBoa
   assert.notEqual(copy.board_id, imported.board_id);
 
   const copiedBoard = await getBoardSnapshot(copy.project_id);
-  const copiedBoardNames = copiedBoard.items.map((item) => item.name);
+  const copiedBoardNames = snapshotItems(copiedBoard).map((item) => item.name);
 
-  assert.deepEqual(boardShape(copiedBoard.items), EXPECTED_BOARD_SHAPE);
+  // The copy has the same boards, each copied with its own media.
+  assert.deepEqual(
+    copiedBoard.boards.map((board) => [board.is_inbox, board.name]),
+    [
+      [true, `${sourceProjectName} copy`],
+      [false, PROJECT_FILE_MEMBER_BOARD.name],
+    ]
+  );
+  assert.deepEqual(boardShape(copiedBoard.boards[0].items), EXPECTED_BOARD_SHAPE);
+  assert.deepEqual(boardShape(copiedBoard.boards[1].items), EXPECTED_MEMBER_BOARD_SHAPE);
 
   for (const name of copiedBoardNames) {
     assert.equal(importedBoardNames.includes(name), false, `${name} is shared with the project it was copied from.`);

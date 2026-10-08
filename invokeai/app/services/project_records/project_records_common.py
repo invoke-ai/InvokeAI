@@ -107,7 +107,7 @@ class ProjectBoardUnavailableError(Exception):
 
 
 PROJECT_BOARD_SNAPSHOT_MAX_ITEMS = 20_000
-"""The largest board the snapshot route will enumerate.
+"""The most items, over all of a project's boards, the snapshot route will enumerate.
 
 The snapshot is unpaginated on purpose — the caller that needs it, exporting a project, has to hold
 the whole list anyway. That is a reason not to page it, not a reason to have no ceiling: the answer
@@ -118,10 +118,10 @@ packed either.
 
 
 class ProjectBoardTooLargeError(Exception):
-    """Raised when a project's board holds more than the snapshot route will enumerate."""
+    """Raised when a project's boards hold more than the snapshot route will enumerate."""
 
     def __init__(self, project_id: str, limit: int) -> None:
-        super().__init__(f"Project {project_id} has more than {limit} items on its board")
+        super().__init__(f"Project {project_id} has more than {limit} items on its boards")
 
 
 class ProjectSummaryDTO(BaseModel):
@@ -153,15 +153,27 @@ class ProjectBoardItemDTO(BaseModel):
     starred: bool = Field(description="Whether the item is starred")
 
 
+class ProjectBoardSnapshotBoardDTO(BaseModel):
+    """One of the project's boards and the visible items on it."""
+
+    board_id: str = Field(description="The board's id on this install")
+    name: str = Field(description="The board's name; the inbox carries the project's")
+    is_inbox: bool = Field(description="Whether this is the project's inbox, which every project has exactly one of")
+    archived: bool = Field(description="Whether the board is archived")
+    items: list[ProjectBoardItemDTO] = Field(description="The board's visible items, ordered by kind then name")
+
+
 class ProjectBoardSnapshotDTO(BaseModel):
-    """Everything a project's board holds that the gallery would show.
+    """Everything a project's boards hold that the gallery would show.
 
     This is the enumeration an export needs in order to carry a project's whole workspace rather
     than only the media its document happens to reference. Intermediates and the canvas's private
-    `other` category are excluded, because neither is something the gallery shows on the board.
+    `other` category are excluded, because neither is something the gallery shows on a board.
 
     Deliberately unversioned: `.invk`'s `board.json` carries its own version, so the archive format
     is free to change without the wire format following it, and vice versa.
     """
 
-    items: list[ProjectBoardItemDTO] = Field(description="The board's visible items, ordered by kind then name")
+    boards: list[ProjectBoardSnapshotBoardDTO] = Field(
+        description="The project's boards, inbox first, then the rest in creation order"
+    )

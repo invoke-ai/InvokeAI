@@ -13,6 +13,7 @@ from invokeai.app.services.project_records.project_records_common import (
     PROJECT_DOCUMENT_MAX_BYTES,
     ProjectBoardItemDTO,
     ProjectBoardNotFoundError,
+    ProjectBoardSnapshotBoardDTO,
     ProjectBoardSnapshotDTO,
     ProjectBoardTooLargeError,
     ProjectBoardUnavailableError,
@@ -389,8 +390,29 @@ class ProjectRecordsSqlite(ProjectRecordsStorageBase):
             if row is None:
                 raise ProjectRecordNotFoundError(project_id)
 
+            inbox_id = row[0]
+            # Both keys: project ids are unique per user only. The inbox leads; the rest follow in
+            # the order they were made, which is what the gallery's default sort shows.
+            cursor.execute(
+                """--sql
+                SELECT board_id, board_name, archived
+                FROM boards
+                WHERE user_id = ? AND project_id = ?
+                ORDER BY CASE WHEN board_id = ? THEN 0 ELSE 1 END, created_at ASC, board_id ASC;
+                """,
+                (user_id, project_id, inbox_id),
+            )
+            board_rows = cursor.fetchall()
+            board_ids = [board_row[0] for board_row in board_rows]
+            if inbox_id not in board_ids:
+                # Only raw SQL can leave an inbox outside its project; the snapshot still leads with it.
+                cursor.execute("SELECT board_id, board_name, archived FROM boards WHERE board_id = ?;", (inbox_id,))
+                board_rows = [cursor.fetchone(), *board_rows]
+                board_ids = [inbox_id, *board_ids]
+            board_placeholders = ", ".join("?" for _ in board_ids)
+
             # One union over both namespaces, shaped like `get_board_media_summaries`. The filters
-            # are what make the result match what the gallery shows for this board: intermediates
+            # are what make the result match what the gallery shows for these boards: intermediates
             # are hidden, and the categories come from IMAGE_CATEGORIES/ASSETS_CATEGORIES, which
             # `other` — the canvas's private category — is deliberately in neither of.
             #
@@ -398,43 +420,56 @@ class ProjectRecordsSqlite(ProjectRecordsStorageBase):
             # board query consults it, so filtering here would make the snapshot disagree with the
             # counts shown beside the board.
             #
-            # Bounded, unlike the counts: the caller holds the whole answer in memory and so does
-            # this, and the route is reachable by anyone with a project id.
+            # Bounded over the whole project, unlike the counts: the caller holds the whole answer
+            # in memory and so does this, and the route is reachable by anyone with a project id.
             cursor.execute(
                 f"""--sql
-                SELECT 'image' AS kind, images.image_name AS name,
+                SELECT board_images.board_id AS board_id, 'image' AS kind, images.image_name AS name,
                        images.image_category AS category, images.starred AS starred
                 FROM board_images
                 INNER JOIN images ON board_images.image_name = images.image_name
-                WHERE board_images.board_id = ?
+                WHERE board_images.board_id IN ({board_placeholders})
                   AND images.is_intermediate = FALSE
                   AND images.image_category IN ({_VISIBLE_CATEGORY_PLACEHOLDERS})
                 UNION ALL
-                SELECT 'video' AS kind, videos.video_name AS name,
+                SELECT board_videos.board_id AS board_id, 'video' AS kind, videos.video_name AS name,
                        videos.video_category AS category, videos.starred AS starred
                 FROM board_videos
                 INNER JOIN videos ON board_videos.video_name = videos.video_name
-                WHERE board_videos.board_id = ?
+                WHERE board_videos.board_id IN ({board_placeholders})
                   AND videos.is_intermediate = FALSE
                   AND videos.video_category IN ({_VISIBLE_CATEGORY_PLACEHOLDERS})
                 ORDER BY kind ASC, name ASC
                 LIMIT ?;
                 """,
                 (
-                    row[0],
+                    *board_ids,
                     *_VISIBLE_BOARD_CATEGORIES,
-                    row[0],
+                    *board_ids,
                     *_VISIBLE_BOARD_CATEGORIES,
                     PROJECT_BOARD_SNAPSHOT_MAX_ITEMS + 1,
                 ),
             )
-            rows = cursor.fetchall()
+            item_rows = cursor.fetchall()
 
-        if len(rows) > PROJECT_BOARD_SNAPSHOT_MAX_ITEMS:
+        if len(item_rows) > PROJECT_BOARD_SNAPSHOT_MAX_ITEMS:
             raise ProjectBoardTooLargeError(project_id, PROJECT_BOARD_SNAPSHOT_MAX_ITEMS)
 
+        items_by_board: dict[str, list[ProjectBoardItemDTO]] = {board_id: [] for board_id in board_ids}
+        for r in item_rows:
+            items_by_board[r[0]].append(ProjectBoardItemDTO(kind=r[1], name=r[2], category=r[3], starred=bool(r[4])))
+
         return ProjectBoardSnapshotDTO(
-            items=[ProjectBoardItemDTO(kind=r[0], name=r[1], category=r[2], starred=bool(r[3])) for r in rows]
+            boards=[
+                ProjectBoardSnapshotBoardDTO(
+                    board_id=board_row[0],
+                    name=board_row[1],
+                    is_inbox=board_row[0] == inbox_id,
+                    archived=bool(board_row[2]),
+                    items=items_by_board[board_row[0]],
+                )
+                for board_row in board_rows
+            ]
         )
 
     def get_board_id(self, user_id: str, project_id: str) -> str:

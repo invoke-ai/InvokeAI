@@ -310,9 +310,17 @@ def test_the_board_snapshot_lists_the_projects_visible_media(
 
     assert response.status_code == status.HTTP_200_OK
     assert response.json() == {
-        "items": [
-            {"category": "control", "kind": "image", "name": "asset.png", "starred": False},
-            {"category": "general", "kind": "image", "name": "shown.png", "starred": False},
+        "boards": [
+            {
+                "archived": False,
+                "board_id": created["board_id"],
+                "is_inbox": True,
+                "items": [
+                    {"category": "control", "kind": "image", "name": "asset.png", "starred": False},
+                    {"category": "general", "kind": "image", "name": "shown.png", "starred": False},
+                ],
+                "name": "Project",
+            }
         ]
     }
 
@@ -323,7 +331,11 @@ def test_the_board_snapshot_of_an_empty_project_is_empty(client: TestClient, use
     response = client.get(f"/api/v1/projects/{created['project_id']}/board-snapshot", headers=_auth(user1_token))
 
     assert response.status_code == status.HTTP_200_OK
-    assert response.json() == {"items": []}
+    assert response.json() == {
+        "boards": [
+            {"archived": False, "board_id": created["board_id"], "is_inbox": True, "items": [], "name": "Project"}
+        ]
+    }
 
 
 def test_the_board_snapshot_of_a_missing_or_foreign_project_is_a_404(
@@ -400,3 +412,15 @@ def test_an_unknown_boards_mode_is_rejected_before_anything_is_deleted(client: T
 
     assert refused.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
     assert client.get(f"/api/v1/projects/{created['project_id']}", headers=_auth(user1_token)).status_code == 200
+
+
+def test_the_board_snapshot_lists_member_boards_after_the_inbox(client: TestClient, user1_token: str):
+    created = _create_project(client, user1_token).json()
+    member = _create_board_in_project(client, user1_token, created["project_id"], "Member")
+
+    response = client.get(f"/api/v1/projects/{created['project_id']}/board-snapshot", headers=_auth(user1_token))
+
+    assert [(board["board_id"], board["is_inbox"], board["name"]) for board in response.json()["boards"]] == [
+        (created["board_id"], True, "Project"),
+        (member, False, "Member"),
+    ]

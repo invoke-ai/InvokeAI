@@ -4075,13 +4075,13 @@ export type paths = {
         };
         /**
          * Get Project Board Snapshot
-         * @description Lists everything on the project's inbox that the gallery would show.
+         * @description Lists everything on the project's boards that the gallery would show, inbox first.
          *
          *     Intermediates and the canvas's private `other` category are excluded. Unpaginated: the caller
-         *     that needs this — exporting a project — has to hold the whole list anyway. It is still bounded,
-         *     because the answer is built entirely in memory and any client with a project id can ask for it;
-         *     a board past the ceiling is one an export could not have packed either, so it is refused as a
-         *     413 rather than paged.
+         *     that needs this — exporting a project — has to hold the whole list anyway. It is still bounded
+         *     over all the boards together, because the answer is built entirely in memory and any client
+         *     with a project id can ask for it; a project past the ceiling is one an export could not have
+         *     packed either, so it is refused as a 413 rather than paged.
          */
         get: operations["get_project_board_snapshot"];
         put?: never;
@@ -38529,22 +38529,53 @@ export type components = {
             starred: boolean;
         };
         /**
+         * ProjectBoardSnapshotBoardDTO
+         * @description One of the project's boards and the visible items on it.
+         */
+        ProjectBoardSnapshotBoardDTO: {
+            /**
+             * Board Id
+             * @description The board's id on this install
+             */
+            board_id: string;
+            /**
+             * Name
+             * @description The board's name; the inbox carries the project's
+             */
+            name: string;
+            /**
+             * Is Inbox
+             * @description Whether this is the project's inbox, which every project has exactly one of
+             */
+            is_inbox: boolean;
+            /**
+             * Archived
+             * @description Whether the board is archived
+             */
+            archived: boolean;
+            /**
+             * Items
+             * @description The board's visible items, ordered by kind then name
+             */
+            items: components["schemas"]["ProjectBoardItemDTO"][];
+        };
+        /**
          * ProjectBoardSnapshotDTO
-         * @description Everything a project's board holds that the gallery would show.
+         * @description Everything a project's boards hold that the gallery would show.
          *
          *     This is the enumeration an export needs in order to carry a project's whole workspace rather
          *     than only the media its document happens to reference. Intermediates and the canvas's private
-         *     `other` category are excluded, because neither is something the gallery shows on the board.
+         *     `other` category are excluded, because neither is something the gallery shows on a board.
          *
          *     Deliberately unversioned: `.invk`'s `board.json` carries its own version, so the archive format
          *     is free to change without the wire format following it, and vice versa.
          */
         ProjectBoardSnapshotDTO: {
             /**
-             * Items
-             * @description The board's visible items, ordered by kind then name
+             * Boards
+             * @description The project's boards, inbox first, then the rest in creation order
              */
-            items: components["schemas"]["ProjectBoardItemDTO"][];
+            boards: components["schemas"]["ProjectBoardSnapshotBoardDTO"][];
         };
         /**
          * ProjectCreateRequest
@@ -59991,7 +60022,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description The id of the project whose board to enumerate */
+                /** @description The id of the project whose boards to enumerate */
                 project_id: string;
             };
             cookie?: never;

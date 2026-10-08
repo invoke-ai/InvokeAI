@@ -43,19 +43,20 @@ const freshNameMaterializer =
 const restore = (
   input: {
     boardItems?: readonly InvkBoardItem[];
+    /** Several boards at once; `boardItems` describes the one-board case. */
+    boards?: readonly { items: readonly InvkBoardItem[]; stagingBoardId: string }[];
     coverBytes?: { bytes: Uint8Array; entryName: string } | null;
     coverSourceImageName?: string | null;
     documentRefs?: readonly InvkMediaRef[];
-    boardId?: string | null;
   },
   deps: Partial<RestoreProjectMediaDeps> = {}
 ) => {
-  const ledger = createRestoredMediaLedger(input.boardId === undefined ? BOARD_ID : input.boardId);
+  const boards = input.boards ?? [{ items: input.boardItems ?? [], stagingBoardId: BOARD_ID }];
+  const ledger = createRestoredMediaLedger(boards.map((board) => board.stagingBoardId));
 
   return restoreProjectMedia(
     {
-      boardId: input.boardId === undefined ? BOARD_ID : input.boardId,
-      boardItems: input.boardItems ?? [],
+      boards,
       coverBytes: input.coverBytes ?? null,
       coverSourceImageName: input.coverSourceImageName ?? null,
       documentRefs: input.documentRefs ?? [],
@@ -409,6 +410,34 @@ describe('progress', () => {
     ]);
   });
 
+  it('counts the items of every staged board, each materialized onto its own board', async () => {
+    const onProgress = vi.fn();
+    const targets: [string, string][] = [];
+    const materializeBoardMedia: MediaMaterializer = (items, boardId, onItemSettled) => {
+      targets.push(...items.map((item): [string, string] => [item.name, boardId]));
+
+      return freshNameMaterializer()(items, boardId, onItemSettled);
+    };
+
+    await restore(
+      {
+        boards: [
+          { items: [boardItem({ name: 'one.png' }), boardItem({ name: 'two.png' })], stagingBoardId: 'staged-inbox' },
+          { items: [], stagingBoardId: 'staged-empty' },
+          { items: [boardItem({ name: 'three.png' })], stagingBoardId: 'staged-old' },
+        ],
+      },
+      { materializeBoardMedia, onProgress }
+    );
+
+    expect(targets).toEqual([
+      ['one.png', 'staged-inbox'],
+      ['two.png', 'staged-inbox'],
+      ['three.png', 'staged-old'],
+    ]);
+    expect(onProgress.mock.calls.at(-1)?.[0]).toEqual({ completed: 3, total: 3 });
+  });
+
   it('drops a deduplicated reference out of the total rather than leaving it unfinished', async () => {
     const onProgress = vi.fn();
 
@@ -423,7 +452,7 @@ describe('progress', () => {
 
 describe('rollbackRestoredMedia', () => {
   const ledger = () => ({
-    boardId: BOARD_ID,
+    boardIds: [BOARD_ID],
     boardImageNames: ['board-image'],
     boardVideoNames: ['board-video'],
     coverImageName: 'cover-image',
@@ -469,6 +498,20 @@ describe('rollbackRestoredMedia', () => {
     expect(deleteBoard).toHaveBeenCalledWith(BOARD_ID, undefined);
   });
 
+  it('tries every staging board even when deleting one of them fails', async () => {
+    const deleteBoard = vi
+      .fn<(boardId: string) => Promise<void>>()
+      .mockRejectedValueOnce(new Error('first board refused'))
+      .mockResolvedValue(undefined);
+
+    await rollbackRestoredMedia(
+      { ...ledger(), boardIds: ['staged-inbox', 'staged-old'] },
+      { deleteBoard, deleteImages: () => Promise.resolve(), deleteVideos: () => Promise.resolve() }
+    );
+
+    expect(deleteBoard.mock.calls.map(([boardId]) => boardId)).toEqual(['staged-inbox', 'staged-old']);
+  });
+
   it('never rejects, whatever the cleanup does', async () => {
     await expect(
       rollbackRestoredMedia(ledger(), {
@@ -484,7 +527,7 @@ describe('rollbackRestoredMedia', () => {
     const deleteVideos = vi.fn(() => Promise.resolve());
     const deleteBoard = vi.fn(() => Promise.resolve());
 
-    await rollbackRestoredMedia(createRestoredMediaLedger(null), { deleteBoard, deleteImages, deleteVideos });
+    await rollbackRestoredMedia(createRestoredMediaLedger([]), { deleteBoard, deleteImages, deleteVideos });
 
     expect(deleteImages).not.toHaveBeenCalled();
     expect(deleteVideos).not.toHaveBeenCalled();

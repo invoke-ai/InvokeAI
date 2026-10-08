@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import {
+  PROJECT_FILE_MEMBER_BOARD,
   assertMockBackendFixture,
   collectCanvasLeaves,
   createMockBackendFixture,
@@ -728,10 +729,12 @@ test('the board snapshot lists only what the gallery would show on a project boa
     const snapshot = await getJson(backend, `/api/v1/projects/${project.project_id}/board-snapshot`);
 
     // `other` is the canvas's private category and intermediates are hidden — neither travels.
-    assert.deepEqual(snapshot.items.map((item) => item.name).sort(), [control, general].sort());
-    assert.deepEqual(snapshot.items.map((item) => item.category).sort(), ['control', 'general']);
+    const [inbox] = snapshot.boards;
+    assert.equal(inbox.is_inbox, true);
+    assert.deepEqual(inbox.items.map((item) => item.name).sort(), [control, general].sort());
+    assert.deepEqual(inbox.items.map((item) => item.category).sort(), ['control', 'general']);
     assert.equal(
-      snapshot.items.every((item) => item.kind === 'image' && item.starred === false),
+      inbox.items.every((item) => item.kind === 'image' && item.starred === false),
       true
     );
 
@@ -741,9 +744,27 @@ test('the board snapshot lists only what the gallery would show on a project boa
       method: 'POST',
     });
     const starred = await getJson(backend, `/api/v1/projects/${project.project_id}/board-snapshot`);
-    assert.equal(starred.items.find((item) => item.name === general).starred, true);
+    assert.equal(starred.boards[0].items.find((item) => item.name === general).starred, true);
 
     assert.equal((await fetch(`${backend.origin}/api/v1/projects/nope/board-snapshot`)).status, 404);
+  });
+});
+
+test('the board snapshot lists the project other boards after the inbox, with their own items', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const snapshot = await getJson(backend, '/api/v1/projects/fixture-project-002/board-snapshot');
+
+    assert.deepEqual(
+      snapshot.boards.map((board) => [board.board_id, board.is_inbox, board.name, board.items.length]),
+      [
+        [PROJECT_FILE_BOARD_ID, true, 'Fixture Project 002', 6],
+        [PROJECT_FILE_MEMBER_BOARD.id, false, PROJECT_FILE_MEMBER_BOARD.name, 2],
+      ]
+    );
+    assert.deepEqual(
+      snapshot.boards[1].items.map((item) => item.name).sort(),
+      [...PROJECT_FILE_BOARD.memberImages].sort()
+    );
   });
 });
 

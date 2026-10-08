@@ -216,15 +216,15 @@ def update_project(
 )
 def get_project_board_snapshot(
     current_user: CurrentUserOrDefault,
-    project_id: str = Path(description="The id of the project whose board to enumerate"),
+    project_id: str = Path(description="The id of the project whose boards to enumerate"),
 ) -> ProjectBoardSnapshotDTO:
-    """Lists everything on the project's inbox that the gallery would show.
+    """Lists everything on the project's boards that the gallery would show, inbox first.
 
     Intermediates and the canvas's private `other` category are excluded. Unpaginated: the caller
-    that needs this — exporting a project — has to hold the whole list anyway. It is still bounded,
-    because the answer is built entirely in memory and any client with a project id can ask for it;
-    a board past the ceiling is one an export could not have packed either, so it is refused as a
-    413 rather than paged.
+    that needs this — exporting a project — has to hold the whole list anyway. It is still bounded
+    over all the boards together, because the answer is built entirely in memory and any client
+    with a project id can ask for it; a project past the ceiling is one an export could not have
+    packed either, so it is refused as a 413 rather than paged.
     """
     try:
         return ApiDependencies.invoker.services.project_records.get_board_snapshot(current_user.user_id, project_id)

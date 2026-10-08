@@ -325,7 +325,7 @@ export const duplicateLibraryProject = async (
 
   const { duplicateProjectRecord } = await import('./invk/duplicateProject');
   const duplicated = await duplicateProjectRecord(
-    { boardItems: snapshot.items, owner, record },
+    { boards: snapshot.boards, owner, record },
     options.onProgress ? { onProgress: options.onProgress } : {}
   );
 
@@ -336,6 +336,7 @@ export const duplicateLibraryProject = async (
   }
 
   return {
+    boardIssues: duplicated.boardIssues,
     boardItemIssues: duplicated.boardItemIssues,
     documentReferenceIssues: duplicated.documentReferenceIssues,
     summary: adoptCreatedProject(duplicated.record, owner),

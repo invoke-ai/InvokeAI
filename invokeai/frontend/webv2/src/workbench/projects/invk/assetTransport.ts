@@ -646,6 +646,23 @@ export const createStagingBoard = async (boardName: string, signal?: AbortSignal
 };
 
 /**
+ * Move a staging board that holds a member board's media into the project it now belongs to, and archive it if
+ * the source had. Only after the project exists: a board is a member of a project the server already has.
+ */
+export const placeBoardInProject = async (
+  boardId: string,
+  projectId: string,
+  archived: boolean,
+  signal?: AbortSignal
+): Promise<void> => {
+  await apiFetchJson<unknown>(`${BOARDS_BASE}/${encodeURIComponent(boardId)}`, {
+    body: JSON.stringify({ project_id: projectId, ...(archived ? { archived: true } : {}) }),
+    method: 'PATCH',
+    signal,
+  });
+};
+
+/**
  * Drop a staging board whose project was never created. `include_images=false` deliberately: the
  * restore deletes its own identities one by one, and a generation that landed on the board
  * meanwhile must survive as Uncategorized.

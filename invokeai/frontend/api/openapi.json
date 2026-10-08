@@ -15839,7 +15839,7 @@
       "get": {
         "tags": ["projects"],
         "summary": "Get Project Board Snapshot",
-        "description": "Lists everything on the project's inbox that the gallery would show.\n\nIntermediates and the canvas's private `other` category are excluded. Unpaginated: the caller\nthat needs this \u2014 exporting a project \u2014 has to hold the whole list anyway. It is still bounded,\nbecause the answer is built entirely in memory and any client with a project id can ask for it;\na board past the ceiling is one an export could not have packed either, so it is refused as a\n413 rather than paged.",
+        "description": "Lists everything on the project's boards that the gallery would show, inbox first.\n\nIntermediates and the canvas's private `other` category are excluded. Unpaginated: the caller\nthat needs this \u2014 exporting a project \u2014 has to hold the whole list anyway. It is still bounded\nover all the boards together, because the answer is built entirely in memory and any client\nwith a project id can ask for it; a project past the ceiling is one an export could not have\npacked either, so it is refused as a 413 rather than paged.",
         "operationId": "get_project_board_snapshot",
         "security": [
           {
@@ -15853,10 +15853,10 @@
             "required": true,
             "schema": {
               "type": "string",
-              "description": "The id of the project whose board to enumerate",
+              "description": "The id of the project whose boards to enumerate",
               "title": "Project Id"
             },
-            "description": "The id of the project whose board to enumerate"
+            "description": "The id of the project whose boards to enumerate"
           }
         ],
         "responses": {
@@ -90118,8 +90118,28 @@
         "title": "ProjectBoardItemDTO",
         "description": "One visible item on a project's board."
       },
-      "ProjectBoardSnapshotDTO": {
+      "ProjectBoardSnapshotBoardDTO": {
         "properties": {
+          "board_id": {
+            "type": "string",
+            "title": "Board Id",
+            "description": "The board's id on this install"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The board's name; the inbox carries the project's"
+          },
+          "is_inbox": {
+            "type": "boolean",
+            "title": "Is Inbox",
+            "description": "Whether this is the project's inbox, which every project has exactly one of"
+          },
+          "archived": {
+            "type": "boolean",
+            "title": "Archived",
+            "description": "Whether the board is archived"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/ProjectBoardItemDTO"
@@ -90130,9 +90150,25 @@
           }
         },
         "type": "object",
-        "required": ["items"],
+        "required": ["board_id", "name", "is_inbox", "archived", "items"],
+        "title": "ProjectBoardSnapshotBoardDTO",
+        "description": "One of the project's boards and the visible items on it."
+      },
+      "ProjectBoardSnapshotDTO": {
+        "properties": {
+          "boards": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectBoardSnapshotBoardDTO"
+            },
+            "type": "array",
+            "title": "Boards",
+            "description": "The project's boards, inbox first, then the rest in creation order"
+          }
+        },
+        "type": "object",
+        "required": ["boards"],
         "title": "ProjectBoardSnapshotDTO",
-        "description": "Everything a project's board holds that the gallery would show.\n\nThis is the enumeration an export needs in order to carry a project's whole workspace rather\nthan only the media its document happens to reference. Intermediates and the canvas's private\n`other` category are excluded, because neither is something the gallery shows on the board.\n\nDeliberately unversioned: `.invk`'s `board.json` carries its own version, so the archive format\nis free to change without the wire format following it, and vice versa."
+        "description": "Everything a project's boards hold that the gallery would show.\n\nThis is the enumeration an export needs in order to carry a project's whole workspace rather\nthan only the media its document happens to reference. Intermediates and the canvas's private\n`other` category are excluded, because neither is something the gallery shows on a board.\n\nDeliberately unversioned: `.invk`'s `board.json` carries its own version, so the archive format\nis free to change without the wire format following it, and vice versa."
       },
       "ProjectCreateRequest": {
         "properties": {

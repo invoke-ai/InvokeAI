@@ -1,6 +1,6 @@
-import type { ProjectBoardItemDTO, ProjectRecordDTO } from '@workbench/projects/api';
+import type { ProjectBoardSnapshotBoardDTO, ProjectRecordDTO } from '@workbench/projects/api';
 
-import { type AccountScope, assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
+import { type AccountScope, assertAccountScopeCurrent, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { createProjectSettled } from '@workbench/projects/api';
 import { createProjectId } from '@workbench/projects/ids';
 import {
@@ -10,18 +10,13 @@ import {
   stripInstallationState,
 } from '@workbench/projects/projectAssets';
 
-import type { InvkBoardItem } from './board';
+import type { InvkBoard } from './board';
 import type { MediaMaterializer } from './restoreProjectMedia';
 import type { ProjectTransferIssues } from './transfer';
 
-import {
-  type CopyMediaResult,
-  copyImagesToBoard,
-  copyVideosToBoard,
-  createStagingBoard,
-  isRequestCancellation,
-} from './assetTransport';
+import { type CopyMediaResult, copyImagesToBoard, copyVideosToBoard, isRequestCancellation } from './assetTransport';
 import { InvkFormatError, toInvkFormatReason } from './format';
+import { createStagingBoards, findInboxStagingBoardId, placeMemberBoards } from './memberBoards';
 import {
   createRestoredMediaLedger,
   restoreProjectMedia,
@@ -33,8 +28,8 @@ import { toMediaRefs } from './transfer';
 /** Copy board media server-side and reuse external reference identities. */
 
 export interface DuplicateProjectInput {
-  /** The board's visible contents, enumerated for the source project. */
-  boardItems: readonly ProjectBoardItemDTO[];
+  /** The source project's boards with their visible contents, inbox first. */
+  boards: readonly ProjectBoardSnapshotBoardDTO[];
   owner: AccountScope;
   /** The acknowledged source record — for an open project, flushed first. */
   record: ProjectRecordDTO;
@@ -98,7 +93,7 @@ export const createCopyMediaMaterializer = (
   };
 };
 
-/** Project creation commits the staging board; precommit rollback deletes only ledger-owned resources. */
+/** Project creation commits the staging boards; precommit rollback deletes only ledger-owned resources. */
 export const duplicateProjectRecord = async (
   input: DuplicateProjectInput,
   deps: DuplicateProjectDeps = {}
@@ -129,18 +124,29 @@ export const duplicateProjectRecord = async (
   const { applyAuthoritativeProjectBoard, serializeProjectDocument } =
     await import('@workbench/projects/projectDocument');
   const canonicalDocument = serializeProjectDocument(project);
-  const boardItems = input.boardItems as readonly InvkBoardItem[];
-  const stagingBoardId = boardItems.length === 0 ? null : await createStagingBoard(name, owner.signal);
-  const ledger = createRestoredMediaLedger(stagingBoardId);
+  const boards: InvkBoard[] = input.boards.map((board) => ({
+    archived: board.archived,
+    isInbox: board.is_inbox,
+    items: board.items,
+    name: board.name,
+  }));
+  // Made before anything is staged: every staging board joins it as it is created, so a copy abandoned at any point
+  // can delete them all.
+  const ledger = createRestoredMediaLedger([]);
   let didCreateProject = false;
+  let didAttemptProjectCreate = false;
 
   try {
     assertAccountScopeCurrent(owner);
 
+    const stagedBoards = await createStagingBoards(boards, name, ledger, owner.signal);
+    const inboxStagingBoardId = findInboxStagingBoardId(stagedBoards);
+
+    assertAccountScopeCurrent(owner);
+
     const restored = await restoreProjectMedia(
       {
-        boardId: stagingBoardId,
-        boardItems,
+        boards: stagedBoards.map(({ board, stagingBoardId }) => ({ items: board.items, stagingBoardId })),
         // Same-server duplication needs no bundled bytes and inherits unresolved external references.
         coverBytes: null,
         coverSourceImageName: selectCoverImageName(canonicalDocument),
@@ -163,6 +169,7 @@ export const duplicateProjectRecord = async (
     );
 
     assertAccountScopeCurrent(owner);
+    didAttemptProjectCreate = true;
 
     const record = await createProjectSettled(
       {
@@ -170,15 +177,19 @@ export const duplicateProjectRecord = async (
         minimum_canvas_schema_version: input.record.minimum_canvas_schema_version,
         name,
         project_id: id,
-        ...(stagingBoardId === null ? {} : { board_id: stagingBoardId }),
+        ...(inboxStagingBoardId === null ? {} : { board_id: inboxStagingBoardId }),
       },
       owner
     );
 
     didCreateProject = true;
     assertAccountScopeCurrent(owner);
+    // The copy exists; its other boards can now belong to it. Reported, never fatal, from here on.
+    const boardIssues = await placeMemberBoards(stagedBoards, record.project_id, { signal: owner.signal });
+    assertAccountScopeCurrent(owner);
 
     return {
+      boardIssues,
       boardItemIssues: restored.boardItemIssues,
       coverImageName: restored.coverImageName,
       documentReferenceIssues: restored.documentReferenceIssues,
@@ -188,9 +199,14 @@ export const duplicateProjectRecord = async (
       },
     };
   } catch (error) {
-    await rollbackUnlessProjectExists(error, didCreateProject, owner, () =>
-      rollbackRestoredMedia(ledger, { signal: owner.signal })
-    );
+    const rollback = () => rollbackRestoredMedia(ledger, { signal: owner.signal });
+
+    // Before the create was even attempted nothing is ambiguous: whatever was staged or copied is ours to drop.
+    if (!didAttemptProjectCreate && isAccountScopeCurrent(owner)) {
+      await rollback();
+    } else {
+      await rollbackUnlessProjectExists(error, didCreateProject, owner, rollback);
+    }
 
     throw error;
   }

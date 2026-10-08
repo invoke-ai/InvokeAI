@@ -5,7 +5,10 @@ import pytest
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.project_records import project_records_sqlite
 from invokeai.app.services.project_records.project_records_common import (
+    ProjectBoardItemDTO,
     ProjectBoardNotFoundError,
+    ProjectBoardSnapshotDTO,
+    ProjectBoardTooLargeError,
     ProjectBoardUnavailableError,
     ProjectCanvasSchemaDowngradeError,
     ProjectCanvasSchemaUnsupportedError,
@@ -625,6 +628,75 @@ def test_get_board_id_is_user_scoped(project_records: ProjectRecordsSqlite, othe
 # --- board snapshot ---------------------------------------------------------------------------
 
 
+def _inbox_items(snapshot: ProjectBoardSnapshotDTO) -> list[ProjectBoardItemDTO]:
+    """The inbox always leads the snapshot."""
+    assert snapshot.boards[0].is_inbox
+    return snapshot.boards[0].items
+
+
+def _member_board(db: SqliteDatabase, board_id: str, *, project_id: str, name: str, archived: bool = False) -> str:
+    _insert_board(db, board_id, name=name, archived=archived)
+    with db.transaction() as cursor:
+        cursor.execute("UPDATE boards SET project_id = ? WHERE board_id = ?;", (project_id, board_id))
+    return board_id
+
+
+def test_the_snapshot_lists_every_board_of_the_project_inbox_first(
+    project_records: ProjectRecordsSqlite, db: SqliteDatabase, other_user_id: str
+) -> None:
+    created = project_records.create(SYSTEM_USER_ID, "Mine", {}, project_id="shared-id")
+    # The other account's same-id project has members of its own, which must not leak in.
+    theirs = project_records.create(other_user_id, "Theirs", {}, project_id="shared-id")
+    _member_board(db, "later", project_id="shared-id", name="Site plan refs")
+    _member_board(db, "old", project_id="shared-id", name="Old façades", archived=True)
+    _insert_board(db, "their-member", user_id=other_user_id, name="Stripes")
+    with db.transaction() as cursor:
+        cursor.execute("UPDATE boards SET project_id = 'shared-id' WHERE board_id = 'their-member';")
+        cursor.execute("UPDATE boards SET created_at = '2020-01-01 00:00:00.000' WHERE board_id = 'old';")
+    _put_image(db, "inbox.png", created.board_id)
+    _put_image(db, "later.png", "later")
+    _put_video(db, "old.mp4", "old")
+    _put_image(db, "theirs.png", "their-member")
+
+    snapshot = project_records.get_board_snapshot(SYSTEM_USER_ID, created.project_id)
+
+    assert [(board.board_id, board.name, board.is_inbox, board.archived) for board in snapshot.boards] == [
+        (created.board_id, "Mine", True, False),
+        ("old", "Old façades", False, True),
+        ("later", "Site plan refs", False, False),
+    ]
+    assert [[item.name for item in board.items] for board in snapshot.boards] == [
+        ["inbox.png"],
+        ["old.mp4"],
+        ["later.png"],
+    ]
+    assert [
+        board.board_id for board in project_records.get_board_snapshot(other_user_id, theirs.project_id).boards
+    ] == [
+        theirs.board_id,
+        "their-member",
+    ]
+
+
+def test_the_snapshot_ceiling_counts_every_board_together(
+    project_records: ProjectRecordsSqlite, db: SqliteDatabase, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(project_records_sqlite, "PROJECT_BOARD_SNAPSHOT_MAX_ITEMS", 2)
+    created = project_records.create(SYSTEM_USER_ID, "Full", {})
+    _member_board(db, "member", project_id=created.project_id, name="Member")
+    _put_image(db, "a.png", created.board_id)
+    _put_image(db, "b.png", "member")
+    assert (
+        sum(len(board.items) for board in project_records.get_board_snapshot(SYSTEM_USER_ID, created.project_id).boards)
+        == 2
+    )
+
+    _put_image(db, "c.png", "member")
+
+    with pytest.raises(ProjectBoardTooLargeError):
+        project_records.get_board_snapshot(SYSTEM_USER_ID, created.project_id)
+
+
 def _put_image(
     db: SqliteDatabase,
     name: str,
@@ -671,7 +743,7 @@ def test_the_snapshot_lists_every_visible_category_of_both_kinds(
 
     snapshot = project_records.get_board_snapshot(SYSTEM_USER_ID, created.project_id)
 
-    assert {(item.kind, item.name, item.category) for item in snapshot.items} == {
+    assert {(item.kind, item.name, item.category) for item in _inbox_items(snapshot)} == {
         (kind, f"{category}.{ext}", category)
         for category in ("general", "control", "mask", "user")
         for kind, ext in (("image", "png"), ("video", "mp4"))
@@ -692,7 +764,7 @@ def test_the_snapshot_excludes_what_the_gallery_does_not_show(
 
     snapshot = project_records.get_board_snapshot(SYSTEM_USER_ID, created.project_id)
 
-    assert [item.name for item in snapshot.items] == ["shown.png", "shown.mp4"]
+    assert [item.name for item in _inbox_items(snapshot)] == ["shown.png", "shown.mp4"]
 
 
 def test_the_snapshot_excludes_media_on_other_boards(project_records: ProjectRecordsSqlite, db: SqliteDatabase) -> None:
@@ -703,7 +775,7 @@ def test_the_snapshot_excludes_media_on_other_boards(project_records: ProjectRec
 
     snapshot = project_records.get_board_snapshot(SYSTEM_USER_ID, mine.project_id)
 
-    assert [item.name for item in snapshot.items] == ["mine.png"]
+    assert [item.name for item in _inbox_items(snapshot)] == ["mine.png"]
 
 
 def test_the_snapshot_carries_starring_and_is_ordered_by_kind_then_name(
@@ -716,7 +788,7 @@ def test_the_snapshot_carries_starring_and_is_ordered_by_kind_then_name(
 
     snapshot = project_records.get_board_snapshot(SYSTEM_USER_ID, created.project_id)
 
-    assert [(item.kind, item.name, item.starred) for item in snapshot.items] == [
+    assert [(item.kind, item.name, item.starred) for item in _inbox_items(snapshot)] == [
         ("image", "a.png", False),
         ("image", "b.png", True),
         ("video", "a.mp4", False),
@@ -733,13 +805,13 @@ def test_a_same_name_image_and_video_are_separate_entries(
 
     snapshot = project_records.get_board_snapshot(SYSTEM_USER_ID, created.project_id)
 
-    assert [(item.kind, item.name) for item in snapshot.items] == [("image", "twin"), ("video", "twin")]
+    assert [(item.kind, item.name) for item in _inbox_items(snapshot)] == [("image", "twin"), ("video", "twin")]
 
 
 def test_an_empty_board_snapshots_to_an_empty_list(project_records: ProjectRecordsSqlite) -> None:
     created = project_records.create(SYSTEM_USER_ID, "Empty", {})
 
-    assert project_records.get_board_snapshot(SYSTEM_USER_ID, created.project_id).items == []
+    assert _inbox_items(project_records.get_board_snapshot(SYSTEM_USER_ID, created.project_id)) == []
 
 
 def test_snapshotting_someone_elses_project_is_not_found(
