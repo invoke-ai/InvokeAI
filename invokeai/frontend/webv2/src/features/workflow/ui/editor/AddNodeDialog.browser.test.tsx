@@ -320,6 +320,8 @@ describe('AddNodeDialog search', () => {
       'Could not load the node list. Check the connection to the server and try again.Service unavailableRetry'
     );
 
+    // Wait for modal setup to isolate the background before moving focus to Retry.
+    await expect.poll(() => host.getAttribute('aria-hidden')).toBe('true');
     retry.focus();
     await act(() => userEvent.keyboard('{Enter}'));
 
