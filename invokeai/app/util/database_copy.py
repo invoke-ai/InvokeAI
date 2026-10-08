@@ -296,7 +296,7 @@ def _move_into_place(work_path: Path, target_path: Path) -> bool:
             return False
         os.replace(work_path, target_path)
         return True
-    work_path.unlink()
+    # The work file's other name goes with its directory, which the caller deletes.
     return True
 
 
