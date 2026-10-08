@@ -698,7 +698,12 @@ export const placeVideoImage = ({
   if (!values.firstFrameImage && !values.sourceVideo) {
     return {
       displaced: clipDisplaced,
-      patch: { ...getFrameImagePatch('firstFrameImage', image, storedClip), references: [] },
+      // The visible last frame stays; one hidden behind stale references is cleared rather than resurfaced.
+      patch: {
+        ...getFrameImagePatch('firstFrameImage', image, storedClip),
+        lastFrameImage: values.lastFrameImage,
+        references: [],
+      },
       slot: 'firstFrame',
       status: 'placed',
     };
@@ -706,7 +711,7 @@ export const placeVideoImage = ({
   if (!values.lastFrameImage && policy.modes.includes('first-last')) {
     return {
       displaced: clipDisplaced,
-      patch: getFrameImagePatch('lastFrameImage', image, storedClip),
+      patch: { ...getFrameImagePatch('lastFrameImage', image, storedClip), references: [] },
       slot: 'lastFrame',
       status: 'placed',
     };

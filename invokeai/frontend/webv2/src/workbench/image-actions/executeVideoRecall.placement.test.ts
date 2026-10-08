@@ -382,9 +382,39 @@ describe('placeVideoImage', () => {
 
       expect(placement).toEqual({
         displaced: false,
-        patch: { lastFrameImage: still('new.png') },
+        patch: { lastFrameImage: still('new.png'), references: [] },
         slot: 'lastFrame',
         status: 'placed',
+      });
+    });
+
+    it('clears stale references that would hide an appended frame, and the last frame they hid', () => {
+      const staleReferences = [{ detail: 'max' as const, image: still('ref.png'), kind: 'image' as const }];
+      const afterFirst = placeVideoImage({
+        append: true,
+        image: still('new.png'),
+        models: [LTX2],
+        videoValues: panel(LTX2, { lastFrameImage: last, references: staleReferences }),
+      });
+
+      expect(afterFirst).toMatchObject({
+        patch: { firstFrameImage: still('new.png'), lastFrameImage: null, references: [] },
+        slot: 'firstFrame',
+      });
+
+      const afterLast = placeVideoImage({
+        append: true,
+        image: still('new.png'),
+        models: [LTX2],
+        videoValues: panel(LTX2, {
+          references: staleReferences,
+          sourceVideo: { ...videoReference('source.mp4').clip },
+        }),
+      });
+
+      expect(afterLast).toMatchObject({
+        patch: { lastFrameImage: still('new.png'), references: [] },
+        slot: 'lastFrame',
       });
     });
 
@@ -439,7 +469,7 @@ describe('placeVideoImage', () => {
         })
       ).toEqual({
         displaced: false,
-        patch: { conditioningClip: null, lastFrameImage: still('new.png') },
+        patch: { conditioningClip: null, lastFrameImage: still('new.png'), references: [] },
         slot: 'lastFrame',
         status: 'placed',
       });

@@ -736,8 +736,8 @@ def recall_video_image(
     """Place a gallery image in the current user's Video panel, where the panel's model takes images.
 
     A model that takes reference images (e.g. MiniMax H3 Ref2VA) gets it as a reference: it replaces the reference
-    images, or with `append` joins them. A model that takes frames (e.g. Wan, LTX-2) gets it as the first frame,
-    clearing the last; with `append` it fills the first free frame slot, and is ignored when both are set. The
+    images, or with `append` joins them. A model that takes frames (e.g. Wan I2V, LTX-2) gets it as the first frame,
+    clearing the last; with `append` it fills the first free frame slot, and is declined when both are set. The
     panel's model decides, so the outcome is reported to the user there rather than in this response.
     """
     assert_image_move_maintenance_inactive()

@@ -16711,7 +16711,7 @@
       "post": {
         "tags": ["recall"],
         "summary": "Recall Video Image",
-        "description": "Place a gallery image in the current user's Video panel, where the panel's model takes images.\n\nA model that takes reference images (e.g. MiniMax H3 Ref2VA) gets it as a reference: it replaces the reference\nimages, or with `append` joins them. A model that takes frames (e.g. Wan, LTX-2) gets it as the first frame,\nclearing the last; with `append` it fills the first free frame slot, and is ignored when both are set. The\npanel's model decides, so the outcome is reported to the user there rather than in this response.",
+        "description": "Place a gallery image in the current user's Video panel, where the panel's model takes images.\n\nA model that takes reference images (e.g. MiniMax H3 Ref2VA) gets it as a reference: it replaces the reference\nimages, or with `append` joins them. A model that takes frames (e.g. Wan I2V, LTX-2) gets it as the first frame,\nclearing the last; with `append` it fills the first free frame slot, and is declined when both are set. The\npanel's model decides, so the outcome is reported to the user there rather than in this response.",
         "operationId": "recall_video_image",
         "security": [
           {
