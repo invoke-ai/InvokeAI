@@ -6,7 +6,6 @@ import time
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Callable, Optional
-from unittest.mock import MagicMock
 
 import pytest
 import torch
@@ -14,7 +13,6 @@ import torch
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.model_load.model_load_default import ModelLoadService
 from invokeai.app.services.model_records import ModelRecordChanges, ModelRecordServiceSQL
-from invokeai.app.services.shared.invocation_context import ModelsInterface
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.siglip import SigLIP_Diffusers_Config
 from invokeai.backend.model_manager.load import LoadedModel, ModelCache, ModelLoader, StaleModelConfigError
@@ -42,8 +40,17 @@ class _Registry:
         return _RecordingLoader, config, submodel_type
 
 
-def _noop(*args, **kwargs) -> None:
-    return None
+class _LoadEvents:
+    """Records the model load events in order, as (event, model name)."""
+
+    def __init__(self) -> None:
+        self.log: list[tuple[str, str]] = []
+
+    def emit_model_load_started(self, config: AnyModelConfig, submodel_type, user_id: str) -> None:
+        self.log.append(("started", config.name))
+
+    def emit_model_load_complete(self, config: AnyModelConfig, submodel_type, user_id: str) -> None:
+        self.log.append(("complete", config.name))
 
 
 @pytest.fixture
@@ -71,9 +78,9 @@ def harness(tmp_path: Path):
         shared_cpu_weights=None,
     )
     service = ModelLoadService(app_config=app_config, ram_cache=cache, registry=_Registry)  # type: ignore[arg-type]
-    events = SimpleNamespace(emit_model_load_started=_noop, emit_model_load_complete=_noop)
+    events = _LoadEvents()
     service.start(SimpleNamespace(services=SimpleNamespace(events=events, model_manager=SimpleNamespace(store=store))))  # type: ignore[arg-type]
-    return service, store, cache
+    return service, store, cache, events
 
 
 def _edit_and_invalidate(store: ModelRecordServiceSQL, cache: ModelCache, changes: ModelRecordChanges) -> None:
@@ -91,25 +98,22 @@ def _is_cached(cache: ModelCache) -> bool:
     return True
 
 
-def test_load_from_record_read_before_invalidating_edit_is_rejected_and_not_cached(harness):
-    service, store, cache = harness
+def test_load_from_record_read_before_invalidating_edit_loads_the_updated_record(harness):
+    service, store, cache, events = harness
     stale = store.get_model(KEY)
 
     _edit_and_invalidate(store, cache, ModelRecordChanges(cpu_only=True))
 
-    with pytest.raises(StaleModelConfigError):
-        service.load_model(stale)
-    assert not _is_cached(cache)
-    assert _RecordingLoader.built_from == []
-
-    loaded = service.load_model(store.get_model(KEY))
+    loaded = service.load_model(stale)
     assert loaded.config.cpu_only is True
     assert _RecordingLoader.built_from == [True]
     assert _is_cached(cache)
+    # One load as far as the UI can tell: a retry that re-announced itself would leave a load showing.
+    assert events.log == [("started", "siglip"), ("complete", "siglip")]
 
 
 def test_load_from_record_read_before_metadata_only_edit_still_loads(harness):
-    service, store, cache = harness
+    service, store, cache, _ = harness
     previous = store.get_model(KEY)
 
     # A rename does not invalidate the cache, so nothing fences a load that read the old name.
@@ -147,34 +151,25 @@ def _run_with_edit_while_queued_on_construction_lock(
     return outcome[0]
 
 
-def test_load_waiting_on_construction_lock_during_invalidating_edit_is_rejected(harness):
-    service, store, cache = harness
+def test_load_waiting_on_construction_lock_during_invalidating_edit_loads_the_updated_record(harness):
+    service, store, cache, events = harness
 
     outcome = _run_with_edit_while_queued_on_construction_lock(
         store, cache, lambda: service.load_model(store.get_model(KEY))
     )
 
-    assert isinstance(outcome, StaleModelConfigError)
-    assert _RecordingLoader.built_from == []
-    assert not _is_cached(cache)
-
-
-def test_invocation_load_superseded_mid_load_loads_the_updated_record(harness):
-    service, store, cache = harness
-    services = SimpleNamespace(model_manager=SimpleNamespace(store=store, load=service))
-    models = ModelsInterface(services=services, data=MagicMock(), util=MagicMock())  # type: ignore[arg-type]
-
-    outcome = _run_with_edit_while_queued_on_construction_lock(store, cache, lambda: models.load(KEY))
-
     assert isinstance(outcome, LoadedModel)
     assert outcome.config.cpu_only is True
+    # Built once, from the updated record: the stale construction never ran.
     assert _RecordingLoader.built_from == [True]
+    # One load as far as the UI can tell: a retry that re-announced itself would leave a load showing.
+    assert events.log == [("started", "siglip"), ("complete", "siglip")]
 
 
 def test_config_object_reused_after_eviction_still_loads(harness):
     """The loader rewrites `config.path` to an absolute path in place; a service that keeps its config
     object across loads must not see that as a load-affecting edit."""
-    service, store, cache = harness
+    service, store, cache, _ = harness
     config = store.get_model(KEY)
     # Use it once so its first-use hold is released and the drop below evicts it outright.
     with service.load_model(config):
@@ -184,3 +179,19 @@ def test_config_object_reused_after_eviction_still_loads(harness):
 
     service.load_model(config)
     assert _RecordingLoader.built_from == [None, None]
+
+
+def test_record_superseded_again_during_retry_raises(harness, monkeypatch):
+    service, store, _, _ = harness
+    fence_checks: list[str] = []
+
+    def never_current(config: AnyModelConfig) -> bool:
+        fence_checks.append(config.key)
+        return False
+
+    monkeypatch.setattr(service, "_config_is_current", never_current)
+
+    with pytest.raises(StaleModelConfigError):
+        service.load_model(store.get_model(KEY))
+    assert fence_checks == [KEY, KEY]
+    assert _RecordingLoader.built_from == []

@@ -19,6 +19,7 @@ from invokeai.backend.model_manager.load import (
     ModelLoader,
     ModelLoaderRegistry,
     ModelLoaderRegistryBase,
+    StaleModelConfigError,
 )
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK, ModelCache
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
@@ -94,6 +95,22 @@ class ModelLoadService(ModelLoadServiceBase):
         if hasattr(self, "_invoker"):
             self._invoker.services.events.emit_model_load_started(model_config, submodel_type, user_id or "system")
 
+        try:
+            loaded_model = self._load(model_config, submodel_type)
+        except StaleModelConfigError:
+            # The edit has already invalidated the cache, so loading what the record says now is what this
+            # call would have done had it been made a moment later. Retried here rather than by callers so
+            # every caller gets it and the load events stay paired.
+            loaded_model = self._load(
+                self._invoker.services.model_manager.store.get_model(model_config.key), submodel_type
+            )
+
+        if hasattr(self, "_invoker"):
+            self._invoker.services.events.emit_model_load_complete(model_config, submodel_type, user_id or "system")
+
+        return loaded_model
+
+    def _load(self, model_config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> LoadedModel:
         implementation, model_config, submodel_type = self._registry.get_implementation(model_config, submodel_type)  # type: ignore
         loader = implementation(
             app_config=self._app_config,
@@ -102,12 +119,7 @@ class ModelLoadService(ModelLoadServiceBase):
         )
         if hasattr(self, "_invoker") and isinstance(loader, ModelLoader):
             loader.config_is_current = self._config_is_current
-        loaded_model: LoadedModel = loader.load_model(model_config, submodel_type)
-
-        if hasattr(self, "_invoker"):
-            self._invoker.services.events.emit_model_load_complete(model_config, submodel_type, user_id or "system")
-
-        return loaded_model
+        return loader.load_model(model_config, submodel_type)
 
     def _config_is_current(self, config: AnyModelConfig) -> bool:
         """Whether `config` still loads the same model as the stored record for its key.
