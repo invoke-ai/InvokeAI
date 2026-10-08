@@ -3,6 +3,7 @@ import type { MouseEvent, ReactNode } from 'react';
 
 import { Menu, Portal } from '@chakra-ui/react';
 import { INTERMEDIATES_SETTING_ID, requestIntermediatesFocus } from '@features/intermediates';
+import { Dialog } from '@platform/ui/Dialog';
 import { RenameDialog } from '@platform/ui/RenameDialog';
 import { useNavigate } from '@tanstack/react-router';
 import { isProjectSummaryCompatible } from '@workbench/projects/library';
@@ -21,6 +22,8 @@ const LazyDeleteProjectDialog = lazy(() =>
     default: module.DeleteProjectDialog,
   }))
 );
+// Modal from the request onward: while the dialog's module is still on its way, shortcuts must already be off.
+const PENDING_DIALOG = <Dialog.Pending />;
 
 /**
  * Use one menu host so switching cards cannot race Zag's nested-layer teardown. Keep dialogs beside the menu so
@@ -141,7 +144,7 @@ export const ProjectActionsMenuProvider = ({ children }: { children: ReactNode }
       />
 
       {hasRequestedDelete ? (
-        <Suspense fallback={null}>
+        <Suspense fallback={dialogRequest?.kind === 'delete' ? PENDING_DIALOG : null}>
           <LazyDeleteProjectDialog
             body={t('projects.deleteProjectCardBody', { name: dialogRequest?.name ?? '' })}
             isOpen={dialogRequest?.kind === 'delete'}

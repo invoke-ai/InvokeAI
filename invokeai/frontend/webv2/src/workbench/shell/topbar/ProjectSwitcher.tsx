@@ -9,6 +9,7 @@ import { useModelLoads } from '@features/models';
 import { getProjectQueueIndicatorState } from '@features/queue/contracts';
 import { useQueueItemProgress } from '@features/queue/react';
 import { Button } from '@platform/ui/Button';
+import { Dialog } from '@platform/ui/Dialog';
 import { MenuContent } from '@platform/ui/Menu';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { RenameDialog } from '@platform/ui/RenameDialog';
@@ -50,6 +51,8 @@ const LazyDeleteProjectDialog = lazy(() =>
     default: module.DeleteProjectDialog,
   }))
 );
+// Modal from the request onward: while the dialog's module is still on its way, shortcuts must already be off.
+const PENDING_DIALOG = <Dialog.Pending />;
 
 const MENU_POSITIONING = { placement: 'bottom-start' } as const;
 const RECENT_PROJECT_LIMIT = 5;
@@ -280,7 +283,7 @@ export const ProjectSwitcher = () => {
         onSubmit={renameProject}
       />
       {hasRequestedDelete ? (
-        <Suspense fallback={null}>
+        <Suspense fallback={deleteTarget !== null ? PENDING_DIALOG : null}>
           <LazyDeleteProjectDialog
             body={t('projects.deleteProjectTabBody', { name: deleteTarget?.name ?? '' })}
             isOpen={deleteTarget !== null}
