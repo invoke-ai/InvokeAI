@@ -1,4 +1,11 @@
-export { GenerationUiProvider, type GenerationUiAdapter } from './ui/GenerationUiContext';
+export {
+  GenerationUiProvider,
+  type CanvasDenoisingStrength,
+  type CanvasDenoisingStrengthProps,
+  type CanvasRenderSize,
+  type CanvasRenderSizeProps,
+  type GenerationUiAdapter,
+} from './ui/GenerationUiContext';
 export { flushGenerateDrafts, useRegisterGenerateDraftFlusher } from './ui/generateDraftRegistry';
 export { useDebouncedDraftValue } from './ui/useDebouncedDraftValue';
 export { useDynamicPrompts, type DynamicPromptsExpansion } from './ui/useDynamicPrompts';

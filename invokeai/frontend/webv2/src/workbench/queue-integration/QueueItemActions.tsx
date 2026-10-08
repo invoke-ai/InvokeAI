@@ -1,7 +1,8 @@
 import type { QueueItemReadModel } from '@features/queue/contracts';
 
-import { ButtonGroup, Dialog, Icon, Portal } from '@chakra-ui/react';
+import { ButtonGroup, Icon, Portal } from '@chakra-ui/react';
 import { Button, CloseButton } from '@platform/ui/Button';
+import { Dialog } from '@platform/ui/Dialog';
 import { JsonPreview } from '@platform/ui/JsonPreview';
 import { useNotify } from '@workbench/useNotify';
 import { FileTextIcon, WandSparklesIcon } from 'lucide-react';

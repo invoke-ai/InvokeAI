@@ -52,6 +52,17 @@ class AppVersion(BaseModel):
     version: str = Field(description="App version")
 
 
+class FrontendConfig(BaseModel):
+    """Presentation settings any signed-in user may read; never include private runtime configuration here."""
+
+    show_donation_link: bool = Field(description="Whether to show the Donate to InvokeAI menu link")
+
+
+@app_router.get("/frontend_config", operation_id="get_frontend_config", response_model=FrontendConfig)
+def get_frontend_config(current_user: CurrentUserOrDefault) -> FrontendConfig:
+    return FrontendConfig(show_donation_link=get_config().show_donation_link)
+
+
 @app_router.get("/version", operation_id="app_version", status_code=200, response_model=AppVersion)
 def get_version() -> AppVersion:
     return AppVersion(version=__version__)

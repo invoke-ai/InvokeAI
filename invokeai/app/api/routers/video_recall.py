@@ -374,15 +374,18 @@ MEDIA_QUALIFIERS: dict[str, tuple[str, ...]] = {
 def apply_media_precedence(resolved: dict[str, Any]) -> dict[str, str]:
     """Drop media a higher-precedence medium in the same request excludes; returns {dropped field: winner}.
 
-    Mirrors the Video panel's reading of a record: a whole-generation conditioning clip excludes every other slot;
-    Ref2VA references replace the frame slots (an initial video rides alongside them); an initial video replaces
-    the first frame, which extend mode extracts from the clip itself.
+    Mirrors the Video panel's reading of a record: a whole-generation conditioning clip excludes every other slot,
+    except that a held soundtrack keeps the frames that anchor the picture generated for it; Ref2VA references
+    replace the frame slots (an initial video rides alongside them); an initial video replaces the first frame,
+    which extend mode extracts from the clip itself.
     """
+    clip_holds_picture = resolved.get("ltx2_conditioning_role") == "video"
     rules: list[tuple[str, bool, tuple[str, ...]]] = [
         (
             "ltx2_conditioning_video",
             "ltx2_conditioning_video" in resolved,
-            ("minimax_h3_references", "source_video", "first_frame_image", "last_frame_image"),
+            ("minimax_h3_references", "source_video")
+            + (("first_frame_image", "last_frame_image") if clip_holds_picture else ()),
         ),
         (
             "minimax_h3_references",
@@ -692,7 +695,8 @@ def recall_conditioning_video(
 ) -> VideoRecallMediaResponse:
     """Set a gallery video as the current user's conditioning clip (models that take one, e.g. LTX-2).
 
-    The clip replaces the panel's other conditioning media: frames, initial video and references.
+    The clip replaces the panel's initial video and references, and in the `video` role its first and last frames;
+    in the `audio` role the frames stay, anchoring the picture generated for the soundtrack.
     """
     return _place_gallery_video(queue_id, "conditioning_video", video_name, current_user, role)
 

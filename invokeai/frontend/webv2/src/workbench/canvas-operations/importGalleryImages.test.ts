@@ -15,6 +15,7 @@ import {
   seedArchitectureCapabilities,
 } from '@features/generation/core/architectureCapabilities.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { getDocumentLeaves } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { createTestInsertionAnchorCapture } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
 import {
@@ -27,7 +28,7 @@ import {
   nextRegionalGuidanceFillColor,
 } from '@workbench/widgets/layers/layerOps';
 import { getProjectWidgetValues } from '@workbench/widgetState';
-import { createInitialWorkbenchState, type WorkbenchAction } from '@workbench/workbenchState.testing';
+import { createInitialWorkbenchState, workbenchReducer, type WorkbenchAction } from '@workbench/workbenchState.testing';
 import { describe, expect, it, vi } from 'vitest';
 
 import { importGalleryImagesToCanvas, type GalleryCanvasImportDestination } from './importGalleryImages';
@@ -91,6 +92,7 @@ const setModel = (project: Project, base: GenerateWidgetValues['model']['base'])
     dynamicPromptsCombinatorial: true,
     dynamicPromptsMaxPrompts: 100,
     dynamicPromptsSampleSeed: 0,
+    dynamicPromptsResample: true,
     dynamicPromptsSeedBehaviour: 'per-iteration',
     componentSourceModel: null,
     height: 1024,
@@ -516,6 +518,39 @@ describe('importGalleryImagesToCanvas', () => {
     expect(matchingEngine.layers.commitStructural).not.toHaveBeenCalled();
     expect(dispatch).toHaveBeenCalledOnce();
     expect(dispatch.mock.calls[0]![0]).toMatchObject({ projectId: project.id });
+  });
+
+  it('lands in the captured project alone, keeping its identity and layers, when the user switches mid-import', async () => {
+    const { project, state } = withProject();
+    const otherProject = { ...withProject().project, id: 'project-2' };
+    let current: WorkbenchState = { ...state, activeProjectId: project.id, projects: [project, otherProject] };
+    const uploadImage = vi.fn<typeof uploadCanvasImage>(() => {
+      current = { ...current, activeProjectId: otherProject.id };
+      return Promise.resolve({ height: 512, imageName: 'resized', width: 512 });
+    });
+
+    const result = await importGalleryImagesToCanvas({
+      applyCanvasMutation: (projectId, mutation) => {
+        current = workbenchReducer(current, { mutation, projectId, type: 'applyCanvasProjectMutation' });
+      },
+      destination: 'control-resized',
+      engine: null,
+      fetchImage: () => Promise.resolve(new Response(new Blob(['pixels']), { status: 200 })),
+      ...queriesFor(() => current),
+      images: [image('a.png')],
+      project,
+      uploadImage,
+    });
+
+    expect(result.status).toBe('imported');
+    expect(current.projects.map((candidate) => candidate.id)).toEqual([project.id, otherProject.id]);
+    const target = current.projects[0]!;
+    const leafIds = getDocumentLeaves(target.canvas.document).map((layer) => layer.id);
+    expect(leafIds).toHaveLength(2);
+    expect(leafIds).toEqual(
+      expect.arrayContaining(['previous', ...(result.status === 'imported' ? result.layerIds : [])])
+    );
+    expect(current.projects[1]!.canvas.document).toBe(otherProject.canvas.document);
   });
 
   it('uses the matching engine final guard when the target project becomes active during preprocessing', async () => {

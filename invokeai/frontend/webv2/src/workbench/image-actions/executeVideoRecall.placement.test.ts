@@ -1,7 +1,11 @@
 import type { ModelConfig } from '@features/models';
 import type { VideoReferenceItem } from '@features/video';
 
-import { createDefaultVideoWidgetValues, createVideoReferenceEntry } from '@features/video';
+import {
+  createDefaultVideoWidgetValues,
+  createVideoConditioningClip,
+  createVideoReferenceEntry,
+} from '@features/video';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -163,23 +167,19 @@ describe('appendReferenceVideo', () => {
 });
 
 describe('placeConditioningClip', () => {
-  it('sets the clip in the requested role and clears every other conditioning slot', () => {
-    const placement = placeConditioningClip({
-      models: [LTX2],
-      role: 'audio',
-      video: clip,
-      videoValues: panel(LTX2, {
-        firstFrameImage: { height: 480, image_name: 'first.png', width: 832 },
-        sourceVideo: { ...videoReference('source.mp4').clip },
-      }),
+  it('sets the clip in the requested role and clears the conditioning slots that role conflicts with', () => {
+    const framed = panel(LTX2, {
+      firstFrameImage: { height: 480, image_name: 'first.png', width: 832 },
+      lastFrameImage: { height: 480, image_name: 'last.png', width: 832 },
     });
 
-    expect(placement).toEqual({
+    // The picture role holds every frame, so the start and end images go.
+    expect(placeConditioningClip({ models: [LTX2], role: 'video', video: clip, videoValues: framed })).toEqual({
       displaced: true,
       patch: {
         conditioningClip: expect.objectContaining({
           clip: expect.objectContaining({ video_name: 'clip.mp4' }),
-          role: 'audio',
+          role: 'video',
         }),
         firstFrameImage: null,
         lastFrameImage: null,
@@ -188,6 +188,25 @@ describe('placeConditioningClip', () => {
       },
       status: 'placed',
     });
+    // A soundtrack leaves them to anchor the picture generated for it.
+    expect(placeConditioningClip({ models: [LTX2], role: 'audio', video: clip, videoValues: framed })).toEqual({
+      displaced: false,
+      patch: {
+        conditioningClip: expect.objectContaining({ role: 'audio' }),
+        references: [],
+        sourceVideo: null,
+      },
+      status: 'placed',
+    });
+    // An initial video conflicts with either role.
+    expect(
+      placeConditioningClip({
+        models: [LTX2],
+        role: 'audio',
+        video: clip,
+        videoValues: panel(LTX2, { sourceVideo: { ...videoReference('source.mp4').clip } }),
+      })
+    ).toMatchObject({ displaced: true, patch: { sourceVideo: null }, status: 'placed' });
   });
 
   it('replacing a clip on an otherwise empty panel displaces nothing', () => {
@@ -328,7 +347,6 @@ describe('placeVideoImage', () => {
       expect(placement).toEqual({
         displaced: true,
         patch: {
-          conditioningClip: null,
           firstFrameImage: still('new.png'),
           lastFrameImage: null,
           references: [],
@@ -364,7 +382,7 @@ describe('placeVideoImage', () => {
 
       expect(placement).toEqual({
         displaced: false,
-        patch: { conditioningClip: null, lastFrameImage: still('new.png') },
+        patch: { lastFrameImage: still('new.png') },
         slot: 'lastFrame',
         status: 'placed',
       });
@@ -381,15 +399,50 @@ describe('placeVideoImage', () => {
       ).toEqual({ status: 'full' });
     });
 
-    it('clears a conditioning clip, as the frame fields do', () => {
-      const placement = placeVideoImage({
-        append: true,
-        image: still('new.png'),
-        models: [LTX2],
-        videoValues: panel(LTX2),
-      });
+    it('clears a clip that holds the picture, as the frame fields do, but keeps a soundtrack', () => {
+      const pictureClip = { ...createVideoConditioningClip(clip), role: 'video' as const };
+      const soundtrack = { ...createVideoConditioningClip(clip), role: 'audio' as const };
 
-      expect(placement).toMatchObject({ patch: { conditioningClip: null, firstFrameImage: still('new.png') } });
+      for (const append of [false, true]) {
+        expect(
+          placeVideoImage({
+            append,
+            image: still('new.png'),
+            models: [LTX2],
+            videoValues: panel(LTX2, { conditioningClip: pictureClip }),
+          })
+        ).toMatchObject({ displaced: true, patch: { conditioningClip: null, firstFrameImage: still('new.png') } });
+
+        const kept = placeVideoImage({
+          append,
+          image: still('new.png'),
+          models: [LTX2],
+          videoValues: panel(LTX2, { conditioningClip: soundtrack }),
+        });
+
+        expect(kept).toMatchObject({ displaced: false, patch: { firstFrameImage: still('new.png') } });
+        expect(kept.status === 'placed' && 'conditioningClip' in kept.patch).toBe(false);
+      }
+    });
+
+    it('clears a picture clip hidden behind the first frame when appending the last', () => {
+      const pictureClip = { ...createVideoConditioningClip(clip), role: 'video' as const };
+
+      // Normalization hides the stored clip behind the first frame; left stored, it would resurface beside the last
+      // frame once the first is cleared. It was never on screen, so it isn't reported as displaced.
+      expect(
+        placeVideoImage({
+          append: true,
+          image: still('new.png'),
+          models: [LTX2],
+          videoValues: panel(LTX2, { conditioningClip: pictureClip, firstFrameImage: first }),
+        })
+      ).toEqual({
+        displaced: false,
+        patch: { conditioningClip: null, lastFrameImage: still('new.png') },
+        slot: 'lastFrame',
+        status: 'placed',
+      });
     });
   });
 

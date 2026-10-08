@@ -1,8 +1,9 @@
 import { classifyGalleryUpload } from '@features/gallery/contracts';
 import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { Dialog } from '@platform/ui/Dialog';
+import { isModalPresent } from '@platform/ui/modalPresence';
 import { isEditableHotkeyTarget } from '@workbench/hotkeys/keys';
-import { isHotkeyModalLayerActive } from '@workbench/hotkeys/modalLayer';
 import { lazy, Suspense, useCallback, useState } from 'react';
 
 export interface PasteMediaRequest {
@@ -12,14 +13,15 @@ export interface PasteMediaRequest {
   settle: () => void;
 }
 
-// Not every dialog registers a hotkey modal layer (ConfirmDialog, RenameDialog,
-// feature-owned dialogs); a paste from inside any open dialog stays with it.
+// Modal dialogs announce their presence; a paste from inside a non-modal one, such as a popover, also stays with it.
 const isInsideDialog = (target: EventTarget | null): boolean =>
   target instanceof Element && target.closest('[role="dialog"], [role="alertdialog"]') !== null;
 
 const PasteMediaDialog = lazy(() =>
   import('./PasteMediaDialog').then((module) => ({ default: module.PasteMediaDialog }))
 );
+// The dialog is open, and modal, from the paste that requested it, not from when its module arrives.
+const PENDING_DIALOG = <Dialog.Pending />;
 
 /**
  * Offer destinations for workbench media paste. Canvas handles its own chord; text fields and open dialogs retain
@@ -35,7 +37,7 @@ export const PasteMediaRuntime = () => {
     let ticket = 0;
     const handlePaste = (event: ClipboardEvent) => {
       const clipboard = event.clipboardData;
-      if (!clipboard || isHotkeyModalLayerActive() || isInsideDialog(event.target)) {
+      if (!clipboard || isModalPresent() || isInsideDialog(event.target)) {
         return;
       }
       if (isEditableHotkeyTarget(event.target) && clipboard.types.includes('text/plain')) {
@@ -58,7 +60,7 @@ export const PasteMediaRuntime = () => {
   });
 
   return dialog.value ? (
-    <Suspense fallback={null}>
+    <Suspense fallback={dialog.isOpen ? PENDING_DIALOG : null}>
       <PasteMediaDialog
         key={dialog.value.ticket}
         isOpen={dialog.isOpen}

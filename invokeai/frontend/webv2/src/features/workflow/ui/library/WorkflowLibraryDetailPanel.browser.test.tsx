@@ -3,6 +3,7 @@ import type { StarterModel } from '@features/models';
 import type { WorkflowModelRequirement } from '@features/workflow/core/modelRequirements';
 import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
 import type { WorkflowLibraryEntry, WorkflowLibraryEntryEnrichment } from '@features/workflow/data/libraryBrowseStore';
+import type { LibraryWorkflowReadOptions } from '@features/workflow/data/libraryCache';
 import type { WorkflowGraphPreviewPort, WorkflowUiAdapter } from '@features/workflow/ui/WorkflowUiContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
@@ -65,13 +66,13 @@ const queries = vi.hoisted(() => ({
   ),
   deleteLibraryWorkflow: vi.fn((_workflowId: string, _signal?: AbortSignal) => Promise.resolve()),
   deleteLibraryWorkflowThumbnail: vi.fn((_workflowId: string, _signal?: AbortSignal) => Promise.resolve()),
-  getLibraryWorkflowCached: vi.fn((_workflowId: string, _signal?: AbortSignal) =>
+  getLibraryWorkflowCached: vi.fn((_workflowId: string, _options?: LibraryWorkflowReadOptions) =>
     Promise.resolve({} as Record<string, unknown>)
   ),
   getLibraryWorkflowRecord: vi.fn((_workflowId: string, _signal?: AbortSignal) =>
     Promise.resolve({} as Record<string, unknown>)
   ),
-  getLibraryWorkflowRecordCached: vi.fn((_workflowId: string, _signal?: AbortSignal) =>
+  getLibraryWorkflowRecordCached: vi.fn((_workflowId: string, _options?: LibraryWorkflowReadOptions) =>
     Promise.resolve({} as Record<string, unknown>)
   ),
   invalidateWorkflowLibraryCache: vi.fn(),

@@ -877,6 +877,10 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         return json(200, { version: MOCK_APP_VERSION });
       }
 
+      if (method === 'GET' && path === '/api/v1/app/frontend_config') {
+        return json(200, { show_donation_link: true });
+      }
+
       if (method === 'GET' && path === '/api/v1/app/generation_device_options') {
         return json(200, [{ device: 'cpu', name: 'CPU' }]);
       }
@@ -1108,12 +1112,20 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         if (action === 'item_ids' || action === 'list') {
           const descending = url.searchParams.get('order_dir')?.toUpperCase() !== 'ASC';
           const itemIds = scopedItems.map((item) => item.item_id).sort((left, right) => left - right);
+          // Like the backend: an optional limit from 1 to MAX_QUEUE_ITEM_IDS_PER_REQUEST returns the head of the
+          // order, and total_count is then the number of ids returned.
+          const limit = action === 'item_ids' ? url.searchParams.get('limit') : null;
 
+          if (limit !== null && !(/^\d+$/.test(limit) && Number(limit) >= 1 && Number(limit) <= 1000)) {
+            return json(422, { detail: 'limit must be an integer from 1 to 1000' });
+          }
           if (descending) {
             itemIds.reverse();
           }
 
-          return json(200, { item_ids: itemIds, total_count: itemIds.length });
+          const returned = limit === null ? itemIds : itemIds.slice(0, Number(limit));
+
+          return json(200, { item_ids: returned, total_count: returned.length });
         }
         if (action === 'clear' && method === 'PUT') {
           state.queueItems.clear();

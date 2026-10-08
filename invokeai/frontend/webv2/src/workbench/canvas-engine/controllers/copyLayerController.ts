@@ -31,7 +31,13 @@ export interface CopyLayerControllerOptions {
   readonly ctx: LayerStepContext &
     Pick<
       CanvasMutationContext,
-      'begin' | 'capturePermit' | 'captureInsertionAnchor' | 'createLayerId' | 'getDocument' | 'isPermitCurrent'
+      | 'begin'
+      | 'capturePermit'
+      | 'captureInsertionAnchor'
+      | 'createLayerId'
+      | 'getDocument'
+      | 'getReducerDocument'
+      | 'isPermitCurrent'
     >;
   readonly backend: RasterBackend;
   readonly exportBaked: (layerId: string) => Promise<ExportResult>;
@@ -61,7 +67,8 @@ export class CopyLayerController {
       if (!ctx.isPermitCurrent(permit)) {
         return { status: 'busy' };
       }
-      const liveDocument = ctx.getDocument();
+      // A preview-tolerant recheck; see `CanvasMutationContext.getReducerDocument`.
+      const liveDocument = ctx.getReducerDocument();
       if (
         !liveDocument ||
         getDocumentLayer(liveDocument, sourceLayer.id) !== sourceLayer ||

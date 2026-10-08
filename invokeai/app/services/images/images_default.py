@@ -45,16 +45,17 @@ class ImageService(ImageServiceABC):
 
     @contextmanager
     def _image_mutation_lock(self) -> Iterator[None]:
-        """Holds the image-mutation lock across a delete unit.
+        """Holds the shared image-mutation lock across a record-and-file mutation.
 
         Every delete here reads an image's subfolder and purges its files at that path after
         the record is gone. A concurrent subfolder move that relocates files and repoints the
         record mid-unit would leave the purge sweeping a path the files already left: permanent
         orphans, unrecoverable because the record is gone and a clean purge drops the journal
-        (JPPhoto, PR #9361). The move service takes the same lock around each of its
-        plan-relocate-repoint cycles, so neither unit can observe the other half-done. With no
-        move service configured there is nothing to coordinate with. The lock is process-local:
-        two Invoke processes sharing one output folder and database are not serialized by it.
+        (JPPhoto, PR #9361). Copies also hold it across record creation, file copy, and rollback,
+        so maintenance cannot inspect or remove a half-created image. The move service takes
+        the same lock around each plan-relocate-repoint cycle. With no move service configured
+        there is nothing to coordinate with. The lock is process-local: two Invoke processes
+        sharing one output folder and database are not serialized by it.
         """
         image_moves = getattr(self.__invoker.services, "image_moves", None)
         if image_moves is None:
@@ -249,6 +250,15 @@ class ImageService(ImageServiceABC):
         Nothing partial survives a failure: the unwind covers everything after the record exists,
         including reading the DTO back, and removes the file as well as the row.
         """
+        with self._image_mutation_lock():
+            return self._copy_with_mutation_lock(source_image_name, board_id, user_id)
+
+    def _copy_with_mutation_lock(
+        self,
+        source_image_name: str,
+        board_id: Optional[str],
+        user_id: Optional[str],
+    ) -> ImageDTO:
         try:
             record = self.__invoker.services.image_records.get(source_image_name)
             metadata = self.__invoker.services.image_records.get_metadata(source_image_name)
@@ -527,7 +537,7 @@ class ImageService(ImageServiceABC):
                     # The record is committed as gone, so the delete succeeded. The journal stays
                     # behind and startup recovery purges the leftover files.
                     self.__invoker.services.logger.error(f"Failed to purge deleted image files: {cleanup_error}")
-                self._on_deleted(image_name)
+                self.notify_deleted(image_name)
             except ImageRecordNotFoundException:
                 # Already deleted by another request; nothing here failed, so nothing to log.
                 raise
@@ -576,7 +586,7 @@ class ImageService(ImageServiceABC):
                         delete_records=records.delete_many,
                         rollback=files.rollback_delete,
                         commit=files.commit_delete,
-                        notify_deleted=self._on_deleted,
+                        notify_deleted=self.notify_deleted,
                         log_error=self.__invoker.services.logger.error,
                     ),
                 )
@@ -609,7 +619,7 @@ class ImageService(ImageServiceABC):
                         delete_records=lambda names, g: records.delete_intermediates_by_names(names, guard=g),
                         abandon=files.abandon_delete,
                         commit=lambda token, names: files.commit_delete(token, image_names=names),
-                        notify_deleted=self._on_deleted,
+                        notify_deleted=self.notify_deleted,
                         log_error=self.__invoker.services.logger.error,
                     ),
                 )
