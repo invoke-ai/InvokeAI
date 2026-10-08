@@ -296,9 +296,19 @@ export const useStructuralPreview = (engine: CanvasPreviewEngine | null): Struct
     (label, prepare) => {
       const session = sessionRef.current;
       sessionRef.current = null;
-      // The engine ended the gesture (a replay or an edit from elsewhere landed): its edit commits like any prepared
-      // edit, and a target that vanished with that document change is not the user's commit to explain.
+      // The engine ended the gesture: a replay, a newer preview, or any edit or committed-document read from elsewhere
+      // (a stroke, a selection edit, a staged result) restored its baseline. Its edit then commits like any prepared
+      // edit, and any refusal to prepare it stays silent. Often that refusal is the interrupting change's own
+      // consequence (an undone conversion, lock or removal); when it is a genuine one, the interrupted gesture's
+      // previews have already reverted on screen, so the control shows the document as it is and the value was
+      // never applied.
       const sessionEnded = session !== null && !session.isActive();
+      // Without a live session of its own, the edit is prepared from the committed document: a preview another
+      // gesture holds ends first, as for any one-shot commit, or its values would leak into the edit and its
+      // revision would turn stale when the commit ends it.
+      if (engine && !session?.isActive()) {
+        engine.layers.endStructuralPreview();
+      }
       const model = engine?.document.model() ?? null;
       let outcome: PreparedCommitOutcome;
       if (!engine || !model) {
@@ -314,7 +324,7 @@ export const useStructuralPreview = (engine: CanvasPreviewEngine | null): Struct
           outcome = result.status === 'unchanged' ? result : { refusal: result, status: 'refused' };
         }
       }
-      if (!(sessionEnded && outcome.status === 'refused' && outcome.refusal.status === 'missing')) {
+      if (!(sessionEnded && outcome.status === 'refused')) {
         reportPreparedCommit(outcome, notify.error, t);
       }
       return outcome;

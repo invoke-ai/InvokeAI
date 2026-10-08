@@ -215,6 +215,40 @@ describe('StructuralLayerController', () => {
       expect(history.canUndo()).toBe(false);
     });
 
+    it('judges an edit against the document left once the open preview ends, not the previewed one', () => {
+      const { controller, ctx, document, history, projectId } = createHarness();
+      const prepareAtCurrent = (name: string) =>
+        prepareRename(createDocumentModel(document(), { editRevision: ctx.getEditRevision(), projectId }), name);
+      const hovered = controller.beginPreview()!;
+      hovered.apply(rename('layer', 'Hovered'));
+      // Prepared over the previewed value, whose revision is current only until the preview ends.
+      const overPreview = prepareAtCurrent('Renamed');
+
+      expect(controller.commitPrepared('Rename', overPreview)).toMatchObject({ status: 'stale' });
+      expect(hovered.isActive()).toBe(false);
+      expect(layerName(document())).toBe('Layer');
+
+      controller.beginPreview()!.apply(rename('layer', 'Hovered'));
+      expect(
+        controller.commit('Rename', rename('layer', 'Renamed'), rename('layer', 'Hovered'), {
+          expectedRevision: ctx.getEditRevision(),
+        })
+      ).toMatchObject({ status: 'stale' });
+      expect(layerName(document())).toBe('Layer');
+      expect(history.canUndo()).toBe(false);
+
+      // A session that previewed nothing leaves the document, and an edit prepared against it, current.
+      const idle = controller.beginPreview()!;
+      expect(controller.commitPrepared('Rename', prepareAtCurrent('Renamed'))).toEqual({ status: 'committed' });
+      expect(idle.isActive()).toBe(false);
+      expect(
+        controller.commit('Rename again', rename('layer', 'Again'), rename('layer', 'Renamed'), {
+          expectedRevision: ctx.getEditRevision(),
+        })
+      ).toEqual({ status: 'committed' });
+      expect(history.entries().past).toEqual(['Rename', 'Rename again']);
+    });
+
     it('records a previewed gesture as one step without dispatching its final value again', async () => {
       const { controller, ctx, dispatched, document, history, projectId } = createHarness();
       const edit = prepareRename(

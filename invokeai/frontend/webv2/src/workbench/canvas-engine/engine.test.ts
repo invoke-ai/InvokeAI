@@ -5868,6 +5868,92 @@ describe('boolean raster operations', () => {
   });
 });
 
+describe('async layer operations with a preview opened while they await', () => {
+  /** Two rasters, the mask to extract through, and an unrelated mask a hover can preview. */
+  const doc = (): CanvasDocumentContractV3 => {
+    const base = twoPaintDoc();
+    return {
+      ...base,
+      stacks: stacksFrom([
+        maskLayer('other'),
+        {
+          ...maskLayer('mask'),
+          mask: {
+            bitmap: { height: 20, imageName: 'mask-bitmap', width: 20 },
+            fill: { color: '#e07575', style: 'diagonal' as const },
+            offset: { x: 15, y: 25 },
+          },
+        },
+        ...getDocumentLeaves(base),
+      ]),
+    };
+  };
+
+  const setup = async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    const { projectId, store } = createReducerBackedStore(doc());
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const screen = createFakeCanvas();
+    const overlay = createFakeCanvas();
+    engine.surface.attach(screen.element, overlay.element);
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    const opacityOf = (id: string) =>
+      getDocumentLeaves(engine.document.getDocument()!).find((layer) => layer.id === id)?.opacity;
+    /** Opens a hover preview of `id`'s opacity, as the user would while the operation awaits. */
+    const hover = (id: string) => {
+      const session = engine.layers.beginStructuralPreview()!;
+      expect(session.apply({ id, patch: { opacity: 0.25 }, type: 'updateCanvasLayer' })).toBe(true);
+      raf.flush();
+      expect(opacityOf(id)).toBe(0.25);
+      return session;
+    };
+    return { engine, hover, opacityOf };
+  };
+
+  it.each([
+    ['copy to raster', (engine: CanvasEngine) => engine.layers.copyLayerToRaster('upper'), 'copied'],
+    ['boolean merge', (engine: CanvasEngine) => engine.layers.booleanMergeRasterLayers('upper', 'intersect'), 'merged'],
+    ['extract masked area', (engine: CanvasEngine) => engine.exports.extractMaskedArea('mask'), 'extracted'],
+  ] as const)('lands a %s past a preview of another layer, ending it as the edit lands', async (_name, run, landed) => {
+    const { engine, hover, opacityOf } = await setup();
+
+    const operation = run(engine);
+    const session = hover('other');
+    const result = await operation;
+
+    expect(typeof result === 'string' ? result : result.status).toBe(landed);
+    expect(session.isActive()).toBe(false);
+    expect(opacityOf('other')).toBe(1);
+    await engine.history.undo();
+    expect(opacityOf('other')).toBe(1);
+    expect(engine.stores.canUndo.get()).toBe(false);
+    engine.lifecycle.dispose();
+  });
+
+  it('refuses a copy whose source is previewed meanwhile, leaving that preview open', async () => {
+    const { engine, hover, opacityOf } = await setup();
+
+    const operation = engine.layers.copyLayerToRaster('upper');
+    const session = hover('upper');
+
+    expect(await operation).toEqual({ status: 'not-ready' });
+    expect(session.isActive()).toBe(true);
+    expect(opacityOf('upper')).toBe(0.25);
+    session.cancel();
+    expect(opacityOf('upper')).toBe(0.5);
+    engine.lifecycle.dispose();
+  });
+});
+
 describe('extract masked canvas area', () => {
   const maskedDoc = (): CanvasDocumentContractV3 => {
     const doc = twoPaintDoc();
@@ -7277,6 +7363,68 @@ describe('mergeVisibleRasterLayers', () => {
     expect(leaves.find((layer) => layer.id === 'upper')?.blendMode).toBe('multiply');
     expect(leaves.find((layer) => layer.id === result.duplicateIds[0])?.blendMode).toBe('multiply');
     expect(session.isActive()).toBe(false);
+    engine.lifecycle.dispose();
+  });
+
+  it('lands a duplicate past a preview of another layer opened while it prepared, ending that preview only then', async () => {
+    const { engine, raf } = setup(interleavedDoc());
+    const blendModeOf = (id: string) =>
+      getDocumentLeaves(engine.document.getDocument()!).find((layer) => layer.id === id)?.blendMode;
+
+    const duplicate = engine.layers.duplicateLayers(['upper']);
+    const session = engine.layers.beginStructuralPreview()!;
+    expect(session.apply({ id: 'below', patch: { blendMode: 'screen' }, type: 'updateCanvasLayer' })).toBe(true);
+    raf.flush();
+    expect(blendModeOf('below')).toBe('screen');
+
+    const result = await duplicate;
+
+    expect(result.status).toBe('duplicated');
+    if (result.status !== 'duplicated') {
+      throw new Error(result.status);
+    }
+    expect(session.isActive()).toBe(false);
+    expect(blendModeOf('below')).toBe('normal');
+    expect(blendModeOf(result.duplicateIds[0]!)).toBe('multiply');
+    await engine.history.undo();
+    expect(getDocumentLeaves(engine.document.getDocument()!).map((layer) => layer.id)).toEqual([
+      'mid-mask',
+      'upper',
+      'below',
+    ]);
+    expect(blendModeOf('below')).toBe('normal');
+    engine.lifecycle.dispose();
+  });
+
+  it('lands a selected merge past a preview of another layer opened while it exported', async () => {
+    const { engine, raf, setPanelSelectedIds } = setup(selectedMergeDoc());
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    setPanelSelectedIds(['upper', 'below']);
+    const opacityOf = (id: string) =>
+      getDocumentLeaves(engine.document.getDocument()!).find((layer) => layer.id === id)?.opacity;
+
+    const merge = engine.layers.mergeSelectedRasterLayers(['upper', 'below']);
+    const session = engine.layers.beginStructuralPreview()!;
+    expect(session.apply({ id: 'mid-mask', patch: { opacity: 0.25 }, type: 'updateCanvasLayer' })).toBe(true);
+    raf.flush();
+    expect(opacityOf('mid-mask')).toBe(0.25);
+
+    expect(await merge).toBe('merged');
+    expect(session.isActive()).toBe(false);
+    expect(opacityOf('mid-mask')).toBe(1);
+    expect(getDocumentLeaves(engine.document.getDocument()!).map((layer) => layer.id)).toEqual([
+      'mid-mask',
+      engine.document.getDocument()!.selectedLayerId,
+    ]);
+    await engine.history.undo();
+    expect(getDocumentLeaves(engine.document.getDocument()!).map((layer) => layer.id)).toEqual([
+      'mid-mask',
+      'upper',
+      'below',
+    ]);
+    expect(opacityOf('mid-mask')).toBe(1);
     engine.lifecycle.dispose();
   });
 

@@ -99,7 +99,12 @@ export interface CanvasMutationContext extends CanvasEditConcurrency {
    * snapshot taken here (and the step or inverse built from it) never carries previewed values.
    */
   getDocument(): CanvasDocumentContractV3 | null;
-  /** The reducer document as it is, previews included; for postconditions and preview baselines. */
+  /**
+   * The reducer document as it is, previews included; for postconditions, preview baselines and rechecks after an
+   * await. A recheck reads here so a preview opened meanwhile neither ends early nor fails it when the preview leaves
+   * what the edit depends on unchanged (a preview replaces only its node and that node's ancestors); admission then
+   * ends the preview as the edit lands.
+   */
   getReducerDocument(): CanvasDocumentContractV3 | null;
   /** Where a new `stack` layer lands: above `aboveId` when it belongs to the stack, else the stack top. */
   captureInsertionAnchor(stack: LayerStackKind, aboveId: string | null): CanvasNodeInsertionAnchor;
@@ -113,7 +118,9 @@ export interface CanvasMutationContext extends CanvasEditConcurrency {
   dispatch(action: CanvasProjectMutation, origin?: CanvasMutationOrigin): boolean;
   /**
    * Admits an edit. `gesture` marks an edit that belongs to the interaction in progress (a live stroke, a float landing
-   * as the user moves on), which an active gesture therefore neither refuses nor holds back.
+   * as the user moves on), which an active gesture therefore neither refuses nor holds back. Admission ends an open
+   * structural preview, restoring its baseline, so the edit never lands over previewed values. A refusal here leaves
+   * the preview open; an admitted transaction that is refused or abandoned later has already ended it.
    */
   begin(options: {
     readonly historyBytes: number;
@@ -145,7 +152,10 @@ export interface CanvasMutationContextDeps {
   readonly installPrepared: (prepared: PreparedLayerCacheReplacement, persist?: boolean) => void;
   readonly reserveRaster: (bytes: number) => RasterMemoryReservationResult;
   readonly isGestureActive: () => boolean;
-  /** Ends an open structural preview, restoring its baseline; see {@link CanvasMutationContext.getDocument}. */
+  /**
+   * Ends an open structural preview, restoring its baseline; see {@link CanvasMutationContext.getDocument} and
+   * {@link CanvasMutationContext.begin}.
+   */
   readonly endStructuralPreview?: () => void;
   readonly createLayerId: () => string;
   readonly report?: (error: EditStepError, label: string) => void;
@@ -306,6 +316,13 @@ export const createCanvasMutationContext = (
     const admission = deps.history.admit(options.historyBytes);
     if (!admission) {
       return { status: 'over-budget' };
+    }
+    try {
+      deps.endStructuralPreview?.();
+    } catch (error) {
+      // The restore dispatch's observers may throw; the refused edit must not keep its history admission.
+      admission.release();
+      throw error;
     }
     const held: { release(): void }[] = [admission];
     let ended = false;

@@ -78,6 +78,47 @@ describe('createCanvasMutationContext', () => {
     expect(endStructuralPreview).toHaveBeenCalledOnce();
   });
 
+  it('ends an open structural preview when it admits an edit, and leaves it when it refuses one', () => {
+    const endStructuralPreview = vi.fn();
+    const document = { selectedLayerId: null } as unknown as CanvasDocumentContractV3;
+    const { context } = createHarness({
+      endStructuralPreview,
+      getDocument: () => document,
+      getReducerDocument: () => document,
+      history: createHistory({ byteBudget: 100 }),
+    });
+
+    expect(context.begin({ historyBytes: 101 })).toEqual({ status: 'over-budget' });
+    expect(endStructuralPreview).not.toHaveBeenCalled();
+    const txn = context.begin({ historyBytes: 10 });
+    expect(endStructuralPreview).toHaveBeenCalledOnce();
+    if (!('publish' in txn)) {
+      throw new Error(`refused: ${txn.status}`);
+    }
+    txn.end();
+  });
+
+  it('releases its admission when ending the preview throws, so the history budget is not leaked', () => {
+    const failure = new Error('observer failed');
+    const endStructuralPreview = vi.fn<() => void>().mockImplementationOnce(() => {
+      throw failure;
+    });
+    const document = { selectedLayerId: null } as unknown as CanvasDocumentContractV3;
+    const { context } = createHarness({
+      endStructuralPreview,
+      getDocument: () => document,
+      getReducerDocument: () => document,
+      history: createHistory({ byteBudget: 100 }),
+    });
+
+    expect(() => context.begin({ historyBytes: 60 })).toThrow(failure);
+    const txn = context.begin({ historyBytes: 60 });
+    if (!('publish' in txn)) {
+      throw new Error(`refused: ${txn.status}`);
+    }
+    txn.end();
+  });
+
   describe('document edit permits', () => {
     it('exposes the engine project id on the concurrency surface', () => {
       const { context } = createHarness();

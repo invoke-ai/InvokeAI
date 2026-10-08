@@ -146,13 +146,15 @@ export class StructuralLayerController {
     inverse: CanvasProjectMutation,
     options: StructuralCommitOptions = {}
   ): StructuralCommitResult {
+    // Ending a preview restores its baseline and advances the revision, so the revision check runs after it: an edit
+    // prepared against previewed values is stale on the document it would land on.
+    this.endPreview();
     const stale = this.staleRevision(
       options.expectedRevision ?? anchorRevisionOf(forward) ?? anchorRevisionOf(inverse)
     );
     if (stale) {
       return stale;
     }
-    this.endPreview();
     return publicResult(this.publish(label, this.step(forward, inverse, options.verify), forward, inverse));
   }
 
@@ -162,6 +164,8 @@ export class StructuralLayerController {
     edit: PreparedDocumentEdit,
     options: PreparedCommitOptions = {}
   ): StructuralCommitResult {
+    // As in `commit`: the preview ends before the revision check judges the document the edit lands on.
+    this.endPreview();
     const stale = this.staleRevision(edit.expectedRevision);
     if (stale) {
       return stale;
@@ -169,7 +173,6 @@ export class StructuralLayerController {
     if (edit.projectId !== this.deps.ctx.projectId) {
       return { status: 'dispatch-rejected' };
     }
-    this.endPreview();
     const step = this.step(edit.forward, edit.inverse, (document) =>
       checkEditPostconditions(document, edit.postconditions)
     );

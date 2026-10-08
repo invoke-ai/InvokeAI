@@ -1,10 +1,15 @@
 import type { ArchitectureCapabilitiesRow } from '@features/generation/core/architectureCapabilities';
-import type { CanvasControlLayerContract, CanvasLayerPreviewMutation } from '@workbench/canvas-engine/api';
+import type {
+  CanvasControlLayerContract,
+  CanvasLayerContract,
+  CanvasLayerPreviewMutation,
+} from '@workbench/canvas-engine/api';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
 import { ensureArchitectureCapabilitiesLoaded } from '@features/generation/data/architectureCapabilitiesStore';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { toaster } from '@platform/ui/toaster';
 import { applyThemeToRoot } from '@theme/applyTheme';
 import { system } from '@theme/system';
 import { createDocumentModel } from '@workbench/canvas-engine/api';
@@ -20,7 +25,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
 import { ControlLayerSettings } from './ControlLayerSettings';
-import { createControlLayer } from './layerOps';
+import { createControlLayer, createEmptyPaintLayer } from './layerOps';
 
 // Stable identities, as the real stores hand out, so only the table's arrival can re-read the policy.
 const catalog = vi.hoisted(() => ({
@@ -92,13 +97,24 @@ const previews: CanvasLayerPreviewMutation[] = [];
 const restores: CanvasLayerPreviewMutation[] = [];
 let editingLocked = false;
 let previewsRefused = false;
+/** Cleared when the engine ends the open session, as an undo landing mid-gesture does. */
+let sessionActive = true;
 
-/** Just enough engine for the panel's reads and commits: every layer has content and contributes, in order. */
-const engineWith = (layers: CanvasControlLayerContract[]): Engine => {
-  const model = createDocumentModel(
+const modelOf = (layers: readonly CanvasLayerContract[], editRevision = 0) =>
+  createDocumentModel(
     { ...createEmptyCanvasDocument(), stacks: stacksFrom(layers) },
-    { editRevision: 0, projectId: 'test-project' }
+    { editRevision, projectId: 'test-project' }
   );
+
+/**
+ * Just enough engine for the panel's reads and commits: every layer has content and contributes, in order.
+ * `replaceLayers` swaps the document the panel reads, as an undo landing mid-gesture would.
+ */
+const engineWith = (
+  layers: CanvasControlLayerContract[]
+): Engine & { replaceLayers(next: CanvasLayerContract[]): void } => {
+  let revision = 0;
+  let model = modelOf(layers);
   const engine = {
     document: { model: () => model },
     exports: { hasExportableLayerContent: () => true },
@@ -126,7 +142,7 @@ const engineWith = (layers: CanvasControlLayerContract[]): Engine => {
             commits.push({ edit, label });
             return { status: 'committed' as const };
           },
-          isActive: () => true,
+          isActive: () => sessionActive,
         };
       },
       commitPrepared: (label: string, edit: unknown) => {
@@ -135,7 +151,10 @@ const engineWith = (layers: CanvasControlLayerContract[]): Engine => {
       },
       endStructuralPreview: () => undefined,
     },
-  } as unknown as Engine;
+    replaceLayers: (next: CanvasLayerContract[]) => {
+      model = modelOf(next, (revision += 1));
+    },
+  } as unknown as Engine & { replaceLayers(next: CanvasLayerContract[]): void };
   attachCanvasOperations(engine, {} as never);
   return engine;
 };
@@ -175,6 +194,7 @@ afterEach(async () => {
   restores.length = 0;
   editingLocked = false;
   previewsRefused = false;
+  sessionActive = true;
   // Returns the capability store and the core registry to their unloaded state between tests.
   accountLifecycle.invalidate();
 });
@@ -414,8 +434,11 @@ describe('ControlLayerSettings weight', () => {
   const weightSlider = () => page.getByRole('slider', { name: 'widgets.layers.control.weight' });
   const weightOf = (edit: unknown, side: 'forward' | 'inverse') =>
     (edit as Record<typeof side, { config: { adapter: { weight: number } } }>)[side].config.adapter.weight;
-  /** One drag on the weight scrubber through each offset (fractions of its 0–2 track), released at the last. */
-  const dragWeight = async (offsets: number[]) => {
+  /**
+   * One drag on the weight scrubber through each offset (fractions of its 0–2 track), released at the last unless
+   * `release` is false.
+   */
+  const dragWeight = async (offsets: number[], release = true) => {
     const frame = weightSlider().element().closest<HTMLElement>('[data-scope="scrubber"]')!;
     const rect = frame.getBoundingClientRect();
     const startX = rect.left + rect.width / 2;
@@ -428,7 +451,9 @@ describe('ControlLayerSettings weight', () => {
     for (const offset of offsets) {
       await pointer(window, 'pointermove', xAt(offset));
     }
-    await pointer(window, 'pointerup', xAt(offsets.at(-1) ?? 0));
+    if (release) {
+      await pointer(window, 'pointerup', xAt(offsets.at(-1) ?? 0));
+    }
   };
   const typeWeight = async (text: string) => {
     await act(async () => {
@@ -445,6 +470,28 @@ describe('ControlLayerSettings weight', () => {
     expect(commits).toHaveLength(1);
     expect(weightOf(commits[0]!.edit, 'forward')).toBe(1.5);
     expect(weightOf(commits[0]!.edit, 'inverse')).toBe(1);
+  });
+
+  it('says nothing when an undo mid-drag turns the layer back into raster and the panel unmounts', async () => {
+    const engine = engineWith([weighted]);
+    await render(weighted, engine);
+    await dragWeight([0.25], false);
+    expect(previews.length).toBeGreaterThan(0);
+
+    // The undo ends the engine's session and the document no longer holds a control layer, so the layer list
+    // unmounts this panel; the unmount settles the drag against a document that refuses it.
+    sessionActive = false;
+    engine.replaceLayers([createEmptyPaintLayer(weighted.name, weighted.id)]);
+    const created = vi.spyOn(toaster, 'create');
+    try {
+      await act(() => root?.unmount());
+      root = null;
+
+      expect(commits).toHaveLength(0);
+      expect(created).not.toHaveBeenCalled();
+    } finally {
+      created.mockRestore();
+    }
   });
 
   it('records nothing and restores the weight when a drag returns to where it started', async () => {

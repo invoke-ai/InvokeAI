@@ -154,13 +154,20 @@ describe('useStructuralPreview', () => {
     expect(engine.layers.commitPrepared).toHaveBeenCalledWith('Opacity', EDIT);
   });
 
-  it('stays silent when the target went missing with the gesture the engine ended, and reports it otherwise', () => {
+  it('stays silent when the document change that ended the gesture also refuses its edit, and reports it otherwise', () => {
     const ended = createSession('busy', false);
     const endedPreview = renderPreview(createEngine(ended));
     endedPreview.preview(opacity(0.5));
 
     expect(endedPreview.commit('Opacity', () => ({ ids: ['layer'], status: 'missing' }) as never)).toEqual({
       refusal: { ids: ['layer'], status: 'missing' },
+      status: 'refused',
+    });
+    // An undone conversion or unlock refuses the late commit too; that refusal is the undo's, not the user's.
+    endedPreview.preview(opacity(0.5));
+    expect(
+      endedPreview.commit('Opacity', () => ({ actual: 'raster', expected: ['control'], status: 'wrong-type' }) as never)
+    ).toMatchObject({
       status: 'refused',
     });
     expect(notify.error).not.toHaveBeenCalled();
@@ -210,6 +217,40 @@ describe('useStructuralPreview over the engine', () => {
     expect(opacityOf()).toBe(1);
     expect(stub.history.canUndo()).toBe(false);
     expect(preview.baseline()).toBeNull();
+    expect(notify.error).not.toHaveBeenCalled();
+  });
+});
+
+describe('useStructuralPreview with a gesture superseded by another', () => {
+  it('commits the superseded gesture from the committed document, ending the newer preview first', () => {
+    const stub = createStructuralEngineStub({
+      schedulePreview: (flush) => {
+        flush();
+        return () => undefined;
+      },
+    });
+    const engine = stub.engine as unknown as CanvasPreviewEngine;
+    const tint = renderPreview(engine);
+    const scrub = renderPreview(engine);
+    const layer = () => getDocumentLayer(stub.document(), 'layer');
+
+    expect(tint.preview({ id: 'layer', patch: { name: 'Draft' }, type: 'updateCanvasLayer' })).toBe(true);
+    // A newer gesture's session restores the first one's baseline and holds its own preview.
+    expect(scrub.preview(opacity(0.3))).toBe(true);
+    expect(layer()).toMatchObject({ name: 'Layer', opacity: 0.3 });
+
+    const outcome = tint.commit('Name', (model, baseline) =>
+      model.prepare({
+        before: baselinePatch(baseline, { name: 'Tinted' }),
+        id: 'layer',
+        patch: { name: 'Tinted' },
+        type: 'patch',
+      })
+    );
+
+    expect(outcome).toEqual({ status: 'committed' });
+    expect(layer()).toMatchObject({ name: 'Tinted', opacity: 1 });
+    expect(stub.history.entries().past).toEqual(['Name']);
     expect(notify.error).not.toHaveBeenCalled();
   });
 });
