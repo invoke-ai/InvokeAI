@@ -126,6 +126,49 @@ export const formatHotkeyForPlatform = (hotkey: string, isMacOs: boolean = IS_MA
   return [...modifiers, key];
 };
 
+/** Text labels: adjacent modifier glyphs on macOS, word labels joined by + elsewhere. */
+const MAC_KEY_LABELS: Record<string, string> = {
+  alt: '⌥',
+  cmd: '⌘',
+  ctrl: '⌃',
+  enter: '↵',
+  option: '⌥',
+  shift: '⇧',
+};
+
+const OTHER_KEY_LABELS: Record<string, string> = {
+  alt: 'Alt',
+  ctrl: 'Ctrl',
+  enter: 'Enter',
+  meta: 'Win',
+  shift: 'Shift',
+};
+
+/** One formatted part's text label, for render sites that draw icons for some keys and need text for the rest. */
+export const formatHotkeyPartLabel = (part: string, isMacOs: boolean = IS_MAC_OS): string =>
+  (isMacOs ? MAC_KEY_LABELS[part] : OTHER_KEY_LABELS[part]) ?? part.toUpperCase();
+
+/** A binding as one line of text, e.g. ⌘K on macOS and Ctrl+K elsewhere, for tooltips and inline copy. */
+export const formatHotkeyLabel = (hotkey: string, isMacOs: boolean = IS_MAC_OS): string =>
+  formatHotkeyForPlatform(hotkey, isMacOs)
+    .map((part) => formatHotkeyPartLabel(part, isMacOs))
+    .join(isMacOs ? '' : '+');
+
+const ARIA_KEY_LABELS: Record<string, string> = {
+  alt: 'Alt',
+  cmd: 'Meta',
+  ctrl: 'Control',
+  enter: 'Enter',
+  option: 'Alt',
+  shift: 'Shift',
+};
+
+/** A binding in `aria-keyshortcuts` syntax. */
+export const formatHotkeyAriaLabel = (hotkey: string, isMacOs: boolean = IS_MAC_OS): string =>
+  formatHotkeyForPlatform(hotkey, isMacOs)
+    .map((part) => ARIA_KEY_LABELS[part] ?? (part.length === 1 ? part.toUpperCase() : part))
+    .join('+');
+
 /** Inputs that take no typed text: a switch or checkbox owning focus has no native undo/shortcut to protect. */
 const NON_TEXT_INPUT_TYPES = new Set([
   'button',

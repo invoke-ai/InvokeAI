@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import { getRegionFocusDefaultKey } from './catalog';
-import { eventToHotkeyString, formatHotkeyForPlatform, normalizeHotkeyString, toTinykeysBinding } from './keys';
+import {
+  eventToHotkeyString,
+  formatHotkeyAriaLabel,
+  formatHotkeyForPlatform,
+  formatHotkeyLabel,
+  normalizeHotkeyString,
+  toTinykeysBinding,
+} from './keys';
 
 describe('hotkey keys', () => {
   it('normalizes modifier order and aliases', () => {
@@ -39,5 +46,19 @@ describe('hotkey keys', () => {
     expect(formatHotkeyForPlatform(getRegionFocusDefaultKey('left', true), true)).toEqual(['ctrl', 'cmd', 'arrowleft']);
     expect(formatHotkeyForPlatform('mod+shift+alt+ctrl+z', true)).toEqual(['ctrl', 'option', 'shift', 'cmd', 'z']);
     expect(formatHotkeyForPlatform('mod+shift+alt+z', false)).toEqual(['ctrl', 'shift', 'alt', 'z']);
+  });
+
+  it('labels a binding as adjacent glyphs on macOS and +-joined words elsewhere', () => {
+    expect(formatHotkeyLabel('mod+enter', true)).toBe('⌘↵');
+    expect(formatHotkeyLabel('mod+k', true)).toBe('⌘K');
+    expect(formatHotkeyLabel('alt+mod+enter', true)).toBe('⌥⌘↵');
+    expect(formatHotkeyLabel('mod+enter', false)).toBe('Ctrl+Enter');
+    expect(formatHotkeyLabel('alt+mod+enter', false)).toBe('Ctrl+Alt+Enter');
+  });
+
+  it('formats a binding for aria-keyshortcuts', () => {
+    expect(formatHotkeyAriaLabel('mod+enter', true)).toBe('Meta+Enter');
+    expect(formatHotkeyAriaLabel('alt+mod+s', true)).toBe('Alt+Meta+S');
+    expect(formatHotkeyAriaLabel('alt+mod+s', false)).toBe('Control+Alt+S');
   });
 });
