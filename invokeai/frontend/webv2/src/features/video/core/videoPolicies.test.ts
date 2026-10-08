@@ -1586,7 +1586,7 @@ describe('reference mode policy', () => {
       settingsFor(model, { componentSourceModel: h3Model(), ...overrides });
 
     expect(getVideoValidationReasons(model, withRefTransformer({}))).toContain(
-      'Reference-to-video needs at least one image or video reference.'
+      'Reference-to-video needs at least one reference.'
     );
     expect(
       getVideoValidationReasons(
@@ -1609,9 +1609,7 @@ describe('reference mode policy', () => {
           ],
         })
       )
-    ).toContain(
-      'At least one reference must contribute visuals — add an image, or set a video reference to include video.'
-    );
+    ).toEqual([]);
     expect(getVideoValidationReasons(model, withRefTransformer({ references: [imageReference] }))).toEqual([]);
   });
 
