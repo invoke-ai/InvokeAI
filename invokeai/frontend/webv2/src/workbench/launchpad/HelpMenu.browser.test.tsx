@@ -28,7 +28,7 @@ await i18n.use(initReactI18next).init({
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-describe('HelpMenu donation link', () => {
+describe.each([false, true])('HelpMenu donation link (compact=%s)', (compact) => {
   let host: HTMLDivElement;
   let root: Root;
   let client: QueryClient;
@@ -44,7 +44,7 @@ describe('HelpMenu donation link', () => {
         <QueryClientProvider client={client}>
           <ChakraProvider value={system}>
             <I18nextProvider i18n={i18n}>
-              <HelpMenu />
+              <HelpMenu compact={compact} />
             </I18nextProvider>
           </ChakraProvider>
         </QueryClientProvider>

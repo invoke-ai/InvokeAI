@@ -3033,7 +3033,12 @@ export type paths = {
         };
         /**
          * Get Queue Item Ids
-         * @description Gets all queue item ids that match the given parameters.
+         * @description Gets the queue item ids that match the given parameters, ordered by creation time.
+         *
+         *     `total_count` is the number of ids in `item_ids`. Without `limit`, every matching id is returned, so it
+         *     equals the number of matching items. With `limit`, only the first `limit` ids of the same order are
+         *     returned, and it is not a total (counting every match would read the whole queue history); use the queue
+         *     status for totals.
          *
          *     IDs for every user's items are returned (item ids carry no sensitive data on their own).
          *     When the corresponding items are hydrated via get_queue_items_by_item_ids, those belonging
@@ -5640,7 +5645,7 @@ export type components = {
              * Control Kinds
              * @description Sorted.
              */
-            control_kinds?: ("controlnet" | "t2i_adapter" | "control_lora" | "z_image_control")[];
+            control_kinds?: ("controlnet" | "t2i_adapter" | "control_lora" | "z_image_control" | "anima_lllite")[];
             /**
              * Max Reference Images
              * @default 0
@@ -23705,7 +23710,7 @@ export type components = {
             item_ids: number[];
             /**
              * Total Count
-             * @description Total number of queue items matching the query
+             * @description Number of ids in item_ids. Equals the number of matching items only when no limit is given; use the queue status for totals
              */
             total_count: number;
         };
@@ -57758,6 +57763,8 @@ export interface operations {
                 order_dir?: components["schemas"]["SQLiteDirection"];
                 /** @description Only include queue items whose origin starts with this prefix */
                 origin_prefix?: string | null;
+                /** @description Return at most this many ids, from the start of the requested order. Omit to return every matching id */
+                limit?: number | null;
             };
             header?: never;
             path: {

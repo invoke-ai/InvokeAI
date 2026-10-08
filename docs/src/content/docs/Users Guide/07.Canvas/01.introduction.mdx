@@ -1,7 +1,7 @@
 ---
 title: Crafting images with the Canvas
 description: An introduction to the Canvas — layers and masks, sending generations to the Canvas, inpainting, outpainting, regional prompts, control layers, drawing and adding gallery images.
-lastUpdated: 2026-09-30
+lastUpdated: 2026-10-05
 ---
 
 import { Image } from 'astro:assets';
@@ -64,11 +64,7 @@ When the Canvas is the source of a generation, InvokeAI looks at what is inside 
 
 In the Edit layout, **Invoke** uses the Canvas as its source and sends the results back to the Canvas. The routing control next to Invoke shows this. Editing the canvas switches the route back to the Canvas automatically, unless the routing is locked. See [Routing images to the Gallery or the Canvas](/users-guide/image-generation/introduction/#routing-images-to-the-gallery-or-the-canvas).
 
-When the source is the Canvas, the Generate panel adds three sections at the bottom:
-
-* **Denoising strength** — how much image-to-image, inpainting and outpainting may change the existing content. The default is 75%.
-* **Scale before processing** — generate at a different size, for example the model's optimal size, and scale the result back to the frame.
-* **Compositing** — how inpainted and outpainted areas are filled and blended: **Infill method**, **Coherence pass mode**, **Coherence edge size**, **Coherence min denoise** and **Mask blur**.
+When the source is the Canvas, the **Size** section's width and height are the frame's, and **Render at** at the bottom of the section chooses the size the model generates at before the result is scaled back to the frame (legacy versions called this *Scale before processing*): the frame's own size, the model's optimal size, or a custom size. The **Render** section adds **Denoising strength** below the guidance scale: how much image-to-image, inpainting and outpainting may change the existing content. The default is 75%, and the section header shows the current value. The Generate panel also adds a **Compositing** section at the bottom, which sets how inpainted and outpainted areas are filled and blended: **Infill method**, **Coherence pass mode**, **Coherence edge size**, **Coherence min denoise** and **Mask blur**.
 
 Results do not go straight onto the canvas. They appear in the **staging area**, a bar at the bottom of the canvas where you can step through the candidates, then **Accept to Layer** the one you want (it becomes a new raster layer), **Save to gallery**, or **Discard**. While results are staged, the canvas tools are locked except for **View**.
 
@@ -172,7 +168,7 @@ The tool strip also has shape, gradient and text tools, which are described in t
 There are three ways to bring an existing image onto the canvas:
 
 * **Drag it from the Gallery.** With the Gallery and the Canvas both on screen (for example, the Compose layout with its center view switched to Canvas), drag an image onto the canvas. Drop zones appear: **Add as Raster Layer**, **Add as Control Layer**, **Add as Regional Reference Image**, **Add as Inpaint Mask** and **Add as Resized Control Layer**, which scales the image to the model's optimal size.
-* **Use the image's menu.** Right-click an image in the Gallery or Preview and choose **New from Image → New Layer from Image**, then the kind of layer. **New from Image → New Canvas from Image** instead starts a new project whose canvas holds the image, sized to fit it.
+* **Use the image's menu.** Right-click an image in the Gallery or Preview and choose **Add to Current Canvas**, then the kind of layer. **New Project from Image** instead starts a new project whose canvas holds the image, sized to fit it; the current project is left as it is.
 * **Paste it.** Copy an image, click the canvas and press **Ctrl+V** (**Cmd+V** on macOS). It is added as a new raster layer at the generation frame.
 
 A new raster layer from an image is placed at its full size at the top-left of the generation frame. Use the **Move** (**V**) or **Transform** (**Ctrl+T**) tool to position and scale it.

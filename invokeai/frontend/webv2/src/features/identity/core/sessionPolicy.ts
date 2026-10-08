@@ -5,9 +5,9 @@ export interface UnauthorizedSessionState {
 }
 
 /**
- * The transport only calls this policy for the current stored credential.
+ * Identity only applies this policy to a 401 for the credential the tab currently holds.
  * Rejecting that credential while auth mode is unresolved must clear it;
- * login requests have no stored bearer token and never reach this policy.
+ * login requests carry no bearer token and never reach this policy.
  */
 export const shouldExpireUnauthorizedSession = (session: UnauthorizedSessionState): boolean =>
   session.phase !== 'ready' || (session.multiuserEnabled && session.user !== null);

@@ -108,7 +108,6 @@ describe('Workflow UI read-port isolation', () => {
       performance: { mark: vi.fn(), measure: vi.fn(), time: vi.fn() },
       preferences: preferences.port,
       project: project.port,
-      registerModalHotkeyLayer: vi.fn(() => vi.fn()),
       widgets: {},
     } as unknown as WorkflowUiAdapter;
 
@@ -232,7 +231,6 @@ describe('Workflow UI read-port isolation', () => {
       performance: { mark: vi.fn(), measure: vi.fn(), time: vi.fn() },
       preferences: createMutablePort(preferencesState()).port,
       project: project.port,
-      registerModalHotkeyLayer: vi.fn(() => vi.fn()),
       widgets: {},
     } as unknown as WorkflowUiAdapter;
     const Consumer = () => <output>{useWorkflowNodeExecutionState('node-1')?.status ?? 'none'}</output>;

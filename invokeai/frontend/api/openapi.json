@@ -12147,7 +12147,7 @@
       "get": {
         "tags": ["queue"],
         "summary": "Get Queue Item Ids",
-        "description": "Gets all queue item ids that match the given parameters.\n\nIDs for every user's items are returned (item ids carry no sensitive data on their own).\nWhen the corresponding items are hydrated via get_queue_items_by_item_ids, those belonging\nto other users are redacted by sanitize_queue_item_for_user. This lets a non-admin see\npartially-redacted entries for other users' jobs in the queue list, while still revealing\nonly timestamps and status for items they do not own.\n\ncurrent_user is required so the endpoint stays behind authentication in multiuser mode.",
+        "description": "Gets the queue item ids that match the given parameters, ordered by creation time.\n\n`total_count` is the number of ids in `item_ids`. Without `limit`, every matching id is returned, so it\nequals the number of matching items. With `limit`, only the first `limit` ids of the same order are\nreturned, and it is not a total (counting every match would read the whole queue history); use the queue\nstatus for totals.\n\nIDs for every user's items are returned (item ids carry no sensitive data on their own).\nWhen the corresponding items are hydrated via get_queue_items_by_item_ids, those belonging\nto other users are redacted by sanitize_queue_item_for_user. This lets a non-admin see\npartially-redacted entries for other users' jobs in the queue list, while still revealing\nonly timestamps and status for items they do not own.\n\ncurrent_user is required so the endpoint stays behind authentication in multiuser mode.",
         "operationId": "get_queue_item_ids",
         "security": [
           {
@@ -12194,6 +12194,26 @@
               "title": "Origin Prefix"
             },
             "description": "Only include queue items whose origin starts with this prefix"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 1000,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Return at most this many ids, from the start of the requested order. Omit to return every matching id",
+              "title": "Limit"
+            },
+            "description": "Return at most this many ids, from the start of the requested order. Omit to return every matching id"
           }
         ],
         "responses": {
@@ -19789,7 +19809,7 @@
           "control_kinds": {
             "items": {
               "type": "string",
-              "enum": ["controlnet", "t2i_adapter", "control_lora", "z_image_control"]
+              "enum": ["controlnet", "t2i_adapter", "control_lora", "z_image_control", "anima_lllite"]
             },
             "type": "array",
             "title": "Control Kinds",
@@ -60497,7 +60517,7 @@
           "total_count": {
             "type": "integer",
             "title": "Total Count",
-            "description": "Total number of queue items matching the query"
+            "description": "Number of ids in item_ids. Equals the number of matching items only when no limit is given; use the queue status for totals"
           }
         },
         "type": "object",

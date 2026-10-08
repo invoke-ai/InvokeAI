@@ -270,8 +270,13 @@ class SessionQueueBase(ABC):
         order_dir: SQLiteDirection = SQLiteDirection.Descending,
         user_id: Optional[str] = None,
         origin_prefix: Optional[str] = None,
+        limit: Optional[int] = None,
     ) -> ItemIdsResult:
-        """Gets all queue item ids that match the given parameters. If user_id is provided, only returns items for that user."""
+        """Gets the ids of queue items that match the given parameters, in the requested created_at order.
+
+        If user_id is provided, only returns items for that user. If limit is provided, returns only the first
+        `limit` ids of that order. total_count is the number of ids in item_ids, which equals the number of
+        matching items only when no limit is given."""
         pass
 
     @abstractmethod

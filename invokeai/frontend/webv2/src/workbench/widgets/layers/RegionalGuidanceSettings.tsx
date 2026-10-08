@@ -19,12 +19,13 @@ import { useNotify } from '@workbench/useNotify';
 import { armMaskTintTarget } from '@workbench/widgets/canvas/color-system/maskTintTarget';
 import { type ColorSamplerEngine, useColorSampler } from '@workbench/widgets/canvas/useColorSampler';
 import {
+  baselineConfig,
   type CanvasPreparedEngine,
   reportMaskEdit,
   useStructuralPreview,
 } from '@workbench/widgets/canvas/useStructuralCommit';
 import { PaletteIcon } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useSelectedModelBase } from './useSelectedModelBase';
@@ -68,7 +69,6 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
   const showSyntaxHighlighting = useWorkbenchPreferenceSelector(
     (preferences) => preferences.showPromptSyntaxHighlighting
   );
-  const fillBeforeRef = useRef<CanvasMaskFillContract | null>(null);
   const [positivePrompt, setPositivePrompt] = useState(layer.positivePrompt ?? '');
   const [negativePrompt, setNegativePrompt] = useState(layer.negativePrompt ?? '');
 
@@ -91,15 +91,12 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
   const showNegativeControls = !hasCapabilities || support?.negativePrompt !== false;
   const unsupportedModel = hasCapabilities && base !== null && support === null;
 
+  // A previewed fill records from where its preview started; any other change from the live layer.
   const commitConfig = useCallback(
-    (label: string, next: RegionalConfigPatch, before: RegionalConfigPatch) => {
-      commitPrepared(label, (model) =>
-        model.prepare({
-          before: { layerType: 'regional_guidance', ...before },
-          config: { layerType: 'regional_guidance', ...next },
-          id: layer.id,
-          type: 'patch-config',
-        })
+    (label: string, next: RegionalConfigPatch) => {
+      const config = { layerType: 'regional_guidance', ...next } as const;
+      commitPrepared(label, (model, baseline) =>
+        model.prepare({ before: baselineConfig(baseline, config), config, id: layer.id, type: 'patch-config' })
       );
     },
     [commitPrepared, layer.id]
@@ -110,13 +107,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
       const value = event.target.value;
       const next = value.length > 0 ? value : null;
       if (next !== layer.positivePrompt) {
-        commitConfig(
-          t('widgets.layers.regionalGuidance.positivePrompt'),
-          { positivePrompt: next },
-          {
-            positivePrompt: layer.positivePrompt,
-          }
-        );
+        commitConfig(t('widgets.layers.regionalGuidance.positivePrompt'), { positivePrompt: next });
       }
     },
     [commitConfig, layer.positivePrompt, t]
@@ -132,13 +123,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
       const value = event.target.value;
       const next = value.length > 0 ? value : null;
       if (next !== layer.negativePrompt) {
-        commitConfig(
-          t('widgets.layers.regionalGuidance.negativePrompt'),
-          { negativePrompt: next },
-          {
-            negativePrompt: layer.negativePrompt,
-          }
-        );
+        commitConfig(t('widgets.layers.regionalGuidance.negativePrompt'), { negativePrompt: next });
       }
     },
     [commitConfig, layer.negativePrompt, t]
@@ -151,13 +136,9 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
 
   const handleAutoNegative = useCallback(
     (details: { checked: boolean }) => {
-      commitConfig(
-        t('widgets.layers.regionalGuidance.autoNegative'),
-        { autoNegative: details.checked },
-        { autoNegative: layer.autoNegative }
-      );
+      commitConfig(t('widgets.layers.regionalGuidance.autoNegative'), { autoNegative: details.checked });
     },
-    [commitConfig, layer.autoNegative, t]
+    [commitConfig, t]
   );
 
   const styleCollection = useMemo(
@@ -172,45 +153,29 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
   );
 
   const commitFill = useCallback(
-    (next: CanvasMaskFillContract, before: CanvasMaskFillContract) => {
-      commitConfig(t('widgets.layers.maskFill.fill'), { mask: { fill: next } }, { mask: { fill: before } });
-    },
+    (next: CanvasMaskFillContract) => commitConfig(t('widgets.layers.maskFill.fill'), { mask: { fill: next } }),
     [commitConfig, t]
   );
 
   const handleColorChange = useCallback(
     (hex: string) => {
-      if (
-        !previewStructural({
-          config: { layerType: 'regional_guidance', mask: { fill: { ...fill, color: hex } } },
-          id: layer.id,
-          type: 'updateCanvasLayerConfig',
-        })
-      ) {
-        return;
-      }
-      if (fillBeforeRef.current === null) {
-        fillBeforeRef.current = fill;
-      }
+      previewStructural({
+        config: { layerType: 'regional_guidance', mask: { fill: { ...fill, color: hex } } },
+        id: layer.id,
+        type: 'updateCanvasLayerConfig',
+      });
     },
     [previewStructural, fill, layer.id]
   );
 
   const handleArmTint = useCallback(() => armMaskTintTarget(layer.id), [layer.id]);
-  const handleColorChangeEnd = useCallback(
-    (hex: string) => {
-      const before = fillBeforeRef.current ?? fill;
-      fillBeforeRef.current = null;
-      commitFill({ ...before, color: hex }, before);
-    },
-    [commitFill, fill]
-  );
+  const handleColorChangeEnd = useCallback((hex: string) => commitFill({ ...fill, color: hex }), [commitFill, fill]);
 
   const handleStyleChange = useCallback(
     ({ value }: SelectValueChangeDetails) => {
       const style = value[0] as CanvasMaskFillContract['style'] | undefined;
       if (style && style !== fill.style) {
-        commitFill({ ...fill, style }, fill);
+        commitFill({ ...fill, style });
       }
     },
     [commitFill, fill]

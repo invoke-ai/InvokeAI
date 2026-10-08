@@ -5,6 +5,7 @@ import { getWorkflowNodeChromeProps, useIsWorkflowImageExport } from '@features/
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { memo, useCallback, type ChangeEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { NotesFlowNode as NotesFlowNodeType } from './flowAdapters';
 
@@ -38,6 +39,7 @@ const NotesSnapshotNode = ({ data }: NodeProps<NotesFlowNodeType>) => {
 };
 
 const NotesEditorNode = ({ data, selected }: NodeProps<NotesFlowNodeType>) => {
+  const { t } = useTranslation();
   const { editGraph } = useProjectGraphCommands();
   const node = data.documentNode;
   const onLabelChange = useCallback(
@@ -62,7 +64,7 @@ const NotesEditorNode = ({ data, selected }: NodeProps<NotesFlowNodeType>) => {
       {...getWorkflowNodeChromeProps({ selected })}
     >
       <Input
-        aria-label="Note title"
+        aria-label={t('widgets.workflow.noteTitle')}
         className="nodrag"
         fontWeight="700"
         mb="1.5"
@@ -71,11 +73,11 @@ const NotesEditorNode = ({ data, selected }: NodeProps<NotesFlowNodeType>) => {
         onChange={onLabelChange}
       />
       <Textarea
-        aria-label="Note text"
+        aria-label={t('widgets.workflow.noteText')}
         className="nodrag nowheel"
         fontSize="xs"
         minH="5rem"
-        placeholder="Write a note…"
+        placeholder={t('widgets.workflow.noteTextPlaceholder')}
         resize="vertical"
         value={node.data.notes}
         onChange={onNotesChange}
