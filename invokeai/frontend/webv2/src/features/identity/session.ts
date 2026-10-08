@@ -1,5 +1,10 @@
 import { createExternalStore } from '@platform/state/externalStore';
-import { ApiError, type HttpAuthAdapter, type HttpCredential } from '@platform/transport/http';
+import {
+  ApiError,
+  type HttpAuthAdapter,
+  type HttpCredential,
+  HttpRequestIdentityExpiredError,
+} from '@platform/transport/http';
 
 import { shouldExpireUnauthorizedSession } from './core/sessionPolicy';
 import { classifyStoredCredential, readTokenUserId } from './core/storedCredential';
@@ -377,15 +382,20 @@ export const identityTransportAuthAdapter: HttpAuthAdapter = {
  * returns the only replacement that survives. Until it settles, other replacements are ignored, and a 401 for the
  * current token or another tab's renewal waits for its outcome; another tab's sign-out applies at once and discards
  * the replacement. The rotation is announced in storage so other tabs hold the 401 the revocation causes until the
- * replacement reaches them. It belongs to the lifetime that started it and is aborted with it. Rotations run one at a
- * time so each sends the credential its predecessor delivered.
+ * replacement reaches them. Rotations run one at a time so each sends the credential its predecessor delivered. Each
+ * belongs to the lifetime that queued it: one still queued when that lifetime ends is rejected without being sent,
+ * since dispatching it later would carry the next account's credential; one in flight is aborted with its lifetime.
  */
 const rotateOwnCredential = <Result extends { refreshedToken: string | null }>(
   request: (signal: AbortSignal) => Promise<Result>
 ): Promise<Result> => {
+  const scope = getAccountLifecycle().capture();
+  const userId = store.getSnapshot().user?.user_id ?? null;
   const run = async (): Promise<Result> => {
-    const scope = getAccountLifecycle().capture();
-    const userId = store.getSnapshot().user?.user_id ?? null;
+    if (getAccountLifecycle().capture() !== scope) {
+      throw new HttpRequestIdentityExpiredError();
+    }
+
     const pending: CredentialRotation = {
       announced: userId === null ? null : { at: Date.now(), userId },
       deferredStorageSync: false,

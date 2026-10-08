@@ -534,6 +534,30 @@ describe('own password change', () => {
     expect(await nextRequestToken()).toBe('token-a-epoch-3');
   });
 
+  it('rejects a queued change unsent when this tab signs out and back in as the same user before it is dispatched', async () => {
+    const first = createDeferredResponse();
+    route = (request) =>
+      request.path === '/api/v1/auth/me' && request.method === 'PATCH' ? first.promise : authRoutes(request);
+
+    const firstChange = changePassword().catch((error: unknown) => error);
+    const secondChange = changePassword().catch((error: unknown) => error);
+    await untilPatchSent('/api/v1/auth/me');
+    await session.logoutSession();
+    route = (request) =>
+      request.path === '/api/v1/auth/login'
+        ? json({ expires_in: 86400, token: 'token-a-login-2', user })
+        : authRoutes(request);
+    await session.loginWithCredentials(user.email, 'password', false);
+    first.resolve(json(user, { refreshedToken: 'token-a-epoch-2' }));
+
+    expect(await firstChange).toBeInstanceOf(http.HttpRequestIdentityExpiredError);
+    expect(await secondChange).toBeInstanceOf(http.HttpRequestIdentityExpiredError);
+    // The same principal does not make the queued change current again; it belonged to the earlier lifetime.
+    expect(sentTo('/api/v1/auth/me', 'PATCH').map((request) => request.authorization)).toEqual(['Bearer token-a']);
+    expect(storage.log.filter((entry) => entry === 'writeRotation')).toHaveLength(1);
+    expect(await nextRequestToken()).toBe('token-a-login-2');
+  });
+
   it('stops deferring for a later lifetime when a stalled change outlives its own', async () => {
     // The change never answers, and this stub ignores aborts, so only the lifetime check releases its hold.
     route = (request) =>
@@ -691,6 +715,34 @@ describe('administrator edits', () => {
     expect(session.getAuthSession()).toMatchObject({ accountEpoch, user });
     expect(accountCacheClears).toBe(0);
     expect(await nextRequestToken()).toBe('token-a-epoch-2');
+  });
+
+  it("rejects a queued own password reset once another tab's account switch ends its lifetime, without sending it", async () => {
+    const first = createDeferredResponse();
+    const tokenB = tokenFor(userB.user_id, 'login');
+    const path = '/api/v1/auth/users/user-a';
+    route = (request) => (request.path === path ? first.promise : authRoutes(request));
+
+    const firstReset = session
+      .updateManagedUser(user.user_id, { password: 'new-password' })
+      .catch((error: unknown) => error);
+    const secondReset = session
+      .updateManagedUser(user.user_id, { password: 'newer-password' })
+      .catch((error: unknown) => error);
+    await untilPatchSent(path);
+    storage.otherTabStores(tokenB);
+    await vi.waitFor(() => {
+      expect(session.getAuthSession().user).toEqual(userB);
+    });
+    first.resolve(json(user, { refreshedToken: 'token-a-epoch-2' }));
+
+    expect(await firstReset).toBeInstanceOf(http.HttpRequestIdentityExpiredError);
+    expect(await secondReset).toBeInstanceOf(http.HttpRequestIdentityExpiredError);
+    // Only account A's own request went out; the queued one never carried account B's credential.
+    expect(sentTo(path, 'PATCH').map((request) => request.authorization)).toEqual(['Bearer token-a']);
+    expect(storage.log.filter((entry) => entry === 'writeRotation')).toHaveLength(1);
+    expect(storage.get()).toBe(tokenB);
+    expect(await nextRequestToken()).toBe(tokenB);
   });
 
   it.each([
