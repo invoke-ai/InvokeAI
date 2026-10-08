@@ -706,6 +706,45 @@ describe('createWorkbenchStore', () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
+  it('composes same-turn functional widget patches from the latest values', () => {
+    const store = createWorkbenchStore();
+    store.commands.widgets.patchValues('upscale', { weights: { first: 0.75, second: 0.5 }, steps: 30 });
+
+    store.commands.widgets.patchValues('upscale', (current) => ({
+      weights: { ...(current.weights as Record<string, number>), first: 0.8 },
+    }));
+    store.commands.widgets.patchValues('upscale', (current) => ({
+      weights: { ...(current.weights as Record<string, number>), second: 0.55 },
+    }));
+
+    expect(getProjectWidgetValues(store.getSnapshot().activeProject, 'upscale')).toMatchObject({
+      steps: 30,
+      weights: { first: 0.8, second: 0.55 },
+    });
+  });
+
+  it('reads and writes the fenced project after a switch and skips a closed project', () => {
+    const store = createWorkbenchStore();
+    const firstProjectId = store.getSnapshot().activeProject.id;
+    store.commands.widgets.patchValues('video', { steps: 12 });
+    const lateUpdate = () =>
+      store.commands.widgets.patchValues('video', (current) => ({ steps: Number(current.steps) + 1 }), firstProjectId);
+
+    store.commands.projects.create();
+    store.commands.widgets.patchValues('video', { steps: 50 });
+    lateUpdate();
+
+    const firstProject = store.getSnapshot().projects.find((project) => project.id === firstProjectId)!;
+    expect(getProjectWidgetValues(firstProject, 'video').steps).toBe(13);
+    expect(getProjectWidgetValues(store.getSnapshot().activeProject, 'video').steps).toBe(50);
+
+    store.commands.projects.close(firstProjectId);
+    const update = vi.fn(() => ({ steps: 99 }));
+    store.commands.widgets.patchValues('video', update, firstProjectId);
+    expect(update).not.toHaveBeenCalled();
+    expect(getProjectWidgetValues(store.getSnapshot().activeProject, 'video').steps).toBe(50);
+  });
+
   it('does not notify subscribers for equivalent queue status writes', () => {
     const store = createWorkbenchStore();
     const project = store.getSnapshot().activeProject;

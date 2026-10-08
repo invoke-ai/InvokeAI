@@ -9,7 +9,7 @@ import { useCallback, useState, type ComponentType, type ElementType } from 'rea
 import { useTranslation } from 'react-i18next';
 
 const MENU_POSITIONING = { placement: 'right-end' } as const;
-const GROUP_LABEL_PROPS = { color: 'fg.subtle', fontSize: '2xs', textTransform: 'uppercase' } as const;
+const GROUP_LABEL_PROPS = { color: 'fg.subtle', fontSize: 'xs', textTransform: 'uppercase' } as const;
 const TRIGGER_JUSTIFY = { justifyContent: 'space-between' } as const;
 // Loaded on trigger hover or focus, so neither the chunk nor its request is part of route startup.
 const loadDonationMenuItem = () => import('@workbench/shell/DonationMenuItem');
@@ -97,7 +97,6 @@ export const HelpMenu = () => {
           aria-label={t('launchpad.help.label')}
           color="fg.muted"
           css={TRIGGER_JUSTIFY}
-          size="xs"
           variant="ghost"
           w="full"
           onFocus={preloadDonationMenuItem}
@@ -129,10 +128,10 @@ export const HelpMenu = () => {
             </Menu.ItemGroup>
             <Menu.Separator />
             <HStack justify="space-between" px="3" py="1.5">
-              <Text fontSize="2xs" fontWeight="700">
+              <Text fontSize="xs" fontWeight="700">
                 Invoke
               </Text>
-              <Text color="fg.subtle" fontSize="2xs">
+              <Text color="fg.subtle" fontSize="xs">
                 {t('launchpad.help.version', { version: APP_VERSION })}
               </Text>
             </HStack>

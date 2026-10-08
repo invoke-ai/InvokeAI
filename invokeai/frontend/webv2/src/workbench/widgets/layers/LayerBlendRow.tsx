@@ -15,8 +15,8 @@ import { useTranslation } from 'react-i18next';
 type LayerBlendRowEngine = Pick<CanvasEngineHandle, 'document' | 'exports' | 'interaction' | 'layers' | 'projectId'>;
 
 const SELECT_POSITIONING = { placement: 'bottom-start', sameWidth: true } as const;
-const BLEND_TRIGGER_PROPS = { fontSize: 'xs', h: '7', minH: '7' } as const;
-const OPACITY_INPUT_PROPS = { fontSize: 'xs', h: '7' } as const;
+const BLEND_TRIGGER_PROPS = { fontSize: 'md', h: 'control.md', minH: 'control.md' } as const;
+const OPACITY_INPUT_PROPS = { fontSize: 'md', h: 'control.md' } as const;
 
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
 
@@ -101,7 +101,6 @@ const BlendModeControl = ({
       itemsMaxH="16rem"
       minW="0"
       positioning={SELECT_POSITIONING}
-      size="xs"
       triggerProps={BLEND_TRIGGER_PROPS}
       value={blendValue}
       valueText={t(`widgets.layers.blendModes.${blendMode}`)}
@@ -201,7 +200,7 @@ const OpacityRow = ({
         disabled={disabled}
         max={100}
         min={0}
-        size="sm"
+        size="lg"
         step={1}
         value={opacityPercent}
         w="16"

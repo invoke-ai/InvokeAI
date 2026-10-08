@@ -193,6 +193,8 @@ interface LayerMenuProps {
    */
   dialogKind?: LayerMenuDialogKind | null;
   onDialogKindChange?: (kind: LayerMenuDialogKind | null) => void;
+  /** After a sibling dialog's close animation; a controlling parent may stop retaining its target here. */
+  onDialogExitComplete?: () => void;
   /** Canvas-only items composed immediately before the terminal danger section. */
   beforeDangerItems?: ReactNode;
   /** Adds the legacy layer and Canvas group labels on the canvas surface. */
@@ -215,6 +217,7 @@ const LayerMenu = ({
   unmountOnExit,
   dialogKind: controlledDialogKind,
   onDialogKindChange,
+  onDialogExitComplete,
   beforeDangerItems,
   showGroupLabels,
 }: LayerMenuProps) => {
@@ -532,6 +535,12 @@ const LayerMenu = ({
   const openRename = useCallback(() => setDialogKind('rename'), [setDialogKind]);
   const closeDialog = useCallback(() => setDialogKind(null), [setDialogKind]);
   const openRunWorkflow = useCallback(() => setDialogKind('run-workflow'), [setDialogKind]);
+  // Each close remounts the run dialog, closed, so the next open starts from a fresh form.
+  const [runWorkflowGeneration, setRunWorkflowGeneration] = useState(0);
+  const handleRunWorkflowExitComplete = useCallback(() => {
+    setRunWorkflowGeneration((generation) => generation + 1);
+    onDialogExitComplete?.();
+  }, [onDialogExitComplete]);
   // Operations present their controls in the Properties pane, so starting one must bring that pane into view.
   const revealProperties = useCallback(
     (layerId: string) => {
@@ -924,7 +933,7 @@ const LayerMenu = ({
             <IconButton
               aria-label={t('widgets.layers.options')}
               color="fg.muted"
-              size="2xs"
+              size="sm"
               variant="ghost"
               onClick={stopPropagation}
             >
@@ -938,7 +947,7 @@ const LayerMenu = ({
               {groupLayout ? (
                 <>
                   <Menu.ItemGroup>
-                    <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                    <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
                       {t(getLayerContextMenuLayerLabelKey(layer.type))}
                     </Menu.ItemGroupLabel>
                     {renderLayerMenuEntries({ entries: groupLayout.layerEntries, runAction, t })}
@@ -947,7 +956,7 @@ const LayerMenu = ({
                     <>
                       <Menu.Separator borderColor="border.subtle" />
                       <Menu.ItemGroup>
-                        <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                        <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
                           {t('widgets.labels.canvas')}
                         </Menu.ItemGroupLabel>
                         {beforeDangerItems}
@@ -975,17 +984,20 @@ const LayerMenu = ({
         submitLabel={t('widgets.layers.actions.rename')}
         title={t('widgets.layers.actions.rename')}
         onClose={closeDialog}
+        onExitComplete={onDialogExitComplete}
         onSubmit={submitRename}
       />
-      {dialogKind === 'run-workflow' ? (
-        <RunLayerWorkflowDialog
-          availability={workflowAvailability}
-          engine={engine}
-          isOpen
-          layerId={layer.id}
-          onClose={closeDialog}
-        />
-      ) : null}
+      {/* Mounted before it opens, like the rename dialog: a dialog that mounts open while the menu is closing is
+          dismissed as nested above the menu's departing layer. */}
+      <RunLayerWorkflowDialog
+        key={runWorkflowGeneration}
+        availability={workflowAvailability}
+        engine={engine}
+        isOpen={dialogKind === 'run-workflow'}
+        layerId={layer.id}
+        onClose={closeDialog}
+        onExitComplete={handleRunWorkflowExitComplete}
+      />
     </>
   );
 };
@@ -1027,9 +1039,14 @@ export const CanvasLayerContextMenu = ({
   showGroupLabels?: boolean;
   onClose: () => void;
 }) => {
-  // The layer a pending sibling dialog is anchored to. Captured while the live
-  // target still exists, then retained until the dialog closes.
-  const [dialogState, setDialogState] = useState<LayerMenuDialogState | null>(null);
+  // The layer a sibling dialog is anchored to. Captured while the live target
+  // still exists, then retained until the dialog has animated out.
+  const [dialogState, setDialogState] = useState<(LayerMenuDialogState & { isOpen: boolean }) | null>(null);
+  // A menu for another layer remounts LayerMenu, cutting the retained dialog short before it reports its exit.
+  // Drop that dialog, or it would resurface as a hidden menu for its layer once this one closes.
+  if (target && dialogState && target.layerId !== dialogState.target.layerId) {
+    setDialogState(null);
+  }
   const renderTarget = resolveMenuTargetForRender(target, dialogState);
 
   const layerId = renderTarget?.layerId ?? null;
@@ -1056,9 +1073,18 @@ export const CanvasLayerContextMenu = ({
   );
   const handleDialogKindChange = useCallback(
     (kind: LayerMenuDialogKind | null) => {
-      setDialogState(kind && target ? { kind, target } : null);
+      setDialogState((current) => {
+        if (kind) {
+          return target ? { isOpen: true, kind, target } : null;
+        }
+        return current ? { ...current, isOpen: false } : null;
+      });
     },
     [target]
+  );
+  const handleDialogExitComplete = useCallback(
+    () => setDialogState((current) => (current?.isOpen ? current : null)),
+    []
   );
 
   if (!renderTarget || !layer) {
@@ -1070,7 +1096,7 @@ export const CanvasLayerContextMenu = ({
       key={renderTarget.layerId}
       beforeDangerItems={beforeDangerItems}
       dispatch={dispatch}
-      dialogKind={dialogState?.kind ?? null}
+      dialogKind={dialogState?.isOpen ? dialogState.kind : null}
       engine={engine}
       layer={layer}
       lazyMount
@@ -1080,6 +1106,7 @@ export const CanvasLayerContextMenu = ({
       showGroupLabels={showGroupLabels}
       unmountOnExit
       onOpenChange={handleOpenChange}
+      onDialogExitComplete={handleDialogExitComplete}
       onDialogKindChange={handleDialogKindChange}
     />
   );
@@ -1101,7 +1128,7 @@ const SUBMENU_META: Record<LayerContextSubmenuId, { defaultLabel: string; icon: 
 };
 
 const SUBMENU_POSITIONING = { placement: 'right-start' } as const;
-const QUICK_MENU_TOOLTIP_CONTENT_PROPS = { fontSize: '2xs' } as const;
+const QUICK_MENU_TOOLTIP_CONTENT_PROPS = { fontSize: 'xs' } as const;
 const QUICK_MENU_TOOLTIP_POSITIONING_PROPS = { placement: 'top' } as const;
 
 const renderLayerMenuEntries = ({
@@ -1213,7 +1240,7 @@ const LayerMenuSubmenu = ({
         ) : (
           <HStack gap="2" minW="0" w="full">
             <Icon as={meta.icon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-            <Text flex="1" fontSize="xs">
+            <Text flex="1" fontSize="md">
               {label}
             </Text>
             <Icon as={ChevronRightIcon} boxSize="3" color="fg.subtle" flexShrink={0} />

@@ -2,6 +2,7 @@ import type { GalleryImageItem } from '@features/gallery/contracts';
 import type { Project } from '@workbench/projectContracts';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { applyThemeToRoot } from '@theme/applyTheme';
 import { system } from '@theme/system';
@@ -276,5 +277,22 @@ describe('PasteMediaRuntime', () => {
     await page.getByRole('button', { name: i18n.t('common.cancel') }).click();
     await expect.element(pasteDialog()).not.toBeInTheDocument();
     expect(mocks.uploadFiles).not.toHaveBeenCalled();
+  });
+
+  it('animates the dialog out instead of unmounting it, releasing workbench hotkeys at close', async () => {
+    paste(document.body, [imageFile()]);
+    await expect
+      .poll(() => document.querySelector('[role="dialog"][data-state]')?.getAttribute('data-state'))
+      .toBe('open');
+    const dialog = document.querySelector('[role="dialog"][data-state]')!;
+
+    const frames = await recordDialogExit(dialog, async () => {
+      await page.getByRole('button', { name: i18n.t('common.cancel') }).click();
+      expect(isHotkeyModalLayerActive()).toBe(false);
+    });
+
+    // An unmounted dialog never reaches its closed state, so it cannot animate out; a retained one does, then leaves.
+    expect(closingFrames(frames)).not.toHaveLength(0);
+    await expect.poll(() => document.querySelector('[role="dialog"][data-state]')).toBeNull();
   });
 });

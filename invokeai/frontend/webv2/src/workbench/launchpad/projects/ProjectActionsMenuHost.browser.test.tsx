@@ -67,7 +67,7 @@ const Card = ({ id }: { id: string }) => {
         aria-expanded={menuTrigger.isExpanded}
         aria-haspopup="menu"
         aria-label={`actions ${id}`}
-        size="2xs"
+        size="sm"
         variant="ghost"
         onClick={menuTrigger.onClick}
         onPointerDown={menuTrigger.onPointerDown}

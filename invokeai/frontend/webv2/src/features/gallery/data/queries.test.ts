@@ -504,6 +504,9 @@ describe('imageIndexAvailabilityOptions', () => {
     expect(pollFor({ data: { modelName: 'clip', state: 'model_missing' }, status: 'success' })).toBe(
       IMAGE_INDEX_UNAVAILABLE_POLL_MS
     );
+    expect(pollFor({ data: { modelName: null, state: 'switching' }, status: 'success' })).toBe(
+      IMAGE_INDEX_UNAVAILABLE_POLL_MS
+    );
     expect(pollFor({ status: 'error' })).toBe(IMAGE_INDEX_UNAVAILABLE_POLL_MS);
     expect(pollFor({ data: { modelName: null, state: 'ready' }, status: 'success' })).toBe(false);
     expect(pollFor({ data: { modelName: null, state: 'disabled' }, status: 'success' })).toBe(false);

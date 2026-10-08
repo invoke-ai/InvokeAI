@@ -38,7 +38,7 @@ export const ImageMapWidgetFooter = (_props: WidgetViewProps) => {
   const skipped = indexCounts && indexCounts.pending === 0 && indexCounts.failed > 0;
 
   return (
-    <HStack borderTopWidth="1px" color="fg.muted" fontSize="2xs" gap="2" justify="space-between" px="3" py="1" w="full">
+    <HStack borderTopWidth="1px" color="fg.muted" fontSize="xs" gap="2" justify="space-between" px="3" py="1" w="full">
       <HStack gap="2" minW="0">
         <Text whiteSpace="nowrap">{data.pointCount.toLocaleString()} points</Text>
         {/* Every sibling in this row is nowrap, so this is the only segment
@@ -62,7 +62,7 @@ export const ImageMapWidgetFooter = (_props: WidgetViewProps) => {
         ) : null}
       </HStack>
       <Tooltip content="Refresh map">
-        <IconButton aria-label="Refresh map" color="fg.muted" size="2xs" variant="ghost" onClick={handleRefresh}>
+        <IconButton aria-label="Refresh map" color="fg.muted" size="sm" variant="ghost" onClick={handleRefresh}>
           <Icon as={RefreshCwIcon} boxSize="3" />
         </IconButton>
       </Tooltip>

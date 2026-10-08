@@ -505,31 +505,16 @@ describe('Properties pane', () => {
     }
   });
 
-  it('titles the pane with the running operation, else the selected layer or group', async () => {
-    const title = () => page.getByRole('heading', { level: 2 });
-    await mount(PropertiesPane);
-    await expect.element(title()).toHaveTextContent('No layer selected');
-
-    await act(() => root?.unmount());
-    host?.remove();
-    registry?.releaseEngine('p');
-    await mount(PropertiesPane, 'group');
-    await expect.element(title()).toHaveTextContent('Group: Folder');
-
-    await act(() => root?.unmount());
-    host?.remove();
-    registry?.releaseEngine('p');
+  it('names a running operation in its own section header', async () => {
+    const operationSection = () => host!.querySelector<HTMLElement>('[role="group"][aria-label="Operation"]');
     await mount(PropertiesPane, 'mask');
-    await expect.element(title()).toHaveTextContent('Layer: Mask');
+    expect(operationSection()).toBeNull();
     await act(() => operations!.start(true));
     await settle();
-    await expect.element(title()).toHaveTextContent('Operation: Filter');
-    // The title replaces the operation section's own header; the group keeps its accessible name.
-    const section = host!.querySelector<HTMLElement>('[role="group"][aria-label="Operation"]')!;
-    expect(section.textContent).not.toContain('Operation');
+    expect(operationSection()?.textContent).toContain('OperationFilter');
     await act(() => operations!.start(false));
     await settle();
-    await expect.element(title()).toHaveTextContent('Layer: Mask');
+    expect(operationSection()).toBeNull();
   });
 
   it('puts a running operation first with Cancel, locks the tool rows in place and hands them focus over', async () => {

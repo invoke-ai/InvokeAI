@@ -1,4 +1,3 @@
-import type { ImageWithDims } from '@features/generation/contracts';
 import type { ModelConfig, ModelTaxonomyType } from '@features/models';
 import type {
   VideoConditioningClip,
@@ -22,9 +21,11 @@ import {
 import {
   applyReferenceExtendNumFrames,
   canPlaceReferenceExtendAnchor,
+  createFrameImageSetter,
   getConditioningClipPatch,
   getInitialVideoPatch,
   getReferencesPatch,
+  isConditioningClipExcludingFrames,
   isVideoTargetResolution,
   normalizeVideoWidgetValues,
   resolveVideoMode,
@@ -87,10 +88,10 @@ const StaleMediaStub = ({ label, onClear }: { label: string; onClear: () => void
 
   return (
     <HStack bg="bg.subtle" gap="2" justify="space-between" p="2" rounded="md">
-      <Text color="fg.muted" fontSize="2xs" textWrap="pretty">
+      <Text color="fg.muted" fontSize="xs" textWrap="pretty">
         {label}
       </Text>
-      <Button flexShrink="0" size="2xs" variant="outline" onClick={onClear}>
+      <Button flexShrink="0" size="sm" variant="outline" onClick={onClear}>
         {t('widgets.video.clearStaleMedia')}
       </Button>
     </HStack>
@@ -127,7 +128,7 @@ export const VideoWidgetView = () => {
   const selection = useVideoUi();
   const models = useModelsSelector((snapshot) => snapshot.models);
   const modelsStatus = useModelsSelector((snapshot) => snapshot.status);
-  const { patchValues, projectId, rawValues } = selection;
+  const { patchValues, projectId, rawValues, readValues } = selection;
   // Reconcile only when inputs change; it is expensive and fresh values rerender every section.
   const values = useMemo(() => {
     const normalized =
@@ -280,19 +281,20 @@ export const VideoWidgetView = () => {
   // extension also keeps the linked tail reference synchronized.
   const referenceExtend = Boolean(policy.references?.extend);
   const maxVideoReferences = policy.references?.maxVideos ?? 3;
-  const setFirstFrame = useCallback(
-    (firstFrameImage: ImageWithDims | null) =>
-      patch({ firstFrameImage, ...(firstFrameImage ? { conditioningClip: null, sourceVideo: null } : {}) }),
-    [patch]
+  const conditioningClip = values.conditioningClip;
+  // A drop commits through the setter captured when it began, so what the frame displaces is read at commit time.
+  const setFirstFrame = useMemo(
+    () => createFrameImageSetter('firstFrameImage', readValues, patch),
+    [patch, readValues]
   );
-  const setLastFrame = useCallback(
-    (lastFrameImage: ImageWithDims | null) =>
-      patch({ lastFrameImage, ...(lastFrameImage ? { conditioningClip: null } : {}) }),
-    [patch]
-  );
-  // A conditioning clip claims a whole modality, so it excludes every other conditioning slot --
-  // and each of those clears it in turn. The role a dropped clip arrives in comes from the gallery
-  // record: an uploaded soundtrack has no picture to condition on.
+  const setLastFrame = useMemo(() => createFrameImageSetter('lastFrameImage', readValues, patch), [patch, readValues]);
+  // Setting a frame is what clears a clip held for its picture, so the frame fields say so beforehand.
+  const frameClearsClipText = isConditioningClipExcludingFrames(conditioningClip)
+    ? t('widgets.video.frameClearsConditioningClip')
+    : undefined;
+  // A conditioning clip claims a whole modality, so it excludes the initial video and references, and in the picture
+  // role the frames too -- and each of those clears it in turn. The role a dropped clip arrives in comes from the
+  // gallery record: an uploaded soundtrack has no picture to condition on.
   const setConditioningClip = useCallback(
     (conditioningClip: VideoConditioningClip | null) => patch(getConditioningClipPatch(conditioningClip)),
     [patch]
@@ -356,36 +358,49 @@ export const VideoWidgetView = () => {
   );
   const clearReferences = useCallback(() => patch({ references: [] }), [patch]);
   const setLoras = useCallback(
-    (loras: VideoWidgetValues['loras']) => {
-      // While enabled, follow a replacement accelerator set or restore model sampling defaults if none remains.
-      // Preserve the edit and notify; never enable acceleration from a list edit.
-      if (!values.model) {
-        patch({ loras });
-        return;
-      }
+    (update: (current: VideoWidgetValues['loras']) => VideoWidgetValues['loras']) => {
+      let notice: Parameters<typeof toaster.create>[0] | undefined;
+      patchValues((current) => {
+        const loras = update(current.loras);
 
-      const result = getAcceleratorLoraChangeResult(values, values.model, models, loras);
+        if (loras === current.loras) {
+          return {};
+        }
+        // While enabled, follow a replacement accelerator set or restore model sampling defaults if none remains.
+        // Preserve the edit and notify; never enable acceleration from a list edit.
+        if (!current.model) {
+          return { loras };
+        }
 
-      patch({ ...result.settings });
+        const result = getAcceleratorLoraChangeResult(current, current.model, models, loras);
 
-      if (result.outcome === 'switched') {
-        toaster.create({
-          description: t('widgets.video.acceleratorSwitchedDescription', {
-            name: result.acceleratorLoras?.map((lora) => lora.name).join(', ') ?? '',
-            steps: result.settings.steps,
-          }),
-          title: t('widgets.video.acceleratorSwitched', { label: policy.ui.accelerator?.label ?? '' }),
-          type: 'info',
-        });
-      } else if (result.outcome === 'disabled') {
-        toaster.create({
-          description: t('widgets.video.acceleratorBrokenDescription'),
-          title: t('widgets.video.acceleratorBroken'),
-          type: 'info',
-        });
+        if (result.outcome === 'switched') {
+          notice = {
+            description: t('widgets.video.acceleratorSwitchedDescription', {
+              name: result.acceleratorLoras?.map((lora) => lora.name).join(', ') ?? '',
+              steps: result.settings.steps,
+            }),
+            title: t('widgets.video.acceleratorSwitched', {
+              label: getVideoModelPolicy(current.model, current).ui.accelerator?.label ?? '',
+            }),
+            type: 'info',
+          };
+        } else if (result.outcome === 'disabled') {
+          notice = {
+            description: t('widgets.video.acceleratorBrokenDescription'),
+            title: t('widgets.video.acceleratorBroken'),
+            type: 'info',
+          };
+        }
+
+        return { ...result.settings };
+      });
+
+      if (notice) {
+        toaster.create(notice);
       }
     },
-    [models, patch, policy.ui.accelerator?.label, t, values]
+    [models, patchValues, t]
   );
   const clearFirstFrame = useCallback(() => patch({ firstFrameImage: null }), [patch]);
   const clearLastFrame = useCallback(() => patch({ lastFrameImage: null }), [patch]);
@@ -460,9 +475,9 @@ export const VideoWidgetView = () => {
   const hasConditioningMedia = Boolean(
     values.firstFrameImage || values.lastFrameImage || values.sourceVideo || values.conditioningClip?.role === 'video'
   );
-  const otherMediaSet = Boolean(
-    values.firstFrameImage || values.lastFrameImage || values.sourceVideo || values.references.length > 0
-  );
+  const otherMediaSet = Boolean(values.sourceVideo || values.references.length > 0);
+  // Frames block only the clip's picture role; its soundtrack is what they can be combined with.
+  const framesSet = Boolean(values.firstFrameImage || values.lastFrameImage);
   const conditioningDerivedText = values.conditioningClip
     ? t(
         values.conditioningClip.role === 'audio'
@@ -478,7 +493,7 @@ export const VideoWidgetView = () => {
   const derivedSourceValueText = useMemo(
     () =>
       dimensionSource && dimensionSource !== 'aspect-ratio' ? (
-        <Text as="span" fontSize="xs" truncate>
+        <Text as="span" fontSize="md" truncate>
           {t(`widgets.video.dimensionSourceValue.${dimensionSource}`)}
         </Text>
       ) : undefined,
@@ -515,7 +530,6 @@ export const VideoWidgetView = () => {
             invalid={!values.model}
             modelTypes={MAIN_MODEL_TYPES}
             placeholder={t('widgets.video.selectModel')}
-            size="xs"
             value={values.model?.key ?? null}
             onChange={selectMainModel}
           />
@@ -543,7 +557,11 @@ export const VideoWidgetView = () => {
           <Stack gap="3" p="2">
             {supportsFirstFrame ? (
               <Field
-                helpText={values.sourceVideo ? undefined : t('widgets.video.firstFrameHelp')}
+                helpText={
+                  values.sourceVideo
+                    ? undefined
+                    : [t('widgets.video.firstFrameHelp'), frameClearsClipText].filter(Boolean).join(' ')
+                }
                 label={t('widgets.video.firstFrame')}
               >
                 <VideoFrameImageField
@@ -558,9 +576,12 @@ export const VideoWidgetView = () => {
             ) : null}
             {supportsLastFrame ? (
               <Field
-                helpText={
-                  values.sourceVideo ? t('widgets.video.lastFrameExtendHelp') : t('widgets.video.lastFrameHelp')
-                }
+                helpText={[
+                  values.sourceVideo ? t('widgets.video.lastFrameExtendHelp') : t('widgets.video.lastFrameHelp'),
+                  frameClearsClipText,
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
                 label={t('widgets.video.lastFrame')}
               >
                 <VideoFrameImageField
@@ -609,7 +630,7 @@ export const VideoWidgetView = () => {
         <GenerationSettingsSection label={t('widgets.video.initialVideo')} sectionId="video-source" defaultOpen>
           <Stack gap="3" p="2">
             {referenceExtend ? (
-              <Text color="fg.muted" fontSize="2xs" textWrap="pretty">
+              <Text color="fg.muted" fontSize="xs" textWrap="pretty">
                 {t('widgets.video.referenceExtendHelp')}
               </Text>
             ) : null}
@@ -659,6 +680,7 @@ export const VideoWidgetView = () => {
               derivedText={conditioningDerivedText}
               disabled={otherMediaSet}
               disabledReason={otherMediaSet ? t('widgets.video.conditioningClipBlocked') : undefined}
+              pictureRoleDisabledReason={framesSet ? t('widgets.video.conditioningRoleVideoBlocked') : undefined}
               onChange={setConditioningClip}
             />
           </Stack>
@@ -673,7 +695,6 @@ export const VideoWidgetView = () => {
                 collection={ASPECT_RATIO_COLLECTION}
                 disabled={hasConditioningMedia}
                 flex="1"
-                size="xs"
                 value={aspectRatioValue}
                 valueText={derivedSourceValueText}
                 onValueChange={set.aspectRatio}
@@ -681,7 +702,6 @@ export const VideoWidgetView = () => {
               <IconButton
                 aria-label={t('widgets.video.swapAspectRatio')}
                 disabled={hasConditioningMedia}
-                size="xs"
                 variant="ghost"
                 onClick={swapAspectRatio}
               >
@@ -692,7 +712,6 @@ export const VideoWidgetView = () => {
           <Field helpText={twoStageHelpText} label={t('widgets.video.targetResolution')}>
             <Select
               collection={targetResolutionCollection}
-              size="xs"
               value={targetResolutionValue}
               onValueChange={set.targetResolution}
             />
@@ -729,7 +748,7 @@ export const VideoWidgetView = () => {
               onChange={set.fps}
             />
           ) : (
-            <Text color="fg.muted" fontSize="2xs">
+            <Text color="fg.muted" fontSize="xs">
               {t('widgets.video.fixedFps', { fps: policy.fps.defaultValue })}
             </Text>
           )}
@@ -747,7 +766,7 @@ export const VideoWidgetView = () => {
               })}
               label={t('widgets.video.accelerator', { label: policy.ui.accelerator.label })}
             >
-              <Switch.Root checked={values.acceleratorEnabled} size="sm" onCheckedChange={toggleAccelerator}>
+              <Switch.Root checked={values.acceleratorEnabled} onCheckedChange={toggleAccelerator}>
                 <Switch.HiddenInput />
                 <Switch.Control _checked={SWITCH_CHECKED_PROPS}>
                   <Switch.Thumb />
@@ -768,7 +787,7 @@ export const VideoWidgetView = () => {
               onChange={set.steps}
             />
           ) : (
-            <Text color="fg.muted" fontSize="2xs">
+            <Text color="fg.muted" fontSize="xs">
               {t('widgets.video.stepsFixed', { steps: policy.defaults.steps })}
             </Text>
           )}
@@ -852,7 +871,7 @@ export const VideoWidgetView = () => {
         </GenerationSettingsSection>
       ) : null}
 
-      <VideoConceptsSection loras={values.loras} model={values.model} onChangeLoras={setLoras} />
+      <VideoConceptsSection projectId={projectId} loras={values.loras} model={values.model} onChangeLoras={setLoras} />
       <VideoComponentsSection values={values} onPatch={patch} />
     </Stack>
   );

@@ -93,7 +93,7 @@ export const AppMenu = () => {
           aria-label={t('topbar.appMenu.open')}
           className="group"
           pe="1.5"
-          size="sm"
+          size="lg"
           variant="ghost"
           onFocus={preloadDonationMenuItem}
           onPointerEnter={preloadDonationMenuItem}
@@ -105,10 +105,8 @@ export const AppMenu = () => {
         <Menu.Positioner>
           <MenuContent minW="15rem">
             <HStack justify="space-between" px="3" py="2">
-              <Text fontSize="xs" fontWeight="800">
-                Invoke
-              </Text>
-              <Text color="fg.subtle" fontSize="2xs">
+              <Text fontWeight="800">Invoke</Text>
+              <Text color="fg.subtle" fontSize="xs">
                 v{APP_VERSION}
               </Text>
             </HStack>
@@ -119,7 +117,7 @@ export const AppMenu = () => {
             </Menu.Item>
             <Menu.Separator />
             <Menu.ItemGroup>
-              <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+              <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
                 {t('topbar.appMenu.manage')}
               </Menu.ItemGroupLabel>
               <Menu.Item value="projects" onClick={openProjects}>
@@ -146,7 +144,7 @@ export const AppMenu = () => {
                 <Icon as={ListOrderedIcon} boxSize="3.5" />
                 <Menu.ItemText>{t('widgets.labels.queue')}</Menu.ItemText>
                 {queuedCount > 0 ? (
-                  <Badge colorPalette="accent" fontSize="2xs" ms="auto" variant="surface">
+                  <Badge colorPalette="accent" fontSize="xs" ms="auto" variant="surface">
                     {queuedCount}
                   </Badge>
                 ) : null}
@@ -223,11 +221,11 @@ const SettingsMenuAction = ({ onClick }: { onClick: () => void }) => {
 const FOOTER_ITEM_PROPS = {
   alignItems: 'center',
   flex: '0 0 auto',
-  h: '7',
+  h: 'control.md',
   justifyContent: 'center',
-  minW: '7',
+  minW: 'control.md',
   p: '0',
-  w: '7',
+  w: 'control.md',
 } as const;
 
 const AppMenuAction = ({

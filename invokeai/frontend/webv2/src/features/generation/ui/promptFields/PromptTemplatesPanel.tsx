@@ -28,7 +28,7 @@ import { useTranslation } from 'react-i18next';
 
 const THUMBNAIL_SIZE = '7';
 // Use a distinct hover fill on bg.muted surfaces.
-const TEMPLATE_ROW_HOVER_PROPS = { bg: 'bg.emphasized/60' };
+const TEMPLATE_ROW_HOVER_PROPS = { bg: 'bg.hover' };
 const TEMPLATE_THUMBNAIL_FALLBACK = (
   <Box
     alignItems="center"
@@ -123,7 +123,7 @@ export const PromptTemplatesPanel = ({
   return (
     <Stack gap="2">
       <PromptPanelHeader label={t('widgets.generate.promptTemplates.title')}>
-        <Button h={PANEL_HEADER_CONTROL_HEIGHT} size="2xs" variant="ghost" onClick={onCreate}>
+        <Button h={PANEL_HEADER_CONTROL_HEIGHT} size="sm" variant="ghost" onClick={onCreate}>
           <PlusIcon />
           {t('widgets.generate.promptTemplates.newTemplate')}
         </Button>
@@ -132,7 +132,6 @@ export const PromptTemplatesPanel = ({
       <Input
         aria-label={t('widgets.generate.promptTemplates.search')}
         placeholder={t('widgets.generate.promptTemplates.search')}
-        size="xs"
         value={searchTerm}
         onChange={handleSearchChange}
       />
@@ -179,14 +178,14 @@ export const PromptTemplatesPanel = ({
           <HStack gap="1" justify="space-between">
             {canManagePromptTemplates ? <PromptTemplateTransferActions catalog={catalog} /> : <Box />}
             {activeTemplate ? (
-              <Button size="2xs" variant="ghost" onClick={clearActiveTemplate}>
+              <Button size="sm" variant="ghost" onClick={clearActiveTemplate}>
                 {t('widgets.generate.promptTemplates.clearApplied', { name: activeTemplate.name })}
               </Button>
             ) : null}
           </HStack>
 
           {activeTemplate && isActiveTemplateMissing ? (
-            <Text color="fg.subtle" fontSize="2xs">
+            <Text color="fg.subtle" fontSize="xs">
               {t('widgets.generate.promptTemplates.appliedMissingHelp', { name: activeTemplate.name })}
             </Text>
           ) : null}
@@ -281,13 +280,13 @@ const PromptTemplateTransferActions = ({ catalog }: { catalog: PromptTemplateCat
   return (
     <HStack gap="0.5">
       <Tooltip content={t('widgets.generate.promptTemplates.importHelp')}>
-        <Button disabled={isBusy} size="2xs" variant="ghost" onClick={pickFile}>
+        <Button disabled={isBusy} size="sm" variant="ghost" onClick={pickFile}>
           <UploadIcon />
           {t('widgets.generate.promptTemplates.import')}
         </Button>
       </Tooltip>
       <Tooltip content={t('widgets.generate.promptTemplates.exportHelp')}>
-        <Button disabled={isBusy} size="2xs" variant="ghost" onClick={handleExport}>
+        <Button disabled={isBusy} size="sm" variant="ghost" onClick={handleExport}>
           <DownloadIcon />
           {t('widgets.generate.promptTemplates.export')}
         </Button>
@@ -305,7 +304,7 @@ const PromptTemplateTransferActions = ({ catalog }: { catalog: PromptTemplateCat
 
 const PanelMessage = ({ children }: { children: string }) => (
   <HStack h="full" justify="center" minH="8rem">
-    <Text color="fg.subtle" fontSize="xs">
+    <Text color="fg.subtle" fontSize="md">
       {children}
     </Text>
   </HStack>
@@ -332,7 +331,7 @@ const TemplateGroup = ({
 
   return (
     <Stack gap="0">
-      <Text color="fg.subtle" fontSize="2xs" fontWeight="700" px="2" textTransform="uppercase">
+      <Text color="fg.subtle" fontSize="xs" fontWeight="700" px="2" textTransform="uppercase">
         {label}
       </Text>
       {templates.map((template) => (
@@ -385,10 +384,10 @@ const TemplateRow = ({
         <button type="button" onClick={handleApply}>
           <TemplateThumbnail template={template} />
           <Stack align="start" flex="1" gap="0" minW="0">
-            <Text as="span" fontSize="xs" fontWeight={isActive ? '600' : '400'}>
+            <Text as="span" fontSize="md" fontWeight={isActive ? '600' : '400'}>
               {template.name}
             </Text>
-            <Text as="span" color="fg.muted" fontFamily="mono" fontSize="2xs" truncate>
+            <Text as="span" color="fg.muted" fontFamily="mono" fontSize="xs" truncate>
               {summary}
             </Text>
           </Stack>
@@ -400,7 +399,7 @@ const TemplateRow = ({
         <Tooltip content={t('common.edit')}>
           <IconButton
             aria-label={`${t('common.edit')}: ${template.name}`}
-            size="2xs"
+            size="sm"
             variant="ghost"
             onClick={handleEdit}
           >
@@ -413,7 +412,7 @@ const TemplateRow = ({
           <IconButton
             aria-label={`${t('common.delete')}: ${template.name}`}
             colorPalette="red"
-            size="2xs"
+            size="sm"
             variant="ghost"
             onClick={handleDelete}
           >

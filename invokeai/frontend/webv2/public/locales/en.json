@@ -182,9 +182,9 @@
     "clearSearch": "Clear search",
     "dontShowMeThese": "Don't show me these",
     "learnMore": "Learn more",
-    "noSchedulersFound": "No schedulers found",
+    "noOptionsFound": "No matches",
     "openSelector": "Open selector",
-    "searchSchedulers": "Search schedulers…",
+    "searchOptions": "Search…",
     "close": "Close",
     "colorPicker": {
       "format": "Color format",
@@ -1382,7 +1382,9 @@
     "scanFolderTooltip": "Scan this folder for model files",
     "scanSummary_one": "{{count}} file in {{path}} · {{notInstalled}} not installed",
     "scanSummary_other": "{{count}} files in {{path}} · {{notInstalled}} not installed",
+    "scopeAllAdded": "All compatible {{scope}} added.",
     "scopeAvailable": "Available {{scope}}",
+    "scopeConcepts": "concepts",
     "scopeModels": "models",
     "scopeNoCompatibleInstalled": "No compatible {{scope}} installed.",
     "scopeNoMatchBases": "No {{scope}} match the selected bases.",
@@ -1784,6 +1786,14 @@
       "saveFailed": "Could not save the vocabulary.",
       "loadFailed": "Could not load the vocabulary."
     },
+    "databaseMaintenance": {
+      "compactDatabase": "Compact database",
+      "confirmTitle": "Run database VACUUM?",
+      "confirmBody": "VACUUM can take a long time for large databases and pauses database activity while it runs.",
+      "completed": "Database VACUUM completed.",
+      "failed": "Database VACUUM failed.",
+      "requestFailed": "The database could not be vacuumed."
+    },
     "catalog": {
       "themeId": {
         "label": "Theme",
@@ -1883,7 +1893,7 @@
       },
       "workspaceActions": {
         "label": "Data & workspace",
-        "description": "Reset the layout, manage intermediates, or permanently delete saved projects and settings."
+        "description": "Reset the layout, manage intermediates, or permanently delete saved projects and settings. Administrators can also run database maintenance."
       },
       "about": {
         "label": "About InvokeAI",
@@ -1896,7 +1906,15 @@
         "label": "Connection style",
         "description": "How connections between nodes are drawn."
       },
+      "promptFontSize": {
+        "label": "Prompt text size",
+        "description": "Size of the text in prompt fields."
+      },
       "options": {
+        "small": "Small",
+        "default": "Default",
+        "large": "Large",
+        "larger": "Larger",
         "curved": "Curved",
         "square": "Square",
         "activeProject": "Active project",
@@ -2124,11 +2142,6 @@
           "drag": "Draw or adjust the search box."
         }
       },
-      "title": {
-        "group": "Group: {{name}}",
-        "layer": "Layer: {{name}}",
-        "operation": "Operation: {{name}}"
-      },
       "target": {
         "defaults": "Defaults",
         "editing": "Editing: {{name}}",
@@ -2195,6 +2208,7 @@
     "generate": {
       "activeCount_one": "{{count}} active",
       "activeCount_other": "{{count}} active",
+      "activeOfTotal": "{{active}}/{{total}} active",
       "activeSteps": "Active steps",
       "addConcept": "Add concept",
       "addConceptsHelp": "Add LoRAs/concepts here to blend them into this generation.",
@@ -2234,6 +2248,12 @@
         "coherenceEdgeSize": "Coherence edge size",
         "coherenceMinDenoise": "Coherence min denoise",
         "maskBlur": "Mask blur"
+      },
+      "conceptMenu": {
+        "disable": "Disable",
+        "enable": "Enable",
+        "openInModelManager": "Open in Model Manager",
+        "remove": "Remove"
       },
       "conceptWeight": "{{name}} weight",
       "concepts": "Concepts",
@@ -2588,7 +2608,7 @@
       "pidNativeHelp": "The requested size is the 4x target; generation runs at a quarter of it."
     },
     "upscale": {
-      "addLora": "LoRAs",
+      "concepts": "Concepts",
       "advanced": "Advanced",
       "bundledVae": "Bundled VAE",
       "cfgScale": "CFG scale",
@@ -2603,8 +2623,7 @@
       "inputSize": "Input",
       "largeOutput": "Large output",
       "largeOutputDescription": "This output may take substantially longer and require more VRAM. Check tile settings before queueing.",
-      "lorasRemoved": "Removed {{count}} incompatible LoRA model(s).",
-      "loraWeight": "{{name}} weight",
+      "lorasRemoved": "Removed {{count}} incompatible concept(s).",
       "mainModel": "Main model",
       "mainModelRequired": "Select a supported main model.",
       "negativePrompt": "Negative prompt",
@@ -2631,12 +2650,11 @@
       "prompts": "Prompts",
       "ready": "Ready",
       "readyDescription": "The upscale graph is ready to queue.",
-      "removeLora": "Remove {{name}}",
       "scale": "Scale",
       "scaleHelp": "Output dimensions are the source dimensions multiplied by this value.",
       "scheduler": "Scheduler",
       "seed": "Seed",
-      "selectLora": "Select a compatible LoRA…",
+      "searchCompatibleConcepts": "Search compatible concepts…",
       "selectMainModel": "Select a supported model…",
       "selectSpandrelModel": "Select a Spandrel model…",
       "selectTileControlNet": "Select a Tile or Union ControlNet…",
@@ -4135,11 +4153,13 @@
       "dimensionSourceValue": {
         "first-frame": "From the first frame",
         "last-frame": "From the last frame",
-        "source-video": "From the initial video"
+        "source-video": "From the initial video",
+        "conditioning-clip": "From the conditioning clip"
       },
       "firstFrame": "First Frame",
       "firstFrameBlocked": "Clear the initial video to start from a frame instead.",
       "firstFrameHelp": "The video starts on this image.",
+      "frameClearsConditioningClip": "Setting a frame removes the conditioning clip, whose picture supplies every frame. Use its soundtrack instead to keep both.",
       "fpsExtendLocked": "The extension inherits the source clip's frame rate.",
       "initialFrames": "Start & End Images",
       "initialVideo": "Initial Video",
@@ -4181,9 +4201,7 @@
       },
       "negativeCfgHelp": "Used only when CFG is greater than 1.",
       "concepts": "Concepts",
-      "loraWeight": "Weight for {{name}}",
       "noLoras": "No concepts added. Compatible LoRAs adjust style and motion.",
-      "removeLora": "Remove {{name}}",
       "selectComponent": "Select a component model…",
       "hybridStartBlock": "Ref2VA AdaLN from block",
       "hybridStartBlockHelp": "Blocks from here through 49 keep this Ref2VA model’s AdaLN projections; earlier blocks use the FL2VA base. Lower values follow references more closely at more of Ref2VA’s quality cost; 25 is the recommended balance.",
@@ -4211,7 +4229,7 @@
       "referenceExtendCapFull": "Initial video not set",
       "referenceExtendCapFullDescription": "All 3 video reference slots are in use, so there is no room for the continuity reference this clip needs. Remove a video reference, then drop the clip again.",
       "placement": {
-        "conditioningClipDisplaced": "A conditioning clip is used on its own, so the panel's other conditioning media was cleared.",
+        "conditioningClipDisplaced": "The panel's conditioning media that can't be combined with this clip was cleared.",
         "conditioningClipNoPicture": "This is an uploaded audio file, so it has no picture to generate a soundtrack for. Use its soundtrack instead.",
         "conditioningClipNotSet": "Conditioning clip not set",
         "conditioningClipSet": "Conditioning clip set",
@@ -4239,12 +4257,13 @@
       "staleReferences": "References are set but the selected model cannot use them.",
       "staleConditioningClip": "A conditioning clip is set, but this model cannot generate from one.",
       "conditioningClip": "Conditioning Clip",
-      "conditioningClipHelp": "Drop a clip to generate the other half of it: a picture for its soundtrack, or a soundtrack for its picture.",
-      "conditioningClipBlocked": "Clear the First Frame, Last Frame, Initial Video and References to use a conditioning clip.",
+      "conditioningClipHelp": "Drop a clip to generate the other half of it: a picture for its soundtrack, or a soundtrack for its picture. A soundtrack can be combined with a First Frame and Last Frame.",
+      "conditioningClipBlocked": "Clear the Initial Video and References to use a conditioning clip.",
       "twoStageConditioningBlocked": "A conditioning clip cannot run a two-stage resolution. Pick a single-stage one.",
       "conditioningRole": "Use from this clip",
       "conditioningRoleAudio": "Its soundtrack \u2014 generate the picture",
       "conditioningRoleVideo": "Its picture \u2014 generate the soundtrack",
+      "conditioningRoleVideoBlocked": "Clear the First Frame and Last Frame to use this clip's picture.",
       "conditioningRoleVideoHelp": "The clip is re-encoded at the generation's canvas, so the picture comes back cropped and recompressed.",
       "conditioningDerivedAudio": "{{frames}} frames at {{fps}} FPS, from the soundtrack's length.",
       "conditioningDerivedVideo": "{{frames}} frames at {{fps}} FPS, from the clip itself.",

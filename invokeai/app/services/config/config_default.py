@@ -42,6 +42,8 @@ RESERVED_BASE_URL_PREFIXES = {"api", "ws", "static", "docs", "redoc", "openapi.j
 EXTERNAL_PROVIDER_CONFIG_FIELDS = (
     "external_alibabacloud_api_key",
     "external_alibabacloud_base_url",
+    "external_atlascloud_api_key",
+    "external_atlascloud_base_url",
     "external_gemini_api_key",
     "external_gemini_base_url",
     "external_openai_api_key",
@@ -113,6 +115,8 @@ class InvokeAIAppConfig(BaseSettings):
         device_working_mem_gb: The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.
         enable_partial_loading: Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.
         keep_ram_copy_of_weights: Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.
+        offload_on_architecture_switch: When a session uses main models of another architecture than the previous one on the same GPU, move every model it does not use from VRAM to RAM before it runs. Models both sessions use stay. Switching back reloads the moved models from RAM, which costs a few seconds per switch when both architectures would have fit in VRAM together; turn this off if you alternate between such models.
+        clear_vram_after_session: After every queue item (each image of a batch), move the models held in VRAM to RAM and return the freed memory to the GPU driver. The models stay cached in RAM; the next item reloads them from there, which costs a few seconds (more with keep_ram_copy_of_weights off). Changes nothing where VRAM is system memory (CPU, MPS, integrated GPUs). Turn this on if a generation that runs fine the first time runs out of memory, or slows down sharply because the GPU spills into shared memory, when it is repeated.
         fp8_compute: Keep ComfyUI 'scaled fp8' checkpoints quantized instead of dequantizing them at load, and run their matmuls on the fp8 tensor cores (requires an Ada/SM 8.9 or newer NVIDIA GPU, or a ROCm GPU that passes an fp8 matmul probe; falls back automatically otherwise). Speeds up denoising and keeps the transformer at fp8 size - FP8 Storage alone also keeps it at that size, without the speedup - but quantizes activations as well, so images will differ from previous versions at the same seed. Reproducibility also requires the model to be FULLY resident in VRAM: a layer whose weights are still in RAM falls back to the dequantized path, and since which layers are resident shifts from run to run, the same seed then yields visibly different images. For repeatable output, ensure the model loads at 100% (e.g. enable_partial_loading=false with enough free VRAM).
         fp8_compute_full_precision_hints: Honor the per-layer 'full_precision_matrix_mult' flags that some scaled-fp8 checkpoints ship. Those layers then dequantize on every forward instead of using the fp8 tensor cores, which can cost a large part of the fp8_compute speedup - on checkpoints that mark many layers, most of it. Set to false to run every quantized layer on the fp8 tensor cores, ignoring the producer's instruction; faster, but the marked layers were flagged as numerically sensitive, so quality may suffer. Only has an effect when fp8_compute is enabled.
         ram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.
@@ -152,6 +156,8 @@ class InvokeAIAppConfig(BaseSettings):
         image_index_batch_size: Number of gallery items embedded per batch by the image index worker.
         external_alibabacloud_api_key: API key for Alibaba Cloud DashScope image generation.
         external_alibabacloud_base_url: Base URL override for Alibaba Cloud DashScope image generation.
+        external_atlascloud_api_key: API key for Atlas Cloud image generation.
+        external_atlascloud_base_url: Base URL override for Atlas Cloud image generation.
         external_gemini_api_key: API key for Gemini image generation.
         external_openai_api_key: API key for OpenAI image generation.
         external_gemini_base_url: Base URL override for Gemini image generation.
@@ -231,6 +237,8 @@ class InvokeAIAppConfig(BaseSettings):
     device_working_mem_gb:        float = Field(default=3,                  description="The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.")
     enable_partial_loading:        bool = Field(default=True,               description="Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.")
     keep_ram_copy_of_weights:      bool = Field(default=True,               description="Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.")
+    offload_on_architecture_switch: bool = Field(default=True,              description="When a session uses main models of another architecture than the previous one on the same GPU, move every model it does not use from VRAM to RAM before it runs. Models both sessions use stay. Switching back reloads the moved models from RAM, which costs a few seconds per switch when both architectures would have fit in VRAM together; turn this off if you alternate between such models.")
+    clear_vram_after_session:      bool = Field(default=False,              description="After every queue item (each image of a batch), move the models held in VRAM to RAM and return the freed memory to the GPU driver. The models stay cached in RAM; the next item reloads them from there, which costs a few seconds (more with keep_ram_copy_of_weights off). Changes nothing where VRAM is system memory (CPU, MPS, integrated GPUs). Turn this on if a generation that runs fine the first time runs out of memory, or slows down sharply because the GPU spills into shared memory, when it is repeated.")
     fp8_compute:                   bool = Field(default=False,              description="Keep ComfyUI 'scaled fp8' checkpoints quantized instead of dequantizing them at load, and run their matmuls on the fp8 tensor cores (requires an Ada/SM 8.9 or newer NVIDIA GPU, or a ROCm GPU that passes an fp8 matmul probe; falls back automatically otherwise). Speeds up denoising and keeps the transformer at fp8 size - FP8 Storage alone also keeps it at that size, without the speedup - but quantizes activations as well, so images will differ from previous versions at the same seed. Reproducibility also requires the model to be FULLY resident in VRAM: a layer whose weights are still in RAM falls back to the dequantized path, and since which layers are resident shifts from run to run, the same seed then yields visibly different images. For repeatable output, ensure the model loads at 100% (e.g. enable_partial_loading=false with enough free VRAM).")
     fp8_compute_full_precision_hints: bool = Field(default=True,            description="Honor the per-layer 'full_precision_matrix_mult' flags that some scaled-fp8 checkpoints ship. Those layers then dequantize on every forward instead of using the fp8 tensor cores, which can cost a large part of the fp8_compute speedup - on checkpoints that mark many layers, most of it. Set to false to run every quantized layer on the fp8 tensor cores, ignoring the producer's instruction; faster, but the marked layers were flagged as numerically sensitive, so quality may suffer. Only has an effect when fp8_compute is enabled.")
     # Deprecated CACHE configs
@@ -290,6 +298,12 @@ class InvokeAIAppConfig(BaseSettings):
     external_alibabacloud_api_key: Optional[str] = Field(default=None, description="API key for Alibaba Cloud DashScope image generation.")
     external_alibabacloud_base_url: Optional[str] = Field(
         default=None, description="Base URL override for Alibaba Cloud DashScope image generation."
+    )
+    external_atlascloud_api_key: Optional[str] = Field(
+        default=None, description="API key for Atlas Cloud image generation."
+    )
+    external_atlascloud_base_url: Optional[str] = Field(
+        default=None, description="Base URL override for Atlas Cloud image generation."
     )
     external_gemini_api_key: Optional[str] = Field(default=None, description="API key for Gemini image generation.")
     external_openai_api_key: Optional[str] = Field(default=None, description="API key for OpenAI image generation.")

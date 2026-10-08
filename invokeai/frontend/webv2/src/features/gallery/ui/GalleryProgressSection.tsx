@@ -89,10 +89,10 @@ export const GalleryProgressSection = ({
       >
         <Icon as={ChevronRightIcon} boxSize="3" transform={progressSectionCollapsed ? undefined : 'rotate(90deg)'} />
         <Icon as={HourglassIcon} boxSize="3" />
-        <Text fontSize="2xs" fontWeight="600" letterSpacing="wide" lineHeight="1" textTransform="uppercase">
+        <Text fontSize="xs" fontWeight="600" letterSpacing="wide" lineHeight="1" textTransform="uppercase">
           {t('widgets.gallery.inProgress')}
         </Text>
-        <Text color="fg.muted" fontSize="xs" fontVariantNumeric="tabular-nums">
+        <Text color="fg.muted" fontSize="md" fontVariantNumeric="tabular-nums">
           · {progressSessions.length}
         </Text>
       </chakra.button>
@@ -276,7 +276,7 @@ const GalleryProgressTile = ({
         display="flex"
       >
         {session.state === 'running' ? (
-          <ProgressCircle.Root aria-label={status} size="xs" value={percentage}>
+          <ProgressCircle.Root aria-label={status} value={percentage}>
             <ProgressCircle.Circle>
               <ProgressCircle.Track />
               <ProgressCircle.Range />

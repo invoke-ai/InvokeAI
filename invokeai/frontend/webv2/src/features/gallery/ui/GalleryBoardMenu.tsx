@@ -179,17 +179,17 @@ export const GalleryBoardMenu = ({
                 <Input
                   aria-label={t('widgets.gallery.boardName')}
                   autoFocus
-                  size="sm"
+                  size="lg"
                   value={renameValue}
                   onChange={handleRenameValueChange}
                   onKeyDown={handleRenameKeyDown}
                 />
               </Dialog.Body>
               <Dialog.Footer>
-                <Button size="xs" variant="ghost" onClick={handleCancelRename}>
+                <Button variant="ghost" onClick={handleCancelRename}>
                   {t('common.cancel')}
                 </Button>
-                <Button disabled={renameValue.trim().length === 0} size="xs" onClick={submitRename}>
+                <Button disabled={renameValue.trim().length === 0} onClick={submitRename}>
                   {t('common.rename')}
                 </Button>
               </Dialog.Footer>
@@ -209,10 +209,10 @@ export const GalleryBoardMenu = ({
               </Dialog.Header>
               <Dialog.Body>
                 <Stack gap="2">
-                  <Text color="fg.subtle" fontSize="xs">
+                  <Text color="fg.subtle" fontSize="md">
                     {t('widgets.gallery.deleteBoardDescription')}
                   </Text>
-                  <Text color="fg.subtle" fontSize="2xs">
+                  <Text color="fg.subtle" fontSize="xs">
                     {t('widgets.gallery.boardItemCounts', {
                       assets: t('widgets.gallery.assetCount', { count: deleteTarget?.assetCount ?? 0 }),
                       images: t('widgets.gallery.imageCount', { count: deleteTarget?.imageCount ?? 0 }),
@@ -222,13 +222,13 @@ export const GalleryBoardMenu = ({
                 </Stack>
               </Dialog.Body>
               <Dialog.Footer>
-                <Button size="xs" variant="ghost" onClick={handleCancelDelete}>
+                <Button variant="ghost" onClick={handleCancelDelete}>
                   {t('common.cancel')}
                 </Button>
-                <Button colorPalette="red" size="xs" variant="outline" onClick={handleDeleteBoardOnly}>
+                <Button colorPalette="red" variant="outline" onClick={handleDeleteBoardOnly}>
                   {t('widgets.gallery.deleteBoardOnly')}
                 </Button>
-                <Button colorPalette="red" size="xs" onClick={handleDeleteBoardAndImages}>
+                <Button colorPalette="red" onClick={handleDeleteBoardAndImages}>
                   {t('widgets.gallery.deleteBoardAndMedia')}
                 </Button>
               </Dialog.Footer>
@@ -361,7 +361,7 @@ const BoardMenuItem = ({
   <Menu.Item data-danger={isDanger ? '' : undefined} value={value} onClick={onClick}>
     <HStack gap="2" minW="0" w="full">
       <Icon as={icon} boxSize="3.5" color={isDanger ? undefined : 'fg.subtle'} flexShrink={0} />
-      <Text flex="1" fontSize="xs">
+      <Text flex="1" fontSize="md">
         {label}
       </Text>
     </HStack>

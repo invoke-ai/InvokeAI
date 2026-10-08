@@ -23,20 +23,23 @@ export const attachQueueDataRuntime = (): (() => void) => {
   return runtime.dispose;
 };
 
+const noop = () => undefined;
+
 /** React is only the idempotent lifecycle adapter for the non-React runtime. */
 export const QueueDataRuntime = () => {
   const confirmation = useQueueConfirmation();
 
   useMountEffect(attachQueueDataRuntime);
 
-  return confirmation ? (
+  // Always mounted, so a cleared confirmation animates out; the dialog keeps the text it showed while it closes.
+  return (
     <ConfirmDialog
-      body={confirmation.body}
-      confirmLabel={confirmation.confirmLabel}
-      isOpen={true}
-      title={confirmation.title}
+      body={confirmation?.body}
+      confirmLabel={confirmation?.confirmLabel ?? ''}
+      isOpen={confirmation !== null}
+      title={confirmation?.title ?? ''}
       onClose={clearQueueConfirmation}
-      onConfirm={confirmation.onConfirm}
+      onConfirm={confirmation?.onConfirm ?? noop}
     />
-  ) : null;
+  );
 };

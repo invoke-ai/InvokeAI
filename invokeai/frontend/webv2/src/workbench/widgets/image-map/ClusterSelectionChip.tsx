@@ -65,7 +65,7 @@ export const ClusterSelectionChip = () => {
       borderRadius="full"
       borderWidth="1px"
       boxShadow="sm"
-      fontSize="xs"
+      fontSize="md"
       gap="1.5"
       maxW="full"
       minW="0"
@@ -92,7 +92,7 @@ export const ClusterSelectionChip = () => {
           aria-label={CLEAR_CLUSTER_SELECTION_LABEL}
           borderRadius="full"
           flexShrink={0}
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={handleClear}
         >
