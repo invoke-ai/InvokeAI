@@ -11,6 +11,7 @@ import type {
   CanvasStagingCandidateContract,
 } from '@workbench/canvas-engine/contracts';
 import type { GraphContract } from '@workbench/graphContracts';
+import type { ExpandedPositivePrompts } from '@workbench/invocationContracts';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
 import {
@@ -3980,10 +3981,21 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       getProjectWidgetValues(getActiveProject(state), 'generate').dynamicPromptsSampleSeed;
     const readSubmission = (state: WorkbenchState) =>
       getActiveProject(state).queue.items[0]?.snapshot.backendSubmission;
-    const submitWithPrompts = (state: WorkbenchState, positivePrompts?: string[]) =>
+    const queuedSampleSeeds = (state: WorkbenchState) =>
+      getActiveProject(state).queue.items.map((item) => item.snapshot.recall?.generateValues?.dynamicPromptsSampleSeed);
+    // Stands in for the caller, which expands with the sample seed it read before dispatching.
+    const submitWithPrompts = (
+      state: WorkbenchState,
+      positivePrompts?: string[],
+      positivePromptsSampleSeed = getProjectWidgetValues(getActiveProject(state), 'generate')
+        .dynamicPromptsCombinatorial
+        ? null
+        : (readSampleSeed(state) as number)
+    ) =>
       workbenchReducer(state, {
         backendSupportsCancellation: true,
         positivePrompts,
+        positivePromptsSampleSeed,
         route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
         projectId: state.activeProjectId,
         type: 'submitResolvedInvocationSnapshot',
@@ -4115,13 +4127,44 @@ describe('workbenchReducer Phase 5 generation flow', () => {
         expect(readSampleSeed(state)).toBe(7);
       });
 
-      it('keeps the sample when the submission is rejected', () => {
-        const state = submitWithPrompts(primeGenerate(undefined, { ...RANDOM_SAMPLE, steps: Number.NaN }), [
-          'a green cat',
-        ]);
+      // A repeated invoke can expand before the first submission's rotation lands, so both carry the same draw.
+      it('rotates once for submissions that drew the same sample, and recalls the sample each one used', () => {
+        const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
 
-        expect(getActiveProject(state).queue.items).toEqual([]);
-        expect(readSampleSeed(state)).toBe(7);
+        try {
+          const primed = primeGenerate(undefined, { ...RANDOM_SAMPLE, batchCount: 1 });
+          const first = submitWithPrompts(primed, ['a green cat'], 7);
+          const rotated = Math.floor(0.5 * SEED_MAX);
+
+          expect(readSampleSeed(first)).toBe(rotated);
+
+          random.mockReturnValue(0.25);
+          const second = submitWithPrompts(first, ['a green cat'], 7);
+
+          expect(getActiveProject(second).queue.items).toHaveLength(2);
+          expect(readSampleSeed(second)).toBe(rotated);
+          expect(queuedSampleSeeds(second)).toEqual([7, 7]);
+        } finally {
+          random.mockRestore();
+        }
+      });
+
+      it('rotates only while the project still holds the sample the expansion used', () => {
+        const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+        try {
+          // The user picked a new sample while the queued one was expanding.
+          const state = submitWithPrompts(
+            primeGenerate(undefined, { ...RANDOM_SAMPLE, dynamicPromptsSampleSeed: 9 }),
+            ['a green cat'],
+            7
+          );
+
+          expect(readSampleSeed(state)).toBe(9);
+          expect(queuedSampleSeeds(state)).toEqual([7]);
+        } finally {
+          random.mockRestore();
+        }
       });
     });
 
@@ -4192,7 +4235,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     });
 
     describe('from the canvas, which compiles outside the reducer', () => {
-      const submitCanvas = (state: WorkbenchState, values: GenerateWidgetValues) =>
+      const submitCanvas = (state: WorkbenchState, values: GenerateWidgetValues, expansion?: ExpandedPositivePrompts) =>
         workbenchReducer(state, {
           backendSupportsCancellation: true,
           canvas: structuredClone(getActiveProject(state).canvas),
@@ -4212,6 +4255,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
             updatedAt: '2026-06-09T00:00:00.000Z',
             version: 1,
           },
+          ...expansion,
           projectId: state.activeProjectId,
           type: 'submitCanvasInvocationSnapshot',
         });
@@ -4233,6 +4277,34 @@ describe('workbenchReducer Phase 5 generation flow', () => {
         expect(readSeed(seedEdited)).toBe(500);
         expect(readSubmission(modeEdited)).toMatchObject({ seed: 10, seedStep: 1 });
         expect(readSeed(modeEdited)).toBe(10);
+      });
+
+      it("rotates Generate's dynamic prompt sample once for the sample the snapshot was expanded with", () => {
+        const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+        try {
+          const compiled = createGenerateValues({
+            batchCount: 1,
+            dynamicPromptsCombinatorial: false,
+            dynamicPromptsResample: true,
+            dynamicPromptsSampleSeed: 7,
+            positivePrompt: 'a {red|green} cat',
+          });
+          // Canvas is told the sample its expansion drew, as Generate is.
+          const drawn = { positivePrompts: ['a green cat'], positivePromptsSampleSeed: 7 };
+          const first = submitCanvas(primeGenerate(undefined, compiled), compiled, drawn);
+          const rotated = Math.floor(0.5 * SEED_MAX);
+
+          expect(readSampleSeed(first)).toBe(rotated);
+
+          random.mockReturnValue(0.25);
+          const second = submitCanvas(first, compiled, drawn);
+
+          expect(readSampleSeed(second)).toBe(rotated);
+          expect(queuedSampleSeeds(second)).toEqual([7, 7]);
+        } finally {
+          random.mockRestore();
+        }
       });
     });
   });

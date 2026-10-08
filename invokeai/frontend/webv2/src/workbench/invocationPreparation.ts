@@ -2,24 +2,25 @@ import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStoreCore } from '@platform/state/externalStoreCore';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 
-interface CanvasInvocationPreparationSnapshot {
+interface InvocationPreparationSnapshot {
   leases: ReadonlyMap<string, number>;
 }
 
-export interface CanvasInvocationPreparationLease {
+export interface InvocationPreparationLease {
   projectId: string;
   token: number;
 }
 
 const EMPTY_LEASES: ReadonlyMap<string, number> = new Map();
-const store = createExternalStoreCore<CanvasInvocationPreparationSnapshot>({ leases: EMPTY_LEASES });
+const store = createExternalStoreCore<InvocationPreparationSnapshot>({ leases: EMPTY_LEASES });
 let nextLeaseToken = 1;
 
 /**
- * Acquire the active-submit acknowledgement before any async work; the Canvas orchestrator separately guards other
- * entry points.
+ * Single-flights a project's submission: acquire before the first await (lazy Canvas chunk, prompt expansion,
+ * workflow generators) so a repeated invoke cannot submit the same captured settings twice. Canvas preparation
+ * separately guards its own entry points.
  */
-export const beginCanvasInvocationPreparation = (projectId: string): CanvasInvocationPreparationLease | null => {
+export const beginInvocationPreparation = (projectId: string): InvocationPreparationLease | null => {
   const { leases } = store.getSnapshot();
 
   if (leases.has(projectId)) {
@@ -32,7 +33,7 @@ export const beginCanvasInvocationPreparation = (projectId: string): CanvasInvoc
   return lease;
 };
 
-export const endCanvasInvocationPreparation = (lease: CanvasInvocationPreparationLease): void => {
+export const endInvocationPreparation = (lease: InvocationPreparationLease): void => {
   const { leases } = store.getSnapshot();
 
   // After account invalidation, an old submission token must not release a new owner's lease for the same id.
@@ -45,12 +46,12 @@ export const endCanvasInvocationPreparation = (lease: CanvasInvocationPreparatio
   store.setSnapshot({ leases: nextLeases.size > 0 ? nextLeases : EMPTY_LEASES });
 };
 
-export const isCanvasInvocationPreparing = (projectId: string): boolean => store.getSnapshot().leases.has(projectId);
+export const isInvocationPreparing = (projectId: string): boolean => store.getSnapshot().leases.has(projectId);
 
-export const useIsCanvasInvocationPreparing = (projectId: string): boolean =>
+export const useIsInvocationPreparing = (projectId: string): boolean =>
   useExternalStoreSelector(store.subscribe, store.getSnapshot, (snapshot) => snapshot.leases.has(projectId));
 
 registerAccountOwnedResource({
   clear: () => store.setSnapshot({ leases: EMPTY_LEASES }),
-  name: 'canvas-invocation-preparation',
+  name: 'invocation-preparation',
 });

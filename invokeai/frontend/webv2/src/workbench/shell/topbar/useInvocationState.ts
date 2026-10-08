@@ -16,7 +16,6 @@ import { getInvocationTemplatesSnapshot, subscribeInvocationTemplates } from '@f
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { submitActiveInvocation } from '@workbench/activeInvocationSubmission';
-import { useIsCanvasInvocationPreparing } from '@workbench/canvasInvocationPreparation';
 import { describeControlLayerIssue } from '@workbench/controlLayerChecks';
 import { getPlacedWidgetTypeIds, getVisibleWidgetTypeIds, graphWidgetSources } from '@workbench/graphWidgets';
 import {
@@ -25,6 +24,7 @@ import {
   localizeInvocationValidationReason,
   resolveInvocationRouteInput,
 } from '@workbench/invocation';
+import { useIsInvocationPreparing } from '@workbench/invocationPreparation';
 import {
   useActiveProjectSelector,
   useWorkbenchCommands,
@@ -114,8 +114,7 @@ export const useInvocationState = (): InvocationState => {
   const modelsStatus = useModelsSelector((snapshot) => snapshot.status);
   const availabilityModels = modelsStatus === 'loaded' ? models : undefined;
   const { invocation } = routeInput;
-  const isCanvasPreparing = useIsCanvasInvocationPreparing(routeInput.projectId);
-  const isPreparing = invocation.sourceId === 'canvas' && isCanvasPreparing;
+  const isPreparing = useIsInvocationPreparing(routeInput.projectId);
 
   useMountEffect(() => {
     void ensureModelsLoaded();

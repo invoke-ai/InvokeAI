@@ -9,6 +9,7 @@ import type { prepareCanvasInvocation } from './widgets/canvas/invoke/prepareCan
 import type { WorkbenchCommands } from './workbenchStore';
 
 import { isInvocationRouteValid, resolveInvocationRoute } from './invocation';
+import { beginInvocationPreparation, endInvocationPreparation } from './invocationPreparation';
 import { submitResolvedInvocation } from './invocationSubmit';
 
 export interface GraphPreviewInvokeDeps {
@@ -22,7 +23,10 @@ export interface GraphPreviewInvokeDeps {
   sourceId: InvocationSourceId | undefined;
 }
 
-/** Resolves and submits a preview against the post-draft-flush project snapshot. */
+/**
+ * Resolves and submits a preview against the post-draft-flush project snapshot. Shares the active submission's
+ * preparation lease, so it reports false while another submission for the project is still preparing.
+ */
 export const resolveAndSubmitGraphPreviewInvocation = ({
   commands,
   formatControlLayerError,
@@ -47,6 +51,12 @@ export const resolveAndSubmitGraphPreviewInvocation = ({
     return false;
   }
 
+  const preparationLease = beginInvocationPreparation(project.id);
+
+  if (!preparationLease) {
+    return false;
+  }
+
   void submitResolvedInvocation({
     commands,
     formatControlLayerError,
@@ -55,6 +65,6 @@ export const resolveAndSubmitGraphPreviewInvocation = ({
     prepareCanvasInvocation: prepareCanvas,
     project,
     route,
-  });
+  }).finally(() => endInvocationPreparation(preparationLease));
   return true;
 };

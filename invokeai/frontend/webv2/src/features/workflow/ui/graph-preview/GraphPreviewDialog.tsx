@@ -305,7 +305,7 @@ export const GraphPreviewDialog = ({
                     cursor={canInvoke ? undefined : 'not-allowed'}
                     opacity={canInvoke ? undefined : 0.6}
                     title={validationMessage}
-                    onClick={invokeRoute}
+                    onClick={canInvoke ? invokeRoute : undefined}
                   >
                     {t('graphPreview.invokeRoute', { route: dialogRoute.label })}
                   </Button>

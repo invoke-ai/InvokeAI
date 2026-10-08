@@ -13,9 +13,9 @@ import type { SubmitResolvedInvocationDeps } from './invocationSubmit';
 import type { PrepareCanvasInvocationArgs } from './widgets/canvas/invoke/prepareCanvasInvocation';
 import type { WorkbenchCommands, WorkbenchQueries } from './workbenchStore';
 
-import { beginCanvasInvocationPreparation, endCanvasInvocationPreparation } from './canvasInvocationPreparation';
 import { createDeferredResource } from './deferredResource';
 import { isInvocationRouteValid, resolveInvocationRoute } from './invocation';
+import { beginInvocationPreparation, endInvocationPreparation } from './invocationPreparation';
 import { submitResolvedInvocation } from './invocationSubmit';
 
 export interface ActiveInvocationSubmissionArgs {
@@ -78,11 +78,11 @@ export const submitActiveInvocation = async (
     return;
   }
 
-  const projectId = snapshot.activeProject.id;
   const isCanvasSubmission = route.sourceId === 'canvas';
-  const preparationLease = isCanvasSubmission ? beginCanvasInvocationPreparation(projectId) : null;
+  // Every route may await (Canvas chunk, prompt expansion, workflow generators) on settings captured above.
+  const preparationLease = beginInvocationPreparation(snapshot.activeProject.id);
 
-  if (isCanvasSubmission && !preparationLease) {
+  if (!preparationLease) {
     return;
   }
 
@@ -108,8 +108,6 @@ export const submitActiveInvocation = async (
 
     throw error;
   } finally {
-    if (preparationLease) {
-      endCanvasInvocationPreparation(preparationLease);
-    }
+    endInvocationPreparation(preparationLease);
   }
 };

@@ -373,6 +373,33 @@ describe('prepareCanvasInvocation generation-device boundary', () => {
 
     expect(metadata?.rand_device).toBe('xpu');
   });
+
+  it("submits the caller's prompt expansion with the sample seed it drew", async () => {
+    const harness = makeHarness({ document: makeDoc([]) });
+    canvasBoundaryMocks.getCanvasEngine.mockReturnValue({
+      lifecycle: { flushPendingUploads: harness.flushPendingUploads },
+    });
+    canvasBoundaryMocks.getCanvasOperations.mockReturnValue({
+      composeForGeneration: (options: Parameters<typeof composeForGeneration>[1]) =>
+        composeForGeneration(harness.host, options),
+    });
+
+    await prepareCanvasInvocation({
+      commands: harness.deps.commands,
+      destination: harness.deps.destination,
+      expansion: { positivePrompts: ['a green cat'], positivePromptsSampleSeed: 7 },
+      formatControlLayerError: harness.deps.formatControlLayerError,
+      generateValues: harness.deps.generateValues,
+      models: harness.deps.models,
+      projectId: harness.deps.projectId,
+      projectSettings: { useCpuNoise: false },
+      strength: harness.deps.strength,
+    });
+
+    expect(harness.submittedGraphs()).toEqual([
+      expect.objectContaining({ positivePrompts: ['a green cat'], positivePromptsSampleSeed: 7 }),
+    ]);
+  });
 });
 
 describe('runCanvasInvocation', () => {

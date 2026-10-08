@@ -11,7 +11,12 @@ import type {
   CanvasStagingCandidateContract,
 } from '@workbench/canvas-engine/api';
 import type { GraphContract } from '@workbench/graphContracts';
-import type { InvocationRoute, InvocationSourceId, ResultDestination } from '@workbench/invocationContracts';
+import type {
+  ExpandedPositivePrompts,
+  InvocationRoute,
+  InvocationSourceId,
+  ResultDestination,
+} from '@workbench/invocationContracts';
 import type {
   BuiltInLayoutPresetId,
   CenterViewId,
@@ -381,11 +386,9 @@ type WorkbenchReducerAction =
   | { type: 'undoWorkflowChange'; projectId?: string; workflowId?: string }
   | { type: 'redoWorkflowChange'; projectId?: string; workflowId?: string }
   | { type: 'submitInvocationSnapshot'; backendSupportsCancellation: boolean; models?: readonly ModelConfig[] }
-  | {
+  | ({
       type: 'submitResolvedInvocationSnapshot';
       backendSupportsCancellation: boolean;
-      /** Expanded positive prompts, resolved by the caller before dispatch. */
-      positivePrompts?: string[];
       /** Async workflow generator outputs, resolved by the caller before dispatch. */
       workflowGenerators?: WorkflowGeneratorResolutions;
       route: InvocationRoute;
@@ -394,7 +397,7 @@ type WorkbenchReducerAction =
       projectId: string;
       /** The workflow the submission was prepared from; required for workflow routes. */
       workflowId?: string;
-    }
+    } & Partial<ExpandedPositivePrompts>)
   | {
       type: 'markQueueItemBackendSubmitted';
       projectId: string;
@@ -491,17 +494,15 @@ type WorkbenchReducerAction =
       origin?: WorkbenchActionOrigin;
     }
   | { type: 'commitCanvasEdit'; projectId: string; intent: CanvasEditIntent }
-  | {
+  | ({
       type: 'submitCanvasInvocationSnapshot';
       backendSupportsCancellation: boolean;
       canvas: CanvasStateContractV3;
       destination: ResultDestination;
       generate: QueueGenerateSnapshot;
       graph: GraphContract;
-      /** Expanded positive prompts, resolved by the caller before dispatch. */
-      positivePrompts?: string[];
       projectId: string;
-    }
+    } & Partial<ExpandedPositivePrompts>)
   | {
       type: 'cancelQueueItem';
       queueItemId: string;
@@ -3392,10 +3393,9 @@ const routeQueueItemResults = (
 const enqueueCompiledSnapshot = (
   project: Project,
   route: InvocationRoute,
-  compiled: {
+  compiled: Partial<ExpandedPositivePrompts> & {
     generate?: QueueGenerateSnapshot;
     graph: GraphContract;
-    positivePrompts?: string[];
     widgetStates: WidgetStateMap;
     /** The serialized parent workflow, without its library record id. */
     workflowJson?: Record<string, unknown>;
@@ -3449,6 +3449,9 @@ const enqueueCompiledSnapshot = (
   const expandedSeedBehaviour = expandedPositivePrompts
     ? (canvasGenerateSettings ?? generateSettings)?.dynamicPromptsSeedBehaviour
     : undefined;
+  // The draw the expansion used. Generate expands before dispatch, so the project's sample seed may have rotated
+  // since; recall and rotation follow the expansion, not the project.
+  const expansionSampleSeed = expandedPositivePrompts ? (compiled.positivePromptsSampleSeed ?? null) : null;
   // Compilation already reserved the starting seed; failures and cancellations do not roll the sequence back.
   const seedPlan = sourceGenerateSettings
     ? planSeedSubmission({
@@ -3515,7 +3518,12 @@ const enqueueCompiledSnapshot = (
         ? normalizeGenerateWidgetValues(widgetStates.generate?.values)
         : null;
   const recall = generateRecallValues
-    ? { generateValues: cloneGenerateWidgetValues(generateRecallValues) }
+    ? {
+        generateValues: {
+          ...cloneGenerateWidgetValues(generateRecallValues),
+          ...(expansionSampleSeed === null ? {} : { dynamicPromptsSampleSeed: expansionSampleSeed }),
+        },
+      }
     : videoSettings
       ? { videoValues: cloneVideoWidgetValues(videoSettings) }
       : undefined;
@@ -3582,8 +3590,9 @@ const enqueueCompiledSnapshot = (
         : project;
   // The queued item carries the previewed draw; rotating afterward makes the preview show the next one.
   const dynamicPromptsSettings = canvasGenerateSettings ?? generateSettings;
+  // Fencing on the expansion's seed keeps a submission that drew an already-rotated sample from rotating again.
   const resampledProject =
-    expandedPositivePrompts &&
+    expansionSampleSeed !== null &&
     dynamicPromptsSettings &&
     dynamicPromptsSettings.dynamicPromptsCombinatorial === false &&
     dynamicPromptsSettings.dynamicPromptsResample
@@ -3591,8 +3600,7 @@ const enqueueCompiledSnapshot = (
           advancedProject,
           route.sourceId === 'canvas' ? 'generate' : route.sourceId,
           (values) =>
-            values.dynamicPromptsSampleSeed === dynamicPromptsSettings.dynamicPromptsSampleSeed &&
-            values.dynamicPromptsCombinatorial === false
+            values.dynamicPromptsSampleSeed === expansionSampleSeed && values.dynamicPromptsCombinatorial === false
               ? { ...values, dynamicPromptsSampleSeed: createDynamicPromptsSampleSeed() }
               : values
         )
@@ -3642,7 +3650,7 @@ const submitInvocationSnapshot = (
   backendSupportsCancellation: boolean,
   route = resolveInvocationRoute(project),
   models?: readonly ModelConfig[],
-  positivePrompts?: string[],
+  expansion: Partial<ExpandedPositivePrompts> = {},
   workflowGenerators?: WorkflowGeneratorResolutions,
   workflowDocument?: ProjectGraphState
 ): Project => {
@@ -3656,7 +3664,7 @@ const submitInvocationSnapshot = (
     return project;
   }
 
-  return enqueueCompiledSnapshot(project, route, { ...compiledSnapshot, positivePrompts }, backendSupportsCancellation);
+  return enqueueCompiledSnapshot(project, route, { ...compiledSnapshot, ...expansion }, backendSupportsCancellation);
 };
 
 export const createInitialWorkbenchState = (): WorkbenchState => {
@@ -4727,7 +4735,7 @@ export const __workbenchReducerInternal = (
             action.backendSupportsCancellation,
             resolveInvocationRoute(project, 'global', action.route, action.models, workflow?.document),
             action.models,
-            action.positivePrompts,
+            { positivePrompts: action.positivePrompts, positivePromptsSampleSeed: action.positivePromptsSampleSeed },
             action.workflowGenerators,
             workflow?.document
           )
@@ -5288,6 +5296,7 @@ export const __workbenchReducerInternal = (
               generate: action.generate,
               graph: action.graph,
               positivePrompts: action.positivePrompts,
+              positivePromptsSampleSeed: action.positivePromptsSampleSeed,
               widgetStates: getWidgetStatesSnapshot(project.widgetInstances),
             },
             action.backendSupportsCancellation,

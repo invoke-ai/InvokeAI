@@ -12,7 +12,7 @@ import type {
   RegionalGuidanceReferenceImage,
 } from '@workbench/canvas-engine/api';
 import type { ComposeForGenerationOptions, ComposeForGenerationResult } from '@workbench/canvas-operations/api';
-import type { ResultDestination } from '@workbench/invocationContracts';
+import type { ExpandedPositivePrompts, ResultDestination } from '@workbench/invocationContracts';
 import type { WorkbenchNotificationKind } from '@workbench/projectContracts';
 import type { ProjectSettings } from '@workbench/settings/contracts';
 import type { WorkbenchCommands, WorkbenchNotificationCommands } from '@workbench/workbenchStore';
@@ -81,8 +81,8 @@ export interface RunCanvasInvocationDeps {
   destination: ResultDestination;
   /** Capture and upload generation composites, releasing pixel resources on success or failure. */
   composeForGeneration: (options: ComposeForGenerationOptions) => Promise<ComposeForGenerationResult>;
-  /** Expanded positive prompts, resolved by the caller before submitting. */
-  positivePrompts?: string[];
+  /** Expanded by the caller before submitting. */
+  expansion?: ExpandedPositivePrompts;
   /** Cancels raster capture for this invocation. */
   signal: AbortSignal;
   /** Paint-bitmap persistence barrier, awaited before compositing. */
@@ -367,7 +367,7 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
       },
       graph: compiled.graph,
       canvas: composites.canvas,
-      positivePrompts: deps.positivePrompts,
+      ...deps.expansion,
       projectId,
     });
     composed.dedupeCommit.commit();
@@ -407,8 +407,8 @@ export interface PrepareCanvasInvocationArgs {
   models?: readonly ModelConfig[];
   /** Caller-captured identity lifetime; direct synchronous callers may omit it. */
   owner?: AccountScope;
-  /** Expanded positive prompts, resolved by the caller before submitting. */
-  positivePrompts?: string[];
+  /** Expanded by the caller before submitting. */
+  expansion?: ExpandedPositivePrompts;
   projectSettings: Pick<ProjectSettings, 'useCpuNoise'>;
   /**
    * The canvas widget's persisted values. The scaling policy is read here, in
@@ -449,6 +449,7 @@ export const prepareCanvasInvocation = async (args: PrepareCanvasInvocationArgs)
     compositing: args.compositing ?? DEFAULT_CANVAS_COMPOSITING,
     destination: args.destination,
     commands: args.commands,
+    expansion: args.expansion,
     composeForGeneration: (composeOptions) => operations.composeForGeneration(composeOptions),
     flushPendingUploads: () => engine.lifecycle.flushPendingUploads(),
     formatControlLayerError: args.formatControlLayerError,

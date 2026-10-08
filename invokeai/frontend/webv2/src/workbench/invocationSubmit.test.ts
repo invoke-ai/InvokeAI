@@ -1,5 +1,10 @@
+import type { MainModelConfig } from '@features/generation/contracts';
 import type { InvocationRoute } from '@workbench/invocationContracts';
 
+import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { dynamicPromptsKeys } from '@features/generation/prompts';
+import { getDefaultGenerateSettings } from '@features/generation/settings';
+import { queryClient } from '@platform/query/client';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -291,5 +296,75 @@ describe('submitResolvedInvocation with a workflow generator', () => {
       message: 'Batch node "string_batch" has an empty collection.',
       title: 'The batch is not ready',
     });
+  });
+});
+
+describe('submitResolvedInvocation with a random dynamic prompt', () => {
+  // Seed capabilities to match app boot; submission fails closed without them.
+  seedArchitectureCapabilities();
+
+  const drawn = { positivePrompts: ['a green cat'], positivePromptsSampleSeed: 7 };
+
+  const submitDrawn = async (sourceId: 'canvas' | 'generate') => {
+    const model: MainModelConfig = { base: 'sd-1', key: 'main', name: 'Main', type: 'main' };
+    const initial = createInitialWorkbenchState();
+    const state = workbenchReducer(
+      sourceId === 'canvas' ? workbenchReducer(initial, { presetId: 'edit', type: 'applyPreset' }) : initial,
+      {
+        type: 'setGenerateSettings',
+        values: {
+          ...getDefaultGenerateSettings(model),
+          dynamicPromptsCombinatorial: false,
+          dynamicPromptsMaxPrompts: 4,
+          dynamicPromptsSampleSeed: 7,
+          model,
+          modelKey: model.key,
+          positivePrompt: 'a {red|green} cat',
+        },
+      }
+    );
+    const project = getActiveProject(state);
+    // Infinite staleTime makes the cached draw authoritative, so no request leaves the test.
+    queryClient.setQueryData(
+      dynamicPromptsKeys.expansion({ combinatorial: false, max_prompts: 4, prompt: 'a {red|green} cat', seed: 7 }),
+      { error: null, prompts: ['a green cat'] }
+    );
+    const route = resolveInvocationRoute(project, 'global', {
+      destination: 'gallery',
+      destinationLocked: false,
+      sourceId,
+      sourceLocked: false,
+    });
+    const commands = createWorkbenchStore().commands;
+    const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
+    const prepareCanvasInvocation = vi.fn();
+
+    expect(route.validationReasons).toEqual([]);
+
+    await submitResolvedInvocation({
+      commands,
+      formatControlLayerError,
+      models: undefined,
+      owner: captureAccountScope(),
+      prepareCanvasInvocation,
+      project,
+      route,
+    });
+
+    return { prepareCanvasInvocation, submitResolved };
+  };
+
+  it('dispatches Generate with the sample seed the expansion was drawn with', async () => {
+    const { submitResolved } = await submitDrawn('generate');
+
+    expect(submitResolved).toHaveBeenCalledTimes(1);
+    expect(submitResolved.mock.calls[0]?.[0]).toMatchObject(drawn);
+  });
+
+  it('hands Canvas the expansion and the sample seed it was drawn with', async () => {
+    const { prepareCanvasInvocation, submitResolved } = await submitDrawn('canvas');
+
+    expect(submitResolved).not.toHaveBeenCalled();
+    expect(prepareCanvasInvocation).toHaveBeenCalledWith(expect.objectContaining({ expansion: drawn }));
   });
 });

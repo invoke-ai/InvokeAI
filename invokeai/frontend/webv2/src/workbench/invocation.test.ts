@@ -531,7 +531,7 @@ describe('submitResolvedInvocation', () => {
     });
 
     expect(submitResolved).toHaveBeenCalledTimes(1);
-    expect(submitResolved.mock.calls[0]?.[0]).toMatchObject({ positivePrompts: undefined });
+    expect(submitResolved.mock.calls[0]?.[0]).not.toHaveProperty('positivePrompts');
   });
 
   // Expansion failures must not submit literal dynamic syntax.

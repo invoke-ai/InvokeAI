@@ -28,6 +28,7 @@ import {
   isInvocationRouteValid,
   resolveInvocationRouteInput,
 } from '@workbench/invocation';
+import { useIsInvocationPreparing } from '@workbench/invocationPreparation';
 import { markWorkbenchPerf, measureWorkbenchPerf, timeWorkbenchPerf } from '@workbench/performanceMarks';
 import { getProjectSyncSnapshot, subscribeProjectSync } from '@workbench/projects/syncStore';
 import { getActiveProjectWorkflow } from '@workbench/projectWorkflows';
@@ -125,6 +126,8 @@ const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode
   const queries = useWorkbenchQueries();
   const openWidget = useOpenWorkbenchWidget();
   const { t } = useTranslation();
+  // The preview submits under the topbar's lease, so it is unavailable while that is held.
+  const isPreparing = useIsInvocationPreparing(routeInput.projectId);
 
   const adapter = useMemo<WorkflowGraphPreviewPort>(
     () => ({
@@ -146,10 +149,11 @@ const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode
         );
 
         return {
-          canInvoke: isInvocationRouteValid(route),
+          canInvoke: isInvocationRouteValid(route) && !isPreparing,
           label: formatRoute(route),
-          validationMessage:
-            typeof route.validationMessage === 'object' && 'controlLayerIssue' in route.validationMessage
+          validationMessage: isPreparing
+            ? t('topbar.invoke.preparing')
+            : typeof route.validationMessage === 'object' && 'controlLayerIssue' in route.validationMessage
               ? describeControlLayerIssue(t, route.validationMessage.controlLayerIssue)
               : route.validationMessage,
         };
@@ -188,7 +192,7 @@ const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode
         openWidget('workflow');
       },
     }),
-    [availabilityModels, commands, openWidget, queries, routeInput, t]
+    [availabilityModels, commands, isPreparing, openWidget, queries, routeInput, t]
   );
 
   return <WorkflowGraphPreviewProvider adapter={adapter}>{children}</WorkflowGraphPreviewProvider>;

@@ -7,6 +7,13 @@ export type InvocationMode = 'global' | 'dialog';
 
 export type ResultDestination = 'canvas' | 'gallery';
 
+/** A dynamic prompt expansion, with the sample seed it drew from (null for All combinations). */
+export interface ExpandedPositivePrompts {
+  positivePrompts: string[];
+  /** Recall reproduces this draw, and a resampling submission rotates only while the project still holds it. */
+  positivePromptsSampleSeed: number | null;
+}
+
 export interface InvocationRoute {
   sourceId: InvocationSourceId;
   destination: ResultDestination;
