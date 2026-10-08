@@ -9,10 +9,13 @@ import type { prepareCanvasInvocation } from './widgets/canvas/invoke/prepareCan
 import type { WorkbenchCommands } from './workbenchStore';
 
 import { isInvocationRouteValid, resolveInvocationRoute } from './invocation';
+import { beginInvocationPreparation, endInvocationPreparation } from './invocationPreparation';
 import { submitResolvedInvocation } from './invocationSubmit';
 
 export interface GraphPreviewInvokeDeps {
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
+  /** Words a blocked canvas preview's control layer for the notice. */
+  formatControlLayerError: Parameters<typeof prepareCanvasInvocation>[0]['formatControlLayerError'];
   models: readonly ModelConfig[] | undefined;
   owner: AccountScope;
   prepareCanvasInvocation: typeof prepareCanvasInvocation;
@@ -20,9 +23,13 @@ export interface GraphPreviewInvokeDeps {
   sourceId: InvocationSourceId | undefined;
 }
 
-/** Resolves and submits a preview against the post-draft-flush project snapshot. */
+/**
+ * Resolves and submits a preview against the post-draft-flush project snapshot. Shares the active submission's
+ * preparation lease, so it reports false while another submission for the project is still preparing.
+ */
 export const resolveAndSubmitGraphPreviewInvocation = ({
   commands,
+  formatControlLayerError,
   models,
   owner,
   prepareCanvasInvocation: prepareCanvas,
@@ -44,6 +51,20 @@ export const resolveAndSubmitGraphPreviewInvocation = ({
     return false;
   }
 
-  void submitResolvedInvocation({ commands, models, owner, prepareCanvasInvocation: prepareCanvas, project, route });
+  const preparationLease = beginInvocationPreparation(project.id);
+
+  if (!preparationLease) {
+    return false;
+  }
+
+  void submitResolvedInvocation({
+    commands,
+    formatControlLayerError,
+    models,
+    owner,
+    prepareCanvasInvocation: prepareCanvas,
+    project,
+    route,
+  }).finally(() => endInvocationPreparation(preparationLease));
   return true;
 };

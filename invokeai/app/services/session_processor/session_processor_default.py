@@ -1,7 +1,7 @@
 import gc
 import time
 import traceback
-from contextlib import contextmanager, suppress
+from contextlib import contextmanager, nullcontext, suppress
 from threading import BoundedSemaphore, Thread
 from threading import Event as ThreadEvent
 from typing import Iterator, Optional
@@ -1063,6 +1063,27 @@ class DefaultSessionProcessor(SessionProcessorBase):
         image_moves = getattr(self._invoker.services, "image_moves", None)
         return image_moves is not None and image_moves.is_maintenance_active()
 
+    def _dequeue_if_storage_maintenance_inactive(
+        self, device: Optional[str]
+    ) -> tuple[bool, Optional[SessionQueueItem]]:
+        """Atomically check storage maintenance state and claim the next queue item.
+
+        Gallery maintenance reserves its busy flag before taking the same mutation lock. If
+        this worker wins the lock first, the subsequent reservation sees the claimed item in
+        queue status; if maintenance wins, this worker leaves queued work pending.
+        """
+        image_moves = getattr(self._invoker.services, "image_moves", None)
+        mutation_lock = (
+            image_moves.image_mutation_lock(blocking=False) if image_moves is not None else nullcontext(True)
+        )
+        with mutation_lock as lock_acquired:
+            if not lock_acquired:
+                return False, None
+            if self._is_image_move_maintenance_active():
+                return False, None
+            item = self._invoker.services.session_queue.dequeue(device=device)
+            return True, item
+
     def _cancel_queue_item_if_owner_inactive(self, queue_item: SessionQueueItem) -> bool:
         """Cancel a dequeued item whose owner is deactivated, deleted, or unverifiable.
 
@@ -1124,11 +1145,6 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     if stop_event.is_set():
                         break
 
-                    if self._is_image_move_maintenance_active():
-                        self._invoker.services.logger.debug("Image storage maintenance is active")
-                        poll_now_event.wait(self._polling_interval)
-                        continue
-
                     # Clear any stale cancel signal from the previous item BEFORE claiming the next
                     # one. Clearing it after dequeue (as before) could wipe a cancel that arrived for
                     # the item we just claimed — e.g. during the gc.collect() below — silently losing
@@ -1145,9 +1161,14 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     # Get the next session to process. dequeue() atomically claims the item, so concurrent
                     # workers never receive the same item. Pass this worker's device so the item is
                     # tagged with the GPU that ran it (None in single-device/legacy mode).
-                    worker.queue_item = self._invoker.services.session_queue.dequeue(
+                    maintenance_inactive, worker.queue_item = self._dequeue_if_storage_maintenance_inactive(
                         device=str(worker.device) if worker.device is not None else None
                     )
+
+                    if not maintenance_inactive:
+                        self._invoker.services.logger.debug("Image storage maintenance is active")
+                        poll_now_event.wait(self._polling_interval)
+                        continue
 
                     if worker.queue_item is None:
                         # The queue was empty, wait for next polling interval or event to try again

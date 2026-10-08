@@ -59,7 +59,8 @@ The clip decides the run's length: in the soundtrack role the Frames control loc
 
 A few rules follow from how it works:
 
-* The clip excludes every other conditioning input — clear the first frame, last frame and initial video to use one.
+* In the soundtrack role, a **First Frame** and **Last Frame** can be combined with the clip: the picture generated for the audio starts or ends on your images. This is how to animate a particular character speaking or singing the soundtrack — set their portrait as the first frame. The aspect ratio then comes from the first frame, or from the last frame when only that is set.
+* The picture role already supplies every frame, so it can't be combined with a first or last frame. While either is set, that role is unavailable and a dropped clip arrives in the soundtrack role; setting a frame while a clip is held for its picture removes the clip, and the frame fields say so beforehand. Neither role combines with an initial video.
 * Only the single-pass resolutions (512p, 704p, 768p) can run; with 1024p or 1536p selected, the Invoke button says to pick another. A [two-stage](#two-stage-presets) refine pass re-noises everything, which would undo the held stream.
 * In the picture role, the output carries **your original footage** at its own resolution with the new soundtrack. The model itself sees the clip resized to the generation canvas, whose aspect ratio the panel takes from the clip, so the soundtrack is generated for the whole frame.
 * To give LTX-2 a bare soundtrack — a song, a voice recording — upload the audio file to the gallery. It becomes a clip whose frames draw the waveform, and dropping it here selects the soundtrack role automatically.
@@ -107,7 +108,7 @@ Context Frames steps along the same 8·n + 1 grid as Frames (9, 17, 25, 33 …).
 
 LTX-2 generates picture and soundtrack as one sequence, so it can hold either stream fixed and generate only the other — the same mechanism a first frame uses to hold one image fixed, applied to a whole stream. The panel exposes this as the [Conditioning Clip](#conditioning-clip):
 
-* **Audio-to-video** encodes the clip's soundtrack and keeps it fixed at every step. Because the model has always learned picture and sound together, it lines the video up with the audio — a face speaking or singing to camera gets matching lip movement. The output contains the original recording, so nothing is lost from the audio. The two modes are mirror images: each returns the stream you supplied untouched.
+* **Audio-to-video** encodes the clip's soundtrack and keeps it fixed at every step. Because the model has always learned picture and sound together, it lines the video up with the audio — a face speaking or singing to camera gets matching lip movement. The output contains the original recording, so nothing is lost from the audio. The two modes are mirror images: each returns the stream you supplied untouched. A first or last frame holds part of the *picture* stream, so it composes with a held soundtrack the same way it does with a generated one.
 * **Video-to-audio** keeps the clip's frames fixed and generates a soundtrack. The output is your original footage, frame for frame, with the generated soundtrack muxed in.
 
 Both run on the single-pass canvases only. Guidance applies as usual on Dev; in particular **Audio CFG** is the one that steers a video-to-audio soundtrack toward the prompt.

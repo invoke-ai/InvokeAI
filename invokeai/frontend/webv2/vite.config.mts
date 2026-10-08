@@ -46,6 +46,11 @@ const ROUTE_SHARED_MODULES = [
   '/features/nodes/index.ts',
   '/features/nodes/ui/NodesPage.tsx',
   '/platform/browser/downloadBlob.ts',
+  // Editor search fields and the lazy pickers share the IME guard; alone it costs a startup request.
+  '/platform/browser/imeComposition.ts',
+  // The route's recovery peek and the lazy editor share the editor-session lock probe; alone they cost a startup request.
+  '/platform/browser/webLocks.ts',
+  '/workbench/projects/editorSession.ts',
   '/platform/ui/BrandIcon.tsx',
   '/platform/ui/Button.tsx',
   '/platform/ui/Tooltip.tsx',
@@ -62,6 +67,9 @@ const ROUTE_SHARED_MODULES = [
   '/platform/transport/connectionStore.ts',
   '/platform/transport/socketHub.ts',
   '/platform/ui/ConfirmDialog.tsx',
+  // Every dialog, eager or lazy, is built on these and the hotkey runtime reads the presence; alone they cost a startup request.
+  '/platform/ui/Dialog.tsx',
+  '/platform/ui/modalPresence.ts',
   // Confirm/Rename dialogs and the boot gates keep closing overlays mounted with it; alone it costs a startup request.
   '/platform/react/useExitRetainedValue.ts',
   '/platform/ui/MiddleTruncate.tsx',
@@ -71,6 +79,8 @@ const ROUTE_SHARED_MODULES = [
   '/platform/ui/list/ListSectionHeader.tsx',
   '/platform/ui/list/ListStack.tsx',
   '/platform/ui/list/listLayout.ts',
+  // The eager List and the lazy Picker share the pinned-header range helpers.
+  '/platform/ui/list/virtualSections.ts',
   // Lazy lists (graph preview) share these with startup; left ungrouped they split into an extra startup chunk.
   '/platform/react/usePreservedScrollOffset.ts',
   '/platform/ui/Scrollable.tsx',
@@ -105,6 +115,11 @@ const ROUTE_SHARED_MODULES = [
 const EDITOR_BOOT_SHARED_MODULES = [
   // Shell regions, their hotkeys and every control that opens a widget read it; alone it cost a boot request.
   '/workbench/focusRegions.tsx',
+  // The shell and lazy guide share hint resources and target resolution without extra boot requests.
+  '/workbench/hotkeys/hintSources.tsx',
+  '/workbench/hotkeys/shortcutHints.ts',
+  '/workbench/hotkeys/targetWidget.ts',
+  '/workbench/widget-frame/compactWidgetCapacity.tsx',
   '/features/gallery/ui/GalleryItemSearch.tsx',
   '/app/GalleryUiAdapter.tsx',
   '/features/generation/core/prompt/ast.ts',
@@ -183,6 +198,7 @@ const GALLERY_PICKER_MODULES = [
   '/features/gallery/picker.ts',
   '/features/gallery/ui/GalleryBoardCover.tsx',
   '/features/gallery/ui/GalleryBoardRowShell.tsx',
+  '/features/gallery/ui/GalleryLoadError.tsx',
   '/features/gallery/ui/GallerySearchField.tsx',
   '/features/gallery/ui/GalleryTileFrame.tsx',
   '/features/gallery/ui/GalleryUploadButton.tsx',
@@ -269,6 +285,8 @@ const getLegacyChunkName = (id: string): string | null => {
   if (
     matchesAnySuffix(id, [
       '/platform/state/selectors.ts',
+      // Eager query stores and lazy runtimes share single-flight scheduling; avoid its standalone boot request.
+      '/platform/state/singleFlight.ts',
       '/workbench/palette/paletteStore.ts',
       '/platform/search/dateTokens.ts',
       '/platform/performance/semanticReady.ts',
@@ -285,6 +303,8 @@ const getLegacyChunkName = (id: string): string | null => {
       '/platform/i18n/languages.ts',
       '/platform/react/useMountEffect.ts',
       '/platform/ui/theme/system.ts',
+      // Editor hints and the lazy Launchpad palette/settings share keycaps without loading editor runtime.
+      '/workbench/hotkeys/keyGlyphs.tsx',
       '/workbench/hotkeys/resolve.ts',
       '/workbench/settings/settingsDialogStore.ts',
     ])

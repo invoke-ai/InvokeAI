@@ -127,6 +127,17 @@
     },
     {
       "category": "MISC FEATURES",
+      "default": true,
+      "description": "Show the Donate to InvokeAI link in the frontend menus.",
+      "env_var": "INVOKEAI_SHOW_DONATION_LINK",
+      "literal_values": [],
+      "name": "show_donation_link",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "MISC FEATURES",
       "default": false,
       "description": "Enable logging of parsed prompt tokens.",
       "env_var": "INVOKEAI_LOG_TOKENIZATION",
@@ -1042,6 +1053,28 @@
       "env_var": "INVOKEAI_EXTERNAL_ALIBABACLOUD_BASE_URL",
       "literal_values": [],
       "name": "external_alibabacloud_base_url",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "EXTERNAL PROVIDERS",
+      "default": null,
+      "description": "API key for Atlas Cloud image generation.",
+      "env_var": "INVOKEAI_EXTERNAL_ATLASCLOUD_API_KEY",
+      "literal_values": [],
+      "name": "external_atlascloud_api_key",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "EXTERNAL PROVIDERS",
+      "default": null,
+      "description": "Base URL override for Atlas Cloud image generation.",
+      "env_var": "INVOKEAI_EXTERNAL_ATLASCLOUD_BASE_URL",
+      "literal_values": [],
+      "name": "external_atlascloud_base_url",
       "required": false,
       "type": "typing.Optional[str]",
       "validation": {}

@@ -196,8 +196,18 @@ describe('getGalleryNavigationStep', () => {
     ['s0', 's1', 's2', 's3', 's4'].map((name) => entry(name, true)),
     ['r0', 'r1', 'r2', 'r3'].map((name) => entry(name)),
   ];
-  const step = (cursorKey: string | null, direction: selection.GalleryNavigationDirection) => {
-    const next = selection.getGalleryNavigationStep(sections, cursorKey, direction, 3);
+  const step = (
+    cursorKeys: string | null | (string | null)[],
+    direction: selection.GalleryNavigationDirection,
+    options?: { itemsOnly?: boolean }
+  ) => {
+    const next = selection.getGalleryNavigationStep(
+      sections,
+      Array.isArray(cursorKeys) ? cursorKeys : [cursorKeys],
+      direction,
+      3,
+      options
+    );
 
     return next === null ? null : next.kind === 'session' ? next.id : next.item.name;
   };
@@ -230,12 +240,12 @@ describe('getGalleryNavigationStep', () => {
   it('lands on the nearest followable tile of a row, and skips a row with none', () => {
     // s1 (column 1) rising to the first in-progress row would land on p1, which is not running.
     expect(
-      selection.getGalleryNavigationStep([sections[0]!.slice(0, 3), sections[1]!], 'image:s1', 'up', 3)
+      selection.getGalleryNavigationStep([sections[0]!.slice(0, 3), sections[1]!], ['image:s1'], 'up', 3)
     ).toMatchObject({ id: 'p0' });
     expect(
       selection.getGalleryNavigationStep(
         [[session('p0', false), session('p1', false)], sections[1]!],
-        'image:s1',
+        ['image:s1'],
         'up',
         3
       )
@@ -253,16 +263,38 @@ describe('getGalleryNavigationStep', () => {
     const waitingRow = [session('q0', false), session('q1', false), session('q2', false)];
 
     expect(
-      selection.getGalleryNavigationStep([[session('p0')], waitingRow, sections[1]!], 'image:s0', 'up', 3)
+      selection.getGalleryNavigationStep([[session('p0')], waitingRow, sections[1]!], ['image:s0'], 'up', 3)
     ).toMatchObject({ id: 'p0' });
     expect(
-      selection.getGalleryNavigationStep([[session('p0')], waitingRow, sections[1]!], 'session:p0', 'down', 3)
+      selection.getGalleryNavigationStep([[session('p0')], waitingRow, sections[1]!], ['session:p0'], 'down', 3)
     ).toMatchObject({ item: { name: 's0' } });
   });
 
-  it('lands on the first followable entry when the cursor is off the sequence', () => {
+  it('lands on the first followable entry only when no cursor is shown', () => {
     expect(step(null, 'down')).toBe('p0');
-    expect(step('image:gone', 'left')).toBe('p0');
     expect(step(null, 'right')).toBe('p0');
+    expect(step(['image:gone', null], 'left')).toBe('p0');
+  });
+
+  it('steps from the first cursor the sections show, never jumping to the first entry past a hidden one', () => {
+    // A followed session the sections do not show (its section collapsed) gives way to the selection behind it.
+    expect(step(['session:hidden', 'image:r1'], 'right')).toBe('r2');
+    expect(step(['session:hidden', 'image:r1'], 'left')).toBe('r0');
+    expect(step(['session:hidden', 'image:s4'], 'up')).toBe('s1');
+    // The first shown candidate wins over later ones.
+    expect(step(['image:r1', 'session:p0'], 'right')).toBe('r2');
+    expect(selection.getGalleryNavigationCursor(sections, ['image:gone', 'session:p2', 'image:r0'])).toBe('session:p2');
+    expect(selection.getGalleryNavigationCursor(sections, ['image:gone', null])).toBeNull();
+  });
+
+  it('steps from a session to the nearest item when only items may be reached', () => {
+    // From the last in-progress tile, the next item is the strip's first; a session is never the target.
+    expect(step('session:p3', 'right', { itemsOnly: true })).toBe('s0');
+    expect(step('session:p2', 'right', { itemsOnly: true })).toBe('s0');
+    expect(step('session:p0', 'down', { itemsOnly: true })).toBe('s0');
+    expect(step('image:s0', 'left', { itemsOnly: true })).toBeNull();
+    expect(step('image:s1', 'up', { itemsOnly: true })).toBeNull();
+    // With no cursor shown, the first item rather than the first session.
+    expect(step(null, 'right', { itemsOnly: true })).toBe('s0');
   });
 });

@@ -13,6 +13,10 @@ import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { describe, expect, it, vi } from 'vitest';
 
 import { resolveAndSubmitGraphPreviewInvocation } from './graphPreviewInvocation';
+import { beginInvocationPreparation, endInvocationPreparation } from './invocationPreparation';
+
+// Production words rejections from the locale; tests only need the structured rejection to reach the notice.
+const formatControlLayerError = ({ code, layerName }: { code: string; layerName: string }) => `${layerName}: ${code}`;
 
 // Seed capabilities to match app boot; submission fails closed without them.
 seedArchitectureCapabilities();
@@ -70,6 +74,7 @@ describe('resolveAndSubmitGraphPreviewInvocation', () => {
 
     const submitted = resolveAndSubmitGraphPreviewInvocation({
       commands,
+      formatControlLayerError,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,
@@ -91,6 +96,7 @@ describe('resolveAndSubmitGraphPreviewInvocation', () => {
 
     const submitted = resolveAndSubmitGraphPreviewInvocation({
       commands,
+      formatControlLayerError,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,
@@ -106,6 +112,31 @@ describe('resolveAndSubmitGraphPreviewInvocation', () => {
     });
   });
 
+  it('returns false and does not submit while another submission for the project is preparing', () => {
+    const project = getActiveProject(createGenerateValues());
+    const commands = createWorkbenchStore().commands;
+    const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
+    const heldLease = beginInvocationPreparation(project.id);
+    expect(heldLease).not.toBeNull();
+
+    try {
+      const submitted = resolveAndSubmitGraphPreviewInvocation({
+        commands,
+        formatControlLayerError,
+        models: undefined,
+        owner: captureAccountScope(),
+        prepareCanvasInvocation: vi.fn(),
+        project,
+        sourceId: 'generate',
+      });
+
+      expect(submitted).toBe(false);
+      expect(submitResolved).not.toHaveBeenCalled();
+    } finally {
+      endInvocationPreparation(heldLease!);
+    }
+  });
+
   it('returns false and does not submit when there is no sourceId', () => {
     const project = getActiveProject(createGenerateValues());
     const commands = createWorkbenchStore().commands;
@@ -114,6 +145,7 @@ describe('resolveAndSubmitGraphPreviewInvocation', () => {
 
     const submitted = resolveAndSubmitGraphPreviewInvocation({
       commands,
+      formatControlLayerError,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,
@@ -134,6 +166,7 @@ describe('resolveAndSubmitGraphPreviewInvocation', () => {
 
     const submitted = resolveAndSubmitGraphPreviewInvocation({
       commands,
+      formatControlLayerError,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,

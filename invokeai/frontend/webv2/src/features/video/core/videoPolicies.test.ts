@@ -6,7 +6,7 @@ import {
   LTX2_DEFAULT_NEGATIVE_PROMPT,
   LTX2_EXTEND_CONTEXT_FRAMES,
 } from '@features/video/core/dimensions';
-import { isVideoTargetResolution, normalizeVideoSettings } from '@features/video/core/settings';
+import { isVideoTargetResolution, normalizeVideoSettings, resolveVideoMode } from '@features/video/core/settings';
 import { describe, expect, it } from 'vitest';
 
 import type { Ltx2TargetResolution, VideoSettings } from './types';
@@ -89,6 +89,8 @@ const settingsFor = (model?: MainModelConfig, overrides: Partial<VideoSettings> 
   ...getDefaultVideoSettings(model),
   ...overrides,
 });
+
+const lossKeys = (result: { losses: readonly { key: string }[] }) => result.losses.map((loss) => loss.key);
 
 describe('isSupportedVideoModel', () => {
   it('accepts Wan mains in any format', () => {
@@ -961,7 +963,7 @@ describe('MiniMax H3 Turbo', () => {
     });
 
     expect(result.settings.acceleratorLoraKeys).toEqual([LIGHTNING_I2V_HIGH.key, LIGHTNING_I2V_LOW.key]);
-    expect(result.clearedLabels).toContain('Acceleration');
+    expect(result.adjustments).toContain('acceleration');
   });
 
   it('carries the fast-path intent across a family switch (Lightning → Turbo)', () => {
@@ -973,7 +975,7 @@ describe('MiniMax H3 Turbo', () => {
     expect(result.settings.acceleratorEnabled).toBe(true);
     expect(result.settings.steps).toBe(6);
     expect(result.settings.loras.map((entry) => entry.model.key)).toEqual(['turbo']);
-    expect(result.clearedLabels).toContain('Acceleration');
+    expect(result.adjustments).toContain('acceleration');
   });
 });
 
@@ -1296,8 +1298,8 @@ describe('getVideoModelSelectionResult', () => {
 
     expect(result.settings.firstFrameImage).toBeNull();
     expect(result.settings.lastFrameImage).toBeNull();
-    expect(result.clearedLabels).toContain('First frame');
-    expect(result.clearedLabels).toContain('Last frame');
+    expect(lossKeys(result)).toContain('firstFrame');
+    expect(lossKeys(result)).toContain('lastFrame');
   });
 
   it('drops the hybrid quality base when the new main is not a Ref2VA checkpoint, keeps it across Ref2VA files', () => {
@@ -1312,14 +1314,14 @@ describe('getVideoModelSelectionResult', () => {
     const toFl2va = getVideoModelSelectionResult({ currentSettings: from, model: h3Model('checkpoint'), models: [] });
 
     expect(toFl2va.settings.h3HybridBaseModel).toBeNull();
-    expect(toFl2va.clearedLabels).toContain('Hybrid quality base');
+    expect(lossKeys(toFl2va)).toContain('h3HybridBaseModel');
 
     const otherRef2va: MainModelConfig = { ...ref2va, key: 'h3-ref2va-2' };
     const toRef2va = getVideoModelSelectionResult({ currentSettings: from, model: otherRef2va, models: [] });
 
     expect(toRef2va.settings.h3HybridBaseModel).toEqual(fl2vaBase);
     expect(toRef2va.settings.h3HybridStartBlock).toBe(30);
-    expect(toRef2va.clearedLabels).not.toContain('Hybrid quality base');
+    expect(lossKeys(toRef2va)).not.toContain('h3HybridBaseModel');
   });
 
   it('keeps a first+last pair on a model with FLF2V, but drops the last frame on TI2V-5B', () => {
@@ -1365,9 +1367,13 @@ describe('getVideoModelSelectionResult', () => {
     expect(result.settings.loras).toEqual([]); // wan LoRAs are incompatible with H3
     expect(result.settings.vae).toBeNull();
     expect(result.settings.wanT5EncoderModel).toBeNull();
-    expect(result.clearedLabels).toEqual(
-      expect.arrayContaining(['Target resolution', 'Frames', 'FPS', 'Acceleration', 'LoRAs', 'VAE', 'Wan T5 Encoder'])
-    );
+    expect(result.adjustments).toEqual(expect.arrayContaining(['targetResolution', 'frames', 'fps', 'acceleration']));
+    // The Lightning pair goes with the accelerator; only the user's own LoRA is reported as lost.
+    expect(result.losses).toEqual([
+      { count: 1, key: 'loras' },
+      { count: 1, key: 'vae' },
+      { count: 1, key: 'wanT5EncoderModel' },
+    ]);
   });
 
   it('leaves user-tuned sampling and LoRA weights alone when the accelerator carries over unchanged', () => {
@@ -1394,7 +1400,8 @@ describe('getVideoModelSelectionResult', () => {
     expect(result.settings).toMatchObject({ acceleratorEnabled: true, cfgScale: 2, steps: 8 });
     expect(result.settings.loras[0]?.weight).toBe(0.5);
     expect(result.settings.loras.map((entry) => entry.model.name)).toContain('Style LoRA');
-    expect(result.clearedLabels).toEqual([]);
+    expect(result.losses).toEqual([]);
+    expect(result.adjustments).toEqual([]);
   });
 
   it('returns no cleared labels when everything carries over', () => {
@@ -1406,7 +1413,8 @@ describe('getVideoModelSelectionResult', () => {
       models: [],
     });
 
-    expect(result.clearedLabels).toEqual([]);
+    expect(result.losses).toEqual([]);
+    expect(result.adjustments).toEqual([]);
     expect(result.settings.modelKey).toBe(wanModel('i2v_a14b', 'diffusers').key);
   });
 });
@@ -1627,7 +1635,7 @@ describe('H3 task switches through the top model selection', () => {
     });
 
     expect(toRef.settings.firstFrameImage).toBeNull();
-    expect(toRef.clearedLabels).toContain('First frame');
+    expect(lossKeys(toRef)).toContain('firstFrame');
 
     const backToFl = getVideoModelSelectionResult({
       currentSettings: { ...toRef.settings, references: [imageReference] },
@@ -1636,7 +1644,7 @@ describe('H3 task switches through the top model selection', () => {
     });
 
     expect(backToFl.settings.references).toEqual([]);
-    expect(backToFl.clearedLabels).toContain('References');
+    expect(lossKeys(backToFl)).toContain('references');
   });
 
   it('a checkpoint-to-checkpoint switch keeps a compatible component source', () => {
@@ -1842,7 +1850,7 @@ describe('reference-extend policy', () => {
     });
 
     expect(toRef.settings.sourceVideo).toEqual(initialVideo);
-    expect(toRef.clearedLabels).not.toContain('Initial video');
+    expect(lossKeys(toRef)).not.toContain('initialVideo');
     // Budget against the final snapped frame count: backend truncation removes overrun from the seam end.
     expect(toRef.settings.numFrames).toBe(124);
     expect(toRef.settings.references[0]).toMatchObject({
@@ -1965,7 +1973,7 @@ describe('LTX-2 policy', () => {
       const result = getVideoModelSelectionResult({ currentSettings: conditioned('video'), model: wan, models: [wan] });
 
       expect(result.settings.conditioningClip).toBeNull();
-      expect(result.clearedLabels).toContain('Conditioning clip');
+      expect(lossKeys(result)).toContain('conditioningClip');
       expect(getVideoDimensions(wan, result.settings)?.source).toBe('aspect-ratio');
     });
 
@@ -2049,15 +2057,38 @@ describe('LTX-2 policy', () => {
       expect(getVideoDimensions(model, conditioned('audio'))?.source).toBe('aspect-ratio');
     });
 
-    it('refuses a clip beside any other conditioning slot', () => {
-      expect(
-        getVideoValidationReasons(
-          model,
-          conditioned('audio', { firstFrameImage: { height: 704, image_name: 'first.png', width: 1248 } })
-        )
-      ).toContain(
-        'A conditioning clip cannot be combined with first/last frames, an initial video or references. Clear one side.'
+    it('refuses a clip beside an initial video, and its picture beside frames', () => {
+      const frame = { height: 704, image_name: 'frame.png', width: 1248 };
+      const source = {
+        endFrame: 94,
+        fps: 24,
+        height: 704,
+        numFrames: 96,
+        startFrame: 0,
+        video_name: 's.mp4',
+        width: 1248,
+      };
+
+      expect(getVideoValidationReasons(model, conditioned('audio', { sourceVideo: source }))).toContain(
+        'A conditioning clip cannot be combined with an initial video or references. Clear one side.'
       );
+      for (const slot of ['firstFrameImage', 'lastFrameImage'] as const) {
+        expect(getVideoValidationReasons(model, conditioned('video', { [slot]: frame })), slot).toContain(
+          "A conditioning clip's picture cannot be combined with first/last frames. Clear one side."
+        );
+      }
+    });
+
+    it('lets first and last frames anchor the picture generated for a soundtrack', () => {
+      const first = { height: 704, image_name: 'first.png', width: 1248 };
+      const last = { height: 704, image_name: 'last.png', width: 1248 };
+      const settings = conditioned('audio', { firstFrameImage: first, lastFrameImage: last });
+
+      expect(resolveVideoMode(settings)).toBe('audio-to-video');
+      expect(getVideoValidationReasons(model, settings)).toEqual([]);
+      // The soundtrack still decides the length; the first frame decides the canvas.
+      expect(getEffectiveVideoTiming(model, settings).numFramesFromClip).toBe(true);
+      expect(getVideoDimensions(model, settings)?.source).toBe('first-frame');
     });
 
     it('refuses a two-stage preset, which the denoise node cannot combine with a held modality', () => {
@@ -2147,7 +2178,7 @@ describe('LTX-2 policy', () => {
 
     expect(toDev.settings.negativePrompt).toBe(LTX2_DEFAULT_NEGATIVE_PROMPT);
     // Filling an empty field in is not something the panel took away.
-    expect(toDev.clearedLabels).not.toContain('Negative prompt');
+    expect(toDev.losses).toEqual([]);
   });
 
   it('leaves an empty negative prompt alone when the panel came from a family that shows the field', () => {
@@ -2262,7 +2293,7 @@ describe('LTX-2 policy', () => {
     });
 
     expect(toDistilled.settings.cfgScale).toBe(6);
-    expect(toDistilled.clearedLabels).toContain('Steps');
+    expect(toDistilled.adjustments).toContain('steps');
 
     const back = getVideoModelSelectionResult({
       currentSettings: toDistilled.settings,
@@ -2433,7 +2464,7 @@ describe('LTX-2 policy', () => {
     expect(toDev.settings.modalityScale).toBe(3);
     // Filling in controls the panel did not have a moment ago is not a clearing, and reporting it
     // would name three settings the user has never seen.
-    expect(toDev.clearedLabels).not.toContain('Advanced guidance');
+    expect(toDev.adjustments).not.toContain('advancedGuidance');
 
     // Moving to the fixed schedule drops both the scales and a carried-over step count.
     const distilled = ltx2('ltx2_distilled');
@@ -2447,7 +2478,7 @@ describe('LTX-2 policy', () => {
     expect(toDistilled.settings.stgScale).toBeNull();
     expect(toDistilled.settings.modalityScale).toBeNull();
     expect(toDistilled.settings.steps).toBe(8);
-    expect(toDistilled.clearedLabels).toEqual(expect.arrayContaining(['Steps', 'Advanced guidance']));
+    expect(toDistilled.adjustments).toEqual(expect.arrayContaining(['steps', 'advancedGuidance']));
   });
 
   it('keeps the negative prompt whenever either classifier-free scale consumes it', () => {
@@ -2591,5 +2622,150 @@ describe('auto duration', () => {
     // The head is found again so the switch is there to use, but the switch stays where the user left it.
     expect(backToLtx2.settings.ltx2DurationHeadModel).toEqual(HEAD);
     expect(backToLtx2.settings.autoDuration).toBe(false);
+  });
+});
+
+describe('what a model switch discards', () => {
+  const HEAD = { base: 'ltx-2', key: 'head', name: 'Duration head', type: 'ltx2_duration_head' as const };
+  const videoReference = {
+    clip: { ...SOURCE_VIDEO, endFrame: 40, startFrame: 8 },
+    conditioning: 'video' as const,
+    kind: 'video' as const,
+  };
+
+  it('counts the references a model without reference mode drops, but not an untouched initial-video anchor', () => {
+    const ref2va = ref2vaTransformer();
+    const fl2va = fl2vaTransformer();
+    const supplied = settingsFor(ref2va, {
+      modelKey: ref2va.key,
+      references: [imageReference, videoReference, { ...imageReference, detail: 'match' }],
+    });
+
+    const result = getVideoModelSelectionResult({ currentSettings: supplied, model: fl2va, models: [ref2va, fl2va] });
+
+    expect(result.settings.references).toEqual([]);
+    expect(result.losses).toEqual([{ count: 3, key: 'references' }]);
+
+    const anchored = getVideoModelSelectionResult({
+      currentSettings: settingsFor(fl2va, { modelKey: fl2va.key, sourceVideo: SOURCE_VIDEO }),
+      model: ref2va,
+      models: [ref2va, fl2va],
+    }).settings;
+    const anchor = anchored.references[0];
+
+    expect(anchor).toMatchObject({ fromSourceVideo: true });
+    // Switching back re-derives the anchor from the initial video, which this model keeps.
+    expect(getVideoModelSelectionResult({ currentSettings: anchored, model: fl2va, models: [] }).losses).toEqual([]);
+
+    const trimmed = { ...anchored, references: [{ ...anchor!, trimOverridden: true }] };
+
+    expect(getVideoModelSelectionResult({ currentSettings: trimmed, model: fl2va, models: [] }).losses).toEqual([
+      { count: 1, key: 'references' },
+    ]);
+
+    // A conditioning chosen on the anchor is not re-derived either: switching back restores the default.
+    const reconditioned = { ...anchored, references: [{ ...anchor!, conditioning: 'video' as const }] };
+
+    expect(getVideoModelSelectionResult({ currentSettings: reconditioned, model: fl2va, models: [] }).losses).toEqual([
+      { count: 1, key: 'references' },
+    ]);
+  });
+
+  it('reports the initial video, frame inputs and conditioning clip as single losses', () => {
+    const h3 = h3Model();
+    const toT2v = getVideoModelSelectionResult({
+      currentSettings: settingsFor(h3, { lastFrameImage: LAST_FRAME, modelKey: h3.key, sourceVideo: SOURCE_VIDEO }),
+      model: wanModel('t2v_a14b'),
+      models: [h3],
+    });
+
+    expect(toT2v.losses).toEqual([
+      { count: 1, key: 'initialVideo' },
+      { count: 1, key: 'lastFrame' },
+    ]);
+
+    // A set trim is named, so the dialog can say the window goes with the clip.
+    const trimmed = getVideoModelSelectionResult({
+      currentSettings: settingsFor(h3, { modelKey: h3.key, sourceVideo: { ...SOURCE_VIDEO, startFrame: 12 } }),
+      model: wanModel('t2v_a14b'),
+      models: [h3],
+    });
+
+    expect(trimmed.losses).toEqual([{ count: 1, key: 'trimmedInitialVideo' }]);
+  });
+
+  it("counts only the user's own LoRAs, not the accelerator pair the switch reconciles", () => {
+    const wan = wanModel('t2v_a14b');
+    const catalog = [wan, LIGHTNING_T2V_HIGH, LIGHTNING_T2V_LOW];
+    const on = getAcceleratorToggleResult(settingsFor(wan, { modelKey: wan.key }), wan, catalog, true).settings;
+    const styled = {
+      ...on,
+      loras: [
+        ...on.loras,
+        { isEnabled: true, model: lora('Ink') as never, weight: 0.5 },
+        { isEnabled: false, model: lora('Grain') as never, weight: 0.3 },
+      ],
+    };
+
+    const result = getVideoModelSelectionResult({ currentSettings: styled, model: h3Model(), models: catalog });
+
+    expect(result.settings.loras).toEqual([]);
+    expect(result.losses).toEqual([{ count: 2, key: 'loras' }]);
+    expect(result.adjustments).toContain('acceleration');
+  });
+
+  it('treats components the previous model seeds as re-derivable, and anything else as the user’s choice', () => {
+    const dev = ltx2('ltx2_dev');
+    const wan = wanModel('t2v_a14b');
+    const catalog = [dev, wan, LTX2_COMPONENTS, LTX2_ENCODER, HEAD];
+    const seeded = { ...getDefaultVideoSettings(dev, catalog), autoDuration: true, modelKey: dev.key };
+
+    expect(seeded).toMatchObject({
+      componentSourceModel: LTX2_COMPONENTS,
+      ltx2DurationHeadModel: HEAD,
+      ltx2TextEncoderModel: LTX2_ENCODER,
+    });
+
+    const toWan = getVideoModelSelectionResult({ currentSettings: seeded, model: wan, models: catalog });
+
+    // Every LTX-2 slot is cleared, but switching back seeds the same three again.
+    expect(toWan.settings).toMatchObject({
+      autoDuration: false,
+      componentSourceModel: null,
+      ltx2DurationHeadModel: null,
+      ltx2TextEncoderModel: null,
+    });
+    expect(toWan.losses).toEqual([]);
+    expect(toWan.adjustments).toContain('autoDuration');
+
+    const otherEncoder = { ...LTX2_ENCODER, key: 'gemma4-alt', name: 'Gemma-4 (q8)' };
+    const chosen = getVideoModelSelectionResult({
+      currentSettings: { ...seeded, ltx2TextEncoderModel: otherEncoder },
+      model: wan,
+      models: [...catalog, otherEncoder],
+    });
+
+    expect(chosen.losses).toEqual([{ count: 1, key: 'ltx2TextEncoderModel' }]);
+
+    // Without the previous model there is nothing to re-seed from, so every dropped component is kept as a loss.
+    const orphaned = getVideoModelSelectionResult({
+      currentSettings: seeded,
+      model: wan,
+      models: catalog.filter((entry) => entry.key !== dev.key),
+    });
+
+    expect(lossKeys(orphaned)).toEqual(['componentSourceModel', 'ltx2DurationHeadModel', 'ltx2TextEncoderModel']);
+  });
+
+  it('reports nothing lost when the inputs a model cannot take are empty, only the values it re-fits', () => {
+    const wan = wanModel('i2v_a14b');
+    const result = getVideoModelSelectionResult({
+      currentSettings: settingsFor(wan, { modelKey: wan.key }),
+      model: h3Model(),
+      models: [wan],
+    });
+
+    expect(result.losses).toEqual([]);
+    expect(result.adjustments).toEqual(expect.arrayContaining(['targetResolution', 'frames', 'fps']));
   });
 });

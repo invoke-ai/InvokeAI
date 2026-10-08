@@ -1,9 +1,8 @@
 import { requestQueueItemReveal } from '@features/queue/reveal';
 import { useExitPresence } from '@platform/react/useExitRetainedValue';
-import { useMountEffect } from '@platform/react/useMountEffect';
+import { Dialog } from '@platform/ui/Dialog';
 import { firstPartyHotkeyCatalog } from '@workbench/hotkeys/catalog';
 import { formatHotkeyForPlatform, MOD_KEY_LABEL } from '@workbench/hotkeys/keys';
-import { registerHotkeyModalLayer } from '@workbench/hotkeys/modalLayer';
 import { useWorkbenchPreferences } from '@workbench/settings/store';
 import { openWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
@@ -15,6 +14,8 @@ import { SETTINGS_ENTRY_DEPS } from './settingsEntryDeps';
 export const loadWorkbenchCommandPaletteDialog = () => import('./WorkbenchCommandPaletteDialog');
 
 const LazyWorkbenchCommandPaletteDialog = lazy(loadWorkbenchCommandPaletteDialog);
+// The palette is open, and modal, from the keypress that opened it, not from when its module arrives.
+const PENDING_DIALOG = <Dialog.Pending />;
 
 /** Lightweight route host; the palette implementation is loaded only while open or animating closed. */
 export const WorkbenchCommandPalette = () => {
@@ -22,17 +23,8 @@ export const WorkbenchCommandPalette = () => {
   const dialog = useExitPresence(isOpen);
 
   return dialog.isMounted ? (
-    <>
-      {isOpen ? <CommandPaletteModalLayer /> : null}
-      <MountedWorkbenchCommandPalette key={dialog.generation} isOpen={isOpen} onExitComplete={dialog.release} />
-    </>
+    <MountedWorkbenchCommandPalette key={dialog.generation} isOpen={isOpen} onExitComplete={dialog.release} />
   ) : null;
-};
-
-const CommandPaletteModalLayer = () => {
-  useMountEffect(() => registerHotkeyModalLayer('command-palette'));
-
-  return null;
 };
 
 const MountedWorkbenchCommandPalette = ({
@@ -45,7 +37,7 @@ const MountedWorkbenchCommandPalette = ({
   const preferences = useWorkbenchPreferences();
 
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={isOpen ? PENDING_DIALOG : null}>
       <LazyWorkbenchCommandPaletteDialog
         catalog={firstPartyHotkeyCatalog}
         formatHotkey={formatHotkeyForPlatform}

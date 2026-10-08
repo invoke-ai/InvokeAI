@@ -7,6 +7,7 @@ import { InvokeMark } from '@platform/ui/InvokeMark';
 import { MenuContent } from '@platform/ui/Menu';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { DiscordIcon, LightbulbFilamentIcon } from '@platform/ui/VendoredIcon';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { OPEN_COMMAND_PALETTE_HOTKEY } from '@workbench/hotkeys/catalog';
 import { openCommandPalette } from '@workbench/palette/paletteStore';
@@ -26,13 +27,15 @@ import {
   SettingsIcon,
   TypeIcon,
 } from 'lucide-react';
-import { useCallback, type ElementType } from 'react';
+import { useCallback, useState, type ComponentType, type ElementType } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useTopbarShortcut } from './useTopbarShortcut';
 
 const MENU_POSITIONING = { placement: 'bottom-start' } as const;
 const DISCORD_URL = 'https://discord.gg/ZmtBAhwWhy';
+// Loaded on trigger hover or focus, so neither the chunk nor its request is part of route startup.
+const loadDonationMenuItem = () => import('@workbench/shell/DonationMenuItem');
 
 export const AppMenu = () => {
   const { t } = useTranslation();
@@ -43,7 +46,7 @@ export const AppMenu = () => {
   const openWorkbenchWidget = useOpenWorkbenchWidget();
   const queuedCount = useActiveProjectSelector((project) => getQueueSummary(project.queue.items).total);
 
-  const openHome = useCallback(() => {
+  const openLaunchpad = useCallback(() => {
     void navigate({ to: '/' });
   }, [navigate]);
   const openProjects = useCallback(() => {
@@ -60,11 +63,41 @@ export const AppMenu = () => {
   }, [navigate]);
   const openQueue = useCallback(() => openWorkbenchWidget('queue'), [openWorkbenchWidget]);
   const openSettings = useCallback(() => openWorkbenchSettings(), []);
+  const queryClient = useQueryClient();
+  // Rendered only once loaded: a lazy() boundary would suspend on open and React delays its reveal, shifting rows.
+  // A chunk that fails to load (e.g. after an upgrade) leaves the optional link absent.
+  const [DonationMenuItem, setDonationMenuItem] = useState<ComponentType | null>(null);
+  const preloadDonationMenuItem = useCallback(() => {
+    void loadDonationMenuItem().then(
+      (module) => {
+        setDonationMenuItem(() => module.DonationMenuItem);
+        return module.prefetchDonationMenuItem(queryClient);
+      },
+      () => undefined
+    );
+  }, [queryClient]);
+  // Assistive technology can activate the trigger with a bare click, without hovering or focusing it first.
+  const handleOpenChange = useCallback(
+    ({ open }: { open: boolean }) => {
+      if (open) {
+        preloadDonationMenuItem();
+      }
+    },
+    [preloadDonationMenuItem]
+  );
 
   return (
-    <Menu.Root positioning={MENU_POSITIONING}>
+    <Menu.Root lazyMount positioning={MENU_POSITIONING} onOpenChange={handleOpenChange}>
       <Menu.Trigger asChild>
-        <IconButton aria-label={t('topbar.appMenu.open')} className="group" pe="1.5" size="lg" variant="ghost">
+        <IconButton
+          aria-label={t('topbar.appMenu.open')}
+          className="group"
+          pe="1.5"
+          size="lg"
+          variant="ghost"
+          onFocus={preloadDonationMenuItem}
+          onPointerEnter={preloadDonationMenuItem}
+        >
           <AppMenuGlyph />
         </IconButton>
       </Menu.Trigger>
@@ -78,9 +111,9 @@ export const AppMenu = () => {
               </Text>
             </HStack>
             <Menu.Separator />
-            <Menu.Item value="home" onClick={openHome}>
+            <Menu.Item value="launchpad" onClick={openLaunchpad}>
               <Icon as={HouseIcon} boxSize="3.5" />
-              <Menu.ItemText>{t('launchpad.sections.home')}</Menu.ItemText>
+              <Menu.ItemText>{t('topbar.appMenu.launchpad')}</Menu.ItemText>
             </Menu.Item>
             <Menu.Separator />
             <Menu.ItemGroup>
@@ -141,6 +174,7 @@ export const AppMenu = () => {
               />
               <AppMenuLink href={DISCORD_URL} icon={DiscordIcon} label="Discord" value="discord" />
             </HStack>
+            {DonationMenuItem ? <DonationMenuItem /> : null}
           </MenuContent>
         </Menu.Positioner>
       </Portal>

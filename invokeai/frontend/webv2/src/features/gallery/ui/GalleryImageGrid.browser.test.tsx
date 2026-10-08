@@ -40,6 +40,7 @@ import { page, userEvent } from 'vitest/browser';
 
 import type { GalleryStateView } from './galleryStateView';
 import type { GalleryActions, GalleryStarredStrip, GalleryWidgetContextValue } from './GalleryWidgetContext';
+import type { GalleryListingState } from './useGalleryData';
 
 import { mergeGalleryLoadedItems } from './galleryGridLayout';
 import { GalleryImageGrid } from './GalleryImageGrid';
@@ -81,6 +82,7 @@ vi.mock('@features/gallery/data/queries', async (importOriginal) => ({
 vi.mock('react-hook-tanstack-virtual', async (importOriginal) => {
   const actual = await importOriginal<typeof VirtualModule>();
   return {
+    ...actual,
     useVirtualizer: (options: {
       count: number;
       horizontal?: boolean;
@@ -253,7 +255,6 @@ const createGallery = (overrides: Partial<GalleryStateView> = {}): GalleryStateV
     compareImageKey: null,
     galleryView: 'images',
     isComparisonActive: false,
-    isLoading: false,
     items,
     page: 0,
     revealTargetPage: null,
@@ -400,11 +401,19 @@ let currentPinnedSessionId: string | null = null;
 let currentProgressSessions: QueueProgressSession[] = [];
 const followProgressSession = vi.fn();
 let currentStrip: GalleryStarredStrip = EMPTY_GALLERY_STARRED_STRIP;
+const READY_LISTING: GalleryListingState = {
+  error: null,
+  isFetchingMore: false,
+  isRetrying: false,
+  retry: () => Promise.resolve(),
+  status: 'ready',
+};
+let currentListing = READY_LISTING;
 let onDragStart = vi.fn();
 
 /** The strip the next renders show; `total` defaults to the item count. */
 const setStrip = (items: GalleryItem[], total = items.length) => {
-  currentStrip = { items, total };
+  currentStrip = { items, state: { ...READY_LISTING, status: items.length > 0 ? 'ready' : 'empty' }, total };
 };
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -437,10 +446,12 @@ const Harness = ({
   );
   const contextValue: GalleryWidgetContextValue = {
     actions: createActions(),
+    boardsState: READY_LISTING,
     filter: createFilter(gallery),
     gallery,
     itemActions: imageActionMocks,
     isWindowTruncated: false,
+    listing: currentListing,
     loadedItems: mergeGalleryLoadedItems(currentStrip.items, gallery.items),
     projectName: 'Project',
     region: 'right',
@@ -549,6 +560,7 @@ beforeEach(() => {
   currentPinnedSessionId = null;
   mocks.progressFrame = null;
   currentStrip = EMPTY_GALLERY_STARRED_STRIP;
+  currentListing = READY_LISTING;
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   host = document.createElement('div');
   host.style.cssText = 'height:480px;left:20px;position:fixed;top:20px;width:600px;';
@@ -877,20 +889,92 @@ describe('GalleryImageGrid mixed item cells', () => {
     await interact(() => pointer('pointerup', videoButton.ownerDocument, 120, 80), 300);
   });
 
-  it.each([
-    { key: '{Enter}', label: 'Enter' },
-    { key: ' ', label: 'Space' },
-  ])('opens a video with $label without activating keyboard DnD', async ({ key }) => {
+  it('selects a video with Space without activating keyboard DnD', async () => {
     const video = createItem('video', 'keyboard.mp4');
 
     await renderGallery(createGallery({ items: [video] }));
     const videoButton = getButton('Select video keyboard.mp4, duration 1:06, for preview');
 
     await interact(() => videoButton.focus());
-    await act(() => userEvent.keyboard(key));
+    await act(() => userEvent.keyboard(' '));
 
     expect(actionMocks.selectItem).toHaveBeenCalledWith(video);
+    expect(imageActionMocks.openItemInPreview).not.toHaveBeenCalled();
     expect(onDragStart).not.toHaveBeenCalled();
+  });
+
+  it('opens the focused video in Preview with Enter, once, without activating keyboard DnD', async () => {
+    const video = createItem('video', 'keyboard.mp4');
+
+    await renderGallery(createGallery({ items: [video] }));
+    const videoButton = getButton('Select video keyboard.mp4, duration 1:06, for preview');
+
+    await interact(() => videoButton.focus());
+    await act(() => userEvent.keyboard('{Enter}'));
+
+    expect(imageActionMocks.openItemInPreview).toHaveBeenCalledExactlyOnceWith(video);
+    // Opening selects; the button's own click would select a second time first.
+    expect(actionMocks.selectItem).not.toHaveBeenCalled();
+    expect(onDragStart).not.toHaveBeenCalled();
+  });
+
+  it('opens once for a held Enter, ignoring its auto-repeat', async () => {
+    const image = createItem('image', 'first.png');
+
+    await renderGallery();
+    const button = getButton('Select first.png for preview');
+    const pressEnter = (repeat: boolean) =>
+      interact(() =>
+        button.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter', repeat }))
+      );
+
+    await interact(() => button.focus());
+    await pressEnter(false);
+    await pressEnter(true);
+    await pressEnter(true);
+
+    expect(imageActionMocks.openItemInPreview).toHaveBeenCalledExactlyOnceWith(image);
+  });
+
+  it('opens a double-clicked thumbnail in Preview after its clicks select it', async () => {
+    const image = createItem('image', 'first.png');
+
+    // The default selection is elsewhere, so the first click's selection is observable.
+    await renderGallery(createGallery({ selectedItemKey: 'image:last.png', selectedItemKeys: ['image:last.png'] }));
+    await act(() => userEvent.dblClick(getButton('Select first.png for preview')));
+
+    expect(actionMocks.selectItem).toHaveBeenCalledWith(image);
+    expect(imageActionMocks.openItemInPreview).toHaveBeenCalledExactlyOnceWith(image);
+  });
+
+  it.each([
+    { expectSelection: () => expect(actionMocks.selectItemRange).toHaveBeenCalled(), modifier: 'shiftKey' },
+    { expectSelection: () => expect(actionMocks.toggleItemInSelection).toHaveBeenCalled(), modifier: 'ctrlKey' },
+    { expectSelection: () => expect(actionMocks.toggleItemInSelection).toHaveBeenCalled(), modifier: 'metaKey' },
+    { expectSelection: () => expect(actionMocks.setCompareItem).toHaveBeenCalled(), modifier: 'altKey' },
+  ])('keeps a $modifier double-click a selection gesture that opens nothing', async ({ expectSelection, modifier }) => {
+    mocks.fetchNames.mockResolvedValue({ items: [] });
+    await renderGallery();
+    const button = getButton('Select last.png for preview');
+
+    await click(button, { [modifier]: true, detail: 1 });
+    await click(button, { [modifier]: true, detail: 2 });
+    await interact(() =>
+      button.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, detail: 2, [modifier]: true }))
+    );
+
+    expectSelection();
+    expect(imageActionMocks.openItemInPreview).not.toHaveBeenCalled();
+  });
+
+  it('toggles the star on each click of a double-click without selecting or opening the item', async () => {
+    await renderGallery();
+    await act(() => userEvent.dblClick(getButton('Star first.png')));
+
+    expect(imageActionMocks.setItemsStarred).toHaveBeenCalledTimes(2);
+    expect(imageActionMocks.setItemsStarred).toHaveBeenCalledWith([{ kind: 'image', name: 'first.png' }], true);
+    expect(actionMocks.selectItem).not.toHaveBeenCalled();
+    expect(imageActionMocks.openItemInPreview).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -1057,10 +1141,14 @@ describe('GalleryImageGrid mixed item cells', () => {
       ],
       items[0]
     );
-    expect(imageActionMocks.deleteItems).toHaveBeenCalledWith([
-      { kind: 'image', name: 'shared' },
-      { kind: 'video', name: 'shared' },
-    ]);
+    // Run with focus outside the grid, the dialog keeps its own focus return.
+    expect(imageActionMocks.deleteItems).toHaveBeenCalledWith(
+      [
+        { kind: 'image', name: 'shared' },
+        { kind: 'video', name: 'shared' },
+      ],
+      { returnFocus: undefined }
+    );
     expect(imageActionMocks.setItemsStarred).toHaveBeenCalledWith(
       [
         { kind: 'image', name: 'shared' },
@@ -1343,7 +1431,8 @@ describe('GalleryImageGrid reveal requests', () => {
   });
 
   it('keeps the loading message while an empty board is still loading', async () => {
-    await renderGallery(createGallery({ isLoading: true, items: [] }));
+    currentListing = { ...READY_LISTING, status: 'loading' };
+    await renderGallery(createGallery({ items: [] }));
 
     expect(host?.textContent).toContain('Loading gallery');
     expect(host?.querySelector('[role="button"]')).toBeNull();
@@ -1606,13 +1695,17 @@ describe('shared gallery progress section', () => {
   };
   it('stays visible above empty and filtered boards and follows the clicked session', async () => {
     currentProgressSessions = [session];
-    for (const boardState of [
-      { selectedBoardId: 'board-other', items: [] },
-      { searchTerm: 'unmatched', items: [] },
-      { starredOnly: true, items: [] },
-      { galleryView: 'assets' as const, items: [], isLoading: true },
-      { page: 5, anchoredWindowPage: 5 },
-    ]) {
+    const cases: [Partial<GalleryStateView>, GalleryListingState['status']][] = [
+      [{ selectedBoardId: 'board-other', items: [] }, 'empty'],
+      [{ searchTerm: 'unmatched', items: [] }, 'empty'],
+      [{ starredOnly: true, items: [] }, 'empty'],
+      [{ galleryView: 'assets', items: [] }, 'loading'],
+      [{ items: [] }, 'error'],
+      [{ page: 5, anchoredWindowPage: 5 }, 'ready'],
+    ];
+
+    for (const [boardState, status] of cases) {
+      currentListing = { ...READY_LISTING, status };
       await renderGallery(createGallery(boardState));
       expect(host?.querySelector('button[title^="Workflow A ·"]')).not.toBeNull();
     }
