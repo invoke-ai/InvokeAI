@@ -520,8 +520,18 @@ class GalleryMaintenanceService:
         backup_dir = self._services.configuration.db_path.parent / "backup"
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         destination = backup_dir / f"backup-{timestamp}-gallery-maintenance-{uuid.uuid4().hex}.db"
+        missing_directories: list[Path] = []
+        current = backup_dir
+        while not current.exists():
+            missing_directories.append(current)
+            current = current.parent
         try:
             self._services.database.backup_to(destination)
+            for directory in reversed(missing_directories):
+                self.__fsync_directory(directory.parent)
+            if not missing_directories:
+                self.__fsync_directory(backup_dir.parent)
+            self.__fsync_directory(backup_dir)
         except Exception as e:
             self._logger.exception("Gallery maintenance database backup failed")
             raise GalleryMaintenanceError("The database backup failed; no gallery changes were made.") from e
@@ -529,15 +539,27 @@ class GalleryMaintenanceService:
 
     def _create_archive_run(self, operation: GalleryMaintenanceOperation) -> Path:
         root = self._archive_root
-        self._assert_archive_root(root)
+        self._ensure_archive_directory(root)
         run_parent = root / "gallery-maintenance"
-        self._assert_archive_root(run_parent)
-        run_parent.mkdir(parents=True, exist_ok=True)
-        self._assert_archive_root(run_parent)
+        self._ensure_archive_directory(run_parent)
         run_path = run_parent / f"{operation.value}-{uuid.uuid4().hex}"
         run_path.mkdir(exist_ok=False)
         self._assert_archive_root(run_path)
+        self.__fsync_directory(run_parent)
         return run_path
+
+    def _ensure_archive_directory(self, path: Path) -> None:
+        """Create archive directories one level at a time and persist every parent entry."""
+        self._assert_archive_root(path)
+        output_root = self._services.image_files.image_root.parent.resolve()
+        current = output_root
+        for part in path.relative_to(output_root).parts:
+            current /= part
+            current.mkdir(exist_ok=True)
+            self._assert_archive_root(current)
+            if not stat.S_ISDIR(current.lstat().st_mode):
+                raise OSError("Archive path component is not a directory")
+            self.__fsync_directory(current.parent)
 
     def _assert_archive_root(self, path: Path) -> None:
         output_root = self._services.image_files.image_root.parent.resolve()
@@ -808,10 +830,14 @@ class GalleryMaintenanceService:
                     counts.failed_count += 1
                     counts.add_error("Could not regenerate an image thumbnail.")
 
-    @staticmethod
-    def _archive_file(source: Path, destination: Path, expected: _StatSignature) -> None:
+    def _archive_file(self, source: Path, destination: Path, expected: _StatSignature) -> None:
         """Copy to an exclusive file, publish without overwrite, then identity-check source removal."""
-        destination.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            destination.parent.relative_to(self._archive_root)
+        except ValueError:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+        else:
+            self._ensure_archive_directory(destination.parent)
         temporary = destination.parent / f".{destination.name}.{uuid.uuid4().hex}.tmp"
         temporary_fd: int | None = None
         quarantine_directory: Path | None = None

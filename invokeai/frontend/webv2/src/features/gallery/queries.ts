@@ -27,4 +27,5 @@ export {
   patchGalleryItemCaches,
 } from './data/queryCache';
 export type { GalleryItemCachePatch } from './data/queryCache';
+export { refreshGalleryThumbnails } from './data/galleryThumbnailRefresh';
 export { createGalleryRealtimeRuntime } from './data/realtimeRuntime';

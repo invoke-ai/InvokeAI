@@ -706,3 +706,147 @@ def test_result_errors_are_bounded(maintenance) -> None:
 
     assert result.failed_count == 25
     assert len(result.errors) == 20
+
+
+def test_archive_directory_entries_are_synced_before_quarantining_thumbnail(maintenance, monkeypatch) -> None:
+    service, _db, records, files = maintenance
+    _save_image_record(records, "missing.png", "recoverable/deep")
+    thumbnail = files.get_path("missing.png", thumbnail=True, image_subfolder="recoverable/deep")
+    thumbnail.parent.mkdir(parents=True, exist_ok=True)
+    thumbnail_bytes = b"recoverable thumbnail"
+    thumbnail.write_bytes(thumbnail_bytes)
+    preview = service.preview(GalleryMaintenanceOperation.REMOVE_MISSING)
+    archive_root = service._archive_root
+    output_root = archive_root.parent
+    events: list[tuple[str, Path]] = []
+    real_mkdir = os.mkdir
+    real_fsync_directory = GalleryMaintenanceService._GalleryMaintenanceService__fsync_directory
+    real_replace = Path.replace
+    durability_failure_injected = False
+
+    def track_mkdir(path, *args, **kwargs):
+        result = real_mkdir(path, *args, **kwargs)
+        created_path = Path(os.fsdecode(path))
+        if created_path == archive_root or archive_root in created_path.parents:
+            events.append(("mkdir", created_path))
+        return result
+
+    def fail_archive_parent_sync(directory: Path) -> None:
+        nonlocal durability_failure_injected
+        directory = Path(directory)
+        if directory == output_root or directory == archive_root or archive_root in directory.parents:
+            events.append(("fsync", directory))
+            if directory.name == "recoverable" and directory.parent.name == "thumbnails":
+                durability_failure_injected = True
+                raise OSError("injected archive directory-entry sync failure")
+        real_fsync_directory(directory)
+
+    def track_source_quarantine(path: Path, target: Path) -> Path:
+        if path == thumbnail and Path(target).parent.name.startswith(".gallery-archive-"):
+            events.append(("quarantine", path))
+        return real_replace(path, target)
+
+    monkeypatch.setattr(os, "mkdir", track_mkdir)
+    monkeypatch.setattr(
+        GalleryMaintenanceService,
+        "_GalleryMaintenanceService__fsync_directory",
+        staticmethod(fail_archive_parent_sync),
+    )
+    monkeypatch.setattr(Path, "replace", track_source_quarantine)
+
+    result = service.execute(GalleryMaintenanceOperation.REMOVE_MISSING, preview.fingerprint)
+
+    assert durability_failure_injected
+    assert not any(kind == "quarantine" for kind, _path in events)
+    assert records.exists("missing.png")
+    assert thumbnail.read_bytes() == thumbnail_bytes
+    assert result.records_removed == 0
+    assert result.thumbnails_archived == 0
+
+    for index, (kind, directory) in enumerate(events):
+        if kind != "mkdir":
+            continue
+        parent_syncs = [
+            event_index
+            for event_index, (event_kind, synced_directory) in enumerate(events)
+            if event_kind == "fsync" and synced_directory == directory.parent
+        ]
+        assert parent_syncs and parent_syncs[0] > index
+
+
+def test_backup_directory_sync_failure_prevents_gallery_deletion(maintenance, monkeypatch) -> None:
+    service, _db, records, files = maintenance
+    _save_image_record(records, "missing.png", "recoverable")
+    thumbnail = files.get_path("missing.png", thumbnail=True, image_subfolder="recoverable")
+    thumbnail.parent.mkdir(parents=True)
+    thumbnail_bytes = b"recoverable thumbnail"
+    thumbnail.write_bytes(thumbnail_bytes)
+    _embedding(service._invoker.services, "image", "missing.png")
+    embedding_before = _embedding_bytes(service._invoker.services, "image", "missing.png")
+    preview = service.preview(GalleryMaintenanceOperation.REMOVE_MISSING)
+    backup_directory = service._invoker.services.configuration.db_path.parent / "backup"
+    database_directory = backup_directory.parent
+    backup_to = service._invoker.services.database.backup_to
+    directory_fsync = GalleryMaintenanceService._GalleryMaintenanceService__fsync_directory
+    real_mkdir = os.mkdir
+    events: list[tuple[str, Path]] = []
+    completed_backup: Path | None = None
+    sync_failure_injected = False
+
+    assert not database_directory.exists()
+    assert not backup_directory.exists()
+
+    def track_mkdir(path, *args, **kwargs):
+        result = real_mkdir(path, *args, **kwargs)
+        created_path = Path(os.fsdecode(path))
+        if created_path in {database_directory, backup_directory}:
+            events.append(("mkdir", created_path))
+        return result
+
+    def create_backup(destination: Path) -> None:
+        nonlocal completed_backup
+        backup_to(destination)
+        completed_backup = destination
+        events.append(("backup", destination))
+
+    def fail_backup_directory_sync(directory: Path) -> None:
+        nonlocal sync_failure_injected
+        directory = Path(directory)
+        events.append(("fsync", directory))
+        if directory == backup_directory:
+            sync_failure_injected = True
+            raise OSError("injected backup directory-entry sync failure")
+        directory_fsync(directory)
+
+    service._invoker.services.database.backup_to = create_backup
+    monkeypatch.setattr(os, "mkdir", track_mkdir)
+    monkeypatch.setattr(
+        GalleryMaintenanceService,
+        "_GalleryMaintenanceService__fsync_directory",
+        staticmethod(fail_backup_directory_sync),
+    )
+
+    with pytest.raises(GalleryMaintenanceError, match="database backup"):
+        service.execute(GalleryMaintenanceOperation.REMOVE_MISSING, preview.fingerprint)
+
+    assert sync_failure_injected
+    assert completed_backup is not None and completed_backup.is_file()
+    assert records.exists("missing.png")
+    assert _embedding_bytes(service._invoker.services, "image", "missing.png") == embedding_before
+    assert thumbnail.read_bytes() == thumbnail_bytes
+    assert not service._archive_root.exists()
+    service._invoker.services.images.notify_deleted.assert_not_called()
+
+    backup_index = next(index for index, (kind, _path) in enumerate(events) if kind == "backup")
+    for created_directory in (database_directory, backup_directory):
+        mkdir_index = next(
+            index
+            for index, (kind, directory) in enumerate(events)
+            if kind == "mkdir" and directory == created_directory
+        )
+        parent_sync_index = next(
+            index
+            for index, (kind, directory) in enumerate(events)
+            if kind == "fsync" and directory == created_directory.parent
+        )
+        assert mkdir_index < backup_index < parent_sync_index

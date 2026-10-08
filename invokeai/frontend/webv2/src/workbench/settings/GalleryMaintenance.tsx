@@ -2,7 +2,7 @@ import type { components } from '@api/schema';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 
 import { Box, Flex, Stack, Text } from '@chakra-ui/react';
-import { invalidateGallery } from '@features/gallery/queries';
+import { invalidateGallery, refreshGalleryThumbnails } from '@features/gallery/queries';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {
   captureAccountScope,
@@ -172,6 +172,10 @@ export const GalleryMaintenance = () => {
       });
       if (!isAccountScopeCurrent(owner)) {
         return;
+      }
+
+      if (operation === 'regenerate_thumbnails' && value.thumbnails_regenerated > 0) {
+        refreshGalleryThumbnails(owner);
       }
 
       let refreshError: string | undefined;

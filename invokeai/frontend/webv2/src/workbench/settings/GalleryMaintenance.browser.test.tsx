@@ -1,3 +1,4 @@
+import type { GalleryItem } from '@features/gallery/core/items';
 import type * as GalleryQueriesModule from '@features/gallery/queries';
 import type * as IdentityModule from '@features/identity';
 import type * as HttpModule from '@platform/transport/http';
@@ -6,6 +7,8 @@ import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
 
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop */
 import { ChakraProvider } from '@chakra-ui/react';
+import { DndContext } from '@dnd-kit/core';
+import { GalleryThumbnailCell } from '@features/gallery/ui/GalleryThumbnail';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -13,7 +16,7 @@ import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { commands, userEvent } from 'vitest/browser';
 
 import type * as SettingsStoreModule from './store';
 
@@ -24,7 +27,14 @@ const mocks = vi.hoisted(() => ({
   canManageAppConfig: true,
   invalidateGallery: vi.fn(),
   refreshImageMapPoints: vi.fn(),
+  refreshGalleryThumbnails: vi.fn(),
 }));
+
+const thumbnailRouteCommands = commands as typeof commands & {
+  getThumbnailRequests: () => Promise<{ statuses: number[]; urls: string[] }>;
+  startThumbnailRoute: (pathname: string) => Promise<void>;
+  stopThumbnailRoute: () => Promise<void>;
+};
 
 vi.mock('@features/identity', async (importOriginal) => ({
   ...(await importOriginal<typeof IdentityModule>()),
@@ -35,8 +45,14 @@ vi.mock('@platform/transport/http', async (importOriginal) => ({
   apiFetchJson: (...args: unknown[]) => mocks.apiFetchJson(...args),
 }));
 vi.mock('@features/gallery/queries', async (importOriginal) => ({
-  ...(await importOriginal<typeof GalleryQueriesModule>()),
-  invalidateGallery: (...args: unknown[]) => mocks.invalidateGallery(...args),
+  ...((actual) => ({
+    ...actual,
+    invalidateGallery: (...args: unknown[]) => mocks.invalidateGallery(...args),
+    refreshGalleryThumbnails: (...args: Parameters<typeof actual.refreshGalleryThumbnails>) => {
+      mocks.refreshGalleryThumbnails(...args);
+      return actual.refreshGalleryThumbnails(...args);
+    },
+  }))(await importOriginal<typeof GalleryQueriesModule>()),
 }));
 vi.mock('@workbench/image-map/imageMapStore', async (importOriginal) => ({
   ...(await importOriginal<typeof ImageMapStoreModule>()),
@@ -135,6 +151,27 @@ const result = (
   ...overrides,
 });
 
+const thumbnailItem: GalleryItem = {
+  boardId: 'board-1',
+  category: 'general',
+  createdAt: '2026-10-07T12:00:00Z',
+  fullUrl: '/api/v1/images/i/repaired/full',
+  height: 64,
+  isIntermediate: false,
+  kind: 'image',
+  name: 'repaired',
+  starred: false,
+  thumbnailUrl: '/api/v1/images/i/repaired/thumbnail',
+  width: 64,
+};
+const thumbnailVideo: GalleryItem = {
+  ...thumbnailItem,
+  durationSeconds: 4,
+  kind: 'video',
+  name: 'unchanged-video',
+  thumbnailUrl: '/api/v1/videos/i/unchanged-video/thumbnail',
+};
+
 describe('gallery maintenance in Data & workspace settings', () => {
   let host: HTMLDivElement;
   let root: Root;
@@ -146,6 +183,48 @@ describe('gallery maintenance in Data & workspace settings', () => {
         <ChakraProvider value={system}>
           <QueryClientProvider client={queryClient}>
             <WorkspaceSettings onReveal={() => {}} />
+          </QueryClientProvider>
+        </ChakraProvider>
+      )
+    );
+  };
+
+  const renderSettingsWithThumbnail = async () => {
+    await act(() =>
+      root.render(
+        <ChakraProvider value={system}>
+          <QueryClientProvider client={queryClient}>
+            <DndContext>
+              <WorkspaceSettings onReveal={() => {}} />
+              <GalleryThumbnailCell
+                alwaysShowDimensions={false}
+                compareRole={null}
+                dragScope="maintenance-test"
+                fit="square"
+                getDragItems={() => [{ kind: 'image', name: thumbnailItem.name }]}
+                getItemLabel={null}
+                isPrimary={false}
+                isSelected={false}
+                item={thumbnailItem}
+                onClick={() => {}}
+                onContextMenu={() => {}}
+                onToggleStarred={() => {}}
+              />
+              <GalleryThumbnailCell
+                alwaysShowDimensions={false}
+                compareRole={null}
+                dragScope="maintenance-test"
+                fit="square"
+                getDragItems={() => [{ kind: 'video', name: thumbnailVideo.name }]}
+                getItemLabel={null}
+                isPrimary={false}
+                isSelected={false}
+                item={thumbnailVideo}
+                onClick={() => {}}
+                onContextMenu={() => {}}
+                onToggleStarred={() => {}}
+              />
+            </DndContext>
           </QueryClientProvider>
         </ChakraProvider>
       )
@@ -176,6 +255,7 @@ describe('gallery maintenance in Data & workspace settings', () => {
     mocks.apiFetchJson.mockReset();
     mocks.invalidateGallery.mockReset().mockResolvedValue(undefined);
     mocks.refreshImageMapPoints.mockReset().mockResolvedValue(undefined);
+    mocks.refreshGalleryThumbnails.mockReset();
     accountLifecycle.activate('gallery-maintenance-settings-test', ':user:gallery-maintenance-settings-test');
     queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     host = document.createElement('div');
@@ -185,6 +265,7 @@ describe('gallery maintenance in Data & workspace settings', () => {
 
   afterEach(async () => {
     await act(() => root.unmount());
+    await thumbnailRouteCommands.stopThumbnailRoute();
     host.remove();
     queryClient.clear();
     accountLifecycle.invalidate();
@@ -404,7 +485,7 @@ describe('gallery maintenance in Data & workspace settings', () => {
         status: action.operation === 'regenerate_thumbnails' ? 'no_op' : 'completed',
         records_removed: 4,
         images_archived: action.operation === 'archive_untracked' ? 4 : 0,
-        thumbnails_regenerated: action.operation === 'regenerate_thumbnails' ? 5 : 0,
+        thumbnails_regenerated: 0,
       })
     );
     await renderSettings();
@@ -419,5 +500,58 @@ describe('gallery maintenance in Data & workspace settings', () => {
     );
     expect(mocks.invalidateGallery).not.toHaveBeenCalled();
     expect(mocks.refreshImageMapPoints).not.toHaveBeenCalled();
+  });
+
+  it('refreshes mounted thumbnails after partial regeneration', async () => {
+    const owner = accountLifecycle.capture();
+    const action = operations[2];
+    await thumbnailRouteCommands.startThumbnailRoute(thumbnailItem.thumbnailUrl);
+    mocks.apiFetchJson
+      .mockResolvedValueOnce(preview(action.operation, action.fingerprint))
+      .mockResolvedValueOnce(
+        result(action.operation, { status: 'partial', thumbnails_regenerated: 2, failed_count: 1 })
+      );
+    await renderSettingsWithThumbnail();
+    const thumbnail = host.querySelector<HTMLImageElement>('img[alt="repaired"]')!;
+    const videoThumbnail = host.querySelector<HTMLImageElement>('img[alt="unchanged-video"]')!;
+    const initialUrl = thumbnail.getAttribute('src');
+    const initialVideoUrl = videoThumbnail.getAttribute('src');
+    await expect.poll(() => thumbnail.complete).toBe(true);
+    expect(thumbnail.naturalWidth).toBe(0);
+    expect((await thumbnailRouteCommands.getThumbnailRequests()).statuses).toEqual([404]);
+    await openAction(action);
+    await act(() => userEvent.click(getConfirmButton(action)!));
+    await expect.poll(() => document.querySelector('[role="alertdialog"]')).toBeNull();
+
+    await expect.poll(() => thumbnail.getAttribute('src')).not.toBe(initialUrl);
+    expect(thumbnail.getAttribute('src')).toContain('gallery_thumbnail_revision=');
+    expect(videoThumbnail.getAttribute('src')).toBe(initialVideoUrl);
+    await expect.poll(async () => (await thumbnailRouteCommands.getThumbnailRequests()).statuses).toEqual([404, 200]);
+    await expect.poll(() => thumbnail.complete && thumbnail.naturalWidth > 0).toBe(true);
+    const requests = await thumbnailRouteCommands.getThumbnailRequests();
+    expect(requests.urls).toHaveLength(2);
+    expect(requests.urls[0]).not.toBe(requests.urls[1]);
+    expect(mocks.refreshGalleryThumbnails).toHaveBeenCalledOnce();
+    expect(mocks.refreshGalleryThumbnails).toHaveBeenCalledWith(owner);
+    expect(mocks.invalidateGallery).not.toHaveBeenCalled();
+    expect(mocks.refreshImageMapPoints).not.toHaveBeenCalled();
+  });
+
+  it('does not refresh thumbnails when regeneration completes for a previous account', async () => {
+    let resolveExecution!: (value: ReturnType<typeof result>) => void;
+    const action = operations[2];
+    mocks.apiFetchJson.mockResolvedValueOnce(preview(action.operation, action.fingerprint)).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveExecution = resolve;
+      })
+    );
+    await renderSettings();
+    await openAction(action);
+    await act(() => userEvent.click(getConfirmButton(action)!));
+
+    await act(() => accountLifecycle.activate('gallery-maintenance-another-account', ':user:another-account'));
+    await act(() => resolveExecution(result(action.operation, { thumbnails_regenerated: 3 })));
+
+    expect(mocks.refreshGalleryThumbnails).not.toHaveBeenCalled();
   });
 });
