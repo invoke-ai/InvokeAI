@@ -257,7 +257,7 @@ Just like with the dev environment, you can build the docs one of two ways:
     And that's it.
 
     :::tip[Deploy Target]
-      The make command here sets the `DEPLOY_TARGET` environment variable to `custom`, so that the final output matches what you'd expect from the final deployment to https://invoke.ai.
+      The make command here sets the `DEPLOY_TARGET` environment variable to `custom`, so that the final output matches what you'd expect from the final deployment to https://v7.invoke.ai.
 
       If you'd rather set a different deploy target, use the manual method.
     :::
@@ -311,7 +311,7 @@ The docs contain tests for the following:
 
 Once you've submitted your updated docs, either via pull request or a main push to your own fork, the `deploy-docs` action will run.
 
-The `deploy-docs` action will install the necessary dependencies, run a build, test and serve the docs on github pages. Any failing deployments will require fixing before deploying.
+The `deploy-docs` action will install the necessary dependencies, run a build and test it. Pushes to `main` then publish the site to https://v7.invoke.ai, served by GitHub Pages from the `invoke-ai/docs-v7` repository. The v6 documentation at https://invoke.ai is built and deployed from the `v6-bugfixes` branch. Any failing deployments will require fixing before deploying.
 
 ## Troubleshooting
 

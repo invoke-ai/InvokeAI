@@ -34,6 +34,8 @@ const revealGalleryItem = vi.fn(
 );
 /** The regions the project's single gallery instance occupies. */
 let galleryRegions: string[] = ['right'];
+/** The store's projects, read by `queries.getProject` at call time. */
+let storedProjects: Record<string, unknown> = {};
 
 vi.mock('@features/video', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -56,6 +58,7 @@ vi.mock('@workbench/WorkbenchContext', () => ({
     widgets: { patchValues: vi.fn() },
   }),
   useWorkbenchQueries: () => ({
+    getProject: (projectId: string) => storedProjects[projectId] ?? null,
     isActiveProject: (projectId: string) => projectId === activeProjectId,
     getSnapshot: () => ({
       activeProject: {
@@ -91,6 +94,7 @@ beforeEach(async () => {
   revealGalleryItem.mockClear();
   reportError.mockClear();
   galleryRegions = ['right'];
+  storedProjects = {};
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -106,6 +110,34 @@ afterEach(async () => {
   if (outstanding) {
     consumeVideoSpanPlaybackRequest(outstanding.token);
   }
+});
+
+describe('readValues', () => {
+  const videoProject = (values: Record<string, unknown>) => ({
+    widgetInstances: { 'video-1': { state: { values }, typeId: 'video' } },
+  });
+
+  it("reads the panel's values when called, for drops that commit after the panel changed", () => {
+    storedProjects = { 'project-1': videoProject({ positivePrompt: 'before' }) };
+    const { readValues } = adapter;
+
+    // No re-render: an async commit holds the adapter it captured, and must still see the store as it is now.
+    storedProjects = { 'project-1': videoProject({ positivePrompt: 'after' }) };
+
+    expect(readValues()).toEqual({ positivePrompt: 'after' });
+  });
+
+  it('reads the project its writes target, and nothing once that project is gone', async () => {
+    storedProjects = { 'project-1': videoProject({ positivePrompt: 'one' }), 'project-2': videoProject({}) };
+    const { readValues } = adapter;
+
+    activeProjectId = 'project-2';
+    await renderAdapter();
+
+    expect(readValues()).toEqual({ positivePrompt: 'one' });
+    storedProjects = {};
+    expect(readValues()).toEqual({});
+  });
 });
 
 describe('videoSpanPlayback', () => {

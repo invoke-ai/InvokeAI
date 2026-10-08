@@ -3,6 +3,7 @@ import type { SettingFieldProps } from '@platform/ui/settings/contracts';
 import type { WorkbenchThemeId } from '@theme/themes';
 
 import { Box, chakra, Checkbox, Flex, HStack, Icon, SimpleGrid, Stack, Text, useSlotRecipe } from '@chakra-ui/react';
+import { useCapabilities } from '@features/identity';
 import { INTERMEDIATES_SETTING_ID } from '@features/intermediates';
 import { Button, ConfirmDialog } from '@platform/ui';
 import { resolveSettingsText } from '@platform/ui/settings/contracts';
@@ -12,8 +13,8 @@ import { previewSwatches, THEMES, type ThemeDefinition } from '@theme/system';
 import { areLoggingPreferencesDefault, resetLoggingPreferences } from '@workbench/diagnostics/loggingPreferences';
 import { clearAllWorkbenchData } from '@workbench/projects/syncedPersistence';
 import { useOptionalWorkbenchCommands, useOptionalWorkbenchPersistenceService } from '@workbench/WorkbenchContext';
-import { BrushCleaningIcon, CheckIcon, RotateCcwIcon, Trash2Icon } from 'lucide-react';
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { BrushCleaningIcon, CheckIcon, DatabaseIcon, RotateCcwIcon, Trash2Icon } from 'lucide-react';
+import { lazy, Suspense, useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AboutSettings } from './AboutSettings';
@@ -33,6 +34,12 @@ import {
 const THEME_GRID_COLUMNS = { base: 2, md: 3 };
 const DEVELOPER_GRID_COLUMNS = { base: 1, md: 2 };
 const DANGER_BUTTON_HOVER_STYLES = { bg: 'fg.error', color: 'bg.subtle' };
+const LazyDatabaseMaintenanceDialog = lazy(() =>
+  import('./DatabaseMaintenanceDialog').then((module) => ({ default: module.DatabaseMaintenanceDialog }))
+);
+const LazyGalleryMaintenance = lazy(() =>
+  import('./GalleryMaintenance').then((module) => ({ default: module.GalleryMaintenance }))
+);
 
 export const ThemeSettings = () => {
   const themeId = useWorkbenchPreferenceSelector((preferences) => preferences.themeId);
@@ -161,10 +168,13 @@ export const LoggingResetSettings = () => {
 
 export const WorkspaceSettings = ({ onReveal }: Pick<SettingFieldProps, 'onReveal'>) => {
   const { t } = useTranslation();
+  const { canManageAppConfig } = useCapabilities();
   const commands = useOptionalWorkbenchCommands();
   const mountedPersistence = useOptionalWorkbenchPersistenceService();
   const scope = useWorkbenchSettingsSelector((snapshot) => snapshot.scope);
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
+  const [isDatabaseDialogMounted, setIsDatabaseDialogMounted] = useState(false);
+  const [isDatabaseDialogOpen, setIsDatabaseDialogOpen] = useState(false);
 
   const clearSavedData = useCallback(async () => {
     const failures = await clearWorkspaceData(
@@ -185,6 +195,11 @@ export const WorkspaceSettings = ({ onReveal }: Pick<SettingFieldProps, 'onRevea
   const resetLayout = useCallback(() => commands?.layout.reset(), [commands]);
   const openClearConfirm = useCallback(() => setIsClearConfirmOpen(true), []);
   const closeClearConfirm = useCallback(() => setIsClearConfirmOpen(false), []);
+  const openDatabaseConfirmation = useCallback(() => {
+    setIsDatabaseDialogMounted(true);
+    setIsDatabaseDialogOpen(true);
+  }, []);
+  const closeDatabaseConfirmation = useCallback(() => setIsDatabaseDialogOpen(false), []);
   const openIntermediates = useCallback(() => onReveal?.('intermediates', INTERMEDIATES_SETTING_ID), [onReveal]);
 
   return (
@@ -202,6 +217,12 @@ export const WorkspaceSettings = ({ onReveal }: Pick<SettingFieldProps, 'onRevea
             {t('settings.catalog.manageIntermediates')}
           </Button>
         ) : null}
+        {canManageAppConfig ? (
+          <Button size="lg" variant="outline" onClick={openDatabaseConfirmation}>
+            <DatabaseIcon />
+            {t('settings.databaseMaintenance.compactDatabase')}
+          </Button>
+        ) : null}
         <Button
           borderColor="border.emphasized"
           color="fg.error"
@@ -214,6 +235,11 @@ export const WorkspaceSettings = ({ onReveal }: Pick<SettingFieldProps, 'onRevea
           Clear saved data…
         </Button>
       </HStack>
+      {canManageAppConfig ? (
+        <Suspense fallback={null}>
+          <LazyGalleryMaintenance />
+        </Suspense>
+      ) : null}
       <ConfirmDialog
         body={
           scope === 'user'
@@ -226,6 +252,11 @@ export const WorkspaceSettings = ({ onReveal }: Pick<SettingFieldProps, 'onRevea
         onClose={closeClearConfirm}
         onConfirm={clearSavedData}
       />
+      {canManageAppConfig && isDatabaseDialogMounted ? (
+        <Suspense fallback={null}>
+          <LazyDatabaseMaintenanceDialog isOpen={isDatabaseDialogOpen} onClose={closeDatabaseConfirmation} />
+        </Suspense>
+      ) : null}
     </Stack>
   );
 };

@@ -1,13 +1,12 @@
 import type { CanvasEngine, CanvasFontCapability } from '@workbench/canvas-engine/api';
 
-import { Box, Dialog, Flex, Input, NativeSelect, Portal, Stack, Text } from '@chakra-ui/react';
+import { Box, Flex, Input, NativeSelect, Portal, Stack, Text } from '@chakra-ui/react';
 import { fontKeys, fontsQueryOptions, getFont, uploadFont, type FontRecord } from '@features/fonts';
 import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
-import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Button, CloseButton } from '@platform/ui';
+import { Dialog } from '@platform/ui/Dialog';
 import { useQueries, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { registerHotkeyModalLayer } from '@workbench/hotkeys/modalLayer';
 import { useCallback, useDeferredValue, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -67,12 +66,6 @@ export const MissingFontsDialog = ({ engine, groups }: { engine: CanvasEngine; g
   );
 };
 
-/** Mounted only while recovery is open, so workbench hotkeys return as soon as it starts closing. */
-const RecoveryModalLayer = () => {
-  useMountEffect(() => registerHotkeyModalLayer('missing-fonts'));
-  return null;
-};
-
 const RecoveryDialog = ({
   groups,
   engine,
@@ -108,7 +101,6 @@ const RecoveryDialog = ({
       onExitComplete={onExitComplete}
       onOpenChange={onOpenChange}
     >
-      {isOpen ? <RecoveryModalLayer /> : null}
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>

@@ -20,14 +20,17 @@ const harness = vi.hoisted(() => ({
   persistEmptySession: vi.fn(),
   project: {} as Project,
   releaseProjectSync: vi.fn(),
+  reopenSession: vi.fn(),
 }));
 
-vi.mock('@features/generation/react', () => ({ flushGenerateDrafts: vi.fn() }));
 vi.mock('./library', () => ({
   deleteLibraryProject: harness.deleteLibraryProject,
   refreshProjectLibrary: vi.fn(),
 }));
-vi.mock('@tanstack/react-router', () => ({ useNavigate: () => harness.navigate }));
+vi.mock('@tanstack/react-router', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useNavigate: () => harness.navigate,
+}));
 vi.mock('@workbench/useNotify', () => ({ useNotify: () => ({ error: harness.notifyError }) }));
 vi.mock('@workbench/WorkbenchContext', () => ({
   useWorkbenchLiveCanvasEngines: () => ({ flushPendingPixels: harness.flushCanvasPixels }),
@@ -37,6 +40,7 @@ vi.mock('@workbench/WorkbenchContext', () => ({
     flushProjectToServer: harness.flush,
     persistEmptySession: harness.persistEmptySession,
     releaseProjectSync: harness.releaseProjectSync,
+    reopenSession: harness.reopenSession,
   }),
   useWorkbenchQueries: () => ({
     getProject: () => harness.project,
@@ -76,6 +80,8 @@ beforeEach(() => {
   harness.persistEmptySession.mockReset();
   harness.persistEmptySession.mockResolvedValue(undefined);
   harness.releaseProjectSync.mockReset();
+  harness.reopenSession.mockReset();
+  harness.reopenSession.mockResolvedValue(undefined);
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -221,6 +227,7 @@ describe('useProjectActions', () => {
     expect(harness.notifyError).toHaveBeenCalledWith('projects.closeBlocked', 'session offline');
     expect(harness.releaseProjectSync).not.toHaveBeenCalled();
     expect(harness.navigate).not.toHaveBeenCalled();
+    expect(harness.reopenSession).toHaveBeenCalledOnce();
   });
 
   it('does not navigate home when queue work starts during last-tab close', async () => {
@@ -242,5 +249,51 @@ describe('useProjectActions', () => {
     expect(harness.notifyError).toHaveBeenCalledWith('projects.closeBlocked', 'projects.activeRunsMustFinish');
     expect(harness.releaseProjectSync).not.toHaveBeenCalled();
     expect(harness.navigate).not.toHaveBeenCalled();
+    // The tab stays open, so the session emptied for leaving must name it again.
+    expect(harness.reopenSession).toHaveBeenCalledOnce();
+    expect(harness.reopenSession.mock.invocationCallOrder[0]).toBeGreaterThan(
+      harness.persistEmptySession.mock.invocationCallOrder[0]!
+    );
+  });
+
+  it('reopens the emptied session when the last tab changed while it was being emptied', async () => {
+    harness.close
+      .mockReturnValueOnce({ ok: false, reason: 'last-project' })
+      .mockReturnValueOnce({ ok: false, reason: 'modified' })
+      .mockReturnValueOnce({ ok: false, reason: 'last-project' })
+      .mockReturnValueOnce({ ok: false, reason: 'last-project' });
+    harness.flush.mockImplementation((project: Project) =>
+      Promise.resolve({
+        documentJson: serializeProjectDocumentV3Json(project).documentJson,
+        kind: 'acknowledged' as const,
+      })
+    );
+    await act(() => root?.render(<Harness />));
+
+    await act(() => userEvent.click(document.querySelector('button')!));
+    await vi.waitFor(() => expect(harness.navigate).toHaveBeenCalledWith({ to: '/' }));
+
+    expect(harness.flush).toHaveBeenCalledTimes(2);
+    expect(harness.persistEmptySession).toHaveBeenCalledTimes(2);
+    expect(harness.reopenSession).toHaveBeenCalledOnce();
+    expect(harness.reopenSession.mock.invocationCallOrder[0]).toBeLessThan(
+      harness.persistEmptySession.mock.invocationCallOrder[1]!
+    );
+  });
+
+  it('leaves the emptied session closed when the last tab closes', async () => {
+    harness.close.mockReturnValue({ ok: false, reason: 'last-project' });
+    harness.flush.mockImplementation((project: Project) =>
+      Promise.resolve({
+        documentJson: serializeProjectDocumentV3Json(project).documentJson,
+        kind: 'acknowledged' as const,
+      })
+    );
+    await act(() => root?.render(<Harness />));
+
+    await act(() => userEvent.click(document.querySelector('button')!));
+    await vi.waitFor(() => expect(harness.navigate).toHaveBeenCalledWith({ to: '/' }));
+
+    expect(harness.reopenSession).not.toHaveBeenCalled();
   });
 });

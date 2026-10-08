@@ -79,7 +79,6 @@ const createGallery = (overrides: Partial<GalleryStateView> = {}): GalleryStateV
     ],
     compareImageKey: null,
     galleryView: 'images',
-    isLoading: false,
     items: [createItem('a.png', false), createItem('b.png', true)],
     pendingPlaceholders: [],
     projectBoardId: null,

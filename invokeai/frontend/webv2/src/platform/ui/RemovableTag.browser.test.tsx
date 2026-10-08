@@ -48,6 +48,9 @@ it('reveals a truncated label in full on hover and keeps the remove control name
 
   await userEvent.hover(element);
   await expect.poll(() => tooltipWith(label)).toBeDefined();
+  // Zag tracks the visible tooltip globally; one left open would open the next hovered trigger's at once.
+  await userEvent.unhover(element);
+  await expect.poll(() => tooltipWith(label)).toBeUndefined();
 });
 
 it('shows no tooltip for a label that fits', async () => {

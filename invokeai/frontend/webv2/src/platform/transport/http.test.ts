@@ -13,11 +13,26 @@ import {
   absolutizeApiUrl,
   apiFetch,
   apiFetchJson,
+  apiFetchRaw,
   buildApiUrl,
   configureHttpAuth,
   getBackendSocketPath,
   getBackendSocketUrl,
+  type HttpAuthAdapter,
 } from './http';
+
+/** A transport-only adapter: Identity's acceptance policy is covered by its own tests. */
+const configureTestAuth = (
+  read: () => { identity: unknown; token: string | null },
+  handlers: Partial<Pick<HttpAuthAdapter, 'onRefreshedToken' | 'onUnauthorized'>> = {}
+): void => {
+  configureHttpAuth({
+    capture: read,
+    onRefreshedToken: handlers.onRefreshedToken ?? vi.fn(),
+    onUnauthorized: handlers.onUnauthorized ?? vi.fn(),
+    subscribe: () => () => undefined,
+  });
+};
 
 describe('deployment-aware backend URLs', () => {
   beforeEach(() => {
@@ -42,31 +57,6 @@ describe('deployment-aware backend URLs', () => {
 });
 
 describe('request identity ownership', () => {
-  it('hands a successful password-change replacement to the identity owner before returning', async () => {
-    let token = 'old-token';
-    const identity = {};
-    const onRefreshedToken = vi.fn((replacement: string, requestToken: string, requestIdentity: unknown) => {
-      expect(requestToken).toBe('old-token');
-      expect(requestIdentity).toBe(identity);
-      token = replacement;
-    });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(new Response('{}', { headers: { 'X-Refreshed-Token': 'new-token' }, status: 200 }))
-    );
-    configureHttpAuth({
-      getIdentity: () => identity,
-      getToken: () => token,
-      onRefreshedToken,
-      onUnauthorized: vi.fn(),
-    });
-
-    await apiFetch('/api/v1/auth/me', { method: 'PATCH' });
-
-    expect(onRefreshedToken).toHaveBeenCalledOnce();
-    expect(token).toBe('new-token');
-  });
-
   it('preserves response headers on API errors for Retry-After handling', async () => {
     const identity = {};
     vi.stubGlobal(
@@ -78,7 +68,7 @@ describe('request identity ownership', () => {
         })
       )
     );
-    configureHttpAuth({ getIdentity: () => identity, getToken: () => null, onUnauthorized: vi.fn() });
+    configureTestAuth(() => ({ identity, token: null }));
 
     const error = await apiFetch('/api/v1/projects/').catch((error: unknown) => error);
 
@@ -100,7 +90,7 @@ describe('request identity ownership', () => {
       });
     });
     vi.stubGlobal('fetch', fetchMock);
-    configureHttpAuth({ getIdentity: () => identity, getToken: () => token, onUnauthorized });
+    configureTestAuth(() => ({ identity, token }), { onUnauthorized });
 
     const oldRequest = apiFetch('/api/v1/projects/');
     const sentHeaders = sentInit?.headers as Headers;
@@ -119,11 +109,11 @@ describe('request identity ownership', () => {
     const onUnauthorized = vi.fn();
     const identity = {};
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 401 })));
-    configureHttpAuth({ getIdentity: () => identity, getToken: () => 'current-token', onUnauthorized });
+    configureTestAuth(() => ({ identity, token: 'current-token' }), { onUnauthorized });
 
     await expect(apiFetch('/api/v1/projects/')).rejects.toMatchObject({ status: 401 });
 
-    expect(onUnauthorized).toHaveBeenCalledWith('current-token', identity);
+    expect(onUnauthorized).toHaveBeenCalledWith({ identity, token: 'current-token' });
   });
 
   it('does not expire a new epoch when the backend reuses the same token string', async () => {
@@ -140,7 +130,7 @@ describe('request identity ownership', () => {
           })
       )
     );
-    configureHttpAuth({ getIdentity: () => identity, getToken: () => token, onUnauthorized });
+    configureTestAuth(() => ({ identity, token }), { onUnauthorized });
 
     const oldRequest = apiFetch('/api/v1/projects/');
 
@@ -164,7 +154,7 @@ describe('request identity ownership', () => {
         }),
     } as Response;
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
-    configureHttpAuth({ getIdentity: () => identity, getToken: () => null, onUnauthorized: vi.fn() });
+    configureTestAuth(() => ({ identity, token: null }));
 
     const oldRequest = apiFetch('/api/v1/auth/status');
     await vi.waitFor(() => {
@@ -181,6 +171,7 @@ describe('request identity ownership', () => {
     let identity = {};
     let resolveBody: ((value: unknown) => void) | undefined;
     const response = {
+      headers: new Headers(),
       json: () =>
         new Promise((resolve) => {
           resolveBody = resolve;
@@ -189,7 +180,7 @@ describe('request identity ownership', () => {
       status: 200,
     } as Response;
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
-    configureHttpAuth({ getIdentity: () => identity, getToken: () => 'stable-token', onUnauthorized: vi.fn() });
+    configureTestAuth(() => ({ identity, token: 'stable-token' }));
 
     const oldRequest = apiFetchJson<{ owner: string }>('/api/v1/projects/');
     await vi.waitFor(() => {
@@ -203,10 +194,81 @@ describe('request identity ownership', () => {
   });
 });
 
+describe('credential outcome reporting', () => {
+  it('reports a replacement token with the credential that sent the request, from checked and raw fetches', async () => {
+    const identity = {};
+    const onRefreshedToken = vi.fn();
+    const fetchMock = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
+      Promise.resolve(new Response('{}', { headers: { 'X-Refreshed-Token': 'token-b' }, status: 200 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    configureTestAuth(() => ({ identity, token: 'token-a' }), { onRefreshedToken });
+
+    await apiFetch('/api/v1/boards/', { method: 'POST' });
+    await apiFetchRaw('/api/v1/images/upload', { method: 'POST' });
+
+    expect(onRefreshedToken.mock.calls).toEqual([
+      [{ identity, token: 'token-a' }, 'token-b'],
+      [{ identity, token: 'token-a' }, 'token-b'],
+    ]);
+    expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get('Authorization')).toBe('Bearer token-a');
+  });
+
+  it('attributes nothing to the held credential when a request did not carry it', async () => {
+    const identity = {};
+    let token: string | null = null;
+    const onRefreshedToken = vi.fn();
+    const onUnauthorized = vi.fn();
+    const fetchMock = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
+      Promise.resolve(new Response('', { headers: { 'X-Refreshed-Token': 'replacement' }, status: 401 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    configureTestAuth(() => ({ identity, token }), { onRefreshedToken, onUnauthorized });
+
+    await expect(apiFetch('/api/v1/auth/status')).rejects.toMatchObject({ status: 401 });
+    token = 'held-token';
+    // A lease released for an earlier account authenticates with that account's token, not the held one.
+    await expect(
+      apiFetch('/api/v1/intermediates/holds/lease', {
+        headers: { Authorization: 'Bearer lease-token' },
+        method: 'DELETE',
+      })
+    ).rejects.toMatchObject({ status: 401 });
+
+    expect(new Headers(fetchMock.mock.calls[1]?.[1]?.headers).get('Authorization')).toBe('Bearer lease-token');
+    expect(onRefreshedToken).not.toHaveBeenCalled();
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+
+  it('never reports a replacement that arrives after its identity lifetime ended', async () => {
+    let identity = {};
+    const onRefreshedToken = vi.fn();
+    let resolveFetch: ((response: Response) => void) | undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveFetch = resolve;
+          })
+      )
+    );
+    configureTestAuth(() => ({ identity, token: 'token-a' }), { onRefreshedToken });
+
+    const lateRequest = apiFetchRaw('/api/v1/boards/', { method: 'POST' });
+
+    identity = {};
+    resolveFetch?.(new Response('{}', { headers: { 'X-Refreshed-Token': 'token-a-renewed' }, status: 200 }));
+
+    await expect(lateRequest).rejects.toMatchObject({ name: 'HttpRequestIdentityExpiredError' });
+    expect(onRefreshedToken).not.toHaveBeenCalled();
+  });
+});
+
 describe('transport diagnostics', () => {
   beforeEach(() => {
     const identity = {};
-    configureHttpAuth({ getIdentity: () => identity, getToken: () => null, onUnauthorized: vi.fn() });
+    configureTestAuth(() => ({ identity, token: null }));
     resetLogging();
     configureLogging({ ...DEFAULT_LOGGING_CONFIG, level: 'debug' });
   });
@@ -280,7 +342,7 @@ describe('media cookie credentials', () => {
   beforeEach(() => {
     // Keep the identity object stable; a fresh object would simulate rotation before the assertion.
     const identity = {};
-    configureHttpAuth({ getIdentity: () => identity, getToken: () => null, onUnauthorized: vi.fn() });
+    configureTestAuth(() => ({ identity, token: null }));
   });
 
   it('sends credentials so login can set the media cookie that authenticates <img> requests', async () => {

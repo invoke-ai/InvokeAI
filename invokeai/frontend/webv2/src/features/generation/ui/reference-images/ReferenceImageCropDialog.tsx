@@ -1,7 +1,7 @@
 import type { GenerateReferenceImageAsset } from '@features/generation/core/types';
 import type { CSSProperties, PointerEvent } from 'react';
 
-import { Box, Dialog, Portal, Stack, Text } from '@chakra-ui/react';
+import { Box, Portal, Stack, Text } from '@chakra-ui/react';
 import { galleryTransfers } from '@features/gallery';
 import {
   FULL_REFERENCE_IMAGE_CROP_BOX,
@@ -20,6 +20,7 @@ import {
   type AccountScope,
 } from '@platform/state/accountLifecycle';
 import { Button, CloseButton } from '@platform/ui';
+import { Dialog } from '@platform/ui/Dialog';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 

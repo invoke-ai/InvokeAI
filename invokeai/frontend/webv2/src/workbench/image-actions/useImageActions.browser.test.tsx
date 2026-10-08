@@ -32,13 +32,17 @@ const mocks = vi.hoisted(() => ({
   galleryPatchItems: vi.fn(),
   galleryWidgetsPatchValues: vi.fn(),
   getItemBoardIds: vi.fn((..._args: unknown[]) => new Map<string, string>()),
+  getCanvasEngine: vi.fn(),
   getItemStarred: vi.fn((..._args: unknown[]) => new Map<string, boolean>()),
+  getProject: vi.fn(),
   getSnapshot: vi.fn(),
   gallerySelectItem: vi.fn(),
   gallerySetItemMultiSelection: vi.fn(),
   imageMetadata: vi.fn(),
   imageResolve: vi.fn((..._args: unknown[]): Promise<unknown> => Promise.reject(new Error('no record'))),
   imageResolveMany: vi.fn((..._args: unknown[]) => Promise.resolve([])),
+  importGalleryImagesToCanvas: vi.fn(),
+  isActiveProject: vi.fn(),
   imageWorkflow: vi.fn((..._args: unknown[]): Promise<{ graph: string | null; workflow: string | null }> =>
     Promise.resolve({ graph: null, workflow: null })
   ),
@@ -145,14 +149,15 @@ vi.mock('@workbench/canvas-operations/api', async () => {
   const { getCanvasImportNotice } = await import('@workbench/canvas-operations/canvasImportNotice');
   return {
     createCanvasFromImages: (...args: unknown[]) => mocks.createCanvasFromImages(...args),
-    getCanvasEngine: vi.fn(),
+    getCanvasEngine: (...args: unknown[]) => mocks.getCanvasEngine(...args),
     getCanvasImportNotice,
-    importGalleryImagesToCanvas: vi.fn(),
+    importGalleryImagesToCanvas: (...args: unknown[]) => mocks.importGalleryImagesToCanvas(...args),
   };
 });
 
-vi.mock('@workbench/WorkbenchContext', () => ({
-  useWorkbenchCommands: () => ({
+vi.mock('@workbench/WorkbenchContext', () => {
+  // The workbench store owns one commands object, so it is the same on every read.
+  const commands = {
     canvas: { apply: vi.fn() },
     gallery: {
       patchItems: (...args: unknown[]) => mocks.galleryPatchItems(...args),
@@ -171,15 +176,19 @@ vi.mock('@workbench/WorkbenchContext', () => ({
     widgets: {
       patchValues: (...args: unknown[]) => mocks.galleryWidgetsPatchValues(...args),
     },
-  }),
-  useWorkbenchQueries: () => ({
-    getProject: vi.fn(),
-    getSnapshot: (...args: unknown[]) => mocks.getSnapshot(...args),
-    isActiveProject: vi.fn(() => true),
-  }),
-  // Only the Video panel's reference capacity is selected; no test here exercises it.
-  useWorkbenchSelector: () => false,
-}));
+  };
+
+  return {
+    useWorkbenchCommands: () => commands,
+    useWorkbenchQueries: () => ({
+      getProject: (...args: unknown[]) => mocks.getProject(...args),
+      getSnapshot: (...args: unknown[]) => mocks.getSnapshot(...args),
+      isActiveProject: (...args: unknown[]) => mocks.isActiveProject(...args),
+    }),
+    // Only the Video panel's reference capacity is selected; no test here exercises it.
+    useWorkbenchSelector: () => false,
+  };
+});
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -275,6 +284,7 @@ beforeEach(() => {
 
     return { activeProject: project, projects: [project] };
   });
+  mocks.isActiveProject.mockImplementation(() => true);
   accountLifecycle.activate('user-a');
   currentItemActionContext = null;
 });
@@ -303,7 +313,7 @@ afterEach(async () => {
   root = null;
 });
 
-describe('new canvas from images', () => {
+describe('canvas destinations', () => {
   const galleryImage = (imageName: string): GalleryImage => ({
     boardId: 'none',
     height: 512,
@@ -329,7 +339,7 @@ describe('new canvas from images', () => {
 
     expect(mocks.notificationsAdd).toHaveBeenCalledWith({
       kind: 'success',
-      title: 'widgets.canvas.import.newCanvasSuccess',
+      title: 'widgets.canvas.import.newProjectSuccess',
     });
     expect(mocks.openWorkbenchWidget).toHaveBeenCalledWith('canvas', {
       preferredRegions: ['center'],
@@ -347,6 +357,71 @@ describe('new canvas from images', () => {
       title: 'widgets.canvas.import.staleProject',
     });
     expect(mocks.openWorkbenchWidget).not.toHaveBeenCalled();
+  });
+
+  it('adds to the current canvas without creating a project', async () => {
+    mocks.getProject.mockImplementation((id: string) => makeMockProject(id));
+    mocks.importGalleryImagesToCanvas.mockResolvedValueOnce({
+      failedImageNames: [],
+      layerIds: ['layer-1'],
+      status: 'imported',
+    });
+
+    await act(() => actionsRef.current!.sendToCanvas([galleryImage('a.png')], 'raster'));
+
+    expect(mocks.createProject).not.toHaveBeenCalled();
+    expect(mocks.createCanvasFromImages).not.toHaveBeenCalled();
+    expect(mocks.importGalleryImagesToCanvas).toHaveBeenCalledWith(
+      expect.objectContaining({ destination: 'raster', project: expect.objectContaining({ id: 'project-1' }) })
+    );
+    expect(mocks.openWorkbenchWidget).toHaveBeenCalledWith('canvas', {
+      preferredRegions: ['center'],
+      requireCenterView: true,
+    });
+  });
+
+  it('keeps the destination captured when the import started after another project becomes active', async () => {
+    let activeProjectId = 'project-1';
+    mocks.isActiveProject.mockImplementation((id: string) => id === activeProjectId);
+    mocks.getProject.mockImplementation((id: string) => makeMockProject(id));
+    mocks.getSnapshot.mockImplementation(() => ({
+      activeProject: makeMockProject(activeProjectId),
+      projects: [makeMockProject('project-1'), makeMockProject('project-2')],
+    }));
+    mocks.importGalleryImagesToCanvas.mockImplementationOnce(async () => {
+      // The user switches projects while the images are being prepared.
+      activeProjectId = 'project-2';
+      await Promise.resolve();
+      return { failedImageNames: [], layerIds: ['layer-1'], status: 'imported' };
+    });
+
+    await act(() => actionsRef.current!.sendToCanvas([galleryImage('a.png')], 'control-resized'));
+
+    expect(mocks.getCanvasEngine).toHaveBeenCalledWith('project-1');
+    expect(mocks.importGalleryImagesToCanvas).toHaveBeenCalledWith(
+      expect.objectContaining({ project: expect.objectContaining({ id: 'project-1' }) })
+    );
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith({ kind: 'success', title: 'widgets.canvas.import.success' });
+    // The canvas the images went to is no longer on screen; the one that is must not be brought forward.
+    expect(mocks.openWorkbenchWidget).not.toHaveBeenCalled();
+  });
+});
+
+describe('compare selection handler', () => {
+  it('stays the same handler while selection-dependent actions are rebuilt', async () => {
+    const before = actionsRef.current!;
+
+    await act(() => {
+      root?.render(
+        <QueryClientProvider client={new QueryClient()}>
+          <Probe modelKey="other-model" ref={actionsRef} />
+        </QueryClientProvider>
+      );
+    });
+
+    // Thumbnail strips hand it to every thumb; a new handler per selection would re-render them all.
+    expect(actionsRef.current).not.toBe(before);
+    expect(actionsRef.current!.selectForCompare).toBe(before.selectForCompare);
   });
 });
 
@@ -600,7 +675,10 @@ describe('partial image mutation outcomes', () => {
 });
 
 type ExpectedItemActions = {
-  deleteItems(refs: Array<{ kind: 'image' | 'video'; name: string }>): Promise<void>;
+  deleteItems(
+    refs: Array<{ kind: 'image' | 'video'; name: string }>,
+    options?: { returnFocus?: () => HTMLElement | null }
+  ): Promise<void>;
   downloadItem(item: { fullUrl: string; kind: 'image' | 'video'; name: string }): Promise<void>;
   downloadItems(
     refs: Array<{ kind: 'image' | 'video'; name: string }>,
@@ -632,11 +710,13 @@ describe('mixed item mutation outcomes', () => {
         </QueryClientProvider>
       );
     });
+    const returnFocus = () => null;
     await act(async () => {
-      await getItemActions().deleteItems(refs);
+      await getItemActions().deleteItems(refs, { returnFocus });
     });
 
-    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function));
+    // The dialog learns where focus goes once the deletion has removed the control that asked for it.
+    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function), returnFocus);
     expect(mocks.itemDelete).not.toHaveBeenCalled();
 
     await act(async () => {

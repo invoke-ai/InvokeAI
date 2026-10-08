@@ -1,11 +1,12 @@
-import { getTokenSessionKey, tokensBelongToSameUser } from 'features/auth/store/authSlice';
+import { getTokenSessionKey, getTokenUserId, tokensBelongToSameUser } from 'features/auth/store/authSlice';
 
 const AUTH_GENERATION_KEY = 'auth_generation';
 const MEDIA_AUTH_LOCK = 'invokeai-media-auth';
 const FALLBACK_LOCK_PREFIX = `${MEDIA_AUTH_LOCK}:`;
 const FALLBACK_LOCK_LEASE_MS = 30_000;
 const FALLBACK_LOCK_POLL_MS = 10;
-const PASSWORD_CHANGE_PREFIX = 'invokeai-password-change:';
+// Shared with webv2's IdentityTokenAdapter: each rotation has a distinct key and { at, userId } value.
+const PASSWORD_CHANGE_PREFIX = 'auth_token_rotation:';
 const PASSWORD_CHANGE_WAIT_MS = 30_000;
 const PASSWORD_CHANGE_POLL_MS = 100;
 
@@ -185,33 +186,31 @@ const delay = (milliseconds: number) =>
     setTimeout(resolve, milliseconds);
   });
 
-type PasswordChangeMarker = {
-  sessionKey: string;
-  generation: number;
-  expiresAt: number;
-};
-
 /** Publish a bounded, cross-tab-visible intent before sending a password-changing request. */
-export const beginPasswordChange = (requestToken: string, requestGeneration: number): (() => void) => {
-  const sessionKey = getTokenSessionKey(requestToken);
-  // For an unreadable token, getTokenSessionKey returns its raw bytes. Do not copy a bearer
-  // credential into a second localStorage key merely to coordinate a request that will fail.
-  if (!sessionKey || sessionKey === requestToken) {
+export const beginPasswordChange = (requestToken: string): (() => void) => {
+  const userId = getTokenUserId(requestToken);
+  // The announcement coordinates a request, not authorization. Never persist bearer bytes.
+  if (userId === null) {
     return () => {};
   }
   const key = `${PASSWORD_CHANGE_PREFIX}${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
-  const marker: PasswordChangeMarker = {
-    sessionKey,
-    generation: requestGeneration,
-    expiresAt: Date.now() + PASSWORD_CHANGE_WAIT_MS,
+  try {
+    localStorage.setItem(key, JSON.stringify({ at: Date.now(), userId }));
+  } catch {
+    // The password request must not fail just because other tabs cannot see its announcement.
+  }
+  return () => {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // An abandoned marker expires even if storage becomes unavailable during cleanup.
+    }
   };
-  localStorage.setItem(key, JSON.stringify(marker));
-  return () => localStorage.removeItem(key);
 };
 
-const hasPendingPasswordChange = (requestToken: string, requestGeneration: number): boolean => {
-  const sessionKey = getTokenSessionKey(requestToken);
-  if (!sessionKey || sessionKey === requestToken) {
+const hasPendingPasswordChange = (requestToken: string, firstSeenAt: number): boolean => {
+  const userId = getTokenUserId(requestToken);
+  if (userId === null) {
     return false;
   }
   for (let index = 0; index < localStorage.length; index++) {
@@ -220,11 +219,16 @@ const hasPendingPasswordChange = (requestToken: string, requestGeneration: numbe
       continue;
     }
     try {
-      const marker = JSON.parse(localStorage.getItem(key) ?? '') as PasswordChangeMarker;
+      const marker: unknown = JSON.parse(localStorage.getItem(key) ?? '');
       if (
-        marker.sessionKey === sessionKey &&
-        marker.generation === requestGeneration &&
-        marker.expiresAt > Date.now()
+        typeof marker === 'object' &&
+        marker !== null &&
+        'userId' in marker &&
+        marker.userId === userId &&
+        'at' in marker &&
+        typeof marker.at === 'number' &&
+        Number.isFinite(marker.at) &&
+        Math.min(marker.at, firstSeenAt) + PASSWORD_CHANGE_WAIT_MS > Date.now()
       ) {
         return true;
       }
@@ -237,14 +241,17 @@ const hasPendingPasswordChange = (requestToken: string, requestGeneration: numbe
 
 /** Defer an old-token 401 until the password-change result can commit its replacement. */
 export const waitForPasswordChange = async (requestToken: string, requestGeneration: number): Promise<void> => {
-  const deadline = Date.now() + PASSWORD_CHANGE_WAIT_MS;
+  const firstSeenAt = Date.now();
+  // Marker timestamps are wall-clock values shared across tabs; the overall wait cap must
+  // still hold when the system clock changes while this request is pending.
+  const deadline = performance.now() + PASSWORD_CHANGE_WAIT_MS;
   while (
     shouldEndSessionForUnauthorized(requestToken) &&
     getAuthGeneration() === requestGeneration &&
-    hasPendingPasswordChange(requestToken, requestGeneration) &&
-    Date.now() < deadline
+    hasPendingPasswordChange(requestToken, firstSeenAt) &&
+    performance.now() < deadline
   ) {
-    await delay(Math.min(PASSWORD_CHANGE_POLL_MS, deadline - Date.now()));
+    await delay(Math.min(PASSWORD_CHANGE_POLL_MS, deadline - performance.now()));
   }
 };
 

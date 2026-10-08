@@ -1,4 +1,7 @@
-/** Read the Auth-owned bearer token per request so HTTP and WebSocket identity stay aligned without reloads. */
+/**
+ * Each request captures the Identity-owned credential once and reports its outcome (a replacement token, a 401)
+ * against that capture, so a late response can never renew or expire a newer credential.
+ */
 
 import { recordLogEvent } from '@platform/logging/logger';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
@@ -6,21 +9,35 @@ import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { getDeploymentBasePath, getDeploymentBaseUrl } from './deploymentBase';
 
 const API_BASE_URL = (import.meta.env.VITE_INVOKEAI_API_BASE_URL ?? '').trim().replace(/\/$/, '');
+
+/** Sliding-expiry renewals and own-password-change replacements arrive in this response header. */
+export const REFRESHED_TOKEN_HEADER = 'X-Refreshed-Token';
+
+export interface HttpCredential {
+  /** Opaque identity lifetime; object identity rotates on reauthentication. */
+  readonly identity: unknown;
+  readonly token: string | null;
+}
+
 export interface HttpAuthAdapter {
-  /** Opaque identity-lifetime token; object identity must rotate on reauthentication. */
-  getIdentity(): unknown;
-  getToken(): string | null;
-  onRefreshedToken?(replacement: string, requestToken: string, requestIdentity: unknown): void;
-  onUnauthorized(rejectedToken: string, rejectedIdentity: unknown): void;
+  /** One synchronous read, so a request never pairs a token with a different identity lifetime. */
+  capture(): HttpCredential;
+  /** A response to a request sent with `credential` carried a replacement token. */
+  onRefreshedToken(credential: HttpCredential, token: string): void;
+  /** A request sent with `credential` was rejected with 401. */
+  onUnauthorized(credential: HttpCredential): void;
+  /** Notifies when the token of the current identity lifetime is replaced in place. */
+  subscribe(listener: () => void): () => void;
 }
 
 /** Transport failures are breadcrumbs; the caller that handles the outcome owns the terminal report. */
 const HTTP_LOG_SOURCE = { area: 'http', namespace: 'transport' } as const;
 
 let authAdapter: HttpAuthAdapter = {
-  getIdentity: () => null,
-  getToken: () => null,
+  capture: () => ({ identity: null, token: null }),
+  onRefreshedToken: () => undefined,
   onUnauthorized: () => undefined,
+  subscribe: () => () => undefined,
 };
 
 /** Selected once by the App composition root; Platform owns no Auth policy. */
@@ -28,9 +45,10 @@ export const configureHttpAuth = (adapter: HttpAuthAdapter): void => {
   authAdapter = adapter;
 };
 
-export const getHttpAuthToken = (): string | null => authAdapter.getToken();
+export const getHttpAuthToken = (): string | null => authAdapter.capture().token;
 
-/** Auth registers 401 handling here to keep session semantics out of transport. */
+export const subscribeHttpCredential = (listener: () => void): (() => void) => authAdapter.subscribe(listener);
+
 export const getBackendSocketUrl = (): string => {
   const baseUrl = API_BASE_URL || getDeploymentBaseUrl();
 
@@ -84,7 +102,7 @@ export class HttpRequestIdentityExpiredError extends Error {
 }
 
 const assertHttpIdentityCurrent = (identity: unknown): void => {
-  if (authAdapter.getIdentity() !== identity) {
+  if (authAdapter.capture().identity !== identity) {
     throw new HttpRequestIdentityExpiredError();
   }
 };
@@ -141,20 +159,29 @@ export const assertOk = async (response: Response): Promise<Response> => {
   throw new ApiError(text || `${response.status} ${response.statusText}`, response.status, response.headers);
 };
 
-const fetchWithAuthToken = async (
-  path: string,
-  init: RequestInit | undefined,
-  token: string | null
-): Promise<Response> => {
+interface AuthenticatedResponse {
+  /** The identity lifetime the request was captured in. */
+  identity: unknown;
+  response: Response;
+  /** The captured credential when it authenticated the request; null for anonymous or caller-authorized requests. */
+  sent: HttpCredential | null;
+}
+
+/** Throws if the identity lifetime ended before the response arrived; reports a replacement token otherwise. */
+const fetchAuthenticated = async (path: string, init: RequestInit | undefined): Promise<AuthenticatedResponse> => {
+  const credential = authAdapter.capture();
   const headers = new Headers(init?.headers);
   const method = (init?.method ?? 'GET').toUpperCase();
   // Breadcrumbs carry the path only; query strings can hold tokens and user input. They are fenced to the account
   // that started the request so late settlements never land in the next account's history.
   const safePath = path.split(/[?#]/, 1)[0] ?? path;
   const owner = captureAccountScope();
+  // A caller-supplied Authorization header (a lease released for an earlier account) is not this tab's credential,
+  // so its response reports nothing about it.
+  const sent = credential.token !== null && !headers.has('Authorization') ? credential : null;
 
-  if (token && !headers.has('Authorization')) {
-    headers.set('Authorization', `Bearer ${token}`);
+  if (sent) {
+    headers.set('Authorization', `Bearer ${sent.token}`);
   }
 
   // Use same-origin credentials so login stores the media cookie. Cross-origin API callers must opt into include
@@ -194,52 +221,39 @@ const fetchWithAuthToken = async (
     );
   }
 
-  return response;
-};
+  assertHttpIdentityCurrent(credential.identity);
 
-/** Authenticated fetch that leaves status handling to the caller. */
-export const apiFetchRaw = async (path: string, init?: RequestInit): Promise<Response> => {
-  const requestToken = getHttpAuthToken();
-  const requestIdentity = authAdapter.getIdentity();
-  const response = await fetchWithAuthToken(path, init, requestToken);
+  const refreshedToken = sent ? response.headers.get(REFRESHED_TOKEN_HEADER) : null;
 
-  assertHttpIdentityCurrent(requestIdentity);
-
-  return response;
-};
-
-export const apiFetch = async (path: string, init?: RequestInit): Promise<Response> => {
-  // Capture one principal so late responses cannot use or expire a newer session.
-  const requestToken = getHttpAuthToken();
-  const requestIdentity = authAdapter.getIdentity();
-  const response = await fetchWithAuthToken(path, init, requestToken);
-  let expiredCurrentIdentity = false;
-
-  assertHttpIdentityCurrent(requestIdentity);
-
-  if (response.ok && requestToken) {
-    const replacement = response.headers?.get('X-Refreshed-Token');
-
-    if (replacement) {
-      authAdapter.onRefreshedToken?.(replacement, requestToken, requestIdentity);
-    }
+  if (sent && refreshedToken) {
+    authAdapter.onRefreshedToken(sent, refreshedToken);
   }
 
-  if (response.status === 401 && requestToken !== null && authAdapter.getToken() === requestToken) {
-    expiredCurrentIdentity = true;
-    authAdapter.onUnauthorized(requestToken, requestIdentity);
+  return { identity: credential.identity, response, sent };
+};
+
+/** Authenticated fetch that leaves status handling, including 401s, to the caller. */
+export const apiFetchRaw = async (path: string, init?: RequestInit): Promise<Response> =>
+  (await fetchAuthenticated(path, init)).response;
+
+export const apiFetch = async (path: string, init?: RequestInit): Promise<Response> => {
+  const { identity, response, sent } = await fetchAuthenticated(path, init);
+  const reportedUnauthorized = response.status === 401 && sent !== null;
+
+  if (reportedUnauthorized) {
+    authAdapter.onUnauthorized(sent);
   }
 
   try {
     const asserted = await assertOk(response);
 
-    assertHttpIdentityCurrent(requestIdentity);
+    assertHttpIdentityCurrent(identity);
 
     return asserted;
   } catch (error) {
-    // Preserve the original ApiError even when current-session 401 handling rotates identity.
-    if (!expiredCurrentIdentity) {
-      assertHttpIdentityCurrent(requestIdentity);
+    // Preserve the original ApiError even when 401 handling rotates identity.
+    if (!reportedUnauthorized) {
+      assertHttpIdentityCurrent(identity);
     }
 
     throw error;
@@ -283,7 +297,7 @@ export const getApiErrorMessage = (error: unknown, fallback: string): string => 
 };
 
 export const apiFetchJson = async <T>(path: string, init?: RequestInit): Promise<T> => {
-  const requestIdentity = authAdapter.getIdentity();
+  const requestIdentity = authAdapter.capture().identity;
   const headers = new Headers(init?.headers);
 
   if (init?.body !== undefined && !(init.body instanceof FormData) && !headers.has('Content-Type')) {

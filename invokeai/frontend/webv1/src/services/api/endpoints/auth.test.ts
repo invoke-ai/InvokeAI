@@ -1,11 +1,7 @@
 import { configureStore } from '@reduxjs/toolkit';
 import type { BaseQueryApi } from '@reduxjs/toolkit/query';
 import { sessionExpiredLogout, tokenRefreshed } from 'features/auth/store/authSlice';
-import {
-  beginPasswordChange,
-  captureAuthGeneration,
-  markTokenRefreshAccepted,
-} from 'features/auth/store/authTokenRefresh';
+import { beginPasswordChange, markTokenRefreshAccepted } from 'features/auth/store/authTokenRefresh';
 import { authApi } from 'services/api/endpoints/auth';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -203,7 +199,7 @@ describe('refreshed token acceptance', () => {
     const replacement = tokenFor(2, 1);
     localStorage.setItem('auth_token', oldToken);
     // This tab did not send the password change. A second tab only shares storage with it.
-    const finishInOtherTab = beginPasswordChange(oldToken, captureAuthGeneration());
+    const finishInOtherTab = beginPasswordChange(oldToken);
     const dispatch = vi.fn((action: ReturnType<typeof sessionExpiredLogout>) => {
       if (action.type === sessionExpiredLogout.type) {
         localStorage.removeItem('auth_token');
@@ -237,6 +233,52 @@ describe('refreshed token acceptance', () => {
     expect(dispatch).not.toHaveBeenCalledWith(sessionExpiredLogout());
   });
 
+  it('preserves the shared replacement when the default frontend rotates a password before a legacy 401', async () => {
+    vi.useFakeTimers();
+    try {
+      const oldToken = tokenFor(1, 0);
+      const replacement = tokenFor(2, 1);
+      localStorage.setItem('auth_token', oldToken);
+      // The webv2 token adapter writes this contract, not the legacy beginPasswordChange helper.
+      localStorage.setItem('auth_token_rotation:webv2-tab', JSON.stringify({ at: Date.now(), userId: 'user-1' }));
+      const dispatch = vi.fn((action: ReturnType<typeof sessionExpiredLogout>) => {
+        if (action.type === sessionExpiredLogout.type) {
+          localStorage.removeItem('auth_token');
+        }
+      });
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(() => Promise.resolve(new Response(null, { status: 401 })))
+      );
+      const request = dynamicBaseQuery(
+        buildV1Url('images/i/example.png'),
+        {
+          dispatch,
+          getState: () => ({}),
+          signal: new AbortController().signal,
+          abort: () => {},
+          endpoint: 'getImageDTO',
+          type: 'query',
+          forced: false,
+          extra: undefined,
+        } as unknown as BaseQueryApi,
+        {}
+      );
+
+      // Advance after fetchBaseQuery has read the 401, so early logout cannot hide behind fetch's microtasks.
+      await vi.advanceTimersByTimeAsync(100);
+      expect(dispatch).not.toHaveBeenCalledWith(sessionExpiredLogout());
+      localStorage.setItem('auth_token', replacement);
+      localStorage.removeItem('auth_token_rotation:webv2-tab');
+      await vi.advanceTimersByTimeAsync(100);
+      expect((await request).error?.status).toBe(401);
+      expect(localStorage.getItem('auth_token')).toBe(replacement);
+      expect(dispatch).not.toHaveBeenCalledWith(sessionExpiredLogout());
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('ends an expired session when no replacement is pending', async () => {
     const expiredToken = tokenFor(1, 0);
     localStorage.setItem('auth_token', expiredToken);
@@ -268,6 +310,95 @@ describe('refreshed token acceptance', () => {
     expect(result.error?.status).toBe(401);
     expect(dispatch).toHaveBeenCalledWith(sessionExpiredLogout());
     expect(localStorage.getItem('auth_token')).toBeNull();
+  });
+
+  it.each([
+    ['auth/me', 'new_password'],
+    ['auth/users/user-1', 'password'],
+  ])('does not discard a concurrent rotation when the legacy password PATCH to %s gets 401', async (url, field) => {
+    vi.useFakeTimers();
+    try {
+      const oldToken = tokenFor(1, 0);
+      const replacement = tokenFor(2, 1);
+      const otherKey = 'auth_token_rotation:webv2-tab';
+      localStorage.setItem('auth_token', oldToken);
+      localStorage.setItem(otherKey, JSON.stringify({ at: Date.now(), userId: 'user-1' }));
+      const dispatch = vi.fn((action: ReturnType<typeof sessionExpiredLogout>) => {
+        if (action.type === sessionExpiredLogout.type) {
+          localStorage.removeItem('auth_token');
+        }
+      });
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(() => Promise.resolve(new Response(null, { status: 401 })))
+      );
+      const request = dynamicBaseQuery(
+        { url: buildV1Url(url), method: 'PATCH', body: { [field]: 'synthetic-test-password' } },
+        {
+          dispatch,
+          getState: () => ({}),
+          signal: new AbortController().signal,
+          abort: () => {},
+          endpoint: 'updateCurrentUser',
+          type: 'mutation',
+          forced: false,
+          extra: undefined,
+        } as unknown as BaseQueryApi,
+        {}
+      );
+      await vi.advanceTimersByTimeAsync(100);
+      expect(dispatch).not.toHaveBeenCalledWith(sessionExpiredLogout());
+      // Withdraw the rejected request's own marker, not the other tab's still-pending rotation.
+      const keys = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index));
+      expect(keys.filter((key) => key?.startsWith('auth_token_rotation:'))).toEqual([otherKey]);
+      localStorage.setItem('auth_token', replacement);
+      localStorage.removeItem(otherKey);
+      await vi.advanceTimersByTimeAsync(100);
+      expect((await request).error?.status).toBe(401);
+      expect(localStorage.getItem('auth_token')).toBe(replacement);
+      expect(dispatch).not.toHaveBeenCalledWith(sessionExpiredLogout());
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not defer explicit logout behind another frontend rotation', async () => {
+    vi.useFakeTimers();
+    try {
+      localStorage.setItem('auth_token', tokenFor(1, 0));
+      localStorage.setItem('auth_token_rotation:other-tab', JSON.stringify({ at: Date.now(), userId: 'user-1' }));
+      const dispatch = vi.fn((action: ReturnType<typeof sessionExpiredLogout>) => {
+        if (action.type === sessionExpiredLogout.type) {
+          localStorage.removeItem('auth_token');
+        }
+      });
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(() => Promise.resolve(new Response(null, { status: 401 })))
+      );
+      const request = dynamicBaseQuery(
+        { url: buildV1Url('auth/logout'), method: 'POST' },
+        {
+          dispatch,
+          getState: () => ({}),
+          signal: new AbortController().signal,
+          abort: () => {},
+          endpoint: 'logout',
+          type: 'mutation',
+          forced: false,
+          extra: undefined,
+        } as unknown as BaseQueryApi,
+        {}
+      );
+      await vi.advanceTimersByTimeAsync(100);
+      expect(dispatch).toHaveBeenCalledWith(sessionExpiredLogout());
+      expect(localStorage.getItem('auth_token')).toBeNull();
+      expect((await request).error?.status).toBe(401);
+    } finally {
+      localStorage.clear();
+      await vi.advanceTimersByTimeAsync(100);
+      vi.useRealTimers();
+    }
   });
 
   it.each([

@@ -304,8 +304,9 @@ describe('createWorkbenchStore', () => {
       });
     const store = createWorkbenchStore(createInitialWorkbenchState(), { loadLayoutPresetWidgets });
 
-    store.commands.layout.applyPreset('edit');
     store.commands.layout.createPreset('custom-pending', 'Pending');
+    // Saving as a new preset moves the project onto it; start the pending switch from Edit.
+    store.commands.layout.applyPreset('edit');
     const activation = store.commands.layout.activatePreset('custom-pending');
     store.commands.layout.deletePreset('custom-pending');
     resolve();
@@ -862,6 +863,22 @@ describe('createWorkbenchStore', () => {
     store.commands.workflows.editGraph({ patch: { name: 'Command-owned workflow' }, type: 'setMetadata' });
 
     expect(getActiveProjectGraph(store.getSnapshot().activeProject).name).toBe('Command-owned workflow');
+  });
+
+  it('undoes a committed rename as its own step, apart from the typed name edits before it', () => {
+    const store = createWorkbenchStore();
+    const workflowId = store.getSnapshot().activeProject.workflows.activeWorkflowId;
+
+    store.commands.workflows.editGraph({ patch: { name: 'Alph' }, type: 'setMetadata' });
+    store.commands.workflows.editGraph({ patch: { name: 'Alpha' }, type: 'setMetadata' });
+    expect(store.commands.workflows.rename(workflowId, 'Alpha, published')).toEqual({ ok: true });
+    expect(getActiveProjectGraph(store.getSnapshot().activeProject).name).toBe('Alpha, published');
+
+    store.commands.workflows.undo();
+    expect(getActiveProjectGraph(store.getSnapshot().activeProject).name).toBe('Alpha');
+
+    store.commands.workflows.undo();
+    expect(getActiveProjectGraph(store.getSnapshot().activeProject).name).toBe('Untitled Workflow');
   });
 
   it('keeps placement selectors stable across generate and settings changes', () => {

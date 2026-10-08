@@ -134,7 +134,7 @@ export const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBas
         requestUrl.endsWith(`/auth/users/${encodeURIComponent(currentUserId)}`) &&
         'password' in requestBody &&
         typeof requestBody.password === 'string'));
-  const finishPasswordChange = isPasswordChange && token ? beginPasswordChange(token, requestGeneration) : null;
+  const finishPasswordChange = isPasswordChange && token ? beginPasswordChange(token) : null;
 
   const fetchBaseQueryArgs: FetchBaseQueryArgs = {
     baseUrl: getBaseUrl(),
@@ -164,7 +164,12 @@ export const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBas
     // so a slow request cannot log out the session that replaced its own. See
     // `shouldEndSessionForUnauthorized`.
     if (result.error && result.error.status === 401 && !isAuthEndpoint && shouldEndSessionForUnauthorized(token)) {
-      if (!isPasswordChange && token) {
+      if (isPasswordChange) {
+        // This request cannot supply a replacement after its own 401. Withdraw only its
+        // announcement so a concurrent tab's still-pending rotation can decide the rejection.
+        finishPasswordChange?.();
+      }
+      if (!isAuthTransition && token) {
         // The server may have revoked this epoch while another request or tab is still
         // committing the password-change replacement. Do not erase its only valid token.
         await waitForPasswordChange(token, requestGeneration);

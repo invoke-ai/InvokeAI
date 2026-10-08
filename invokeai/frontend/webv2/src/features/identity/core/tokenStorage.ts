@@ -1,203 +1,139 @@
 const AUTH_TOKEN_STORAGE_KEY = 'auth_token';
 
-export interface IdentityTokenAdapter {
-  clear(): void;
-  get(): string | null;
-  set(token: string): void;
+/** Each announced rotation is stored under its own key, so concurrent rotations never overwrite each other. */
+const ROTATION_STORAGE_KEY_PREFIX = 'auth_token_rotation:';
+
+/**
+ * The single marker earlier builds wrote. Their announcements are not seen during a rolling upgrade; it is removed on
+ * announcing so one left by a tab that unloaded mid-change does not persist.
+ */
+const LEGACY_ROTATION_STORAGE_KEY = 'auth_token_rotation';
+
+/**
+ * Announces to other tabs that a tab is rotating the shared credential (an own password change), so that a 401 the
+ * revocation causes elsewhere waits for the replacement instead of ending the session. Stale markers are ignored by
+ * age, so a tab that unloads mid-change cannot keep other tabs waiting forever.
+ */
+export interface CredentialRotationMarker {
+  /** Unique per rotation; the announcing tab withdraws only the marker with its own id. */
+  readonly id: string;
+  /** `Date.now()` when the rotation started. */
+  readonly at: number;
+  /** Whose credential is being rotated; a 401 for another principal's token is not the rotation's doing. */
+  readonly userId: string;
 }
 
-export const getAuthToken = (): string | null => {
-  try {
-    return window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
-  } catch {
+/**
+ * Persists the bearer token across reloads and carries other tabs' changes to it. Requests never read it: the tab's
+ * in-memory credential is authoritative.
+ */
+export interface IdentityTokenAdapter {
+  /** `undefined` when storage cannot be read. */
+  read(): string | null | undefined;
+  write(token: string): void;
+  clear(): void;
+  /** Every announced rotation, stale ones included; `undefined` when storage cannot be read. */
+  readRotations(): readonly CredentialRotationMarker[] | undefined;
+  writeRotation(marker: CredentialRotationMarker): void;
+  clearRotation(id: string): void;
+  /** Notifies when another document changes the stored token or any rotation marker. */
+  subscribe(onChange: () => void): () => void;
+}
+
+const parseRotationMarker = (id: string, value: string | null): CredentialRotationMarker | null => {
+  if (value === null) {
     return null;
   }
-};
 
-export const setAuthToken = (token: string): void => {
   try {
-    window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
-  } catch {
-    // Storage unavailable: the backend session lasts until reload.
-  }
-};
+    const parsed: unknown = JSON.parse(value);
 
-export const clearAuthToken = (): void => {
-  try {
-    window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+    return typeof parsed === 'object' &&
+      parsed !== null &&
+      'at' in parsed &&
+      typeof parsed.at === 'number' &&
+      'userId' in parsed &&
+      typeof parsed.userId === 'string'
+      ? { at: parsed.at, id, userId: parsed.userId }
+      : null;
   } catch {
-    // Nothing to clear if storage is unavailable.
+    return null;
   }
 };
 
 export const browserIdentityTokenAdapter: IdentityTokenAdapter = {
-  clear: clearAuthToken,
-  get: getAuthToken,
-  set: setAuthToken,
-};
-
-const PASSWORD_CHANGE_PREFIX = 'invokeai-webv2-password-change:';
-const PASSWORD_CHANGE_WAIT_MS = 30_000;
-const PASSWORD_CHANGE_POLL_MS = 100;
-
-type TokenClaims = { epoch: number; userId: string };
-type PasswordChangeMarker = { expiresAt: number; sessionKey: string };
-
-const localPasswordChanges = new Map<string, PasswordChangeMarker>();
-
-const getClaims = (token: string | null): TokenClaims | null => {
-  const encoded = token?.split('.')[1];
-
-  if (!encoded) {
-    return null;
-  }
-
-  try {
-    const normalized = encoded.replace(/-/g, '+').replace(/_/g, '/');
-    const payload = JSON.parse(atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '='))) as Record<
-      string,
-      unknown
-    >;
-
-    if (typeof payload.user_id !== 'string') {
-      return null;
-    }
-
-    return {
-      epoch: typeof payload.token_epoch === 'number' ? payload.token_epoch : 0,
-      userId: payload.user_id,
-    };
-  } catch {
-    return null;
-  }
-};
-
-export const getTokenUserId = (token: string | null): string | null => getClaims(token)?.userId ?? null;
-
-const getSessionKey = (token: string): string => {
-  const claims = getClaims(token);
-
-  return claims ? `${claims.userId}:${claims.epoch}` : token;
-};
-
-/** Accept an epoch replacement even when a routine refresh changed the stored token first. */
-export const isNewEpochForCurrentSession = (request: string, current: string | null, replacement: string): boolean => {
-  const requestClaims = getClaims(request);
-  const currentClaims = getClaims(current);
-  const replacementClaims = getClaims(replacement);
-
-  return (
-    requestClaims !== null &&
-    currentClaims !== null &&
-    replacementClaims !== null &&
-    requestClaims.userId === currentClaims.userId &&
-    currentClaims.userId === replacementClaims.userId &&
-    requestClaims.epoch === currentClaims.epoch &&
-    replacementClaims.epoch > requestClaims.epoch
-  );
-};
-
-const getStorage = (): Storage | null => {
-  try {
-    return globalThis.localStorage ?? null;
-  } catch {
-    return null;
-  }
-};
-
-/** Store intent before sending the password change; never persist bearer bytes. */
-export const beginPasswordChange = (token: string | null): (() => void) => {
-  if (!token) {
-    return () => undefined;
-  }
-
-  const sessionKey = getSessionKey(token);
-  // This key coordinates a request, not an authorization decision; it only needs to avoid tab collisions.
-  const id = `${PASSWORD_CHANGE_PREFIX}${Date.now()}-${Math.random()}`;
-  const marker: PasswordChangeMarker = { expiresAt: Date.now() + PASSWORD_CHANGE_WAIT_MS, sessionKey };
-  localPasswordChanges.set(id, marker);
-
-  // An unreadable token can still coordinate this tab, but must not be copied into storage.
-  if (sessionKey !== token) {
+  clear: () => {
     try {
-      getStorage()?.setItem(id, JSON.stringify(marker));
+      window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
     } catch {
-      // Storage can be unavailable while this tab still has an in-memory credential.
+      // Nothing to clear if storage is unavailable.
     }
-  }
-
-  return () => {
-    localPasswordChanges.delete(id);
+  },
+  clearRotation: (id) => {
     try {
-      getStorage()?.removeItem(id);
+      window.localStorage.removeItem(`${ROTATION_STORAGE_KEY_PREFIX}${id}`);
     } catch {
-      // An expired marker is ignored even if storage becomes unavailable at cleanup.
+      // Nothing to clear if storage is unavailable.
     }
-  };
-};
-
-const hasPendingPasswordChange = (token: string): boolean => {
-  const sessionKey = getSessionKey(token);
-  const now = Date.now();
-
-  for (const [id, marker] of localPasswordChanges) {
-    if (marker.expiresAt <= now) {
-      localPasswordChanges.delete(id);
-      continue;
+  },
+  read: () => {
+    try {
+      return window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+    } catch {
+      return undefined;
     }
+  },
+  readRotations: () => {
+    try {
+      const storage = window.localStorage;
+      const markers: CredentialRotationMarker[] = [];
 
-    if (marker.sessionKey === sessionKey) {
-      return true;
-    }
-  }
+      for (let index = 0; index < storage.length; index += 1) {
+        const key = storage.key(index);
 
-  // Cross-tab markers are only used for readable JWTs. A malformed token is never persisted.
-  if (sessionKey === token) {
-    return false;
-  }
+        if (key?.startsWith(ROTATION_STORAGE_KEY_PREFIX)) {
+          const marker = parseRotationMarker(key.slice(ROTATION_STORAGE_KEY_PREFIX.length), storage.getItem(key));
 
-  try {
-    const storage = getStorage();
-
-    if (!storage) {
-      return false;
-    }
-
-    for (let index = storage.length - 1; index >= 0; index--) {
-      const key = storage.key(index);
-
-      if (!key?.startsWith(PASSWORD_CHANGE_PREFIX)) {
-        continue;
-      }
-
-      try {
-        const marker = JSON.parse(storage.getItem(key) ?? '') as PasswordChangeMarker;
-
-        if (marker.expiresAt <= now) {
-          storage.removeItem(key);
-        } else if (marker.sessionKey === sessionKey) {
-          return true;
+          if (marker !== null) {
+            markers.push(marker);
+          }
         }
-      } catch {
-        // Malformed marker is not evidence of an in-flight password change.
       }
+
+      return markers;
+    } catch {
+      return undefined;
     }
-  } catch {
-    // Fall back to same-tab markers when storage is blocked.
-  }
+  },
+  subscribe: (onChange) => {
+    const onStorage = (event: StorageEvent): void => {
+      // A null key means another document cleared all of storage.
+      if (
+        event.key === null ||
+        event.key === AUTH_TOKEN_STORAGE_KEY ||
+        event.key.startsWith(ROTATION_STORAGE_KEY_PREFIX)
+      ) {
+        onChange();
+      }
+    };
 
-  return false;
+    window.addEventListener('storage', onStorage);
+
+    return () => window.removeEventListener('storage', onStorage);
+  },
+  write: (token) => {
+    try {
+      window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+    } catch {
+      // Storage unavailable: the in-memory credential lasts until reload.
+    }
+  },
+  writeRotation: ({ at, id, userId }) => {
+    try {
+      window.localStorage.removeItem(LEGACY_ROTATION_STORAGE_KEY);
+      window.localStorage.setItem(`${ROTATION_STORAGE_KEY_PREFIX}${id}`, JSON.stringify({ at, userId }));
+    } catch {
+      // Storage unavailable: other tabs cannot see this tab's credential either, so there is nothing to announce.
+    }
+  },
 };
-
-/** Bound delayed expiry when an old-token 401 races the response that replaces it. */
-export const waitForPasswordChange = async (token: string, isCurrent: () => boolean): Promise<void> => {
-  const deadline = Date.now() + PASSWORD_CHANGE_WAIT_MS;
-
-  while (isCurrent() && hasPendingPasswordChange(token) && Date.now() < deadline) {
-    await new Promise<void>((resolve) => {
-      globalThis.setTimeout(resolve, Math.min(PASSWORD_CHANGE_POLL_MS, deadline - Date.now()));
-    });
-  }
-};
-
-export const isPasswordChangePending = hasPendingPasswordChange;

@@ -55,7 +55,7 @@ vi.mock('@features/workflow/react', async (importOriginal) => ({
   subscribeInvocationTemplates: templates.subscribe,
 }));
 vi.mock('@workbench/activeInvocationSubmission', () => ({ submitActiveInvocation: () => Promise.resolve() }));
-vi.mock('@workbench/canvasInvocationPreparation', () => ({ useIsCanvasInvocationPreparing: () => false }));
+vi.mock('@workbench/invocationPreparation', () => ({ useIsInvocationPreparing: () => false }));
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(harness.project as Project),
   useWorkbenchCommands: () => ({}),

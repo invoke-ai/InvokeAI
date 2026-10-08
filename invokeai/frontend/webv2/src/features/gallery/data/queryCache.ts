@@ -11,7 +11,7 @@ import type { InfiniteData, Query, QueryClient, QueryKey } from '@tanstack/react
 
 import { toGalleryItemKey } from '@features/gallery/core/items';
 import { pruneImageClusterMembers } from '@features/gallery/core/semanticImageQuery';
-import { captureAccountScope } from '@platform/state/accountLifecycle';
+import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { rollBackUnclaimedEntries } from '@platform/state/compareAndSwapRollback';
 import { hashKey } from '@tanstack/react-query';
 
@@ -30,6 +30,36 @@ export type GalleryItemCachePatch =
   | { kind: 'delete'; result: GalleryItemMutationResult }
   | { boardId: string; kind: 'move'; result: GalleryItemMutationResult }
   | { kind: 'star'; result: GalleryItemMutationResult; starred: boolean };
+
+let galleryThumbnailRevision = 0;
+const galleryThumbnailRevisionListeners = new Set<() => void>();
+
+export const getGalleryThumbnailRevision = (): number => galleryThumbnailRevision;
+
+export const subscribeGalleryThumbnailRevision = (listener: () => void): (() => void) => {
+  galleryThumbnailRevisionListeners.add(listener);
+  return () => galleryThumbnailRevisionListeners.delete(listener);
+};
+
+/** Ask mounted gallery thumbnails to request their URLs again after maintenance repairs them. */
+export const refreshGalleryThumbnails = (owner: AccountScope): void => {
+  if (!isAccountScopeCurrent(owner)) {
+    return;
+  }
+
+  galleryThumbnailRevision += 1;
+  galleryThumbnailRevisionListeners.forEach((listener) => listener());
+};
+
+export const getRefreshedGalleryThumbnailUrl = (url: string, currentRevision: number): string => {
+  if (currentRevision === 0 || /^(?:blob|data):/i.test(url)) {
+    return url;
+  }
+
+  const refreshedUrl = new URL(url, window.location.href);
+  refreshedUrl.searchParams.set('gallery_thumbnail_revision', String(currentRevision));
+  return refreshedUrl.toString();
+};
 
 /** A list window's pages, or the starred strip's single page. */
 type GalleryItemsCacheData = InfiniteData<GalleryItemsPage, number> | GalleryItemsPage;

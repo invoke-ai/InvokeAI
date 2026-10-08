@@ -1,3 +1,4 @@
+import os
 import sqlite3
 import threading
 from collections.abc import Generator
@@ -119,6 +120,31 @@ class SqliteDatabase:
                     self._logger.info(f"Cleaned database (freed {freed_space_in_mb}MB)")
         except Exception as e:
             self._logger.error(f"Error cleaning database: {e}")
+            raise
+
+    def backup_to(self, destination: Path) -> None:
+        """Create a consistent SQLite backup at a new destination.
+
+        The connection backup API includes committed WAL pages. The shared lock keeps this
+        connection's transaction users from interleaving with the copy, and the destination is
+        reserved exclusively so an existing backup can never be overwritten.
+        """
+        destination = Path(destination)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        descriptor = os.open(destination, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        os.close(descriptor)
+        try:
+            with self._lock:
+                backup_connection = sqlite3.connect(destination)
+                try:
+                    self._conn.backup(backup_connection)
+                    backup_connection.commit()
+                finally:
+                    backup_connection.close()
+        except Exception:
+            destination.unlink(missing_ok=True)
+            Path(f"{destination}-wal").unlink(missing_ok=True)
+            Path(f"{destination}-shm").unlink(missing_ok=True)
             raise
 
     @contextmanager

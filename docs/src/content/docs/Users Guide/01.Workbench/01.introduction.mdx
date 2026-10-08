@@ -22,7 +22,7 @@ Hover over a numbered circle, or tap it on a touchscreen, for a short descriptio
 | --- | --- | --- |
 | 1 | **App menu** | Links to Projects, the Model Manager, Fonts, the Queue, Settings and help. |
 | 2 | **Project switcher** | Shows the active project and switches between projects. See [Working with Projects](/users-guide/projects/introduction/). |
-| 3 | **Layout preset tabs** | One tab per saved layout. A dot on the active tab means the layout has unsaved changes; its arrow opens the preset menu. |
+| 3 | **Layout preset tabs** | One tab per saved layout. A dot on a tab's icon means that layout has unsaved changes in this project; the active tab's arrow opens the preset menu. |
 | 4 | **Save as new preset** | Saves the current arrangement as a new preset. |
 | 5 | **Invoke controls** | The number of iterations, the **Invoke** button, and routing, which chooses where the settings come from and where results go. |
 | 6 | **Rails** | A strip of icons down each edge of the window, one icon per panel placed on that side. |
@@ -153,12 +153,12 @@ When the window is narrow, the tabs show only their icons. Hover over one to see
 
 ### Changing a preset
 
-Once you move, add or remove panels, the active preset's tab shows a dot to say the layout no longer matches the saved preset. Nothing is lost if you switch away: the arrangement you had stays with the project.
+Once you move, add or remove panels, the active preset's tab shows a dot on its icon to say the layout no longer matches the saved preset; hover over or focus the tab to see **Unsaved layout changes**. Nothing is lost if you switch away: each preset keeps the arrangement you left it in, floating windows included, and switching back brings that arrangement back, so several presets can have unsaved changes at once. These working arrangements belong to the project and are saved with it; other projects open each preset as it was saved.
 
 Click the arrow on the active tab, or right-click any tab, to open the preset menu:
 
-- **Save changes** stores the current arrangement in the preset, so it opens that way from now on.
-- **Revert to saved layout** puts the panels back as the preset saved them. <kbd>Shift</kbd>+<kbd>R</kbd> does the same.
+- **Save changes** stores the preset's arrangement in the preset, so it opens that way from now on. On a tab that isn't active, it saves the arrangement that preset was left in without switching to it.
+- **Revert to saved layout** puts the panels back as the preset saved them. <kbd>Shift</kbd>+<kbd>R</kbd> does the same for the active preset, and so does choosing the active preset again with its shortcut (<kbd>Alt</kbd>+<kbd>1</kbd> to <kbd>Alt</kbd>+<kbd>4</kbd>) or from the command palette. On a tab that isn't active, it forgets that preset's unsaved arrangement. Either way, undo brings the arrangement back.
 - **Edit preset…** changes the preset's name, icon and default routing.
 - **Delete preset…** removes a preset you created.
 - **Manage presets** opens the list of all presets.
@@ -174,7 +174,7 @@ You can also save changes to the built-in presets. Your version replaces the ori
 4. Choose the **Default source**, the panel **Invoke** reads its settings from (such as Generate or Workflow), and the **Default destination**, **Canvas** or **Gallery**.
 5. Click **Save preset**.
 
-The new preset captures the whole arrangement, including floating windows and their positions. It becomes the active preset and gets a tab at the end of the row.
+The new preset captures the whole arrangement, including floating windows and their positions. It becomes the active preset and gets a tab at the end of the row; the preset you started from keeps its saved arrangement.
 
 ### Managing presets
 
