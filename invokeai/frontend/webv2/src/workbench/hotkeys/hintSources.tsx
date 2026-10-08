@@ -24,7 +24,10 @@ export const createShortcutHintSources = () => {
   const sources = new Map<string, ShortcutHintSource>();
   const listeners = new Set<() => void>();
   const notify = () => listeners.forEach((listener) => listener());
-  let focusElement: Element | null = typeof document === 'undefined' ? null : document.activeElement;
+  // The page itself owns nothing a guide could describe or return focus to; popovers fall back to their trigger.
+  const toFocusOwner = (element: Element | null): Element | null =>
+    element === document.body || element === document.documentElement ? null : element;
+  let focusElement: Element | null = typeof document === 'undefined' ? null : toFocusOwner(document.activeElement);
   let clearedElement: Element | null = null;
   const focusListeners = new Set<() => void>();
   const updateFocus = (event?: FocusEvent) => {
@@ -33,8 +36,15 @@ export const createShortcutHintSources = () => {
       return;
     }
     if (!active?.closest('[data-workbench-focus-preserve]')) {
-      focusElement = active;
+      focusElement = toFocusOwner(active);
       focusListeners.forEach((listener) => listener());
+    }
+  };
+  // Leaving for the body (a background click, blur()) fires focusout without a focusin; the element that will own
+  // focus is only known once the focus update settles, while focus moving to another element reports it via focusin.
+  const settleFocus = (event: FocusEvent) => {
+    if (!event.relatedTarget) {
+      queueMicrotask(() => updateFocus(event));
     }
   };
   return {
@@ -48,6 +58,7 @@ export const createShortcutHintSources = () => {
       subscribe: (listener: () => void): (() => void) => {
         if (focusListeners.size === 0) {
           document.addEventListener('focusin', updateFocus);
+          document.addEventListener('focusout', settleFocus);
           updateFocus();
         }
         focusListeners.add(listener);
@@ -55,6 +66,7 @@ export const createShortcutHintSources = () => {
           focusListeners.delete(listener);
           if (focusListeners.size === 0) {
             document.removeEventListener('focusin', updateFocus);
+            document.removeEventListener('focusout', settleFocus);
           }
         };
       },

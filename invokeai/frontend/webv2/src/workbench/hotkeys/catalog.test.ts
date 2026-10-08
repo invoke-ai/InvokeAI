@@ -7,6 +7,7 @@ import {
   regionFocusHotkeys,
 } from './catalog';
 import { IS_MAC_OS } from './keys';
+import { toPlatformHotkey } from './resolve';
 
 describe('firstPartyHotkeyCatalog', () => {
   it('keeps legacy default hotkey parity', () => {
@@ -54,9 +55,9 @@ describe('firstPartyHotkeyCatalog', () => {
     expect(saveLayout).toMatchObject({ allowInEditable: false, defaultKeys: [] });
   });
 
-  // Option+Shift+Arrow selects by word or paragraph in macOS text fields, where region focus must still be reachable.
-  it('moves region focus with Control+Option+Arrow on macOS and Alt+Shift+Arrow elsewhere', () => {
-    expect(getRegionFocusDefaultKey('left', true)).toBe('ctrl+alt+arrowleft');
+  // On macOS, Option+Shift+Arrow selects text and Control+Option+Arrow is VoiceOver's navigation chord.
+  it('moves region focus with Control+Command+Arrow on macOS and Alt+Shift+Arrow elsewhere', () => {
+    expect(toPlatformHotkey(getRegionFocusDefaultKey('left', true), true)).toBe('ctrl+meta+arrowleft');
     expect(getRegionFocusDefaultKey('down', false)).toBe('alt+shift+arrowdown');
     expect(regionFocusHotkeys.map((hotkey) => hotkey.defaultKeys)).toEqual(
       (['left', 'right', 'up', 'down'] as const).map((direction) => [getRegionFocusDefaultKey(direction, IS_MAC_OS)])

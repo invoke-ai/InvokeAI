@@ -20,8 +20,11 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
 // The hotkey module reads the platform once, as it loads: this file runs the real runtime under a macOS identity.
+// tinykeys resolves `mod` from navigator.platform, so both platform reads must say macOS.
+// Neither fake is restored: browser test files are isolated, and both readers consult the platform only at load.
 vi.hoisted(() => {
   Object.defineProperty(navigator, 'userAgentData', { configurable: true, value: { platform: 'macOS' } });
+  Object.defineProperty(navigator, 'platform', { configurable: true, value: 'MacIntel' });
 });
 
 const runtime = vi.hoisted(() => ({
@@ -127,13 +130,15 @@ afterEach(async () => {
   accountLifecycle.invalidate();
 });
 
-it('leaves Option+Shift+Arrow to the text field on macOS and moves between regions with Control+Option+Arrow', async () => {
+it('leaves Option+Shift+Arrow to the text field and Control+Option+Arrow to VoiceOver, and moves between regions with Control+Command+Arrow', async () => {
   expect(IS_MAC_OS).toBe(true);
   const textarea = host.querySelector<HTMLTextAreaElement>('[aria-label="left text"]')!;
   const claimed: string[] = [];
   const observe = (event: KeyboardEvent) => {
     if (event.defaultPrevented) {
-      claimed.push(`${event.altKey ? 'alt+' : ''}${event.ctrlKey ? 'ctrl+' : ''}${event.key}`);
+      claimed.push(
+        `${event.altKey ? 'alt+' : ''}${event.ctrlKey ? 'ctrl+' : ''}${event.metaKey ? 'meta+' : ''}${event.key}`
+      );
     }
   };
   window.addEventListener('keydown', observe);
@@ -142,11 +147,13 @@ it('leaves Option+Shift+Arrow to the text field on macOS and moves between regio
     await press('two words');
     // Option+Shift+Left selects the word before the caret, as it does in every macOS text field.
     await press('{Alt>}{Shift>}{ArrowLeft}{/Shift}{/Alt}');
+    // VoiceOver's navigation chord (VO+Arrow) must stay with the screen reader.
+    await press('{Control>}{Alt>}{ArrowRight}{/Alt}{/Control}');
     expect(claimed).toEqual([]);
     expect(document.activeElement).toBe(textarea);
 
-    await press('{Control>}{Alt>}{ArrowRight}{/Alt}{/Control}');
-    expect(claimed).toEqual(['alt+ctrl+ArrowRight']);
+    await press('{Control>}{Meta>}{ArrowRight}{/Meta}{/Control}');
+    expect(claimed).toEqual(['ctrl+meta+ArrowRight']);
     await vi.waitFor(() => expect(focusedRegion()).toBe(regionElement('center')));
     expect(textarea.value).toBe('two words');
   } finally {

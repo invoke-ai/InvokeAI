@@ -109,9 +109,9 @@ let queryClient: QueryClient;
 const project = () => runtime.store.getSnapshot().activeProject;
 const regionElement = (region: WidgetRegion) => host.querySelector<HTMLElement>(`[data-focus-region="${region}"]`)!;
 const press = (keys: string) => act(() => userEvent.keyboard(keys));
-/** The default region-focus chord: Control+Option+Arrow on macOS, Alt+Shift+Arrow elsewhere. */
+/** The default region-focus chord: Control+Command+Arrow on macOS, Alt+Shift+Arrow elsewhere. */
 const regionChord = (arrow: string) =>
-  IS_MAC_OS ? `{Control>}{Alt>}{${arrow}}{/Alt}{/Control}` : `{Alt>}{Shift>}{${arrow}}{/Shift}{/Alt}`;
+  IS_MAC_OS ? `{Control>}{Meta>}{${arrow}}{/Meta}{/Control}` : `{Alt>}{Shift>}{${arrow}}{/Shift}{/Alt}`;
 const focusRegion = (region: WidgetRegion) => act(() => regionElement(region).focus());
 const expectFocusedRegion = (region: WidgetRegion) =>
   vi.waitFor(() => {

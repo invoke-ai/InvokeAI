@@ -95,7 +95,10 @@ const ConnectedShortcutGuide = ({
     () => [...firstPartyHotkeyCatalog, ...extensionHotkeys].map((hotkey) => applyCustomHotkeys(hotkey, customHotkeys)),
     [customHotkeys, extensionHotkeys]
   );
-  const onCanvas = isProperties || (target.activeWidgetTypeId === 'canvas' && isEditableHotkeyTarget(element));
+  // Without a mounted canvas source the guide lists only global hints, so it must not title itself as on-canvas.
+  const onCanvas =
+    canvasHints !== null &&
+    (isProperties || (target.activeWidgetTypeId === 'canvas' && isEditableHotkeyTarget(element)));
   const snapshot = canvasHints ?? SURFACE_HINTS[target.activeWidgetTypeId ?? ''] ?? GLOBAL_HINTS;
   const resolved = useMemo(() => {
     const hints: readonly ShortcutHint[] = canvasHints

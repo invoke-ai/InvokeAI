@@ -91,7 +91,7 @@ const initialHints: ShortcutHintSnapshot = {
 };
 const hints = createExternalStore(initialHints);
 
-const Harness = ({ width = 900 }: { width?: number }) => {
+const Harness = ({ width = 900, withCanvasSource = true }: { width?: number; withCanvasSource?: boolean }) => {
   const sensors = useSensors(useSensor(PrimaryMouseSensor, { activationConstraint: { distance: 6 } }));
   const projectId = runtime.store.getSnapshot().activeProject.id;
   const source = useMemo(
@@ -110,7 +110,7 @@ const Harness = ({ width = 900 }: { width?: number }) => {
     }),
     [projectId]
   );
-  useRegisterShortcutHintSource(source);
+  useRegisterShortcutHintSource(withCanvasSource ? source : null);
   return (
     <>
       <WorkbenchHotkeyRuntime />
@@ -143,13 +143,13 @@ const Harness = ({ width = 900 }: { width?: number }) => {
   );
 };
 
-const render = async (width = 900) => {
+const render = async (width = 900, withCanvasSource = true) => {
   await act(() =>
     root!.render(
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
           <WorkbenchFocusProvider>
-            <Harness width={width} />
+            <Harness width={width} withCanvasSource={withCanvasSource} />
           </WorkbenchFocusProvider>
         </ChakraProvider>
       </I18nextProvider>
@@ -361,6 +361,54 @@ describe('contextual status-bar guide', () => {
     await expect.poll(() => host!.querySelector('kbd')?.textContent).toBe('ctrl');
     expect(host!.textContent).toContain('Cancel generation');
     expect(host!.textContent).not.toContain('Apply transform');
+  });
+
+  it('drops commands a text field blocks while it is edited and restores them once focus leaves for the page', async () => {
+    const field = document.createElement('input');
+    field.setAttribute('aria-label', 'Page field');
+    document.body.append(field);
+    try {
+      await expect.poll(() => host!.textContent).toContain('Cancel generation');
+      await act(() => field.focus());
+      // Invoke stays usable from text fields; Cancel generation is not, so the guide must judge the focused field.
+      await expect.poll(() => host!.textContent).not.toContain('Cancel generation');
+      expect(host!.textContent).toContain('Invoke');
+      // Leaving for the body fires focusout without a focusin.
+      await act(() => field.blur());
+      expect(document.activeElement).toBe(document.body);
+      await expect.poll(() => host!.textContent).toContain('Cancel generation');
+    } finally {
+      field.remove();
+    }
+  });
+
+  it('returns focus to the chip, not the page, when opened after focus left for the background', async () => {
+    await page.getByRole('textbox', { name: 'Canvas field' }).click();
+    await act(() => (document.activeElement as HTMLElement).blur());
+    expect(document.activeElement).toBe(document.body);
+    const guide = page.getByRole('button', { name: 'Shortcuts', exact: true });
+    await act(() => (guide.element() as HTMLElement).focus());
+    await userEvent.keyboard('{Enter}');
+    await expect.element(page.getByRole('dialog')).toBeVisible();
+    await userEvent.keyboard('{Escape}');
+    await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
+    await expect.poll(() => document.activeElement).toBe(guide.element());
+  });
+
+  it('keeps the global title for an edited canvas target without a mounted canvas hint source', async () => {
+    await act(() => root!.unmount());
+    root = createRoot(host!);
+    await render(900, false);
+    await page.getByRole('textbox', { name: 'Canvas field' }).click();
+    await page.getByRole('button', { name: 'Shortcuts', exact: true }).click();
+    const popup = page.getByRole('dialog');
+    await expect.poll(() => popup.element().textContent).toContain('Workbench');
+    expect(popup.element().textContent).not.toContain('On Canvas');
+    await userEvent.keyboard('{Escape}');
+    await page.getByRole('textbox', { name: 'Property field' }).click();
+    await page.getByRole('button', { name: 'Shortcuts', exact: true }).click();
+    await expect.poll(() => page.getByRole('dialog').element().textContent).toContain('Workbench');
+    expect(page.getByRole('dialog').element().textContent).not.toContain('On Canvas');
   });
 
   it('runs configured global shortcuts from the compact chip and its popover without activating the chip for modified Enter', async () => {

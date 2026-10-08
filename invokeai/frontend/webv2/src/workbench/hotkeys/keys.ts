@@ -63,15 +63,19 @@ export const normalizeHotkeyString = (hotkey: string): string => {
   return key ? [...modifiers, key].join('+') : '';
 };
 
-export const eventToHotkeyString = (event: KeyboardEvent): string => {
+/** `mod` is the platform's primary modifier (Cmd on macOS, Ctrl elsewhere); the other one, when held too, is kept. */
+export const eventToHotkeyString = (event: KeyboardEvent, isMacOs = IS_MAC_OS): string => {
   if (event.isComposing || event.keyCode === 229 || ['Alt', 'Control', 'Meta', 'Shift'].includes(event.key)) {
     return '';
   }
 
   const modifiers: string[] = [];
 
-  if (event.metaKey || event.ctrlKey) {
-    modifiers.push(IS_MAC_OS ? (event.metaKey ? 'mod' : 'ctrl') : event.ctrlKey ? 'mod' : 'meta');
+  if (isMacOs ? event.metaKey : event.ctrlKey) {
+    modifiers.push('mod');
+  }
+  if (isMacOs ? event.ctrlKey : event.metaKey) {
+    modifiers.push(isMacOs ? 'ctrl' : 'meta');
   }
   if (event.shiftKey) {
     modifiers.push('shift');
