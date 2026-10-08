@@ -6,6 +6,7 @@ import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop */
 import { ChakraProvider } from '@chakra-ui/react';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -71,12 +72,15 @@ import { WorkspaceSettings } from './CustomSettingsEditors';
 describe('database maintenance in Data & workspace settings', () => {
   let host: HTMLDivElement;
   let root: Root;
+  let queryClient: QueryClient;
 
   const renderSettings = async () => {
     await act(() =>
       root.render(
         <ChakraProvider value={system}>
-          <WorkspaceSettings />
+          <QueryClientProvider client={queryClient}>
+            <WorkspaceSettings />
+          </QueryClientProvider>
         </ChakraProvider>
       )
     );
@@ -86,8 +90,10 @@ describe('database maintenance in Data & workspace settings', () => {
     await act(() =>
       root.render(
         <ChakraProvider value={system}>
-          <LaunchpadTopBar />
-          <AppMenu />
+          <QueryClientProvider client={queryClient}>
+            <LaunchpadTopBar />
+            <AppMenu />
+          </QueryClientProvider>
         </ChakraProvider>
       )
     );
@@ -116,6 +122,7 @@ describe('database maintenance in Data & workspace settings', () => {
     mocks.notifyError.mockReset();
     mocks.notifySuccess.mockReset();
     accountLifecycle.activate('database-maintenance-settings-test', ':user:database-maintenance-settings-test');
+    queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
@@ -124,6 +131,7 @@ describe('database maintenance in Data & workspace settings', () => {
   afterEach(async () => {
     await act(() => root.unmount());
     host.remove();
+    queryClient.clear();
     accountLifecycle.invalidate();
   });
 

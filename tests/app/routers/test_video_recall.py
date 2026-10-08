@@ -466,14 +466,23 @@ class TestParameterRecall:
                     "ltx2_conditioning_video": {"video_name": "song.mp4"},
                     "ltx2_conditioning_role": "audio",
                 },
-                {"ltx2_conditioning_video", "ltx2_conditioning_role"},
+                {"ltx2_conditioning_video", "ltx2_conditioning_role", "first_frame_image"},
                 {
-                    "first_frame_image": "ltx2_conditioning_video",
                     "source_video": "ltx2_conditioning_video",
                     "source_video_start_frame": "ltx2_conditioning_video",
                     "source_video_end_frame": "ltx2_conditioning_video",
                     "minimax_h3_references": "ltx2_conditioning_video",
                 },
+            ),
+            (
+                {
+                    "first_frame_image": {"image_name": "first.png"},
+                    "last_frame_image": {"image_name": "last.png"},
+                    "ltx2_conditioning_video": {"video_name": "clip.mp4"},
+                    "ltx2_conditioning_role": "video",
+                },
+                {"ltx2_conditioning_video", "ltx2_conditioning_role"},
+                {"first_frame_image": "ltx2_conditioning_video", "last_frame_image": "ltx2_conditioning_video"},
             ),
             (
                 {"first_frame_image": {"image_name": "first.png"}, "minimax_h3_references": []},
@@ -493,7 +502,8 @@ class TestParameterRecall:
         ids=[
             "initial-video-over-first-frame",
             "references-over-frames",
-            "conditioning-clip-over-all",
+            "soundtrack-clip-over-all-but-frames",
+            "picture-clip-over-frames",
             "empty-list-beside-a-frame",
             "empty-list-beside-a-clip",
         ],

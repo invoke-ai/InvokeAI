@@ -2133,6 +2133,18 @@ class SqliteSessionQueue(SessionQueueBase):
         }
         return [summaries_by_id[item_id] for item_id in item_ids if item_id in summaries_by_id]
 
+    def has_active_queue_work(self) -> bool:
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                SELECT 1
+                FROM session_queue
+                WHERE status IN ('pending', 'in_progress')
+                LIMIT 1
+                """
+            )
+            return cursor.fetchone() is not None
+
     def get_queue_status(
         self,
         queue_id: str,
