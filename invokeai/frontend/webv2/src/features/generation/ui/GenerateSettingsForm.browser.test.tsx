@@ -1,5 +1,6 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type { GenerationModelCatalogItem } from '@features/generation/contracts';
+import type { GenerateLora, LoraModelConfig } from '@features/generation/core/types';
 import type { ComponentType } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
@@ -16,6 +17,7 @@ import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import { GenerateWidgetView } from './GenerateWidgetView';
 import { GenerationUiProvider, type GenerationUiAdapter } from './GenerationUiContext';
@@ -224,6 +226,35 @@ afterEach(async () => {
 });
 
 describe('GenerateSettingsForm render isolation', () => {
+  it('preserves a settled weight draft when removing another concept from an already open menu', async () => {
+    const first: LoraModelConfig = { base: 'sdxl', key: 'ink', name: 'Ink', type: 'lora' };
+    const second: LoraModelConfig = { base: 'sdxl', key: 'chalk', name: 'Chalk', type: 'lora' };
+    await settle(() =>
+      storedValues().patchSnapshot({
+        loras: [first, second].map((model) => ({ isEnabled: true, model, weight: 0.75 })),
+      })
+    );
+    const row = (name: string) => host!.querySelector<HTMLElement>(`[role="group"][aria-label="${name}"]`)!;
+
+    // Capture the second row's menu before the first row's 250 ms draft has committed.
+    await settle(() => {
+      row('Ink')
+        .querySelector('[role="slider"]')!
+        .dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }));
+      row('Chalk')
+        .querySelector('[data-list-primary]')!
+        .dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    });
+    await expect.poll(() => (storedValues().getSnapshot().loras as GenerateLora[])[0]?.weight).toBe(0.8);
+    const remove = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
+      (item) => item.textContent === 'widgets.generate.conceptMenu.remove'
+    );
+    expect(remove).toBeDefined();
+    await act(() => userEvent.click(remove!));
+
+    expect(storedValues().getSnapshot().loras).toEqual([{ isEnabled: true, model: first, weight: 0.8 }]);
+  });
+
   it('re-renders only the owning section while scrubbing, and nothing when the debounce persists it', async () => {
     const scrubber = stepsScrubber();
     const rect = scrubber.getBoundingClientRect();
@@ -288,6 +319,27 @@ describe('GenerateSettingsForm render isolation', () => {
     expect(patches).toEqual([{ patch: { steps: 31 }, projectId: 'project-1' }]);
     expect(storedValues('project-2').getSnapshot().steps).toBe(50);
     expect(stepsValue()).toBe(50);
+  });
+
+  it('discards a pending concept weight when another project finishes opening', async () => {
+    const model: LoraModelConfig = { base: 'sdxl', key: 'ink-wash', name: 'Ink Wash', type: 'lora' };
+    stableGroups.models.catalog = [MODEL, model];
+    storedValues().patchSnapshot({ loras: [{ isEnabled: true, model, weight: 0.75 }] });
+    storedValues('project-2').patchSnapshot({ loras: [{ isEnabled: true, model, weight: 1.25 }] });
+    await renderAdapter(buildAdapter());
+    const weight = () => host!.querySelector('[role="group"][aria-label="Ink Wash"] [role="slider"]');
+
+    await settle(() => weight()?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' })));
+    expect(weight()?.getAttribute('aria-valuenow')).toBe('0.8');
+    expect(patches).toEqual([]);
+
+    // The open action already flushed before its server request; edits made during that request must not leak.
+    await renderAdapter(buildAdapter('project-2'));
+    await settle(noop, 400);
+
+    expect(patches).toEqual([]);
+    expect(storedValues('project-2').getSnapshot().loras).toEqual([{ isEnabled: true, model, weight: 1.25 }]);
+    expect(weight()?.getAttribute('aria-valuenow')).toBe('1.25');
   });
 
   it('flushes a pending edit to its own project on unmount, not on ordinary re-renders', async () => {

@@ -199,12 +199,12 @@ const WorkflowEditorPreparingState = ({ edgeCount, nodeCount }: { edgeCount: num
   <Flex align="center" bg="bg.inset" h="full" justify="center" p="6" w="full">
     <Stack align="center" gap="3" textAlign="center">
       <HStack color="fg.muted" gap="2">
-        <Spinner size="sm" />
-        <Text fontSize="sm" fontWeight="700">
+        <Spinner size="lg" />
+        <Text fontSize="lg" fontWeight="700">
           Preparing workflow graph
         </Text>
       </HStack>
-      <Text color="fg.subtle" fontSize="xs">
+      <Text color="fg.subtle" fontSize="md">
         Loading {nodeCount.toLocaleString()} node{nodeCount === 1 ? '' : 's'} and {edgeCount.toLocaleString()} edge
         {edgeCount === 1 ? '' : 's'}.
       </Text>

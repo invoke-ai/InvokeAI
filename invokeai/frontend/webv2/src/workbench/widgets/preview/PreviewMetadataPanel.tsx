@@ -125,7 +125,7 @@ const PreviewDetailsQuery = ({
   if (item.kind === 'video') {
     if (detailsQuery.isPending) {
       return (
-        <Text color="fg.subtle" fontSize="2xs">
+        <Text color="fg.subtle" fontSize="xs">
           {t('widgets.preview.loadingMetadata')}
         </Text>
       );
@@ -202,11 +202,11 @@ const ImageDetails = ({
     <Scrollable flex="1" minH="0">
       <Stack gap="2" pe="1">
         {isLoading ? (
-          <Text color="fg.subtle" fontSize="2xs">
+          <Text color="fg.subtle" fontSize="xs">
             {t('widgets.preview.loadingMetadata')}
           </Text>
         ) : (
-          <DataList.Root gap="1.5" orientation="horizontal" size="sm">
+          <DataList.Root gap="1.5" orientation="horizontal">
             {entries.map((entry) => {
               const recall = ENTRY_RECALL_KINDS[entry.key];
 
@@ -250,23 +250,23 @@ const DetailsTabs = ({
       flexDirection="column"
       lazyMount
       minH="0"
-      size="sm"
+      size="xl"
       unmountOnExit
       variant="outline"
     >
       <Tabs.List flexShrink={0}>
         {details ? (
-          <Tabs.Trigger fontSize="2xs" value="details">
+          <Tabs.Trigger fontSize="xs" value="details">
             {t('widgets.preview.details')}
           </Tabs.Trigger>
         ) : null}
-        <Tabs.Trigger disabled={metadata === null} fontSize="2xs" value="metadata">
+        <Tabs.Trigger disabled={metadata === null} fontSize="xs" value="metadata">
           {t('widgets.preview.metadata')}
         </Tabs.Trigger>
-        <Tabs.Trigger disabled={workflow === null} fontSize="2xs" value="workflow">
+        <Tabs.Trigger disabled={workflow === null} fontSize="xs" value="workflow">
           {t('widgets.preview.workflow')}
         </Tabs.Trigger>
-        <Tabs.Trigger disabled={graph === null} fontSize="2xs" value="graph">
+        <Tabs.Trigger disabled={graph === null} fontSize="xs" value="graph">
           {t('widgets.preview.graph')}
         </Tabs.Trigger>
       </Tabs.List>
@@ -316,14 +316,14 @@ const MetadataRow = ({
 
   return (
     <DataList.Item alignItems="start" className="group">
-      <DataList.ItemLabel fontSize="2xs">{entry.label}</DataList.ItemLabel>
-      <DataList.ItemValue alignItems="flex-start" fontSize="2xs" minW="0">
+      <DataList.ItemLabel fontSize="xs">{entry.label}</DataList.ItemLabel>
+      <DataList.ItemValue alignItems="flex-start" fontSize="xs" minW="0">
         {entry.isMultiline ? (
-          <Text flex="1" fontSize="2xs" minW="0" whiteSpace="pre-wrap">
+          <Text flex="1" fontSize="xs" minW="0" whiteSpace="pre-wrap">
             {entry.value}
           </Text>
         ) : (
-          <MiddleTruncate flex="1" fontSize="2xs" minW="0" text={entry.value} />
+          <MiddleTruncate flex="1" fontSize="xs" minW="0" text={entry.value} />
         )}
         <HStack
           alignSelf="flex-start"
@@ -339,7 +339,7 @@ const MetadataRow = ({
               <IconButton
                 aria-label={recallVerb.label}
                 color="fg.muted"
-                size="2xs"
+                size="sm"
                 variant="ghost"
                 onClick={recallValue}
               >
@@ -348,7 +348,7 @@ const MetadataRow = ({
             </Tooltip>
           ) : null}
           <Tooltip content={t('common.copy')}>
-            <IconButton aria-label={t('common.copy')} color="fg.muted" size="2xs" variant="ghost" onClick={copyValue}>
+            <IconButton aria-label={t('common.copy')} color="fg.muted" size="sm" variant="ghost" onClick={copyValue}>
               <Icon as={CopyIcon} boxSize="3" />
             </IconButton>
           </Tooltip>

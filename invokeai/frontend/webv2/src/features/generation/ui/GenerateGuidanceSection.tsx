@@ -51,18 +51,18 @@ export const GenerateGuidanceSection = ({
   const badges = (
     <>
       {hasIncompatible ? (
-        <Badge colorPalette="orange" size="xs" variant="surface">
+        <Badge colorPalette="orange" variant="surface">
           {t('widgets.generate.incompatible')}
         </Badge>
       ) : null}
       {activeCount > 0 ? (
-        <Badge size="xs" variant="surface">
-          {t('widgets.generate.activeCount', { count: activeCount })}
+        <Badge variant="surface">
+          {activeCount === totalCount
+            ? t('widgets.generate.activeCount', { count: activeCount })
+            : t('widgets.generate.activeOfTotal', { active: activeCount, total: totalCount })}
         </Badge>
       ) : totalCount > 0 ? (
-        <Badge size="xs" variant="surface">
-          {t('widgets.generate.offCount', { count: totalCount })}
-        </Badge>
+        <Badge variant="surface">{t('widgets.generate.offCount', { count: totalCount })}</Badge>
       ) : null}
     </>
   );
@@ -84,7 +84,6 @@ export const GenerateGuidanceSection = ({
           selectedModel={selectedModel}
           settings={settings}
           onCommit={onConceptCommit}
-          onCommitImmediate={onCommitImmediate}
         />
       </Stack>
     </GenerateCollapsibleSection>

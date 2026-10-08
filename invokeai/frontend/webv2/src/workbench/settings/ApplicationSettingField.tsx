@@ -35,7 +35,7 @@ export const ApplicationSettingField = (props: SettingFieldProps) => {
   const { t } = useTranslation();
   const fallback = useMemo(
     () => (
-      <Text role="status" fontSize="xs" color="fg.muted">
+      <Text role="status" fontSize="md" color="fg.muted">
         {t('common.loading')}
       </Text>
     ),

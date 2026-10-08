@@ -5,6 +5,7 @@ import type { KeyboardEvent, ReactNode } from 'react';
 import { Box, Flex, Icon, InputGroup, NumberInput } from '@chakra-ui/react';
 import { Button } from '@platform/ui/Button';
 import { Slider } from '@platform/ui/Slider';
+import { CONTROL_HEIGHT_PX } from '@theme/scale';
 import { MoveHorizontalIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -28,9 +29,9 @@ interface FormNumberFieldProps {
   onValueCommit?: (details: ChakraNumberInput.ValueChangeDetails) => void;
 }
 
-const AFFIX_PROPS = { color: 'fg.muted', fontSize: '2xs', lineHeight: '1' } as const;
-// InputGroup pads the input by `--input-height` (28px at size xs) minus the offset; the text must clear the affix.
-const INPUT_HEIGHT_PX = 28;
+const AFFIX_PROPS = { color: 'fg.muted', fontSize: 'xs', lineHeight: '1' } as const;
+// InputGroup pads the input by `--input-height` minus the offset; the text must clear the affix.
+const INPUT_HEIGHT_PX = CONTROL_HEIGHT_PX.md;
 const AFFIX_CHAR_PX = 6;
 const AFFIX_GUTTER_PX = 8;
 const affixOffset = (chars: number): string => `${INPUT_HEIGHT_PX - AFFIX_GUTTER_PX - chars * AFFIX_CHAR_PX}px`;
@@ -100,7 +101,6 @@ export const FormNumberField = ({
       flexShrink={0}
       max={max}
       min={min}
-      size="xs"
       step={step}
       value={live ? value : (draft ?? value)}
       w={`${FORM_NUMBER_FIELD_WIDTH_PX}px`}
@@ -119,7 +119,7 @@ export const FormNumberField = ({
         startElementProps={START_ELEMENT_PROPS}
         startOffset={label ? affixOffset(label.length) : affixOffset(2)}
       >
-        <NumberInput.Input aria-label={ariaLabel} fontSize="xs" fontVariantNumeric="tabular-nums" textAlign="end" />
+        <NumberInput.Input aria-label={ariaLabel} fontVariantNumeric="tabular-nums" textAlign="end" />
       </InputGroup>
     </NumberInput.Root>
   );
@@ -199,7 +199,6 @@ export const FormSlider = ({
       max={max}
       min={min}
       minW="0"
-      size="sm"
       step={step}
       value={values}
       onKeyDownCapture={onKeyDownCapture}
@@ -273,20 +272,12 @@ export const ApplyCancelBar = ({
         disabled={applyDisabled}
         flexShrink={0}
         loading={applyLoading}
-        size="xs"
         variant="solid"
         onClick={onApply}
       >
         {t('common.apply')}
       </Button>
-      <Button
-        data-pane-action="cancel"
-        disabled={cancelDisabled}
-        flexShrink={0}
-        size="xs"
-        variant="ghost"
-        onClick={onCancel}
-      >
+      <Button data-pane-action="cancel" disabled={cancelDisabled} flexShrink={0} variant="ghost" onClick={onCancel}>
         {t('common.cancel')}
       </Button>
     </Flex>

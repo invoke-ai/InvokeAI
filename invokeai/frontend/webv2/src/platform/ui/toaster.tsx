@@ -22,10 +22,11 @@ export const AppToaster = () => (
   <Portal>
     <ChakraToaster toaster={toaster}>
       {(toast) => (
-        <ToastRoot maxW="calc(100vw - 2rem)" overflowWrap="anywhere" w="24rem">
-          <HStack align="start" gap="3">
+        <ToastRoot maxW="calc(100vw - 2rem)" w="24rem">
+          {/* Unbroken model names, paths, and URLs wrap only once the flex chain may shrink below them. */}
+          <HStack align="start" gap="3" minW="0" w="full">
             <ToastIndicator />
-            <Stack gap="1" flex="1">
+            <Stack flex="1" gap="1" minW="0">
               {toast.title ? <ToastTitle>{toast.title}</ToastTitle> : null}
               {toast.description ? <ToastDescription>{toast.description}</ToastDescription> : null}
             </Stack>

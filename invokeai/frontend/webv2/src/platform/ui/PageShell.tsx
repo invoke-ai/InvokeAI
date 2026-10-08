@@ -42,11 +42,11 @@ const PageShellHeader = ({
 }: Pick<PageShellProps, 'actions' | 'description' | 'title'>) => (
   <Flex align="center" gap="3" justify="space-between" wrap="wrap">
     <Stack gap="0.5">
-      <Heading fontSize="xl" fontWeight="700">
+      <Heading fontSize="3xl" fontWeight="700">
         {title}
       </Heading>
       {description ? (
-        <Text color="fg.muted" fontSize="xs">
+        <Text color="fg.muted" fontSize="md">
           {description}
         </Text>
       ) : null}

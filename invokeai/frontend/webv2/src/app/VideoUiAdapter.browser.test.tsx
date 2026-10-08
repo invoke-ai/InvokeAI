@@ -37,7 +37,8 @@ let galleryRegions: string[] = ['right'];
 /** The store's projects, read by `queries.getProject` at call time. */
 let storedProjects: Record<string, unknown> = {};
 
-vi.mock('@features/video', () => ({
+vi.mock('@features/video', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   VideoUiProvider: ({ adapter: next, children }: { adapter: VideoUiAdapter; children: ReactNode }) => {
     adapter = next;
     return children;

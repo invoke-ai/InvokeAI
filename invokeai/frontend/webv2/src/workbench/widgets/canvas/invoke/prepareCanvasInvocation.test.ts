@@ -262,7 +262,8 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
       outputOnlyMaskedRegions: options.outputOnlyMaskedRegions ?? true,
     },
     destination: options.destination ?? 'canvas',
-    scaling: options.scaling ?? DEFAULT_CANVAS_SCALING,
+    // The harness's tiny frames would grow under the default auto scaling; wiring tests read them at frame size.
+    scaling: options.scaling ?? { ...DEFAULT_CANVAS_SCALING, method: 'none' },
     commands: {
       generation: {
         submitCanvas: (payload) => dispatch({ ...payload, type: 'submitCanvasInvocationSnapshot' }),

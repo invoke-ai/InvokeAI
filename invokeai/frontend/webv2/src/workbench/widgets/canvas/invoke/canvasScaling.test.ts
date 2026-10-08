@@ -3,13 +3,17 @@ import { describe, expect, it } from 'vitest';
 import { readCanvasScaling } from './canvasScaling';
 
 describe('readCanvasScaling', () => {
-  it('defaults to no scaling with no manual size', () => {
-    expect(readCanvasScaling(undefined)).toEqual({ height: null, method: 'none', width: null });
+  it('defaults to auto scaling with no manual size', () => {
+    expect(readCanvasScaling(undefined)).toEqual({ height: null, method: 'auto', width: null });
     expect(readCanvasScaling({ scaleMethod: 'bigger', scaledWidth: -5, scaledHeight: 'tall' })).toEqual({
       height: null,
-      method: 'none',
+      method: 'auto',
       width: null,
     });
+  });
+
+  it('keeps an explicit choice of no scaling', () => {
+    expect(readCanvasScaling({ scaleMethod: 'none' }).method).toBe('none');
   });
 
   it('reads a persisted manual size as whole pixels', () => {

@@ -88,10 +88,10 @@ const StaleMediaStub = ({ label, onClear }: { label: string; onClear: () => void
 
   return (
     <HStack bg="bg.subtle" gap="2" justify="space-between" p="2" rounded="md">
-      <Text color="fg.muted" fontSize="2xs" textWrap="pretty">
+      <Text color="fg.muted" fontSize="xs" textWrap="pretty">
         {label}
       </Text>
-      <Button flexShrink="0" size="2xs" variant="outline" onClick={onClear}>
+      <Button flexShrink="0" size="sm" variant="outline" onClick={onClear}>
         {t('widgets.video.clearStaleMedia')}
       </Button>
     </HStack>
@@ -358,36 +358,49 @@ export const VideoWidgetView = () => {
   );
   const clearReferences = useCallback(() => patch({ references: [] }), [patch]);
   const setLoras = useCallback(
-    (loras: VideoWidgetValues['loras']) => {
-      // While enabled, follow a replacement accelerator set or restore model sampling defaults if none remains.
-      // Preserve the edit and notify; never enable acceleration from a list edit.
-      if (!values.model) {
-        patch({ loras });
-        return;
-      }
+    (update: (current: VideoWidgetValues['loras']) => VideoWidgetValues['loras']) => {
+      let notice: Parameters<typeof toaster.create>[0] | undefined;
+      patchValues((current) => {
+        const loras = update(current.loras);
 
-      const result = getAcceleratorLoraChangeResult(values, values.model, models, loras);
+        if (loras === current.loras) {
+          return {};
+        }
+        // While enabled, follow a replacement accelerator set or restore model sampling defaults if none remains.
+        // Preserve the edit and notify; never enable acceleration from a list edit.
+        if (!current.model) {
+          return { loras };
+        }
 
-      patch({ ...result.settings });
+        const result = getAcceleratorLoraChangeResult(current, current.model, models, loras);
 
-      if (result.outcome === 'switched') {
-        toaster.create({
-          description: t('widgets.video.acceleratorSwitchedDescription', {
-            name: result.acceleratorLoras?.map((lora) => lora.name).join(', ') ?? '',
-            steps: result.settings.steps,
-          }),
-          title: t('widgets.video.acceleratorSwitched', { label: policy.ui.accelerator?.label ?? '' }),
-          type: 'info',
-        });
-      } else if (result.outcome === 'disabled') {
-        toaster.create({
-          description: t('widgets.video.acceleratorBrokenDescription'),
-          title: t('widgets.video.acceleratorBroken'),
-          type: 'info',
-        });
+        if (result.outcome === 'switched') {
+          notice = {
+            description: t('widgets.video.acceleratorSwitchedDescription', {
+              name: result.acceleratorLoras?.map((lora) => lora.name).join(', ') ?? '',
+              steps: result.settings.steps,
+            }),
+            title: t('widgets.video.acceleratorSwitched', {
+              label: getVideoModelPolicy(current.model, current).ui.accelerator?.label ?? '',
+            }),
+            type: 'info',
+          };
+        } else if (result.outcome === 'disabled') {
+          notice = {
+            description: t('widgets.video.acceleratorBrokenDescription'),
+            title: t('widgets.video.acceleratorBroken'),
+            type: 'info',
+          };
+        }
+
+        return { ...result.settings };
+      });
+
+      if (notice) {
+        toaster.create(notice);
       }
     },
-    [models, patch, policy.ui.accelerator?.label, t, values]
+    [models, patchValues, t]
   );
   const clearFirstFrame = useCallback(() => patch({ firstFrameImage: null }), [patch]);
   const clearLastFrame = useCallback(() => patch({ lastFrameImage: null }), [patch]);
@@ -480,7 +493,7 @@ export const VideoWidgetView = () => {
   const derivedSourceValueText = useMemo(
     () =>
       dimensionSource && dimensionSource !== 'aspect-ratio' ? (
-        <Text as="span" fontSize="xs" truncate>
+        <Text as="span" fontSize="md" truncate>
           {t(`widgets.video.dimensionSourceValue.${dimensionSource}`)}
         </Text>
       ) : undefined,
@@ -517,7 +530,6 @@ export const VideoWidgetView = () => {
             invalid={!values.model}
             modelTypes={MAIN_MODEL_TYPES}
             placeholder={t('widgets.video.selectModel')}
-            size="xs"
             value={values.model?.key ?? null}
             onChange={selectMainModel}
           />
@@ -618,7 +630,7 @@ export const VideoWidgetView = () => {
         <GenerationSettingsSection label={t('widgets.video.initialVideo')} sectionId="video-source" defaultOpen>
           <Stack gap="3" p="2">
             {referenceExtend ? (
-              <Text color="fg.muted" fontSize="2xs" textWrap="pretty">
+              <Text color="fg.muted" fontSize="xs" textWrap="pretty">
                 {t('widgets.video.referenceExtendHelp')}
               </Text>
             ) : null}
@@ -683,7 +695,6 @@ export const VideoWidgetView = () => {
                 collection={ASPECT_RATIO_COLLECTION}
                 disabled={hasConditioningMedia}
                 flex="1"
-                size="xs"
                 value={aspectRatioValue}
                 valueText={derivedSourceValueText}
                 onValueChange={set.aspectRatio}
@@ -691,7 +702,6 @@ export const VideoWidgetView = () => {
               <IconButton
                 aria-label={t('widgets.video.swapAspectRatio')}
                 disabled={hasConditioningMedia}
-                size="xs"
                 variant="ghost"
                 onClick={swapAspectRatio}
               >
@@ -702,7 +712,6 @@ export const VideoWidgetView = () => {
           <Field helpText={twoStageHelpText} label={t('widgets.video.targetResolution')}>
             <Select
               collection={targetResolutionCollection}
-              size="xs"
               value={targetResolutionValue}
               onValueChange={set.targetResolution}
             />
@@ -739,7 +748,7 @@ export const VideoWidgetView = () => {
               onChange={set.fps}
             />
           ) : (
-            <Text color="fg.muted" fontSize="2xs">
+            <Text color="fg.muted" fontSize="xs">
               {t('widgets.video.fixedFps', { fps: policy.fps.defaultValue })}
             </Text>
           )}
@@ -757,7 +766,7 @@ export const VideoWidgetView = () => {
               })}
               label={t('widgets.video.accelerator', { label: policy.ui.accelerator.label })}
             >
-              <Switch.Root checked={values.acceleratorEnabled} size="sm" onCheckedChange={toggleAccelerator}>
+              <Switch.Root checked={values.acceleratorEnabled} onCheckedChange={toggleAccelerator}>
                 <Switch.HiddenInput />
                 <Switch.Control _checked={SWITCH_CHECKED_PROPS}>
                   <Switch.Thumb />
@@ -778,7 +787,7 @@ export const VideoWidgetView = () => {
               onChange={set.steps}
             />
           ) : (
-            <Text color="fg.muted" fontSize="2xs">
+            <Text color="fg.muted" fontSize="xs">
               {t('widgets.video.stepsFixed', { steps: policy.defaults.steps })}
             </Text>
           )}
@@ -862,7 +871,7 @@ export const VideoWidgetView = () => {
         </GenerationSettingsSection>
       ) : null}
 
-      <VideoConceptsSection loras={values.loras} model={values.model} onChangeLoras={setLoras} />
+      <VideoConceptsSection projectId={projectId} loras={values.loras} model={values.model} onChangeLoras={setLoras} />
       <VideoComponentsSection values={values} onPatch={patch} />
     </Stack>
   );

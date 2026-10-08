@@ -284,7 +284,6 @@ const LayerChildRowComponent = ({
             defaultValue={name}
             flex="1"
             minW="0"
-            size="2xs"
             userSelect="text"
             onBlur={handleNameBlur}
             onClick={stopPropagation}
@@ -292,12 +291,12 @@ const LayerChildRowComponent = ({
             onPointerDown={stopPropagation}
           />
         ) : (
-          <Text color={muted ? 'fg.muted' : undefined} flex="1" fontSize="2xs" fontWeight="600" minW="0" truncate>
+          <Text color={muted ? 'fg.muted' : undefined} flex="1" fontSize="xs" fontWeight="600" minW="0" truncate>
             {name}
           </Text>
         )}
         {child.detail !== null && !renaming ? (
-          <Text color="fg.subtle" flexShrink={0} fontSize="2xs" fontVariantNumeric="tabular-nums">
+          <Text color="fg.subtle" flexShrink={0} fontSize="xs" fontVariantNumeric="tabular-nums">
             {child.detail}
           </Text>
         ) : null}
@@ -325,7 +324,7 @@ export const ChildDragGhost = ({ child }: { child: ProjectedChildRow }) => {
       rounded="sm"
     >
       <Icon as={CHILD_ROW_GLYPHS[child.kind]} boxSize="3" color="fg.muted" flexShrink={0} />
-      <Text fontSize="2xs" fontWeight="700" truncate>
+      <Text fontSize="xs" fontWeight="700" truncate>
         {childRowName(child, t)}
       </Text>
     </HStack>

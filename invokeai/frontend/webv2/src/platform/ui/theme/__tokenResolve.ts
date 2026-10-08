@@ -81,6 +81,7 @@ export const CONSUMER_TOKENS = [
   'bg.panel',
   'bg.emphasized',
   'bg.inset',
+  'bg.hover',
   'bg.error',
   'bg.success',
   'bg.warning',

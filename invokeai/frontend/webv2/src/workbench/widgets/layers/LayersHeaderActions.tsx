@@ -50,7 +50,7 @@ const AddLayerMenuItems = () => {
         <Fragment key={group.titleKey}>
           {groupIndex > 0 ? <Menu.Separator borderColor="border.subtle" /> : null}
           <Menu.ItemGroup>
-            <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+            <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
               {t(group.titleKey)}
             </Menu.ItemGroupLabel>
             {group.items
@@ -61,9 +61,7 @@ const AddLayerMenuItems = () => {
                   <Menu.Item key={item.id} value={item.id} onSelect={handleSelect(item.id)}>
                     <HStack gap="2" minW="0" w="full">
                       <Icon as={ItemIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-                      <Text flex="1" fontSize="xs">
-                        {t(item.labelKey)}
-                      </Text>
+                      <Text flex="1">{t(item.labelKey)}</Text>
                     </HStack>
                   </Menu.Item>
                 );
@@ -82,7 +80,7 @@ export const LayersHeaderActions = () => {
   return (
     <Menu.Root positioning={MENU_POSITIONING}>
       <Menu.Trigger asChild>
-        <IconButton aria-label={t('widgets.layers.addLayer')} color="fg.muted" size="2xs" variant="ghost">
+        <IconButton aria-label={t('widgets.layers.addLayer')} color="fg.muted" size="sm" variant="ghost">
           <PlusIcon />
         </IconButton>
       </Menu.Trigger>

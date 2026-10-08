@@ -2,65 +2,92 @@ import type { CanvasEngine, CanvasFontCapability } from '@workbench/canvas-engin
 
 import { Box, Dialog, Flex, Input, NativeSelect, Portal, Stack, Text } from '@chakra-ui/react';
 import { fontKeys, fontsQueryOptions, getFont, uploadFont, type FontRecord } from '@features/fonts';
+import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Button, CloseButton } from '@platform/ui';
-import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueries, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { registerHotkeyModalLayer } from '@workbench/hotkeys/modalLayer';
 import { useCallback, useDeferredValue, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type FontGroup = ReturnType<CanvasFontCapability['collectReferences']>[number];
 
+/** Per font: `undefined` while checking, `null` when it cannot be fetched, else the stored content hash. */
+const storedContentHashes = (queries: readonly UseQueryResult<FontRecord>[]) =>
+  queries.map((query) => (query.isPending ? undefined : query.isError ? null : query.data.contentHash));
+
 export const MissingFontsDialog = ({ engine, groups }: { engine: CanvasEngine; groups: readonly FontGroup[] }) => {
   const { t } = useTranslation('fonts');
-  const queries = useQueries({
+  // Combined results are structurally shared, so `unavailable` keeps its identity until a check's outcome changes.
+  const storedHashes = useQueries({
     queries: groups.map(({ fontRef }) => ({
       queryKey: fontKeys.detail(fontRef.id),
       queryFn: ({ signal }: { signal: AbortSignal }) => getFont(fontRef.id, signal),
       retry: false,
       staleTime: 30_000,
     })),
+    combine: storedContentHashes,
   });
   const unavailable = useMemo(
     () =>
       groups.filter((group, index) => {
-        const query = queries[index];
-        return query && !query.isPending && (query.isError || query.data?.contentHash !== group.fontRef.contentHash);
+        const stored = storedHashes[index];
+        return stored !== undefined && stored !== group.fontRef.contentHash;
       }),
-    [groups, queries]
+    [groups, storedHashes]
   );
   const signature = JSON.stringify(unavailable.map(({ fontRef }) => [fontRef.id, fontRef.contentHash]));
   const [dismissed, setDismissed] = useState<string | null>(null);
   const close = useCallback(() => setDismissed(signature), [signature]);
   const reopen = useCallback(() => setDismissed(null), []);
-  if (!unavailable.length) {
-    return null;
-  }
+  const isOpen = unavailable.length > 0 && dismissed !== signature;
+  // Resolving the last font closes the dialog; its exit keeps the rows it last showed instead of collapsing.
+  const recovery = useExitRetainedValue(isOpen ? unavailable : null);
   return (
     <>
-      <Box position="absolute" top="2" left="50%" transform="translateX(-50%)" zIndex="2">
-        <Button colorPalette="orange" size="xs" onClick={reopen}>
-          {t('fonts.missing.warning', { count: unavailable.length })}
-        </Button>
-      </Box>
-      {dismissed !== signature ? <RecoveryDialog groups={unavailable} engine={engine} onClose={close} /> : null}
+      {unavailable.length ? (
+        <Box position="absolute" top="2" left="50%" transform="translateX(-50%)" zIndex="2">
+          <Button colorPalette="orange" onClick={reopen}>
+            {t('fonts.missing.warning', { count: unavailable.length })}
+          </Button>
+        </Box>
+      ) : null}
+      {recovery.value ? (
+        <RecoveryDialog
+          key={recovery.generation}
+          groups={recovery.value}
+          engine={engine}
+          isOpen={recovery.isOpen}
+          onClose={close}
+          onExitComplete={recovery.release}
+        />
+      ) : null}
     </>
   );
+};
+
+/** Mounted only while recovery is open, so workbench hotkeys return as soon as it starts closing. */
+const RecoveryModalLayer = () => {
+  useMountEffect(() => registerHotkeyModalLayer('missing-fonts'));
+  return null;
 };
 
 const RecoveryDialog = ({
   groups,
   engine,
+  isOpen,
   onClose,
+  onExitComplete,
 }: {
-  groups: FontGroup[];
+  groups: readonly FontGroup[];
   engine: CanvasEngine;
+  isOpen: boolean;
   onClose: () => void;
+  onExitComplete: () => void;
 }) => {
   const { t } = useTranslation('fonts');
   const queryClient = useQueryClient();
-  useMountEffect(() => registerHotkeyModalLayer('missing-fonts'));
   const onOpenChange = useCallback(
     ({ open }: { open: boolean }) => {
       if (!open) {
@@ -73,7 +100,15 @@ const RecoveryDialog = ({
     void queryClient.invalidateQueries({ queryKey: fontKeys.all });
   }, [queryClient]);
   return (
-    <Dialog.Root open placement="center" size="lg" scrollBehavior="inside" onOpenChange={onOpenChange}>
+    <Dialog.Root
+      open={isOpen}
+      placement="center"
+      size="lg"
+      scrollBehavior="inside"
+      onExitComplete={onExitComplete}
+      onOpenChange={onOpenChange}
+    >
+      {isOpen ? <RecoveryModalLayer /> : null}
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
@@ -83,7 +118,7 @@ const RecoveryDialog = ({
             </Dialog.Header>
             <Dialog.Body>
               <Stack gap="4">
-                <Text color="fg.muted" fontSize="sm">
+                <Text color="fg.muted" fontSize="lg">
                   {t('fonts.missing.description')}
                 </Text>
                 {groups.map((group) => (
@@ -183,18 +218,20 @@ const RecoveryRow = ({ group, engine }: { group: FontGroup; engine: CanvasEngine
       : (catalog.data?.items ?? []);
   return (
     <Stack borderWidth="1px" borderRadius="md" p="3" gap="2">
-      <Text fontWeight="medium">{group.fontRef.label}</Text>
-      <Text color="fg.muted" fontSize="xs">
+      <Text fontSize="lg" fontWeight="medium">
+        {group.fontRef.label}
+      </Text>
+      <Text color="fg.muted" fontSize="md">
         {t('fonts.missing.layers', { count: group.count })}
       </Text>
       <Input
         aria-label={t('fonts.missing.search')}
         placeholder={t('fonts.missing.search')}
-        size="sm"
+        size="lg"
         value={search}
         onChange={searchChanged}
       />
-      <NativeSelect.Root size="sm">
+      <NativeSelect.Root size="xl">
         <NativeSelect.Field
           aria-label={t('fonts.missing.replacement')}
           value={selected?.id ?? ''}
@@ -211,17 +248,10 @@ const RecoveryRow = ({ group, engine }: { group: FontGroup; engine: CanvasEngine
       </NativeSelect.Root>
       {offset > 0 || (catalog.data?.total ?? 0) > 50 ? (
         <Flex gap="2" justify="flex-end">
-          <Button
-            size="xs"
-            variant="outline"
-            color="fg"
-            disabled={offset === 0 || catalog.isFetching}
-            onClick={previousPage}
-          >
+          <Button variant="outline" color="fg" disabled={offset === 0 || catalog.isFetching} onClick={previousPage}>
             {t('common.previousPage')}
           </Button>
           <Button
-            size="xs"
             variant="outline"
             color="fg"
             disabled={catalog.isFetching || offset + 50 >= (catalog.data?.total ?? 0)}
@@ -231,31 +261,31 @@ const RecoveryRow = ({ group, engine }: { group: FontGroup; engine: CanvasEngine
           </Button>
         </Flex>
       ) : null}
-      {catalog.isPending ? <Text fontSize="xs">{t('common.loading')}</Text> : null}
+      {catalog.isPending ? <Text fontSize="md">{t('common.loading')}</Text> : null}
       {catalog.isError ? (
-        <Text role="alert" color="fg.error" fontSize="xs">
+        <Text role="alert" color="fg.error" fontSize="md">
           {t('fonts.missing.catalogError')}
-          <Button size="xs" color="fg" variant="outline" ml="2" onClick={retryCatalog}>
+          <Button color="fg" variant="outline" ml="2" onClick={retryCatalog}>
             {t('common.retry')}
           </Button>
         </Text>
       ) : null}
       {selected ? (
-        <Text fontSize="xs" color="fg.muted">
+        <Text fontSize="md" color="fg.muted">
           {t('fonts.missing.axesNotice')}
         </Text>
       ) : null}
       {error ? (
-        <Text role="alert" color="fg.error" fontSize="xs">
+        <Text role="alert" color="fg.error" fontSize="md">
           {error}
         </Text>
       ) : null}
       <Flex gap="2" justify="flex-end">
         <input ref={inputRef} type="file" accept=".ttf,.otf,.woff,.woff2" hidden onChange={uploaded} />
-        <Button color="fg" variant="outline" size="sm" loading={busy} onClick={chooseFile}>
+        <Button color="fg" variant="outline" size="lg" loading={busy} onClick={chooseFile}>
           {t('fonts.missing.upload')}
         </Button>
-        <Button colorPalette="accent" size="sm" disabled={!selected || busy} onClick={replace}>
+        <Button colorPalette="accent" size="lg" disabled={!selected || busy} onClick={replace}>
           {t('fonts.missing.replaceAll')}
         </Button>
       </Flex>

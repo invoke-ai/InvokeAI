@@ -546,7 +546,7 @@ const BulkItemMenuItems = ({
 
   return (
     <>
-      <Text color="fg.subtle" fontSize="2xs" fontWeight="700" px="3" py="1.5" textTransform="uppercase">
+      <Text color="fg.subtle" fontSize="xs" fontWeight="700" px="3" py="1.5" textTransform="uppercase">
         {itemRefs.length} items selected
       </Text>
       <Menu.Separator borderColor="border.subtle" />
@@ -947,7 +947,7 @@ const BulkMenuItems = ({
 
   return (
     <>
-      <Text color="fg.subtle" fontSize="2xs" fontWeight="700" px="3" py="1.5" textTransform="uppercase">
+      <Text color="fg.subtle" fontSize="xs" fontWeight="700" px="3" py="1.5" textTransform="uppercase">
         {images.length} images selected
       </Text>
       <Menu.Separator borderColor="border.subtle" />
@@ -1093,7 +1093,7 @@ const ChangeBoardMenuItem = ({ board, onMove }: { board: GalleryBoard; onMove: (
 
   return (
     <Menu.Item value={`move-to-${board.id}`} onClick={handleClick}>
-      <MiddleTruncate fontSize="xs" minW="0" text={board.name} />
+      <MiddleTruncate fontSize="md" minW="0" text={board.name} />
     </Menu.Item>
   );
 };
@@ -1113,7 +1113,7 @@ const ContextSubMenu = ({
     <Menu.TriggerItem>
       <HStack gap="2" minW="0" w="full">
         <Icon as={icon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-        <Text flex="1" fontSize="xs">
+        <Text flex="1" fontSize="md">
           {label}
         </Text>
         <Icon as={ChevronRightIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
@@ -1123,7 +1123,7 @@ const ContextSubMenu = ({
       <Menu.Positioner>
         <MenuContent {...MENU_CONTENT_PROPS} maxH="18rem" overflowY={scrollArea ? undefined : 'auto'}>
           {scrollArea ? (
-            <ScrollArea.Root maxH="inherit" size="xs" variant="hover" w="full">
+            <ScrollArea.Root maxH="inherit" variant="hover" w="full">
               <ScrollArea.Viewport maxH="inherit" w="full">
                 <ScrollArea.Content>{children}</ScrollArea.Content>
               </ScrollArea.Viewport>
@@ -1161,7 +1161,7 @@ const ContextMenuItem = ({
   <Menu.Item data-danger={isDanger ? '' : undefined} disabled={disabled} value={value} onClick={onClick}>
     <HStack gap="2" minW="0" w="full">
       <Icon as={icon} boxSize="3.5" color={isDanger ? undefined : 'fg.subtle'} fill={iconFill} flexShrink={0} />
-      <Text flex="1" fontSize="xs">
+      <Text flex="1" fontSize="md">
         {label}
       </Text>
     </HStack>
