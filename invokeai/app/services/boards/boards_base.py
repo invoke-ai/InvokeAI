@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Optional
 
 from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardRecordOrderBy
 from invokeai.app.services.boards.boards_common import BoardDTO
@@ -14,8 +15,9 @@ class BoardServiceABC(ABC):
         self,
         board_name: str,
         user_id: str,
+        project_id: Optional[str] = None,
     ) -> BoardDTO:
-        """Creates a board for a specific user."""
+        """Creates a board for a specific user, in one of their projects or in the Library."""
         pass
 
     @abstractmethod
@@ -40,7 +42,7 @@ class BoardServiceABC(ABC):
         self,
         board_id: str,
     ) -> bool:
-        """Delete a board only if no project owns it. Returns whether it was deleted.
+        """Delete a board unless it is a project's inbox. Returns whether it was deleted.
 
         The only deletion there is. An unconditional `delete` used to sit beside this one with no
         callers, which made "a project's board cannot be deleted out from under it" true by

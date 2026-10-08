@@ -2418,7 +2418,7 @@ export type paths = {
         put?: never;
         /**
          * Create Board
-         * @description Creates a board for the current user
+         * @description Creates a board for the current user, in one of their projects or in the Library
          */
         post: operations["create_board"];
         delete?: never;
@@ -2450,7 +2450,13 @@ export type paths = {
         head?: never;
         /**
          * Update Board
-         * @description Updates a board (user must have access to it)
+         * @description Updates a board (user must have access to it).
+         *
+         *     A project's inbox takes its name, archived state and visibility from the project and cannot be
+         *     moved, so those changes are refused for it — for admins too; its cover is still fair game. A
+         *     board in a project is private and unshared, so a move into a project, or a visibility change on
+         *     a member, is refused when the result would be otherwise. The storage decides all of this in one
+         *     transaction; the DTO read here is only for the ownership check.
          */
         patch: operations["update_board"];
         trace?: never;
@@ -4017,7 +4023,7 @@ export type paths = {
         put?: never;
         /**
          * Create Project
-         * @description Creates a project, and the private board it owns, for the current user.
+         * @description Creates a project, and the private inbox board it owns, for the current user.
          */
         post: operations["create_project"];
         delete?: never;
@@ -4046,10 +4052,10 @@ export type paths = {
         post?: never;
         /**
          * Delete Project
-         * @description Deletes one of the current user's projects, and the board it owns, in one transaction.
+         * @description Deletes one of the current user's projects and its inbox, in one transaction.
          *
-         *     Idempotent. The media survives: deleting the board drops its memberships, so the images and
-         *     videos on it return to Uncategorized, exactly as they would if the board were deleted without
+         *     Idempotent. The media survives either way: deleting a board drops its memberships, so the images
+         *     and videos on it return to Uncategorized, exactly as they would if the board were deleted without
          *     `include_images`. There is deliberately no option to take them with it — a project is a
          *     workspace, and emptying someone's gallery is not what deleting one should be able to mean.
          *     Nothing is reported back for the same reason: nothing was destroyed to report.
@@ -4069,7 +4075,7 @@ export type paths = {
         };
         /**
          * Get Project Board Snapshot
-         * @description Lists everything on the project's board that the gallery would show.
+         * @description Lists everything on the project's inbox that the gallery would show.
          *
          *     Intermediates and the canvas's private `other` category are excluded. Unpaginated: the caller
          *     that needs this — exporting a project — has to hold the whole list anyway. It is still bounded,
@@ -6143,6 +6149,11 @@ export type components = {
             archived?: boolean | null;
             /** @description The visibility of the board. */
             board_visibility?: components["schemas"]["BoardVisibility"] | null;
+            /**
+             * Project Id
+             * @description Move the board into one of the owner's projects, or to the Library with an explicit null. Omit the field to leave the board where it is.
+             */
+            project_id?: string | null;
         };
         /**
          * BoardDTO
@@ -6195,6 +6206,11 @@ export type components = {
              */
             board_visibility?: components["schemas"]["BoardVisibility"];
             /**
+             * Project Id
+             * @description The id of the owner's project this board belongs to; absent for a Library board.
+             */
+            project_id?: string | null;
+            /**
              * Cover Video Name
              * @description The name of the board's cover video, when the most recent item is a video.
              */
@@ -6227,10 +6243,11 @@ export type components = {
              */
             owner_username?: string | null;
             /**
-             * Project Id
-             * @description The id of the project that owns this board, if any.
+             * Is Inbox
+             * @description Whether this board is its project's inbox, which only the project APIs may change.
+             * @default false
              */
-            project_id?: string | null;
+            is_inbox?: boolean;
         };
         /**
          * BoardField
@@ -38541,7 +38558,7 @@ export type components = {
             project_id?: string | null;
             /**
              * Board Id
-             * @description An existing unclaimed private board for the project to adopt, renamed to match. Omit to create one. Restoring a project uploads its media into such a board first, so that creating the project is the single commit point for an import.
+             * @description An existing unclaimed private Library board for the project to adopt as its inbox, renamed to match. Omit to create one. Restoring a project uploads its media into such a board first, so that creating the project is the single commit point for an import.
              */
             board_id?: string | null;
             /**
@@ -56576,6 +56593,8 @@ export interface operations {
             query: {
                 /** @description The name of the board to create */
                 board_name: string;
+                /** @description One of the current user's projects to create the board in; omit for the Library */
+                project_id?: string | null;
             };
             header?: never;
             path?: never;
@@ -59936,7 +59955,10 @@ export interface operations {
     };
     delete_project: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description What becomes of the project's boards other than its inbox: released to the Library with their media, or deleted so their media returns to Uncategorized */
+                boards?: "release" | "delete";
+            };
             header?: never;
             path: {
                 /** @description The id of the project to delete */

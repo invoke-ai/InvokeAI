@@ -47,9 +47,14 @@ export const getGalleryBoardGroups = ({
   const projectBoard = fetchedProjectBoard ? { ...fetchedProjectBoard, name: projectName } : null;
 
   const matchesBoardSearch = (board: GalleryBoard) => matchesSearch(getGalleryBoardLabel(board, t));
-  // Always retain the active project's board regardless of the other-projects filter.
+  // The open project's own boards always show, whatever the other-projects filter says. Its id is read off its
+  // fetched inbox, which is a member of it; until the inbox arrives, no board can be known to be its.
+  const openProjectId = fetchedProjectBoard?.projectId ?? null;
   const belongsToVisibleProject = (board: GalleryBoard) =>
-    showOtherProjects || board.projectId === null || board.id === projectBoard?.id;
+    showOtherProjects ||
+    board.projectId === null ||
+    board.id === projectBoard?.id ||
+    (openProjectId !== null && board.projectId === openProjectId);
   const regularBoards = boards.filter(
     (board) =>
       board.kind === 'board' &&

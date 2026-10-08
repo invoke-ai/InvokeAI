@@ -51,15 +51,16 @@ class BoardService(BoardServiceABC):
         self,
         board_name: str,
         user_id: str,
+        project_id: Optional[str] = None,
     ) -> BoardDTO:
-        board_record = self.__invoker.services.board_records.save(board_name, user_id)
+        board_record = self.__invoker.services.board_records.save(board_name, user_id, project_id)
         return board_record_to_dto(board_record, None, 0, 0)
 
     def get_dto(self, board_id: str) -> BoardDTO:
-        # One query for the record and its claiming project. `get_dto` is what every authorization
-        # check resolves through, so a second lookup here is a second transaction — and the lock it
-        # takes — on the most-travelled read in the API.
-        board_record, project_id = self.__invoker.services.board_records.get_with_project_id(board_id)
+        # One query for the record and the project it is the inbox of. `get_dto` is what every
+        # authorization check resolves through, so a second lookup here is a second transaction —
+        # and the lock it takes — on the most-travelled read in the API.
+        board_record, inbox_of_project_id = self.__invoker.services.board_records.get_with_inbox_project(board_id)
         cover_image_name, cover_video_name = self._resolve_cover(board_record.board_id)
         image_count, video_count, asset_count, asset_video_count = self._get_counts(board_id)
         return board_record_to_dto(
@@ -70,7 +71,7 @@ class BoardService(BoardServiceABC):
             cover_video_name=cover_video_name,
             video_count=video_count,
             asset_video_count=asset_video_count,
-            project_id=project_id,
+            is_inbox=inbox_of_project_id is not None,
         )
 
     def update(
@@ -80,8 +81,8 @@ class BoardService(BoardServiceABC):
     ) -> BoardDTO:
         self.__invoker.services.board_records.update(board_id, changes)
         # Re-read through `get_dto` rather than shaping the update's own return: it is the one
-        # place that resolves cover, counts and claiming project together, and an update that
-        # dropped `project_id` would tell the gallery a project's board is an ordinary one.
+        # place that resolves cover, counts and the inbox flag together, and an update that
+        # dropped the flag would tell the gallery a project's inbox is an ordinary board.
         return self.get_dto(board_id)
 
     def delete_if_unclaimed(self, board_id: str) -> bool:
@@ -128,7 +129,7 @@ class BoardService(BoardServiceABC):
         summaries = self.__invoker.services.gallery.get_board_media_summaries(
             [record.board_id for record in board_records]
         )
-        project_ids = self.__invoker.services.board_records.get_project_ids_for_boards(
+        inbox_board_ids = self.__invoker.services.board_records.get_inbox_board_ids(
             [record.board_id for record in board_records]
         )
         owners = (
@@ -153,7 +154,7 @@ class BoardService(BoardServiceABC):
                     cover_video_name=summary.cover_video_name,
                     video_count=summary.video_count,
                     asset_video_count=summary.asset_video_count,
-                    project_id=project_ids.get(r.board_id),
+                    is_inbox=r.board_id in inbox_board_ids,
                 )
             )
 

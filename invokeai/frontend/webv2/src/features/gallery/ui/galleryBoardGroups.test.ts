@@ -10,6 +10,7 @@ const createBoard = (overrides: Partial<GalleryBoard> & Pick<GalleryBoard, 'id' 
   assetVideoCount: 0,
   imageCount: 0,
   kind: 'board',
+  isInbox: false,
   projectId: null,
   videoCount: 0,
   ...overrides,
@@ -20,8 +21,10 @@ const dogs = createBoard({ id: 'dogs', name: 'dogs' });
 const cats = createBoard({ id: 'cats', name: 'Cats' });
 const archived = createBoard({ archived: true, id: 'gorl', name: 'GORL' });
 const dateBoard = createBoard({ id: 'by_date:2026-07-28', kind: 'date', name: '28 July' });
-const otherProject = createBoard({ id: 'other', name: 'Someone else', projectId: 'project-2' });
-const ownProject = createBoard({ id: 'mine', name: 'My project', projectId: 'project-1' });
+const otherProject = createBoard({ id: 'other', isInbox: true, name: 'Someone else', projectId: 'project-2' });
+const ownProject = createBoard({ id: 'mine', isInbox: true, name: 'My project', projectId: 'project-1' });
+const ownMember = createBoard({ id: 'mine-member', name: 'Façades', projectId: 'project-1' });
+const otherMember = createBoard({ id: 'other-member', name: 'Their façades', projectId: 'project-2' });
 const t = (key: string) => (key === 'widgets.gallery.uncategorized' ? 'Uncategorized' : key);
 
 const groupsOf = (overrides: Partial<Parameters<typeof getGalleryBoardGroups>[0]> = {}) =>
@@ -69,6 +72,16 @@ describe('getGalleryBoardGroups', () => {
     const groups = groupsOf({ projectBoardId: 'mine', showOtherProjects: false });
 
     expect(groups.yourBoards.map((board) => board.id)).toEqual(['none', 'mine', 'dogs', 'cats']);
+  });
+
+  it('keeps the open project members, but not other projects members, while other projects are hidden', () => {
+    const groups = groupsOf({
+      boards: [uncategorized, dogs, ownProject, ownMember, otherProject, otherMember],
+      projectBoardId: 'mine',
+      showOtherProjects: false,
+    });
+
+    expect(groups.yourBoards.map((board) => board.id)).toEqual(['none', 'mine', 'dogs', 'mine-member']);
   });
 
   /** The fetched list can lag a rename; the live project name wins for the open project's row. */

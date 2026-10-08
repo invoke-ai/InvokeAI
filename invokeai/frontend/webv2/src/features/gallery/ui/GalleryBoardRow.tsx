@@ -166,7 +166,7 @@ export const GalleryBoardRow = ({
             </Badge>
           </Tooltip>
         ) : null}
-        {board.projectId !== null ? (
+        {board.isInbox ? (
           <Badge colorPalette={isSelected ? undefined : 'accent'} flexShrink={0} variant="subtle">
             {t('common.project')}
           </Badge>

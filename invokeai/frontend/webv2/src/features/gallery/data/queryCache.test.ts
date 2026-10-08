@@ -479,6 +479,7 @@ const createBoard = (id: string, overrides: Partial<GalleryBoard> = {}): Gallery
   imageCount: 1,
   kind: 'board',
   name: `Board ${id}`,
+  isInbox: false,
   projectId: null,
   videoCount: 0,
   ...overrides,

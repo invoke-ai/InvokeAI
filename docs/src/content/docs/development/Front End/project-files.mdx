@@ -8,13 +8,16 @@ Import also accepts the `.invokeproject.json` envelope shipped by earlier webv2 
 
 `.invk` is shared with the previous frontend's [canvas projects](/development/front-end/canvas-projects/), which write version 1 of the same container. Workbench projects write version 2. The two are deliberately not interchangeable — see [Versions](#versions).
 
-## Every project owns one board
+## Boards belong to projects
 
-The backend gives each project exactly one private board (`projects.board_id` is `NOT NULL UNIQUE` with a foreign key to `boards`). The board is the project's workspace: everything it generates lands there, and only the project APIs may touch it.
+A board lives in exactly one of its owner's projects, or in the **Library** — the tier every project can see. `boards.project_id` is the stored membership (`NULL` is the Library); it is a plain indexed column rather than a foreign key, because `projects` is keyed by `(user_id, project_id)` and adding a composite constraint would mean rebuilding `boards` under enforced cascades. The services keep it consistent: `POST /boards/?project_id=` inserts from the project row itself, `PATCH /boards/{id}` with `project_id` (a project, or `null` for the Library) moves a board and guards the destination's existence in the same `UPDATE`, and both answer `404` for a project the owner does not have. Boards in a project are private and unshared; a move or visibility change that would make a member otherwise is refused with `409`.
 
-- **Renaming** a project renames its board in the same transaction. The generic `PATCH /boards/{id}` refuses a claimed board with `409`, so the two names cannot commit independently.
-- **Deleting** a project deletes its board with it, in one transaction. `DELETE /boards/{id}` refuses a claimed board *before* touching any media, and the foreign key is the backstop for a board claimed concurrently.
-- **The media survives.** Deleting a project removes the board and its memberships; the images and videos themselves return to Uncategorized, exactly as they would if the board were deleted without `include_images`.
+Every project also has an **inbox**: the one board `projects.board_id` names (`NOT NULL UNIQUE`, foreign key `ON DELETE RESTRICT`). It is created with the project, is always a member of it, and is the only board the project APIs manage.
+
+- **Renaming** a project renames its inbox in the same transaction. The generic `PATCH /boards/{id}` refuses to rename, archive, publish or move an inbox with `409`, so the two names cannot commit independently; its cover may still change. `BoardDTO.is_inbox` is how clients tell it apart from an ordinary member.
+- **Deleting** a project deletes its inbox with it, in one transaction, and either releases its other boards to the Library (`?boards=release`, the default) or deletes them too (`?boards=delete`). `DELETE /boards/{id}` refuses an inbox *before* touching any media, and the foreign key is the backstop for a board claimed concurrently.
+- **The media survives.** No path through the project APIs deletes media: a deleted board drops its memberships, and the images and videos return to Uncategorized, exactly as they would if the board were deleted without `include_images`.
+- **Imports adopt a Library board as the inbox.** `POST /projects` with `board_id` claims an unclaimed private board, renames it and makes it a member; a board already in another project is refused as unavailable.
 - **The document's `projectBoardId` is a cache, never the truth.** Hydration overwrites it from the project record, and export strips it — along with `selectedBoardId` — because a board id means nothing on the install a project arrives at. Board ids elsewhere in a document, such as a workflow node's board input, are deliberately left alone.
 
 ## Synced canvas schema compatibility
@@ -218,6 +221,6 @@ Earlier webv2 builds exported `*.invokeproject.json` files containing a version 
 
 The archive stores references to models, LoRAs and other generation resources, not the model files themselves. Loading a project on another install restores its canvas and images, but missing models still need to be installed or replaced.
 
-**Not exported:** models and LoRAs, library templates themselves, queue history, intermediates, the canvas's private `other` media except where the document references it, gallery boards other than the project's own, and account preferences. A project file carries one project's workspace, not the install around it.
+**Not exported:** models and LoRAs, library templates themselves, queue history, intermediates, the canvas's private `other` media except where the document references it, gallery boards other than the project's inbox, and account preferences. A project file carries one project's workspace, not the install around it.
 
 **Workflows travel with the project.** A schema-3 document carries the project's whole workflow collection (`workflows.entries`, each with its document and optional source and last-run metadata) and its active selection, so an archive holds every workflow the project owns, active or not, and every media reference they name is bundled like any other document reference. Source metadata names the library template a copy came from; import clears it, because a template id on one install names nothing on another and a portable file must never inherit a library write target. Same-server duplication keeps it. Older archives that carry a schema-2 `projectGraph` load through the same migration as older server documents: that graph becomes the project's first and only workflow.

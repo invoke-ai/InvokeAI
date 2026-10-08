@@ -66,6 +66,7 @@ const createBoard = (id: string, name: string): GalleryBoard => ({
   imageCount: 3,
   kind: 'board',
   name,
+  isInbox: false,
   projectId: null,
   videoCount: 0,
 });

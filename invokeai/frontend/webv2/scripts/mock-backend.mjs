@@ -593,7 +593,7 @@ const boardDto = (state, board) => {
     cover_image_name: cover?.kind === 'image' ? cover.name : null,
     cover_video_name: cover?.kind === 'video' ? cover.name : null,
     image_count: images.filter((image) => image.image_category === 'general').length,
-    // The backend's BoardRecord excludes nulls, so an unclaimed board omits the key entirely.
+    is_inbox: projectId !== null,
     ...(projectId === null ? {} : { project_id: projectId }),
     video_count: videos.length,
   };

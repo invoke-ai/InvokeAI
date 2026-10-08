@@ -49,6 +49,7 @@ const createBoard = (overrides: Partial<GalleryBoard> & Pick<GalleryBoard, 'id' 
   assetVideoCount: 0,
   imageCount: 0,
   kind: 'board',
+  isInbox: false,
   projectId: null,
   videoCount: 0,
   ...overrides,

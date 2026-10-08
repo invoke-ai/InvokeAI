@@ -60,10 +60,12 @@ export interface GalleryBoard {
   createdAt?: string | null;
   ownerName?: string | null;
   /**
-   * Project ownership controls naming and deletion; generic board actions must exclude all project-owned boards.
-   * Null denotes an ordinary board.
+   * The project this board belongs to; null is the Library. Members are ordinary boards; only the inbox is
+   * managed through its project.
    */
   projectId: string | null;
+  /** Its project's inbox: named after the project and only renamed, archived, moved or deleted through it. */
+  isInbox: boolean;
 }
 
 export interface GalleryImage extends GeneratedImageContract {

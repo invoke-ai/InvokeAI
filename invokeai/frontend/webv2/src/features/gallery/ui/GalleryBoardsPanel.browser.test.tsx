@@ -55,6 +55,7 @@ const createBoard = (overrides: Partial<GalleryBoard> & Pick<GalleryBoard, 'id' 
   assetVideoCount: 0,
   imageCount: 50,
   kind: 'board',
+  isInbox: false,
   projectId: null,
   videoCount: 0,
   ...overrides,
@@ -176,8 +177,10 @@ describe('GalleryBoardsPanel', () => {
   });
 
   /** Badges and protection follow every board's owner; only hoisting depends on the active project. */
-  it('marks every project-owned board with a Project badge', async () => {
-    const ownedBoards = boards.map((board) => (board.id === 'cats' ? { ...board, projectId: 'p1' } : board));
+  it('marks a project inbox with a Project badge', async () => {
+    const ownedBoards = boards.map((board) =>
+      board.id === 'cats' ? { ...board, isInbox: true, projectId: 'p1' } : board
+    );
 
     await renderPanel({ ...createGallery(), boards: ownedBoards, projectBoardId: 'cats' } as GalleryStateView);
 

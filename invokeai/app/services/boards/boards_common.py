@@ -28,13 +28,14 @@ class BoardDTO(BoardRecord):
     field lets clients split the total across the Media/Assets views."""
     owner_username: Optional[str] = Field(default=None, description="The username of the board owner (for admin view).")
     """The username of the board owner (for admin view)."""
-    project_id: Optional[str] = Field(default=None, description="The id of the project that owns this board, if any.")
-    """Set when a project owns this board. Such a board can only be renamed or deleted through the
-    project APIs; the generic board routes refuse it. Ownership is derived by joining `projects`, so
-    it never appears on `BoardRecord` and is never a column on `boards`.
-
-    Note that `BoardRecord` extends `BaseModelExcludeNull`: this field is *omitted* from serialized
-    output rather than sent as `null`, so clients must treat absent as "not a project board"."""
+    is_inbox: bool = Field(
+        default=False, description="Whether this board is its project's inbox, which only the project APIs may change."
+    )
+    """The inbox is the one board every project has: it takes the project's name, cannot be moved,
+    renamed, archived or deleted through the generic board routes, and goes with the project when
+    the project is deleted. Derived by joining `projects.board_id`, never stored on `boards`; the
+    board's membership (`project_id`) is the stored fact, and an inbox is always a member of its
+    own project."""
 
 
 def board_record_to_dto(
@@ -46,7 +47,7 @@ def board_record_to_dto(
     cover_video_name: Optional[str] = None,
     video_count: int = 0,
     asset_video_count: int = 0,
-    project_id: Optional[str] = None,
+    is_inbox: bool = False,
 ) -> BoardDTO:
     """Converts a board record to a board DTO."""
     return BoardDTO(
@@ -58,5 +59,5 @@ def board_record_to_dto(
         asset_count=asset_count,
         asset_video_count=asset_video_count,
         owner_username=owner_username,
-        project_id=project_id,
+        is_inbox=is_inbox,
     )

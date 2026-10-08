@@ -44,10 +44,10 @@ export const GalleryBoardMenu = ({
   targetRef.current = target;
 
   const board = target?.board ?? null;
-  // Protect every project-owned board from rename/archive/delete. Also check the active project's board ID because
-  // omitted project_id must not expose invalid actions.
+  // An inbox is renamed, archived and deleted through its project; every other real board is the user's to manage.
+  // The active project's own inbox is also checked by id, because a draft project's inbox can predate the listing.
   const isManagedBoard =
-    board !== null && board.kind === 'board' && board.projectId === null && board.id !== gallery.projectBoardId;
+    board !== null && board.kind === 'board' && !board.isInbox && board.id !== gallery.projectBoardId;
   const positioning = useMemo(
     () => ({
       getAnchorRect: () => {
@@ -138,7 +138,7 @@ export const GalleryBoardMenu = ({
           <Menu.Positioner>
             {board && (
               <MenuContent minW="12rem">
-                {board.projectId !== null && (
+                {board.isInbox && board.projectId !== null && (
                   <>
                     <BoardExportProjectMenuItem board={board} />
                     <Menu.Separator />

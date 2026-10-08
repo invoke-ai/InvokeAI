@@ -6,10 +6,13 @@ from invokeai.app.services.board_records.board_records_common import (
     BoardChanges,
     BoardRecord,
     BoardRecordDeleteException,
+    BoardRecordInboxException,
     BoardRecordNotFoundException,
     BoardRecordOrderBy,
-    BoardRecordProjectOwnedException,
+    BoardRecordProjectNotFoundException,
+    BoardRecordProjectUnavailableException,
     BoardRecordSaveException,
+    BoardVisibility,
     deserialize_board_record,
 )
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
@@ -44,29 +47,29 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
             except Exception as e:
                 raise BoardRecordDeleteException from e
 
-    def get_project_ids_for_boards(self, board_ids: list[str]) -> dict[str, str]:
+    def get_inbox_board_ids(self, board_ids: list[str]) -> set[str]:
         if not board_ids:
-            return {}
+            return set()
 
         # Chunked because the caller is a board *listing*: an admin's `GET /boards/?all=true`
         # passes every board on the install at once, and one bind parameter per board runs into
         # SQLITE_MAX_VARIABLE_NUMBER — which fails the whole listing rather than degrading.
-        claimed: dict[str, str] = {}
+        inboxes: set[str] = set()
         with self._db.transaction() as cursor:
             for start in range(0, len(board_ids), _BOARD_ID_QUERY_CHUNK):
                 chunk = board_ids[start : start + _BOARD_ID_QUERY_CHUNK]
                 placeholders = ", ".join("?" for _ in chunk)
                 cursor.execute(
                     f"""--sql
-                    SELECT board_id, project_id FROM projects WHERE board_id IN ({placeholders});
+                    SELECT board_id FROM projects WHERE board_id IN ({placeholders});
                     """,
                     tuple(chunk),
                 )
-                claimed.update({row[0]: row[1] for row in cursor.fetchall()})
-        return claimed
+                inboxes.update(row[0] for row in cursor.fetchall())
+        return inboxes
 
-    def get_with_project_id(self, board_id: str) -> tuple[BoardRecord, Optional[str]]:
-        """The board and the project that claims it, in one query.
+    def get_with_inbox_project(self, board_id: str) -> tuple[BoardRecord, Optional[str]]:
+        """The board and the project whose inbox it is, in one query.
 
         `get_dto` needs both and is called on every authorization check, so asking for them
         separately doubled the round trips — and the transactions, which take a re-entrant lock —
@@ -76,7 +79,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
             try:
                 cursor.execute(
                     """--sql
-                    SELECT boards.*, projects.project_id AS claimed_by_project_id
+                    SELECT boards.*, projects.project_id AS inbox_of_project_id
                     FROM boards
                     LEFT JOIN projects ON projects.board_id = boards.board_id
                     WHERE boards.board_id = ?;
@@ -89,24 +92,41 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         if result is None:
             raise BoardRecordNotFoundException
         row = dict(result)
-        project_id = row.pop("claimed_by_project_id", None)
-        return BoardRecord(**row), project_id
+        inbox_of_project_id = row.pop("inbox_of_project_id", None)
+        return BoardRecord(**row), inbox_of_project_id
 
     def save(
         self,
         board_name: str,
         user_id: str,
+        project_id: Optional[str] = None,
     ) -> BoardRecord:
         with self._db.transaction() as cursor:
             try:
                 board_id = uuid_string()
-                cursor.execute(
-                    """--sql
-                    INSERT OR IGNORE INTO boards (board_id, board_name, user_id)
-                    VALUES (?, ?, ?);
-                    """,
-                    (board_id, board_name, user_id),
-                )
+                if project_id is None:
+                    cursor.execute(
+                        """--sql
+                        INSERT OR IGNORE INTO boards (board_id, board_name, user_id)
+                        VALUES (?, ?, ?);
+                        """,
+                        (board_id, board_name, user_id),
+                    )
+                else:
+                    # The project lookup is the insert's own source row, so a project deleted
+                    # between a caller's check and this statement yields no board rather than a
+                    # member of nothing. Project ids are unique per user only, hence both keys.
+                    cursor.execute(
+                        """--sql
+                        INSERT INTO boards (board_id, board_name, user_id, project_id)
+                        SELECT ?, ?, projects.user_id, projects.project_id
+                        FROM projects
+                        WHERE projects.user_id = ? AND projects.project_id = ?;
+                        """,
+                        (board_id, board_name, user_id, project_id),
+                    )
+                    if cursor.rowcount == 0:
+                        raise BoardRecordProjectNotFoundException
             except sqlite3.Error as e:
                 raise BoardRecordSaveException from e
         return self.get(board_id)
@@ -167,28 +187,65 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         board_id: str,
         changes: BoardChanges,
     ) -> BoardRecord:
+        # The rules are decided and applied inside one transaction. The connection is shared and
+        # `transaction()` holds its lock for the whole block, so a project claiming the board, or
+        # a share landing on it, commits either before this read or after this write — there is no
+        # window in which a stale router-side DTO can let an inbox be renamed or a shared board
+        # moved into a project. The one check that is not a read is the destination project's
+        # existence, which the UPDATE guards itself, so a project deleted mid-request leaves the
+        # board where it was rather than a member of nothing.
         with self._db.transaction() as cursor:
             try:
-                changes_project_owned_state = (
+                cursor.execute(
+                    """--sql
+                    SELECT boards.board_visibility,
+                           boards.project_id,
+                           EXISTS (SELECT 1 FROM projects WHERE projects.board_id = boards.board_id) AS is_inbox,
+                           EXISTS (SELECT 1 FROM shared_boards WHERE shared_boards.board_id = boards.board_id)
+                               AS is_shared
+                    FROM boards
+                    WHERE board_id = ?;
+                    """,
+                    (board_id,),
+                )
+                row = cast(Union[sqlite3.Row, None], cursor.fetchone())
+                if row is None:
+                    raise BoardRecordNotFoundException
+
+                changes_inbox_state = (
                     changes.board_name is not None
                     or changes.archived is not None
                     or changes.board_visibility is not None
+                    or changes.moves_board
                 )
-                # One conditional write, not a read followed by a write. A project claim racing
-                # this statement either commits first and makes rowcount zero, or waits until this
-                # update has committed; there is no stale DTO window in which project-owned state
-                # can be renamed, archived or published.
+                if row["is_inbox"] and changes_inbox_state:
+                    raise BoardRecordInboxException
+
+                next_project_id = changes.project_id if changes.moves_board else row["project_id"]
+                next_visibility = (
+                    changes.board_visibility.value if changes.board_visibility is not None else row["board_visibility"]
+                )
+                if next_project_id is not None and (
+                    next_visibility != BoardVisibility.Private.value or row["is_shared"]
+                ):
+                    raise BoardRecordProjectUnavailableException
+
+                destination_project_id = changes.project_id if changes.moves_board else None
                 cursor.execute(
                     """--sql
                     UPDATE boards
                     SET board_name = COALESCE(?, board_name),
                         cover_image_name = COALESCE(?, cover_image_name),
                         archived = COALESCE(?, archived),
-                        board_visibility = COALESCE(?, board_visibility)
+                        board_visibility = COALESCE(?, board_visibility),
+                        project_id = CASE WHEN ? THEN ? ELSE project_id END
                     WHERE board_id = ?
                       AND (
-                        ? = FALSE
-                        OR NOT EXISTS (SELECT 1 FROM projects WHERE projects.board_id = boards.board_id)
+                        ? IS NULL
+                        OR EXISTS (
+                          SELECT 1 FROM projects
+                          WHERE projects.user_id = boards.user_id AND projects.project_id = ?
+                        )
                       );
                     """,
                     (
@@ -196,16 +253,15 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
                         changes.cover_image_name,
                         changes.archived,
                         changes.board_visibility.value if changes.board_visibility is not None else None,
+                        changes.moves_board,
+                        changes.project_id,
                         board_id,
-                        changes_project_owned_state,
+                        destination_project_id,
+                        destination_project_id,
                     ),
                 )
-
                 if cursor.rowcount == 0:
-                    cursor.execute("SELECT 1 FROM boards WHERE board_id = ?;", (board_id,))
-                    if cursor.fetchone() is None:
-                        raise BoardRecordNotFoundException
-                    raise BoardRecordProjectOwnedException
+                    raise BoardRecordProjectNotFoundException
 
             except sqlite3.Error as e:
                 raise BoardRecordSaveException from e

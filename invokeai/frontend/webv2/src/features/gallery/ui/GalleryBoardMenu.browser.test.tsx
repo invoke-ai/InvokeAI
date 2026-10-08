@@ -43,6 +43,7 @@ const board = {
   imageCount: 2,
   kind: 'board',
   name: 'Board 1',
+  isInbox: false,
   projectId: null,
   videoCount: 1,
 } as const;

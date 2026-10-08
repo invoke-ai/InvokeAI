@@ -362,3 +362,41 @@ def test_projects_stay_private_to_their_owner(client: TestClient, user1_token: s
     assert client.get(f"/api/v1/boards/{created['board_id']}", headers=_auth(user1_token)).status_code == (
         status.HTTP_200_OK
     )
+
+
+def _create_board_in_project(client: TestClient, token: str, project_id: str, name: str) -> str:
+    response = client.post(f"/api/v1/boards/?board_name={name}&project_id={project_id}", headers=_auth(token))
+    assert response.status_code == status.HTTP_201_CREATED
+    return response.json()["board_id"]
+
+
+def test_deleting_a_project_releases_its_other_boards_to_the_library(client: TestClient, user1_token: str):
+    created = _create_project(client, user1_token).json()
+    member = _create_board_in_project(client, user1_token, created["project_id"], "Member")
+
+    deleted = client.delete(f"/api/v1/projects/{created['project_id']}", headers=_auth(user1_token))
+
+    assert deleted.status_code == status.HTTP_204_NO_CONTENT
+    assert client.get(f"/api/v1/boards/{created['board_id']}", headers=_auth(user1_token)).status_code == 404
+    released = client.get(f"/api/v1/boards/{member}", headers=_auth(user1_token)).json()
+    assert released.get("project_id") is None
+    assert released["is_inbox"] is False
+
+
+def test_deleting_a_project_can_delete_its_other_boards(client: TestClient, user1_token: str):
+    created = _create_project(client, user1_token).json()
+    member = _create_board_in_project(client, user1_token, created["project_id"], "Member")
+
+    deleted = client.delete(f"/api/v1/projects/{created['project_id']}?boards=delete", headers=_auth(user1_token))
+
+    assert deleted.status_code == status.HTTP_204_NO_CONTENT
+    assert client.get(f"/api/v1/boards/{member}", headers=_auth(user1_token)).status_code == 404
+
+
+def test_an_unknown_boards_mode_is_rejected_before_anything_is_deleted(client: TestClient, user1_token: str):
+    created = _create_project(client, user1_token).json()
+
+    refused = client.delete(f"/api/v1/projects/{created['project_id']}?boards=burn", headers=_auth(user1_token))
+
+    assert refused.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    assert client.get(f"/api/v1/projects/{created['project_id']}", headers=_auth(user1_token)).status_code == 200

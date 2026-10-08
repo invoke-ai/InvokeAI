@@ -1,7 +1,7 @@
 import json
 import sqlite3
 import uuid
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from invokeai.app.services.board_records.board_records_common import BOARD_NAME_MAX_LENGTH, BoardVisibility
 from invokeai.app.services.image_records.image_records_common import ASSETS_CATEGORIES, IMAGE_CATEGORIES
@@ -58,7 +58,7 @@ def _require_project_document_size(actual_bytes: int) -> None:
 class ProjectRecordsSqlite(ProjectRecordsStorageBase):
     """SQLite implementation of per-user project document storage.
 
-    A project and its board are one unit: every write touching both happens inside a single
+    A project and its inbox are one unit: every write touching both happens inside a single
     `self._db.transaction()`.
 
     That transaction is why this class talks to `boards` in raw SQL rather than through
@@ -97,7 +97,7 @@ class ProjectRecordsSqlite(ProjectRecordsStorageBase):
         try:
             with self._db.transaction() as cursor:
                 if board_id is None:
-                    resolved_board_id = self._insert_board(cursor, user_id=user_id, name=name)
+                    resolved_board_id = self._insert_board(cursor, user_id=user_id, name=name, project_id=project_id)
                 else:
                     self._claim_board(cursor, user_id=user_id, board_id=board_id, name=name, project_id=project_id)
                     resolved_board_id = board_id
@@ -265,7 +265,7 @@ class ProjectRecordsSqlite(ProjectRecordsStorageBase):
             if cursor.rowcount == 0:
                 # Another SQLite connection can win after the read above but before this
                 # compare-and-swap. Re-read inside the transaction so the refusal reports the
-                # actual winning revision and never renames the board.
+                # actual winning revision and never renames the inbox.
                 cursor.execute(
                     """--sql
                     SELECT revision FROM projects
@@ -339,12 +339,31 @@ class ProjectRecordsSqlite(ProjectRecordsStorageBase):
                 client_maximum_version=client_maximum_version,
             )
 
-    def delete(self, user_id: str, project_id: str) -> None:
+    def delete(self, user_id: str, project_id: str, boards: Literal["release", "delete"] = "release") -> None:
         with self._db.transaction() as cursor:
             row = self._board_row(cursor, user_id=user_id, project_id=project_id)
 
             if row is None:
                 return
+
+            # The project's other boards first, while the project row still identifies them. Both
+            # keys: project ids are unique per user only. Deleting a board cascades its memberships,
+            # returning the media to Uncategorized; the image and video records and their files are
+            # untouched either way.
+            if boards == "delete":
+                cursor.execute(
+                    """--sql
+                    DELETE FROM boards WHERE user_id = ? AND project_id = ? AND board_id != ?;
+                    """,
+                    (user_id, project_id, row[0]),
+                )
+            else:
+                cursor.execute(
+                    """--sql
+                    UPDATE boards SET project_id = NULL WHERE user_id = ? AND project_id = ? AND board_id != ?;
+                    """,
+                    (user_id, project_id, row[0]),
+                )
 
             cursor.execute(
                 """--sql
@@ -354,9 +373,8 @@ class ProjectRecordsSqlite(ProjectRecordsStorageBase):
                 (user_id, project_id),
             )
             delete_media_references(cursor, owner_kind="project", user_id=user_id, owner_id=project_id)
-            # Only after the project is gone: the board FK is RESTRICT, so a claimed board cannot be
-            # deleted. Deleting the board cascades its memberships, returning the media to
-            # Uncategorized; the image and video records and their files are untouched.
+            # Only after the project is gone: the inbox FK is RESTRICT, so a claimed board cannot be
+            # deleted.
             cursor.execute(
                 """--sql
                 DELETE FROM boards WHERE board_id = ?;
@@ -429,7 +447,7 @@ class ProjectRecordsSqlite(ProjectRecordsStorageBase):
         return row[0]
 
     def _board_row(self, cursor: sqlite3.Cursor, *, user_id: str, project_id: str) -> Optional[sqlite3.Row]:
-        """The project's board row, or `None` when this user has no such project.
+        """The project's inbox row, or `None` when this user has no such project.
 
         Cursor-taking rather than transaction-opening, so callers stay in charge of the unit of work
         this class's docstring describes.
@@ -443,23 +461,28 @@ class ProjectRecordsSqlite(ProjectRecordsStorageBase):
 
         return cursor.fetchone()
 
-    def _insert_board(self, cursor: sqlite3.Cursor, *, user_id: str, name: str) -> str:
+    def _insert_board(self, cursor: sqlite3.Cursor, *, user_id: str, name: str, project_id: str) -> str:
         board_id = uuid_string()
         cursor.execute(
             """--sql
-            INSERT INTO boards (board_id, board_name, user_id, board_visibility, archived)
-            VALUES (?, ?, ?, ?, FALSE);
+            INSERT INTO boards (board_id, board_name, user_id, board_visibility, archived, project_id)
+            VALUES (?, ?, ?, ?, FALSE, ?);
             """,
-            (board_id, name[:BOARD_NAME_MAX_LENGTH], user_id, BoardVisibility.Private.value),
+            (board_id, name[:BOARD_NAME_MAX_LENGTH], user_id, BoardVisibility.Private.value, project_id),
         )
         return board_id
 
     def _claim_board(self, cursor: sqlite3.Cursor, *, user_id: str, board_id: str, name: str, project_id: str) -> None:
-        """Take ownership of an existing private board, or explain why it cannot be taken.
+        """Make an existing private Library board the new project's inbox, or explain why not.
 
         One query answers every way a claim can fail. The `UNIQUE` constraint on `projects.board_id`
         settles the race this check cannot see: two imports claiming the same board both pass here,
         and exactly one of them survives the insert.
+
+        A board that belongs to another project is refused as unavailable: an inbox is created with
+        its project, and adopting a member would silently demote whatever board that project already
+        had. Membership of the project being created is excluded for the same reason the claimed
+        check is — a repeated create made it a member the first time round.
 
         The project being created is excluded from the "already claimed" test, so a client that
         re-sends a create it never got an answer for reaches the project insert and is refused there,
@@ -478,28 +501,29 @@ class ProjectRecordsSqlite(ProjectRecordsStorageBase):
                 EXISTS(
                     SELECT 1 FROM projects p
                     WHERE p.board_id = b.board_id AND NOT (p.user_id = ? AND p.project_id = ?)
-                )
+                ),
+                b.project_id IS NOT NULL AND b.project_id != ?
             FROM boards b
             WHERE b.board_id = ?;
             """,
-            (user_id, project_id, board_id),
+            (user_id, project_id, project_id, board_id),
         )
         row = cursor.fetchone()
 
         if row is None or row[0] != user_id:
             raise ProjectBoardNotFoundError(board_id)
 
-        if row[1] != BoardVisibility.Private.value or row[2] or row[3]:
+        if row[1] != BoardVisibility.Private.value or row[2] or row[3] or row[4]:
             raise ProjectBoardUnavailableError(board_id)
 
-        # Un-archived as well as renamed. A project's board takes its archived state from the
-        # project, and `PATCH /boards/{id}` refuses to set it on a claimed board — so a board that
+        # Un-archived as well as renamed. A project's inbox takes its archived state from the
+        # project, and `PATCH /boards/{id}` refuses to set it on an inbox — so a board that
         # arrived archived would be invisible in every listing with no API left to fix it.
         cursor.execute(
             """--sql
-            UPDATE boards SET board_name = ?, archived = FALSE WHERE board_id = ?;
+            UPDATE boards SET board_name = ?, archived = FALSE, project_id = ? WHERE board_id = ?;
             """,
-            (name[:BOARD_NAME_MAX_LENGTH], board_id),
+            (name[:BOARD_NAME_MAX_LENGTH], project_id, board_id),
         )
 
     @staticmethod

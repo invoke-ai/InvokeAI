@@ -799,3 +799,86 @@ def test_deleting_a_project_drops_its_references(db: SqliteDatabase, project_rec
     project_records.delete(SYSTEM_USER_ID, created.project_id)
 
     assert _media_references(db, created.project_id) == set()
+
+
+# --- board membership -------------------------------------------------------------------------
+
+
+def _board_project(db: SqliteDatabase, board_id: str) -> str | None:
+    with db.transaction() as cursor:
+        cursor.execute("SELECT project_id FROM boards WHERE board_id = ?;", (board_id,))
+        row = cursor.fetchone()
+    return None if row is None else row[0]
+
+
+def test_a_new_inbox_is_a_member_of_its_project(project_records: ProjectRecordsSqlite, db: SqliteDatabase) -> None:
+    created = project_records.create(SYSTEM_USER_ID, "Fresh", {})
+
+    assert _board_project(db, created.board_id) == created.project_id
+
+
+def test_a_claimed_inbox_joins_its_project(project_records: ProjectRecordsSqlite, db: SqliteDatabase) -> None:
+    _insert_board(db, "staging")
+
+    created = project_records.create(SYSTEM_USER_ID, "Imported", {}, board_id="staging")
+
+    assert _board_project(db, "staging") == created.project_id
+
+
+def test_a_board_in_another_project_cannot_become_an_inbox(
+    project_records: ProjectRecordsSqlite, db: SqliteDatabase
+) -> None:
+    """Adopting a member would silently demote the inbox the other project already has."""
+    other = project_records.create(SYSTEM_USER_ID, "Other", {})
+    _insert_board(db, "member")
+    with db.transaction() as cursor:
+        cursor.execute("UPDATE boards SET project_id = ? WHERE board_id = 'member';", (other.project_id,))
+
+    with pytest.raises(ProjectBoardUnavailableError):
+        project_records.create(SYSTEM_USER_ID, "Claimant", {}, board_id="member")
+
+    assert _board_project(db, "member") == other.project_id
+
+
+def test_deleting_a_project_releases_its_other_boards_to_the_library_by_default(
+    project_records: ProjectRecordsSqlite, db: SqliteDatabase, other_user_id: str
+) -> None:
+    created = project_records.create(SYSTEM_USER_ID, "Doomed", {}, project_id="shared-id")
+    # The other account's same-id project is untouched: membership is keyed by owner too.
+    theirs = project_records.create(other_user_id, "Theirs", {}, project_id="shared-id")
+    _insert_board(db, "member")
+    _insert_board(db, "their-member", user_id=other_user_id)
+    with db.transaction() as cursor:
+        cursor.execute("UPDATE boards SET project_id = 'shared-id' WHERE board_id IN ('member', 'their-member');")
+    _add_image_to_board(db, "kept.png", "member")
+
+    project_records.delete(SYSTEM_USER_ID, created.project_id)
+
+    assert _board_name(db, created.board_id) is None
+    assert _board_project(db, "member") is None
+    assert _board_project(db, "their-member") == theirs.project_id
+    with db.transaction() as cursor:
+        cursor.execute("SELECT board_id FROM board_images WHERE image_name = 'kept.png';")
+        assert cursor.fetchone()[0] == "member"
+
+
+def test_deleting_a_project_can_take_its_other_boards_but_never_their_media(
+    project_records: ProjectRecordsSqlite, db: SqliteDatabase, other_user_id: str
+) -> None:
+    created = project_records.create(SYSTEM_USER_ID, "Doomed", {}, project_id="shared-id")
+    project_records.create(other_user_id, "Theirs", {}, project_id="shared-id")
+    _insert_board(db, "member")
+    _insert_board(db, "their-member", user_id=other_user_id)
+    with db.transaction() as cursor:
+        cursor.execute("UPDATE boards SET project_id = 'shared-id' WHERE board_id IN ('member', 'their-member');")
+    _add_image_to_board(db, "kept.png", "member")
+
+    project_records.delete(SYSTEM_USER_ID, created.project_id, boards="delete")
+
+    assert _board_name(db, "member") is None
+    assert _board_name(db, "their-member") is not None
+    with db.transaction() as cursor:
+        cursor.execute("SELECT COUNT(*) FROM board_images WHERE image_name = 'kept.png';")
+        assert cursor.fetchone()[0] == 0
+        cursor.execute("SELECT COUNT(*) FROM images WHERE image_name = 'kept.png';")
+        assert cursor.fetchone()[0] == 1
