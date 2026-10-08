@@ -231,6 +231,30 @@ describe('unload journal and the editor route', () => {
     await expect(peekOpenProjectIds()).resolves.toEqual([project.id]);
   });
 
+  it("does not count another running tab's staged draft as one that would open", async () => {
+    const lock = await acquireExclusiveLock('invokeai:v7:webv2:editor-session:tab-a');
+    if (lock.kind !== 'acquired') {
+      throw new Error('The editor session lock was not acquired.');
+    }
+    releases.push(lock.release);
+    const tabA = openTab('tab-a', 'writer-a');
+    const loaded = await tabA.loadWorkbench();
+    server.offline = true;
+    await tabA.saveWorkbench(renamed(loaded.state, 'Staged in A'));
+    server.offline = false;
+    guardSession.json = JSON.stringify({ account: loaded.state.account, activeProjectId: '', openProjectIds: [] });
+    window.sessionStorage.setItem(EDITOR_SESSION_STORAGE_KEY, 'tab-b');
+
+    await expect(peekOpenProjectIds()).resolves.toEqual([]);
+    // Tab A's own reload would take it.
+    window.sessionStorage.setItem(EDITOR_SESSION_STORAGE_KEY, 'tab-a');
+    await expect(peekOpenProjectIds()).resolves.toEqual([project.id]);
+    // Tab A is gone: any tab would recover it now.
+    window.sessionStorage.setItem(EDITOR_SESSION_STORAGE_KEY, 'tab-b');
+    await lock.release();
+    await expect(peekOpenProjectIds()).resolves.toEqual([project.id]);
+  });
+
   it('counts a project known only from its journal as one that would open', async () => {
     const tab = openTab('tab-a', 'writer-a1');
     const loaded = await tab.loadWorkbench();

@@ -17,3 +17,11 @@ This page lists known cases where InvokeAI does not yet behave as this documenta
 **Workaround:** None in the v7 interface. Administrators can still view and manage all users' boards, images, and workflows.
 
 **Tracking:** [invoke-ai/InvokeAI#9673](https://github.com/invoke-ai/InvokeAI/issues/9673)
+
+### Plain-HTTP access: another tab can take a still-open tab's unsaved changes
+
+**Documented behavior:** If a change cannot be saved yet, your browser keeps it and the tab that made it keeps retrying until the save goes through. See [Saving and syncing](/users-guide/projects/introduction/#saving-and-syncing).
+
+**Current behavior:** When Invoke is opened over plain HTTP from another computer (for example `http://192.168.1.20:9090` on your local network), the browser turns off a feature Invoke uses to tell open tabs apart (Web Locks), so Invoke cannot tell whether another tab is still open. Opening Invoke in another tab, or reloading another tab, then takes over the unsaved changes a still-open tab is holding: an edit whose save had not finished when the tab was hidden, or one kept while the server was unreachable. The second tab saves them, and undoing the edit in the first tab no longer removes it.
+
+**Workaround:** Open Invoke over HTTPS, or at `localhost` on the computer running it, where browsers provide Web Locks.

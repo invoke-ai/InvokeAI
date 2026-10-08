@@ -2,7 +2,12 @@ import type { ExclusiveLockResult } from '@platform/browser/webLocks';
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { createEditorSessionProvider, EDITOR_SESSION_STORAGE_KEY, isEditorSessionLive } from './editorSession';
+import {
+  createEditorSessionLivenessCheck,
+  createEditorSessionProvider,
+  EDITOR_SESSION_STORAGE_KEY,
+  isEditorSessionLive,
+} from './editorSession';
 
 const createStorage = (initial?: string) => {
   const values = new Map<string, string>();
@@ -212,5 +217,18 @@ describe('editor session identity', () => {
     await expect(isEditorSessionLive('free', queryLock)).resolves.toBe(false);
     await expect(isEditorSessionLive('unknown', queryLock)).resolves.toBe(false);
     expect(queried).toEqual(['held', 'free', 'unknown'].map((id) => `invokeai:v7:webv2:editor-session:${id}`));
+  });
+
+  it("never takes this page's own session for another page's, and asks about each other session once", async () => {
+    const asked: string[] = [];
+    const isOtherPageLive = createEditorSessionLivenessCheck('own', (editorSessionId) => {
+      asked.push(editorSessionId);
+      return Promise.resolve(true);
+    });
+
+    await expect(isOtherPageLive('own')).resolves.toBe(false);
+    await expect(isOtherPageLive('other')).resolves.toBe(true);
+    await expect(isOtherPageLive('other')).resolves.toBe(true);
+    expect(asked).toEqual(['other']);
   });
 });

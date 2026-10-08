@@ -60,7 +60,7 @@ import {
   toDirtyProjectDraft,
   toSchemaRefusedProjectDraft,
 } from './draftStore';
-import { getEditorSession, isEditorSessionLive } from './editorSession';
+import { createEditorSessionLivenessCheck, getEditorSession, isEditorSessionLive } from './editorSession';
 import { createDeterministicProjectId } from './ids';
 import { createAccountOwnedProjectDraftStore } from './indexedDbDraftStore';
 import { seedProjectLibrary, upsertProjectSummary } from './library';
@@ -778,22 +778,42 @@ export const createDurableSyncedWorkbenchPersistence = (
     return getOwnedDraft(store, projectId, activeEditorSessionId);
   };
 
-  const listDraftProjectCandidates = async (store: ProjectDraftStore): Promise<ProjectDraftSummary[]> => {
-    const candidates: ProjectDraftSummary[] = [];
+  /**
+   * The drafts this page may take. A lineage named after another running page's editor session is that page's to stage
+   * and save, so this page neither adopts it, opens its project for it, nor offers it for recovery, as with that page's
+   * unload journal: an edit adopted here could never be retired by an undo there. A draft records its lineage, not the
+   * page staging it, so a lineage named after no session (one isolated for an unopenable draft) is taken as before, as
+   * is every draft when liveness cannot be told (no Web Locks).
+   */
+  const withoutLivePagesDrafts = async (
+    items: readonly ProjectDraftSummary[],
+    editorSessionId: string
+  ): Promise<ProjectDraftSummary[]> => {
+    const isOtherPageLive = createEditorSessionLivenessCheck(editorSessionId, isOtherEditorSessionLive);
+    const verdicts = await Promise.all(items.map((item) => isOtherPageLive(item.editorSessionId)));
+    const candidates = items.filter((_, index) => !verdicts[index]);
+    for (const item of candidates) {
+      rememberFutureDraft(item);
+    }
+    return candidates;
+  };
+
+  const listDraftProjectCandidates = async (
+    store: ProjectDraftStore,
+    editorSessionId: string
+  ): Promise<ProjectDraftSummary[]> => {
+    const items: ProjectDraftSummary[] = [];
     let after: [string, string] | undefined;
     for (;;) {
       const page = await store.list({ ...(after ? { after } : {}), limit: 100 });
       if (page.kind !== 'available') {
         markLocalDraftFailure('list:drafts');
-        return candidates;
+        return withoutLivePagesDrafts(items, editorSessionId);
       }
-      for (const item of page.items) {
-        rememberFutureDraft(item);
-        candidates.push(item);
-      }
+      items.push(...page.items);
       if (!page.nextCursor) {
         clearLocalDraftFailure('list:drafts');
-        return candidates;
+        return withoutLivePagesDrafts(items, editorSessionId);
       }
       after = page.nextCursor;
     }
@@ -801,9 +821,10 @@ export const createDurableSyncedWorkbenchPersistence = (
 
   const listProjectDraftCandidates = async (
     store: ProjectDraftStore,
-    projectId: string
+    projectId: string,
+    editorSessionId: string
   ): Promise<ProjectDraftSummary[]> => {
-    const candidates: ProjectDraftSummary[] = [];
+    const items: ProjectDraftSummary[] = [];
     let after: string | undefined;
     for (;;) {
       const page = await store.listForProject(projectId, {
@@ -812,15 +833,12 @@ export const createDurableSyncedWorkbenchPersistence = (
       });
       if (page.kind !== 'available') {
         markLocalDraftFailure(`list:${projectId}`);
-        return candidates;
+        return withoutLivePagesDrafts(items, editorSessionId);
       }
-      for (const item of page.items) {
-        rememberFutureDraft(item);
-        candidates.push(item);
-      }
+      items.push(...page.items);
       if (!page.nextCursor) {
         clearLocalDraftFailure(`list:${projectId}`);
-        return candidates;
+        return withoutLivePagesDrafts(items, editorSessionId);
       }
       after = page.nextCursor;
     }
@@ -1659,7 +1677,7 @@ export const createDurableSyncedWorkbenchPersistence = (
   const hydrateProjectWithDraft = async (projectId: string, projectName: string): Promise<ProjectLoadResult> => {
     assertOwner();
     const [store, session] = await Promise.all([getDraftStore(), getEditorSessionForService()]);
-    const draftSummaries = await listProjectDraftCandidates(store, projectId);
+    const draftSummaries = await listProjectDraftCandidates(store, projectId, session.id);
     const draft = await adoptNewestDraft(store, projectId, session.id, draftSummaries);
     assertOwner();
     const reportOwnedProjectSync = (): void => {
@@ -2265,8 +2283,7 @@ export const createDurableSyncedWorkbenchPersistence = (
           owner.accountId === null
             ? ({ kind: 'unavailable' } as const)
             : await store.reconcileUnloadJournal(owner.accountId, Date.parse(now()), {
-                isEditorSessionLive: (editorSessionId) =>
-                  editorSessionId === session.id ? Promise.resolve(false) : isOtherEditorSessionLive(editorSessionId),
+                isEditorSessionLive: createEditorSessionLivenessCheck(session.id, isOtherEditorSessionLive),
               });
         assertOwner();
         unloadJournalTarget = { editorSessionId: session.id, store };
@@ -2336,7 +2353,7 @@ export const createDurableSyncedWorkbenchPersistence = (
         sessionSavePending = false;
         seedProjectLibrary(summaries, owner);
         const [draftCandidates, retargetHandoffs] = await Promise.all([
-          listDraftProjectCandidates(store),
+          listDraftProjectCandidates(store, session.id),
           listRetargetHandoffs(store),
         ]);
         const draftCandidatesByProject = groupDraftCandidatesByProject(draftCandidates);

@@ -12,6 +12,7 @@ import type { WorkbenchSessionBlob } from './session';
 import { createDurableSyncedWorkbenchPersistence, type DurableProjectPersistenceApi } from './durableSyncedPersistence';
 import { serializeProjectDocumentV3 } from './projectDocument';
 import { serializeSessionBlob } from './session';
+import { getProjectSyncSnapshot } from './syncStore';
 
 const now = '2026-10-05T00:00:00.000Z';
 
@@ -343,6 +344,65 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
         const recovered = await openTab('tab-b').loadWorkbench();
         expect(recovered.state.projects).toMatchObject([{ id: project.id, name: "Typed in the lineage's own tab" }]);
       });
+    });
+  });
+
+  describe('a staged draft of a tab that is still running', () => {
+    /** Tab A stages an edit the server has not acknowledged (it is unreachable), then keeps running. */
+    const stageInTab = async (name: string) => {
+      const tab = openTab();
+      const loaded = await tab.loadWorkbench();
+      server.offline = true;
+      await tab.saveWorkbench(named(loaded.state, name));
+      server.offline = false;
+      return { loaded, tab };
+    };
+
+    it('is left to that tab, whose undo then retires it', async () => {
+      const { loaded, tab } = await stageInTab('Staged in tab A');
+
+      const other = openTab('tab-b');
+      const loadedOther = await other.loadWorkbench();
+
+      expect(loadedOther.state.projects).toMatchObject([{ id: project.id, name: project.name }]);
+      expect(loadedOther.conflicts).toEqual([]);
+      await expect(other.hydrateProjectFromServer(project.id)).resolves.toMatchObject({
+        project: { name: project.name },
+      });
+      expect(getProjectSyncSnapshot().recoverableDrafts).toEqual([]);
+      await expect(store.get(project.id, 'tab-a')).resolves.toMatchObject({
+        draft: { documentJson: expect.stringContaining('Staged in tab A') as unknown },
+        kind: 'found',
+      });
+      // Undone in tab A: its own save retires the edit, which no other tab holds.
+      await tab.saveWorkbench(loaded.state);
+      await expect(store.listForProject(project.id)).resolves.toMatchObject({ items: [] });
+    });
+
+    it('is still taken by a reload of that tab, which holds the same editor session', async () => {
+      const tab = openTab();
+      const loaded = await tab.loadWorkbench();
+      // Never reached the server or the session: only its draft makes the reload open it.
+      const fresh = { ...createDraftProject(loaded.state.projects), name: 'Created offline' };
+      server.offline = true;
+      await tab.saveWorkbench(stateWith([...loaded.state.projects, fresh]));
+      server.offline = false;
+
+      const reloaded = await openTab().loadWorkbench();
+
+      expect(reloaded.state.projects).toContainEqual(
+        expect.objectContaining({ id: fresh.id, name: 'Created offline' })
+      );
+    });
+
+    it('is recovered by another tab once that tab is gone', async () => {
+      await stageInTab('Staged before the crash');
+      unloadTab('tab-a');
+
+      const recovered = await openTab('tab-b').loadWorkbench();
+
+      expect(recovered.state.projects).toMatchObject([{ id: project.id, name: 'Staged before the crash' }]);
+      expect(recovered.conflicts).toEqual([]);
     });
   });
 

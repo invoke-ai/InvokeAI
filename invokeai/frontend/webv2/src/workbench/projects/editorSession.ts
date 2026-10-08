@@ -39,6 +39,29 @@ export const isEditorSessionLive = async (
 ): Promise<boolean> => (await queryLock(`${EDITOR_SESSION_LOCK_PREFIX}${editorSessionId}`)) === true;
 
 /**
+ * Whether a page other than this one still holds an editor session, for one pass over stored records: each session is
+ * asked once. This page's own session (the one it holds, or will reclaim) is never another page's, although this page
+ * holds its lock.
+ */
+export const createEditorSessionLivenessCheck = (
+  ownEditorSessionId: string | null,
+  isLive: (editorSessionId: string) => Promise<boolean> = isEditorSessionLive
+): ((editorSessionId: string) => Promise<boolean>) => {
+  const verdicts = new Map<string, Promise<boolean>>();
+  return (editorSessionId) => {
+    if (editorSessionId === ownEditorSessionId) {
+      return Promise.resolve(false);
+    }
+    let verdict = verdicts.get(editorSessionId);
+    if (!verdict) {
+      verdict = isLive(editorSessionId);
+      verdicts.set(editorSessionId, verdict);
+    }
+    return verdict;
+  };
+};
+
+/**
  * Each call is one holder of the tab's editor session; the lock is given back when the last holder releases. A
  * superseded editor that is still finishing its exit and the editor that replaced it share one claim, so neither can
  * drop the lock from under the other.

@@ -3,10 +3,10 @@ import type { AccountState, WorkbenchState } from '@workbench/projectContracts';
 import type { QueueRunJournal } from '@workbench/queue-integration/queueRunJournal';
 import type { WorkbenchPreferences } from '@workbench/settings/contracts';
 
-import type { ProjectDraftStore } from './draftStore';
+import type { ProjectDraftKey, ProjectDraftStore } from './draftStore';
 
 import { getClientStateValue, setClientStateValue } from './api';
-import { EDITOR_SESSION_STORAGE_KEY, isEditorSessionLive } from './editorSession';
+import { createEditorSessionLivenessCheck, EDITOR_SESSION_STORAGE_KEY } from './editorSession';
 
 /** Session tabs are separate from settings; legacy undefined openProjectIds means unknown/open-all. */
 
@@ -92,6 +92,29 @@ export const fetchSessionBlobStrict = async (signal?: AbortSignal): Promise<Work
 
 type DurableRecoveryProjectIdsResult = { kind: 'available'; projectIds: string[] } | { kind: 'unavailable' };
 
+/** A project whose draft the editor would take: the first not staged under another running page's session. */
+const findDraftProjectIdToRecover = async (
+  draftStore: ProjectDraftStore,
+  isOtherPageLive: (editorSessionId: string) => Promise<boolean>
+): Promise<DurableRecoveryProjectIdsResult> => {
+  let after: ProjectDraftKey | undefined;
+  for (;;) {
+    const page = await draftStore.list({ ...(after ? { after } : {}), limit: 20 });
+    if (page.kind !== 'available') {
+      return page;
+    }
+    for (const draft of page.items) {
+      if (!(await isOtherPageLive(draft.editorSessionId))) {
+        return { kind: 'available', projectIds: [draft.projectId] };
+      }
+    }
+    if (!page.nextCursor) {
+      return { kind: 'available', projectIds: [] };
+    }
+    after = page.nextCursor;
+  }
+};
+
 const listDurableRecoveryProjectIds = async (): Promise<DurableRecoveryProjectIdsResult> => {
   let draftStore: ProjectDraftStore;
   let queueRunJournal: QueueRunJournal;
@@ -123,22 +146,20 @@ const listDurableRecoveryProjectIds = async (): Promise<DurableRecoveryProjectId
   }
 
   try {
-    // Another page's entry is that page's to settle while it runs; this page's own (the session it will reclaim, if it
-    // persisted one) becomes a draft when the editor loads.
+    // Another page's journal entries and staged drafts are that page's to settle while it runs; this page's own (under
+    // the session it will reclaim, if it persisted one) are taken when the editor loads.
     let ownEditorSessionId: string | null = null;
     try {
       ownEditorSessionId = window.sessionStorage.getItem(EDITOR_SESSION_STORAGE_KEY);
     } catch {
       ownEditorSessionId = null;
     }
+    const isOtherPageLive = createEditorSessionLivenessCheck(ownEditorSessionId);
     const [drafts, retargets, queueRuns, journal] = await Promise.all([
-      draftStore.list({ limit: 1 }),
+      findDraftProjectIdToRecover(draftStore, isOtherPageLive),
       draftStore.listRetargets({ limit: 1 }),
       queueRunJournal.listProjectIds(),
-      draftStore.peekUnloadJournalProjectIds(1, {
-        isEditorSessionLive: (editorSessionId) =>
-          editorSessionId === ownEditorSessionId ? Promise.resolve(false) : isEditorSessionLive(editorSessionId),
-      }),
+      draftStore.peekUnloadJournalProjectIds(1, { isEditorSessionLive: isOtherPageLive }),
     ]);
     if (drafts.kind !== 'available' || retargets.kind !== 'available' || queueRuns.kind !== 'available') {
       return { kind: 'unavailable' };
@@ -148,7 +169,7 @@ const listDurableRecoveryProjectIds = async (): Promise<DurableRecoveryProjectId
       projectIds: [
         ...new Set([
           ...queueRuns.projectIds,
-          ...drafts.items.map((draft) => draft.projectId),
+          ...drafts.projectIds,
           ...retargets.items.map((handoff) => handoff.targetProjectId),
           // An edit journaled before the project's first save becomes its draft when the editor loads.
           ...(journal.kind === 'available' ? journal.projectIds : []),
