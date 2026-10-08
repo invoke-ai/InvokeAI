@@ -90,8 +90,10 @@ describe('database maintenance in Data & workspace settings', () => {
     await act(() =>
       root.render(
         <ChakraProvider value={system}>
-          <LaunchpadTopBar />
-          <AppMenu />
+          <QueryClientProvider client={queryClient}>
+            <LaunchpadTopBar />
+            <AppMenu />
+          </QueryClientProvider>
         </ChakraProvider>
       )
     );
