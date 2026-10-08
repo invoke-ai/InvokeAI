@@ -3455,3 +3455,56 @@ def test_restore_skips_an_unparseable_marker_without_abandoning_the_rest(
         for tmpdir in tmpdirs:
             active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
             shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+@pytest.mark.parametrize("invalid_status", ["not-a-valid-status", ["not-a-valid-status"]])
+def test_restore_skips_a_marker_with_an_invalid_status_without_claiming_it_or_abandoning_the_rest(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_download_queue,
+    mm2_session,
+    invalid_status: str | list[str],
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
+
+    bad_tmpdir = mm2_app_config.models_path / f"tmpinstall_bad_status_{uuid.uuid4().hex}"
+    good_tmpdir = mm2_app_config.models_path / f"tmpinstall_good_{uuid.uuid4().hex}"
+    bad_tmpdir.mkdir(parents=True, exist_ok=True)
+    good_tmpdir.mkdir(parents=True, exist_ok=True)
+    try:
+        (bad_tmpdir / INSTALL_MARKER_FILENAME).write_text(
+            json.dumps(
+                {
+                    "version": INSTALL_MARKER_VERSION,
+                    "source": "stabilityai/invalid-status",
+                    "config_in": {},
+                    "status": invalid_status,
+                }
+            )
+        )
+
+        job = ModelInstallJob(
+            id=99997,
+            source=HFModelSource(repo_id="stabilityai/ordinary", variant=ModelRepoVariant.Default),
+            config_in=ModelRecordChanges(),
+            local_path=good_tmpdir,
+        )
+        job._install_tmpdir = good_tmpdir
+        job.status = InstallStatus.PAUSED
+        mm2_installer._write_install_marker(job, status=InstallStatus.PAUSED)
+
+        restored_installer = ModelInstallService(
+            app_config=mm2_app_config,
+            record_store=mm2_installer.record_store,
+            download_queue=mm2_download_queue,
+            session=mm2_session,
+        )
+        restored_installer._restore_incomplete_installs()
+
+        assert [str(job.source) for job in restored_installer.list_jobs()] == ["stabilityai/ordinary"]
+        assert not active_install_sentinel_path(bad_tmpdir).exists()
+    finally:
+        for tmpdir in (bad_tmpdir, good_tmpdir):
+            active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
+            shutil.rmtree(tmpdir, ignore_errors=True)

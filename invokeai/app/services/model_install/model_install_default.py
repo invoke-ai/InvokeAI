@@ -423,10 +423,10 @@ class ModelInstallService(ModelInstallServiceBase):
             if marker.get("recovery_required") is True:
                 self._logger.warning(f"Preserving install recovery data in {tmpdir}")
                 continue
-            if status in {InstallStatus.COMPLETED.value, InstallStatus.ERROR.value, InstallStatus.CANCELLED.value}:
-                continue
-
             try:
+                parsed_status = InstallStatus(status) if status else InstallStatus.WAITING
+                if parsed_status in {InstallStatus.COMPLETED, InstallStatus.ERROR, InstallStatus.CANCELLED}:
+                    continue
                 source_str = marker.get("source")
                 if not isinstance(source_str, str):
                     raise ValueError("Missing source in install marker")
@@ -471,7 +471,7 @@ class ModelInstallService(ModelInstallServiceBase):
             files_meta = marker.get("files") or []
             if files_meta:
                 job._resume_metadata = {f.get("url"): f for f in files_meta if f.get("url")}
-            job.status = InstallStatus(status) if status else InstallStatus.WAITING
+            job.status = parsed_status
             self._install_jobs.append(job)
 
             if job.paused:
