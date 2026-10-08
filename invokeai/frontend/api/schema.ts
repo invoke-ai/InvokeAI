@@ -2335,6 +2335,74 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/app/gallery/maintenance/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Gallery Maintenance */
+        post: operations["preview_gallery_maintenance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/gallery/maintenance/remove-missing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Remove Missing Images */
+        post: operations["remove_missing_images"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/gallery/maintenance/archive-untracked": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive Untracked Images */
+        post: operations["archive_untracked_images"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/gallery/maintenance/regenerate-thumbnails": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Regenerate Missing Thumbnails */
+        post: operations["regenerate_missing_thumbnails"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/boards/": {
         parameters: {
             query?: never;
@@ -16253,6 +16321,67 @@ export type components = {
              * @description The unique name of the image or video.
              */
             name: string;
+        };
+        /** GalleryMaintenanceExecuteRequest */
+        GalleryMaintenanceExecuteRequest: {
+            /** Fingerprint */
+            fingerprint: string;
+        };
+        /**
+         * GalleryMaintenanceOperation
+         * @enum {string}
+         */
+        GalleryMaintenanceOperation: "remove_missing" | "archive_untracked" | "regenerate_thumbnails";
+        /** GalleryMaintenancePreview */
+        GalleryMaintenancePreview: {
+            operation: components["schemas"]["GalleryMaintenanceOperation"];
+            /** Fingerprint */
+            fingerprint: string;
+            /** Examined Count */
+            examined_count: number;
+            /** Affected Count */
+            affected_count: number;
+            /** Skipped Count */
+            skipped_count: number;
+            /** Error Count */
+            error_count: number;
+            /** Errors */
+            errors?: string[];
+            /** Archive Path */
+            archive_path?: string | null;
+        };
+        /** GalleryMaintenancePreviewRequest */
+        GalleryMaintenancePreviewRequest: {
+            operation: components["schemas"]["GalleryMaintenanceOperation"];
+        };
+        /** GalleryMaintenanceResult */
+        GalleryMaintenanceResult: {
+            operation: components["schemas"]["GalleryMaintenanceOperation"];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "completed" | "partial" | "no_op" | "failed";
+            /** Examined Count */
+            examined_count: number;
+            /** Skipped Count */
+            skipped_count: number;
+            /** Failed Count */
+            failed_count: number;
+            /** Records Removed */
+            records_removed: number;
+            /** Images Archived */
+            images_archived: number;
+            /** Thumbnails Archived */
+            thumbnails_archived: number;
+            /** Thumbnails Regenerated */
+            thumbnails_regenerated: number;
+            /** Archive Path */
+            archive_path?: string | null;
+            /** Backup Path */
+            backup_path?: string | null;
+            /** Errors */
+            errors?: string[];
         };
         /**
          * Gemini Image Generation
@@ -56085,6 +56214,278 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    preview_gallery_maintenance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GalleryMaintenancePreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GalleryMaintenancePreview"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Admin privileges required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Gallery maintenance is already active */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Gallery maintenance preview failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Gallery maintenance unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    remove_missing_images: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GalleryMaintenanceExecuteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GalleryMaintenanceResult"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Admin privileges required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Preview is stale or image storage is busy */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Gallery maintenance failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Gallery maintenance unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    archive_untracked_images: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GalleryMaintenanceExecuteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GalleryMaintenanceResult"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Admin privileges required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Preview is stale or image storage is busy */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Gallery maintenance failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Gallery maintenance unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    regenerate_missing_thumbnails: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GalleryMaintenanceExecuteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GalleryMaintenanceResult"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Admin privileges required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Preview is stale or image storage is busy */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Gallery maintenance failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Gallery maintenance unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

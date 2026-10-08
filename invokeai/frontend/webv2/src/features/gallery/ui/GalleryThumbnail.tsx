@@ -5,9 +5,23 @@ import { Badge, chakra } from '@chakra-ui/react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { formatGalleryVideoDuration, toGalleryItemRef } from '@features/gallery/core/items';
+import {
+  getGalleryThumbnailRevision,
+  getRefreshedGalleryThumbnailUrl,
+  subscribeGalleryThumbnailRevision,
+} from '@features/gallery/queries';
 import { IconButton } from '@platform/ui/Button';
 import { StarIcon } from 'lucide-react';
-import { useCallback, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import {
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type KeyboardEvent,
+  type MouseEvent,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
@@ -81,6 +95,18 @@ const GalleryThumbnail = ({
   onToggleStarred: (item: GalleryItem) => void;
 }) => {
   const { t } = useTranslation();
+  const thumbnailRevision = useSyncExternalStore(
+    subscribeGalleryThumbnailRevision,
+    getGalleryThumbnailRevision,
+    getGalleryThumbnailRevision
+  );
+  const thumbnailUrl = useMemo(
+    () =>
+      item.kind === 'image'
+        ? getRefreshedGalleryThumbnailUrl(item.thumbnailUrl || item.fullUrl, thumbnailRevision)
+        : item.thumbnailUrl || item.fullUrl,
+    [item.fullUrl, item.kind, item.thumbnailUrl, thumbnailRevision]
+  );
   const isCompared = compareRole !== null;
   const duration = item.kind === 'video' ? formatGalleryVideoDuration(item.durationSeconds) : null;
 
@@ -225,7 +251,7 @@ const GalleryThumbnail = ({
           alt={item.name}
           decoding={item.kind === 'video' ? 'async' : undefined}
           draggable={false}
-          src={item.thumbnailUrl || item.fullUrl}
+          src={thumbnailUrl}
           style={imageStyle}
         />
       </button>
@@ -279,7 +305,7 @@ const GalleryThumbnail = ({
       {previewStyle
         ? createPortal(
             <div aria-hidden="true" style={previewStyle}>
-              <img alt="" src={item.thumbnailUrl || item.fullUrl} style={PREVIEW_IMAGE_STYLE} />
+              <img alt="" src={thumbnailUrl} style={PREVIEW_IMAGE_STYLE} />
             </div>,
             document.body
           )
