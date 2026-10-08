@@ -60,6 +60,7 @@ const adapter = {
   playVideoSpanInPreview: () => null,
   projectId: 'project-1',
   rawValues: {},
+  readValues: () => ({}),
   reportError: () => undefined,
   showPromptSyntaxHighlighting: false,
   touchGalleryImages: () => undefined,

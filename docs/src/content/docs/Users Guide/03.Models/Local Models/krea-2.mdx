@@ -36,6 +36,7 @@ LoRA). For lower VRAM, use a smaller transformer build:
 | GGUF Q4_K_M (starter model) | ≈ 7 GB           | stays packed, unpacked per layer                            |
 | GGUF Q8_0 (starter model)   | ≈ 13 GB          | near-full quality                                           |
 | int8 (`int8_convrot`)       | ≈ 12.6 GiB       | stays int8 on every device, no FP8 setting needed           |
+| GGUF Q8_CR (ComfyUI-GGUF)   | ≈ 12.8 GiB       | the same int8 inside a `.gguf`, stays int8 on every device  |
 | fp8 / `fp8_scaled`          | ≈ 12.6 GB        | with FP8 Storage (switched on at install) or `fp8_compute`  |
 | MXFP8                       | ≈ 24 GB          | unpacked to BF16 at load; prefer the fp8, NVFP4 or GGUF build |
 
@@ -84,6 +85,7 @@ encoder closely; the remaining difference is the quantization of the encoder.
   `qwen3vl` architecture tag and does not install a plain Qwen3 file as one.
 - The `mmproj-*.gguf` file next to it holds the vision part and is not needed. Installing it is refused
   with a message saying so.
+- ComfyUI-GGUF's `Q8_CR` encoder files are refused at install; only the transformer loads from `Q8_CR`.
 - LoRAs with text-encoder layers still apply to a quantized encoder.
 
 ## Conditioning enhancers
