@@ -724,6 +724,7 @@ def test_remote_install_recovery_survives_cleanup_and_restart(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
     existing_paths = set(mm2_app_config.models_path.iterdir())
     tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}recovery-{uuid.uuid4().hex}"
     tmpdir.mkdir()
@@ -2035,6 +2036,7 @@ def test_restore_paused_hf_install_preserves_access_token(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
 
     access_token = "hf_test_access_token"
     tmpdir = mm2_app_config.models_path / f"tmpinstall_resume_token_{uuid.uuid4().hex}"
@@ -2098,6 +2100,7 @@ def test_restore_claims_downloads_done_staging_before_queueing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
     tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}restore-complete-{uuid.uuid4().hex}"
     tmpdir.mkdir()
     source = URLModelSource(url=Url("https://example.com/model.safetensors"))
@@ -3362,6 +3365,7 @@ def test_restore_keeps_a_legacy_marker_whose_key_predates_key_validation(
     the tmpdir and `_remove_dangling_install_dirs` keeps any tmpdir whose marker is readable and non-terminal.
     Containment does not depend on this - `install_path()` checks the key at the join and errors the job."""
     assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
 
     tmpdirs: list[Path] = []
     try:
@@ -3407,6 +3411,7 @@ def test_restore_skips_an_unparseable_marker_without_abandoning_the_rest(
     """A marker whose stored config no longer validates must skip that one marker, not raise out of the loop and
     leave every interrupted install after it unrestored."""
     assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
 
     tmpdirs: list[Path] = []
     try:
