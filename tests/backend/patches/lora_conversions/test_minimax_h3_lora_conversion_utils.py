@@ -208,3 +208,50 @@ def test_rejects_malformed_fused_tensors():
     }
     with pytest.raises(ValueError, match="odd output row count"):
         lora_model_from_minimax_h3_state_dict(sd)
+
+
+def _to_kohya(sd: dict[str, torch.Tensor], alpha: float, separator: str = "_") -> dict[str, torch.Tensor]:
+    """Re-key a dotted turbo-style dict the way kohya sd-scripts / musubi-tuner write it."""
+    kohya: dict[str, torch.Tensor] = {}
+    for key, value in sd.items():
+        module, _, suffix = key.rpartition(".lora_")
+        flat = f"lora_unet{separator}{module.replace('.', '_')}"
+        kohya[f"{flat}.lora_{suffix.replace('A.', 'down.').replace('B.', 'up.')}"] = value
+        kohya[f"{flat}.alpha"] = torch.tensor(alpha)
+    return kohya
+
+
+@pytest.mark.parametrize("separator", ["_", "__"])
+def test_kohya_keys_convert_like_dotted_keys(separator: str):
+    dotted = _make_turbo_style_state_dict()
+    kohya = _to_kohya(dotted, alpha=RANK / 2, separator=separator)
+    assert is_state_dict_likely_in_minimax_h3_format(kohya)
+
+    expected = lora_model_from_minimax_h3_state_dict(dotted)
+    patch = lora_model_from_minimax_h3_state_dict(kohya)
+
+    assert patch.layers.keys() == expected.layers.keys()
+    for key, layer in patch.layers.items():
+        reference = expected.layers[key]
+        assert isinstance(layer, LoRALayer) and isinstance(reference, LoRALayer)
+        assert torch.equal(layer.up, reference.up)
+        assert torch.equal(layer.down, reference.down)
+        assert layer.scale() == pytest.approx(0.5 if layer.down.shape[0] == RANK else RANK / 4)
+
+
+def test_kohya_key_naming_no_h3_linear_is_not_detected():
+    # A flattened path outside the H3 Linear vocabulary would convert to a module that does not
+    # exist (a silent no-op), so one such key disqualifies the whole file.
+    kohya = _to_kohya(_make_turbo_style_state_dict(), alpha=RANK)
+    kohya["lora_unet_x_embedder_proj.lora_down.weight"] = torch.zeros(RANK, HIDDEN)
+    assert not is_state_dict_likely_in_minimax_h3_format(kohya)
+
+    # A parent of real Linears is not itself a Linear.
+    kohya = _to_kohya(_make_turbo_style_state_dict(), alpha=RANK)
+    kohya["lora_unet_blocks_0_attn.lora_down.weight"] = torch.zeros(RANK, HIDDEN)
+    assert not is_state_dict_likely_in_minimax_h3_format(kohya)
+
+    # Refiner blocks have no AdaLN projection.
+    kohya = _to_kohya(_make_turbo_style_state_dict(), alpha=RANK)
+    kohya["lora_unet_token_refiner_blocks_0_adaln_proj_linear.lora_down.weight"] = torch.zeros(RANK, TIME_EMBED)
+    assert not is_state_dict_likely_in_minimax_h3_format(kohya)

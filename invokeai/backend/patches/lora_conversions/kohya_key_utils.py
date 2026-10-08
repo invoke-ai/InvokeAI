@@ -58,6 +58,26 @@ def insert_periods_into_kohya_key(key: str, parsing_tree: ParsingTree) -> str:
     return ".".join(result_parts)
 
 
+def kohya_module_path_is_leaf(module_path: str, parsing_tree: ParsingTree) -> bool:
+    """True if a dotted module path walks the tree all the way to a leaf.
+
+    ``insert_periods_into_kohya_key`` only rejects *leftover* tokens, so a prefix of a real path (e.g.
+    ``blocks.0.attn``) parses cleanly without naming a module. Requiring a leaf rejects those.
+    """
+    subtree = parsing_tree
+    for component in module_path.split("."):
+        # Mirror ``insert_periods_into_kohya_key``'s precedence: an exact match wins over the index
+        # placeholder. Without that, a numeric component would always be looked up as INDEX_PLACEHOLDER and
+        # a tree enumerating the specific indices it accepts (e.g. Krea-2's ``tmlp``) could never reach its leaves.
+        if component in subtree:
+            subtree = subtree[component]
+        elif component.isnumeric() and INDEX_PLACEHOLDER in subtree:
+            subtree = subtree[INDEX_PLACEHOLDER]
+        else:
+            return False
+    return not subtree
+
+
 def generate_kohya_parsing_tree_from_keys(keys: Iterable[str]) -> ParsingTree:
     """Generate a parsing tree from a list of keys.
 
