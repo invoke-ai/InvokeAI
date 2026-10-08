@@ -1,3 +1,4 @@
+import math
 from typing import overload
 
 import gguf
@@ -204,10 +205,27 @@ class GGMLTensor(torch.Tensor):
 
 # What one dequantization allocates beyond its result, per weight element: the block kernels in
 # `utils.py` widen codes and scales through integer and float16 intermediates before the final cast.
-# Measured on CUDA (torch 2.13) for a 4608x53248 weight: about 2 bytes for Q8_0 and Q4_0, 3 for Q4_K
-# and Q6_K, 5 for Q5_K, 6 for BF16 and 8 for Q5_1. The host-side counterpart, for decoding a whole tensor
-# at load, is `_PEAK_COPIES` in `model_manager/load/quantized_embedding.py`.
-_DEQUANT_INTERMEDIATE_BYTES_PER_ELEMENT = 8
+# Measured on CUDA (torch 2.13) for a 4608x53248 weight and rounded up; F32/F16 are a plain cast. Types
+# not listed (the IQ family decodes through the numpy fallback) get the worst measured value. The
+# host-side counterpart, for decoding a whole tensor at load, is `_PEAK_COPIES` in
+# `model_manager/load/quantized_embedding.py`.
+_GGMLQ = gguf.GGMLQuantizationType
+_DEQUANT_INTERMEDIATE_BYTES_PER_ELEMENT: dict[gguf.GGMLQuantizationType, float] = {
+    _GGMLQ.F32: 0.05,
+    _GGMLQ.F16: 0.0,
+    _GGMLQ.Q8_0: 2.0,
+    _GGMLQ.Q4_0: 2.0,
+    _GGMLQ.Q4_1: 3.0,
+    _GGMLQ.Q6_K: 3.25,
+    _GGMLQ.Q4_K: 3.25,
+    _GGMLQ.Q2_K: 3.25,
+    _GGMLQ.Q3_K: 3.5,
+    _GGMLQ.Q5_K: 5.25,
+    _GGMLQ.BF16: 6.0,
+    _GGMLQ.Q5_0: 8.0,
+    _GGMLQ.Q5_1: 8.0,
+}
+_DEQUANT_INTERMEDIATE_BYTES_WORST = 8.0
 
 
 def peak_ggml_linear_dequant_transient_bytes(model: torch.nn.Module) -> int:
@@ -217,13 +235,19 @@ def peak_ggml_linear_dequant_transient_bytes(model: torch.nn.Module) -> int:
     which is not part of the model's resident size and so has to fit inside the calling node's
     working-memory reservation. The layers run one after another and free their copy before the
     next one allocates, so the peak is the largest single layer's: its dequantized copy, the kernels'
-    intermediates, and the packed bytes, which partial loading copies to the device for the call.
-    Zero when no Linear weight is packed.
+    intermediates for its quantization type, and the packed bytes, which partial loading copies to
+    the device for the call. Zero when no Linear weight is packed.
     """
     peak = 0
     for module in model.modules():
-        weight = getattr(module, "weight", None)
-        if isinstance(module, torch.nn.Linear) and isinstance(weight, GGMLTensor):
-            per_element = weight.compute_dtype.itemsize + _DEQUANT_INTERMEDIATE_BYTES_PER_ELEMENT
-            peak = max(peak, weight.tensor_shape.numel() * per_element + weight.quantized_data.nbytes)
+        if not isinstance(module, torch.nn.Linear):
+            continue
+        weight = module.weight
+        if not isinstance(weight, GGMLTensor):
+            continue
+        intermediates = _DEQUANT_INTERMEDIATE_BYTES_PER_ELEMENT.get(
+            weight._ggml_quantization_type, _DEQUANT_INTERMEDIATE_BYTES_WORST
+        )
+        per_element = weight.compute_dtype.itemsize + intermediates
+        peak = max(peak, math.ceil(weight.tensor_shape.numel() * per_element) + weight.quantized_data.nbytes)
     return peak
