@@ -7,13 +7,6 @@ import { Box, Flex, type BoxProps, type FlexProps, type SystemStyleObject } from
  * supplies bordered, shadowed media geometry.
  */
 
-export const previewGridCss = {
-  backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1.5px)',
-  backgroundPosition: 'center',
-  backgroundRepeat: 'repeat',
-  backgroundSize: '24px 24px',
-} as const;
-
 export const getFittedFrameCss = (width: number, height: number): SystemStyleObject => ({
   // The cue gallery thumbnails give when a touch hold arms their drag; only a draggable frame is ever armed.
   '&[data-drag-armed=true]': { filter: 'saturate(0)' },
@@ -55,11 +48,9 @@ export const PreviewStage = ({
 }) => (
   <Flex
     align="center"
-    backgroundColor="bg.inset"
-    color="fg.grid"
     containerType="size"
-    css={previewGridCss}
     justify="center"
+    layerStyle="dotGrid"
     p={padding}
     pb={paddingBottom}
     position="relative"

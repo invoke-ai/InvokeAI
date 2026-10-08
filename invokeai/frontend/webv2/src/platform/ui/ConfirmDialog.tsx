@@ -1,5 +1,6 @@
 import { Dialog, Portal, Stack, Text } from '@chakra-ui/react';
-import { useCallback, useRef, useState, type ReactNode } from 'react';
+import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { Button, CloseButton } from './Button';
 
@@ -12,6 +13,7 @@ export const ConfirmDialog = ({
   isOpen,
   onClose,
   onConfirm,
+  onExitComplete,
   title,
 }: {
   body: ReactNode;
@@ -22,10 +24,24 @@ export const ConfirmDialog = ({
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => Promise<void> | void;
+  /** After the close animation; hosts that retain the dialog's subject release it here. */
+  onExitComplete?: () => void;
   title: string;
 }) => {
   const [isPending, setIsPending] = useState(false);
   const isPendingRef = useRef(false);
+  // Hosts often clear the subject the dialog describes as it closes; keep the text it showed while it animates out.
+  const live = useMemo(
+    () => ({ body, confirmLabel, isDestructive, title }),
+    [body, confirmLabel, isDestructive, title]
+  );
+  const shown = useExitRetainedValue(isOpen ? live : null);
+  const text = shown.value ?? live;
+  const { release } = shown;
+  const handleExitComplete = useCallback(() => {
+    release();
+    onExitComplete?.();
+  }, [onExitComplete, release]);
 
   const handleConfirm = useCallback(async () => {
     if (isPendingRef.current) {
@@ -71,6 +87,7 @@ export const ConfirmDialog = ({
       open={isOpen}
       role="alertdialog"
       size="sm"
+      onExitComplete={handleExitComplete}
       onOpenChange={handleOpenChange}
     >
       <Portal>
@@ -78,24 +95,25 @@ export const ConfirmDialog = ({
         <Dialog.Positioner>
           <Dialog.Content>
             <Dialog.Header>
-              <Dialog.Title>{title}</Dialog.Title>
+              <Dialog.Title>{text.title}</Dialog.Title>
             </Dialog.Header>
             <Dialog.Body>
-              <Stack gap="2">{typeof body === 'string' ? <Text fontSize="xs">{body}</Text> : body}</Stack>
+              <Stack gap="2">
+                {typeof text.body === 'string' ? <Text fontSize="md">{text.body}</Text> : text.body}
+              </Stack>
             </Dialog.Body>
             <Dialog.Footer>
-              <Button disabled={isPending} size="xs" variant="ghost" onClick={handleClose}>
+              <Button disabled={isPending} variant="ghost" onClick={handleClose}>
                 Cancel
               </Button>
               <Button
-                colorPalette={isDestructive ? 'red' : 'accent'}
+                colorPalette={text.isDestructive ? 'red' : 'accent'}
                 disabled={isPending}
                 loading={isPending}
-                size="xs"
                 variant="solid"
                 onClick={handleConfirmClick}
               >
-                {confirmLabel}
+                {text.confirmLabel}
               </Button>
             </Dialog.Footer>
             <Dialog.CloseTrigger asChild>

@@ -9,7 +9,7 @@ from invokeai.app.services.image_index.image_index_common import (
     MediaKind,
     ProjectionRecord,
     blob_to_coords,
-    blob_to_embedding,
+    blobs_to_embeddings,
     coords_to_blob,
     embedding_to_blob,
 )
@@ -19,6 +19,9 @@ from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries import Queries
 from invokeai.app.services.shared.database.queries.locks import DatabaseLock
 from invokeai.backend.util.logging import InvokeAILogger
+
+# What `embedding_to_blob` writes.
+_STORED_ENCODING = "float16"
 
 
 class ImageIndexRecords(ImageIndexRecordsBase):
@@ -35,7 +38,7 @@ class ImageIndexRecords(ImageIndexRecordsBase):
     def upsert_embedding(self, item: IndexedItem, model_id: str, embedding: np.ndarray) -> None:
         blob = embedding_to_blob(embedding)
         # The item may be deleted between being scheduled and embedded, which makes the embedding pointless.
-        if not self._queries.image_index.upsert_embedding(item, model_id, embedding.shape[0], blob):
+        if not self._queries.image_index.upsert_embedding(item, model_id, embedding.shape[0], blob, _STORED_ENCODING):
             self._logger.debug(f"Skipped embedding for missing {item.kind} {item.name}")
 
     def get_embeddings(self, items: list[IndexedItem], model_id: str) -> tuple[list[IndexedItem], np.ndarray]:
@@ -47,19 +50,18 @@ class ImageIndexRecords(ImageIndexRecordsBase):
         # Read back in the caller's order: the returned matrix's rows align with it.
         found_items = [item for item in items if item in rows]
 
-        dim: int | None = None
-        vectors: list[np.ndarray] = []
-        for item in found_items:
-            row_dim, blob = rows[item]
-            if dim is None:
-                dim = row_dim
-            elif row_dim != dim:
-                raise ValueError(f"Inconsistent embedding dims for model {model_id}: found {row_dim} and {dim}")
-            vectors.append(blob_to_embedding(blob, row_dim))
-
-        if not vectors:
+        if not found_items:
             return [], np.empty((0, 0), dtype=EMBEDDING_DTYPE)
-        return found_items, np.stack(vectors)
+
+        dim = rows[found_items[0]][0]
+        for item in found_items:
+            row_dim = rows[item][0]
+            if row_dim != dim:
+                raise ValueError(f"Inconsistent embedding dims for model {model_id}: found {row_dim} and {dim}")
+        matrix = blobs_to_embeddings(
+            [rows[item][1] for item in found_items], [rows[item][2] for item in found_items], dim
+        )
+        return found_items, matrix
 
     def delete_embedding(self, item: IndexedItem) -> None:
         self._queries.image_index.delete_embedding(item)

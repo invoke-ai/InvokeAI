@@ -126,7 +126,7 @@ export const GalleryBoardsPanel = () => {
         <IconButton
           aria-label={t('widgets.gallery.createBoard')}
           color="fg.muted"
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={handleAddBoard}
         >
@@ -145,7 +145,7 @@ export const GalleryBoardsPanel = () => {
         onSearchChange={setSearchTerm}
         onSubmitSearch={handleSubmitSearch}
       />
-      <ScrollArea.Root flex="1" minH="0" size="xs" variant="hover" w="full">
+      <ScrollArea.Root flex="1" minH="0" variant="hover" w="full">
         <ScrollArea.Viewport ref={boardsViewportRef} h="full" w="full">
           <ScrollArea.Content {...SCROLL_CONTENT_PROPS}>
             <GalleryBoardSection
@@ -221,7 +221,7 @@ export const GalleryBoardsPanel = () => {
 
             {!groups.hasAnyMatch && !groups.canCreateFromSearch ? (
               <HStack justify="center" py="3">
-                <Text color="fg.muted" fontSize="2xs">
+                <Text color="fg.muted" fontSize="xs">
                   {t('widgets.gallery.noBoardsMatchSearch')}
                 </Text>
               </HStack>

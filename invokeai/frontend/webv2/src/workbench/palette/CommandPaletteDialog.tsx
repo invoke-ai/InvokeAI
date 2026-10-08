@@ -28,7 +28,7 @@ const TAB_HINT_KEYS = ['tab'];
 const FooterHint = ({ children, keys, shrink = false }: { children: string; keys: string[]; shrink?: boolean }) => (
   <HStack flexShrink={shrink ? 1 : 0} gap="1" minW="0">
     {keys.map((key) => (
-      <Kbd key={key} flexShrink={0} size="sm" textTransform="lowercase">
+      <Kbd key={key} flexShrink={0} textTransform="lowercase">
         {key}
       </Kbd>
     ))}
@@ -47,12 +47,15 @@ export const CommandPaletteDialog = ({
   isOpen,
   modifierKeyLabel,
   onClose,
+  onExitComplete,
   providers = NO_PROVIDERS,
 }: {
   entries: PaletteEntry[];
   isOpen: boolean;
   modifierKeyLabel: string;
   onClose: () => void;
+  /** After the close animation; hosts that keep the palette mounted while it closes unmount it here. */
+  onExitComplete?: () => void;
   providers?: PaletteSearchProvider[];
 }) => {
   const onDialogOpenChange = useCallback(
@@ -74,16 +77,16 @@ export const CommandPaletteDialog = ({
       restoreFocus
       scrollBehavior="inside"
       unmountOnExit
+      onExitComplete={onExitComplete}
       onOpenChange={onDialogOpenChange}
     >
-      {isOpen ? (
-        <CommandPaletteContent
-          entries={entries}
-          modifierKeyLabel={modifierKeyLabel}
-          providers={providers}
-          onClose={onClose}
-        />
-      ) : null}
+      <CommandPaletteContent
+        entries={entries}
+        isOpen={isOpen}
+        modifierKeyLabel={modifierKeyLabel}
+        providers={providers}
+        onClose={onClose}
+      />
     </Dialog.Root>
   );
 };
@@ -92,11 +95,13 @@ export default CommandPaletteDialog;
 
 const CommandPaletteContent = ({
   entries,
+  isOpen,
   modifierKeyLabel,
   onClose,
   providers,
 }: {
   entries: PaletteEntry[];
+  isOpen: boolean;
   modifierKeyLabel: string;
   onClose: () => void;
   providers: PaletteSearchProvider[];
@@ -123,7 +128,7 @@ const CommandPaletteContent = ({
           py="6"
           title={t('commandPalette.states.couldNotSearch', { label: controller.scopeLabel })}
         >
-          <Button size="xs" variant="subtle" onClick={controller.onRetry}>
+          <Button variant="subtle" onClick={controller.onRetry}>
             {t('common.retry')}
           </Button>
         </EmptyState>
@@ -143,7 +148,8 @@ const CommandPaletteContent = ({
 
   return (
     <Portal>
-      {controller.stage?.clearPreview ? <StagePreviewLifetime stage={controller.stage} /> : null}
+      {/* A preview ends when the palette closes, not when its exit animation finishes. */}
+      {isOpen && controller.stage?.clearPreview ? <StagePreviewLifetime stage={controller.stage} /> : null}
       <Dialog.Backdrop bg="blackAlpha.300" />
       <Dialog.Positioner alignItems="flex-start" pt="15vh">
         <Dialog.Content
@@ -176,7 +182,7 @@ const CommandPaletteContent = ({
                 color="fg"
                 display="inline-flex"
                 flexShrink={0}
-                fontSize="xs"
+                fontSize="md"
                 fontWeight="600"
                 gap="1"
                 px="1.5"
@@ -207,7 +213,7 @@ const CommandPaletteContent = ({
               bg="transparent"
               color="fg"
               flex="1"
-              fontSize="sm"
+              fontSize="lg"
               outline="none"
               placeholder={controller.placeholder}
               role="combobox"
@@ -218,7 +224,7 @@ const CommandPaletteContent = ({
               onKeyDown={onSearchKeyDown}
             />
             {controller.dateInvalidHint ? (
-              <Text color="fg.error" flexShrink={0} fontSize="xs" id={DATE_HINT_ID} maxW="45%" role="status" truncate>
+              <Text color="fg.error" flexShrink={0} fontSize="md" id={DATE_HINT_ID} maxW="45%" role="status" truncate>
                 {controller.dateInvalidHint}
               </Text>
             ) : controller.dateSummary ? (
@@ -227,7 +233,7 @@ const CommandPaletteContent = ({
                 borderRadius="sm"
                 color="fg.muted"
                 flexShrink={0}
-                fontSize="xs"
+                fontSize="md"
                 id={DATE_HINT_ID}
                 px="1.5"
                 py="0.5"
@@ -257,7 +263,7 @@ const CommandPaletteContent = ({
             borderTopWidth="1px"
             color="fg.subtle"
             flexShrink={0}
-            fontSize="xs"
+            fontSize="md"
             gap="4"
             h="8"
             hideBelow="sm"

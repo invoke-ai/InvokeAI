@@ -128,7 +128,7 @@ export const NodeFieldControl = ({
 
   if (!invocationNode || !template) {
     return (
-      <Alert.Root status="error" size="sm" variant="surface">
+      <Alert.Root status="error" variant="surface">
         <Alert.Indicator />
         <Alert.Title>This field no longer exists in the project graph.</Alert.Title>
       </Alert.Root>
@@ -140,7 +140,7 @@ export const NodeFieldControl = ({
         aria-label={resetAriaLabel}
         color="fg.subtle"
         flexShrink={0}
-        size="2xs"
+        size="sm"
         title="Reset to default value"
         variant="ghost"
         onClick={onResetClick}
@@ -158,12 +158,11 @@ export const NodeFieldControl = ({
             <Input
               aria-label="Field label"
               color={isInvalid ? 'fg.error' : 'fg.muted'}
-              fontSize="2xs"
+              fontSize="xs"
               fontWeight="600"
               h="5"
               id={labelInputId}
               placeholder={template.title}
-              size="2xs"
               value={draftLabel ?? label}
               variant="flushed"
               w="full"
@@ -184,12 +183,12 @@ export const NodeFieldControl = ({
           </HStack>
         )}
         {element.data.showDescription && description ? (
-          <Text color="fg.subtle" fontSize="2xs">
+          <Text color="fg.subtle" fontSize="xs">
             {description}
           </Text>
         ) : null}
         {isConnected ? (
-          <Text color="fg.subtle" fontSize="2xs">
+          <Text color="fg.subtle" fontSize="xs">
             {t('nodes.providedByConnection')}
           </Text>
         ) : (
@@ -213,7 +212,6 @@ export const NodeFieldControl = ({
                   aria-label={`${t('common.shuffle')} ${label}`}
                   color="fg.muted"
                   flexShrink={0}
-                  size="xs"
                   variant="outline"
                   onClick={onShuffleClick}
                 >
@@ -223,7 +221,7 @@ export const NodeFieldControl = ({
             ) : null}
           </HStack>
         )}
-        {invalidReason ? <Field.ErrorText fontSize="2xs">{invalidReason}</Field.ErrorText> : null}
+        {invalidReason ? <Field.ErrorText fontSize="xs">{invalidReason}</Field.ErrorText> : null}
       </Stack>
     </Field.Root>
   );

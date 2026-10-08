@@ -51,6 +51,16 @@ class MockApiDependencies(ApiDependencies):
         self.invoker = invoker
 
 
+def _png_bytes() -> bytes:
+    from io import BytesIO
+
+    from PIL import Image
+
+    buffer = BytesIO()
+    Image.new("RGB", (8, 8), color=(200, 30, 30)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
 class FakeImageIndexService(ImageIndexServiceBase):
     """Records projection/search requests instead of running a worker."""
 
@@ -68,10 +78,15 @@ class FakeImageIndexService(ImageIndexServiceBase):
         self.embedded_images: list = []
         self.vocab_invalidations = 0
         self.vocab_state: tuple[str, str | None] = ("idle", None)
+        self.replacing = False
 
     @property
     def model_id(self) -> str | None:
         return self._model_id
+
+    @property
+    def replacing_model(self) -> bool:
+        return self.replacing
 
     def get_status(self) -> ImageIndexStatus | None:
         if self._model_id is None:
@@ -218,6 +233,7 @@ def mock_services(
         boards=BoardService(),
         bulk_download=BulkDownloadService(),
         configuration=configuration,
+        database=db,
         events=TestEventService(),
         image_files=None,  # type: ignore
         image_records=ImageRecordStorage(db),
@@ -384,6 +400,7 @@ def test_points_computing_and_enqueues_when_cache_missing(
 
     body = response.json()
     assert body["state"] == "computing"
+    assert body["model_id"] == MODEL_ID
     assert body["stale"] is True
     # System user is admin in single-user mode -> all_images scope.
     assert image_index_service.projection_requests == [(SYSTEM_USER_ID, True)]
@@ -473,6 +490,14 @@ def test_status_model_missing_when_enabled_without_model(
         pytest.param(lambda client: client.get("/api/v1/image_map/points"), id="points"),
         pytest.param(lambda client: client.get("/api/v1/image_map/status"), id="status"),
         pytest.param(lambda client: client.post("/api/v1/image_map/refresh"), id="refresh"),
+        # Gallery search runs without the map open, so it must recover on its own.
+        pytest.param(lambda client: client.get("/api/v1/image_map/search", params={"q": "a cat"}), id="search"),
+        pytest.param(
+            lambda client: client.post(
+                "/api/v1/image_map/search_by_image", files={"image": ("ref.png", _png_bytes(), "image/png")}
+            ),
+            id="search_by_image",
+        ),
     ],
 )
 def test_endpoints_activate_a_model_installed_since_startup(
@@ -517,6 +542,78 @@ def test_points_serve_the_index_once_it_is_activated(
     assert client.get("/api/v1/image_map/status").json()["enabled"] is True
 
 
+@pytest.mark.parametrize("endpoint", ["points", "status"])
+def test_reads_revalidate_an_encoder_deleted_after_activation(
+    endpoint: str, mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    mock_invoker.services.configuration.image_index_enabled = True
+
+    def revalidate() -> bool:
+        image_index_service._model_id = None
+        return False
+
+    image_index_service.try_activate = revalidate  # type: ignore[method-assign]
+    body = client.get(f"/api/v1/image_map/{endpoint}").json()
+    projection = body["projection"] if endpoint == "status" else body
+    assert projection["state"] == "model_missing"
+    assert body["model_id"] is None
+    assert body["model_name"] == mock_invoker.services.configuration.image_index_model
+    if endpoint == "status":
+        assert body["enabled"] is False
+        assert body["index"] is None
+
+
+@pytest.mark.parametrize("endpoint", ["points", "status"])
+def test_reads_report_a_draining_replacement_as_computing_rather_than_missing(
+    endpoint: str, mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    # The replacement is installed; offering to install it again would invite a
+    # duplicate install while the retired encoder's work drains.
+    mock_invoker.services.configuration.image_index_enabled = True
+    image_index_service._model_id = None
+    image_index_service.replacing = True
+    body = client.get(f"/api/v1/image_map/{endpoint}").json()
+    projection = body["projection"] if endpoint == "status" else body
+    assert projection["state"] == "computing"
+    assert body["model_id"] is None
+    assert body["model_name"] is None
+
+    mock_invoker.services.configuration.image_index_enabled = False
+    body = client.get(f"/api/v1/image_map/{endpoint}").json()
+    assert (body["projection"] if endpoint == "status" else body)["state"] == "disabled"
+
+
+def test_search_during_a_replacement_says_the_model_is_switching(
+    mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    mock_invoker.services.configuration.image_index_enabled = True
+    image_index_service._model_id = None
+    image_index_service.replacing = True
+    response = client.get("/api/v1/image_map/search", params={"q": "a cat"})
+    assert response.status_code == 409
+    assert "switching" in response.json()["detail"]
+
+
+@pytest.mark.parametrize("endpoint", ["points", "status"])
+def test_encoder_fingerprint_changes_without_a_missing_model_response(
+    endpoint: str, mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    _seed_embedded_image(mock_invoker, "a.png")
+    _seed_projection(mock_invoker, SYSTEM_USER_ID, imgs("a.png"), np.zeros((1, 2), dtype=np.float32))
+    before = client.get(f"/api/v1/image_map/{endpoint}").json()
+    assert before["model_id"] == MODEL_ID
+    assert (before["projection"] if endpoint == "status" else before)["point_count"] == 1
+
+    # The browser can miss the whole removal/reinstall while closed or suspended.
+    # The new encoder must identify itself before it has any projected points.
+    image_index_service._model_id = "replacement-model-hash"
+    after = client.get(f"/api/v1/image_map/{endpoint}").json()
+    assert after["model_id"] == "replacement-model-hash"
+    projection = after["projection"] if endpoint == "status" else after
+    assert projection["state"] == "empty"
+    assert projection["point_count"] == 0
+
+
 def test_status_disabled(mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient) -> None:
     image_index_service._model_id = None
     mock_invoker.services.configuration.image_index_enabled = False
@@ -524,6 +621,19 @@ def test_status_disabled(mock_invoker: Invoker, image_index_service: FakeImageIn
     assert body["enabled"] is False
     assert body["model_name"] is None
     assert body["projection"]["state"] == "disabled"
+
+
+def test_search_refuses_a_model_replaced_after_query_embedding(
+    image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    def embed_then_replace(text: str) -> np.ndarray:
+        image_index_service._model_id = "replacement-model"
+        return np.ones(DIM, dtype=np.float32)
+
+    image_index_service.embed_text = embed_then_replace  # type: ignore[method-assign]
+    response = client.get("/api/v1/image_map/search", params={"q": "a cat"})
+    assert response.status_code == 409
+    assert image_index_service.search_calls == []
 
 
 def test_eps_validation(client: TestClient) -> None:
@@ -1174,18 +1284,12 @@ def test_cluster_labels_skips_the_embedding_gather_when_nothing_clustered(
 def test_search_by_image_upload_returns_ranked_results(
     image_index_service: FakeImageIndexService, client: TestClient
 ) -> None:
-    from io import BytesIO
-
-    from PIL import Image
-
-    buffer = BytesIO()
-    Image.new("RGB", (8, 8), color=(200, 30, 30)).save(buffer, format="PNG")
     image_index_service.search_results = [(IndexedItem("image", "a.png"), 0.9), (IndexedItem("image", "b.png"), 0.4)]
 
     response = client.post(
         "/api/v1/image_map/search_by_image",
         params={"limit": 5},
-        files={"image": ("ref.png", buffer.getvalue(), "image/png")},
+        files={"image": ("ref.png", _png_bytes(), "image/png")},
     )
 
     assert response.status_code == 200
@@ -1573,7 +1677,10 @@ def test_image_labels_rank_the_vocabulary_for_one_image(mock_invoker: Invoker, c
 
     assert body["label"] == "beta"
     assert body["alternates"] == ["alpha", "gamma"]
-    assert body["score"] == pytest.approx(0.8 / float(np.linalg.norm(vector)))
+    stored_vector = (vector / np.linalg.norm(vector)).astype("<f2")
+    expected_embedding = stored_vector.astype(np.float32)
+    expected_embedding /= np.linalg.norm(expected_embedding.astype(np.float64))
+    assert body["score"] == pytest.approx(float(expected_embedding[1]))
 
     # top_k bounds the total label count (best + alternates).
     body = client.get("/api/v1/image_map/image_labels", params={"image_name": "leaning.png", "top_k": 1}).json()

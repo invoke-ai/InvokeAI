@@ -1,8 +1,14 @@
 """The image index: embeddings of images and videos, cached map projections, and custom vocabulary."""
 
-from sqlalchemy import Column, ForeignKey, Index
+from sqlalchemy import CheckConstraint, Column, ForeignKey, Index
 
-from invokeai.app.services.shared.database.schema.metadata import USER_ID_LENGTH, inserted_at, table, updated_at
+from invokeai.app.services.shared.database.schema.metadata import (
+    USER_ID_LENGTH,
+    default,
+    inserted_at,
+    table,
+    updated_at,
+)
 from invokeai.app.services.shared.database.types import BigInt, Blob, Key, LongText, NoCaseKey
 
 image_embeddings = table(
@@ -11,9 +17,11 @@ image_embeddings = table(
     # The embedding model's content hash, not its install key.
     Column("model_id", Key(), primary_key=True),
     Column("dim", BigInt(), nullable=False),
-    # float32, L2-normalized: dim * 4 bytes.
+    # L2-normalized, in the little-endian float type `encoding` names: dim * 2 or dim * 4 bytes.
     Column("embedding", Blob(), nullable=False),
     inserted_at(),
+    Column("encoding", LongText(), nullable=False, server_default=default("float32")),
+    CheckConstraint("encoding IN ('float32', 'float16')", name="encoding"),
 )
 
 Index("idx_image_embeddings_model_id", image_embeddings.c.model_id)
@@ -24,9 +32,11 @@ video_embeddings = table(
     # The embedding model's content hash, not its install key.
     Column("model_id", Key(), primary_key=True),
     Column("dim", BigInt(), nullable=False),
-    # float32, L2-normalized: dim * 4 bytes.
+    # L2-normalized, in the little-endian float type `encoding` names: dim * 2 or dim * 4 bytes.
     Column("embedding", Blob(), nullable=False),
     inserted_at(),
+    Column("encoding", LongText(), nullable=False, server_default=default("float32")),
+    CheckConstraint("encoding IN ('float32', 'float16')", name="encoding"),
 )
 
 Index("idx_video_embeddings_model_id", video_embeddings.c.model_id)

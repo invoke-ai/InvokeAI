@@ -1,6 +1,6 @@
 ---
 title: PR Merge Policy
-lastUpdated: 2026-02-19
+lastUpdated: 2026-10-05
 ---
 
 import { Steps } from '@astrojs/starlight/components';
@@ -62,6 +62,47 @@ documentation that they used while creating the code both in the PR
 and as comments in the code itself. If there are any licensing
 restrictions, these should be linked to and/or reproduced in the repo
 root.
+
+## Abandoned Community PRs
+
+On occasion an outside contributor will submit a PR and then abandon
+it halfway through the review process. The protocol for dealing with
+such cases is as follows.
+
+<Steps>
+
+  1. Give the PR author a chance to reengage.
+
+     If there has been no movement on the PR over the course of a week,
+     the assigned reviewer should send a comment to the author asking
+     if they are still working on the PR.
+
+     If the PR has seen no activity from the author two weeks after it
+     stalled, the assigned reviewer moves to the next step.
+
+  2. The assigned reviewer determines whether the PR is salvageable.
+
+     The assigned reviewer makes a judgement call whether the PR is worth pursuing and that the
+     effort justifies the returns. They may:
+     - Elect to take ownership of the PR and shepherd it into the merge.
+     - Decline to adopt it (see step 5).
+
+  3. In the event the assigned reviewer elects to take ownership, they must:
+     - Confirm that "Allow edits by maintainers" is enabled on the PR.
+     - Ask a maintainer to assign a secondary reviewer to review their work.
+
+  4. The assigned reviewer pushes fixes to the PR branch, and the secondary reviewer
+     reviews and ultimately approves the PR, as per usual practice.
+
+  5. If the reviewer elects not to adopt the PR:
+
+     - The reviewer should notify collaborators in the **#request-reviews Discord channel**
+     - Collaborators and maintainers briefly discuss whether another developer is willing
+       to salvage the PR or close it.
+     - If the consensus is to close the PR, then the assigned reviewer should close the PR
+       with a courtesy note to the author offering to consider reopening the PR upon request.
+
+</Steps>
 
 ## Summary
 

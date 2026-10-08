@@ -57,8 +57,9 @@ server_only = pytest.mark.skipif(
     external_test_db_url() is None, reason="needs a MySQL or MariaDB server (INVOKEAI_TEST_DB_URL)"
 )
 
-# The migrations that run on SQLite only: every one up to the cutover. Their number never grows.
-SQLITE_ONLY_MIGRATIONS = 63
+# The migrations that run on SQLite only: every one up to the cutover. Their number grows only by a migration
+# written before the cutover and merged after it (2026_09_30_store_embeddings_fp16), never by a new one.
+SQLITE_ONLY_MIGRATIONS = 64
 QUARANTINE_TABLE = "orphaned_projects_2026_08_06"
 CUTOVER_SCHEMAS = Path(__file__).parent / "server_schema_at_cutover"
 

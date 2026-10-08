@@ -7,7 +7,6 @@ import { FieldLabel } from '@platform/ui/Field';
 export const PropertiesSection = ({
   children,
   disabled = false,
-  headerHidden = false,
   ref,
   subtitle,
   title,
@@ -15,8 +14,6 @@ export const PropertiesSection = ({
   children: ReactNode;
   /** The surface is busy elsewhere (staging, generation, an operation): the rows stay in place but cannot act. */
   disabled?: boolean;
-  /** The pane title already names this section; `title` still labels the group for assistive technology. */
-  headerHidden?: boolean;
   ref?: Ref<HTMLDivElement>;
   subtitle?: string;
   title: string;
@@ -34,16 +31,14 @@ export const PropertiesSection = ({
       py="2.5"
       role="group"
     >
-      {headerHidden ? null : (
-        <Flex align="baseline" gap="2" minW="0">
-          <FieldLabel>{title}</FieldLabel>
-          {subtitle ? (
-            <Text color="fg.muted" fontSize="xs" minW="0" truncate>
-              {subtitle}
-            </Text>
-          ) : null}
-        </Flex>
-      )}
+      <Flex align="baseline" gap="2" minW="0">
+        <FieldLabel>{title}</FieldLabel>
+        {subtitle ? (
+          <Text color="fg.muted" minW="0" truncate>
+            {subtitle}
+          </Text>
+        ) : null}
+      </Flex>
       {children}
     </Stack>
   );

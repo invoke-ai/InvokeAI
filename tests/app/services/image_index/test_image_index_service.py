@@ -30,11 +30,17 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.images.images_common import image_record_to_dto
 from invokeai.app.services.images.images_default import ImageService
+from invokeai.app.services.model_load.model_load_default import ModelLoadService
+from invokeai.app.services.model_records.model_records_sql import ModelRecordServiceSQL
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.errors import LockTimeoutError
 from invokeai.app.services.video_records.video_records_default import VideoRecordStorage
 from invokeai.app.services.videos.videos_common import VideoDTO, video_record_to_dto
 from invokeai.app.services.videos.videos_default import VideoService
+from invokeai.backend.model_manager.configs.clip_vision import CLIPVision_Diffusers_Config
+from invokeai.backend.model_manager.configs.siglip import SigLIP_Diffusers_Config
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+from invokeai.backend.model_manager.taxonomy import ModelRepoVariant, ModelSourceType
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
@@ -42,6 +48,8 @@ from tests.test_nodes import TestEventService
 
 MODEL_ID = "test-model-hash"
 DIM = 8
+# An encoder swap evicts the retired model from every per-device cache; most tests have none.
+_NO_MODEL_CACHES = SimpleNamespace(ram_caches={})
 
 
 def _wait_until(predicate: Callable[[], bool], timeout: float = 10.0) -> None:
@@ -102,6 +110,21 @@ def index_records(db: Database) -> ImageIndexRecords:
     return ImageIndexRecords(db)
 
 
+@pytest.fixture(params=[CLIPVision_Diffusers_Config, SigLIP_Diffusers_Config], ids=["clip", "siglip"])
+def encoder_config(
+    request: pytest.FixtureRequest, tmp_path: Path
+) -> CLIPVision_Diffusers_Config | SigLIP_Diffusers_Config:
+    return request.param(
+        key="encoder-key",
+        hash=MODEL_ID,
+        path=str(tmp_path / "encoder"),
+        file_size=1,
+        name="encoder",
+        source=str(tmp_path / "encoder"),
+        source_type=ModelSourceType.Path,
+    )
+
+
 @pytest.fixture
 def images_service() -> ImageService:
     images = ImageService()
@@ -160,7 +183,7 @@ def _make_invoker(
         image_index_records=index_records,
         events=TestEventService(),
         session_queue=session_queue,
-        model_manager=model_manager,
+        model_manager=model_manager if model_manager is not None else SimpleNamespace(load=_NO_MODEL_CACHES),
     )
     return SimpleNamespace(services=services)
 
@@ -465,14 +488,13 @@ def test_model_not_installed_message_flags_same_name_wrong_type() -> None:
 
 
 def test_try_activate_picks_up_a_model_installed_after_startup(
+    encoder_config: CLIPVision_Diffusers_Config | SigLIP_Diffusers_Config,
     images_service: ImageService,
     index_records: ImageIndexRecords,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # The encoder is usually installed from the image map itself, long after
     # the server came up; that must not need a restart.
-    from invokeai.backend.model_manager.taxonomy import ModelType
-
     installed: list[object] = []
     resolutions = 0
 
@@ -483,7 +505,9 @@ def test_try_activate_picks_up_a_model_installed_after_startup(
 
     monkeypatch.setattr(ImageIndexService, "_resolve_model_config", resolve)
     store = SimpleNamespace(search_by_attr=lambda **kwargs: [])
-    invoker = _make_invoker(images_service, index_records, model_manager=SimpleNamespace(store=store))
+    invoker = _make_invoker(
+        images_service, index_records, model_manager=SimpleNamespace(store=store, load=_NO_MODEL_CACHES)
+    )
     service = ImageIndexService()
     try:
         service.start(invoker)
@@ -498,15 +522,18 @@ def test_try_activate_picks_up_a_model_installed_after_startup(
         assert service.try_activate() is False
         assert resolutions == 2
 
-        installed.append(SimpleNamespace(hash=MODEL_ID, type=ModelType.CLIPVision, path="/models/encoder"))
+        installed.append(encoder_config)
         service._last_activation_attempt = time.monotonic() - _ACTIVATION_RETRY_INTERVAL_S - 1
 
         assert service.try_activate() is True
         assert service.model_id == MODEL_ID
         _wait_until(lambda: service._worker is not None and service._worker.is_alive())
-        # The fast path: no further model-store queries once it is running.
+        # Running and missing states share the same throttled catalog check.
         assert service.try_activate() is True
         assert resolutions == 3
+        service._last_activation_attempt = time.monotonic() - _ACTIVATION_RETRY_INTERVAL_S - 1
+        assert service.try_activate() is True
+        assert resolutions == 4
     finally:
         service.stop()
 
@@ -518,6 +545,7 @@ def test_try_activate_picks_up_a_model_installed_after_startup(
 
 
 def test_failed_late_activation_rolls_back_rather_than_wedging_the_service(
+    encoder_config: CLIPVision_Diffusers_Config | SigLIP_Diffusers_Config,
     images_service: ImageService,
     index_records: ImageIndexRecords,
     monkeypatch: pytest.MonkeyPatch,
@@ -525,10 +553,7 @@ def test_failed_late_activation_rolls_back_rather_than_wedging_the_service(
     # Publishing the model before the worker exists would leave the service
     # claiming to run with nothing consuming the queue — and try_activate's
     # fast path would answer True forever, so no later request would retry.
-    from invokeai.backend.model_manager.taxonomy import ModelType
-
-    resolved = SimpleNamespace(hash=MODEL_ID, type=ModelType.CLIPVision, path="/models/encoder")
-    monkeypatch.setattr(ImageIndexService, "_resolve_model_config", lambda self, model_name: resolved)
+    monkeypatch.setattr(ImageIndexService, "_resolve_model_config", lambda self, model_name: encoder_config)
     launches = 0
 
     def launch(self, invoker):
@@ -540,7 +565,9 @@ def test_failed_late_activation_rolls_back_rather_than_wedging_the_service(
 
     original_launch = ImageIndexService._launch_worker
     store = SimpleNamespace(search_by_attr=lambda **kwargs: [])
-    invoker = _make_invoker(images_service, index_records, model_manager=SimpleNamespace(store=store))
+    invoker = _make_invoker(
+        images_service, index_records, model_manager=SimpleNamespace(store=store, load=_NO_MODEL_CACHES)
+    )
     service = ImageIndexService()
     try:
         # Inert at start: the encoder was not installed yet.
@@ -548,7 +575,7 @@ def test_failed_late_activation_rolls_back_rather_than_wedging_the_service(
         service.start(invoker)
         assert service.model_id is None
 
-        monkeypatch.setattr(ImageIndexService, "_resolve_model_config", lambda self, model_name: resolved)
+        monkeypatch.setattr(ImageIndexService, "_resolve_model_config", lambda self, model_name: encoder_config)
         monkeypatch.setattr(ImageIndexService, "_launch_worker", launch)
         service._last_activation_attempt = time.monotonic() - _ACTIVATION_RETRY_INTERVAL_S - 1
 
@@ -567,6 +594,406 @@ def test_failed_late_activation_rolls_back_rather_than_wedging_the_service(
         service.stop()
 
 
+@pytest.mark.parametrize("normalize_loaded_path", [False, True], ids=["catalog-path", "normalized-loaded-path"])
+def test_encoder_metadata_edits_keep_worker_indexing_without_map_requests(
+    normalize_loaded_path: bool,
+    db: Database,
+    encoder_config: CLIPVision_Diffusers_Config | SigLIP_Diffusers_Config,
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    models_dir = Path(encoder_config.path).parent
+    encoder_config.path = "encoder"
+    store = ModelRecordServiceSQL(db, InvokeAILogger.get_logger())
+    store.add_model(encoder_config)
+    invoker = _make_invoker(
+        images_service,
+        index_records,
+        image_records=image_records,
+        model_manager=SimpleNamespace(store=store, load=_NO_MODEL_CACHES),
+    )
+    invoker.services.configuration.image_index_model = encoder_config.name
+    invoker.services.configuration.models_dir = models_dir
+
+    def encode(self, images):
+        if normalize_loaded_path:
+            # The shared model loader makes its supplied config path absolute.
+            self._model_config.path = str((models_dir / self._model_config.path).resolve())
+        return _fake_encode(images)
+
+    monkeypatch.setattr(ImageIndexService, "_encode_with_model", encode)
+    service = ImageIndexService()
+    try:
+        _save_image(image_records, "before-edit.png")
+        service.start(invoker)
+        _wait_until(lambda: index_records.count_index_status(MODEL_ID).embedded == 1)
+        worker = service._worker
+
+        # Edit the catalog between worker checks, retaining the same configured
+        # encoder after its rename. No map request drives this reconciliation.
+        with service._activation_lock:
+            store.replace_model(
+                encoder_config.key,
+                encoder_config.model_copy(
+                    update={"name": "renamed encoder", "description": "Edited description", "cover_image": "cover.png"}
+                ),
+            )
+            invoker.services.configuration.image_index_model = "renamed encoder"
+            expired = time.monotonic() - _ACTIVATION_RETRY_INTERVAL_S - 1
+            service._last_activation_attempt = expired
+        _wait_until(lambda: service._last_activation_attempt != expired)
+        # The timestamp is written before the catalog read. Wait for the whole
+        # check to finish before observing availability or adding new work.
+        with service._activation_lock:
+            assert service.model_id == MODEL_ID
+        assert service._worker is worker
+        assert worker is not None and worker.is_alive()
+
+        _save_image(image_records, "after-edit.png")
+        images_service._on_changed(_dto_for(image_records, "after-edit.png"))
+        _wait_until(lambda: index_records.count_index_status(MODEL_ID).embedded == 2)
+    finally:
+        service.stop()
+
+
+def test_deleted_encoder_becomes_unavailable_and_reinstall_resumes_without_duplicate_callbacks(
+    encoder_config: CLIPVision_Diffusers_Config | SigLIP_Diffusers_Config,
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    installed = [encoder_config]
+    monkeypatch.setattr(
+        ImageIndexService, "_resolve_model_config", lambda self, name: installed[0] if installed else None
+    )
+    monkeypatch.setattr(ImageIndexService, "_encode_with_model", lambda self, images: _fake_encode(images))
+    invoker = _make_invoker(images_service, index_records, image_records=image_records)
+    service = ImageIndexService()
+    try:
+        _save_image(image_records, "before.png")
+        service.start(invoker)
+        _wait_until(lambda: index_records.count_index_status(MODEL_ID).embedded == 1)
+        service._processor = object()
+        service._cpu_model = object()
+        service._text_encoder_failure = "previous installation was incomplete"
+        service._vocab_cache = (["old"], np.ones((1, DIM), dtype=np.float32))
+
+        installed.clear()
+        service._last_activation_attempt = time.monotonic() - _ACTIVATION_RETRY_INTERVAL_S - 1
+        assert service.try_activate() is False
+        assert service.model_id is None
+        assert not service.replacing_model
+        assert service.get_status() is None
+        assert service.get_vocab_build_state() == ("unavailable", None)
+        assert service.request_projection("system") is False
+        # The exiting worker releases the deleted encoder's resources itself.
+        _wait_until(lambda: not service._worker.is_alive())
+        assert service._processor is None
+        assert service._cpu_model is None
+        assert service._vocab_cache is None
+
+        _save_image(image_records, "during.png")
+        images_service._on_changed(_dto_for(image_records, "during.png"))
+        assert service._queue.empty()
+        installed.append(encoder_config.model_copy(update={"path": encoder_config.path + "-reinstalled"}))
+        service._last_activation_attempt = time.monotonic() - _ACTIVATION_RETRY_INTERVAL_S - 1
+        assert service.try_activate() is True
+        _wait_until(lambda: index_records.count_index_status(MODEL_ID).embedded == 2)
+        assert len(images_service._on_changed_callbacks) == 1
+        assert len(images_service._on_deleted_callbacks) == 1
+        assert len(invoker.services.videos._on_changed_callbacks) == 1
+        assert len(invoker.services.videos._on_deleted_callbacks) == 1
+        assert service._processor is None
+        assert service._cpu_model is None
+        assert service._text_encoder_failure is None
+        assert service._vocab_cache is None
+    finally:
+        service.stop()
+
+
+@pytest.mark.parametrize("replacement_kind", ["reinstall", "key", "path", "cpu_only", "repo_variant", "type"])
+@pytest.mark.parametrize("background_batch", [False, True], ids=["query", "worker"])
+def test_encoder_replacement_waits_for_inflight_embedding_and_discards_retired_batch(
+    replacement_kind: str,
+    background_batch: bool,
+    encoder_config: CLIPVision_Diffusers_Config | SigLIP_Diffusers_Config,
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    installed = [encoder_config]
+    entered = threading.Event()
+    release = threading.Event()
+    replacements = {
+        "reinstall": {"hash": "replacement-model-hash", "path": encoder_config.path + "-replacement"},
+        "key": {"key": "replacement-key"},
+        "path": {"path": encoder_config.path + "-moved"},
+        "cpu_only": {"cpu_only": True},
+        "repo_variant": {"repo_variant": ModelRepoVariant.FP16},
+    }
+    if replacement_kind == "type":
+        replacement_type = (
+            SigLIP_Diffusers_Config
+            if isinstance(encoder_config, CLIPVision_Diffusers_Config)
+            else CLIPVision_Diffusers_Config
+        )
+        replacement = replacement_type(**encoder_config.model_dump(exclude={"type"}))
+    else:
+        replacement = encoder_config.model_copy(update=replacements[replacement_kind])
+    seen_models: list[CLIPVision_Diffusers_Config | SigLIP_Diffusers_Config] = []
+
+    def encode(self, images):
+        seen_models.append(self._model_config)
+        if len(seen_models) == 1:
+            entered.set()
+            assert release.wait(timeout=10)
+            assert self._model_config is encoder_config
+        return _fake_encode(images)
+
+    monkeypatch.setattr(
+        ImageIndexService, "_resolve_model_config", lambda self, name: installed[0] if installed else None
+    )
+    monkeypatch.setattr(ImageIndexService, "_encode_with_model", encode)
+    service = ImageIndexService()
+    query = None
+    try:
+        if background_batch:
+            _save_image(image_records, "pending.png")
+        service.start(_make_invoker(images_service, index_records, image_records=image_records))
+        if not background_batch:
+            query = threading.Thread(target=lambda: service.embed_image(Image.new("RGB", (16, 16))))
+            query.start()
+        assert entered.wait(timeout=10)
+
+        if replacement_kind == "reinstall":
+            installed.clear()
+        else:
+            installed[0] = replacement
+        service._last_activation_attempt = time.monotonic() - _ACTIVATION_RETRY_INTERVAL_S - 1
+        assert service.try_activate() is False
+        assert service.model_id is None
+        assert service.replacing_model is (replacement_kind != "reinstall")
+        installed[:] = [replacement]
+        service._last_activation_attempt = time.monotonic() - _ACTIVATION_RETRY_INTERVAL_S - 1
+        assert service.try_activate() is False
+        assert service.replacing_model
+        assert service._model_config is encoder_config
+
+        release.set()
+        if query is not None:
+            query.join(timeout=10)
+            assert not query.is_alive()
+        # No further request: the retiring worker completes the swap once its users drain.
+        _wait_until(lambda: service.model_id == replacement.hash)
+        assert not service.replacing_model
+        if background_batch:
+            # Re-encoded by the replacement: the retired encoder's batch was not stored.
+            _wait_until(lambda: index_records.count_index_status(replacement.hash).embedded == 1)
+        else:
+            service.embed_image(Image.new("RGB", (16, 16)))
+        assert seen_models == [encoder_config, replacement]
+    finally:
+        release.set()
+        if query is not None:
+            query.join(timeout=10)
+        service.stop()
+
+
+def _write_clip_vision_weights(path: Path, seed: int) -> None:
+    from transformers import CLIPVisionConfig, CLIPVisionModelWithProjection
+
+    config = CLIPVisionConfig(
+        hidden_size=8,
+        intermediate_size=16,
+        num_hidden_layers=1,
+        num_attention_heads=2,
+        image_size=224,
+        patch_size=112,
+        projection_dim=DIM,
+    )
+    with torch.random.fork_rng(devices=[]):
+        torch.manual_seed(seed)
+        CLIPVisionModelWithProjection(config).save_pretrained(path)
+
+
+def test_reinstalled_encoder_keeping_its_key_embeds_with_the_new_weights(
+    tmp_path: Path,
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The shared model cache is keyed by model key alone. Reinstalling the encoder in place changes
+    # its hash but not its key, and embeddings computed by the cached, retired weights would be
+    # stored under the replacement's hash and survive a restart.
+    from transformers import CLIPImageProcessor, CLIPVisionModelWithProjection
+
+    encoder_path = tmp_path / "encoder"
+    _write_clip_vision_weights(encoder_path, seed=1)
+    retired = CLIPVision_Diffusers_Config(
+        key="encoder-key",
+        hash="retired-hash",
+        path=str(encoder_path),
+        file_size=1,
+        name="encoder",
+        source=str(encoder_path),
+        source_type=ModelSourceType.Path,
+    )
+    installed = [retired]
+    monkeypatch.setattr(ImageIndexService, "_resolve_model_config", lambda self, name: installed[0])
+    # Embed through the shared cache, as an accelerator host does, but on CPU tensors.
+    monkeypatch.setattr(TorchDevice, "choose_torch_device", staticmethod(lambda: torch.device("cpu")))
+    monkeypatch.setattr(ImageIndexService, "_cpu_mode", lambda self: False)
+    invoker = _make_invoker(images_service, index_records, image_records=image_records, device=None)
+    cache = ModelCache(
+        execution_device_working_mem_gb=1,
+        enable_partial_loading=False,
+        keep_ram_copy_of_weights=True,
+        execution_device=torch.device("cpu"),
+        logger=invoker.services.logger,
+        # The default store is process-global; keep this encoder's weights out of it.
+        shared_cpu_weights=None,
+    )
+    invoker.services.model_manager = SimpleNamespace(
+        load=ModelLoadService(app_config=invoker.services.configuration, ram_cache=cache)
+    )
+    item = IndexedItem("image", "a.png")
+    service = ImageIndexService()
+    try:
+        _save_image(image_records, item.name)
+        service.start(invoker)
+        _wait_until(lambda: index_records.count_index_status(retired.hash).embedded == 1)
+        retired_embedding = index_records.get_embeddings([item], retired.hash)[1][0]
+
+        _write_clip_vision_weights(encoder_path, seed=2)
+        replacement = retired.model_copy(update={"hash": "replacement-hash"})
+        with service._activation_lock:
+            installed[0] = replacement
+            service._last_activation_attempt = time.monotonic() - _ACTIVATION_RETRY_INTERVAL_S - 1
+        _wait_until(lambda: index_records.count_index_status(replacement.hash).embedded == 1)
+
+        with torch.no_grad():
+            pixel_values = CLIPImageProcessor()(images=images_service.get_pil_image(item.name), return_tensors="pt")
+            expected = CLIPVisionModelWithProjection.from_pretrained(encoder_path)(**pixel_values).image_embeds[0]
+        expected = (expected / expected.norm()).numpy()
+        stored = index_records.get_embeddings([item], replacement.hash)[1][0]
+        assert not np.allclose(expected, retired_embedding, atol=1e-3), "the two encoders must disagree"
+        np.testing.assert_allclose(stored, expected, atol=1e-4)
+        cosine = float(np.dot(stored.astype(np.float64), expected.astype(np.float64)))
+        assert 1.0 - cosine <= 1e-6
+    finally:
+        service.stop()
+        cache.shutdown()
+
+
+def test_worker_detected_replacement_resumes_indexing_without_requests(
+    encoder_config: CLIPVision_Diffusers_Config | SigLIP_Diffusers_Config,
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Deleting and re-adding the encoder gives it a new key. With the image map
+    # closed, nothing but the worker notices, and gallery search and new-image
+    # indexing must not stay down until someone opens the map.
+    installed = [encoder_config]
+    monkeypatch.setattr(ImageIndexService, "_resolve_model_config", lambda self, name: installed[0])
+    monkeypatch.setattr(ImageIndexService, "_encode_with_model", lambda self, images: _fake_encode(images))
+    service = ImageIndexService()
+    try:
+        _save_image(image_records, "before.png")
+        service.start(_make_invoker(images_service, index_records, image_records=image_records))
+        _wait_until(lambda: index_records.count_index_status(MODEL_ID).embedded == 1)
+        retired = service._worker
+
+        replacement = encoder_config.model_copy(update={"key": "re-added-key"})
+        with service._activation_lock:
+            installed[0] = replacement
+            service._last_activation_attempt = time.monotonic() - _ACTIVATION_RETRY_INTERVAL_S - 1
+
+        _wait_until(lambda: service._model_config is replacement and service.model_id == MODEL_ID)
+        assert retired is not None
+        _wait_until(lambda: not retired.is_alive())
+        assert service._worker is not retired and service._worker.is_alive()
+
+        _save_image(image_records, "after.png")
+        images_service._on_changed(_dto_for(image_records, "after.png"))
+        _wait_until(lambda: index_records.count_index_status(MODEL_ID).embedded == 2)
+        assert len(images_service._on_changed_callbacks) == 1
+    finally:
+        service.stop()
+
+
+def test_stop_releases_a_worker_waiting_for_request_users_to_drain(
+    encoder_config: CLIPVision_Diffusers_Config | SigLIP_Diffusers_Config,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    installed = [encoder_config]
+    monkeypatch.setattr(ImageIndexService, "_resolve_model_config", lambda self, name: installed[0])
+    monkeypatch.setattr(ImageIndexService, "_encode_with_model", lambda self, images: _fake_encode(images))
+    service = ImageIndexService()
+    service.start(_make_invoker(images_service, index_records))
+    worker = service._worker
+    assert worker is not None
+    with service.use_model():
+        installed[0] = encoder_config.model_copy(update={"key": "replacement-key"})
+        service._last_activation_attempt = time.monotonic() - _ACTIVATION_RETRY_INTERVAL_S - 1
+        assert service.try_activate() is False
+        assert service.replacing_model
+
+        # Shutdown must not wait out the request, nor start the replacement.
+        service.stop()
+        assert not worker.is_alive()
+        assert service._worker is worker
+        assert not service.replacing_model
+        assert service.model_id is None
+
+
+def test_projection_finishing_after_encoder_removal_does_not_publish(
+    encoder_config: CLIPVision_Diffusers_Config | SigLIP_Diffusers_Config,
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    installed = [encoder_config]
+    entered = threading.Event()
+    release = threading.Event()
+
+    def project(matrix):
+        entered.set()
+        assert release.wait(timeout=10)
+        return np.zeros((len(matrix), 2), dtype=np.float32)
+
+    monkeypatch.setattr(
+        ImageIndexService, "_resolve_model_config", lambda self, name: installed[0] if installed else None
+    )
+    monkeypatch.setattr(ImageIndexService, "_encode_with_model", lambda self, images: _fake_encode(images))
+    monkeypatch.setattr(image_index_default, "compute_umap", project)
+    service = ImageIndexService()
+    try:
+        _save_image(image_records, "projected.png")
+        service.start(_make_invoker(images_service, index_records, image_records=image_records))
+        _wait_until(lambda: index_records.count_index_status(MODEL_ID).embedded == 1)
+        assert service.request_projection("system")
+        assert entered.wait(timeout=10)
+        installed.clear()
+        service._last_activation_attempt = time.monotonic() - _ACTIVATION_RETRY_INTERVAL_S - 1
+        assert service.try_activate() is False
+        release.set()
+        _wait_until(lambda: not service._worker.is_alive())
+        assert index_records.get_projection("system", MODEL_ID) is None
+    finally:
+        release.set()
+        service.stop()
+
+
 def test_late_activation_survives_a_model_store_failure(
     images_service: ImageService,
     index_records: ImageIndexRecords,
@@ -578,7 +1005,9 @@ def test_late_activation_survives_a_model_store_failure(
         raise RuntimeError("model store unavailable")
 
     store = SimpleNamespace(search_by_attr=lambda **kwargs: [])
-    invoker = _make_invoker(images_service, index_records, model_manager=SimpleNamespace(store=store))
+    invoker = _make_invoker(
+        images_service, index_records, model_manager=SimpleNamespace(store=store, load=_NO_MODEL_CACHES)
+    )
     service = ImageIndexService()
     monkeypatch.setattr(ImageIndexService, "_resolve_model_config", lambda self, model_name: None)
     service.start(invoker)
@@ -1011,7 +1440,7 @@ def test_empty_model_name_does_not_resolve_to_an_arbitrary_model(
     """
     installed = SimpleNamespace(key="some-key", name="clip-vit-large-patch14", hash="some-hash")
     store = SimpleNamespace(search_by_attr=lambda model_name, model_type: [installed])
-    model_manager = SimpleNamespace(store=store)
+    model_manager = SimpleNamespace(store=store, load=_NO_MODEL_CACHES)
 
     service = ImageIndexService()
     service._invoker = _make_invoker(images_service, index_records, model_manager=model_manager)
@@ -1038,7 +1467,9 @@ def test_duplicate_model_names_resolve_deterministically(
     def resolve(order: list[SimpleNamespace]) -> SimpleNamespace:
         store = SimpleNamespace(search_by_attr=lambda model_name, model_type: list(order))
         service = ImageIndexService()
-        service._invoker = _make_invoker(images_service, index_records, model_manager=SimpleNamespace(store=store))
+        service._invoker = _make_invoker(
+            images_service, index_records, model_manager=SimpleNamespace(store=store, load=_NO_MODEL_CACHES)
+        )
         return service._resolve_model_config("clip-vit-large-patch14")
 
     # Same set, either insertion order — the winner must not move.

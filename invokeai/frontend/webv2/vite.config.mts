@@ -62,6 +62,8 @@ const ROUTE_SHARED_MODULES = [
   '/platform/transport/connectionStore.ts',
   '/platform/transport/socketHub.ts',
   '/platform/ui/ConfirmDialog.tsx',
+  // Confirm/Rename dialogs and the boot gates keep closing overlays mounted with it; alone it costs a startup request.
+  '/platform/react/useExitRetainedValue.ts',
   '/platform/ui/MiddleTruncate.tsx',
   // The queue widget and the Launchpad managers share the list row; a separate chunk would cost a request.
   '/platform/ui/list/ListDivider.tsx',

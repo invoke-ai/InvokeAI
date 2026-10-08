@@ -1,12 +1,14 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type { GalleryImage, GalleryImageItem, GalleryItemsPage, GalleryVideoItem } from '@features/gallery';
 import type { InvocationProgressEvent, QueueItem, QueueItemStatusChangedEvent } from '@features/queue/contracts';
+import type * as DeletionConfirmationModule from '@workbench/image-actions/useDeletionConfirmation';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext, useSensor, useSensors, type DndContextProps } from '@dnd-kit/core';
 import { requestGalleryItemReveal } from '@features/gallery/contracts';
 import { createQueueCoordinator, type QueueCoordinatorBackendPort } from '@features/queue/runtime/coordinator';
+import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
 import { QueryClient, QueryClientProvider, type InfiniteData } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { HoldToDragSensor, PrimaryMouseSensor } from '@workbench/shell/holdToDragSensor';
@@ -15,6 +17,7 @@ import { act, useCallback } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import { LivePreviewFollowProvider, useLivePreviewFollow } from './livePreviewFollow';
 
@@ -127,6 +130,7 @@ const mocks = vi.hoisted(() => {
         selectedItemKey: string | null;
       };
       onImagesDeleted?: (imageNames: string[]) => void;
+      requestDeletionConfirmation?: DeletionConfirmationModule.RequestDeletionConfirmation;
     },
     recentImages,
     bridgeProgressImage: null as unknown,
@@ -236,7 +240,7 @@ vi.mock('@features/gallery/contracts', async (importOriginal) => ({
   requestGalleryItemReveal: vi.fn(),
 }));
 
-vi.mock('@workbench/image-actions', () => ({
+vi.mock('@workbench/image-actions', async () => ({
   EMPTY_IMAGE_RECALL_CAPABILITIES: {},
   ImageContextMenu: () => null,
   RecallActionButtons: () => null,
@@ -252,10 +256,9 @@ vi.mock('@workbench/image-actions', () => ({
   getImageRecallTitle: () => '',
   getSelectedGalleryImage: () => null,
   getSelectedGalleryImageFromValues: () => null,
-  useDeletionConfirmation: () => ({
-    dialog: null,
-    requestDeletionConfirmation: (_itemRefs: unknown, executeDeletion: () => Promise<void>) => executeDeletion(),
-  }),
+  useDeletionConfirmation: (
+    await vi.importActual<typeof DeletionConfirmationModule>('@workbench/image-actions/useDeletionConfirmation')
+  ).useDeletionConfirmation,
   useImageActions: (options: typeof mocks.imageActionOptions) => {
     mocks.imageActionOptions = options;
     return {};
@@ -2241,5 +2244,41 @@ describe('preview keyboard navigation boundary', () => {
       [...host!.querySelectorAll('[data-swipe-neighbor="next"] img')].map((image) => image.getAttribute('src'))
     ).toContain('/images/oldest/full');
     expect(host?.querySelector('[data-swipe-neighbor="previous"] img')).toBeNull();
+  });
+});
+
+describe('preview deletion confirmation', () => {
+  it('stays open while a live session takes over the preview, then animates out on close', async () => {
+    await render();
+    await act(() => {
+      void mocks.imageActionOptions!.requestDeletionConfirmation!([{ kind: 'image', name: 'newest' }], () =>
+        Promise.resolve()
+      );
+    });
+    await expect.poll(() => document.querySelector('[role="alertdialog"]')?.getAttribute('data-state')).toBe('open');
+    const dialog = document.querySelector('[role="alertdialog"]')!;
+    const confirmation = dialog.textContent;
+
+    mocks.project.queue.items = [queueItem];
+    mocks.project.settings.showProgressImagesInViewer = true;
+    mocks.useActiveProgressTarget.mockReturnValue({ itemIndex: 1, queueItemId: 'queue-item-live' });
+    mocks.useProgressImage.mockReturnValue({
+      dataUrl: 'data:image/png;base64,',
+      height: 64,
+      target: { itemIndex: 1, queueItemId: 'queue-item-live' },
+      width: 64,
+    });
+    await rerender();
+    expect(host?.querySelector('img[src^="data:image/png"]')).not.toBeNull();
+    expect(dialog.isConnected).toBe(true);
+    expect(dialog).toHaveAttribute('data-state', 'open');
+
+    const frames = closingFrames(await recordDialogExit(dialog, () => act(() => userEvent.keyboard('{Escape}'))));
+
+    expect(frames).not.toHaveLength(0);
+    for (const frame of frames) {
+      expect(frame.text).toBe(confirmation);
+    }
+    await expect.poll(() => document.querySelector('[role="alertdialog"]')).toBeNull();
   });
 });

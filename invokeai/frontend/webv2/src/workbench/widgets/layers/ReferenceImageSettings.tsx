@@ -383,7 +383,7 @@ const ReferenceImageEditor = ({
               colorPalette="red"
               position="absolute"
               right="0.5"
-              size="2xs"
+              size="sm"
               top="0.5"
               variant="solid"
               onClick={handleClearImage}
@@ -393,10 +393,10 @@ const ReferenceImageEditor = ({
           ) : null}
         </DropZone>
         <Stack align="start" flex="1" gap="1" minW="0">
-          <Text color="fg.muted" fontSize="2xs">
+          <Text color="fg.muted" fontSize="xs">
             {t('widgets.layers.regionalGuidance.referenceImageHelp')}
           </Text>
-          <Button size="xs" variant="ghost" onClick={openUpload}>
+          <Button variant="ghost" onClick={openUpload}>
             <UploadIcon size="12" />
             {t('widgets.gallery.picker.upload')}
           </Button>
@@ -409,7 +409,6 @@ const ReferenceImageEditor = ({
           aria-label={t('widgets.layers.regionalGuidance.model')}
           collection={modelCollection}
           positioning={SELECT_POSITIONING}
-          size="xs"
           value={modelValue}
           valueText={modelName}
           onValueChange={handleModel}
@@ -423,7 +422,6 @@ const ReferenceImageEditor = ({
               aria-label={t('widgets.layers.regionalGuidance.method')}
               collection={collections.method}
               positioning={SELECT_POSITIONING}
-              size="xs"
               value={methodValue}
               valueText={t(`widgets.layers.regionalGuidance.methods.${config.method}`)}
               onValueChange={handleMethod}
@@ -435,7 +433,6 @@ const ReferenceImageEditor = ({
               formatValue={formatWeight}
               max={2}
               min={-1}
-              size="sm"
               step={0.01}
               value={weightValue}
               withThumbTooltip

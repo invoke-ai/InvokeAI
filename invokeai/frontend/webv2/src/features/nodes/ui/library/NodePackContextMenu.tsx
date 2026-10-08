@@ -62,7 +62,7 @@ export const NodePackContextMenu = ({
               <MenuContent minW="12rem">
                 <Menu.Item value="copy-path" onClick={() => void handleCopyPath(pack.path)}>
                   <Icon as={ClipboardCopyIcon} boxSize="3.5" />
-                  <Menu.ItemText fontSize="xs">{t('nodes.copyPath')}</Menu.ItemText>
+                  <Menu.ItemText fontSize="md">{t('nodes.copyPath')}</Menu.ItemText>
                 </Menu.Item>
                 <Menu.Separator />
                 <Menu.Item
@@ -74,7 +74,7 @@ export const NodePackContextMenu = ({
                   }}
                 >
                   <Icon as={Trash2Icon} boxSize="3.5" />
-                  <Menu.ItemText fontSize="xs">{t('nodes.uninstall')}</Menu.ItemText>
+                  <Menu.ItemText fontSize="md">{t('nodes.uninstall')}</Menu.ItemText>
                 </Menu.Item>
               </MenuContent>
             ) : null}

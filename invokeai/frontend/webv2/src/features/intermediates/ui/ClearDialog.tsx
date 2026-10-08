@@ -55,7 +55,7 @@ const Impact = ({ preview }: { preview: IntermediatesPreview }) => {
 
   return (
     <Stack gap="1.5">
-      <Text fontSize="sm" fontWeight="600">
+      <Text fontSize="lg" fontWeight="600">
         {nothing
           ? t('intermediates.dialog.nothing')
           : t('intermediates.dialog.summary', {
@@ -65,7 +65,7 @@ const Impact = ({ preview }: { preview: IntermediatesPreview }) => {
             })}
       </Text>
       {nothing ? null : (
-        <Text fontSize="xs">
+        <Text fontSize="md">
           {impact.unknownSizeCount > 0 && impact.reclaimableBytes === 0
             ? t('intermediates.dialog.reclaimUnknown')
             : t('intermediates.dialog.reclaim', { size: formatBytes(impact.reclaimableBytes) })}
@@ -75,7 +75,7 @@ const Impact = ({ preview }: { preview: IntermediatesPreview }) => {
         </Text>
       )}
       {kept > 0 ? (
-        <Text color="fg.muted" fontSize="xs">
+        <Text color="fg.muted" fontSize="md">
           {t('intermediates.dialog.kept', { count: kept })}{' '}
           {t('intermediates.dialog.keptReasons', {
             reasons: new Intl.ListFormat(i18n.resolvedLanguage, { style: 'long', type: 'conjunction' }).format(
@@ -114,12 +114,12 @@ const AffectedDocuments = ({
 
   return (
     <Stack gap="1">
-      <Text fontSize="xs" fontWeight="600">
+      <Text fontSize="md" fontWeight="600">
         {t('intermediates.dialog.affected')}
       </Text>
       <Stack as="ul" gap="0.5" maxH="32" overflowY="auto" ps="4">
         {preview.affectedDocuments.map((document) => (
-          <Text as="li" fontSize="xs" key={`${document.kind}:${document.userId}:${document.ownerId}`}>
+          <Text as="li" fontSize="md" key={`${document.kind}:${document.userId}:${document.ownerId}`}>
             {t(AFFECTED_DOCUMENT_LABELS[document.kind], {
               count: document.references,
               name: document.name ?? document.ownerId,
@@ -135,7 +135,7 @@ const AffectedDocuments = ({
           </Text>
         ))}
         {hidden > 0 ? (
-          <Text as="li" color="fg.muted" fontSize="xs">
+          <Text as="li" color="fg.muted" fontSize="md">
             {t('intermediates.dialog.affectedMore', { count: hidden })}
           </Text>
         ) : null}
@@ -223,19 +223,19 @@ export const ClearDialog = ({
                 <Dialog.Description asChild>
                   <Box aria-busy={(preview === null && !state?.previewError) || undefined} aria-live="polite">
                     {state?.previewError ? (
-                      <Alert.Root size="sm" status="error" variant="surface">
+                      <Alert.Root status="error" variant="surface">
                         <Alert.Indicator />
                         <Alert.Content>
                           <Alert.Description>{state.previewError}</Alert.Description>
                         </Alert.Content>
-                        <Button size="2xs" variant="outline" onClick={onRetryPreview}>
+                        <Button size="sm" variant="outline" onClick={onRetryPreview}>
                           {t('common.retry')}
                         </Button>
                       </Alert.Root>
                     ) : preview === null ? (
                       <Stack align="center" direction="row" gap="2">
-                        <Spinner color="fg.muted" size="xs" />
-                        <Text color="fg.muted" fontSize="xs">
+                        <Spinner color="fg.muted" />
+                        <Text color="fg.muted" fontSize="md">
                           {t('intermediates.dialog.loadingPreview')}
                         </Text>
                       </Stack>
@@ -248,15 +248,14 @@ export const ClearDialog = ({
                   checked={isForce}
                   colorPalette="red"
                   disabled={state?.isStarting}
-                  size="sm"
                   onCheckedChange={(event) => onModeChange(event.checked === true ? 'force' : 'safe')}
                 >
                   <Checkbox.HiddenInput />
                   <Checkbox.Control />
-                  <Checkbox.Label fontSize="xs">{t('intermediates.dialog.forceToggle')}</Checkbox.Label>
+                  <Checkbox.Label fontSize="md">{t('intermediates.dialog.forceToggle')}</Checkbox.Label>
                 </Checkbox.Root>
                 {isForce ? (
-                  <Alert.Root size="sm" status="warning" variant="surface">
+                  <Alert.Root status="warning" variant="surface">
                     <Alert.Indicator />
                     <Alert.Content>
                       <Alert.Description>
@@ -275,21 +274,19 @@ export const ClearDialog = ({
                     <Checkbox.Root
                       checked={acknowledged}
                       colorPalette="red"
-                      size="sm"
                       onCheckedChange={(event) => setAcknowledged(event.checked === true)}
                     >
                       <Checkbox.HiddenInput />
                       <Checkbox.Control />
-                      <Checkbox.Label fontSize="xs">{t('intermediates.dialog.acknowledge')}</Checkbox.Label>
+                      <Checkbox.Label fontSize="md">{t('intermediates.dialog.acknowledge')}</Checkbox.Label>
                     </Checkbox.Root>
                     <Stack gap="1">
-                      <chakra.label fontSize="xs" htmlFor={confirmInputId}>
+                      <chakra.label fontSize="md" htmlFor={confirmInputId}>
                         {t('intermediates.dialog.typeToConfirm', { word: CONFIRM_WORD })}
                       </chakra.label>
                       <Input
                         autoComplete="off"
                         id={confirmInputId}
-                        size="xs"
                         spellCheck={false}
                         value={typed}
                         onChange={(event) => setTyped(event.currentTarget.value)}
@@ -298,21 +295,20 @@ export const ClearDialog = ({
                   </Stack>
                 ) : null}
                 {state?.startError ? (
-                  <Text color="fg.error" fontSize="xs" role="alert">
+                  <Text color="fg.error" fontSize="md" role="alert">
                     {state.startError}
                   </Text>
                 ) : null}
               </Stack>
             </Dialog.Body>
             <Dialog.Footer>
-              <Button ref={cancelRef} disabled={state?.isStarting} size="xs" variant="ghost" onClick={onClose}>
+              <Button ref={cancelRef} disabled={state?.isStarting} variant="ghost" onClick={onClose}>
                 {t('common.cancel')}
               </Button>
               <Button
                 colorPalette="red"
                 disabled={!canConfirm}
                 loading={state?.isStarting}
-                size="xs"
                 variant="solid"
                 onClick={onConfirm}
               >

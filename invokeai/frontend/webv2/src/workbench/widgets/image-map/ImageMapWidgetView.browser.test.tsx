@@ -1,4 +1,5 @@
 import type { ImageMapState } from '@workbench/image-map/api';
+import type * as ImageMapStoreModule from '@workbench/image-map/imageMapStore';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { ChakraProvider } from '@chakra-ui/react';
@@ -6,11 +7,19 @@ import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { page } from 'vitest/browser';
 
 // Stand-ins for the gallery's values and the workbench commands the chip and Esc write through.
 const workbench = vi.hoisted(() => ({
   galleryValues: {} as Record<string, unknown>,
   patchValues: vi.fn(),
+}));
+
+const recovery = vi.hoisted(() => ({ status: vi.fn(), points: vi.fn() }));
+vi.mock('@workbench/image-map/api', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  fetchImageMapStatus: recovery.status,
+  fetchImageMapPoints: recovery.points,
 }));
 
 vi.mock('@workbench/WorkbenchContext', () => ({
@@ -52,8 +61,9 @@ const models = vi.hoisted(() => {
         return () => listeners.delete(listener);
       },
     },
+    canManageModels: true,
     ensureStartersLoaded: vi.fn(),
-    install: vi.fn((_request: { config?: unknown; source: string }) => Promise.resolve(true)),
+    openAddModelsSearch: vi.fn(),
   };
 });
 
@@ -65,13 +75,12 @@ vi.mock('@features/models', async (importOriginal) => {
     ensureStartersLoaded: models.ensureStartersLoaded,
     useActiveInstallSources: () =>
       useSyncExternalStore(models.activeSources.subscribe, models.activeSources.get, models.activeSources.get),
-    useInstallActions: () => ({ install: models.install, installMany: vi.fn(), pendingSources: EMPTY_SOURCES }),
+    useOpenAddModelsSearch: () => (models.canManageModels ? models.openAddModelsSearch : null),
     useStartersSelector: (selector: (snapshot: unknown) => unknown) =>
       selector({ response: { starter_models: STARTERS } }),
   };
 });
 
-const EMPTY_SOURCES: ReadonlySet<string> = new Set<string>();
 const ENCODER_SOURCE = 'apple/DFN2B-CLIP-ViT-L-14-39B';
 const ENCODER_DEPENDENCY_SOURCE = 'InvokeAI/encoder-preprocessor';
 const STARTERS = [
@@ -151,6 +160,7 @@ const dataFor = (
   modelName = 'clip-vit-large-patch14'
 ) => ({
   clusterEps: null,
+  modelId: null,
   modelName: state === 'model_missing' ? modelName : null,
   pointCount: 0,
   points: [],
@@ -199,6 +209,7 @@ beforeEach(() => {
   registered.commands = [];
   registered.hotkeys = [];
   models.activeSources.set([]);
+  models.canManageModels = true;
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -217,8 +228,7 @@ describe('Image Map unavailable states', () => {
       'model_missing',
       'Embedding model not installed',
       'To enable image indexing, install the image encoder model',
-      // A standing action: nothing polls while the indexer is inert, so the
-      // message has to offer its own way to ask the server again.
+      // A standing action also lets a user retry immediately after installing.
       ['Check again'],
     ],
     [
@@ -248,8 +258,53 @@ describe('Image Map unavailable states', () => {
   );
 });
 
-describe('Image Map missing-model install link', () => {
-  it('queues the starter install for the configured encoder', async () => {
+describe('Image Map missing-model link', () => {
+  it('replaces stalled indexing with the install link on a status poll and recovers after reinstall', async () => {
+    const actual = await vi.importActual<typeof ImageMapStoreModule>('@workbench/image-map/imageMapStore');
+    await renderState('disabled');
+    await act(() => {
+      imageMapStore.patchSnapshot({
+        data: { ...dataFor('disabled'), state: 'computing' },
+        indexCounts: { embedded: 4, failed: 0, pending: 6, total: 10 },
+        indexUpdatedAt: Date.now() - 120_000,
+      });
+    });
+    expect(host?.textContent).toContain('Indexing gallery');
+    recovery.status.mockResolvedValue({
+      index: null,
+      modelId: null,
+      modelName: 'DFN2B-CLIP-ViT-L-14-39B',
+      state: 'model_missing',
+    });
+    await act(async () => {
+      actual.refreshImageIndexStatus();
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    });
+    expect(host?.textContent).toContain('Embedding model not installed');
+    expect(host?.querySelector('[role="progressbar"]')).toBeNull();
+    const link = host?.querySelector('button');
+    expect(link?.textContent).toBe('DFN2B-CLIP-ViT-L-14-39B');
+    await act(() => link?.click());
+    expect(models.openAddModelsSearch).toHaveBeenCalledWith('DFN2B-CLIP-ViT-L-14-39B');
+    await page.screenshot({ path: '../../../../artifacts/image-map/model-removed.png' });
+
+    actual.setClusterLabelsEnabled(false);
+    recovery.status.mockResolvedValue({ index: null, modelId: null, modelName: null, state: 'empty' });
+    recovery.points.mockResolvedValue({ ...dataFor('disabled'), state: 'empty' });
+    await act(async () => {
+      actual.refreshImageIndexStatus();
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    });
+    expect(host?.textContent).toContain('Nothing to map yet');
+    expect(host?.textContent).not.toContain('Embedding model not installed');
+    actual.setClusterLabelsEnabled(true);
+  });
+
+  it('opens Add Models on the configured encoder instead of downloading it', async () => {
     await renderState('model_missing', 'DFN2B-CLIP-ViT-L-14-39B');
 
     expect(host?.textContent).toContain(
@@ -260,34 +315,19 @@ describe('Image Map missing-model install link', () => {
 
     expect(link?.textContent).toBe('DFN2B-CLIP-ViT-L-14-39B');
 
-    await act(async () => {
-      link?.click();
-      await Promise.resolve();
-    });
+    await act(() => link?.click());
 
-    expect(models.install).toHaveBeenCalledWith(expect.objectContaining({ source: 'apple/DFN2B-CLIP-ViT-L-14-39B' }));
+    expect(models.openAddModelsSearch).toHaveBeenCalledWith('DFN2B-CLIP-ViT-L-14-39B');
   });
 
-  it('queues the starter dependencies ahead of the model itself', async () => {
+  it('leaves the encoder as plain text for a session that cannot manage models', async () => {
+    models.canManageModels = false;
     await renderState('model_missing', 'DFN2B-CLIP-ViT-L-14-39B');
 
-    await act(async () => {
-      host?.querySelector('button')?.click();
-      await Promise.resolve();
-    });
-
-    expect(models.install.mock.calls.map(([request]) => request.source)).toEqual([
-      ENCODER_DEPENDENCY_SOURCE,
-      ENCODER_SOURCE,
-    ]);
-    // The curated metadata rides along, so the model registers under its
-    // starter identity instead of whatever probing guesses.
-    expect(models.install).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        config: expect.objectContaining({ name: 'DFN2B-CLIP-ViT-L-14-39B', type: 'clip_vision' }),
-        source: ENCODER_SOURCE,
-      })
+    expect(host?.textContent).toContain(
+      'install the image encoder model DFN2B-CLIP-ViT-L-14-39B from the Model Manager'
     );
+    expect(buttonLabels()).toEqual(['Check again']);
   });
 
   it('reports an in-flight download instead of offering the install again', async () => {
@@ -358,6 +398,7 @@ describe('Image Map indexing activity', () => {
       clusterLabelsHash: null,
       data: {
         clusterEps: null,
+        modelId: null,
         modelName: null,
         pointCount: 2,
         points: [
@@ -444,6 +485,7 @@ describe('Image Map cluster selection chip', () => {
       clusterLabelsHash: null,
       data: {
         clusterEps: null,
+        modelId: null,
         modelName: null,
         pointCount: POINTS.length,
         points: POINTS,

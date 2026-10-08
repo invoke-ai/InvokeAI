@@ -449,6 +449,7 @@ export const getPromptHistoryRecallPatch = ({
 
 export const EXTERNAL_PROVIDER_NODE_TYPES: Record<string, string> = {
   alibabacloud: 'alibabacloud_image_generation',
+  atlascloud: 'atlascloud_image_generation',
   gemini: 'gemini_image_generation',
   openai: 'openai_image_generation',
   seedream: 'seedream_image_generation',

@@ -181,9 +181,9 @@
     "clearSearch": "Clear search",
     "dontShowMeThese": "Don't show me these",
     "learnMore": "Learn more",
-    "noSchedulersFound": "No schedulers found",
+    "noOptionsFound": "No matches",
     "openSelector": "Open selector",
-    "searchSchedulers": "Search schedulers…",
+    "searchOptions": "Search…",
     "close": "Close",
     "colorPicker": {
       "format": "Color format",
@@ -1381,7 +1381,9 @@
     "scanFolderTooltip": "Scan this folder for model files",
     "scanSummary_one": "{{count}} file in {{path}} · {{notInstalled}} not installed",
     "scanSummary_other": "{{count}} files in {{path}} · {{notInstalled}} not installed",
+    "scopeAllAdded": "All compatible {{scope}} added.",
     "scopeAvailable": "Available {{scope}}",
+    "scopeConcepts": "concepts",
     "scopeModels": "models",
     "scopeNoCompatibleInstalled": "No compatible {{scope}} installed.",
     "scopeNoMatchBases": "No {{scope}} match the selected bases.",
@@ -1783,6 +1785,14 @@
       "saveFailed": "Could not save the vocabulary.",
       "loadFailed": "Could not load the vocabulary."
     },
+    "databaseMaintenance": {
+      "compactDatabase": "Compact database",
+      "confirmTitle": "Run database VACUUM?",
+      "confirmBody": "VACUUM can take a long time for large databases and pauses database activity while it runs.",
+      "completed": "Database VACUUM completed.",
+      "failed": "Database VACUUM failed.",
+      "requestFailed": "The database could not be vacuumed."
+    },
     "catalog": {
       "themeId": {
         "label": "Theme",
@@ -1882,7 +1892,7 @@
       },
       "workspaceActions": {
         "label": "Data & workspace",
-        "description": "Reset the layout, manage intermediates, or permanently delete saved projects and settings."
+        "description": "Reset the layout, manage intermediates, or permanently delete saved projects and settings. Administrators can also run database maintenance."
       },
       "about": {
         "label": "About InvokeAI",
@@ -1895,7 +1905,15 @@
         "label": "Connection style",
         "description": "How connections between nodes are drawn."
       },
+      "promptFontSize": {
+        "label": "Prompt text size",
+        "description": "Size of the text in prompt fields."
+      },
       "options": {
+        "small": "Small",
+        "default": "Default",
+        "large": "Large",
+        "larger": "Larger",
         "curved": "Curved",
         "square": "Square",
         "activeProject": "Active project",
@@ -2123,11 +2141,6 @@
           "drag": "Draw or adjust the search box."
         }
       },
-      "title": {
-        "group": "Group: {{name}}",
-        "layer": "Layer: {{name}}",
-        "operation": "Operation: {{name}}"
-      },
       "target": {
         "defaults": "Defaults",
         "editing": "Editing: {{name}}",
@@ -2194,6 +2207,7 @@
     "generate": {
       "activeCount_one": "{{count}} active",
       "activeCount_other": "{{count}} active",
+      "activeOfTotal": "{{active}}/{{total}} active",
       "activeSteps": "Active steps",
       "addConcept": "Add concept",
       "addConceptsHelp": "Add LoRAs/concepts here to blend them into this generation.",
@@ -2233,6 +2247,12 @@
         "coherenceEdgeSize": "Coherence edge size",
         "coherenceMinDenoise": "Coherence min denoise",
         "maskBlur": "Mask blur"
+      },
+      "conceptMenu": {
+        "disable": "Disable",
+        "enable": "Enable",
+        "openInModelManager": "Open in Model Manager",
+        "remove": "Remove"
       },
       "conceptWeight": "{{name}} weight",
       "concepts": "Concepts",
@@ -2587,7 +2607,7 @@
       "pidNativeHelp": "The requested size is the 4x target; generation runs at a quarter of it."
     },
     "upscale": {
-      "addLora": "LoRAs",
+      "concepts": "Concepts",
       "advanced": "Advanced",
       "bundledVae": "Bundled VAE",
       "cfgScale": "CFG scale",
@@ -2602,8 +2622,7 @@
       "inputSize": "Input",
       "largeOutput": "Large output",
       "largeOutputDescription": "This output may take substantially longer and require more VRAM. Check tile settings before queueing.",
-      "lorasRemoved": "Removed {{count}} incompatible LoRA model(s).",
-      "loraWeight": "{{name}} weight",
+      "lorasRemoved": "Removed {{count}} incompatible concept(s).",
       "mainModel": "Main model",
       "mainModelRequired": "Select a supported main model.",
       "negativePrompt": "Negative prompt",
@@ -2630,12 +2649,11 @@
       "prompts": "Prompts",
       "ready": "Ready",
       "readyDescription": "The upscale graph is ready to queue.",
-      "removeLora": "Remove {{name}}",
       "scale": "Scale",
       "scaleHelp": "Output dimensions are the source dimensions multiplied by this value.",
       "scheduler": "Scheduler",
       "seed": "Seed",
-      "selectLora": "Select a compatible LoRA…",
+      "searchCompatibleConcepts": "Search compatible concepts…",
       "selectMainModel": "Select a supported model…",
       "selectSpandrelModel": "Select a Spandrel model…",
       "selectTileControlNet": "Select a Tile or Union ControlNet…",
@@ -4180,9 +4198,7 @@
       },
       "negativeCfgHelp": "Used only when CFG is greater than 1.",
       "concepts": "Concepts",
-      "loraWeight": "Weight for {{name}}",
       "noLoras": "No concepts added. Compatible LoRAs adjust style and motion.",
-      "removeLora": "Remove {{name}}",
       "selectComponent": "Select a component model…",
       "hybridStartBlock": "Ref2VA AdaLN from block",
       "hybridStartBlockHelp": "Blocks from here through 49 keep this Ref2VA model’s AdaLN projections; earlier blocks use the FL2VA base. Lower values follow references more closely at more of Ref2VA’s quality cost; 25 is the recommended balance.",

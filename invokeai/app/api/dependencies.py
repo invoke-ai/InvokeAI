@@ -19,6 +19,7 @@ from invokeai.app.services.events.events_fastapievents import FastAPIEventServic
 from invokeai.app.services.external_generation.external_generation_default import ExternalGenerationService
 from invokeai.app.services.external_generation.providers import (
     AlibabaCloudProvider,
+    AtlasCloudProvider,
     GeminiProvider,
     OpenAIProvider,
     SeedreamProvider,
@@ -185,6 +186,7 @@ class ApiDependencies:
         external_generation = ExternalGenerationService(
             providers={
                 AlibabaCloudProvider.provider_id: AlibabaCloudProvider(app_config=configuration, logger=logger),
+                AtlasCloudProvider.provider_id: AtlasCloudProvider(app_config=configuration, logger=logger),
                 GeminiProvider.provider_id: GeminiProvider(app_config=configuration, logger=logger),
                 OpenAIProvider.provider_id: OpenAIProvider(app_config=configuration, logger=logger),
                 SeedreamProvider.provider_id: SeedreamProvider(app_config=configuration, logger=logger),
@@ -228,6 +230,7 @@ class ApiDependencies:
             boards=boards,
             bulk_download=bulk_download,
             configuration=configuration,
+            database=database,
             events=events,
             image_files=image_files,
             image_moves=image_moves,
@@ -286,7 +289,6 @@ class ApiDependencies:
             model_manager=model_manager,
             logger=logger,
         )
-        database.clean()
         ApiDependencies.database = database
 
     @staticmethod

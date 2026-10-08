@@ -99,14 +99,14 @@ def _lock_media(kind: MediaKind) -> Select[Any]:
 
 @functools.cache
 def _upsert_embedding(kind: MediaKind, dialect_name: str) -> Any:
-    return upsert(dialect_name, _KINDS[kind].embeddings, update=["dim", "embedding"])
+    return upsert(dialect_name, _KINDS[kind].embeddings, update=["dim", "embedding", "encoding"])
 
 
 def _named_embeddings(kind: MediaKind) -> Select[Any]:
     embeddings, name = _KINDS[kind].embeddings, _KINDS[kind].name
-    return select(literal(kind), embeddings.c[name], embeddings.c.dim, embeddings.c.embedding).where(
-        embeddings.c.model_id == bindparam("model_id"), InBoundSet(embeddings.c[name], bindparam(f"{kind}_names"))
-    )
+    return select(
+        literal(kind), embeddings.c[name], embeddings.c.dim, embeddings.c.embedding, embeddings.c.encoding
+    ).where(embeddings.c.model_id == bindparam("model_id"), InBoundSet(embeddings.c[name], bindparam(f"{kind}_names")))
 
 
 # Both kinds in one statement, each kind's names in one parameter: an IN list would bind every name, in statements
@@ -203,8 +203,8 @@ class ProjectionRow(NamedTuple):
     updated_at: str
 
 
-def _found_embeddings(rows: Sequence[Sequence[Any]]) -> dict[IndexedItem, tuple[int, bytes]]:
-    return {IndexedItem(kind, name): (dim, embedding) for kind, name, dim, embedding in rows}
+def _found_embeddings(rows: Sequence[Sequence[Any]]) -> dict[IndexedItem, tuple[int, bytes, str]]:
+    return {IndexedItem(kind, name): (dim, embedding, encoding) for kind, name, dim, embedding, encoding in rows}
 
 
 def _items(names: list[tuple[MediaKind, Sequence[str]]]) -> list[IndexedItem]:
@@ -213,19 +213,27 @@ def _items(names: list[tuple[MediaKind, Sequence[str]]]) -> list[IndexedItem]:
 
 class ImageIndexQueries(QueryModule):
     @write
-    def upsert_embedding(self, conn: Connection, item: IndexedItem, model_id: str, dim: int, embedding: bytes) -> bool:
-        """Stores the item's embedding under the model, replacing one stored before. Whether the item exists: an item
-        deleted meanwhile gets none."""
+    def upsert_embedding(
+        self, conn: Connection, item: IndexedItem, model_id: str, dim: int, embedding: bytes, encoding: str
+    ) -> bool:
+        """Stores the item's embedding, in the float type `encoding` names, under the model, replacing one stored
+        before. Whether the item exists: an item deleted meanwhile gets none."""
         if conn.execute(_lock_media(item.kind), {"name": item.name}).first() is None:
             return False
-        values = {_KINDS[item.kind].name: item.name, "model_id": model_id, "dim": dim, "embedding": embedding}
+        values = {
+            _KINDS[item.kind].name: item.name,
+            "model_id": model_id,
+            "dim": dim,
+            "embedding": embedding,
+            "encoding": encoding,
+        }
         conn.execute(_upsert_embedding(item.kind, conn.dialect.name), values)
         return True
 
     @mapped(_found_embeddings)
     @read
     def embeddings(self, conn: Connection, items: Sequence[IndexedItem], model_id: str) -> Sequence[Row[Any]]:
-        """The dimension and float32 bytes of each item's embedding under the model, for the items that have one."""
+        """The dimension, bytes and encoding of each item's embedding under the model, for the items that have one."""
         if not items:
             return []
         parameters = {f"{kind}_names": bound_set(item.name for item in items if item.kind == kind) for kind in _KINDS}

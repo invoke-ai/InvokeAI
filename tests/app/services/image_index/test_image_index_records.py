@@ -2,16 +2,18 @@
 
 import numpy as np
 import pytest
-from sqlalchemy import insert, update
+from sqlalchemy import func, insert, select, update
 
 from invokeai.app.services.board_image_records.board_image_records_default import BoardImageRecordStorage
 from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardVisibility
 from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
 from invokeai.app.services.board_video_records.board_video_records_default import BoardVideoRecordStorage
+from invokeai.app.services.image_index import image_index_common
 from invokeai.app.services.image_index.image_index_common import (
     IndexedItem,
     blob_to_coords,
     blob_to_embedding,
+    blobs_to_embeddings,
     coords_to_blob,
     embedding_to_blob,
 )
@@ -21,7 +23,11 @@ from invokeai.app.services.image_records.image_records_default import ImageRecor
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries.locks import DatabaseLock
 from invokeai.app.services.shared.database.schema.boards import shared_boards
-from invokeai.app.services.shared.database.schema.image_index import image_embeddings, image_projections
+from invokeai.app.services.shared.database.schema.image_index import (
+    image_embeddings,
+    image_projections,
+    video_embeddings,
+)
 from invokeai.app.services.shared.database.schema.images import images
 from invokeai.app.services.shared.database.schema.videos import videos
 from invokeai.app.services.users.users_common import UserCreateRequest
@@ -142,19 +148,108 @@ def _vec(seed: int) -> np.ndarray:
     return v / np.linalg.norm(v)
 
 
+def _expected_fp16_roundtrip(vector: np.ndarray) -> np.ndarray:
+    narrowed = np.asarray(vector, dtype=np.dtype("<f2")).astype(np.float64)
+    norm = np.sqrt(np.sum(narrowed * narrowed, dtype=np.float64))
+    return (narrowed / norm).astype(np.float32)
+
+
 # --- Blob helpers ---
 
 
-def test_embedding_blob_roundtrip_is_bit_exact() -> None:
-    v = _vec(1)
-    assert np.array_equal(blob_to_embedding(embedding_to_blob(v), DIM), v)
+def test_embedding_blob_stores_little_endian_fp16_and_renormalizes_on_read() -> None:
+    vector = _vec(1)
+    blob = embedding_to_blob(vector)
+
+    assert blob == np.asarray(vector, dtype=np.dtype("<f2")).tobytes()
+    decoded = blob_to_embedding(blob, DIM, "float16")
+    expected = _expected_fp16_roundtrip(vector)
+
+    assert decoded.dtype == np.float32
+    assert not decoded.flags.writeable
+    np.testing.assert_allclose(decoded, expected, rtol=0, atol=1e-7)
+    assert abs(np.linalg.norm(decoded.astype(np.float64)) - 1.0) <= 1e-6
+    assert 1.0 - float(np.dot(vector.astype(np.float64), decoded.astype(np.float64))) <= 1e-6
 
 
-def test_embedding_blob_rejects_bad_shapes() -> None:
+def test_embedding_blob_preserves_legacy_float32_values_read_only() -> None:
+    vector = _vec(1)
+    blob = vector.tobytes()
+
+    decoded = blob_to_embedding(blob, DIM, "float32")
+
+    assert len(blob) == DIM * 4
+    assert np.array_equal(decoded, vector)
+    assert decoded.dtype == np.float32
+    assert not decoded.flags.writeable
+
+
+def test_768_dim_embedding_blob_uses_half_storage_bytes() -> None:
+    vector = np.random.default_rng(821).standard_normal(768).astype(np.float32)
+    vector /= np.linalg.norm(vector)
+
+    assert len(embedding_to_blob(vector)) == 1536
+    assert len(vector.tobytes()) == 3072
+    decoded = blob_to_embedding(embedding_to_blob(vector), 768, "float16")
+    cosine = float(np.dot(vector.astype(np.float64), decoded.astype(np.float64)))
+    assert abs(np.linalg.norm(decoded.astype(np.float64)) - 1.0) <= 1e-6
+    assert 1.0 - cosine <= 1e-6
+
+    query = np.random.default_rng(822).standard_normal(768).astype(np.float32)
+    query /= np.linalg.norm(query)
+    orthogonal = np.random.default_rng(823).standard_normal(768).astype(np.float32)
+    orthogonal -= query * np.dot(query, orthogonal)
+    orthogonal /= np.linalg.norm(orthogonal)
+    candidates = [query, query + orthogonal * 1e-3, query + orthogonal * 0.1]
+    candidates = [candidate / np.linalg.norm(candidate) for candidate in candidates]
+    decoded_candidates = [blob_to_embedding(embedding_to_blob(candidate), 768, "float16") for candidate in candidates]
+    source_scores = [float(np.dot(query, candidate)) for candidate in candidates]
+    stored_scores = [float(np.dot(query, candidate)) for candidate in decoded_candidates]
+
+    assert max(abs(source - stored) for source, stored in zip(source_scores, stored_scores, strict=True)) <= 1e-3
+    assert source_scores[0] - source_scores[1] < 2e-3
+    assert source_scores[0] - source_scores[2] > 2e-3
+    assert stored_scores[0] > stored_scores[2]
+
+
+def test_embedding_blob_rejects_bad_shapes_and_dimensions() -> None:
     with pytest.raises(ValueError):
         embedding_to_blob(np.zeros((2, 2), dtype=np.float32))
-    with pytest.raises(ValueError):
-        blob_to_embedding(embedding_to_blob(_vec(1)), DIM + 1)
+    with pytest.raises(ValueError, match="dimension"):
+        blob_to_embedding(embedding_to_blob(_vec(1)), DIM + 1, "float16")
+    for dim in (0, -1):
+        with pytest.raises(ValueError, match="positive"):
+            blob_to_embedding(b"", dim, "float16")
+
+
+def test_embedding_blob_requires_explicit_supported_encoding_and_exact_length() -> None:
+    fp16 = np.asarray(_vec(1), dtype=np.dtype("<f2")).tobytes()
+    fp32 = _vec(1).tobytes()
+
+    with pytest.raises(ValueError, match="encoding"):
+        blob_to_embedding(fp16, DIM, "float64")
+    with pytest.raises(ValueError, match="expected"):
+        blob_to_embedding(fp16[:-2], DIM, "float16")
+    with pytest.raises(ValueError, match="expected"):
+        blob_to_embedding(fp16, DIM, "float32")
+    # This payload has exactly the size of a valid fp16 vector, but its declared
+    # encoding is float32. The decoder must reject it instead of guessing by size.
+    with pytest.raises(ValueError, match="expected"):
+        blob_to_embedding(fp32[: len(fp16)], DIM, "float32")
+
+
+def test_embedding_blob_rejects_nonfinite_and_zero_decoded_vectors() -> None:
+    for vector in (
+        np.array([np.nan, 1, 1, 1], dtype=np.dtype("<f2")),
+        np.array([np.inf, 1, 1, 1], dtype=np.dtype("<f2")),
+        np.zeros(4, dtype=np.dtype("<f2")),
+        np.array([np.nan, 1, 1, 1], dtype=np.float32),
+        np.array([np.inf, 1, 1, 1], dtype=np.float32),
+        np.zeros(4, dtype=np.float32),
+    ):
+        encoding = "float16" if vector.dtype.itemsize == 2 else "float32"
+        with pytest.raises(ValueError):
+            blob_to_embedding(vector.tobytes(), len(vector), encoding)
 
 
 def test_embedding_blob_rejects_non_finite_values() -> None:
@@ -216,7 +311,9 @@ def test_embedding_blob_survives_global_numpy_error_state() -> None:
 
 def test_embedding_blob_narrows_float64_input() -> None:
     v64 = (np.arange(DIM, dtype=np.float64) + 1.0) / 10.0
-    assert np.array_equal(blob_to_embedding(embedding_to_blob(v64), DIM), v64.astype(np.float32))
+    np.testing.assert_allclose(
+        blob_to_embedding(embedding_to_blob(v64), DIM, "float16"), _expected_fp16_roundtrip(v64), rtol=0, atol=1e-7
+    )
 
 
 def test_coords_blob_roundtrip_and_validation() -> None:
@@ -237,19 +334,33 @@ def test_coords_from_blob_are_writable() -> None:
 # --- Embedding CRUD ---
 
 
-def test_upsert_and_get_roundtrip(image_records: ImageRecordStorage, index_records: ImageIndexRecords) -> None:
+def _stored(database: Database, item: IndexedItem) -> tuple[str, int]:
+    """The encoding and byte length of the item's stored embedding."""
+    table, name = (image_embeddings, "image_name") if item.kind == "image" else (video_embeddings, "video_name")
+    with database.begin(write=False) as conn:
+        row = conn.execute(
+            select(table.c.encoding, func.length(table.c.embedding)).where(table.c[name] == item.name)
+        ).one()
+    return str(row[0]), int(row[1])
+
+
+def test_upsert_and_get_roundtrip(
+    image_records: ImageRecordStorage, index_records: ImageIndexRecords, database: Database
+) -> None:
     _save_image(image_records, "a.png")
     _save_image(image_records, "b.png")
     va, vb = _vec(1), _vec(2)
     index_records.upsert_embedding(IndexedItem("image", "a.png"), MODEL_ID, va)
     index_records.upsert_embedding(IndexedItem("image", "b.png"), MODEL_ID, vb)
 
+    assert _stored(database, IndexedItem("image", "a.png")) == ("float16", DIM * 2)
+
     names, matrix = index_records.get_embeddings(imgs("b.png", "a.png", "missing.png"), MODEL_ID)
 
     assert names == imgs("b.png", "a.png")
     assert matrix.dtype == np.float32
-    assert np.array_equal(matrix[0], vb)
-    assert np.array_equal(matrix[1], va)
+    np.testing.assert_allclose(matrix[0], _expected_fp16_roundtrip(vb), rtol=0, atol=1e-7)
+    np.testing.assert_allclose(matrix[1], _expected_fp16_roundtrip(va), rtol=0, atol=1e-7)
 
 
 def test_upsert_replaces_existing_embedding(
@@ -262,7 +373,7 @@ def test_upsert_replaces_existing_embedding(
 
     names, matrix = index_records.get_embeddings(imgs("a.png"), MODEL_ID)
     assert names == imgs("a.png")
-    assert np.array_equal(matrix[0], replacement)
+    np.testing.assert_allclose(matrix[0], _expected_fp16_roundtrip(replacement), rtol=0, atol=1e-7)
 
 
 def test_get_embeddings_empty_input_and_no_matches(
@@ -300,9 +411,9 @@ def test_get_embeddings_returns_a_large_request_in_the_callers_order(
 
     assert names == requested
     assert matrix.shape == (count, DIM)
-    assert np.array_equal(matrix[0], _vec(count - 1))
-    assert np.array_equal(matrix[1], _vec(count - 2))
-    assert np.array_equal(matrix[-1], _vec(0))
+    # Rows must still align with the names after chunking and reordering.
+    np.testing.assert_allclose(matrix[0], _expected_fp16_roundtrip(_vec(count - 1)), rtol=0, atol=1e-7)
+    np.testing.assert_allclose(matrix[-1], _expected_fp16_roundtrip(_vec(0)), rtol=0, atol=1e-7)
 
 
 def test_get_embeddings_rejects_inconsistent_dims(
@@ -869,8 +980,87 @@ def test_videos_are_stored_counted_and_listed_alongside_images(
     )
     # Rows follow the caller's order across both namespaces, not one namespace after the other.
     assert items == [IndexedItem("video", "clip.mp4"), IndexedItem("image", "a.png")]
-    assert np.array_equal(matrix[0], _vec(2))
-    assert np.array_equal(matrix[1], _vec(1))
+    np.testing.assert_allclose(matrix[0], _expected_fp16_roundtrip(_vec(2)), rtol=0, atol=1e-7)
+    np.testing.assert_allclose(matrix[1], _expected_fp16_roundtrip(_vec(1)), rtol=0, atol=1e-7)
+
+
+def test_records_read_mixed_legacy_and_fp16_encodings_across_media_kinds(
+    database: Database,
+    image_records: ImageRecordStorage,
+    video_records: VideoRecordStorage,
+    index_records: ImageIndexRecords,
+) -> None:
+    _save_image(image_records, "legacy.png")
+    _save_video(video_records, "half.mp4")
+    legacy = _vec(1)
+    half = _vec(2)
+
+    with database.begin(write=True) as conn:
+        # A row from before fp16 storage: the column's default names its encoding.
+        conn.execute(
+            insert(image_embeddings).values(
+                image_name="legacy.png", model_id=MODEL_ID, dim=DIM, embedding=legacy.tobytes()
+            )
+        )
+        conn.execute(
+            insert(video_embeddings).values(
+                video_name="half.mp4", model_id=MODEL_ID, dim=DIM, embedding=embedding_to_blob(half), encoding="float16"
+            )
+        )
+
+    items, matrix = index_records.get_embeddings(
+        [IndexedItem("video", "half.mp4"), IndexedItem("image", "legacy.png")], MODEL_ID
+    )
+
+    assert items == [IndexedItem("video", "half.mp4"), IndexedItem("image", "legacy.png")]
+    assert matrix.dtype == np.float32
+    np.testing.assert_allclose(matrix[0], _expected_fp16_roundtrip(half), rtol=0, atol=1e-7)
+    assert np.array_equal(matrix[1], legacy)
+
+
+def test_embedding_matrix_decode_keeps_rows_aligned_across_encodings_and_chunks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(image_index_common, "_DECODE_CHUNK_ROWS", 2)
+    vectors = [_vec(seed) for seed in range(7)]
+    encodings = ["float16", "float32", "float32", "float16", "float16", "float32", "float16"]
+    blobs = [embedding_to_blob(v) if e == "float16" else v.tobytes() for v, e in zip(vectors, encodings, strict=True)]
+
+    matrix = blobs_to_embeddings(blobs, encodings, DIM)
+
+    assert matrix.shape == (7, DIM)
+    for row, vector, encoding in zip(matrix, vectors, encodings, strict=True):
+        if encoding == "float32":
+            assert np.array_equal(row, vector)
+        else:
+            np.testing.assert_allclose(row, _expected_fp16_roundtrip(vector), rtol=0, atol=1e-7)
+
+    uniform = blobs_to_embeddings([embedding_to_blob(v) for v in vectors], ["float16"] * len(vectors), DIM)
+    np.testing.assert_allclose(uniform, np.stack([_expected_fp16_roundtrip(v) for v in vectors]), rtol=0, atol=1e-7)
+
+    # A degenerate row in an encoding group's last, partial chunk must still be rejected: row 5 is
+    # the third float32 row, and row 4 the third float16 row once row 6 is dropped.
+    zero_last = [*blobs[:5], np.zeros(DIM, np.float32).tobytes(), blobs[6]]
+    with pytest.raises(ValueError, match="all-zero"):
+        blobs_to_embeddings(zero_last, encodings, DIM)
+    nan_last = [*blobs[:4], np.full(DIM, np.nan, "<f2").tobytes(), blobs[5]]
+    with pytest.raises(ValueError, match="NaN or infinite"):
+        blobs_to_embeddings(nan_last, encodings[:6], DIM)
+
+
+def test_image_and_video_upserts_set_fp16_encoding(
+    database: Database,
+    image_records: ImageRecordStorage,
+    video_records: VideoRecordStorage,
+    index_records: ImageIndexRecords,
+) -> None:
+    _save_image(image_records, "a.png")
+    _save_video(video_records, "clip.mp4")
+    index_records.upsert_embedding(IndexedItem("image", "a.png"), MODEL_ID, _vec(1))
+    index_records.upsert_embedding(IndexedItem("video", "clip.mp4"), MODEL_ID, _vec(2))
+
+    assert _stored(database, IndexedItem("image", "a.png")) == ("float16", DIM * 2)
+    assert _stored(database, IndexedItem("video", "clip.mp4")) == ("float16", DIM * 2)
 
 
 def test_an_image_and_a_video_are_different_items(
@@ -885,8 +1075,18 @@ def test_an_image_and_a_video_are_different_items(
     index_records.upsert_embedding(IndexedItem("image", "same.png"), MODEL_ID, _vec(1))
     index_records.upsert_embedding(IndexedItem("video", "same.png"), MODEL_ID, _vec(2))
 
-    assert np.array_equal(index_records.get_embeddings(imgs("same.png"), MODEL_ID)[1][0], _vec(1))
-    assert np.array_equal(index_records.get_embeddings(vids("same.png"), MODEL_ID)[1][0], _vec(2))
+    np.testing.assert_allclose(
+        index_records.get_embeddings(imgs("same.png"), MODEL_ID)[1][0],
+        _expected_fp16_roundtrip(_vec(1)),
+        rtol=0,
+        atol=1e-7,
+    )
+    np.testing.assert_allclose(
+        index_records.get_embeddings(vids("same.png"), MODEL_ID)[1][0],
+        _expected_fp16_roundtrip(_vec(2)),
+        rtol=0,
+        atol=1e-7,
+    )
 
     index_records.delete_embedding(IndexedItem("image", "same.png"))
     assert index_records.get_embeddings(imgs("same.png"), MODEL_ID)[0] == []

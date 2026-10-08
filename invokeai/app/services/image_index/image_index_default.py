@@ -1,9 +1,10 @@
 import os
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from queue import Empty, Queue
-from typing import TYPE_CHECKING, AbstractSet, Any, Callable, Optional
+from typing import TYPE_CHECKING, AbstractSet, Any, Callable, Iterable, Iterator, Optional
 
 import numpy as np
 import torch
@@ -212,7 +213,7 @@ def warm_up_attention(config: "InvokeAIAppConfig", logger: "Logger") -> None:
         logger.warning("Attention warm-up failed", exc_info=True)
 
 
-# Minimum gap between re-resolutions of a missing embedding model. The map's
+# Minimum gap between re-resolutions of the configured embedding model. The map's
 # status endpoint is polled, and each attempt is a model-store query, so the
 # retry is throttled rather than run per request.
 _ACTIVATION_RETRY_INTERVAL_S = 5.0
@@ -285,6 +286,15 @@ class ImageIndexService(ImageIndexServiceBase):
         # it registers image callbacks and starts the worker, and two concurrent
         # map requests must not do either twice.
         self._activation_lock = threading.Lock()
+        # Request threads may still be using an encoder after it is removed.
+        # Retirement publishes unavailability immediately; replacement waits
+        # for these users and the worker without a polling request joining them.
+        self._model_users = 0
+        self._users_drained = threading.Condition(self._activation_lock)
+        # A retired model whose configured name now resolves to another
+        # installation; cleared once the replacement starts or is missing.
+        self._replacement_pending = False
+        self._callbacks_registered = False
         self._last_activation_attempt: float = 0.0
         # Set by stop() so a request that raced shutdown cannot start a worker
         # the invoker will never join.
@@ -344,52 +354,73 @@ class ImageIndexService(ImageIndexServiceBase):
 
     @property
     def model_id(self) -> str | None:
-        return self._model_id
+        return None if self._stop_event.is_set() else self._model_id
+
+    @property
+    def replacing_model(self) -> bool:
+        return self._replacement_pending and self._stop_event.is_set() and not self._stopped
+
+    @contextmanager
+    def use_model(self) -> Iterator[None]:
+        with self._activation_lock:
+            self._model_users += 1
+        try:
+            yield
+        finally:
+            with self._activation_lock:
+                self._model_users -= 1
+                if not self._model_users:
+                    self._users_drained.notify_all()
 
     def get_status(self) -> ImageIndexStatus | None:
-        if self._invoker is None or self._model_id is None:
+        model_id = self.model_id
+        if self._invoker is None or model_id is None:
             return None
-        status = self._invoker.services.image_index_records.count_index_status(self._model_id)
+        status = self._invoker.services.image_index_records.count_index_status(model_id)
         return status.model_copy(update={"failed": len(self._failed)})
 
     def embed_image(self, image: Image.Image) -> np.ndarray:
-        if self._encode_fn is None:
-            raise RuntimeError("The image index is not running")
-        rgb = image.convert("RGB")
-        try:
-            matrix = np.asarray(self._encode_fn([rgb]), dtype=EMBEDDING_DTYPE)
-        except Exception:
-            # The model cache deletes an entry whose load failed precisely so
-            # the next attempt rebuilds it from disk (e.g. an entry left in a
-            # bad state by VRAM contention with a concurrent generation).
-            # One retry is the cache's designed recovery; the worker gets the
-            # same effect from its batch retry loop.
-            if self._invoker is not None:
-                self._invoker.services.logger.warning(
-                    "Image embed failed; retrying with a fresh model load", exc_info=True
-                )
-            matrix = np.asarray(self._encode_fn([rgb]), dtype=EMBEDDING_DTYPE)
-        if matrix.ndim != 2 or matrix.shape[0] != 1:
-            raise RuntimeError(f"Encoder returned shape {matrix.shape}; expected (1, D)")
-        return _normalize_query_vector(matrix[0])
+        with self.use_model():
+            if self.model_id is None or self._encode_fn is None:
+                raise RuntimeError("The image index is not running")
+            rgb = image.convert("RGB")
+            try:
+                matrix = np.asarray(self._encode_fn([rgb]), dtype=EMBEDDING_DTYPE)
+            except Exception:
+                # The model cache deletes an entry whose load failed precisely so
+                # the next attempt rebuilds it from disk (e.g. an entry left in a
+                # bad state by VRAM contention with a concurrent generation).
+                # One retry is the cache's designed recovery; the worker gets the
+                # same effect from its batch retry loop.
+                if self._invoker is not None:
+                    self._invoker.services.logger.warning(
+                        "Image embed failed; retrying with a fresh model load", exc_info=True
+                    )
+                matrix = np.asarray(self._encode_fn([rgb]), dtype=EMBEDDING_DTYPE)
+            if matrix.ndim != 2 or matrix.shape[0] != 1:
+                raise RuntimeError(f"Encoder returned shape {matrix.shape}; expected (1, D)")
+            return _normalize_query_vector(matrix[0])
 
     def embed_text(self, text: str) -> np.ndarray:
         return self._embed_texts([text])[0]
 
     def _embed_texts(self, texts: list[str]) -> np.ndarray:
         """Batched text embedding, (N, D) L2-normalized."""
-        if self._model_id is None:
-            raise TextSearchUnavailableError("The image index is not running")
+        with self.use_model():
+            if self.model_id is None:
+                raise TextSearchUnavailableError("The image index is not running")
 
-        tokenizer, model, is_siglip = self._get_text_encoder()
-        with torch.no_grad():
-            # SigLIP was trained with pad-to-max-length; pad-to-longest degrades
-            # its text embeddings. CLIP uses ordinary longest-padding.
-            inputs = tokenizer(texts, padding="max_length" if is_siglip else True, return_tensors="pt", truncation=True)
-            outputs = model(**inputs)
-            embeddings = outputs.pooler_output if is_siglip else outputs.text_embeds
-            matrix = embeddings.float().cpu().numpy()
-        return _normalize_batch(matrix)
+            tokenizer, model, is_siglip = self._get_text_encoder()
+            with torch.no_grad():
+                # SigLIP was trained with pad-to-max-length; pad-to-longest degrades
+                # its text embeddings. CLIP uses ordinary longest-padding.
+                inputs = tokenizer(
+                    texts, padding="max_length" if is_siglip else True, return_tensors="pt", truncation=True
+                )
+                outputs = model(**inputs)
+                embeddings = outputs.pooler_output if is_siglip else outputs.text_embeds
+                matrix = embeddings.float().cpu().numpy()
+            return _normalize_batch(matrix)
 
     def get_vocab_embeddings(self) -> tuple[list[str], np.ndarray]:
         """The phrase-embedding matrix for cluster labelling.
@@ -402,7 +433,7 @@ class ImageIndexService(ImageIndexServiceBase):
         worker instead and this raises until it lands.
         """
         with self._vocab_lock:
-            if self._vocab_cache is not None:
+            if self._vocab_cache is not None and self.model_id is not None:
                 return self._vocab_cache
             if self._vocab_failure is not None:
                 # Aged past the retry window: drop the memo and fall through to
@@ -428,7 +459,7 @@ class ImageIndexService(ImageIndexServiceBase):
                     raise self._vocab_failure.with_traceback(None)
                 self._vocab_failure = None
                 self._vocab_failed_at = None
-            if self._invoker is None or self._model_id is None:
+            if self._invoker is None or self.model_id is None:
                 raise TextSearchUnavailableError("The image index is not running")
 
             self._vocab_build_requested.set()
@@ -449,7 +480,7 @@ class ImageIndexService(ImageIndexServiceBase):
         self._vocab_build_requested.set()
 
     def get_vocab_build_state(self) -> tuple[VocabBuildState, Optional[str]]:
-        if self._invoker is None or self._model_id is None:
+        if self._invoker is None or self.model_id is None:
             return "unavailable", None
         # Flags first: a pending invalidation means the current cache (or
         # failure) is about to be discarded, so reporting it would be a lie.
@@ -661,36 +692,37 @@ class ImageIndexService(ImageIndexServiceBase):
             return self._text_encoder
 
     def get_accessible_embeddings(self, user_id: str | None) -> tuple[list[IndexedItem], np.ndarray]:
-        if self._invoker is None or self._model_id is None:
-            return [], np.empty((0, 0), dtype=EMBEDDING_DTYPE)
-        records = self._invoker.services.image_index_records
+        with self.use_model():
+            if self._invoker is None or self.model_id is None:
+                return [], np.empty((0, 0), dtype=EMBEDDING_DTYPE)
+            records = self._invoker.services.image_index_records
 
-        items = records.list_accessible_embedded_items(user_id, self._model_id)
-        if not items:
-            return [], np.empty((0, 0), dtype=EMBEDDING_DTYPE)
+            items = records.list_accessible_embedded_items(user_id, self._model_id)
+            if not items:
+                return [], np.empty((0, 0), dtype=EMBEDDING_DTYPE)
 
-        # Memory math: one entry is N x dim float32 (~300 MB at 100k x 768),
-        # so the LRU holds two entries and evicts oldest-first rather than
-        # clearing wholesale. Keys self-invalidate: any change to the
-        # accessible set changes the scope hash.
-        cache_key = scope_hash(self._model_id, items)
-        with self._search_cache_lock:
-            cached = self._search_cache.get(cache_key)
-            if cached is not None:
-                # LRU touch.
-                del self._search_cache[cache_key]
-                self._search_cache[cache_key] = cached
-        if cached is None:
-            # Built outside the lock: a concurrent miss for the same scope
-            # transiently builds a duplicate, which beats serializing every
-            # search behind a multi-second BLOB read.
-            cached = records.get_embeddings(items, self._model_id)
+            # Memory math: one entry is N x dim float32 (~300 MB at 100k x 768),
+            # so the LRU holds two entries and evicts oldest-first rather than
+            # clearing wholesale. Keys self-invalidate: any change to the
+            # accessible set changes the scope hash.
+            cache_key = scope_hash(self._model_id, items)
             with self._search_cache_lock:
-                while len(self._search_cache) >= 2:
-                    self._search_cache.pop(next(iter(self._search_cache)))
-                self._search_cache[cache_key] = cached
+                cached = self._search_cache.get(cache_key)
+                if cached is not None:
+                    # LRU touch.
+                    del self._search_cache[cache_key]
+                    self._search_cache[cache_key] = cached
+            if cached is None:
+                # Built outside the lock: a concurrent miss for the same scope
+                # transiently builds a duplicate, which beats serializing every
+                # search behind a multi-second BLOB read.
+                cached = records.get_embeddings(items, self._model_id)
+                with self._search_cache_lock:
+                    while len(self._search_cache) >= 2:
+                        self._search_cache.pop(next(iter(self._search_cache)))
+                    self._search_cache[cache_key] = cached
 
-        return cached
+            return cached
 
     def search_similar(
         self,
@@ -732,7 +764,7 @@ class ImageIndexService(ImageIndexServiceBase):
         failed_scope: Optional[str] = None,
         user_initiated: bool = False,
     ) -> bool:
-        if self._model_id is None or self._worker is None or not self._worker.is_alive():
+        if self.model_id is None or self._worker is None or not self._worker.is_alive():
             return False
         if failed_scope is not None and not self._failed_scope_retry_available(user_id, failed_scope):
             # The caller is asking on behalf of a cached failure whose one retry
@@ -820,83 +852,182 @@ class ImageIndexService(ImageIndexServiceBase):
             self._launch_worker(invoker)
 
     def try_activate(self) -> bool:
-        """Resolve the configured encoder again and start indexing if it is now installed.
+        """Reconcile encoder installation, draining retired work before replacement.
 
-        `start()` resolves the model once, at server start, and leaves the
-        service inert when it is missing — so a model installed afterwards (the
-        image map's own message offers that install) would not be indexed until
-        the next restart. The image map endpoints call this, so opening the
-        panel is enough to pick the model up. Throttled, because those
-        endpoints are polled.
+        Called off the event loop by map and search requests and by the
+        worker. Rechecks are throttled in both the running and missing states.
+        No join is taken here: a deleted model becomes unavailable at once,
+        while its in-flight users keep their stable resources until the
+        exiting worker, or a later request, can safely replace them. Only that
+        swap waits, for the model-load lock (_drop_cached_models).
         """
-        # Fast path, unlocked: the overwhelmingly common case is a running
-        # indexer, and every map request would otherwise queue on the lock.
-        if self._model_id is not None:
-            return True
         invoker = self._invoker
         if invoker is None or not invoker.services.configuration.image_index_enabled:
             return False
 
         with self._activation_lock:
-            if self._model_id is not None:
-                return True
-            if self._stopped or (self._worker is not None and self._worker.is_alive()):
+            if self._stopped:
                 return False
+            if self._encode_fn_override is not None:
+                return self.model_id is not None
             now = time.monotonic()
             if now - self._last_activation_attempt < _ACTIVATION_RETRY_INTERVAL_S:
-                return False
+                return self.model_id is not None
             self._last_activation_attempt = now
 
             config = invoker.services.configuration
             try:
                 model_config = self._resolve_model_config(config.image_index_model)
             except Exception:
-                # Unlike start(), this runs on a request thread: a model-store
-                # failure must degrade the map to `model_missing`, which is
-                # what these endpoints reported before they resolved anything,
-                # rather than turning three read endpoints into 500s.
+                # Request-driven reconciliation must not turn reads into 500s.
                 invoker.services.logger.warning("Image index: could not resolve the embedding model", exc_info=True)
+                # A failed catalog read is not evidence that a running model
+                # was deleted. Keep its current availability and retry later.
+                return self.model_id is not None
+            if model_config is not None and self._model_config is not None and self.model_id is not None:
+                # Catalog metadata does not change loaded resources. Include
+                # cache identity, loader selection, and placement/sizing config
+                # for CLIP/SigLIP, but leave name/description/cover edits alone.
+                resource_fields = {"key", "hash", "base", "type", "format", "repo_variant", "cpu_only"}
+                if (
+                    model_config.model_dump(include=resource_fields)
+                    == self._model_config.model_dump(include=resource_fields)
+                    # The shared loader normalizes config.path in place.
+                    and (config.models_path / model_config.path).resolve()
+                    == (config.models_path / self._model_config.path).resolve()
+                ):
+                    return True
+            self._stop_event.set()
+            self._replacement_pending = model_config is not None
+            if self._model_users or (self._worker is not None and self._worker.is_alive()):
+                # A live worker finishes the swap as it exits (_finish_retirement).
                 return False
-            if model_config is None:
-                # Silent: start() already logged the diagnosis once, and this
-                # runs on a polled endpoint.
-                return False
+            return self._swap_model(invoker, model_config)
 
-            invoker.services.logger.info(
-                f"Image index: embedding model '{config.image_index_model}' is now installed; starting the indexer"
+    def _swap_model(self, invoker: "Invoker", model_config: Optional["AnyModelConfig"]) -> bool:
+        """Retire the drained model and start `model_config`, if any. Called under _activation_lock."""
+        config = invoker.services.configuration
+        self._drop_cached_models(invoker, (self._model_config, model_config))
+        self._reset_model_resources()
+        self._replacement_pending = False
+        self._model_config = None
+        self._encode_fn = None
+        self._model_id = None
+        if model_config is None:
+            return False
+
+        invoker.services.logger.info(
+            f"Image index: embedding model '{config.image_index_model}' is now installed; starting the indexer"
+        )
+        # `_model_id` last, and rolled back as a set: it is the flag every
+        # other thread reads as "the indexer is running". Published before
+        # the worker exists, a failed launch would wedge the service there
+        # permanently — try_activate would treat it as running while
+        # nothing consumed the queue, and no later request would retry.
+        self._model_config = model_config
+        self._encode_fn = self._encode_with_model
+        self._model_id = model_config.hash
+        try:
+            self._launch_worker(invoker)
+        except Exception:
+            self._stop_event.set()
+            self._model_config = None
+            self._encode_fn = None
+            self._model_id = None
+            invoker.services.logger.warning(
+                "Image index: could not start the indexer after the model became available; "
+                "the next image map or search request will retry",
+                exc_info=True,
             )
-            # `_model_id` last, and rolled back as a set: it is the flag every
-            # other thread reads as "the indexer is running". Published before
-            # the worker exists, a failed launch would wedge the service there
-            # permanently — the fast path above would answer True forever while
-            # nothing consumed the queue, and no later request would retry.
-            self._model_config = model_config
-            self._encode_fn = self._encode_with_model
-            self._model_id = model_config.hash
+            return False
+        return True
+
+    def _finish_retirement(self) -> None:
+        """Complete a retirement as the worker exits, once request users have drained.
+
+        Replacement must not wait for an image map request: with the map closed,
+        semantic search and new-image indexing would stay down indefinitely.
+        """
+        invoker = self._invoker
+        assert invoker is not None
+        with self._activation_lock:
+            while self._model_users and not self._stopped:
+                self._users_drained.wait()
+            if self._stopped or not self._stop_event.is_set():
+                return
+            self._last_activation_attempt = time.monotonic()
             try:
-                self._launch_worker(invoker)
+                model_config = self._resolve_model_config(invoker.services.configuration.image_index_model)
             except Exception:
-                self._model_config = None
-                self._encode_fn = None
-                self._model_id = None
-                invoker.services.logger.warning(
-                    "Image index: could not start the indexer after the model became available; "
-                    "the next image map request will retry",
-                    exc_info=True,
-                )
-                return False
-            return True
+                # Stay retired; the next request's try_activate swaps once the catalog reads again. Without a
+                # resolved replacement, reads must not report one as starting.
+                self._replacement_pending = False
+                invoker.services.logger.warning("Image index: could not resolve the embedding model", exc_info=True)
+                return
+            self._swap_model(invoker, model_config)
+
+    def _drop_cached_models(self, invoker: "Invoker", configs: Iterable[Optional["AnyModelConfig"]]) -> None:
+        """Evict the retired and replacement encoders from every per-device model cache.
+
+        The shared cache is keyed by model key alone, so an encoder that keeps its key across a
+        reinstall would be served from the retired weights while its embeddings are stored under
+        the replacement's hash, and those survive a restart. The write lock keeps a concurrent
+        load from re-registering the old shared CPU weights around the drop. It is taken under
+        _activation_lock, so map polls, searches and stop() wait out any model load or VRAM move
+        in flight; that cannot deadlock, because the worker and request users have drained and
+        nothing takes _activation_lock while holding the load lock.
+        """
+        keys = {config.key for config in configs if config is not None}
+        if not keys:
+            # Still missing: this runs on every throttled recheck, and must not queue behind a load.
+            return
+        with MODEL_LOAD_LOCK.write_lock():
+            for cache in set(invoker.services.model_manager.load.ram_caches.values()):
+                for key in keys:
+                    cache.drop_model(key)
+
+    def _reset_model_resources(self) -> None:
+        """Retire caches only after the worker and request users have drained.
+
+        Called under _activation_lock. Same-hash reinstalls must also discard
+        lazy encoders and load failures: their path or installation may have
+        changed even though stored image embeddings remain valid. Taking
+        _vocab_lock here reverses the worker's vocab-build order
+        (_vocab_lock, then use_model); that is safe only because no build can
+        be running once the worker has left its loop and request users drained.
+        """
+        self._processor = None
+        self._cpu_model = None
+        self._text_encoder = None
+        self._text_encoder_failure = None
+        with self._vocab_lock:
+            self._vocab_cache = None
+            self._vocab_failure = None
+            self._vocab_failed_at = None
+        self._vocab_build_requested.clear()
+        self._vocab_invalidate_requested.clear()
+        with self._search_cache_lock:
+            self._search_cache.clear()
+        with self._projection_lock:
+            self._projection_requests.clear()
+            self._failed_projection_scopes.clear()
+        self._attempts.clear()
+        self._failed.clear()
+        self._pending_pokes.clear()
+        self._systemic_failures = 0
 
     def _launch_worker(self, invoker: "Invoker") -> None:
-        """Wire the image callbacks and start the worker thread. Runs once per active model."""
+        """Start one worker, keeping callback registration scoped to the service."""
         discarded = invoker.services.image_index_records.delete_embeddings_for_other_models(self._model_id)
         if discarded:
             invoker.services.logger.info(f"Discarded {discarded} embeddings computed by a previously-configured model")
 
-        invoker.services.images.on_changed(self._on_image_changed)
-        invoker.services.images.on_deleted(self._on_image_deleted)
-        invoker.services.videos.on_changed(self._on_video_changed)
-        invoker.services.videos.on_deleted(self._on_video_deleted)
+        if not self._callbacks_registered:
+            invoker.services.images.on_changed(self._on_image_changed)
+            invoker.services.images.on_deleted(self._on_image_deleted)
+            invoker.services.videos.on_changed(self._on_video_changed)
+            invoker.services.videos.on_deleted(self._on_video_deleted)
+            self._callbacks_registered = True
 
         self._backfill_pending.set()
         # A previous run stopped mid-pass leaves this set; this run's pass announces itself.
@@ -910,6 +1041,8 @@ class ImageIndexService(ImageIndexServiceBase):
         # worker that this stop would then never see.
         with self._activation_lock:
             self._stopped = True
+            # Release a retiring worker waiting for request users in _finish_retirement.
+            self._users_drained.notify_all()
         self._stop_event.set()
         if self._worker is not None and self._worker.is_alive():
             self._worker.join(timeout=10)
@@ -954,6 +1087,10 @@ class ImageIndexService(ImageIndexServiceBase):
                 self._attempts.pop(item, None)
                 self._status_dirty.set()
             return
+        if self._stop_event.is_set():
+            # Reinstallation backfills from the records. Retaining callbacks'
+            # items while no worker can consume them would grow without bound.
+            return
         with self._pending_lock:
             if item in self._pending:
                 return
@@ -985,6 +1122,8 @@ class ImageIndexService(ImageIndexServiceBase):
         logger = self._invoker.services.logger
         while not self._stop_event.is_set():
             try:
+                if not self.try_activate():
+                    break
                 batch = self._next_batch()
                 if self._status_dirty.is_set():
                     # The worker is the only emitter, so events are totally
@@ -1010,8 +1149,11 @@ class ImageIndexService(ImageIndexServiceBase):
                     # symptom it was added to fix.
                     self._wait_for_idle_generation()
                     if self._stop_event.is_set():
+                        self._forget_pending(batch)
                         break
                     ok = self._process_batch(batch)
+                    if self._stop_event.is_set():
+                        break
                     self._emit_status()
                     if ok:
                         continue
@@ -1104,6 +1246,10 @@ class ImageIndexService(ImageIndexServiceBase):
                 self._backfill_pending.set()
                 self._status_dirty.set()
                 self._stop_event.wait(_POLL_SECONDS)
+        try:
+            self._finish_retirement()
+        except Exception:
+            logger.exception("Image index: could not finish retiring the embedding model")
 
     def _next_batch(self) -> Optional[list[IndexedItem]]:
         """Get the next batch of items, preferring backfill work.
@@ -1222,6 +1368,8 @@ class ImageIndexService(ImageIndexServiceBase):
             try:
                 embeddings = np.asarray(self._encode_fn(images), dtype=EMBEDDING_DTYPE)
             except Exception:
+                if self._stop_event.is_set():
+                    return False
                 logger.exception(f"Image index: failed to embed a batch of {len(loaded)} items")
                 self._attribute_batch_failure("the encoder raised", loaded)
                 return False
@@ -1258,17 +1406,20 @@ class ImageIndexService(ImageIndexServiceBase):
 
             stored: list[IndexedItem] = []
             try:
-                for item, embedding in zip(loaded, embeddings, strict=True):
-                    # Deliberately not caught per-item: any exception from here must reach the
-                    # handler below, which fails every unstored item and returns False to re-arm
-                    # the backfill. Swallowing one item's error here would leave it unembedded
-                    # with no retry ever scheduled, wedging `pending` above zero.
-                    self._invoker.services.image_index_records.upsert_embedding(item, self._model_id, embedding)
-                    stored.append(item)
-                    self._attempts.pop(item, None)
-                    # An item that recovers (e.g. re-embedded after an
-                    # update) must stop counting against the failed total.
-                    self._failed.discard(item)
+                with self._activation_lock:
+                    if self._stop_event.is_set():
+                        return False
+                    for item, embedding in zip(loaded, embeddings, strict=True):
+                        # Deliberately not caught per-item: any exception from here must reach the
+                        # handler below, which fails every unstored item and returns False to re-arm
+                        # the backfill. Swallowing one item's error here would leave it unembedded
+                        # with no retry ever scheduled, wedging `pending` above zero.
+                        self._invoker.services.image_index_records.upsert_embedding(item, self._model_id, embedding)
+                        stored.append(item)
+                        self._attempts.pop(item, None)
+                        # An item that recovers (e.g. re-embedded after an
+                        # update) must stop counting against the failed total.
+                        self._failed.discard(item)
             except Exception:
                 # A raise here (e.g. "database is locked") is a property of the database, not of
                 # any item, so it is systemic: the unstored items stay pending and are retried
@@ -1507,14 +1658,17 @@ class ImageIndexService(ImageIndexServiceBase):
         # empty cache still claims the current scope, so staleness detection —
         # not client polling — decides when to retry).
         try:
-            records.set_projection(
-                user_id,
-                self._model_id,
-                current_hash,
-                projection_params(n_points=len(found_items)),
-                found_items,
-                coords,
-            )
+            with self._activation_lock:
+                if self._stop_event.is_set():
+                    return
+                records.set_projection(
+                    user_id,
+                    self._model_id,
+                    current_hash,
+                    projection_params(n_points=len(found_items)),
+                    found_items,
+                    coords,
+                )
         except Exception as e:
             # Same reasoning as the read above: the fit is done but unsaved, so
             # re-queue rather than drop it and leave /refresh's promise unmet.
@@ -1685,7 +1839,7 @@ class ImageIndexService(ImageIndexServiceBase):
             # which is stable across reinstalls of the same set: a different winner changes the
             # model hash, and `start()` then discards every embedding computed under the old one.
             chosen = min(configs, key=lambda config: config.key)
-            if len(configs) > 1:
+            if len(configs) > 1 and (self._model_config is None or chosen.key != self._model_config.key):
                 self._invoker.services.logger.warning(
                     f"Multiple {model_type.value} models named '{model_name}' are installed; "
                     f"using '{chosen.key}' for the image index"

@@ -338,9 +338,11 @@ CREATE TABLE `image_embeddings` (
   `dim` bigint NOT NULL,
   `embedding` longblob NOT NULL,
   `created_at` varchar(32) COLLATE utf8mb4_0900_bin NOT NULL,
+  `encoding` longtext COLLATE utf8mb4_0900_bin NOT NULL DEFAULT (_utf8mb4'float32'),
   PRIMARY KEY (`image_name`,`model_id`),
   KEY `idx_image_embeddings_model_id` (`model_id`),
-  CONSTRAINT `fk_image_embeddings_image_name_images` FOREIGN KEY (`image_name`) REFERENCES `images` (`image_name`) ON DELETE CASCADE
+  CONSTRAINT `fk_image_embeddings_image_name_images` FOREIGN KEY (`image_name`) REFERENCES `images` (`image_name`) ON DELETE CASCADE,
+  CONSTRAINT `ck_image_embeddings_encoding` CHECK ((`encoding` in (_utf8mb4'float32',_utf8mb4'float16')))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE `image_projections` (
@@ -443,9 +445,11 @@ CREATE TABLE `video_embeddings` (
   `dim` bigint NOT NULL,
   `embedding` longblob NOT NULL,
   `created_at` varchar(32) COLLATE utf8mb4_0900_bin NOT NULL,
+  `encoding` longtext COLLATE utf8mb4_0900_bin NOT NULL DEFAULT (_utf8mb4'float32'),
   PRIMARY KEY (`video_name`,`model_id`),
   KEY `idx_video_embeddings_model_id` (`model_id`),
-  CONSTRAINT `fk_video_embeddings_video_name_videos` FOREIGN KEY (`video_name`) REFERENCES `videos` (`video_name`) ON DELETE CASCADE
+  CONSTRAINT `fk_video_embeddings_video_name_videos` FOREIGN KEY (`video_name`) REFERENCES `videos` (`video_name`) ON DELETE CASCADE,
+  CONSTRAINT `ck_video_embeddings_encoding` CHECK ((`encoding` in (_utf8mb4'float32',_utf8mb4'float16')))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE `wildcards` (
