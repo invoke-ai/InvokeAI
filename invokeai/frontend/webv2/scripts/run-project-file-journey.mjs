@@ -431,6 +431,7 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
 
   await runDuplication({ browser, contexts, errors, imported, importedBoardNames });
   await runWorkflowCollection({ browser, contexts, errors, imported });
+  await runUnloadRecovery({ browser, contexts, errors, imported });
   await runMissingBinaryImport({ browser, contexts, entries, errors, tempDirectory });
 
   return {
@@ -615,6 +616,7 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
   await saveDialog.getByRole('textbox').fill('Journey Saved');
   await saveDialog.getByRole('button', { exact: true, name: 'Save' }).click();
   await page.getByText('Workflow saved', { exact: true }).waitFor();
+  assert.equal(await currentWorkflowName(), 'Journey Saved');
 
   const libraryWrites = (await workflowRequests())
     .slice(requestsBefore)
@@ -629,7 +631,7 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
   assert.equal(saved.revision, 1);
   assert.equal(library.items.find((item) => item.workflow_id === template.workflow_id)?.name, 'Journey Template');
 
-  // The project keeps both workflows; the saved copy now targets the new template, and the name stayed the copy's.
+  // The project keeps both workflows; the saved copy now targets the new template and takes its name.
   const record = await waitForSavedWorkflows(
     projectId,
     (candidate) =>
@@ -641,7 +643,7 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
   assert.equal(record.data.documentSchemaVersion, 3);
   assert.deepEqual(
     record.data.workflows.entries.map((entry) => entry.document.name),
-    ['Empty Workflow', 'Journey Template edited']
+    ['Empty Workflow', 'Journey Saved']
   );
   assert.deepEqual(record.data.workflows.entries[1].source, { libraryWorkflowId: saved.workflow_id, revision: 1 });
   assert.equal(record.data.workflows.activeWorkflowId, record.data.workflows.entries[1].document.id);
@@ -650,11 +652,120 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('main', { exact: true, name: imported.name }).waitFor();
   await selectLayoutPreset(page, 'Automate', 'Workflow');
-  assert.equal(await currentWorkflowName(), 'Journey Template edited');
+  assert.equal(await currentWorkflowName(), 'Journey Saved');
   await openProjectWorkflows();
   assert.equal(await cards.count(), 2);
   await page.keyboard.press('Escape');
   await dialog.waitFor({ state: 'hidden' });
+
+  await context.close();
+  contexts.delete(context);
+  assertNoBrowserErrors(errors);
+};
+
+/**
+ * Whether browser recovery holds `marker`, in the unload journal or in a staged draft, read from a same-origin page no
+ * editor has reconciled it from. A draft staged by an autosave that beat the navigation retires the journal entry.
+ */
+const isRecoverable = (page, marker) =>
+  page.evaluate(async (needle) => {
+    const read = async (name, storeName) => {
+      const database = await new Promise((resolve, reject) => {
+        const request = indexedDB.open(name);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      try {
+        if (!database.objectStoreNames.contains(storeName)) {
+          return [];
+        }
+        return await new Promise((resolve, reject) => {
+          const request = database.transaction(storeName).objectStore(storeName).getAll();
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+      } finally {
+        database.close();
+      }
+    };
+    for (const { name } of await indexedDB.databases()) {
+      const storeName = name?.startsWith('invokeai:v7:webv2:unload-journal')
+        ? 'entries'
+        : name?.startsWith('invokeai:v7:webv2:workbench')
+          ? 'draftBodies'
+          : null;
+      if (storeName && (await read(name, storeName)).some((record) => record.documentJson.includes(needle))) {
+        return true;
+      }
+    }
+    return false;
+  }, marker);
+
+/**
+ * Edits made just before the page goes away survive a real unload. A rename commits at once and each navigation
+ * follows its click immediately, normally well inside the autosave debounce, so the edit crosses in the unload journal.
+ */
+const runUnloadRecovery = async ({ browser, contexts, errors, imported }) => {
+  const context = await browser.newContext();
+  contexts.add(context);
+  const page = await context.newPage();
+  observeBrowserErrors(page, 'unload recovery', errors);
+  const main = page.getByRole('main', { exact: true, name: imported.name });
+  const workflowName = page.getByRole('button', { name: /^Open this project's workflows\. Current workflow: / });
+  const dialog = page.getByRole('dialog', { exact: true, name: 'Workflows' });
+  const renameDialog = page.getByRole('dialog', { exact: true, name: 'Rename workflow' });
+  const currentWorkflowName = async () =>
+    (await workflowName.getAttribute('aria-label')).replace("Open this project's workflows. Current workflow: ", '');
+  const openEditor = async () => {
+    await page.goto(`${origin}/#/app?project=${encodeURIComponent(imported.project_id)}`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await main.waitFor();
+    await selectLayoutPreset(page, 'Automate', 'Workflow');
+  };
+  const rename = async (name) => {
+    await workflowName.click();
+    await dialog.locator('[data-library-tab="project"]').waitFor();
+    await dialog
+      .locator('[data-project-workflow-detail]')
+      .getByRole('button', { exact: true, name: 'More actions' })
+      .click();
+    await page.getByRole('menuitem', { name: /^Rename…/ }).click();
+    await renameDialog.getByRole('textbox').fill(name);
+    await renameDialog.getByRole('button', { exact: true, name: 'Rename' }).click();
+  };
+
+  // Navigating away: browser recovery holds the edit before any editor loads again. Saves to the server are held,
+  // so it is there only through the journal written while the page unloaded, or through an autosave's local stage.
+  await openEditor();
+  // Never answered: the page goes away with the request still open, so nothing is logged.
+  const holdProjectSaves = (route) => (route.request().method() === 'PUT' ? new Promise(() => {}) : route.fallback());
+  await page.route('**/api/v1/projects/**', holdProjectSaves);
+  await rename('Unload navigate');
+  await page.goto(`${origin}/manifest.webmanifest`, { waitUntil: 'domcontentloaded' });
+  assert.equal(await isRecoverable(page, 'Unload navigate'), true, 'browser recovery holds the rename after unload');
+  await page.unroute('**/api/v1/projects/**', holdProjectSaves);
+  await openEditor();
+  assert.equal(await currentWorkflowName(), 'Unload navigate');
+
+  // Reloading the editor.
+  await rename('Unload reload');
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await main.waitFor();
+  assert.equal(await currentWorkflowName(), 'Unload reload');
+
+  // Leaving the editor and reloading at once, while its exit checkpoint may still be saving.
+  await rename('Unload home');
+  await renameDialog.waitFor({ state: 'hidden' });
+  await page.keyboard.press('Escape');
+  await dialog.waitFor({ state: 'hidden' });
+  await page.getByRole('button', { exact: true, name: 'Open menu' }).click();
+  await page.getByRole('menuitem', { exact: true, name: 'Launchpad' }).click();
+  await page.waitForURL(/#\/$/);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.getByRole('heading', { exact: true, name: 'Welcome to Invoke' }).waitFor();
+  await openEditor();
+  assert.equal(await currentWorkflowName(), 'Unload home');
 
   await context.close();
   contexts.delete(context);

@@ -1,10 +1,10 @@
-import type { GalleryItem, GalleryItemRef } from '@features/gallery/core/items';
+import type { GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery/core/items';
 import type { GalleryThumbnailFit } from '@features/gallery/core/settings';
 
 import { Badge, chakra } from '@chakra-ui/react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { formatGalleryVideoDuration, toGalleryItemRef } from '@features/gallery/core/items';
+import { formatGalleryVideoDuration, toGalleryItemKey, toGalleryItemRef } from '@features/gallery/core/items';
 import {
   getGalleryThumbnailRevision,
   getRefreshedGalleryThumbnailUrl,
@@ -29,11 +29,18 @@ import { getGalleryItemDragData, getGalleryItemDragId } from './galleryDnd';
 import { GalleryTileFrame } from './GalleryTileFrame';
 
 /** Desaturate armed and active touch drags, including the portalled preview. */
+/** The grid's one thumbnail Tab stop: the tile keyboard focus returns to. */
+export const GALLERY_TAB_STOP_SELECTOR = 'button[data-gallery-item-key][tabindex="0"]';
+
 const THUMBNAIL_DRAG_CSS = { filter: 'saturate(0)' } as const;
 const THUMBNAIL_ARMED_CSS = { '&[data-drag-armed=true]': { filter: 'saturate(0)' } } as const;
 
-/** Modified chords are app hotkeys (Mod+Enter invokes), never tile activation or a keyboard drag. */
-const isModifiedKey = (event: KeyboardEvent) => event.ctrlKey || event.metaKey || event.altKey || event.shiftKey;
+/**
+ * Modified chords are app hotkeys (Mod+Enter invokes), never tile activation or a keyboard drag; modified clicks are
+ * selection gestures, never an open.
+ */
+const isModified = (event: KeyboardEvent | MouseEvent) =>
+  event.ctrlKey || event.metaKey || event.altKey || event.shiftKey;
 
 const PREVIEW_IMAGE_STYLE = {
   borderRadius: '0.375rem',
@@ -74,9 +81,12 @@ const GalleryThumbnail = ({
   getItemLabel,
   isPrimary,
   isSelected,
+  isTabStop,
   item,
   onClick,
   onContextMenu,
+  onFocusLost,
+  onOpen,
   onToggleStarred,
 }: {
   alwaysShowDimensions: boolean;
@@ -89,9 +99,15 @@ const GalleryThumbnail = ({
   getItemLabel: ((item: GalleryItemRef) => Promise<string | null>) | null;
   isPrimary: boolean;
   isSelected: boolean;
+  /** The grid's one thumbnail Tab stop; the other thumbnails are reached with the arrow keys. */
+  isTabStop: boolean;
   item: GalleryItem;
   onClick: (item: GalleryItem, event: MouseEvent) => void;
   onContextMenu: (item: GalleryItem, x: number, y: number) => void;
+  /** Runs after the tile left the document holding focus, once the grid has committed what replaced it. */
+  onFocusLost: (itemKey: GalleryItemKey) => void;
+  /** Double-click or Enter: show the item in the centre Preview. */
+  onOpen: (item: GalleryItem) => void;
   onToggleStarred: (item: GalleryItem) => void;
 }) => {
   const { t } = useTranslation();
@@ -119,7 +135,7 @@ const GalleryThumbnail = ({
       listeners && {
         ...listeners,
         onKeyDown: (event: KeyboardEvent) => {
-          if (!isModifiedKey(event)) {
+          if (!isModified(event)) {
             listeners.onKeyDown?.(event);
           }
         },
@@ -135,12 +151,26 @@ const GalleryThumbnail = ({
     setDragOrigin(isDragging ? (tileRef.current?.getBoundingClientRect() ?? null) : null);
   }, [isDragging]);
 
+  const itemKey = toGalleryItemKey(item);
+  // Covers focus anywhere in the tile, its star toggle included: a star click can move the item between sections.
   const setTileRef = useCallback(
     (node: HTMLDivElement | null) => {
       tileRef.current = node;
       setNodeRef(node);
+
+      if (!node) {
+        return;
+      }
+
+      return () => {
+        if (node.contains(document.activeElement)) {
+          queueMicrotask(() => onFocusLost(itemKey));
+        }
+        tileRef.current = null;
+        setNodeRef(null);
+      };
     },
-    [setNodeRef]
+    [itemKey, onFocusLost, setNodeRef]
   );
 
   const previewStyle = useMemo(
@@ -192,12 +222,35 @@ const GalleryThumbnail = ({
   );
 
   const handleClick = useCallback((event: MouseEvent) => onClick(item, event), [item, onClick]);
+  // The clicks before it have already selected the item.
+  const handleDoubleClick = useCallback(
+    (event: MouseEvent) => {
+      if (!isModified(event)) {
+        onOpen(item);
+      }
+    },
+    [item, onOpen]
+  );
 
-  const handleActivationKeyDown = useCallback((event: KeyboardEvent<HTMLButtonElement>) => {
-    if (!isModifiedKey(event) && (event.key === 'Enter' || event.key === ' ')) {
+  // Enter opens and Space selects; neither starts a keyboard drag. Enter's default would click (select) first.
+  const handleActivationKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLButtonElement>) => {
+      if (isModified(event) || (event.key !== 'Enter' && event.key !== ' ')) {
+        return;
+      }
+
       event.stopPropagation();
-    }
-  }, []);
+
+      if (event.key === 'Enter') {
+        event.preventDefault();
+
+        if (!event.repeat) {
+          onOpen(item);
+        }
+      }
+    },
+    [item, onOpen]
+  );
 
   // Fetched on reveal rather than per rendered tile: labels cost a request each, and the cache makes repeat
   // reveals free while still picking up a rebuilt vocabulary.
@@ -236,15 +289,20 @@ const GalleryThumbnail = ({
     >
       <button
         aria-current={isPrimary ? 'true' : undefined}
+        // Enter opens the item in Preview; Space keeps the button's own activation, which selects.
+        aria-keyshortcuts="Enter"
         aria-label={
           item.kind === 'video'
             ? t('widgets.gallery.selectVideoForPreview', { duration, name: item.name })
             : t('widgets.gallery.selectImageForPreview', { name: item.name })
         }
         aria-pressed={isSelected}
+        data-gallery-item-key={itemKey}
         style={THUMBNAIL_BUTTON_STYLE}
+        tabIndex={isTabStop ? 0 : -1}
         type="button"
         onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
         onKeyDown={handleActivationKeyDown}
       >
         <img
@@ -294,6 +352,8 @@ const GalleryThumbnail = ({
         opacity={item.starred ? 1 : 0}
         position="absolute"
         size="sm"
+        // Pointer-only: the star hotkey toggles the selection, which keyboard focus follows.
+        tabIndex={-1}
         top="1"
         transition="opacity var(--wb-motion-duration-medium) ease"
         variant="solid"

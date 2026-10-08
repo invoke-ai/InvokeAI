@@ -315,6 +315,7 @@ export const GalleryPickerGrid = ({
 
   const handleClick = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
+      // Placeholder tiles from the previous scope are shown, not offered.
       if (isStale) {
         return;
       }

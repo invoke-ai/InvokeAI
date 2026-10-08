@@ -11,6 +11,12 @@ import { closingFrames, recordDialogExit } from './dialogExit.testing';
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const noop = () => undefined;
+// A control in the body, which a dialog left to itself might focus first.
+const OPTION_BODY = (
+  <label>
+    <input type="checkbox" /> Option
+  </label>
+);
 let confirmCalls = 0;
 const handleConfirm = () => {
   confirmCalls += 1;
@@ -101,5 +107,44 @@ describe('ConfirmDialog', () => {
       expect(frame.text).toContain('Delete image');
       expect(frame.text).toContain('Delete Sunset?');
     }
+  });
+
+  const renderDialog = async (isDestructive: boolean) => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(() =>
+      root?.render(
+        <ChakraProvider value={system}>
+          <ConfirmDialog
+            body={OPTION_BODY}
+            confirmLabel="Go"
+            isDestructive={isDestructive}
+            isOpen
+            title="Sure?"
+            onClose={noop}
+            onConfirm={noop}
+          />
+        </ChakraProvider>
+      )
+    );
+    await expect
+      .poll(() => document.querySelector('[role="alertdialog"]')?.contains(document.activeElement), { timeout: 5000 })
+      .toBe(true);
+  };
+  const focusedLabel = () => (document.activeElement as HTMLElement | null)?.textContent?.trim() ?? '';
+
+  it('opens a destructive confirmation on Cancel, ahead of a control in its body', async () => {
+    await renderDialog(true);
+
+    expect(focusedLabel()).toBe('Cancel');
+  });
+
+  it('leaves a non-destructive confirmation on the dialog’s own initial focus', async () => {
+    await renderDialog(false);
+
+    expect(document.activeElement).not.toBe(
+      [...document.querySelectorAll('button')].find((button) => button.textContent === 'Cancel')
+    );
   });
 });

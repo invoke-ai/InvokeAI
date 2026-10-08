@@ -1,7 +1,6 @@
 import type { ProjectRecordDTO } from '@workbench/projects/api';
 
-import { Dialog, Icon, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
-import { flushGenerateDrafts } from '@features/generation/react';
+import { Icon, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {
   assertAccountScopeCurrent,
@@ -11,6 +10,7 @@ import {
 import { areArraysEqual } from '@platform/state/selectors';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, CloseButton, Row, Scrollable } from '@platform/ui';
+import { Dialog } from '@platform/ui/Dialog';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { MIN_SUPPORTED_CANVAS_SCHEMA_VERSION } from '@workbench/canvasSchemaVersion';
 import { formatRelativeTime } from '@workbench/launchpad/formatRelativeTime';
@@ -96,7 +96,6 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
           return;
         }
 
-        flushGenerateDrafts();
         projects.open(result.project);
         onClose();
       } catch (error) {
@@ -122,7 +121,6 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
       const result = persistence.adoptProjectRecord(record);
 
       if (result.status === 'loaded') {
-        flushGenerateDrafts();
         projects.open(result.project);
         onClose();
       } else if (result.status === 'refused') {

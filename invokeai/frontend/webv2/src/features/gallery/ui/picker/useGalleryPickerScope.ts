@@ -42,6 +42,8 @@ export const useGalleryPickerScope = () => {
   );
   const data = useGalleryData({
     galleryView: scope.galleryView,
+    // Scope changes keep the previous list on screen, dimmed, until the new one lands or fails.
+    keepPreviousScope: true,
     page: 0,
     projectBoardId: getGalleryProjectBoardId(galleryValues),
     // No recents overlay: `items` must stay null until the first page lands,

@@ -48,6 +48,8 @@ Each row shows, from left to right:
 
 Rows can have child rows, shown with a chevron: adjustments and regenerate regions on raster layers, noise and denoise limits on inpaint masks, and reference images on regional guidance layers. Select a child row to edit it in Properties.
 
+Drag an adjustment to reorder it, or drop it on another raster layer or group, or among that layer's adjustments, to move it there as one undoable step. Reference images move between regional guidance layers the same way. A child row's right-click menu also has a **Move to layer** submenu listing the layers that can take it.
+
 ### Working with layers
 
 * **Add** a layer with the **+** button next to the Layers and History tabs, or by right-clicking empty space in the list. The new layer is placed above the selected one and selected.
@@ -120,8 +122,8 @@ Adjustment child rows each have their own settings, such as **Brightness** and *
 
 ### Control layer
 
-* **Adapter type** — ControlNet, T2I Adapter, Control LoRA or Z-Image ControlNet, depending on the model selected in the Generate panel.
-* **Model** — the installed control models of that type for the same model family. If the list is empty, install one from the starter models.
+* **Adapter type** — ControlNet, T2I Adapter, Control LoRA, Z-Image ControlNet or Anima ControlNet-LLLite, depending on the model selected in the Generate panel.
+* **Model** — the installed control models of that type for the same model family. If the list is empty, install one from the starter models. For Anima, the list holds the LLLite control adapters but not the Inpainting adapter, and each LLLite model can drive only one control layer per generation.
 * **Weight** — how strongly the guide is followed (0 to 2; the default is 0.75 for ControlNet).
 * **Step range** — the part of the generation, from start to finish, in which the guide applies.
 * **Control mode** (ControlNet only) — **Balanced**, **More prompt**, **More control** or **Unbalanced**.

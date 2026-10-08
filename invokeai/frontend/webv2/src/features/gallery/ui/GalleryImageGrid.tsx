@@ -1,15 +1,20 @@
-import { Box, chakra, Flex, HStack, Icon, ScrollArea, Spinner, Stack, Text } from '@chakra-ui/react';
+import { Box, chakra, Flex, HStack, Icon, ScrollArea, Spinner, Stack, Text, VisuallyHidden } from '@chakra-ui/react';
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { toGalleryItemKey, type GalleryItem, type GalleryItemKey } from '@features/gallery/core/items';
 import {
   getGalleryRevealRequest,
   getGallerySessionNavigationKey,
+  getSelectedGalleryItemFromValues,
   subscribeGalleryRevealRequests,
   type GalleryNavigationEntry,
   type GalleryRevealRequest,
 } from '@features/gallery/core/selection';
 import { isDateBoardId } from '@features/gallery/data/backend';
-import { GALLERY_PAGE_SIZE, imageIndexAvailabilityOptions } from '@features/gallery/data/queries';
+import {
+  GALLERY_PAGE_SIZE,
+  imageIndexAvailabilityOptions,
+  type GalleryItemsFilter,
+} from '@features/gallery/data/queries';
 import { Button, DropZone } from '@platform/ui';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRightIcon, StarIcon, UploadIcon } from 'lucide-react';
@@ -23,10 +28,12 @@ import {
   useState,
   useSyncExternalStore,
   type DragEvent,
+  type FocusEvent,
   type KeyboardEvent,
   type ReactNode,
 } from 'react';
-import { useVirtualizer } from 'react-hook-tanstack-virtual';
+import { flushSync } from 'react-dom';
+import { defaultRangeExtractor, useVirtualizer } from 'react-hook-tanstack-virtual';
 import { useTranslation } from 'react-i18next';
 
 import type { GallerySparsePageState } from './useGalleryData';
@@ -50,13 +57,17 @@ import {
   getGalleryStarredLayout,
   getGalleryStarredStripItems,
 } from './galleryGridLayout';
+import { focusVisibleOperable, GalleryLoadErrorState, GalleryLoadNotice, GalleryRetryButton } from './GalleryLoadError';
 import { GalleryProgressSection } from './GalleryProgressSection';
-import { GalleryThumbnailCell } from './GalleryThumbnail';
+import { getGallerySelectedImageQuery, isGallerySelectionInScope } from './galleryStateView';
+import { GALLERY_TAB_STOP_SELECTOR, GalleryThumbnailCell } from './GalleryThumbnail';
 import { useGalleryUi } from './GalleryUiContext';
-import { useGalleryWidget } from './GalleryWidgetContext';
+import { useGalleryWidget, type GalleryStarredStrip } from './GalleryWidgetContext';
 import { useGalleryGridHotkeys } from './useGalleryGridHotkeys';
 import { useGalleryGridSelection } from './useGalleryGridSelection';
 import { useGalleryUploadInput } from './useGalleryUploadInput';
+
+type VirtualRange = Parameters<typeof defaultRangeExtractor>[0];
 
 /**
  * Seeds the measured width per region so remounting the gallery in a placement
@@ -72,35 +83,83 @@ let lastPageFollowedRevealToken = 0;
 
 const dragEventContainsFiles = (event: DragEvent): boolean => Array.from(event.dataTransfer.types).includes('Files');
 
-const GalleryPageError = ({ pageState }: { pageState: GallerySparsePageState }) => {
+const GalleryPageError = ({
+  onFocusLost,
+  compact = false,
+  pageOffset,
+  pageState,
+}: {
+  onFocusLost: () => void;
+  compact?: boolean;
+  pageOffset: number;
+  pageState: GallerySparsePageState;
+}) => {
   const { t } = useTranslation();
-  const handleRetry = useCallback(() => void pageState.retry(), [pageState]);
+  const isMoreError = pageOffset > 0;
+  const read = useMemo(
+    () => ({
+      isRetrying: pageState.isLoading,
+      retry: async () => {
+        await pageState.retry();
+      },
+    }),
+    [pageState]
+  );
+  const message = t(isMoreError ? 'widgets.gallery.listingLoadMoreFailed' : 'widgets.gallery.listingRefreshFailed');
+
+  if (compact) {
+    return (
+      <>
+        <VisuallyHidden>
+          {message} {pageState.error?.message}
+        </VisuallyHidden>
+        <GalleryRetryButton
+          aria-label={t(isMoreError ? 'widgets.gallery.retryLoadingMoreItems' : 'widgets.gallery.retryLoadingItems')}
+          color="fg"
+          flagsFailure
+          read={read}
+          size="xs"
+          variant="ghost"
+          onFocusLost={onFocusLost}
+        />
+      </>
+    );
+  }
 
   return (
     <Stack align="center" gap="1" maxW="full" px="1">
       <Text color="fg.muted" fontSize="xs" lineClamp={2} textAlign="center">
-        {pageState.error?.message}
+        {message}
       </Text>
-      <Button color="fg" size="sm" variant="ghost" onClick={handleRetry}>
-        {t('common.retry')}
-      </Button>
+      <GalleryRetryButton
+        aria-label={t(isMoreError ? 'widgets.gallery.retryLoadingMoreItems' : 'widgets.gallery.retryLoadingItems')}
+        color="fg"
+        flagsFailure
+        read={read}
+        size="sm"
+        variant="ghost"
+        onFocusLost={onFocusLost}
+      />
     </Stack>
   );
 };
 
 const GallerySparseSlot = ({
   cellSizePx,
+  onFocusLost,
+  pageOffset,
   pageState,
   showPageStatus,
 }: {
   cellSizePx: number;
+  onFocusLost: () => void;
+  pageOffset: number;
   pageState: GallerySparsePageState | undefined;
   showPageStatus: boolean;
 }) => {
   const { t } = useTranslation();
   const error = pageState?.error;
   const state = error && showPageStatus ? 'error' : pageState?.isLoading && showPageStatus ? 'loading' : 'empty';
-  const retry = useCallback(() => void pageState?.retry(), [pageState]);
 
   return (
     <Box
@@ -116,6 +175,11 @@ const GallerySparseSlot = ({
       overflow="hidden"
       role="listitem"
       rounded="sm"
+      aria-label={
+        state === 'error'
+          ? t(pageOffset > 0 ? 'widgets.gallery.listingLoadMoreFailed' : 'widgets.gallery.listingRefreshFailed')
+          : undefined
+      }
     >
       {state === 'loading' ? (
         <Stack align="center" aria-label={t('widgets.gallery.loadingBackendGallery')} gap="1" role="status">
@@ -125,14 +189,7 @@ const GallerySparseSlot = ({
           </Text>
         </Stack>
       ) : state === 'error' && pageState ? (
-        <Stack align="center" gap="0" maxW="full" px="1" role="group">
-          <Text aria-live="polite" color="fg.muted" fontSize="xs" lineClamp={1} textAlign="center">
-            {error?.message}
-          </Text>
-          <Button color="fg" size="sm" variant="ghost" onClick={retry}>
-            {t('common.retry')}
-          </Button>
-        </Stack>
+        <GalleryPageError compact onFocusLost={onFocusLost} pageOffset={pageOffset} pageState={pageState} />
       ) : null}
     </Box>
   );
@@ -141,15 +198,19 @@ const GallerySparseSlot = ({
 /** Show all appears only when starred items exceed the strip and activates the starred-only listing. */
 const GalleryStarredSectionHeader = ({
   isOpen,
+  onFocusLost,
   onShowAll,
   onToggle,
   shownCount,
+  state,
   total,
 }: {
   isOpen: boolean;
+  onFocusLost: () => void;
   onShowAll: () => void;
   onToggle: () => void;
   shownCount: number;
+  state: GalleryStarredStrip['state'];
   total: number;
 }) => {
   const { t } = useTranslation();
@@ -194,6 +255,18 @@ const GalleryStarredSectionHeader = ({
           </Text>
         </HStack>
       </chakra.button>
+      {state.status === 'stale-error' ? (
+        // The strip keeps its earlier cells; the header carries the failed refresh and its recovery.
+        <GalleryRetryButton
+          aria-label={t('widgets.gallery.retryRefreshingStarredItems')}
+          color="fg.error"
+          flagsFailure
+          read={state}
+          size="xs"
+          variant="ghost"
+          onFocusLost={onFocusLost}
+        />
+      ) : null}
       {total > shownCount ? (
         <Button
           aria-label={t('widgets.gallery.showAllStarredItems')}
@@ -220,7 +293,9 @@ const GalleryStarredSection = ({
   columnCount,
   isOpen,
   renderCell,
+  state,
   total,
+  onFocusLost,
   onShowAll,
   onToggle,
 }: {
@@ -230,7 +305,9 @@ const GalleryStarredSection = ({
   columnCount: number;
   isOpen: boolean;
   renderCell: (item: GalleryItem) => ReactNode;
+  state: GalleryStarredStrip['state'];
   total: number;
+  onFocusLost: () => void;
   onShowAll: () => void;
   onToggle: () => void;
 }) => {
@@ -242,7 +319,9 @@ const GalleryStarredSection = ({
       <GalleryStarredSectionHeader
         isOpen={isOpen}
         shownCount={isOpen ? cells.length : 0}
+        state={state}
         total={total}
+        onFocusLost={onFocusLost}
         onShowAll={onShowAll}
         onToggle={onToggle}
       />
@@ -269,6 +348,50 @@ const GalleryStarredSection = ({
   );
 };
 
+/** A tile's own select button, not the star toggle layered over it. */
+const TILE_BUTTON_SELECTOR = '[role="listitem"] button[aria-pressed]';
+
+const NO_ITEMS: GalleryItem[] = [];
+const GRID_OVERSCAN_ROWS = 4;
+
+/** Where keyboard focus last was among the thumbnails: the scope and position outlive the tile itself. */
+interface FocusedTile {
+  filter: GalleryItemsFilter;
+  index: number;
+  key: GalleryItemKey;
+}
+
+/** The rows in view plus the one keyboard focus needs wherever the grid scrolls; -1 keeps nothing. */
+const extractRangeKeeping = (range: VirtualRange, keptRow: number): number[] => {
+  const indexes = defaultRangeExtractor(range);
+
+  return keptRow < 0 || keptRow >= range.count || indexes.includes(keptRow)
+    ? indexes
+    : [...indexes, keptRow].sort((a, b) => a - b);
+};
+
+/** The item of the thumbnail tile holding `element`, whether its select button or the star toggle over it. */
+const getTileItemKey = (element: Element | null): GalleryItemKey | null =>
+  (element
+    ?.closest('[role="listitem"]')
+    ?.querySelector('[data-gallery-item-key]')
+    ?.getAttribute('data-gallery-item-key') ?? null) as GalleryItemKey | null;
+
+/** The tile that shows a navigation entry: a thumbnail, or an in-progress session. */
+const findEntryTile = (viewport: HTMLElement, entry: GalleryNavigationEntry): HTMLElement | null =>
+  viewport.querySelector<HTMLElement>(
+    entry.kind === 'session'
+      ? `[data-gallery-session-id="${CSS.escape(entry.id)}"]`
+      : `[data-gallery-item-key="${CSS.escape(toGalleryItemKey(entry.item))}"]`
+  );
+
+/** Prefers a visible tile; an empty grid offers whatever else it shows (its upload target, the strip header). */
+const focusVisibleGridContent = (viewport: HTMLElement | null, edge: 'first' | 'last') => {
+  if (!focusVisibleOperable(viewport, { edge, selector: TILE_BUTTON_SELECTOR })) {
+    focusVisibleOperable(viewport, { edge });
+  }
+};
+
 /** Measure viewport width for columns so both layouts share the same grid. */
 export const GalleryImageGrid = () => {
   const { t } = useTranslation();
@@ -278,6 +401,7 @@ export const GalleryImageGrid = () => {
     gallery,
     isWindowTruncated,
     itemActions,
+    listing,
     region,
     setVisibleRange,
     sparseListing,
@@ -285,6 +409,7 @@ export const GalleryImageGrid = () => {
   } = useGalleryWidget();
   const {
     gallery: galleryCommands,
+    galleryValues,
     getItemLabel,
     ImageContextMenu,
     followedProgressSessionId,
@@ -319,7 +444,9 @@ export const GalleryImageGrid = () => {
     handleThumbnailContextMenu,
     loadedItems,
     selectedItemKeys,
+    selectItemRange,
     syncRangeInteractionContext,
+    toggleItem,
   } = useGalleryGridSelection();
 
   const columnCount = getGalleryColumnCount({ imageDensityPercent, widthPx: viewportWidth });
@@ -361,9 +488,13 @@ export const GalleryImageGrid = () => {
   const sparsePageErrors = useMemo(
     () =>
       [...(sparseListing?.pageStates ?? [])].flatMap(([pageOffset, pageState]) =>
-        pageState.error && !sparsePageStatusOffsets.has(pageOffset) ? [{ pageOffset, pageState }] : []
+        pageState.error &&
+        !(pageOffset === 0 && listing.status === 'stale-error') &&
+        !sparsePageStatusOffsets.has(pageOffset)
+          ? [{ pageOffset, pageState }]
+          : []
       ),
-    [sparseListing?.pageStates, sparsePageStatusOffsets]
+    [listing.status, sparseListing?.pageStates, sparsePageStatusOffsets]
   );
   const isFollowingLive = followedProgressSessionId !== null;
   const isComparisonActive = gallery.isComparisonActive && !isFollowingLive;
@@ -375,6 +506,10 @@ export const GalleryImageGrid = () => {
   // still has the strip to show.
   const isEmpty =
     (usesSparseListing ? sparseBackendItemCount === 0 && sparseRecentItems.length === 0 : gallery.items.length === 0) &&
+    starredStrip.items.length === 0;
+  // A failed strip with no cells to show (none loaded, or an empty earlier result) reports in the header's place.
+  const isStarredFailedEmpty =
+    (starredStrip.state.status === 'error' || starredStrip.state.status === 'stale-error') &&
     starredStrip.items.length === 0;
   // A ranking that matched nothing is still a search result, never an empty
   // board inviting an upload.
@@ -389,14 +524,31 @@ export const GalleryImageGrid = () => {
   // Exclude collapsed tiles from navigation, but retain hidden starred selections' section identity so arrows can
   // step out.
   const isProgressOpen = showPendingItems && !progressSectionCollapsed;
-  const navigationSections = useMemo((): GalleryNavigationEntry[][] => {
-    const shownStripItems = isStarredOpen ? starredCells : [];
-    const selectedKey = gallery.selectedItemKey;
+  const shownStripItems = isStarredOpen ? starredCells : NO_ITEMS;
+  // A starred selection no tile shows still belongs to the strip: one under the collapsed disclosure or past the
+  // shown rows, which the strip holds, or — as in Preview — one beyond the strip's bound, which the view names no
+  // visible key for and only the persisted selection holds (the listing is unstarred). Either way the arrows step
+  // from it rather than from the first tile. The persisted selection counts only when made in this listing: one
+  // left over from another board, search or filter would put a phantom entry at the end of this strip.
+  const hiddenStripSelection = useMemo((): GalleryItem | null => {
+    const selectedItem = getSelectedGalleryItemFromValues(galleryValues);
+    const selectedKey = gallery.selectedItemKey ?? (selectedItem ? toGalleryItemKey(selectedItem) : null);
     const isSelected = (item: GalleryItem) => toGalleryItemKey(item) === selectedKey;
-    const hiddenStripSelection =
-      selectedKey !== null && !shownStripItems.some(isSelected) && !gallery.items.some(isSelected)
-        ? starredStrip.items.find(isSelected)
-        : undefined;
+
+    if (selectedKey === null || shownStripItems.some(isSelected) || gallery.items.some(isSelected)) {
+      return null;
+    }
+
+    return (
+      starredStrip.items.find(isSelected) ??
+      (selectedItem?.starred &&
+      isSelected(selectedItem) &&
+      isGallerySelectionInScope(getGallerySelectedImageQuery(galleryValues), gallery)
+        ? selectedItem
+        : null)
+    );
+  }, [gallery, galleryValues, shownStripItems, starredStrip.items]);
+  const navigationSections = useMemo((): GalleryNavigationEntry[][] => {
     const stripEntries: GalleryNavigationEntry[] = shownStripItems.map((item) => ({ item, kind: 'item' }));
 
     if (hiddenStripSelection) {
@@ -428,18 +580,16 @@ export const GalleryImageGrid = () => {
     ];
   }, [
     gallery.items,
-    gallery.selectedItemKey,
     columnCount,
     isProgressOpen,
-    isStarredOpen,
+    hiddenStripSelection,
     progressSessions,
     sparseListing,
     isSparsePaginated,
     sparseBackendItemCount,
     sparseRecentAtTop,
     sparseRecentItems,
-    starredCells,
-    starredStrip.items,
+    shownStripItems,
     usesSparseListing,
   ]);
   const cursorKey =
@@ -457,6 +607,62 @@ export const GalleryImageGrid = () => {
     (item: GalleryItem) => sparseSelectionPages.get(toGalleryItemKey(item)),
     [sparseSelectionPages]
   );
+  // Thumbnails in visual order share one Tab stop. Sparse slots must retain their real row positions even when pages
+  // are unloaded, and recent results sit at the order-dependent end of that listing.
+  const sparseSlotEntries = useMemo(
+    () => [...(sparseListing?.itemSlots.entries() ?? [])].sort(([left], [right]) => left - right),
+    [sparseListing?.itemSlots]
+  );
+  const tileKeys = useMemo(() => {
+    const items = usesSparseListing
+      ? [
+          ...shownStripItems,
+          ...(sparseRecentAtTop ? sparseRecentItems : []),
+          ...sparseSlotEntries.map(([, item]) => item),
+          ...(!sparseRecentAtTop ? sparseRecentItems : []),
+        ]
+      : [...shownStripItems, ...gallery.items];
+
+    return items.map(toGalleryItemKey);
+  }, [gallery.items, shownStripItems, sparseRecentAtTop, sparseRecentItems, sparseSlotEntries, usesSparseListing]);
+  const [focusedTile, setFocusedTile] = useState<FocusedTile | null>(null);
+  const selectedTileIndex = gallery.selectedItemKey === null ? -1 : tileKeys.indexOf(gallery.selectedItemKey);
+  const focusedTileIndex = focusedTile === null ? -1 : tileKeys.indexOf(focusedTile.key);
+  const tabStopIndex =
+    focusedTileIndex >= 0
+      ? focusedTileIndex
+      : selectedTileIndex >= 0
+        ? selectedTileIndex
+        : focusedTile?.filter === filter
+          ? Math.max(0, Math.min(focusedTile.index, tileKeys.length - 1))
+          : 0;
+  const tabStopKey = tileKeys[tabStopIndex] ?? null;
+  const tabStopItemKey = tabStopKey;
+  const tabStopStripIndex =
+    tabStopItemKey === null ? -1 : shownStripItems.findIndex((item) => toGalleryItemKey(item) === tabStopItemKey);
+  const tabStopRecentIndex =
+    usesSparseListing && tabStopItemKey !== null
+      ? sparseRecentItems.findIndex((item) => toGalleryItemKey(item) === tabStopItemKey)
+      : -1;
+  const tabStopSparseIndex =
+    usesSparseListing && tabStopItemKey !== null
+      ? (sparseSlotEntries.find(([, item]) => toGalleryItemKey(item) === tabStopItemKey)?.[0] ?? -1)
+      : -1;
+  const sparseBackendRows = Math.ceil(sparseBackendItemCount / columnCount);
+  const tabStopRow = usesSparseListing
+    ? tabStopStripIndex >= 0
+      ? -1
+      : tabStopRecentIndex >= 0
+        ? (sparseRecentAtTop ? 0 : sparseBackendRows) + Math.floor(tabStopRecentIndex / columnCount)
+        : tabStopSparseIndex >= 0
+          ? leadingRecentRows + Math.floor(tabStopSparseIndex / columnCount)
+          : -1
+    : tabStopIndex < shownStripItems.length
+      ? -1
+      : Math.floor((tabStopIndex - shownStripItems.length) / columnCount);
+  // Scrolling never unmounts the Tab stop, which is also the focused tile while the grid holds focus: focus would
+  // fall to the document body, and Tab would skip the grid.
+  const rangeExtractor = useCallback((range: VirtualRange) => extractRangeKeeping(range, tabStopRow), [tabStopRow]);
 
   const backendRowCount = usesSparseListing ? Math.ceil(sparseBackendItemCount / columnCount) : rows.length;
   const rowCount = usesSparseListing ? backendRowCount + sparseRecentRowCount : rows.length;
@@ -508,6 +714,7 @@ export const GalleryImageGrid = () => {
   const starredLayout = getGalleryStarredLayout({
     collapsed: !isStarredOpen,
     columns: columnCount,
+    failed: isStarredFailedEmpty,
     shownCount: starredCells.length,
     tileSize: cellSizePx,
   });
@@ -526,12 +733,24 @@ export const GalleryImageGrid = () => {
     total: number | null;
   } | null>(null);
   const handleVirtualizerChange = useCallback(
-    (instance: { getVirtualItems: () => readonly { index: number }[] }) => {
+    (instance: {
+      getVirtualItems: () => readonly { index: number }[];
+      range?: { endIndex: number; startIndex: number } | null;
+    }) => {
       if (!usesSparseListing || !sparseListing) {
         return;
       }
 
-      const visibleItems = instance.getVirtualItems();
+      // The range extractor also retains the roving Tab stop, which may be far outside the viewport. Do not let that
+      // accessibility row expand the sparse Query subscription or become the scroll anchor.
+      const visibleItems = instance
+        .getVirtualItems()
+        .filter(
+          ({ index }) =>
+            instance.range === null ||
+            instance.range === undefined ||
+            (index >= instance.range.startIndex && index <= instance.range.endIndex)
+        );
       const viewport = viewportRef.current;
       const previousGeometry = lastMeasuredSparseGeometryRef.current;
       const canCaptureAnchor =
@@ -635,7 +854,8 @@ export const GalleryImageGrid = () => {
     getItemKey: getRowKey,
     getScrollElement,
     onChange: handleVirtualizerChange,
-    overscan: 4,
+    overscan: GRID_OVERSCAN_ROWS,
+    rangeExtractor,
   });
   const pendingSparseNavigationRef = useRef<{
     filterIdentity: string;
@@ -745,15 +965,146 @@ export const GalleryImageGrid = () => {
     }
   };
 
+  const handleGridFocus = useCallback(
+    (event: FocusEvent<HTMLElement>) => {
+      const key = getTileItemKey(event.target as HTMLElement);
+
+      if (key) {
+        const index = tileKeys.indexOf(key as GalleryItemKey);
+
+        setFocusedTile((current) =>
+          current?.key === key && current.index === index && current.filter === filter
+            ? current
+            : { filter, index, key: key as GalleryItemKey }
+        );
+      }
+    },
+    [filter, tileKeys]
+  );
+
+  // A tile that leaves the document holding focus (deleted, moved between the strip and the listing, replaced by
+  // another board's) takes focus with it. The same item takes it back where it now shows, else the Tab stop, else
+  // the grid itself while it has no tiles, so the keys stay with the gallery; a user who already went elsewhere
+  // keeps their focus.
+  const restoreTileFocus = useCallback((itemKey: GalleryItemKey) => {
+    const viewport = viewportRef.current;
+    const active = document.activeElement;
+
+    if (viewport && (active === null || active === document.body)) {
+      (
+        viewport.querySelector<HTMLElement>(`[data-gallery-item-key="${CSS.escape(itemKey)}"]`) ??
+        viewport.querySelector<HTMLElement>(GALLERY_TAB_STOP_SELECTOR) ??
+        viewport
+      ).focus({ preventScroll: true });
+    }
+  }, []);
+
+  /** The tile holding keyboard focus inside the grid: a thumbnail's item key, or a session's navigation key. */
+  const getFocusedTileKey = (): string | null => {
+    const viewport = viewportRef.current;
+    const active = document.activeElement;
+
+    if (!viewport || !(active instanceof HTMLElement) || !viewport.contains(active)) {
+      return null;
+    }
+
+    const sessionId = active.closest('[data-gallery-session-id]')?.getAttribute('data-gallery-session-id');
+
+    return sessionId ? getGallerySessionNavigationKey(sessionId) : getTileItemKey(active);
+  };
+  // A followed session the grid does not show (its section collapsed) gives way to the selection, which a starred
+  // item beyond the strip's bound is too, though the view names no visible key for it.
+  const getCursorCandidates = () => [
+    getFocusedTileKey(),
+    followedProgressSessionId === null ? null : getGallerySessionNavigationKey(followedProgressSessionId),
+    hiddenStripSelection ? toGalleryItemKey(hiddenStripSelection) : gallery.selectedItemKey,
+  ];
+  /** The first thumbnail in view, where the arrows start when no cursor is on screen. */
+  const getFirstVisibleTileKey = (): string | null => {
+    const viewport = viewportRef.current;
+
+    if (!viewport) {
+      return null;
+    }
+
+    const bounds = viewport.getBoundingClientRect();
+
+    // Document order is visual order: the pinned strip, then the rendered listing rows by index.
+    for (const tile of viewport.querySelectorAll<HTMLElement>('button[data-gallery-item-key]')) {
+      const rect = tile.getBoundingClientRect();
+
+      if (rect.bottom > bounds.top && rect.top < bounds.bottom) {
+        return tile.getAttribute('data-gallery-item-key');
+      }
+    }
+
+    return null;
+  };
+  const getFocusedItem = () => {
+    const key = getTileItemKey(document.activeElement);
+
+    return key && viewportRef.current?.contains(document.activeElement)
+      ? (loadedItems.find((item) => toGalleryItemKey(item) === key) ?? null)
+      : null;
+  };
+
+  /**
+   * Arrow keys move keyboard focus to the entry while focus is in the grid; a command run elsewhere leaves focus be,
+   * and a focus-only move (no `select`) needs focus in the grid to mean anything.
+   */
+  const moveToEntry = (entry: GalleryNavigationEntry, select: (() => void) | null) => {
+    const viewport = viewportRef.current;
+
+    if (!viewport?.contains(document.activeElement)) {
+      if (select) {
+        select();
+        scrollToEntry(entry);
+      }
+      return;
+    }
+
+    // Committed before focus moves: the target becomes the Tab stop, which keeps it mounted however far it is.
+    flushSync(() => {
+      select?.();
+
+      if (entry.kind === 'item') {
+        const key = toGalleryItemKey(entry.item);
+
+        setFocusedTile({ filter, index: tileKeys.indexOf(key), key });
+      }
+    });
+    scrollToEntry(entry);
+    findEntryTile(viewport, entry)?.focus({ preventScroll: true });
+  };
+
+  // A confirmation the grid's keys opened returns focus to the tile that held it, or to the Tab stop once a
+  // deletion has taken that tile away.
+  const getDialogReturnFocus = () => {
+    const viewport = viewportRef.current;
+    const opener = document.activeElement;
+
+    if (!viewport || !(opener instanceof HTMLElement) || !viewport.contains(opener)) {
+      return undefined;
+    }
+
+    return () =>
+      opener.isConnected ? opener : (viewport.querySelector<HTMLElement>(GALLERY_TAB_STOP_SELECTOR) ?? viewport);
+  };
+
   useGalleryGridHotkeys({
     actionSelectionRefs,
     columnCount,
-    cursorKey,
+    getCursorCandidates,
+    getDialogReturnFocus,
+    getFirstVisibleTileKey,
+    getFocusedItem,
     loadedItems,
+    moveToEntry,
     navigationSections,
     navigateToUnloadedSlot: handleNavigateToUnloadedSlot,
     getSelectionPage,
-    scrollToEntry,
+    selectItemRange,
+    toggleItem,
   });
 
   const settlePendingSparseNavigation = useEffectEvent(() => {
@@ -999,7 +1350,8 @@ export const GalleryImageGrid = () => {
   ]);
 
   const virtualRows = virtualizer.virtualItems;
-  const lastVisibleRowIndex = virtualRows[virtualRows.length - 1]?.index ?? 0;
+  // From the rows in view and their overscan, never the Tab stop kept mounted far below them.
+  const lastVisibleRowIndex = Math.min((virtualizer.range?.endIndex ?? 0) + GRID_OVERSCAN_ROWS, rowCount - 1);
 
   useEffect(() => {
     if (!usesSparseListing && paginationMode === 'infinite' && rowCount > 0 && lastVisibleRowIndex >= rowCount - 2) {
@@ -1082,9 +1434,15 @@ export const GalleryImageGrid = () => {
     (item: GalleryItem) => void itemActions.setItemsStarred([{ kind: item.kind, name: item.name }], !item.starred),
     [itemActions]
   );
+  const handleOpenItem = useCallback((item: GalleryItem) => itemActions.openItemInPreview(item), [itemActions]);
 
   // Releasing the anchor puts the window back over the top of the listing.
   const handleReturnToBoardTop = useCallback(() => galleryCommands.setPage(0), [galleryCommands]);
+
+  // A successful retry unmounts the Retry that held focus; content the user can already see takes it instead,
+  // without scrolling. After more items load at the end, that is the bottom of the visible grid, beside the new items.
+  const focusGridContent = useCallback(() => focusVisibleGridContent(viewportRef.current, 'first'), []);
+  const focusGridEnd = useCallback(() => focusVisibleGridContent(viewportRef.current, 'last'), []);
 
   const renderCell = useCallback(
     (item: GalleryItem, slotKey: string = toGalleryItemKey(item), selectionPage?: number) => {
@@ -1107,9 +1465,12 @@ export const GalleryImageGrid = () => {
           getItemLabel={getReadyItemLabel}
           isPrimary={!isFollowingLive && itemKey === gallery.selectedItemKey}
           isSelected={!isFollowingLive && selectedItemKeys.has(itemKey)}
+          isTabStop={itemKey === tabStopKey}
           item={item}
           onClick={handleThumbnailClick}
           onContextMenu={handleThumbnailContextMenu}
+          onFocusLost={restoreTileFocus}
+          onOpen={handleOpenItem}
           onToggleStarred={handleToggleStarred}
           selectionPage={selectionPage}
         />
@@ -1120,29 +1481,49 @@ export const GalleryImageGrid = () => {
       gallery.selectedItemKey,
       getDragItems,
       getReadyItemLabel,
+      handleOpenItem,
       handleThumbnailClick,
       handleThumbnailContextMenu,
       handleToggleStarred,
       isComparisonActive,
       isFollowingLive,
       region,
+      restoreTileFocus,
       selectedItemKeys,
       showImageDimensions,
       t,
+      tabStopKey,
       thumbnailFit,
     ]
   );
 
   const anchoredWindowFirstItem = gallery.anchoredWindowPage * GALLERY_PAGE_SIZE + 1;
-  const initialSparsePageState = sparseListing?.pageStates.get(isSparsePaginated ? sparsePageOffset : 0);
-
+  const sparseErrorPageOffset = [...(sparseListing?.pageStates ?? [])].find(([, pageState]) => pageState.error)?.[0];
   return (
     <Stack flex="1" gap="0" h="full" minH="0" minW="0" w="full">
-      {sparsePageErrors.length > 0 ? (
+      {listing.status === 'stale-error' &&
+      (!usesSparseListing || (Boolean(sparseListing?.pageStates.get(0)?.error) && !sparsePageStatusOffsets.has(0))) ? (
+        <GalleryLoadNotice
+          bg="bg.panel"
+          data-gallery-page-error={usesSparseListing ? 0 : undefined}
+          flexShrink={0}
+          message={t('widgets.gallery.listingRefreshFailed')}
+          px="2"
+          py="1"
+          read={listing}
+          retryLabel={t('widgets.gallery.retryLoadingItems')}
+          onFocusLost={focusGridContent}
+        />
+      ) : null}
+      {usesSparseListing && listing.status !== 'error' && sparsePageErrors.length > 0 ? (
         <Stack borderBottomWidth="1px" borderColor="border.subtle" flexShrink="0" gap="1" px="2" py="1">
           {sparsePageErrors.map(({ pageOffset, pageState }) => (
             <Box key={pageOffset} data-gallery-page-error={pageOffset}>
-              <GalleryPageError pageState={pageState} />
+              <GalleryPageError
+                onFocusLost={pageOffset > 0 ? focusGridEnd : focusGridContent}
+                pageOffset={pageOffset}
+                pageState={pageState}
+              />
             </Box>
           ))}
         </Stack>
@@ -1172,8 +1553,23 @@ export const GalleryImageGrid = () => {
           </Flex>
         ) : null}
         <ScrollArea.Root h="full" minH="0" variant="hover" w="full">
-          <ScrollArea.Viewport ref={viewportRef} data-dnd-auto-scroll="false" h="full" outline="none" w="full">
-            <ScrollArea.Content display="flex" flexDirection="column" minH="full">
+          {/* Focusable from script only: it holds keyboard focus while the grid has no tiles to give it. */}
+          <ScrollArea.Viewport
+            ref={viewportRef}
+            aria-label={t('widgets.gallery.contentAriaLabel')}
+            data-dnd-auto-scroll="false"
+            focusVisibleRing="inside"
+            h="full"
+            outline="none"
+            role="group"
+            tabIndex={-1}
+            w="full"
+            onFocus={handleGridFocus}
+          >
+            {/* The viewport is a flex column, and `minH` replaces the content's automatic minimum: without
+                `flexShrink={0}` the content would be squeezed to the viewport's height, shrinking the virtual rows'
+                sizer (it holds nothing in flow) so the rows overflow it and whatever follows sits mid-list. */}
+            <ScrollArea.Content display="flex" flexDirection="column" flexShrink={0} minH="full">
               {pinnedHeight > 0 ? (
                 <Box
                   borderBottomWidth="1px"
@@ -1190,9 +1586,29 @@ export const GalleryImageGrid = () => {
                       columnCount={columnCount}
                       isOpen={isStarredOpen}
                       renderCell={renderCell}
+                      state={starredStrip.state}
                       total={starredStrip.total}
+                      onFocusLost={focusGridContent}
                       onShowAll={handleShowAllStarred}
                       onToggle={handleToggleStarredSection}
+                    />
+                  ) : isStarredFailedEmpty ? (
+                    // Never an absent strip: a failed one says so where it would sit, without holding up the grid.
+                    <GalleryLoadNotice
+                      h={`${GALLERY_STARRED_HEADER_HEIGHT_PX}px`}
+                      message={t(
+                        starredStrip.state.status === 'error'
+                          ? 'widgets.gallery.starredLoadFailed'
+                          : 'widgets.gallery.starredRefreshFailed'
+                      )}
+                      px="1"
+                      read={starredStrip.state}
+                      retryLabel={t(
+                        starredStrip.state.status === 'error'
+                          ? 'widgets.gallery.retryLoadingStarredItems'
+                          : 'widgets.gallery.retryRefreshingStarredItems'
+                      )}
+                      onFocusLost={focusGridContent}
                     />
                   ) : null}
                   <GalleryProgressSection
@@ -1202,22 +1618,31 @@ export const GalleryImageGrid = () => {
                   />
                 </Box>
               ) : null}
-              {isEmpty ? (
-                gallery.isLoading ||
-                hasActiveSearch ||
-                isVirtualBoard ||
-                gallery.starredOnly ||
-                initialSparsePageState?.error ? (
+              {listing.status === 'error' ? (
+                <Flex
+                  data-gallery-page-error={usesSparseListing ? sparseErrorPageOffset : undefined}
+                  flex="1"
+                  minH="8rem"
+                >
+                  <GalleryLoadErrorState
+                    read={listing}
+                    retryLabel={t('widgets.gallery.retryLoadingItems')}
+                    title={t('widgets.gallery.listingLoadFailed')}
+                    onFocusLost={focusGridContent}
+                  />
+                </Flex>
+              ) : isEmpty && isStarredFailedEmpty && listing.status !== 'loading' ? (
+                <Box flex="1" minH="8rem" />
+              ) : isEmpty ? (
+                listing.status === 'loading' || hasActiveSearch || isVirtualBoard || gallery.starredOnly ? (
                   <Flex align="center" color="fg.muted" flex="1" justify="center" minH="8rem">
-                    {initialSparsePageState?.error ? null : (
-                      <Text>
-                        {gallery.isLoading
-                          ? t('widgets.gallery.loadingBackendGallery')
-                          : gallery.starredOnly && gallery.semanticImageQuery === null
-                            ? t('widgets.gallery.noStarredItemsMatch')
-                            : t('widgets.gallery.noImagesMatch')}
-                      </Text>
-                    )}
+                    <Text>
+                      {listing.status === 'loading'
+                        ? t('widgets.gallery.loadingBackendGallery')
+                        : gallery.starredOnly && gallery.semanticImageQuery === null
+                          ? t('widgets.gallery.noStarredItemsMatch')
+                          : t('widgets.gallery.noImagesMatch')}
+                    </Text>
                   </Flex>
                 ) : (
                   // No inset: the zone shares the thumbnails' outer edges.
@@ -1243,7 +1668,10 @@ export const GalleryImageGrid = () => {
                 )
               ) : (
                 <>
-                  <Box h={`${virtualizer.totalSize}px`} position="relative" w="full">
+                  {/* Rows have a fixed pitch, so the row model sizes the grid in the same render. The virtualizer's
+                      total trails a row-count change by a commit, long enough for the notice after the rows to
+                      leave first and the browser to clamp a scroll position resting at the bottom. */}
+                  <Box h={`${rowCount * rowHeightPx}px`} position="relative" w="full">
                     <Box
                       aria-label={t('widgets.gallery.itemsAriaLabel')}
                       h="full"
@@ -1310,6 +1738,8 @@ export const GalleryImageGrid = () => {
                               <GallerySparseSlot
                                 key={getGallerySparseSlotKey(absoluteItemIndex)}
                                 cellSizePx={cellSizePx}
+                                onFocusLost={focusGridEnd}
+                                pageOffset={pageOffset}
                                 pageState={sparseListing.pageStates.get(pageOffset)}
                                 showPageStatus={sparsePageStatusOffsets.get(pageOffset) === absoluteItemIndex}
                               />
@@ -1362,26 +1792,40 @@ export const GalleryImageGrid = () => {
                       })}
                     </Box>
                   </Box>
+                  {!usesSparseListing && listing.status === 'more-error' ? (
+                    // Loaded pages stay; only the page that failed waits on Retry.
+                    <GalleryLoadNotice
+                      justify="center"
+                      message={t('widgets.gallery.listingLoadMoreFailed')}
+                      px="2"
+                      py="2"
+                      read={listing}
+                      retryLabel={t('widgets.gallery.retryLoadingMoreItems')}
+                      onFocusLost={focusGridEnd}
+                    />
+                  ) : !usesSparseListing &&
+                    paginationMode === 'infinite' &&
+                    (listing.isFetchingMore || listing.status === 'loading') &&
+                    gallery.items.length > 0 ? (
+                    <Flex align="center" justify="center" py="2">
+                      <Spinner color="fg.subtle" />
+                    </Flex>
+                  ) : null}
                   {!usesSparseListing &&
                     paginationMode === 'infinite' &&
-                    gallery.isLoading &&
-                    gallery.items.length > 0 && (
-                      <Flex align="center" justify="center" py="2">
-                        <Spinner color="fg.subtle" />
+                    !listing.isFetchingMore &&
+                    isWindowTruncated && (
+                      <Flex align="center" justify="center" py="3">
+                        <Text color="fg.subtle" fontSize="md" textAlign="center">
+                          {gallery.anchoredWindowPage > 0
+                            ? t('widgets.gallery.windowLimitFrom', {
+                                count: gallery.items.length,
+                                index: anchoredWindowFirstItem,
+                              })
+                            : t('widgets.gallery.windowLimit', { count: gallery.items.length })}
+                        </Text>
                       </Flex>
                     )}
-                  {!usesSparseListing && paginationMode === 'infinite' && !gallery.isLoading && isWindowTruncated && (
-                    <Flex align="center" justify="center" py="3">
-                      <Text color="fg.subtle" fontSize="md" textAlign="center">
-                        {gallery.anchoredWindowPage > 0
-                          ? t('widgets.gallery.windowLimitFrom', {
-                              count: gallery.items.length,
-                              index: anchoredWindowFirstItem,
-                            })
-                          : t('widgets.gallery.windowLimit', { count: gallery.items.length })}
-                      </Text>
-                    </Flex>
-                  )}
                 </>
               )}
             </ScrollArea.Content>

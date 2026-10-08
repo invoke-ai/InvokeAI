@@ -8,6 +8,7 @@ import { getGalleryUploadAccept, toGalleryItemKey } from '@features/gallery/core
 import { GALLERY_PAGE_SIZE, galleryItemsPageOptions } from '@features/gallery/data/queries';
 import { BoardCover, BoardCoverIcon } from '@features/gallery/ui/GalleryBoardCover';
 import { getGalleryBoardGroups } from '@features/gallery/ui/galleryBoardGroups';
+import { GalleryAnnouncer, GalleryLoadErrorState, GalleryLoadNotice } from '@features/gallery/ui/GalleryLoadError';
 import { GallerySearchField } from '@features/gallery/ui/GallerySearchField';
 import { GallerySearchHelp } from '@features/gallery/ui/GallerySearchHelp';
 import { getGalleryProjectBoardId, getGallerySelectedBoardId } from '@features/gallery/ui/galleryStateView';
@@ -16,6 +17,7 @@ import { getGalleryUploadTargetLabel } from '@features/gallery/ui/GalleryUploadB
 import { GalleryViewSegmentTabs } from '@features/gallery/ui/GalleryViewTabs';
 import { useGalleryUploadAction } from '@features/gallery/ui/useGalleryUploadAction';
 import { useGalleryUploadInput } from '@features/gallery/ui/useGalleryUploadInput';
+import { isImeComposing } from '@platform/browser/imeComposition';
 import { Button, CloseButton, IconButton } from '@platform/ui/Button';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { segmentTabsPanelId, segmentTabsTabId } from '@platform/ui/SegmentTabs';
@@ -109,11 +111,14 @@ export const GalleryPickerView = ({
 
   const knownTotal = data.total;
   const isStale =
-    data.items === null && lastListing !== null && lastListing.filterIdentity !== filterIdentity && knownTotal !== 0;
-  const listing = isStale ? lastListing?.listing : data.sparseListing;
-  const itemSlots = listing?.itemSlots ?? EMPTY_SLOTS;
-  const pageStates = isStale ? EMPTY_PAGE_STATES : (listing?.pageStates ?? EMPTY_PAGE_STATES);
-  const total = listing?.total ?? knownTotal;
+    data.listing.status === 'loading' &&
+    data.items === null &&
+    lastListing !== null &&
+    lastListing.filterIdentity !== filterIdentity;
+  const sparseListing = isStale ? lastListing?.listing : data.sparseListing;
+  const itemSlots = sparseListing?.itemSlots ?? EMPTY_SLOTS;
+  const pageStates = isStale ? EMPTY_PAGE_STATES : (sparseListing?.pageStates ?? EMPTY_PAGE_STATES);
+  const total = sparseListing?.total ?? knownTotal;
   const totalSlots = total ?? GALLERY_PAGE_SIZE;
   const activeFilterCursor = activeCursor?.filterIdentity === filterIdentity ? activeCursor.index : null;
   const setVisibleRange = data.setVisibleRange;
@@ -141,7 +146,8 @@ export const GalleryPickerView = ({
   const selectedBoard = data.boards.find((board) => board.id === data.selectedBoardId);
   const boardName = selectedBoard ? getGalleryBoardLabel(selectedBoard, t) : t('widgets.gallery.selectedBoardFallback');
   const uploadTarget = getGalleryUploadTargetLabel(data.boards, data.selectedBoardId, t);
-  const showsGrid = scope.pane === 'items' && (total === null || total > 0);
+  const showsGrid = scope.pane === 'items' && data.listing.status !== 'error' && (total === null || total > 0);
+  const isBoardListUnavailable = data.boardsState.status === 'error';
 
   const getTileState = useCallback(
     (item: GalleryItem) => getGalleryPickerTileState(item, accept, selection),
@@ -257,7 +263,7 @@ export const GalleryPickerView = ({
 
   const handleSearchKeyDown = useCallback(
     (event: KeyboardEvent<HTMLInputElement>) => {
-      if (event.nativeEvent.isComposing) {
+      if (isImeComposing(event.nativeEvent)) {
         return;
       }
 
@@ -280,12 +286,11 @@ export const GalleryPickerView = ({
         return;
       }
 
-      if (isStale) {
+      if (isStale || data.listing.status === 'error') {
         if (event.key === 'Enter' || isGalleryPickerNavKey(event.key)) {
           event.preventDefault();
           event.stopPropagation();
         }
-
         return;
       }
 
@@ -320,6 +325,7 @@ export const GalleryPickerView = ({
       isSearching,
       isStale,
       filterIdentity,
+      data.listing.status,
       pickItem,
       resolvedActiveIndex,
       setVisibleRange,
@@ -355,19 +361,40 @@ export const GalleryPickerView = ({
     }
   }, [data.boards, data.selectedBoardId, galleryValues, onClose, revealInGallery, scope.galleryView]);
 
-  const status = getGalleryPickerStatus({
-    accept,
-    activeItem,
-    isSearching,
-    isWindowTruncated: false,
-    loadedCount: itemSlots.size,
-    pane: scope.pane,
-    remaining: getGalleryPickerRemaining(accept, selection),
-    total,
-    visibleBoardCount,
-  })
-    .map((part) => t(`widgets.gallery.picker.${part.kind}`, 'count' in part ? { count: part.count } : undefined))
-    .join(' · ');
+  const pickerNotice =
+    scope.pane !== 'items'
+      ? null
+      : data.listing.status === 'more-error'
+        ? { message: 'widgets.gallery.listingLoadMoreFailed', retryLabel: 'widgets.gallery.retryLoadingMoreItems' }
+        : data.listing.status === 'stale-error'
+          ? { message: 'widgets.gallery.listingRefreshFailed', retryLabel: 'widgets.gallery.retryLoadingItems' }
+          : null;
+  const showPickerNotice =
+    pickerNotice !== null &&
+    (data.sparseListing === undefined ||
+      [...pageStates].some(
+        ([pageOffset, pageState]) =>
+          pageState.error !== null &&
+          [...itemSlots.keys()].some((index) => index >= pageOffset && index < pageOffset + GALLERY_PAGE_SIZE)
+      ));
+  // Counts of a list that failed to load would claim it is empty.
+  const shouldHideStatus =
+    isStale || (scope.pane === 'boards' ? isBoardListUnavailable : data.listing.status === 'error');
+  const status = shouldHideStatus
+    ? ''
+    : getGalleryPickerStatus({
+        accept,
+        activeItem,
+        isSearching,
+        isWindowTruncated: data.isWindowTruncated,
+        loadedCount: itemSlots.size,
+        pane: scope.pane,
+        remaining: getGalleryPickerRemaining(accept, selection),
+        total,
+        visibleBoardCount,
+      })
+        .map((part) => t(`widgets.gallery.picker.${part.kind}`, 'count' in part ? { count: part.count } : undefined))
+        .join(' · ');
 
   const searchEndElement = useMemo(
     () => (
@@ -387,11 +414,13 @@ export const GalleryPickerView = ({
         : showsGrid
           ? {
               'aria-activedescendant':
-                resolvedActiveIndex >= 0 ? galleryPickerOptionId(listboxId, resolvedActiveIndex) : undefined,
+                resolvedActiveIndex >= 0 && !isStale
+                  ? galleryPickerOptionId(listboxId, resolvedActiveIndex)
+                  : undefined,
               'aria-controls': listboxId,
             }
           : undefined,
-    [boardsId, listboxId, resolvedActiveIndex, scope.pane, showsGrid]
+    [boardsId, isStale, listboxId, resolvedActiveIndex, scope.pane, showsGrid]
   );
   const searchLabel =
     scope.pane === 'boards'
@@ -464,9 +493,18 @@ export const GalleryPickerView = ({
         minH="0"
         role="tabpanel"
       >
-        {scope.pane === 'boards' ? (
+        {scope.pane === 'boards' && isBoardListUnavailable ? (
+          <GalleryLoadErrorState
+            read={data.boardsState}
+            retryLabel={t('widgets.gallery.retryLoadingBoards')}
+            title={t('widgets.gallery.boardsLoadFailed')}
+            onFocusLost={focusSearch}
+          />
+        ) : scope.pane === 'boards' ? (
           <GalleryPickerBoards
-            emptyMessage={t('widgets.gallery.noBoardsMatchSearch')}
+            emptyMessage={
+              data.boardsState.status === 'loading' ? t('common.loading') : t('widgets.gallery.noBoardsMatchSearch')
+            }
             galleryView={scope.galleryView}
             groups={boardGroups}
             id={boardsId}
@@ -474,6 +512,13 @@ export const GalleryPickerView = ({
             selectedBoardId={data.selectedBoardId}
             onExitTop={focusSearch}
             onSelect={handleSelectBoard}
+          />
+        ) : data.listing.status === 'error' ? (
+          <GalleryLoadErrorState
+            read={data.listing}
+            retryLabel={t('widgets.gallery.retryLoadingItems')}
+            title={t('widgets.gallery.listingLoadFailed')}
+            onFocusLost={focusSearch}
           />
         ) : showsGrid ? (
           <GalleryPickerGrid
@@ -508,6 +553,19 @@ export const GalleryPickerView = ({
             ) : null}
           </Stack>
         )}
+        {showPickerNotice ? (
+          <GalleryLoadNotice
+            borderColor="border.subtle"
+            borderTopWidth="1px"
+            message={t(pickerNotice.message)}
+            pe="1"
+            ps="2"
+            py="1"
+            read={data.listing}
+            retryLabel={t(pickerNotice.retryLabel)}
+            onFocusLost={focusSearch}
+          />
+        ) : null}
       </Stack>
       <HStack borderColor="border.subtle" borderTopWidth="1px" gap="2" justify="space-between" pe="1" ps="2" py="1">
         <Text color="fg.subtle" fontSize="xs" fontVariantNumeric="tabular-nums" minW="0" role="status" truncate>
@@ -524,6 +582,7 @@ export const GalleryPickerView = ({
           </Button>
         ) : null}
       </HStack>
+      <GalleryAnnouncer message={pickerNotice ? t(pickerNotice.message) : ''} />
     </Stack>
   );
 };

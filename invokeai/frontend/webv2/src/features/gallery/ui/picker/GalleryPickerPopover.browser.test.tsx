@@ -711,4 +711,111 @@ describe('GalleryPickerPopover', () => {
     expect(onPick).toHaveBeenCalledOnce();
     expect(document.querySelector(OPEN_DIALOG)).toBeNull();
   });
+
+  it('reports a failed first listing with Retry instead of loading skeletons forever', async () => {
+    mocks.listItems.mockImplementationOnce(() => {
+      throw new Error('Service Unavailable');
+    });
+    const { dialog } = await openPicker();
+    const input = getSearchInput(dialog);
+
+    await vi.waitFor(() => expect(dialog.querySelector('[role="alert"]')?.textContent).toContain('listingLoadFailed'));
+    expect(dialog.querySelector('[role="listbox"]')).toBeNull();
+    expect(input.getAttribute('aria-controls')).toBeNull();
+    // A count of a list that never loaded would read as an empty board.
+    expect(getStatus(dialog)).toBe('');
+
+    await pressKey(input, 'Enter');
+    expect(onPick).not.toHaveBeenCalled();
+
+    const retry = dialog.querySelector<HTMLButtonElement>('button[aria-label="widgets.gallery.retryLoadingItems"]');
+
+    retry?.focus();
+    await act(() => retry?.click());
+    await settle();
+
+    expect(dialog.querySelector('[role="alert"]')).toBeNull();
+    expect(getOptions(dialog)).toHaveLength(6);
+    // The Retry that held focus is gone; the search field, which drives the grid, takes it back.
+    expect(document.activeElement).toBe(input);
+  });
+
+  it('shows a failed search as that search failing, not the previous results, and recovers with Retry', async () => {
+    const { dialog } = await openPicker();
+    const input = getSearchInput(dialog);
+
+    expect(getOptions(dialog)).toHaveLength(6);
+    mocks.listItems.mockImplementationOnce(() => {
+      throw new Error('Service Unavailable');
+    });
+    await typeSearch(input, 'cat');
+
+    await vi.waitFor(() => expect(dialog.querySelector('[role="alert"]')).not.toBeNull());
+    expect(getOptions(dialog)).toEqual([]);
+    expect(dialog.querySelector('[aria-busy="true"][role="listbox"]')).toBeNull();
+
+    await pressKey(input, 'Enter');
+    expect(onPick).not.toHaveBeenCalled();
+
+    await act(() =>
+      dialog.querySelector<HTMLButtonElement>('button[aria-label="widgets.gallery.retryLoadingItems"]')?.click()
+    );
+    await settle();
+
+    expect(getOptions(dialog).map((option) => option.dataset.itemKey)).toEqual(['image:cat.png']);
+    expect(mocks.listItems).toHaveBeenLastCalledWith(expect.objectContaining({ searchTerm: 'cat' }));
+  });
+
+  it('shows the previous scope only as a dimmed, inert placeholder while loading, and never during a retry', async () => {
+    const { dialog } = await openPicker();
+    const input = getSearchInput(dialog);
+    let deliver: () => void = () => undefined;
+    const deferCatResults = () =>
+      new Promise((resolve) => {
+        deliver = () => resolve({ items: [dogItems[3]], total: 1 });
+      });
+
+    mocks.listItems.mockImplementationOnce(deferCatResults);
+    await typeSearch(input, 'cat');
+
+    // The previous board's tiles stay on screen, but as a busy placeholder for the new search, not its results.
+    const listbox = dialog.querySelector<HTMLElement>('[role="listbox"]');
+
+    expect(listbox?.getAttribute('aria-busy')).toBe('true');
+    expect(getOptions(dialog)).toHaveLength(6);
+    expect(input.getAttribute('aria-activedescendant')).toBeNull();
+    await act(() => getOption(dialog, 'image:a.png').click());
+    await pressKey(input, 'Enter');
+    expect(onPick).not.toHaveBeenCalled();
+    expect(getStatus(dialog)).not.toBe('widgets.gallery.picker.matchCount');
+
+    await act(() => deliver());
+    await settle();
+
+    expect(dialog.querySelector('[role="listbox"]')?.getAttribute('aria-busy')).toBeNull();
+    expect(getOptions(dialog).map((option) => option.dataset.itemKey)).toEqual(['image:cat.png']);
+
+    // A search that failed keeps showing its failure while it is retried; the placeholder does not return.
+    mocks.listItems.mockImplementationOnce(() => {
+      throw new Error('Service Unavailable');
+    });
+    await typeSearch(input, 'b');
+    await vi.waitFor(() => expect(dialog.querySelector('[role="alert"]')).not.toBeNull());
+
+    mocks.listItems.mockImplementationOnce(deferCatResults);
+    await act(() =>
+      dialog.querySelector<HTMLButtonElement>('button[aria-label="widgets.gallery.retryLoadingItems"]')?.click()
+    );
+    await settle();
+
+    expect(dialog.querySelector('[role="alert"]')?.getAttribute('aria-busy')).toBe('true');
+    expect(dialog.querySelector('[role="listbox"]')).toBeNull();
+    expect(getOptions(dialog)).toEqual([]);
+
+    await act(() => deliver());
+    await settle();
+
+    expect(dialog.querySelector('[role="alert"]')).toBeNull();
+    expect(getOptions(dialog).map((option) => option.dataset.itemKey)).toEqual(['image:cat.png']);
+  });
 });

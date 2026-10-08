@@ -46,7 +46,7 @@ export const AppMenu = () => {
   const openWorkbenchWidget = useOpenWorkbenchWidget();
   const queuedCount = useActiveProjectSelector((project) => getQueueSummary(project.queue.items).total);
 
-  const openHome = useCallback(() => {
+  const openLaunchpad = useCallback(() => {
     void navigate({ to: '/' });
   }, [navigate]);
   const openProjects = useCallback(() => {
@@ -111,9 +111,9 @@ export const AppMenu = () => {
               </Text>
             </HStack>
             <Menu.Separator />
-            <Menu.Item value="home" onClick={openHome}>
+            <Menu.Item value="launchpad" onClick={openLaunchpad}>
               <Icon as={HouseIcon} boxSize="3.5" />
-              <Menu.ItemText>{t('launchpad.sections.home')}</Menu.ItemText>
+              <Menu.ItemText>{t('topbar.appMenu.launchpad')}</Menu.ItemText>
             </Menu.Item>
             <Menu.Separator />
             <Menu.ItemGroup>

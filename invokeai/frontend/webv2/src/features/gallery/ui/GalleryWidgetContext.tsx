@@ -7,9 +7,9 @@ import type { GalleryItemsFilter } from '@features/gallery/data/queries';
 import { toGalleryItemKey } from '@features/gallery/core/items';
 import { createContext, use, useEffect, useMemo, useSyncExternalStore } from 'react';
 
-import type { GalleryStateView } from './galleryStateView';
+import type { GalleryReadState, GalleryStateView } from './galleryStateView';
 import type { GalleryItemActions, GalleryWidgetProps, GalleryWidgetRuntime } from './GalleryUiContext';
-import type { GallerySparseListing } from './useGalleryData';
+import type { GalleryListingState, GallerySparseListing } from './useGalleryData';
 
 /**
  * The provider maps widget intents to workbench/backend actions; shared ImageActions owns cross-widget item
@@ -52,6 +52,7 @@ export interface GalleryActions {
 /** The bounded starred strip above the listing; empty whenever it does not apply. */
 export interface GalleryStarredStrip {
   items: GalleryItem[];
+  state: GalleryReadState;
   /** Starred items under the same filter, per the backend; 0 until known. */
   total: number;
 }
@@ -59,6 +60,8 @@ export interface GalleryStarredStrip {
 export interface GalleryWidgetContextValue {
   gallery: GalleryStateView;
   actions: GalleryActions;
+  /** The board list's standing; its failure is the board panel's to show, never the grid's. */
+  boardsState: GalleryReadState;
   /**
    * The query filter the visible items came from. Shared rather than re-derived
    * so range selection and the item list can never disagree about which query
@@ -68,6 +71,8 @@ export interface GalleryWidgetContextValue {
   itemActions: GalleryItemActions;
   /** The infinite window is full and the board holds images it cannot reach. */
   isWindowTruncated: boolean;
+  /** How the listing behind `gallery.items` stands for the current scope, and its recovery. */
+  listing: GalleryListingState;
   /** Everything on hand — strip first, then the listing, without repeats — for lookups by key. */
   loadedItems: GalleryItem[];
   /** Main Gallery's absolute page slots. Other Gallery surfaces continue to use a dense loaded projection. */

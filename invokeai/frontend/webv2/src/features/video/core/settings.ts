@@ -552,6 +552,13 @@ export const VIDEO_SOURCE_FALLBACK_FPS = 16;
  * Estimate frames from duration/fps; backend extraction resolves exact indices. Default trim omits the final frame
  * to avoid duplicating it at the extension seam.
  */
+// Never below 1: the crossfade join needs at least a two-frame trim.
+const getDefaultSourceEndFrame = (numFrames: number): number => Math.max(1, numFrames - 2);
+
+/** Whether the initial video's window differs from the one a fresh pick gets. */
+export const isVideoSourceClipTrimmed = (clip: VideoSourceClip): boolean =>
+  clip.startFrame !== 0 || clip.endFrame !== getDefaultSourceEndFrame(clip.numFrames);
+
 export const createVideoSourceClip = (item: {
   durationSeconds: number;
   fps?: number;
@@ -563,8 +570,7 @@ export const createVideoSourceClip = (item: {
   const numFrames = Math.max(1, Math.round(item.durationSeconds * fps));
 
   return {
-    // Never below 1: the crossfade join needs at least a two-frame trim.
-    endFrame: Math.max(1, numFrames - 2),
+    endFrame: getDefaultSourceEndFrame(numFrames),
     fps,
     height: item.height,
     numFrames,
@@ -861,6 +867,9 @@ export const canPlaceReferenceExtendAnchor = (
   );
 };
 
+/** The conditioning a derived Initial Video anchor starts with; the user may change it. */
+export const REFERENCE_EXTEND_ANCHOR_CONDITIONING: VideoReferenceConditioning = 'video_audio';
+
 /**
  * Synchronizes the linked reference with Initial Video. Preserve explicit trims only for the same flagged source;
  * otherwise derive the default. Prefer the flagged anchor, then adopt a matching visual reference, or append if
@@ -880,7 +889,7 @@ export const applyReferenceExtendSourceVideo = (
 
   const linked: VideoReferenceItem = {
     clip: deriveReferenceExtendClip(sourceVideo, numFrames),
-    conditioning: 'video_audio',
+    conditioning: REFERENCE_EXTEND_ANCHOR_CONDITIONING,
     fromSourceVideo: true,
     kind: 'video',
   };

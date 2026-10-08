@@ -24,18 +24,29 @@ const getGalleryRegions = (project: Project): WidgetRegion[] =>
     )
   );
 
+/** Where a reveal that leaves the center alone may raise the Gallery. */
+const PANEL_REGIONS: readonly WidgetRegion[] = ['right', 'left', 'bottom'];
+
+export interface FindGalleryItemOptions {
+  /**
+   * Also bring Preview to the front of the center (the default). Off, the center keeps what it shows, so an editor
+   * there stays in front, and the Gallery is raised only in a panel.
+   */
+  revealPreview?: boolean;
+}
+
 /**
  * Raise Preview then Gallery immediately so Gallery wins shared regions, then lazy-load reveal. Claim the gesture
  * ticket before import to preserve press order and project fencing.
  */
-export const useFindGalleryItem = (): ((ref: GalleryItemRef) => void) => {
+export const useFindGalleryItem = (): ((ref: GalleryItemRef, options?: FindGalleryItemOptions) => void) => {
   const commands = useWorkbenchCommands();
   const queries = useWorkbenchQueries();
   const queryClient = useQueryClient();
   const openWorkbenchWidget = useOpenWorkbenchWidget();
 
   return useCallback(
-    (ref: GalleryItemRef) => {
+    (ref: GalleryItemRef, { revealPreview = true }: FindGalleryItemOptions = {}) => {
       const activeProject = queries.getSnapshot().activeProject;
       // Minted here, not inside the import below: both the ordering and the
       // project fence describe the PRESS, and reading either after the chunk
@@ -51,8 +62,14 @@ export const useFindGalleryItem = (): ((ref: GalleryItemRef) => void) => {
       };
       const galleryRegions = getGalleryRegions(activeProject);
 
-      openWorkbenchWidget('preview', { preferredRegions: ['center'], requireCenterView: true });
-      openWorkbenchWidget('gallery', galleryRegions.length > 0 ? { preferredRegions: galleryRegions } : undefined);
+      if (revealPreview) {
+        openWorkbenchWidget('preview', { preferredRegions: ['center'], requireCenterView: true });
+        openWorkbenchWidget('gallery', galleryRegions.length > 0 ? { preferredRegions: galleryRegions } : undefined);
+      } else {
+        const panelRegions = galleryRegions.filter((region) => region !== 'center');
+
+        openWorkbenchWidget('gallery', { preferredRegions: panelRegions.length > 0 ? panelRegions : PANEL_REGIONS });
+      }
 
       void import('@workbench/image-actions/revealGalleryItem')
         .then(({ revealGalleryItem }) => revealGalleryItem({ commands, queries, queryClient }, ref, ticket))

@@ -21,7 +21,13 @@ vi.mock('./GalleryBoardDragMonitor', () => ({ GalleryBoardDragMonitor: () => nul
 vi.mock('./GalleryLayout', () => ({ GalleryLayout: () => null }));
 vi.mock('./useGalleryActions', () => ({ useGalleryActions: () => ({}) }));
 vi.mock('./useGalleryData', () => ({ useGalleryData: () => mocks.galleryData }));
-vi.mock('./useGalleryStarredStrip', () => ({ useGalleryStarredStrip: () => ({ items: [], total: 0 }) }));
+vi.mock('./useGalleryStarredStrip', () => ({
+  useGalleryStarredStrip: () => ({
+    items: [],
+    state: { error: null, isFetchingMore: false, isRetrying: false, retry: () => Promise.resolve(), status: 'ready' },
+    total: 0,
+  }),
+}));
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -140,10 +146,12 @@ it('exposes sparse ranking pages to item context-menu actions', async () => {
   const queryClient = new QueryClient();
   mocks.galleryData = {
     boards: [],
+    boardsState: { error: null, isFetchingMore: false, isRetrying: false, retry: noop, status: 'ready' },
     filter: { boardId: 'none' },
     isLoadingItems: false,
     isWindowTruncated: false,
     items: [deepItem],
+    listing: { error: null, isFetchingMore: false, isRetrying: false, retry: noop, status: 'ready' },
     loadMore: noop,
     queryError: null,
     selectedBoardId: 'none',
@@ -159,11 +167,13 @@ it('exposes sparse ranking pages to item context-menu actions', async () => {
 
   await act(() =>
     root?.render(
-      <QueryClientProvider client={queryClient}>
-        <GalleryUiProvider adapter={adapter}>
-          <GalleryWidgetView region="left" runtime={runtime} />
-        </GalleryUiProvider>
-      </QueryClientProvider>
+      <ChakraProvider value={system}>
+        <QueryClientProvider client={queryClient}>
+          <GalleryUiProvider adapter={adapter}>
+            <GalleryWidgetView region="left" runtime={runtime} />
+          </GalleryUiProvider>
+        </QueryClientProvider>
+      </ChakraProvider>
     )
   );
 

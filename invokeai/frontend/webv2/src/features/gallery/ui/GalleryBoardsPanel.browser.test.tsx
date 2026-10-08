@@ -75,7 +75,6 @@ const createGallery = (settings: Partial<GallerySettings> = {}): GalleryStateVie
     compareImageKey: null,
     galleryView: 'images',
     isComparisonActive: false,
-    isLoading: false,
     items: [],
     page: 0,
     pendingPlaceholders: [],
@@ -100,6 +99,7 @@ let root: Root | null = null;
 const renderPanel = async (gallery: GalleryStateView = createGallery()) => {
   const contextValue = {
     actions,
+    boardsState: { error: null, isRetrying: false, retry: () => Promise.resolve(), status: 'ready' },
     gallery,
     itemActions,
     projectName: 'Project',

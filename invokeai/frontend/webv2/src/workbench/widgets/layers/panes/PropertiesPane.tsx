@@ -86,22 +86,24 @@ const ConnectedProperties = ({
           ))}
         </PropertiesSection>
       ) : null}
-      <PropertiesSection
-        ref={toolSection}
-        disabled={isSurfaceInteractionLocked || running !== null}
-        subtitle={toolName}
-        title={t('widgets.properties.sections.tool')}
-      >
-        {tool.paintsLeaf && !running ? <GroupSelectedNotice /> : null}
-        {Preview ? <Preview engine={engine} isExternalInteractionLocked={isSurfaceInteractionLocked} /> : null}
-        {tool.groups.map((group) => (
-          // Keyed by GROUP id, not tool id: tools sharing a group keep its
-          // DOM (and collapse state) alive across the tool switch.
-          <PropertyGroup key={group.id} collapsible={group.collapsible} id={group.id} label={t(group.labelKey)}>
-            <group.body {...regionProps} />
-          </PropertyGroup>
-        ))}
-      </PropertiesSection>
+      {tool.groups.length > 0 || Preview ? (
+        <PropertiesSection
+          ref={toolSection}
+          disabled={isSurfaceInteractionLocked || running !== null}
+          subtitle={toolName}
+          title={t('widgets.properties.sections.tool')}
+        >
+          {tool.paintsLeaf && !running ? <GroupSelectedNotice /> : null}
+          {Preview ? <Preview engine={engine} isExternalInteractionLocked={isSurfaceInteractionLocked} /> : null}
+          {tool.groups.map((group) => (
+            // Keyed by GROUP id, not tool id: tools sharing a group keep its
+            // DOM (and collapse state) alive across the tool switch.
+            <PropertyGroup key={group.id} collapsible={group.collapsible} id={group.id} label={t(group.labelKey)}>
+              <group.body {...regionProps} />
+            </PropertyGroup>
+          ))}
+        </PropertiesSection>
+      ) : null}
       <LayerSection disabled={isSurfaceInteractionLocked || running !== null} />
       {Footer ? (
         <Flex

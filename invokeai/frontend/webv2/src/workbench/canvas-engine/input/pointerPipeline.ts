@@ -4,13 +4,15 @@
  * tool, while quick C selects bbox persistently. Temporary switches preserve sessions and are blocked mid-gesture.
  * Escape/pointercancel cancel; extra buttons are ignored mid-gesture. Enter acts only while the keyboard root owns
  * focus. Hold keys and the Escape ladder also act after a control was merely clicked, but never over an editable
- * field, a keyboard-navigated control or an open overlay. Key releases are always observed and never consumed. DOM
- * access is injected.
+ * field, a keyboard-navigated control, an open overlay or beneath a modal dialog. Key releases are always observed and
+ * never consumed. DOM access is injected.
  */
 
 import type { Tool, ToolContext } from '@workbench/canvas-engine/tools/tool';
 import type { PointerInput, ToolId, Vec2 } from '@workbench/canvas-engine/types';
 import type { Viewport } from '@workbench/canvas-engine/viewport';
+
+import { isModalPresent } from '@platform/ui/modalPresence';
 
 /** The tool id temporarily activated while alt is held (ships in Task P2.4). */
 const ALT_TEMP_TOOL: ToolId = 'colorPicker';
@@ -215,9 +217,12 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
     return [buildPointerInput(event, origin)];
   };
 
-  /** Enter belongs to the canvas only when focus is on its keyboard root (or nowhere) and no control claims it. */
+  /**
+   * Enter belongs to the canvas only when focus is on its keyboard root (or nowhere), no control claims it and no modal
+   * dialog is open: focus can rest on the document body beneath one.
+   */
   const ownsKeyboard = (event: KeyboardEvent): boolean => {
-    if (event.defaultPrevented || isInteractiveTarget(event.target)) {
+    if (event.defaultPrevented || isModalPresent(event) || isInteractiveTarget(event.target)) {
       return false;
     }
     return isDocumentRootTarget(event.target) || deps.getKeyboardRoot()?.contains(event.target as Node) === true;
@@ -228,7 +233,7 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
    * row), but not over an editable field, a control reached by keyboard or an open overlay.
    */
   const ownsCanvasKey = (event: KeyboardEvent): boolean => {
-    if (event.defaultPrevented || isEditableTarget(event.target)) {
+    if (event.defaultPrevented || isModalPresent(event) || isEditableTarget(event.target)) {
       return false;
     }
     if (ownsKeyboard(event)) {

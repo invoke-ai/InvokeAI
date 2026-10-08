@@ -11,6 +11,7 @@ import type {
   CanvasStagingCandidateContract,
 } from '@workbench/canvas-engine/contracts';
 import type { GraphContract } from '@workbench/graphContracts';
+import type { ExpandedPositivePrompts } from '@workbench/invocationContracts';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
 import {
@@ -217,6 +218,7 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   dynamicPromptsCombinatorial: true,
   dynamicPromptsMaxPrompts: 100,
   dynamicPromptsSampleSeed: 0,
+  dynamicPromptsResample: true,
   dynamicPromptsSeedBehaviour: 'per-iteration',
   componentSourceModel: null,
   height: 1024,
@@ -510,6 +512,23 @@ describe('generation-device orchestration metadata', () => {
 });
 
 describe('workbench hydration invariants', () => {
+  it('preserves saved status placements and does not re-enable a removed shortcuts widget on hydration', () => {
+    const initial = createInitialWorkbenchState();
+    const project = getActiveProject(initial);
+    const bottom = {
+      ...project.widgetRegions.bottom,
+      instanceIds: ['autosave-status', 'server-status', 'notifications'],
+      alignEndInstanceIds: ['notifications'],
+    };
+    const stored = {
+      ...initial,
+      projects: [{ ...project, widgetRegions: { ...project.widgetRegions, bottom } }],
+    };
+    const hydrated = workbenchReducer(initial, { state: stored, type: 'hydrateWorkbench' });
+    expect(getActiveProject(hydrated).widgetRegions.bottom.instanceIds).toEqual(bottom.instanceIds);
+    expect(getActiveProject(hydrated).widgetRegions.bottom.alignEndInstanceIds).toEqual(['notifications']);
+  });
+
   it('seeds a draft when a projectless session hydrates', () => {
     const initial = createInitialWorkbenchState();
     // Model the projectless cache written after closing the last tab.
@@ -577,6 +596,7 @@ describe('workbench widget region defaults', () => {
       'server-status',
       'queue-status',
       'gallery:bottom',
+      'shortcuts',
       'notifications',
       'autosave-status',
     ]);
@@ -916,6 +936,91 @@ describe('workbench widget region opening', () => {
     expect(getActiveProject(state).widgetRegions.bottom.activeInstanceId).toBe('queue');
     expect(getActiveProject(state).widgetRegions.bottom.instanceIds).toEqual(['diagnostics', 'queue']);
     expect(getActiveProject(state).widgetRegions.bottom.isCollapsed).toBe(false);
+  });
+
+  describe('opening a side panel’s front instance in the center', () => {
+    // Edit shows Canvas in the center and keeps Preview a member of the right panel, behind Layers.
+    const editWithPreviewInRightPanel = (patch: (project: Project) => Project = (project) => project) => {
+      let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'edit', type: 'applyPreset' });
+      state = workbenchReducer(state, { region: 'right', type: 'selectRegionWidget', widgetId: 'preview' });
+
+      return {
+        ...state,
+        projects: state.projects.map((project) => (project.id === state.activeProjectId ? patch(project) : project)),
+      };
+    };
+    const openPreviewInCenter = (state: WorkbenchState) =>
+      getActiveProject(workbenchReducer(state, { region: 'center', type: 'openRegionWidget', widgetId: 'preview' }));
+
+    it('shows the one instance in the center while the panel fronts its neighbour', () => {
+      const before = editWithPreviewInRightPanel();
+      expect(getActiveProject(before).widgetRegions.right).toMatchObject({
+        activeInstanceId: 'preview',
+        instanceIds: ['layers', 'preview'],
+      });
+
+      const project = openPreviewInCenter(before);
+
+      expect(project.widgetRegions.center).toMatchObject({
+        activeInstanceId: 'preview',
+        instanceIds: ['canvas', 'preview'],
+      });
+      expect(project.widgetRegions.right).toMatchObject({
+        activeInstanceId: 'layers',
+        instanceIds: ['layers', 'preview'],
+        isCollapsed: false,
+      });
+      expect(Object.values(project.widgetInstances).filter((instance) => instance.typeId === 'preview')).toHaveLength(
+        1
+      );
+    });
+
+    it('moves only the pointer of a hidden panel, leaving it hidden', () => {
+      const project = openPreviewInCenter(
+        editWithPreviewInRightPanel((value) => ({
+          ...value,
+          layout: { ...value.layout, panels: { ...value.layout.panels, isRightOpen: false } },
+        }))
+      );
+
+      expect(project.layout.panels.isRightOpen).toBe(false);
+      expect(project.widgetRegions.right.activeInstanceId).toBe('layers');
+    });
+
+    it('collapses a panel holding nothing else', () => {
+      const project = openPreviewInCenter(
+        editWithPreviewInRightPanel((value) => ({
+          ...value,
+          widgetRegions: {
+            ...value.widgetRegions,
+            right: { ...value.widgetRegions.right, activeInstanceId: 'preview', instanceIds: ['preview'] },
+          },
+        }))
+      );
+
+      expect(project.widgetRegions.right).toMatchObject({ activeInstanceId: 'preview', isCollapsed: true });
+      expect(project.widgetRegions.center.activeInstanceId).toBe('preview');
+    });
+
+    it('leaves the bottom region alone, whose next member may be a status item with no panel', () => {
+      const before = editWithPreviewInRightPanel((value) => ({
+        ...value,
+        widgetRegions: {
+          ...value.widgetRegions,
+          bottom: {
+            ...value.widgetRegions.bottom,
+            activeInstanceId: 'preview',
+            instanceIds: ['server-status', 'preview'],
+            isCollapsed: false,
+          },
+        },
+      }));
+
+      const project = openPreviewInCenter(before);
+
+      expect(project.widgetRegions.bottom).toEqual(getActiveProject(before).widgetRegions.bottom);
+      expect(project.widgetRegions.right.activeInstanceId).toBe('layers');
+    });
   });
 });
 
@@ -1540,7 +1645,7 @@ describe('workbench layout presets', () => {
     });
     expect(project.widgetRegions.bottom).toMatchObject({
       activeInstanceId: 'gallery:bottom',
-      instanceIds: ['server-status', 'queue-status', 'gallery:bottom', 'notifications', 'autosave-status'],
+      instanceIds: ['server-status', 'queue-status', 'gallery:bottom', 'shortcuts', 'notifications', 'autosave-status'],
       isCollapsed: true,
       sizePx: 180,
     });
@@ -3872,12 +3977,25 @@ describe('workbenchReducer Phase 5 generation flow', () => {
   describe('seed modes on the compiled submission', () => {
     const SEED_MAX = 4_294_967_295;
     const readSeed = (state: WorkbenchState) => getProjectWidgetValues(getActiveProject(state), 'generate').seed;
+    const readSampleSeed = (state: WorkbenchState) =>
+      getProjectWidgetValues(getActiveProject(state), 'generate').dynamicPromptsSampleSeed;
     const readSubmission = (state: WorkbenchState) =>
       getActiveProject(state).queue.items[0]?.snapshot.backendSubmission;
-    const submitWithPrompts = (state: WorkbenchState, positivePrompts?: string[]) =>
+    const queuedSampleSeeds = (state: WorkbenchState) =>
+      getActiveProject(state).queue.items.map((item) => item.snapshot.recall?.generateValues?.dynamicPromptsSampleSeed);
+    // Stands in for the caller, which expands with the sample seed it read before dispatching.
+    const submitWithPrompts = (
+      state: WorkbenchState,
+      positivePrompts?: string[],
+      positivePromptsSampleSeed = getProjectWidgetValues(getActiveProject(state), 'generate')
+        .dynamicPromptsCombinatorial
+        ? null
+        : (readSampleSeed(state) as number)
+    ) =>
       workbenchReducer(state, {
         backendSupportsCancellation: true,
         positivePrompts,
+        positivePromptsSampleSeed,
         route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
         projectId: state.activeProjectId,
         type: 'submitResolvedInvocationSnapshot',
@@ -3958,6 +4076,98 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       expect(readSeed(next)).toBe(42);
     });
 
+    describe('dynamic prompts sample seed', () => {
+      const RANDOM_SAMPLE = {
+        dynamicPromptsCombinatorial: false,
+        dynamicPromptsResample: true,
+        dynamicPromptsSampleSeed: 7,
+        positivePrompt: 'a {red|green} cat',
+      } satisfies Partial<GenerateWidgetValues>;
+
+      it('draws a new sample after queueing the previewed one, alongside the image seed advance', () => {
+        const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+        try {
+          const state = submitWithPrompts(
+            primeGenerate(undefined, { ...RANDOM_SAMPLE, batchCount: 1, seed: 42, seedMode: 'increment' }),
+            ['a green cat']
+          );
+
+          expect(readSubmission(state)).toMatchObject({ positivePrompts: ['a green cat'], seed: 42 });
+          expect(readSampleSeed(state)).toBe(Math.floor(0.5 * SEED_MAX));
+          expect(readSeed(state)).toBe(43);
+        } finally {
+          random.mockRestore();
+        }
+      });
+
+      it('keeps the sample when resampling is off', () => {
+        const state = submitWithPrompts(primeGenerate(undefined, { ...RANDOM_SAMPLE, dynamicPromptsResample: false }), [
+          'a green cat',
+        ]);
+
+        expect(readSubmission(state)).toMatchObject({ positivePrompts: ['a green cat'] });
+        expect(readSampleSeed(state)).toBe(7);
+      });
+
+      it('keeps the sample in All combinations mode', () => {
+        const state = submitWithPrompts(
+          primeGenerate(undefined, { ...RANDOM_SAMPLE, dynamicPromptsCombinatorial: true }),
+          ['a red cat', 'a green cat']
+        );
+
+        expect(readSubmission(state)).toMatchObject({ positivePrompts: ['a red cat', 'a green cat'] });
+        expect(readSampleSeed(state)).toBe(7);
+      });
+
+      it('keeps the sample when the submission expanded nothing', () => {
+        const state = submitWithPrompts(primeGenerate(undefined, { ...RANDOM_SAMPLE, positivePrompt: 'a plain cat' }));
+
+        expect(getActiveProject(state).queue.items).toHaveLength(1);
+        expect(readSampleSeed(state)).toBe(7);
+      });
+
+      // A repeated invoke can expand before the first submission's rotation lands, so both carry the same draw.
+      it('rotates once for submissions that drew the same sample, and recalls the sample each one used', () => {
+        const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+        try {
+          const primed = primeGenerate(undefined, { ...RANDOM_SAMPLE, batchCount: 1 });
+          const first = submitWithPrompts(primed, ['a green cat'], 7);
+          const rotated = Math.floor(0.5 * SEED_MAX);
+
+          expect(readSampleSeed(first)).toBe(rotated);
+
+          random.mockReturnValue(0.25);
+          const second = submitWithPrompts(first, ['a green cat'], 7);
+
+          expect(getActiveProject(second).queue.items).toHaveLength(2);
+          expect(readSampleSeed(second)).toBe(rotated);
+          expect(queuedSampleSeeds(second)).toEqual([7, 7]);
+        } finally {
+          random.mockRestore();
+        }
+      });
+
+      it('rotates only while the project still holds the sample the expansion used', () => {
+        const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+        try {
+          // The user picked a new sample while the queued one was expanding.
+          const state = submitWithPrompts(
+            primeGenerate(undefined, { ...RANDOM_SAMPLE, dynamicPromptsSampleSeed: 9 }),
+            ['a green cat'],
+            7
+          );
+
+          expect(readSampleSeed(state)).toBe(9);
+          expect(queuedSampleSeeds(state)).toEqual([7]);
+        } finally {
+          random.mockRestore();
+        }
+      });
+    });
+
     it('advances Upscale and Video seeds through the same boundary', () => {
       const upscaleModels = [
         createUpscaleModel('main', 'main', 'sd-1'),
@@ -4025,7 +4235,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     });
 
     describe('from the canvas, which compiles outside the reducer', () => {
-      const submitCanvas = (state: WorkbenchState, values: GenerateWidgetValues) =>
+      const submitCanvas = (state: WorkbenchState, values: GenerateWidgetValues, expansion?: ExpandedPositivePrompts) =>
         workbenchReducer(state, {
           backendSupportsCancellation: true,
           canvas: structuredClone(getActiveProject(state).canvas),
@@ -4045,6 +4255,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
             updatedAt: '2026-06-09T00:00:00.000Z',
             version: 1,
           },
+          ...expansion,
           projectId: state.activeProjectId,
           type: 'submitCanvasInvocationSnapshot',
         });
@@ -4066,6 +4277,34 @@ describe('workbenchReducer Phase 5 generation flow', () => {
         expect(readSeed(seedEdited)).toBe(500);
         expect(readSubmission(modeEdited)).toMatchObject({ seed: 10, seedStep: 1 });
         expect(readSeed(modeEdited)).toBe(10);
+      });
+
+      it("rotates Generate's dynamic prompt sample once for the sample the snapshot was expanded with", () => {
+        const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+        try {
+          const compiled = createGenerateValues({
+            batchCount: 1,
+            dynamicPromptsCombinatorial: false,
+            dynamicPromptsResample: true,
+            dynamicPromptsSampleSeed: 7,
+            positivePrompt: 'a {red|green} cat',
+          });
+          // Canvas is told the sample its expansion drew, as Generate is.
+          const drawn = { positivePrompts: ['a green cat'], positivePromptsSampleSeed: 7 };
+          const first = submitCanvas(primeGenerate(undefined, compiled), compiled, drawn);
+          const rotated = Math.floor(0.5 * SEED_MAX);
+
+          expect(readSampleSeed(first)).toBe(rotated);
+
+          random.mockReturnValue(0.25);
+          const second = submitCanvas(first, compiled, drawn);
+
+          expect(readSampleSeed(second)).toBe(rotated);
+          expect(queuedSampleSeeds(second)).toEqual([7, 7]);
+        } finally {
+          random.mockRestore();
+        }
       });
     });
   });
@@ -5135,6 +5374,32 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     values = getProjectWidgetValues(getActiveProject(state), 'gallery');
     expect(values.galleryPage).toBe(0);
     expect(values.selectedImageQuery).toMatchObject({ starredOnly: false });
+  });
+
+  it('stamps a selection with the project board the grid shows when no board was chosen', () => {
+    let state = createInitialWorkbenchState();
+    const projectId = getActiveProject(state).id;
+    const stampedBoardId = () =>
+      (getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageQuery as { boardId: string }).boardId;
+
+    state = workbenchReducer(state, { boardId: 'project-board', projectId, type: 'setGalleryProjectBoardId' });
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('a.png', 'project-board'),
+      type: 'selectGalleryItem',
+    });
+    expect(stampedBoardId()).toBe('project-board');
+
+    state = workbenchReducer(state, {
+      itemKeys: ['image:a.png', 'image:b.png'],
+      primaryItem: createGalleryImageItem('b.png', 'project-board'),
+      type: 'setGalleryMultiSelection',
+    });
+    expect(stampedBoardId()).toBe('project-board');
+
+    // An explicit choice, Uncategorized included, still wins over the project board.
+    state = workbenchReducer(state, { boardId: 'none', type: 'selectGalleryBoard' });
+    state = workbenchReducer(state, { item: createGalleryImageItem('c.png'), type: 'selectGalleryItem' });
+    expect(stampedBoardId()).toBe('none');
   });
 
   it('stamps a landing generation against the unfiltered listing', () => {
@@ -6238,6 +6503,81 @@ describe('workbenchReducer canvas v2 layer reducers', () => {
     const rolledBack = rollback(layer);
     expect(getLayerIds(rolledBack)).toEqual(['a', 'b']);
     expect(getCanvas(rolledBack).document.selectedLayerId).toBe('b');
+    expect(getCanvas(rolledBack).stagingArea).toBe(stagingArea);
+  });
+
+  it.each([
+    ['keeps an editable mask as the editing target', false, 'm'],
+    ['selects the result over a locked mask the next stroke would refuse', true, 'accepted'],
+  ])('%s through an accept and its rollback', (_label, isLocked, expectedSelection) => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [
+      { ...createInpaintMaskLayer('m'), isLocked },
+      createRasterLayer('a'),
+    ]);
+    state = workbenchReducer(state, { id: 'm', type: 'setCanvasSelectedLayer' });
+    const candidate: Project['canvas']['stagingArea']['pendingImages'][number] = {
+      height: 64,
+      imageName: 'eye.png',
+      imageUrl: 'url',
+      placement: { height: 64, opacity: 1, width: 64, x: 0, y: 0 },
+      queuedAt: 'now',
+      sourceQueueItemId: 'queue-1',
+      thumbnailUrl: 'thumb',
+      width: 64,
+    };
+    const stagingArea: Project['canvas']['stagingArea'] = {
+      ...getCanvas(state).stagingArea,
+      isVisible: true,
+      pendingImageIds: ['queue-1'],
+      pendingImages: [candidate],
+      selectedImageIndex: 0,
+    };
+    state = {
+      ...state,
+      projects: state.projects.map((project) =>
+        project.id === state.activeProjectId ? { ...project, canvas: { ...project.canvas, stagingArea } } : project
+      ),
+    };
+    const layer: CanvasRasterLayerContractV2 = { ...createRasterLayer('accepted', 'eye.png'), name: 'Accepted' };
+    const event = {
+      createdAt: '2026-07-16T00:00:00.000Z',
+      id: 'event-accepted',
+      summary: 'Accepted eye.png into a new raster layer',
+      type: 'canvas-layer-accepted' as const,
+    };
+
+    const committed = workbenchReducer(state, {
+      anchor: stackTopAnchor(state.activeProjectId),
+      candidateFingerprint: getCanvasStagingCandidateFingerprint(candidate),
+      continueStaging: false,
+      event,
+      layer,
+      selectedImageIndex: 0,
+      type: 'commitStagedImage',
+    });
+
+    expect(getCanvas(committed).document.stacks.raster.map((node) => node.id)).toEqual(['accepted', 'a']);
+    expect(getCanvas(committed).document.stacks.raster[0]).toMatchObject({ isEnabled: true });
+    expect(getCanvas(committed).document.selectedLayerId).toBe(expectedSelection);
+
+    const rollback = (from: WorkbenchState) =>
+      workbenchReducer(from, {
+        continueStaging: false,
+        event,
+        layer,
+        selectedLayerId: 'm',
+        stagingArea,
+        type: 'rollbackStagedImageCommit',
+      });
+    // A selection that moved after the accept is not the accept's own result, so the rollback refuses it.
+    const moved = workbenchReducer(committed, {
+      id: expectedSelection === 'm' ? 'accepted' : 'm',
+      type: 'setCanvasSelectedLayer',
+    });
+    expect(rollback(moved)).toBe(moved);
+    const rolledBack = rollback(committed);
+    expect(getCanvas(rolledBack).document.stacks.raster.map((node) => node.id)).toEqual(['a']);
+    expect(getCanvas(rolledBack).document.selectedLayerId).toBe('m');
     expect(getCanvas(rolledBack).stagingArea).toBe(stagingArea);
   });
 

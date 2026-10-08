@@ -7,7 +7,6 @@ import type {
 } from '@features/gallery/contracts';
 import type { GalleryItemsFilter } from '@features/gallery/queries';
 import type { QueueItem, QueueProgressSession } from '@features/queue/contracts';
-import type { KeyboardEvent } from 'react';
 
 import {
   compareGalleryItems,
@@ -158,7 +157,6 @@ const toNeighbor = (entry: GalleryNavigationEntry | null): PreviewNeighbor =>
 export interface PreviewNavigationState {
   /** Every saved item the arrows can reach, in order: the starred strip, then the listing. */
   boardItems: GalleryItem[];
-  handleNavigationKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void;
   isLoadingBoard: boolean;
   /** Resolves true once a step was dispatched; false when there was nowhere to go or the step went stale. */
   navigate: (offset: -1 | 1) => Promise<boolean>;
@@ -173,6 +171,8 @@ export interface PreviewNavigationState {
   /** Lazily fetch the full ordered listing when an action needs an item beyond the sparse loaded pages. */
   loadOrderedRefs: (signal: AbortSignal) => Promise<GalleryItemRef[]>;
   selectPreviewItem: (item: GalleryItem) => void;
+  /** How many of `boardItems` lead as the starred strip, ahead of the in-progress sessions. */
+  stripItemCount: number;
 }
 
 export const usePreviewNavigation = ({
@@ -522,11 +522,16 @@ export const usePreviewNavigation = ({
     [progressSessions]
   );
   const stripEntries = useMemo(() => toItemEntries(stripItems), [stripItems]);
+  // The grid's order: the starred strip it pins at the top, its In progress section, then the listing.
   const navigationSections = useMemo(
-    () => [sessionEntries, stripEntries, toItemEntries(listingItems)],
+    () => [stripEntries, sessionEntries, toItemEntries(listingItems)],
     [listingItems, sessionEntries, stripEntries]
   );
-  const cursorKey = followedSessionId !== null ? getGallerySessionNavigationKey(followedSessionId) : selectedItemKey;
+  // The live session while following it, else the selection; a session that has just gone gives way to the selection.
+  const cursorKeys = useMemo(
+    () => [followedSessionId === null ? null : getGallerySessionNavigationKey(followedSessionId), selectedItemKey],
+    [followedSessionId, selectedItemKey]
+  );
   const navigationCursor =
     followedSessionId !== null || selectedItemKey === null
       ? -1
@@ -597,7 +602,7 @@ export const usePreviewNavigation = ({
         return entry !== null;
       };
 
-      const loadedEntry = getGalleryNavigationStep(navigationSections, cursorKey, direction);
+      const loadedEntry = getGalleryNavigationStep(navigationSections, cursorKeys, direction);
 
       if (loadedEntry !== null && !selectedItemNeedsLocation && !(offset === -1 && hasUnresolvedPreviousListingPage)) {
         pageFetchRequestRef.current?.controller.abort();
@@ -668,8 +673,8 @@ export const usePreviewNavigation = ({
               }
 
               const sections = [
-                sessionEntries,
                 stripEntries,
+                sessionEntries,
                 toItemEntries(
                   mergePreviewBoardItems(
                     pages.flatMap(({ data }) => data.items),
@@ -679,7 +684,7 @@ export const usePreviewNavigation = ({
                   ).filter((item) => !stripKeys.has(toGalleryItemKey(item)))
                 ),
               ];
-              const entry = getGalleryNavigationStep(sections, cursorKey, direction);
+              const entry = getGalleryNavigationStep(sections, cursorKeys, direction);
 
               if (entry !== null) {
                 return stepTo(entry, pages);
@@ -704,8 +709,8 @@ export const usePreviewNavigation = ({
             total = currentPage.total;
 
             const currentSections = [
-              sessionEntries,
               stripEntries,
+              sessionEntries,
               toItemEntries(
                 mergePreviewBoardItems(
                   pages.flatMap(({ data }) => data.items),
@@ -715,7 +720,7 @@ export const usePreviewNavigation = ({
                 ).filter((item) => !stripKeys.has(toGalleryItemKey(item)))
               ),
             ];
-            const currentEntry = getGalleryNavigationStep(currentSections, cursorKey, direction);
+            const currentEntry = getGalleryNavigationStep(currentSections, cursorKeys, direction);
 
             if (currentEntry !== null) {
               return stepTo(currentEntry, pages);
@@ -743,15 +748,15 @@ export const usePreviewNavigation = ({
               total = page.total;
               const pageItems = pages.flatMap(({ data }) => data.items);
               const sections = [
-                sessionEntries,
                 stripEntries,
+                sessionEntries,
                 toItemEntries(
                   mergePreviewBoardItems(pageItems, previewMergeItems, navigationOrderDir, {
                     isRanked: navigationSemanticQuery !== null,
                   }).filter((item) => !stripKeys.has(toGalleryItemKey(item)))
                 ),
               ];
-              const entry = getGalleryNavigationStep(sections, cursorKey, direction);
+              const entry = getGalleryNavigationStep(sections, cursorKeys, direction);
 
               if (entry !== null) {
                 return stepTo(entry, pages);
@@ -774,7 +779,7 @@ export const usePreviewNavigation = ({
     },
     [
       boardPageResults,
-      cursorKey,
+      cursorKeys,
       followSession,
       isComparing,
       accountScope,
@@ -800,29 +805,6 @@ export const usePreviewNavigation = ({
     ]
   );
 
-  const handleNavigationKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLDivElement>) => {
-      if (event.target instanceof Element && event.target.closest('video')) {
-        return;
-      }
-
-      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
-        return;
-      }
-
-      if (isComparing) {
-        return;
-      }
-
-      // stopPropagation keeps the widget hotkey runtime from handling the same
-      // arrow press a second time.
-      event.preventDefault();
-      event.stopPropagation();
-      void navigate(event.key === 'ArrowLeft' ? -1 : 1);
-    },
-    [isComparing, navigate]
-  );
-
   // The same resolution navigate() makes, so a swipe reveals what committing it will select.
   const neighbors = useMemo((): PreviewNeighbors => {
     if (isComparing) {
@@ -834,7 +816,7 @@ export const usePreviewNavigation = ({
         return { kind: 'more' };
       }
 
-      const neighbor = getGalleryNavigationStep(navigationSections, cursorKey, offset === 1 ? 'right' : 'left');
+      const neighbor = getGalleryNavigationStep(navigationSections, cursorKeys, offset === 1 ? 'right' : 'left');
 
       if (neighbor !== null) {
         return toNeighbor(neighbor);
@@ -847,7 +829,7 @@ export const usePreviewNavigation = ({
 
     return { next: resolve(1), previous: resolve(-1) };
   }, [
-    cursorKey,
+    cursorKeys,
     hasUnresolvedPreviousListingPage,
     isComparing,
     listingTotal,
@@ -874,7 +856,6 @@ export const usePreviewNavigation = ({
 
   return {
     boardItems,
-    handleNavigationKeyDown,
     isLoadingBoard,
     navigate,
     neighbors,
@@ -883,5 +864,6 @@ export const usePreviewNavigation = ({
     getSelectionPage,
     loadOrderedRefs,
     selectPreviewItem,
+    stripItemCount: stripItems.length,
   };
 };

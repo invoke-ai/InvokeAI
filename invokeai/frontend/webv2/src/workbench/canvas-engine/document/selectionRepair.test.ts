@@ -11,7 +11,7 @@ import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { describe, expect, it } from 'vitest';
 
 import { removeNodes } from './documentTree';
-import { repairSelectedLayerId } from './selectionRepair';
+import { repairSelectedLayerId, selectionAfterAcceptedResult } from './selectionRepair';
 
 const layer = layerContract;
 const group = groupContract;
@@ -122,5 +122,37 @@ describe('selection repair through the reducer', () => {
     ],
   ])('%s', (_label, selected, mutation, expected) => {
     expect(reduce(selected, mutation)).toBe(expected);
+  });
+});
+
+describe('selectionAfterAcceptedResult', () => {
+  /** raster: r1, g-r[r2] · control: c1, c-off · regional: g-o[rg1], g-off[rg2], g-lock[rg3] · inpaint: m1, m-lock */
+  const stacks = stacksFrom([
+    layer('r1'),
+    group('g-r', [layer('r2')]),
+    layer('c1', 'control'),
+    layer('c-off', 'control', { isEnabled: false }),
+    group('g-o', [layer('rg1', 'regional_guidance')]),
+    group('g-off', [layer('rg2', 'regional_guidance')], { isEnabled: false }),
+    group('g-lock', [layer('rg3', 'regional_guidance')], { isLocked: true }),
+    layer('m1', 'inpaint_mask'),
+    layer('m-lock', 'inpaint_mask', { isLocked: true }),
+  ]);
+
+  it.each([
+    ['keeps a selected inpaint mask', 'm1', 'm1'],
+    ['keeps a selected regional mask inside an editable group', 'rg1', 'rg1'],
+    ['keeps a selected control layer', 'c1', 'c1'],
+    ['selects the result over a locked mask', 'm-lock', 'accepted'],
+    ['selects the result over a disabled control layer', 'c-off', 'accepted'],
+    ['selects the result over a mask in a disabled group', 'rg2', 'accepted'],
+    ['selects the result over a mask in a locked group', 'rg3', 'accepted'],
+    ['selects the result over an overlay group, which no stroke can paint', 'g-o', 'accepted'],
+    ['selects the result over a raster leaf it now covers', 'r1', 'accepted'],
+    ['selects the result over a raster group', 'g-r', 'accepted'],
+    ['selects the result when nothing was selected', null, 'accepted'],
+    ['selects the result when the selection no longer exists', 'gone', 'accepted'],
+  ])('%s', (_label, selected, expected) => {
+    expect(selectionAfterAcceptedResult(stacks, selected, 'accepted')).toBe(expected);
   });
 });

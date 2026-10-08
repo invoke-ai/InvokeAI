@@ -1,7 +1,8 @@
 import { chakra, HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { APP_VERSION, DOCS_URL } from '@platform/runtime/appMetadata';
-import { Button } from '@platform/ui/Button';
+import { Button, IconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
+import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import { DiscordIcon, GithubIcon } from '@platform/ui/VendoredIcon';
 import { useQueryClient } from '@tanstack/react-query';
 import { BookOpenTextIcon, ChevronRightIcon, ClapperboardIcon, CircleQuestionMarkIcon } from 'lucide-react';
@@ -9,7 +10,8 @@ import { useCallback, useState, type ComponentType, type ElementType } from 'rea
 import { useTranslation } from 'react-i18next';
 
 const MENU_POSITIONING = { placement: 'right-end' } as const;
-const GROUP_LABEL_PROPS = { color: 'fg.subtle', fontSize: 'xs', textTransform: 'uppercase' } as const;
+/** fg.muted: fg.subtle falls below 4.5:1 on the menu surface at this size. */
+const GROUP_LABEL_PROPS = { color: 'fg.muted', fontSize: 'xs', textTransform: 'uppercase' } as const;
 const TRIGGER_JUSTIFY = { justifyContent: 'space-between' } as const;
 // Loaded on trigger hover or focus, so neither the chunk nor its request is part of route startup.
 const loadDonationMenuItem = () => import('@workbench/shell/DonationMenuItem');
@@ -65,8 +67,10 @@ const HelpMenuLink = ({ href, icon, labelKey, value }: HelpLink) => {
   );
 };
 
-export const HelpMenu = () => {
+/** `compact` is the icon-only rail: the trigger is named by a tooltip instead of its label. */
+export const HelpMenu = ({ compact = false }: { compact?: boolean }) => {
   const { t } = useTranslation();
+  const ids = useTooltipTriggerIds();
   const queryClient = useQueryClient();
   // Rendered only once loaded: a lazy() boundary would suspend on open and React delays its reveal, shifting rows.
   // A chunk that fails to load (e.g. after an upgrade) leaves the optional link absent.
@@ -91,24 +95,41 @@ export const HelpMenu = () => {
   );
 
   return (
-    <Menu.Root lazyMount positioning={MENU_POSITIONING} onOpenChange={handleOpenChange}>
-      <Menu.Trigger asChild>
-        <Button
-          aria-label={t('launchpad.help.label')}
-          color="fg.muted"
-          css={TRIGGER_JUSTIFY}
-          variant="ghost"
-          w="full"
-          onFocus={preloadDonationMenuItem}
-          onPointerEnter={preloadDonationMenuItem}
-        >
-          <Icon as={CircleQuestionMarkIcon} boxSize="3.5" />
-          <Text flex="1" textAlign="start" truncate>
-            {t('launchpad.help.label')}
-          </Text>
-          <Icon as={ChevronRightIcon} boxSize="3" />
-        </Button>
-      </Menu.Trigger>
+    <Menu.Root ids={ids} lazyMount positioning={MENU_POSITIONING} onOpenChange={handleOpenChange}>
+      {compact ? (
+        <Tooltip content={t('launchpad.help.label')} ids={ids} placement="right">
+          <Menu.Trigger asChild>
+            <IconButton
+              aria-label={t('launchpad.help.label')}
+              color="fg.muted"
+              size="lg"
+              variant="ghost"
+              onFocus={preloadDonationMenuItem}
+              onPointerEnter={preloadDonationMenuItem}
+            >
+              <Icon as={CircleQuestionMarkIcon} boxSize="3.5" />
+            </IconButton>
+          </Menu.Trigger>
+        </Tooltip>
+      ) : (
+        <Menu.Trigger asChild>
+          <Button
+            aria-label={t('launchpad.help.label')}
+            color="fg.muted"
+            css={TRIGGER_JUSTIFY}
+            variant="ghost"
+            w="full"
+            onFocus={preloadDonationMenuItem}
+            onPointerEnter={preloadDonationMenuItem}
+          >
+            <Icon as={CircleQuestionMarkIcon} boxSize="3.5" />
+            <Text flex="1" textAlign="start" truncate>
+              {t('launchpad.help.label')}
+            </Text>
+            <Icon as={ChevronRightIcon} boxSize="3" />
+          </Button>
+        </Menu.Trigger>
+      )}
       <Portal>
         <Menu.Positioner>
           <MenuContent minW="13rem">
@@ -131,7 +152,7 @@ export const HelpMenu = () => {
               <Text fontSize="xs" fontWeight="700">
                 Invoke
               </Text>
-              <Text color="fg.subtle" fontSize="xs">
+              <Text color="fg.muted" fontSize="xs">
                 {t('launchpad.help.version', { version: APP_VERSION })}
               </Text>
             </HStack>
