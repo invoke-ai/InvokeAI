@@ -882,15 +882,19 @@ const buildLtx2VideoGraph = (settings: VideoSettings, model: MainModelConfig): B
 
   // The generation opens either from a still or from the tail of the clip being continued; a last
   // frame rides on top of either as a keyframe. `-1` is resolved against the run's own frame count
-  // by the denoise node, so the encode does not go stale when the length changes.
+  // by the denoise node, so the encode does not go stale when the length changes -- including the
+  // length a held soundtrack wires in, since audio-to-video holds the other stream and leaves both
+  // frame slots free to anchor the picture generated for it.
   // Keyed on the MODE rather than on whichever slot still holds something. Validation refuses every
   // bad combination before a graph is built, so this is the second line rather than the first -- but
   // a held frame reaching the graph unasked is both a silent change of output and, beside a
   // whole-clip conditioning, a shape failure inside the transformer, and the sibling MiniMax builder
   // guards the same way.
-  const holdsFirstFrame = (mode === 'first-frame' || mode === 'first-last') && settings.firstFrameImage;
+  const holdsFirstFrame =
+    (mode === 'first-frame' || mode === 'first-last' || mode === 'audio-to-video') && settings.firstFrameImage;
   const holdsLastFrame =
-    (mode === 'last-frame' || mode === 'first-last' || mode === 'extend') && settings.lastFrameImage;
+    (mode === 'last-frame' || mode === 'first-last' || mode === 'extend' || mode === 'audio-to-video') &&
+    settings.lastFrameImage;
 
   if (holdsFirstFrame) {
     addHeldFrame('image_conditioning', holdsFirstFrame, stages.base, denoise, 0);

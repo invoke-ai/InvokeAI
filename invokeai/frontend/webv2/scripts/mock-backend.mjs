@@ -898,6 +898,10 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         return json(200, { version: MOCK_APP_VERSION });
       }
 
+      if (method === 'GET' && path === '/api/v1/app/frontend_config') {
+        return json(200, { show_donation_link: true });
+      }
+
       if (method === 'GET' && path === '/api/v1/app/generation_device_options') {
         return json(200, [{ device: 'cpu', name: 'CPU' }]);
       }

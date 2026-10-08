@@ -63,6 +63,8 @@ from invokeai.backend.quantization.int8_convrot import (
     install_int8_convrot_layers,
     reject_unmarked_int8_weights,
     resolve_quantized_module_paths,
+    split_int8_convrot_layers,
+    swap_in_int8_linears,
 )
 from invokeai.backend.quantization.load_plan import reserve_for_load
 from invokeai.backend.quantization.nvfp4 import (
@@ -642,7 +644,9 @@ class Krea2GGUFCheckpointModel(ModelLoader):
 
     GGUF ships only the transformer; the VAE (Qwen-Image), Qwen3-VL encoder, tokenizer and scheduler
     are sourced separately by the Krea-2 model-loader invocation (mix-and-match, like Z-Image/FLUX).
-    The GGML tensors stay quantized and are dequantized on-the-fly during inference.
+    The GGML tensors stay quantized and are dequantized on-the-fly during inference. ComfyUI-GGUF's
+    ``Q8_CR`` layers arrive from `gguf_sd_loader` as an ``int8_tensorwise`` export and stay int8 as
+    `Int8ConvrotLinear`, beside whatever GGML-quantized layers the same file mixes in.
     """
 
     def _load_model(
@@ -669,14 +673,40 @@ class Krea2GGUFCheckpointModel(ModelLoader):
         compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
         # GGMLTensor wrappers (kept on CPU; dequantized on-the-fly by the cache during inference).
-        sd = gguf_sd_loader(model_path, compute_dtype=compute_dtype)
+        sd = gguf_sd_loader(model_path, compute_dtype=compute_dtype, q8_cr="decode")
         sd = CheckpointPrefix.detect(sd).strip(sd)
+        # As in the single-file loader: the key conversion drops these weights but not their markers.
+        sd = _drop_discarded_native_final_layers(sd)
+        # Before the key conversion, which carries `.weight_scale` along with its weight but not
+        # `.comfy_quant` -- see the single-file loader above.
+        int8_markers = extract_int8_convrot_markers(sd)
+        # An `I8` tensor the metadata does not claim is still a GGMLTensor of dtype int8, and `gguf` has
+        # no dequantizer for it: without this it fails on the first denoise step instead of here.
+        reject_unmarked_int8_weights(sd, int8_markers, "Krea-2 GGUF")
         # GGUF conversions use the native/ComfyUI compact key naming; remap to diffusers keys.
+        key_map: dict[str, str] = {}
         if _is_native_krea2_format(sd):
-            sd = _convert_krea2_native_to_diffusers(sd)
+            sd = _convert_krea2_native_to_diffusers(sd, key_map=key_map)
 
         with accelerate.init_empty_weights():
             model = Krea2Transformer2DModel(**KREA2_TRANSFORMER_CONFIG)
+
+        if int8_markers:
+            # Not `install_int8_convrot_layers`: its cast and RAM reservation are for a state dict of
+            # dense tensors, and casting a GGMLTensor to another dtype raises. Everything else in this
+            # file stays the GGMLTensor it already is, so only the split and the swap apply.
+            quantized = split_int8_convrot_layers(
+                sd,
+                resolve_quantized_module_paths(int8_markers, key_map),
+                compute_dtype,
+                model=model,
+                skip_patterns=_model_declared_skip_patterns(model),
+            )
+            swap_in_int8_linears(model, sd, quantized)
+            self._logger.info(
+                f"Krea-2: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
+                "(ComfyUI-GGUF Q8_CR, dequantized per forward)"
+            )
 
         load_state_dict_ignoring_extras(model, sd, source="Krea-2 GGUF checkpoint", assign=True, allow_missing=True)
         # Reject GGUF layouts that don't fully populate the diffusers Krea2Transformer2DModel (city96/

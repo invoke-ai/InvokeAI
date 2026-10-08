@@ -2355,6 +2355,74 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/app/gallery/maintenance/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Gallery Maintenance */
+        post: operations["preview_gallery_maintenance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/gallery/maintenance/remove-missing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Remove Missing Images */
+        post: operations["remove_missing_images"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/gallery/maintenance/archive-untracked": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive Untracked Images */
+        post: operations["archive_untracked_images"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/gallery/maintenance/regenerate-thumbnails": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Regenerate Missing Thumbnails */
+        post: operations["regenerate_missing_thumbnails"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/boards/": {
         parameters: {
             query?: never;
@@ -2617,6 +2685,23 @@ export type paths = {
          * @description Retrieves all **unique related model keys** for a list of given models. This is useful for contextual suggestions or filtering.
          */
         post: operations["get_related_models_batch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/frontend_config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Frontend Config */
+        get: operations["get_frontend_config"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4192,7 +4277,8 @@ export type paths = {
          * Recall Conditioning Video
          * @description Set a gallery video as the current user's conditioning clip (models that take one, e.g. LTX-2).
          *
-         *     The clip replaces the panel's other conditioning media: frames, initial video and references.
+         *     The clip replaces the panel's initial video and references, and in the `video` role its first and last frames;
+         *     in the `audio` role the frames stay, anchoring the picture generated for the soundtrack.
          */
         post: operations["recall_conditioning_video"];
         delete?: never;
@@ -16133,6 +16219,17 @@ export type components = {
             type: "freeu";
         };
         /**
+         * FrontendConfig
+         * @description Presentation settings any signed-in user may read; never include private runtime configuration here.
+         */
+        FrontendConfig: {
+            /**
+             * Show Donation Link
+             * @description Whether to show the Donate to InvokeAI menu link
+             */
+            show_donation_link: boolean;
+        };
+        /**
          * GalleryItem
          * @description A gallery item — either an image or a video, with shared fields and a discriminator.
          *
@@ -16295,6 +16392,67 @@ export type components = {
              * @description The unique name of the image or video.
              */
             name: string;
+        };
+        /** GalleryMaintenanceExecuteRequest */
+        GalleryMaintenanceExecuteRequest: {
+            /** Fingerprint */
+            fingerprint: string;
+        };
+        /**
+         * GalleryMaintenanceOperation
+         * @enum {string}
+         */
+        GalleryMaintenanceOperation: "remove_missing" | "archive_untracked" | "regenerate_thumbnails";
+        /** GalleryMaintenancePreview */
+        GalleryMaintenancePreview: {
+            operation: components["schemas"]["GalleryMaintenanceOperation"];
+            /** Fingerprint */
+            fingerprint: string;
+            /** Examined Count */
+            examined_count: number;
+            /** Affected Count */
+            affected_count: number;
+            /** Skipped Count */
+            skipped_count: number;
+            /** Error Count */
+            error_count: number;
+            /** Errors */
+            errors?: string[];
+            /** Archive Path */
+            archive_path?: string | null;
+        };
+        /** GalleryMaintenancePreviewRequest */
+        GalleryMaintenancePreviewRequest: {
+            operation: components["schemas"]["GalleryMaintenanceOperation"];
+        };
+        /** GalleryMaintenanceResult */
+        GalleryMaintenanceResult: {
+            operation: components["schemas"]["GalleryMaintenanceOperation"];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "completed" | "partial" | "no_op" | "failed";
+            /** Examined Count */
+            examined_count: number;
+            /** Skipped Count */
+            skipped_count: number;
+            /** Failed Count */
+            failed_count: number;
+            /** Records Removed */
+            records_removed: number;
+            /** Images Archived */
+            images_archived: number;
+            /** Thumbnails Archived */
+            thumbnails_archived: number;
+            /** Thumbnails Regenerated */
+            thumbnails_regenerated: number;
+            /** Archive Path */
+            archive_path?: string | null;
+            /** Backup Path */
+            backup_path?: string | null;
+            /** Errors */
+            errors?: string[];
         };
         /**
          * Gemini Image Generation
@@ -22368,6 +22526,7 @@ export type components = {
          *         allow_headers: Headers allowed for CORS.
          *         ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.
          *         ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.
+         *         show_donation_link: Show the Donate to InvokeAI link in the frontend menus.
          *         log_tokenization: Enable logging of parsed prompt tokens.
          *         patchmatch: Enable patchmatch inpaint code.
          *         models_dir: Path to the models directory.
@@ -22530,6 +22689,12 @@ export type components = {
              * @default 9
              */
             http_compression_level?: number;
+            /**
+             * Show Donation Link
+             * @description Show the Donate to InvokeAI link in the frontend menus.
+             * @default true
+             */
+            show_donation_link?: boolean;
             /**
              * Log Tokenization
              * @description Enable logging of parsed prompt tokens.
@@ -56182,6 +56347,278 @@ export interface operations {
             };
         };
     };
+    preview_gallery_maintenance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GalleryMaintenancePreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GalleryMaintenancePreview"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Admin privileges required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Gallery maintenance is already active */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Gallery maintenance preview failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Gallery maintenance unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    remove_missing_images: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GalleryMaintenanceExecuteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GalleryMaintenanceResult"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Admin privileges required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Preview is stale or image storage is busy */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Gallery maintenance failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Gallery maintenance unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    archive_untracked_images: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GalleryMaintenanceExecuteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GalleryMaintenanceResult"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Admin privileges required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Preview is stale or image storage is busy */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Gallery maintenance failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Gallery maintenance unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    regenerate_missing_thumbnails: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GalleryMaintenanceExecuteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GalleryMaintenanceResult"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Admin privileges required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Preview is stale or image storage is busy */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Gallery maintenance failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Gallery maintenance unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     list_boards: {
         parameters: {
             query?: {
@@ -56822,6 +57259,26 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    get_frontend_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FrontendConfig"];
+                };
             };
         };
     };

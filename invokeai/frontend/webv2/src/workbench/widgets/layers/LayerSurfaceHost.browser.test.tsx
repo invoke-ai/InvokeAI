@@ -165,22 +165,31 @@ it.each([
 // A closed menu stays in the DOM until its own exit animation ends.
 const openMenu = () => document.querySelector('[role="menu"][data-state="open"]');
 
-/** Choose a menu's rename item, then dismiss the dialog, which is left animating out. */
+/** Choose a menu's rename item, then hold its real exit animation while a successor opens. */
 const renameThenDismiss = async (id: string) => {
   await act(() => openSurface({ anchor, id, kind: 'menu' }));
   await act(() => page.getByRole('menuitem', { name: 'Rename layer', exact: true }).click());
   await expect.element(page.getByRole('dialog', { name: 'Rename layer' })).toBeVisible();
-  const dialog = document.querySelector('[role="dialog"]')!;
+  const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!;
+  await Promise.all(dialog.getAnimations().map((animation) => animation.finished));
+  // Driver round trips can outlast the exit animation on CI; hold it before sending Escape.
+  dialog.style.animationPlayState = 'paused';
   await act(() => userEvent.keyboard('{Escape}'));
   expect(dialog.isConnected).toBe(true);
   expect(dialog).toHaveAttribute('data-state', 'closed');
+  const animations = dialog.getAnimations();
+  expect(animations).not.toHaveLength(0);
+  for (const animation of animations) {
+    expect(animation.playState).toBe('paused');
+  }
   return dialog;
 };
 
 it('drops a layer rename still animating out when another layer opens its menu', async () => {
-  await renameThenDismiss('layer');
+  const dialog = await renameThenDismiss('layer');
   await act(() => openSurface({ anchor: { ...anchor }, id: 'child', kind: 'menu' }));
   await expect.poll(openMenu).not.toBeNull();
+  expect(dialog.isConnected).toBe(false);
 
   mocks.layerMenuRender.mockClear();
   await act(() => userEvent.keyboard('{Escape}'));
@@ -195,6 +204,8 @@ it('opens a group menu requested while its rename animates out, and keeps it onc
 
   await act(() => openSurface({ anchor: { ...anchor }, id: 'group', kind: 'menu' }));
   await expect.poll(openMenu).not.toBeNull();
+  expect(dialog.isConnected).toBe(true);
+  dialog.style.removeProperty('animation-play-state');
   await expect.poll(() => dialog.isConnected).toBe(false);
 
   expect(openMenu()).not.toBeNull();

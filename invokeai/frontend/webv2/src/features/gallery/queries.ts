@@ -35,6 +35,10 @@ export {
   invalidateGallery,
   invalidateGalleryItems,
   patchGalleryItemCaches,
+  getGalleryThumbnailRevision,
+  getRefreshedGalleryThumbnailUrl,
+  refreshGalleryThumbnails,
+  subscribeGalleryThumbnailRevision,
 } from './data/queryCache';
 export type { GalleryItemCachePatch } from './data/queryCache';
 export { createGalleryRealtimeRuntime } from './data/realtimeRuntime';

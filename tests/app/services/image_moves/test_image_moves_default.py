@@ -10,13 +10,14 @@ from PIL import Image
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.image_moves.image_moves_default import (
+    ImageMoveJobAlreadyRunning,
     ImageMoveQueueActive,
     ImageMoveService,
     UnreadableImageError,
 )
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
-from invokeai.app.services.session_queue.session_queue_common import DEFAULT_QUEUE_ID, SessionQueueStatus
+from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.shared.sqlite.sqlite_util import init_db
 from invokeai.backend.util.logging import InvokeAILogger
@@ -522,19 +523,7 @@ def test_start_leaves_maintenance_active_when_recovery_remains_incomplete(tmp_pa
 def test_background_move_rejects_active_queue_work(tmp_path: Path, pending: int, in_progress: int) -> None:
     service, _records = _service(tmp_path, strategy="date")
     invoker = MagicMock()
-    invoker.services.session_queue.get_queue_status.return_value = SessionQueueStatus(
-        queue_id=DEFAULT_QUEUE_ID,
-        item_id=None,
-        batch_id=None,
-        session_id=None,
-        pending=pending,
-        in_progress=in_progress,
-        waiting=0,
-        completed=0,
-        failed=0,
-        canceled=0,
-        total=1,
-    )
+    invoker.services.session_queue.has_active_queue_work.return_value = pending > 0 or in_progress > 0
     service.start(invoker)
 
     with pytest.raises(ImageMoveQueueActive, match="queue work is active"):
@@ -545,30 +534,83 @@ def test_background_move_is_reserved_before_queue_check(tmp_path: Path) -> None:
     service, _records = _service(tmp_path, strategy="date")
     invoker = MagicMock()
 
-    def get_queue_status(queue_id: str) -> SessionQueueStatus:
-        assert queue_id == DEFAULT_QUEUE_ID
+    def has_active_queue_work() -> bool:
         assert service.is_maintenance_active() is True
-        return SessionQueueStatus(
-            queue_id=DEFAULT_QUEUE_ID,
-            item_id=None,
-            batch_id=None,
-            session_id=None,
-            pending=1,
-            in_progress=0,
-            waiting=0,
-            completed=0,
-            failed=0,
-            canceled=0,
-            total=1,
-        )
+        return True
 
-    invoker.services.session_queue.get_queue_status.side_effect = get_queue_status
+    invoker.services.session_queue.has_active_queue_work.side_effect = has_active_queue_work
     service.start(invoker)
 
     with pytest.raises(ImageMoveQueueActive, match="queue work is active"):
         service.start_background_move_all()
 
     assert service.is_maintenance_active() is False
+
+
+def test_gallery_maintenance_reservation_blocks_moves_and_releases_after_failure(tmp_path: Path) -> None:
+    service, _records = _service(tmp_path, strategy="date")
+
+    try:
+        with service.reserve_gallery_maintenance():
+            assert service.is_maintenance_active() is True
+            with pytest.raises(ImageMoveJobAlreadyRunning, match="maintenance"):
+                service.start_background_recovery()
+
+        assert service.is_maintenance_active() is False
+
+        with pytest.raises(RuntimeError, match="operation failed"):
+            with service.reserve_gallery_maintenance():
+                raise RuntimeError("operation failed")
+
+        assert service.is_maintenance_active() is False
+    finally:
+        service.stop()
+
+
+def test_gallery_maintenance_reservation_refuses_active_queue_and_releases_flag(tmp_path: Path) -> None:
+    service, _records = _service(tmp_path, strategy="date")
+    invoker = MagicMock()
+
+    def has_active_queue_work() -> bool:
+        # The operation reservation must be visible before it reads queue state.
+        assert service.is_maintenance_active() is True
+        return True
+
+    invoker.services.session_queue.has_active_queue_work.side_effect = has_active_queue_work
+    service.start(invoker)
+
+    try:
+        with pytest.raises(ImageMoveQueueActive, match="queue work is active"):
+            with service.reserve_gallery_maintenance():
+                pytest.fail("maintenance must not begin with pending queue work")
+
+        assert service.is_maintenance_active() is False
+    finally:
+        service.stop()
+
+
+@pytest.mark.parametrize("status", ["pending", "in_progress"])
+def test_gallery_maintenance_reservation_refuses_active_work_on_custom_queue(tmp_path: Path, status: str) -> None:
+    service, _records = _service(tmp_path, strategy="date")
+    queue = SqliteSessionQueue(db=service._db)
+    with service._db.transaction() as cursor:
+        cursor.execute(
+            """--sql
+            INSERT INTO session_queue (batch_id, queue_id, session_id, session, status)
+            VALUES ('custom-batch', 'custom-queue', 'custom-session', '{}', ?)
+            """,
+            (status,),
+        )
+    service.set_session_queue(queue)
+
+    try:
+        with pytest.raises(ImageMoveQueueActive, match="queue work is active"):
+            with service.reserve_gallery_maintenance():
+                pytest.fail("maintenance must not begin while a custom queue has pending work")
+
+        assert service.is_maintenance_active() is False
+    finally:
+        service.stop()
 
 
 def test_maintenance_is_active_while_background_job_or_uncommitted_journal_exists(tmp_path: Path) -> None:
