@@ -6,7 +6,7 @@ import {
   LTX2_DEFAULT_NEGATIVE_PROMPT,
   LTX2_EXTEND_CONTEXT_FRAMES,
 } from '@features/video/core/dimensions';
-import { isVideoTargetResolution, normalizeVideoSettings } from '@features/video/core/settings';
+import { isVideoTargetResolution, normalizeVideoSettings, resolveVideoMode } from '@features/video/core/settings';
 import { describe, expect, it } from 'vitest';
 
 import type { Ltx2TargetResolution, VideoSettings } from './types';
@@ -2056,15 +2056,38 @@ describe('LTX-2 policy', () => {
       expect(getVideoDimensions(model, conditioned('audio'))?.source).toBe('aspect-ratio');
     });
 
-    it('refuses a clip beside any other conditioning slot', () => {
-      expect(
-        getVideoValidationReasons(
-          model,
-          conditioned('audio', { firstFrameImage: { height: 704, image_name: 'first.png', width: 1248 } })
-        )
-      ).toContain(
-        'A conditioning clip cannot be combined with first/last frames, an initial video or references. Clear one side.'
+    it('refuses a clip beside an initial video, and its picture beside frames', () => {
+      const frame = { height: 704, image_name: 'frame.png', width: 1248 };
+      const source = {
+        endFrame: 94,
+        fps: 24,
+        height: 704,
+        numFrames: 96,
+        startFrame: 0,
+        video_name: 's.mp4',
+        width: 1248,
+      };
+
+      expect(getVideoValidationReasons(model, conditioned('audio', { sourceVideo: source }))).toContain(
+        'A conditioning clip cannot be combined with an initial video or references. Clear one side.'
       );
+      for (const slot of ['firstFrameImage', 'lastFrameImage'] as const) {
+        expect(getVideoValidationReasons(model, conditioned('video', { [slot]: frame })), slot).toContain(
+          "A conditioning clip's picture cannot be combined with first/last frames. Clear one side."
+        );
+      }
+    });
+
+    it('lets first and last frames anchor the picture generated for a soundtrack', () => {
+      const first = { height: 704, image_name: 'first.png', width: 1248 };
+      const last = { height: 704, image_name: 'last.png', width: 1248 };
+      const settings = conditioned('audio', { firstFrameImage: first, lastFrameImage: last });
+
+      expect(resolveVideoMode(settings)).toBe('audio-to-video');
+      expect(getVideoValidationReasons(model, settings)).toEqual([]);
+      // The soundtrack still decides the length; the first frame decides the canvas.
+      expect(getEffectiveVideoTiming(model, settings).numFramesFromClip).toBe(true);
+      expect(getVideoDimensions(model, settings)?.source).toBe('first-frame');
     });
 
     it('refuses a two-stage preset, which the denoise node cannot combine with a held modality', () => {
