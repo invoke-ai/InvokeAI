@@ -27724,10 +27724,11 @@ export type components = {
         };
         /**
          * LoRA_LyCORIS_MiniMaxH3_Config
-         * @description Model config for MiniMax H3 LoRA models in LyCORIS (single-file PEFT) format.
+         * @description Model config for MiniMax H3 LoRA models in LyCORIS (single-file PEFT or kohya) format.
          *
          *     H3 LoRAs (e.g. the MiniMax-H3 Turbo step-distillation LoRA) target the
-         *     ``MiniMaxH3Transformer3DModel`` in the checkpoint's native single-file layout.
+         *     ``MiniMaxH3Transformer3DModel`` in the checkpoint's native single-file layout,
+         *     with dotted keys or kohya-flattened ``lora_unet_*`` keys.
          *     Detection keys on H3-exclusive submodule names (the fused ``attn.qkv_proj``
          *     under a bare ``attn.``, and ``adaln_proj.linear``) and rejects any state dict
          *     carrying another architecture's signature — see
