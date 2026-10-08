@@ -198,6 +198,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     variant_type_adapter,
 )
+from invokeai.backend.quantization.gguf.loaders import parse_q8_cr_markers
 
 logger = logging.getLogger(__name__)
 
@@ -658,6 +659,27 @@ class ModelConfigFactory:
         return e
 
     @staticmethod
+    def _raise_for_unsupported_gguf_quantization(mod: ModelOnDisk, config: Config_Base) -> None:
+        """Refuse a GGUF whose ComfyUI-GGUF quantization the matched config's loader cannot decode.
+
+        Here rather than in each GGUF config: the question is the same for all of them, and a GGUF config
+        added later is refused by default instead of installing a file it fails on at the first render.
+        `InvalidMatchError`, so the installer shows the reason rather than registering an unknown model.
+        Read from the cached metadata, so a large file is not re-read once per candidate.
+        """
+        if getattr(config, "format", None) is not ModelFormat.GGUFQuantized:
+            return
+        try:
+            markers = parse_q8_cr_markers(mod.metadata(), mod.path.name)
+        except ValueError as e:
+            raise InvalidMatchError(str(e)) from None
+        if markers and not type(config).DECODES_GGUF_Q8_CR:
+            raise InvalidMatchError(
+                f"{mod.path.name} is a ComfyUI-GGUF Q8_CR (int8 convrot) file, which this model type cannot load "
+                "yet. Use a GGML-quantized (Q8_0, Q4_K, ...) or safetensors build instead."
+            )
+
+    @staticmethod
     def from_dict(fields: dict[str, Any]) -> AnyModelConfig:
         """Return the appropriate config object from raw dict values."""
         model = AnyModelConfigValidator.validate_python(fields)
@@ -864,7 +886,9 @@ class ModelConfigFactory:
             try:
                 # Technically, from_model_on_disk returns a Config_Base, but in practice it will always be a member of
                 # the AnyModelConfig union.
-                details[candidate_name] = candidate_class.from_model_on_disk(mod, fields)  # type: ignore
+                candidate = candidate_class.from_model_on_disk(mod, fields)
+                ModelConfigFactory._raise_for_unsupported_gguf_quantization(mod, candidate)
+                details[candidate_name] = candidate  # type: ignore
             except NotAMatchError as e:
                 # This means the model didn't match this config class. It's not an error, just no match.
                 details[candidate_name] = ModelConfigFactory._detach_traceback(e)
