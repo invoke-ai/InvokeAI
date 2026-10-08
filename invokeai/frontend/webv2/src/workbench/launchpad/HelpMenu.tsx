@@ -1,16 +1,18 @@
-import type { ElementType } from 'react';
-
 import { chakra, HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { APP_VERSION, DOCS_URL } from '@platform/runtime/appMetadata';
 import { Button } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
 import { DiscordIcon, GithubIcon } from '@platform/ui/VendoredIcon';
+import { useQueryClient } from '@tanstack/react-query';
 import { BookOpenTextIcon, ChevronRightIcon, ClapperboardIcon, CircleQuestionMarkIcon } from 'lucide-react';
+import { useCallback, useState, type ComponentType, type ElementType } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const MENU_POSITIONING = { placement: 'right-end' } as const;
 const GROUP_LABEL_PROPS = { color: 'fg.subtle', fontSize: 'xs', textTransform: 'uppercase' } as const;
 const TRIGGER_JUSTIFY = { justifyContent: 'space-between' } as const;
+// Loaded on trigger hover or focus, so neither the chunk nor its request is part of route startup.
+const loadDonationMenuItem = () => import('@workbench/shell/DonationMenuItem');
 
 interface HelpLink {
   href: string;
@@ -65,11 +67,41 @@ const HelpMenuLink = ({ href, icon, labelKey, value }: HelpLink) => {
 
 export const HelpMenu = () => {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  // Rendered only once loaded: a lazy() boundary would suspend on open and React delays its reveal, shifting rows.
+  // A chunk that fails to load (e.g. after an upgrade) leaves the optional link absent.
+  const [DonationMenuItem, setDonationMenuItem] = useState<ComponentType | null>(null);
+  const preloadDonationMenuItem = useCallback(() => {
+    void loadDonationMenuItem().then(
+      (module) => {
+        setDonationMenuItem(() => module.DonationMenuItem);
+        return module.prefetchDonationMenuItem(queryClient);
+      },
+      () => undefined
+    );
+  }, [queryClient]);
+  // Assistive technology can activate the trigger with a bare click, without hovering or focusing it first.
+  const handleOpenChange = useCallback(
+    ({ open }: { open: boolean }) => {
+      if (open) {
+        preloadDonationMenuItem();
+      }
+    },
+    [preloadDonationMenuItem]
+  );
 
   return (
-    <Menu.Root positioning={MENU_POSITIONING}>
+    <Menu.Root lazyMount positioning={MENU_POSITIONING} onOpenChange={handleOpenChange}>
       <Menu.Trigger asChild>
-        <Button aria-label={t('launchpad.help.label')} color="fg.muted" css={TRIGGER_JUSTIFY} variant="ghost" w="full">
+        <Button
+          aria-label={t('launchpad.help.label')}
+          color="fg.muted"
+          css={TRIGGER_JUSTIFY}
+          variant="ghost"
+          w="full"
+          onFocus={preloadDonationMenuItem}
+          onPointerEnter={preloadDonationMenuItem}
+        >
           <Icon as={CircleQuestionMarkIcon} boxSize="3.5" />
           <Text flex="1" textAlign="start" truncate>
             {t('launchpad.help.label')}
@@ -92,6 +124,7 @@ export const HelpMenu = () => {
               {COMMUNITY.map((link) => (
                 <HelpMenuLink key={link.value} {...link} />
               ))}
+              {DonationMenuItem ? <DonationMenuItem /> : null}
             </Menu.ItemGroup>
             <Menu.Separator />
             <HStack justify="space-between" px="3" py="1.5">

@@ -80,6 +80,16 @@ You can use any config file with the `--config` CLI arg. Pass in the path to the
 
 Note that environment variables will trump any settings in the config file.
 
+#### Donation Links
+
+The **Help & resources** and app menus show a heart icon labeled **Donate to InvokeAI**, which opens [GitHub Sponsors](https://github.com/sponsors/invoke-ai) in a new tab. Hosted deployments can hide both entries by adding this setting to `invokeai.yaml`:
+
+```yaml
+show_donation_link: false
+```
+
+The default is `true`. Restart InvokeAI and reload the browser after changing this setting. It can also be set with the `INVOKEAI_SHOW_DONATION_LINK` environment variable.
+
 #### Model Marketplace API Keys
 
 Some model marketplaces require an API key to download models. You can provide a URL pattern and appropriate token in your `invokeai.yaml` file to provide that API key.
