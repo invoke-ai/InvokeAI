@@ -848,6 +848,8 @@ export interface AutoDurationBounds {
   contextFrames: number;
   /** The longest total the head can hand the run, context included, at `fps`. */
   maxFrames: number;
+  /** The most new material that total holds: `maxFrames` less the context. */
+  maxNewFrames: number;
   /** The rate the seconds are read at; a continuation's is the source's. */
   fps: number;
 }
@@ -878,7 +880,7 @@ export const getAutoDurationBounds = (
   }
   const timing = getEffectiveVideoTiming(model, settings);
   const source = resolveVideoMode(settings) === 'extend' ? settings.sourceVideo : null;
-  const fps = source?.fps ?? timing.fps;
+  const fps = source ? source.fps : timing.fps;
   const contextFrames = source ? settings.ltx2ExtendContextFrames : 0;
   // Both 8k + 1, so their difference plus one is too: the longest prediction that still fits.
   const bounds = ltx2AutoDurationBounds(fps, frames.min, timing.numFrames - Math.max(0, contextFrames - 1));
@@ -893,6 +895,7 @@ export const getAutoDurationBounds = (
     contextFrames,
     fps,
     maxFrames: contextFrames ? contextFrames + predicted - 1 : predicted,
+    maxNewFrames: contextFrames ? predicted - 1 : predicted,
   };
 };
 

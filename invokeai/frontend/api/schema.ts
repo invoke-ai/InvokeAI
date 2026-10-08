@@ -25089,7 +25089,9 @@ export type components = {
          *     The duration head reads the same connector outputs the transformer's prompt cross-attention
          *     consumes, so it judges the prompt the model will actually see rather than its raw text. The
          *     prediction is clamped to `min_seconds`/`max_seconds` and then snapped down onto the VAE's
-         *     causal temporal grid (`8k + 1`), which is the only frame count a generation can run at.
+         *     causal temporal grid (`8k + 1`), which is the only frame count a generation can run at. The
+         *     total is then capped at `max_num_frames` (by default LTX-2's longest clip), which can be
+         *     shorter than `max_seconds` at a high frame rate.
          *
          *     For an extension, the prompt describes the continuation rather than the frames it opens with,
          *     so the prediction sizes the new material and `context_frames` is added in front of it.
@@ -25152,10 +25154,10 @@ export type components = {
             context_frames?: number;
             /**
              * Max Num Frames
-             * @description Longest total frame count the run was sized for. The result never exceeds it, whatever frame rate the seconds bounds turn out to be read at.
-             * @default null
+             * @description Longest total frame count, context included, the run was sized for. The result is capped at it, so it holds at whatever `fps` the run turns out to have.
+             * @default 481
              */
-            max_num_frames?: number | null;
+            max_num_frames?: number;
             /**
              * type
              * @default ltx2_duration

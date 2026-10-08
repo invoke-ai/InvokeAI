@@ -778,8 +778,8 @@ const buildLtx2VideoGraph = (settings: VideoSettings, model: MainModelConfig): B
   // own edge further down, and a second edge into one input is a malformed graph rather than a
   // fallback. An extension's prompt sizes the continuation; its rate and held context arrive over
   // edges once the join is laid out. The head chooses at most the Frames value, which under auto
-  // duration is the ceiling the run's memory was sized for -- passed in frames as well, because a
-  // continuation's seconds are read at a rate only the run knows.
+  // duration is the ceiling the run's memory was sized for. It goes in frames only: the node turns it
+  // into seconds at the rate it actually runs at, which for a continuation only the run knows.
   const durationBounds = getAutoDurationBounds(model, settings);
   const durationHead =
     durationBounds && settings.ltx2DurationHeadModel
@@ -789,7 +789,6 @@ const buildLtx2VideoGraph = (settings: VideoSettings, model: MainModelConfig): B
           id: 'duration',
           type: 'ltx2_duration',
           max_num_frames: timing.numFrames,
-          max_seconds: durationBounds.maxSeconds,
           min_seconds: durationBounds.minSeconds,
         })
       : null;

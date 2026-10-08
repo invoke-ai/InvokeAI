@@ -12,7 +12,12 @@ from invokeai.app.invocations.baseinvocation import (
 from invokeai.app.invocations.fields import Input, InputField, LTX2ConditioningField, OutputField
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.ltx2.constants import LTX2_DEFAULT_FPS, LTX2_FRAME_MODULUS, LTX2_TEMPORAL_COMPRESSION
+from invokeai.backend.ltx2.constants import (
+    LTX2_DEFAULT_FPS,
+    LTX2_FRAME_MODULUS,
+    LTX2_NUM_FRAMES_MAX,
+    LTX2_TEMPORAL_COMPRESSION,
+)
 from invokeai.backend.ltx2.packing import snap_num_frames_down
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 
@@ -49,7 +54,9 @@ class LTX2DurationInvocation(BaseInvocation):
     The duration head reads the same connector outputs the transformer's prompt cross-attention
     consumes, so it judges the prompt the model will actually see rather than its raw text. The
     prediction is clamped to `min_seconds`/`max_seconds` and then snapped down onto the VAE's
-    causal temporal grid (`8k + 1`), which is the only frame count a generation can run at.
+    causal temporal grid (`8k + 1`), which is the only frame count a generation can run at. The
+    total is then capped at `max_num_frames` (by default LTX-2's longest clip), which can be
+    shorter than `max_seconds` at a high frame rate.
 
     For an extension, the prompt describes the continuation rather than the frames it opens with,
     so the prediction sizes the new material and `context_frames` is added in front of it.
@@ -93,11 +100,12 @@ class LTX2DurationInvocation(BaseInvocation):
         description="Source frames the run opens with, as an extension's `context_frames`. The prediction "
         "covers what follows them, so they are added to it. 0 when nothing is held.",
     )
-    max_num_frames: int | None = InputField(
-        default=None,
+    max_num_frames: int = InputField(
+        default=LTX2_NUM_FRAMES_MAX,
         ge=1,
-        description="Longest total frame count the run was sized for. The result never exceeds it, whatever "
-        "frame rate the seconds bounds turn out to be read at.",
+        le=LTX2_NUM_FRAMES_MAX,
+        description="Longest total frame count, context included, the run was sized for. The result is "
+        "capped at it, so it holds at whatever `fps` the run turns out to have.",
     )
 
     @torch.no_grad()
@@ -113,8 +121,8 @@ class LTX2DurationInvocation(BaseInvocation):
         # would put the sum below off the grid.
         if self.context_frames and (self.context_frames - 1) % LTX2_FRAME_MODULUS:
             raise ValueError(f"context_frames ({self.context_frames}) must be 0 or on the 8k+1 grid.")
-        ceiling = snap_num_frames_down(self.max_num_frames) if self.max_num_frames is not None else None
-        if ceiling is not None and self.context_frames and ceiling <= self.context_frames:
+        ceiling = snap_num_frames_down(self.max_num_frames)
+        if self.context_frames and ceiling <= self.context_frames:
             raise ValueError(
                 f"max_num_frames ({self.max_num_frames}) leaves no room after {self.context_frames} context frames."
             )
@@ -150,8 +158,10 @@ class LTX2DurationInvocation(BaseInvocation):
             # that is itself 8k + 1, so the total stays on the grid. At least one group, or the
             # continuation would be all replay.
             num_frames = self.context_frames + max(num_frames - 1, LTX2_FRAME_MODULUS)
-        if ceiling is not None:
-            num_frames = min(num_frames, ceiling)
+        # The ceiling is in frames because only this node knows the rate the run plays at: seconds
+        # sized by a caller at a guessed rate would stop short of it or overrun it. Both sides are on
+        # the grid, so capping here is exactly the longest prediction that fits.
+        num_frames = min(num_frames, ceiling)
 
         context.logger.info(
             f"LTX-2 duration: predicted {seconds:.2f}s -> {num_frames} frames at {self.fps} fps"

@@ -2585,9 +2585,32 @@ describe('auto duration', () => {
       contextFrames: 25,
       fps: 30,
       maxFrames: 121,
+      maxNewFrames: 96,
       maxSeconds: 97 / 30,
       minSeconds: 1,
     });
+  });
+
+  it('holds a continuation inside the trained range of the head, below the Frames ceiling', () => {
+    const extending = settings({
+      ltx2ExtendContextFrames: 17,
+      numFrames: 481,
+      sourceVideo: {
+        endFrame: 48,
+        fps: 20,
+        height: 704,
+        numFrames: 49,
+        startFrame: 0,
+        video_name: 's.mp4',
+        width: 1248,
+      },
+    } as Partial<VideoSettings>);
+    const bounds = getAutoDurationBounds(ltx2('ltx2_dev'), extending);
+
+    // 465 frames of room is 23 s at 20 fps; the head stops at 20 s, i.e. 393 frames on the grid.
+    expect(bounds?.maxSeconds).toBe(20);
+    expect(bounds?.maxNewFrames).toBe(392);
+    expect(bounds?.maxFrames).toBe(17 + 392);
   });
 
   it('is inactive without a head, however the flag is stored', () => {

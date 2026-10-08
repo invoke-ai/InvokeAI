@@ -160,9 +160,7 @@ export const VideoWidgetView = () => {
     [autoDurationBounds]
   );
   const autoDurationSupported = useMemo(() => isAutoDurationSupportedForMode(values), [values]);
-  const extendNewFrames = autoDurationBounds
-    ? autoDurationBounds.maxFrames - autoDurationBounds.contextFrames
-    : (policy.ui.extendContext?.newFrames ?? 0);
+  const extendNewFrames = autoDurationBounds?.maxNewFrames ?? policy.ui.extendContext?.newFrames ?? 0;
   const durationSeconds = getVideoDurationSeconds(
     timing.numFrames,
     // In extend mode the extension inherits the SOURCE clip's frame rate.

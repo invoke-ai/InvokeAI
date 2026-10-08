@@ -1437,9 +1437,10 @@ describe('compileVideoGraph — LTX-2 auto duration', () => {
     expect(hasEdge(backendGraph, extend.id, 'context_frames', duration.id, 'context_frames')).toBe(true);
     expect(rateSource).toBeDefined();
     expect(hasEdge(backendGraph, rateSource!.node_id, rateSource!.field, duration.id, 'fps')).toBe(true);
-    // 17 context frames leave 121 - 16 = 105 for the prediction, read at the source's 30 fps.
-    expect(duration.max_seconds).toBe(105 / 30);
+    // The ceiling goes in frames alone: the node converts it at the rate it receives, so a seconds
+    // bound sized here at the gallery's reading of that rate would override it.
     expect(duration.max_num_frames).toBe(121);
+    expect(duration.max_seconds).toBeUndefined();
     expect(
       backendGraph.edges.filter(
         (edge) => edge.destination.node_id === denoise.id && edge.destination.field === 'num_frames'
@@ -1471,8 +1472,37 @@ describe('compileVideoGraph — LTX-2 auto duration', () => {
 
     // Frames is the ceiling the run's memory was sized for; the head reads seconds at the run's rate.
     expect(duration.fps).toBe(60);
-    expect(duration.max_seconds).toBe(241 / 60);
+    expect(duration.max_num_frames).toBe(241);
     expect(duration.min_seconds).toBe(1);
+  });
+
+  it('runs both passes of a two-stage continuation at the length it chose, at the source rate', () => {
+    const model = ltx2Model('ltx2_dev');
+    const settings = autoSettings(model, { sourceVideo: LTX2_SOURCE_CLIP, targetResolution: '1024p' });
+    const { backendGraph } = compileVideoGraph(settings, model);
+    const duration = nodeOfType(backendGraph, 'ltx2_duration');
+    const denoises = nodesOfType(backendGraph, 'ltx2_denoise');
+    const rateSource = backendGraph.edges.find(
+      (edge) => edge.destination.node_id === duration.id && edge.destination.field === 'fps'
+    )?.source;
+
+    expect(denoises).toHaveLength(2);
+    expect(rateSource).toBeDefined();
+    for (const denoise of denoises) {
+      expect(hasEdge(backendGraph, duration.id, 'num_frames', denoise.id, 'num_frames'), denoise.id).toBe(true);
+      // Each pass plays at the rate the head converted at, or the chosen length means another duration.
+      expect(hasEdge(backendGraph, rateSource!.node_id, rateSource!.field, denoise.id, 'fps'), denoise.id).toBe(true);
+    }
+  });
+
+  it('skips the head when the context of a continuation leaves it no range to choose from', () => {
+    const model = ltx2Model('ltx2_dev');
+    // 17 held frames leave 33 - 16 = 17 for the prediction, 0.7 s at 24 fps: under the head's 1 s floor.
+    const settings = autoSettings(model, { numFrames: 33, sourceVideo: LTX2_SOURCE_CLIP });
+    const { backendGraph } = compileVideoGraph(settings, model);
+
+    expect(nodesOfType(backendGraph, 'ltx2_duration')).toHaveLength(0);
+    expect(nodeOfType(backendGraph, 'ltx2_denoise').num_frames).toBe(33);
   });
 
   it('skips the head when the Frames ceiling leaves it no range to choose from', () => {
