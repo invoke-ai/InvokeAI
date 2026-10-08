@@ -195,8 +195,18 @@ export const updateProject = (
   );
 };
 
-export const deleteProject = async (projectId: string, signal?: AbortSignal): Promise<void> => {
-  await apiFetch(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}`, { method: 'DELETE', signal });
+/** What becomes of a deleted project's boards other than its inbox, which always goes with the project. */
+export type DeleteProjectBoards = 'delete' | 'release';
+
+/** Media is never deleted: released boards keep theirs in the Library, deleted boards' returns to Uncategorized. */
+export const deleteProject = async (
+  projectId: string,
+  signal?: AbortSignal,
+  boards: DeleteProjectBoards = 'release'
+): Promise<void> => {
+  const query = boards === 'release' ? '' : '?boards=delete';
+
+  await apiFetch(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}${query}`, { method: 'DELETE', signal });
 };
 
 /** Includes unreferenced visible board media; excludes intermediate/other categories. */

@@ -1,4 +1,5 @@
 import type { GalleryItem } from '@features/gallery/core/items';
+import type { GalleryProjectRef } from '@features/gallery/core/types';
 import type { GalleryItemsFilter } from '@features/gallery/data/queries';
 import type { TFunction } from 'i18next';
 
@@ -94,6 +95,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     generateValues,
     projectId,
     projectName,
+    projects,
     ItemActionsProvider,
   } = useGalleryUi();
   const galleryView = getGalleryView(galleryValues);
@@ -230,7 +232,9 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
         isWindowTruncated={data.isWindowTruncated}
         listing={data.listing}
         loadedItems={loadedItems}
+        projectId={projectId}
         projectName={projectName}
+        projects={projects}
         region={region}
         runtime={runtime}
         starredStrip={starredStrip}
@@ -277,7 +281,9 @@ const GalleryWidgetContent = ({
   isWindowTruncated,
   listing,
   loadedItems,
+  projectId,
   projectName,
+  projects,
   region,
   runtime,
   starredStrip,
@@ -289,13 +295,16 @@ const GalleryWidgetContent = ({
   isWindowTruncated: boolean;
   listing: GalleryListingState;
   loadedItems: GalleryItem[];
+  projectId: string;
   projectName: string;
+  projects: readonly GalleryProjectRef[];
   region: GalleryWidgetProps['region'];
   runtime: GalleryWidgetRuntime;
   starredStrip: GalleryStarredStrip;
 }) => {
   const { t } = useTranslation();
   const itemActions = useGalleryItemActions();
+  const projectNames = useMemo(() => new Map(projects.map((project) => [project.id, project.name])), [projects]);
   const contextValue = useMemo<GalleryWidgetContextValue>(
     () => ({
       actions,
@@ -306,7 +315,9 @@ const GalleryWidgetContent = ({
       itemActions,
       listing,
       loadedItems,
+      projectId,
       projectName,
+      projectNames,
       region,
       runtime,
       starredStrip,
@@ -320,7 +331,9 @@ const GalleryWidgetContent = ({
       itemActions,
       listing,
       loadedItems,
+      projectId,
       projectName,
+      projectNames,
       region,
       runtime,
       starredStrip,

@@ -1,4 +1,5 @@
 import type { Project } from '@workbench/projectContracts';
+import type { DeleteProjectBoards } from '@workbench/projects/api';
 import type { ProjectSummary } from '@workbench/projects/library';
 import type { MouseEvent } from 'react';
 
@@ -8,7 +9,6 @@ import { useModelLoads } from '@features/models';
 import { getProjectQueueIndicatorState } from '@features/queue/contracts';
 import { useQueueItemProgress } from '@features/queue/react';
 import { Button } from '@platform/ui/Button';
-import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { MenuContent } from '@platform/ui/Menu';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { RenameDialog } from '@platform/ui/RenameDialog';
@@ -37,11 +37,19 @@ import {
   Trash2Icon,
   XIcon,
 } from 'lucide-react';
-import { useCallback, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { projectSwitcherStore, setProjectSwitcherOpen } from './projectSwitcherStore';
 import { HIDE_BELOW_PROJECT_NAME_WIDTH } from './topbarBreakpoints';
+
+// The dialog reads the gallery's board query, and this host sits in a boot graph the performance gates pin by source
+// file, so even a shared three-line wrapper module would register as growth. Loaded the first time a delete is asked for.
+const LazyDeleteProjectDialog = lazy(() =>
+  import('@workbench/projects/components/DeleteProjectDialog').then((module) => ({
+    default: module.DeleteProjectDialog,
+  }))
+);
 
 const MENU_POSITIONING = { placement: 'bottom-start' } as const;
 const RECENT_PROJECT_LIMIT = 5;
@@ -63,6 +71,8 @@ export const ProjectSwitcher = () => {
   const returnFocus = useCallback(() => triggerRef.current, []);
   const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  // Once mounted the dialog stays, so its close animation and the lazy chunk are paid for once.
+  const [hasRequestedDelete, setHasRequestedDelete] = useState(false);
   const [isOpenDialogVisible, setIsOpenDialogVisible] = useState(false);
 
   const isMenuOpen = projectSwitcherStore.useSelector((snapshot) => snapshot.isOpen);
@@ -114,21 +124,24 @@ export const ProjectSwitcher = () => {
     },
     [renameTarget, t]
   );
-  const confirmDeleteProject = useCallback(async () => {
-    const project = deleteTarget ? getProject(deleteTarget.id) : null;
+  const confirmDeleteProject = useCallback(
+    async (boards: DeleteProjectBoards) => {
+      const project = deleteTarget ? getProject(deleteTarget.id) : null;
 
-    if (project) {
-      await deleteProject(project);
-    }
-  }, [deleteProject, deleteTarget, getProject]);
+      if (project) {
+        await deleteProject(project, boards);
+      }
+    },
+    [deleteProject, deleteTarget, getProject]
+  );
   const renameActiveProject = useCallback(
     () => setRenameTarget({ id: activeProjectId, name: activeProjectName }),
     [activeProjectId, activeProjectName]
   );
-  const deleteActiveProject = useCallback(
-    () => setDeleteTarget({ id: activeProjectId, name: activeProjectName }),
-    [activeProjectId, activeProjectName]
-  );
+  const deleteActiveProject = useCallback(() => {
+    setHasRequestedDelete(true);
+    setDeleteTarget({ id: activeProjectId, name: activeProjectName });
+  }, [activeProjectId, activeProjectName]);
   const showActiveProjectDetails = useCallback(() => openWorkbenchWidget('project'), [openWorkbenchWidget]);
   const exportActiveProject = useCallback(() => {
     flushGenerateDrafts();
@@ -266,14 +279,17 @@ export const ProjectSwitcher = () => {
         onClose={closeRenameDialog}
         onSubmit={renameProject}
       />
-      <ConfirmDialog
-        body={`${t('projects.deleteProjectTabBody', { name: deleteTarget?.name ?? '' })} ${t('projects.deleteProjectBoardNote')}`}
-        confirmLabel={t('projects.deleteProject')}
-        isOpen={deleteTarget !== null}
-        title={t('projects.deleteProjectQuestion')}
-        onClose={closeDeleteDialog}
-        onConfirm={confirmDeleteProject}
-      />
+      {hasRequestedDelete ? (
+        <Suspense fallback={null}>
+          <LazyDeleteProjectDialog
+            body={t('projects.deleteProjectTabBody', { name: deleteTarget?.name ?? '' })}
+            isOpen={deleteTarget !== null}
+            projectId={deleteTarget?.id ?? null}
+            onClose={closeDeleteDialog}
+            onConfirm={confirmDeleteProject}
+          />
+        </Suspense>
+      ) : null}
       {/*
        * Keep the dialog mounted by open state; its lazyMount/unmountOnExit handle closed cost and preserve exit
        * animation.

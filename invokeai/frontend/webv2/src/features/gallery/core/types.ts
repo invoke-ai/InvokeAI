@@ -35,6 +35,12 @@ export interface GeneratedVideoContract {
 
 export type GalleryView = 'images' | 'assets';
 
+/** What the gallery needs to know about a project to group its boards: the id boards carry, and a name. */
+export interface GalleryProjectRef {
+  id: string;
+  name: string;
+}
+
 export type GalleryOrderDir = 'ASC' | 'DESC';
 
 export type GalleryBoardOrderBy = 'created_at' | 'board_name';

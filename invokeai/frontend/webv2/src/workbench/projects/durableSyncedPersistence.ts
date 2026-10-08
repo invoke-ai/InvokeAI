@@ -18,7 +18,13 @@ import {
   withAuthoritativeProjectBoard,
 } from '@workbench/workbenchState';
 
-import type { ProjectCreateRequest, ProjectRecordDTO, ProjectSummaryDTO, ProjectUpdateRequest } from './api';
+import type {
+  DeleteProjectBoards,
+  ProjectCreateRequest,
+  ProjectRecordDTO,
+  ProjectSummaryDTO,
+  ProjectUpdateRequest,
+} from './api';
 import type {
   ProjectDraft,
   ProjectDraftCopyReservation,
@@ -229,7 +235,7 @@ export interface DurableHydratedWorkbenchSnapshot extends HydratedWorkbenchSnaps
 
 export interface DurableProjectPersistenceApi {
   createProject(request: ProjectCreateRequest, owner: AccountScope): Promise<ProjectRecordDTO>;
-  deleteProject(projectId: string, signal?: AbortSignal): Promise<void>;
+  deleteProject(projectId: string, signal?: AbortSignal, boards?: DeleteProjectBoards): Promise<void>;
   deleteSession(signal?: AbortSignal): Promise<void>;
   getProject(projectId: string, signal?: AbortSignal): Promise<ProjectRecordDTO>;
   listProjects(signal?: AbortSignal): Promise<ProjectSummaryDTO[]>;
@@ -392,7 +398,7 @@ export interface DurableSyncedWorkbenchPersistence {
     generation: number,
     updatedAt: number
   ): Promise<void>;
-  deleteProjectOnServer(projectId: string): Promise<void>;
+  deleteProjectOnServer(projectId: string, boards?: DeleteProjectBoards): Promise<void>;
   ensureProjectOnServer(project: Project): Promise<void>;
   flushProjectToServer(project: Project): Promise<ProjectPushOutcome>;
   getProjectDraftDocument(projectId: string): Promise<string | null>;
@@ -1983,7 +1989,7 @@ export const createDurableSyncedWorkbenchPersistence = (
         unopenableDrafts.delete(`${projectId}\u0000${editorSessionId}`);
         reportSync(lastKnownState?.projects ?? []);
       }),
-    deleteProjectOnServer: (projectId) =>
+    deleteProjectOnServer: (projectId, boards = 'release') =>
       enqueue(async () => {
         const resolvedProjectId = resolveProjectId(projectId);
         const hadDeleteFence = deletedProjectIds.has(resolvedProjectId);
@@ -2002,7 +2008,7 @@ export const createDurableSyncedWorkbenchPersistence = (
             throw new Error('This tab no longer owns the local project draft.');
           }
           try {
-            await api.deleteProject(resolvedProjectId, owner.signal);
+            await api.deleteProject(resolvedProjectId, owner.signal, boards);
           } catch (error) {
             if (!isStatus(error, 404)) {
               throw error;

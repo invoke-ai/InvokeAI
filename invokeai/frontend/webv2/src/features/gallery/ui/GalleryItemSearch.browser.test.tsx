@@ -79,6 +79,7 @@ const adapter: GalleryUiAdapter = {
   notifications: { add: notificationsAdd, reportError: noop },
   projectId: 'project-1',
   projectName: 'Project',
+  projects: [],
   widgets: { openGallery: () => true, patchGalleryValues: noop },
 };
 

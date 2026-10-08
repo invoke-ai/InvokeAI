@@ -5,10 +5,13 @@ import { GALLERY_AUTO_ADD_FOLLOW } from '@features/gallery/core/settings';
 import { Button } from '@platform/ui/Button';
 import { Dialog } from '@platform/ui/Dialog';
 import { MenuContent } from '@platform/ui/Menu';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import {
   ArchiveIcon,
+  ChevronRightIcon,
   DownloadIcon,
   FileDownIcon,
+  FolderInputIcon,
   PencilIcon,
   SquareArrowDownIcon,
   Trash2Icon,
@@ -153,6 +156,7 @@ export const GalleryBoardMenu = ({
                 {isManagedBoard && (
                   <>
                     <BoardRenameMenuItem board={board} onRename={setRenameTarget} onRenameValue={setRenameValue} />
+                    <BoardMoveSubMenu board={board} />
                     <BoardArchiveMenuItem archived={board.archived} boardId={board.id} />
                     <Menu.Separator />
                     <BoardDeleteMenuItem board={board} onDelete={setDeleteTarget} />
@@ -259,6 +263,85 @@ const BoardExportProjectMenuItem = ({ board }: { board: GalleryBoard }) => {
       value="export-project"
       onClick={handleClick}
     />
+  );
+};
+
+const SUBMENU_POSITIONING = { gutter: 2, placement: 'right-start' } as const;
+
+/**
+ * Where a board can go: the Library, the open project, then the account's other projects by name — every tier
+ * but the one it is in. Nested so the board menu keeps its one-level shape for the common actions.
+ */
+const BoardMoveSubMenu = ({ board }: { board: GalleryBoard }) => {
+  const { t } = useTranslation();
+  const { actions, projectId, projectName, projectNames } = useGalleryWidget();
+  const destinations = useMemo(() => {
+    const others = [...projectNames]
+      .filter(([id]) => id !== projectId && id !== board.projectId)
+      .map(([id, name]) => ({ id, label: name }))
+      .sort((left, right) => left.label.localeCompare(right.label));
+
+    return [
+      ...(board.projectId !== null ? [{ id: null, label: t('widgets.gallery.boardGroups.library') }] : []),
+      ...(board.projectId !== projectId ? [{ id: projectId, label: projectName }] : []),
+      ...others,
+    ];
+  }, [board.projectId, projectId, projectName, projectNames, t]);
+
+  if (destinations.length === 0) {
+    return null;
+  }
+
+  return (
+    <Menu.Root positioning={SUBMENU_POSITIONING}>
+      <Menu.TriggerItem>
+        <HStack gap="2" minW="0" w="full">
+          <Icon as={FolderInputIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
+          <Text flex="1" fontSize="md">
+            {t('widgets.gallery.moveBoard')}
+          </Text>
+          <Icon as={ChevronRightIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
+        </HStack>
+      </Menu.TriggerItem>
+      <Portal>
+        <Menu.Positioner>
+          <MenuContent maxH="18rem" minW="12rem" overflowY="auto">
+            {destinations.map((destination) => (
+              <BoardMoveMenuItem
+                key={destination.id ?? 'library'}
+                boardId={board.id}
+                destinationId={destination.id}
+                label={destination.label}
+                onMove={actions.moveBoard}
+              />
+            ))}
+          </MenuContent>
+        </Menu.Positioner>
+      </Portal>
+    </Menu.Root>
+  );
+};
+
+const BoardMoveMenuItem = ({
+  boardId,
+  destinationId,
+  label,
+  onMove,
+}: {
+  boardId: string;
+  destinationId: string | null;
+  label: string;
+  onMove: (boardId: string, projectId: string | null, destinationLabel: string) => Promise<void>;
+}) => {
+  const handleClick = useCallback(
+    () => void onMove(boardId, destinationId, label),
+    [boardId, destinationId, label, onMove]
+  );
+
+  return (
+    <Menu.Item value={`move-board-to-${destinationId ?? 'library'}`} onClick={handleClick}>
+      <MiddleTruncate fontSize="md" minW="0" text={label} />
+    </Menu.Item>
   );
 };
 

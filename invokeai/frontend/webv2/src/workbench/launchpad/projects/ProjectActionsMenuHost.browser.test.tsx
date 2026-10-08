@@ -3,19 +3,40 @@ import type { MouseEvent } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { IconButton } from '@platform/ui/Button';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act, useCallback, useMemo } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
+const deleteSpy = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+
 vi.mock('./useProjectCardActions', () => ({
   useProjectCardActions: () => ({
-    delete: () => Promise.resolve(),
+    delete: deleteSpy,
     duplicate: () => {},
     export: () => {},
     rename: () => Promise.resolve(),
   }),
+}));
+
+// The host owns the lazy mount and the threading of the user's choice; the dialog's own behaviour has its own test.
+vi.mock('@workbench/projects/components/DeleteProjectDialog', () => ({
+  DeleteProjectDialog: ({
+    isOpen,
+    projectId,
+    onConfirm,
+  }: {
+    isOpen: boolean;
+    projectId: string | null;
+    onConfirm: (boards: 'delete' | 'release') => void;
+  }) =>
+    isOpen ? (
+      <button data-testid="confirm-delete" onClick={() => onConfirm('delete')}>
+        delete {projectId}
+      </button>
+    ) : null,
 }));
 
 vi.mock('react-i18next', () => ({
@@ -38,6 +59,9 @@ const { ProjectActionsMenuProvider, useProjectActionsMenu, useProjectActionsMenu
   await import('./ProjectActionsMenuHost');
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+// The delete dialog reads the board list to say what happens to the project's boards.
+const queryClient = new QueryClient();
 
 const makeSummary = (id: string): ProjectSummary =>
   ({
@@ -131,9 +155,11 @@ describe('ProjectActionsMenuHost', () => {
     await act(() =>
       root?.render(
         <ChakraProvider value={system}>
-          <ProjectActionsMenuProvider>
-            <Card id="one" />
-          </ProjectActionsMenuProvider>
+          <QueryClientProvider client={queryClient}>
+            <ProjectActionsMenuProvider>
+              <Card id="one" />
+            </ProjectActionsMenuProvider>
+          </QueryClientProvider>
         </ChakraProvider>
       )
     );
@@ -146,6 +172,35 @@ describe('ProjectActionsMenuHost', () => {
     });
   });
 
+  it('mounts the delete dialog on first request and threads the chosen board mode to the action', async () => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(() =>
+      root?.render(
+        <ChakraProvider value={system}>
+          <QueryClientProvider client={queryClient}>
+            <ProjectActionsMenuProvider>
+              <Card id="one" />
+            </ProjectActionsMenuProvider>
+          </QueryClientProvider>
+        </ChakraProvider>
+      )
+    );
+    expect(document.querySelector('[data-testid="confirm-delete"]')).toBeNull();
+
+    await act(() => userEvent.click(dotsButton('one')));
+    const item = document.querySelector<HTMLElement>('[role="menuitem"][data-value="delete"]')!;
+    await act(() => userEvent.click(item));
+
+    await vi.waitFor(() => {
+      expect(document.querySelector('[data-testid="confirm-delete"]')?.textContent).toBe('delete one');
+    });
+    await act(() => userEvent.click(document.querySelector<HTMLElement>('[data-testid="confirm-delete"]')!));
+
+    expect(deleteSpy).toHaveBeenCalledExactlyOnceWith('delete');
+  });
+
   it('opens the Preferences intermediates section focused on the project', async () => {
     const { peekIntermediatesFocus } = await import('@features/intermediates/data/focus');
     host = document.createElement('div');
@@ -154,9 +209,11 @@ describe('ProjectActionsMenuHost', () => {
     await act(() =>
       root?.render(
         <ChakraProvider value={system}>
-          <ProjectActionsMenuProvider>
-            <Card id="one" />
-          </ProjectActionsMenuProvider>
+          <QueryClientProvider client={queryClient}>
+            <ProjectActionsMenuProvider>
+              <Card id="one" />
+            </ProjectActionsMenuProvider>
+          </QueryClientProvider>
         </ChakraProvider>
       )
     );
@@ -184,10 +241,12 @@ describe('ProjectActionsMenuHost', () => {
     await act(async () => {
       root?.render(
         <ChakraProvider value={system}>
-          <ProjectActionsMenuProvider>
-            <Card id="one" />
-            <Card id="two" />
-          </ProjectActionsMenuProvider>
+          <QueryClientProvider client={queryClient}>
+            <ProjectActionsMenuProvider>
+              <Card id="one" />
+              <Card id="two" />
+            </ProjectActionsMenuProvider>
+          </QueryClientProvider>
         </ChakraProvider>
       );
       await new Promise<void>((resolve) => {

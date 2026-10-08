@@ -268,7 +268,7 @@ export const projectBoardId = (index) => `fixture-project-board-${ordinal(index,
 
 export const PROJECT_FILE_BOARD_ID = projectBoardId(1);
 
-const buildBoard = (boardId, boardName, images, videos, createdAt) => {
+const buildBoard = (boardId, boardName, images, videos, createdAt, projectId = null) => {
   const boardImages = images.filter((image) => image.board_id === boardId);
   const boardVideos = videos.filter((video) => video.board_id === boardId);
   const cover = [
@@ -303,10 +303,15 @@ const buildBoard = (boardId, boardName, images, videos, createdAt) => {
     created_at: createdAt,
     image_count: boardImages.filter((image) => image.image_category === 'general').length,
     owner_username: null,
+    // Membership, as the backend stores it: an inbox belongs to its project, a Library board to none.
+    project_id: projectId,
     user_id: FIXTURE_USER_ID,
     video_count: boardVideos.length,
   };
 };
+
+/** The project ids `createProjects` assigns, so boards can belong to them without the documents in hand. */
+export const fixtureProjectId = (index) => `fixture-project-${ordinal(index, 3)}`;
 
 const createBoards = (images, videos, projectCount) => [
   ...range(10, (index) =>
@@ -319,7 +324,25 @@ const createBoards = (images, videos, projectCount) => [
     )
   ),
   ...range(projectCount, (index) =>
-    buildBoard(projectBoardId(index), `Fixture Project ${ordinal(index, 3)}`, images, videos, timestampAt(index))
+    buildBoard(
+      projectBoardId(index),
+      `Fixture Project ${ordinal(index, 3)}`,
+      images,
+      videos,
+      timestampAt(index),
+      fixtureProjectId(index)
+    )
+  ),
+  // The first two projects also hold ordinary boards, so a project section has more than its inbox to show.
+  ...range(Math.min(projectCount, 2), (index) =>
+    buildBoard(
+      `fixture-member-board-${ordinal(index, 2)}`,
+      index === 0 ? 'Façade variants' : 'Site plan refs',
+      images,
+      videos,
+      timestampAt(index + 100),
+      fixtureProjectId(index)
+    )
   ),
 ];
 
@@ -609,7 +632,7 @@ const createWorkflowDocument = ({ description, graphId, index, name, workflowNod
  * `projectGraph`, which the project-file journey loads, exports and imports through the migration boundary.
  */
 const createProjectDocument = ({ index, layers = [], workflowNodes = [] }) => {
-  const id = `fixture-project-${ordinal(index, 3)}`;
+  const id = fixtureProjectId(index);
   const graphId = `${id}-graph`;
   const primaryWorkflow = createWorkflowDocument({
     description: index === 0 ? 'Representative 100-node workflow.' : '',

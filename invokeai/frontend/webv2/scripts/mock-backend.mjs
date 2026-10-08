@@ -524,8 +524,8 @@ const listVideos = (state, url) => {
   };
 };
 
-/** The project that owns this board, if any. Derived, exactly as the backend derives it. */
-const projectIdForBoard = (state, boardId) =>
+/** The project this board is the inbox of, if any. Derived from `projects.board_id`, as the backend derives it. */
+const inboxProjectIdForBoard = (state, boardId) =>
   [...state.projects.values()].find((project) => project.board_id === boardId)?.project_id ?? null;
 
 /** Match /board-snapshot visibility and ordering: exclude intermediate/other items, sort by kind then name. */
@@ -585,7 +585,7 @@ const boardDto = (state, board) => {
       right.name.localeCompare(left.name)
   )[0];
 
-  const projectId = projectIdForBoard(state, board.board_id);
+  const projectId = board.project_id ?? null;
 
   return {
     ...board,
@@ -593,8 +593,9 @@ const boardDto = (state, board) => {
     cover_image_name: cover?.kind === 'image' ? cover.name : null,
     cover_video_name: cover?.kind === 'video' ? cover.name : null,
     image_count: images.filter((image) => image.image_category === 'general').length,
-    is_inbox: projectId !== null,
-    ...(projectId === null ? {} : { project_id: projectId }),
+    is_inbox: inboxProjectIdForBoard(state, board.board_id) !== null,
+    // Membership is stored on the board; the backend sends null for a Library board.
+    project_id: projectId,
     video_count: videos.length,
   };
 };
@@ -909,6 +910,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           const name = requested.name ?? `Project Name #${projectNumber}`;
 
           // Adopting a prepopulated board makes project creation the import commit point.
+          const projectId = requested.project_id ?? `mock-project-${projectNumber}`;
           let boardId = requested.board_id ?? null;
           if (boardId === null) {
             boardId = `mock-project-board-${projectNumber}`;
@@ -920,6 +922,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
               created_at: now,
               deleted_at: null,
               owner_username: null,
+              project_id: projectId,
               updated_at: now,
               user_id: MOCK_USER_ID,
             });
@@ -928,10 +931,15 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             if (!board) {
               return json(404, { detail: 'Board not found' });
             }
-            if (board.board_visibility !== 'private' || projectIdForBoard(state, boardId) !== null) {
+            if (
+              board.board_visibility !== 'private' ||
+              inboxProjectIdForBoard(state, boardId) !== null ||
+              (board.project_id ?? null) !== null
+            ) {
               return json(409, { detail: 'Board is not available to be claimed by a project' });
             }
             board.board_name = name;
+            board.project_id = projectId;
             board.updated_at = now;
           }
 
@@ -947,7 +955,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             data: requested.data ?? {},
             minimum_canvas_schema_version: minimum,
             name,
-            project_id: requested.project_id ?? `mock-project-${projectNumber}`,
+            project_id: projectId,
             revision: 1,
             updated_at: now,
           };
@@ -1021,16 +1029,33 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         }
         if (method === 'DELETE') {
           if (project) {
+            const boardsMode = url.searchParams.get('boards') ?? 'release';
+            if (boardsMode !== 'release' && boardsMode !== 'delete') {
+              return json(422, { detail: 'boards must be release or delete' });
+            }
             state.projects.delete(projectId);
-            // The board goes with the project; its media survives as uncategorized.
-            state.boards.delete(project.board_id);
+            // The inbox goes with the project; the other boards are released or go too. Media survives as
+            // uncategorized either way.
+            const removedBoardIds = new Set([project.board_id]);
+            for (const board of state.boards.values()) {
+              if ((board.project_id ?? null) === projectId && board.board_id !== project.board_id) {
+                if (boardsMode === 'delete') {
+                  removedBoardIds.add(board.board_id);
+                } else {
+                  board.project_id = null;
+                }
+              }
+            }
+            for (const boardId of removedBoardIds) {
+              state.boards.delete(boardId);
+            }
             for (const image of state.images.values()) {
-              if (image.board_id === project.board_id) {
+              if (removedBoardIds.has(image.board_id)) {
                 image.board_id = null;
               }
             }
             for (const video of state.videos.values()) {
-              if (video.board_id === project.board_id) {
+              if (removedBoardIds.has(video.board_id)) {
                 video.board_id = null;
               }
             }
@@ -1473,6 +1498,10 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         if (method === 'POST') {
           const now = timestamp(state);
           const boardId = `mock-board-${state.nextBoardNumber}`;
+          const projectId = url.searchParams.get('project_id');
+          if (projectId !== null && !state.projects.has(projectId)) {
+            return json(404, { detail: 'Project not found' });
+          }
           const board = {
             archived: false,
             board_id: boardId,
@@ -1481,6 +1510,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             created_at: now,
             deleted_at: null,
             owner_username: null,
+            project_id: projectId,
             updated_at: now,
             user_id: MOCK_USER_ID,
           };
@@ -1505,15 +1535,25 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         }
         if (method === 'PATCH') {
           const changes = await readJsonBody(request);
+          const moves = Object.hasOwn(changes, 'project_id');
 
-          // A project's board takes its name, archived state and visibility from the project.
+          // An inbox takes its name, archived state and visibility from the project and cannot move.
           if (
-            projectIdForBoard(state, boardId) !== null &&
+            inboxProjectIdForBoard(state, boardId) !== null &&
             (changes.board_name !== undefined ||
               changes.archived !== undefined ||
-              changes.board_visibility !== undefined)
+              changes.board_visibility !== undefined ||
+              moves)
           ) {
-            return json(409, { detail: 'This board belongs to a project' });
+            return json(409, { detail: "This board is the project's inbox" });
+          }
+          const nextProjectId = moves ? changes.project_id : (board.project_id ?? null);
+          const nextVisibility = changes.board_visibility ?? board.board_visibility;
+          if (nextProjectId !== null && nextVisibility !== 'private') {
+            return json(409, { detail: 'Boards in a project must be private and unshared' });
+          }
+          if (nextProjectId !== null && !state.projects.has(nextProjectId)) {
+            return json(404, { detail: 'Project not found' });
           }
 
           for (const key of ['archived', 'board_name', 'board_visibility', 'cover_image_name']) {
@@ -1521,14 +1561,17 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
               board[key] = changes[key];
             }
           }
+          if (moves) {
+            board.project_id = nextProjectId;
+          }
           board.updated_at = timestamp(state);
 
           return json(201, boardDto(state, board));
         }
         if (method === 'DELETE') {
-          if (projectIdForBoard(state, boardId) !== null) {
+          if (inboxProjectIdForBoard(state, boardId) !== null) {
             // Refused before any media is touched — the whole point of the ordering.
-            return json(409, { detail: 'This board belongs to a project' });
+            return json(409, { detail: "This board is the project's inbox" });
           }
 
           const includeImages = url.searchParams.get('include_images') === 'true';

@@ -174,6 +174,7 @@ const Harness = ({
       progressSessions,
       projectId: 'project-1',
       projectName: 'Project',
+      projects: [],
       widgets: { openGallery: () => true, patchGalleryValues: patch },
     };
   }, [galleryValues, progressSessions]);

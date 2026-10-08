@@ -5,6 +5,7 @@ import type { Project, ProjectLoadResult } from '@workbench/projectContracts';
 import { ChakraProvider } from '@chakra-ui/react';
 import { GenerationUiProvider } from '@features/generation/react';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { GenerateDenoisingStrength } from '@workbench/widgets/canvas/GenerateDenoisingStrength';
 import {
@@ -66,7 +67,7 @@ const generationUi = {
   sectionPreferences: { sectionsOpen: {}, setSectionOpen: () => undefined },
 } as unknown as GenerationUiAdapter;
 
-const Harness = () => {
+const HarnessBody = () => {
   const { closeProject, openProject } = useProjectActions();
   return (
     <ChakraProvider value={system}>
@@ -78,6 +79,14 @@ const Harness = () => {
     </ChakraProvider>
   );
 };
+
+// Deleting invalidates the gallery's board lists, so the hook reads the query client.
+const queryClient = new QueryClient();
+const Harness = () => (
+  <QueryClientProvider client={queryClient}>
+    <HarnessBody />
+  </QueryClientProvider>
+);
 
 const click = (label: 'close' | 'open', project: { id: string; name: string }) =>
   act(() => {

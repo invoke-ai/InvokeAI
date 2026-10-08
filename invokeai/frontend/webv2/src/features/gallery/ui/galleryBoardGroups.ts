@@ -1,27 +1,38 @@
 import type { GalleryBoard } from '@features/gallery/core/types';
 
-import { getGalleryBoardLabel, type GalleryBoardTranslate } from '@features/gallery/core/boardLabels';
+import { getGalleryBoardLabel, inboxFirst, type GalleryBoardTranslate } from '@features/gallery/core/boardLabels';
+
+/** One other project's boards: its inbox first, named after the project, then the rest. */
+export interface GalleryBoardProjectGroup {
+  boards: GalleryBoard[];
+  projectId: string;
+}
 
 export interface GalleryBoardGroups {
-  /** Archived boards, split out of the main list into their own section. */
+  /** Archived boards from every tier, split out of the lists into their own section. */
   archivedBoards: GalleryBoard[];
   /** The search term names no existing board, so it can create one. */
   canCreateFromSearch: boolean;
   dateBoards: GalleryBoard[];
   /** Any row at all survived the search — drives the "no matches" copy. */
   hasAnyMatch: boolean;
-  /** Uncategorized first, then the project board (if any), then other boards. */
-  yourBoards: GalleryBoard[];
+  /** Uncategorized first, then the boards in no project. */
+  libraryBoards: GalleryBoard[];
+  /** Other projects in name order; empty unless other projects are shown. */
+  otherProjects: GalleryBoardProjectGroup[];
+  /** The open project's inbox first, then its other boards. */
+  projectBoards: GalleryBoard[];
 }
 
 /**
- * Apply visibility filters while grouping; GET /boards/ cannot filter other projects and returns the complete
- * list.
+ * Apply visibility filters while grouping; GET /boards/ cannot filter by project and returns the complete list.
+ * Membership is the board's own `projectId`; `projectBoardId` also claims the open project's inbox, which a draft
+ * project can know before the listing does.
  */
 export const getGalleryBoardGroups = ({
   boards,
   projectBoardId,
-  projectName,
+  projectId,
   searchTerm,
   showArchived,
   showDates,
@@ -30,7 +41,8 @@ export const getGalleryBoardGroups = ({
 }: {
   boards: readonly GalleryBoard[];
   projectBoardId: string | null;
-  projectName: string;
+  /** The open project; null where there is none, in which case every project is "other". */
+  projectId: string | null;
   searchTerm: string;
   showArchived: boolean;
   showDates: boolean;
@@ -38,50 +50,73 @@ export const getGalleryBoardGroups = ({
   t: GalleryBoardTranslate;
 }): GalleryBoardGroups => {
   const normalizedSearchTerm = searchTerm.trim().toLowerCase();
-  const matchesSearch = (name: string) => !normalizedSearchTerm || name.toLowerCase().includes(normalizedSearchTerm);
+  const matchesBoardSearch = (board: GalleryBoard) =>
+    !normalizedSearchTerm || getGalleryBoardLabel(board, t).toLowerCase().includes(normalizedSearchTerm);
+  const isOpenProjectBoard = (board: GalleryBoard) =>
+    board.id === projectBoardId || (projectId !== null && board.projectId === projectId);
 
   const uncategorizedBoard = boards.find((board) => board.kind === 'uncategorized') ?? null;
-  const fetchedProjectBoard = projectBoardId ? (boards.find((board) => board.id === projectBoardId) ?? null) : null;
-  // The board renames with its project server-side, but the fetched list can lag
-  // a rename — the live project name is authoritative for the open project's row.
-  const projectBoard = fetchedProjectBoard ? { ...fetchedProjectBoard, name: projectName } : null;
+  const regularBoards = boards.filter((board) => board.kind === 'board' && matchesBoardSearch(board));
+  const liveBoards = regularBoards.filter((board) => !board.archived);
 
-  const matchesBoardSearch = (board: GalleryBoard) => matchesSearch(getGalleryBoardLabel(board, t));
-  // The open project's own boards always show, whatever the other-projects filter says. Its id is read off its
-  // fetched inbox, which is a member of it; until the inbox arrives, no board can be known to be its.
-  const openProjectId = fetchedProjectBoard?.projectId ?? null;
-  const belongsToVisibleProject = (board: GalleryBoard) =>
-    showOtherProjects ||
-    board.projectId === null ||
-    board.id === projectBoard?.id ||
-    (openProjectId !== null && board.projectId === openProjectId);
-  const regularBoards = boards.filter(
-    (board) =>
-      board.kind === 'board' &&
-      board.id !== projectBoard?.id &&
-      belongsToVisibleProject(board) &&
-      matchesBoardSearch(board)
-  );
-  const dateBoards = showDates ? boards.filter((board) => board.kind === 'date' && matchesBoardSearch(board)) : [];
-  const archivedBoards = showArchived ? regularBoards.filter((board) => board.archived) : [];
-
-  // Keep the fixed system row first as boards accumulate.
-  const yourBoards = [
+  const projectBoards = inboxFirst(liveBoards.filter(isOpenProjectBoard));
+  const libraryBoards = [
     ...(uncategorizedBoard && matchesBoardSearch(uncategorizedBoard) ? [uncategorizedBoard] : []),
-    ...(projectBoard && matchesBoardSearch(projectBoard) ? [projectBoard] : []),
-    ...regularBoards.filter((board) => !board.archived),
+    ...liveBoards.filter((board) => board.projectId === null && !isOpenProjectBoard(board)),
   ];
 
-  const hasAnyMatch = yourBoards.length > 0 || dateBoards.length > 0 || archivedBoards.length > 0;
-  const hasExactMatch =
-    boards.some((board) => getGalleryBoardLabel(board, t).toLowerCase() === normalizedSearchTerm) ||
-    projectName.toLowerCase() === normalizedSearchTerm;
+  const otherProjects: GalleryBoardProjectGroup[] = [];
+  if (showOtherProjects) {
+    const byProject = new Map<string, GalleryBoard[]>();
+    for (const board of liveBoards) {
+      if (board.projectId !== null && !isOpenProjectBoard(board)) {
+        const group = byProject.get(board.projectId);
+
+        if (group) {
+          group.push(board);
+        } else {
+          byProject.set(board.projectId, [board]);
+        }
+      }
+    }
+    for (const [otherProjectId, projectGroupBoards] of byProject) {
+      otherProjects.push({ boards: inboxFirst(projectGroupBoards), projectId: otherProjectId });
+    }
+    // The inbox carries the project's name, so projects sort by it where one is listed.
+    const nameOf = (group: GalleryBoardProjectGroup) => group.boards.find((board) => board.isInbox)?.name ?? '';
+    otherProjects.sort((left, right) => nameOf(left).localeCompare(nameOf(right)));
+  }
+
+  const dateBoards = showDates ? boards.filter((board) => board.kind === 'date' && matchesBoardSearch(board)) : [];
+  const archivedBoards = showArchived
+    ? regularBoards.filter(
+        (board) => board.archived && (showOtherProjects || board.projectId === null || isOpenProjectBoard(board))
+      )
+    : [];
+
+  const hasAnyMatch =
+    projectBoards.length > 0 ||
+    libraryBoards.length > 0 ||
+    otherProjects.length > 0 ||
+    dateBoards.length > 0 ||
+    archivedBoards.length > 0;
+  // Only the rows on screen count as taken: a name in a hidden project (or an archived board while archived boards
+  // are hidden) may legitimately be reused, and refusing it would leave the search with nothing to do.
+  const hasExactMatch = [
+    ...projectBoards,
+    ...libraryBoards,
+    ...otherProjects.flatMap((group) => group.boards),
+    ...dateBoards,
+    ...archivedBoards,
+  ].some((board) => getGalleryBoardLabel(board, t).toLowerCase() === normalizedSearchTerm);
 
   return {
     archivedBoards,
     canCreateFromSearch: normalizedSearchTerm.length > 0 && !hasExactMatch,
     dateBoards,
     hasAnyMatch,
-    yourBoards,
+    libraryBoards,
+    otherProjects,
+    projectBoards,
   };
 };

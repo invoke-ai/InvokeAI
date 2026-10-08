@@ -278,11 +278,12 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
   await exportPage.goto(`${origin}${sourceProjectPath}`, { waitUntil: 'domcontentloaded' });
   await exportPage.getByRole('main', { exact: true, name: sourceProjectName }).waitFor();
 
-  const selectedBoardRow = exportPage.locator('button[aria-current="true"]').filter({ hasText: sourceProjectName });
+  // The project's inbox is selected and shown as "Inbox" under the project's own heading.
+  const selectedBoardRow = exportPage.locator('button[aria-current="true"]').filter({ hasText: 'Inbox' });
 
   await selectedBoardRow.first().waitFor();
 
-  await exportPage.getByRole('button', { exact: true, name: `Board actions for ${sourceProjectName}` }).click();
+  await exportPage.getByRole('button', { exact: true, name: 'Board actions for Inbox' }).click();
   await exportPage.getByRole('menuitem', { exact: true, name: 'Export project (.invk)' }).waitFor();
   await exportPage.getByRole('menuitem', { name: /^Download Board/ }).waitFor();
   await exportPage.keyboard.press('Escape');

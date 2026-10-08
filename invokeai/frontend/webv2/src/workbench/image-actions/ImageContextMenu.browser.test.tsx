@@ -19,7 +19,12 @@ const findGalleryItem = vi.fn();
 
 vi.mock('@workbench/image-actions/useFindGalleryItem', () => ({ useFindGalleryItem: () => findGalleryItem }));
 vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: () => vi.fn() }));
+vi.mock('@workbench/projects/library', () => ({
+  useProjectLibrarySelector: (selector: (snapshot: { summaries: [] }) => unknown) => selector({ summaries: [] }),
+}));
 vi.mock('@workbench/WorkbenchContext', () => ({
+  useActiveProjectId: () => 'project-1',
+  useActiveProjectName: () => 'Project',
   useWorkbenchCommands: () => ({
     generation: { setSource: vi.fn() },
     widgets: { patchValues: vi.fn() },
@@ -508,7 +513,7 @@ describe('ImageContextMenu mixed-media action visibility', () => {
     expect(document.querySelector('[aria-label="Download video"]')).not.toBeNull();
     expect(document.querySelector('[aria-label="Open in preview"]')).not.toBeNull();
     expect(document.querySelector('[aria-label="Star video"]')).not.toBeNull();
-    expect(document.body.textContent).toContain('Change Board');
+    expect(document.body.textContent).toContain('widgets.gallery.changeBoard');
     expect(document.body.textContent).toContain('Delete Video');
     expect(document.body.textContent).not.toContain('Copy to clipboard');
     expect(document.body.textContent).not.toContain('widgets.preview.copyCurrentFrame');
@@ -622,7 +627,7 @@ describe('ImageContextMenu mixed-media action visibility', () => {
     expect(document.body.textContent).toContain('2 items selected');
     expect(document.body.textContent).toContain('Star All');
     expect(document.body.textContent).toContain('Download Selection');
-    expect(document.body.textContent).toContain('Change Board');
+    expect(document.body.textContent).toContain('widgets.gallery.changeBoard');
     expect(document.body.textContent).toContain('Delete Selection');
     expect(document.body.textContent).not.toContain('widgets.canvas.import.addToCurrentCanvas');
     expect(document.body.textContent).not.toContain('widgets.canvas.import.newProjectFromImage');

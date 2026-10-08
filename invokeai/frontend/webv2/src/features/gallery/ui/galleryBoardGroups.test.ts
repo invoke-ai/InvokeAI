@@ -9,8 +9,8 @@ const createBoard = (overrides: Partial<GalleryBoard> & Pick<GalleryBoard, 'id' 
   assetCount: 0,
   assetVideoCount: 0,
   imageCount: 0,
-  kind: 'board',
   isInbox: false,
+  kind: 'board',
   projectId: null,
   videoCount: 0,
   ...overrides,
@@ -21,17 +21,22 @@ const dogs = createBoard({ id: 'dogs', name: 'dogs' });
 const cats = createBoard({ id: 'cats', name: 'Cats' });
 const archived = createBoard({ archived: true, id: 'gorl', name: 'GORL' });
 const dateBoard = createBoard({ id: 'by_date:2026-07-28', kind: 'date', name: '28 July' });
-const otherProject = createBoard({ id: 'other', isInbox: true, name: 'Someone else', projectId: 'project-2' });
-const ownProject = createBoard({ id: 'mine', isInbox: true, name: 'My project', projectId: 'project-1' });
-const ownMember = createBoard({ id: 'mine-member', name: 'Façades', projectId: 'project-1' });
-const otherMember = createBoard({ id: 'other-member', name: 'Their façades', projectId: 'project-2' });
-const t = (key: string) => (key === 'widgets.gallery.uncategorized' ? 'Uncategorized' : key);
+const mine = createBoard({ id: 'mine', isInbox: true, name: 'My project', projectId: 'project-1' });
+const mineMember = createBoard({ id: 'mine-member', name: 'Façades', projectId: 'project-1' });
+const mineArchived = createBoard({ archived: true, id: 'mine-old', name: 'Old façades', projectId: 'project-1' });
+const zebra = createBoard({ id: 'zebra', isInbox: true, name: 'Zebra study', projectId: 'project-z' });
+const zebraMember = createBoard({ id: 'zebra-member', name: 'Stripes', projectId: 'project-z' });
+const apple = createBoard({ id: 'apple', isInbox: true, name: 'Apple ads', projectId: 'project-a' });
+const t = (key: string) =>
+  key === 'widgets.gallery.uncategorized' ? 'Uncategorized' : key === 'widgets.gallery.inbox' ? 'Inbox' : key;
+
+const ALL = [uncategorized, dogs, cats, archived, dateBoard, zebraMember, mineMember, zebra, mine, apple, mineArchived];
 
 const groupsOf = (overrides: Partial<Parameters<typeof getGalleryBoardGroups>[0]> = {}) =>
   getGalleryBoardGroups({
-    boards: [uncategorized, dogs, cats, archived, dateBoard, otherProject, ownProject],
-    projectBoardId: null,
-    projectName: 'Project',
+    boards: ALL,
+    projectBoardId: 'mine',
+    projectId: 'project-1',
     searchTerm: '',
     showArchived: true,
     showDates: true,
@@ -40,18 +45,57 @@ const groupsOf = (overrides: Partial<Parameters<typeof getGalleryBoardGroups>[0]
     ...overrides,
   });
 
+const ids = (boards: GalleryBoard[]) => boards.map((board) => board.id);
+
 describe('getGalleryBoardGroups', () => {
-  it('splits archived boards into their own section instead of the main list', () => {
+  it('puts the open project inbox first, then its members, and Uncategorized first in the Library', () => {
     const groups = groupsOf();
 
-    expect(groups.yourBoards.map((board) => board.id)).toEqual(['none', 'dogs', 'cats', 'other', 'mine']);
-    expect(groups.archivedBoards.map((board) => board.id)).toEqual(['gorl']);
+    expect(ids(groups.projectBoards)).toEqual(['mine', 'mine-member']);
+    expect(ids(groups.libraryBoards)).toEqual(['none', 'dogs', 'cats']);
   });
 
-  it('pins Uncategorized first, then the hoisted project board, then other boards', () => {
-    const groups = groupsOf({ projectBoardId: 'cats' });
+  it('claims the open project inbox by id before the listing knows its membership', () => {
+    const draftInbox = createBoard({ id: 'draft', isInbox: true, name: 'Draft' });
+    const groups = groupsOf({
+      boards: [uncategorized, draftInbox, dogs],
+      projectBoardId: 'draft',
+      projectId: 'p-draft',
+    });
 
-    expect(groups.yourBoards.map((board) => board.id)).toEqual(['none', 'cats', 'dogs', 'other', 'mine']);
+    expect(ids(groups.projectBoards)).toEqual(['draft']);
+    expect(ids(groups.libraryBoards)).toEqual(['none', 'dogs']);
+  });
+
+  it('groups other projects by name with each inbox first, only when they are shown', () => {
+    const groups = groupsOf();
+
+    expect(groups.otherProjects.map((group) => [group.projectId, ids(group.boards)])).toEqual([
+      ['project-a', ['apple']],
+      ['project-z', ['zebra', 'zebra-member']],
+    ]);
+    expect(groupsOf({ showOtherProjects: false }).otherProjects).toEqual([]);
+  });
+
+  it('keeps other projects archived boards out of the archived section while they are hidden', () => {
+    const otherArchived = createBoard({ archived: true, id: 'their-old', name: 'Theirs', projectId: 'project-z' });
+
+    expect(ids(groupsOf({ boards: [...ALL, otherArchived] }).archivedBoards)).toEqual([
+      'gorl',
+      'mine-old',
+      'their-old',
+    ]);
+    expect(ids(groupsOf({ boards: [...ALL, otherArchived], showOtherProjects: false }).archivedBoards)).toEqual([
+      'gorl',
+      'mine-old',
+    ]);
+  });
+
+  it('treats every project as other where no project is open', () => {
+    const groups = groupsOf({ projectBoardId: null, projectId: null });
+
+    expect(groups.projectBoards).toEqual([]);
+    expect(groups.otherProjects.map((group) => group.projectId)).toEqual(['project-a', 'project-1', 'project-z']);
   });
 
   it('hides the date and archived sections when their toggles are off', () => {
@@ -59,73 +103,43 @@ describe('getGalleryBoardGroups', () => {
 
     expect(groups.archivedBoards).toEqual([]);
     expect(groups.dateBoards).toEqual([]);
-    expect(groups.yourBoards.map((board) => board.id)).toEqual(['none', 'dogs', 'cats', 'other', 'mine']);
   });
 
-  it('drops boards owned by another project when they are hidden', () => {
-    const groups = groupsOf({ showOtherProjects: false });
-
-    expect(groups.yourBoards.map((board) => board.id)).toEqual(['none', 'dogs', 'cats']);
-  });
-
-  it('keeps the open project own board even while other projects are hidden', () => {
-    const groups = groupsOf({ projectBoardId: 'mine', showOtherProjects: false });
-
-    expect(groups.yourBoards.map((board) => board.id)).toEqual(['none', 'mine', 'dogs', 'cats']);
-  });
-
-  it('keeps the open project members, but not other projects members, while other projects are hidden', () => {
-    const groups = groupsOf({
-      boards: [uncategorized, dogs, ownProject, ownMember, otherProject, otherMember],
-      projectBoardId: 'mine',
-      showOtherProjects: false,
-    });
-
-    expect(groups.yourBoards.map((board) => board.id)).toEqual(['none', 'mine', 'dogs', 'mine-member']);
-  });
-
-  /** The fetched list can lag a rename; the live project name wins for the open project's row. */
-  it('shows the open project board under the live project name, and searches by it', () => {
-    const groups = groupsOf({ projectBoardId: 'mine', projectName: 'Renamed' });
-
-    expect(groups.yourBoards.find((board) => board.id === 'mine')?.name).toBe('Renamed');
-    expect(
-      groupsOf({ projectBoardId: 'mine', projectName: 'Renamed', searchTerm: 'renamed' }).yourBoards
-    ).toContainEqual(expect.objectContaining({ id: 'mine' }));
-    expect(
-      groupsOf({ projectBoardId: 'mine', projectName: 'Renamed', searchTerm: 'My project' }).yourBoards.map(
-        (board) => board.id
-      )
-    ).not.toContain('mine');
-  });
-
-  it('filters every section by a case-insensitive substring match', () => {
+  it('filters every section by a case-insensitive substring match on the shown label', () => {
     const groups = groupsOf({ searchTerm: 'DOG' });
 
-    expect(groups.yourBoards.map((board) => board.id)).toEqual(['dogs']);
-    expect(groups.archivedBoards).toEqual([]);
-    expect(groups.dateBoards).toEqual([]);
+    expect(ids(groups.libraryBoards)).toEqual(['dogs']);
+    expect(groups.projectBoards).toEqual([]);
+    expect(groups.otherProjects).toEqual([]);
     expect(groups.hasAnyMatch).toBe(true);
+
+    // Inboxes answer to "Inbox", not to the project name the server stores them under.
+    expect(ids(groupsOf({ searchTerm: 'inbox' }).projectBoards)).toEqual(['mine']);
+    expect(groupsOf({ searchTerm: 'inbox' }).otherProjects.map((group) => ids(group.boards))).toEqual([
+      ['apple'],
+      ['zebra'],
+    ]);
+    expect(groupsOf({ searchTerm: 'zebra' }).hasAnyMatch).toBe(false);
   });
 
   it('matches anywhere in the name, so Uncategorized answers to "cat"', () => {
-    expect(groupsOf({ searchTerm: 'cat' }).yourBoards.map((board) => board.id)).toEqual(['none', 'cats']);
+    expect(ids(groupsOf({ searchTerm: 'cat' }).libraryBoards)).toEqual(['none', 'cats']);
   });
 
   it('offers to create only when the search names no existing board', () => {
     expect(groupsOf({ searchTerm: 'birds' }).canCreateFromSearch).toBe(true);
     expect(groupsOf({ searchTerm: 'cats' }).canCreateFromSearch).toBe(false);
     expect(groupsOf({ searchTerm: '  CATS  ' }).canCreateFromSearch).toBe(false);
+    expect(groupsOf({ searchTerm: 'Uncategorized' }).canCreateFromSearch).toBe(false);
+    expect(groupsOf({ searchTerm: 'Inbox' }).canCreateFromSearch).toBe(false);
     expect(groupsOf({ searchTerm: '' }).canCreateFromSearch).toBe(false);
   });
 
-  it('treats the localized Uncategorized label as an exact match', () => {
-    expect(groupsOf({ searchTerm: 'Uncategorized' }).canCreateFromSearch).toBe(false);
-  });
-
-  /** A loading project board still exists; its name must not offer duplicate creation. */
-  it('treats the project board name as an exact match even before the board arrives', () => {
-    expect(groupsOf({ searchTerm: 'Project' }).canCreateFromSearch).toBe(false);
+  it('lets a name that exists only in a hidden tier be created', () => {
+    // "Stripes" lives in project-z, hidden while other projects are off; "GORL" is archived and hidden.
+    expect(groupsOf({ searchTerm: 'Stripes', showOtherProjects: false }).canCreateFromSearch).toBe(true);
+    expect(groupsOf({ searchTerm: 'GORL', showArchived: false }).canCreateFromSearch).toBe(true);
+    expect(groupsOf({ searchTerm: 'Stripes' }).canCreateFromSearch).toBe(false);
   });
 
   it('reports no match when the search excludes every row', () => {

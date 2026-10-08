@@ -1032,20 +1032,31 @@ export const getGalleryImageMetadata = async (
   return body && typeof body === 'object' && !Array.isArray(body) ? (body as GalleryImageMetadata) : null;
 };
 
-export const createGalleryBoard = async (boardName: string, signal?: AbortSignal): Promise<GalleryBoard> => {
-  const query = toSearchParams({ board_name: boardName });
+/** `projectId` null creates in the Library; a project must be the caller's own, else the backend answers 404. */
+export const createGalleryBoard = async (
+  boardName: string,
+  projectId: string | null = null,
+  signal?: AbortSignal
+): Promise<GalleryBoard> => {
+  const query = toSearchParams({ board_name: boardName, ...(projectId === null ? {} : { project_id: projectId }) });
   const body = await apiFetchJson<BackendBoardDTO>(`/api/v1/boards/?${query}`, { method: 'POST', signal });
 
   return mapBoard(body);
 };
 
+/** `projectId` moves the board: a project id, or null for the Library. Undefined, like the others, means unchanged. */
 export const updateGalleryBoard = async (
   boardId: string,
-  changes: { name?: string; archived?: boolean },
+  changes: { name?: string; archived?: boolean; projectId?: string | null },
   signal?: AbortSignal
 ): Promise<GalleryBoard> => {
   const body = await apiFetchJson<BackendBoardDTO>(`/api/v1/boards/${encodeURIComponent(boardId)}`, {
-    body: JSON.stringify({ archived: changes.archived, board_name: changes.name }),
+    // JSON.stringify drops undefined keys, which is what leaves a field unchanged; an explicit null must survive.
+    body: JSON.stringify({
+      archived: changes.archived,
+      board_name: changes.name,
+      ...(changes.projectId !== undefined ? { project_id: changes.projectId } : {}),
+    }),
     method: 'PATCH',
     signal,
   });

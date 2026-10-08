@@ -23,6 +23,7 @@ import {
 import { getBoardCounts } from './galleryStateView';
 
 export const GalleryBoardRow = ({
+  accessibleName,
   board,
   isAutoAddTarget = false,
   isMenuOpen,
@@ -31,6 +32,8 @@ export const GalleryBoardRow = ({
   onOpenMenu,
   onSelectBoard,
 }: {
+  /** What assistive tech calls the row when its visible label alone is ambiguous, such as another project's Inbox. */
+  accessibleName?: string;
   board: GalleryBoard;
   /** Results without a board of their own land here (the gallery is not following its selection). */
   isAutoAddTarget?: boolean;
@@ -46,6 +49,7 @@ export const GalleryBoardRow = ({
   const { active } = useDndContext();
   const dragData = active?.data.current;
   const boardLabel = getGalleryBoardLabel(board, t);
+  const spokenLabel = accessibleName ?? boardLabel;
 
   const canDropItems =
     acceptsGalleryItemMoves(board.kind) &&
@@ -116,7 +120,7 @@ export const GalleryBoardRow = ({
     () =>
       onOpenMenu ? (
         <IconButton
-          aria-label={t('widgets.gallery.boardActionsForBoard', { name: boardLabel })}
+          aria-label={t('widgets.gallery.boardActionsForBoard', { name: spokenLabel })}
           className="board-row-actions"
           flexShrink={0}
           // Its menu anchors to this button, so it must not fade out beneath it.
@@ -132,7 +136,7 @@ export const GalleryBoardRow = ({
           <MoreVerticalIcon />
         </IconButton>
       ) : null,
-    [boardLabel, handleActionsClick, isMenuOpen, onOpenMenu, stopPropagation, t]
+    [handleActionsClick, isMenuOpen, onOpenMenu, spokenLabel, stopPropagation, t]
   );
 
   return (
@@ -151,6 +155,7 @@ export const GalleryBoardRow = ({
       <GalleryBoardRowShell
         ref={setNodeRef}
         actions={actions}
+        ariaLabel={accessibleName}
         cover={cover}
         isDropTarget={canDropItems}
         isSelected={isSelected}
@@ -165,11 +170,6 @@ export const GalleryBoardRow = ({
               {t('widgets.gallery.autoAddBadge')}
             </Badge>
           </Tooltip>
-        ) : null}
-        {board.isInbox ? (
-          <Badge colorPalette={isSelected ? undefined : 'accent'} flexShrink={0} variant="subtle">
-            {t('common.project')}
-          </Badge>
         ) : null}
         <Tooltip content={countsBreakdown}>
           <Badge aria-label={countsBreakdown} flexShrink={0} fontVariantNumeric="tabular-nums" variant="subtle">

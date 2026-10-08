@@ -14,7 +14,7 @@ import searchHelp from '../assets/gallery-search-help.png';
 import semanticSearch from '../assets/gallery-semantic-search.png';
 import selection from '../assets/gallery-selection.webp';
 
-The **Gallery** holds every image and video you generate or upload. It is organized into **boards**: the always-present **Uncategorized** board, a board for each project, and boards you create yourself. From the Gallery you choose where new results go, find media by its prompt or by what it shows, and move, star, download or delete it.
+The **Gallery** holds every image and video you generate or upload. It is organized into **boards**. Every board belongs either to a project — each has an **Inbox** for new results, plus any boards you add to it — or to the **Library**, whose boards are available from every project and include the always-present **Uncategorized** board. From the Gallery you choose where new results go, find media by its prompt or by what it shows, and move, star, download or delete it.
 
 <Image src={overview} alt="The Gallery with the Concept Art board selected: the board list at the top, the Media and Uploads tabs, the search field, and a grid of images with starred items pinned at the top." width={420} />
 
@@ -23,7 +23,7 @@ The **Gallery** holds every image and video you generate or upload. It is organi
 The Gallery has three parts:
 
 * **The header** shows the selected board after *Gallery /*. Click the board name to hide or show the board list. The gear button opens the [Gallery settings](/users-guide/gallery/gallery-reference/#gallery-settings).
-* **The board list** has a search field (**Search or create boards**), a **Filter & sort boards** button, and the boards themselves, grouped under **Boards** and, when turned on, **By Date** and **Archived**. Each group can be collapsed.
+* **The board list** has a search field (**Search or create boards**), a **Filter & sort boards** button, and the boards themselves, grouped under the open project's name, **Library** and, when turned on, **Other projects**, **By Date** and **Archived**. Each group can be collapsed; the project and Library groups show how many boards you have made in them, and **Other projects** how many projects it lists.
 * **The media area** shows the contents of the selected board, on two tabs:
   * **Media** — images and videos generated in InvokeAI.
   * **Uploads** — images, videos and audio you have uploaded.
@@ -32,13 +32,13 @@ The Gallery has three parts:
 
 When the Gallery is narrow, or docked in a side rail, the board list sits above the media grid. When it is wide, the board list becomes a column on the left. Drag the divider between them to resize the list.
 
-Each board shows its cover image, its name and a count such as **76 | 12**: 76 items on the Media tab and 12 on the Uploads tab. A project's board is marked **Project**. On a multi-user installation, other people's boards show their owner's name.
+Each board shows its cover image, its name and a count such as **76 | 12**: 76 items on the Media tab and 12 on the Uploads tab. A project's Inbox is pinned at the top of its group with an inbox icon. On a multi-user installation, other people's boards show their owner's name.
 
 ## Boards
 
 ### Creating a board
 
-Type a name into **Search or create boards**. If no board has that name, a **Create board "…"** row appears at the end of the list; click it, or press **Enter**. You can also type the name and click the **+** button next to the **Boards** heading.
+Type a name into **Search or create boards**. If no board has that name, a **Create board "…" in …** row appears, in the group the board will go to; click it, or press **Enter**. The open project's group and the **Library** group each have a **+** button: press one to choose where the board goes, then type its name — or type the name first and press the **+** of the group you want.
 
 <Image src={createBoard} alt="Typing Seascapes into the board search field shows a Create board &quot;Seascapes&quot; row." width={420} />
 
@@ -48,8 +48,8 @@ The new board is selected straight away, so it also becomes the destination for 
 
 **By default, new results go to the board that is selected in the Gallery**: select a board, press **Invoke**, and the results land on that board. The destination is fixed when you press Invoke, so you can select another board and queue more work while earlier jobs are still running, without redirecting them.
 
-* A new project starts with its own board selected. See [Projects](/users-guide/projects/introduction/#where-your-images-go).
-* If you select a date board (see below), results go to the project's board, because date boards are only a view.
+* A new project starts with its Inbox selected. See [Projects](/users-guide/projects/introduction/#where-your-images-go).
+* If you select a date board (see below), results go to the project's Inbox, because date boards are only a view.
 * Uploads go to the selected board.
 * If you archive or delete the selected board, the selection, and with it the destination, moves to **Uncategorized**.
 
@@ -66,14 +66,14 @@ The **Filter & sort boards** button beside the search field controls which board
 * **Board visibility**
   * **Date boards** — adds a **By Date** group with one board per day on which you created media. Date boards are read-only views: you cannot upload to them, drop media on them, or rename or delete them.
   * **Archived boards** — adds an **Archived** group listing the boards you have archived.
-  * **Other projects' boards** — shows the boards of your other projects, which are hidden by default to keep the list focused. The current project's board is always shown.
-* **Sort by** — **Created** (the default) or **Name**, in descending or ascending order. **Uncategorized** and the current project's board always stay at the top.
+  * **Other projects' boards** — adds an **Other projects** group with your other projects' boards, grouped by project. They are hidden by default to keep the list focused; the open project's boards are always shown.
+* **Sort by** — **Created** (the default) or **Name**, in descending or ascending order. Each project's **Inbox** and the Library's **Uncategorized** always stay at the top of their group.
 
 These choices are saved with the project, so each project can list boards differently.
 
 ### Renaming, archiving, downloading and deleting boards
 
-Right-click a board, or hover over it and click its **⋯** button, to rename, archive, download or delete it. [Managing boards](/users-guide/gallery/gallery-reference/#managing-boards) in the Gallery Reference describes each action, including what deleting a board does to its media.
+Right-click a board, or hover over it and click its **⋯** button, to rename, move, archive, download or delete it. [Managing boards](/users-guide/gallery/gallery-reference/#managing-boards) in the Gallery Reference describes each action, including what deleting a board does to its media.
 
 ## Finding media in a board
 

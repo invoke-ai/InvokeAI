@@ -104,6 +104,9 @@ const renderBar = async (
     gallery,
     itemActions,
     loadedItems: mergeGalleryLoadedItems(strip.items, gallery.items),
+    projectId: 'p1',
+    projectName: 'Mahogany House',
+    projectNames: new Map([['p2', 'Harbor Tower']]),
     starredStrip: strip,
   } as unknown as GalleryWidgetContextValue;
 
@@ -221,6 +224,34 @@ describe('GallerySelectionBar', () => {
     );
 
     expect(labels).toEqual(['Cats', 'Uncategorized']);
+  });
+
+  it('groups move targets by the open project, the Library and other projects', async () => {
+    await renderBar(
+      createGallery({
+        boards: [
+          createBoard({ id: 'dogs', name: 'dogs' }),
+          createBoard({ id: 'theirs-member', name: 'Stripes', projectId: 'p2' }),
+          createBoard({ id: 'mine-member', name: 'Façades', projectId: 'p1' }),
+          createBoard({ id: 'mine', isInbox: true, name: 'Mahogany House', projectId: 'p1' }),
+          createBoard({ id: 'cats', name: 'Cats' }),
+        ],
+      })
+    );
+    await click(getButton('widgets.gallery.moveSelectionToBoard'));
+
+    const groups = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-scope="menu"] [data-part="item-group"]')
+    ).map((group) => [
+      group.querySelector('[data-part="item-group-label"]')?.textContent,
+      Array.from(group.querySelectorAll('[data-part="item-text"]')).map((element) => element.textContent),
+    ]);
+
+    expect(groups).toEqual([
+      ['Mahogany House', ['widgets.gallery.inbox', 'Façades']],
+      ['widgets.gallery.boardGroups.library', ['Cats']],
+      ['Harbor Tower', ['Stripes']],
+    ]);
   });
 
   it('disables the move control when there is nowhere to move to', async () => {

@@ -16,12 +16,15 @@ import type { GalleryListingState } from './useGalleryData';
  */
 export interface GalleryActions {
   archiveBoard: (boardId: string, archived: boolean) => Promise<void>;
-  createBoard: (boardName: string) => Promise<void>;
+  /** In the given project, or in the Library for null. */
+  createBoard: (boardName: string, projectId: string | null) => Promise<void>;
   deleteBoard: (boardId: string, includeImages: boolean) => Promise<void>;
   downloadBoard: (boardId: string) => Promise<void>;
   /** Export the project that owns this board as a complete `.invk` archive. */
   exportProject: (projectId: string, projectName: string) => void;
   loadMore: () => void;
+  /** Into a project, or to the Library for null; `destinationLabel` is what the confirmation names. */
+  moveBoard: (boardId: string, projectId: string | null, destinationLabel: string) => Promise<void>;
   refresh: () => void;
   renameBoard: (boardId: string, boardName: string) => Promise<void>;
   selectBoard: (boardId: string) => void;
@@ -75,7 +78,10 @@ export interface GalleryWidgetContextValue {
   /** Everything on hand — strip first, then the listing, without repeats — for lookups by key. */
   loadedItems: GalleryItem[];
   starredStrip: GalleryStarredStrip;
+  projectId: string;
   projectName: string;
+  /** Names for the projects other boards belong to, keyed by project id. */
+  projectNames: ReadonlyMap<string, string>;
   /** Placement, used only to scope cached viewport measurements. */
   region: GalleryWidgetProps['region'];
   runtime: GalleryWidgetRuntime;

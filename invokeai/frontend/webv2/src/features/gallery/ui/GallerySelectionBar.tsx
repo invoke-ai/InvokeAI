@@ -1,7 +1,7 @@
 import type { GalleryBoard } from '@features/gallery/core/types';
 
 import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
-import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
+import { getGalleryBoardDestinationGroups, getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { parseGalleryItemKey, shouldStarSelection } from '@features/gallery/core/items';
 import { IconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
@@ -18,7 +18,7 @@ const MOVE_MENU_POSITIONING = { placement: 'top-end' } as const;
 
 export const GallerySelectionBar = () => {
   const { t } = useTranslation();
-  const { gallery, itemActions, loadedItems } = useGalleryWidget();
+  const { gallery, itemActions, loadedItems, projectId, projectName, projectNames } = useGalleryWidget();
   const moveTriggerIds = useMenuTriggerIds();
   const selectedItemKeys = gallery.selectedItemKeys;
   const selectionCount = selectedItemKeys.length;
@@ -35,6 +35,10 @@ export const GallerySelectionBar = () => {
         (board) => board.kind !== 'date' && !board.archived && board.id !== gallery.selectedBoardId
       ),
     [gallery.boards, gallery.selectedBoardId]
+  );
+  const moveGroups = useMemo(
+    () => getGalleryBoardDestinationGroups({ boards: moveTargets, projectId, projectName, projectNames, t }),
+    [moveTargets, projectId, projectName, projectNames, t]
   );
 
   const handleToggleStarred = useCallback(
@@ -101,8 +105,13 @@ export const GallerySelectionBar = () => {
         <Portal>
           <Menu.Positioner>
             <MenuContent maxH="18rem" minW="12rem" overflowY="auto">
-              {moveTargets.map((board) => (
-                <MoveTargetItem key={board.id} board={board} onSelect={handleMoveToBoard} />
+              {moveGroups.map((group) => (
+                <Menu.ItemGroup key={group.id}>
+                  <Menu.ItemGroupLabel>{group.label}</Menu.ItemGroupLabel>
+                  {group.boards.map((board) => (
+                    <MoveTargetItem key={board.id} board={board} onSelect={handleMoveToBoard} />
+                  ))}
+                </Menu.ItemGroup>
               ))}
             </MenuContent>
           </Menu.Positioner>

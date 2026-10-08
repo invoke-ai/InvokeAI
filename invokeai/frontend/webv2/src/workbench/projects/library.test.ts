@@ -212,7 +212,7 @@ describe('library mutations', () => {
 
     await library.deleteLibraryProject('doomed');
 
-    expect(api.deleteProject).toHaveBeenCalledWith('doomed', expect.any(AbortSignal));
+    expect(api.deleteProject).toHaveBeenCalledWith('doomed', expect.any(AbortSignal), 'release');
     expect(library.getProjectLibrary().summaries).toHaveLength(0);
   });
 
@@ -267,12 +267,23 @@ describe('library mutations', () => {
     expect(api.deleteProject).not.toHaveBeenCalled();
   });
 
+  it('hands the choice to delete the project boards through whichever path deletes', async () => {
+    const { handle } = openProject('open');
+    api.deleteProject.mockResolvedValue(undefined);
+
+    await library.deleteLibraryProject('open', 'delete');
+    expect(handle.deleteOnServer).toHaveBeenCalledWith('delete');
+
+    await library.deleteLibraryProject('closed', 'delete');
+    expect(api.deleteProject).toHaveBeenCalledWith('closed', expect.any(AbortSignal), 'delete');
+  });
+
   it('deletes a closed project over HTTP, because no engine holds it', async () => {
     api.deleteProject.mockResolvedValue(undefined);
 
     await library.deleteLibraryProject('closed');
 
-    expect(api.deleteProject).toHaveBeenCalledWith('closed', expect.any(AbortSignal));
+    expect(api.deleteProject).toHaveBeenCalledWith('closed', expect.any(AbortSignal), 'release');
   });
 
   it('does not delete while another tab owns an active project run', async () => {

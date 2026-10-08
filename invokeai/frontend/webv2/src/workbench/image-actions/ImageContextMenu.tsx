@@ -10,11 +10,13 @@ import {
   legacyGeneratedImageToGalleryItem,
   toGalleryItemKey,
 } from '@features/gallery';
+import { getGalleryBoardDestinationGroups, getGalleryBoardLabel } from '@features/gallery/contracts';
 import { MenuContent, MenuIconItem } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
+import { useProjectLibrarySelector } from '@workbench/projects/library';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
-import { useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { useActiveProjectId, useActiveProjectName, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import {
   ClapperboardIcon,
   AsteriskIcon,
@@ -1057,35 +1059,52 @@ const ChangeBoardSubMenu = ({
   currentBoardId: string | null;
   onMove: (boardId: string) => void;
 }) => {
+  const { t } = useTranslation();
+  const projectId = useActiveProjectId();
+  const projectName = useActiveProjectName();
+  const librarySummaries = useProjectLibrarySelector((snapshot) => snapshot.summaries);
   const handleRemoveFromBoard = useCallback(() => onMove('none'), [onMove]);
-  const visibleBoards = useMemo(
-    () => boards.filter((board) => board.kind === 'board' && board.id !== currentBoardId),
-    [boards, currentBoardId]
+  const groups = useMemo(
+    () =>
+      getGalleryBoardDestinationGroups({
+        boards: boards.filter((board) => board.kind === 'board' && board.id !== currentBoardId),
+        projectId,
+        projectName,
+        projectNames: new Map(librarySummaries.map((summary) => [summary.id, summary.name])),
+        t,
+      }),
+    [boards, currentBoardId, librarySummaries, projectId, projectName, t]
   );
 
   return (
-    <ContextSubMenu icon={FolderIcon} label="Change Board" scrollArea>
+    <ContextSubMenu icon={FolderIcon} label={t('widgets.gallery.changeBoard')} scrollArea>
       {currentBoardId !== 'none' && (
         <ContextMenuItem
           icon={FolderIcon}
-          label="Remove from Board"
+          label={t('widgets.gallery.removeFromBoard')}
           value="remove-from-board"
           onClick={handleRemoveFromBoard}
         />
       )}
-      {visibleBoards.map((board) => (
-        <ChangeBoardMenuItem key={board.id} board={board} onMove={onMove} />
+      {groups.map((group) => (
+        <Menu.ItemGroup key={group.id}>
+          <Menu.ItemGroupLabel>{group.label}</Menu.ItemGroupLabel>
+          {group.boards.map((board) => (
+            <ChangeBoardMenuItem key={board.id} board={board} onMove={onMove} />
+          ))}
+        </Menu.ItemGroup>
       ))}
     </ContextSubMenu>
   );
 };
 
 const ChangeBoardMenuItem = ({ board, onMove }: { board: GalleryBoard; onMove: (boardId: string) => void }) => {
+  const { t } = useTranslation();
   const handleClick = useCallback(() => onMove(board.id), [board.id, onMove]);
 
   return (
     <Menu.Item value={`move-to-${board.id}`} onClick={handleClick}>
-      <MiddleTruncate fontSize="md" minW="0" text={board.name} />
+      <MiddleTruncate fontSize="md" minW="0" text={getGalleryBoardLabel(board, t)} />
     </Menu.Item>
   );
 };
