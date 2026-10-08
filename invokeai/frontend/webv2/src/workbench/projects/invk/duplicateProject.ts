@@ -10,11 +10,11 @@ import {
   stripInstallationState,
 } from '@workbench/projects/projectAssets';
 
-import type { InvkBoard } from './board';
 import type { MediaMaterializer } from './restoreProjectMedia';
 import type { ProjectTransferIssues } from './transfer';
 
 import { type CopyMediaResult, copyImagesToBoard, copyVideosToBoard, isRequestCancellation } from './assetTransport';
+import { INVK_MAX_BOARDS, type InvkBoard } from './board';
 import { InvkFormatError, toInvkFormatReason } from './format';
 import { createStagingBoards, findInboxStagingBoardId, placeMemberBoards } from './memberBoards';
 import {
@@ -130,6 +130,14 @@ export const duplicateProjectRecord = async (
     items: board.items,
     name: board.name,
   }));
+
+  // The same ceiling as an archive: a copy stages and moves each board one request at a time.
+  if (boards.length > INVK_MAX_BOARDS) {
+    throw new InvkFormatError(
+      'too-large',
+      `Project has ${String(boards.length)} boards; a copy carries at most ${String(INVK_MAX_BOARDS)}`
+    );
+  }
   // Made before anything is staged: every staging board joins it as it is created, so a copy abandoned at any point
   // can delete them all.
   const ledger = createRestoredMediaLedger([]);

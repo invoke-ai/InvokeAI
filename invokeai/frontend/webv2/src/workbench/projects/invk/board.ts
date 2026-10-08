@@ -74,9 +74,15 @@ const zBoard = z
   })
   .strict();
 
+/**
+ * Boards an archive may name. Each one costs the importer a create and a move, so a file must not be able to ask
+ * for an unbounded number of them in a few kilobytes; no real project comes near this.
+ */
+export const INVK_MAX_BOARDS = 1000;
+
 const zBoardSnapshotV2 = z
   .object({
-    boards: z.array(zBoard).min(1),
+    boards: z.array(zBoard).min(1).max(INVK_MAX_BOARDS),
     version: z.literal(2),
   })
   .strict();
@@ -144,12 +150,21 @@ export const parseInvkBoardSnapshot = (data: unknown): InvkBoardSnapshot => {
 };
 
 /** Build the entry from a server snapshot. Sorting here is what makes exports byte-comparable. */
-export const buildInvkBoardSnapshot = (boards: readonly InvkBoard[]): InvkBoardSnapshot => ({
-  boards: [...boards.filter((board) => board.isInbox), ...boards.filter((board) => !board.isInbox)].map((board) => ({
-    archived: board.archived,
-    isInbox: board.isInbox,
-    items: [...board.items].sort(compareItems),
-    name: board.name,
-  })),
-  version: 2,
-});
+export const buildInvkBoardSnapshot = (boards: readonly InvkBoard[]): InvkBoardSnapshot => {
+  if (boards.length > INVK_MAX_BOARDS) {
+    throw new InvkFormatError(
+      'too-large',
+      `Project has ${String(boards.length)} boards; an archive names at most ${String(INVK_MAX_BOARDS)}`
+    );
+  }
+
+  return {
+    boards: [...boards.filter((board) => board.isInbox), ...boards.filter((board) => !board.isInbox)].map((board) => ({
+      archived: board.archived,
+      isInbox: board.isInbox,
+      items: [...board.items].sort(compareItems),
+      name: board.name,
+    })),
+    version: 2,
+  };
+};

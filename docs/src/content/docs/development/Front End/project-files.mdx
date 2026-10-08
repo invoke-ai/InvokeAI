@@ -199,7 +199,7 @@ Future format changes should add a new member to the union rather than widening 
 
 ## Guards
 
-`archive.ts` is the only module that imports fflate, and it does so with `await import()` so the ZIP codec never enters an initial chunk — the architecture budget fails on a new package appearing in a route's source-owner set. Both directions are bounded by `INVK_MAX_ARCHIVE_BYTES` and `INVK_MAX_ENTRIES`, because an `.invk` is a file someone was handed.
+`archive.ts` is the only module that imports fflate, and it does so with `await import()` so the ZIP codec never enters an initial chunk — the architecture budget fails on a new package appearing in a route's source-owner set. Both directions are bounded by `INVK_MAX_ARCHIVE_BYTES`, `INVK_MAX_ENTRIES` and, for `board.json`, `INVK_MAX_BOARDS`, because an `.invk` is a file someone was handed: a few kilobytes of empty boards must not be able to ask the importer for thousands of creates and moves. Duplicating a project applies the same board ceiling.
 
 The input `File.size` is rejected before `arrayBuffer()` allocates its bytes. On export, one shared response reader checks declared `Content-Length` values and streams every asset through the same fixed 2 GiB allocation budget, including concurrent responses. It cancels a response when its declared length, streamed bytes or cumulative retained bytes cross the ceiling. The accumulated entries are checked before packing and the packed ZIP is checked again afterward, because compression can change the final output size.
 

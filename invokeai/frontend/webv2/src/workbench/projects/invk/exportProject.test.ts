@@ -551,4 +551,17 @@ describe('board membership', () => {
 
     expect(() => planInvkExport(withInbox(boardItems))).toThrowError(/archive entries/u);
   });
+
+  it('refuses a project with more boards than an archive may name, before fetching anything', () => {
+    const members = Array.from({ length: 1000 }, (_unused, index) => ({
+      archived: false,
+      isInbox: false,
+      items: [],
+      name: `Board ${String(index)}`,
+    }));
+
+    expect(() => planInvkExport({ ...withInbox([]), boards: [...withInbox([]).boards, ...members] })).toThrowError(
+      expect.objectContaining({ reason: 'too-large' })
+    );
+  });
 });

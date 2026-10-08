@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildInvkBoardSnapshot, flattenInvkBoardItems, parseInvkBoardSnapshot, type InvkBoardItem } from './board';
+import {
+  buildInvkBoardSnapshot,
+  flattenInvkBoardItems,
+  INVK_MAX_BOARDS,
+  parseInvkBoardSnapshot,
+  type InvkBoardItem,
+} from './board';
 import { InvkFormatError } from './format';
 
 /** Malformed board enumeration must fail before restore creates resources. */
@@ -122,6 +128,17 @@ describe('parseInvkBoardSnapshot', () => {
     expectRefusal({ boards: [inbox([item({ category: 'other' as never })])], version: 2 });
   });
 
+  /** A few kilobytes must not be able to ask the importer for an unbounded number of creates and moves. */
+  it('caps how many boards a file may name', () => {
+    const members = (count: number) =>
+      Array.from({ length: count }, (_, index) => member([], `Board ${String(index)}`));
+
+    expect(
+      parseInvkBoardSnapshot({ boards: [inbox([]), ...members(INVK_MAX_BOARDS - 1)], version: 2 }).boards
+    ).toHaveLength(INVK_MAX_BOARDS);
+    expectRefusal({ boards: [inbox([]), ...members(INVK_MAX_BOARDS)], version: 2 });
+  });
+
   it('refuses an unknown kind, a malformed known version, and an unknown key', () => {
     expectRefusal({ boards: [inbox([item({ kind: 'audio' as never })])], version: 2 });
     expectRefusal({ items: [], version: 2 });
@@ -145,6 +162,15 @@ describe('parseInvkBoardSnapshot', () => {
 });
 
 describe('buildInvkBoardSnapshot', () => {
+  it('refuses to write more boards than a reader accepts', () => {
+    const boards = [
+      inbox([]),
+      ...Array.from({ length: INVK_MAX_BOARDS }, (_, index) => member([], `B${String(index)}`)),
+    ];
+
+    expect(() => buildInvkBoardSnapshot(boards)).toThrowError(expect.objectContaining({ reason: 'too-large' }));
+  });
+
   it('sorts items, leads with the inbox and stamps the file version, without touching the input', () => {
     const items = [item({ name: 'b.png' }), item({ name: 'a.png' })];
     const snapshot = buildInvkBoardSnapshot([member([item({ name: 'm.png' })]), inbox(items)]);

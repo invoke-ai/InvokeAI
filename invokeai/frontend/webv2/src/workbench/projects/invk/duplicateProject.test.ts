@@ -345,6 +345,23 @@ describe('duplicateProjectRecord', () => {
     expect(api.createProjectSettled.mock.calls[0]![0]).toMatchObject({ board_id: 'staging-board' });
   });
 
+  it('refuses a source with more boards than a copy may carry, before staging anything', async () => {
+    const members = Array.from({ length: 1000 }, (_unused, index) => ({
+      archived: false,
+      board_id: `b${String(index)}`,
+      is_inbox: false,
+      items: [],
+      name: `Board ${String(index)}`,
+    }));
+
+    await expect(
+      duplicateProject.duplicateProjectRecord({ boards: [...inboxOf([]), ...members], owner, record: sourceRecord() })
+    ).rejects.toMatchObject({ reason: 'too-large' });
+
+    expect(transport.createStagingBoard).not.toHaveBeenCalled();
+    expect(api.createProjectSettled).not.toHaveBeenCalled();
+  });
+
   it('deletes the boards it had staged when staging a later one fails', async () => {
     transport.createStagingBoard.mockResolvedValueOnce('staging-board').mockRejectedValueOnce(new Error('refused'));
 
