@@ -29,11 +29,12 @@ from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.schema.boards import board_images, boards
 from invokeai.app.services.shared.database.schema.image_index import image_index_vocab_terms
 from invokeai.app.services.shared.database.schema.models import models
+from invokeai.app.services.shared.database.schema.session_queue import session_queue
 from invokeai.app.services.shared.database.startup import init_database, open_migrated_database
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.users.users_default import UserService
 from invokeai.app.util import database_copy
-from invokeai.app.util.database_copy import copy
+from invokeai.app.util.database_copy import copy, copy_to_sqlite
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.fixtures.database import external_test_db_url
 
@@ -281,3 +282,142 @@ def test_a_failed_copy_leaves_a_target_the_app_refuses_and_says_how_to_start_aga
     config = load_config_from_root(tmp_path).model_copy(update={"db_url": url})
     with pytest.raises(Exception, match="no record of the migrations"):
         open_migrated_database(config, LOGGER).dispose()
+
+
+def test_a_copy_to_sqlite_asks_for_its_source(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    _install(tmp_path, orphans=False)
+
+    assert copy_to_sqlite(tmp_path / "back.db", source_url=None, root=tmp_path, check_only=False) == 1
+    assert "Name the source" in capsys.readouterr().out
+
+
+def test_a_copy_to_sqlite_overwrites_no_file(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    _install(tmp_path, orphans=False)
+    existing = tmp_path / "databases" / "invokeai.db"
+    before = existing.read_bytes()
+
+    url = "mariadb+pymysql://invokeai:secret@127.0.0.1:1/invokeai"
+    assert copy_to_sqlite(existing, source_url=url, root=tmp_path, check_only=False) == 1
+    assert "overwrites no database" in capsys.readouterr().out
+    assert existing.read_bytes() == before
+
+
+def _moved_to_a_server(tmp_path: Path, url: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """An install whose database `invoke-db-copy` moved to the server, which its config now names."""
+    monkeypatch.setattr(startup, "MINIMUM_MAX_ALLOWED_PACKET", 1)
+    _install(tmp_path, orphans=False)
+    (tmp_path / "invokeai.yaml").write_text(f'schema_version: "4.0.3"\ndb_url: "{url}"\n')
+    assert copy(None, root=tmp_path, check_only=False, skip_orphans=False) == 0
+
+
+@server_only
+def test_a_server_database_goes_back_to_sqlite(
+    tmp_path: Path,
+    empty_database: Database,
+    _external_test_schema: Optional[URL],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert _external_test_schema is not None
+    url = _external_test_schema.render_as_string(hide_password=False)
+    _moved_to_a_server(tmp_path, url, monkeypatch)
+
+    # Work done on the server after the move, which the old SQLite file does not hold.
+    server = open_migrated_database(load_config_from_root(tmp_path), LOGGER)
+    try:
+        with server.engine.connect() as conn:
+            # As MySQL's background statistics update does: it then serves the id counter of that moment from a
+            # cache, until the cache expires a day later.
+            conn.exec_driver_sql("ANALYZE TABLE session_queue").all()
+            conn.commit()
+        [user] = [user for user in UserService(server).list_users() if user.email == "alice@test.com"]
+        BoardRecordStorage(server).save("Made on the server", user.user_id)
+        with server.begin(write=True) as conn:
+            item = {"batch_id": "b", "queue_id": "default", "session": "{}"}
+            conn.execute(insert(session_queue), [{**item, "session_id": f"s{n}"} for n in range(3)])
+            newest = conn.execute(select(func.max(session_queue.c.item_id))).scalar_one()
+            conn.execute(delete(session_queue).where(session_queue.c.item_id == newest))
+    finally:
+        server.dispose()
+    capsys.readouterr()
+
+    back = tmp_path / "back" / "invokeai.db"
+    back.parent.mkdir()
+    assert copy_to_sqlite(back, source_url=None, root=tmp_path, check_only=False) == 0
+    assert "every table matches its source" in capsys.readouterr().out
+    assert sorted(path.name for path in back.parent.iterdir()) == ["invokeai.db"]
+
+    # The app takes the file as an up-to-date database, holding what the server held.
+    config = load_config_from_root(tmp_path).model_copy(update={"db_url": None, "db_dir": back.parent})
+    copied = open_migrated_database(config, LOGGER)
+    try:
+        boards_held = BoardRecordStorage(copied).get_all(user.user_id, False, "board_name", "ASC")  # type: ignore[arg-type]
+        assert sorted(board.board_name for board in boards_held) == ["Holiday", "Made on the server"]
+        with copied.begin(write=True) as conn:
+            conn.execute(insert(session_queue).values(batch_id="b", queue_id="default", session="{}", session_id="new"))
+            # The id the server issued and deleted is not issued again.
+            assert conn.execute(select(func.max(session_queue.c.item_id))).scalar_one() > newest
+    finally:
+        copied.dispose()
+
+
+@server_only
+def test_a_copy_to_sqlite_waits_for_no_running_app_and_keeps_no_failed_copy(
+    tmp_path: Path,
+    empty_database: Database,
+    _external_test_schema: Optional[URL],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert _external_test_schema is not None
+    url = _external_test_schema.render_as_string(hide_password=False)
+    _moved_to_a_server(tmp_path, url, monkeypatch)
+    back = tmp_path / "back.db"
+
+    running = Database.open_url(url, LOGGER)
+    try:
+        running.hold_instance_lock()
+        assert copy_to_sqlite(back, source_url=None, root=tmp_path, check_only=False) == 1
+        assert "Another InvokeAI process" in capsys.readouterr().out
+    finally:
+        running.dispose()
+
+    assert copy_to_sqlite(back, source_url=None, root=tmp_path, check_only=True) == 0
+    assert "Nothing was copied" in capsys.readouterr().out
+    assert not back.exists()
+
+    def lost(source: Database, target: Database) -> None:
+        raise ConnectionError("the connection to the server was lost")
+
+    monkeypatch.setattr(database_copy, "copy_records", lost)
+    assert copy_to_sqlite(back, source_url=None, root=tmp_path, check_only=False) == 1
+    assert "not kept" in capsys.readouterr().out
+    assert not back.exists()
+    assert not [path for path in tmp_path.iterdir() if path.name.startswith("invoke-db-copy-")]
+
+    # A file made at the target path while copying is not overwritten.
+    def made_meanwhile(source: Database, target: Database) -> dict[str, int]:
+        back.write_bytes(b"made meanwhile")
+        return copy_records(source, target)
+
+    monkeypatch.setattr(database_copy, "copy_records", made_meanwhile)
+    assert copy_to_sqlite(back, source_url=None, root=tmp_path, check_only=False) == 1
+    assert "overwrites no file" in capsys.readouterr().out
+    assert back.read_bytes() == b"made meanwhile"
+    assert not [path for path in tmp_path.iterdir() if path.name.startswith("invoke-db-copy-")]
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["--to-sqlite", "back.db", "--target", "mysql+pymysql://u:p@db/invokeai"],
+        ["--to-sqlite", "back.db", "--orphans", "skip"],
+        ["--source", "mysql+pymysql://u:p@db/invokeai"],
+    ],
+)
+def test_arguments_of_the_other_direction_are_refused(monkeypatch: pytest.MonkeyPatch, arguments: list[str]) -> None:
+    monkeypatch.setattr("sys.argv", ["invoke-db-copy", *arguments])
+
+    with pytest.raises(SystemExit) as refused:
+        database_copy.main()
+    assert refused.value.code == 2

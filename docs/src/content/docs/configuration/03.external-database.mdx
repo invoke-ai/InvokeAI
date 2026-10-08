@@ -86,6 +86,22 @@ Two kinds of value are copied in the form a server stores:
 
 After copying, `invoke-db-copy` compares every table of the copy with its source, row by row, and only then writes the records that make it a database InvokeAI takes. If the copy fails or does not match, InvokeAI refuses the target: drop the database, create it again empty, and run `invoke-db-copy` again.
 
+## Going back to SQLite
+
+`invoke-db-copy --to-sqlite FILE` copies the server database back into a new SQLite file. Removing `db_url` alone is not a way back: InvokeAI then opens the SQLite database it used before the move, as it was then. The boards, image records, workflows and accounts made since are not in it, and the gallery no longer shows the images made since, although their files are in the outputs folder.
+
+1. Stop InvokeAI. `invoke-db-copy` refuses to copy a database an InvokeAI process uses.
+2. Copy into a new file:
+
+   ```bash
+   invoke-db-copy --to-sqlite invokeai-from-server.db
+   ```
+
+3. In the install's database directory (`db_dir`, by default `databases` in the root), rename `invokeai.db`, which holds the state before the move, and put the new file in its place, named `invokeai.db`.
+4. Remove `db_url` from `invokeai.yaml`, and `INVOKEAI_DB_URL` from the environment, and start InvokeAI.
+
+The source is the database `db_url` names, unless `--source URL` names another; it is not changed. The new file appears only once every table matches its source, so a copy that fails leaves no file behind, and `invoke-db-copy` never overwrites an existing file. Ids continue as they did on the server: a queue item gets no id the server already gave out.
+
 ## Limits
 
 - **One InvokeAI process per database.** At startup a process cancels the queue items left running and updates its bundled workflows and style presets, which a second process would undo. The first process holds a lock on the database; a second one refuses to start. If a process ends without closing its connection, because its computer crashed or lost the network, the server releases its lock within ten minutes; the refusal names the query that finds the connection to end sooner with `KILL`.

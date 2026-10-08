@@ -47,9 +47,10 @@ def copy_rows(
     """Copies every row of the application tables (by default all of them) from `source` into `target`.
 
     Tables are copied in foreign key order, in batches of a transaction each, and a table the source lacks is
-    skipped. The target computes the generated columns itself. The ids an integer key generates next continue
-    after the highest one copied, or, from a SQLite source, which records it, after the highest one the source
-    ever issued: an AUTOINCREMENT table issues no id twice, across the copy too.
+    skipped. The target computes the generated columns itself. The ids an AUTOINCREMENT table generates next continue
+    after the highest one the source ever issued, deleted rows included: such a table issues no id twice, across the
+    copy too, in either direction. (Other integer keys continue as the target's backend does: SQLite's rowid tables
+    reuse the highest id after it is deleted.)
 
     :param transform: Applied to each row before it is written.
     :param keep_first: Tables where a row the target holds equal to another one is skipped, not refused.
@@ -60,7 +61,7 @@ def copy_rows(
     copied: dict[str, int] = {}
     with source.begin(write=False) as src:
         present = set(inspect(src).get_table_names())
-        issued = _sqlite_sequences(src) if source.dialect_name == "sqlite" else {}
+        issued = _sqlite_sequences(src) if source.dialect_name == "sqlite" else _server_sequences(src)
         for table in metadata.sorted_tables:
             if table not in wanted or table.name not in present:
                 continue
@@ -363,6 +364,18 @@ def _canonical(row: Row) -> bytes:
         return item
 
     return json.dumps({name: value(item) for name, item in sorted(row.items())}, default=str).encode()
+
+
+def _server_sequences(conn: Connection) -> dict[str, int]:
+    """The highest id each AUTO_INCREMENT table of a MySQL or MariaDB database has issued, deleted rows included."""
+    if conn.dialect.name == "mysql":
+        # MySQL serves these statistics from a cache that it refreshes once a day by default.
+        conn.exec_driver_sql("SET SESSION information_schema_stats_expiry = 0")
+    rows = conn.exec_driver_sql(
+        "SELECT TABLE_NAME, AUTO_INCREMENT FROM information_schema.TABLES "
+        "WHERE TABLE_SCHEMA = DATABASE() AND AUTO_INCREMENT IS NOT NULL"
+    ).all()
+    return {str(name): int(next_id) - 1 for name, next_id in rows}
 
 
 def _sqlite_sequences(conn: Connection) -> dict[str, int]:
