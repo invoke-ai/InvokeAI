@@ -9,7 +9,7 @@ import {
   getGalleryThumbnailRevision,
   getRefreshedGalleryThumbnailUrl,
   subscribeGalleryThumbnailRevision,
-} from '@features/gallery/data/galleryThumbnailRefresh';
+} from '@features/gallery/queries';
 import { IconButton } from '@platform/ui/Button';
 import { StarIcon } from 'lucide-react';
 import {
