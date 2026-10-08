@@ -71,6 +71,7 @@ from invokeai.backend.model_manager.metadata import (
     AnyModelRepoMetadata,
     HuggingFaceMetadataFetch,
     ModelMetadataFetchBase,
+    ModelMetadataUnavailableError,
     ModelMetadataWithFiles,
     RemoteModelFile,
 )
@@ -341,6 +342,8 @@ class ModelInstallService(ModelInstallServiceBase):
                         "resume_message": part.resume_message,
                     }
                 )
+        elif job._resume_metadata:
+            files.extend(dict(metadata) for metadata in job._resume_metadata.values())
         marker = {
             "version": INSTALL_MARKER_VERSION,
             "source": str(job.source),
@@ -488,6 +491,12 @@ class ModelInstallService(ModelInstallServiceBase):
             else:
                 try:
                     self._resume_remote_download(job)
+                except ModelMetadataUnavailableError as e:
+                    self._logger.warning(f"Could not resume install {source_str} because metadata is unavailable: {e}")
+                    job.status = InstallStatus.PAUSED
+                    self._write_install_marker(job, status=InstallStatus.PAUSED)
+                    if self._stop_event.is_set():
+                        return
                 except Exception as e:
                     if self._stop_event.is_set():
                         self._logger.info(f"Leaving interrupted install in {job._install_tmpdir} for next startup")

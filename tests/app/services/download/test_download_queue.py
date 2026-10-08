@@ -335,7 +335,10 @@ def test_multifile_download(tmp_path: Path, mm2_session: Session) -> None:
     queue.stop()
 
 
-def test_multifile_error_preserves_sibling_part_paused_during_callback(tmp_path: Path, mm2_session: Session) -> None:
+@pytest.mark.parametrize("status", [DownloadJobStatus.WAITING, DownloadJobStatus.RUNNING, DownloadJobStatus.PAUSED])
+def test_multifile_error_preserves_sibling_part_paused_during_callback(
+    tmp_path: Path, mm2_session: Session, status: DownloadJobStatus
+) -> None:
     queue = DownloadQueueService(requests_session=mm2_session, requests_session_is_trusted=True)
     failed_part = DownloadJob(
         id=10,
@@ -351,7 +354,7 @@ def test_multifile_error_preserves_sibling_part_paused_during_callback(tmp_path:
         source=AnyHttpUrl("https://example.com/paused.safetensors"),
         dest=sibling_path,
         download_path=sibling_path,
-        status=DownloadJobStatus.RUNNING,
+        status=status,
     )
     paused_sibling.pause()
     parent = MultiFileDownloadJob(
@@ -367,6 +370,17 @@ def test_multifile_error_preserves_sibling_part_paused_during_callback(tmp_path:
 
     assert paused_sibling.paused
     assert partial_path.read_bytes() == b"paused partial"
+    if status == DownloadJobStatus.RUNNING:
+        # The active worker owns cleanup of its mapping after its pause callback returns.
+        assert paused_sibling.id in queue._download_part2parent
+    else:
+        # No worker remains to release a queued or already-paused part's mapping.
+        assert paused_sibling.id not in queue._download_part2parent
+
+    # A pending worker may deliver the pause callback after the parent has already failed.
+    queue._mfd_cancelled(paused_sibling)
+    queue._download_part2parent.pop(paused_sibling.id, None)
+    assert paused_sibling.id not in queue._download_part2parent
 
 
 @pytest.mark.timeout(timeout=10, method="thread")

@@ -18,6 +18,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from pydantic_core import Url
+from requests import Timeout
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.download import DownloadJob, DownloadJobStatus, MultiFileDownloadJob
@@ -943,6 +944,44 @@ def _write_remote_install_marker(
     return download_path
 
 
+def test_restore_metadata_timeout_preserves_partial_download_for_retry(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}restore-timeout-{uuid.uuid4().hex}"
+    tmpdir.mkdir(parents=True)
+    partial_path = tmpdir / "weights.safetensors.downloading"
+    partial_path.write_bytes(b"partial model")
+    source = HFModelSource(repo_id="stabilityai/sdxl-turbo", variant=ModelRepoVariant.Default)
+    job = ModelInstallJob(
+        id=9906,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.DOWNLOADING,
+    )
+    job._install_tmpdir = tmpdir
+    mm2_installer._write_install_marker(job, status=InstallStatus.DOWNLOADING)
+
+    def raise_metadata_timeout(*args: Any, **kwargs: Any) -> None:
+        raise Timeout("Hugging Face metadata request timed out")
+
+    assert mm2_installer._session is not None
+    monkeypatch.setattr(mm2_installer._session, "get", raise_metadata_timeout)
+
+    mm2_installer._restore_incomplete_installs()
+
+    restored_job = mm2_installer.get_job_by_source(source)[-1]
+    assert restored_job.status == InstallStatus.PAUSED
+    assert partial_path.read_bytes() == b"partial model"
+    marker = mm2_installer._read_install_marker(tmpdir)
+    assert marker is not None
+    assert marker["status"] == InstallStatus.PAUSED.value
+    assert active_install_sentinel_path(tmpdir).exists()
+
+
 def test_queue_rejection_during_shutdown_preserves_completed_download(
     mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
 ) -> None:
@@ -1028,6 +1067,24 @@ def test_stop_preserves_restored_downloads_without_a_multifile_job(
     assert mm2_installer._wait_for_restore_complete(timeout=10)
     tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}restore-stop-{status.value}-{uuid.uuid4().hex}"
     partial_path = _write_remote_install_marker(mm2_installer, tmpdir, 9904, status)
+    resume_metadata = [
+        {
+            "url": "https://example.com/weights.safetensors",
+            "canonical_url": "https://cdn.example.com/weights-v1.safetensors",
+            "etag": '"model-v1"',
+            "last_modified": "Wed, 01 Jan 2025 00:00:00 GMT",
+            "expected_total_bytes": 4096,
+            "final_url": "https://cdn.example.com/weights-v1.safetensors",
+            "download_path": (tmpdir / "weights.safetensors").as_posix(),
+            "resume_required": False,
+            "resume_message": None,
+        }
+    ]
+    if status == InstallStatus.PAUSED:
+        marker_path = tmpdir / INSTALL_MARKER_FILENAME
+        marker = json.loads(marker_path.read_text(encoding="utf-8"))
+        marker["files"] = resume_metadata
+        marker_path.write_text(json.dumps(marker), encoding="utf-8")
     queued_jobs: list[ModelInstallJob] = []
     monkeypatch.setattr(mm2_installer, "_put_in_queue", queued_jobs.append)
 
@@ -1043,6 +1100,8 @@ def test_stop_preserves_restored_downloads_without_a_multifile_job(
     marker = mm2_installer._read_install_marker(tmpdir)
     assert marker is not None
     assert marker["status"] == status.value
+    if status == InstallStatus.PAUSED:
+        assert marker["files"] == resume_metadata
     expected_payload = b"downloaded model" if status == InstallStatus.DOWNLOADS_DONE else b"partial download"
     assert partial_path.read_bytes() == expected_payload
     assert not active_install_sentinel_path(tmpdir).exists()

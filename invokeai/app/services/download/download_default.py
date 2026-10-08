@@ -885,7 +885,9 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
     def _mfd_cancelled(self, download_job: DownloadJob) -> None:
         with self._lock:
-            mf_job = self._download_part2parent[download_job.id]
+            mf_job = self._download_part2parent.get(download_job.id)
+            if mf_job is None:
+                return
             self._finalize_multifile_cancellation(mf_job, paused=download_job.paused)
 
     def _mfd_error(self, download_job: DownloadJob, excp: Optional[Exception] = None) -> None:
@@ -896,11 +898,15 @@ class DownloadQueueService(DownloadQueueServiceBase):
             if not mf_job.in_terminal_state:
                 self._mfd_pending.pop(mf_job.id, None)
                 for part in mf_job.download_parts:
-                    if part is download_job or part.in_terminal_state:
+                    if part is download_job:
                         continue
-                    if part.paused:
+                    if part.paused or part.status == DownloadJobStatus.PAUSED:
                         # A pause can be requested while the worker still reports RUNNING. Preserve that user's
-                        # partial file; its worker will finish the pause callback and remove its own parent link.
+                        # partial file. A non-running part has no worker left to remove its parent link.
+                        if part.status != DownloadJobStatus.RUNNING:
+                            self._download_part2parent.pop(part.id, None)
+                        continue
+                    if part.in_terminal_state:
                         continue
                     part.cancel()
                     self._cleanup_cancelled_job(part)
