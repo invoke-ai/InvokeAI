@@ -83290,7 +83290,7 @@
         "category": "conditioning",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Describes one video reference for MiniMax H3 Ref2VA.\n\n'Audio only' conditions on the video's soundtrack alone (the standalone audio-reference\nkind). At least one reference of the request must contribute visuals, and a conditioning\nchoice that includes audio requires the video to actually carry a soundtrack.",
+        "description": "Describes one video reference for MiniMax H3 Ref2VA.\n\n'Audio only' conditions on the video's soundtrack alone (the standalone audio-reference\nkind). A conditioning choice that includes audio requires the video to actually carry a soundtrack.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
