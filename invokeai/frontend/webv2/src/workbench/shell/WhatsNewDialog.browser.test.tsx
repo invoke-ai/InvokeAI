@@ -131,7 +131,7 @@ describe('WhatsNewDialog', () => {
     );
     expect(page.getByRole('link', { name: i18n.t('whatsNew.readTheDocs') }).element()).toHaveAttribute(
       'href',
-      'https://invoke-ai.github.io/InvokeAI-7/'
+      'https://v7.invoke.ai/'
     );
 
     await page.getByRole('button', { name: /close/i }).click();
