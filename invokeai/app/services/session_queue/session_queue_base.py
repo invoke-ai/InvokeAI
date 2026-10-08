@@ -138,6 +138,11 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
+    def has_active_queue_work(self) -> bool:
+        """Return whether any queue has pending or in-progress work."""
+        pass
+
+    @abstractmethod
     def get_counts_by_destination(
         self, queue_id: str, destination: str, user_id: Optional[str] = None
     ) -> SessionQueueCountsByDestination:

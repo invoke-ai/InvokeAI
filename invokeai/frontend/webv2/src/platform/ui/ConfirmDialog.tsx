@@ -11,6 +11,7 @@ export const ConfirmDialog = ({
   confirmLabel,
   finalFocusEl,
   isDestructive = true,
+  isConfirmDisabled = false,
   isOpen,
   onClose,
   onConfirm,
@@ -22,6 +23,8 @@ export const ConfirmDialog = ({
   /** Where focus returns on close when the opener may no longer exist, e.g. a row the confirmed action deleted. */
   finalFocusEl?: () => HTMLElement | null;
   isDestructive?: boolean;
+  /** Keep confirmation unavailable until the caller has prepared a valid confirmation target. */
+  isConfirmDisabled?: boolean;
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => Promise<void> | void;
@@ -46,7 +49,7 @@ export const ConfirmDialog = ({
   }, [onExitComplete, release]);
 
   const handleConfirm = useCallback(async () => {
-    if (isPendingRef.current) {
+    if (isPendingRef.current || isConfirmDisabled) {
       return;
     }
 
@@ -60,7 +63,7 @@ export const ConfirmDialog = ({
       setIsPending(false);
       onClose();
     }
-  }, [onClose, onConfirm]);
+  }, [isConfirmDisabled, onClose, onConfirm]);
 
   const handleClose = useCallback(() => {
     if (!isPendingRef.current) {
@@ -115,7 +118,7 @@ export const ConfirmDialog = ({
               </Button>
               <Button
                 colorPalette={text.isDestructive ? 'red' : 'accent'}
-                disabled={isPending}
+                disabled={isPending || isConfirmDisabled}
                 loading={isPending}
                 variant="solid"
                 onClick={handleConfirmClick}

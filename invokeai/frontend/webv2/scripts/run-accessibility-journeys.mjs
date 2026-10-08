@@ -608,15 +608,22 @@ const runTopbarMenuJourney = async (browser) => {
     const whatsNewItem = page.getByRole('menuitem', { exact: true, name: "What's New in Invoke" });
     const documentationItem = page.getByRole('menuitem', { exact: true, name: 'Documentation' });
     const discordItem = page.getByRole('menuitem', { exact: true, name: 'Discord' });
+    const donationItem = appMenu.getByRole('menuitem', { exact: true, name: 'Donate to InvokeAI' });
     await commandPaletteItem.waitFor();
     await settingsItem.waitFor();
     await whatsNewItem.waitFor();
     await documentationItem.waitFor();
     await discordItem.waitFor();
+    await donationItem.waitFor();
+    assert.equal(await donationItem.getAttribute('href'), 'https://github.com/sponsors/invoke-ai');
+    assert.equal(await donationItem.getAttribute('target'), '_blank');
 
     const footerMetrics = await appMenu.evaluate((menu) => {
       const menuBounds = menu.getBoundingClientRect();
-      const footerItems = [...menu.querySelectorAll('[role="menuitem"]')].slice(-5);
+      const footerValues = ['command-palette', 'settings', 'whats-new', 'documentation', 'discord'];
+      const footerItems = [...menu.querySelectorAll('[role="menuitem"]')].filter((item) =>
+        footerValues.includes(item.getAttribute('data-value'))
+      );
 
       return {
         itemsFit: footerItems.every((item) => {
@@ -639,6 +646,8 @@ const runTopbarMenuJourney = async (browser) => {
     assert.equal(await page.getByRole('tooltip', { name: /^Command palette/ }).count(), 0);
 
     await appMenu.press('End');
+    assert.equal(await appMenu.getAttribute('aria-activedescendant'), await donationItem.getAttribute('id'));
+    await appMenu.press('ArrowUp');
     assert.equal(await appMenu.getAttribute('aria-activedescendant'), await discordItem.getAttribute('id'));
     for (const item of [documentationItem, whatsNewItem, settingsItem, commandPaletteItem]) {
       await appMenu.press('ArrowUp');

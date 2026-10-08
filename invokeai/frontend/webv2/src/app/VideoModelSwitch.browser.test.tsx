@@ -151,6 +151,7 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectSelector: (selector: (project: Project) => unknown) =>
     selector(useSyncExternalStore(store.subscribe, store.getSnapshot).activeProject),
   useWorkbenchCommands: () => store.commands,
+  useWorkbenchQueries: () => store.queries,
 }));
 
 const i18n = i18next.createInstance();

@@ -504,6 +504,24 @@ def _unlink_always_fails(path: Path, missing_ok: bool = False) -> None:
 class TestDeleteTransactional:
     """delete() journals its intent, deletes the record, then purges — never losing files on failure."""
 
+    def test_notify_deleted_is_public_and_callbacks_observe_removed_record(
+        self, real_image_service: tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage]
+    ) -> None:
+        service, records, _storage = real_image_service
+        _seed_record(records, "maintenance-removed.png", is_intermediate=False)
+        notified: list[str] = []
+
+        def record_removed(image_name: str) -> None:
+            with pytest.raises(ImageRecordNotFoundException):
+                records.get(image_name)
+            notified.append(image_name)
+
+        service.on_deleted(record_removed)
+        records.delete("maintenance-removed.png")
+        service.notify_deleted("maintenance-removed.png")
+
+        assert notified == ["maintenance-removed.png"]
+
     def test_delete_success_removes_files_record_and_fires_callback_once(self, disk_image_service: ImageService):
         invoker = disk_image_service._ImageService__invoker  # type: ignore
         storage = invoker.services.image_files
@@ -1391,6 +1409,59 @@ class TestStorageAccounting:
         assert dto.file_size_bytes == (
             storage.get_path("copy.png").stat().st_size + storage.get_path("copy.png", thumbnail=True).stat().st_size
         )
+
+    def test_copy_holds_the_move_mutation_lock_across_record_and_file_creation(
+        self, wired_with_move_service, monkeypatch
+    ) -> None:
+        svc, records, storage, moves = wired_with_move_service
+        invoker = svc._ImageService__invoker  # type: ignore
+        invoker.services.names.create_image_name.return_value = "copy.png"
+        invoker.services.urls.get_image_url.return_value = "/api/v1/images/i/copy.png"
+        invoker.services.board_image_records.get_board_for_image.return_value = None
+        invoker.services.configuration.image_subfolder_strategy = "flat"
+        _seed_record(records, "source.png", is_intermediate=False)
+        _save_image_file(storage, "source.png")
+
+        copy_started = threading.Event()
+        finish_copy = threading.Event()
+        real_copy = storage.copy
+
+        def pause_file_copy(*args, **kwargs):
+            # The record exists but the new original is not present yet. A concurrent missing-file
+            # maintenance scan must not be able to remove this half-written copy.
+            assert records.get("copy.png")
+            assert not storage.get_path("copy.png").exists()
+            copy_started.set()
+            assert finish_copy.wait(timeout=10), "copy was not released"
+            return real_copy(*args, **kwargs)
+
+        monkeypatch.setattr(storage, "copy", pause_file_copy)
+        copy_errors: list[Exception] = []
+
+        def copy_image() -> None:
+            try:
+                svc.copy("source.png")
+            except Exception as error:
+                copy_errors.append(error)
+
+        copy_thread = threading.Thread(target=copy_image)
+        copy_thread.start()
+        try:
+            assert copy_started.wait(timeout=10), "copy did not reach its file write"
+
+            # Probe the actual lock while the record/file pair is half-created. This is deterministic:
+            # an unlocked copy lets the probe acquire the lock, while a guarded copy does not.
+            acquired = moves._image_mutation_lock.acquire(blocking=False)
+            if acquired:
+                moves._image_mutation_lock.release()
+            assert not acquired, "copy released the shared mutation lock before its file write completed"
+        finally:
+            finish_copy.set()
+            copy_thread.join(timeout=10)
+
+        assert not copy_thread.is_alive()
+        assert copy_errors == []
+        assert storage.get_path("copy.png").exists()
 
     def test_a_failed_measurement_leaves_the_size_unknown_and_the_image_intact(self, wired, monkeypatch) -> None:
         svc, records, storage = wired
