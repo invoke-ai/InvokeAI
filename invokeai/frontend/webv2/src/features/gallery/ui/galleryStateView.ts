@@ -184,6 +184,21 @@ export const getGallerySelectedImageQuery = (values: Record<string, unknown>): G
   };
 };
 
+/**
+ * The selection was made in the listing the view shows: its stamp names the same board, view, order, search and
+ * starred filter. A selection stamped elsewhere (another board, or before a search or filter changed) is not this
+ * listing's, though it persists across those switches.
+ */
+export const isGallerySelectionInScope = (
+  selectedImageQuery: GallerySelectedImageQuery,
+  scope: Pick<GalleryStateView, 'galleryView' | 'searchTerm' | 'selectedBoardId' | 'settings' | 'starredOnly'>
+): boolean =>
+  selectedImageQuery.boardId === scope.selectedBoardId &&
+  selectedImageQuery.galleryView === scope.galleryView &&
+  selectedImageQuery.imageOrderDir === scope.settings.imageOrderDir &&
+  selectedImageQuery.searchTerm === scope.searchTerm &&
+  selectedImageQuery.starredOnly === scope.starredOnly;
+
 export const getGalleryTotalImages = (values: Record<string, unknown>): number | null =>
   typeof values.galleryTotalImages === 'number' && Number.isFinite(values.galleryTotalImages)
     ? Math.max(0, values.galleryTotalImages)
@@ -327,11 +342,13 @@ export const getGalleryStateView = (
     settings.paginationMode === 'paginated' &&
     selectedImageQuery.paginationMode === 'paginated' &&
     semanticImageQuery === null &&
-    selectedImageQuery.boardId === selectedBoardId &&
-    selectedImageQuery.galleryView === galleryView &&
-    selectedImageQuery.imageOrderDir === settings.imageOrderDir &&
-    selectedImageQuery.searchTerm === searchTerm &&
-    selectedImageQuery.starredOnly === starredOnly &&
+    isGallerySelectionInScope(selectedImageQuery, {
+      galleryView,
+      searchTerm,
+      selectedBoardId,
+      settings,
+      starredOnly,
+    }) &&
     // A starred item lives in the strip, never on a page of the unstarred
     // listing; Preview stamps its starred-list page, which the grid must not follow.
     (starredOnly || selectedItem?.starred !== true)

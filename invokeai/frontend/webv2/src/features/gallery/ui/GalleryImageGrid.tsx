@@ -52,6 +52,7 @@ import {
 } from './galleryGridLayout';
 import { focusVisibleOperable, GalleryLoadErrorState, GalleryLoadNotice, GalleryRetryButton } from './GalleryLoadError';
 import { GalleryProgressSection } from './GalleryProgressSection';
+import { getGallerySelectedImageQuery, isGallerySelectionInScope } from './galleryStateView';
 import { GALLERY_TAB_STOP_SELECTOR, GalleryThumbnailCell } from './GalleryThumbnail';
 import { useGalleryUi } from './GalleryUiContext';
 import { useGalleryWidget, type GalleryStarredStrip } from './GalleryWidgetContext';
@@ -344,7 +345,8 @@ export const GalleryImageGrid = () => {
   // A starred selection no tile shows still belongs to the strip: one under the collapsed disclosure or past the
   // shown rows, which the strip holds, or — as in Preview — one beyond the strip's bound, which the view names no
   // visible key for and only the persisted selection holds (the listing is unstarred). Either way the arrows step
-  // from it rather than from the first tile.
+  // from it rather than from the first tile. The persisted selection counts only when made in this listing: one
+  // left over from another board, search or filter would put a phantom entry at the end of this strip.
   const hiddenStripSelection = useMemo((): GalleryItem | null => {
     const selectedItem = getSelectedGalleryItemFromValues(galleryValues);
     const selectedKey = gallery.selectedItemKey ?? (selectedItem ? toGalleryItemKey(selectedItem) : null);
@@ -355,9 +357,14 @@ export const GalleryImageGrid = () => {
     }
 
     return (
-      starredStrip.items.find(isSelected) ?? (selectedItem?.starred && isSelected(selectedItem) ? selectedItem : null)
+      starredStrip.items.find(isSelected) ??
+      (selectedItem?.starred &&
+      isSelected(selectedItem) &&
+      isGallerySelectionInScope(getGallerySelectedImageQuery(galleryValues), gallery)
+        ? selectedItem
+        : null)
     );
-  }, [gallery.items, gallery.selectedItemKey, galleryValues, shownStripItems, starredStrip.items]);
+  }, [gallery, galleryValues, shownStripItems, starredStrip.items]);
   const navigationSections = useMemo((): GalleryNavigationEntry[][] => {
     const stripEntries: GalleryNavigationEntry[] = shownStripItems.map((item) => ({ item, kind: 'item' }));
 

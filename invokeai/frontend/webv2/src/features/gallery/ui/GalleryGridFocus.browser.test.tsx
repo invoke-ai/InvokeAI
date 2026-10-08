@@ -646,7 +646,11 @@ describe('Gallery grid keyboard focus', () => {
     const beyond = createItem('starred-40.png', { starred: true });
     const items = createItems(6);
     // The strip's bound left the selection out, and the listing holds unstarred items only: no tile shows it.
-    await renderGrid(items, { galleryValues: { selectedImage: beyond }, selected: null, strip });
+    await renderGrid(items, {
+      galleryValues: { selectedBoardId: 'board-a', selectedImage: beyond },
+      selected: null,
+      strip,
+    });
     expect(thumbnail('starred-40.png')).toBeNull();
     button('Elsewhere').focus();
 
@@ -654,6 +658,48 @@ describe('Gallery grid keyboard focus', () => {
     await settle();
 
     expect(selectedKey()).toBe('image:image-0.png');
+  });
+
+  it("starts from the new board's first starred tile when the starred selection stayed on the previous board", async () => {
+    const starredA = createItem('starred-a.png', { starred: true });
+    await renderGrid(createItems(6), {
+      // Selecting stamps the listing the selection was made in.
+      galleryValues: {
+        selectedBoardId: 'board-a',
+        selectedImage: starredA,
+        selectedImageName: 'image:starred-a.png',
+        selectedImageQuery: {
+          boardId: 'board-a',
+          galleryView: 'images',
+          imageOrderDir: 'DESC',
+          page: 0,
+          paginationMode: 'paginated',
+          searchTerm: '',
+          starredOnly: false,
+        },
+      },
+      selected: starredA,
+      strip: [starredA],
+    });
+
+    // As the board switch leaves it: the selection set clears, but the primary selection and its stamp persist.
+    const stripB = [0, 1, 2].map((index) =>
+      createItem(`starred-b-${index}.png`, { boardId: 'board-b', starred: true })
+    );
+    await act(() =>
+      setState({
+        gallery: { ...state.gallery, items: createItems(6, 'other'), selectedBoardId: 'board-b', ...selectionOf(null) },
+        galleryValues: { ...state.galleryValues, selectedBoardId: 'board-b', selectedImageNames: [] },
+        strip: stripB,
+      })
+    );
+    await settle();
+    button('Elsewhere').focus();
+
+    await act(() => runtimeMocks.extensions.commands.executeForSource('gallery.galleryNavRight', gallerySource));
+    await settle();
+
+    expect(selectedKey()).toBe('image:starred-b-0.png');
   });
 
   it('holds focus on the named grid while a new board loads, then resumes on that board', async () => {
