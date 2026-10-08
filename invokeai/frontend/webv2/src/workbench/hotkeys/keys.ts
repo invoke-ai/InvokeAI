@@ -97,14 +97,34 @@ export const toTinykeysBinding = (hotkey: string): string => {
 /** The `mod` key's platform name; a bare modifier normalizes to nothing, so use this rather than formatting 'mod'. */
 export const MOD_KEY_LABEL = IS_MAC_OS ? 'cmd' : 'ctrl';
 
-/** Fixed pointer gestures may use a bare modifier instead of a complete hotkey chord. */
-export const formatHotkeyPartForPlatform = (part: string): string => {
-  const named = part.trim().toLowerCase().replace('mod', MOD_KEY_LABEL);
-  return IS_MAC_OS ? named.replace('alt', 'option') : named;
+const formatPart = (part: string, isMacOs: boolean): string => {
+  const named = part
+    .trim()
+    .toLowerCase()
+    .replace('mod', isMacOs ? 'cmd' : 'ctrl');
+  return isMacOs ? named.replace('alt', 'option') : named;
 };
 
-export const formatHotkeyForPlatform = (hotkey: string): string[] =>
-  normalizeHotkeyString(hotkey).split('+').filter(Boolean).map(formatHotkeyPartForPlatform);
+/** Fixed pointer gestures may use a bare modifier instead of a complete hotkey chord. */
+export const formatHotkeyPartForPlatform = (part: string): string => formatPart(part, IS_MAC_OS);
+
+/** Apple's menu order, Control Option Shift Command; normalization keeps its own order for comparison. */
+const MAC_DISPLAY_MODIFIER_RANK: Record<string, number> = { cmd: 3, ctrl: 0, meta: 3, option: 1, shift: 2 };
+
+export const formatHotkeyForPlatform = (hotkey: string, isMacOs: boolean = IS_MAC_OS): string[] => {
+  const parts = normalizeHotkeyString(hotkey)
+    .split('+')
+    .filter(Boolean)
+    .map((part) => formatPart(part, isMacOs));
+
+  if (!isMacOs) {
+    return parts;
+  }
+
+  const key = parts.at(-1)!;
+  const modifiers = parts.slice(0, -1).sort((a, b) => MAC_DISPLAY_MODIFIER_RANK[a]! - MAC_DISPLAY_MODIFIER_RANK[b]!);
+  return [...modifiers, key];
+};
 
 /** Inputs that take no typed text: a switch or checkbox owning focus has no native undo/shortcut to protect. */
 const NON_TEXT_INPUT_TYPES = new Set([

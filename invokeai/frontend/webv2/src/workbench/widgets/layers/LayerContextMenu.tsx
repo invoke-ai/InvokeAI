@@ -33,6 +33,7 @@ import {
 } from '@workbench/canvas-engine/api';
 import { getCanvasOperations } from '@workbench/canvas-operations/api';
 import { useWorkbenchFocus } from '@workbench/focusRegions';
+import { ShortcutKeycaps } from '@workbench/hotkeys/keyGlyphs';
 import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
 import { publishLayerPanelSelection, readLayerPanelState, useLayerPanelState } from '@workbench/layerPanelState';
 import { useNotify } from '@workbench/useNotify';
@@ -1330,15 +1331,22 @@ const LayerMenuItem = ({
   onSelect: () => void;
   tone?: 'danger';
   value: string;
-}) => (
-  <MenuActionItem
-    disabled={disabled}
-    hintParts={hint ? formatHotkeyForPlatform(hint) : undefined}
-    icon={icon}
-    iconColor={iconColor}
-    label={label}
-    tone={tone}
-    value={value}
-    onSelect={onSelect}
-  />
-);
+}) => {
+  const shortcut = useMemo(
+    () => (hint ? <ShortcutKeycaps parts={formatHotkeyForPlatform(hint)} /> : undefined),
+    [hint]
+  );
+
+  return (
+    <MenuActionItem
+      disabled={disabled}
+      icon={icon}
+      iconColor={iconColor}
+      label={label}
+      shortcut={shortcut}
+      tone={tone}
+      value={value}
+      onSelect={onSelect}
+    />
+  );
+};

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { getRegionFocusDefaultKey } from './catalog';
-import { eventToHotkeyString, normalizeHotkeyString, toTinykeysBinding } from './keys';
+import { eventToHotkeyString, formatHotkeyForPlatform, normalizeHotkeyString, toTinykeysBinding } from './keys';
 
 describe('hotkey keys', () => {
   it('normalizes modifier order and aliases', () => {
@@ -33,5 +33,11 @@ describe('hotkey keys', () => {
 
     expect(eventToHotkeyString(event, false)).toBe('mod+meta+arrowleft');
     expect(eventToHotkeyString({ key: 'ArrowLeft', metaKey: true } as KeyboardEvent, false)).toBe('meta+arrowleft');
+  });
+
+  it('shows macOS modifiers in Control, Option, Shift, Command order and leaves other platforms alone', () => {
+    expect(formatHotkeyForPlatform(getRegionFocusDefaultKey('left', true), true)).toEqual(['ctrl', 'cmd', 'arrowleft']);
+    expect(formatHotkeyForPlatform('mod+shift+alt+ctrl+z', true)).toEqual(['ctrl', 'option', 'shift', 'cmd', 'z']);
+    expect(formatHotkeyForPlatform('mod+shift+alt+z', false)).toEqual(['ctrl', 'shift', 'alt', 'z']);
   });
 });

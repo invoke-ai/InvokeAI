@@ -5,6 +5,7 @@ import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button } from '@platform/ui/Button';
 import { Dialog } from '@platform/ui/Dialog';
 import { EmptyState } from '@platform/ui/EmptyState';
+import { ShortcutKeyGlyph } from '@workbench/hotkeys/keyGlyphs';
 import { SearchIcon, XIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -20,8 +21,8 @@ const INPUT_PLACEHOLDER_STYLE = { color: 'fg.subtle' };
 const INPUT_FOCUS_WITHIN_STYLE = { outlineColor: 'accent.focusRing' };
 const DATE_HINT_ID = 'command-palette-date-hint';
 const NO_PROVIDERS: PaletteSearchProvider[] = [];
-const NAV_HINT_KEYS = ['↑', '↓'];
-const ENTER_HINT_KEYS = ['↵'];
+const NAV_HINT_KEYS = ['arrowup', 'arrowdown'];
+const ENTER_HINT_KEYS = ['enter'];
 const ESC_HINT_KEYS = ['esc'];
 const TAB_HINT_KEYS = ['tab'];
 
@@ -30,7 +31,7 @@ const FooterHint = ({ children, keys, shrink = false }: { children: string; keys
   <HStack flexShrink={shrink ? 1 : 0} gap="1" minW="0">
     {keys.map((key) => (
       <Kbd key={key} flexShrink={0} textTransform="lowercase">
-        {key}
+        <ShortcutKeyGlyph fallback={key} part={key} />
       </Kbd>
     ))}
     <Text truncate>{children}</Text>
@@ -110,7 +111,7 @@ const CommandPaletteContent = ({
   const { t } = useTranslation();
   const controller = useCommandPaletteController({ entries, onClose, providers });
   const rowsRef = useRef<CommandPaletteRowsHandle>(null);
-  const modEnterHintKeys = useMemo(() => [modifierKeyLabel, '↵'], [modifierKeyLabel]);
+  const modEnterHintKeys = useMemo(() => [modifierKeyLabel, 'enter'], [modifierKeyLabel]);
   const handleSearchKeyDown = controller.onSearchKeyDown;
   const onSearchKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) =>
