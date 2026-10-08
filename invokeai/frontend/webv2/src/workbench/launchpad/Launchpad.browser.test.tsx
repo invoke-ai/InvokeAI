@@ -9,6 +9,7 @@ import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { closeModelDetail } from '@features/models/ui/uiStore';
 import { auditAccessibility } from '@platform/browser/auditAccessibility.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
   createRootRoute,
@@ -101,6 +102,7 @@ const lora = (key: string): ModelConfig =>
 
 let host: HTMLDivElement;
 let root: Root;
+let queryClient: QueryClient;
 
 const render = async () => {
   const rootRoute = createRootRoute({ component: Launchpad });
@@ -115,9 +117,11 @@ const render = async () => {
 
   await act(async () => {
     root.render(
-      <ChakraProvider value={system}>
-        <RouterProvider router={router} />
-      </ChakraProvider>
+      <QueryClientProvider client={queryClient}>
+        <ChakraProvider value={system}>
+          <RouterProvider router={router} />
+        </ChakraProvider>
+      </QueryClientProvider>
     );
     await router.load();
   });
@@ -142,6 +146,8 @@ const isInView = (element: Element) => {
 };
 
 beforeEach(() => {
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  queryClient.setQueryData(['frontend-config'], { show_donation_link: false });
   applyThemeToRoot(DEFAULT_THEME_ID);
   accountLifecycle.activate('launchpad-shell-test', ':user:launchpad-shell-test');
   setModelsSnapshotForTests({ models: [lora('a'), lora('b')], status: 'loaded' });
@@ -153,6 +159,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   await act(() => root.unmount());
+  queryClient.clear();
   host.remove();
   accountLifecycle.invalidate();
   await page.viewport(1280, 900);
