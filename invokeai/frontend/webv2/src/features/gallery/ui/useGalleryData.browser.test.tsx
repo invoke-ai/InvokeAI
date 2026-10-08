@@ -278,6 +278,66 @@ describe('useGalleryData sparse page subscriptions', () => {
     expect([...latestData!.sparseListing!.pageStates.keys()]).toEqual([60]);
   });
 
+  it('does not restore a stale discovered count while a shrunken listing loads its clamped page', async () => {
+    let resolveShrunkPage!: (page: { items: GalleryItem[]; total: number }) => void;
+    let resolveFirstPage!: (page: { items: GalleryItem[]; total: number }) => void;
+    mocks.listGalleryItems.mockImplementation(({ limit, offset }: { limit: number; offset: number }) => {
+      if (limit === 0) {
+        return Promise.resolve({ items: [], total: 121 });
+      }
+
+      if (offset === 120) {
+        return new Promise((resolve) => {
+          resolveShrunkPage = resolve;
+        });
+      }
+
+      if (offset === 0) {
+        return new Promise((resolve) => {
+          resolveFirstPage = resolve;
+        });
+      }
+
+      throw new Error(`Unexpected item page at offset ${offset}`);
+    });
+
+    await act(() =>
+      root?.render(
+        <QueryClientProvider client={queryClient!}>
+          <Probe page={2} paginated />
+        </QueryClientProvider>
+      )
+    );
+    await vi.waitFor(() => expect(readRequests()).toContainEqual({ limit: 0, offset: 0 }));
+    await vi.waitFor(() => expect(readRequests()).toContainEqual({ limit: 60, offset: 120 }));
+
+    let renderError: unknown;
+    try {
+      await act(async () => {
+        resolveShrunkPage({ items: [], total: 60 });
+        await Promise.resolve();
+      });
+    } catch (error) {
+      renderError = error;
+    }
+
+    expect(renderError).toBeUndefined();
+    await vi.waitFor(() => expect(readRequests()).toContainEqual({ limit: 60, offset: 0 }));
+    expect(latestData?.total).toBe(60);
+    expect(readRequests().filter(({ limit, offset }) => limit === 60 && offset === 120)).toHaveLength(1);
+
+    await act(async () => {
+      resolveFirstPage({
+        items: Array.from({ length: 60 }, (_, index) => createItem(index)),
+        total: 60,
+      });
+      await Promise.resolve();
+    });
+    await vi.waitFor(() => expect(latestData?.items).toHaveLength(60));
+    expect(latestData?.total).toBe(60);
+    expect(readRequests().filter(({ limit, offset }) => limit === 60 && offset === 120)).toHaveLength(1);
+  });
+
   it('surfaces count errors and retries count discovery before loading a clamped page', async () => {
     let attempts = 0;
     mocks.listGalleryItems.mockImplementation(({ offset, limit }: { offset: number; limit: number }) => {

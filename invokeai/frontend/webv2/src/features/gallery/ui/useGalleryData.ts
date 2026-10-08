@@ -312,7 +312,9 @@ export const useGalleryData = ({
     enabled: sparseViewport && isPaginated && page > 0 && retainedTotal === null && cachedFirstPage === undefined,
   });
   const hasUnresolvedTotalError = totalError !== null && retainedTotal === null && cachedFirstPage === undefined;
-  const stableTotal = retainedTotal ?? cachedFirstPage?.total ?? queriedTotal ?? null;
+  const isInitialTotalDiscovery = retainedTotal === null && cachedFirstPage === undefined;
+  const stableTotal =
+    retainedTotal ?? cachedFirstPage?.total ?? (isInitialTotalDiscovery ? queriedTotal : undefined) ?? null;
   const knownTotal = stableTotal;
   const maxPaginatedPage =
     knownTotal === null || !Number.isFinite(knownTotal)
@@ -420,7 +422,8 @@ export const useGalleryData = ({
 
   // Keep this listing's total for the hook lifetime after its count/page Query data leaves cache. Active page totals
   // replace it only after loaded pages settle and agree.
-  const currentTotal = observedTotal ?? (isPaginated && !isFetchingTotal ? queriedTotal : undefined);
+  const currentTotal =
+    observedTotal ?? (isPaginated && isInitialTotalDiscovery && !isFetchingTotal ? queriedTotal : undefined);
   if (
     sparseViewport &&
     currentTotal !== undefined &&

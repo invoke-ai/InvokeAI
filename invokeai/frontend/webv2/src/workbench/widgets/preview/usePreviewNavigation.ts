@@ -541,6 +541,28 @@ export const usePreviewNavigation = ({
         ?.offset ?? selectedPageOffset
     );
   }, [boardPageResults, selectedItemKey, selectedPageOffset]);
+  const selectedListingPage = boardPageResults.find(({ data }) =>
+    data.items.some((item) => toGalleryItemKey(item) === selectedItemKey)
+  );
+  const selectedItemStartsPage =
+    selectedListingPage !== undefined &&
+    selectedListingPage.data.items[0] !== undefined &&
+    toGalleryItemKey(selectedListingPage.data.items[0]) === selectedItemKey;
+  const previousListingPageOffset = selectedItemPageOffset - GALLERY_PAGE_SIZE;
+  const previousListingPageQueryIndex = adjacentPageOffsets.indexOf(previousListingPageOffset);
+  const previousListingPageQuery =
+    previousListingPageOffset === selectedPageOffset
+      ? selectedPageQuery
+      : previousListingPageQueryIndex >= 0
+        ? adjacentPageQueries[previousListingPageQueryIndex]
+        : undefined;
+  const hasUnresolvedPreviousListingPage =
+    selectedItemStartsPage &&
+    previousListingPageOffset >= 0 &&
+    (listingTotal === undefined || previousListingPageOffset < listingTotal) &&
+    (!boardPageResults.some(({ offset }) => offset === previousListingPageOffset) ||
+      previousListingPageQuery?.isFetching === true ||
+      previousListingPageQuery?.isError === true);
   const selectedItemIsMissingFromStampedPage =
     selectedItem !== null &&
     selectedItemKey !== null &&
@@ -577,7 +599,7 @@ export const usePreviewNavigation = ({
 
       const loadedEntry = getGalleryNavigationStep(navigationSections, cursorKey, direction);
 
-      if (loadedEntry !== null && !selectedItemNeedsLocation) {
+      if (loadedEntry !== null && !selectedItemNeedsLocation && !(offset === -1 && hasUnresolvedPreviousListingPage)) {
         pageFetchRequestRef.current?.controller.abort();
         pageFetchRequestRef.current = null;
         pendingNavigationContextRef.current = null;
@@ -596,6 +618,18 @@ export const usePreviewNavigation = ({
       const pages = [...boardPageResults];
       let pageOffset = selectedItemPageOffset;
       let total = listingTotal ?? pages[0]?.data.total;
+      const updatePage = (offset: number, data: GalleryItemsPage) => {
+        const index = pages.findIndex((page) => page.offset === offset);
+        const page = { offset, data };
+
+        if (index === -1) {
+          pages.push(page);
+        } else {
+          pages[index] = page;
+        }
+
+        pages.sort((a, b) => a.offset - b.offset);
+      };
 
       return (async () => {
         try {
@@ -646,7 +680,7 @@ export const usePreviewNavigation = ({
               return false;
             }
 
-            pages.push({ offset: selectedPageOffset, data: currentPage });
+            updatePage(selectedPageOffset, currentPage);
             total = currentPage.total;
 
             const currentSections = [
@@ -685,8 +719,7 @@ export const usePreviewNavigation = ({
                 return false;
               }
 
-              pages.push({ offset: pageOffset, data: page });
-              pages.sort((a, b) => a.offset - b.offset);
+              updatePage(pageOffset, page);
               total = page.total;
               const pageItems = pages.flatMap(({ data }) => data.items);
               const sections = [
@@ -733,6 +766,7 @@ export const usePreviewNavigation = ({
       selectedPageOffset,
       selectedItem,
       selectedItemNeedsLocation,
+      hasUnresolvedPreviousListingPage,
       navigationSemanticQuery,
       pendingNavigationContextRef,
       pageFetchRequestRef,
@@ -776,6 +810,10 @@ export const usePreviewNavigation = ({
     }
 
     const resolve = (offset: -1 | 1): PreviewNeighbor => {
+      if (offset === -1 && !selectedItemNeedsLocation && hasUnresolvedPreviousListingPage) {
+        return { kind: 'more' };
+      }
+
       const neighbor = getGalleryNavigationStep(navigationSections, cursorKey, offset === 1 ? 'right' : 'left');
 
       if (neighbor !== null) {
@@ -788,7 +826,15 @@ export const usePreviewNavigation = ({
     };
 
     return { next: resolve(1), previous: resolve(-1) };
-  }, [cursorKey, isComparing, listingTotal, navigationSections, selectedItemPageOffset]);
+  }, [
+    cursorKey,
+    hasUnresolvedPreviousListingPage,
+    isComparing,
+    listingTotal,
+    navigationSections,
+    selectedItemNeedsLocation,
+    selectedItemPageOffset,
+  ]);
 
   // Prefetch the images a step would land on to avoid decode flashes during navigation.
   const previousNeighborUrl =
