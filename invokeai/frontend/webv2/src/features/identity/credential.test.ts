@@ -11,9 +11,16 @@ import type * as sessionModule from './session';
  */
 
 const storage = vi.hoisted(() => {
+  interface Marker {
+    readonly at: number;
+    readonly id: string;
+    readonly userId: string;
+  }
+
   const listeners = new Set<() => void>();
   let stored: string | null = null;
-  let rotation: { at: number; userId: string } | null = null;
+  /** Announced rotations by id, as browser storage keeps each under its own key. */
+  const rotations = new Map<string, Marker>();
   const log: string[] = [];
   const notify = (): void => {
     for (const listener of listeners) {
@@ -26,12 +33,12 @@ const storage = vi.hoisted(() => {
       clear: () => {
         stored = null;
       },
-      clearRotation: () => {
+      clearRotation: (id: string) => {
         log.push('clearRotation');
-        rotation = null;
+        rotations.delete(id);
       },
       read: () => stored,
-      readRotation: () => rotation,
+      readRotations: () => [...rotations.values()],
       subscribe: (listener: () => void) => {
         listeners.add(listener);
         return () => listeners.delete(listener);
@@ -40,18 +47,25 @@ const storage = vi.hoisted(() => {
         log.push(`write:${token}`);
         stored = token;
       },
-      writeRotation: (marker: { at: number; userId: string }) => {
+      writeRotation: (marker: Marker) => {
         log.push('writeRotation');
-        rotation = marker;
+        rotations.set(marker.id, marker);
       },
     },
     get: () => stored,
-    getRotation: () => rotation,
+    getRotations: () => [...rotations.values()],
     /** This tab's own writes, in order. */
     log,
-    /** Another tab announced or withdrew a credential rotation; this tab hears about it through a storage event. */
-    otherTabAnnouncesRotation: (marker: { at: number; userId: string } | null) => {
-      rotation = marker;
+    /**
+     * Another tab announced (or, with `null`, withdrew) its credential rotation; this tab hears about it through a
+     * storage event. `tab` names the announcing tab, whose rotation id it is.
+     */
+    otherTabAnnouncesRotation: (marker: { at: number; userId: string } | null, tab = 'other-tab') => {
+      if (marker === null) {
+        rotations.delete(tab);
+      } else {
+        rotations.set(tab, { ...marker, id: tab });
+      }
       notify();
     },
     /** Another tab changed the shared token; this tab hears about it through a storage event. */
@@ -63,7 +77,7 @@ const storage = vi.hoisted(() => {
       listeners.clear();
       log.length = 0;
       stored = null;
-      rotation = null;
+      rotations.clear();
     },
     /** A token left by an earlier page load. */
     seed: (token: string) => {
@@ -410,7 +424,7 @@ describe('own password change', () => {
 
     expect(await pendingChange).toBeInstanceOf(http.HttpRequestIdentityExpiredError);
     expect(storage.get()).toBeNull();
-    expect(storage.getRotation()).toBeNull();
+    expect(storage.getRotations()).toEqual([]);
     expect(session.getAuthSession()).toMatchObject({ sessionExpired: false, user: null });
     expect(await nextRequestToken()).toBeNull();
   });
@@ -423,7 +437,7 @@ describe('own password change', () => {
     const pendingChange = changePassword();
     await untilPatchSent('/api/v1/auth/me');
 
-    expect(storage.getRotation()).toMatchObject({ userId: user.user_id });
+    expect(storage.getRotations()).toEqual([expect.objectContaining({ userId: user.user_id })]);
 
     storage.log.length = 0;
     change.resolve(json(user, { refreshedToken: 'token-a-epoch-2' }));
@@ -431,7 +445,7 @@ describe('own password change', () => {
 
     // A waiting tab adopts whatever is stored when the announcement is withdrawn, so the replacement comes first.
     expect(storage.log).toEqual(['write:token-a-epoch-2', 'clearRotation']);
-    expect(storage.getRotation()).toBeNull();
+    expect(storage.getRotations()).toEqual([]);
   });
 
   it('withdraws only its own announcement, not one another tab of the same user made meanwhile', async () => {
@@ -446,7 +460,37 @@ describe('own password change', () => {
     change.resolve(json(user, { refreshedToken: 'token-a-epoch-2' }));
     await pendingChange;
 
-    expect(storage.getRotation()).toBe(otherTabMarker);
+    expect(storage.getRotations()).toEqual([{ ...otherTabMarker, id: 'other-tab' }]);
+  });
+
+  it("clears other tabs' announcements past their wait when announcing, and keeps live ones", async () => {
+    const change = createDeferredResponse();
+    route = (request) =>
+      request.path === '/api/v1/auth/me' && request.method === 'PATCH' ? change.promise : authRoutes(request);
+    const kept = [
+      { at: Date.now() - 1_000, id: 'same-user-tab', userId: user.user_id },
+      { at: Date.now() - 1_000, id: 'other-user-tab', userId: userB.user_id },
+      // Left by a clock step back; it ages out once real time passes it.
+      { at: Date.now() + 600_000, id: 'future-tab', userId: user.user_id },
+    ];
+
+    storage.otherTabAnnouncesRotation({ at: Date.now() - 31_000, userId: user.user_id }, 'unloaded-tab');
+    for (const { id, ...marker } of kept) {
+      storage.otherTabAnnouncesRotation(marker, id);
+    }
+    const pendingChange = changePassword();
+    await untilPatchSent('/api/v1/auth/me');
+
+    expect(storage.getRotations()).toHaveLength(kept.length + 1);
+    expect(storage.getRotations()).toEqual(
+      expect.arrayContaining([...kept, expect.objectContaining({ userId: user.user_id })])
+    );
+
+    change.resolve(json(user, { refreshedToken: 'token-a-epoch-2' }));
+    await pendingChange;
+
+    expect(storage.getRotations()).toHaveLength(kept.length);
+    expect(storage.getRotations()).toEqual(expect.arrayContaining(kept));
   });
 
   it('withdraws the announcement when this tab leaves or signs out mid-change', async () => {
@@ -460,18 +504,18 @@ describe('own password change', () => {
 
     void changePassword().catch(() => undefined);
     await untilPatchSent('/api/v1/auth/me');
-    expect(storage.getRotation()).not.toBeNull();
+    expect(storage.getRotations()).toHaveLength(1);
     window.dispatchEvent(new Event('pagehide'));
-    expect(storage.getRotation()).toBeNull();
+    expect(storage.getRotations()).toEqual([]);
 
     await session.logoutSession();
     await signIn();
     void changePassword().catch(() => undefined);
     await vi.waitFor(() => {
-      expect(storage.getRotation()).not.toBeNull();
+      expect(storage.getRotations()).toHaveLength(1);
     });
     await session.logoutSession();
-    expect(storage.getRotation()).toBeNull();
+    expect(storage.getRotations()).toEqual([]);
     expect(storage.get()).toBeNull();
   });
 
@@ -485,7 +529,7 @@ describe('own password change', () => {
     change.resolve(json({ detail: 'Current password is incorrect' }, { status: 400 }));
     await pendingChange;
 
-    expect(storage.getRotation()).toBeNull();
+    expect(storage.getRotations()).toEqual([]);
     expect(storage.get()).toBe('token-a');
   });
 
@@ -627,6 +671,34 @@ describe("another tab's password change", () => {
     expect(storage.get()).toBeNull();
   });
 
+  it('keeps holding that 401 while a concurrent change of the same user is still announced', async () => {
+    const { accountEpoch } = session.getAuthSession();
+    const replacement = tokenFor(user.user_id, 'epoch-2');
+    route = revokedRoute;
+
+    storage.otherTabAnnouncesRotation({ at: Date.now() - 1_000, userId: user.user_id }, 'first-tab');
+    storage.otherTabAnnouncesRotation({ at: Date.now(), userId: user.user_id }, 'second-tab');
+    await expect(http.apiFetch('/api/v1/boards/revoked')).rejects.toMatchObject({ status: 401 });
+
+    // The later change failed (the earlier one revoked its token), but the earlier one is still in flight.
+    storage.otherTabAnnouncesRotation(null, 'second-tab');
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    expect(session.getAuthSession()).toMatchObject({ accountEpoch, sessionExpired: false, user });
+    expect(storage.get()).toBe('token-a');
+
+    storage.otherTabStores(replacement);
+    storage.otherTabAnnouncesRotation(null, 'first-tab');
+    route = authRoutes;
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+
+    expect(session.getAuthSession()).toMatchObject({ accountEpoch, sessionExpired: false, user });
+    expect(await nextRequestToken()).toBe(replacement);
+  });
+
   it('expires the session when the announcing tab never settles its change', async () => {
     vi.useFakeTimers();
     try {
@@ -640,6 +712,44 @@ describe("another tab's password change", () => {
       await vi.advanceTimersByTimeAsync(1_000);
       expect(session.getAuthSession()).toMatchObject({ sessionExpired: true, user: null });
       expect(storage.get()).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('extends the hold for a later announcement and ends it when the last live one ages out', async () => {
+    vi.useFakeTimers();
+    try {
+      route = revokedRoute;
+
+      storage.otherTabAnnouncesRotation({ at: Date.now(), userId: user.user_id }, 'first-tab');
+      await expect(http.apiFetch('/api/v1/boards/revoked')).rejects.toMatchObject({ status: 401 });
+      await vi.advanceTimersByTimeAsync(20_000);
+      storage.otherTabAnnouncesRotation({ at: Date.now(), userId: user.user_id }, 'second-tab');
+      await vi.advanceTimersByTimeAsync(29_000);
+      expect(session.getAuthSession().user).toEqual(user);
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(session.getAuthSession()).toMatchObject({ sessionExpired: true, user: null });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('shortens the hold to the next live announcement when the latest is withdrawn', async () => {
+    vi.useFakeTimers();
+    try {
+      route = revokedRoute;
+
+      storage.otherTabAnnouncesRotation({ at: Date.now() - 20_000, userId: user.user_id }, 'first-tab');
+      storage.otherTabAnnouncesRotation({ at: Date.now(), userId: user.user_id }, 'second-tab');
+      await expect(http.apiFetch('/api/v1/boards/revoked')).rejects.toMatchObject({ status: 401 });
+      storage.otherTabAnnouncesRotation(null, 'second-tab');
+      await vi.advanceTimersByTimeAsync(9_000);
+      expect(session.getAuthSession().user).toEqual(user);
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(session.getAuthSession()).toMatchObject({ sessionExpired: true, user: null });
     } finally {
       vi.useRealTimers();
     }
@@ -677,7 +787,10 @@ describe("another tab's password change", () => {
 
       storage.otherTabAnnouncesRotation({ at: Date.now() + 600_000, userId: user.user_id });
       await expect(http.apiFetch('/api/v1/boards/revoked')).rejects.toMatchObject({ status: 401 });
-      await vi.advanceTimersByTimeAsync(30_000);
+      await vi.advanceTimersByTimeAsync(20_000);
+      // Re-reading the marker on a later storage change does not restart its wait.
+      storage.otherTabAnnouncesRotation({ at: Date.now(), userId: userB.user_id }, 'unrelated-tab');
+      await vi.advanceTimersByTimeAsync(10_000);
 
       expect(session.getAuthSession()).toMatchObject({ sessionExpired: true, user: null });
     } finally {

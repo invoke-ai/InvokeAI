@@ -8,7 +8,7 @@ const testState = vi.hoisted(() => {
   const events: string[] = [];
   const listeners = new Set<() => void>();
   let stored: string | null = null;
-  let rotation: { at: number; userId: string } | null = null;
+  const rotations = new Map<string, { at: number; id: string; userId: string }>();
   let blocked = false;
 
   const tokenAdapter = {
@@ -18,11 +18,11 @@ const testState = vi.hoisted(() => {
         stored = null;
       }
     }),
-    clearRotation: () => {
-      rotation = null;
+    clearRotation: (id: string) => {
+      rotations.delete(id);
     },
     read: vi.fn(() => (blocked ? undefined : stored)),
-    readRotation: () => (blocked ? undefined : rotation),
+    readRotations: () => (blocked ? undefined : [...rotations.values()]),
     subscribe: (listener: () => void) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -33,9 +33,9 @@ const testState = vi.hoisted(() => {
         stored = nextToken;
       }
     }),
-    writeRotation: (marker: { at: number; userId: string }) => {
+    writeRotation: (marker: { at: number; id: string; userId: string }) => {
       if (!blocked) {
-        rotation = marker;
+        rotations.set(marker.id, marker);
       }
     },
   };
@@ -57,7 +57,7 @@ const testState = vi.hoisted(() => {
       events.length = 0;
       listeners.clear();
       stored = null;
-      rotation = null;
+      rotations.clear();
       blocked = false;
       tokenAdapter.clear.mockClear();
       tokenAdapter.read.mockClear();

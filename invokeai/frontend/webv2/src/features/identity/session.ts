@@ -1,3 +1,4 @@
+import { createUuid } from '@platform/browser/randomUuid';
 import { createExternalStore } from '@platform/state/externalStore';
 import {
   ApiError,
@@ -245,35 +246,84 @@ const getPendingRotation = (): CredentialRotation | null =>
 const ANNOUNCED_ROTATION_WAIT_MS = 30_000;
 
 /**
- * The rotation another tab has announced for `userId`'s credential, if it is still within its wait. A marker dated in
- * the future (a clock step, or not written by this app) counts from now, so it can never hold longer than the wait.
+ * The rotation of `userId`'s credential announced most recently and still within its wait; another tab may announce
+ * a concurrent one, which keeps its own marker. A marker dated in the future (a clock step, or not written by this
+ * app) counts from when it was first read, now unless `firstSeen` (marker id to time) recorded an earlier read, so it
+ * can never hold longer than the wait.
  */
-const readAnnouncedRotation = (userId: string | null): CredentialRotationMarker | null => {
-  const marker = userId === null ? null : tokenStore.readRotation();
+const readAnnouncedRotation = (
+  userId: string | null,
+  firstSeen?: Map<string, number>
+): CredentialRotationMarker | null => {
+  const markers = userId === null ? undefined : tokenStore.readRotations();
+  const now = Date.now();
+  let latest: CredentialRotationMarker | null = null;
 
-  if (marker === null || marker === undefined || marker.userId !== userId) {
-    return null;
+  for (const marker of markers ?? []) {
+    if (marker.userId !== userId) {
+      continue;
+    }
+
+    const seen = firstSeen?.get(marker.id) ?? now;
+    const at = Math.min(marker.at, seen);
+
+    firstSeen?.set(marker.id, seen);
+
+    if (now - at < ANNOUNCED_ROTATION_WAIT_MS && (latest === null || at > latest.at)) {
+      latest = { ...marker, at };
+    }
   }
 
-  const at = Math.min(marker.at, Date.now());
-
-  return Date.now() - at < ANNOUNCED_ROTATION_WAIT_MS ? { at, userId: marker.userId } : null;
+  return latest;
 };
 
-/** Resolves once `marker` is no longer announced for `userId`: when it is cleared or when its wait ends. */
+/**
+ * Announce this tab's rotation, first removing markers past their wait: they are ignored anyway, and only a tab that
+ * unloaded mid-change leaves one behind. A marker dated in the future (a clock step back during a change that never
+ * withdrew) is left until real time passes it and it ages out; such orphans are rare, bounded by the size of the
+ * clock step, and never hold a 401 longer than the wait.
+ */
+const announceRotation = (marker: CredentialRotationMarker): void => {
+  for (const stale of tokenStore.readRotations() ?? []) {
+    if (marker.at - stale.at >= ANNOUNCED_ROTATION_WAIT_MS) {
+      tokenStore.clearRotation(stale.id);
+    }
+  }
+
+  tokenStore.writeRotation(marker);
+};
+
+/**
+ * Resolves once no rotation of `marker`'s principal is announced any longer, or when the latest live announcement's
+ * wait ends. Waiting for every announcement, not just `marker`, keeps one concurrent change that fails from releasing
+ * a 401 that another, still in flight, caused. Each storage change re-anchors the wait to the latest live
+ * announcement, so a later one extends it and withdrawing the latest shortens it to the next.
+ */
 const untilAnnouncedRotationSettles = (marker: CredentialRotationMarker): Promise<void> =>
   new Promise((resolve) => {
+    // Remembered for the whole wait, so re-reading a future-dated marker cannot keep restarting its wait.
+    const firstSeen = new Map([[marker.id, marker.at]]);
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const settle = (): void => {
       clearTimeout(timer);
       unsubscribe();
       resolve();
     };
-    const timer = setTimeout(settle, Math.max(0, marker.at + ANNOUNCED_ROTATION_WAIT_MS - Date.now()));
+    const holdUntilWaitEnds = (latest: CredentialRotationMarker): void => {
+      clearTimeout(timer);
+      timer = setTimeout(settle, Math.max(0, latest.at + ANNOUNCED_ROTATION_WAIT_MS - Date.now()));
+    };
     const unsubscribe = tokenStore.subscribe(() => {
-      if (readAnnouncedRotation(marker.userId) === null) {
+      const latest = readAnnouncedRotation(marker.userId, firstSeen);
+
+      if (latest === null) {
         settle();
+      } else {
+        holdUntilWaitEnds(latest);
       }
     });
+
+    holdUntilWaitEnds(marker);
   });
 
 /** The rejected credential already waiting on an announced rotation; a second 401 for it adds nothing. */
@@ -397,7 +447,7 @@ const rotateOwnCredential = <Result extends { refreshedToken: string | null }>(
     }
 
     const pending: CredentialRotation = {
-      announced: userId === null ? null : { at: Date.now(), userId },
+      announced: userId === null ? null : { at: Date.now(), id: createUuid(), userId },
       deferredStorageSync: false,
       deferredUnauthorized: null,
       scope,
@@ -406,7 +456,7 @@ const rotateOwnCredential = <Result extends { refreshedToken: string | null }>(
     rotation = pending;
 
     if (pending.announced !== null) {
-      tokenStore.writeRotation(pending.announced);
+      announceRotation(pending.announced);
     }
 
     try {
@@ -428,6 +478,9 @@ const rotateOwnCredential = <Result extends { refreshedToken: string | null }>(
       return result;
     } finally {
       rotation = null;
+      // Withdraw before handling a deferred 401, so this tab does not wait on its own, settled announcement. The
+      // withdrawal removes only this rotation's marker: when the 401 came from another tab's concurrent change
+      // revoking this tab's token, that tab's marker is still announced and the 401 waits for its replacement.
       withdrawAnnouncedRotation(pending);
 
       if (pending.deferredStorageSync) {
@@ -503,17 +556,9 @@ const activateAccount = (user: UserDTO, token: string): number => {
  * rotation's own marker is cleared; another tab of the same user may have announced its own meanwhile.
  */
 const withdrawAnnouncedRotation = (pending: CredentialRotation): void => {
-  const { announced } = pending;
-
-  if (announced === null) {
-    return;
-  }
-
-  pending.announced = null;
-  const stored = tokenStore.readRotation();
-
-  if (stored === undefined || (stored !== null && stored.at === announced.at && stored.userId === announced.userId)) {
-    tokenStore.clearRotation();
+  if (pending.announced !== null) {
+    tokenStore.clearRotation(pending.announced.id);
+    pending.announced = null;
   }
 };
 

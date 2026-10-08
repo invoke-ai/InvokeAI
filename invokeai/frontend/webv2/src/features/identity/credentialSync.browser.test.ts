@@ -11,7 +11,20 @@ import type * as sessionModule from './session';
  */
 
 const TOKEN_KEY = 'auth_token';
-const ROTATION_KEY = 'auth_token_rotation';
+const ROTATION_KEY_PREFIX = 'auth_token_rotation:';
+/** The marker the other tab writes when it announces a password change of its own. */
+const OTHER_TAB_ROTATION_KEY = `${ROTATION_KEY_PREFIX}other-tab`;
+
+const rotationMarkerKeys = (): string[] =>
+  Array.from({ length: window.localStorage.length }, (_, index) => window.localStorage.key(index)).filter(
+    (key): key is string => key?.startsWith(ROTATION_KEY_PREFIX) ?? false
+  );
+
+const removeRotationMarkers = (): void => {
+  for (const key of rotationMarkerKeys()) {
+    window.localStorage.removeItem(key);
+  }
+};
 
 const userFor = (userId: string) => ({
   created_at: '2026-07-25T12:00:00Z',
@@ -67,6 +80,10 @@ const backend = (request: SentRequest): Response | Promise<Response> => {
     case '/api/v1/auth/login':
       return json({ expires_in: 86400, token: tokenFor('user-a', 'login'), user: userFor('user-a') });
     case '/api/v1/auth/me':
+      if (request.method === 'PATCH') {
+        // The only password change sent here races the other tab's, which the server committed first.
+        return json({ detail: 'Could not validate credentials' }, { status: 401 });
+      }
       return principal ? json(userFor(principal)) : json({ detail: 'Not authenticated' }, { status: 401 });
     case '/api/v1/boards/revoked':
       return json({ detail: 'revoked' }, { status: 401 });
@@ -88,7 +105,7 @@ const writeClientState = (): Promise<Response> =>
 beforeEach(async () => {
   vi.resetModules();
   window.localStorage.removeItem(TOKEN_KEY);
-  window.localStorage.removeItem(ROTATION_KEY);
+  removeRotationMarkers();
   sent = [];
   pendingWrite = null;
   vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => {
@@ -117,7 +134,7 @@ afterEach(() => {
   stopSync();
   otherTab.remove();
   window.localStorage.removeItem(TOKEN_KEY);
-  window.localStorage.removeItem(ROTATION_KEY);
+  removeRotationMarkers();
   vi.unstubAllGlobals();
 });
 
@@ -204,13 +221,13 @@ it('holds a 401 while another tab announces a password change, then adopts the r
   const { accountEpoch } = session.getAuthSession();
   const replacement = tokenFor('user-a', 'epoch-2');
 
-  otherTabStorage().setItem(ROTATION_KEY, JSON.stringify({ at: Date.now(), userId: 'user-a' }));
+  otherTabStorage().setItem(OTHER_TAB_ROTATION_KEY, JSON.stringify({ at: Date.now(), userId: 'user-a' }));
   await expect(http.apiFetch('/api/v1/boards/revoked')).rejects.toMatchObject({ status: 401 });
 
   expect(session.getAuthSession()).toMatchObject({ accountEpoch, sessionExpired: false, user: { user_id: 'user-a' } });
 
   otherTabStorage().setItem(TOKEN_KEY, replacement);
-  otherTabStorage().removeItem(ROTATION_KEY);
+  otherTabStorage().removeItem(OTHER_TAB_ROTATION_KEY);
   await vi.waitFor(() => {
     expect(session.identityTransportAuthAdapter.capture().token).toBe(replacement);
   }, CROSS_DOCUMENT);
@@ -221,14 +238,42 @@ it('holds a 401 while another tab announces a password change, then adopts the r
 });
 
 it('expires the held 401 once the announcing tab withdraws without a replacement', async () => {
-  otherTabStorage().setItem(ROTATION_KEY, JSON.stringify({ at: Date.now(), userId: 'user-a' }));
+  otherTabStorage().setItem(OTHER_TAB_ROTATION_KEY, JSON.stringify({ at: Date.now(), userId: 'user-a' }));
   await expect(http.apiFetch('/api/v1/boards/revoked')).rejects.toMatchObject({ status: 401 });
   expect(session.getAuthSession().user?.user_id).toBe('user-a');
 
-  otherTabStorage().removeItem(ROTATION_KEY);
+  otherTabStorage().removeItem(OTHER_TAB_ROTATION_KEY);
 
   await vi.waitFor(() => {
     expect(session.getAuthSession()).toMatchObject({ sessionExpired: true, user: null });
   }, CROSS_DOCUMENT);
   expect(window.localStorage.getItem(TOKEN_KEY)).toBeNull();
+});
+
+it('waits for the replacement of a concurrent password change in another tab that revoked its own change', async () => {
+  const { accountEpoch } = session.getAuthSession();
+  const loginToken = tokenFor('user-a', 'login');
+  const replacement = tokenFor('user-a', 'epoch-2');
+
+  // Both tabs change the password at once; the server commits the other tab's change first, revoking this tab's token.
+  otherTabStorage().setItem(OTHER_TAB_ROTATION_KEY, JSON.stringify({ at: Date.now(), userId: 'user-a' }));
+  await expect(
+    session.updateOwnProfile({ current_password: 'old-password', new_password: 'new-password' })
+  ).rejects.toMatchObject({ status: 401 });
+
+  // This tab's own announcement is withdrawn, but the other tab's still holds the 401 its change caused.
+  expect(rotationMarkerKeys()).toEqual([OTHER_TAB_ROTATION_KEY]);
+  expect(session.getAuthSession()).toMatchObject({ accountEpoch, sessionExpired: false, user: { user_id: 'user-a' } });
+  expect(window.localStorage.getItem(TOKEN_KEY)).toBe(loginToken);
+
+  otherTabStorage().setItem(TOKEN_KEY, replacement);
+  otherTabStorage().removeItem(OTHER_TAB_ROTATION_KEY);
+  await vi.waitFor(() => {
+    expect(session.identityTransportAuthAdapter.capture().token).toBe(replacement);
+  }, CROSS_DOCUMENT);
+  await writeClientState();
+
+  expect(session.getAuthSession()).toMatchObject({ accountEpoch, sessionExpired: false, user: { user_id: 'user-a' } });
+  expect(sent.at(-1)!.authorization).toBe(`Bearer ${replacement}`);
+  expect(window.localStorage.getItem(TOKEN_KEY)).toBe(replacement);
 });
