@@ -361,3 +361,81 @@ def test_generate_snapped_size_stays_within_max_image_size() -> None:
 
     assert provider.last_request is not None
     assert (provider.last_request.width, provider.last_request.height) == (4096, 2304)
+
+
+def _starter_buckets() -> list[tuple[str, str, int, int]]:
+    """Every ratio bucket a txt2img external starter model declares."""
+    return [
+        (starter.source, ratio, size.width, size.height)
+        for starter in STARTER_MODELS
+        if starter.capabilities is not None and "txt2img" in starter.capabilities.modes
+        for ratio, size in (starter.capabilities.aspect_ratio_sizes or {}).items()
+    ]
+
+
+@pytest.mark.parametrize("source, ratio, width, height", _starter_buckets())
+def test_starter_model_ratio_request_is_moved_to_its_bucket(source: str, ratio: str, width: int, height: int) -> None:
+    """A request at a bucketed ratio but another size gets the bucket's size, even when the bucket's key is not in
+    lowest terms (Seedream's "21:9" bucket for a 1568x672 request, which reduces to 7:3)."""
+    starter = next(model for model in STARTER_MODELS if model.source == source)
+    assert starter.capabilities is not None
+    provider_id, provider_model_id = source.removeprefix("external://").split("/", 1)
+    model = ExternalApiModelConfig(
+        key=source,
+        name=starter.name,
+        provider_id=provider_id,
+        provider_model_id=provider_model_id,
+        capabilities=starter.capabilities,
+    )
+    provider = DummyProvider(provider_id, configured=True, result=ExternalGenerationResult(images=[]))
+    service = ExternalGenerationService({provider_id: provider}, logging.getLogger("test"))
+    left, right = (int(part) for part in ratio.split(":"))
+
+    service.generate(_build_request(model=model, width=left * 16, height=right * 16))
+
+    assert provider.last_request is not None
+    assert (provider.last_request.width, provider.last_request.height) == (width, height)
+
+
+@pytest.mark.parametrize(
+    "allowed, sizes, width, height, expected",
+    [
+        # A literally allowed ratio keeps its size even when a bucket is keyed in other terms.
+        (["7:3"], {"21:9": (1536, 672)}, 1400, 600, (1400, 600)),
+        (["1:1"], {"2:2": (512, 512)}, 1024, 1024, (1024, 1024)),
+        (["21:9", "7:3"], {"21:9": (1680, 720)}, 1400, 600, (1400, 600)),
+        # An exact bucket key wins over an equivalent one declared first.
+        (["21:9", "7:3"], {"21:9": (1680, 720), "7:3": (1400, 600)}, 700, 300, (1400, 600)),
+        # A bucket whose ratio is not allowed is never used; the request snaps to an allowed bucket.
+        (["1:1"], {"21:9": (1536, 672), "1:1": (1024, 1024)}, 735, 315, (1024, 1024)),
+        # A ratio key that str.isdigit() accepts but int() rejects is ignored, not a crash.
+        (["²:1", "1:1"], None, 600, 600, (600, 600)),
+        # So is one too long for int() to parse.
+        (["1:1", "9" * 5000 + ":1"], None, 600, 1400, (917, 917)),
+    ],
+)
+def test_generate_custom_ratio_declarations_keep_previous_sizes(
+    allowed: list[str],
+    sizes: dict[str, tuple[int, int]] | None,
+    width: int,
+    height: int,
+    expected: tuple[int, int],
+) -> None:
+    """User-installed models may declare ratios and buckets in any spelling; equivalence matching must not change
+    the size a request was previously sent at."""
+    model = _build_model(
+        ExternalModelCapabilities(
+            modes=["txt2img"],
+            allowed_aspect_ratios=allowed,
+            aspect_ratio_sizes=None
+            if sizes is None
+            else {ratio: ExternalImageSize(width=w, height=h) for ratio, (w, h) in sizes.items()},
+        )
+    )
+    provider = DummyProvider("openai", configured=True, result=ExternalGenerationResult(images=[]))
+    service = ExternalGenerationService({"openai": provider}, logging.getLogger("test"))
+
+    service.generate(_build_request(model=model, width=width, height=height))
+
+    assert provider.last_request is not None
+    assert (provider.last_request.width, provider.last_request.height) == expected

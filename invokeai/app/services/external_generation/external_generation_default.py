@@ -224,7 +224,15 @@ class ExternalGenerationService(ExternalGenerationServiceBase):
                 return request
             return self._bucket_to_size(request, size.width, size.height, aspect_ratio)
 
-        if _declared_ratio(aspect_ratio, capabilities.allowed_aspect_ratios) is not None:
+        if aspect_ratio in capabilities.allowed_aspect_ratios:
+            return request
+
+        # A ratio allowed only in other terms ("21:9" for a 7:3 request) passes as-is when there is no bucket to move
+        # it to; with buckets, the closest-ratio lookup below already reaches the equivalent one.
+        if (
+            not capabilities.aspect_ratio_sizes
+            and _declared_ratio(aspect_ratio, capabilities.allowed_aspect_ratios) is not None
+        ):
             return request
 
         closest = _select_closest_ratio(
@@ -304,9 +312,15 @@ def _select_closest_ratio(width: int, height: int, ratios: list[str]) -> str | N
 def _reduce_ratio(ratio: str) -> str:
     """A "W:H" ratio of whole numbers in lowest terms; anything else is returned unchanged."""
     left, _, right = ratio.partition(":")
-    if not (left.isdigit() and right.isdigit()) or int(left) == 0 or int(right) == 0:
+    if not (left.isdecimal() and right.isdecimal()):
         return ratio
-    return _format_aspect_ratio(int(left), int(right))
+    try:
+        width, height = int(left), int(right)
+    except ValueError:  # beyond int()'s digit limit
+        return ratio
+    if width == 0 or height == 0:
+        return ratio
+    return _format_aspect_ratio(width, height)
 
 
 def _declared_ratio(aspect_ratio: str, declared: Iterable[str]) -> str | None:
@@ -319,7 +333,7 @@ def _size_for_ratio(ratio: str, area: int, max_size: ExternalImageSize | None = 
     """The exact-ratio size whose pixel area is closest to `area` without exceeding `max_size`,
     for a ratio of whole numbers."""
     left_text, _, right_text = ratio.partition(":")
-    if not (left_text.isdigit() and right_text.isdigit()) or int(left_text) == 0 or int(right_text) == 0:
+    if not (left_text.isdecimal() and right_text.isdecimal()) or int(left_text) == 0 or int(right_text) == 0:
         return None
     left, right = int(left_text), int(right_text)
     scale = max(1, round(math.sqrt(area / (left * right))))
