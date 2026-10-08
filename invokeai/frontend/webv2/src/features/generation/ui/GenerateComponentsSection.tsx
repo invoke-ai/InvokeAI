@@ -8,15 +8,17 @@ import {
   type ComponentSlotPolicy,
 } from '@features/generation/core/baseGenerationPolicies';
 import { isMainModelConfig, isModelIdentifierConfig, isVaeModelConfig } from '@features/generation/core/settings';
+import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Field } from '@platform/ui';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { type GenerateDraft, pickGenerateSettings } from './generateDebounce';
 import { GenerationModelSelect as ModelSelect } from './GenerationUiContext';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 
 interface GenerateComponentsSectionProps {
-  settings: GenerateSettings;
+  draft: GenerateDraft;
   selectedModel: GenerateModelConfig | undefined;
   onCommit: (patch: Partial<GenerateSettings>) => void;
 }
@@ -24,7 +26,32 @@ interface GenerateComponentsSectionProps {
 const toComponentModel = (model: ModelConfig | null): ComponentModelConfig | null =>
   isModelIdentifierConfig(model) ? model : null;
 
-const getComponentPolicyContext = (model: GenerateModelConfig, settings: GenerateSettings): ComponentPolicyContext => ({
+const selectComponentSettings = pickGenerateSettings([
+  'clipEmbedModel',
+  'clipGEmbedModel',
+  'clipLEmbedModel',
+  'componentSourceModel',
+  'gemma2EncoderModel',
+  'ideogram4UnconditionalModel',
+  'mistralEncoderModel',
+  'pidDecoderModel',
+  'pidMode',
+  'qwen35EncoderModel',
+  'qwen3EncoderModel',
+  'qwen3VLEncoderModel',
+  'qwenVLEncoderModel',
+  't5EncoderModel',
+  'vae',
+  'wanLowNoiseModel',
+  'wanT5EncoderModel',
+]);
+
+type ComponentSettings = ReturnType<typeof selectComponentSettings>;
+
+const getComponentPolicyContext = (
+  model: GenerateModelConfig,
+  settings: ComponentSettings
+): ComponentPolicyContext => ({
   model,
   settings,
   selectedComponents: {
@@ -75,8 +102,9 @@ const ComponentPicker = ({
   );
 };
 
-export const GenerateComponentsSection = ({ onCommit, selectedModel, settings }: GenerateComponentsSectionProps) => {
+export const GenerateComponentsSection = ({ draft, onCommit, selectedModel }: GenerateComponentsSectionProps) => {
   const { t } = useTranslation();
+  const settings = useExternalStoreSelector(draft.subscribe, draft.getSnapshot, selectComponentSettings);
   const ctx = useMemo(
     () => (selectedModel ? getComponentPolicyContext(selectedModel, settings) : null),
     [selectedModel, settings]

@@ -2,10 +2,11 @@ import type { GraphPreviewSourceState, WorkflowInvocationSourceId } from '@featu
 import type { ReactFlowInstance } from '@xyflow/react';
 import type { ReactNode } from 'react';
 
-import { Box, Center, Dialog, Icon, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
+import { Box, Center, Icon, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import { localizeForLoopValidationReason } from '@features/workflow/core/forLoops';
 import { useWorkflowGraphPreview } from '@features/workflow/ui/WorkflowUiContext';
 import { Button, JsonPreview, SegmentTabs, segmentTabsPanelId, segmentTabsTabId, toaster } from '@platform/ui';
+import { Dialog } from '@platform/ui/Dialog';
 import { CheckIcon, ChevronUpIcon, CopyIcon, TriangleAlertIcon } from 'lucide-react';
 import { lazy, Suspense, useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -304,7 +305,7 @@ export const GraphPreviewDialog = ({
                     cursor={canInvoke ? undefined : 'not-allowed'}
                     opacity={canInvoke ? undefined : 0.6}
                     title={validationMessage}
-                    onClick={invokeRoute}
+                    onClick={canInvoke ? invokeRoute : undefined}
                   >
                     {t('graphPreview.invokeRoute', { route: dialogRoute.label })}
                   </Button>

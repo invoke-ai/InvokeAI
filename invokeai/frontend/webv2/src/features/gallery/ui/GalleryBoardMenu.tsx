@@ -1,8 +1,9 @@
 import type { GalleryBoard } from '@features/gallery/core/types';
 
-import { Dialog, HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import { GALLERY_AUTO_ADD_FOLLOW } from '@features/gallery/core/settings';
 import { Button } from '@platform/ui/Button';
+import { Dialog } from '@platform/ui/Dialog';
 import { MenuContent } from '@platform/ui/Menu';
 import {
   ArchiveIcon,

@@ -35,6 +35,7 @@ const WidgetLoadingSurface = ({ bg = 'bg.inset', label }: { bg?: 'bg.inset' | 'b
     aria-label={label}
     aria-live="polite"
     bg={bg}
+    data-widget-loading=""
     flex="1"
     minH="0"
     minW="0"
