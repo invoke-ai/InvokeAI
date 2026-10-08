@@ -49,7 +49,7 @@ export default defineConfig({
       },
       favicon: 'favicon.svg',
       editLink: {
-        baseUrl: 'https://github.com/invoke-ai/InvokeAI/edit/main/docs',
+        baseUrl: 'https://github.com/invoke-ai/InvokeAI/edit/v6-bugfixes/docs',
       },
       head,
       defaultLocale: 'root',
