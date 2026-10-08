@@ -422,6 +422,9 @@ class ProjectRecordsSqlite(ProjectRecordsStorageBase):
             #
             # Bounded over the whole project, unlike the counts: the caller holds the whole answer
             # in memory and so does this, and the route is reachable by anyone with a project id.
+            # Unordered on purpose: an ORDER BY would make SQLite sort every row before the LIMIT
+            # could stop the scan, so a project far over the ceiling would pay for the whole
+            # answer it is refused. The rows are sorted below, once they are known to fit.
             cursor.execute(
                 f"""--sql
                 SELECT board_images.board_id AS board_id, 'image' AS kind, images.image_name AS name,
@@ -439,7 +442,6 @@ class ProjectRecordsSqlite(ProjectRecordsStorageBase):
                 WHERE board_videos.board_id IN ({board_placeholders})
                   AND videos.is_intermediate = FALSE
                   AND videos.video_category IN ({_VISIBLE_CATEGORY_PLACEHOLDERS})
-                ORDER BY kind ASC, name ASC
                 LIMIT ?;
                 """,
                 (
@@ -455,8 +457,9 @@ class ProjectRecordsSqlite(ProjectRecordsStorageBase):
         if len(item_rows) > PROJECT_BOARD_SNAPSHOT_MAX_ITEMS:
             raise ProjectBoardTooLargeError(project_id, PROJECT_BOARD_SNAPSHOT_MAX_ITEMS)
 
+        # Deterministic per board: by kind, then name, the order the archive writes.
         items_by_board: dict[str, list[ProjectBoardItemDTO]] = {board_id: [] for board_id in board_ids}
-        for r in item_rows:
+        for r in sorted(item_rows, key=lambda r: (r[1], r[2])):
             items_by_board[r[0]].append(ProjectBoardItemDTO(kind=r[1], name=r[2], category=r[3], starred=bool(r[4])))
 
         return ProjectBoardSnapshotDTO(
