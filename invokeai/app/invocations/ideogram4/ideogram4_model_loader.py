@@ -182,8 +182,9 @@ class Ideogram4ModelLoaderInvocation(BaseInvocation):
                 f"'{config.name}' is the {branch} branch of Ideogram 4 and cannot be used as '{slot}', "
                 f"which needs the {expected} one. If the two are wired the wrong way round, swap them. "
                 "A file without branch metadata (every GGUF, and stripped safetensors) is classified by "
-                f"its name, so if this one was renamed, rename it to contain '{expected}' (or not) and "
-                "re-install it."
+                "its name: a name containing 'uncond' installs as the unconditional branch, any other name "
+                "as the conditional one. If this file was renamed, remove the model, give the file its "
+                "published name back and install it again."
             )
 
     def _resolve_encoder(

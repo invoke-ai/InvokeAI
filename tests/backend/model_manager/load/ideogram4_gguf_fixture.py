@@ -46,8 +46,14 @@ def packs_every_weight(name: str, shape: tuple[int, ...]) -> bool:
     return name.endswith(".weight")
 
 
-def write_ideogram4_gguf(path: Path, packs: Packs, *, seed: int = 0) -> dict[str, torch.Tensor]:
-    """Write a randomly initialised tiny transformer to ``path``.
+def write_ideogram4_gguf(
+    path: Path,
+    packs: Packs,
+    *,
+    qtype: gguf.GGMLQuantizationType = gguf.GGMLQuantizationType.Q8_0,
+    seed: int = 0,
+) -> dict[str, torch.Tensor]:
+    """Write a randomly initialised tiny transformer to ``path``, ``packs`` tensors stored as ``qtype``.
 
     Returns the float32 values a reader dequantizes each tensor to, i.e. what the file *means*, so a
     test can build the reference model from them rather than from the pre-quantization originals.
@@ -60,11 +66,11 @@ def write_ideogram4_gguf(path: Path, packs: Packs, *, seed: int = 0) -> dict[str
     meant: dict[str, torch.Tensor] = {}
     for name, tensor in model.state_dict().items():
         data = tensor.detach().to(torch.float32).numpy()
-        qtype = gguf.GGMLQuantizationType.Q8_0 if packs(name, data.shape) else gguf.GGMLQuantizationType.BF16
-        raw = quantize(data, qtype)
+        stored_as = qtype if packs(name, data.shape) else gguf.GGMLQuantizationType.BF16
+        raw = quantize(data, stored_as)
         # `raw_shape` is the packed byte shape; gguf derives the logical one from it.
-        writer.add_tensor(name, raw, raw_shape=raw.shape, raw_dtype=qtype)
-        meant[name] = torch.from_numpy(dequantize(raw, qtype)).reshape(tensor.shape)
+        writer.add_tensor(name, raw, raw_shape=raw.shape, raw_dtype=stored_as)
+        meant[name] = torch.from_numpy(dequantize(raw, stored_as)).reshape(tensor.shape)
     writer.write_header_to_file()
     writer.write_kv_data_to_file()
     writer.write_tensors_to_file()

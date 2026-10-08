@@ -124,9 +124,9 @@ ideogram_4_gguf_q4_0 = StarterModel(
     name="Ideogram 4 (GGUF, Q4_0)",
     base=BaseModelType.Ideogram4,
     source=f"{_MOLBAL_GGUF}/ideogram4-transformer-q4_0.gguf",
-    description="Community GGUF of Ideogram 4 in Q4_0, the smallest build: 5.6GB per branch in memory "
-    "against 8.7GB for fp8, on every device. Installs the unconditional branch, the Qwen3-VL 8B encoder "
-    "and the VAE with it. Non-commercial license. ~21GB total",
+    description="Community GGUF of Ideogram 4 in Q4_0, the smallest build: 5.6GB per branch in memory on "
+    "every device, against 8.7GB for fp8 with FP8 Storage (about 17GB without). Installs the unconditional "
+    "branch, the Qwen3-VL 8B encoder and the VAE with it. Non-commercial license. ~21GB total",
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
     dependencies=[ideogram_4_unconditional_gguf_q4_0, ideogram_4_qwen3_vl_encoder_8b, flux2_vae],
@@ -168,8 +168,8 @@ ideogram_4_gguf_q5_1 = StarterModel(
     name="Ideogram 4 (GGUF, Q5_1)",
     base=BaseModelType.Ideogram4,
     source=f"{_MOLBAL_GGUF}/ideogram4-transformer-q5_1.gguf",
-    description="Community GGUF of Ideogram 4 in Q5_1, the largest GGUF that is still smaller than fp8: "
-    "7.3GB per branch in memory, on every device. Installs the unconditional branch, the Qwen3-VL 8B "
+    description="Community GGUF of Ideogram 4 in Q5_1, the largest of these starters: 7.3GB per branch "
+    "in memory, on every device. Installs the unconditional branch, the Qwen3-VL 8B "
     "encoder and the VAE with it. Non-commercial license. ~25GB total",
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,

@@ -40,10 +40,12 @@ SEAM = Seam(
 LAYOUTS = pytest.mark.parametrize("packs", [packs_block_linears, packs_every_weight], ids=["molbal", "rectangleworm"])
 
 
-def _load(monkeypatch, tmp_path, packs: Packs) -> tuple[torch.nn.Module, dict[str, torch.Tensor], SeamRun]:
+def _load(
+    monkeypatch, tmp_path, packs: Packs, qtype: gguf.GGMLQuantizationType = gguf.GGMLQuantizationType.Q8_0
+) -> tuple[torch.nn.Module, dict[str, torch.Tensor], SeamRun]:
     tmp_path.mkdir(parents=True, exist_ok=True)
     path = tmp_path / "ideogram4-transformer-q8_0.gguf"
-    meant = write_ideogram4_gguf(path, packs)
+    meant = write_ideogram4_gguf(path, packs, qtype=qtype)
     config = Main_GGUF_Ideogram4_Config.model_construct(path=str(path), name="ideogram4", branch="conditional")
 
     run = prepare(
@@ -72,16 +74,24 @@ def _forward(model: torch.nn.Module) -> torch.Tensor:
 
 
 @LAYOUTS
-def test_the_gguf_branch_computes_what_its_file_means(monkeypatch, tmp_path, packs: Packs) -> None:
+@pytest.mark.parametrize(
+    "qtype",
+    [gguf.GGMLQuantizationType.Q8_0, gguf.GGMLQuantizationType.Q5_1, gguf.GGMLQuantizationType.Q4_0],
+    ids=lambda qtype: qtype.name,
+)
+def test_the_gguf_branch_computes_what_its_file_means(
+    monkeypatch, tmp_path, packs: Packs, qtype: gguf.GGMLQuantizationType
+) -> None:
     """Against a dense model holding the values the file dequantizes to, so the comparison is not
-    blurred by quantization error. Not bit-exact all the same: the torch Q8_0 kernel multiplies codes
+    blurred by quantization error. Q4_0 and Q5_1 are the starter builds' types. Not bit-exact all the
+    same: the torch kernels multiply codes
     by their fp16 block scale in fp16, the reference reader in float32. A dropped norm weight, a
     zeroed embedding or an activation cast to the wrong dtype is off by orders of magnitude more.
 
     Wrapped in the custom layers first, as the model cache does on every load: that is the path the
     packed Linear weights take in production.
     """
-    model, meant, _ = _load(monkeypatch, tmp_path, packs)
+    model, meant, _ = _load(monkeypatch, tmp_path, packs, qtype)
     apply_custom_layers_to_model(model)
     reference = Ideogram4Transformer(TINY_CONFIG)
     reference.load_state_dict(meant)
@@ -123,19 +133,21 @@ def test_an_unquantized_linear_weight_is_unpacked_and_a_quantized_one_is_not(mon
 
 
 @LAYOUTS
-def test_the_load_reserves_what_dequantizing_adds(monkeypatch, tmp_path, packs: Packs) -> None:
-    """The framework reserves the file's size before the loader runs, so what the loader still owes
-    is the growth of each tensor it widens -- not the total of them, which for the BF16 tensors of
-    most releases would evict other models from the cache to make room for bytes that already exist.
+def test_the_load_reserves_the_model_as_it_will_be_held(monkeypatch, tmp_path, packs: Packs) -> None:
+    """One absolute reservation: `make_room` makes that much room rather than adding to the file-size
+    reservation the framework made before the loader ran, so reserving only what dequantizing adds
+    would evict nothing. It covers every weight as the model ends up holding it -- packed or
+    unpacked -- plus the largest unpacked tensor, which is briefly held twice while it is replaced.
     """
     model, _, run = _load(monkeypatch, tmp_path, packs)
-    reader = gguf.GGUFReader(tmp_path / "ideogram4-transformer-q8_0.gguf")
-    stored = {tensor.name: int(tensor.n_bytes) for tensor in reader.tensors}
-    widened = {
-        name: param.numel() * param.element_size() - stored[name]
+    held = {
+        name: param.data.quantized_data.nbytes
+        if isinstance(param.data, GGMLTensor)
+        else param.numel() * param.element_size()
         for name, param in model.named_parameters()
-        if type(param.data) is torch.Tensor
     }
+    largest_unpacked = max(
+        size for name, size in held.items() if not isinstance(model.get_parameter(name).data, GGMLTensor)
+    )
 
-    assert run.reserved == [sum(max(0, growth) for growth in widened.values())]
-    assert run.reserved[0] > 0, "the fixture widens at least the quantized norms or BF16 to float32"
+    assert run.reserved == [sum(held.values()) + largest_unpacked]

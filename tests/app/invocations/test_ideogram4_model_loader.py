@@ -10,7 +10,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from invokeai.app.invocations.ideogram4.ideogram4_model_loader import Ideogram4ModelLoaderInvocation
+from invokeai.app.invocations.ideogram4.ideogram4_model_loader import (
+    _SINGLE_FILE_FORMATS,
+    Ideogram4ModelLoaderInvocation,
+)
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
@@ -239,14 +242,11 @@ def test_a_diffusers_model_cannot_be_the_unconditional_branch() -> None:
         _invoke(configs)
 
 
-def test_the_unconditional_picker_offers_every_single_file_format() -> None:
+def test_the_unconditional_picker_offers_what_the_node_accepts() -> None:
     field = Ideogram4ModelLoaderInvocation.model_fields["unconditional_model"]
 
     assert field.json_schema_extra is not None
-    assert set(field.json_schema_extra["ui_model_format"]) == {
-        ModelFormat.Checkpoint.value,
-        ModelFormat.GGUFQuantized.value,
-    }
+    assert set(field.json_schema_extra["ui_model_format"]) == {f.value for f in _SINGLE_FILE_FORMATS}
 
 
 def test_the_vae_picker_offers_the_bases_the_architecture_accepts() -> None:

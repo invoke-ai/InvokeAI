@@ -205,7 +205,8 @@ class GGMLTensor(torch.Tensor):
 # What one dequantization allocates beyond its result, per weight element: the block kernels in
 # `utils.py` widen codes and scales through integer and float16 intermediates before the final cast.
 # Measured on CUDA (torch 2.13) for a 4608x53248 weight: about 2 bytes for Q8_0 and Q4_0, 3 for Q4_K
-# and Q6_K, 5 for Q5_K, 6 for BF16 and 8 for Q5_1.
+# and Q6_K, 5 for Q5_K, 6 for BF16 and 8 for Q5_1. The host-side counterpart, for decoding a whole tensor
+# at load, is `_PEAK_COPIES` in `model_manager/load/quantized_embedding.py`.
 _DEQUANT_INTERMEDIATE_BYTES_PER_ELEMENT = 8
 
 

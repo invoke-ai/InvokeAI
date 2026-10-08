@@ -544,9 +544,11 @@ def _dequantize_ggml_at_load(
     every forward -- for the BF16 `llm_cond_proj` most releases ship, a 245M-element weight, that is a
     measured 1.87 GB transient per call.
 
-    The framework reserved the file's size before the loader ran, which already covers every packed
-    tensor, so what is reserved here is each tensor's growth over its packed size: nothing for BF16,
-    and little for the rest -- the norms, a two-row embedding and the two embedders.
+    The reservation is absolute, because `make_room` makes that much room rather than adding to the
+    file-size reservation the framework made before the loader ran: everything that stays packed at
+    its packed size, everything replaced at its unpacked size, and one replacement in flight. BF16 is
+    reinterpreted rather than run through the GGML kernel, which widens through int32 and float32 on
+    the way -- about 8 bytes per element, 2 GB for `llm_cond_proj` alone.
     """
     linear_params = {
         f"{module_name}.{param_name}"
@@ -564,16 +566,24 @@ def _dequantize_ggml_at_load(
             or any(pattern in key for pattern in skip_patterns)
         )
     ]
-    reserve(
-        sum(
-            max(0, sd[key].tensor_shape.numel() * sd[key].compute_dtype.itemsize - sd[key].quantized_data.nbytes)
-            for key in keys
-        )
+    unpacked = {key: sd[key].tensor_shape.numel() * sd[key].compute_dtype.itemsize for key in keys}
+    kept = sum(
+        value.quantized_data.nbytes if isinstance(value, GGMLTensor) else value.nbytes
+        for key, value in sd.items()
+        if key not in unpacked
     )
+    reserve(kept + sum(unpacked.values()) + max(unpacked.values(), default=0))
     # One at a time, so each packed original is released as its replacement lands.
     for key in keys:
-        sd[key] = sd[key].get_dequantized_tensor()
+        sd[key] = _unpack(sd[key])
     return len(keys)
+
+
+def _unpack(value: GGMLTensor) -> torch.Tensor:
+    """`value` as a plain tensor in its compute dtype; BF16 as a view of its bytes, not a decode."""
+    if value._ggml_quantization_type is gguf.GGMLQuantizationType.BF16:
+        return value.quantized_data.view(torch.bfloat16).reshape(value.tensor_shape).to(value.compute_dtype)
+    return value.get_dequantized_tensor()
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Ideogram4, type=ModelType.Main, format=ModelFormat.GGUFQuantized)
@@ -610,8 +620,6 @@ class Ideogram4GGUFModel(ModelLoader):
         target_device = TorchDevice.choose_torch_device()
         compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
-        # The framework has already reserved the file's size, and the weights stay packed, so that
-        # covers everything but the growth of the tensors dequantized below, which reserve for it.
         sd: dict[str, torch.Tensor] = gguf_sd_loader(Path(config.path), compute_dtype=compute_dtype)
 
         with accelerate.init_empty_weights():

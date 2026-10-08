@@ -272,8 +272,8 @@ def _gguf_branch(*packed: str) -> Ideogram4Transformer:
 def test_a_gguf_branch_adds_its_dequantization_headroom() -> None:
     """A packed GGUF Linear is dequantized inside every forward, as an int8 one is.
 
-    Measured on the released geometry, `llm_cond_proj` alone needs 0.9 to 2.3 GB for that depending
-    on the quantization type, so a GGUF branch must not report the zero a dense one does. The layers
+    Measured on the released geometry, `llm_cond_proj` alone needs 0.9 to 2.3 GB for that where a
+    release quantizes it, so a GGUF branch must not report the zero a dense one does. The layers
     run one after another, so it is the largest packed layer that counts, not their sum.
     """
     largest = "layers.0.feed_forward.w1"
