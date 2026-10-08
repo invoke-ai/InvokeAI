@@ -24,6 +24,8 @@ vi.mock('react-i18next', () => ({
         'widgets.gallery.boardGroups.byDate': 'Dates',
         'widgets.gallery.boardGroups.library': 'Library',
         'widgets.gallery.boardGroups.otherProjects': 'Other projects',
+        'widgets.gallery.createBoard': 'Create board',
+        'widgets.gallery.createBoardIn': `Create board in ${String(values?.destination)}`,
         'widgets.gallery.createBoardNamedIn': `Create board "${String(values?.name)}" in ${String(values?.destination)}`,
         'widgets.gallery.inbox': 'Inbox',
         'widgets.gallery.inboxOf': `${String(values?.project)} / Inbox`,
@@ -38,7 +40,7 @@ vi.mock('react-i18next', () => ({
 }));
 
 const actions = {
-  createBoard: vi.fn(async () => {}),
+  createBoard: vi.fn(() => Promise.resolve(true)),
   selectBoard: vi.fn(),
   updateSettings: vi.fn(),
 };
@@ -177,6 +179,24 @@ const pressEnter = async (input: HTMLInputElement) => {
   });
 };
 
+const getCreateDialog = async () => {
+  let dialog: HTMLElement | null = null;
+
+  await vi.waitFor(() => {
+    dialog = document.querySelector<HTMLElement>('[role="dialog"][data-state="open"]');
+    expect(dialog).not.toBeNull();
+  });
+
+  return dialog!;
+};
+const getDialogInput = (dialog: HTMLElement) => dialog.querySelector<HTMLInputElement>('input[name="renameValue"]')!;
+const submit = async (dialog: HTMLElement) => {
+  await act(async () => {
+    dialog.querySelector('form')!.requestSubmit();
+    await Promise.resolve();
+  });
+};
+
 const click = async (element: HTMLElement) => {
   await act(async () => {
     element.click();
@@ -285,38 +305,40 @@ describe('GalleryBoardsPanel', () => {
     expect(getSearchInput().value).toBe('');
   });
 
-  it('creates an unmatched name in the open project by default', async () => {
+  it('offers an unmatched name in both tiers, each row creating where it sits', async () => {
     await renderPanel();
     await type(getSearchInput(), 'birds');
 
     const sections = getRowsBySection();
     expect(sections['Mahogany House']).toEqual(['Create board "birds" in Mahogany House']);
-    expect(sections.Library).toEqual([]);
+    expect(sections.Library).toEqual(['Create board "birds" in Library']);
 
-    await click(getBoardRows().find((row) => row.textContent?.includes('Create board'))!);
-
-    expect(actions.createBoard).toHaveBeenCalledWith('birds', 'p1');
-  });
-
-  it('creates in the Library after its "+" chose that tier, and keeps that choice', async () => {
-    await renderPanel();
-    await click(getAddButton('widgets.gallery.createBoardInLibrary'));
-    expect(document.activeElement).toBe(getSearchInput());
-
-    await type(getSearchInput(), 'birds');
-    expect(getRowsBySection().Library).toEqual(['Create board "birds" in Library']);
-
-    await pressEnter(getSearchInput());
+    await click(getBoardRows().find((row) => row.textContent?.includes('in Library'))!);
     expect(actions.createBoard).toHaveBeenCalledWith('birds', null);
+    expect(getSearchInput().value).toBe('');
 
     await type(getSearchInput(), 'fish');
-    await pressEnter(getSearchInput());
-    expect(actions.createBoard).toHaveBeenLastCalledWith('fish', null);
+    await click(getBoardRows().find((row) => row.textContent?.includes('in Mahogany House'))!);
+    expect(actions.createBoard).toHaveBeenLastCalledWith('fish', 'p1');
+  });
+
+  it('asks for a name in a dialog from a "+" and creates in that tier', async () => {
+    await renderPanel();
+    await click(getAddButton('widgets.gallery.createBoardInLibrary'));
+
+    const dialog = await getCreateDialog();
+    expect(dialog.querySelector('h2')?.textContent).toBe('Create board in Library');
+    expect(document.activeElement).toBe(getDialogInput(dialog));
+    expect(actions.createBoard).not.toHaveBeenCalled();
+
+    await type(getDialogInput(dialog), 'birds');
+    await submit(dialog);
+
+    expect(actions.createBoard).toHaveBeenCalledExactlyOnceWith('birds', null);
+    await vi.waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull());
 
     await click(getAddButton('widgets.gallery.createBoardInProject'));
-    await type(getSearchInput(), 'frogs');
-    await pressEnter(getSearchInput());
-    expect(actions.createBoard).toHaveBeenLastCalledWith('frogs', 'p1');
+    expect((await getCreateDialog()).querySelector('h2')?.textContent).toBe('Create board in Mahogany House');
   });
 
   it('counts the boards made in each tier, not its fixed row', async () => {
@@ -337,13 +359,54 @@ describe('GalleryBoardsPanel', () => {
     expect(row?.textContent).toContain('Inbox');
   });
 
-  it('creates at once from a "+" when an unmatched name is already typed', async () => {
+  it('creates nothing from a dismissed dialog or a blank name, and leaves the search as it was', async () => {
+    await renderPanel();
+    await type(getSearchInput(), 'bir');
+    await click(getAddButton('widgets.gallery.createBoardInProject'));
+
+    const dialog = await getCreateDialog();
+    await type(getDialogInput(dialog), '   ');
+    await submit(dialog);
+    expect(actions.createBoard).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull());
+
+    await click(getAddButton('widgets.gallery.createBoardInLibrary'));
+    const reopened = await getCreateDialog();
+    await click([...reopened.querySelectorAll('button')].find((button) => button.textContent === 'common.cancel')!);
+
+    await vi.waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull());
+    expect(actions.createBoard).not.toHaveBeenCalled();
+    expect(getSearchInput().value).toBe('bir');
+  });
+
+  it('keeps the dialog and its name when the create fails, so it can be tried again', async () => {
+    actions.createBoard.mockResolvedValueOnce(false);
+    await renderPanel();
+    await type(getSearchInput(), 'birds');
+    await click(getAddButton('widgets.gallery.createBoardInProject'));
+
+    const dialog = await getCreateDialog();
+    await submit(dialog);
+
+    expect(actions.createBoard).toHaveBeenCalledExactlyOnceWith('birds', 'p1');
+    expect(document.querySelector('[role="dialog"][data-state="open"]')).toBe(dialog);
+    expect(getDialogInput(dialog).value).toBe('birds');
+    expect(getSearchInput().value).toBe('birds');
+  });
+
+  it('starts the dialog from the typed search, so a name that found nothing is not retyped', async () => {
     await renderPanel();
     await type(getSearchInput(), 'birds');
 
     await click(getAddButton('widgets.gallery.createBoardInProject'));
 
-    expect(actions.createBoard).toHaveBeenCalledWith('birds', 'p1');
+    const dialog = await getCreateDialog();
+    expect(getDialogInput(dialog).value).toBe('birds');
+    expect(actions.createBoard).not.toHaveBeenCalled();
+
+    await submit(dialog);
+
+    expect(actions.createBoard).toHaveBeenCalledExactlyOnceWith('birds', 'p1');
     expect(getSearchInput().value).toBe('');
   });
 

@@ -105,12 +105,14 @@ export const useGalleryActions = ({
           gallery.selectBoard(board.id);
           recordSuccess(t('widgets.gallery.boardCreated', { name: board.name }));
           refresh();
+
+          return true;
         } catch (error: unknown) {
-          if (!isAccountScopeCurrent(owner)) {
-            return;
+          if (isAccountScopeCurrent(owner)) {
+            recordError(error);
           }
 
-          recordError(error);
+          return false;
         }
       },
       deleteBoard: async (boardId, includeImages) => {

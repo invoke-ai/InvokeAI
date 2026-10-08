@@ -17,7 +17,8 @@ import type { GalleryListingState } from './useGalleryData';
 export interface GalleryActions {
   archiveBoard: (boardId: string, archived: boolean) => Promise<void>;
   /** In the given project, or in the Library for null. */
-  createBoard: (boardName: string, projectId: string | null) => Promise<void>;
+  /** Resolves `true` once the board exists and is selected; a reported failure resolves `false`. */
+  createBoard: (boardName: string, projectId: string | null) => Promise<boolean>;
   deleteBoard: (boardId: string, includeImages: boolean) => Promise<void>;
   downloadBoard: (boardId: string) => Promise<void>;
   /** Export the project that owns this board as a complete `.invk` archive. */

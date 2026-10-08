@@ -7,6 +7,7 @@ import { getGalleryProjectGroupLabel } from '@features/gallery/core/boardLabels'
 import { toGalleryItemKey } from '@features/gallery/core/items';
 import { usePreservedScrollOffset } from '@platform/react/usePreservedScrollOffset';
 import { IconButton } from '@platform/ui/Button';
+import { RenameDialog } from '@platform/ui/RenameDialog';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { PlusIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -27,16 +28,16 @@ import { useGalleryWidget } from './GalleryWidgetContext';
 const SCROLL_CONTENT_PROPS = { py: '1' } as const;
 const CREATE_ROW_COVER = <BoardCoverIcon icon={PlusIcon} />;
 
-/** Which tier a board typed into the search field is created in; each tier's "+" chooses it. */
+/** Where a new board goes: the open project or the Library. */
 type CreateTier = 'library' | 'project';
 
 export const GalleryBoardsPanel = () => {
   const { t } = useTranslation();
   const { actions, boardsState, gallery, projectId, projectName, projectNames } = useGalleryWidget();
   const [searchTerm, setSearchTerm] = useState('');
-  const [createTier, setCreateTier] = useState<CreateTier>('project');
+  // The tier whose "+" asked for a name; the dialog it opens creates there.
+  const [createDialogTier, setCreateDialogTier] = useState<CreateTier | null>(null);
   const [boardMenuTarget, setBoardMenuTarget] = useState<GalleryBoardMenuTarget | null>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const boardsViewportRef = useRef<HTMLDivElement>(null);
 
   // The shell keeps the gallery mounted across layout switches, and a scroll
@@ -75,41 +76,50 @@ export const GalleryBoardsPanel = () => {
   );
 
   const trimmedSearchTerm = searchTerm.trim();
+  const tierLabel = useCallback(
+    (tier: CreateTier) => (tier === 'project' ? projectName : t('widgets.gallery.boardGroups.library')),
+    [projectName, t]
+  );
 
+  const createBoardIn = useCallback(
+    (name: string, tier: CreateTier) => actions.createBoard(name, tier === 'project' ? projectId : null),
+    [actions, projectId]
+  );
+  // The row goes away as soon as it is taken, so a slow create cannot be taken twice.
   const createBoardFromSearch = useCallback(
     (tier: CreateTier) => {
-      if (!groups.canCreateFromSearch) {
-        return;
+      if (groups.canCreateFromSearch) {
+        setSearchTerm('');
+        void createBoardIn(trimmedSearchTerm, tier);
+      }
+    },
+    [createBoardIn, groups.canCreateFromSearch, trimmedSearchTerm]
+  );
+
+  // Enter creates only with no matches, avoiding accidental near-duplicate boards; it takes the project's row,
+  // the first of the two the typed name offers.
+  const handleSubmitSearch = useCallback(() => {
+    if (!groups.hasAnyMatch) {
+      createBoardFromSearch('project');
+    }
+  }, [createBoardFromSearch, groups.hasAnyMatch]);
+
+  // A "+" asks for the name in a dialog, started from whatever is typed so a search that found nothing is not lost.
+  const handleAddProjectBoard = useCallback(() => setCreateDialogTier('project'), []);
+  const handleAddLibraryBoard = useCallback(() => setCreateDialogTier('library'), []);
+  const closeCreateDialog = useCallback(() => setCreateDialogTier(null), []);
+  // The dialog keeps the typed name while its submit is pending, and keeps it on a failure the action has already
+  // reported, which it learns of as a rejection; the search is cleared only once the board exists.
+  const handleCreateDialogSubmit = useCallback(
+    async (name: string) => {
+      if (!(await createBoardIn(name, createDialogTier ?? 'project'))) {
+        throw new Error('The board was not created.');
       }
 
       setSearchTerm('');
-      void actions.createBoard(trimmedSearchTerm, tier === 'project' ? projectId : null);
     },
-    [actions, groups.canCreateFromSearch, projectId, trimmedSearchTerm]
+    [createBoardIn, createDialogTier]
   );
-
-  // Enter creates only with no matches, avoiding accidental near-duplicate boards.
-  const handleSubmitSearch = useCallback(() => {
-    if (!groups.hasAnyMatch) {
-      createBoardFromSearch(createTier);
-    }
-  }, [createBoardFromSearch, createTier, groups.hasAnyMatch]);
-
-  // A "+" with a typed, unmatched name creates at once; otherwise it picks the tier and asks for a name.
-  const handleAddBoard = useCallback(
-    (tier: CreateTier) => {
-      if (groups.canCreateFromSearch) {
-        createBoardFromSearch(tier);
-        return;
-      }
-
-      setCreateTier(tier);
-      searchInputRef.current?.focus();
-    },
-    [createBoardFromSearch, groups.canCreateFromSearch]
-  );
-  const handleAddProjectBoard = useCallback(() => handleAddBoard('project'), [handleAddBoard]);
-  const handleAddLibraryBoard = useCallback(() => handleAddBoard('library'), [handleAddBoard]);
   const addProjectBoardAction = useMemo(
     () => <AddBoardButton label={t('widgets.gallery.createBoardInProject')} onClick={handleAddProjectBoard} />,
     [handleAddProjectBoard, t]
@@ -166,14 +176,12 @@ export const GalleryBoardsPanel = () => {
       onSelectBoard={handleSelectBoard}
     />
   );
+  // A typed name no board has is offered in both tiers, so the choice is made where the board will show.
   const renderCreateRow = (tier: CreateTier) =>
-    groups.canCreateFromSearch && createTier === tier ? (
+    groups.canCreateFromSearch ? (
       <GalleryBoardRowShell
         cover={CREATE_ROW_COVER}
-        label={t('widgets.gallery.createBoardNamedIn', {
-          destination: tier === 'project' ? projectName : t('widgets.gallery.boardGroups.library'),
-          name: trimmedSearchTerm,
-        })}
+        label={t('widgets.gallery.createBoardNamedIn', { destination: tierLabel(tier), name: trimmedSearchTerm })}
         labelWeight="600"
         onSelect={tier === 'project' ? createProjectBoardFromSearch : createLibraryBoardFromSearch}
       />
@@ -196,12 +204,7 @@ export const GalleryBoardsPanel = () => {
 
   return (
     <Stack flex="1" gap="1" minH="0" minW="0">
-      <GalleryBoardFilters
-        ref={searchInputRef}
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        onSubmitSearch={handleSubmitSearch}
-      />
+      <GalleryBoardFilters searchTerm={searchTerm} onSearchChange={setSearchTerm} onSubmitSearch={handleSubmitSearch} />
       <ScrollArea.Root flex="1" minH="0" variant="hover" w="full">
         <ScrollArea.Viewport ref={boardsViewportRef} h="full" w="full">
           <ScrollArea.Content {...SCROLL_CONTENT_PROPS}>
@@ -327,13 +330,24 @@ export const GalleryBoardsPanel = () => {
         </ScrollArea.Scrollbar>
       </ScrollArea.Root>
       <GalleryBoardMenu target={boardMenuTarget} onClose={handleBoardMenuClose} />
+      <RenameDialog
+        cancelLabel={t('common.cancel')}
+        initialName={trimmedSearchTerm}
+        isOpen={createDialogTier !== null}
+        label={t('widgets.gallery.boardName')}
+        submitLabel={t('widgets.gallery.createBoard')}
+        submitUnchanged
+        title={t('widgets.gallery.createBoardIn', { destination: tierLabel(createDialogTier ?? 'project') })}
+        onClose={closeCreateDialog}
+        onSubmit={handleCreateDialogSubmit}
+      />
     </Stack>
   );
 };
 
 const AddBoardButton = ({ label, onClick }: { label: string; onClick: () => void }): ReactNode => (
   <Tooltip content={label}>
-    <IconButton aria-label={label} color="fg.muted" size="sm" variant="ghost" onClick={onClick}>
+    <IconButton aria-haspopup="dialog" aria-label={label} color="fg.muted" size="sm" variant="ghost" onClick={onClick}>
       <Icon as={PlusIcon} boxSize="3.5" />
     </IconButton>
   </Tooltip>

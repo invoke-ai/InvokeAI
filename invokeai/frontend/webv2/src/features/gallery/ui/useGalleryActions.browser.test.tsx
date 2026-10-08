@@ -316,7 +316,7 @@ describe('optimistic board updates', () => {
     expect(mocks.ensureProjectOnServer).not.toHaveBeenCalled();
 
     await act(async () => {
-      await actionsRef.current?.createBoard('New', 'p1');
+      await expect(actionsRef.current?.createBoard('New', 'p1')).resolves.toBe(true);
     });
     expect(mocks.ensureProjectOnServer).toHaveBeenCalledOnce();
     expect(mocks.ensureProjectOnServer.mock.invocationCallOrder[0]).toBeLessThan(
