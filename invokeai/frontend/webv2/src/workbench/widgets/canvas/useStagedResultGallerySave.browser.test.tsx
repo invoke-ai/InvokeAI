@@ -276,9 +276,12 @@ describe('saving a staged result to the Gallery', () => {
     await act(() => saving);
     await until(() => expect(toastText()).toContain('Saved to Board A'));
     expect(toastButton('Show in Gallery')).toBeNull();
+    // Checked synchronously around the switch: the toaster's own timeout would also close it within a wait.
+    expect(toastRoot()?.getAttribute('data-state')).toBe('open');
 
     await act(() => accountLifecycle.activate('another-user'));
 
+    expect(toastRoot()?.getAttribute('data-state')).toBe('closed');
     await until(() => expect(toastRoot()).toBeNull());
   });
 
