@@ -245,9 +245,27 @@ describe('sparse gallery geometry', () => {
       total: 130,
     });
 
-    expect(entries).toHaveLength(10);
-    expect(entries[0]).toEqual({ item: first, kind: 'item' });
-    expect(entries[1]).toEqual({ id: 'gallery-loading-slot:121', kind: 'session', navigable: false });
-    expect(entries[2]).toEqual({ item: third, kind: 'item' });
+    expect(entries).toHaveLength(11);
+    expect(entries[0]).toEqual({ id: 'gallery-unloaded-slot:119', kind: 'slot', navigable: true });
+    expect(entries[1]).toEqual({ item: first, kind: 'item' });
+    expect(entries[2]).toEqual({ id: 'gallery-loading-slot:121', kind: 'slot', navigable: false });
+    expect(entries[3]).toEqual({ item: third, kind: 'item' });
+  });
+
+  it('includes a navigable preceding row before a distant active page', () => {
+    const first = createImageItem('first');
+    const entries = buildSparseGalleryNavigationEntries({
+      columnCount: 3,
+      itemSlots: new Map([[120, first]]),
+      pageOffsets: [120],
+      total: 600,
+    });
+
+    expect(entries.slice(0, 4)).toEqual([
+      { id: 'gallery-unloaded-slot:117', kind: 'slot', navigable: true },
+      { id: 'gallery-unloaded-slot:118', kind: 'slot', navigable: true },
+      { id: 'gallery-unloaded-slot:119', kind: 'slot', navigable: true },
+      { item: first, kind: 'item' },
+    ]);
   });
 });

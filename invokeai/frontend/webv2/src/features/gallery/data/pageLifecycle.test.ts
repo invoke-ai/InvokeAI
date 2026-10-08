@@ -15,6 +15,7 @@ import { planGalleryPageOffsets } from '@features/gallery/ui/galleryGridLayout';
 
 import {
   GALLERY_PAGE_SIZE,
+  fetchGalleryItemsPage,
   galleryItemsPageOptions,
   galleryStarredStripOptions,
   type GalleryItemsFilter,
@@ -458,6 +459,34 @@ describe('Gallery sparse page lifecycle', () => {
     expect(backend.listGalleryItems).toHaveBeenCalledOnce();
     unsubscribes.forEach((unsubscribe) => unsubscribe());
     observers.forEach((observer) => observer.destroy());
+    client.clear();
+  });
+
+  it('keeps an imperative page read alive after its final UI observer leaves', async () => {
+    const client = createQueryClient();
+    let resolve!: (page: GalleryItemsPage) => void;
+    let requestSignal: AbortSignal | undefined;
+    backend.listGalleryItems.mockImplementation(
+      ({ signal }: { signal: AbortSignal }) =>
+        new Promise<GalleryItemsPage>((complete) => {
+          resolve = complete;
+          requestSignal = signal;
+        })
+    );
+
+    const options = galleryItemsPageOptions(filter, 0);
+    const observer = new QueryObserver(client, { ...options, enabled: false });
+    const unsubscribe = observer.subscribe(() => undefined);
+    const imperativeRead = fetchGalleryItemsPage(client, filter, 0);
+
+    await vi.waitFor(() => expect(backend.listGalleryItems).toHaveBeenCalledOnce());
+    unsubscribe();
+
+    expect(requestSignal?.aborted).toBe(false);
+    resolve(createPage(0));
+    await expect(imperativeRead).resolves.toMatchObject({ offset: 0 });
+
+    observer.destroy();
     client.clear();
   });
 });

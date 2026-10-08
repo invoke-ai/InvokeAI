@@ -79,12 +79,30 @@ export const useGalleryGridSelection = () => {
   const selectItemRange = useCallback(
     async (
       item: GalleryItem,
-      { anchorKey, selectionPage }: { anchorKey?: GalleryItemKey | null; selectionPage?: number } = {}
+      {
+        anchorKey,
+        isFocusCurrent,
+        isNavigationCurrent,
+        selectionPage,
+      }: {
+        anchorKey?: GalleryItemKey | null;
+        isFocusCurrent?: () => boolean;
+        isNavigationCurrent?: () => boolean;
+        selectionPage?: number;
+      } = {}
     ) => {
       const owner = captureAccountScope();
       const capturedContext = rangeInteractionContextRef.current;
       const anchorItemKey = anchorKey ?? capturedContext.selectedItemKey;
       const targetItemKey = toGalleryItemKey(item);
+      const isInteractionContextCurrent = () =>
+        isAccountScopeCurrent(owner) &&
+        rangeInteractionContextRef.current.filterIdentity === capturedContext.filterIdentity &&
+        rangeInteractionContextRef.current.selectedItemKey === capturedContext.selectedItemKey;
+      const isInteractionCurrent = (requireFocusedTarget = false) =>
+        isNavigationCurrent?.() !== false &&
+        (!requireFocusedTarget || isFocusCurrent?.() !== false) &&
+        isInteractionContextCurrent();
       const selectSingleItem = () => {
         if (selectionPage === undefined) {
           actions.selectItem(item);
@@ -93,15 +111,15 @@ export const useGalleryGridSelection = () => {
         }
       };
 
+      if (!isInteractionContextCurrent()) {
+        return;
+      }
+
       if (!anchorItemKey) {
         selectSingleItem();
         return;
       }
 
-      const isInteractionCurrent = () =>
-        isAccountScopeCurrent(owner) &&
-        rangeInteractionContextRef.current.filterIdentity === capturedContext.filterIdentity &&
-        rangeInteractionContextRef.current.selectedItemKey === capturedContext.selectedItemKey;
       const selectFromRefs = (refs: readonly GalleryItemRef[]): boolean => {
         const range = getGalleryItemRange(refs, anchorItemKey, targetItemKey);
 
@@ -118,13 +136,20 @@ export const useGalleryGridSelection = () => {
       };
       const materializedRefs = gallery.items.map(toGalleryItemRef);
       const namesOptions = galleryItemNamesOptions(filter);
+      const usesSynchronousNames = isDateBoardId(filter.boardId);
+      let hasAwaitedNames = false;
 
       try {
-        const orderedRefs = isDateBoardId(filter.boardId)
-          ? queryClient.getQueryData<GalleryItemNames>(namesOptions.queryKey)?.items
-          : (await queryClient.fetchQuery(namesOptions)).items;
+        let orderedRefs: readonly GalleryItemRef[] | undefined;
+        if (usesSynchronousNames) {
+          orderedRefs = queryClient.getQueryData<GalleryItemNames>(namesOptions.queryKey)?.items;
+        } else {
+          const namesPromise = queryClient.fetchQuery(namesOptions);
+          hasAwaitedNames = true;
+          orderedRefs = (await namesPromise).items;
+        }
 
-        if (!isInteractionCurrent()) {
+        if (!isInteractionCurrent(hasAwaitedNames)) {
           return;
         }
 
@@ -132,13 +157,17 @@ export const useGalleryGridSelection = () => {
           return;
         }
       } catch {
-        if (!isInteractionCurrent()) {
+        if (!isInteractionCurrent(hasAwaitedNames)) {
           return;
         }
       }
 
       // The names list describes the listing only; a range inside the strip
       // resolves against the strip's own order.
+      if (!isInteractionCurrent(hasAwaitedNames)) {
+        return;
+      }
+
       if (!selectFromRefs(materializedRefs) && !selectFromRefs(starredStrip.items.map(toGalleryItemRef))) {
         selectSingleItem();
       }

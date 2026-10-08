@@ -408,9 +408,6 @@ describe('GalleryPickerPopover', () => {
     await vi.waitFor(() =>
       expect(mocks.listItems.mock.calls.filter(([filter]) => filter.offset === 60)).toHaveLength(1)
     );
-    for (let index = 0; index < 59; index += 1) {
-      await pressKey(input, 'ArrowLeft');
-    }
     const retry = await vi.waitFor(() => {
       const button = [...dialog.querySelectorAll<HTMLButtonElement>('button')].find((candidate) =>
         candidate.textContent?.includes('common.retry')
@@ -420,8 +417,11 @@ describe('GalleryPickerPopover', () => {
       return button;
     });
     expect(retry).toBeDefined();
-    await pressKey(input, 'Enter');
-    await vi.waitFor(() => expect(getActiveOption(dialog)?.dataset.itemKey).toBe('image:page-60.png'));
+    const retryBounds = retry!.getBoundingClientRect();
+    const dialogBounds = dialog.getBoundingClientRect();
+    expect(retryBounds.top).toBeGreaterThanOrEqual(dialogBounds.top);
+    expect(retryBounds.bottom).toBeLessThanOrEqual(dialogBounds.bottom);
+    await act(() => retry!.click());
     expect(mocks.listItems.mock.calls.filter(([filter]) => filter.offset === 60)).toHaveLength(2);
   });
 

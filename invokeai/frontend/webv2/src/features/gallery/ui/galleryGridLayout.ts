@@ -221,6 +221,8 @@ export const buildSparseGalleryNavigationEntries = ({
   const firstPageOffset = pageOffsets.reduce((first, offset) => Math.min(first, offset), Number.POSITIVE_INFINITY);
   const lastPageOffset = Math.max(...pageOffsets);
   const activeStartIndex = Math.floor(firstPageOffset / columnCount) * columnCount;
+  const startIndex =
+    includeUnloadedBoundaries && firstPageOffset > 0 ? Math.max(0, activeStartIndex - columnCount) : activeStartIndex;
   const activeEndIndex = Math.min(total ?? Number.POSITIVE_INFINITY, lastPageOffset + GALLERY_PAGE_SIZE);
   const endIndex =
     includeUnloadedBoundaries && total !== null
@@ -228,7 +230,7 @@ export const buildSparseGalleryNavigationEntries = ({
       : activeEndIndex;
   const entries: GalleryNavigationEntry[] = [];
 
-  for (let index = activeStartIndex; index < endIndex; index += 1) {
+  for (let index = startIndex; index < endIndex; index += 1) {
     const item = itemSlots.get(index);
     const isActivePage = activePages.has(Math.floor(index / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE);
 
@@ -236,8 +238,8 @@ export const buildSparseGalleryNavigationEntries = ({
       item
         ? { item, kind: 'item' }
         : isActivePage
-          ? { id: `gallery-loading-slot:${index}`, kind: 'session', navigable: false }
-          : { id: `gallery-unloaded-slot:${index}`, kind: 'session', navigable: true }
+          ? { id: `gallery-loading-slot:${index}`, kind: 'slot', navigable: false }
+          : { id: `gallery-unloaded-slot:${index}`, kind: 'slot', navigable: true }
     );
   }
 

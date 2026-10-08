@@ -221,6 +221,7 @@ export const isGalleryNavigationCurrent = (sequence: number): boolean => sequenc
 
 export type GalleryNavigationEntry =
   | { kind: 'item'; item: GalleryItem }
+  | { kind: 'slot'; id: string; navigable: boolean }
   | { kind: 'session'; id: string; navigable: boolean };
 
 export type GalleryNavigationDirection = 'down' | 'left' | 'right' | 'up';
@@ -228,7 +229,11 @@ export type GalleryNavigationDirection = 'down' | 'left' | 'right' | 'up';
 export const getGallerySessionNavigationKey = (sessionId: string): string => `session:${sessionId}`;
 
 const getGalleryNavigationEntryKey = (entry: GalleryNavigationEntry): string =>
-  entry.kind === 'item' ? toGalleryItemKey(entry.item) : getGallerySessionNavigationKey(entry.id);
+  entry.kind === 'item'
+    ? toGalleryItemKey(entry.item)
+    : entry.kind === 'slot'
+      ? entry.id
+      : getGallerySessionNavigationKey(entry.id);
 
 /**
  * Where an arrow steps from: the first candidate the sections show. A candidate they do not show (a followed session
@@ -257,7 +262,10 @@ export const getGalleryNavigationStep = (
   { itemsOnly = false }: { itemsOnly?: boolean } = {}
 ): GalleryNavigationEntry | null => {
   const isNavigable = (entry: GalleryNavigationEntry | undefined): entry is GalleryNavigationEntry =>
-    entry !== undefined && (entry.kind === 'item' || (!itemsOnly && entry.navigable));
+    entry !== undefined &&
+    (entry.kind === 'item' ||
+      (entry.kind === 'slot' && entry.navigable) ||
+      (entry.kind === 'session' && !itemsOnly && entry.navigable));
   const entries = sections.flat();
   const cursorKey = getGalleryNavigationCursor(sections, cursorKeys);
 

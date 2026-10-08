@@ -152,7 +152,9 @@ const toNeighbor = (entry: GalleryNavigationEntry | null): PreviewNeighbor =>
     ? null
     : entry.kind === 'item'
       ? { item: entry.item, kind: 'item' }
-      : { id: entry.id, kind: 'session' };
+      : entry.kind === 'session'
+        ? { id: entry.id, kind: 'session' }
+        : null;
 
 export interface PreviewNavigationState {
   /** Every saved item the arrows can reach, in order: the starred strip, then the listing. */
@@ -595,11 +597,13 @@ export const usePreviewNavigation = ({
       const stepTo = (entry: GalleryNavigationEntry | null, pages: typeof boardPageResults): boolean => {
         if (entry?.kind === 'session') {
           followSession(entry.id);
-        } else if (entry) {
+        } else if (entry?.kind === 'item') {
           stampSelection(entry.item, pages);
+        } else {
+          return false;
         }
 
-        return entry !== null;
+        return true;
       };
 
       const loadedEntry = getGalleryNavigationStep(navigationSections, cursorKeys, direction);

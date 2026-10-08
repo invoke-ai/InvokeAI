@@ -13,7 +13,13 @@ import { useGallerySelectionStarred, useGalleryWidget } from './GalleryWidgetCon
  * How an arrow moves: `select` replaces the selection with the next tile, `extend` selects the range from the anchor
  * to it, and `focus` moves keyboard focus alone, so a toggle can then build a discontiguous selection.
  */
-type GalleryNavigationMode = 'extend' | 'focus' | 'select';
+export type GalleryNavigationMode = 'extend' | 'focus' | 'select';
+
+export interface GalleryUnloadedNavigationRequest {
+  anchorKey: GalleryItemKey | null;
+  mode: GalleryNavigationMode;
+  onResolved: (itemKey: GalleryItemKey) => void;
+}
 
 const GALLERY_HOTKEYS = [
   ['gallery.selectAllOnPage', 'widgets.gallery.commands.selectAllOnPage', null, ['mod+a']],
@@ -76,6 +82,7 @@ export const useGalleryGridHotkeys = ({
   navigationSections,
   navigateToUnloadedSlot,
   getSelectionPage,
+  onNavigationStart,
   selectItemRange,
   toggleItem,
 }: {
@@ -102,7 +109,9 @@ export const useGalleryGridHotkeys = ({
   /** The arrow-key sections in visual order: the starred strip, in progress, the listing. */
   navigationSections: readonly (readonly GalleryNavigationEntry[])[];
   /** Loads a sparse absolute slot; it becomes selectable after its page hydrates. */
-  navigateToUnloadedSlot?: (absoluteIndex: number) => void;
+  navigateToUnloadedSlot?: (absoluteIndex: number, request: GalleryUnloadedNavigationRequest) => void;
+  /** Supersedes any unfinished sparse navigation before handling this newer arrow command. */
+  onNavigationStart?: () => void;
   /** The sparse page stamp for a loaded listing item. */
   getSelectionPage?: (item: GalleryItem) => number | undefined;
   selectItemRange: (
@@ -119,6 +128,7 @@ export const useGalleryGridHotkeys = ({
   const keyboardRangeRef = useRef<{ anchorKey: GalleryItemKey | null; reachedKey: GalleryItemKey } | null>(null);
 
   const navigate = useEffectEvent((direction: GalleryNavigationDirection, mode: GalleryNavigationMode) => {
+    onNavigationStart?.();
     const cursorKey = getGalleryNavigationCursor(navigationSections, getCursorCandidates());
     // Ranges and focus moves step between items only: in-progress sessions are followed, never selected. They stay in
     // the sections, since one can be where the step starts.
@@ -138,10 +148,28 @@ export const useGalleryGridHotkeys = ({
       return;
     }
 
-    const unloadedSlotMatch = entry.kind === 'session' ? /^gallery-unloaded-slot:(\d+)$/.exec(entry.id) : null;
+    const unloadedSlotMatch = entry.kind === 'slot' ? /^gallery-unloaded-slot:(\d+)$/.exec(entry.id) : null;
 
     if (unloadedSlotMatch) {
-      navigateToUnloadedSlot?.(Number(unloadedSlotMatch[1]));
+      const range = keyboardRangeRef.current;
+      const anchorKey =
+        mode === 'extend'
+          ? range && range.reachedKey === cursorKey
+            ? range.anchorKey
+            : gallery.selectedItemKey
+          : null;
+
+      navigateToUnloadedSlot?.(Number(unloadedSlotMatch[1]), {
+        anchorKey,
+        mode,
+        onResolved: (itemKey) => {
+          keyboardRangeRef.current = mode === 'extend' ? { anchorKey, reachedKey: itemKey } : null;
+        },
+      });
+      return;
+    }
+
+    if (entry.kind === 'slot') {
       return;
     }
 

@@ -21,6 +21,8 @@ import {
   type Query,
   type QueryClient,
   type QueryKey,
+  type QueryObserverOptions,
+  QueryObserver,
 } from '@tanstack/react-query';
 
 import {
@@ -501,12 +503,17 @@ const galleryItemLocationKey = (
   ref: GalleryItemRef
 ) => ['gallery', 'item-location', getAccountKey(owner), filter, ref] as const;
 
-const sharedQueryConsumers = new WeakMap<QueryClient, Map<string, number>>();
+interface SharedQueryConsumerState {
+  count: number;
+  unsubscribeObserver: () => void;
+}
+
+const sharedQueryConsumers = new WeakMap<QueryClient, Map<string, SharedQueryConsumerState>>();
 
 /** Stop one caller's wait immediately; cancel the Query only after its final caller leaves. */
-const fetchSharedQuery = <T>(
+const fetchSharedQuery = <T, TQueryKey extends QueryKey>(
   client: QueryClient,
-  queryKey: QueryKey,
+  options: QueryObserverOptions<T, Error, T, T, TQueryKey>,
   signal: AbortSignal | undefined,
   cancelQueryWhenUnused: boolean,
   fetch: () => Promise<T>
@@ -515,29 +522,41 @@ const fetchSharedQuery = <T>(
     return Promise.reject(signal.reason ?? new DOMException('The operation was aborted.', 'AbortError'));
   }
 
-  const queryHash = hashKey(queryKey);
-  const consumers = sharedQueryConsumers.get(client) ?? new Map<string, number>();
+  const queryHash = hashKey(options.queryKey);
+  const consumers = sharedQueryConsumers.get(client) ?? new Map<string, SharedQueryConsumerState>();
 
   sharedQueryConsumers.set(client, consumers);
-  consumers.set(queryHash, (consumers.get(queryHash) ?? 0) + 1);
+  let sharedState = consumers.get(queryHash);
+
+  if (!sharedState) {
+    // The explicit Query observer keeps TanStack from aborting a signal-aware read when its last UI observer leaves
+    // but an imperative reveal/location caller still awaits the shared request.
+    const observer = new QueryObserver(client, { ...options, enabled: false });
+
+    sharedState = { count: 0, unsubscribeObserver: observer.subscribe(() => undefined) };
+    consumers.set(queryHash, sharedState);
+  }
+  sharedState.count += 1;
 
   return new Promise((resolve, reject) => {
     let settled = false;
     const release = (cancelIfLast: boolean) => {
-      const remainingConsumers = Math.max(0, (consumers.get(queryHash) ?? 1) - 1);
+      const state = consumers.get(queryHash);
+      const remainingConsumers = Math.max(0, (state?.count ?? 1) - 1);
 
       if (remainingConsumers === 0) {
         consumers.delete(queryHash);
-        const query = client.getQueryCache().find({ exact: true, queryKey });
+        state?.unsubscribeObserver();
+        const query = client.getQueryCache().find({ exact: true, queryKey: options.queryKey });
 
         if (cancelIfLast && cancelQueryWhenUnused && (query?.getObserversCount() ?? 0) === 0) {
-          void client.cancelQueries({ exact: true, queryKey });
+          void client.cancelQueries({ exact: true, queryKey: options.queryKey });
         }
         if (consumers.size === 0) {
           sharedQueryConsumers.delete(client);
         }
       } else {
-        consumers.set(queryHash, remainingConsumers);
+        state!.count = remainingConsumers;
       }
     };
     const onAbort = () => {
@@ -592,7 +611,7 @@ export const fetchGalleryItemsPage = (
 ): Promise<GalleryItemsPage> => {
   const pageOptions = galleryItemsPageOptions(inputFilter, offset);
 
-  return fetchSharedQuery(queryClient, pageOptions.queryKey, signal, true, () =>
+  return fetchSharedQuery(queryClient, pageOptions, signal, true, () =>
     queryClient.fetchQuery(staleTime === undefined ? pageOptions : { ...pageOptions, staleTime })
   );
 };
@@ -711,7 +730,7 @@ export const fetchVerifiedGalleryItemPage = async (
     const locationOptions = galleryItemLocationOptionsForOwner(owner, filter, ref);
 
     const location = await fenceError(
-      fetchSharedQuery(queryClient, locationOptions.queryKey, requestSignal, true, () =>
+      fetchSharedQuery(queryClient, locationOptions, requestSignal, true, () =>
         queryClient.fetchQuery({ ...locationOptions, staleTime: 0 })
       )
     );

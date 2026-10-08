@@ -17,6 +17,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { toGalleryItemRef } from '@features/gallery/core/items';
 import { requestGalleryItemReveal } from '@features/gallery/core/selection';
 import { getGallerySettings } from '@features/gallery/core/settings';
 import {
@@ -76,6 +77,8 @@ const mocks = vi.hoisted(() => ({
     overscan: number;
   }>,
   useRealGridVirtualizer: false,
+  partialRowPosition: null as { ratio: number; rowIndex: number; visibleRows: number } | null,
+  partialRowScrollOffset: null as number | null,
 }));
 
 const getNamesKey = (filter: unknown) => ['test-gallery-item-names', JSON.stringify(filter)] as const;
@@ -136,9 +139,22 @@ vi.mock('react-hook-tanstack-virtual', async (importOriginal) => {
       const starts = sizes.map(
         (_, index) => (options.scrollMargin ?? 0) + sizes.slice(0, index).reduce((total, size) => total + size, 0)
       );
+      const partialRow = mocks.partialRowPosition;
+      const rowSize = sizes[partialRow?.rowIndex ?? 0] ?? 0;
+      const scrollOffset = partialRow ? (starts[partialRow.rowIndex] ?? 0) + rowSize * partialRow.ratio : null;
+      const scrollHeight = partialRow
+        ? (options.getScrollElement()?.clientHeight ?? rowSize * partialRow.visibleRows)
+        : null;
+      mocks.partialRowScrollOffset = scrollOffset;
 
       return {
         measure: mocks.measure,
+        range: partialRow
+          ? { endIndex: partialRow.rowIndex + partialRow.visibleRows, startIndex: partialRow.rowIndex }
+          : null,
+        scrollOffset,
+        scrollRect:
+          scrollHeight === null ? null : { height: scrollHeight, width: options.getScrollElement()?.clientWidth ?? 0 },
         scrollToIndex: mocks.scrollToIndex,
         totalSize: sizes.reduce((total, size) => total + size, 0),
         virtualItems: Array.from({ length: options.count }, (_, index) => ({
@@ -694,6 +710,9 @@ beforeEach(() => {
   currentStrip = EMPTY_GALLERY_STARRED_STRIP;
   currentSparseListing = undefined;
   mocks.useRealGridVirtualizer = false;
+  mocks.partialRowPosition = null;
+  mocks.partialRowScrollOffset = null;
+  mocks.virtualizerOptions.length = 0;
   currentListing = READY_LISTING;
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   host = document.createElement('div');
@@ -1940,6 +1959,39 @@ describe('GalleryImageGrid virtualization', () => {
     expect(status?.getBoundingClientRect().width).toBeGreaterThan(0);
   });
 
+  it('keeps a sparse-page Retry on a fully visible row when the first visible row is clipped', async () => {
+    const pageError = new Error('Page unavailable');
+    const retry = vi.fn(() => Promise.resolve());
+    currentSparseListing = {
+      itemSlots: new Map(),
+      pageStates: new Map([[0, { error: pageError, isLoading: false, retry }]]),
+      recentItems: [],
+      total: 120,
+    };
+    mocks.partialRowPosition = { ratio: 0.8, rowIndex: 0, visibleRows: 3 };
+
+    await renderGallery(createGallery({ items: [], settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' } }));
+
+    const viewport = host!.querySelector<HTMLElement>('[data-part="viewport"]')!;
+
+    await interact(() => {
+      viewport.scrollTop = mocks.partialRowScrollOffset ?? 0;
+      viewport.dispatchEvent(new Event('scroll'));
+    });
+    await interact(noop);
+
+    const retryButton = host!.querySelector<HTMLButtonElement>('[data-gallery-slot-state="error"] button')!;
+    const retryCell = retryButton.closest<HTMLElement>('[role="listitem"]')!;
+    const retryRect = retryCell.getBoundingClientRect();
+    const viewportRect = viewport.getBoundingClientRect();
+
+    expect(retryRect.top).toBeGreaterThanOrEqual(viewportRect.top - 1);
+    expect(retryRect.bottom).toBeLessThanOrEqual(viewportRect.bottom + 1);
+
+    await click(retryButton);
+    expect(retry).toHaveBeenCalledOnce();
+  });
+
   it('renders absolute sparse slots, page-local retry, and recent overlays at the sort edge', async () => {
     const first = createItem('image', 'sparse-120.png');
     const third = createItem('image', 'sparse-122.png');
@@ -2064,7 +2116,7 @@ describe('GalleryImageGrid virtualization', () => {
     };
     await renderGallery({ ...currentGallery, items: [lastInPage, firstNextPage] });
     expect(actionMocks.selectItem).toHaveBeenLastCalledWith(firstNextPage, 1);
-    expect(document.activeElement).toBe(lastTile);
+    expect(document.activeElement).toBe(getButton('Select page-1-first.png for preview'));
 
     registeredCommands.get('gallery.selectAllOnPage')?.();
     expect(actionMocks.selectItemRange).toHaveBeenLastCalledWith(
@@ -2074,6 +2126,266 @@ describe('GalleryImageGrid virtualization', () => {
       ],
       lastInPage
     );
+  });
+
+  it('loads and extends a sparse range across an unloaded page boundary', async () => {
+    const lastInPage = createItem('image', 'range-page-0-last.png');
+    const firstNextPage = createItem('image', 'range-page-1-first.png');
+    mocks.fetchNames.mockResolvedValue({
+      items: [toGalleryItemRef(lastInPage), toGalleryItemRef(firstNextPage)],
+      total: 2,
+    });
+    currentSparseListing = {
+      itemSlots: new Map([[59, lastInPage]]),
+      pageStates: new Map([[0, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }]]),
+      recentItems: [],
+      total: 120,
+    };
+
+    await renderGallery(
+      createGallery({
+        items: [lastInPage],
+        selectedItemKey: 'image:range-page-0-last.png',
+        selectedItemKeys: ['image:range-page-0-last.png'],
+        settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' },
+      })
+    );
+    await interact(() => getButton('Select range-page-0-last.png for preview').focus());
+    registeredCommands.get('gallery.extendSelectionRight')?.();
+
+    expect(setVisibleRange).toHaveBeenLastCalledWith({ endIndexExclusive: 120, startIndex: 60 });
+    currentSparseListing = {
+      itemSlots: new Map([
+        [59, lastInPage],
+        [60, firstNextPage],
+      ]),
+      pageStates: new Map([
+        [0, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }],
+        [60, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }],
+      ]),
+      recentItems: [],
+      total: 120,
+    };
+    await renderGallery({ ...currentGallery, items: [lastInPage, firstNextPage] });
+
+    await vi.waitFor(() =>
+      expect(actionMocks.selectItemRange).toHaveBeenLastCalledWith(
+        [toGalleryItemRef(lastInPage), toGalleryItemRef(firstNextPage)],
+        firstNextPage,
+        1
+      )
+    );
+    expect(document.activeElement).toBe(getButton('Select range-page-1-first.png for preview'));
+  });
+
+  it('extends a sparse range across an unloaded date-board page with cached names', async () => {
+    const lastInPage = createItem('image', 'date-range-page-0-last.png');
+    const firstNextPage = createItem('image', 'date-range-page-1-first.png');
+    const dateBoardId = 'by_date:2026-07-30';
+    const gallery = createGallery({
+      boards: [{ ...board, id: dateBoardId, kind: 'date' }],
+      items: [lastInPage],
+      selectedBoardId: dateBoardId,
+      selectedItemKey: 'image:date-range-page-0-last.png',
+      selectedItemKeys: ['image:date-range-page-0-last.png'],
+      settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' },
+    });
+    const filter = {
+      boardId: dateBoardId,
+      galleryView: gallery.galleryView,
+      orderDir: gallery.settings.imageOrderDir,
+      searchTerm: '',
+    };
+    const orderedRefs = [toGalleryItemRef(lastInPage), toGalleryItemRef(firstNextPage)];
+    queryClient?.setQueryData(getNamesKey(filter), { items: orderedRefs, total: 120 });
+    currentSparseListing = {
+      itemSlots: new Map([[59, lastInPage]]),
+      pageStates: new Map([[0, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }]]),
+      recentItems: [],
+      total: 120,
+    };
+
+    await renderGallery(gallery);
+    await interact(() => getButton('Select date-range-page-0-last.png for preview').focus());
+    registeredCommands.get('gallery.extendSelectionRight')?.();
+
+    currentSparseListing = {
+      itemSlots: new Map([
+        [59, lastInPage],
+        [60, firstNextPage],
+      ]),
+      pageStates: new Map([
+        [0, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }],
+        [60, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }],
+      ]),
+      recentItems: [],
+      total: 120,
+    };
+    await renderGallery({ ...currentGallery, items: [lastInPage, firstNextPage] });
+
+    await vi.waitFor(() => expect(actionMocks.selectItemRange).toHaveBeenLastCalledWith(orderedRefs, firstNextPage, 1));
+    expect(document.activeElement).toBe(getButton('Select date-range-page-1-first.png for preview'));
+    expect(mocks.fetchNames).not.toHaveBeenCalled();
+  });
+
+  it('loads an unloaded page for focus-only navigation without changing selection', async () => {
+    const lastInPage = createItem('image', 'focus-page-0-last.png');
+    const firstNextPage = createItem('image', 'focus-page-1-first.png');
+    currentSparseListing = {
+      itemSlots: new Map([[59, lastInPage]]),
+      pageStates: new Map([[0, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }]]),
+      recentItems: [],
+      total: 120,
+    };
+
+    await renderGallery(
+      createGallery({
+        items: [lastInPage],
+        selectedItemKey: 'image:focus-page-0-last.png',
+        selectedItemKeys: ['image:focus-page-0-last.png'],
+        settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' },
+      })
+    );
+    await interact(() => getButton('Select focus-page-0-last.png for preview').focus());
+    registeredCommands.get('gallery.moveFocusRight')?.();
+
+    expect(setVisibleRange).toHaveBeenLastCalledWith({ endIndexExclusive: 120, startIndex: 60 });
+    currentSparseListing = {
+      itemSlots: new Map([
+        [59, lastInPage],
+        [60, firstNextPage],
+      ]),
+      pageStates: new Map([
+        [0, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }],
+        [60, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }],
+      ]),
+      recentItems: [],
+      total: 120,
+    };
+    await renderGallery({ ...currentGallery, items: [lastInPage, firstNextPage] });
+
+    expect(document.activeElement).toBe(getButton('Select focus-page-1-first.png for preview'));
+    expect(actionMocks.selectItem).not.toHaveBeenCalled();
+  });
+
+  it.each(['backend-ordered names', 'materialized fallback', 'error fallback'] as const)(
+    'cancels a hydrated range when focus moves during the %s path',
+    async (resolutionPath) => {
+      const previousItem = createItem('image', 'hydrated-cancel-page-0-previous.png');
+      const anchorItem = createItem('image', 'hydrated-cancel-page-0-anchor.png');
+      const pendingItem = createItem('image', 'hydrated-cancel-page-1-pending.png');
+      let resolveNames: ((value: { items: GalleryItemRef[]; total: number }) => void) | null = null;
+      let rejectNames: ((reason?: unknown) => void) | null = null;
+      mocks.fetchNames.mockReturnValue(
+        new Promise((resolve, reject) => {
+          resolveNames = resolve;
+          rejectNames = reject;
+        })
+      );
+      currentSparseListing = {
+        itemSlots: new Map([
+          [58, previousItem],
+          [59, anchorItem],
+        ]),
+        pageStates: new Map([[0, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }]]),
+        recentItems: [],
+        total: 120,
+      };
+
+      await renderGallery(
+        createGallery({
+          items: [previousItem, anchorItem],
+          selectedItemKey: 'image:hydrated-cancel-page-0-anchor.png',
+          selectedItemKeys: ['image:hydrated-cancel-page-0-anchor.png'],
+          settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' },
+        })
+      );
+      await interact(() => getButton('Select hydrated-cancel-page-0-anchor.png for preview').focus());
+      registeredCommands.get('gallery.extendSelectionRight')?.();
+
+      currentSparseListing = {
+        itemSlots: new Map([
+          [58, previousItem],
+          [59, anchorItem],
+          [60, pendingItem],
+        ]),
+        pageStates: new Map([
+          [0, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }],
+          [60, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }],
+        ]),
+        recentItems: [],
+        total: 120,
+      };
+      await renderGallery({ ...currentGallery, items: [previousItem, anchorItem, pendingItem] });
+      await vi.waitFor(() => expect(mocks.fetchNames).toHaveBeenCalledOnce());
+
+      registeredCommands.get('gallery.moveFocusLeft')?.();
+      expect(document.activeElement).toBe(getButton('Select hydrated-cancel-page-0-anchor.png for preview'));
+      if (resolutionPath === 'error fallback') {
+        await interact(() => rejectNames?.(new Error('Names unavailable')));
+      } else {
+        await interact(() =>
+          resolveNames?.({
+            items:
+              resolutionPath === 'backend-ordered names'
+                ? [toGalleryItemRef(previousItem), toGalleryItemRef(anchorItem), toGalleryItemRef(pendingItem)]
+                : [],
+            total: 120,
+          })
+        );
+      }
+
+      expect(actionMocks.selectItemRange).not.toHaveBeenCalled();
+      expect(document.activeElement).toBe(getButton('Select hydrated-cancel-page-0-anchor.png for preview'));
+    }
+  );
+
+  it('drops a pending range when a newer focus-only move supersedes it', async () => {
+    const previousItem = createItem('image', 'supersede-page-0-previous.png');
+    const anchorItem = createItem('image', 'supersede-page-0-anchor.png');
+    const pendingItem = createItem('image', 'supersede-page-1-pending.png');
+    currentSparseListing = {
+      itemSlots: new Map([
+        [58, previousItem],
+        [59, anchorItem],
+      ]),
+      pageStates: new Map([[0, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }]]),
+      recentItems: [],
+      total: 120,
+    };
+
+    await renderGallery(
+      createGallery({
+        items: [previousItem, anchorItem],
+        selectedItemKey: 'image:supersede-page-0-anchor.png',
+        selectedItemKeys: ['image:supersede-page-0-anchor.png'],
+        settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' },
+      })
+    );
+    await interact(() => getButton('Select supersede-page-0-anchor.png for preview').focus());
+    registeredCommands.get('gallery.extendSelectionRight')?.();
+    expect(setVisibleRange).toHaveBeenLastCalledWith({ endIndexExclusive: 120, startIndex: 60 });
+
+    registeredCommands.get('gallery.moveFocusLeft')?.();
+    expect(document.activeElement).toBe(getButton('Select supersede-page-0-previous.png for preview'));
+
+    currentSparseListing = {
+      itemSlots: new Map([
+        [58, previousItem],
+        [59, anchorItem],
+        [60, pendingItem],
+      ]),
+      pageStates: new Map([
+        [0, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }],
+        [60, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }],
+      ]),
+      recentItems: [],
+      total: 120,
+    };
+    await renderGallery({ ...currentGallery, items: [previousItem, anchorItem, pendingItem] });
+
+    expect(actionMocks.selectItemRange).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(getButton('Select supersede-page-0-previous.png for preview'));
   });
 
   it('uses an indexed reveal to request and scroll to only the located page', async () => {

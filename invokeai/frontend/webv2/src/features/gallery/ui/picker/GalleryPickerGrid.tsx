@@ -203,6 +203,7 @@ export const GalleryPickerGrid = ({
   onColumnCountChange,
   onVisibleRangeChange,
   pageStates,
+  suppressInlineRetry,
   total,
 }: {
   activeIndex: number;
@@ -219,6 +220,7 @@ export const GalleryPickerGrid = ({
   onColumnCountChange: (columnCount: number) => void;
   onVisibleRangeChange: (range: { endIndexExclusive: number; startIndex: number }) => void;
   pageStates: ReadonlyMap<number, GallerySparsePageState>;
+  suppressInlineRetry: boolean;
   total: number | null;
 }) => {
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
@@ -395,12 +397,12 @@ export const GalleryPickerGrid = ({
                 return (
                   <GalleryPickerPlaceholder
                     key={index}
-                    error={isRetrySlot ? pageState.error : null}
+                    error={isRetrySlot && !suppressInlineRetry ? pageState.error : null}
                     idBase={idBase}
                     index={index}
                     isActive={index === activeIndex}
                     isLoading={pageState ? pageState.isLoading : true}
-                    retry={isRetrySlot ? pageState.retry : undefined}
+                    retry={isRetrySlot && !suppressInlineRetry ? pageState.retry : undefined}
                     total={total ?? -1}
                   />
                 );

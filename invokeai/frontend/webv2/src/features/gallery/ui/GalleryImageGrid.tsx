@@ -63,7 +63,11 @@ import { getGallerySelectedImageQuery, isGallerySelectionInScope } from './galle
 import { GALLERY_TAB_STOP_SELECTOR, GalleryThumbnailCell } from './GalleryThumbnail';
 import { useGalleryUi } from './GalleryUiContext';
 import { useGalleryWidget, type GalleryStarredStrip } from './GalleryWidgetContext';
-import { useGalleryGridHotkeys } from './useGalleryGridHotkeys';
+import {
+  useGalleryGridHotkeys,
+  type GalleryNavigationMode,
+  type GalleryUnloadedNavigationRequest,
+} from './useGalleryGridHotkeys';
 import { useGalleryGridSelection } from './useGalleryGridSelection';
 import { useGalleryUploadInput } from './useGalleryUploadInput';
 
@@ -379,11 +383,11 @@ const getTileItemKey = (element: Element | null): GalleryItemKey | null =>
 
 /** The tile that shows a navigation entry: a thumbnail, or an in-progress session. */
 const findEntryTile = (viewport: HTMLElement, entry: GalleryNavigationEntry): HTMLElement | null =>
-  viewport.querySelector<HTMLElement>(
-    entry.kind === 'session'
-      ? `[data-gallery-session-id="${CSS.escape(entry.id)}"]`
-      : `[data-gallery-item-key="${CSS.escape(toGalleryItemKey(entry.item))}"]`
-  );
+  entry.kind === 'session'
+    ? viewport.querySelector<HTMLElement>(`[data-gallery-session-id="${CSS.escape(entry.id)}"]`)
+    : entry.kind === 'item'
+      ? viewport.querySelector<HTMLElement>(`[data-gallery-item-key="${CSS.escape(toGalleryItemKey(entry.item))}"]`)
+      : null;
 
 /** Prefers a visible tile; an empty grid offers whatever else it shows (its upload target, the strip header). */
 const focusVisibleGridContent = (viewport: HTMLElement | null, edge: 'first' | 'last') => {
@@ -460,42 +464,6 @@ export const GalleryImageGrid = () => {
       ? Math.min(GALLERY_PAGE_SIZE, Math.max(0, (sparseListing.total ?? 0) - sparsePageOffset))
       : (sparseListing.total ?? 0)
     : 0;
-  const sparsePageStatusOffsets = useMemo(() => {
-    if (!sparseListing) {
-      return new Map<number, number>();
-    }
-
-    const offsets = new Map<number, number>();
-    for (const [pageOffset, pageState] of sparseListing.pageStates) {
-      if (!pageState.error && !pageState.isLoading) {
-        continue;
-      }
-
-      const visibleRangeStart = isSparsePaginated ? sparsePageOffset : 0;
-      const visibleRangeEnd = visibleRangeStart + sparseBackendItemCount;
-      const pageStart = Math.max(pageOffset, visibleRangeStart);
-      const pageEnd = Math.min(pageOffset + GALLERY_PAGE_SIZE, visibleRangeEnd);
-      for (let itemIndex = pageStart; itemIndex < pageEnd; itemIndex += 1) {
-        const listingIndex = isSparsePaginated ? itemIndex - sparsePageOffset : itemIndex;
-        if (!sparseListing.itemSlots.has(listingIndex)) {
-          offsets.set(pageOffset, itemIndex);
-          break;
-        }
-      }
-    }
-    return offsets;
-  }, [isSparsePaginated, sparseBackendItemCount, sparseListing, sparsePageOffset]);
-  const sparsePageErrors = useMemo(
-    () =>
-      [...(sparseListing?.pageStates ?? [])].flatMap(([pageOffset, pageState]) =>
-        pageState.error &&
-        !(pageOffset === 0 && listing.status === 'stale-error') &&
-        !sparsePageStatusOffsets.has(pageOffset)
-          ? [{ pageOffset, pageState }]
-          : []
-      ),
-    [listing.status, sparseListing?.pageStates, sparsePageStatusOffsets]
-  );
   const isFollowingLive = followedProgressSessionId !== null;
   const isComparisonActive = gallery.isComparisonActive && !isFollowingLive;
   const selectedBoard = gallery.boards.find((board) => board.id === gallery.selectedBoardId);
@@ -857,11 +825,28 @@ export const GalleryImageGrid = () => {
     overscan: GRID_OVERSCAN_ROWS,
     rangeExtractor,
   });
+  const sparseNavigationGenerationRef = useRef(0);
   const pendingSparseNavigationRef = useRef<{
+    anchorKey: GalleryItemKey | null;
     filterIdentity: string;
     index: number;
+    mode: GalleryNavigationMode;
+    navigationGeneration: number;
+    onResolved: (itemKey: GalleryItemKey) => void;
     originItemKey: string | null;
+    originFocusKey: string | null;
+    shouldRestoreFocus: boolean;
   } | null>(null);
+  const pendingSparseFocusRef = useRef<{
+    filterIdentity: string;
+    itemKey: GalleryItemKey;
+    originFocusKey: string;
+  } | null>(null);
+  const cancelPendingSparseNavigation = useCallback(() => {
+    sparseNavigationGenerationRef.current += 1;
+    pendingSparseNavigationRef.current = null;
+    pendingSparseFocusRef.current = null;
+  }, []);
   const requestSparseAbsoluteIndex = useCallback(
     (absoluteIndex: number) => {
       if (!sparseListing || isSparsePaginated || !setVisibleRange) {
@@ -882,11 +867,30 @@ export const GalleryImageGrid = () => {
     [columnCount, isSparsePaginated, leadingRecentRows, setVisibleRange, sparseListing, virtualizer]
   );
   const handleNavigateToUnloadedSlot = useCallback(
-    (index: number) => {
+    (index: number, request: GalleryUnloadedNavigationRequest) => {
+      const viewport = viewportRef.current;
+      const shouldRestoreFocus = Boolean(viewport?.contains(document.activeElement));
+      const active = document.activeElement;
+      const activeSessionId =
+        shouldRestoreFocus && active instanceof HTMLElement
+          ? active.closest('[data-gallery-session-id]')?.getAttribute('data-gallery-session-id')
+          : null;
+
+      pendingSparseFocusRef.current = null;
       pendingSparseNavigationRef.current = {
+        anchorKey: request.anchorKey,
         filterIdentity: sparseFilterIdentity,
         index,
+        mode: request.mode,
+        navigationGeneration: sparseNavigationGenerationRef.current,
+        onResolved: request.onResolved,
         originItemKey: cursorKey,
+        originFocusKey: shouldRestoreFocus
+          ? activeSessionId
+            ? getGallerySessionNavigationKey(activeSessionId)
+            : getTileItemKey(active)
+          : null,
+        shouldRestoreFocus,
       };
       requestSparseAbsoluteIndex(index);
     },
@@ -960,7 +964,7 @@ export const GalleryImageGrid = () => {
           viewport.scrollTo({ top: rowBottom - viewport.clientHeight });
         }
       }
-    } else {
+    } else if (entry.kind === 'item') {
       scrollToItemKey(toGalleryItemKey(entry.item));
     }
   };
@@ -1103,6 +1107,7 @@ export const GalleryImageGrid = () => {
     navigationSections,
     navigateToUnloadedSlot: handleNavigateToUnloadedSlot,
     getSelectionPage,
+    onNavigationStart: cancelPendingSparseNavigation,
     selectItemRange,
     toggleItem,
   });
@@ -1119,17 +1124,79 @@ export const GalleryImageGrid = () => {
       return;
     }
 
+    if (pending.shouldRestoreFocus && pending.originFocusKey !== getFocusedTileKey()) {
+      pendingSparseNavigationRef.current = null;
+      return;
+    }
+
     const item = sparseListing?.itemSlots.get(pending.index);
 
     if (item) {
       pendingSparseNavigationRef.current = null;
-      actions.selectItem(item, Math.floor(pending.index / GALLERY_PAGE_SIZE));
+      const itemKey = toGalleryItemKey(item);
+      const selectionPage = getSelectionPage(item) ?? Math.floor(pending.index / GALLERY_PAGE_SIZE);
+
+      pending.onResolved(itemKey);
+
+      if (pending.mode === 'select') {
+        actions.selectItem(item, selectionPage);
+      } else if (pending.mode === 'extend') {
+        const isNavigationCurrent = () => pending.navigationGeneration === sparseNavigationGenerationRef.current;
+        const isFocusCurrent = () => !pending.shouldRestoreFocus || getFocusedTileKey() === itemKey;
+
+        void selectItemRange(item, {
+          anchorKey: pending.anchorKey,
+          isFocusCurrent,
+          isNavigationCurrent,
+          selectionPage,
+        });
+      }
+
+      if (pending.shouldRestoreFocus && pending.originFocusKey) {
+        pendingSparseFocusRef.current = {
+          filterIdentity: pending.filterIdentity,
+          itemKey,
+          originFocusKey: pending.originFocusKey,
+        };
+        setFocusedTile({ filter, index: tileKeys.indexOf(itemKey), key: itemKey });
+      }
     }
   });
 
   useEffect(() => {
     settlePendingSparseNavigation();
   }, [cursorKey, sparseFilterIdentity, sparseListing?.itemSlots]);
+
+  useLayoutEffect(() => {
+    const pending = pendingSparseFocusRef.current;
+
+    if (!pending) {
+      return;
+    }
+
+    if (pending.filterIdentity !== sparseFilterIdentity) {
+      pendingSparseFocusRef.current = null;
+      return;
+    }
+
+    if (focusedTile?.key !== pending.itemKey) {
+      return;
+    }
+
+    const viewport = viewportRef.current;
+
+    if (!viewport?.contains(document.activeElement) || getFocusedTileKey() !== pending.originFocusKey) {
+      pendingSparseFocusRef.current = null;
+      return;
+    }
+
+    const target = viewport.querySelector<HTMLElement>(`[data-gallery-item-key="${CSS.escape(pending.itemKey)}"]`);
+
+    if (target) {
+      pendingSparseFocusRef.current = null;
+      target.focus({ preventScroll: true });
+    }
+  }, [focusedTile, sparseFilterIdentity, sparseListing?.itemSlots]);
 
   // Only explicit reveals scroll. Retry while the item loads; retire the request when another selection supersedes
   // it.
@@ -1350,6 +1417,75 @@ export const GalleryImageGrid = () => {
   ]);
 
   const virtualRows = virtualizer.virtualItems;
+  const sparsePageStatusOffsets = useMemo(() => {
+    if (!sparseListing) {
+      return new Map<number, number>();
+    }
+
+    const scrollOffset = virtualizer.scrollOffset;
+    const scrollHeight = virtualizer.scrollRect?.height;
+    const visibleRows =
+      scrollOffset === null || scrollHeight === undefined
+        ? virtualRows
+        : virtualRows.filter((row) => row.start >= scrollOffset && row.end <= scrollOffset + scrollHeight);
+    const firstVisibleRow = visibleRows[0]?.index;
+    const lastVisibleRow = visibleRows.at(-1)?.index;
+
+    if (firstVisibleRow === undefined || lastVisibleRow === undefined) {
+      return new Map<number, number>();
+    }
+
+    const firstBackendRow = Math.max(0, firstVisibleRow - leadingRecentRows);
+    const afterLastBackendRow = Math.min(backendRowCount, lastVisibleRow + 1 - leadingRecentRows);
+    const visibleStart = (isSparsePaginated ? sparsePageOffset : 0) + firstBackendRow * columnCount;
+    const visibleEnd = Math.min(
+      (isSparsePaginated ? sparsePageOffset : 0) + sparseBackendItemCount,
+      (isSparsePaginated ? sparsePageOffset : 0) + afterLastBackendRow * columnCount
+    );
+    const offsets = new Map<number, number>();
+
+    for (const [pageOffset, pageState] of sparseListing.pageStates) {
+      if (!pageState.error && !pageState.isLoading) {
+        continue;
+      }
+
+      const pageStart = Math.max(pageOffset, visibleStart);
+      const pageEnd = Math.min(pageOffset + GALLERY_PAGE_SIZE, visibleEnd);
+
+      for (let itemIndex = pageStart; itemIndex < pageEnd; itemIndex += 1) {
+        const listingIndex = isSparsePaginated ? itemIndex - sparsePageOffset : itemIndex;
+
+        if (!sparseListing.itemSlots.has(listingIndex)) {
+          offsets.set(pageOffset, itemIndex);
+          break;
+        }
+      }
+    }
+
+    return offsets;
+  }, [
+    backendRowCount,
+    columnCount,
+    isSparsePaginated,
+    leadingRecentRows,
+    sparseBackendItemCount,
+    sparseListing,
+    sparsePageOffset,
+    virtualRows,
+    virtualizer.scrollOffset,
+    virtualizer.scrollRect?.height,
+  ]);
+  const sparsePageErrors = useMemo(
+    () =>
+      [...(sparseListing?.pageStates ?? [])].flatMap(([pageOffset, pageState]) =>
+        pageState.error &&
+        !(pageOffset === 0 && listing.status === 'stale-error') &&
+        !sparsePageStatusOffsets.has(pageOffset)
+          ? [{ pageOffset, pageState }]
+          : []
+      ),
+    [listing.status, sparseListing?.pageStates, sparsePageStatusOffsets]
+  );
   // From the rows in view and their overscan, never the Tab stop kept mounted far below them.
   const lastVisibleRowIndex = Math.min((virtualizer.range?.endIndex ?? 0) + GRID_OVERSCAN_ROWS, rowCount - 1);
 

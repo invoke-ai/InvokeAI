@@ -421,6 +421,95 @@ describe('Gallery listing failures', () => {
     expect(transport.listItems.mock.calls.slice(failedCalls).map(([request]) => request.offset)).toEqual([60]);
   });
 
+  it('keeps a failed distant page retry visible when its first slot is above the viewport', async () => {
+    transport.listItems.mockImplementation(({ offset }) =>
+      offset === 420 ? fail() : page(dogs(Math.min(60, 600 - offset), offset), 600)
+    );
+    await renderGallery();
+
+    await waitFor(() => expect(offsetsRequested()).toContain(0));
+    const viewport = gridViewport()!;
+
+    await act(() => {
+      viewport.scrollTop = Math.floor((viewport.scrollHeight - viewport.clientHeight) * 0.75);
+      viewport.dispatchEvent(new Event('scroll'));
+    });
+
+    await waitFor(() => expect(offsetsRequested()).toContain(420));
+    await waitFor(() => expect(findButton('Retry loading more items')).not.toBeNull());
+    const retry = findButton('Retry loading more items');
+    expect(retry).not.toBeNull();
+    const rect = retry!.getBoundingClientRect();
+    const viewportRect = viewport.getBoundingClientRect();
+
+    expect(rect.top).toBeGreaterThanOrEqual(viewportRect.top - 1);
+    expect(rect.bottom).toBeLessThanOrEqual(viewportRect.bottom + 1);
+
+    await act(() => retry!.click());
+    await waitFor(() => expect(offsetsRequested().filter((offset) => offset === 420)).toHaveLength(2));
+  });
+
+  it('keeps a visible retry when the first failed row is only partly visible', async () => {
+    transport.listItems.mockImplementation(({ offset }) =>
+      offset === 420 ? fail() : page(dogs(Math.min(60, 600 - offset), offset), 600)
+    );
+    await renderGallery();
+    await waitFor(() => expect(offsetsRequested()).toContain(0));
+
+    const viewport = gridViewport()!;
+
+    await act(() => {
+      viewport.scrollTop = Math.floor((viewport.scrollHeight - viewport.clientHeight) * 0.75);
+      viewport.dispatchEvent(new Event('scroll'));
+    });
+    await waitFor(() => expect(offsetsRequested()).toContain(420));
+    await waitFor(() => expect(findButton('Retry loading more items')).not.toBeNull());
+
+    const retry = findButton('Retry loading more items')!;
+    const statusCell = retry.closest<HTMLElement>('[role="listitem"]')!;
+    const viewportRect = viewport.getBoundingClientRect();
+    const cellRect = statusCell.getBoundingClientRect();
+    const visibleCellHeight = cellRect.height * 0.2;
+
+    await act(() => {
+      viewport.scrollTop += cellRect.top - (viewportRect.top - cellRect.height + visibleCellHeight);
+      viewport.dispatchEvent(new Event('scroll'));
+    });
+    await settleFrames();
+    const visibleRetry = [
+      ...(host?.querySelectorAll<HTMLButtonElement>('button[aria-label="Retry loading more items"]') ?? []),
+    ].find((button) => {
+      const rect = button.getBoundingClientRect();
+      const currentViewportRect = viewport.getBoundingClientRect();
+
+      return rect.top >= currentViewportRect.top - 1 && rect.bottom <= currentViewportRect.bottom + 1;
+    });
+    const pageRetry = host?.querySelector<HTMLButtonElement>(
+      '[data-gallery-page-error="420"] button[aria-label="Retry loading more items"]'
+    );
+    const retryControl = visibleRetry ?? pageRetry;
+
+    expect(retryControl).not.toBeNull();
+    if (visibleRetry) {
+      const rect = visibleRetry.getBoundingClientRect();
+      const currentViewportRect = viewport.getBoundingClientRect();
+
+      expect(rect.top).toBeGreaterThanOrEqual(currentViewportRect.top - 1);
+      expect(rect.bottom).toBeLessThanOrEqual(currentViewportRect.bottom + 1);
+    } else {
+      const rect = pageRetry!.getBoundingClientRect();
+
+      expect(rect.top).toBeGreaterThanOrEqual(0);
+      expect(rect.bottom).toBeLessThanOrEqual(document.documentElement.clientHeight);
+    }
+
+    transport.listItems.mockImplementation(({ offset }) =>
+      offset === 420 ? page([image('recovered.png', 'dogs')], 600) : page(dogs(Math.min(60, 600 - offset), offset), 600)
+    );
+    await act(() => retryControl!.click());
+    await waitFor(() => expect(offsetsRequested().filter((offset) => offset === 420)).toHaveLength(2));
+  });
+
   it("keeps a scope's earlier results through a failed refresh, with a notice that Retry clears", async () => {
     await renderGallery();
     await waitFor(() => expect(thumbnailNames()).toHaveLength(3));

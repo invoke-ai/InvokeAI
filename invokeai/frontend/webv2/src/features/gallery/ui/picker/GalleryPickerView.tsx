@@ -371,12 +371,7 @@ export const GalleryPickerView = ({
           : null;
   const showPickerNotice =
     pickerNotice !== null &&
-    (data.sparseListing === undefined ||
-      [...pageStates].some(
-        ([pageOffset, pageState]) =>
-          pageState.error !== null &&
-          [...itemSlots.keys()].some((index) => index >= pageOffset && index < pageOffset + GALLERY_PAGE_SIZE)
-      ));
+    (data.sparseListing === undefined || [...pageStates.values()].some((pageState) => pageState.error !== null));
   // Counts of a list that failed to load would claim it is empty.
   const shouldHideStatus =
     isStale || (scope.pane === 'boards' ? isBoardListUnavailable : data.listing.status === 'error');
@@ -535,6 +530,7 @@ export const GalleryPickerView = ({
             onColumnCountChange={setColumnCount}
             onVisibleRangeChange={handleVisibleRangeChange}
             pageStates={pageStates}
+            suppressInlineRetry={showPickerNotice}
             total={total}
           />
         ) : (
