@@ -10,12 +10,19 @@ import {
   type ProjectBoardAssignment,
   type ProjectConflictInfo,
   type RecoverableProjectDraft,
+  type UnloadJournalOutcome,
 } from './durableSyncedPersistence';
 
 export { serializeProjectDocument } from './projectDocument';
 export { deserializeProjectDocument, deserializeProjectRecord } from './projectHydration';
 export { ProjectDocumentTooLargeError, WorkbenchBackendUnavailableError } from './durableSyncedPersistence';
-export type { DurableHydratedWorkbenchSnapshot, ProjectBoardAssignment, ProjectConflictInfo, RecoverableProjectDraft };
+export type {
+  DurableHydratedWorkbenchSnapshot,
+  ProjectBoardAssignment,
+  ProjectConflictInfo,
+  RecoverableProjectDraft,
+  UnloadJournalOutcome,
+};
 
 export type WorkbenchSaveResult = DurableWorkbenchSaveResult;
 export type SyncedWorkbenchPersistence = DurableSyncedWorkbenchPersistence;

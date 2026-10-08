@@ -73,6 +73,7 @@ describe('loadCanvasState', () => {
       { beginEndStepPct: [0, 1], controlMode: null, kind: 't2i_adapter', model: 't2i', weight: 1 },
       { beginEndStepPct: [0, 1], controlMode: null, kind: 'control_lora', model: 'flux-control', weight: 0.75 },
       { beginEndStepPct: [0.2, 0.9], controlMode: null, kind: 'z_image_control', model: 'z-control', weight: 0.7 },
+      { beginEndStepPct: [0, 0.8], controlMode: null, kind: 'anima_lllite', model: 'anima-sketch', weight: 1.2 },
     ] as const;
     const layers = adapters.map((adapter, index) => ({
       ...createControlLayer(`Control ${index}`, `control-${index}`),
@@ -84,6 +85,40 @@ describe('loadCanvasState', () => {
     expect(loaded.document.stacks.control.map((layer) => (layer.type === 'control' ? layer.adapter : null))).toEqual(
       adapters
     );
+  });
+
+  it('loads an Anima control layer saved before LLLite support exactly as it was saved', () => {
+    // Earlier builds offered only ControlNet on Anima, listing LLLite models under it and warning that the kind was
+    // unsupported. Load cannot tell an LLLite key from a ControlNet key without the catalog, so it keeps the kind;
+    // the settings panel reports it and switching to LLLite keeps the model.
+    const saved = {
+      ...createControlLayer('Anima Control', 'anima-control'),
+      adapter: {
+        beginEndStepPct: [0, 0.75],
+        controlMode: 'balanced',
+        kind: 'controlnet',
+        model: 'anima-sketch',
+        weight: 0.75,
+      },
+    };
+
+    const loaded = load(withNodes([saved], 'control'));
+
+    expect(loaded.document.stacks.control).toEqual([saved]);
+  });
+
+  it('refuses a control layer whose adapter kind this build does not know, naming the layer', () => {
+    const future = {
+      ...createControlLayer('Future Control', 'future-control'),
+      adapter: { beginEndStepPct: [0, 1], controlMode: null, kind: 'future_adapter', model: 'm', weight: 1 },
+    };
+
+    const refused = refusal(withNodes([createControlLayer('Kept', 'kept'), future], 'control'));
+
+    expect(refused.status).toBe('invalid');
+    expect(refused.status === 'invalid' ? refused.diagnostics : []).toEqual([
+      expect.objectContaining({ path: 'document.stacks.control[1]' }),
+    ]);
   });
 
   it('normalizes an incomplete persisted Z-Image control with backend defaults', () => {

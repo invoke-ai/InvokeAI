@@ -24,7 +24,7 @@ import type { LayerTreeRow } from './layerTreeRows';
 
 import { colorLabelHex } from './colorLabels';
 import { ControlLayerWarningIcon } from './ControlLayerWarningIcon';
-import { LayerActiveDot, ROW_SELECTION_FOCUS } from './LayerActiveDot';
+import { LayerActiveDot, TREE_ROW_FOCUS } from './LayerActiveDot';
 import { recordLayerRowCommit } from './layerPanelDiagnostics';
 import { LAYER_TREE_INDENT_PX } from './layerPanelRows';
 import { anchorFromPoint } from './layerRowCommands';
@@ -301,7 +301,7 @@ const LayerRowComponent = ({
       role="treeitem"
       rounded="sm"
       tabIndex={focused ? 0 : -1}
-      _focusVisible={ROW_SELECTION_FOCUS}
+      _focusVisible={TREE_ROW_FOCUS}
       onClick={handleSelect}
       onContextMenu={handleContextMenu}
       onDoubleClick={startRename}

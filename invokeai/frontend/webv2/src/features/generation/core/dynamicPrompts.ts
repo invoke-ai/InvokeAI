@@ -9,6 +9,8 @@ export type DynamicPromptsSeedBehaviour = 'per-iteration' | 'per-image';
 export interface DynamicPromptsConfig {
   combinatorial: boolean;
   maxPrompts: number;
+  /** Draws a new sample seed after each queued submission (random mode only). */
+  resample: boolean;
   sampleSeed: number;
   seedBehaviour: DynamicPromptsSeedBehaviour;
 }
@@ -290,6 +292,7 @@ export const sanitizeDynamicPromptsConfig = (value: unknown): DynamicPromptsConf
   return {
     combinatorial: config.combinatorial !== false,
     maxPrompts: sanitizeMaxPrompts(config.maxPrompts),
+    resample: config.resample !== false,
     sampleSeed: sanitizeSampleSeed(config.sampleSeed),
     seedBehaviour: isDynamicPromptsSeedBehaviour(config.seedBehaviour) ? config.seedBehaviour : 'per-iteration',
   };

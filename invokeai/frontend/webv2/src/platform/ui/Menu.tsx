@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
-import type { ComponentProps } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 
-import { Box, HStack, Icon, Kbd, Menu, Stack, Text, useMenuContext } from '@chakra-ui/react';
+import { Box, HStack, Icon, Menu, Stack, Text, useMenuContext } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { createExternalStore } from '@platform/state/externalStore';
 import { useCallback, useId } from 'react';
@@ -28,8 +28,8 @@ export interface MenuActionItemProps {
   iconColor?: string;
   tone?: 'danger';
   disabled?: boolean;
-  /** Trailing keycap strings, already formatted for the platform. */
-  hintParts?: readonly string[];
+  /** Trailing keycaps; the caller renders them, since key glyphs are a workbench concern. */
+  shortcut?: ReactNode;
   onSelect: () => void;
 }
 
@@ -39,11 +39,11 @@ const TWO_LINE_ITEM = { py: '1.5' } as const;
 export const MenuActionItem = ({
   disabled,
   hint,
-  hintParts,
   icon,
   iconColor,
   label,
   onSelect,
+  shortcut,
   tone,
   value,
 }: MenuActionItemProps) => (
@@ -77,15 +77,7 @@ export const MenuActionItem = ({
           {label}
         </Text>
       )}
-      {hintParts && hintParts.length > 0 ? (
-        <HStack flexShrink={0} gap="0.5">
-          {hintParts.map((part) => (
-            <Kbd key={part} textTransform="lowercase">
-              {part}
-            </Kbd>
-          ))}
-        </HStack>
-      ) : null}
+      {shortcut}
     </HStack>
   </Menu.Item>
 );

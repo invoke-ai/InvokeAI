@@ -8,11 +8,14 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { page } from 'vitest/browser';
 
 import { CanvasBottomOverlay } from './CanvasBottomOverlay';
 import { StagingBar } from './StagingBar';
 
-const contextMenu = vi.hoisted(() => ({ targets: [] as { slotId: string; x: number; y: number }[] }));
+const contextMenu = vi.hoisted(() => ({
+  targets: [] as { slotId: string; x: number; y: number }[],
+}));
 vi.mock('./StagingItemContextMenu', () => ({
   StagingItemContextMenu: ({ target }: { target: { slot: { id: string }; x: number; y: number } }) => {
     contextMenu.targets.push({ slotId: target.slot.id, x: target.x, y: target.y });
@@ -74,7 +77,20 @@ const renderStagingBar = async (
   onSaveToLayerAndContinue: () => void = noop,
   onPreloadCandidate: (imageName: string) => void = noop,
   onSelectImage: (index: number) => void = noop,
-  slotAt: (index: number) => CanvasStagingSlot = makeSlot
+  slotAt: (index: number) => CanvasStagingSlot = makeSlot,
+  {
+    canvasWidth = CANVAS_WIDTH,
+    isGenerating = false,
+    isSavingToGallery = false,
+    onAccept = noop,
+    onSaveToGallery = () => Promise.resolve(),
+  }: {
+    canvasWidth?: number;
+    isGenerating?: boolean;
+    isSavingToGallery?: boolean;
+    onAccept?: () => void;
+    onSaveToGallery?: (imageName: string) => Promise<void>;
+  } = {}
 ) => {
   const slots = Array.from({ length: slotCount }, (_, index) => slotAt(index));
   const selectedSlot = slots[selectedImageIndex];
@@ -89,7 +105,7 @@ const renderStagingBar = async (
     root?.render(
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
-          <Box h="400px" position="relative" w={`${CANVAS_WIDTH}px`}>
+          <Box h="400px" position="relative" w={`${canvasWidth}px`}>
             <CanvasBottomOverlay.Root>
               <CanvasBottomOverlay.Staging>
                 <StagingBar
@@ -98,19 +114,21 @@ const renderStagingBar = async (
                   autoSwitchMode="off"
                   canAccept
                   hasMultipleSlots={slotCount > 1}
-                  isGenerating={false}
+                  isGenerating={isGenerating}
+                  isSavingToGallery={isSavingToGallery}
                   isVisible
                   selectedCandidate={selectedSlot?.kind === 'candidate' ? selectedSlot.candidate : undefined}
                   selectedImageIndex={selectedImageIndex}
                   selectedSlot={selectedSlot}
                   slots={slots}
-                  onAccept={noop}
+                  onAccept={onAccept}
                   onCancelQueueItem={noop}
                   onCycle={noop}
                   onDiscardAll={noop}
                   onDiscardSelected={noop}
                   onPreloadCandidate={onPreloadCandidate}
                   onSelectImage={onSelectImage}
+                  onSaveToGallery={onSaveToGallery}
                   onSaveToLayerAndContinue={onSaveToLayerAndContinue}
                   onSetAutoSwitch={noop}
                   onToggleThumbnails={noop}
@@ -275,4 +293,112 @@ describe('StagingBar thumbnail strip', () => {
 
     expect(onSaveToLayerAndContinue).toHaveBeenCalledOnce();
   });
+  it('accepts from the bar and keeps the hidden-layer alternative', async () => {
+    const onAccept = vi.fn();
+    const onSaveToLayerAndContinue = vi.fn();
+    await renderStagingBar(1, 0, onSaveToLayerAndContinue, noop, noop, makeSlot, { onAccept });
+    const accept = page.getByRole('button', { exact: true, name: 'Accept to Layer' });
+    await expect.element(accept).toBeVisible();
+    await accept.click();
+    expect(onAccept).toHaveBeenCalledOnce();
+
+    await page.getByRole('button', { name: 'More accept options' }).click();
+    const keepHidden = page.getByRole('menuitem', { name: 'Keep as Hidden Layer' });
+    await expect.element(keepHidden).toBeVisible();
+    await keepHidden.click();
+    expect(onSaveToLayerAndContinue).toHaveBeenCalledOnce();
+    expect(onAccept).toHaveBeenCalledOnce();
+  });
+
+  it.each([360, 450, 560, 640, 700, 800])(
+    'keeps the accept split button and every other control inside a %ipx canvas while a batch is generating',
+    async (canvasWidth) => {
+      const { overlay } = await renderStagingBar(
+        3,
+        0,
+        noop,
+        noop,
+        noop,
+        (index) => (index === 0 ? makeSlot(index) : makePlaceholder(index)),
+        { canvasWidth, isGenerating: true }
+      );
+      const trigger = page.getByRole('button', { name: 'More accept options' }).element();
+      const accept = page.getByRole('button', { exact: true, name: 'Accept to Layer' }).element();
+      const bounds = overlay.getBoundingClientRect();
+      expect(trigger.getBoundingClientRect().right).toBeLessThanOrEqual(bounds.right);
+      expect(accept.getBoundingClientRect().left).toBeGreaterThanOrEqual(bounds.left);
+      // Nothing in the bar is clipped: each control a pointer can reach sits inside the canvas.
+      for (const control of overlay.querySelectorAll<HTMLElement>('button')) {
+        const rect = control.getBoundingClientRect();
+        // Thumbnails scroll inside their own strip, which the first test covers.
+        if (rect.width > 1 && !control.closest('[data-scope="scroll-area"]')) {
+          expect(rect.left, control.getAttribute('aria-label') ?? control.textContent ?? '').toBeGreaterThanOrEqual(
+            bounds.left
+          );
+          expect(rect.right, control.getAttribute('aria-label') ?? control.textContent ?? '').toBeLessThanOrEqual(
+            bounds.right
+          );
+        }
+      }
+      // The accept action keeps its full name, and Tooltip, however narrow the bar.
+      expect(accept.getAttribute('aria-label')).toBe('Accept to Layer');
+      // Collapsed or not, Discard All and the generating status keep their names.
+      await expect.element(page.getByRole('button', { name: 'Discard All' })).toBeVisible();
+      expect(page.getByRole('status').element().textContent).toBe('Generating…');
+    }
+  );
+
+  it('saves the selected candidate from an icon button that keeps its name inside a compact canvas', async () => {
+    const onSaveToGallery = vi.fn(() => Promise.resolve());
+    const { overlay } = await renderStagingBar(3, 1, noop, noop, noop, makeSlot, {
+      canvasWidth: 640,
+      isGenerating: true,
+      onSaveToGallery,
+    });
+    const save = page.getByRole('button', { exact: true, name: 'Save to gallery' });
+    const bounds = overlay.getBoundingClientRect();
+    const rect = save.element().getBoundingClientRect();
+
+    expect(rect.left).toBeGreaterThanOrEqual(bounds.left);
+    expect(rect.right).toBeLessThanOrEqual(bounds.right);
+    await save.click();
+    expect(onSaveToGallery).toHaveBeenCalledExactlyOnceWith('image-1');
+  });
+
+  it('holds the save button while a save of the candidate is in flight', async () => {
+    const onSaveToGallery = vi.fn(() => Promise.resolve());
+    await renderStagingBar(1, 0, noop, noop, noop, makeSlot, { isSavingToGallery: true, onSaveToGallery });
+
+    await expect.element(page.getByRole('button', { exact: true, name: 'Save to gallery' })).toBeDisabled();
+  });
+
+  it.each([
+    { canvasWidth: 800, iconOnly: false },
+    { canvasWidth: 360, iconOnly: true },
+  ])(
+    'shows one Cancel for a running slot at $canvasWidth px, labelled only when there is room',
+    async ({ canvasWidth, iconOnly }) => {
+      const { overlay } = await renderStagingBar(
+        2,
+        1,
+        noop,
+        noop,
+        noop,
+        (index) => (index === 0 ? makeSlot(index) : makePlaceholder(index)),
+        { canvasWidth, isGenerating: true }
+      );
+      const visibleCancels = [...overlay.querySelectorAll<HTMLButtonElement>('button')].filter(
+        (button) =>
+          (button.getAttribute('aria-label') ?? button.textContent?.trim()) === 'Cancel' &&
+          button.getBoundingClientRect().width > 0
+      );
+
+      expect(visibleCancels).toHaveLength(1);
+      // The icon-only one carries its name (and so its tooltip); the labelled one shows the word itself.
+      expect(visibleCancels[0]!.hasAttribute('aria-label')).toBe(iconOnly);
+      expect(visibleCancels[0]!.getBoundingClientRect().right).toBeLessThanOrEqual(
+        overlay.getBoundingClientRect().right
+      );
+    }
+  );
 });

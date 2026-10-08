@@ -44,7 +44,7 @@ page lists the builds it supports.
 
 InvokeAI recognizes the format from the file's contents, so you install them like any other model:
 
-- **GGUF** (`.gguf`, llama.cpp quantization such as Q4_K or Q8_0): weights stay packed in memory and are unpacked layer by layer during generation. Supported for the FLUX.1, FLUX.2, Z-Image, Krea-2, Qwen-Image and Wan transformers, and for the T5, Qwen3, Qwen3-VL, Mistral and Gemma 2 text encoders.
+- **GGUF** (`.gguf`, llama.cpp quantization such as Q4_K or Q8_0): weights stay packed in memory and are unpacked layer by layer during generation. Supported for the FLUX.1, FLUX.2, Z-Image, Krea-2, Qwen-Image and Wan transformers, and for the T5, Qwen3, Qwen3-VL, Mistral and Gemma 2 text encoders. ComfyUI-GGUF's `Q8_CR` files, which store int8 (`int8_convrot`) layers inside a `.gguf`, load for the Krea-2 transformer; for other models, and for ComfyUI-GGUF's `Q4_CR`, installation is refused with a message saying so.
 - **NF4** (bitsandbytes): 4-bit, CUDA only.
 - **SDNQ**: see [SDNQ Quantization](/configuration/optimization/sdnq-quantization/).
 - **int8** (`int8_convrot`, from ComfyUI repackages): the weights stay int8 in memory on every device, including Apple Silicon, and need no setting to turn on. Supported for FLUX.1, FLUX.2 Klein, Z-Image, Krea-2, Ideogram 4, MiniMax H3, LTX-2 and the PiD decoders, and for the Qwen3 8B, Qwen3-VL and LTX-2 Gemma encoders.

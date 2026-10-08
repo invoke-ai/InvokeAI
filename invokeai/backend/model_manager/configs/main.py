@@ -1,7 +1,7 @@
 import re
 from abc import ABC
 from pathlib import Path
-from typing import Any, Literal, Self
+from typing import Any, ClassVar, Literal, Self
 
 import torch
 from pydantic import BaseModel, Field
@@ -2042,6 +2042,8 @@ class Main_Checkpoint_Krea2_Config(Checkpoint_Config_Base, Main_Config_Base, Con
 
 class Main_GGUF_Krea2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
     """Model config for GGUF-quantized Krea-2 transformer models (single-file)."""
+
+    DECODES_GGUF_Q8_CR: ClassVar[bool] = True
 
     base: Literal[BaseModelType.Krea2] = Field(default=BaseModelType.Krea2)
     format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)

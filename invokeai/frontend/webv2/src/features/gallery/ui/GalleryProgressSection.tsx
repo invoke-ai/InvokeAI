@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { GalleryProgressLayout } from './galleryGridLayout';
 
+import { GALLERY_TAB_STOP_SELECTOR } from './GalleryThumbnail';
 import { SELECTED_TILE_CSS } from './GalleryTileFrame';
 import { useGalleryUi } from './GalleryUiContext';
 import { useGalleryWidget } from './GalleryWidgetContext';
@@ -36,10 +37,12 @@ export const GalleryProgressSection = ({
   const restoreFocus = useCallback(() => {
     const root = rootRef.current;
     const viewport = getScrollElement();
+    // The section's own disclosure while it stays, else the selection, else the grid's thumbnail Tab stop — never
+    // simply the first thumbnail, which is the first starred one.
     const target =
       root?.querySelector<HTMLButtonElement>('[data-progress-disclosure]') ??
       viewport?.querySelector<HTMLElement>('button[aria-current="true"]') ??
-      viewport?.querySelector<HTMLElement>('[role="listitem"] button') ??
+      viewport?.querySelector<HTMLElement>(GALLERY_TAB_STOP_SELECTOR) ??
       viewport?.querySelector<HTMLElement>('[role="button"]') ??
       viewport;
     target?.focus({ preventScroll: true });
@@ -242,6 +245,7 @@ const GalleryProgressTile = ({
       aria-label={`${label} · ${status}`}
       aria-pressed={isShownSelected}
       aria-disabled={session.state !== 'running'}
+      data-gallery-session-id={session.id}
       tabIndex={session.state === 'running' ? 0 : -1}
       borderColor={isShownSelected ? 'accent.solid' : 'border.subtle'}
       borderWidth="2px"

@@ -3,13 +3,13 @@ import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { Dispatch } from 'react';
 
-import { getDocumentLeaves, getDocumentNode } from '@workbench/canvas-engine/api';
+import { getDocumentNode } from '@workbench/canvas-engine/api';
 import { useCallback, useMemo } from 'react';
 
 import type { LayerRowCommands, LayerSurfaceAnchor } from './layerRowCommands';
 
 import { LayerChildMenu } from './LayerChildMenu';
-import { getLayerChildItem, type ProjectedChildRow } from './layerChildRows';
+import { getLayerChildItem, layerChildMoveTargets, type ProjectedChildRow } from './layerChildRows';
 import { CanvasLayerContextMenu, type LayerContextMenuEngine } from './LayerContextMenu';
 import { LayerGroupContextMenu, type LayerGroupContextMenuEngine } from './LayerGroupContextMenu';
 import { LayerStackMenu } from './LayerStackMenu';
@@ -69,19 +69,15 @@ export const LayerSurfaceHost = ({
     return item.isEnabled === child.isEnabled ? child : { ...child, isEnabled: item.isEnabled };
   }, [document, surface]);
   const moveTargets = useMemo(() => {
-    if (surface?.kind !== 'child-menu' || surface.child.kind !== 'reference-image') {
+    if (surface?.kind !== 'child-menu') {
       return [];
     }
-    const { child } = surface;
-    return getDocumentLeaves(document)
-      .filter(
-        (leaf) =>
-          leaf.type === 'regional_guidance' &&
-          leaf.id !== child.layerId &&
-          !leaf.referenceImages.some((ref) => ref.id === child.itemId)
-      )
-      .map((leaf) => ({ id: leaf.id, name: leaf.name }));
-  }, [document, surface]);
+    // Offer only landings the model would accept, so a locked layer never appears as a target.
+    const model = engine?.document.model();
+    return layerChildMoveTargets(document, surface.child)
+      .filter((target) => !model?.refusalFor(target.command))
+      .map(({ id, name }) => ({ id, name }));
+  }, [document, engine, surface]);
   if (surface?.kind === 'stack-menu') {
     return (
       <LayerStackMenu

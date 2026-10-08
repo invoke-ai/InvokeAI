@@ -533,7 +533,9 @@ export const FloatingWidgetWindow = ({
         return;
       }
 
+      // The move consumes the key: the widget's own arrow bindings must not act on it too.
       event.preventDefault();
+      event.stopPropagation();
       // Like a pointer move: from where the window is on screen, keeping the stored size.
       commitGeometry(keepInViewport({ heightPx, widthPx, x: rendered.x + offset[0], y: rendered.y + offset[1] }));
     },
@@ -562,7 +564,9 @@ export const FloatingWidgetWindow = ({
         return;
       }
 
+      // The resize consumes the key, as the move does.
       event.preventDefault();
+      event.stopPropagation();
 
       const resized = resizeOnScreen({ heightPx, widthPx, x, y }, rendered, 'se', offset[0], offset[1]);
 
