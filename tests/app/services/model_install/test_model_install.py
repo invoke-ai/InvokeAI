@@ -341,6 +341,42 @@ def test_start_removes_stale_but_preserves_live_install_claims(
     delete_active_install_sentinel(live_root)
 
 
+def test_start_preserves_claim_for_small_process_start_time_drift(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from invokeai.app.services.model_install.model_install_common import active_install_sentinel_path
+
+    assert isinstance(mm2_installer, ModelInstallService)
+    claimed_root = mm2_app_config.models_path / "claim-time-drift"
+    claimed_root.mkdir()
+    claim = active_install_sentinel_path(claimed_root)
+    claim.write_text("12345 100.0\n", encoding="ascii")
+    observed_start_time = [100.75]
+
+    class Process:
+        def __init__(self, _pid: int) -> None:
+            pass
+
+        def status(self) -> str:
+            return model_install_default.psutil.STATUS_RUNNING
+
+        def create_time(self) -> float:
+            return observed_start_time[0]
+
+    monkeypatch.setattr(model_install_default.psutil, "Process", Process)
+
+    mm2_installer._remove_stale_install_source_claims()
+
+    assert claim.exists()
+
+    observed_start_time[0] = 102.0
+    mm2_installer._remove_stale_install_source_claims()
+
+    assert not claim.exists()
+
+
 def test_startup_cleanup_preserves_claimed_remote_staging(
     mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
 ) -> None:
@@ -884,6 +920,134 @@ def _queue_downloaded_job(
     return job
 
 
+def _write_remote_install_marker(
+    installer: ModelInstallService,
+    tmpdir: Path,
+    job_id: int,
+    status: InstallStatus,
+) -> Path:
+    tmpdir.mkdir(parents=True, exist_ok=True)
+    download_path = tmpdir / (
+        "weights.safetensors" if status == InstallStatus.DOWNLOADS_DONE else "weights.safetensors.downloading"
+    )
+    download_path.write_bytes(b"downloaded model" if status == InstallStatus.DOWNLOADS_DONE else b"partial download")
+    job = ModelInstallJob(
+        id=job_id,
+        source=URLModelSource(url=Url("https://example.com/weights.safetensors")),
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=status,
+    )
+    job._install_tmpdir = tmpdir
+    installer._write_install_marker(job, status=status)
+    return download_path
+
+
+def test_queue_rejection_during_shutdown_preserves_completed_download(
+    mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}queue-stop-{uuid.uuid4().hex}"
+    partial_path = _write_remote_install_marker(mm2_installer, tmpdir, 9905, InstallStatus.DOWNLOADS_DONE)
+    job = ModelInstallJob(
+        id=9905,
+        source=URLModelSource(url=Url("https://example.com/weights.safetensors")),
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.DOWNLOADS_DONE,
+    )
+    job._install_tmpdir = tmpdir
+    mm2_installer._install_jobs.append(job)
+    mm2_installer._stop_event.set()
+
+    mm2_installer._put_in_queue(job)
+
+    assert job.status == InstallStatus.DOWNLOADS_DONE
+    assert partial_path.read_bytes() == b"downloaded model"
+    assert mm2_installer._read_install_marker(tmpdir) is not None
+
+
+def test_restore_leaves_unvisited_markers_untouched_when_stopping(
+    mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
+    first_tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}restore-stop-first-{uuid.uuid4().hex}"
+    second_tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}restore-stop-second-{uuid.uuid4().hex}"
+    first_partial = _write_remote_install_marker(mm2_installer, first_tmpdir, 9901, InstallStatus.DOWNLOADING)
+    second_partial = _write_remote_install_marker(mm2_installer, second_tmpdir, 9902, InstallStatus.DOWNLOADING)
+    mm2_installer._stop_event.set()
+
+    mm2_installer._restore_incomplete_installs()
+
+    assert first_partial.read_bytes() == b"partial download"
+    assert second_partial.read_bytes() == b"partial download"
+    assert mm2_installer._read_install_marker(first_tmpdir) is not None
+    assert mm2_installer._read_install_marker(second_tmpdir) is not None
+
+
+def test_stop_during_startup_restore_preserves_the_current_download(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}restore-stop-active-{uuid.uuid4().hex}"
+    partial_path = _write_remote_install_marker(mm2_installer, tmpdir, 9903, InstallStatus.DOWNLOADING)
+    restore_started = threading.Event()
+    resume_remote_download = mm2_installer._resume_remote_download
+
+    def wait_until_stopping(job: ModelInstallJob, *, operation_reserved: bool = False) -> None:
+        restore_started.set()
+        assert mm2_installer._stop_event.wait(timeout=5)
+        resume_remote_download(job, operation_reserved=operation_reserved)
+
+    monkeypatch.setattr(mm2_installer, "_resume_remote_download", wait_until_stopping)
+    mm2_installer._restore_incomplete_installs_async()
+    assert restore_started.wait(timeout=5)
+
+    mm2_installer.stop()
+
+    marker = mm2_installer._read_install_marker(tmpdir)
+    assert marker is not None
+    assert marker["status"] == InstallStatus.PAUSED.value
+    assert partial_path.read_bytes() == b"partial download"
+    assert not active_install_sentinel_path(tmpdir).exists()
+    assert mm2_installer._restore_completed_event.is_set()
+
+
+@pytest.mark.parametrize("status", [InstallStatus.PAUSED, InstallStatus.DOWNLOADS_DONE])
+def test_stop_preserves_restored_downloads_without_a_multifile_job(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+    status: InstallStatus,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}restore-stop-{status.value}-{uuid.uuid4().hex}"
+    partial_path = _write_remote_install_marker(mm2_installer, tmpdir, 9904, status)
+    queued_jobs: list[ModelInstallJob] = []
+    monkeypatch.setattr(mm2_installer, "_put_in_queue", queued_jobs.append)
+
+    mm2_installer._restore_incomplete_installs()
+    jobs = mm2_installer.list_jobs()
+    assert len(jobs) == 1
+    assert jobs[0].status == status
+    if status == InstallStatus.DOWNLOADS_DONE:
+        assert queued_jobs == jobs
+
+    mm2_installer.stop()
+
+    marker = mm2_installer._read_install_marker(tmpdir)
+    assert marker is not None
+    assert marker["status"] == status.value
+    expected_payload = b"downloaded model" if status == InstallStatus.DOWNLOADS_DONE else b"partial download"
+    assert partial_path.read_bytes() == expected_payload
+    assert not active_install_sentinel_path(tmpdir).exists()
+
+
 def test_service_stop_waits_for_active_install_without_cancelling_it(
     mm2_installer: ModelInstallServiceBase,
     mm2_app_config: InvokeAIAppConfig,
@@ -946,7 +1110,7 @@ def test_service_stop_waits_for_active_install_without_cancelling_it(
     assert not tmpdir.exists()
 
 
-def test_service_stop_does_not_delete_a_job_between_dequeue_and_worker_activation(
+def test_service_stop_preserves_a_job_between_dequeue_and_worker_activation(
     mm2_installer: ModelInstallServiceBase,
     mm2_app_config: InvokeAIAppConfig,
     embedding_file: Path,
@@ -989,8 +1153,12 @@ def test_service_stop_does_not_delete_a_job_between_dequeue_and_worker_activatio
     assert not stop_thread.is_alive()
     assert not stop_errors
     assert stop_finished.is_set()
-    assert job.cancelled
-    assert not tmpdir.exists()
+    assert job.downloads_done
+    assert tmpdir.exists()
+    assert (tmpdir / embedding_file.name).exists()
+    marker = installer._read_install_marker(tmpdir)
+    assert marker is not None
+    assert marker["status"] == InstallStatus.DOWNLOADS_DONE.value
 
 
 def test_cancel_during_install_preflight_waits_for_probe_then_cleans_safely(

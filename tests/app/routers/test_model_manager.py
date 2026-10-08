@@ -627,6 +627,46 @@ def test_remote_download_replacement_returns_conflict(monkeypatch: Any, operatio
     assert "previous download" in exc_info.value.detail
 
 
+@pytest.mark.parametrize("operation", ["resume", "restart_failed", "restart_file"])
+def test_install_path_claim_conflict_returns_conflict(monkeypatch: Any, operation: str) -> None:
+    from types import SimpleNamespace
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager as model_manager_router
+    from invokeai.app.services.model_install.model_install_common import InstallCancellationConflictError
+
+    class Installer:
+        def get_job_by_id(self, job_id: int) -> object:
+            assert job_id == 42
+            return object()
+
+        def resume_job(self, _job: object) -> None:
+            raise InstallCancellationConflictError("Another operation owns the install path")
+
+        def restart_failed(self, _job: object) -> None:
+            raise InstallCancellationConflictError("Another operation owns the install path")
+
+        def restart_file(self, _job: object, _source: str) -> None:
+            raise InstallCancellationConflictError("Another operation owns the install path")
+
+    services = SimpleNamespace(model_manager=SimpleNamespace(install=Installer()))
+    monkeypatch.setattr(model_manager_router, "ApiDependencies", MockApiDependencies(DummyInvoker(services)))
+
+    with pytest.raises(HTTPException) as exc_info:
+        if operation == "resume":
+            model_manager_router.resume_model_install_job(current_admin=None, id=42)
+        elif operation == "restart_failed":
+            model_manager_router.restart_failed_model_install_job(current_admin=None, id=42)
+        else:
+            model_manager_router.restart_model_install_file(
+                current_admin=None, id=42, file_source="https://example.com/model.safetensors"
+            )
+
+    assert exc_info.value.status_code == 409
+    assert "owns the install path" in exc_info.value.detail
+
+
 @pytest.mark.parametrize("install_fails", [False, True])
 def test_conversion_cleans_scratch_after_success_and_ordinary_failure(
     monkeypatch: Any, tmp_path: Path, install_fails: bool

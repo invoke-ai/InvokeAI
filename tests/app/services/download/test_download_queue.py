@@ -335,6 +335,40 @@ def test_multifile_download(tmp_path: Path, mm2_session: Session) -> None:
     queue.stop()
 
 
+def test_multifile_error_preserves_sibling_part_paused_during_callback(tmp_path: Path, mm2_session: Session) -> None:
+    queue = DownloadQueueService(requests_session=mm2_session, requests_session_is_trusted=True)
+    failed_part = DownloadJob(
+        id=10,
+        source=AnyHttpUrl("https://example.com/failed.safetensors"),
+        dest=tmp_path / "failed.safetensors",
+        status=DownloadJobStatus.ERROR,
+    )
+    sibling_path = tmp_path / "paused.safetensors"
+    partial_path = sibling_path.with_name(f"{sibling_path.name}.downloading")
+    partial_path.write_bytes(b"paused partial")
+    paused_sibling = DownloadJob(
+        id=11,
+        source=AnyHttpUrl("https://example.com/paused.safetensors"),
+        dest=sibling_path,
+        download_path=sibling_path,
+        status=DownloadJobStatus.RUNNING,
+    )
+    paused_sibling.pause()
+    parent = MultiFileDownloadJob(
+        id=12,
+        dest=tmp_path,
+        status=DownloadJobStatus.RUNNING,
+        download_parts={failed_part, paused_sibling},
+    )
+    queue._download_part2parent[failed_part.id] = parent
+    queue._download_part2parent[paused_sibling.id] = parent
+
+    queue._mfd_error(failed_part, RuntimeError("sibling failed"))
+
+    assert paused_sibling.paused
+    assert partial_path.read_bytes() == b"paused partial"
+
+
 @pytest.mark.timeout(timeout=10, method="thread")
 def test_multifile_download_error(tmp_path: Path, mm2_session: Session) -> None:
     fetcher = HuggingFaceMetadataFetch(mm2_session)

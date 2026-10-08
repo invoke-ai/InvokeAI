@@ -898,6 +898,10 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 for part in mf_job.download_parts:
                     if part is download_job or part.in_terminal_state:
                         continue
+                    if part.paused:
+                        # A pause can be requested while the worker still reports RUNNING. Preserve that user's
+                        # partial file; its worker will finish the pause callback and remove its own parent link.
+                        continue
                     part.cancel()
                     self._cleanup_cancelled_job(part)
                     part.status = DownloadJobStatus.CANCELLED

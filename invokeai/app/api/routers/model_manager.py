@@ -1338,7 +1338,7 @@ def pause_model_install_job(
         raise HTTPException(status_code=415, detail=str(e))
     try:
         installer.pause_job(job)
-    except InstallDownloadConflictError as e:
+    except (InstallCancellationConflictError, InstallDownloadConflictError) as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     return job
 
@@ -1364,7 +1364,7 @@ def resume_model_install_job(
         raise HTTPException(status_code=415, detail=str(e))
     try:
         installer.resume_job(job)
-    except InstallDownloadConflictError as e:
+    except (InstallCancellationConflictError, InstallDownloadConflictError) as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     return job
 
@@ -1390,7 +1390,7 @@ def restart_failed_model_install_job(
         raise HTTPException(status_code=415, detail=str(e))
     try:
         installer.restart_failed(job)
-    except (InstallDownloadConflictError, InstallRecoveryRequiredError) as e:
+    except (InstallCancellationConflictError, InstallDownloadConflictError) as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     return job
 
@@ -1418,7 +1418,7 @@ def restart_model_install_file(
         raise HTTPException(status_code=415, detail=str(e))
     try:
         installer.restart_file(job, str(file_source))
-    except (InstallDownloadConflictError, InstallRecoveryRequiredError) as e:
+    except (InstallCancellationConflictError, InstallDownloadConflictError) as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     return job
 

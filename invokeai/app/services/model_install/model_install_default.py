@@ -156,6 +156,7 @@ class ModelInstallService(ModelInstallServiceBase):
         # _restore_incomplete_installs_async() finishes so an import racing start() cannot pass the barrier early.
         self._restore_completed_event = threading.Event()
         self._startup_error: Optional[BaseException] = None
+        self._restore_thread: Optional[threading.Thread] = None
         self._download_queue = download_queue
         self._download_cache: Dict[int, ModelInstallJob] = {}
         self._remote_download_operations: set[int] = set()
@@ -300,7 +301,9 @@ class ModelInstallService(ModelInstallServiceBase):
                 pid = int(pid_text)
                 create_time = float(create_time_text)
                 process = psutil.Process(pid)
-                if process.status() == psutil.STATUS_ZOMBIE or process.create_time() != create_time:
+                # On Linux, psutil derives process start time from boot time plus kernel ticks. A small boot-time
+                # adjustment can change that value for a live process, so exact float equality can remove its claim.
+                if process.status() == psutil.STATUS_ZOMBIE or abs(process.create_time() - create_time) > 1.0:
                     claim_path.unlink(missing_ok=True)
             except (psutil.NoSuchProcess, psutil.ZombieProcess):
                 claim_path.unlink(missing_ok=True)
@@ -410,6 +413,8 @@ class ModelInstallService(ModelInstallServiceBase):
             active_sources = {str(j.source) for j in self._install_jobs if not j.in_terminal_state}
             active_sources.update(str(j.source) for j in self._download_cache.values() if not j.in_terminal_state)
         for tmpdir in path.glob(f"{TMPDIR_PREFIX}*"):
+            if self._stop_event.is_set():
+                return
             if has_active_install_sentinel(tmpdir):
                 self._logger.debug(f"Skipping active install directory {tmpdir}")
                 continue
@@ -484,6 +489,10 @@ class ModelInstallService(ModelInstallServiceBase):
                 try:
                     self._resume_remote_download(job)
                 except Exception as e:
+                    if self._stop_event.is_set():
+                        self._logger.info(f"Leaving interrupted install in {job._install_tmpdir} for next startup")
+                        job.status = InstallStatus.PAUSED
+                        return
                     self._set_error(job, e)
                     if job._install_tmpdir is not None and not job._install_tmpdir_claim_conflict:
                         if job._install_tmpdir_active_sentinel_created:
@@ -505,7 +514,8 @@ class ModelInstallService(ModelInstallServiceBase):
             finally:
                 self._restore_completed_event.set()
 
-        threading.Thread(target=_run, daemon=True).start()
+        self._restore_thread = threading.Thread(target=_run, daemon=True)
+        self._restore_thread.start()
 
     def _wait_for_restore_complete(self, timeout: Optional[float] = None) -> bool:
         deadline = time.monotonic() + timeout if timeout is not None else None
@@ -659,6 +669,9 @@ class ModelInstallService(ModelInstallServiceBase):
             # Let the worker finish (or leave a dequeued job untouched) before cleaning pending jobs. Otherwise
             # shutdown can mistake a job between Queue.get() and _active_install_job assignment for pending work.
             self._install_thread.join()
+            restore_thread = self._restore_thread
+            if restore_thread is not None and restore_thread is not threading.current_thread():
+                restore_thread.join()
         finally:
             try:
                 with self._remote_download_condition:
@@ -691,14 +704,23 @@ class ModelInstallService(ModelInstallServiceBase):
                 multifile_job = job._multifile_job
                 download_callback_pending = any(cached_job is job for cached_job in self._download_cache.values())
                 downloads_complete = multifile_job is not None and multifile_job.complete
-                if multifile_job is None:
+                preserve_download_status = (
+                    job.status
+                    if multifile_job is None and job.status in {InstallStatus.PAUSED, InstallStatus.DOWNLOADS_DONE}
+                    else None
+                )
+                if preserve_download_status is None and multifile_job is None:
                     job.cancel()
-                elif downloads_complete:
+                elif preserve_download_status is None and downloads_complete:
                     job.status = InstallStatus.DOWNLOADS_DONE
-                else:
+                elif preserve_download_status is None:
                     job.status = InstallStatus.PAUSED
 
-            if multifile_job is not None and downloads_complete:
+            if preserve_download_status is not None:
+                self._write_install_marker(job, status=preserve_download_status)
+                if not download_callback_pending:
+                    self._release_install_tmpdir_claim(job)
+            elif multifile_job is not None and downloads_complete:
                 self._write_install_marker(job, status=InstallStatus.DOWNLOADS_DONE)
                 if not download_callback_pending:
                     self._release_install_tmpdir_claim(job)
@@ -728,7 +750,11 @@ class ModelInstallService(ModelInstallServiceBase):
         with self._lock:
             queued = self._queue_install_job_locked(job)
         if not queued:
-            self.cancel_job(job)
+            if self._stop_event.is_set():
+                # A completed download that races shutdown remains resumable on the next start.
+                job.status = InstallStatus.DOWNLOADS_DONE
+            else:
+                self.cancel_job(job)
 
     def _queue_install_job_locked(self, job: ModelInstallJob) -> bool:
         """Queue an install while holding _lock, preserving shutdown and wait_for_installs ordering."""
