@@ -344,6 +344,15 @@ describe('createVideoRecallRuntime', () => {
     ['a placement without the video it places', { ...placementEvent('initial_video'), video: null }],
     ['a placement whose video has no size', { ...placementEvent('initial_video'), video: { video_name: 'clip.mp4' } }],
     ['an unknown action', { ...placementEvent('initial_video'), action: 'delete_video' }],
+    [
+      'an image placement without its append flag',
+      { action: 'image', image: { height: 1, image_name: 'a.png', width: 1 }, user_id: 'owner' },
+    ],
+    [
+      'an image placement whose image has no size',
+      { action: 'image', append: false, image: { image_name: 'a.png' }, user_id: 'owner' },
+    ],
+
     ['a conditioning video without its role', placementEvent('conditioning_video')],
     [
       'a conditioning video with an unknown role',
@@ -490,6 +499,101 @@ describe('createVideoRecallRuntime', () => {
       expect(lastNotice()).toEqual(
         expect.objectContaining({ kind: 'success', title: 'widgets.video.placement.referenceAdded' })
       );
+
+      runtime.dispose();
+    });
+
+    const imageEvent = (append: boolean, image_name = 'still.png') => ({
+      action: 'image',
+      append,
+      image: { height: 512, image_name, width: 512 },
+      queue_id: 'default',
+      user_id: 'owner',
+    });
+
+    it('sends an image as a Ref2VA reference image and appends the next one', async () => {
+      const { lastNotice, runtime, socket, videoShown, videoValues } = setup(REF2VA);
+
+      socket.emit(imageEvent(false, 'a.png'));
+      await flush();
+      socket.emit(imageEvent(true, 'b.png'));
+      await flush();
+
+      expect(videoValues().references).toEqual([
+        { detail: 'max', image: { height: 512, image_name: 'a.png', width: 512 }, kind: 'image' },
+        { detail: 'match', image: { height: 512, image_name: 'b.png', width: 512 }, kind: 'image' },
+      ]);
+      expect(lastNotice()).toMatchObject({ kind: 'success', title: 'widgets.video.placement.referenceImageAdded' });
+      expect(videoShown()).toBe(true);
+
+      runtime.dispose();
+    });
+
+    it('sends an image as the first frame of a frame model and appends the last frame', async () => {
+      const { lastNotice, runtime, socket, videoValues } = setup();
+
+      socket.emit(imageEvent(false, 'first.png'));
+      await flush();
+      expect(videoValues()).toMatchObject({ firstFrameImage: { image_name: 'first.png' }, lastFrameImage: null });
+      expect(lastNotice()).toMatchObject({ title: 'widgets.video.placement.firstFrameSet' });
+
+      socket.emit(imageEvent(true, 'last.png'));
+      await flush();
+      expect(videoValues()).toMatchObject({
+        firstFrameImage: { image_name: 'first.png' },
+        lastFrameImage: { image_name: 'last.png' },
+      });
+      expect(lastNotice()).toMatchObject({ title: 'widgets.video.placement.lastFrameSet' });
+
+      runtime.dispose();
+    });
+
+    it('says so when an image clears a picture clip, and keeps a soundtrack quietly', async () => {
+      const { lastNotice, runtime, socket, videoValues } = setup(LTX2);
+      socket.emit({ ...placementEvent('conditioning_video'), conditioning_role: 'video' });
+      await flush();
+      expect(videoValues()).toMatchObject({ conditioningClip: { role: 'video' } });
+
+      socket.emit(imageEvent(true));
+      await flush();
+
+      expect(videoValues()).toMatchObject({ conditioningClip: null, firstFrameImage: { image_name: 'still.png' } });
+      expect(lastNotice()).toMatchObject({
+        kind: 'info',
+        message: 'widgets.video.placement.imageDisplaced',
+        title: 'widgets.video.placement.firstFrameSet',
+      });
+
+      // A soundtrack is anchored by the frames, so the next image lands beside it.
+      socket.emit({ ...placementEvent('conditioning_video'), conditioning_role: 'audio' });
+      await flush();
+      socket.emit(imageEvent(true, 'last.png'));
+      await flush();
+
+      expect(videoValues()).toMatchObject({
+        conditioningClip: { role: 'audio' },
+        firstFrameImage: { image_name: 'still.png' },
+        lastFrameImage: { image_name: 'last.png' },
+      });
+      expect(lastNotice()).toMatchObject({ kind: 'success', title: 'widgets.video.placement.lastFrameSet' });
+
+      runtime.dispose();
+    });
+
+    it.each([
+      [WAN_T2V, false, 'widgets.video.placement.imageUnsupported'],
+      [WAN_I2V, true, 'widgets.video.placement.imageFull'],
+    ])('declines an image with nowhere to go, leaving the panel alone', async (panelModel, append, message) => {
+      const { lastNotice, projectId, runtime, socket, store, videoShown, videoValues } = setup(panelModel);
+      store.commands.widgets.patchValues('video', { lastFrameImage: heldFrame }, projectId);
+      const before = videoValues();
+
+      socket.emit(imageEvent(append));
+      await flush();
+
+      expect(videoValues()).toBe(before);
+      expect(lastNotice()).toMatchObject({ kind: 'info', message, title: 'widgets.video.placement.imageNotPlaced' });
+      expect(videoShown()).toBe(false);
 
       runtime.dispose();
     });
