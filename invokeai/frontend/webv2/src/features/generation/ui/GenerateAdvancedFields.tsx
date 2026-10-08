@@ -11,19 +11,21 @@ import {
   MAX_HIDIFFUSION_RATIO,
   MIN_HIDIFFUSION_T1_RATIO,
 } from '@features/generation/core/settings';
+import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Field, Select } from '@platform/ui';
 import { ModelDefaultButton } from '@platform/ui/ModelDefaultButton';
 import { ScrubberField } from '@platform/ui/ScrubberField';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { type GenerateDraft, pickGenerateSettings } from './generateDebounce';
 import { GenerationModelSelect as ModelSelect } from './GenerationUiContext';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 import { GenerateFieldContextMenu } from './shared/GenerateFieldContextMenu';
 import { GenerateToggleSwitch } from './shared/GenerateToggleSwitch';
 
 interface GenerateAdvancedFieldsProps {
-  settings: GenerateSettings;
+  draft: GenerateDraft;
   selectedModel: GenerateModelConfig | undefined;
   onCommit: (patch: Partial<GenerateSettings>) => void;
   onCommitImmediate: (patch: Partial<GenerateSettings>) => void;
@@ -36,16 +38,34 @@ const VAE_PRECISION_COLLECTION = createListCollection({
   ] as const,
 });
 
+const selectAdvancedSettings = pickGenerateSettings([
+  'cfgRescaleMultiplier',
+  'clipSkip',
+  'colorCompensation',
+  'hiDiffusionEnabled',
+  'hiDiffusionRauNetEnabled',
+  'hiDiffusionT1Ratio',
+  'hiDiffusionT2Ratio',
+  'hiDiffusionWindowAttentionEnabled',
+  'pidMode',
+  'pidSteps',
+  'seamlessXAxis',
+  'seamlessYAxis',
+  'vae',
+  'vaePrecision',
+]);
+
 export const GenerateAdvancedFields = ({
+  draft,
   onCommit,
   onCommitImmediate,
   selectedModel,
-  settings,
 }: GenerateAdvancedFieldsProps) => {
   const { t } = useTranslation();
+  const settings = useExternalStoreSelector(draft.subscribe, draft.getSnapshot, selectAdvancedSettings);
   const modelBase = selectedModel?.base;
   const modelDefaults = selectedModel ? getDefaultGenerateSettings(selectedModel) : null;
-  const policy = getGenerationUiPolicy(selectedModel, settings);
+  const policy = getGenerationUiPolicy(selectedModel);
   const pidHelpText =
     settings.pidMode === 'fit'
       ? t('widgets.generate.pidFitHelp')

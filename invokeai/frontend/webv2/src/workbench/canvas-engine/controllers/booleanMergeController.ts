@@ -31,7 +31,13 @@ export interface BooleanMergeControllerOptions {
   readonly ctx: LayerStepContext &
     Pick<
       CanvasMutationContext,
-      'begin' | 'capturePermit' | 'captureInsertionAnchor' | 'createLayerId' | 'getDocument' | 'isPermitCurrent'
+      | 'begin'
+      | 'capturePermit'
+      | 'captureInsertionAnchor'
+      | 'createLayerId'
+      | 'getDocument'
+      | 'getReducerDocument'
+      | 'isPermitCurrent'
     >;
   readonly backend: RasterBackend;
   readonly isCacheReady: (layer: CanvasLayerContract, document: CanvasDocumentContractV3) => boolean;
@@ -119,9 +125,12 @@ export class BooleanMergeController {
       ) {
         return 'not-ready';
       }
-      const liveDocument = ctx.getDocument();
+      // A preview-tolerant recheck; see `CanvasMutationContext.getReducerDocument`.
+      const liveDocument = ctx.getReducerDocument();
+      const liveEligibility = liveDocument ? mergeDownEligibility(liveDocument, upperLayerId) : null;
       if (
         !liveDocument ||
+        liveEligibility?.status !== 'eligible' ||
         getDocumentLayer(liveDocument, upperLayerId) !== upper ||
         lookupLayerBelow(liveDocument, upperLayerId) !== below
       ) {

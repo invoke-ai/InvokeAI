@@ -113,7 +113,6 @@ export const NodeFieldControl = ({
     (seedMode: SeedMode) => editGraph({ fieldName, nodeId, seedMode, type: 'setFieldSeedMode' }),
     [editGraph, fieldName, nodeId]
   );
-  const resetAriaLabel = useMemo(() => `Reset ${label} to default value`, [label]);
   const showsShuffle =
     element.data.showShuffle &&
     !!template &&
@@ -130,18 +129,17 @@ export const NodeFieldControl = ({
     return (
       <Alert.Root status="error" variant="surface">
         <Alert.Indicator />
-        <Alert.Title>This field no longer exists in the project graph.</Alert.Title>
+        <Alert.Title>{t('nodes.fieldUnavailable')}</Alert.Title>
       </Alert.Root>
     );
   }
   const resetButton = canReset ? (
-    <Tooltip content="Reset to default value">
+    <Tooltip content={t('nodes.resetToDefault')}>
       <IconButton
-        aria-label={resetAriaLabel}
+        aria-label={t('nodes.resetFieldToDefault', { label })}
         color="fg.subtle"
         flexShrink={0}
         size="sm"
-        title="Reset to default value"
         variant="ghost"
         onClick={onResetClick}
       >
@@ -156,7 +154,7 @@ export const NodeFieldControl = ({
         {isLabelEditable ? (
           <HStack gap="1" minW="0" w="full">
             <Input
-              aria-label="Field label"
+              aria-label={t('nodes.fieldLabel')}
               color={isInvalid ? 'fg.error' : 'fg.muted'}
               fontSize="xs"
               fontWeight="600"
@@ -209,7 +207,7 @@ export const NodeFieldControl = ({
             {showsShuffle ? (
               <Tooltip content={t('common.shuffle')}>
                 <IconButton
-                  aria-label={`${t('common.shuffle')} ${label}`}
+                  aria-label={t('nodes.shuffleField', { label })}
                   color="fg.muted"
                   flexShrink={0}
                   variant="outline"

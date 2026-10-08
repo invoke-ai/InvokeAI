@@ -34,6 +34,7 @@ const pageErrors: string[] = [];
 const BASE_CONFIG: DynamicPromptsConfig = {
   combinatorial: true,
   maxPrompts: 100,
+  resample: true,
   sampleSeed: 0,
   seedBehaviour: 'per-iteration',
 };
@@ -196,6 +197,37 @@ describe('dynamic prompts popover controls', () => {
 
     expect(onChange).toHaveBeenCalledWith({ combinatorial: false });
     expect(row().getBoundingClientRect().height).toBe(combinatorialHeight);
+  });
+
+  it('offers resampling only for random samples', async () => {
+    const onChange = vi.fn();
+    const resampleLabel = () =>
+      [...document.querySelectorAll<HTMLElement>('[data-scope="switch"][data-part="label"]')].find(
+        (label) => label.textContent === 'widgets.generate.dynamicPrompts.newSampleEveryInvoke'
+      );
+
+    await render(onChange);
+    await openPopover();
+
+    expect(resampleLabel(), 'all combinations have nothing to resample').toBeUndefined();
+
+    await act(async () => {
+      await userEvent.click(document.querySelector<HTMLElement>('[data-scope="menu"][data-part="trigger"]')!);
+    });
+    await act(async () => {
+      ([...document.querySelectorAll('[data-scope="menu"][data-part="item"]')].at(-1) as HTMLElement).click();
+      await Promise.resolve();
+    });
+
+    expect(onChange).toHaveBeenCalledWith({ combinatorial: false });
+    expect(resampleLabel(), 'random sample offers resampling').toBeTruthy();
+
+    await act(async () => {
+      await userEvent.click(resampleLabel()!);
+    });
+
+    expect(onChange).toHaveBeenCalledWith({ resample: false });
+    expect(pageErrors).toEqual([]);
   });
 
   it('labels both settings controls with a real, associated label', async () => {

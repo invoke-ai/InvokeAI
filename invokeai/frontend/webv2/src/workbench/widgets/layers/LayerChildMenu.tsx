@@ -1,11 +1,12 @@
 import type { ComponentProps } from 'react';
 
-import { Menu, Portal } from '@chakra-ui/react';
+import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { MenuActionItem, MenuContent } from '@platform/ui';
 import {
   ArrowDownIcon,
   ArrowRightIcon,
   ArrowUpIcon,
+  ChevronRightIcon,
   CircleIcon,
   CircleOffIcon,
   CopyIcon,
@@ -29,7 +30,10 @@ const ChildMenuItem = MenuActionItem;
 
 type MenuPositioning = ComponentProps<typeof Menu.Root>['positioning'];
 
-/** The context menu of a projected child row: toggle it, or remove it. */
+const SUBMENU_POSITIONING = { placement: 'right-start' } as const;
+const noop = (): void => undefined;
+
+/** The context menu of a projected child row: toggle, rename, reorder, move to another layer, or remove it. */
 export const LayerChildMenu = ({
   anchor,
   child,
@@ -42,7 +46,7 @@ export const LayerChildMenu = ({
   child: ProjectedChildRow;
   commands: LayerRowCommands;
   editingLocked: boolean;
-  /** Other layers the item can move to (reference images), keyboard parity for the cross-layer drag. */
+  /** Other layers the item can move to, keyboard parity for the cross-layer drag. */
   moveTargets: readonly { id: string; name: string }[];
   onClose: () => void;
 }) => {
@@ -113,15 +117,36 @@ export const LayerChildMenu = ({
                 />
               </>
             ) : null}
-            {moveTargets.map((target) => (
-              <MoveToLayerItem
-                key={target.id}
-                child={child}
-                commands={commands}
-                disabled={editingLocked}
-                target={target}
+            {moveTargets.length === 0 ? null : editingLocked ? (
+              <ChildMenuItem
+                disabled
+                icon={ArrowRightIcon}
+                label={t('widgets.layers.modifiers.moveToLayer')}
+                value="move-to"
+                onSelect={noop}
               />
-            ))}
+            ) : (
+              <Menu.Root positioning={SUBMENU_POSITIONING}>
+                <Menu.TriggerItem aria-label={t('widgets.layers.modifiers.moveToLayer')}>
+                  <HStack gap="2" minW="0" w="full">
+                    <Icon as={ArrowRightIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
+                    <Text flex="1" fontSize="md">
+                      {t('widgets.layers.modifiers.moveToLayer')}
+                    </Text>
+                    <Icon as={ChevronRightIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
+                  </HStack>
+                </Menu.TriggerItem>
+                <Portal>
+                  <Menu.Positioner>
+                    <MenuContent maxW="18rem" minW="10rem" py="1">
+                      {moveTargets.map((target) => (
+                        <MoveToLayerItem key={target.id} child={child} commands={commands} target={target} />
+                      ))}
+                    </MenuContent>
+                  </Menu.Positioner>
+                </Portal>
+              </Menu.Root>
+            )}
             <ChildMenuItem
               disabled={editingLocked}
               icon={XIcon}
@@ -140,23 +165,12 @@ export const LayerChildMenu = ({
 const MoveToLayerItem = ({
   child,
   commands,
-  disabled,
   target,
 }: {
   child: ProjectedChildRow;
   commands: LayerRowCommands;
-  disabled: boolean;
   target: { id: string; name: string };
 }) => {
-  const { t } = useTranslation();
   const handleSelect = useCallback(() => commands.moveChildToLayer(child, target.id), [child, commands, target.id]);
-  return (
-    <ChildMenuItem
-      disabled={disabled}
-      icon={ArrowRightIcon}
-      label={t('widgets.layers.modifiers.moveToLayer', { name: target.name })}
-      value={`move-to:${target.id}`}
-      onSelect={handleSelect}
-    />
-  );
+  return <ChildMenuItem label={target.name} value={`move-to:${target.id}`} onSelect={handleSelect} />;
 };

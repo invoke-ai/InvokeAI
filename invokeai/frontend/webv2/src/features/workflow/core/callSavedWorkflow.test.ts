@@ -13,9 +13,11 @@ import {
   CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX,
   getSavedWorkflowDynamicEdgeIdsToRemove,
   getSavedWorkflowDynamicFields,
+  type SavedWorkflowDynamicField,
   syncCallSavedWorkflowFields,
 } from './callSavedWorkflow';
-import { buildInvocationNode, createProjectGraph, projectGraphReducer } from './document';
+import { CONNECTOR_OUTPUT_HANDLE } from './connectorHandles';
+import { buildConnectorNode, buildInvocationNode, createProjectGraph, projectGraphReducer } from './document';
 import { parseWorkflowJson, serializeWorkflowJson } from './workflowJson';
 
 const field = (name: string, typeName: string, overrides: Partial<FieldInputTemplate> = {}): FieldInputTemplate => ({
@@ -602,28 +604,186 @@ describe('Call Saved Workflow dynamic fields', () => {
     expect(readiness.reasons).toContain('"Call Saved Workflow" is missing required input "Left Addend".');
   });
 
-  it('clears dynamic state when the selected workflow changes', () => {
-    const callNode = buildInvocationNode(callSavedWorkflowTemplate, { x: 0, y: 0 });
+  /** A call to `child-1` with an upstream node wired into both of its exposed inputs. */
+  const buildConnectedCall = (): ProjectGraphState => {
+    const source = buildInvocationNode(addTemplate, { x: 0, y: 0 });
+    source.id = 'source-1';
+    const callNode = buildInvocationNode(callSavedWorkflowTemplate, { x: 100, y: 0 });
     callNode.id = 'call-1';
-    const fields = getSavedWorkflowDynamicFields(buildChildWorkflow(), templates);
-    const document = syncCallSavedWorkflowFields(
-      { ...createProjectGraph('parent'), nodes: [callNode] },
+    callNode.data.inputs.workflow_id = { label: '', name: 'workflow_id', value: 'child-1' };
+    let document = syncCallSavedWorkflowFields(
+      { ...createProjectGraph('parent'), nodes: [source, callNode] },
       callNode.id,
-      fields,
+      getSavedWorkflowDynamicFields(buildChildWorkflow(), templates),
       []
     );
+
+    for (const fieldName of ['a', 'b']) {
+      document = projectGraphReducer(document, {
+        edge: {
+          id: `edge-${fieldName}`,
+          source: source.id,
+          sourceHandle: 'value',
+          target: callNode.id,
+          targetHandle: dynamicFieldName(fieldName),
+          type: 'default',
+        },
+        type: 'addEdge',
+      });
+    }
+
+    return document;
+  };
+  const findCallNode = (document: ProjectGraphState) =>
+    document.nodes.find((candidate): candidate is WorkflowInvocationNode => candidate.id === 'call-1');
+
+  it('keeps dynamic inputs and their connections while a newly selected workflow loads', () => {
+    const document = buildConnectedCall();
     const changed = projectGraphReducer(document, {
       fieldName: 'workflow_id',
-      nodeId: callNode.id,
+      nodeId: 'call-1',
       type: 'setFieldValue',
       value: 'workflow-2',
     });
-    const node = changed.nodes.find((candidate): candidate is WorkflowInvocationNode => candidate.id === callNode.id);
+    const node = findCallNode(changed);
 
+    // Which connections still fit is only known once the new signature arrives; the sync decides then.
+    expect(changed.edges.map((edge) => edge.id)).toEqual(['edge-a', 'edge-b']);
+    expect(Object.keys(node?.data.dynamicInputTemplates ?? {})).toEqual([dynamicFieldName('a'), dynamicFieldName('b')]);
+    expect(node?.data.inputs.workflow_id?.value).toBe('workflow-2');
+    expect(node?.data.callSavedWorkflowStatus).toBe('loading');
+  });
+
+  /** `child-1`'s fields as another workflow saved from it declares them: same identities, its own defaults. */
+  const copiedChildFields = () =>
+    getSavedWorkflowDynamicFields(buildChildWorkflow(), templates).map((field) => ({
+      ...field,
+      initialValue: field.fieldName === dynamicFieldName('a') ? 5 : 7,
+    }));
+  const selectWorkflow = (document: ProjectGraphState, value: string) =>
+    projectGraphReducer(document, { fieldName: 'workflow_id', nodeId: 'call-1', type: 'setFieldValue', value });
+  const syncWith = (document: ProjectGraphState, fields: SavedWorkflowDynamicField[]) =>
+    syncCallSavedWorkflowFields(
+      document,
+      'call-1',
+      fields,
+      getSavedWorkflowDynamicEdgeIdsToRemove(document, 'call-1', fields, templates)
+    );
+  const dynamicValues = (document: ProjectGraphState) => {
+    const inputs = findCallNode(document)?.data.inputs ?? {};
+
+    return [inputs[dynamicFieldName('a')]?.value, inputs[dynamicFieldName('b')]?.value];
+  };
+
+  it("takes another workflow's own values on a switch but keeps edited values through a refresh", () => {
+    const edited = projectGraphReducer(buildConnectedCall(), {
+      fieldName: dynamicFieldName('a'),
+      nodeId: 'call-1',
+      type: 'setFieldValue',
+      value: 42,
+    });
+
+    // A refresh of the same workflow with new defaults keeps what the user set.
+    expect(dynamicValues(syncWith(edited, copiedChildFields()))).toEqual([42, 2]);
+
+    // Another workflow sharing the field identities starts from its own defaults; its connections still carry over.
+    const switched = syncWith(selectWorkflow(edited, 'child-2'), copiedChildFields());
+    expect(dynamicValues(switched)).toEqual([5, 7]);
+    expect(switched.edges.map((edge) => edge.id)).toEqual(['edge-a', 'edge-b']);
+    expect(findCallNode(switched)?.data.callSavedWorkflowFieldsFrom).toBeUndefined();
+
+    // Selecting the original again before the other one loaded is no switch at all.
+    const returned = syncWith(selectWorkflow(selectWorkflow(edited, 'child-2'), 'child-1'), copiedChildFields());
+    expect(dynamicValues(returned)).toEqual([42, 2]);
+  });
+
+  it("removes the previous workflow's inputs when the newly selected one fails, but not on a failure of its own", () => {
+    const failed = projectGraphReducer(selectWorkflow(buildConnectedCall(), 'missing'), {
+      nodeId: 'call-1',
+      status: 'error',
+      type: 'setCallSavedWorkflowStatus',
+    });
+
+    expect(failed.edges).toEqual([]);
+    expect(findCallNode(failed)?.data.dynamicInputTemplates).toEqual({});
+    expect(findCallNode(failed)?.data.callSavedWorkflowStatus).toBe('error');
+
+    // The inputs describe the selection itself: a transient failure must not cost its connections.
+    const transient = projectGraphReducer(buildConnectedCall(), {
+      nodeId: 'call-1',
+      status: 'error',
+      type: 'setCallSavedWorkflowStatus',
+    });
+
+    expect(transient.edges.map((edge) => edge.id)).toEqual(['edge-a', 'edge-b']);
+    expect(Object.keys(findCallNode(transient)?.data.dynamicInputTemplates ?? {})).toHaveLength(2);
+  });
+
+  it("saves a node mid-switch as a fresh selection, not the previous workflow's inputs under the new id", () => {
+    const exposed = projectGraphReducer(buildConnectedCall(), {
+      fieldIdentifier: { fieldName: dynamicFieldName('a'), nodeId: 'call-1' },
+      type: 'exposeField',
+    });
+    const reloaded = parseWorkflowJson(serializeWorkflowJson(selectWorkflow(exposed, 'child-2'))).document;
+    const node = findCallNode(reloaded);
+
+    expect(node?.data.inputs.workflow_id?.value).toBe('child-2');
+    expect(node?.data.callSavedWorkflowStatus).toBe('loading');
+    expect(node?.data.callSavedWorkflowFieldsFrom).toBeUndefined();
+    expect(
+      Object.keys(node?.data.inputs ?? {}).filter((name) => name.startsWith(CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX))
+    ).toEqual([]);
+    expect(node?.data.dynamicInputTemplates ?? {}).toEqual({});
+    expect(reloaded.edges).toEqual([]);
+    expect(Object.values(reloaded.form.elements).filter((element) => element.type === 'node-field')).toEqual([]);
+
+    // The reopened node then takes the selected workflow's own values, as the switch would have.
+    expect(dynamicValues(syncWith(reloaded, copiedChildFields()))).toEqual([5, 7]);
+
+    // Inputs that belong to the selection survive a save unchanged.
+    const kept = findCallNode(parseWorkflowJson(serializeWorkflowJson(exposed)).document);
+    expect(Object.keys(kept?.data.dynamicInputTemplates ?? {})).toEqual([dynamicFieldName('a'), dynamicFieldName('b')]);
+  });
+
+  it('removes connections from an unconnected connector into inputs the next signature lacks', () => {
+    const connector = buildConnectorNode({ x: 50, y: 0 });
+    connector.id = 'connector-1';
+    const base = buildConnectedCall();
+    const document: ProjectGraphState = {
+      ...base,
+      edges: ['a', 'b'].map((fieldName) => ({
+        id: `edge-${fieldName}`,
+        source: connector.id,
+        sourceHandle: CONNECTOR_OUTPUT_HANDLE,
+        target: 'call-1',
+        targetHandle: dynamicFieldName(fieldName),
+        type: 'default' as const,
+      })),
+      nodes: [...base.nodes, connector],
+    };
+    const onlyA = getSavedWorkflowDynamicFields(buildChildWorkflow(), templates).filter(
+      (field) => field.fieldName === dynamicFieldName('a')
+    );
+
+    // Nothing upstream gives the connector a type to check, so its connection stays only while its input exists.
+    expect(getSavedWorkflowDynamicEdgeIdsToRemove(document, 'call-1', onlyA, templates)).toEqual(['edge-b']);
+  });
+
+  it('removes dynamic inputs and their connections when the selection is cleared', () => {
+    const changed = projectGraphReducer(buildConnectedCall(), {
+      fieldName: 'workflow_id',
+      nodeId: 'call-1',
+      type: 'setFieldValue',
+      value: '',
+    });
+    const node = findCallNode(changed);
+
+    expect(changed.edges).toEqual([]);
     expect(node?.data.dynamicInputTemplates).toEqual({});
     expect(
       Object.keys(node?.data.inputs ?? {}).some((name) => name.startsWith(CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX))
     ).toBe(false);
+    expect(node?.data.callSavedWorkflowStatus).toBe('ready');
   });
 
   it('retries a failed selection when the same workflow is chosen again', () => {

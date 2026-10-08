@@ -10,7 +10,8 @@ import {
   registerAccountOwnedResource,
 } from '@platform/state/accountLifecycle';
 import { apiFetchJson, getApiErrorMessage, ApiError } from '@platform/transport/http';
-import { Button, ConfirmDialog } from '@platform/ui';
+import { Button } from '@platform/ui/Button';
+import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { refreshImageMapPoints } from '@workbench/image-map/imageMapStore';
 import { createElement, useCallback, useId, useMemo, useRef, useState, type ReactNode } from 'react';

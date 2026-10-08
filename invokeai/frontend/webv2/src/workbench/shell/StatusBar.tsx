@@ -6,7 +6,10 @@ import { Box, Flex, Icon, Popover, Portal } from '@chakra-ui/react';
 import { useDndContext, useDroppable } from '@dnd-kit/core';
 import { horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { PopoverContent, Row, Tooltip } from '@platform/ui';
+import { isModalPresent, subscribeModalPresence } from '@platform/ui/modalPresence';
 import { useHighlightedRegion } from '@workbench/focusRegions';
+import { useShortcutFocusRestore } from '@workbench/hotkeys/hintSources';
+import { isShortcutGuideSessionKey } from '@workbench/hotkeys/shortcutHints';
 import {
   WidgetEnableMenu,
   WidgetInstanceContextMenu,
@@ -17,6 +20,11 @@ import {
   type WidgetEnableMenuItem,
   type WidgetInstanceContextMenuTarget,
 } from '@workbench/widget-frame';
+import {
+  CompactWidgetCapacityProvider,
+  createCompactWidgetCapacity,
+  useCompactWidgetCapacityResource,
+} from '@workbench/widget-frame/compactWidgetCapacity';
 import {
   getWidgetRegionDropId,
   getWidgetRegionEndDropData,
@@ -36,7 +44,15 @@ import {
 import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { ArrowRightToLineIcon } from 'lucide-react';
-import { type KeyboardEvent, type MouseEvent, type ReactNode, useCallback, useMemo, useState } from 'react';
+import {
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+  useCallback,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface BottomWidgetItem extends PlacedWidgetRegionItem<WidgetPlacementInstanceMeta> {
@@ -71,7 +87,14 @@ const BottomEndCluster = ({
   });
 
   return (
-    <Flex ref={setNodeRef} align="center" alignSelf="stretch" flexShrink={0} position="relative">
+    <Flex
+      ref={setNodeRef}
+      data-status-bar-cluster
+      align="center"
+      alignSelf="stretch"
+      flexShrink={0}
+      position="relative"
+    >
       {children}
       {showDropChrome ? (
         <>
@@ -89,6 +112,9 @@ const COMPACT_ROW_ACTIVE_HOVER_PROPS = { bg: 'bg.emphasized', color: 'brand.fg' 
 const TOOLTIP_POSITIONING = { placement: 'top' } as const;
 
 export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) => {
+  const [capacity] = useState(createCompactWidgetCapacity);
+  const bindSpacer = useCallback((element: HTMLDivElement | null) => capacity.bindSpacer(element), [capacity]);
+  const modal = useSyncExternalStore(subscribeModalPresence, isModalPresent, isModalPresent);
   const { t } = useTranslation();
   const placementProject = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const bottomRegion = useActiveProjectSelector((project) => project.widgetRegions.bottom);
@@ -108,7 +134,7 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
   });
   const items = getWidgetRegionItems(bottomRegionViewModel);
   const compactItems = items.flatMap((item): BottomWidgetItem[] => {
-    if (!isCompactBottomItem(item)) {
+    if (!isCompactBottomItem(item) || (modal && item.widget.manifest.preserveWorkbenchFocus)) {
       return [];
     }
 
@@ -175,68 +201,70 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
   const isBottomOutlined = useHighlightedRegion() === 'bottom';
 
   return (
-    <WidgetStrip
-      align="center"
-      as="footer"
-      bg="bg.subtle"
-      borderTopWidth="1px"
-      borderColor={isBottomOutlined ? 'transparent' : 'border.subtle'}
-      color="fg.muted"
-      dropState={dropState}
-      flexShrink={0}
-      h="6"
-      overlay="none"
-      px="2"
-      region="bottom"
-      sortableInstanceIds={sortableInstanceIds}
-      strategy={horizontalListSortingStrategy}
-      w="full"
-      onContextMenu={openEnableMenu}
-    >
-      <Flex align="center" alignSelf="stretch" flexShrink={0} position="relative">
-        {startItems.map((item) => (
-          <CompactBottomWidget
-            key={item.id}
-            item={item}
-            isActive={item.isExpandable && item.id === bottomRegion.activeInstanceId && !bottomRegion.isCollapsed}
-            onContextMenu={openInstanceMenu}
-            onSelect={handleSelect}
-          />
-        ))}
+    <CompactWidgetCapacityProvider capacity={capacity}>
+      <WidgetStrip
+        align="center"
+        as="footer"
+        bg="bg.subtle"
+        borderTopWidth="1px"
+        borderColor={isBottomOutlined ? 'transparent' : 'border.subtle'}
+        color="fg.muted"
+        dropState={dropState}
+        flexShrink={0}
+        h="6"
+        overlay="none"
+        px="2"
+        region="bottom"
+        sortableInstanceIds={sortableInstanceIds}
+        strategy={horizontalListSortingStrategy}
+        w="full"
+        onContextMenu={openEnableMenu}
+      >
+        <Flex data-status-bar-cluster align="center" alignSelf="stretch" flexShrink={0} position="relative">
+          {startItems.map((item) => (
+            <CompactBottomWidget
+              key={item.id}
+              item={item}
+              isActive={item.isExpandable && item.id === bottomRegion.activeInstanceId && !bottomRegion.isCollapsed}
+              onContextMenu={openInstanceMenu}
+              onSelect={handleSelect}
+            />
+          ))}
 
-        <WidgetEnableMenu
-          contextTarget={enableMenuTarget}
-          groupLabel="Bottom Widgets"
-          items={items}
-          positioning={BOTTOM_MENU_POSITIONING}
-          trigger={BOTTOM_MENU_TRIGGER}
-          triggerLabel="Bottom widget visibility"
-          onContextClose={handleContextClose}
-          onToggle={toggleBottomWidget}
+          <WidgetEnableMenu
+            contextTarget={enableMenuTarget}
+            groupLabel="Bottom Widgets"
+            items={items}
+            positioning={BOTTOM_MENU_POSITIONING}
+            trigger={BOTTOM_MENU_TRIGGER}
+            triggerLabel="Bottom widget visibility"
+            onContextClose={handleContextClose}
+            onToggle={toggleBottomWidget}
+          />
+          {showDropChrome ? <ClusterDropRing dropState={dropState} isOver={isOverStart} /> : null}
+        </Flex>
+
+        <Box ref={bindSpacer} flex="1" minW="0" />
+        <BottomEndCluster dropState={dropState} showDropChrome={showDropChrome}>
+          {endItems.map((item) => (
+            <CompactBottomWidget
+              key={item.id}
+              item={item}
+              isActive={item.isExpandable && item.id === bottomRegion.activeInstanceId && !bottomRegion.isCollapsed}
+              onContextMenu={openInstanceMenu}
+              onSelect={handleSelect}
+            />
+          ))}
+        </BottomEndCluster>
+        <WidgetInstanceContextMenu
+          isAlignedEnd={isItemAlignedEnd}
+          target={instanceMenuTarget}
+          onClose={handleInstanceClose}
+          onRemove={toggleBottomWidget}
+          onSetAlignment={setItemAlignment}
         />
-        {showDropChrome ? <ClusterDropRing dropState={dropState} isOver={isOverStart} /> : null}
-      </Flex>
-
-      <Box flex="1" />
-      <BottomEndCluster dropState={dropState} showDropChrome={showDropChrome}>
-        {endItems.map((item) => (
-          <CompactBottomWidget
-            key={item.id}
-            item={item}
-            isActive={item.isExpandable && item.id === bottomRegion.activeInstanceId && !bottomRegion.isCollapsed}
-            onContextMenu={openInstanceMenu}
-            onSelect={handleSelect}
-          />
-        ))}
-      </BottomEndCluster>
-      <WidgetInstanceContextMenu
-        isAlignedEnd={isItemAlignedEnd}
-        target={instanceMenuTarget}
-        onClose={handleInstanceClose}
-        onRemove={toggleBottomWidget}
-        onSetAlignment={setItemAlignment}
-      />
-    </WidgetStrip>
+      </WidgetStrip>
+    </CompactWidgetCapacityProvider>
   );
 };
 
@@ -257,12 +285,32 @@ const CompactBottomWidget = ({
     typeId: item.typeId,
   });
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const restoreShortcutFocus = useShortcutFocusRestore();
+  const capacity = useCompactWidgetCapacityResource();
+  const bindWrapper = useCallback(
+    (element: HTMLDivElement | null) => {
+      setNodeRef(element);
+      const release =
+        item.widget.manifest.compactSizing === 'remaining-space' ? capacity?.bindChip(element) : undefined;
+      return () => {
+        release?.();
+        setNodeRef(null);
+      };
+    },
+    [capacity, item.widget.manifest.compactSizing, setNodeRef]
+  );
   const isActivatable = item.isExpandable || item.isPopover;
   const rowDragHandleProps = isActivatable
     ? Object.fromEntries(Object.entries(dragHandleProps).filter(([key]) => key !== 'onKeyDown'))
     : dragHandleProps;
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLElement>) => {
+      if (item.widget.manifest.preserveWorkbenchFocus) {
+        if (!isShortcutGuideSessionKey(event)) {
+          return;
+        }
+        event.stopPropagation();
+      }
       if (event.key !== 'Enter' && event.key !== ' ') {
         return;
       }
@@ -278,7 +326,7 @@ const CompactBottomWidget = ({
 
       onSelect(item.id);
     },
-    [item.id, item.isPopover, onSelect]
+    [item.id, item.isPopover, item.widget.manifest.preserveWorkbenchFocus, onSelect]
   );
   const activationProps = useMemo(
     () =>
@@ -308,6 +356,7 @@ const CompactBottomWidget = ({
       aria-pressed={item.isPopover ? undefined : isRowActive}
       color={isRowActive ? undefined : 'fg.muted'}
       cursor={isDragging ? 'grabbing' : 'default'}
+      px={item.widget.manifest.compactSizing === 'remaining-space' ? '1.5' : undefined}
       h="full"
       w="auto"
       {...(isRowActive ? COMPACT_ROW_ACTIVE_PROPS : null)}
@@ -325,7 +374,13 @@ const CompactBottomWidget = ({
   // focus restore, aria) while the outer Box keeps the tooltip's trigger id —
   // two elements, so the two machines never fight over one `id`.
   const content = (
-    <Box ref={setNodeRef} h="full" style={style}>
+    <Box
+      ref={bindWrapper}
+      data-status-bar-widget={item.id}
+      data-workbench-focus-preserve={item.widget.manifest.preserveWorkbenchFocus || undefined}
+      h="full"
+      style={style}
+    >
       {item.isPopover ? <Popover.Trigger asChild>{row}</Popover.Trigger> : row}
     </Box>
   );
@@ -343,6 +398,7 @@ const CompactBottomWidget = ({
   if (item.isPopover) {
     return (
       <Popover.Root
+        finalFocusEl={item.widget.manifest.preserveWorkbenchFocus ? restoreShortcutFocus : undefined}
         lazyMount
         open={isPopoverOpen}
         positioning={WIDGET_POPOVER_POSITIONING}
@@ -353,9 +409,11 @@ const CompactBottomWidget = ({
         <Portal>
           <Popover.Positioner>
             <PopoverContent
+              data-workbench-focus-preserve={item.widget.manifest.preserveWorkbenchFocus || undefined}
               display="flex"
               flexDirection="column"
               maxH="min(28rem, var(--available-height))"
+              maxW="calc(100vw - 16px)"
               p="0"
               w="26rem"
             >

@@ -6,10 +6,10 @@ import { auditAccessibility } from '@platform/browser/auditAccessibility.testing
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { closingFrames, recordDialogExit, type DialogExitFrame } from '@platform/ui/dialogExit.testing';
+import { isModalPresent } from '@platform/ui/modalPresence';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { createEmptyCanvasState } from '@workbench/canvasMigration';
-import { isHotkeyModalLayerActive } from '@workbench/hotkeys/modalLayer';
 import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -112,11 +112,11 @@ const expectRowWhileClosing = (frames: readonly DialogExitFrame[]) => {
 it('animates recovery out on dismissal and returns workbench hotkeys as it starts closing', async () => {
   await render();
   await expect.element(page.getByRole('dialog', { name: 'Missing fonts' })).toBeVisible();
-  expect(isHotkeyModalLayerActive()).toBe(true);
+  expect(isModalPresent()).toBe(true);
 
   const frames = await recordDialogExit(document.querySelector('[role="dialog"]')!, async () => {
     await act(() => page.getByRole('button', { name: 'Continue with previews' }).click());
-    expect(isHotkeyModalLayerActive()).toBe(false);
+    expect(isModalPresent()).toBe(false);
   });
 
   expectRowWhileClosing(frames);
@@ -134,7 +134,7 @@ it('animates out with its rows once a retry finds every font', async () => {
 
   expectRowWhileClosing(frames);
   await expect.poll(() => document.querySelector('[role="dialog"]')).toBeNull();
-  expect(isHotkeyModalLayerActive()).toBe(false);
+  expect(isModalPresent()).toBe(false);
 });
 
 it('replaces every use through the undoable Canvas capability with target axis limits', async () => {

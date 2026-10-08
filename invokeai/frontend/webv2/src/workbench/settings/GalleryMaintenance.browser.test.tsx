@@ -66,7 +66,10 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   useOptionalWorkbenchCommands: () => null,
   useOptionalWorkbenchPersistenceService: () => null,
 }));
-vi.mock('@tanstack/react-router', () => ({ useNavigate: () => vi.fn() }));
+vi.mock('@tanstack/react-router', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useNavigate: () => vi.fn(),
+}));
 vi.mock('@workbench/palette/PaletteButton', () => ({ PaletteButton: () => null }));
 vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: () => vi.fn() }));
 vi.mock('@workbench/shell/topbar/useTopbarShortcut', () => ({ useTopbarShortcut: () => null }));
@@ -205,9 +208,12 @@ describe('gallery maintenance in Data & workspace settings', () => {
                 getItemLabel={null}
                 isPrimary={false}
                 isSelected={false}
+                isTabStop={false}
                 item={thumbnailItem}
                 onClick={() => {}}
                 onContextMenu={() => {}}
+                onFocusLost={() => {}}
+                onOpen={() => {}}
                 onToggleStarred={() => {}}
               />
               <GalleryThumbnailCell
@@ -219,9 +225,12 @@ describe('gallery maintenance in Data & workspace settings', () => {
                 getItemLabel={null}
                 isPrimary={false}
                 isSelected={false}
+                isTabStop={false}
                 item={thumbnailVideo}
                 onClick={() => {}}
                 onContextMenu={() => {}}
+                onFocusLost={() => {}}
+                onOpen={() => {}}
                 onToggleStarred={() => {}}
               />
             </DndContext>
