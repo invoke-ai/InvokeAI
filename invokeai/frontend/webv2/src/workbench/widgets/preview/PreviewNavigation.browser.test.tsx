@@ -288,7 +288,7 @@ vi.mock('@features/gallery/queries', () => ({
     queryClient: QueryClient,
     query: { boardId: string; orderDir?: 'ASC' | 'DESC'; starred?: boolean },
     offset: number,
-    { signal }: { signal?: AbortSignal }
+    { signal, staleTime }: { signal?: AbortSignal; staleTime?: number }
   ) => {
     if (signal) {
       mocks.galleryPageFetchSignals.push(signal);
@@ -328,7 +328,7 @@ vi.mock('@features/gallery/queries', () => ({
           total: Math.max(storedPage?.total ?? 0, offset + orderedItems.length),
         });
       },
-      staleTime: Infinity,
+      staleTime: staleTime ?? 60_000,
     });
   },
   fetchVerifiedGalleryItemPage: (
@@ -989,6 +989,56 @@ describe('preview keyboard navigation boundary', () => {
       undefined,
       2,
       true
+    );
+  });
+
+  it('loads the preceding listing page after a relocated selection moves to a page start', async () => {
+    const previous = createImageItem('relocated-predecessor', '2026-07-19T23:59:00.000Z');
+    const selected = createImageItem('relocated-selected', '2026-07-19T23:58:00.000Z');
+    const fillers = Array.from({ length: 59 }, (_unused, index) =>
+      createImageItem(`relocated-${index}`, new Date(Date.UTC(2026, 6, 20, 0, 1) - index * 1000).toISOString())
+    );
+    const starred = { ...createImageItem('relocated-starred', '2026-07-21T00:00:00.000Z'), starred: true };
+
+    setGalleryValues({
+      galleryPage: 1,
+      recentImages: [],
+      selectedImage: legacyImage(selected.name, selected.createdAt),
+      selectedImageName: selected.name,
+      selectedImageQuery: { ...deepQuery, page: 1, paginationMode: 'paginated' },
+    });
+    mocks.galleryStripItems = [starred];
+    mocks.galleryItemPages = [
+      { items: [...fillers, previous], total: 120 },
+      { items: [createImageItem('stale-page-one', '2026-07-19T23:57:00.000Z')], total: 120 },
+    ];
+    mocks.verifiedGalleryPage = { index: 60, offset: 60, page: { items: [selected], total: 120 }, total: 120 };
+
+    await render();
+    const previousPageQuery = mocks.galleryItemPageQueryKeys.find(({ offset }) => offset === 0);
+    expect(previousPageQuery).toBeDefined();
+    await act(() => {
+      // Simulate a cached page from before an insertion moved the selected item across the page boundary.
+      queryClient!.setQueryData(previousPageQuery!.queryKey, {
+        items: [...fillers, selected],
+        offset: 0,
+        total: 120,
+      });
+    });
+    await pressArrow('ArrowLeft');
+
+    expect(mocks.verifiedGalleryPageFetches).toHaveLength(1);
+    expect(mocks.commands.gallery.selectItem).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'image', name: previous.name }),
+      undefined,
+      0,
+      true
+    );
+    expect(mocks.commands.gallery.selectItem).not.toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'image', name: starred.name }),
+      expect.anything(),
+      expect.anything(),
+      expect.anything()
     );
   });
 

@@ -650,13 +650,33 @@ export const usePreviewNavigation = ({
               pages.splice(0, pages.length, { offset: located.offset, data: located.page });
               pageOffset = located.offset;
               total = located.total;
+
+              if (direction === 'left' && located.index === located.offset && located.offset > 0) {
+                const previousOffset = located.offset - GALLERY_PAGE_SIZE;
+                const previousPage = await fetchGalleryItemsPage(
+                  queryClient,
+                  listingFilterWithStarred,
+                  previousOffset,
+                  { signal: requestSignal, staleTime: 0 }
+                );
+
+                if (!isCurrentNavigation()) {
+                  return false;
+                }
+
+                updatePage(previousOffset, previousPage);
+              }
+
               const sections = [
                 sessionEntries,
                 stripEntries,
                 toItemEntries(
-                  mergePreviewBoardItems(located.page.items, previewMergeItems, navigationOrderDir, {
-                    isRanked: navigationSemanticQuery !== null,
-                  }).filter((item) => !stripKeys.has(toGalleryItemKey(item)))
+                  mergePreviewBoardItems(
+                    pages.flatMap(({ data }) => data.items),
+                    previewMergeItems,
+                    navigationOrderDir,
+                    { isRanked: navigationSemanticQuery !== null }
+                  ).filter((item) => !stripKeys.has(toGalleryItemKey(item)))
                 ),
               ];
               const entry = getGalleryNavigationStep(sections, cursorKey, direction);
