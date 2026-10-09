@@ -36,13 +36,13 @@ MIN_AUTO_ROCM_MAJOR = 10
 _TRUTHY = {"1", "on", "yes", "true", "y"}
 
 
-def rocm_major_version(torch_version: str) -> Optional[int]:
-    """The ROCm major version in a torch version's local label (`2.13.0+rocm10.0.0` -> 10), or None without one.
+def rocm_major_version(rocm_version: Optional[str], torch_version: str) -> Optional[int]:
+    """The ROCm major version torch was built against, or None when neither source names one.
 
-    The label rather than `torch.version.hip`: AMD's ROCm 10 wheels report HIP 7.15. A locally built torch has no
-    label, so `auto` leaves it alone.
+    `torch.version.rocm` (`10.0.0` on AMD's wheels) first, then the local label of the torch version (`2.13.0+rocm7.2`)
+    for a build that leaves it unset. Not `torch.version.hip`: AMD's ROCm 10 wheels report HIP 7.15.
     """
-    match = re.search(r"\+rocm(\d+)", torch_version)
+    match = re.match(r"(\d+)\.", rocm_version or "") or re.search(r"\+rocm(\d+)", torch_version)
     return int(match.group(1)) if match else None
 
 
@@ -115,7 +115,9 @@ def apply_rocm_aotriton_setting(
         archs.clear()
 
     exported = os.environ.get(AOTRITON_EXPERIMENTAL_ENV)
-    value, reason = resolve_aotriton_experimental(setting, exported, rocm_major_version(torch.__version__), archs)
+    value, reason = resolve_aotriton_experimental(
+        setting, exported, rocm_major_version(getattr(torch.version, "rocm", None), torch.__version__), archs
+    )
     if exported is not None and setting != "auto" and (exported.strip().lower() in _TRUTHY) != (setting == "on"):
         logger.warning(
             f"rocm_aotriton_experimental is '{setting}', but {AOTRITON_EXPERIMENTAL_ENV}={exported} is set in the "

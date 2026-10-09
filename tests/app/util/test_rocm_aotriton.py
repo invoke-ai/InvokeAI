@@ -18,19 +18,22 @@ from invokeai.app.util.rocm_aotriton import (
 
 
 @pytest.mark.parametrize(
-    ("version", "expected"),
+    ("rocm", "version", "expected"),
     [
-        ("2.13.0+rocm10.0.0", 10),
-        ("2.13.0+rocm7.2", 7),
-        ("2.10.0+rocm7.1", 7),
-        ("2.13.0+cu130", None),
-        ("2.13.0", None),
-        # A locally built ROCm torch: no label, so `auto` cannot tell which ROCm it is.
-        ("2.8.0a0+gitfc14c65", None),
+        # AMD's wheels: both agree.
+        ("10.0.0", "2.13.0+rocm10.0.0", 10),
+        # A build that leaves torch.version.rocm unset: the label tells.
+        (None, "2.13.0+rocm7.2", 7),
+        (None, "2.10.0+rocm7.1", 7),
+        # A locally built ROCm torch has no label; torch.version.rocm still names the ROCm.
+        ("10.0.0", "2.8.0a0+gitfc14c65", 10),
+        (None, "2.8.0a0+gitfc14c65", None),
+        (None, "2.13.0+cu130", None),
+        (None, "2.13.0", None),
     ],
 )
-def test_rocm_major_version_reads_the_local_label(version: str, expected: int | None):
-    assert rocm_major_version(version) == expected
+def test_rocm_major_version_prefers_torch_version_rocm(rocm: str | None, version: str, expected: int | None):
+    assert rocm_major_version(rocm, version) == expected
 
 
 def test_auto_turns_the_kernels_on_for_rocm_10_on_gfx1200():
@@ -83,11 +86,15 @@ def no_exported_switch(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv(AOTRITON_EXPERIMENTAL_ENV, raising=False)
 
 
-def _rocm_build(version: str = "2.13.0+rocm10.0.0", arch: str = "gfx1200"):
-    """Patches standing in for a ROCm torch with one GPU of `arch` to generate on."""
+def _rocm_build(version: str = "2.13.0+rocm10.0.0", arch: str = "gfx1200", rocm: str | None = "10.0.0"):
+    """Patches standing in for a ROCm torch with one GPU of `arch` to generate on.
+
+    Both version sources are patched, so the host's own torch (CUDA, CPU or another ROCm) cannot decide the outcome.
+    """
     return (
         patch("torch.version.hip", "7.15.26333"),
         patch.object(torch, "__version__", version),
+        patch("torch.version.rocm", rocm, create=True),
         patch(
             "invokeai.backend.util.devices.TorchDevice.get_generation_devices",
             return_value=[torch.device("cuda", 0)],
@@ -98,7 +105,7 @@ def _rocm_build(version: str = "2.13.0+rocm10.0.0", arch: str = "gfx1200"):
 
 def _apply(setting, patches, logger=None):
     logger = logger or MagicMock(spec=logging.Logger)
-    with patches[0], patches[1], patches[2], patches[3]:
+    with patches[0], patches[1], patches[2], patches[3], patches[4]:
         apply_rocm_aotriton_setting(setting, "auto", logger)
     return logger
 
@@ -113,6 +120,23 @@ def test_apply_strips_the_feature_suffix_from_the_arch_name(no_exported_switch):
     """`gcnArchName` carries target features (`gfx1200:xnack-`); the measured list holds bare names."""
     _apply("auto", _rocm_build(arch="gfx1200"))
     assert os.environ.get(AOTRITON_EXPERIMENTAL_ENV) == "1"
+
+
+@pytest.mark.parametrize(
+    ("version", "rocm", "exported"),
+    [
+        # A local ROCm 10 build: no label, but torch.version.rocm names it.
+        ("2.8.0a0+gitfc14c65", "10.0.0", "1"),
+        # torch.version.rocm wins over the label.
+        ("2.13.0+rocm10.0.0", "7.2.0", None),
+        # Without torch.version.rocm the label decides.
+        ("2.13.0+rocm10.0.0", None, "1"),
+    ],
+    ids=["local-build", "attribute-wins", "label-fallback"],
+)
+def test_apply_reads_the_rocm_version_from_torch(no_exported_switch, version, rocm, exported):
+    _apply("auto", _rocm_build(version=version, rocm=rocm))
+    assert os.environ.get(AOTRITON_EXPERIMENTAL_ENV) == exported
 
 
 def test_apply_leaves_an_unmeasured_gpu_unset_and_says_how_to_opt_in(no_exported_switch):
