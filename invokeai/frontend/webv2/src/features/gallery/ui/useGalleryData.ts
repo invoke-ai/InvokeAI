@@ -16,33 +16,60 @@ import {
   type GalleryItemsFilter,
 } from '@features/gallery/data/queries';
 import { parseDateTokens } from '@platform/search/dateTokens';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { useCallback, useMemo } from 'react';
+import { hashKey, keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useCallback, useMemo, useState } from 'react';
 
-import { resolveGallerySelectedBoardId } from './galleryStateView';
+import {
+  getGalleryListing,
+  getGalleryReadStatus,
+  resolveGallerySelectedBoardId,
+  type GalleryReadState,
+} from './galleryStateView';
+
+/** The listing's read state, plus whether a further page is on its way. */
+export interface GalleryListingState extends GalleryReadState {
+  isFetchingMore: boolean;
+}
 
 export interface GalleryData {
   boards: GalleryBoard[];
+  boardsState: GalleryReadState;
   filter: GalleryItemsFilter;
   hasMore: boolean;
-  isLoadingItems: boolean;
   /** The resolved board the items were fetched for. */
   selectedBoardId: string;
   /** Distinguish reaching the window cap from reaching the board end; only truncation needs an explanation. */
   isWindowTruncated: boolean;
+  /** The current scope's items; null until it has something to show, and whenever it failed without data. */
   items: GalleryItem[] | null;
+  listing: GalleryListingState;
   loadMore: () => void;
-  /** The current query's failure, or null while it is healthy. */
-  queryError: Error | null;
+  /**
+   * The previous scope's items while the current one loads, for consumers that keep them on screen (dimmed and
+   * busy) across a scope change. Never set once the current scope has data or has failed.
+   */
+  previousScopeItems: GalleryItem[] | null;
   total: number | null;
 }
 
 const EMPTY_BOARDS: GalleryBoard[] = [];
 
 const useGalleryBoards = ({ settings }: { settings: GallerySettings }) => {
-  const query = useQuery(galleryBoardsOptions(getGalleryListingBoardsQuery(settings)));
+  const { data, error, errorUpdateCount, isError, isFetching, refetch } = useQuery(
+    galleryBoardsOptions(getGalleryListingBoardsQuery(settings))
+  );
+  const boards = data ?? EMPTY_BOARDS;
+  const status = getGalleryReadStatus({ errorUpdateCount, hasData: data !== undefined, isError }, boards.length);
+  const isFailed = status === 'error' || status === 'stale-error';
+  const retry = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
+  const boardsState = useMemo<GalleryReadState>(
+    () => ({ error, isRetrying: isFailed && isFetching, retry, status }),
+    [error, isFailed, isFetching, retry, status]
+  );
 
-  return { boards: query.data ?? EMPTY_BOARDS };
+  return { boards, boardsState };
 };
 
 const isRecentItemVisible = (item: GalleryItem, filter: GalleryItemsFilter): boolean => {
@@ -124,6 +151,7 @@ export const isGalleryWindowTruncated = ({
 
 export const useGalleryData = ({
   galleryView,
+  keepPreviousScope = false,
   page,
   projectBoardId,
   recentImages,
@@ -134,6 +162,8 @@ export const useGalleryData = ({
   starred,
 }: {
   galleryView: GalleryView;
+  /** Hold the previous scope's items as `previousScopeItems` while a new scope loads. */
+  keepPreviousScope?: boolean;
   page: number;
   projectBoardId: string | null;
   recentImages: readonly GeneratedImageContract[];
@@ -149,7 +179,7 @@ export const useGalleryData = ({
    */
   starred?: boolean;
 }): GalleryData => {
-  const { boards } = useGalleryBoards({ settings });
+  const { boards, boardsState } = useGalleryBoards({ settings });
   const boardId = resolveGallerySelectedBoardId({ projectBoardId, selectedBoardId }, boards);
   const isPaginated = settings.paginationMode === 'paginated';
   const dateParse = useMemo(() => parseDateTokens(searchTerm), [searchTerm]);
@@ -175,22 +205,37 @@ export const useGalleryData = ({
       starred,
     ]
   );
+  const itemsOptions = galleryItemsInfiniteOptions(
+    filter,
+    // Infinite page values anchor deep reveals; board/search/view changes reset them to zero.
+    isPaginated
+      ? { kind: 'anchor', offset: page * GALLERY_PAGE_SIZE }
+      : { kind: 'infinite', offset: page * GALLERY_PAGE_SIZE }
+  );
+  const scopeHash = hashKey(itemsOptions.queryKey);
   const {
-    data: queryData,
-    error: queryError,
+    data,
+    error,
+    errorUpdateCount,
     fetchNextPage,
     hasNextPage,
+    isError,
     isFetching,
     isFetchingNextPage,
-  } = useInfiniteQuery(
-    galleryItemsInfiniteOptions(
-      filter,
-      // Infinite page values anchor deep reveals; board/search/view changes reset them to zero.
-      isPaginated
-        ? { kind: 'anchor', offset: page * GALLERY_PAGE_SIZE }
-        : { kind: 'infinite', offset: page * GALLERY_PAGE_SIZE }
-    )
-  );
+    isFetchNextPageError,
+    isPlaceholderData,
+    refetch,
+  } = useInfiniteQuery({
+    ...itemsOptions,
+    ...(keepPreviousScope ? { placeholderData: keepPreviousData } : {}),
+  });
+  // Query forgets which fetch failed as soon as any other starts, so an unrelated refetch (an invalidation after a
+  // generation) would turn a failed next page into a "refresh" failure and let scrolling silently retry it. Keep
+  // the page count the failure left this scope at: the next page stays failed until a Retry, a page beyond it, or
+  // another scope. Recorded from the fetch's own result, in the handler that started it.
+  const [failedNextPage, setFailedNextPage] = useState<{ pageCount: number; scopeHash: string } | null>(null);
+  // Everything below describes this scope; another scope's placeholder is only ever `previousScopeItems`.
+  const queryData = isPlaceholderData ? undefined : data;
   const backendItems = useMemo(() => {
     if (!isPaginated) {
       return flattenGalleryItemsData(queryData);
@@ -206,20 +251,33 @@ export const useGalleryData = ({
   // nowhere near.
   const shouldOverlayRecentItems = !isPaginated && page === 0;
   const maxRows = isPaginated ? GALLERY_PAGE_SIZE : GALLERY_MAX_ROWS;
-  const items = useMemo(
+  const scopedItems = useMemo(
     () =>
-      queryData || (shouldOverlayRecentItems && recentImages.length > 0)
-        ? mergeGalleryItemWindow({
-            backendItems,
-            filter,
-            maxRows,
-            recentImages: shouldOverlayRecentItems ? recentImages : [],
-          })
-        : null,
-    [backendItems, filter, maxRows, queryData, recentImages, shouldOverlayRecentItems]
+      mergeGalleryItemWindow({
+        backendItems,
+        filter,
+        maxRows,
+        recentImages: shouldOverlayRecentItems ? recentImages : [],
+      }),
+    [backendItems, filter, maxRows, recentImages, shouldOverlayRecentItems]
+  );
+  const isNextPageFailed =
+    isFetchNextPageError ||
+    (failedNextPage?.scopeHash === scopeHash && failedNextPage.pageCount === (queryData?.pages.length ?? 0));
+  const { items, status } = useMemo(
+    () =>
+      getGalleryListing(
+        { errorUpdateCount, hasData: queryData !== undefined, isError, isFetchNextPageError: isNextPageFailed },
+        scopedItems
+      ),
+    [errorUpdateCount, isError, isNextPageFailed, queryData, scopedItems]
+  );
+  const previousScopeItems = useMemo(
+    () => (status === 'loading' && isPlaceholderData && data ? flattenGalleryItemsData(data).slice(0, maxRows) : null),
+    [data, isPlaceholderData, maxRows, status]
   );
   const total = queryData?.pages[0]?.total ?? null;
-  const hasMore = !isPaginated && Boolean(hasNextPage);
+  const hasMore = !isPaginated && queryData !== undefined && Boolean(hasNextPage);
   const isWindowTruncated = isGalleryWindowTruncated({
     hasNextPage: Boolean(hasNextPage),
     isPaginated,
@@ -227,23 +285,54 @@ export const useGalleryData = ({
     maxRows,
     total,
   });
+  const fetchMore = useCallback(async () => {
+    const result = await fetchNextPage();
+
+    if (result.isFetchNextPageError) {
+      setFailedNextPage({ pageCount: result.data?.pages.length ?? 0, scopeHash });
+    }
+  }, [fetchNextPage, scopeHash]);
+  // A failed page waits for an explicit Retry; scrolling near the end must not hammer it.
   const loadMore = useCallback(() => {
-    if (!hasMore || isFetchingNextPage) {
+    if (!hasMore || isFetchingNextPage || isNextPageFailed) {
       return;
     }
 
-    void fetchNextPage();
-  }, [fetchNextPage, hasMore, isFetchingNextPage]);
+    void fetchMore();
+  }, [fetchMore, hasMore, isFetchingNextPage, isNextPageFailed]);
+  // The observer re-runs whatever its current key needs, so a retry started in one scope never lands in another.
+  const retry = useCallback(async () => {
+    if (status !== 'more-error') {
+      await refetch();
+      return;
+    }
+
+    setFailedNextPage(null);
+    await fetchMore();
+  }, [fetchMore, refetch, status]);
+  const isFailed = status === 'error' || status === 'stale-error';
+  const listing = useMemo<GalleryListingState>(
+    () => ({
+      error,
+      isFetchingMore: isFetchingNextPage,
+      // An unrelated refetch is not a retry of the failed page.
+      isRetrying: status === 'more-error' ? isFetchingNextPage : isFailed && isFetching,
+      retry,
+      status,
+    }),
+    [error, isFailed, isFetching, isFetchingNextPage, retry, status]
+  );
 
   return {
     boards,
+    boardsState,
     filter,
     hasMore,
-    isLoadingItems: isFetching,
     isWindowTruncated,
     items,
+    listing,
     loadMore,
-    queryError,
+    previousScopeItems,
     selectedBoardId: boardId,
     total,
   };

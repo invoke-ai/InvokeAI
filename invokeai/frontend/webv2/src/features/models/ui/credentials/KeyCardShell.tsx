@@ -50,16 +50,16 @@ export const KeyCardShell = ({
       </Flex>
       <Stack flex="1" gap="0" minW="0">
         <HStack gap="1.5">
-          <Text fontSize="xs" fontWeight="700" truncate>
+          <Text fontSize="md" fontWeight="700" truncate>
             {title}
           </Text>
           {status ? (
-            <Badge colorPalette={status.palette} flexShrink={0} fontSize="2xs" size="sm" variant="surface">
+            <Badge colorPalette={status.palette} flexShrink={0} fontSize="xs" size="lg" variant="surface">
               {status.label}
             </Badge>
           ) : null}
         </HStack>
-        <Text color="fg.subtle" fontSize="2xs" lineClamp={2}>
+        <Text color="fg.subtle" fontSize="xs" lineClamp={2}>
           {description}
         </Text>
       </Stack>

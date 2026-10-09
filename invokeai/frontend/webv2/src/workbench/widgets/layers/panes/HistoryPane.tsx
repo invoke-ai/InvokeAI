@@ -20,7 +20,7 @@ export const HistoryPane = () => {
 
   if (!engine) {
     return (
-      <Flex align="center" color="fg.muted" fontSize="xs" h="full" justify="center" p="4">
+      <Flex align="center" color="fg.muted" fontSize="md" h="full" justify="center" p="4">
         {t('widgets.properties.noCanvas')}
       </Flex>
     );
@@ -46,7 +46,7 @@ const ConnectedHistory = ({ engine }: { engine: CanvasEngineHandle }) => {
             aria-label={t('widgets.canvas.commands.undo')}
             color="fg.muted"
             disabled={!canUndo}
-            size="2xs"
+            size="sm"
             variant="ghost"
             onClick={undo}
           >
@@ -58,19 +58,19 @@ const ConnectedHistory = ({ engine }: { engine: CanvasEngineHandle }) => {
             aria-label={t('widgets.canvas.commands.redo')}
             color="fg.muted"
             disabled={!canRedo}
-            size="2xs"
+            size="sm"
             variant="ghost"
             onClick={redo}
           >
             <Icon as={Redo2Icon} boxSize="3.5" />
           </IconButton>
         </Tooltip>
-        <Text color="fg.muted" fontSize="2xs" fontVariantNumeric="tabular-nums">
+        <Text color="fg.muted" fontSize="xs" fontVariantNumeric="tabular-nums">
           {t('widgets.layers.historyPane.count', { count: past.length })}
         </Text>
       </HStack>
       {past.length === 0 && future.length === 0 ? (
-        <Flex align="center" color="fg.muted" flex="1" fontSize="xs" justify="center" p="4">
+        <Flex align="center" color="fg.muted" flex="1" fontSize="md" justify="center" p="4">
           {t('widgets.layers.historyPane.empty')}
         </Flex>
       ) : (
@@ -133,7 +133,7 @@ const HistoryStep = ({
         color={isCurrent ? 'fg' : 'fg.muted'}
         fontStyle={isFuture ? 'italic' : undefined}
         flex="1"
-        fontSize="xs"
+        fontSize="md"
         minH="6"
         px="2"
         py="1"

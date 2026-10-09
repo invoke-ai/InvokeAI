@@ -106,6 +106,41 @@ describe('cancelScopedQueueItems', () => {
   });
 });
 
+describe('scoped clears', () => {
+  // More than the read model's recent window: a clear must handle the whole scope, not its newest page.
+  const scopeIds = Array.from({ length: 120 }, (_, index) => 120 - index);
+
+  beforeEach(() => {
+    accountLifecycle.activate('user-a');
+    transport.apiFetchJson.mockReset();
+    transport.apiFetchJson.mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes('/item_ids')) {
+        return Promise.resolve({ item_ids: scopeIds, total_count: scopeIds.length });
+      }
+      if (url.endsWith('/items_by_ids')) {
+        const { item_ids: itemIds } = JSON.parse(String(init?.body)) as { item_ids: number[] };
+        return Promise.resolve(itemIds.map((itemId) => ({ item_id: itemId, status: 'failed' })));
+      }
+      return Promise.resolve({});
+    });
+  });
+
+  it.each([
+    { clear: clearFailedQueueItems, name: 'clear failed' },
+    { clear: clearScopedQueue, name: 'clear scoped' },
+  ])('$name reads every id in the scope, without a limit, and deletes each one', async ({ clear }) => {
+    await clear({ originPrefix: 'webv2:p:a:' });
+
+    const urls = requestedUrls();
+    expect(urls.filter((url) => url.includes('/item_ids'))).toEqual([
+      '/api/v1/queue/default/item_ids?order_dir=DESC&origin_prefix=webv2%3Ap%3Aa%3A',
+    ]);
+    expect(urls.filter((url) => /\/i\/\d+$/.test(url)).sort()).toEqual(
+      scopeIds.map((itemId) => `/api/v1/queue/default/i/${String(itemId)}`).sort()
+    );
+  });
+});
+
 describe('getQueueItemsByIds', () => {
   beforeEach(() => {
     transport.apiFetchJson.mockReset();

@@ -201,7 +201,9 @@ class ModelOnDisk:
                 checkpoint = torch.load(path, map_location="meta")
                 assert isinstance(checkpoint, dict)
             elif path.suffix.endswith(".gguf"):
-                checkpoint = gguf_sd_loader(path, compute_dtype=torch.float32)
+                # Identification reads shapes and never builds a module. Whether a Q8_CR file's quantization
+                # is supported is decided from its metadata by `ModelConfigFactory`, once, not per candidate.
+                checkpoint = gguf_sd_loader(path, compute_dtype=torch.float32, q8_cr="ignore")
             elif path.suffix.endswith(".safetensors"):
                 if _is_sdnq_safetensors(path):
                     checkpoint = sdnq_sd_loader(path, compute_dtype=torch.float32)

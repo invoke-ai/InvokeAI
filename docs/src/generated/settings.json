@@ -127,6 +127,17 @@
     },
     {
       "category": "MISC FEATURES",
+      "default": true,
+      "description": "Show the Donate to InvokeAI link in the frontend menus.",
+      "env_var": "INVOKEAI_SHOW_DONATION_LINK",
+      "literal_values": [],
+      "name": "show_donation_link",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "MISC FEATURES",
       "default": false,
       "description": "Enable logging of parsed prompt tokens.",
       "env_var": "INVOKEAI_LOG_TOKENIZATION",
@@ -522,6 +533,28 @@
       "env_var": "INVOKEAI_KEEP_RAM_COPY_OF_WEIGHTS",
       "literal_values": [],
       "name": "keep_ram_copy_of_weights",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "CACHE",
+      "default": true,
+      "description": "When a session uses main models of another architecture than the previous one on the same GPU, move every model it does not use from VRAM to RAM before it runs. Models both sessions use stay. Switching back reloads the moved models from RAM, which costs a few seconds per switch when both architectures would have fit in VRAM together; turn this off if you alternate between such models.",
+      "env_var": "INVOKEAI_OFFLOAD_ON_ARCHITECTURE_SWITCH",
+      "literal_values": [],
+      "name": "offload_on_architecture_switch",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "CACHE",
+      "default": false,
+      "description": "After every queue item (each image of a batch), move the models held in VRAM to RAM and return the freed memory to the GPU driver. The models stay cached in RAM; the next item reloads them from there, which costs a few seconds (more with keep_ram_copy_of_weights off). Changes nothing where VRAM is system memory (CPU, MPS, integrated GPUs). Turn this on if a generation that runs fine the first time runs out of memory, or slows down sharply because the GPU spills into shared memory, when it is repeated.",
+      "env_var": "INVOKEAI_CLEAR_VRAM_AFTER_SESSION",
+      "literal_values": [],
+      "name": "clear_vram_after_session",
       "required": false,
       "type": "<class 'bool'>",
       "validation": {}
@@ -1034,6 +1067,28 @@
       "env_var": "INVOKEAI_EXTERNAL_ALIBABACLOUD_BASE_URL",
       "literal_values": [],
       "name": "external_alibabacloud_base_url",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "EXTERNAL PROVIDERS",
+      "default": null,
+      "description": "API key for Atlas Cloud image generation.",
+      "env_var": "INVOKEAI_EXTERNAL_ATLASCLOUD_API_KEY",
+      "literal_values": [],
+      "name": "external_atlascloud_api_key",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "EXTERNAL PROVIDERS",
+      "default": null,
+      "description": "Base URL override for Atlas Cloud image generation.",
+      "env_var": "INVOKEAI_EXTERNAL_ATLASCLOUD_BASE_URL",
+      "literal_values": [],
+      "name": "external_atlascloud_base_url",
       "required": false,
       "type": "typing.Optional[str]",
       "validation": {}

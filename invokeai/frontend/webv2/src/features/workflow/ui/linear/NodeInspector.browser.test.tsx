@@ -149,7 +149,6 @@ const createAdapter = (nodeExecution: WorkflowUiAdapter['nodeExecution']): Workf
     },
     preferences: { getSnapshot: () => ({}), subscribe: () => () => {} },
     project: { getSnapshot: () => projectSnapshot, subscribe: () => () => {} },
-    registerModalHotkeyLayer: vi.fn(() => vi.fn()),
     widgets: { open: vi.fn(), patchValues: vi.fn() },
   }) as unknown as WorkflowUiAdapter;
 

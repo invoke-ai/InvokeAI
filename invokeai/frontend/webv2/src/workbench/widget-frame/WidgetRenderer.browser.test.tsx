@@ -7,10 +7,10 @@ import type {
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type * as workbenchContext from '@workbench/WorkbenchContext';
 
-import { ChakraProvider, Stack, Text } from '@chakra-ui/react';
+import { Box, ChakraProvider, Stack, Text } from '@chakra-ui/react';
 import { StatusWidgetChip } from '@platform/ui';
 import { system } from '@theme/system';
-import { FocusRegionProvider } from '@workbench/focusRegions';
+import { FocusRegionProvider, useFocusRegionProps } from '@workbench/focusRegions';
 import { createTestFocusController } from '@workbench/focusRegions.testing';
 import { createWidgetImplementationResource } from '@workbench/widgetImplementationResource';
 import i18next from 'i18next';
@@ -19,6 +19,7 @@ import { act, type ReactNode, type SVGProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 const workbenchMocks = vi.hoisted(() => ({
   project: {
@@ -88,12 +89,14 @@ await i18n.use(initReactI18next).init({
 
 const TestIcon = (props: SVGProps<SVGSVGElement>) => <svg {...props} />;
 const TestView = () => <div data-testid="loaded" />;
+const FocusableView = () => <button type="button">Loaded control</button>;
+const CenterFrame = ({ children }: { children: ReactNode }) => <Box {...useFocusRegionProps('center')}>{children}</Box>;
 const TooltipView = () => (
   <Stack data-testid="loaded" gap="2">
-    <Text data-widget-identity-label="" fontSize="xs" fontWeight="700">
+    <Text data-widget-identity-label="" fontSize="md" fontWeight="700">
       Test widget
     </Text>
-    <Text color="fg.subtle" fontSize="2xs">
+    <Text color="fg.subtle" fontSize="xs">
       Ready
     </Text>
   </Stack>
@@ -104,7 +107,7 @@ const CompactView = () => (
   </StatusWidgetChip>
 );
 const CustomHeaderLabel = () => (
-  <Text data-widget-identity-label="" fontSize="xs" fontWeight="700">
+  <Text data-widget-identity-label="" fontSize="md" fontWeight="700">
     Custom widget label
   </Text>
 );
@@ -217,6 +220,39 @@ afterEach(async () => {
 });
 
 describe('WidgetRenderer loading identity transitions', () => {
+  it.each(['left', 'center'] as const)(
+    'keeps %s navigation focus when a lazy view replaces its fallback',
+    async (region) => {
+      const { resolve, widget } = createDeferredWidget();
+      widget.manifest.chrome = { header: 'hidden' };
+      const view = <WidgetRenderer instance={createInstance()} region={region} widget={widget} />;
+      await render(
+        <>
+          <button type="button">Opener</button>
+          {region === 'center' ? <CenterFrame>{view}</CenterFrame> : view}
+        </>
+      );
+      const opener = host!.querySelector('button')!;
+      opener.focus();
+      focusController.focusRegion(region, undefined, 'test-instance');
+      await act(async () => {
+        await new Promise(requestAnimationFrame);
+        await new Promise(requestAnimationFrame);
+      });
+      // A replaceable side fallback must not take focus; center has a persistent owning frame.
+      if (region === 'left') {
+        expect(document.activeElement).toBe(opener);
+      } else {
+        expect(document.activeElement).toBe(host!.querySelector('[data-focus-region="center"]'));
+      }
+      await resolve({ view: FocusableView });
+      await expect.poll(() => host?.textContent).toContain('Loaded control');
+      await expect.poll(() => document.activeElement).toBe(host!.querySelector(`[data-focus-region="${region}"]`));
+      await act(() => userEvent.keyboard('{Tab}'));
+      expect(document.activeElement?.textContent).toBe('Loaded control');
+    }
+  );
+
   // Center and right docks own separate chrome; identity slots belong in left/bottom panel frames.
   it('swaps spinner for icon without moving a renamed standard header', async () => {
     const { resolve, widget } = createDeferredWidget();

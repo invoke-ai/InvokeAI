@@ -39,7 +39,7 @@ export const FieldDescriptionPopover = ({
           aria-label="Edit field description"
           className="nodrag"
           color={description ? 'accent.solid' : 'fg.subtle'}
-          size="2xs"
+          size="sm"
           title="Edit field description"
           variant="ghost"
         >
@@ -51,17 +51,16 @@ export const FieldDescriptionPopover = ({
           <PopoverContent w="18rem">
             <Popover.Body p="2">
               <Stack gap="1">
-                <Text color="fg.subtle" fontSize="2xs" lineHeight={1.3}>
+                <Text color="fg.subtle" fontSize="xs" lineHeight={1.3}>
                   Field description — overrides the node's default. Clear to restore it.
                 </Text>
                 <Textarea
                   aria-label="Field description"
                   className="nodrag nowheel"
-                  fontSize="2xs"
+                  fontSize="xs"
                   minH="4rem"
                   placeholder={templateDescription || 'Describe this field…'}
                   resize="vertical"
-                  size="xs"
                   value={description ?? ''}
                   onChange={onDescriptionChange}
                 />

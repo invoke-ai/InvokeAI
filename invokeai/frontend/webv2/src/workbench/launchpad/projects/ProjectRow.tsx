@@ -65,9 +65,9 @@ export const ProjectRow = ({
         <ProjectCover coverUrl={summary.coverUrl} />
       </Box>
       <Flex flex="1" gap="3" minW="0" pointerEvents="none">
-        <MiddleTruncate flex="1" fontSize="xs" fontWeight="600" minW="0" text={summary.name} />
+        <MiddleTruncate flex="1" fontSize="md" fontWeight="600" minW="0" text={summary.name} />
         <ProjectCompatibilityBadge summary={summary} />
-        <Text color="fg.muted" flexShrink={0} fontSize="2xs">
+        <Text color="fg.muted" flexShrink={0} fontSize="xs">
           {t('projects.editedRelative', { time: formatRelativeTime(summary.updatedAt) })}
         </Text>
       </Flex>
@@ -77,7 +77,7 @@ export const ProjectRow = ({
           aria-pressed={isPinned}
           color={isPinned ? 'fg' : 'fg.muted'}
           opacity={isPinned ? 1 : 0}
-          size="2xs"
+          size="sm"
           title={isPinned ? t('projects.unpin') : t('projects.pin')}
           variant="ghost"
           _focusVisible={REVEAL_ON_HOVER}
@@ -91,7 +91,7 @@ export const ProjectRow = ({
           aria-haspopup="menu"
           aria-label={t('common.actions')}
           color="fg.muted"
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={menuTrigger.onClick}
           onPointerDown={menuTrigger.onPointerDown}

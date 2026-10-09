@@ -1,5 +1,37 @@
+import type { SystemStyleObject } from '@chakra-ui/react';
+
 import { defineRecipe, defineSlotRecipe } from '@chakra-ui/react';
-import { recipes as chakraRecipes, slotRecipes as chakraSlotRecipes } from '@chakra-ui/react/theme';
+
+import { recipes as chakraRecipes, slotRecipes as chakraSlotRecipes } from './rebase';
+import { CONTROL_HEIGHT_PX, type ControlSize } from './scale';
+
+const CONTROL_SIZES = Object.keys(CONTROL_HEIGHT_PX) as ControlSize[];
+
+type SlotStyles = Partial<Record<string, SystemStyleObject>>;
+
+/** The renamed stock step each control size takes padding and text from; heights always come from the scale. */
+const CONTROL_BASIS: Record<ControlSize, string> = {
+  xs: 'md',
+  sm: 'md',
+  md: 'md',
+  lg: 'lg',
+  xl: 'xl',
+  '2xl': 'xl',
+  '3xl': '3xl',
+};
+
+/**
+ * Builds every control size from the stock steps, so same-named sizes align across control recipes. A recipe without
+ * the basis step (select has no stock 3xl) takes its xl.
+ */
+const controlSizes = <T>(
+  stock: Record<string, T> | undefined,
+  build: (styles: T | undefined, height: string, size: ControlSize) => T,
+  basis: Record<ControlSize, string> = CONTROL_BASIS
+) =>
+  Object.fromEntries(
+    CONTROL_SIZES.map((size) => [size, build(stock?.[basis[size]] ?? stock?.xl, `{sizes.control.${size}}`, size)])
+  );
 
 /** Extend the tooltip recipe; replacing it drops arrow size/background variables. */
 export const tooltipSlotRecipe = defineSlotRecipe({
@@ -21,6 +53,14 @@ export const tooltipSlotRecipe = defineSlotRecipe({
     arrowTip: {
       ...chakraSlotRecipes.tooltip.base?.arrowTip,
       borderColor: 'border.emphasized',
+    },
+    positioner: {
+      ...chakraSlotRecipes.tooltip.base?.positioner,
+      // Zag translates the positioner by `--x`/`--y`, which it sets inline a frame after opening. Unset, they leave it
+      // at the page's origin, where a tooltip closed within that frame (focus, then a click that disables the trigger)
+      // would fade out. Default off-screen, as Zag does for a positioner with no placement.
+      '--x': '0px',
+      '--y': '-100vh',
     },
   },
 });
@@ -79,8 +119,24 @@ export const toastSlotRecipe = defineSlotRecipe({
     ...chakraSlotRecipes.toast.base,
     root: {
       ...chakraSlotRecipes.toast.base?.root,
-      '&[data-type=success]': { ...chakraSlotRecipes.toast.base?.root?.['&[data-type=success]'], bg: 'green.700' },
-      '&[data-type=warning]': { ...chakraSlotRecipes.toast.base?.root?.['&[data-type=warning]'], bg: 'orange.700' },
+      // Chakra's `*.contrast` text is black on these fills in dark color modes; the 700 steps need white. Its
+      // lightening trigger hover drops white text below AA on red, so status toasts darken on hover instead.
+      '&[data-type=error]': {
+        ...chakraSlotRecipes.toast.base?.root?.['&[data-type=error]'],
+        '--toast-trigger-bg': '{black/20}',
+      },
+      '&[data-type=success]': {
+        ...chakraSlotRecipes.toast.base?.root?.['&[data-type=success]'],
+        bg: 'green.700',
+        color: 'white',
+        '--toast-trigger-bg': '{black/20}',
+      },
+      '&[data-type=warning]': {
+        ...chakraSlotRecipes.toast.base?.root?.['&[data-type=warning]'],
+        bg: 'orange.700',
+        color: 'white',
+        '--toast-trigger-bg': '{black/20}',
+      },
     },
     description: { ...chakraSlotRecipes.toast.base?.description, opacity: 1 },
   },
@@ -100,20 +156,20 @@ export const tabsSlotRecipe = defineSlotRecipe({
     ...chakraSlotRecipes.tabs.variants,
     size: {
       ...chakraSlotRecipes.tabs.variants?.size,
-      xs: {
+      lg: {
         root: {
-          '--tabs-height': 'sizes.8',
+          '--tabs-height': '{sizes.control.lg}',
           '--tabs-content-padding': 'spacing.2.5',
         },
-        trigger: { px: '2.5', py: '0.5', textStyle: 'xs' },
+        trigger: { px: '2.5', py: '0.5', textStyle: 'md' },
       },
-      sm: {
-        ...chakraSlotRecipes.tabs.variants?.size?.sm,
-        trigger: { ...chakraSlotRecipes.tabs.variants?.size?.sm?.trigger, textStyle: 'xs' },
+      xl: {
+        ...chakraSlotRecipes.tabs.variants?.size?.xl,
+        trigger: { ...chakraSlotRecipes.tabs.variants?.size?.xl?.trigger, textStyle: 'md' },
       },
-      md: {
-        ...chakraSlotRecipes.tabs.variants?.size?.md,
-        trigger: { ...chakraSlotRecipes.tabs.variants?.size?.md?.trigger, textStyle: 'xs' },
+      '2xl': {
+        ...chakraSlotRecipes.tabs.variants?.size?.['2xl'],
+        trigger: { ...chakraSlotRecipes.tabs.variants?.size?.['2xl']?.trigger, textStyle: 'md' },
       },
     },
     variant: {
@@ -144,7 +200,7 @@ export const tabsSlotRecipe = defineSlotRecipe({
         trigger: {
           ...chakraSlotRecipes.tabs.variants?.variant?.enclosed?.trigger,
           _hover: {
-            '&:not([data-selected])': { bg: 'bg.emphasized' },
+            '&:not([data-selected])': { bg: 'bg.hover' },
           },
         },
       },
@@ -173,6 +229,15 @@ export const tabsSlotRecipe = defineSlotRecipe({
   } as unknown as typeof chakraSlotRecipes.tabs.variants,
 });
 
+/** Buttons keep their stock 2xs styles (renamed sm) for the two smallest steps. */
+const BUTTON_BASIS: Record<ControlSize, string> = { ...CONTROL_BASIS, xs: 'sm', sm: 'sm' };
+
+const BUTTON_SIZE_TWEAKS: Partial<Record<ControlSize, SystemStyleObject>> = {
+  xs: { px: '1.5', _icon: { height: '3', width: '3' } },
+  lg: { px: '3', textStyle: 'md' },
+  xl: { textStyle: 'md' },
+};
+
 export const buttonRecipe = defineRecipe({
   ...chakraRecipes.button,
   base: {
@@ -183,13 +248,12 @@ export const buttonRecipe = defineRecipe({
   },
   variants: {
     ...chakraRecipes.button.variants,
-    // Align xs button height with segment tabs.
-    size: {
-      ...chakraRecipes.button.variants?.size,
-      xs: { ...chakraRecipes.button.variants?.size?.xs, h: '7', minW: '7' },
-      sm: { ...chakraRecipes.button.variants?.size?.sm, h: '8', minW: '8', px: '3', textStyle: 'xs' },
-      md: { ...chakraRecipes.button.variants?.size?.md, h: '9', minW: '9', textStyle: 'xs' },
-    },
+    // Heights come from the shared scale, so a button aligns with same-sized inputs, selects, and segment tabs.
+    size: controlSizes<SystemStyleObject>(
+      chakraRecipes.button.variants?.size,
+      (styles, height, size) => ({ ...styles, h: height, minW: height, ...BUTTON_SIZE_TWEAKS[size] }),
+      BUTTON_BASIS
+    ),
     variant: {
       ...chakraRecipes.button.variants?.variant,
       // Use translucent hover tint because solid subtle fills disappear on matching surfaces.
@@ -218,6 +282,19 @@ export const buttonRecipe = defineRecipe({
     },
   } as unknown as typeof chakraRecipes.button.variants,
 });
+
+/**
+ * Stock segment groups skip xl; the larger steps take the renamed stock 2xl and 3xl. Those two now subtract the root
+ * border like every other step (stock did not), so they are 2px shorter than stock but align with same-sized buttons.
+ */
+const SEGMENT_BASIS: Record<ControlSize, string> = { ...CONTROL_BASIS, xl: 'lg', '2xl': '2xl' };
+
+const SEGMENT_SIZE_TWEAKS: Partial<Record<ControlSize, SystemStyleObject>> = {
+  xs: { px: '1.5' },
+  sm: { px: '2' },
+  md: { px: '2.5' },
+  lg: { px: '3.5', textStyle: 'md' },
+};
 
 export const segmentGroupSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.segmentGroup,
@@ -266,38 +343,14 @@ export const segmentGroupSlotRecipe = defineSlotRecipe({
   variants: {
     ...chakraSlotRecipes.segmentGroup.variants,
     // Subtract root borders from same-size button heights so segment controls align with neighboring buttons.
-    size: {
-      ...chakraSlotRecipes.segmentGroup.variants?.size,
-      // Chakra has no 2xs segment group; derive it from xs styles.
-      '2xs': {
-        item: {
-          ...chakraSlotRecipes.segmentGroup.variants?.size?.xs?.item,
-          height: 'calc({sizes.6} - 2px)',
-          px: '2',
-          textStyle: 'xs',
-        },
-      },
-      xs: {
-        item: {
-          ...chakraSlotRecipes.segmentGroup.variants?.size?.xs?.item,
-          height: 'calc({sizes.7} - 2px)',
-          px: '2.5',
-        },
-      },
-      sm: {
-        item: {
-          ...chakraSlotRecipes.segmentGroup.variants?.size?.sm?.item,
-          height: 'calc({sizes.8} - 2px)',
-          px: '3.5',
-          textStyle: 'xs',
-        },
-      },
-    },
+    size: controlSizes<SlotStyles>(
+      chakraSlotRecipes.segmentGroup.variants?.size,
+      (styles, height, size) => ({
+        item: { ...styles?.item, height: `calc(${height} - 2px)`, ...SEGMENT_SIZE_TWEAKS[size] },
+      }),
+      SEGMENT_BASIS
+    ),
   } as unknown as typeof chakraSlotRecipes.segmentGroup.variants,
-  defaultVariants: {
-    ...chakraSlotRecipes.segmentGroup.defaultVariants,
-    size: 'xs',
-  },
 });
 
 const formControlFocused = {
@@ -361,13 +414,10 @@ export const inputRecipe = defineRecipe({
   ...chakraRecipes.input,
   variants: {
     ...chakraRecipes.input.variants,
-    // Keep same-named input, select, combobox, and button sizes aligned.
-    size: {
-      ...chakraRecipes.input.variants?.size,
-      xs: { ...chakraRecipes.input.variants?.size?.xs, '--input-height': 'sizes.7' },
-      sm: { ...chakraRecipes.input.variants?.size?.sm, '--input-height': 'sizes.8' },
-      md: { ...chakraRecipes.input.variants?.size?.md, '--input-height': 'sizes.9' },
-    },
+    size: controlSizes<SystemStyleObject>(chakraRecipes.input.variants?.size, (styles, height) => ({
+      ...styles,
+      '--input-height': height,
+    })),
     variant: {
       ...chakraRecipes.input.variants?.variant,
       outline: { ...chakraRecipes.input.variants?.variant?.outline, ...formControlNoFocusRing },
@@ -400,21 +450,10 @@ export const numberInputSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.numberInput,
   variants: {
     ...chakraSlotRecipes.numberInput.variants,
-    size: {
-      ...chakraSlotRecipes.numberInput.variants?.size,
-      xs: {
-        ...chakraSlotRecipes.numberInput.variants?.size?.xs,
-        input: { ...chakraSlotRecipes.numberInput.variants?.size?.xs?.input, '--input-height': 'sizes.7' },
-      },
-      sm: {
-        ...chakraSlotRecipes.numberInput.variants?.size?.sm,
-        input: { ...chakraSlotRecipes.numberInput.variants?.size?.sm?.input, '--input-height': 'sizes.8' },
-      },
-      md: {
-        ...chakraSlotRecipes.numberInput.variants?.size?.md,
-        input: { ...chakraSlotRecipes.numberInput.variants?.size?.md?.input, '--input-height': 'sizes.9' },
-      },
-    },
+    size: controlSizes<SlotStyles>(chakraSlotRecipes.numberInput.variants?.size, (styles, height) => ({
+      ...styles,
+      input: { ...styles?.input, '--input-height': height },
+    })),
     variant: {
       ...chakraSlotRecipes.numberInput.variants?.variant,
       outline: {
@@ -459,8 +498,8 @@ export const dropdownItem = {
     _highlighted: { bg: 'bg.error' },
     _hover: { bg: 'bg.error' },
   },
-  _highlighted: { bg: 'bg.emphasized' },
-  _hover: { bg: 'bg.emphasized' },
+  _highlighted: { bg: 'bg.hover' },
+  _hover: { bg: 'bg.hover' },
   _focusVisible: {
     outline: '2px solid',
     outlineColor: 'accent.solid',
@@ -470,7 +509,7 @@ export const dropdownItem = {
 
 export const dropdownGroupLabel = {
   color: 'fg.subtle',
-  fontSize: '2xs',
+  fontSize: 'xs',
   fontWeight: '600',
   letterSpacing: '0.02em',
   lineHeight: 'shorter',
@@ -499,10 +538,6 @@ export const menuSlotRecipe = defineSlotRecipe({
       bg: 'border.subtle',
     },
   },
-  defaultVariants: {
-    ...chakraSlotRecipes.menu.defaultVariants,
-    size: 'sm',
-  },
 });
 
 export const selectSlotRecipe = defineSlotRecipe({
@@ -511,21 +546,10 @@ export const selectSlotRecipe = defineSlotRecipe({
   // in the cast.
   variants: {
     ...chakraSlotRecipes.select.variants,
-    size: {
-      ...chakraSlotRecipes.select.variants?.size,
-      xs: {
-        ...chakraSlotRecipes.select.variants?.size?.xs,
-        root: { ...chakraSlotRecipes.select.variants?.size?.xs?.root, '--select-trigger-height': 'sizes.7' },
-      },
-      sm: {
-        ...chakraSlotRecipes.select.variants?.size?.sm,
-        root: { ...chakraSlotRecipes.select.variants?.size?.sm?.root, '--select-trigger-height': 'sizes.8' },
-      },
-      md: {
-        ...chakraSlotRecipes.select.variants?.size?.md,
-        root: { ...chakraSlotRecipes.select.variants?.size?.md?.root, '--select-trigger-height': 'sizes.9' },
-      },
-    },
+    size: controlSizes<SlotStyles>(chakraSlotRecipes.select.variants?.size, (styles, height) => ({
+      ...styles,
+      root: { ...styles?.root, '--select-trigger-height': height },
+    })),
     variant: {
       ...chakraSlotRecipes.select.variants?.variant,
       outline: {
@@ -571,21 +595,10 @@ export const comboboxSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.combobox,
   variants: {
     ...chakraSlotRecipes.combobox.variants,
-    size: {
-      ...chakraSlotRecipes.combobox.variants?.size,
-      xs: {
-        ...chakraSlotRecipes.combobox.variants?.size?.xs,
-        root: { ...chakraSlotRecipes.combobox.variants?.size?.xs?.root, '--combobox-input-height': 'sizes.7' },
-      },
-      sm: {
-        ...chakraSlotRecipes.combobox.variants?.size?.sm,
-        root: { ...chakraSlotRecipes.combobox.variants?.size?.sm?.root, '--combobox-input-height': 'sizes.8' },
-      },
-      md: {
-        ...chakraSlotRecipes.combobox.variants?.size?.md,
-        root: { ...chakraSlotRecipes.combobox.variants?.size?.md?.root, '--combobox-input-height': 'sizes.9' },
-      },
-    },
+    size: controlSizes<SlotStyles>(chakraSlotRecipes.combobox.variants?.size, (styles, height) => ({
+      ...styles,
+      root: { ...styles?.root, '--combobox-input-height': height },
+    })),
     variant: {
       ...chakraSlotRecipes.combobox.variants?.variant,
       outline: {
@@ -668,12 +681,12 @@ export const dialogSlotRecipe = defineSlotRecipe({
     title: {
       ...chakraSlotRecipes.dialog.base?.title,
       fontWeight: '700',
-      textStyle: 'xs',
+      textStyle: 'md',
     },
     description: {
       ...chakraSlotRecipes.dialog.base?.description,
       color: 'fg.subtle',
-      textStyle: 'xs',
+      textStyle: 'md',
     },
     closeTrigger: {
       ...chakraSlotRecipes.dialog.base?.closeTrigger,
@@ -718,23 +731,23 @@ export const sliderSlotRecipe = defineSlotRecipe({
     size: {
       // Fine pointers use smaller thumbs. Update marker center with thumb size and zero marker inset because Zag
       // already applies half-thumb offsets.
+      xl: {
+        root: {
+          ...chakraSlotRecipes.slider.variants?.size?.xl?.root,
+          '--slider-marker-inset': '0px',
+          '@media (pointer: fine)': { '--slider-marker-center': '4px', '--slider-thumb-size': 'sizes.3.5' },
+        },
+      },
       lg: {
         root: {
           ...chakraSlotRecipes.slider.variants?.size?.lg?.root,
           '--slider-marker-inset': '0px',
-          '@media (pointer: fine)': { '--slider-marker-center': '4px', '--slider-thumb-size': 'sizes.3.5' },
+          '@media (pointer: fine)': { '--slider-marker-center': '4px', '--slider-thumb-size': 'sizes.3' },
         },
       },
       md: {
         root: {
           ...chakraSlotRecipes.slider.variants?.size?.md?.root,
-          '--slider-marker-inset': '0px',
-          '@media (pointer: fine)': { '--slider-marker-center': '4px', '--slider-thumb-size': 'sizes.3' },
-        },
-      },
-      sm: {
-        root: {
-          ...chakraSlotRecipes.slider.variants?.size?.sm?.root,
           '--slider-marker-inset': '0px',
           '@media (pointer: fine)': { '--slider-marker-center': '3px', '--slider-thumb-size': 'sizes.2.5' },
         },
@@ -749,22 +762,22 @@ export const progressCircleSlotRecipe = defineSlotRecipe({
     ...chakraSlotRecipes.progressCircle.variants,
     size: {
       ...chakraSlotRecipes.progressCircle.variants?.size,
-      '2xs': {
+      sm: {
         circle: {
           '--size': '16px',
           '--thickness': '3px',
         },
         valueText: {
-          textStyle: '2xs',
+          textStyle: 'xs',
         },
       },
-      '3xs': {
+      xs: {
         circle: {
           '--size': '14px',
           '--thickness': '2px',
         },
         valueText: {
-          textStyle: '2xs',
+          textStyle: 'xs',
         },
       },
     },
@@ -829,16 +842,12 @@ export const colorPickerSlotRecipe = defineSlotRecipe({
     channelText: {
       ...chakraSlotRecipes.colorPicker.base?.channelText,
       color: 'fg.subtle',
-      textStyle: '2xs',
+      textStyle: 'xs',
     },
     transparencyGrid: {
       ...chakraSlotRecipes.colorPicker.base?.transparencyGrid,
       borderRadius: 'inherit',
     },
-  },
-  defaultVariants: {
-    ...chakraSlotRecipes.colorPicker.defaultVariants,
-    size: 'xs',
   },
 });
 
@@ -900,14 +909,17 @@ const rowFocusRing = {
   outlineOffset: '-2px',
 } as const;
 
+/** Hover, extended to a row whose context menu is open so the row it acts on stays marked. */
+const ROW_POINTED = '&:is(:hover, [data-hover], [data-menu-open]):not(:disabled, [data-disabled], [data-static])';
+
 /** One row surface for every list-like control; `Row` and `ListItem` both build on it. */
 const rowSurface = {
   borderRadius: 'sm',
   textAlign: 'start',
   transition: 'background var(--wb-motion-duration-fast) ease, color var(--wb-motion-duration-fast) ease',
   w: 'full',
-  // Keep hover below selected emphasis so pointing does not resemble selection.
-  _hover: { bg: 'bg.muted/60' },
+  // Keep the pointed fill below selected emphasis so pointing does not resemble selection.
+  [ROW_POINTED]: { bg: 'bg.hover' },
   _disabled: { cursor: 'not-allowed', opacity: 0.5 },
 } as const;
 
@@ -915,17 +927,17 @@ const rowSurface = {
 const rowTones = {
   none: {},
   muted: { bg: 'bg.muted' },
-  selected: { bg: 'bg.emphasized/60', _hover: { bg: 'bg.emphasized/60' } },
-  emphasized: { bg: 'bg.emphasized', _hover: { bg: 'bg.emphasized' } },
+  selected: { bg: 'bg.emphasized/60', [ROW_POINTED]: { bg: 'bg.emphasized/60' } },
+  emphasized: { bg: 'bg.emphasized', [ROW_POINTED]: { bg: 'bg.emphasized' } },
   brand: {
     bg: 'brand.subtle',
     color: 'brand.fg',
-    _hover: { bg: 'brand.subtle' },
+    [ROW_POINTED]: { bg: 'brand.subtle' },
   },
   accent: {
     bg: 'accent.solid',
     color: 'accent.contrast',
-    _hover: { bg: 'accent.solid' },
+    [ROW_POINTED]: { bg: 'accent.solid' },
   },
 } as const;
 
@@ -948,19 +960,31 @@ export const rowRecipe = defineRecipe({
  * the button has focus; the accent tone recolors muted text so it stays legible on the solid fill.
  */
 export const listItemSlotRecipe = defineSlotRecipe({
-  slots: ['root', 'check', 'primary', 'body', 'titleLine', 'title', 'badges', 'description', 'trailing', 'actions'],
+  slots: [
+    'root',
+    'check',
+    'primary',
+    'body',
+    'titleLine',
+    'title',
+    'badges',
+    'description',
+    'trailing',
+    'actions',
+    'detail',
+  ],
   base: {
     root: {
       ...rowSurface,
       alignItems: 'stretch',
       display: 'flex',
+      // Lets `detail` take its own line under the row.
+      flexWrap: 'wrap',
       minW: 0,
       position: 'relative',
       '&:has([data-list-primary]:focus-visible)': rowFocusRing,
       // Rows of a page being replaced stay readable; only the pointer says the list is working.
       '&[data-busy]': { cursor: 'progress' },
-      // Nothing to press: pointing must not look like an affordance.
-      '&[data-static]:hover': { bg: 'transparent' },
     },
     check: {
       alignItems: 'center',
@@ -996,7 +1020,7 @@ export const listItemSlotRecipe = defineSlotRecipe({
       minW: 0,
     },
     title: {
-      fontSize: 'xs',
+      fontSize: 'md',
       fontWeight: '600',
       lineHeight: 'shorter',
     },
@@ -1008,7 +1032,7 @@ export const listItemSlotRecipe = defineSlotRecipe({
     },
     description: {
       color: 'fg.muted',
-      fontSize: '2xs',
+      fontSize: 'xs',
       lineHeight: 'shorter',
       minW: 0,
     },
@@ -1017,7 +1041,7 @@ export const listItemSlotRecipe = defineSlotRecipe({
       color: 'fg.muted',
       display: 'flex',
       flexShrink: 0,
-      fontSize: '2xs',
+      fontSize: 'xs',
       gap: '1.5',
     },
     // Controls beside the primary button, never inside it.
@@ -1027,6 +1051,13 @@ export const listItemSlotRecipe = defineSlotRecipe({
       flexShrink: 0,
       gap: '0.5',
       pe: '1',
+    },
+    // Row-owned content on its own line, inset to the primary button's text.
+    detail: {
+      flexBasis: '100%',
+      minW: 0,
+      pb: '2',
+      px: '2',
     },
   },
   variants: {
@@ -1052,6 +1083,12 @@ export const listItemSlotRecipe = defineSlotRecipe({
         root: { minH: '13' },
         primary: { gap: '2.5', px: '2', py: '1.5' },
       },
+      // Comfortable's media one step tighter, for rows whose detail line already adds height.
+      snug: {
+        root: { minH: '12' },
+        primary: { gap: '2.5', px: '1.5', py: '1.5' },
+        detail: { pb: '1.5', px: '1.5' },
+      },
     },
   },
   defaultVariants: { active: 'none', density: 'regular' },
@@ -1072,7 +1109,7 @@ export const listSectionHeaderSlotRecipe = defineSlotRecipe({
     },
     label: {
       color: 'fg.muted',
-      fontSize: '2xs',
+      fontSize: 'xs',
       fontWeight: '700',
       letterSpacing: '0.04em',
       lineHeight: 'shorter',
@@ -1085,7 +1122,7 @@ export const listSectionHeaderSlotRecipe = defineSlotRecipe({
     count: {
       color: 'fg.muted',
       flexShrink: 0,
-      fontSize: '2xs',
+      fontSize: 'xs',
       fontVariantNumeric: 'tabular-nums',
       lineHeight: 'shorter',
     },
@@ -1098,7 +1135,7 @@ export const chipRecipe = defineRecipe({
     borderRadius: 'sm',
     display: 'inline-flex',
     flexShrink: '0',
-    fontSize: '2xs',
+    fontSize: 'xs',
     fontWeight: '500',
     gap: '1.5',
     px: '2',
@@ -1121,7 +1158,7 @@ export const chipRecipe = defineRecipe({
 export const fieldLabelRecipe = defineRecipe({
   base: {
     color: 'fg.muted',
-    fontSize: '2xs',
+    fontSize: 'xs',
     fontWeight: '600',
     letterSpacing: '0.03em',
   },
@@ -1166,8 +1203,8 @@ export const themeCardRecipe = defineSlotRecipe({
       flexDirection: 'column',
       gap: '0.5',
     },
-    name: { color: 'fg', fontSize: 'sm', fontWeight: '600' },
-    description: { color: 'fg.muted', fontSize: '2xs', lineHeight: '1.3' },
+    name: { color: 'fg', fontSize: 'lg', fontWeight: '600' },
+    description: { color: 'fg.muted', fontSize: 'xs', lineHeight: '1.3' },
     indicator: {
       alignItems: 'center',
       borderRadius: 'full',

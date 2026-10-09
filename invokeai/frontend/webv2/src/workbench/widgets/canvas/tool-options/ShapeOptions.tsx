@@ -4,15 +4,11 @@ import type { ToolFormProps, ToolPropertyForm } from '@workbench/widgets/canvas/
 import { Text } from '@chakra-ui/react';
 import { ToggleIconButton } from '@platform/ui/Button';
 import { ColorPicker } from '@platform/ui/ColorPicker';
-import { MAX_SHAPE_STROKE_WIDTH, getDocumentLayer } from '@workbench/canvas-engine/api';
+import { ScrubberField } from '@platform/ui/ScrubberField';
+import { DEFAULT_SHAPE_OPTIONS, MAX_SHAPE_STROKE_WIDTH, getDocumentLayer } from '@workbench/canvas-engine/api';
 import { useActiveColorCommands, useActiveColorPair } from '@workbench/widgets/canvas/color-system/useActiveColors';
 import { useShapeOptions } from '@workbench/widgets/canvas/engineStoreHooks';
-import {
-  FormNumberField,
-  FormSlider,
-  useNumberCommit,
-  useSliderGesture,
-} from '@workbench/widgets/canvas/tool-presentation/FormControls';
+import { useSliderGesture } from '@workbench/widgets/canvas/tool-presentation/FormControls';
 import {
   EditTargetChip,
   PropertyControlRow,
@@ -35,6 +31,7 @@ interface SelectedShape {
 }
 
 const FALLBACK_COLOR = '#000000';
+const formatPx = (value: number): string => `${value}px`;
 
 /**
  * Edit selected shape content or tool defaults with pair colors. Color gestures commit once; without a selected
@@ -61,25 +58,32 @@ const useShapeEditor = (engine: ToolFormProps['engine']) => {
   const stroke = selected ? selected.source.stroke : options.strokeEnabled ? pair.background : null;
   const strokeWidth = selected ? selected.source.strokeWidth : options.strokeWidth;
 
+  const selectedId = selected?.id ?? null;
+  // Scrubbers keep the handler a gesture started with, so writes patch the live source and options: an undo or
+  // hotkey landing mid-drag survives the release.
   const commitSource = useCallback(
     (patch: Partial<ShapeSource>) => {
-      if (!selected) {
+      if (!selectedId) {
         return;
       }
-      // Vertices belong to polygons only; a box kind never carries stale ones.
-      const { points, ...merged } = { ...selected.source, ...patch };
-      const after: ShapeSource = merged.kind === 'polygon' ? { ...merged, points } : merged;
-      commitPrepared(t('widgets.canvas.toolOptions.shapeEdit'), (model) =>
-        model.prepare({ id: selected.id, source: after, type: 'patch-source' })
-      );
+      commitPrepared(t('widgets.canvas.toolOptions.shapeEdit'), (model) => {
+        const layer = model.getLayer(selectedId);
+        if (layer?.type !== 'raster' || layer.source.type !== 'shape') {
+          return { ids: [selectedId], status: 'missing' };
+        }
+        // Vertices belong to polygons only; a box kind never carries stale ones.
+        const { points, ...merged } = { ...layer.source, ...patch };
+        const after: ShapeSource = merged.kind === 'polygon' ? { ...merged, points } : merged;
+        return model.prepare({ id: selectedId, source: after, type: 'patch-source' });
+      });
     },
-    [commitPrepared, selected, t]
+    [commitPrepared, selectedId, t]
   );
   const setOptions = useCallback(
     (patch: Partial<ShapeToolOptions>) => {
-      engine.interaction.set('shapeOptions', { ...options, ...patch });
+      engine.interaction.set('shapeOptions', { ...engine.interaction.get('shapeOptions'), ...patch });
     },
-    [engine, options]
+    [engine]
   );
   const setKind = useCallback(
     (next: ShapeKind) => {
@@ -161,6 +165,11 @@ const useShapeEditor = (engine: ToolFormProps['engine']) => {
 const ShapeSettings = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
   const editor = useShapeEditor(engine);
+  const selectsMask = useActiveProjectSelector((project) => {
+    const { document } = project.canvas;
+    const layer = document.selectedLayerId ? getDocumentLayer(document, document.selectedLayerId) : undefined;
+    return layer?.type === 'inpaint_mask' || layer?.type === 'regional_guidance';
+  });
   const sampleColor = useColorSampler(engine);
   // A selected layer shows its own kind and can only switch among the box
   // kinds (a box has no vertices to become a polygon; a polygon switched to a
@@ -199,7 +208,6 @@ const ShapeSettings = ({ engine }: ToolFormProps) => {
   );
   const setWidth = useCallback((value: number) => editor.setStrokeWidth(Math.max(0, Math.round(value))), [editor]);
   const widthGesture = useSliderGesture(Math.round(editor.strokeWidth), setWidth, previewWidth);
-  const onWidthCommit = useNumberCommit(setWidth);
   return (
     <>
       <EditTargetChip layerName={editor.selectedName} />
@@ -216,6 +224,11 @@ const ShapeSettings = ({ engine }: ToolFormProps) => {
           value={editor.target}
           onValueChange={editor.setTarget}
         />
+      ) : null}
+      {selectsMask && editor.target === 'selected' ? (
+        <Text color="fg.muted" fontSize="xs">
+          {t('widgets.canvas.toolOptions.shapeMaskHint')}
+        </Text>
       ) : null}
       {/* The chip stays enabled-looking but inert when the slot is off; the toggle owns enablement. */}
       <PropertyControlRow label={t('widgets.canvas.toolOptions.shapeFill')}>
@@ -250,35 +263,18 @@ const ShapeSettings = ({ engine }: ToolFormProps) => {
           onCheckedChange={editor.setStrokeEnabled}
         />
       </PropertyControlRow>
-      <PropertyControlRow label={t('widgets.properties.rows.width')}>
-        <FormSlider
-          aria-label={t('widgets.canvas.toolOptions.shapeStrokeWidth')}
-          disabled={editor.stroke === null}
-          max={MAX_SHAPE_STROKE_WIDTH}
-          min={0}
-          value={widthGesture.value}
-          onValueChange={widthGesture.onChange}
-          onValueChangeEnd={widthGesture.onChangeEnd}
-        />
-        <FormNumberField
-          aria-label={t('widgets.canvas.toolOptions.shapeStrokeWidth')}
-          disabled={editor.stroke === null}
-          max={MAX_SHAPE_STROKE_WIDTH}
-          min={0}
-          suffix="px"
-          value={String(Math.round(editor.strokeWidth))}
-          onValueCommit={onWidthCommit}
-        />
-      </PropertyControlRow>
-      <Text color="fg.muted" fontSize="2xs">
-        {t(
-          editor.toolKind === 'polygon'
-            ? 'widgets.canvas.toolOptions.shapePolygonHint'
-            : editor.toolKind === 'freehand'
-              ? 'widgets.canvas.toolOptions.shapeFreehandHint'
-              : 'widgets.canvas.toolOptions.shapeHint'
-        )}
-      </Text>
+      <ScrubberField
+        defaultValue={DEFAULT_SHAPE_OPTIONS.strokeWidth}
+        disabled={editor.stroke === null}
+        formatValue={formatPx}
+        label={t('widgets.canvas.toolOptions.shapeStrokeWidth')}
+        max={MAX_SHAPE_STROKE_WIDTH}
+        min={0}
+        step={1}
+        value={widthGesture.value}
+        onChange={widthGesture.onChange}
+        onChangeEnd={widthGesture.onChangeEnd}
+      />
     </>
   );
 };
