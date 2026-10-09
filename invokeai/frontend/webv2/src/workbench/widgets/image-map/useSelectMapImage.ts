@@ -8,6 +8,8 @@ import {
   registerImageCluster,
   requestGalleryItemReveal,
 } from '@features/gallery/contracts';
+import { abortGalleryLocatorRequests, createGalleryLocatorRequest } from '@features/gallery/utility';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { useQueryClient } from '@tanstack/react-query';
 import { revealGalleryItem } from '@workbench/image-actions/revealGalleryItem';
 import { getProjectWidgetValues } from '@workbench/widgetState';
@@ -31,25 +33,42 @@ export const useMapSelection = (): MapSelectionActions => {
   const queryClient = useQueryClient();
   const selectItem = useCallback(
     (ref: GalleryItemRef) => {
-      const ticket = { projectId: queries.getSnapshot().activeProject.id, sequence: claimGalleryNavigationSequence() };
+      const sequence = claimGalleryNavigationSequence();
+      abortGalleryLocatorRequests();
+      const locatorRequest = createGalleryLocatorRequest();
+      const ticket = {
+        accountScope: captureAccountScope(),
+        locatorSignal: locatorRequest.signal,
+        projectId: queries.getSnapshot().activeProject.id,
+        sequence,
+      };
 
-      void revealGalleryItem({ commands, queries, queryClient }, ref, ticket).catch(() => {
-        // A click on a just-deleted point, or a blip mid-backend-restart, simply
-        // leaves the selection unchanged. The map sits beside the grid and has
-        // moved nothing, so there is nothing to explain.
-      });
+      void revealGalleryItem({ commands, queries, queryClient }, ref, ticket)
+        .catch(() => {
+          // A click on a just-deleted point, or a blip mid-backend-restart, simply
+          // leaves the selection unchanged. The map sits beside the grid and has
+          // moved nothing, so there is nothing to explain.
+        })
+        .finally(locatorRequest.release);
     },
     [commands, queries, queryClient]
   );
 
   const selectCluster = useCallback(
     (primaryItem: GalleryItemRef, itemKeys: GalleryItemKey[], label: string) => {
+      const accountScope = captureAccountScope();
+      const projectId = queries.getSnapshot().activeProject.id;
       const sequence = claimGalleryNavigationSequence();
+      abortGalleryLocatorRequests();
 
       galleryItems
         .resolve(primaryItem)
         .then((image) => {
-          if (!isGalleryNavigationCurrent(sequence)) {
+          if (
+            accountScope.signal.aborted ||
+            !isGalleryNavigationCurrent(sequence) ||
+            !queries.isActiveProject(projectId)
+          ) {
             return;
           }
 
@@ -70,13 +89,13 @@ export const useMapSelection = (): MapSelectionActions => {
           // Select and reveal the proximity list's first item even if already selected, restoring scroll after a
           // repeated click.
           commands.gallery.selectItem(image);
-          requestGalleryItemReveal(toGalleryItemKey(primaryItem));
+          requestGalleryItemReveal(toGalleryItemKey(primaryItem), accountScope.signal);
         })
         .catch(() => {
           // Selection is simply left unchanged on hydrate failure.
         });
     },
-    [commands]
+    [commands, queries]
   );
 
   return useMemo(() => ({ selectCluster, selectItem }), [selectCluster, selectItem]);
@@ -102,6 +121,7 @@ export const useClearClusterSelection = (): (() => void) => {
     }
 
     claimGalleryNavigationSequence();
+    abortGalleryLocatorRequests();
     widgets.patchValues('gallery', {
       galleryPage: 0,
       searchTerm: '',

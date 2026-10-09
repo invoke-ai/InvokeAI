@@ -1,9 +1,11 @@
 import type { GalleryItem, GalleryItemKey } from '@features/gallery/core/items';
+import type { GallerySparseListing } from '@features/gallery/ui/useGalleryData';
 import type { KeyboardEvent, RefObject } from 'react';
 
 import { Box, HStack, Icon, Stack, Text } from '@chakra-ui/react';
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { getGalleryUploadAccept, toGalleryItemKey } from '@features/gallery/core/items';
+import { GALLERY_PAGE_SIZE, galleryItemsPageOptions } from '@features/gallery/data/queries';
 import { BoardCover, BoardCoverIcon } from '@features/gallery/ui/GalleryBoardCover';
 import { getGalleryBoardGroups } from '@features/gallery/ui/galleryBoardGroups';
 import { GalleryAnnouncer, GalleryLoadErrorState, GalleryLoadNotice } from '@features/gallery/ui/GalleryLoadError';
@@ -26,7 +28,6 @@ import { useTranslation } from 'react-i18next';
 
 import {
   GALLERY_PICKER_MIN_COLUMNS,
-  getGalleryPickerDefaultIndex,
   getGalleryPickerNeighborIndex,
   getGalleryPickerRemaining,
   getGalleryPickerSelectionAfterPick,
@@ -44,8 +45,22 @@ import { useGalleryPickerScope } from './useGalleryPickerScope';
 
 const BOARD_BUTTON_EXPANDED_PROPS = { bg: 'bg.hover' } as const;
 
-/** Unseeded until the first page loads; then the Gallery's selection if it is on that page, else nothing. */
-type ActiveKeyState = GalleryItemKey | null | undefined;
+const EMPTY_SLOTS: ReadonlyMap<number, GalleryItem> = new Map();
+const EMPTY_PAGE_STATES: GallerySparseListing['pageStates'] = new Map();
+
+const haveSameSlots = (left: GallerySparseListing | null, right: GallerySparseListing): boolean => {
+  if (left?.total !== right.total || left.itemSlots.size !== right.itemSlots.size) {
+    return false;
+  }
+
+  for (const [index, item] of right.itemSlots) {
+    if (left.itemSlots.get(index) !== item) {
+      return false;
+    }
+  }
+
+  return true;
+};
 
 export const GalleryPickerView = ({
   accept,
@@ -72,39 +87,99 @@ export const GalleryPickerView = ({
   const currentKey = gallerySelectedItem ? toGalleryItemKey(gallerySelectedItem) : null;
   const seedKey = gallerySelectedItem && accept.includes(gallerySelectedItem.kind) ? currentKey : null;
 
-  const [activeKey, setActiveKey] = useState<ActiveKeyState>(undefined);
+  // The highlight follows its item's key when an insert shifts it; only a placeholder is held by index. Each
+  // deliberate placement takes a new `placement`, so it reveals even where an earlier one rested.
+  const [activeCursor, setActiveCursor] = useState<{
+    filterIdentity: string;
+    index: number;
+    key: GalleryItemKey | null;
+    placement: number;
+  } | null>(null);
+  const placeActiveCursor = useCallback(
+    (filterIdentity: string, index: number, key: GalleryItemKey | null) =>
+      setActiveCursor((current) => ({ filterIdentity, index, key, placement: (current?.placement ?? 0) + 1 })),
+    []
+  );
   const [columnCount, setColumnCount] = useState(GALLERY_PICKER_MIN_COLUMNS);
   const [isUploading, setIsUploading] = useState(false);
-  // Async uploads need current selection capacity; the sentinel needs a stable callback across page fetches.
+  // Async uploads need current selection capacity.
   const selectionRef = useRef(selection);
-  const loadMoreRef = useRef(data.loadMore);
+  // Keep prior absolute slots dimmed during scope changes; a new scope starts at its own page zero.
+  const [lastListing, setLastListing] = useState<{ filterIdentity: string; listing: GallerySparseListing } | null>(
+    null
+  );
 
   // eslint-disable-next-line react/refs
   selectionRef.current = selection;
-  // eslint-disable-next-line react/refs
-  loadMoreRef.current = data.loadMore;
 
-  // The previous scope's items stay dimmed while the new scope loads; skeletons show only before any result. A
-  // failed scope shows its failure, never the previous scope's items.
-  const { listing } = data;
-  const isStale = data.items === null && data.previousScopeItems !== null;
-  const items = data.items ?? data.previousScopeItems;
-
-  // Seed once the first page is in, so a selection past it never yanks the
-  // highlight (and the scroll) when a later page happens to contain it.
-  if (activeKey === undefined && data.items !== null) {
-    setActiveKey(seedKey && data.items.some((item) => toGalleryItemKey(item) === seedKey) ? seedKey : null);
+  const filterIdentity = JSON.stringify(galleryItemsPageOptions(data.filter, 0).queryKey.slice(3, 5));
+  if (
+    data.items !== null &&
+    data.sparseListing &&
+    (lastListing?.filterIdentity !== filterIdentity || !haveSameSlots(lastListing.listing, data.sparseListing))
+  ) {
+    setLastListing({ filterIdentity, listing: data.sparseListing });
   }
 
-  const activeIndex = activeKey && items ? items.findIndex((item) => toGalleryItemKey(item) === activeKey) : -1;
+  const knownTotal = data.total;
+  const isStale =
+    data.listing.status === 'loading' &&
+    data.items === null &&
+    lastListing !== null &&
+    lastListing.filterIdentity !== filterIdentity;
+  const sparseListing = isStale ? lastListing?.listing : data.sparseListing;
+  const itemSlots = sparseListing?.itemSlots ?? EMPTY_SLOTS;
+  const pageStates = isStale ? EMPTY_PAGE_STATES : (sparseListing?.pageStates ?? EMPTY_PAGE_STATES);
+  const total = sparseListing?.total ?? knownTotal;
+  const totalSlots = total ?? GALLERY_PAGE_SIZE;
+  const activeFilterCursor = activeCursor?.filterIdentity === filterIdentity ? activeCursor : null;
+  const setVisibleRange = data.setVisibleRange;
+  const slotIndexByKey = useMemo(
+    () => new Map([...itemSlots].map(([index, item]) => [toGalleryItemKey(item), index])),
+    [itemSlots]
+  );
+  const getSlotKey = useCallback(
+    (index: number): GalleryItemKey | null => {
+      const item = itemSlots.get(index);
+
+      return item ? toGalleryItemKey(item) : null;
+    },
+    [itemSlots]
+  );
+
+  const defaultActiveIndex = useMemo(() => {
+    const slots = [...itemSlots].sort(([left], [right]) => left - right);
+    const firstPickable = slots.find(([, item]) => getGalleryPickerTileState(item, accept, selection) === 'pickable');
+
+    return firstPickable?.[0] ?? slots[0]?.[0] ?? -1;
+  }, [accept, itemSlots, selection]);
+
+  // Seed once page zero lands. A selection elsewhere in the listing must not pull the picker away from its start.
+  if (activeFilterCursor === null && data.items !== null) {
+    const seededIndex = seedKey
+      ? [...itemSlots].find(([index, item]) => index < GALLERY_PAGE_SIZE && toGalleryItemKey(item) === seedKey)?.[0]
+      : undefined;
+
+    const index = seededIndex ?? defaultActiveIndex;
+
+    placeActiveCursor(filterIdentity, index, getSlotKey(index));
+  } else if (activeFilterCursor?.key === null && itemSlots.has(activeFilterCursor.index)) {
+    // A placeholder the highlight rests on has loaded: hold its item from now on.
+    setActiveCursor({ ...activeFilterCursor, key: getSlotKey(activeFilterCursor.index) });
+  }
+
   const resolvedActiveIndex =
-    activeIndex >= 0 ? activeIndex : items ? getGalleryPickerDefaultIndex(items, accept, selection) : -1;
-  const activeItem = resolvedActiveIndex >= 0 ? items?.[resolvedActiveIndex] : undefined;
-  const resolvedActiveKey = activeItem ? toGalleryItemKey(activeItem) : null;
+    activeFilterCursor === null
+      ? defaultActiveIndex
+      : ((activeFilterCursor.key === null ? undefined : slotIndexByKey.get(activeFilterCursor.key)) ??
+        activeFilterCursor.index);
+  const activeItem = resolvedActiveIndex >= 0 ? itemSlots.get(resolvedActiveIndex) : undefined;
+  const activePageOffset = Math.floor(Math.max(0, resolvedActiveIndex) / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE;
+  const activePageState = pageStates.get(activePageOffset);
   const selectedBoard = data.boards.find((board) => board.id === data.selectedBoardId);
   const boardName = selectedBoard ? getGalleryBoardLabel(selectedBoard, t) : t('widgets.gallery.selectedBoardFallback');
   const uploadTarget = getGalleryUploadTargetLabel(data.boards, data.selectedBoardId, t);
-  const showsGrid = scope.pane === 'items' && listing.status !== 'error' && (items === null || items.length > 0);
+  const showsGrid = scope.pane === 'items' && data.listing.status !== 'error' && (total === null || total > 0);
   const isBoardListUnavailable = data.boardsState.status === 'error';
 
   const getTileState = useCallback(
@@ -244,19 +319,27 @@ export const GalleryPickerView = ({
         return;
       }
 
-      // The previous scope's items are on screen only as a placeholder; nothing in them is pickable.
-      if (!items || isStale) {
+      if (isStale || data.listing.status === 'error') {
+        if (event.key === 'Enter' || isGalleryPickerNavKey(event.key)) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
         return;
       }
 
       if (isGalleryPickerNavKey(event.key) && isGalleryPickerNavKeyForField(event.key, event.currentTarget.value)) {
-        const next = items[getGalleryPickerNeighborIndex(resolvedActiveIndex, items.length, columnCount, event.key)];
+        const nextIndex = getGalleryPickerNeighborIndex(resolvedActiveIndex, totalSlots, columnCount, event.key);
 
         event.preventDefault();
         event.stopPropagation();
 
-        if (next) {
-          setActiveKey(toGalleryItemKey(next));
+        if (nextIndex >= 0) {
+          placeActiveCursor(filterIdentity, nextIndex, getSlotKey(nextIndex));
+
+          // A subscribed page keeps the range around it; narrowing to the cursor would drop the rest of the view.
+          if (!pageStates.has(Math.floor(nextIndex / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE)) {
+            setVisibleRange?.({ endIndexExclusive: nextIndex + 1, startIndex: nextIndex });
+          }
         }
       } else if (event.key === 'Enter') {
         event.preventDefault();
@@ -264,10 +347,13 @@ export const GalleryPickerView = ({
 
         if (activeItem) {
           pickItem(activeItem);
+        } else if (activePageState?.error) {
+          void activePageState.retry();
         }
       }
     },
     [
+      activePageState,
       activeItem,
       boardGroups,
       boardsId,
@@ -275,21 +361,36 @@ export const GalleryPickerView = ({
       handleSelectBoard,
       isSearching,
       isStale,
-      items,
+      filterIdentity,
+      data.listing.status,
+      getSlotKey,
+      pageStates,
       pickItem,
+      placeActiveCursor,
       resolvedActiveIndex,
+      setVisibleRange,
       scope.pane,
+      totalSlots,
     ]
   );
 
   const handleActivate = useCallback(
     (item: GalleryItem) => {
-      setActiveKey(toGalleryItemKey(item));
+      const key = toGalleryItemKey(item);
+      const index = slotIndexByKey.get(key);
+
+      if (index !== undefined) {
+        placeActiveCursor(filterIdentity, index, key);
+      }
+
       pickItem(item);
     },
-    [pickItem]
+    [filterIdentity, pickItem, placeActiveCursor, slotIndexByKey]
   );
-  const handleLoadMore = useCallback(() => loadMoreRef.current(), []);
+  const handleVisibleRangeChange = useCallback(
+    (range: { endIndexExclusive: number; startIndex: number }) => setVisibleRange?.(range),
+    [setVisibleRange]
+  );
   const handleClearSearch = useCallback(() => setSearchTerm(''), [setSearchTerm]);
 
   const openGallery = useCallback(() => {
@@ -304,24 +405,28 @@ export const GalleryPickerView = ({
   const pickerNotice =
     scope.pane !== 'items'
       ? null
-      : listing.status === 'more-error'
+      : data.listing.status === 'more-error'
         ? { message: 'widgets.gallery.listingLoadMoreFailed', retryLabel: 'widgets.gallery.retryLoadingMoreItems' }
-        : listing.status === 'stale-error'
+        : data.listing.status === 'stale-error'
           ? { message: 'widgets.gallery.listingRefreshFailed', retryLabel: 'widgets.gallery.retryLoadingItems' }
           : null;
+  const showPickerNotice =
+    pickerNotice !== null &&
+    (data.sparseListing === undefined || [...pageStates.values()].some((pageState) => pageState.error !== null));
   // Counts of a list that failed to load would claim it is empty.
-  const isCurrentPaneUnavailable = scope.pane === 'boards' ? isBoardListUnavailable : listing.status === 'error';
-  const status = isCurrentPaneUnavailable
+  const shouldHideStatus =
+    isStale || (scope.pane === 'boards' ? isBoardListUnavailable : data.listing.status === 'error');
+  const status = shouldHideStatus
     ? ''
     : getGalleryPickerStatus({
         accept,
         activeItem,
         isSearching,
         isWindowTruncated: data.isWindowTruncated,
-        loadedCount: items?.length ?? 0,
+        loadedCount: itemSlots.size,
         pane: scope.pane,
         remaining: getGalleryPickerRemaining(accept, selection),
-        total: data.total,
+        total,
         visibleBoardCount,
       })
         .map((part) => t(`widgets.gallery.picker.${part.kind}`, 'count' in part ? { count: part.count } : undefined))
@@ -345,11 +450,13 @@ export const GalleryPickerView = ({
         : showsGrid
           ? {
               'aria-activedescendant':
-                resolvedActiveKey && !isStale ? galleryPickerOptionId(listboxId, resolvedActiveKey) : undefined,
+                resolvedActiveIndex >= 0 && !isStale
+                  ? galleryPickerOptionId(listboxId, resolvedActiveIndex)
+                  : undefined,
               'aria-controls': listboxId,
             }
           : undefined,
-    [boardsId, isStale, listboxId, resolvedActiveKey, scope.pane, showsGrid]
+    [boardsId, isStale, listboxId, resolvedActiveIndex, scope.pane, showsGrid]
   );
   const searchLabel =
     scope.pane === 'boards'
@@ -442,27 +549,31 @@ export const GalleryPickerView = ({
             onExitTop={focusSearch}
             onSelect={handleSelectBoard}
           />
-        ) : listing.status === 'error' ? (
+        ) : data.listing.status === 'error' ? (
           <GalleryLoadErrorState
-            read={listing}
+            read={data.listing}
             retryLabel={t('widgets.gallery.retryLoadingItems')}
             title={t('widgets.gallery.listingLoadFailed')}
             onFocusLost={focusSearch}
           />
         ) : showsGrid ? (
           <GalleryPickerGrid
-            activeKey={resolvedActiveKey}
+            activeIndex={resolvedActiveIndex}
+            activePlacement={`${filterIdentity}\n${activeFilterCursor ? `#${activeFilterCursor.placement}` : resolvedActiveIndex}`}
             columnCount={columnCount}
             currentKey={currentKey}
             getTileState={getTileState}
             idBase={listboxId}
             isMultiple={isMultiple}
             isStale={isStale}
-            items={items}
+            itemSlots={itemSlots}
             label={t('widgets.gallery.picker.itemsLabel')}
             onActivate={handleActivate}
             onColumnCountChange={setColumnCount}
-            onLoadMore={handleLoadMore}
+            onVisibleRangeChange={handleVisibleRangeChange}
+            pageStates={pageStates}
+            suppressInlineRetry={showPickerNotice}
+            total={total}
           />
         ) : (
           <Stack align="center" color="fg.muted" gap="2" justify="center" minH="7rem" px="4" py="6">
@@ -480,7 +591,7 @@ export const GalleryPickerView = ({
             ) : null}
           </Stack>
         )}
-        {pickerNotice ? (
+        {showPickerNotice ? (
           <GalleryLoadNotice
             borderColor="border.subtle"
             borderTopWidth="1px"
@@ -488,7 +599,7 @@ export const GalleryPickerView = ({
             pe="1"
             ps="2"
             py="1"
-            read={listing}
+            read={data.listing}
             retryLabel={t(pickerNotice.retryLabel)}
             onFocusLost={focusSearch}
           />
