@@ -349,6 +349,14 @@ class InvokeAIAppConfig(BaseSettings):
                 )
         return v
 
+    @field_validator("rocm_aotriton_experimental", mode="before")
+    @classmethod
+    def validate_rocm_aotriton_experimental(cls, v: object) -> object:
+        # YAML 1.1 reads an unquoted `on` or `off` as a boolean, and unquoted is how the setting gets written.
+        if isinstance(v, bool):
+            return "on" if v else "off"
+        return v
+
     @field_validator("base_url")
     @classmethod
     def validate_base_url(cls, v: Optional[str]) -> Optional[str]:
