@@ -83,11 +83,14 @@ def harness(tmp_path: Path):
     return service, store, cache, events
 
 
-def _edit_and_invalidate(store: ModelRecordServiceSQL, cache: ModelCache, changes: ModelRecordChanges) -> None:
+def _edit_and_invalidate(
+    service: ModelLoadService, store: ModelRecordServiceSQL, cache: ModelCache, changes: ModelRecordChanges
+) -> None:
     """The record edit followed by the cache drop, as `update_model_record` performs them."""
-    store.update_model(KEY, changes=changes, allow_class_change=True)
-    with MODEL_LOAD_LOCK.write_lock():
-        cache.drop_model(KEY)
+    with service.record_edit(KEY):
+        store.update_model(KEY, changes=changes, allow_class_change=True)
+        with MODEL_LOAD_LOCK.write_lock():
+            cache.drop_model(KEY)
 
 
 def _is_cached(cache: ModelCache) -> bool:
@@ -102,7 +105,7 @@ def test_load_from_record_read_before_invalidating_edit_loads_the_updated_record
     service, store, cache, events = harness
     stale = store.get_model(KEY)
 
-    _edit_and_invalidate(store, cache, ModelRecordChanges(cpu_only=True))
+    _edit_and_invalidate(service, store, cache, ModelRecordChanges(cpu_only=True))
 
     loaded = service.load_model(stale)
     assert loaded.config.cpu_only is True
@@ -125,7 +128,7 @@ def test_load_from_record_read_before_metadata_only_edit_still_loads(harness):
 
 
 def _run_with_edit_while_queued_on_construction_lock(
-    store: ModelRecordServiceSQL, cache: ModelCache, load: Callable[[], object]
+    service: ModelLoadService, store: ModelRecordServiceSQL, cache: ModelCache, load: Callable[[], object]
 ) -> object:
     """The #9674 ordering: `load` reads a current record, then waits for the construction lock while
     a `cpu_only` edit commits and invalidates under it. Returns what `load` returned or raised."""
@@ -144,8 +147,9 @@ def _run_with_edit_while_queued_on_construction_lock(
         while MODEL_LOAD_LOCK._writers_waiting == 0:
             assert time.monotonic() < deadline, "loader never queued for the construction lock"
             time.sleep(0.001)
-        store.update_model(KEY, changes=ModelRecordChanges(cpu_only=True))
-        cache.drop_model(KEY)
+        with service.record_edit(KEY):
+            store.update_model(KEY, changes=ModelRecordChanges(cpu_only=True))
+            cache.drop_model(KEY)
     loader.join(timeout=10)
     assert len(outcome) == 1
     return outcome[0]
@@ -155,7 +159,7 @@ def test_load_waiting_on_construction_lock_during_invalidating_edit_loads_the_up
     service, store, cache, events = harness
 
     outcome = _run_with_edit_while_queued_on_construction_lock(
-        store, cache, lambda: service.load_model(store.get_model(KEY))
+        service, store, cache, lambda: service.load_model(store.get_model(KEY))
     )
 
     assert isinstance(outcome, LoadedModel)
@@ -164,6 +168,30 @@ def test_load_waiting_on_construction_lock_during_invalidating_edit_loads_the_up
     assert _RecordingLoader.built_from == [True]
     # One load as far as the UI can tell: a retry that re-announced itself would leave a load showing.
     assert events.log == [("started", "siglip"), ("complete", "siglip")]
+
+
+def test_edit_committed_while_load_waits_but_invalidating_after_it_is_not_built_from_the_old_record(harness):
+    """The load reads a current record and queues behind an unrelated construction; the edit commits
+    meanwhile but reaches its invalidation only after the load holds the construction lock."""
+    service, store, cache, _ = harness
+    outcome: list[LoadedModel] = []
+    loader = threading.Thread(target=lambda: outcome.append(service.load_model(store.get_model(KEY))))
+
+    with service.record_edit(KEY):
+        with MODEL_LOAD_LOCK.write_lock():  # an unrelated construction in progress
+            loader.start()
+            deadline = time.monotonic() + 10
+            while MODEL_LOAD_LOCK._writers_waiting == 0:
+                assert time.monotonic() < deadline, "loader never queued for the construction lock"
+                time.sleep(0.001)
+            store.update_model(KEY, changes=ModelRecordChanges(cpu_only=True))
+        loader.join(timeout=10)
+        with MODEL_LOAD_LOCK.write_lock():
+            cache.drop_model(KEY)
+
+    assert len(outcome) == 1
+    assert outcome[0].config.cpu_only is True
+    assert _RecordingLoader.built_from == [True]
 
 
 def test_config_object_reused_after_eviction_still_loads(harness):
@@ -195,3 +223,54 @@ def test_record_superseded_again_during_retry_raises(harness, monkeypatch):
         service.load_model(store.get_model(KEY))
     assert fence_checks == [KEY, KEY]
     assert _RecordingLoader.built_from == []
+
+
+def test_database_transaction_starting_while_a_cold_load_is_queued_does_not_hold_the_model_load_lock(
+    harness, monkeypatch
+):
+    """A long DB transaction (e.g. VACUUM) that starts after a cold load read its record, while that load
+    waits for the construction lock, must not leave the load holding MODEL_LOAD_LOCK while it waits on the
+    database: unrelated MODEL_LOAD_LOCK users, such as other devices' VRAM moves, would stall with it."""
+    service, store, cache, _ = harness
+    config = store.get_model(KEY)
+    record_reads = threading.Semaphore(0)
+    store_get_model = store.get_model
+
+    def get_model(key: str) -> AnyModelConfig:
+        record_reads.release()
+        return store_get_model(key)
+
+    monkeypatch.setattr(store, "get_model", get_model)
+    loads: list[LoadedModel] = []
+    acquired = threading.Event()
+
+    def take_model_load_lock() -> None:
+        with MODEL_LOAD_LOCK.write_lock():
+            acquired.set()
+
+    loader = threading.Thread(target=lambda: loads.append(service.load_model(config)))
+    other = threading.Thread(target=take_model_load_lock)
+    with MODEL_LOAD_LOCK.write_lock():  # an unrelated construction in progress
+        loader.start()
+        assert record_reads.acquire(timeout=10)
+        deadline = time.monotonic() + 10
+        while MODEL_LOAD_LOCK._writers_waiting == 0:
+            assert time.monotonic() < deadline, "loader never queued for the construction lock"
+            time.sleep(0.001)
+        store._db._lock.acquire()  # the transaction starts; VACUUM holds this for its whole run
+    try:
+        # The loader now holds the construction lock: it either finishes without the database, or reads
+        # its record again under the lock and blocks there.
+        deadline = time.monotonic() + 10
+        while loader.is_alive() and not record_reads.acquire(timeout=0.01):
+            assert time.monotonic() < deadline, "loader neither finished nor read its record again"
+        other.start()
+        lock_was_free = acquired.wait(timeout=5)
+    finally:
+        store._db._lock.release()
+    loader.join(timeout=10)
+    other.join(timeout=10)
+
+    assert lock_was_free
+    assert len(loads) == 1
+    assert _is_cached(cache)

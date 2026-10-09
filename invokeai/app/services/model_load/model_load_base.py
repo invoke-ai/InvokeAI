@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, ContextManager, Optional
 
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load import LoadedModel, LoadedModelWithoutConfig
@@ -28,6 +28,13 @@ class ModelLoadServiceBase(ABC):
         :param user_id: The user whose action triggered the load, threaded into the model load
             events so they can be routed to that user's UI (defaults to the system user).
         """
+
+    @abstractmethod
+    def record_edit(self, key: str) -> ContextManager[None]:
+        """Bracket a write of `key`'s record that may change how it loads, from before it commits until
+        after any cache invalidation it performs, so that loads which read the record meanwhile re-check it
+        under MODEL_LOAD_LOCK. Every writer of load-affecting settings must use it: a cold load trusts its
+        pre-lock record read unless a bracket was open at that read or opened since."""
 
     @property
     @abstractmethod

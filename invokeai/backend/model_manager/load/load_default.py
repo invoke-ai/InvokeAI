@@ -248,11 +248,11 @@ def _model_declared_skip_patterns(model: torch.nn.Module) -> tuple[str, ...]:
 class ModelLoader(ModelLoaderBase):
     """Default implementation of ModelLoaderBase."""
 
-    # Optionally set on an instance before `load_model()`: called with the caller's config while
-    # construction is serialized against cache invalidation; False rejects the load with
-    # StaleModelConfigError. An attribute rather than a constructor argument so that registered
-    # loaders overriding `__init__` keep working.
-    config_is_current: Optional[Callable[[AnyModelConfig], bool]] = None
+    # Optionally set on an instance before `load_model()`: on a cache miss, called with the caller's config
+    # before MODEL_LOAD_LOCK is taken; the callable it returns is called once construction is serialized
+    # against cache invalidation, and False rejects the load with StaleModelConfigError. An attribute
+    # rather than a constructor argument so that registered loaders overriding `__init__` keep working.
+    config_check: Optional[Callable[[AnyModelConfig], Callable[[], bool]]] = None
 
     def __init__(
         self,
@@ -367,6 +367,11 @@ class ModelLoader(ModelLoaderBase):
         #
         # Lock-ordering: the write lock is acquired before any ModelCache._lock taken below
         # (get/make_room/put), matching the readers' order, so there is no AB-BA deadlock.
+        #
+        # The caller read `config` before this point. A record edit commits first and then invalidates the
+        # cache under this lock; building from a record superseded by an edit that has already invalidated
+        # would re-admit what that edit evicted, so the config check is finished under the lock.
+        still_current = self.config_check(config) if self.config_check is not None else None
         with MODEL_LOAD_LOCK.write_lock():
             # Double-checked locking: another worker sharing this cache may have loaded the same
             # entry while we waited for the mutex. (Workers on other devices use a different cache,
@@ -376,11 +381,7 @@ class ModelLoader(ModelLoaderBase):
             except IndexError:
                 pass
 
-            # The caller read `config` before taking this lock. A record edit commits first and then
-            # invalidates the cache under this lock, so an edit that has committed by now has either
-            # dropped this model already or will drop whatever this load admits; building from the
-            # superseded record in the first case would re-admit what that edit evicted.
-            if self.config_is_current is not None and not self.config_is_current(config):
+            if still_current is not None and not still_current():
                 raise StaleModelConfigError(
                     f"Model '{config.name}' was modified while it was being loaded; retry with the updated model."
                 )

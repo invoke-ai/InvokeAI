@@ -502,7 +502,9 @@ def _reidentify_model(key: str) -> AnyModelConfig:
     result.config.source = config.source
     result.config.source_type = config.source_type
 
-    return ApiDependencies.invoker.services.model_manager.store.replace_model(config.key, result.config)
+    # The probe resets load-affecting settings (cpu_only, default_settings), so in-flight loads must re-check.
+    with ApiDependencies.invoker.services.model_manager.load.record_edit(config.key):
+        return ApiDependencies.invoker.services.model_manager.store.replace_model(config.key, result.config)
 
 
 class FoundModel(BaseModel):
@@ -637,7 +639,7 @@ def _update_model_record(key: str, changes: ModelRecordChanges) -> AnyModelConfi
     # Claimed for the whole update: a conversion running on this key carries a snapshot of the
     # record taken before it started and writes it into the replacement, so an edit accepted
     # meanwhile would be reported as saved and then silently dropped.
-    with _claim_model_key(key):
+    with _claim_model_key(key), ApiDependencies.invoker.services.model_manager.load.record_edit(key):
         try:
             previous_config = record_store.get_model(key)
             config = record_store.update_model(key, changes=changes, allow_class_change=True)

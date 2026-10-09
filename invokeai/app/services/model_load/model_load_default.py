@@ -1,7 +1,9 @@
 """Implementation of model loader service."""
 
+import threading
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Callable, Optional, Type
+from typing import Callable, ContextManager, Iterator, Optional, Type
 
 from picklescan.scanner import scan_file_path
 from safetensors.torch import load_file as safetensors_load_file
@@ -26,6 +28,34 @@ from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import 
 from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
+
+
+class _RecordEdits:
+    """Per model key: a generation bumped as each record edit starts, and how many edits are in progress."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        # Never pruned: one int per model key ever edited.
+        self._generations: dict[str, int] = {}
+        self._in_progress: dict[str, int] = {}
+
+    @contextmanager
+    def edit(self, key: str) -> Iterator[None]:
+        with self._lock:
+            self._generations[key] = self._generations.get(key, 0) + 1
+            self._in_progress[key] = self._in_progress.get(key, 0) + 1
+        try:
+            yield
+        finally:
+            with self._lock:
+                self._in_progress[key] -= 1
+                if not self._in_progress[key]:
+                    del self._in_progress[key]
+
+    def snapshot(self, key: str) -> tuple[int, bool]:
+        """(generation, whether an edit is in progress)."""
+        with self._lock:
+            return self._generations.get(key, 0), key in self._in_progress
 
 
 class ModelLoadService(ModelLoadServiceBase):
@@ -56,6 +86,7 @@ class ModelLoadService(ModelLoadServiceBase):
         self._ram_caches: dict[str, ModelCache] = dict(ram_caches) if ram_caches else {}
         self._ram_caches.setdefault(str(TorchDevice.normalize(ram_cache.execution_device)), ram_cache)
         self._registry = registry
+        self._record_edits = _RecordEdits()
 
     def start(self, invoker: Invoker) -> None:
         self._invoker = invoker
@@ -118,16 +149,35 @@ class ModelLoadService(ModelLoadServiceBase):
             ram_cache=self.ram_cache,
         )
         if hasattr(self, "_invoker") and isinstance(loader, ModelLoader):
-            loader.config_is_current = self._config_is_current
+            loader.config_check = self._check_config
         return loader.load_model(model_config, submodel_type)
 
-    def _config_is_current(self, config: AnyModelConfig) -> bool:
-        """Whether `config` still loads the same model as the stored record for its key.
+    def record_edit(self, key: str) -> ContextManager[None]:
+        return self._record_edits.edit(key)
 
-        Runs under the MODEL_LOAD_LOCK write lock, which is what makes it a fence, so the record read
-        cannot move ahead of the lock. A long DB transaction (e.g. compaction) therefore stalls every
-        MODEL_LOAD_LOCK user process-wide, not just this cold load, until it finishes.
+    def _check_config(self, config: AnyModelConfig) -> Callable[[], bool]:
+        """Check `config` against its record; the returned callable completes the check under MODEL_LOAD_LOCK.
+
+        The record is read here, before the lock, so a long DB transaction (e.g. VACUUM) stalls only this
+        load and not every MODEL_LOAD_LOCK user. An edit brackets its commit and its cache invalidation
+        with `record_edit()`, so an edit that commits after this read was either in progress when the
+        snapshot below was taken or bumped the generation since; only then is the record read again,
+        under the lock, as the invalidation that follows the commit also takes that lock.
         """
+        generation, edit_in_progress = self._record_edits.snapshot(config.key)
+        current = self._config_is_current(config)
+
+        def still_current() -> bool:
+            if not current:
+                return False
+            if edit_in_progress or self._record_edits.snapshot(config.key)[0] != generation:
+                return self._config_is_current(config)
+            return True
+
+        return still_current
+
+    def _config_is_current(self, config: AnyModelConfig) -> bool:
+        """Whether `config` still loads the same model as the stored record for its key."""
         try:
             current = self._invoker.services.model_manager.store.get_model(config.key)
         except UnknownModelException:
