@@ -25,7 +25,6 @@ import type {
   GenerateSettings,
   MainModelConfig,
   PidMode,
-  VaePrecision,
 } from './types';
 
 import {
@@ -169,49 +168,6 @@ const ANIMA_SCHEDULERS = new Set(ANIMA_SCHEDULER_OPTIONS.map((option) => option.
 export const isKnownScheduler = (value: string): boolean => KNOWN_SCHEDULERS.has(value);
 
 export { isSupportedGenerateBase, SUPPORTED_GENERATE_BASES, type SupportedGenerateBase };
-
-export interface GenerationModelPolicy {
-  isSupported: boolean;
-  dimensions: {
-    grid: number;
-    min: number;
-    max: number;
-    optimal: number;
-  };
-  defaults: {
-    steps: number;
-    cfgScale: number;
-    cfgRescaleMultiplier: number;
-    scheduler: string;
-    vaePrecision: VaePrecision;
-  };
-  scheduler: {
-    options: readonly SchedulerOption[];
-    defaultValue: string;
-    appliesToGraph: boolean;
-    coerceForGraph: (value: string) => string;
-  };
-  prompt: {
-    negativeVisible: boolean;
-    negativeUsedInGraph: boolean;
-    negativeHelpText?: string;
-  };
-  ui: {
-    guidanceLabel: GuidanceLabel;
-    /** The node-enforced floor for the guidance control; `null` max means the node enforces none. */
-    guidanceMin: number;
-    guidanceMax: number | null;
-    schedulerVisible: boolean;
-    clipSkipMax: number | null;
-    cfgRescaleVisible: boolean;
-    colorCompensationVisible: boolean;
-    hiDiffusionVisible: boolean;
-    seamlessVisible: boolean;
-    sdVaeVisible: boolean;
-    vaePrecisionVisible: boolean;
-    seedVisible: boolean;
-  };
-}
 
 const FALLBACK_GENERATION_CONFIG: BaseGenerationConfig = {
   dimensions: { grid: 8, optimalSide: 1024 },
@@ -381,10 +337,7 @@ export const getPromptPolicy = (
   };
 };
 
-export const getGenerationUiPolicy = (
-  model: GenerateModelConfig | undefined,
-  _settings: Pick<GenerateSettings, 'cfgScale'>
-) => {
+export const getGenerationUiPolicy = (model: GenerateModelConfig | undefined) => {
   const config = getBaseGenerationConfig(model);
   const seedVisible = model?.type === 'external_image_generator' ? model.capabilities?.supports_seed === true : true;
 
@@ -458,29 +411,6 @@ export const EXTERNAL_PROVIDER_NODE_TYPES: Record<string, string> = {
 export const getExternalProviderNodeType = (providerId: unknown): string | null =>
   typeof providerId === 'string' ? (EXTERNAL_PROVIDER_NODE_TYPES[providerId] ?? null) : null;
 
-export const getGenerationModelPolicy = (
-  model: GenerateModelConfig | undefined,
-  settings: GenerateSettings
-): GenerationModelPolicy => {
-  const config = getBaseGenerationConfig(model);
-  const dimensions = getGenerationDimensions(model);
-  const defaults = getGenerationDefaults(model);
-
-  return {
-    isSupported: model ? isSupportedGenerateModel(model) : false,
-    dimensions,
-    defaults,
-    scheduler: {
-      options: getSchedulerOptions(model, settings.scheduler),
-      defaultValue: defaults.scheduler,
-      appliesToGraph: config.schedulerAppliesToGraph,
-      coerceForGraph: (value: string) => coerceSchedulerForGraph(model, value),
-    },
-    prompt: getPromptPolicy(model, settings),
-    ui: getGenerationUiPolicy(model, settings),
-  };
-};
-
 export const getDefaultGenerateSettings = (model?: GenerateModelConfig): GenerateSettings => {
   const defaults = getGenerationDefaults(model);
   const dimensions = getGenerationDimensions(model);
@@ -505,6 +435,7 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     dynamicPromptsCombinatorial: true,
     dynamicPromptsMaxPrompts: DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS,
     dynamicPromptsSampleSeed: 0,
+    dynamicPromptsResample: true,
     dynamicPromptsSeedBehaviour: 'per-iteration',
     clipEmbedModel: null,
     clipGEmbedModel: null,
@@ -604,9 +535,12 @@ export type GenerateComponentValueKey =
   | 'gemma2EncoderModel'
   | 'vae';
 
+/** The settings component slot rules read beyond the selected components themselves. */
+export type ComponentPolicySettings = Pick<GenerateSettings, 'componentSourceModel' | 'pidMode'>;
+
 export interface ComponentPolicyContext {
   model: GenerateModelConfig;
-  settings: GenerateSettings;
+  settings: ComponentPolicySettings;
   selectedComponents: Pick<GenerateSettings, GenerateComponentValueKey>;
 }
 
@@ -917,7 +851,7 @@ const EMPTY_COMPONENT_POLICY: ComponentSectionPolicy = createPolicy(false, []);
 
 const getBaseComponentSectionPolicy = (
   model: GenerateModelConfig | undefined,
-  _settings: GenerateSettings
+  _settings: ComponentPolicySettings
 ): ComponentSectionPolicy => {
   if (!model || model.type === 'external_image_generator') {
     return EMPTY_COMPONENT_POLICY;
@@ -1149,7 +1083,7 @@ const getBaseComponentSectionPolicy = (
 /** Add and validate PiD slots; each base policy retains ownership of its other component validation. */
 export const getComponentSectionPolicy = (
   model: GenerateModelConfig | undefined,
-  settings: GenerateSettings
+  settings: ComponentPolicySettings
 ): ComponentSectionPolicy => {
   const policy = getBaseComponentSectionPolicy(model, settings);
 
@@ -1459,7 +1393,7 @@ const getSettingsWithCompatibleModelSelections = (
 
   const policy = getComponentSectionPolicy(model, nextSettings);
   const slotsByKey = new Map(policy.slots.map((slotPolicy) => [slotPolicy.key, slotPolicy]));
-  const uiPolicy = getGenerationUiPolicy(model, nextSettings);
+  const uiPolicy = getGenerationUiPolicy(model);
 
   for (const key of Object.keys(COMPONENT_SETTING_LABELS) as GenerateComponentValueKey[]) {
     if (!nextSettings[key]) {

@@ -827,6 +827,7 @@ const SingleImageMenuItems = ({
         />
       </ContextSubMenu>
       <Menu.Separator borderColor="border.subtle" />
+      <CanvasDestinationMenuItems actions={actions} images={images} isBulk={false} />
       <ContextMenuItem icon={ScanIcon} label="Send to Upscale" value="send-to-upscale" onClick={handleSendToUpscale} />
       <ContextMenuItem
         icon={ClapperboardIcon}
@@ -856,7 +857,6 @@ const SingleImageMenuItems = ({
         onClick={handleSelectForCompare}
       />
       <Menu.Separator borderColor="border.subtle" />
-      <NewFromImageSubMenu actions={actions} images={images} isBulk={false} />
       <FindInGalleryMenuItem itemRef={imageItemRef} />
       <ChangeBoardSubMenu boards={boards} currentBoardId={image.boardId} onMove={handleMove} />
       <Menu.Separator borderColor="border.subtle" />
@@ -951,6 +951,8 @@ const BulkMenuItems = ({
         {images.length} images selected
       </Text>
       <Menu.Separator borderColor="border.subtle" />
+      <CanvasDestinationMenuItems actions={actions} images={images} isBulk />
+      <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem
         icon={StarIcon}
         iconFill={allStarred ? 'currentColor' : 'none'}
@@ -964,7 +966,6 @@ const BulkMenuItems = ({
         value="download-selection"
         onClick={handleDownload}
       />
-      <NewFromImageSubMenu actions={actions} images={images} isBulk />
       <ChangeBoardSubMenu boards={boards} currentBoardId={null} onMove={handleMove} />
       <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem
@@ -978,31 +979,8 @@ const BulkMenuItems = ({
   );
 };
 
-const NewFromImageSubMenu = ({
-  actions,
-  images,
-  isBulk,
-}: {
-  actions: ImageActions;
-  images: GalleryImage[];
-  isBulk: boolean;
-}) => {
-  const { t } = useTranslation();
-  const handleNewCanvas = useCallback(() => void actions.createCanvasFromImages(images), [actions, images]);
-  return (
-    <ContextSubMenu icon={FileImageIcon} label={t('widgets.canvas.import.newFromImage', { count: images.length })}>
-      <ContextMenuItem
-        icon={FileImageIcon}
-        label={t('widgets.canvas.import.newCanvasFromImage', { count: images.length })}
-        value="new-canvas-from-image"
-        onClick={handleNewCanvas}
-      />
-      <GalleryCanvasImportSubMenu actions={actions} images={images} isBulk={isBulk} />
-    </ContextSubMenu>
-  );
-};
-
-const GalleryCanvasImportSubMenu = ({
+/** The open project's canvas leads; starting a separate project from the images is the explicit alternative. */
+const CanvasDestinationMenuItems = ({
   actions,
   images,
   isBulk,
@@ -1013,13 +991,27 @@ const GalleryCanvasImportSubMenu = ({
 }) => {
   const { t } = useTranslation();
   const items = getGalleryCanvasImportMenuItems(isBulk);
+  const handleNewProject = useCallback(() => void actions.createCanvasFromImages(images), [actions, images]);
 
   return (
-    <ContextSubMenu icon={LayersIcon} label={t('widgets.canvas.import.newLayerFromImage', { count: images.length })}>
-      {items.map((item) => (
-        <GalleryCanvasImportDestinationMenuItem key={item.destination} actions={actions} images={images} item={item} />
-      ))}
-    </ContextSubMenu>
+    <>
+      <ContextSubMenu icon={LayersIcon} label={t('widgets.canvas.import.addToCurrentCanvas')}>
+        {items.map((item) => (
+          <GalleryCanvasImportDestinationMenuItem
+            key={item.destination}
+            actions={actions}
+            images={images}
+            item={item}
+          />
+        ))}
+      </ContextSubMenu>
+      <ContextMenuItem
+        icon={FileImageIcon}
+        label={t('widgets.canvas.import.newProjectFromImage', { count: images.length })}
+        value="new-project-from-image"
+        onClick={handleNewProject}
+      />
+    </>
   );
 };
 

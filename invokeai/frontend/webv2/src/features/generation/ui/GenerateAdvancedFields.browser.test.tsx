@@ -3,6 +3,7 @@ import type { MainModelConfig } from '@features/generation/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
+import { createExternalStoreCore } from '@platform/state/externalStoreCore';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
 import { act } from 'react';
@@ -78,8 +79,8 @@ const render = async (model: MainModelConfig, hiDiffusionEnabled: boolean) => {
       <ChakraProvider value={system}>
         <I18nextProvider i18n={i18n}>
           <GenerateAdvancedFields
+            draft={createExternalStoreCore(settings)}
             selectedModel={model}
-            settings={settings}
             onCommit={onCommit}
             onCommitImmediate={vi.fn()}
           />

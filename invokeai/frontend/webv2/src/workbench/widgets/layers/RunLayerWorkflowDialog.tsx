@@ -3,7 +3,7 @@ import type { ProjectGraphState } from '@features/workflow/contracts';
 import type { CanvasExportCapability, CanvasLayerCapability } from '@workbench/canvas-engine/api';
 import type { FormEvent } from 'react';
 
-import { chakra, createListCollection, Dialog, Portal, Stack, Text } from '@chakra-ui/react';
+import { chakra, createListCollection, Portal, Stack, Text } from '@chakra-ui/react';
 import { galleryDurability, galleryImages } from '@features/gallery';
 import { invalidateGalleryItems } from '@features/gallery/queries';
 import { runUtilityGraph } from '@features/queue/utility';
@@ -23,6 +23,7 @@ import { createUuid } from '@platform/browser/randomUuid';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { socketHub } from '@platform/transport/socketHub';
 import { Button, CloseButton, Field, Select } from '@platform/ui';
+import { Dialog } from '@platform/ui/Dialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { getCanvasOperations } from '@workbench/canvas-operations/api';
 import { getActiveProjectGraph } from '@workbench/projectWorkflows';

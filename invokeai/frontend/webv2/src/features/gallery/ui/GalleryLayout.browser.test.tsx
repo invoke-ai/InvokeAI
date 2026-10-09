@@ -68,7 +68,6 @@ const createGallery = (overrides: Partial<GalleryStateView> = {}) =>
     boards: [board],
     compareImageKey: null,
     galleryView: 'images',
-    isLoading: false,
     items: [createItem('a.png'), createItem('b.png')],
     pendingPlaceholders: [],
     projectBoardId: null,
@@ -98,6 +97,14 @@ const createContextValue = () =>
     region: 'center',
   }) as unknown as GalleryWidgetContextValue;
 
+const READY = {
+  error: null,
+  isFetchingMore: false,
+  isRetrying: false,
+  retry: () => Promise.resolve(),
+  status: 'ready',
+} as const;
+
 const contextBase = {
   actions: {
     createBoard: vi.fn(),
@@ -110,9 +117,11 @@ const contextBase = {
     updateSettings: vi.fn(),
     uploadFiles: vi.fn(),
   },
+  boardsState: READY,
   filter: { boardId: 'dogs', galleryView: 'images', searchTerm: '' },
   gallery,
   isWindowTruncated: false,
+  listing: READY,
   starredStrip: EMPTY_GALLERY_STARRED_STRIP,
   itemActions: {
     deleteItems: vi.fn(),
@@ -136,6 +145,7 @@ const adapter = {
   getItemLabel: () => Promise.resolve(null),
   followProgressSession: vi.fn(),
   antialiasProgressImages: false,
+  galleryValues: {},
   widgets: { openGallery: vi.fn(() => true), patchGalleryValues: vi.fn() },
 } as unknown as GalleryUiAdapter;
 
@@ -413,7 +423,7 @@ describe('gallery layout shells', () => {
   it('moves focus to the toolbar toggle when Show all removes the strip header', async () => {
     const starredItem = { ...createItem('starred.png'), starred: true };
 
-    contextBase.starredStrip = { items: [starredItem], total: 9 };
+    contextBase.starredStrip = { items: [starredItem], state: READY, total: 9 };
     setGallery(createGallery({ items: [createItem('a.png')], starredOnly: false }));
     await renderLayout(GalleryWideLayout);
 

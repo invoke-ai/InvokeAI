@@ -1,6 +1,12 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 
-import type { ProjectDraftBody, ProjectDraftMetadata, ProjectDraftWriterClaim } from './draftStore';
+import type {
+  ProjectDraftBody,
+  ProjectDraftMetadata,
+  ProjectDraftWriterClaim,
+  ProjectUnloadJournalEntry,
+  ProjectUnloadJournalKey,
+} from './draftStore';
 
 export const WORKBENCH_DATABASE_VERSION = 4;
 export const WORKBENCH_DRAFT_STORE = 'drafts';
@@ -89,37 +95,122 @@ export interface WorkbenchDatabaseSchema extends DBSchema {
 
 export type WorkbenchDatabase = IDBPDatabase<WorkbenchDatabaseSchema>;
 
+export const UNLOAD_JOURNAL_DATABASE_VERSION = 1;
+export const UNLOAD_JOURNAL_STORE = 'entries';
+
+/**
+ * Unload journal entries live in their own database: Chromium drops a committed write at unload while a read-write
+ * transaction of the same database is still open, which a stage in flight in the workbench database would be.
+ */
+export interface UnloadJournalDatabaseSchema extends DBSchema {
+  entries: {
+    key: ProjectUnloadJournalKey;
+    value: ProjectUnloadJournalEntry;
+  };
+}
+
+export type UnloadJournalDatabase = IDBPDatabase<UnloadJournalDatabaseSchema>;
+
 const WORKBENCH_DATABASE_NAME_BASE = 'invokeai:v7:webv2:workbench';
+const UNLOAD_JOURNAL_DATABASE_NAME_BASE = 'invokeai:v7:webv2:unload-journal';
 
 export const getWorkbenchDatabaseName = (storageSuffix: string): string =>
   `${WORKBENCH_DATABASE_NAME_BASE}${storageSuffix}`;
 
-const unavailableDatabases = new WeakSet<WorkbenchDatabase>();
+export const getUnloadJournalDatabaseName = (storageSuffix: string): string =>
+  `${UNLOAD_JOURNAL_DATABASE_NAME_BASE}${storageSuffix}`;
 
-export const isWorkbenchDatabaseAvailable = (database: WorkbenchDatabase): boolean =>
-  !unavailableDatabases.has(database);
+const unavailableDatabases = new WeakSet<object>();
 
-export const openWorkbenchDatabase = (
-  storageSuffix: string,
-  { timeoutMs = 1_000 }: { timeoutMs?: number } = {}
-): Promise<WorkbenchDatabase> => {
-  let connection: WorkbenchDatabase | undefined;
+export const isWorkbenchDatabaseAvailable = (database: object): boolean => !unavailableDatabases.has(database);
+
+const openDatabaseWithin = <Schema extends DBSchema>(
+  name: string,
+  version: number,
+  label: string,
+  timeoutMs: number,
+  upgrade: NonNullable<Parameters<typeof openDB<Schema>>[2]>['upgrade']
+): Promise<IDBPDatabase<Schema>> => {
+  let connection: IDBPDatabase<Schema> | undefined;
   let didSettle = false;
   let rejectOpen: (reason: unknown) => void = () => undefined;
-  const opening = openDB<WorkbenchDatabaseSchema>(getWorkbenchDatabaseName(storageSuffix), WORKBENCH_DATABASE_VERSION, {
-    blocked: () => rejectOpen(new DOMException('Opening the workbench database was blocked.', 'InvalidStateError')),
+  const markUnavailable = (database: IDBPDatabase<Schema>): void => {
+    unavailableDatabases.add(database);
+  };
+  const opening = openDB<Schema>(name, version, {
+    blocked: () => rejectOpen(new DOMException(`Opening the ${label} database was blocked.`, 'InvalidStateError')),
     blocking: () => {
       if (connection) {
-        unavailableDatabases.add(connection);
+        markUnavailable(connection);
         connection.close();
       }
     },
     terminated: () => {
       if (connection) {
-        unavailableDatabases.add(connection);
+        markUnavailable(connection);
       }
     },
-    upgrade(database, oldVersion, _newVersion, transaction) {
+    upgrade,
+  });
+  return new Promise((resolve, reject) => {
+    rejectOpen = (reason) => {
+      if (!didSettle) {
+        didSettle = true;
+        reject(reason);
+      }
+    };
+    const timeout = globalThis.setTimeout(
+      () => rejectOpen(new DOMException(`Opening the ${label} database timed out.`, 'TimeoutError')),
+      timeoutMs
+    );
+    void opening.then(
+      (database) => {
+        connection = database;
+        globalThis.clearTimeout(timeout);
+        if (didSettle) {
+          markUnavailable(database);
+          database.close();
+          return;
+        }
+        didSettle = true;
+        resolve(database);
+      },
+      (error) => {
+        globalThis.clearTimeout(timeout);
+        rejectOpen(error);
+      }
+    );
+  });
+};
+
+export const openUnloadJournalDatabase = (
+  storageSuffix: string,
+  { timeoutMs = 1_000 }: { timeoutMs?: number } = {}
+): Promise<UnloadJournalDatabase> =>
+  openDatabaseWithin<UnloadJournalDatabaseSchema>(
+    getUnloadJournalDatabaseName(storageSuffix),
+    UNLOAD_JOURNAL_DATABASE_VERSION,
+    'unload journal',
+    timeoutMs,
+    (database, oldVersion) => {
+      if (oldVersion < 1) {
+        database.createObjectStore(UNLOAD_JOURNAL_STORE, {
+          keyPath: ['projectId', 'editorSessionId', 'writerToken', 'generation'],
+        });
+      }
+    }
+  );
+
+export const openWorkbenchDatabase = (
+  storageSuffix: string,
+  { timeoutMs = 1_000 }: { timeoutMs?: number } = {}
+): Promise<WorkbenchDatabase> =>
+  openDatabaseWithin<WorkbenchDatabaseSchema>(
+    getWorkbenchDatabaseName(storageSuffix),
+    WORKBENCH_DATABASE_VERSION,
+    'workbench',
+    timeoutMs,
+    (database, oldVersion, _newVersion, transaction) => {
       if (oldVersion < 1) {
         const drafts = database.createObjectStore(WORKBENCH_DRAFT_STORE, {
           keyPath: ['projectId', 'editorSessionId'],
@@ -158,38 +249,8 @@ export const openWorkbenchDatabase = (
       if (oldVersion < 4) {
         database.createObjectStore(WORKBENCH_QUEUE_RECEIPT_STORE, { keyPath: 'key' });
       }
-    },
-  });
-  return new Promise((resolve, reject) => {
-    rejectOpen = (reason) => {
-      if (!didSettle) {
-        didSettle = true;
-        reject(reason);
-      }
-    };
-    const timeout = globalThis.setTimeout(
-      () => rejectOpen(new DOMException('Opening the workbench database timed out.', 'TimeoutError')),
-      timeoutMs
-    );
-    void opening.then(
-      (database) => {
-        connection = database;
-        globalThis.clearTimeout(timeout);
-        if (didSettle) {
-          unavailableDatabases.add(database);
-          database.close();
-          return;
-        }
-        didSettle = true;
-        resolve(database);
-      },
-      (error) => {
-        globalThis.clearTimeout(timeout);
-        rejectOpen(error);
-      }
-    );
-  });
-};
+    }
+  );
 
 export type DeleteWorkbenchDatabaseFinalResult = { kind: 'deleted' | 'unavailable' };
 export type DeleteWorkbenchDatabaseResult =
@@ -198,8 +259,28 @@ export type DeleteWorkbenchDatabaseResult =
 
 const pendingDeletions = new Map<string, Promise<DeleteWorkbenchDatabaseResult>>();
 
-export const deleteWorkbenchDatabase = (storageSuffix: string): Promise<DeleteWorkbenchDatabaseResult> => {
-  const name = getWorkbenchDatabaseName(storageSuffix);
+const combineDeletions = (results: DeleteWorkbenchDatabaseFinalResult[]): DeleteWorkbenchDatabaseFinalResult => ({
+  kind: results.every((result) => result.kind === 'deleted') ? 'deleted' : 'unavailable',
+});
+
+/** Deletes the account's browser recovery: the workbench database and its unload journal database. */
+export const deleteWorkbenchDatabase = async (storageSuffix: string): Promise<DeleteWorkbenchDatabaseResult> => {
+  const deletions = await Promise.all([
+    deleteDatabaseNamed(getWorkbenchDatabaseName(storageSuffix)),
+    deleteDatabaseNamed(getUnloadJournalDatabaseName(storageSuffix)),
+  ]);
+  if (deletions.every((deletion) => deletion.kind !== 'blocked')) {
+    return combineDeletions(deletions as DeleteWorkbenchDatabaseFinalResult[]);
+  }
+  return {
+    completion: Promise.all(
+      deletions.map((deletion) => (deletion.kind === 'blocked' ? deletion.completion : deletion))
+    ).then(combineDeletions),
+    kind: 'blocked',
+  };
+};
+
+const deleteDatabaseNamed = (name: string): Promise<DeleteWorkbenchDatabaseResult> => {
   const pending = pendingDeletions.get(name);
   if (pending) {
     return pending;

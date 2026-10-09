@@ -24,7 +24,8 @@ vi.mock('react-i18next', () => ({
 
 const navigate = vi.hoisted(() => vi.fn());
 
-vi.mock('@tanstack/react-router', () => ({
+vi.mock('@tanstack/react-router', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useNavigate: () => navigate,
   Link: ({ children, ...props }: { children?: unknown } & Record<string, unknown>) => (
     <a href="/app" {...props}>

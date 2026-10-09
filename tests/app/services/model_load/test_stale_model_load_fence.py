@@ -56,14 +56,14 @@ class _LoadEvents:
 @pytest.fixture
 def harness(tmp_path: Path):
     _RecordingLoader.built_from = []
-    app_config = InvokeAIAppConfig(use_memory_db=True)
+    app_config = InvokeAIAppConfig(use_memory_db=True, models_dir=tmp_path)
     logger = InvokeAILogger.get_logger()
     store = ModelRecordServiceSQL(create_mock_sqlite_database(app_config, logger), logger)
     model_dir = tmp_path / "siglip"
     model_dir.mkdir()
     store.add_model(
         SigLIP_Diffusers_Config(
-            key=KEY, path=str(model_dir), name="siglip", hash="abc", file_size=1, source="test", source_type="path"
+            key=KEY, path="siglip", name="siglip", hash="abc", file_size=1, source="test", source_type="path"
         )
     )
     cache = ModelCache(
@@ -205,6 +205,8 @@ def test_config_object_reused_after_eviction_still_loads(harness):
     with MODEL_LOAD_LOCK.write_lock():
         cache.drop_model(KEY)
 
+    # Checked directly: a spurious rejection would otherwise be hidden by the retry.
+    assert service._config_is_current(config)
     service.load_model(config)
     assert _RecordingLoader.built_from == [None, None]
 

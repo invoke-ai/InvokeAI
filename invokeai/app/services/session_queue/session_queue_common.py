@@ -220,7 +220,10 @@ class ItemIdsResult(BaseModel):
     """Response containing ordered item ids with metadata for optimistic updates."""
 
     item_ids: list[int] = Field(description="Ordered list of item ids")
-    total_count: int = Field(description="Total number of queue items matching the query")
+    total_count: int = Field(
+        description="Number of ids in item_ids. Equals the number of matching items only when no limit is given; "
+        "use the queue status for totals"
+    )
 
 
 NodeFieldValueValidator = TypeAdapter(list[NodeFieldValue])

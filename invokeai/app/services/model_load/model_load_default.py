@@ -183,7 +183,7 @@ class ModelLoadService(ModelLoadServiceBase):
         except UnknownModelException:
             # Nothing newer to load instead, and the key can no longer be requested.
             return True
-        return not load_settings_changed(config, current)
+        return not load_settings_changed(config, current, models_path=self._app_config.models_path)
 
     def load_model_from_path(
         self, model_path: Path, loader: Optional[Callable[[Path], AnyModel]] = None

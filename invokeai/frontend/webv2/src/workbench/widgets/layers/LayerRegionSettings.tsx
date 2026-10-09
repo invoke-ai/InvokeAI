@@ -5,8 +5,12 @@ import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps'
 import { createListCollection, HStack, Stack, Text } from '@chakra-ui/react';
 import { ColorPicker, Field, Select } from '@platform/ui';
 import { type ColorSamplerEngine, useColorSampler } from '@workbench/widgets/canvas/useColorSampler';
-import { type CanvasPreparedEngine, useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
-import { useCallback, useMemo, useRef } from 'react';
+import {
+  baselineConfig,
+  type CanvasPreparedEngine,
+  useStructuralPreview,
+} from '@workbench/widgets/canvas/useStructuralCommit';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const MASK_FILL_STYLES: readonly CanvasMaskFillContract['style'][] = [
@@ -30,7 +34,6 @@ export const LayerRegionSettings = ({ engine, layer }: LayerRegionSettingsProps)
   const { t } = useTranslation();
   const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const sampleColor = useColorSampler(engine);
-  const fillBeforeRef = useRef<CanvasMaskFillContract | null>(null);
   const region = layer.inpaint;
 
   const styleCollection = useMemo(
@@ -44,18 +47,15 @@ export const LayerRegionSettings = ({ engine, layer }: LayerRegionSettingsProps)
     [t]
   );
 
+  // A previewed color records from where its preview started; a style change from the live region.
   const commitFill = useCallback(
-    (next: CanvasMaskFillContract, before: CanvasMaskFillContract) => {
+    (next: CanvasMaskFillContract) => {
       if (!region) {
         return;
       }
-      commitPrepared(t('widgets.layers.maskFill.fill'), (model) =>
-        model.prepare({
-          before: { inpaint: { ...region, fill: before }, layerType: 'raster' },
-          config: { inpaint: { ...region, fill: next }, layerType: 'raster' },
-          id: layer.id,
-          type: 'patch-config',
-        })
+      const config = { inpaint: { ...region, fill: next }, layerType: 'raster' } as const;
+      commitPrepared(t('widgets.layers.maskFill.fill'), (model, baseline) =>
+        model.prepare({ before: baselineConfig(baseline, config), config, id: layer.id, type: 'patch-config' })
       );
     },
     [commitPrepared, layer.id, region, t]
@@ -63,34 +63,22 @@ export const LayerRegionSettings = ({ engine, layer }: LayerRegionSettingsProps)
 
   const handleColorChange = useCallback(
     (hex: string) => {
-      if (!region) {
-        return;
-      }
-      if (
-        !previewStructural({
-          config: {
-            inpaint: { ...region, fill: { ...region.fill, color: hex } },
-            layerType: 'raster',
-          },
+      if (region) {
+        previewStructural({
+          config: { inpaint: { ...region, fill: { ...region.fill, color: hex } }, layerType: 'raster' },
           id: layer.id,
           type: 'updateCanvasLayerConfig',
-        })
-      ) {
-        return;
+        });
       }
-      fillBeforeRef.current ??= region.fill;
     },
     [previewStructural, layer.id, region]
   );
 
   const handleColorChangeEnd = useCallback(
     (hex: string) => {
-      if (!region) {
-        return;
+      if (region) {
+        commitFill({ ...region.fill, color: hex });
       }
-      const before = fillBeforeRef.current ?? region.fill;
-      fillBeforeRef.current = null;
-      commitFill({ ...before, color: hex }, before);
     },
     [commitFill, region]
   );
@@ -99,7 +87,7 @@ export const LayerRegionSettings = ({ engine, layer }: LayerRegionSettingsProps)
     ({ value }: SelectValueChangeDetails) => {
       const style = value[0] as CanvasMaskFillContract['style'] | undefined;
       if (region && style && style !== region.fill.style) {
-        commitFill({ ...region.fill, style }, region.fill);
+        commitFill({ ...region.fill, style });
       }
     },
     [commitFill, region]

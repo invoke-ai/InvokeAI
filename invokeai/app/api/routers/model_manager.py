@@ -4,13 +4,14 @@ import asyncio
 import contextlib
 import io
 import pathlib
+import shutil
 import threading
 import traceback
 import unicodedata
 from collections.abc import Generator
 from copy import deepcopy
 from enum import Enum
-from tempfile import TemporaryDirectory
+from tempfile import mkdtemp
 from typing import Any, List, Optional, Type
 
 import huggingface_hub
@@ -28,7 +29,12 @@ from invokeai.app.services.model_images.model_images_common import (
     ModelImageFileDeleteException,
     ModelImageFileNotFoundException,
 )
-from invokeai.app.services.model_install.model_install_common import ModelInstallJob
+from invokeai.app.services.model_install.model_install_common import (
+    InstallCancellationConflictError,
+    InstallDownloadConflictError,
+    InstallRecoveryRequiredError,
+    ModelInstallJob,
+)
 from invokeai.app.services.model_load.model_load_common import load_settings_changed
 from invokeai.app.services.model_records import (
     InvalidModelException,
@@ -487,7 +493,10 @@ def _reidentify_model(key: str) -> AnyModelConfig:
     # backbone (a 16-channel VAE, a PiD decoder), the HF repo or URL may. A file copied into the models
     # folder has also lost the folder it came from, so without the source a re-probe refiles it under
     # the default.
-    result = ModelConfigFactory.from_model_on_disk(mod, {"source": config.source, "source_type": config.source_type})
+    override_fields = {"source": config.source, "source_type": config.source_type}
+    if encoder_id := getattr(config, "image_encoder_model_id", None):
+        override_fields["image_encoder_model_id"] = encoder_id
+    result = ModelConfigFactory.from_model_on_disk(mod, override_fields)
     if result.config is None:
         raise InvalidModelException("Unable to identify model format")
 
@@ -502,9 +511,11 @@ def _reidentify_model(key: str) -> AnyModelConfig:
     result.config.source = config.source
     result.config.source_type = config.source_type
 
-    # The probe resets load-affecting settings (cpu_only, default_settings), so in-flight loads must re-check.
+    # The probe can reset load-affecting settings (cpu_only, default_settings), so in-flight loads must re-check.
     with ApiDependencies.invoker.services.model_manager.load.record_edit(config.key):
-        return ApiDependencies.invoker.services.model_manager.store.replace_model(config.key, result.config)
+        updated = ApiDependencies.invoker.services.model_manager.store.replace_model(config.key, result.config)
+        _invalidate_model_load_caches(config.key, config, updated)
+    return updated
 
 
 class FoundModel(BaseModel):
@@ -646,21 +657,7 @@ def _update_model_record(key: str, changes: ModelRecordChanges) -> AnyModelConfi
             # Settings that change how the model loads (e.g. fp8_storage, cpu_only) are baked into the cached
             # nn.Module at load time, so toggling them on a cached model is otherwise silently a no-op until
             # the entry is evicted. Drop any unlocked cached entries for this model so the next load rebuilds.
-            if load_settings_changed(previous_config, config):
-                # Drop the model from every per-device cache so the next load on any GPU rebuilds it.
-                # Hold the model-load write lock so no worker is mid-construction while we invalidate:
-                # a concurrent load could otherwise peek the old shared CPU weights before the drop and
-                # re-register them as canonical after it. Acquiring the lock can wait on an in-flight
-                # load/VRAM transfer, but this entire helper already runs off the event loop.
-                with MODEL_LOAD_LOCK.write_lock():
-                    dropped = sum(
-                        cache.drop_model(key)
-                        for cache in ApiDependencies.invoker.services.model_manager.load.ram_caches.values()
-                    )
-                if dropped:
-                    logger.info(
-                        f"Dropped {dropped} cached entr{'y' if dropped == 1 else 'ies'} for model {key} after settings change."
-                    )
+            _invalidate_model_load_caches(key, previous_config, config)
             config = prepare_model_config_for_response(config, ApiDependencies)
             logger.info(f"Updated model: {key}")
         except UnknownModelException as e:
@@ -699,6 +696,20 @@ async def update_model_record(
     if "key" in changes.model_fields_set and changes.key != key:
         raise HTTPException(status_code=422, detail="A model's key cannot be changed")
     return await asyncio.to_thread(_update_model_record, key, changes)
+
+
+def _invalidate_model_load_caches(key: str, previous: AnyModelConfig, updated: AnyModelConfig) -> None:
+    """Drop cached instances when a record change affects how the model is loaded."""
+    if not load_settings_changed(previous, updated):
+        return
+    services = ApiDependencies.invoker.services
+    # Prevent a concurrent load from re-registering state built from the previous model identity.
+    with MODEL_LOAD_LOCK.write_lock():
+        dropped = sum(cache.drop_model(key) for cache in services.model_manager.load.ram_caches.values())
+    if dropped:
+        services.logger.info(
+            f"Dropped {dropped} cached entr{'y' if dropped == 1 else 'ies'} for model {key} after settings change."
+        )
 
 
 @model_manager_router.get(
@@ -1244,6 +1255,7 @@ def get_model_install_job(
     responses={
         201: {"description": "The job was cancelled successfully"},
         415: {"description": "No such job"},
+        409: {"description": "The job cannot be cancelled safely in its current state"},
     },
     status_code=201,
 )
@@ -1257,7 +1269,10 @@ def cancel_model_install_job(
         job = installer.get_job_by_id(id)
     except ValueError as e:
         raise HTTPException(status_code=415, detail=str(e))
-    installer.cancel_job(job)
+    try:
+        installer.cancel_job(job)
+    except (InstallCancellationConflictError, InstallDownloadConflictError) as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
 
 
 @model_manager_router.post(
@@ -1265,6 +1280,7 @@ def cancel_model_install_job(
     operation_id="pause_model_install_job",
     responses={
         201: {"description": "The job was paused successfully"},
+        409: {"description": "The job cannot be paused in its current state"},
         415: {"description": "No such job"},
     },
     status_code=201,
@@ -1278,7 +1294,10 @@ def pause_model_install_job(
         job = installer.get_job_by_id(id)
     except ValueError as e:
         raise HTTPException(status_code=415, detail=str(e))
-    installer.pause_job(job)
+    try:
+        installer.pause_job(job)
+    except (InstallCancellationConflictError, InstallDownloadConflictError) as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
     return job
 
 
@@ -1287,6 +1306,7 @@ def pause_model_install_job(
     operation_id="resume_model_install_job",
     responses={
         201: {"description": "The job was resumed successfully"},
+        409: {"description": "A previous download still owns the staging directory"},
         415: {"description": "No such job"},
     },
     status_code=201,
@@ -1300,7 +1320,10 @@ def resume_model_install_job(
         job = installer.get_job_by_id(id)
     except ValueError as e:
         raise HTTPException(status_code=415, detail=str(e))
-    installer.resume_job(job)
+    try:
+        installer.resume_job(job)
+    except (InstallCancellationConflictError, InstallDownloadConflictError) as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
     return job
 
 
@@ -1309,6 +1332,7 @@ def resume_model_install_job(
     operation_id="restart_failed_model_install_job",
     responses={
         201: {"description": "Failed files restarted successfully"},
+        409: {"description": "A prior download is active or recovery data must be preserved"},
         415: {"description": "No such job"},
     },
     status_code=201,
@@ -1322,7 +1346,10 @@ def restart_failed_model_install_job(
         job = installer.get_job_by_id(id)
     except ValueError as e:
         raise HTTPException(status_code=415, detail=str(e))
-    installer.restart_failed(job)
+    try:
+        installer.restart_failed(job)
+    except (InstallCancellationConflictError, InstallDownloadConflictError) as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
     return job
 
 
@@ -1331,6 +1358,7 @@ def restart_failed_model_install_job(
     operation_id="restart_model_install_file",
     responses={
         201: {"description": "File restarted successfully"},
+        409: {"description": "A prior download is active or recovery data must be preserved"},
         415: {"description": "No such job"},
     },
     status_code=201,
@@ -1346,7 +1374,10 @@ def restart_model_install_file(
         job = installer.get_job_by_id(id)
     except ValueError as e:
         raise HTTPException(status_code=415, detail=str(e))
-    installer.restart_file(job, str(file_source))
+    try:
+        installer.restart_file(job, str(file_source))
+    except (InstallCancellationConflictError, InstallDownloadConflictError) as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
     return job
 
 
@@ -1435,8 +1466,10 @@ def _convert_model(key: str, user_id: str) -> AnyModelConfig:
     scratch_dir = ApiDependencies.invoker.services.configuration.models_path / CONVERSION_SCRATCH_DIRNAME
     scratch_dir.mkdir(parents=True, exist_ok=True)
 
-    with TemporaryDirectory(dir=scratch_dir) as tmpdir:
-        convert_path = pathlib.Path(tmpdir) / pathlib.Path(model_config.path).stem
+    tmpdir = pathlib.Path(mkdtemp(dir=scratch_dir))
+    preserve_scratch = False
+    try:
+        convert_path = tmpdir / pathlib.Path(model_config.path).stem
         converted_model = loader.load_model(model_config, user_id=user_id)
         # write the converted file to the convert path
         raw_model = converted_model.model
@@ -1465,6 +1498,14 @@ def _convert_model(key: str, user_id: str) -> AnyModelConfig:
                         ),
                     )
                 )
+            except InstallRecoveryRequiredError as e:
+                preserve_scratch = True
+                logger.error(str(e))
+                store.update_model(key, changes=ModelRecordChanges(name=original_name))
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"{e} Conversion recovery source retained at {tmpdir.resolve()}.",
+                ) from e
             except Exception as e:
                 logger.error(str(e))
                 store.update_model(key, changes=ModelRecordChanges(name=original_name))
@@ -1485,6 +1526,9 @@ def _convert_model(key: str, user_id: str) -> AnyModelConfig:
             new_config = store.get_model(new_key)
             new_config = prepare_model_config_for_response(new_config, ApiDependencies)
             return new_config
+    finally:
+        if not preserve_scratch:
+            shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 class StarterModelResponse(BaseModel):

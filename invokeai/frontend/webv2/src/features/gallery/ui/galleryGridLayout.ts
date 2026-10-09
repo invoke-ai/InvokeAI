@@ -147,17 +147,22 @@ export const getGalleryProgressLayout = ({
 };
 export type GalleryProgressLayout = ReturnType<typeof getGalleryProgressLayout>;
 
-/** The pinned starred strip: its disclosure row plus, while open, its bounded rows. */
+/**
+ * The pinned starred strip: its disclosure row plus, while open, its bounded rows. A strip that failed with
+ * nothing to show keeps the header row alone, to report the failure in place of the cells.
+ */
 export const getGalleryStarredLayout = ({
   columns,
   tileSize,
   shownCount,
   collapsed,
+  failed = false,
 }: {
   columns: number;
   tileSize: number;
   shownCount: number;
   collapsed: boolean;
+  failed?: boolean;
 }) => {
   const rowCount = Math.ceil(shownCount / columns);
   const rowHeight = tileSize + GALLERY_GRID_GAP_PX;
@@ -165,7 +170,12 @@ export const getGalleryStarredLayout = ({
   return {
     rowCount,
     rowHeight,
-    height: shownCount > 0 ? GALLERY_STARRED_HEADER_HEIGHT_PX + (collapsed ? 0 : rowCount * rowHeight) : 0,
+    height:
+      shownCount > 0
+        ? GALLERY_STARRED_HEADER_HEIGHT_PX + (collapsed ? 0 : rowCount * rowHeight)
+        : failed
+          ? GALLERY_STARRED_HEADER_HEIGHT_PX
+          : 0,
   };
 };
 

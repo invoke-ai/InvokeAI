@@ -158,6 +158,12 @@ export type CanvasProjectMutation =
   | { type: 'deleteCanvasSnapshot'; snapshotId: string }
   | { type: 'setCanvasStagingAutoSwitch'; mode: CanvasStagingAreaContractV2['autoSwitchMode'] };
 
+/** The only mutations a widget may preview live; every other structural edit is prepared and committed. */
+export type CanvasLayerPreviewMutation = Extract<
+  CanvasProjectMutation,
+  { type: 'updateCanvasLayer' | 'updateCanvasLayerConfig' }
+>;
+
 /** Why a canvas mutation is dispatched; system work never triggers user-routing policy. */
 export type CanvasMutationOrigin = 'user' | 'system';
 

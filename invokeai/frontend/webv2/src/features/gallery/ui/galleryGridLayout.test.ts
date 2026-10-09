@@ -139,6 +139,12 @@ describe('pinned sections layout', () => {
     expect(getGalleryStarredLayout({ collapsed: false, columns: 2, shownCount: 0, tileSize: 96 }).height).toBe(0);
   });
 
+  it('keeps only the header row for a strip that failed with nothing to show, so the scroll margin covers it', () => {
+    expect(
+      getGalleryStarredLayout({ collapsed: false, columns: 2, failed: true, shownCount: 0, tileSize: 96 }).height
+    ).toBe(GALLERY_STARRED_HEADER_HEIGHT_PX);
+  });
+
   it('closes the pinned block with its footer only when something is pinned', () => {
     expect(getGalleryPinnedHeightPx(0, 0)).toBe(0);
     expect(getGalleryPinnedHeightPx(40, 0)).toBe(40 + GALLERY_PINNED_FOOTER_PX);

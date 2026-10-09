@@ -496,6 +496,377 @@ def test_convert_model_releases_the_lock_when_the_conversion_fails() -> None:
     assert exc_info.value.status_code == 424
 
 
+def test_convert_model_retains_recovery_source_and_restores_model_name(monkeypatch: Any, tmp_path: Path) -> None:
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager as model_manager_router
+    from invokeai.app.services.model_install.model_install_common import InstallRecoveryRequiredError
+    from invokeai.app.services.model_records import ModelRecordChanges
+    from invokeai.backend.model_manager.configs.main import Main_Checkpoint_SD1_Config
+    from invokeai.backend.model_manager.taxonomy import (
+        BaseModelType,
+        ModelFormat,
+        ModelSourceType,
+        ModelType,
+        ModelVariantType,
+        SchedulerPredictionType,
+    )
+
+    model_config = Main_Checkpoint_SD1_Config(
+        key="model-key",
+        path="/models/original.safetensors",
+        name="Original Model",
+        format=ModelFormat.Checkpoint,
+        base=BaseModelType.StableDiffusion1,
+        type=ModelType.Main,
+        config_path="/configs/model.yaml",
+        variant=ModelVariantType.Normal,
+        hash="111222333444",
+        file_size=8192,
+        source="/models/original.safetensors",
+        source_type=ModelSourceType.Path,
+        prediction_type=SchedulerPredictionType.Epsilon,
+    )
+
+    class Store:
+        def get_model(self, key: str) -> Main_Checkpoint_SD1_Config:
+            assert key == model_config.key
+            return model_config
+
+        def update_model(self, key: str, changes: ModelRecordChanges) -> None:
+            assert key == model_config.key
+            if changes.name is not None:
+                model_config.name = changes.name
+
+    def save_pretrained(path: Path) -> None:
+        path.mkdir()
+        (path / "weights.safetensors").write_text("converted")
+
+    def reject_recovery_source(path: Path, *, config: ModelRecordChanges) -> str:
+        raise InstallRecoveryRequiredError(f"Install recovery required. Source: {path}; destination: /models/recovery")
+
+    services = SimpleNamespace(
+        model_manager=SimpleNamespace(
+            store=Store(),
+            load=SimpleNamespace(
+                load_model=lambda *_args, **_kwargs: SimpleNamespace(
+                    model=SimpleNamespace(save_pretrained=save_pretrained)
+                )
+            ),
+            install=SimpleNamespace(install_path=reject_recovery_source),
+        ),
+        configuration=SimpleNamespace(models_path=tmp_path),
+        logger=MagicMock(),
+    )
+    monkeypatch.setattr(model_manager_router, "ApiDependencies", MockApiDependencies(DummyInvoker(services)))
+
+    with pytest.raises(HTTPException) as exc_info:
+        model_manager_router.convert_model(
+            current_admin=SimpleNamespace(user_id="test-user"),
+            key=model_config.key,
+        )
+
+    assert exc_info.value.status_code == 409
+    assert "Source:" in exc_info.value.detail
+    recovery_path = Path(exc_info.value.detail.rsplit("retained at ", 1)[1].rstrip("."))
+    assert recovery_path.is_dir()
+    assert (recovery_path / "original" / "weights.safetensors").read_text() == "converted"
+    assert model_config.name == "Original Model"
+
+
+def test_cancel_model_install_does_not_map_unrelated_value_error_to_conflict(monkeypatch: Any) -> None:
+    from types import SimpleNamespace
+
+    from invokeai.app.api.routers import model_manager as model_manager_router
+
+    class Installer:
+        def get_job_by_id(self, _job_id: int) -> object:
+            return object()
+
+        def cancel_job(self, _job: object) -> None:
+            raise ValueError("unrelated service failure")
+
+    services = SimpleNamespace(model_manager=SimpleNamespace(install=Installer()))
+    monkeypatch.setattr(model_manager_router, "ApiDependencies", MockApiDependencies(DummyInvoker(services)))
+
+    with pytest.raises(ValueError, match="unrelated service failure"):
+        model_manager_router.cancel_model_install_job(current_admin=None, id=42)
+
+
+@pytest.mark.parametrize("operation", ["restart_failed", "restart_file"])
+def test_restart_recovery_required_install_returns_conflict(monkeypatch: Any, operation: str) -> None:
+    from types import SimpleNamespace
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager as model_manager_router
+    from invokeai.app.services.model_install.model_install_common import InstallRecoveryRequiredError
+
+    class Installer:
+        def get_job_by_id(self, job_id: int) -> object:
+            assert job_id == 42
+            return object()
+
+        def restart_failed(self, _job: object) -> None:
+            raise InstallRecoveryRequiredError("Cannot restart an install that requires recovery")
+
+        def restart_file(self, _job: object, _source: str) -> None:
+            raise InstallRecoveryRequiredError("Cannot restart an install that requires recovery")
+
+    services = SimpleNamespace(model_manager=SimpleNamespace(install=Installer()))
+    monkeypatch.setattr(model_manager_router, "ApiDependencies", MockApiDependencies(DummyInvoker(services)))
+
+    with pytest.raises(HTTPException) as exc_info:
+        if operation == "restart_failed":
+            model_manager_router.restart_failed_model_install_job(current_admin=None, id=42)
+        else:
+            model_manager_router.restart_model_install_file(
+                current_admin=None, id=42, file_source="https://example.com/model.safetensors"
+            )
+
+    assert exc_info.value.status_code == 409
+    assert "requires recovery" in exc_info.value.detail
+
+
+@pytest.mark.parametrize("operation", ["cancel", "pause", "resume", "restart_failed", "restart_file"])
+def test_remote_download_replacement_returns_conflict(monkeypatch: Any, operation: str) -> None:
+    from types import SimpleNamespace
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager as model_manager_router
+    from invokeai.app.services.model_install.model_install_common import InstallDownloadConflictError
+
+    class Installer:
+        def get_job_by_id(self, job_id: int) -> object:
+            assert job_id == 42
+            return object()
+
+        def resume_job(self, _job: object) -> None:
+            raise InstallDownloadConflictError("A previous download is still active")
+
+        def pause_job(self, _job: object) -> None:
+            raise InstallDownloadConflictError("A previous download is still active")
+
+        def cancel_job(self, _job: object) -> None:
+            raise InstallDownloadConflictError("A previous download is still active")
+
+        def restart_failed(self, _job: object) -> None:
+            raise InstallDownloadConflictError("A previous download is still active")
+
+        def restart_file(self, _job: object, _source: str) -> None:
+            raise InstallDownloadConflictError("A previous download is still active")
+
+    services = SimpleNamespace(model_manager=SimpleNamespace(install=Installer()))
+    monkeypatch.setattr(model_manager_router, "ApiDependencies", MockApiDependencies(DummyInvoker(services)))
+
+    with pytest.raises(HTTPException) as exc_info:
+        if operation == "cancel":
+            model_manager_router.cancel_model_install_job(current_admin=None, id=42)
+        elif operation == "resume":
+            model_manager_router.resume_model_install_job(current_admin=None, id=42)
+        elif operation == "pause":
+            model_manager_router.pause_model_install_job(current_admin=None, id=42)
+        elif operation == "restart_failed":
+            model_manager_router.restart_failed_model_install_job(current_admin=None, id=42)
+        else:
+            model_manager_router.restart_model_install_file(
+                current_admin=None, id=42, file_source="https://example.com/model.safetensors"
+            )
+
+    assert exc_info.value.status_code == 409
+    assert "previous download" in exc_info.value.detail
+
+
+@pytest.mark.parametrize("operation", ["resume", "restart_failed", "restart_file"])
+def test_install_path_claim_conflict_returns_conflict(monkeypatch: Any, operation: str) -> None:
+    from types import SimpleNamespace
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager as model_manager_router
+    from invokeai.app.services.model_install.model_install_common import InstallCancellationConflictError
+
+    class Installer:
+        def get_job_by_id(self, job_id: int) -> object:
+            assert job_id == 42
+            return object()
+
+        def resume_job(self, _job: object) -> None:
+            raise InstallCancellationConflictError("Another operation owns the install path")
+
+        def restart_failed(self, _job: object) -> None:
+            raise InstallCancellationConflictError("Another operation owns the install path")
+
+        def restart_file(self, _job: object, _source: str) -> None:
+            raise InstallCancellationConflictError("Another operation owns the install path")
+
+    services = SimpleNamespace(model_manager=SimpleNamespace(install=Installer()))
+    monkeypatch.setattr(model_manager_router, "ApiDependencies", MockApiDependencies(DummyInvoker(services)))
+
+    with pytest.raises(HTTPException) as exc_info:
+        if operation == "resume":
+            model_manager_router.resume_model_install_job(current_admin=None, id=42)
+        elif operation == "restart_failed":
+            model_manager_router.restart_failed_model_install_job(current_admin=None, id=42)
+        else:
+            model_manager_router.restart_model_install_file(
+                current_admin=None, id=42, file_source="https://example.com/model.safetensors"
+            )
+
+    assert exc_info.value.status_code == 409
+    assert "owns the install path" in exc_info.value.detail
+
+
+@pytest.mark.parametrize("install_fails", [False, True])
+def test_conversion_cleans_scratch_after_success_and_ordinary_failure(
+    monkeypatch: Any, tmp_path: Path, install_fails: bool
+) -> None:
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager as model_manager_router
+    from invokeai.app.services.model_images.model_images_common import ModelImageFileNotFoundException
+    from invokeai.app.services.model_records import ModelRecordChanges
+    from invokeai.backend.model_manager.configs.main import Main_Checkpoint_SD1_Config
+    from invokeai.backend.model_manager.taxonomy import (
+        BaseModelType,
+        ModelFormat,
+        ModelSourceType,
+        ModelType,
+        ModelVariantType,
+        SchedulerPredictionType,
+    )
+
+    models_path = tmp_path / "models"
+    models_path.mkdir()
+    original = Main_Checkpoint_SD1_Config(
+        key="model-key",
+        path="original.safetensors",
+        name="Original Model",
+        format=ModelFormat.Checkpoint,
+        base=BaseModelType.StableDiffusion1,
+        type=ModelType.Main,
+        config_path="model.yaml",
+        variant=ModelVariantType.Normal,
+        hash="111222333444",
+        file_size=8192,
+        source="local-source",
+        source_type=ModelSourceType.Path,
+        prediction_type=SchedulerPredictionType.Epsilon,
+    )
+    converted = SimpleNamespace(key="converted-key")
+
+    class Store:
+        def get_model(self, key: str) -> Any:
+            return original if key == original.key else converted
+
+        def update_model(self, key: str, changes: ModelRecordChanges) -> None:
+            if changes.name is not None:
+                original.name = changes.name
+
+    def save_pretrained(path: Path) -> None:
+        path.mkdir()
+        (path / "weights.safetensors").write_bytes(b"weights")
+
+    class Installer:
+        def install_path(self, _path: Path, *, config: ModelRecordChanges) -> str:
+            if install_fails:
+                raise ValueError("ordinary install failure")
+            return converted.key
+
+        def delete(self, _key: str) -> None:
+            return None
+
+    def model_image(_key: str) -> None:
+        raise ModelImageFileNotFoundException()
+
+    services = SimpleNamespace(
+        model_manager=SimpleNamespace(
+            store=Store(),
+            load=SimpleNamespace(
+                load_model=lambda *_args, **_kwargs: SimpleNamespace(
+                    model=SimpleNamespace(save_pretrained=save_pretrained)
+                )
+            ),
+            install=Installer(),
+        ),
+        configuration=SimpleNamespace(models_path=models_path),
+        model_images=SimpleNamespace(get=model_image),
+        logger=MagicMock(),
+    )
+    monkeypatch.setattr(model_manager_router, "ApiDependencies", MockApiDependencies(DummyInvoker(services)))
+    monkeypatch.setattr(model_manager_router, "prepare_model_config_for_response", lambda config, _deps: config)
+
+    if install_fails:
+        with pytest.raises(HTTPException) as exc_info:
+            model_manager_router._convert_model(original.key, user_id="test-user")
+        assert exc_info.value.status_code == 409
+    else:
+        assert model_manager_router._convert_model(original.key, user_id="test-user") is converted
+
+    scratch_dir = models_path / model_manager_router.CONVERSION_SCRATCH_DIRNAME
+    assert scratch_dir.exists()
+    assert list(scratch_dir.iterdir()) == []
+
+
+def test_cancel_recovery_required_install_returns_conflict(monkeypatch: Any) -> None:
+    from types import SimpleNamespace
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager as model_manager_router
+    from invokeai.app.services.model_install.model_install_common import InstallRecoveryRequiredError
+
+    class Installer:
+        def get_job_by_id(self, job_id: int) -> object:
+            assert job_id == 42
+            return object()
+
+        def cancel_job(self, _job: object) -> None:
+            raise InstallRecoveryRequiredError("Cannot cancel an install that requires recovery")
+
+    services = SimpleNamespace(model_manager=SimpleNamespace(install=Installer()))
+    monkeypatch.setattr(model_manager_router, "ApiDependencies", MockApiDependencies(DummyInvoker(services)))
+
+    with pytest.raises(HTTPException) as exc_info:
+        model_manager_router.cancel_model_install_job(current_admin=None, id=42)
+
+    assert exc_info.value.status_code == 409
+    assert "requires recovery" in exc_info.value.detail
+
+
+def test_cancel_active_install_returns_conflict(monkeypatch: Any) -> None:
+    from types import SimpleNamespace
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager as model_manager_router
+    from invokeai.app.services.model_install.model_install_common import InstallCancellationConflictError
+
+    class Installer:
+        def get_job_by_id(self, job_id: int) -> object:
+            assert job_id == 43
+            return object()
+
+        def cancel_job(self, _job: object) -> None:
+            raise InstallCancellationConflictError("Cannot cancel while install files are being moved")
+
+    services = SimpleNamespace(model_manager=SimpleNamespace(install=Installer()))
+    monkeypatch.setattr(model_manager_router, "ApiDependencies", MockApiDependencies(DummyInvoker(services)))
+
+    with pytest.raises(HTTPException) as exc_info:
+        model_manager_router.cancel_model_install_job(current_admin=None, id=43)
+
+    assert exc_info.value.status_code == 409
+    assert "being moved" in exc_info.value.detail
+
+
 def test_delete_is_refused_while_the_same_model_is_being_converted() -> None:
     """A delete landing mid-conversion must not pull the source out from under it.
 

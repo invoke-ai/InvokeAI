@@ -139,24 +139,43 @@ def test_update_changing_type_drops_stale_format_and_variant(store: ModelRecordS
     assert isinstance(new_config, TextLLM_Diffusers_Config)
 
 
-def test_model_records_rejects_invalid_attr_changes(store: ModelRecordServiceBase):
-    config = example_ti_config("key1")
-    store.add_model(config)
-    config = store.get_model("key1")
-    # upcast_attention is an invalid field for TIs
-    changes = ModelRecordChanges(upcast_attention=True)
+@pytest.mark.parametrize("allow_class_change", [False, True])
+def test_rejected_update_preserves_the_complete_stored_record(
+    store: ModelRecordServiceBase, allow_class_change: bool
+) -> None:
+    original = example_ti_config("key1")
+    store.add_model(original)
+    before = store.get_model(original.key)
+    # A classification edit may combine valid metadata changes with an incompatible model format.
+    changes = ModelRecordChanges(name="edited name", path="/tmp/edited.bin", format=ModelFormat.Diffusers)
+
     with pytest.raises(ValidationError):
-        store.update_model(config.key, changes)
+        store.update_model(original.key, changes, allow_class_change=allow_class_change)
+
+    after = store.get_model(original.key)
+    assert type(after) is type(before)
+    assert after.model_dump() == before.model_dump()
 
 
-def test_model_records_rejects_invalid_attr_changes_that_change_class(store: ModelRecordServiceBase):
-    config = example_ti_config("key1")
-    store.add_model(config)
-    config = store.get_model("key1")
-    # upcast_attention is an invalid field for TIs
-    changes = ModelRecordChanges(upcast_attention=True)
+def test_rejected_class_change_preserves_the_original_record(store: ModelRecordServiceBase) -> None:
+    original = example_ti_config("key1")
+    store.add_model(original)
+    before = store.get_model(original.key)
+    # Correcting a model's classification can leave an explicitly incompatible format in the submitted edit.
+    changes = ModelRecordChanges(type=ModelType.LoRA, format=ModelFormat.EmbeddingFile, name="edited name")
+
     with pytest.raises(ValidationError):
-        store.update_model(config.key, changes)
+        store.update_model(original.key, changes, allow_class_change=True)
+
+    after = store.get_model(original.key)
+    assert isinstance(after, TI_File_SD1_Config)
+    assert after.model_dump() == before.model_dump()
+
+
+@pytest.mark.parametrize("field", ["type", "base"])
+def test_model_record_changes_reject_invalid_classification_values(field: str) -> None:
+    with pytest.raises(ValidationError):
+        ModelRecordChanges.model_validate({field: "not-a-model-classification"})
 
 
 def test_unknown_key(store: ModelRecordServiceBase):

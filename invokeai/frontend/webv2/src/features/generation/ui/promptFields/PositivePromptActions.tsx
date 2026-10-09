@@ -11,7 +11,19 @@ import type { DynamicPromptsFieldConfig } from '@features/generation/ui/promptFi
 import type { DroppedPromptImage } from '@features/generation/ui/promptFields/usePromptImageDrop';
 import type { ChangeEvent, MouseEvent } from 'react';
 
-import { Checkbox, HStack, Icon, Image, Input, Popover, Portal, Separator, Stack, Text } from '@chakra-ui/react';
+import {
+  Checkbox,
+  HStack,
+  Icon,
+  Image,
+  Input,
+  Popover,
+  Portal,
+  Separator,
+  Spinner,
+  Stack,
+  Text,
+} from '@chakra-ui/react';
 import { galleryImageUrls } from '@features/gallery/utility';
 import { filterPromptHistory } from '@features/generation/core/promptHistory';
 import { resolveSelectedSystemPromptId } from '@features/generation/core/systemPrompts';
@@ -560,13 +572,15 @@ const ExpandPromptButton = ({
       {/* Always the feature name: the popover explains a missing model and offers the way out. */}
       <Tooltip content={t('widgets.generate.expandPrompt')} ids={popoverIds}>
         <Popover.Trigger asChild>
+          {/* Stays enabled mid-run so a dismissed popover can be reopened to follow progress. */}
           <IconButton
+            aria-busy={isLoading || undefined}
             aria-label={t('widgets.generate.expandPrompt')}
-            disabled={isDisabled || isLoading}
+            disabled={isDisabled}
             size="sm"
             variant="ghost"
           >
-            <PencilSparklesIcon />
+            {isLoading ? <Spinner /> : <PencilSparklesIcon />}
           </IconButton>
         </Popover.Trigger>
       </Tooltip>
@@ -793,13 +807,15 @@ const ImageToPromptButton = ({
     >
       <Tooltip content={t('widgets.generate.imageToPrompt')} ids={popoverIds}>
         <Popover.Trigger asChild>
+          {/* Stays enabled mid-run so a dismissed popover can be reopened to follow progress. */}
           <IconButton
+            aria-busy={isLoading || undefined}
             aria-label={t('widgets.generate.imageToPrompt')}
-            disabled={isDisabled || isLoading}
+            disabled={isDisabled}
             size="sm"
             variant="ghost"
           >
-            <ImageUpIcon />
+            {isLoading ? <Spinner /> : <ImageUpIcon />}
           </IconButton>
         </Popover.Trigger>
       </Tooltip>
