@@ -80,8 +80,12 @@ class FakeLoadedModel:
     def compute_device(self) -> torch.device:
         return self._compute_device
 
+    @property
+    def model(self):
+        return self._model
+
     @contextmanager
-    def model_on_device(self):
+    def model_on_device(self, working_mem_bytes=None):
         yield (None, self._model)
 
     def __enter__(self):
