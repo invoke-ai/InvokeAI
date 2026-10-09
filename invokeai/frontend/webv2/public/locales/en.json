@@ -2244,7 +2244,75 @@
       "color": "Color",
       "swatches": "Swatches",
       "history": "History",
-      "overview": "Overview"
+      "overview": "Overview",
+      "remoteWorkers": "Remote Workers"
+    },
+    "remoteWorkers": {
+      "title": "Distributed rendering",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "enable": "Enable distributed rendering",
+      "description": "Send new generations to Local, remote workers, or both. Worker logins are private to each InvokeAI user.",
+      "dispatch": {
+        "title": "Dispatch",
+        "distributed": "Distributed",
+        "remoteOnly": "Remote Only",
+        "distributedDescription": "Local and enabled remotes share the real InvokeAI queue. Whichever worker is free takes the next job.",
+        "remoteOnlyDescription": "Only enabled remotes consume these queue items. Local does not render them."
+      },
+      "status": {
+        "disabled": "Disabled",
+        "paused": "Paused",
+        "online": "Online",
+        "offline": "Offline",
+        "loginRequired": "Login required",
+        "checking": "Checking"
+      },
+      "worker": {
+        "settings": "Remote worker {{slot}} settings",
+        "disableForNewJobs": "Disable remote worker {{slot}} for new jobs",
+        "enableForNewJobs": "Enable remote worker {{slot}} for new jobs",
+        "collapseSettings": "Collapse remote worker {{slot}} settings",
+        "expandSettings": "Expand remote worker {{slot}} settings",
+        "nameLabel": "Remote worker {{slot}} name",
+        "defaultName": "Remote {{slot}}"
+      },
+      "login": {
+        "checking": "Checking login",
+        "saved": "Login saved",
+        "none": "No saved login",
+        "description": "Optional. For this worker's multi-user login, enter your own account credentials.",
+        "emailPlaceholder": "Remote InvokeAI email",
+        "passwordPlaceholder": "Remote InvokeAI password",
+        "replacePasswordPlaceholder": "New password (to replace saved login)",
+        "save": "Save login",
+        "remove": "Remove login",
+        "savedMessage": "Login saved on this InvokeAI server.",
+        "removedMessage": "Saved login removed.",
+        "loadError": "Could not load saved login status",
+        "saveError": "Could not save worker login",
+        "removeError": "Could not remove worker login"
+      },
+      "workers": {
+        "title": "Workers",
+        "configured_one": "{{count}} configured",
+        "configured_other": "{{count}} configured",
+        "none": "Add a valid http(s) worker URL to use distributed rendering.",
+        "editAddresses": "Edit worker addresses",
+        "doneEditingAddresses": "Done editing addresses",
+        "editorDescription": "One URL per line. Worker names can be changed in each worker's expanded settings.",
+        "urlsLabel": "Remote worker URLs",
+        "statusHelp": "Paused means no availability checks while distributed rendering is off. When enabled: green = online, red = offline, orange = login required. These badges are display-only; the backend verifies reachability before a worker claims a job. The power icon excludes a worker from new jobs without stopping running ones. Offline workers remain configured and can rejoin pending work when they recover. Passwords are encrypted on the primary instance; protect its runtime directory and use HTTPS across untrusted networks."
+      },
+      "modelTransfer": {
+        "title": "Model transfer",
+        "transferMissing": "Transfer missing models",
+        "keepCopies": "Keep copies on remote workers",
+        "advanced": "Advanced model transfer settings",
+        "hostLabel": "Primary host address for model transfers (optional)",
+        "hostPlaceholder": "Auto-detect primary host LAN IP"
+      },
+      "destinationHelp": "Results follow your selected destination: Gallery uses the board selected when you invoke; Canvas receives staging candidates you can accept."
     },
     "generate": {
       "activeCount_one": "{{count}} active",

@@ -202,7 +202,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const selectedItemKey = selectedItem ? toGalleryItemKey(selectedItem) : null;
   const activeGalleryPlaceholder =
     livePreview.sessions.find((session) => session.id === livePreview.followedSessionId) ?? null;
-  const shouldFollowLive = activeGalleryPlaceholder !== null;
+  const shouldFollowLive = activeGalleryPlaceholder !== null && !livePreview.viewingSaved;
   const isComparing =
     !shouldFollowLive &&
     selectedItem?.kind === 'image' &&
@@ -244,11 +244,12 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
 
   const selectGalleryItemAtPage = useCallback(
     (item: GalleryItem, selectionPage: number) => {
+      livePreview.showSaved();
       gallery.selectItem(item, undefined, selectionPage, true);
       // Deliberate navigation: the grid follows it, unlike auto-selection.
       requestGalleryItemReveal(toGalleryItemKey(item));
     },
-    [gallery]
+    [gallery, livePreview]
   );
   const {
     boardItems,

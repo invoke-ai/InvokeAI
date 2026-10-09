@@ -14,6 +14,7 @@ let store: ReturnType<typeof createWorkbenchStore>;
 let adapter: GalleryUiAdapter;
 const noop = () => undefined;
 const livePreviewFollow = vi.fn();
+const livePreviewShowSaved = vi.fn();
 const openWorkbenchWidget = vi.fn();
 
 vi.mock('@features/gallery/react', () => ({
@@ -31,6 +32,8 @@ vi.mock('@workbench/widgets/preview/livePreviewFollow', () => ({
     follow: livePreviewFollow,
     pin: vi.fn(),
     showAll: vi.fn(),
+    showSaved: livePreviewShowSaved,
+    viewingSaved: false,
   }),
 }));
 vi.mock('@workbench/projects/useProjectFileActions', () => ({ useExportLibraryProject: () => noop }));
@@ -74,6 +77,36 @@ describe('Gallery live-follow adapter', () => {
     accountLifecycle.activate('gallery-adapter-test');
     owner.followProgressSession('run:2', { revealPreview: true });
     expect(livePreviewFollow).not.toHaveBeenCalled();
+  });
+});
+
+describe('Gallery saved-media navigation', () => {
+  const image = {
+    kind: 'image',
+    name: 'existing.png',
+    boardId: 'none',
+    category: 'general',
+    createdAt: '2026-09-21T00:00:00.000Z',
+    fullUrl: '/existing.png',
+    height: 64,
+    isIntermediate: false,
+    starred: false,
+    thumbnailUrl: '/existing-thumb.png',
+    width: 64,
+  } as Parameters<GalleryUiAdapter['gallery']['selectItem']>[0];
+
+  it('hands even a reselected Gallery image to Preview while live progress exists', () => {
+    const owner = renderAdapter();
+    owner.gallery.selectItem(image);
+    owner.gallery.selectItem(image);
+    expect(livePreviewShowSaved).toHaveBeenCalledTimes(2);
+  });
+
+  it('hands range and toggle selections to Preview too', () => {
+    const owner = renderAdapter();
+    owner.gallery.setItemMultiSelection(['image:existing.png'], image);
+    owner.gallery.toggleItemSelection(image, null);
+    expect(livePreviewShowSaved).toHaveBeenCalledTimes(2);
   });
 });
 
