@@ -69,6 +69,7 @@ from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import Rec
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.sage_attention import sage_attention_scope
 
 
 @invocation(
@@ -525,26 +526,27 @@ class FluxDenoiseInvocation(BaseInvocation):
             else:
                 context.logger.debug(f"DyPE disabled: resolution={self.width}x{self.height}, preset={self.dype_preset}")
 
-            x = denoise(
-                model=transformer,
-                img=x,
-                img_ids=img_ids,
-                pos_regional_prompting_extension=pos_regional_prompting_extension,
-                neg_regional_prompting_extension=neg_regional_prompting_extension,
-                timesteps=timesteps,
-                step_callback=self._build_step_callback(context),
-                guidance=self.guidance,
-                cfg_scale=cfg_scale,
-                inpaint_extension=inpaint_extension,
-                controlnet_extensions=controlnet_extensions,
-                pos_ip_adapter_extensions=pos_ip_adapter_extensions,
-                neg_ip_adapter_extensions=neg_ip_adapter_extensions,
-                img_cond=img_cond,
-                img_cond_seq=img_cond_seq,
-                img_cond_seq_ids=img_cond_seq_ids,
-                dype_extension=dype_extension,
-                scheduler=scheduler,
-            )
+            with sage_attention_scope():
+                x = denoise(
+                    model=transformer,
+                    img=x,
+                    img_ids=img_ids,
+                    pos_regional_prompting_extension=pos_regional_prompting_extension,
+                    neg_regional_prompting_extension=neg_regional_prompting_extension,
+                    timesteps=timesteps,
+                    step_callback=self._build_step_callback(context),
+                    guidance=self.guidance,
+                    cfg_scale=cfg_scale,
+                    inpaint_extension=inpaint_extension,
+                    controlnet_extensions=controlnet_extensions,
+                    pos_ip_adapter_extensions=pos_ip_adapter_extensions,
+                    neg_ip_adapter_extensions=neg_ip_adapter_extensions,
+                    img_cond=img_cond,
+                    img_cond_seq=img_cond_seq,
+                    img_cond_seq_ids=img_cond_seq_ids,
+                    dype_extension=dype_extension,
+                    scheduler=scheduler,
+                )
 
         x = unpack(x.float(), self.height, self.width)
         return x
