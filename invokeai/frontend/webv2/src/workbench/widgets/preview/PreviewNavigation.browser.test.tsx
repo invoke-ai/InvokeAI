@@ -28,6 +28,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
 import { LivePreviewFollowProvider, useLivePreviewFollow } from './livePreviewFollow';
+import { usePreviewHeaderContext, type PreviewItemPosition } from './previewHeaderStore';
 
 const queueItem: QueueItem = {
   backendItemIds: [1],
@@ -147,6 +148,7 @@ const mocks = vi.hoisted(() => {
     verifiedGalleryPageFetches: [] as Array<{ ref: { kind: 'image' | 'video'; name: string }; signal: AbortSignal }>,
     galleryItemPages: [] as GalleryItemsPage[],
     galleryItemNames: [] as Array<{ kind: 'image' | 'video'; name: string }>,
+    galleryItemNamesGate: null as Promise<void> | null,
     galleryItemNamesOptionCalls: 0,
     imageActionOptions: null as null | {
       getItemActionContext?: () => {
@@ -379,7 +381,10 @@ vi.mock('@features/gallery/queries', () => ({
 
     return {
       queryKey: ['test-item-names', query],
-      queryFn: () => Promise.resolve({ items: mocks.galleryItemNames, total: mocks.galleryItemNames.length }),
+      queryFn: async () => {
+        await mocks.galleryItemNamesGate;
+        return { items: mocks.galleryItemNames, total: mocks.galleryItemNames.length };
+      },
       staleTime: Infinity,
     };
   },
@@ -512,6 +517,15 @@ const FollowProbe = () => {
   return <span ref={ref} />;
 };
 
+let headerPosition: PreviewItemPosition | null = null;
+const HeaderPositionProbe = () => {
+  const { position } = usePreviewHeaderContext();
+  const ref = useCallback(() => {
+    headerPosition = position;
+  }, [position]);
+  return <span ref={ref} />;
+};
+
 // The shell's sensors, so touch on the preview arbitrates between swipe and drag as it does in the app.
 const ShellDndContext = ({ children }: Pick<DndContextProps, 'children'>) => {
   const sensors = useSensors(
@@ -546,6 +560,7 @@ const renderTree = async (client: QueryClient) => {
               <ShellDndContext>
                 <LivePreviewFollowProvider>
                   <FollowProbe />
+                  <HeaderPositionProbe />
                   <CenterRegion>
                     <PreviewWidgetView instance={instance} manifest={manifest} region="center" runtime={runtime} />
                   </CenterRegion>
@@ -764,6 +779,7 @@ beforeEach(() => {
   mocks.verifiedGalleryPage = null;
   mocks.verifiedGalleryPageFetches.length = 0;
   mocks.galleryItemNames = [];
+  mocks.galleryItemNamesGate = null;
   mocks.galleryItemNamesOptionCalls = 0;
   mocks.imageActionOptions = null;
   mocks.galleryItemPages = [
@@ -1237,6 +1253,81 @@ describe('preview keyboard navigation boundary', () => {
       expect.anything(),
       expect.anything()
     );
+  });
+
+  it('loads the succeeding listing page before a recent after a relocated selection moves to a page end', async () => {
+    // Oldest first, so the recent result sorts after every saved item.
+    const pageItem = (index: number) =>
+      createImageItem(`relocated-${index}`, new Date(Date.UTC(2026, 6, 1) + index * 1_000).toISOString());
+    const selected = pageItem(119);
+    const located = Array.from({ length: 60 }, (_unused, index) => pageItem(60 + index));
+
+    setGalleryValues({
+      galleryPage: 1,
+      recentImages: [legacyImage('recent-newer', '2026-09-01T00:00:00.000Z')],
+      selectedImage: legacyImage(selected.name, selected.createdAt),
+      selectedImageName: selected.name,
+      selectedImageQuery: { ...deepQuery, imageOrderDir: 'ASC', page: 0 },
+    });
+    // Stored newest first; the mock reverses each page for oldest-first listings.
+    mocks.galleryItemPages = [
+      { items: [], total: 180 },
+      { items: [], total: 180 },
+      { items: Array.from({ length: 60 }, (_unused, index) => pageItem(179 - index)), total: 180 },
+    ];
+    mocks.verifiedGalleryPage = { index: 119, offset: 60, page: { items: located, total: 180 }, total: 180 };
+
+    await render();
+    await pressArrow('ArrowRight');
+
+    await vi.waitFor(() =>
+      expect(mocks.commands.gallery.selectItem).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ kind: 'image', name: 'relocated-120' }),
+        undefined,
+        2,
+        true
+      )
+    );
+  });
+
+  it('swipes toward a pending neighbor, not the loaded guess, while the selection must be relocated', async () => {
+    const newer = createImageItem('stale-newer', '2026-07-20T00:00:03.000Z');
+    const selected = createImageItem('moved-away', '2026-07-20T00:00:02.000Z');
+    const older = createImageItem('stale-older', '2026-07-20T00:00:01.000Z');
+    const relocatedNext = createImageItem('relocated-next', '2026-07-19T00:00:00.000Z');
+
+    setGalleryValues({
+      recentImages: [],
+      selectedImage: legacyImage(selected.name, selected.createdAt),
+      selectedImageName: selected.name,
+      selectedImageQuery: { ...deepQuery, page: 0 },
+    });
+    mocks.galleryItemPages = [
+      { items: [newer, older], total: 62 },
+      { items: [], total: 62 },
+    ];
+    mocks.verifiedGalleryPage = {
+      index: 60,
+      offset: 60,
+      page: { items: [selected, relocatedNext], total: 62 },
+      total: 62,
+    };
+
+    await render();
+    await expect.poll(() => selectedThumb()).toBe(selected.name);
+    await flickPreview(1);
+
+    await vi.waitFor(() =>
+      expect(mocks.commands.gallery.selectItem).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ name: relocatedNext.name }),
+        undefined,
+        1,
+        true
+      )
+    );
+    expect(
+      [...host!.querySelectorAll('[data-swipe-neighbor="next"] img')].map((image) => image.getAttribute('src'))
+    ).not.toContain(older.fullUrl);
   });
 
   it('does not select a missing key when verified lookup returns no result', async () => {
@@ -2012,6 +2103,27 @@ describe('preview keyboard navigation boundary', () => {
     );
   });
 
+  it('reports the selection position in the whole board while only the pages around it are loaded', async () => {
+    const pageItem = (index: number) =>
+      createImageItem(`position-${index}`, new Date(Date.UTC(2026, 6, 1) - index * 1_000).toISOString());
+    const selected = pageItem(330);
+
+    mocks.galleryItemPages = Array.from({ length: 7 }, (_unused, page) => ({
+      items: page >= 4 ? Array.from({ length: 60 }, (_item, index) => pageItem(page * 60 + index)) : [],
+      total: 420,
+    }));
+    setGalleryValues({
+      recentImages: [],
+      selectedImage: legacyImage(selected.name, selected.createdAt),
+      selectedImageName: selected.name,
+      selectedImageQuery: { ...deepQuery, page: 5 },
+    });
+
+    await render();
+
+    await expect.poll(() => headerPosition).toEqual({ boardItemCount: 420, isLoadingBoard: false, selectedIndex: 330 });
+  });
+
   it('hands image actions the selected item absolute page', async () => {
     const deepA = createImageItem('deep-a', '2026-07-20T00:00:04.000Z');
     const deepB = createImageItem('deep-b', '2026-07-20T00:00:03.000Z');
@@ -2534,6 +2646,39 @@ describe('preview keyboard navigation boundary', () => {
       true
     );
     expect(mocks.commands.account.updateProjectPreferences).not.toHaveBeenCalled();
+  });
+
+  it('steps right off the followed session onto the top of the board when the selection sits further down', async () => {
+    const pageItem = (index: number) =>
+      createImageItem(`board-${index}`, new Date(Date.UTC(2026, 6, 1) - index * 1_000).toISOString());
+    const selected = pageItem(330);
+
+    mocks.galleryItemPages = Array.from({ length: 7 }, (_unused, page) => ({
+      items: page === 0 || page >= 4 ? Array.from({ length: 60 }, (_item, index) => pageItem(page * 60 + index)) : [],
+      total: 420,
+    }));
+    setGalleryValues({
+      recentImages: [],
+      selectedImage: legacyImage(selected.name, selected.createdAt),
+      selectedImageName: selected.name,
+      selectedImageQuery: { ...deepQuery, page: 5 },
+    });
+    mocks.project.queue.items = [{ ...queueItem, backendItemIds: [1, 2], completedBackendItemIds: [1] }];
+    mocks.project.settings.showProgressImagesInViewer = true;
+    mocks.runningProgressTargets = [{ itemIndex: 2, queueItemId: queueItem.id }];
+
+    await render();
+    await vi.waitFor(() => expect(mocks.galleryItemPageOffsets).toEqual(expect.arrayContaining([240, 300, 360])));
+    await pressArrow('ArrowRight');
+
+    await vi.waitFor(() =>
+      expect(mocks.commands.gallery.selectItem).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ name: 'board-0' }),
+        undefined,
+        0,
+        true
+      )
+    );
   });
 
   it('renders the live frame with the standard media chrome: footer up, no badge, item border', async () => {
@@ -3159,6 +3304,31 @@ describe('preview keyboard navigation boundary', () => {
       { kind: 'image', name: 'range-180' },
       { kind: 'image', name: 'range-181' },
     ]);
+  });
+
+  it('keeps loading the ordered listing for a deletion that clears the selection first', async () => {
+    const before = createImageItem('before', '2026-07-30T13:00:00Z');
+    const selected = createImageItem('selected', '2026-07-30T12:00:00Z');
+    const after = createImageItem('after', '2026-07-30T11:00:00Z');
+    let openNames!: () => void;
+
+    mocks.galleryItemPages = [{ items: [before, selected, after], total: 3 }];
+    mocks.galleryItemNames = [before, selected, after].map(({ kind, name }) => ({ kind, name }));
+    mocks.galleryItemNamesGate = new Promise<void>((resolve) => {
+      openNames = resolve;
+    });
+    setGalleryValues({ recentImages: [], selectedImage: selected, selectedImageName: 'image:selected' });
+
+    await render();
+    await expect.poll(() => mocks.imageActionOptions?.getItemActionContext?.().items.length).toBe(3);
+    const refs = mocks.imageActionOptions!.getItemActionContext!().loadOrderedRefs(new AbortController().signal);
+
+    // The deletion removes its primary optimistically while the order is still loading.
+    setGalleryValues({ selectedImage: null, selectedImageName: null });
+    await rerender();
+    openNames();
+
+    await expect(refs).resolves.toEqual(mocks.galleryItemNames);
   });
 
   it('prefetches an image neighbor but never assigns a full video URL to Image', async () => {

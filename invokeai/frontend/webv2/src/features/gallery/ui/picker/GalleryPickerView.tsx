@@ -1,4 +1,4 @@
-import type { GalleryItem } from '@features/gallery/core/items';
+import type { GalleryItem, GalleryItemKey } from '@features/gallery/core/items';
 import type { GallerySparseListing } from '@features/gallery/ui/useGalleryData';
 import type { KeyboardEvent, RefObject } from 'react';
 
@@ -87,7 +87,12 @@ export const GalleryPickerView = ({
   const currentKey = gallerySelectedItem ? toGalleryItemKey(gallerySelectedItem) : null;
   const seedKey = gallerySelectedItem && accept.includes(gallerySelectedItem.kind) ? currentKey : null;
 
-  const [activeCursor, setActiveCursor] = useState<{ filterIdentity: string; index: number } | null>(null);
+  // The highlight follows its item's key when an insert shifts it; only a placeholder is held by index.
+  const [activeCursor, setActiveCursor] = useState<{
+    filterIdentity: string;
+    index: number;
+    key: GalleryItemKey | null;
+  } | null>(null);
   const [columnCount, setColumnCount] = useState(GALLERY_PICKER_MIN_COLUMNS);
   const [isUploading, setIsUploading] = useState(false);
   // Async uploads need current selection capacity.
@@ -120,8 +125,20 @@ export const GalleryPickerView = ({
   const pageStates = isStale ? EMPTY_PAGE_STATES : (sparseListing?.pageStates ?? EMPTY_PAGE_STATES);
   const total = sparseListing?.total ?? knownTotal;
   const totalSlots = total ?? GALLERY_PAGE_SIZE;
-  const activeFilterCursor = activeCursor?.filterIdentity === filterIdentity ? activeCursor.index : null;
+  const activeFilterCursor = activeCursor?.filterIdentity === filterIdentity ? activeCursor : null;
   const setVisibleRange = data.setVisibleRange;
+  const slotIndexByKey = useMemo(
+    () => new Map([...itemSlots].map(([index, item]) => [toGalleryItemKey(item), index])),
+    [itemSlots]
+  );
+  const getSlotKey = useCallback(
+    (index: number): GalleryItemKey | null => {
+      const item = itemSlots.get(index);
+
+      return item ? toGalleryItemKey(item) : null;
+    },
+    [itemSlots]
+  );
 
   const defaultActiveIndex = useMemo(() => {
     const slots = [...itemSlots].sort(([left], [right]) => left - right);
@@ -136,10 +153,19 @@ export const GalleryPickerView = ({
       ? [...itemSlots].find(([index, item]) => index < GALLERY_PAGE_SIZE && toGalleryItemKey(item) === seedKey)?.[0]
       : undefined;
 
-    setActiveCursor({ filterIdentity, index: seededIndex ?? defaultActiveIndex });
+    const index = seededIndex ?? defaultActiveIndex;
+
+    setActiveCursor({ filterIdentity, index, key: getSlotKey(index) });
+  } else if (activeFilterCursor?.key === null && itemSlots.has(activeFilterCursor.index)) {
+    // A placeholder the highlight rests on has loaded: hold its item from now on.
+    setActiveCursor({ ...activeFilterCursor, key: getSlotKey(activeFilterCursor.index) });
   }
 
-  const resolvedActiveIndex = activeFilterCursor !== null ? activeFilterCursor : defaultActiveIndex;
+  const resolvedActiveIndex =
+    activeFilterCursor === null
+      ? defaultActiveIndex
+      : ((activeFilterCursor.key === null ? undefined : slotIndexByKey.get(activeFilterCursor.key)) ??
+        activeFilterCursor.index);
   const activeItem = resolvedActiveIndex >= 0 ? itemSlots.get(resolvedActiveIndex) : undefined;
   const activePageOffset = Math.floor(Math.max(0, resolvedActiveIndex) / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE;
   const activePageState = pageStates.get(activePageOffset);
@@ -301,8 +327,12 @@ export const GalleryPickerView = ({
         event.stopPropagation();
 
         if (nextIndex >= 0) {
-          setActiveCursor({ filterIdentity, index: nextIndex });
-          setVisibleRange?.({ endIndexExclusive: nextIndex + 1, startIndex: nextIndex });
+          setActiveCursor({ filterIdentity, index: nextIndex, key: getSlotKey(nextIndex) });
+
+          // A subscribed page keeps the range around it; narrowing to the cursor would drop the rest of the view.
+          if (!pageStates.has(Math.floor(nextIndex / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE)) {
+            setVisibleRange?.({ endIndexExclusive: nextIndex + 1, startIndex: nextIndex });
+          }
         }
       } else if (event.key === 'Enter') {
         event.preventDefault();
@@ -326,6 +356,8 @@ export const GalleryPickerView = ({
       isStale,
       filterIdentity,
       data.listing.status,
+      getSlotKey,
+      pageStates,
       pickItem,
       resolvedActiveIndex,
       setVisibleRange,
@@ -336,15 +368,16 @@ export const GalleryPickerView = ({
 
   const handleActivate = useCallback(
     (item: GalleryItem) => {
-      const entry = [...itemSlots].find(([, slotItem]) => toGalleryItemKey(slotItem) === toGalleryItemKey(item));
+      const key = toGalleryItemKey(item);
+      const index = slotIndexByKey.get(key);
 
-      if (entry) {
-        setActiveCursor({ filterIdentity, index: entry[0] });
+      if (index !== undefined) {
+        setActiveCursor({ filterIdentity, index, key });
       }
 
       pickItem(item);
     },
-    [filterIdentity, itemSlots, pickItem]
+    [filterIdentity, pickItem, slotIndexByKey]
   );
   const handleVisibleRangeChange = useCallback(
     (range: { endIndexExclusive: number; startIndex: number }) => setVisibleRange?.(range),
@@ -518,7 +551,7 @@ export const GalleryPickerView = ({
         ) : showsGrid ? (
           <GalleryPickerGrid
             activeIndex={resolvedActiveIndex}
-            activeScope={filterIdentity}
+            activePlacement={`${filterIdentity}\n${activeFilterCursor?.index ?? resolvedActiveIndex}`}
             columnCount={columnCount}
             currentKey={currentKey}
             getTileState={getTileState}

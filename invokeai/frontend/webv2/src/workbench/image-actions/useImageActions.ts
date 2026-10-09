@@ -384,10 +384,12 @@ export const useImageActions = ({
 
         const current = getItemActionContext();
 
+        // The optimistic removal below clears the deleted primary from the host's selection, so an empty selection
+        // is still this deletion's; only another item selected meanwhile makes the successor stale.
         return Boolean(
           current &&
           current.filterIdentity === deletionContext.filterIdentity &&
-          current.selectedItemKey === deletionContext.selectedItemKey
+          (current.selectedItemKey === deletionContext.selectedItemKey || current.selectedItemKey === null)
         );
       };
       const rollbackCaches = patchGalleryItemCaches(queryClient, {

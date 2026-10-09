@@ -191,7 +191,7 @@ const GalleryPickerPlaceholder = ({
 /** A virtualized absolute-slot picker backed by the same 60-item Query pages as Gallery. */
 export const GalleryPickerGrid = ({
   activeIndex,
-  activeScope,
+  activePlacement,
   columnCount,
   currentKey,
   getTileState,
@@ -208,8 +208,11 @@ export const GalleryPickerGrid = ({
   total,
 }: {
   activeIndex: number;
-  /** The listing `activeIndex` belongs to; a new listing reveals its highlight even at the same index. */
-  activeScope: string;
+  /**
+   * The highlight's last deliberate placement, in its listing. A new placement reveals the highlight even at the same
+   * index; an insert that only shifts the highlighted item's index does not.
+   */
+  activePlacement: string;
   columnCount: number;
   currentKey: GalleryItemKey | null;
   getTileState: (item: GalleryItem) => GalleryPickerTileState;
@@ -312,17 +315,18 @@ export const GalleryPickerGrid = ({
     measure();
   }, [columnCount, measure, rowPitch]);
 
-  // Reveal the highlight when it moves, its listing changes, or a reflow moves its row. A later count update must not
-  // pull a pointer-scrolled view back to it; a highlight past the known count is revealed once the count reaches it.
+  // Reveal the highlight when it is placed, its listing changes, or a reflow moves its row. A later count update or
+  // insert must not pull a pointer-scrolled view back to it; a highlight past the known count is revealed once the
+  // count reaches it.
   const revealedActiveRef = useRef<string | null>(null);
   useLayoutEffect(() => {
-    const active = `${activeScope}\n${activeIndex}\n${columnCount}`;
+    const active = `${activePlacement}\n${columnCount}`;
 
     if (activeIndex >= 0 && activeIndex < totalSlots && revealedActiveRef.current !== active) {
       revealedActiveRef.current = active;
       scrollToIndex(Math.floor(activeIndex / columnCount), { align: 'auto' });
     }
-  }, [activeIndex, activeScope, columnCount, scrollToIndex, totalSlots]);
+  }, [activeIndex, activePlacement, columnCount, scrollToIndex, totalSlots]);
 
   const handleClick = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {

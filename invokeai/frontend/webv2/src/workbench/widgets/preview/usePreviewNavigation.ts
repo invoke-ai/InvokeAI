@@ -164,8 +164,9 @@ export interface PreviewNavigationState {
   navigate: (offset: -1 | 1) => Promise<boolean>;
   /** What each step would land on, so a swipe can show it before committing. */
   neighbors: PreviewNeighbors;
-  /** The selection's index in `boardItems`; -1 while following live or off the list. */
-  navigationCursor: number;
+  /** The selection's place in the whole strip-then-listing order (-1 while following live or off the list), and that
+   * order's length. */
+  position: { index: number; total: number };
   /** Identity of the backing query — the action context's filter identity. */
   navigationQueryKey: string;
   /** The page a selection of `item` is stamped with — see the action context's `getItemSelectionPage`. */
@@ -246,11 +247,13 @@ export const usePreviewNavigation = ({
   // Publish navigation context in layout effect so boundary-fetch continuations cannot observe new UI with a stale
   // fence.
   const navigationContextKeyRef = useRef(navigationContextKey);
+  const navigationQueryKeyRef = useRef(navigationQueryKey);
   const pendingNavigationContextRef = useRef<string | null>(null);
   const pageFetchRequestRef = useRef<{ contextKey: string; controller: AbortController } | null>(null);
 
   useLayoutEffect(() => {
     navigationContextKeyRef.current = navigationContextKey;
+    navigationQueryKeyRef.current = navigationQueryKey;
     const pageFetchRequest = pageFetchRequestRef.current;
 
     if (pageFetchRequest && pageFetchRequest.contextKey !== navigationContextKey) {
@@ -261,7 +264,7 @@ export const usePreviewNavigation = ({
     if (pendingNavigationContextRef.current !== navigationContextKey) {
       pendingNavigationContextRef.current = null;
     }
-  }, [navigationContextKey]);
+  }, [navigationContextKey, navigationQueryKey]);
 
   useMountEffect(() => () => pageFetchRequestRef.current?.controller.abort());
 
@@ -504,7 +507,8 @@ export const usePreviewNavigation = ({
         ]);
 
         requestSignal.throwIfAborted();
-        if (!isAccountScopeCurrent(accountScope) || navigationContextKeyRef.current !== navigationContextKey) {
+        // Fenced on the listing, not the selection: a deletion clears the selection before it asks for this order.
+        if (!isAccountScopeCurrent(accountScope) || navigationQueryKeyRef.current !== navigationQueryKey) {
           throw new DOMException('The Preview listing changed.', 'AbortError');
         }
 
@@ -515,7 +519,7 @@ export const usePreviewNavigation = ({
         }
       }
     },
-    [accountScope, listingFilterWithStarred, navigationContextKey, queryClient, stripItems]
+    [accountScope, listingFilterWithStarred, navigationQueryKey, queryClient, stripItems]
   );
   const isLoadingBoard = hasNavigationContext && isFetchingBoardItems;
   const sessionEntries = useMemo(
@@ -538,6 +542,15 @@ export const usePreviewNavigation = ({
     followedSessionId !== null || selectedItemKey === null
       ? -1
       : boardItems.findIndex((item) => toGalleryItemKey(item) === selectedItemKey);
+  // `boardItems` holds only the pages around the selection; the listing part of the cursor is offset by where that
+  // window starts, and the total adds the listing items outside it.
+  const windowStartIndex = boardPageResults[0]?.offset ?? 0;
+  const positionIndex = navigationCursor < stripItems.length ? navigationCursor : navigationCursor + windowStartIndex;
+  const positionTotal = Math.max(
+    positionIndex + 1,
+    boardItems.length + Math.max(0, (listingTotal ?? 0) - backendBoardItems.length)
+  );
+  const position = useMemo(() => ({ index: positionIndex, total: positionTotal }), [positionIndex, positionTotal]);
   const selectedItemPageOffset = useMemo(() => {
     if (selectedItemKey === null) {
       return selectedPageOffset;
@@ -591,6 +604,40 @@ export const usePreviewNavigation = ({
       .find(({ offset }) => offset === selectedPageOffset)
       ?.data.items.some((item) => toGalleryItemKey(item) === selectedItemKey);
   const selectedItemNeedsLocation = selectedItemIsMissingFromStampedPage;
+  const getSectionsFor = useCallback(
+    (pages: typeof boardPageResults) => [
+      stripEntries,
+      sessionEntries,
+      toItemEntries(mergeListingItems(pages.flatMap(({ data }) => data.items))),
+    ],
+    [mergeListingItems, sessionEntries, stripEntries]
+  );
+  // A step right onto the listing comes from the strip or the sessions, and enters it where the grid's listing starts:
+  // the board's top, or the page's in paginated mode. A window anchored lower would otherwise land mid-board. Returns
+  // the pages to step within, 'unloaded' while the start page is not loaded, or null for an ordinary step.
+  const listingStartOffset = isPaginatedWindow ? selectedPageOffset : 0;
+  const firstListingItem = listingItems[0];
+  const getListingStartPages = useCallback(
+    (entry: GalleryNavigationEntry | null): typeof boardPageResults | 'unloaded' | null => {
+      if (entry?.kind !== 'item' || entry.item !== firstListingItem) {
+        return null;
+      }
+
+      const entryKey = toGalleryItemKey(entry.item);
+      const entryPage = boardPageResults.find(({ data }) =>
+        data.items.some((item) => toGalleryItemKey(item) === entryKey)
+      );
+
+      if (entryPage === undefined || entryPage.offset === listingStartOffset) {
+        return null;
+      }
+
+      const startPages = boardPageResults.filter(({ offset }) => offset >= listingStartOffset);
+
+      return startPages[0]?.offset === listingStartOffset ? startPages : 'unloaded';
+    },
+    [boardPageResults, firstListingItem, listingStartOffset]
+  );
 
   // Share navigation between keyboard, footer, and swipe; comparison does not step saved images.
   const navigate = useCallback(
@@ -615,8 +662,19 @@ export const usePreviewNavigation = ({
       };
 
       const loadedEntry = getGalleryNavigationStep(navigationSections, cursorKeys, direction);
+      const listingStartPages = offset === 1 ? getListingStartPages(loadedEntry) : null;
+
+      if (Array.isArray(listingStartPages)) {
+        pageFetchRequestRef.current?.controller.abort();
+        pageFetchRequestRef.current = null;
+        pendingNavigationContextRef.current = null;
+        return Promise.resolve(
+          stepTo(getGalleryNavigationStep(getSectionsFor(listingStartPages), cursorKeys, direction), listingStartPages)
+        );
+      }
 
       if (
+        listingStartPages === null &&
         loadedEntry !== null &&
         !selectedItemNeedsLocation &&
         !(offset === 1 ? hasUnresolvedNextListingPage : hasUnresolvedPreviousListingPage)
@@ -654,6 +712,20 @@ export const usePreviewNavigation = ({
 
       return (async () => {
         try {
+          if (listingStartPages === 'unloaded') {
+            const startPage = await fetchGalleryItemsPage(queryClient, listingFilterWithStarred, listingStartOffset, {
+              signal: requestSignal,
+            });
+
+            if (!isCurrentNavigation()) {
+              return false;
+            }
+
+            const startPages = [{ offset: listingStartOffset, data: startPage }];
+
+            return stepTo(getGalleryNavigationStep(getSectionsFor(startPages), cursorKeys, direction), startPages);
+          }
+
           if (selectedItemNeedsLocation && selectedItem) {
             const located = await fetchVerifiedGalleryItemPage(
               queryClient,
@@ -672,12 +744,24 @@ export const usePreviewNavigation = ({
               pageOffset = located.offset;
               total = located.total;
 
-              if (direction === 'left' && located.index === located.offset && located.offset > 0) {
-                const previousOffset = located.offset - GALLERY_PAGE_SIZE;
-                const previousPage = await fetchGalleryItemsPage(
+              // At the located page's edge, its neighbor page comes first: a recent or another section could
+              // otherwise sit just past the edge and take the step.
+              const adjacentOffset =
+                direction === 'left'
+                  ? located.index === located.offset && located.offset > 0
+                    ? located.offset - GALLERY_PAGE_SIZE
+                    : null
+                  : located.page.items.at(-1) !== undefined &&
+                      toGalleryItemKey(located.page.items.at(-1)!) === toGalleryItemKey(selectedItem) &&
+                      located.offset + GALLERY_PAGE_SIZE < located.total
+                    ? located.offset + GALLERY_PAGE_SIZE
+                    : null;
+
+              if (adjacentOffset !== null) {
+                const adjacentPage = await fetchGalleryItemsPage(
                   queryClient,
                   listingFilterWithStarred,
-                  previousOffset,
+                  adjacentOffset,
                   { signal: requestSignal, staleTime: 0 }
                 );
 
@@ -685,7 +769,7 @@ export const usePreviewNavigation = ({
                   return false;
                 }
 
-                updatePage(previousOffset, previousPage);
+                updatePage(adjacentOffset, adjacentPage);
               }
 
               const sections = [
@@ -797,7 +881,10 @@ export const usePreviewNavigation = ({
       boardPageResults,
       cursorKeys,
       followSession,
+      getListingStartPages,
+      getSectionsFor,
       isComparing,
+      listingStartOffset,
       accountScope,
       listingFilterWithStarred,
       listingTotal,
@@ -829,14 +916,22 @@ export const usePreviewNavigation = ({
     }
 
     const resolve = (offset: -1 | 1): PreviewNeighbor => {
+      const neighbor = getGalleryNavigationStep(navigationSections, cursorKeys, offset === 1 ? 'right' : 'left');
+      const listingStartPages = offset === 1 ? getListingStartPages(neighbor) : null;
+
+      if (listingStartPages !== null) {
+        return listingStartPages === 'unloaded'
+          ? { kind: 'more' }
+          : toNeighbor(getGalleryNavigationStep(getSectionsFor(listingStartPages), cursorKeys, 'right'));
+      }
+
+      // A selection that must be relocated first steps from wherever it is found, not from the loaded guess.
       if (
-        !selectedItemNeedsLocation &&
+        selectedItemNeedsLocation ||
         (offset === 1 ? hasUnresolvedNextListingPage : hasUnresolvedPreviousListingPage)
       ) {
         return { kind: 'more' };
       }
-
-      const neighbor = getGalleryNavigationStep(navigationSections, cursorKeys, offset === 1 ? 'right' : 'left');
 
       if (neighbor !== null) {
         return toNeighbor(neighbor);
@@ -850,6 +945,8 @@ export const usePreviewNavigation = ({
     return { next: resolve(1), previous: resolve(-1) };
   }, [
     cursorKeys,
+    getListingStartPages,
+    getSectionsFor,
     hasUnresolvedNextListingPage,
     hasUnresolvedPreviousListingPage,
     isComparing,
@@ -880,9 +977,9 @@ export const usePreviewNavigation = ({
     isLoadingBoard,
     navigate,
     neighbors,
-    navigationCursor,
     navigationQueryKey,
     getSelectionPage,
+    position,
     loadOrderedRefs,
     selectPreviewItem,
     stripItemCount: stripItems.length,

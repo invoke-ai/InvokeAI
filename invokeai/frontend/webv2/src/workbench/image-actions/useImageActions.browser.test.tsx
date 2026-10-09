@@ -1145,6 +1145,35 @@ describe('primary successor after confirmed deletion', () => {
     expect(mocks.gallerySelectItem).toHaveBeenCalledWith(after, 'project-1');
   });
 
+  it('selects the successor once the optimistic removal has cleared the host selection', async () => {
+    const primary = galleryItem('image', 'primary.png');
+    const after = galleryItem('image', 'after.png');
+    const refs = [primary, after].map(({ kind, name }) => ({ kind, name }));
+    currentItemActionContext = {
+      filterIdentity: 'filter-a',
+      items: [primary, after],
+      loadOrderedRefs: () => Promise.resolve(refs),
+      selectedItemKey: 'image:primary.png',
+    };
+    // A host reports the store's selection, which removing the selected item clears.
+    mocks.galleryRemoveItems.mockImplementationOnce((itemKeys: GalleryItemKey[]) => {
+      if (currentItemActionContext?.selectedItemKey && itemKeys.includes(currentItemActionContext.selectedItemKey)) {
+        currentItemActionContext = { ...currentItemActionContext, items: [after], selectedItemKey: null };
+      }
+    });
+    mocks.itemDelete.mockResolvedValue({
+      affectedBoardIds: ['board-1'],
+      failed: [],
+      succeeded: [{ kind: 'image', name: primary.name }],
+    });
+
+    await act(async () => {
+      await getItemActions().deleteItems([{ kind: 'image', name: primary.name }]);
+    });
+
+    expect(mocks.gallerySelectItem).toHaveBeenCalledWith(after, 'project-1');
+  });
+
   it('resolves an unloaded successor by qualified ref', async () => {
     const primary = galleryItem('image', 'primary.png');
     const before = galleryItem('image', 'before.png');

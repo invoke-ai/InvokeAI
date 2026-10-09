@@ -257,9 +257,9 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     isLoadingBoard,
     loadOrderedRefs,
     navigate,
-    navigationCursor,
     navigationQueryKey,
     neighbors,
+    position,
     selectPreviewItem,
     stripItemCount,
   } = usePreviewNavigation({
@@ -520,14 +520,13 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       itemName: headerItemName,
       openItemMenu: shouldFollowLive ? null : openItemContextMenu,
       position: hasHeaderItem
-        ? { boardItemCount: boardItems.length, isLoadingBoard, selectedIndex: navigationCursor }
+        ? { boardItemCount: position.total, isLoadingBoard, selectedIndex: position.index }
         : null,
       // Only the single image frame carries a loupe: videos have none and
       // compare has its own synced pair.
       zoom: hasHeaderItem && !isComparing && contextMenuItem.kind === 'image' ? zoomCommands : null,
     });
   }, [
-    boardItems.length,
     boardName,
     contextMenuItem,
     copyCurrentVideoFrame,
@@ -537,8 +536,8 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     isComparing,
     isLoadingBoard,
     isVideoFrameCopyAvailable,
-    navigationCursor,
     openItemContextMenu,
+    position,
     shouldFollowLive,
     zoomCommands,
   ]);

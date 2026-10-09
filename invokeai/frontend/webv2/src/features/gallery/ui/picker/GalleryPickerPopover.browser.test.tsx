@@ -349,6 +349,27 @@ describe('GalleryPickerPopover', () => {
     expect(document.querySelector(OPEN_DIALOG)).toBeNull();
   });
 
+  it('keeps the highlight on its item when an insert shifts the listing', async () => {
+    const { dialog } = await openPicker();
+
+    expect(getActiveOption(dialog)).toBe(getOption(dialog, 'image:b.png'));
+
+    // Another client adds a newer image, so the refetched listing moves every item one slot along.
+    dogItems.unshift(image('new.png'));
+    try {
+      await act(() => queryClient!.invalidateQueries());
+      await vi.waitFor(() => expect(getOption(dialog, 'image:new.png')).toBeDefined());
+      await settle();
+
+      expect(getActiveOption(dialog)).toBe(getOption(dialog, 'image:b.png'));
+
+      await pressKey(getSearchInput(dialog), 'Enter');
+      expect(onPick).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ name: 'b.png' }));
+    } finally {
+      dogItems.shift();
+    }
+  });
+
   it('requests a distant keyboard target by page offset without fetching intervening pages', async () => {
     const total = 2_400;
     const lastPageOffset = Math.floor((total - 1) / 60) * 60;
@@ -378,6 +399,46 @@ describe('GalleryPickerPopover', () => {
     expect(requestedOffsets).toContain(lastPageOffset);
     expect(requestedOffsets.every((offset) => offset === 0 || offset >= lastPageOffset - 60)).toBe(true);
     expect(mocks.listInfiniteItems).not.toHaveBeenCalled();
+  });
+
+  it('keeps both pages of a view that straddles a page edge loaded while the arrows move within it', async () => {
+    const total = 120;
+    mocks.listItems.mockImplementation((filter: { offset: number }) => {
+      const items = Array.from({ length: Math.max(0, Math.min(60, total - filter.offset)) }, (_, index) =>
+        image(`edge-${filter.offset + index}.png`)
+      );
+
+      return { itemIndices: items.map((_, index) => filter.offset + index), items, offset: filter.offset, total };
+    });
+
+    const { dialog } = await openPicker();
+    const input = getSearchInput(dialog);
+    const activeIndex = () => Number(getActiveOption(dialog)?.dataset.itemIndex ?? -1);
+    const columns = getColumnCount(dialog);
+
+    await pressKey(input, 'End');
+    await vi.waitFor(() => expect(activeIndex()).toBe(total - 1));
+
+    // Walk up into the first page: the row just left behind, on the second page, stays in view.
+    while (activeIndex() >= 60) {
+      await pressKey(input, 'ArrowUp');
+    }
+    const belowIndex = activeIndex() + columns;
+
+    expect(belowIndex).toBeGreaterThanOrEqual(60);
+    // Record every state the tile passes through: dropping its page would flash a skeleton before it re-subscribes.
+    const belowKey = `image:edge-${belowIndex}.png`;
+    const tileKeys = new Set<string | null | undefined>();
+    const observer = new MutationObserver(() => {
+      tileKeys.add(dialog.querySelector(`[data-item-index="${belowIndex}"]`)?.getAttribute('data-item-key'));
+    });
+    observer.observe(dialog, { attributes: true, childList: true, subtree: true });
+    await pressKey(input, 'ArrowLeft');
+    observer.disconnect();
+
+    expect(activeIndex()).toBe(belowIndex - columns - 1);
+    expect([...tileKeys].filter((key) => key !== belowKey)).toEqual([]);
+    expect(dialog.querySelector(`[data-item-index="${belowIndex}"]`)?.getAttribute('data-item-key')).toBe(belowKey);
   });
 
   it('keeps a pointer-scrolled position when a later page changes the count', async () => {
@@ -416,6 +477,47 @@ describe('GalleryPickerPopover', () => {
     await vi.waitFor(() => expect(dialog.querySelector('[role="option"][aria-setsize="601"]')).not.toBeNull());
     await settle();
 
+    expect(viewport!.scrollTop).toBe(scrolledTop);
+  });
+
+  it('keeps a pointer-scrolled position when an insert shifts the highlighted item', async () => {
+    let inserted = 0;
+    mocks.listItems.mockImplementation((filter: { offset: number }) => {
+      const total = 600 + inserted;
+      const items = Array.from({ length: Math.max(0, Math.min(60, total - filter.offset)) }, (_, index) => {
+        const position = filter.offset + index - inserted;
+
+        return image(position < 0 ? 'shifted-new.png' : `shifted-${position}.png`);
+      });
+
+      return { itemIndices: items.map((_, index) => filter.offset + index), items, offset: filter.offset, total };
+    });
+
+    const { dialog } = await openPicker();
+
+    expect(getActiveOption(dialog)?.dataset.itemKey).toBe('image:shifted-0.png');
+    let viewport: HTMLElement | null = getActiveOption(dialog)!.parentElement;
+
+    while (viewport && viewport.scrollHeight <= viewport.clientHeight) {
+      viewport = viewport.parentElement;
+    }
+
+    // Scroll the highlighted first row out of view while its page stays loaded.
+    await act(() => {
+      viewport!.scrollTop = getActiveOption(dialog)!.getBoundingClientRect().height * 4;
+      viewport!.dispatchEvent(new Event('scroll'));
+    });
+    await settle();
+    const scrolledTop = viewport!.scrollTop;
+
+    expect(scrolledTop).toBeGreaterThan(0);
+    inserted = 1;
+    await act(() => queryClient!.invalidateQueries());
+    await vi.waitFor(() => expect(dialog.querySelector('[role="option"][aria-setsize="601"]')).not.toBeNull());
+    await settle();
+
+    // The highlight moved one slot along with its item, which stays scrolled out of view.
+    expect(getSearchInput(dialog).getAttribute('aria-activedescendant')).toMatch(/-slot-1$/);
     expect(viewport!.scrollTop).toBe(scrolledTop);
   });
 

@@ -4957,7 +4957,7 @@ export const __workbenchReducerInternal = (
                   ...existingNavigationQuery,
                   ...(semanticKey
                     ? {
-                        boardId: typeof values.selectedBoardId === 'string' ? values.selectedBoardId : 'none',
+                        boardId: getGallerySelectionBoardId(values),
                         semanticKey,
                       }
                     : { semanticKey: null }),
@@ -5073,7 +5073,7 @@ export const __workbenchReducerInternal = (
                     ...existingNavigationQuery,
                     ...(semanticKey
                       ? {
-                          boardId: typeof values.selectedBoardId === 'string' ? values.selectedBoardId : 'none',
+                          boardId: getGallerySelectionBoardId(values),
                           semanticKey,
                         }
                       : { semanticKey: null }),

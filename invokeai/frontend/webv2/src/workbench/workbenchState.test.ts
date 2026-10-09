@@ -5356,6 +5356,44 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(stamp()).toMatchObject({ page: 2, query: { page: 2 } });
   });
 
+  it.each(['selectGalleryItem', 'setGalleryMultiSelection'] as const)(
+    'stamps a ranked %s step with the board the grid ranks within, its project board when none is saved',
+    (type) => {
+      let state = createInitialWorkbenchState();
+
+      state = workbenchReducer(state, {
+        type: 'patchWidgetValues',
+        values: { projectBoardId: 'board-project', selectedBoardId: undefined },
+        widgetId: 'gallery',
+      });
+      state = workbenchReducer(state, { item: createGalleryImageItem('first.png'), type: 'selectGalleryItem' });
+      state = workbenchReducer(state, {
+        type: 'patchWidgetValues',
+        values: { semanticImageQuery: { kind: 'text', query: 'sunset' } },
+        widgetId: 'gallery',
+      });
+      const ranked = createGalleryImageItem('ranked.png');
+      state = workbenchReducer(
+        state,
+        type === 'selectGalleryItem'
+          ? { item: ranked, preserveNavigationQuery: true, selectionPage: 1, type }
+          : {
+              itemKeys: ['image:ranked.png'],
+              preserveNavigationQuery: true,
+              primaryItem: ranked,
+              selectionPage: 1,
+              type,
+            }
+      );
+
+      expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageQuery).toMatchObject({
+        boardId: 'board-project',
+        page: 1,
+        semanticKey: 'text:sunset',
+      });
+    }
+  );
+
   it('ties a selected semantic result page to the active ranking', () => {
     let state = createInitialWorkbenchState();
 
