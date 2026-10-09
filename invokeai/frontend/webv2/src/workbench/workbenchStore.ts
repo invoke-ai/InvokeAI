@@ -190,6 +190,14 @@ const createCommands = (
           selectionPage,
           type: 'selectGalleryItem',
         }),
+      /** Select an image found outside the Gallery; Preview navigates within the image's own board. */
+      selectImageInItsBoard: (image: GeneratedImageContract & Partial<GalleryImage>, projectId?: string): void =>
+        dispatch({
+          item: legacyGeneratedImageToGalleryItem(image),
+          navigateItemBoard: true,
+          projectId,
+          type: 'selectGalleryItem',
+        }),
       setCompareImage: (image: (GeneratedImageContract & Partial<GalleryImage>) | null, projectId?: string): void =>
         dispatch({
           image: image ? legacyGeneratedImageToGalleryItem(image) : null,

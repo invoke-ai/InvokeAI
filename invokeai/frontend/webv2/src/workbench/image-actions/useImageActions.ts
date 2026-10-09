@@ -381,8 +381,8 @@ export const useImageActions = ({
       reportMutationOutcome(action, requested.length, result, boardId);
     };
     const deleteItemsConfirmed = (items: GalleryItemRef[]): Promise<void> => {
-      // Capture successor context before optimistic removal. Partial failures reconcile via invalidation; total
-      // failures restore widget snapshots directly.
+      // Capture successor context before optimistic removal. Any rejected items restore the widget snapshot; the
+      // confirmed removals then apply again.
       const deletionContext = getItemActionContext?.() ?? null;
       let orderedRefs: GalleryItemRef[] | null = null;
       const isDeletionContextCurrent = (): boolean => {
@@ -393,8 +393,8 @@ export const useImageActions = ({
         const current = getItemActionContext();
 
         // The optimistic removal below clears the deleted primary from the host's selection, so the selection is
-        // still this deletion's while the store holds what that removal left; anything selected since, loaded by
-        // the host or not, makes the successor stale.
+        // still this deletion's while the store holds what that removal (or restoring rejected items) left;
+        // anything selected since, loaded by the host or not, makes the successor stale.
         return Boolean(
           current &&
           current.filterIdentity === deletionContext.filterIdentity &&
@@ -420,13 +420,24 @@ export const useImageActions = ({
       // Once backend-confirmed deletion starts applying, later callback failures must not restore deleted items.
       let confirmedApplied = false;
       const galleryWidgetSnapshot = applyGalleryItemRemoval(items.map(toGalleryItemKey));
-      const selectionAfterRemoval = getPersistedGallerySelectionKey();
+      let selectionAfterRemoval = getPersistedGallerySelectionKey();
 
       return runItemMutation({
         action: 'delete',
         applyConfirmed: async (result, signal) => {
+          // A rejected request reports its items as failed rather than throwing. Those items remain, so restore what
+          // the optimistic removal cleared; confirmed removals are applied again below.
           if (result.failed.length > 0) {
+            // Restoring changes the persisted selection the successor fence compares against: adopt it only when
+            // the selection was still this deletion's, so a choice made meanwhile still wins.
+            const wasCurrent = isDeletionContextCurrent();
+
             rollbackCachesOnce();
+            restoreGalleryItemRemoval(galleryWidgetSnapshot);
+
+            if (wasCurrent) {
+              selectionAfterRemoval = getPersistedGallerySelectionKey();
+            }
           }
 
           if (result.succeeded.length === 0) {

@@ -441,6 +441,11 @@ type WorkbenchReducerAction =
   | {
       type: 'selectGalleryItem';
       item: GalleryItem;
+      /**
+       * Navigate within the item's own board, unfiltered, instead of the listing the Gallery shows: for selections
+       * made outside the Gallery, such as a search result from any board.
+       */
+      navigateItemBoard?: boolean;
       preserveNavigationQuery?: boolean;
       projectId?: string;
       selectionPage?: number;
@@ -3696,6 +3701,21 @@ const getGallerySelectionPage = (values: Record<string, unknown>, selectionPage:
       ? Math.max(0, Math.floor(values.galleryPage))
       : 0;
 
+/**
+ * A host step keeps the selection's query but follows the Gallery's active ranking, except for a selection that
+ * navigates its item's own board.
+ */
+const getRankingStampFields = (
+  values: Record<string, unknown>,
+  existingNavigationQuery: Record<string, unknown>,
+  semanticKey: string
+): Record<string, unknown> =>
+  existingNavigationQuery.itemBoard === true
+    ? {}
+    : semanticKey
+      ? { boardId: getGallerySelectionBoardId(values), semanticKey }
+      : { semanticKey: null };
+
 /** The listing the Gallery shows now, which a selection made in it navigates within. */
 const getCurrentGallerySelectionQuery = (values: Record<string, unknown>, page: number): Record<string, unknown> => {
   const settings = getGallerySettings(values);
@@ -4945,22 +4965,32 @@ export const __workbenchReducerInternal = (
       return updateGalleryValuesAndPauseLiveFollow(
         state,
         (values) => {
-          const selectedImagePage = getGallerySelectionPage(values, action.selectionPage);
+          // A selection navigated within its own board has no known page there; Preview locates it.
+          const selectedImagePage =
+            action.navigateItemBoard && !hasGallerySelectionPage(action.selectionPage)
+              ? 0
+              : getGallerySelectionPage(values, action.selectionPage);
           const semanticKey = gallerySemanticReferenceKey(parseGallerySemanticReference(values.semanticImageQuery));
           const existingNavigationQuery =
             values.selectedImageQuery && typeof values.selectedImageQuery === 'object'
               ? (values.selectedImageQuery as Record<string, unknown>)
               : null;
-          const selectedImageQuery =
-            action.preserveNavigationQuery && existingNavigationQuery
+          const settings = getGallerySettings(values);
+          const selectedImageQuery = action.navigateItemBoard
+            ? {
+                boardId: action.item.boardId,
+                galleryView: action.item.category === 'general' ? 'images' : 'assets',
+                imageOrderDir: settings.imageOrderDir,
+                itemBoard: true,
+                page: selectedImagePage,
+                paginationMode: settings.paginationMode,
+                searchTerm: '',
+                starredOnly: false,
+              }
+            : action.preserveNavigationQuery && existingNavigationQuery
               ? {
                   ...existingNavigationQuery,
-                  ...(semanticKey
-                    ? {
-                        boardId: getGallerySelectionBoardId(values),
-                        semanticKey,
-                      }
-                    : { semanticKey: null }),
+                  ...getRankingStampFields(values, existingNavigationQuery, semanticKey),
                   page: selectedImagePage,
                 }
               : getCurrentGallerySelectionQuery(values, selectedImagePage);
@@ -5071,12 +5101,7 @@ export const __workbenchReducerInternal = (
               action.preserveNavigationQuery && existingNavigationQuery
                 ? {
                     ...existingNavigationQuery,
-                    ...(semanticKey
-                      ? {
-                          boardId: getGallerySelectionBoardId(values),
-                          semanticKey,
-                        }
-                      : { semanticKey: null }),
+                    ...getRankingStampFields(values, existingNavigationQuery, semanticKey),
                     page: selectedImagePage,
                   }
                 : getCurrentGallerySelectionQuery(values, selectedImagePage),

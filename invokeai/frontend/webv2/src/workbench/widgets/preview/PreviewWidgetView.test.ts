@@ -11,6 +11,7 @@ describe('getPreviewSelectedPage', () => {
     boardId: 'none',
     galleryView: 'images' as const,
     imageOrderDir: 'DESC' as const,
+    itemBoard: false,
     page: 3,
     paginationMode: 'infinite' as const,
     searchTerm: '',

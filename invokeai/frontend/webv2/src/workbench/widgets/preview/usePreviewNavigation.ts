@@ -221,14 +221,15 @@ export const usePreviewNavigation = ({
     () => parseDateTokens(selectedImageQuery.searchTerm),
     [selectedImageQuery.searchTerm]
   );
-  // A ranked filmstrip follows the gallery's current search, board and paging; a listing follows the selection's.
-  const navigationBoardId = semanticQuery ? galleryBoardId : selectedImageQuery.boardId;
+  // A ranked filmstrip follows the gallery's current search, board and paging; a listing follows the selection's. A
+  // selection made outside the Gallery navigates its own board even while the Gallery ranks.
+  const navigationSemanticQuery = selectedImageQuery.itemBoard ? null : semanticQuery;
+  const navigationBoardId = navigationSemanticQuery ? galleryBoardId : selectedImageQuery.boardId;
   const navigationGalleryView = selectedImageQuery.galleryView;
   const navigationOrderDir = selectedImageQuery.imageOrderDir;
   // The grid partitions: its listing is unstarred-only, with the starred
   // items in the strip above it, unless the starred filter is on.
   const navigationStarredOnly = selectedImageQuery.starredOnly;
-  const navigationSemanticQuery = semanticQuery;
   const navigationSemanticKey = gallerySemanticReferenceKey(navigationSemanticQuery);
   const navigationPaginationMode =
     navigationSemanticQuery === null ? selectedImageQuery.paginationMode : galleryPaginationMode;
@@ -542,15 +543,6 @@ export const usePreviewNavigation = ({
     followedSessionId !== null || selectedItemKey === null
       ? -1
       : boardItems.findIndex((item) => toGalleryItemKey(item) === selectedItemKey);
-  // `boardItems` holds only the pages around the selection; the listing part of the cursor is offset by where that
-  // window starts, and the total adds the listing items outside it.
-  const windowStartIndex = boardPageResults[0]?.offset ?? 0;
-  const positionIndex = navigationCursor < stripItems.length ? navigationCursor : navigationCursor + windowStartIndex;
-  const positionTotal = Math.max(
-    positionIndex + 1,
-    boardItems.length + Math.max(0, (listingTotal ?? 0) - backendBoardItems.length)
-  );
-  const position = useMemo(() => ({ index: positionIndex, total: positionTotal }), [positionIndex, positionTotal]);
   const selectedItemPageOffset = useMemo(() => {
     if (selectedItemKey === null) {
       return selectedPageOffset;
@@ -604,6 +596,24 @@ export const usePreviewNavigation = ({
       .find(({ offset }) => offset === selectedPageOffset)
       ?.data.items.some((item) => toGalleryItemKey(item) === selectedItemKey);
   const selectedItemNeedsLocation = selectedItemIsMissingFromStampedPage;
+  // `boardItems` holds only the pages around the selection; the listing part of the cursor is offset by where that
+  // window starts, and the total adds the listing items outside it. A selection not yet located in its listing sits
+  // in the window only as an anchor, so it has no position until a step locates it.
+  const windowStartIndex = boardPageResults[0]?.offset ?? 0;
+  const isSelectionInLoadedPage = boardPageResults.some(({ data }) =>
+    data.items.some((item) => toGalleryItemKey(item) === selectedItemKey)
+  );
+  const positionIndex =
+    selectedItemNeedsLocation && !isSelectionInLoadedPage
+      ? -1
+      : navigationCursor < stripItems.length
+        ? navigationCursor
+        : navigationCursor + windowStartIndex;
+  const positionTotal =
+    selectedItemNeedsLocation && !isSelectionInLoadedPage
+      ? stripItems.length + (listingTotal ?? backendBoardItems.length)
+      : Math.max(positionIndex + 1, boardItems.length + Math.max(0, (listingTotal ?? 0) - backendBoardItems.length));
+  const position = useMemo(() => ({ index: positionIndex, total: positionTotal }), [positionIndex, positionTotal]);
   const getSectionsFor = useCallback(
     (pages: typeof boardPageResults) => [
       stripEntries,

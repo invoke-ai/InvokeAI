@@ -5489,6 +5489,58 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(values.selectedImageQuery).toMatchObject({ starredOnly: false });
   });
 
+  it('stamps a selection made outside the Gallery with the board the item belongs to, unfiltered', () => {
+    let state = createInitialWorkbenchState();
+
+    // The Gallery shows another board, searched, starred-only and paged.
+    state = workbenchReducer(state, { boardId: 'board-elsewhere', type: 'selectGalleryBoard' });
+    state = workbenchReducer(state, { searchTerm: 'sunset', type: 'setGallerySearchTerm' });
+    state = workbenchReducer(state, { starredOnly: true, type: 'setGalleryStarredOnly' });
+    state = workbenchReducer(state, { page: 4, type: 'setGalleryPage' });
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('found.png', 'board-found'),
+      navigateItemBoard: true,
+      type: 'selectGalleryItem',
+    });
+
+    const values = getProjectWidgetValues(getActiveProject(state), 'gallery');
+
+    expect(values.selectedImagePage).toBe(0);
+    expect(values.selectedImageQuery).toMatchObject({
+      boardId: 'board-found',
+      galleryView: 'images',
+      page: 0,
+      searchTerm: '',
+      starredOnly: false,
+    });
+  });
+
+  it('keeps an item-board stamp through a host step while the Gallery ranks', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('found.png', 'board-found'),
+      navigateItemBoard: true,
+      type: 'selectGalleryItem',
+    });
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: { semanticImageQuery: { kind: 'text', query: 'sunset' } },
+      widgetId: 'gallery',
+    });
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('next.png', 'board-found'),
+      preserveNavigationQuery: true,
+      selectionPage: 2,
+      type: 'selectGalleryItem',
+    });
+
+    const query = getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageQuery;
+
+    expect(query).toMatchObject({ boardId: 'board-found', itemBoard: true, page: 2 });
+    expect(query).not.toHaveProperty('semanticKey', 'text:sunset');
+  });
+
   it('stamps a selection with the project board the grid shows when no board was chosen', () => {
     let state = createInitialWorkbenchState();
     const projectId = getActiveProject(state).id;

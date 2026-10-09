@@ -945,6 +945,39 @@ describe('total transport failure rollback', () => {
     );
   });
 
+  it('restores the selection when the server rejects every item instead of failing the request', async () => {
+    const refs = [{ kind: 'image' as const, name: 'gone.png' }];
+    const selected = { kind: 'image', name: 'gone.png' };
+    const before = makeMockProject('project-1', {
+      selectedImage: selected,
+      selectedImageName: 'image:gone.png',
+      selectedImageNames: ['image:gone.png'],
+    });
+    const afterRemoval = makeMockProject('project-1', {
+      selectedImage: null,
+      selectedImageName: null,
+      selectedImageNames: [],
+    });
+
+    mocks.getSnapshot.mockReturnValueOnce({ activeProject: before, projects: [before] }).mockReturnValue({
+      activeProject: afterRemoval,
+      projects: [afterRemoval],
+    });
+    // A rejected request is reported as a result whose items all failed.
+    mocks.itemDelete.mockResolvedValue({ affectedBoardIds: [], failed: refs, succeeded: [] });
+
+    await act(async () => {
+      await getItemActions().deleteItems(refs);
+    });
+
+    expect(mocks.galleryWidgetsPatchValues).toHaveBeenCalledWith(
+      'gallery',
+      { selectedImage: selected, selectedImageName: 'image:gone.png', selectedImageNames: ['image:gone.png'] },
+      'project-1',
+      'system'
+    );
+  });
+
   it('does not clobber a gallery widget field something else changed before the rollback runs', async () => {
     const refs = [{ kind: 'image' as const, name: 'gone.png' }];
     const before = makeMockProject('project-1', { recentImages: [recentImageFixture] });
@@ -1218,6 +1251,48 @@ describe('primary successor after confirmed deletion', () => {
     });
 
     expect(mocks.gallerySelectItem).toHaveBeenCalledWith(after, 'project-1');
+  });
+
+  it('selects the successor beside a rejected item when the host has re-rendered without the primary', async () => {
+    const primary = galleryItem('image', 'primary.png');
+    const rejected = galleryItem('image', 'rejected.png');
+    const after = galleryItem('image', 'after.png');
+    const refs = [primary, rejected, after].map(({ kind, name }) => ({ kind, name }));
+    currentItemActionContext = {
+      filterIdentity: 'filter-a',
+      items: [primary, rejected, after],
+      loadOrderedRefs: () => Promise.resolve(refs),
+      selectedItemKey: 'image:primary.png',
+    };
+    const store = modelGallerySelectionStore('image:primary.png');
+    mocks.galleryRemoveItems.mockImplementationOnce((itemKeys: GalleryItemKey[]) => {
+      store.remove(itemKeys);
+      currentItemActionContext = { ...currentItemActionContext!, items: [after], selectedItemKey: null };
+    });
+    // Restoring the rejected item's removal writes the selection back to the store; the host has not re-rendered.
+    mocks.galleryWidgetsPatchValues.mockImplementation((_widgetId: string, values: Record<string, unknown>) => {
+      if (typeof values.selectedImageName === 'string') {
+        store.select(values.selectedImageName as GalleryItemKey);
+      }
+    });
+    mocks.itemDelete.mockResolvedValue({
+      affectedBoardIds: ['board-1'],
+      failed: [{ kind: 'image', name: rejected.name }],
+      succeeded: [{ kind: 'image', name: primary.name }],
+    });
+
+    await act(async () => {
+      await getItemActions().deleteItems([
+        { kind: 'image', name: primary.name },
+        { kind: 'image', name: rejected.name },
+      ]);
+    });
+
+    expect(mocks.gallerySetItemMultiSelection).toHaveBeenCalledWith(
+      ['image:rejected.png', 'image:after.png'],
+      after,
+      'project-1'
+    );
   });
 
   it('keeps an item selected during the deletion even when the host has not loaded it', async () => {

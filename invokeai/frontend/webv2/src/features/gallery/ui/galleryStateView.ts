@@ -158,6 +158,8 @@ export interface GallerySelectedImageQuery {
   page: number;
   paginationMode: 'infinite' | 'paginated';
   searchTerm: string;
+  /** The selection navigates its item's own board, unranked: one made outside the Gallery, such as a search pick. */
+  itemBoard: boolean;
   /** Ranking identity for a semantic result page; null for ordinary listings and legacy state. */
   semanticKey: string | null;
   starredOnly: boolean;
@@ -188,6 +190,7 @@ export const getGallerySelectedImageQuery = (values: Record<string, unknown>): G
       query?.paginationMode === 'infinite' || query?.paginationMode === 'paginated'
         ? query.paginationMode
         : settings.paginationMode,
+    itemBoard: query?.itemBoard === true,
     searchTerm: query && typeof query.searchTerm === 'string' ? query.searchTerm : String(values.searchTerm ?? ''),
     semanticKey: query && typeof query.semanticKey === 'string' && query.semanticKey ? query.semanticKey : null,
     starredOnly: query && typeof query.starredOnly === 'boolean' ? query.starredOnly : getGalleryStarredOnly(values),

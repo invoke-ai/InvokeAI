@@ -2124,6 +2124,50 @@ describe('preview keyboard navigation boundary', () => {
     await expect.poll(() => headerPosition).toEqual({ boardItemCount: 420, isLoadingBoard: false, selectedIndex: 330 });
   });
 
+  it('reports no position for a selection its stamped page does not hold until a step locates it', async () => {
+    const pageItem = (index: number) =>
+      createImageItem(`unlocated-${index}`, new Date(Date.UTC(2026, 6, 1) - index * 1_000).toISOString());
+    const selected = pageItem(330);
+
+    // Stamped on page 0 (as a selection made outside the Gallery is), but the item sits on page 5.
+    mocks.galleryItemPages = Array.from({ length: 7 }, (_unused, page) => ({
+      items: Array.from({ length: 60 }, (_item, index) => pageItem(page * 60 + index)),
+      total: 420,
+    }));
+    setGalleryValues({
+      recentImages: [],
+      selectedImage: legacyImage(selected.name, selected.createdAt),
+      selectedImageName: selected.name,
+      selectedImageQuery: { ...deepQuery, page: 0 },
+    });
+
+    await render();
+
+    await expect.poll(() => headerPosition).toEqual({ boardItemCount: 420, isLoadingBoard: false, selectedIndex: -1 });
+  });
+
+  it('keeps the position of a selection that moved onto an adjacent loaded page', async () => {
+    const pageItem = (index: number) =>
+      createImageItem(`shifted-${index}`, new Date(Date.UTC(2026, 6, 1) - index * 1_000).toISOString());
+    const selected = pageItem(330);
+
+    // Stamped on page 4, but an insert pushed it onto page 5, which Preview loads beside page 4.
+    mocks.galleryItemPages = Array.from({ length: 7 }, (_unused, page) => ({
+      items: Array.from({ length: 60 }, (_item, index) => pageItem(page * 60 + index)),
+      total: 420,
+    }));
+    setGalleryValues({
+      recentImages: [],
+      selectedImage: legacyImage(selected.name, selected.createdAt),
+      selectedImageName: selected.name,
+      selectedImageQuery: { ...deepQuery, page: 4 },
+    });
+
+    await render();
+
+    await expect.poll(() => headerPosition).toEqual({ boardItemCount: 420, isLoadingBoard: false, selectedIndex: 330 });
+  });
+
   it('hands image actions the selected item absolute page', async () => {
     const deepA = createImageItem('deep-a', '2026-07-20T00:00:04.000Z');
     const deepB = createImageItem('deep-b', '2026-07-20T00:00:03.000Z');
@@ -2466,6 +2510,19 @@ describe('preview keyboard navigation boundary', () => {
 
     expect(mocks.galleryItemFilters.at(-1)).toMatchObject({ boardId: 'board-a' });
     expect(mocks.galleryItemFilters.at(-1)).not.toHaveProperty('semanticQuery');
+
+    // A pick made outside the Gallery (a search result) keeps its own board even while the Gallery ranks.
+    mocks.galleryItemFilters.length = 0;
+    setGalleryValues({
+      semanticImageQuery: { kind: 'text', query: 'sunset' },
+      selectedImageQuery: { ...(galleryValues.selectedImageQuery as object), itemBoard: true },
+    });
+    await rerender();
+
+    // Only Preview asks for board A; the Gallery's grid keeps ranking board B.
+    expect(mocks.galleryItemFilters.some((query) => query.boardId === 'board-a' && !('semanticQuery' in query))).toBe(
+      true
+    );
   });
 
   it('stamps the selected ranking page when the footer paginates semantic results', async () => {
