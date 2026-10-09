@@ -22,6 +22,7 @@ export {
   getCurrentVideoValues,
   placeConditioningClip,
   placeInitialVideo,
+  placeVideoImage,
   type PlaceableVideo,
 } from './executeVideoRecall';
 export { getImageRecallVerb, IMAGE_RECALL_KINDS } from './RecallActionButtons';

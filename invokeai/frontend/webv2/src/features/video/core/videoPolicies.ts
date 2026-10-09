@@ -2308,7 +2308,7 @@ export const getVideoValidationReasons = (model: MainModelConfig, settings: Vide
   if (!config.modes.includes(mode)) {
     if (referenceOnly && settings.references.length === 0) {
       // Explain the missing reference rather than implying a defective text-to-video model.
-      reasons.push('Reference-to-video needs at least one image or video reference.');
+      reasons.push('Reference-to-video needs at least one reference.');
     } else {
       reasons.push(`${model.name} does not support ${VIDEO_MODE_DESCRIPTIONS[mode]}.`);
     }
@@ -2320,15 +2320,6 @@ export const getVideoValidationReasons = (model: MainModelConfig, settings: Vide
     const caps = config.references;
     const videoCount = settings.references.filter((reference) => reference.kind === 'video').length;
     const imageCount = settings.references.length - videoCount;
-    const allAudioOnly =
-      settings.references.length > 0 &&
-      settings.references.every((reference) => reference.kind === 'video' && reference.conditioning === 'audio');
-
-    if (allAudioOnly) {
-      reasons.push(
-        'At least one reference must contribute visuals — add an image, or set a video reference to include video.'
-      );
-    }
     if (caps && videoCount > caps.maxVideos) {
       reasons.push(`At most ${caps.maxVideos} video references are supported.`);
     }
