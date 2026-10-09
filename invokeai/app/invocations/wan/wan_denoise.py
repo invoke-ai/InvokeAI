@@ -53,6 +53,7 @@ from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import Rec
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import WanConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.sage_attention import sage_attention_scope
 from invokeai.backend.wan.memory_optimization import wan_memory_optimization
 from invokeai.backend.wan.sampling_utils import get_spatial_scale_factor, make_noise
 
@@ -658,6 +659,7 @@ class WanDenoiseInvocation(BaseInvocation):
                 ),
             )
             exit_stack.callback(swapper.close)
+            exit_stack.enter_context(sage_attention_scope())
 
             for step_idx, t in enumerate(tqdm(timesteps, desc="Denoising (Wan 2.2)", total=total_steps)):
                 timestep = t.expand(latents.shape[0])
