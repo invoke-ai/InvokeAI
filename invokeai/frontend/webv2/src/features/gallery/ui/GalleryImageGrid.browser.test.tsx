@@ -467,6 +467,7 @@ const followProgressSession = vi.fn();
 let currentStrip: GalleryStarredStrip = EMPTY_GALLERY_STARRED_STRIP;
 let currentSparseListing: GallerySparseListing | undefined;
 const setVisibleRange = vi.fn();
+const pinRevealIndex = vi.fn();
 const READY_LISTING: GalleryListingState = {
   error: null,
   isFetchingMore: false,
@@ -521,6 +522,7 @@ const Harness = ({
     loadedItems: mergeGalleryLoadedItems(currentStrip.items, gallery.items),
     projectName: 'Project',
     region: 'right',
+    pinRevealIndex,
     runtime,
     setVisibleRange,
     sparseListing: currentSparseListing,
@@ -1738,6 +1740,51 @@ describe('GalleryImageGrid reveal requests', () => {
 
     expect(setVisibleRange).not.toHaveBeenCalled();
     expect(mocks.scrollToIndex).not.toHaveBeenCalled();
+  });
+
+  it('pins a verified reveal index past a stale total and scrolls to it once its page lands', async () => {
+    const firstPageItem = createItem('image', 'first.png');
+    const added = createItem('image', 'added.png');
+    const pageState = { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) };
+    // Another client added item 61 after this grid counted 60; Find in Gallery located it at index 60.
+    currentSparseListing = {
+      itemSlots: new Map([[0, firstPageItem]]),
+      pageStates: new Map([[0, pageState]]),
+      recentItems: [],
+      total: 60,
+    };
+    const gallery = createGallery({
+      items: [firstPageItem],
+      selectedItemKey: null,
+      selectedItemKeys: ['image:added.png'],
+      settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' },
+    });
+    await renderGallery(gallery);
+    setVisibleRange.mockClear();
+    mocks.scrollToIndex.mockClear();
+
+    await interact(() => requestReveal('image:added.png', 60));
+
+    expect(pinRevealIndex).toHaveBeenCalledExactlyOnceWith(60);
+    expect(setVisibleRange).toHaveBeenCalledWith({ endIndexExclusive: 60, startIndex: 60 });
+
+    mocks.scrollToIndex.mockClear();
+    currentSparseListing = {
+      itemSlots: new Map([
+        [0, firstPageItem],
+        [60, added],
+      ]),
+      pageStates: new Map([
+        [0, pageState],
+        [60, pageState],
+      ]),
+      recentItems: [],
+      total: 61,
+    };
+    await renderGallery({ ...gallery, items: [firstPageItem, added] });
+
+    // The pending reveal scrolls by key only once the item's slot exists.
+    expect(mocks.scrollToIndex).toHaveBeenCalledOnce();
   });
 
   it('reveals a starred item in the strip, and keeps the reveal pending while the strip is collapsed', async () => {

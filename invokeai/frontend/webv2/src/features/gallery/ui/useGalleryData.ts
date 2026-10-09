@@ -66,6 +66,11 @@ export interface GalleryData {
   /** Absolute backend positions for the currently subscribed pages in the main Gallery and picker. */
   sparseListing?: GallerySparseListing;
   setVisibleRange?: (range: { endIndexExclusive: number; startIndex: number }) => void;
+  /**
+   * Keep a locator-verified index's page subscribed even past a stale total, so that page's fresher total reconciles
+   * the listing. Lasts until the listing changes or another reveal replaces it.
+   */
+  pinRevealIndex?: (absoluteIndex: number) => void;
 }
 
 export interface GallerySparsePageState {
@@ -339,6 +344,18 @@ export const useGalleryData = ({
     },
     []
   );
+  const [revealPin, setRevealPin] = useState<{ filterIdentity: string; offset: number } | null>(null);
+  const revealPinOffset = revealPin?.filterIdentity === filterIdentity ? revealPin.offset : null;
+  const pinRevealIndex = useCallback((absoluteIndex: number) => {
+    const offset = Math.floor(Math.max(0, absoluteIndex) / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE;
+    const activeFilterIdentity = filterIdentityRef.current;
+
+    setRevealPin((current) =>
+      current?.filterIdentity === activeFilterIdentity && current.offset === offset
+        ? current
+        : { filterIdentity: activeFilterIdentity, offset }
+    );
+  }, []);
   const [knownTotalSnapshot, setKnownTotalSnapshot] = useState<{ filterIdentity: string; total: number } | null>(null);
   const retainedTotal = knownTotalSnapshot?.filterIdentity === filterIdentity ? knownTotalSnapshot.total : null;
   const cachedFirstPage = queryClient.getQueryData<{ items: GalleryItem[]; total: number }>(firstPageOptions.queryKey);
@@ -382,19 +399,19 @@ export const useGalleryData = ({
 
     // Infinite listings learn their total from page zero. Once known, subscriptions follow only the virtual range
     // and its virtualizer overscan, even when it is far from the start of the listing.
-    if (knownTotal === 0) {
-      return [0];
-    }
+    const plannedOffsets =
+      knownTotal === 0 || (knownTotal === null && !hasRequestedRange)
+        ? [0]
+        : planGalleryPageOffsets({
+            endIndexExclusive: visibleEndIndexExclusive,
+            startIndex: visibleStartIndex,
+            total: knownTotal,
+          });
 
-    if (knownTotal === null && !hasRequestedRange) {
-      return [0];
-    }
-
-    return planGalleryPageOffsets({
-      endIndexExclusive: visibleEndIndexExclusive,
-      startIndex: visibleStartIndex,
-      total: knownTotal,
-    });
+    // A revealed item may sit past a total counted before another client added it.
+    return revealPinOffset === null || plannedOffsets.includes(revealPinOffset)
+      ? plannedOffsets
+      : [...plannedOffsets, revealPinOffset].sort((left, right) => left - right);
   }, [
     hasRequestedRange,
     isPaginated,
@@ -402,6 +419,7 @@ export const useGalleryData = ({
     isFetchingTotal,
     hasUnresolvedTotalError,
     page,
+    revealPinOffset,
     selectedPageOffset,
     sparseViewport,
     visibleEndIndexExclusive,
@@ -838,6 +856,7 @@ export const useGalleryData = ({
     queryError: sparseViewport ? (pageError ?? firstPageError ?? (hasUnresolvedTotalError ? totalError : null)) : error,
     previousScopeItems,
     selectedBoardId: boardId,
+    pinRevealIndex: sparseViewport && !isPaginated ? pinRevealIndex : undefined,
     setVisibleRange: sparseViewport ? setVisibleRange : undefined,
     sparseListing,
     total,

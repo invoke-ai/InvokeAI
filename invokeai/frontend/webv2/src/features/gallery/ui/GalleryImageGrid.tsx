@@ -406,6 +406,7 @@ export const GalleryImageGrid = () => {
     isWindowTruncated,
     itemActions,
     listing,
+    pinRevealIndex,
     region,
     setVisibleRange,
     sparseListing,
@@ -847,14 +848,22 @@ export const GalleryImageGrid = () => {
     pendingSparseNavigationRef.current = null;
     pendingSparseFocusRef.current = null;
   }, []);
+  /**
+   * A `verified` index comes from a reveal's locator and may exceed a total counted before another client added
+   * items; its page is pinned so its fresher total reconciles the listing.
+   */
   const requestSparseAbsoluteIndex = useCallback(
-    (absoluteIndex: number) => {
+    (absoluteIndex: number, { verified = false }: { verified?: boolean } = {}) => {
       if (!sparseListing || isSparsePaginated || !setVisibleRange) {
         return;
       }
 
-      if (absoluteIndex < 0 || (sparseListing.total !== null && absoluteIndex >= sparseListing.total)) {
+      if (absoluteIndex < 0 || (!verified && sparseListing.total !== null && absoluteIndex >= sparseListing.total)) {
         return;
+      }
+
+      if (verified) {
+        pinRevealIndex?.(absoluteIndex);
       }
 
       const pageOffset = Math.floor(absoluteIndex / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE;
@@ -864,7 +873,7 @@ export const GalleryImageGrid = () => {
       });
       virtualizer.scrollToIndex(leadingRecentRows + Math.floor(absoluteIndex / columnCount));
     },
-    [columnCount, isSparsePaginated, leadingRecentRows, setVisibleRange, sparseListing, virtualizer]
+    [columnCount, isSparsePaginated, leadingRecentRows, pinRevealIndex, setVisibleRange, sparseListing, virtualizer]
   );
   const handleNavigateToUnloadedSlot = useCallback(
     (index: number, request: GalleryUnloadedNavigationRequest) => {
@@ -1263,7 +1272,7 @@ export const GalleryImageGrid = () => {
         const indexedItem = sparseListing.itemSlots.get(revealRequest.absoluteIndex);
 
         if (!indexedItem || toGalleryItemKey(indexedItem) !== revealRequest.itemKey) {
-          requestSparseAbsoluteIndex(revealRequest.absoluteIndex);
+          requestSparseAbsoluteIndex(revealRequest.absoluteIndex, { verified: true });
         }
       }
     }

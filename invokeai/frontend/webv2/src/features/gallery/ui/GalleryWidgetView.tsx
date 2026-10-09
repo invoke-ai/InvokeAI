@@ -250,6 +250,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
         projectName={projectName}
         region={region}
         runtime={runtime}
+        pinRevealIndex={data.pinRevealIndex}
         setVisibleRange={data.setVisibleRange}
         sparseListing={data.sparseListing}
         starredStrip={starredStrip}
@@ -296,6 +297,7 @@ const GalleryWidgetContent = ({
   isWindowTruncated,
   listing,
   loadedItems,
+  pinRevealIndex,
   projectName,
   region,
   runtime,
@@ -310,6 +312,7 @@ const GalleryWidgetContent = ({
   isWindowTruncated: boolean;
   listing: GalleryListingState;
   loadedItems: GalleryItem[];
+  pinRevealIndex: GalleryData['pinRevealIndex'];
   projectName: string;
   region: GalleryWidgetProps['region'];
   runtime: GalleryWidgetRuntime;
@@ -329,6 +332,7 @@ const GalleryWidgetContent = ({
       itemActions,
       listing,
       loadedItems,
+      pinRevealIndex,
       projectName,
       region,
       runtime,
@@ -345,6 +349,7 @@ const GalleryWidgetContent = ({
       itemActions,
       listing,
       loadedItems,
+      pinRevealIndex,
       projectName,
       region,
       runtime,

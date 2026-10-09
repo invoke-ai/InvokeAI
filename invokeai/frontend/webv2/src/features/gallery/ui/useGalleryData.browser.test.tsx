@@ -167,6 +167,34 @@ describe('useGalleryData sparse page subscriptions', () => {
     expect(latestData?.sparseListing?.itemSlots.get(1)?.name).toBe('image-61.png');
   });
 
+  it('reconciles a stale infinite total from a pinned reveal page', async () => {
+    let total = 60;
+    mocks.listGalleryItems.mockImplementation(({ offset, limit }: { offset: number; limit: number }) =>
+      Promise.resolve({
+        items: Array.from({ length: Math.max(0, Math.min(limit, total - offset)) }, (_, index) =>
+          createItem(offset + index)
+        ),
+        total,
+      })
+    );
+
+    await act(() =>
+      root?.render(
+        <QueryClientProvider client={queryClient!}>
+          <Probe />
+        </QueryClientProvider>
+      )
+    );
+    await vi.waitFor(() => expect(latestData?.total).toBe(60));
+
+    // Another client adds a 61st item; Find in Gallery verified it at index 60.
+    total = 61;
+    await act(() => latestData!.pinRevealIndex!(60));
+
+    await vi.waitFor(() => expect(latestData?.total).toBe(61));
+    expect(latestData?.sparseListing?.itemSlots.get(60)?.name).toBe('image-60.png');
+  });
+
   it('keeps an empty cold paginated listing subscribed to page zero', async () => {
     mocks.listGalleryItems.mockResolvedValue({ items: [], total: 0 });
 

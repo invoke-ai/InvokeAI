@@ -83,6 +83,8 @@ export interface GalleryWidgetContextValue {
   sparseListing?: GallerySparseListing;
   /** Reports the grid's virtual item range so only intersecting page queries stay subscribed. */
   setVisibleRange?: (range: { endIndexExclusive: number; startIndex: number }) => void;
+  /** See `GalleryData.pinRevealIndex`; offered for sparse infinite listings only. */
+  pinRevealIndex?: (absoluteIndex: number) => void;
   starredStrip: GalleryStarredStrip;
   projectName: string;
   /** Placement, used only to scope cached viewport measurements. */
