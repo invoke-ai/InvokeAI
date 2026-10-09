@@ -9,6 +9,7 @@ import {
   type GalleryNavigationEntry,
   type GalleryRevealRequest,
 } from '@features/gallery/core/selection';
+import { gallerySemanticReferenceKey } from '@features/gallery/core/semanticImageQuery';
 import { isDateBoardId } from '@features/gallery/data/backend';
 import {
   GALLERY_PAGE_SIZE,
@@ -363,6 +364,8 @@ interface FocusedTile {
   filter: GalleryItemsFilter;
   index: number;
   key: GalleryItemKey;
+  /** The sparse slot it showed, whose next occupant inherits the Tab stop; positions elsewhere shift with eviction. */
+  slot?: number;
 }
 
 /** The rows in view plus the one keyboard focus needs wherever the grid scrolls; -1 keeps nothing. */
@@ -461,6 +464,7 @@ export const GalleryImageGrid = () => {
     loadedItems,
     selectedItemKeys,
     selectItemRange,
+    shouldStarSelection,
     syncRangeInteractionContext,
     toggleItem,
   } = useGalleryGridSelection({ getSelectionPage });
@@ -509,13 +513,21 @@ export const GalleryImageGrid = () => {
   // shown rows, which the strip holds, or — as in Preview — one beyond the strip's bound, which the view names no
   // visible key for and only the persisted selection holds (the listing is unstarred). Either way the arrows step
   // from it rather than from the first tile. The persisted selection counts only when made in this listing: one
-  // left over from another board, search or filter would put a phantom entry at the end of this strip.
+  // left over from another board, search or filter would put a phantom entry at the end of this strip. Where the
+  // strip does not apply (the starred-only listing, a ranking, an anchored window) there is no strip to hold it.
+  const isStripApplicable =
+    !gallery.starredOnly && gallery.semanticImageQuery === null && gallery.anchoredWindowPage === 0;
   const hiddenStripSelection = useMemo((): GalleryItem | null => {
     const selectedItem = getSelectedGalleryItemFromValues(galleryValues);
     const selectedKey = gallery.selectedItemKey ?? (selectedItem ? toGalleryItemKey(selectedItem) : null);
     const isSelected = (item: GalleryItem) => toGalleryItemKey(item) === selectedKey;
 
-    if (selectedKey === null || shownStripItems.some(isSelected) || gallery.items.some(isSelected)) {
+    if (
+      !isStripApplicable ||
+      selectedKey === null ||
+      shownStripItems.some(isSelected) ||
+      gallery.items.some(isSelected)
+    ) {
       return null;
     }
 
@@ -527,7 +539,7 @@ export const GalleryImageGrid = () => {
         ? selectedItem
         : null)
     );
-  }, [gallery, galleryValues, shownStripItems, starredStrip.items]);
+  }, [gallery, galleryValues, isStripApplicable, shownStripItems, starredStrip.items]);
   const navigationSections = useMemo((): GalleryNavigationEntry[][] => {
     const stripEntries: GalleryNavigationEntry[] = shownStripItems.map((item) => ({ item, kind: 'item' }));
 
@@ -580,10 +592,12 @@ export const GalleryImageGrid = () => {
     shownStripItems,
     usesSparseListing,
   ]);
-  const cursorKey =
+  // What a step into an unloaded page started from. The persisted primary, unlike the visible key, survives its page
+  // leaving the subscribed range while the target page loads.
+  const navigationOriginKey =
     followedProgressSessionId !== null
       ? getGallerySessionNavigationKey(followedProgressSessionId)
-      : gallery.selectedItemKey;
+      : gallery.primarySelectedItemKey;
   // Thumbnails in visual order share one Tab stop. Sparse slots must retain their real row positions even when pages
   // are unloaded, and recent results sit at the order-dependent end of that listing.
   const sparseSlotEntries = useMemo(
@@ -605,13 +619,16 @@ export const GalleryImageGrid = () => {
   const [focusedTile, setFocusedTile] = useState<FocusedTile | null>(null);
   const selectedTileIndex = gallery.selectedItemKey === null ? -1 : tileKeys.indexOf(gallery.selectedItemKey);
   const focusedTileIndex = focusedTile === null ? -1 : tileKeys.indexOf(focusedTile.key);
+  const focusedSlotItem = focusedTile?.slot === undefined ? undefined : sparseListing?.itemSlots.get(focusedTile.slot);
   const tabStopIndex =
     focusedTileIndex >= 0
       ? focusedTileIndex
       : selectedTileIndex >= 0
         ? selectedTileIndex
         : focusedTile?.filter === filter
-          ? Math.max(0, Math.min(focusedTile.index, tileKeys.length - 1))
+          ? focusedTile.slot === undefined
+            ? Math.max(0, Math.min(focusedTile.index, tileKeys.length - 1))
+            : Math.max(0, focusedSlotItem ? tileKeys.indexOf(toGalleryItemKey(focusedSlotItem)) : 0)
           : 0;
   const tabStopKey = tileKeys[tabStopIndex] ?? null;
   const tabStopItemKey = tabStopKey;
@@ -858,10 +875,11 @@ export const GalleryImageGrid = () => {
   }, []);
   /**
    * A `verified` index comes from a reveal's locator and may exceed a total counted before another client added
-   * items; its page is pinned so its fresher total reconciles the listing.
+   * items; its page is pinned so its fresher total reconciles the listing. `keepIndex` names a slot whose page stays
+   * subscribed alongside, as an arrow step's origin must until the step lands.
    */
   const requestSparseAbsoluteIndex = useCallback(
-    (absoluteIndex: number, { verified = false }: { verified?: boolean } = {}) => {
+    (absoluteIndex: number, { keepIndex, verified = false }: { keepIndex?: number; verified?: boolean } = {}) => {
       if (!sparseListing || isSparsePaginated || !setVisibleRange) {
         return;
       }
@@ -875,12 +893,17 @@ export const GalleryImageGrid = () => {
       }
 
       const pageOffset = Math.floor(absoluteIndex / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE;
+      const keptPageOffset =
+        keepIndex === undefined ? pageOffset : Math.floor(keepIndex / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE;
 
       // A page already subscribed keeps the range around it; narrowing to it would drop the cursor's page.
       if (!sparseListing.pageStates.has(pageOffset)) {
         setVisibleRange({
-          endIndexExclusive: Math.min(sparseListing.total ?? Number.POSITIVE_INFINITY, pageOffset + GALLERY_PAGE_SIZE),
-          startIndex: pageOffset,
+          endIndexExclusive: Math.min(
+            sparseListing.total ?? Number.POSITIVE_INFINITY,
+            Math.max(pageOffset, keptPageOffset) + GALLERY_PAGE_SIZE
+          ),
+          startIndex: Math.min(pageOffset, keptPageOffset),
         });
       }
       virtualizer.scrollToIndex(leadingRecentRows + Math.floor(absoluteIndex / columnCount));
@@ -897,6 +920,15 @@ export const GalleryImageGrid = () => {
           ? active.closest('[data-gallery-session-id]')?.getAttribute('data-gallery-session-id')
           : null;
 
+      const originFocusKey = shouldRestoreFocus
+        ? activeSessionId
+          ? getGallerySessionNavigationKey(activeSessionId)
+          : getTileItemKey(active)
+        : null;
+      // The step starts from the focused tile, else the selection; a listing slot's page stays loaded under it.
+      const stepOriginKey = originFocusKey ?? navigationOriginKey;
+      const originSlot = sparseSlotEntries.find(([, item]) => toGalleryItemKey(item) === stepOriginKey)?.[0];
+
       pendingSparseFocusRef.current = null;
       pendingSparseNavigationRef.current = {
         anchorKey: request.anchorKey,
@@ -905,17 +937,13 @@ export const GalleryImageGrid = () => {
         mode: request.mode,
         navigationGeneration: sparseNavigationGenerationRef.current,
         onResolved: request.onResolved,
-        originItemKey: cursorKey,
-        originFocusKey: shouldRestoreFocus
-          ? activeSessionId
-            ? getGallerySessionNavigationKey(activeSessionId)
-            : getTileItemKey(active)
-          : null,
+        originItemKey: navigationOriginKey,
+        originFocusKey,
         shouldRestoreFocus,
       };
-      requestSparseAbsoluteIndex(index);
+      requestSparseAbsoluteIndex(index, { keepIndex: originSlot });
     },
-    [cursorKey, requestSparseAbsoluteIndex, sparseFilterIdentity]
+    [navigationOriginKey, requestSparseAbsoluteIndex, sparseFilterIdentity, sparseSlotEntries]
   );
 
   const measureVirtualizer = useEffectEvent(() => {
@@ -996,31 +1024,40 @@ export const GalleryImageGrid = () => {
 
       if (key) {
         const index = tileKeys.indexOf(key as GalleryItemKey);
+        const slot = sparseSlotEntries.find(([, item]) => toGalleryItemKey(item) === key)?.[0];
 
         setFocusedTile((current) =>
-          current?.key === key && current.index === index && current.filter === filter
+          current?.key === key && current.index === index && current.slot === slot && current.filter === filter
             ? current
-            : { filter, index, key: key as GalleryItemKey }
+            : { filter, index, key: key as GalleryItemKey, slot }
         );
       }
     },
-    [filter, tileKeys]
+    [filter, sparseSlotEntries, tileKeys]
   );
 
   // A tile that leaves the document holding focus (deleted, moved between the strip and the listing, replaced by
-  // another board's) takes focus with it. The same item takes it back where it now shows, else the Tab stop, else
-  // the grid itself while it has no tiles, so the keys stay with the gallery; a user who already went elsewhere
-  // keeps their focus.
+  // another board's, its page evicted by scrolling away) takes focus with it. The same item takes it back where it
+  // now shows, else the Tab stop while in view, else the first tile in view, else the grid itself, so the keys stay
+  // with the gallery without pulling the next arrow back to a far-off tile; a user who already went elsewhere keeps
+  // their focus.
   const restoreTileFocus = useCallback((itemKey: GalleryItemKey) => {
     const viewport = viewportRef.current;
     const active = document.activeElement;
 
-    if (viewport && (active === null || active === document.body)) {
-      (
-        viewport.querySelector<HTMLElement>(`[data-gallery-item-key="${CSS.escape(itemKey)}"]`) ??
-        viewport.querySelector<HTMLElement>(GALLERY_TAB_STOP_SELECTOR) ??
-        viewport
-      ).focus({ preventScroll: true });
+    if (!viewport || (active !== null && active !== document.body)) {
+      return;
+    }
+
+    const sameItem = viewport.querySelector<HTMLElement>(`[data-gallery-item-key="${CSS.escape(itemKey)}"]`);
+
+    if (sameItem) {
+      sameItem.focus({ preventScroll: true });
+    } else if (
+      !focusVisibleOperable(viewport, { selector: GALLERY_TAB_STOP_SELECTOR }) &&
+      !focusVisibleOperable(viewport, { selector: TILE_BUTTON_SELECTOR })
+    ) {
+      viewport.focus({ preventScroll: true });
     }
   }, []);
 
@@ -1123,13 +1160,13 @@ export const GalleryImageGrid = () => {
     getDialogReturnFocus,
     getFirstVisibleTileKey,
     getFocusedItem,
-    loadedItems,
     moveToEntry,
     navigationSections,
     navigateToUnloadedSlot: handleNavigateToUnloadedSlot,
     getSelectionPage,
     onNavigationStart: cancelPendingSparseNavigation,
     selectItemRange,
+    shouldStar: shouldStarSelection,
     toggleItem,
   });
 
@@ -1140,7 +1177,7 @@ export const GalleryImageGrid = () => {
       return;
     }
 
-    if (pending.filterIdentity !== sparseFilterIdentity || pending.originItemKey !== cursorKey) {
+    if (pending.filterIdentity !== sparseFilterIdentity || pending.originItemKey !== navigationOriginKey) {
       pendingSparseNavigationRef.current = null;
       return;
     }
@@ -1195,7 +1232,7 @@ export const GalleryImageGrid = () => {
 
   useEffect(() => {
     settlePendingSparseNavigation();
-  }, [cursorKey, sparseFilterIdentity, sparseListing?.itemSlots, sparseListing?.pageStates]);
+  }, [navigationOriginKey, sparseFilterIdentity, sparseListing?.itemSlots, sparseListing?.pageStates]);
 
   useLayoutEffect(() => {
     const pending = pendingSparseFocusRef.current;
@@ -1231,6 +1268,12 @@ export const GalleryImageGrid = () => {
   // Only explicit reveals scroll. Retry while the item loads; retire the request when another selection supersedes
   // it.
   const revealRequest = useSyncExternalStore(subscribeGalleryRevealRequests, getGalleryRevealRequest);
+  // A reveal's index locates the item in the listing the selection navigates (Preview's), which keeps its own query
+  // after this grid's board, order, search, filter or ranking changes. Only that same listing's index means a slot here.
+  const selectedImageQuery = getGallerySelectedImageQuery(galleryValues);
+  const isRevealIndexInScope =
+    isGallerySelectionInScope(selectedImageQuery, gallery) &&
+    (selectedImageQuery.semanticKey ?? '') === gallerySemanticReferenceKey(gallery.semanticImageQuery);
   const pendingRevealRef = useRef<GalleryRevealRequest | null>(null);
   // Honor requests preceding mount; selection mismatch, rather than request age, determines staleness.
   const consumedRevealTokenRef = useRef(0);
@@ -1289,7 +1332,7 @@ export const GalleryImageGrid = () => {
       consumedRevealTokenRef.current = revealRequest.token;
       pendingRevealRef.current = revealRequest;
 
-      if (revealRequest.absoluteIndex !== undefined && sparseListing && !isSparsePaginated) {
+      if (revealRequest.absoluteIndex !== undefined && isRevealIndexInScope && sparseListing && !isSparsePaginated) {
         const indexedItem = sparseListing.itemSlots.get(revealRequest.absoluteIndex);
 
         if (!indexedItem || toGalleryItemKey(indexedItem) !== revealRequest.itemKey) {
@@ -1299,7 +1342,14 @@ export const GalleryImageGrid = () => {
     }
 
     settlePendingReveal();
-  }, [isSparsePaginated, navigationSections, requestSparseAbsoluteIndex, revealRequest, sparseListing]);
+  }, [
+    isRevealIndexInScope,
+    isSparsePaginated,
+    navigationSections,
+    requestSparseAbsoluteIndex,
+    revealRequest,
+    sparseListing,
+  ]);
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current;

@@ -7,7 +7,7 @@ import { useEffect, useEffectEvent, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useGalleryUi } from './GalleryUiContext';
-import { useGallerySelectionStarred, useGalleryWidget } from './GalleryWidgetContext';
+import { useGalleryWidget } from './GalleryWidgetContext';
 
 /**
  * How an arrow moves: `select` replaces the selection with the next tile, `extend` selects the range from the anchor
@@ -77,13 +77,13 @@ export const useGalleryGridHotkeys = ({
   getDialogReturnFocus,
   getFirstVisibleTileKey,
   getFocusedItem,
-  loadedItems,
   moveToEntry,
   navigationSections,
   navigateToUnloadedSlot,
   getSelectionPage,
   onNavigationStart,
   selectItemRange,
+  shouldStar,
   toggleItem,
 }: {
   actionSelectionRefs: GalleryItemRef[];
@@ -99,8 +99,6 @@ export const useGalleryGridHotkeys = ({
   getFirstVisibleTileKey: () => string | null;
   /** The thumbnail holding keyboard focus, if any. */
   getFocusedItem: () => GalleryItem | null;
-  /** Everything on hand for star-state lookups, strip included. */
-  loadedItems: readonly GalleryItem[];
   /**
    * Applies `select` (none for a focus-only move), brings the entry's tile into view, and moves keyboard focus there
    * when the grid holds it.
@@ -118,14 +116,23 @@ export const useGalleryGridHotkeys = ({
     item: GalleryItem,
     options?: { anchorKey?: GalleryItemKey | null; selectionPage?: number }
   ) => Promise<void>;
+  /** Whether the star command stars the action selection: some of it is not starred. */
+  shouldStar: boolean;
   toggleItem: (item: GalleryItem) => void;
 }) => {
   const { t } = useTranslation();
   const { actions, gallery, itemActions, runtime } = useGalleryWidget();
   const { followProgressSession, gallery: galleryCommands } = useGalleryUi();
-  const shouldStar = useGallerySelectionStarred(actionSelectionRefs, loadedItems);
   // A run of Shift+arrows keeps the anchor it started from; the range it last reached says whether it is still running.
   const keyboardRangeRef = useRef<{ anchorKey: GalleryItemKey | null; reachedKey: GalleryItemKey } | null>(null);
+
+  // A run continues from its own anchor. A new one starts from the persisted primary, which outlives its tile when
+  // a sparse page leaves the viewport; a stored null would let the next step re-anchor on the moved primary.
+  const getRangeAnchorKey = (cursorKey: string | null): GalleryItemKey | null => {
+    const range = keyboardRangeRef.current;
+
+    return range && range.reachedKey === cursorKey ? range.anchorKey : gallery.primarySelectedItemKey;
+  };
 
   const navigate = useEffectEvent((direction: GalleryNavigationDirection, mode: GalleryNavigationMode) => {
     onNavigationStart?.();
@@ -151,13 +158,7 @@ export const useGalleryGridHotkeys = ({
     const unloadedSlotMatch = entry.kind === 'slot' ? /^gallery-unloaded-slot:(\d+)$/.exec(entry.id) : null;
 
     if (unloadedSlotMatch) {
-      const range = keyboardRangeRef.current;
-      const anchorKey =
-        mode === 'extend'
-          ? range && range.reachedKey === cursorKey
-            ? range.anchorKey
-            : gallery.selectedItemKey
-          : null;
+      const anchorKey = mode === 'extend' ? getRangeAnchorKey(cursorKey) : null;
 
       navigateToUnloadedSlot?.(Number(unloadedSlotMatch[1]), {
         anchorKey,
@@ -192,8 +193,7 @@ export const useGalleryGridHotkeys = ({
       return;
     }
 
-    const range = keyboardRangeRef.current;
-    const anchorKey = range && range.reachedKey === cursorKey ? range.anchorKey : gallery.selectedItemKey;
+    const anchorKey = getRangeAnchorKey(cursorKey);
 
     keyboardRangeRef.current = { anchorKey, reachedKey: toGalleryItemKey(entry.item) };
     moveToEntry(
@@ -205,9 +205,14 @@ export const useGalleryGridHotkeys = ({
   const executeGalleryHotkey = useEffectEvent((commandId: string) => {
     if (commandId === 'gallery.selectAllOnPage') {
       const primaryItem = gallery.items[0];
+      const selectionPage = primaryItem ? getSelectionPage?.(primaryItem) : undefined;
 
       if (primaryItem) {
-        actions.selectItemRange(gallery.items.map(toGalleryItemRef), primaryItem);
+        if (selectionPage === undefined) {
+          actions.selectItemRange(gallery.items.map(toGalleryItemRef), primaryItem);
+        } else {
+          actions.selectItemRange(gallery.items.map(toGalleryItemRef), primaryItem, selectionPage);
+        }
       }
       return;
     }

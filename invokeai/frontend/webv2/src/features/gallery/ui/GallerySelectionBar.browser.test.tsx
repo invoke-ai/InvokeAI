@@ -103,6 +103,7 @@ const renderBar = async (
 ) => {
   const strip = starredStrip ?? EMPTY_GALLERY_STARRED_STRIP;
   const contextValue = {
+    filter: { boardId: gallery.selectedBoardId, starred: gallery.starredOnly === true },
     gallery,
     itemActions,
     loadedItems: mergeGalleryLoadedItems(strip.items, gallery.items),
@@ -185,6 +186,28 @@ describe('GallerySelectionBar', () => {
     await click(getButton('widgets.gallery.unstarSelection'));
 
     expect(itemActions.setItemsStarred).toHaveBeenCalledWith(expect.anything(), false);
+  });
+
+  it('unstars a starred-only selection whose members no page has loaded', async () => {
+    const selectedItemKeys = ['image:a.png', 'image:never-loaded-1.png', 'image:never-loaded-2.png'] as const;
+    await renderBar(
+      createGallery({
+        items: [createItem('a.png', true)],
+        selectedItemKey: 'image:a.png',
+        selectedItemKeys: [...selectedItemKeys],
+        starredOnly: true,
+      })
+    );
+    await click(getButton('widgets.gallery.unstarSelection'));
+
+    expect(itemActions.setItemsStarred).toHaveBeenCalledExactlyOnceWith(
+      [
+        { kind: 'image', name: 'a.png' },
+        { kind: 'image', name: 'never-loaded-1.png' },
+        { kind: 'image', name: 'never-loaded-2.png' },
+      ],
+      false
+    );
   });
 
   it('retains the selected item star state after its sparse page is evicted', async () => {

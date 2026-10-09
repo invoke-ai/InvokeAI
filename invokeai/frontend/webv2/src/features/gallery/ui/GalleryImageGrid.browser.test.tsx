@@ -295,7 +295,21 @@ const createFilter = (gallery: GalleryStateView): GalleryItemsFilter => {
     galleryView: gallery.galleryView,
     orderDir: gallery.settings.imageOrderDir,
     searchTerm: parse.text,
+    ...(gallery.starredOnly ? { starred: true } : {}),
   };
+};
+
+// `useGalleryData` memoizes its filter, so an unchanged scope keeps one filter object across renders.
+const stableFilters = new Map<string, GalleryItemsFilter>();
+const getStableFilter = (gallery: GalleryStateView): GalleryItemsFilter => {
+  const filter = createFilter(gallery);
+  const identity = JSON.stringify(filter);
+
+  if (!stableFilters.has(identity)) {
+    stableFilters.set(identity, filter);
+  }
+
+  return stableFilters.get(identity)!;
 };
 
 /** Infinite-mode settings at the sparsest density, so few columns fit the harness. */
@@ -316,7 +330,8 @@ const createGallery = (overrides: Partial<GalleryStateView> = {}): GalleryStateV
     isComparisonActive: false,
     items,
     page: 0,
-    primarySelectedItemKey: 'image:first.png',
+    // A visible selection is the persisted primary; tests whose primary is off-page name it explicitly.
+    primarySelectedItemKey: overrides.selectedItemKey === undefined ? 'image:first.png' : overrides.selectedItemKey,
     revealTargetPage: null,
     projectBoardId: null,
     searchTerm: '',
@@ -401,6 +416,7 @@ const createActions = (): GalleryActions =>
   }) as unknown as GalleryActions;
 
 type CanonicalContextTarget = {
+  allStarred?: boolean;
   itemRefs?: GalleryItemRef[];
   items: GalleryItem[];
   x: number;
@@ -413,6 +429,7 @@ const ContextMenuProbe = ({ target }: { target: CanonicalContextTarget }) => (
         ? {
             itemRefs: target.itemRefs ?? null,
             items: target.items.map(({ kind, name }) => ({ kind, name })),
+            ...(target.allStarred === undefined ? {} : { allStarred: target.allStarred }),
           }
         : null
     )}
@@ -424,7 +441,8 @@ const NoopProvider = ({ children }: { children: ReactNode }) => children;
 const createAdapter = (
   progressSessions: QueueProgressSession[],
   liveFollowEnabled: boolean,
-  pinnedProgressSessionId: string | null
+  pinnedProgressSessionId: string | null,
+  galleryValues: Record<string, unknown>
 ): GalleryUiAdapter =>
   ({
     ItemActionsProvider: NoopProvider,
@@ -446,7 +464,7 @@ const createAdapter = (
       toggleItemSelection: noop,
       updateSettings: noop,
     },
-    galleryValues: {},
+    galleryValues,
     generateValues: {},
     getItemLabel: mocks.getItemLabel,
     liveFollowEnabled,
@@ -466,6 +484,8 @@ let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 let queryClient: QueryClient | null = null;
 let currentGallery = createGallery();
+/** The persisted Gallery values; by default the selection was made in the listing the harness shows. */
+let currentGalleryValues: Record<string, unknown> = {};
 let currentLiveFollowEnabled = false;
 let currentPinnedSessionId: string | null = null;
 let currentProgressSessions: QueueProgressSession[] = [];
@@ -520,7 +540,7 @@ const Harness = ({
   const contextValue: GalleryWidgetContextValue = {
     actions: createActions(),
     boardsState: READY_LISTING,
-    filter: createFilter(gallery),
+    filter: getStableFilter(gallery),
     gallery,
     itemActions: imageActionMocks,
     isWindowTruncated: false,
@@ -539,7 +559,9 @@ const Harness = ({
     <I18nextProvider i18n={i18n}>
       <ChakraProvider value={system}>
         <QueryClientProvider client={queryClient!}>
-          <GalleryUiProvider adapter={createAdapter(progressSessions, liveFollowEnabled, pinnedSessionId)}>
+          <GalleryUiProvider
+            adapter={createAdapter(progressSessions, liveFollowEnabled, pinnedSessionId, currentGalleryValues)}
+          >
             <GalleryWidgetContext value={contextValue}>
               <DndContext autoScroll={workbenchAutoScroll} sensors={sensors}>
                 <DragMonitor />
@@ -619,7 +641,9 @@ const QueryBackedGalleryHarness = ({
   } as unknown as GalleryWidgetContextValue;
 
   return (
-    <GalleryUiProvider adapter={createAdapter(progressSessions, liveFollowEnabled, pinnedSessionId)}>
+    <GalleryUiProvider
+      adapter={createAdapter(progressSessions, liveFollowEnabled, pinnedSessionId, currentGalleryValues)}
+    >
       <GalleryWidgetContext value={contextValue}>
         <DndContext autoScroll={workbenchAutoScroll} sensors={sensors}>
           <DragMonitor />
@@ -709,6 +733,8 @@ beforeEach(() => {
   mocks.getGalleryItemByRef.mockReset();
   registeredCommands.clear();
   currentGallery = createGallery();
+  currentGalleryValues = { selectedBoardId: board.id };
+  stableFilters.clear();
   mocks.itemProgress = null;
   mocks.indexAvailability = { modelName: null, state: 'disabled' };
   mocks.getItemLabel.mockReset();
@@ -1022,6 +1048,57 @@ describe('GalleryImageGrid mixed item cells', () => {
     );
   });
 
+  it('reads a starred-only selection as starred where no page has loaded its members', async () => {
+    const loaded = [
+      createItem('image', 'starred-loaded-0.png', { starred: true }),
+      createItem('image', 'starred-loaded-1.png', { starred: true }),
+    ];
+    const selectedRefs = [...loaded.map(toGalleryItemRef), { kind: 'image' as const, name: 'starred-unloaded.png' }];
+    await renderGallery(
+      createGallery({
+        items: loaded,
+        selectedItemKey: 'image:starred-loaded-0.png',
+        selectedItemKeys: ['image:starred-loaded-0.png', 'image:starred-loaded-1.png', 'image:starred-unloaded.png'],
+        settings: DENSE_SETTINGS,
+        starredOnly: true,
+      })
+    );
+
+    registeredCommands.get('gallery.starImage')?.();
+    expect(imageActionMocks.setItemsStarred).toHaveBeenCalledExactlyOnceWith(selectedRefs, false);
+
+    await interact(() =>
+      getButton('Select starred-loaded-0.png for preview').dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 23, clientY: 41 })
+      )
+    );
+    expect(JSON.parse(host?.querySelector('[data-testid="context-target"]')?.textContent ?? 'null')).toMatchObject({
+      allStarred: true,
+      itemRefs: selectedRefs,
+    });
+  });
+
+  it('starts the arrows from the first tile in view for a starred-only selection no loaded page holds', async () => {
+    const shown = [0, 1, 2].map((index) => createItem('image', `starred-only-${index}.png`, { starred: true }));
+    const unloaded = createItem('image', 'starred-only-unloaded.png', { starred: true });
+    // In scope of this listing, so only the absent strip could claim it.
+    currentGalleryValues = { selectedBoardId: board.id, selectedImage: unloaded, starredOnly: true };
+    await renderGallery(
+      createGallery({
+        items: shown,
+        primarySelectedItemKey: 'image:starred-only-unloaded.png',
+        selectedItemKey: null,
+        selectedItemKeys: ['image:starred-only-unloaded.png'],
+        settings: DENSE_SETTINGS,
+        starredOnly: true,
+      })
+    );
+
+    registeredCommands.get('gallery.galleryNavLeft')?.();
+
+    expect(actionMocks.selectItem).toHaveBeenCalledExactlyOnceWith(shown[0]);
+  });
+
   it('renders same-name media independently and gives a video a static accessible poster', async () => {
     const gallery = createGallery({
       items: [createItem('image', 'shared'), createItem('video', 'shared')],
@@ -1296,6 +1373,7 @@ describe('GalleryImageGrid mixed item cells', () => {
           { kind: 'video', name: 'unloaded.mp4' },
         ],
         items: [{ kind: 'image', name: 'loaded.png' }],
+        allStarred: false,
       })
     );
   });
@@ -1475,6 +1553,37 @@ describe('GalleryImageGrid range selection', () => {
 
     await vi.waitFor(() => expect(actionMocks.selectItemRange).toHaveBeenCalledWith(orderedRefs, target));
     expect(actionMocks.selectItem).not.toHaveBeenCalled();
+  });
+
+  it('keeps an evicted primary as the anchor through a run of Shift+arrows', async () => {
+    const [anchor, first, second, third] = ['anchor.png', 'run-a.png', 'run-b.png', 'run-c.png'].map((name) =>
+      createItem('image', name)
+    );
+    const refs = [anchor!, first!, second!, third!].map(toGalleryItemRef);
+    mocks.fetchNames.mockResolvedValue({ items: refs, total: refs.length });
+    await renderGallery(
+      createGallery({
+        items: [first!, second!, third!],
+        primarySelectedItemKey: 'image:anchor.png',
+        selectedItemKey: null,
+        selectedItemKeys: ['image:anchor.png'],
+        settings: DENSE_SETTINGS,
+      })
+    );
+    await interact(() => getButton('Select run-a.png for preview').focus());
+
+    registeredCommands.get('gallery.extendSelectionRight')?.();
+    await vi.waitFor(() => expect(actionMocks.selectItemRange).toHaveBeenLastCalledWith(refs.slice(0, 3), second));
+    // As the store applies the range: the item it reached becomes the primary.
+    await renderGallery({
+      ...currentGallery,
+      primarySelectedItemKey: 'image:run-b.png',
+      selectedItemKey: 'image:run-b.png',
+      selectedItemKeys: ['image:anchor.png', 'image:run-a.png', 'image:run-b.png'],
+    });
+
+    registeredCommands.get('gallery.extendSelectionRight')?.();
+    await vi.waitFor(() => expect(actionMocks.selectItemRange).toHaveBeenLastCalledWith(refs, third));
   });
 
   it('reuses the date board name list already in the query cache', async () => {
@@ -1844,6 +1953,56 @@ describe('GalleryImageGrid reveal requests', () => {
     await renderGallery({ ...gallery, items: [item59, late, item61] });
 
     expect(actionMocks.selectItem).not.toHaveBeenCalled();
+  });
+
+  it('reveals by key, not by index, when the selection navigates a listing the grid no longer shows', async () => {
+    const deep = createItem('image', 'deep.png');
+    const gallery = createGallery({
+      primarySelectedItemKey: 'image:deep.png',
+      selectedItemKey: null,
+      selectedItemKeys: ['image:deep.png'],
+      settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' },
+    });
+    // Preview steps through the listing the selection was made in, from before the grid's order flipped.
+    currentGalleryValues = {
+      selectedBoardId: board.id,
+      selectedImageQuery: {
+        boardId: board.id,
+        galleryView: 'images',
+        imageOrderDir: gallery.settings.imageOrderDir === 'DESC' ? 'ASC' : 'DESC',
+        page: 1,
+        paginationMode: 'infinite',
+        searchTerm: '',
+        starredOnly: false,
+      },
+    };
+    const settled = { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) };
+    currentSparseListing = {
+      itemSlots: new Map([[0, createItem('image', 'page-zero.png')]]),
+      pageStates: new Map([[0, settled]]),
+      recentItems: [],
+      total: 120,
+    };
+    await renderGallery(gallery);
+
+    await interact(() => requestReveal('image:deep.png', 70));
+
+    expect(pinRevealIndex).not.toHaveBeenCalled();
+    expect(setVisibleRange).not.toHaveBeenCalled();
+    expect(mocks.scrollToIndex).not.toHaveBeenCalled();
+
+    currentSparseListing = {
+      itemSlots: new Map([
+        [0, createItem('image', 'page-zero.png')],
+        [10, deep],
+      ]),
+      pageStates: new Map([[0, settled]]),
+      recentItems: [],
+      total: 120,
+    };
+    await renderGallery({ ...currentGallery, items: [deep] });
+
+    expect(mocks.scrollToIndex).toHaveBeenCalledOnce();
   });
 
   it('pins a verified reveal index past a stale total and scrolls to it once its page lands', async () => {
@@ -2424,7 +2583,7 @@ describe('GalleryImageGrid virtualization', () => {
     const lastTile = getButton('Select page-0-last.png for preview');
     await interact(() => lastTile.focus());
     await act(() => userEvent.keyboard('{ArrowRight}'));
-    expect(setVisibleRange).toHaveBeenLastCalledWith({ endIndexExclusive: 120, startIndex: 60 });
+    expect(setVisibleRange).toHaveBeenLastCalledWith({ endIndexExclusive: 120, startIndex: 0 });
     expect(mocks.scrollToIndex).toHaveBeenCalled();
     expect(document.activeElement).toBe(lastTile);
 
@@ -2450,7 +2609,8 @@ describe('GalleryImageGrid virtualization', () => {
         { kind: 'image', name: 'page-0-last.png' },
         { kind: 'image', name: 'page-1-first.png' },
       ],
-      lastInPage
+      lastInPage,
+      0
     );
   });
 
@@ -2479,7 +2639,7 @@ describe('GalleryImageGrid virtualization', () => {
     await interact(() => getButton('Select range-page-0-last.png for preview').focus());
     registeredCommands.get('gallery.extendSelectionRight')?.();
 
-    expect(setVisibleRange).toHaveBeenLastCalledWith({ endIndexExclusive: 120, startIndex: 60 });
+    expect(setVisibleRange).toHaveBeenLastCalledWith({ endIndexExclusive: 120, startIndex: 0 });
     currentSparseListing = {
       itemSlots: new Map([
         [59, lastInPage],
@@ -2575,7 +2735,7 @@ describe('GalleryImageGrid virtualization', () => {
     await interact(() => getButton('Select focus-page-0-last.png for preview').focus());
     registeredCommands.get('gallery.moveFocusRight')?.();
 
-    expect(setVisibleRange).toHaveBeenLastCalledWith({ endIndexExclusive: 120, startIndex: 60 });
+    expect(setVisibleRange).toHaveBeenLastCalledWith({ endIndexExclusive: 120, startIndex: 0 });
     currentSparseListing = {
       itemSlots: new Map([
         [59, lastInPage],
@@ -2690,7 +2850,7 @@ describe('GalleryImageGrid virtualization', () => {
     );
     await interact(() => getButton('Select supersede-page-0-anchor.png for preview').focus());
     registeredCommands.get('gallery.extendSelectionRight')?.();
-    expect(setVisibleRange).toHaveBeenLastCalledWith({ endIndexExclusive: 120, startIndex: 60 });
+    expect(setVisibleRange).toHaveBeenLastCalledWith({ endIndexExclusive: 120, startIndex: 0 });
 
     registeredCommands.get('gallery.moveFocusLeft')?.();
     expect(document.activeElement).toBe(getButton('Select supersede-page-0-previous.png for preview'));
@@ -2712,6 +2872,171 @@ describe('GalleryImageGrid virtualization', () => {
 
     expect(actionMocks.selectItemRange).not.toHaveBeenCalled();
     expect(document.activeElement).toBe(getButton('Select supersede-page-0-previous.png for preview'));
+  });
+
+  it('keeps the origin page subscribed while an arrow step loads the next page, so the step lands', async () => {
+    const lastInPage = createItem('image', 'origin-page-0-last.png');
+    const firstNextPage = createItem('image', 'origin-page-1-first.png');
+    const settled = { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) };
+    const loading = { ...settled, isLoading: true };
+    // As the data layer does: only pages the requested range covers stay subscribed, and the visible selection key
+    // leaves with its page.
+    const renderRequestedPages = async (nextPageItem: GalleryItem | null) => {
+      const [{ endIndexExclusive, startIndex }] = setVisibleRange.mock.lastCall as [
+        { endIndexExclusive: number; startIndex: number },
+      ];
+      const keepsOrigin = startIndex < 60;
+      const itemSlots = new Map<number, GalleryItem>(keepsOrigin ? [[59, lastInPage]] : []);
+      const pageStates = new Map(keepsOrigin ? [[0, settled]] : []);
+
+      if (endIndexExclusive > 60) {
+        pageStates.set(60, nextPageItem ? settled : loading);
+      }
+      if (nextPageItem) {
+        itemSlots.set(60, nextPageItem);
+      }
+
+      currentSparseListing = { itemSlots, pageStates, recentItems: [], total: 120 };
+      await renderGallery({
+        ...currentGallery,
+        items: [...itemSlots.values()],
+        selectedItemKey: keepsOrigin ? 'image:origin-page-0-last.png' : null,
+      });
+    };
+    currentSparseListing = {
+      itemSlots: new Map([[59, lastInPage]]),
+      pageStates: new Map([[0, settled]]),
+      recentItems: [],
+      total: 120,
+    };
+    await renderGallery(
+      createGallery({
+        items: [lastInPage],
+        selectedItemKey: 'image:origin-page-0-last.png',
+        selectedItemKeys: ['image:origin-page-0-last.png'],
+        settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' },
+      })
+    );
+    const originTile = getButton('Select origin-page-0-last.png for preview');
+    await interact(() => originTile.focus());
+
+    await act(() => userEvent.keyboard('{ArrowRight}'));
+    await renderRequestedPages(null);
+    expect(document.activeElement).toBe(originTile);
+    await renderRequestedPages(firstNextPage);
+
+    expect(actionMocks.selectItem).toHaveBeenLastCalledWith(firstNextPage, 1);
+    expect(document.activeElement).toBe(getButton('Select origin-page-1-first.png for preview'));
+  });
+
+  it('lands a step whose origin page leaves the viewport while the next page loads', async () => {
+    const lastInPage = createItem('image', 'scrolled-page-0-last.png');
+    const firstNextPage = createItem('image', 'scrolled-page-1-first.png');
+    const settled = { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) };
+    currentSparseListing = {
+      itemSlots: new Map([[59, lastInPage]]),
+      pageStates: new Map([[0, settled]]),
+      recentItems: [],
+      total: 120,
+    };
+    await renderGallery(
+      createGallery({
+        items: [lastInPage],
+        selectedItemKey: 'image:scrolled-page-0-last.png',
+        selectedItemKeys: ['image:scrolled-page-0-last.png'],
+        settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' },
+      })
+    );
+
+    // Run from elsewhere, then the view scrolls on: the selection's page unsubscribes and its visible key clears.
+    registeredCommands.get('gallery.galleryNavRight')?.();
+    currentSparseListing = {
+      itemSlots: new Map(),
+      pageStates: new Map([[60, { ...settled, isLoading: true }]]),
+      recentItems: [],
+      total: 120,
+    };
+    await renderGallery({ ...currentGallery, items: [], selectedItemKey: null });
+    currentSparseListing = {
+      itemSlots: new Map([[60, firstNextPage]]),
+      pageStates: new Map([[60, settled]]),
+      recentItems: [],
+      total: 120,
+    };
+    await renderGallery({ ...currentGallery, items: [firstNextPage] });
+
+    expect(actionMocks.selectItem).toHaveBeenCalledExactlyOnceWith(firstNextPage, 1);
+  });
+
+  it('hands focus to the first tile in view when the focused tile leaves with its page', async () => {
+    const items = Array.from({ length: 120 }, (_, index) => createItem('image', `evicted-focus-${index}.png`));
+    const settled = { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) };
+    currentSparseListing = {
+      itemSlots: new Map(items.map((item, index) => [index, item])),
+      pageStates: new Map([
+        [0, settled],
+        [60, settled],
+      ]),
+      recentItems: [],
+      total: items.length,
+    };
+    await renderGallery(
+      createGallery({
+        items,
+        selectedItemKey: null,
+        selectedItemKeys: [],
+        settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' },
+      })
+    );
+    await interact(() => getButton('Select evicted-focus-11.png for preview').focus());
+
+    // In view after the scroll: the tile as many places into the loaded pages as the focused one was, mid-row.
+    const viewport = host!.querySelector<HTMLElement>('[data-part="viewport"]')!;
+    const deepTile = getButton('Select evicted-focus-71.png for preview');
+    await interact(() => {
+      viewport.scrollTop += deepTile.getBoundingClientRect().top - viewport.getBoundingClientRect().top;
+    });
+    // Scrolled away, page zero leaves the subscribed range.
+    currentSparseListing = {
+      itemSlots: new Map(items.slice(60).map((item, index) => [index + 60, item])),
+      pageStates: new Map([[60, settled]]),
+      recentItems: [],
+      total: items.length,
+    };
+    await renderGallery({ ...currentGallery, items: items.slice(60) });
+
+    expect(document.activeElement).toBe(
+      deepTile.closest('[data-gallery-section="regular"]')?.querySelector('button[aria-pressed]')
+    );
+  });
+
+  it('stamps select-all with the absolute page its first item sits on', async () => {
+    const deepItems = [createItem('image', 'select-all-page-1-a.png'), createItem('image', 'select-all-page-1-b.png')];
+    currentSparseListing = {
+      itemSlots: new Map([
+        [60, deepItems[0]!],
+        [61, deepItems[1]!],
+      ]),
+      pageStates: new Map([[60, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }]]),
+      recentItems: [],
+      total: 120,
+    };
+    await renderGallery(
+      createGallery({
+        items: deepItems,
+        selectedItemKey: null,
+        selectedItemKeys: [],
+        settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' },
+      })
+    );
+
+    registeredCommands.get('gallery.selectAllOnPage')?.();
+
+    expect(actionMocks.selectItemRange).toHaveBeenCalledExactlyOnceWith(
+      deepItems.map(toGalleryItemRef),
+      deepItems[0],
+      1
+    );
   });
 
   it('uses an indexed reveal to request and scroll to only the located page', async () => {

@@ -191,8 +191,9 @@ export const useGallerySelectionStarred = (
   selectedItems: readonly GalleryItemRef[],
   loadedItems: readonly GalleryItem[]
 ): boolean => {
-  const selectedKeys = selectedItems.map(toGalleryItemKey);
-  const identity = JSON.stringify(selectedKeys);
+  const { filter } = useGalleryWidget();
+  const selectedKeys = useMemo(() => selectedItems.map(toGalleryItemKey), [selectedItems]);
+  const identity = useMemo(() => JSON.stringify(selectedKeys), [selectedKeys]);
   const queryClient = useQueryClient();
   const store = useMemo(() => createSelectionStarStore(), []);
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
@@ -203,9 +204,15 @@ export const useGallerySelectionStarred = (
     store.sync(identity, selectedKeys, loadedItems);
   }, [identity, loadedItems, selectedKeys, store]);
 
-  const loadedStarred = new Map(loadedItems.map((item) => [toGalleryItemKey(item), item.starred]));
+  const loadedStarred = useMemo(
+    () => new Map(loadedItems.map((item) => [toGalleryItemKey(item), item.starred])),
+    [loadedItems]
+  );
+  // In a starred-only listing every item is starred, including selected ones no page has loaded.
+  const unknownStarred = filter.starred === true;
+
   // Flags are per item, so ones known before a selection change still answer for items that stay selected.
-  return selectedKeys.some((key) => !(loadedStarred.get(key) ?? snapshot.starredByKey.get(key) ?? false));
+  return selectedKeys.some((key) => !(loadedStarred.get(key) ?? snapshot.starredByKey.get(key) ?? unknownStarred));
 };
 
 export const GalleryWidgetContext = createContext<GalleryWidgetContextValue | null>(null);

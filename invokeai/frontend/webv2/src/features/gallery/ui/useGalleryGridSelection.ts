@@ -15,7 +15,7 @@ import { useCallback, useMemo, useRef, useState, type MouseEvent } from 'react';
 
 import type { GalleryItemContextMenuTarget } from './GalleryUiContext';
 
-import { useGalleryWidget } from './GalleryWidgetContext';
+import { useGallerySelectionStarred, useGalleryWidget } from './GalleryWidgetContext';
 
 const getGalleryItemRange = (
   orderedRefs: readonly GalleryItemRef[],
@@ -277,6 +277,18 @@ export const useGalleryGridSelection = ({
     [actions, selectItemRange, toggleItem]
   );
 
+  /** Falls back to the primary selection so hotkeys work before a multi-select. */
+  const actionSelectionRefs = useMemo(
+    () =>
+      selectedItemRefs.length > 0
+        ? selectedItemRefs
+        : gallery.selectedItemKey
+          ? [parseGalleryItemKey(gallery.selectedItemKey)]
+          : [],
+    [gallery.selectedItemKey, selectedItemRefs]
+  );
+  const shouldStarSelection = useGallerySelectionStarred(actionSelectionRefs, loadedItems);
+
   const handleThumbnailContextMenu = useCallback(
     (item: GalleryItem, x: number, y: number) => {
       const itemKey = toGalleryItemKey(item);
@@ -289,13 +301,20 @@ export const useGalleryGridSelection = ({
           ),
         ];
 
-        setContextMenuTarget({ itemRefs: selectedItemRefs, items: selectionItems, x, y });
+        // The menu sees only loaded items; the star answer also covers selected items no page holds.
+        setContextMenuTarget({
+          allStarred: !shouldStarSelection,
+          itemRefs: selectedItemRefs,
+          items: selectionItems,
+          x,
+          y,
+        });
         return;
       }
 
       setContextMenuTarget({ itemRefs: [toGalleryItemRef(item)], items: [item], x, y });
     },
-    [loadedItems, selectedItemKeys, selectedItemRefs]
+    [loadedItems, selectedItemKeys, selectedItemRefs, shouldStarSelection]
   );
 
   const getDragItems = useCallback(
@@ -313,17 +332,6 @@ export const useGalleryGridSelection = ({
 
   const handleCloseContextMenu = useCallback(() => setContextMenuTarget(null), []);
 
-  /** Falls back to the primary selection so hotkeys work before a multi-select. */
-  const actionSelectionRefs = useMemo(
-    () =>
-      selectedItemRefs.length > 0
-        ? selectedItemRefs
-        : gallery.selectedItemKey
-          ? [parseGalleryItemKey(gallery.selectedItemKey)]
-          : [],
-    [gallery.selectedItemKey, selectedItemRefs]
-  );
-
   return {
     actionSelectionRefs,
     activeContextMenuTarget,
@@ -334,6 +342,7 @@ export const useGalleryGridSelection = ({
     loadedItems,
     selectedItemKeys,
     selectItemRange,
+    shouldStarSelection,
     syncRangeInteractionContext,
     toggleItem,
   };

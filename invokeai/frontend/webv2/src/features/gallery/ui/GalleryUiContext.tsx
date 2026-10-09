@@ -39,6 +39,8 @@ export interface GalleryItemActionsOptions {
 }
 
 export interface GalleryItemContextMenuTarget {
+  /** Whether every target is starred, when the host knows more than `items`, which omits unloaded targets. */
+  allStarred?: boolean;
   itemRefs: GalleryItemRef[];
   items: GalleryItem[];
   x: number;
