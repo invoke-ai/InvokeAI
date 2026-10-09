@@ -239,6 +239,58 @@ describe('GallerySelectionBar', () => {
     expect(getButton('widgets.gallery.unstarSelection')).toBeTruthy();
   });
 
+  it('keeps a retained star flag for an item that stays selected when the selection grows', async () => {
+    const gallery = createGallery({
+      items: [createItem('a.png', true)],
+      selectedItemKey: 'image:a.png',
+      selectedItemKeys: ['image:a.png'],
+      starredOnly: true,
+    });
+
+    await renderBar(gallery);
+    // A's page leaves the window, then starred B joins the selection.
+    await renderBar({ ...gallery, items: [] });
+    await renderBar({
+      ...gallery,
+      items: [createItem('b.png', true)],
+      selectedItemKey: 'image:b.png',
+      selectedItemKeys: ['image:a.png', 'image:b.png'],
+    });
+
+    expect(getButton('widgets.gallery.unstarSelection')).toBeTruthy();
+  });
+
+  it('restores a retained flag when a patch made before the selection grew is reverted', async () => {
+    const gallery = createGallery({
+      items: [createItem('a.png', true)],
+      selectedItemKey: 'image:a.png',
+      selectedItemKeys: ['image:a.png'],
+    });
+    const grown: GalleryStateView = {
+      ...gallery,
+      items: [createItem('b.png', true)],
+      selectedItemKey: 'image:b.png',
+      selectedItemKeys: ['image:a.png', 'image:b.png'],
+    };
+
+    await renderBar(gallery);
+    await renderBar({ ...gallery, items: [] });
+    let rollback = () => {};
+    await act(() => {
+      rollback = patchGalleryItemCaches(queryClient, {
+        kind: 'star',
+        result: { failed: [], succeeded: [{ kind: 'image', name: 'a.png' }] },
+        starred: false,
+      });
+    });
+    await renderBar(grown);
+    expect(getButton('widgets.gallery.starSelection')).toBeTruthy();
+
+    await act(() => rollback());
+
+    expect(getButton('widgets.gallery.unstarSelection')).toBeTruthy();
+  });
+
   it('reads star state from the strip for a selection the listing window has not loaded', async () => {
     await renderBar(createGallery({ items: [] }), {
       items: [createItem('a.png', true), createItem('b.png', true)],

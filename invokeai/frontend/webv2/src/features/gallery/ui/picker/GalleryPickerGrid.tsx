@@ -191,6 +191,7 @@ const GalleryPickerPlaceholder = ({
 /** A virtualized absolute-slot picker backed by the same 60-item Query pages as Gallery. */
 export const GalleryPickerGrid = ({
   activeIndex,
+  activeScope,
   columnCount,
   currentKey,
   getTileState,
@@ -207,6 +208,8 @@ export const GalleryPickerGrid = ({
   total,
 }: {
   activeIndex: number;
+  /** The listing `activeIndex` belongs to; a new listing reveals its highlight even at the same index. */
+  activeScope: string;
   columnCount: number;
   currentKey: GalleryItemKey | null;
   getTileState: (item: GalleryItem) => GalleryPickerTileState;
@@ -309,11 +312,17 @@ export const GalleryPickerGrid = ({
     measure();
   }, [columnCount, measure, rowPitch]);
 
+  // Reveal the highlight when it moves, its listing changes, or a reflow moves its row. A later count update must not
+  // pull a pointer-scrolled view back to it; a highlight past the known count is revealed once the count reaches it.
+  const revealedActiveRef = useRef<string | null>(null);
   useLayoutEffect(() => {
-    if (activeIndex >= 0 && activeIndex < totalSlots) {
+    const active = `${activeScope}\n${activeIndex}\n${columnCount}`;
+
+    if (activeIndex >= 0 && activeIndex < totalSlots && revealedActiveRef.current !== active) {
+      revealedActiveRef.current = active;
       scrollToIndex(Math.floor(activeIndex / columnCount), { align: 'auto' });
     }
-  }, [activeIndex, columnCount, scrollToIndex, totalSlots]);
+  }, [activeIndex, activeScope, columnCount, scrollToIndex, totalSlots]);
 
   const handleClick = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {

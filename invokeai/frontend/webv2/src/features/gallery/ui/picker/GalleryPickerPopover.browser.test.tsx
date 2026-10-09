@@ -380,6 +380,82 @@ describe('GalleryPickerPopover', () => {
     expect(mocks.listInfiniteItems).not.toHaveBeenCalled();
   });
 
+  it('keeps a pointer-scrolled position when a later page changes the count', async () => {
+    let total = 600;
+    mocks.listItems.mockImplementation((filter: { offset: number }) => {
+      const items = Array.from({ length: Math.max(0, Math.min(60, total - filter.offset)) }, (_, index) =>
+        image(`scrolled-${filter.offset + index}.png`)
+      );
+
+      return { itemIndices: items.map((_, index) => filter.offset + index), items, offset: filter.offset, total };
+    });
+
+    const { dialog } = await openPicker();
+    const firstOption = await vi.waitFor(() => {
+      const option = dialog.querySelector<HTMLElement>('[role="option"]');
+
+      expect(option).not.toBeNull();
+      return option!;
+    });
+    let viewport: HTMLElement | null = firstOption.parentElement;
+
+    while (viewport && viewport.scrollHeight <= viewport.clientHeight) {
+      viewport = viewport.parentElement;
+    }
+
+    expect(viewport).not.toBeNull();
+    // Another client adds an item, so pages fetched after the scroll report a larger count.
+    total = 601;
+    await act(() => {
+      viewport!.scrollTop = viewport!.scrollHeight / 2;
+      viewport!.dispatchEvent(new Event('scroll'));
+    });
+    const scrolledTop = viewport!.scrollTop;
+
+    expect(scrolledTop).toBeGreaterThan(0);
+    await vi.waitFor(() => expect(dialog.querySelector('[role="option"][aria-setsize="601"]')).not.toBeNull());
+    await settle();
+
+    expect(viewport!.scrollTop).toBe(scrolledTop);
+  });
+
+  it('keeps the highlight in view when the column count changes', async () => {
+    const total = 60;
+    mocks.listItems.mockImplementation((filter: { offset: number }) => {
+      const items = Array.from({ length: Math.max(0, Math.min(60, total - filter.offset)) }, (_, index) =>
+        image(`reflow-${filter.offset + index}.png`)
+      );
+
+      return { itemIndices: items.map((_, index) => filter.offset + index), items, offset: filter.offset, total };
+    });
+
+    const { dialog } = await openPicker();
+
+    await pressKey(getSearchInput(dialog), 'End');
+    await vi.waitFor(() => expect(getActiveOption(dialog)?.getAttribute('aria-posinset')).toBe(String(total)));
+    const columnsBefore = getComputedStyle(getActiveOption(dialog)!.parentElement!).gridTemplateColumns;
+
+    // Narrowing the popover drops a column, which moves the highlight's row further down.
+    await act(() => {
+      dialog.style.width = `${dialog.getBoundingClientRect().width * 0.7}px`;
+    });
+    await vi.waitFor(() =>
+      expect(getComputedStyle(getActiveOption(dialog)!.parentElement!).gridTemplateColumns).not.toBe(columnsBefore)
+    );
+    await settle();
+
+    const option = getActiveOption(dialog)!.getBoundingClientRect();
+    let viewport: HTMLElement | null = getActiveOption(dialog)!.parentElement;
+
+    while (viewport && viewport.scrollHeight <= viewport.clientHeight) {
+      viewport = viewport.parentElement;
+    }
+    const bounds = viewport!.getBoundingClientRect();
+
+    expect(option.top).toBeGreaterThanOrEqual(bounds.top - 1);
+    expect(option.bottom).toBeLessThanOrEqual(bounds.bottom + 1);
+  });
+
   it('shows and retries a failed uncached page within the current listing', async () => {
     const total = 120;
     let failedSecondPage = false;

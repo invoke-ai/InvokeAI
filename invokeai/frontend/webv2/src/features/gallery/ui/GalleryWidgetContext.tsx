@@ -160,13 +160,14 @@ const createSelectionStarStore = (): SelectionStarStore => {
       return () => listeners.delete(listener);
     },
     sync: (identity, selectedKeys, loadedItems) => {
-      const isSameSelection = snapshot.identity === identity;
-      const starredByKey = new Map(isSameSelection ? snapshot.starredByKey : []);
-
       selectedKeySet = new Set(selectedKeys);
 
-      if (!isSameSelection) {
-        patchedFrom = new Map();
+      // Items that stay selected keep their known flags when the selection changes around them.
+      const isStillSelected = ([key]: [string, unknown]) => selectedKeySet.has(key);
+      const starredByKey = new Map([...snapshot.starredByKey].filter(isStillSelected));
+
+      if (snapshot.identity !== identity) {
+        patchedFrom = new Map([...patchedFrom].filter(isStillSelected));
       }
 
       for (const item of loadedItems) {
@@ -203,9 +204,8 @@ export const useGallerySelectionStarred = (
   }, [identity, loadedItems, selectedKeys, store]);
 
   const loadedStarred = new Map(loadedItems.map((item) => [toGalleryItemKey(item), item.starred]));
-  const knownStarred = snapshot.identity === identity ? snapshot.starredByKey : new Map<string, boolean>();
-
-  return selectedKeys.some((key) => !(loadedStarred.get(key) ?? knownStarred.get(key) ?? false));
+  // Flags are per item, so ones known before a selection change still answer for items that stay selected.
+  return selectedKeys.some((key) => !(loadedStarred.get(key) ?? snapshot.starredByKey.get(key) ?? false));
 };
 
 export const GalleryWidgetContext = createContext<GalleryWidgetContextValue | null>(null);

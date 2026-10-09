@@ -518,6 +518,7 @@ export const GalleryPickerView = ({
         ) : showsGrid ? (
           <GalleryPickerGrid
             activeIndex={resolvedActiveIndex}
+            activeScope={filterIdentity}
             columnCount={columnCount}
             currentKey={currentKey}
             getTileState={getTileState}
