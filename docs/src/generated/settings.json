@@ -484,6 +484,17 @@
     },
     {
       "category": "CACHE",
+      "default": 0.0,
+      "description": "The amount of VRAM (in GB) to subtract from the model cache's available memory budget. Defaults to 0.",
+      "env_var": "INVOKEAI_RESERVE_VRAM_GB",
+      "literal_values": [],
+      "name": "reserve_vram_gb",
+      "required": false,
+      "type": "<class 'float'>",
+      "validation": {}
+    },
+    {
+      "category": "CACHE",
       "default": false,
       "description": "If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.",
       "env_var": "INVOKEAI_LOG_MEMORY_USAGE",
