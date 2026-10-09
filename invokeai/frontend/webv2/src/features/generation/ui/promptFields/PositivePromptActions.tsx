@@ -11,7 +11,19 @@ import type { DynamicPromptsFieldConfig } from '@features/generation/ui/promptFi
 import type { DroppedPromptImage } from '@features/generation/ui/promptFields/usePromptImageDrop';
 import type { ChangeEvent, MouseEvent } from 'react';
 
-import { Checkbox, HStack, Icon, Image, Input, Popover, Portal, Separator, Stack, Text } from '@chakra-ui/react';
+import {
+  Checkbox,
+  HStack,
+  Icon,
+  Image,
+  Input,
+  Popover,
+  Portal,
+  Separator,
+  Spinner,
+  Stack,
+  Text,
+} from '@chakra-ui/react';
 import { galleryImageUrls } from '@features/gallery/utility';
 import { filterPromptHistory } from '@features/generation/core/promptHistory';
 import { resolveSelectedSystemPromptId } from '@features/generation/core/systemPrompts';
@@ -62,7 +74,7 @@ const OpenModelManagerButton = ({ modelType }: { modelType?: string }) => {
   );
 
   return (
-    <Button alignSelf="start" px="1.5" size="xs" variant="plain" onClick={handleClick}>
+    <Button alignSelf="start" px="1.5" variant="plain" onClick={handleClick}>
       {t('widgets.generate.openModelManager')}
     </Button>
   );
@@ -250,7 +262,7 @@ const TemplateViewModeButton = ({
 
   return (
     <Tooltip content={label}>
-      <IconButton aria-label={label} aria-pressed={isViewMode} size="2xs" variant="ghost" onClick={handleClick}>
+      <IconButton aria-label={label} aria-pressed={isViewMode} size="sm" variant="ghost" onClick={handleClick}>
         {isViewMode ? <EyeOffIcon /> : <EyeIcon />}
       </IconButton>
     </Tooltip>
@@ -280,7 +292,7 @@ export const AddPromptTriggerButton = ({
       <IconButton
         aria-expanded={isOpen}
         aria-label={t('widgets.generate.addPromptTrigger')}
-        size="2xs"
+        size="sm"
         variant="ghost"
         onClick={handleClick}
       >
@@ -347,7 +359,6 @@ export const PromptTriggerPopover = ({
                   <Input
                     aria-label={t('widgets.generate.searchPromptTriggers')}
                     placeholder={t('widgets.generate.searchPromptTriggers')}
-                    size="xs"
                     value={searchTerm}
                     onChange={handleSearchChange}
                   />
@@ -359,7 +370,7 @@ export const PromptTriggerPopover = ({
                       <Stack gap="2">
                         {groupedOptions.map((group) => (
                           <Stack key={group.group} gap="0">
-                            <Text color="fg.subtle" fontSize="2xs" fontWeight="700" px="2" textTransform="uppercase">
+                            <Text color="fg.subtle" fontSize="xs" fontWeight="700" px="2" textTransform="uppercase">
                               {group.group}
                             </Text>
                             {group.options.map((option, index) => (
@@ -389,10 +400,10 @@ const PromptTriggerEmptyState = () => {
 
   return (
     <Stack align="start" gap="2.5">
-      <Text color="fg.subtle" fontSize="2xs" fontWeight="700" textTransform="uppercase">
+      <Text color="fg.subtle" fontSize="xs" fontWeight="700" textTransform="uppercase">
         {t('widgets.generate.addPromptTrigger')}
       </Text>
-      <Text color="fg.subtle" fontSize="xs">
+      <Text color="fg.subtle" fontSize="md">
         {t('widgets.generate.noPromptTriggersAvailable')}
       </Text>
       <OpenModelManagerButton />
@@ -416,12 +427,11 @@ const PromptTriggerOptionButton = ({
       justifyContent="start"
       px="2"
       py="1.5"
-      size="xs"
       transitionDuration="faster"
       variant="ghost"
       onClick={handleClick}
     >
-      <Text color="fg" fontSize="xs" textAlign="start" wordBreak="break-word">
+      <Text color="fg" fontSize="md" textAlign="start" wordBreak="break-word">
         {option.label}
       </Text>
     </Button>
@@ -562,13 +572,15 @@ const ExpandPromptButton = ({
       {/* Always the feature name: the popover explains a missing model and offers the way out. */}
       <Tooltip content={t('widgets.generate.expandPrompt')} ids={popoverIds}>
         <Popover.Trigger asChild>
+          {/* Stays enabled mid-run so a dismissed popover can be reopened to follow progress. */}
           <IconButton
+            aria-busy={isLoading || undefined}
             aria-label={t('widgets.generate.expandPrompt')}
-            disabled={isDisabled || isLoading}
-            size="2xs"
+            disabled={isDisabled}
+            size="sm"
             variant="ghost"
           >
-            <PencilSparklesIcon />
+            {isLoading ? <Spinner /> : <PencilSparklesIcon />}
           </IconButton>
         </Popover.Trigger>
       </Tooltip>
@@ -577,12 +589,12 @@ const ExpandPromptButton = ({
           <PopoverContent w="22rem">
             <Popover.Body p="2.5">
               <Stack gap="2.5">
-                <Text color="fg.subtle" fontSize="2xs" fontWeight="700" textTransform="uppercase">
+                <Text color="fg.subtle" fontSize="xs" fontWeight="700" textTransform="uppercase">
                   {t('widgets.generate.expandPrompt')}
                 </Text>
                 {textLlmModels.length === 0 ? (
                   <>
-                    <Text color="fg.subtle" fontSize="xs">
+                    <Text color="fg.subtle" fontSize="md">
                       {t('widgets.generate.installTextLlmToExpandPrompts')}
                     </Text>
                     <OpenModelManagerButton modelType="text_llm" />
@@ -593,13 +605,12 @@ const ExpandPromptButton = ({
                       isClearable={false}
                       modelTypes={TEXT_LLM_MODEL_TYPES}
                       placeholder={t('widgets.generate.selectTextLlm')}
-                      size="xs"
                       value={selectedModel?.key ?? null}
                       onChange={handleModelChange}
                     />
                     {suggestion?.modelSource && !suggestedModelKey ? (
                       <>
-                        <Text color="fg.subtle" fontSize="xs">
+                        <Text color="fg.subtle" fontSize="md">
                           {t('widgets.generate.expandSuggestedModelMissing', {
                             model: suggestion.modelName ?? suggestion.modelSource,
                           })}
@@ -622,7 +633,7 @@ const ExpandPromptButton = ({
                     ) : null}
                     <LLMTaskProgressDisplay taskId={taskId} />
                     {positivePrompt.trim() ? null : (
-                      <Text color="fg.subtle" fontSize="xs">
+                      <Text color="fg.subtle" fontSize="md">
                         {t('widgets.generate.enterPromptToExpand')}
                       </Text>
                     )}
@@ -630,7 +641,6 @@ const ExpandPromptButton = ({
                       // The request carries the system prompt's text, so it waits for the list.
                       disabled={!selectedModel || !positivePrompt.trim() || systemPrompts.isLoading}
                       loading={isLoading}
-                      size="xs"
                       onClick={handleRunExpandPrompt}
                     >
                       {t('widgets.generate.expand')}
@@ -672,13 +682,13 @@ const ExpandPromptImageOption = ({
         src={galleryImageUrls.thumbnail(image.image_name)}
       />
       {canReadImages ? (
-        <Checkbox.Root checked={isIncluded} size="sm" onCheckedChange={onIncludedChange}>
+        <Checkbox.Root checked={isIncluded} onCheckedChange={onIncludedChange}>
           <Checkbox.HiddenInput />
           <Checkbox.Control />
-          <Checkbox.Label fontSize="xs">{t('widgets.generate.expandFromFirstFrame')}</Checkbox.Label>
+          <Checkbox.Label fontSize="md">{t('widgets.generate.expandFromFirstFrame')}</Checkbox.Label>
         </Checkbox.Root>
       ) : (
-        <Text color="fg.subtle" fontSize="xs">
+        <Text color="fg.subtle" fontSize="md">
           {t('widgets.generate.expandFirstFrameUnreadable')}
         </Text>
       )}
@@ -797,13 +807,15 @@ const ImageToPromptButton = ({
     >
       <Tooltip content={t('widgets.generate.imageToPrompt')} ids={popoverIds}>
         <Popover.Trigger asChild>
+          {/* Stays enabled mid-run so a dismissed popover can be reopened to follow progress. */}
           <IconButton
+            aria-busy={isLoading || undefined}
             aria-label={t('widgets.generate.imageToPrompt')}
-            disabled={isDisabled || isLoading}
-            size="2xs"
+            disabled={isDisabled}
+            size="sm"
             variant="ghost"
           >
-            <ImageUpIcon />
+            {isLoading ? <Spinner /> : <ImageUpIcon />}
           </IconButton>
         </Popover.Trigger>
       </Tooltip>
@@ -812,12 +824,12 @@ const ImageToPromptButton = ({
           <PopoverContent w="22rem">
             <Popover.Body p="2.5">
               <Stack gap="2.5">
-                <Text color="fg.subtle" fontSize="2xs" fontWeight="700" textTransform="uppercase">
+                <Text color="fg.subtle" fontSize="xs" fontWeight="700" textTransform="uppercase">
                   {t('widgets.generate.imageToPrompt')}
                 </Text>
                 {llavaModels.length === 0 ? (
                   <>
-                    <Text color="fg.subtle" fontSize="xs">
+                    <Text color="fg.subtle" fontSize="md">
                       {t('widgets.generate.installVisionModelToGeneratePrompts')}
                     </Text>
                     <OpenModelManagerButton modelType="llava_onevision" />
@@ -828,7 +840,6 @@ const ImageToPromptButton = ({
                       isClearable={false}
                       modelTypes={LLAVA_MODEL_TYPES}
                       placeholder={t('widgets.generate.selectVisionModel')}
-                      size="xs"
                       value={selectedModel?.key ?? null}
                       onChange={handleModelChange}
                     />
@@ -842,20 +853,15 @@ const ImageToPromptButton = ({
                           rounded="md"
                           src={image.thumbnailUrl || image.imageUrl}
                         />
-                        <MiddleTruncate color="fg.subtle" fontSize="xs" text={image.imageName} />
+                        <MiddleTruncate color="fg.subtle" fontSize="md" text={image.imageName} />
                       </HStack>
                     ) : (
-                      <Text color="fg.subtle" fontSize="xs">
+                      <Text color="fg.subtle" fontSize="md">
                         {t('widgets.generate.selectImageFirst')}
                       </Text>
                     )}
                     <LLMTaskProgressDisplay taskId={taskId} />
-                    <Button
-                      disabled={!image || !selectedModel}
-                      loading={isLoading}
-                      size="xs"
-                      onClick={handleRunImageToPrompt}
-                    >
+                    <Button disabled={!image || !selectedModel} loading={isLoading} onClick={handleRunImageToPrompt}>
                       {t('widgets.generate.generatePrompt')}
                     </Button>
                   </>
@@ -901,7 +907,7 @@ const PositivePromptHistoryButton = ({ onUsePrompt }: Pick<PositivePromptActions
     >
       <Tooltip content={t('widgets.generate.promptHistory')} ids={popoverIds}>
         <Popover.Trigger asChild>
-          <IconButton aria-label={t('widgets.generate.promptHistory')} size="2xs" variant="ghost">
+          <IconButton aria-label={t('widgets.generate.promptHistory')} size="sm" variant="ghost">
             <HistoryIcon />
           </IconButton>
         </Popover.Trigger>
@@ -916,11 +922,10 @@ const PositivePromptHistoryButton = ({ onUsePrompt }: Pick<PositivePromptActions
                     aria-label={t('widgets.generate.searchPromptHistory')}
                     disabled={promptHistory.length === 0}
                     placeholder={t('widgets.generate.searchPromptHistory')}
-                    size="xs"
                     value={searchTerm}
                     onChange={onChangeSearchTerm}
                   />
-                  <Button disabled={promptHistory.length === 0} size="xs" variant="ghost" onClick={clearPromptHistory}>
+                  <Button disabled={promptHistory.length === 0} variant="ghost" onClick={clearPromptHistory}>
                     <Icon as={TrashIcon} boxSize="3" />
                     {t('common.clear')}
                   </Button>
@@ -943,7 +948,7 @@ const PositivePromptHistoryButton = ({ onUsePrompt }: Pick<PositivePromptActions
                     </Stack>
                   )}
                 </Scrollable>
-                <Text color="fg.subtle" fontSize="2xs" textAlign="center">
+                <Text color="fg.subtle" fontSize="xs" textAlign="center">
                   {t('widgets.generate.promptHistoryKeyboardHelp')}
                 </Text>
               </Stack>
@@ -970,7 +975,7 @@ const PromptHistoryItemWithSeparator = ({
 
 const PromptHistoryEmptyText = ({ children }: { children: string }) => (
   <HStack h="full" justify="center" minH="9rem">
-    <Text color="fg.subtle" fontSize="xs">
+    <Text color="fg.subtle" fontSize="md">
       {children}
     </Text>
   </HStack>
@@ -990,12 +995,12 @@ const PromptHistoryItemRow = ({
 
   return (
     <HStack align="start" gap="1.5" pr="1">
-      <IconButton aria-label={t('widgets.generate.usePrompt')} size="2xs" variant="ghost" onClick={handleUsePrompt}>
+      <IconButton aria-label={t('widgets.generate.usePrompt')} size="sm" variant="ghost" onClick={handleUsePrompt}>
         <Icon as={Undo2Icon} boxSize="3.5" />
       </IconButton>
       <Stack flex="1" gap="0.5" minW="0">
         {prompt.positivePrompt ? (
-          <Text color="fg" fontSize="2xs" wordBreak="break-word">
+          <Text color="fg" fontSize="xs" wordBreak="break-word">
             <Text as="span" color="fg.subtle" fontWeight="600">
               {t('common.prompt')}:
             </Text>{' '}
@@ -1003,7 +1008,7 @@ const PromptHistoryItemRow = ({
           </Text>
         ) : null}
         {prompt.negativePrompt ? (
-          <Text color="fg" fontSize="2xs" wordBreak="break-word">
+          <Text color="fg" fontSize="xs" wordBreak="break-word">
             <Text as="span" color="fg.subtle" fontWeight="600">
               {t('common.negative')}:
             </Text>{' '}
@@ -1015,7 +1020,7 @@ const PromptHistoryItemRow = ({
       <IconButton
         aria-label={t('widgets.generate.deletePromptHistoryItem')}
         colorPalette="red"
-        size="2xs"
+        size="sm"
         variant="ghost"
         onClick={handleDelete}
       >

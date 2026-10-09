@@ -12,7 +12,11 @@ import type { ProjectDraftStore } from './draftStore';
 import type { WorkbenchSessionBlob } from './session';
 
 import { ProjectCreateAbsentError } from './api';
-import { createMemoryProjectDraftStore, createUnavailableProjectDraftStore } from './draftStore';
+import {
+  createMemoryProjectDraftStore,
+  createUnavailableProjectDraftStore,
+  PROJECT_UNLOAD_JOURNAL_MAX_BYTES,
+} from './draftStore';
 import {
   createDurableSyncedWorkbenchPersistence,
   ProjectDraftWriteRejectedError,
@@ -20,7 +24,7 @@ import {
   type DurableProjectPersistenceApi,
 } from './durableSyncedPersistence';
 import { createDeterministicProjectId } from './ids';
-import { serializeProjectDocumentV3 } from './projectDocument';
+import { serializeProjectDocumentV3, serializeProjectDocumentV3Json } from './projectDocument';
 import { acquireProjectMutationLock } from './projectLifecycleLocks';
 import { getProjectSyncSnapshot, registerOpenProject, unregisterOpenProject } from './syncStore';
 
@@ -847,6 +851,97 @@ describe('durable project persistence', () => {
 
     expect(close).toHaveBeenCalledOnce();
     expect(releaseSession).toHaveBeenCalledOnce();
+  });
+
+  it('resolves the last release only once the editor session lock is given back', async () => {
+    const owner = captureAccountScope();
+    let releaseLock!: () => void;
+    const lockReleased = new Promise<void>((resolve) => {
+      releaseLock = resolve;
+    });
+    const service = createDurableSyncedWorkbenchPersistence(owner, {
+      api: createApi(),
+      draftStore: Promise.resolve(createMemoryProjectDraftStore()),
+      editorSession: Promise.resolve({ id: 'editor-1', release: () => lockReleased }),
+      writerToken: 'writer-1',
+    });
+    await service.loadWorkbench();
+    let isReleased = false;
+
+    void service
+      .retain()()
+      .then(() => {
+        isReleased = true;
+      });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    expect(isReleased).toBe(false);
+
+    releaseLock();
+    await vi.waitFor(() => expect(isReleased).toBe(true));
+  });
+
+  it('keeps a closed session closed until the editor reopens it', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const service = createService(owner, api);
+    const project = createDraftProject([]);
+    await service.loadWorkbench();
+
+    const reopened = vi.fn();
+    service.subscribeSessionReopened(reopened);
+    const closing = service.persistEmptySession(stateWith([project]));
+    expect(service.hasClosedSession()).toBe(true);
+    await closing;
+    expect(service.hasClosedSession()).toBe(true);
+    expect(reopened).not.toHaveBeenCalled();
+
+    vi.mocked(api.saveSession).mockClear();
+    await service.reopenSession(stateWith([project]));
+
+    expect(service.hasClosedSession()).toBe(false);
+    expect(reopened).toHaveBeenCalledOnce();
+    expect(
+      vi
+        .mocked(api.saveSession)
+        .mock.calls.at(-1)?.[0]
+        .projects.map(({ id }) => id)
+    ).toEqual([project.id]);
+  });
+
+  it('gives up project locks held for an unfinished resolution when a newer editor takes over', async () => {
+    const owner = captureAccountScope();
+    const release = vi.fn(() => Promise.resolve());
+    vi.mocked(acquireProjectMutationLock).mockResolvedValue({ kind: 'acquired', release });
+    const api = createApi();
+    const draftStore = createMemoryProjectDraftStore();
+    const project = createDraftProject([]);
+    await draftStore.stage({
+      baseRevision: 1,
+      documentJson: JSON.stringify(serializeProjectDocumentV3(project)),
+      documentSchemaVersion: 3,
+      editorSessionId: 'editor-1',
+      generation: 1,
+      projectId: project.id,
+      updatedAt: Date.parse(now),
+      writerToken: 'old-writer',
+    });
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: project.id,
+      openProjectIds: [project.id],
+    });
+    const service = createService(owner, api, draftStore);
+    await service.loadWorkbench();
+    await service.resolveConflictDiscard(project.id);
+    expect(release).not.toHaveBeenCalled();
+
+    service.releaseMutationLocks();
+    expect(release).toHaveBeenCalledOnce();
+
+    service.acknowledgeProjectResolution(project.id);
+    expect(release).toHaveBeenCalledOnce();
   });
 
   it('stages the exact V2 document before issuing a create', async () => {
@@ -3058,5 +3153,291 @@ describe('durable project persistence', () => {
     expect(copyA.targetProjectId).not.toBe(copyB.targetProjectId);
     expect(api.records.get(copyA.targetProjectId)?.name).toContain('local A');
     expect(api.records.get(copyB.targetProjectId)?.name).toContain('local B');
+  });
+});
+
+describe('unload journal', () => {
+  const openSession = (api: ReturnType<typeof createApi>, project: Project): void => {
+    api.records.set(project.id, toRecord(project));
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: project.id,
+      openProjectIds: [project.id],
+    });
+  };
+  /** The next page load in the same tab: same editor session, new writer. */
+  const reload = (owner: AccountScope, api: DurableProjectPersistenceApi, draftStore: ProjectDraftStore) =>
+    createDurableSyncedWorkbenchPersistence(owner, {
+      api,
+      deleteDatabase: () => Promise.resolve({ kind: 'deleted' }),
+      draftStore: Promise.resolve(draftStore),
+      editorSession: Promise.resolve({ id: 'editor-1', release: () => Promise.resolve() }),
+      now: () => now,
+      writerToken: 'writer-2',
+    });
+
+  it('journals an edit no save has staged, and the next load recovers it as a pending draft', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const draftStore = createMemoryProjectDraftStore();
+    const project = createDraftProject([]);
+    openSession(api, project);
+    const service = createService(owner, api, draftStore);
+    const loaded = await service.loadWorkbench();
+    const edited = stateWith([{ ...loaded.state.projects[0]!, name: 'Typed before reload' }]);
+
+    const outcome = service.journalBeforeUnload(edited);
+    expect(outcome).toMatchObject({ kind: 'journaled', projectIds: [project.id], skippedOversizedProjectIds: [] });
+    await expect(outcome.kind === 'journaled' ? outcome.written : null).resolves.toBe(true);
+    // `pagehide` and becoming hidden both fire on unload; the second has nothing new.
+    expect(service.journalBeforeUnload(edited)).toEqual({ kind: 'nothing-to-journal' });
+
+    const next = reload(owner, api, draftStore);
+    const recovered = await next.loadWorkbench();
+
+    expect(recovered.state.projects).toMatchObject([{ id: project.id, name: 'Typed before reload' }]);
+    expect(recovered.conflicts).toEqual([]);
+    expect(next.hasPendingChanges()).toBe(true);
+    await next.saveWorkbench(recovered.state);
+    expect(api.records.get(project.id)).toMatchObject({ name: 'Typed before reload', revision: 2 });
+  });
+
+  it('journals nothing local recovery already holds, nor for a closed session or an ended account', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const project = createDraftProject([]);
+    openSession(api, project);
+    const service = createService(owner, api);
+    const loaded = await service.loadWorkbench();
+
+    expect(service.journalBeforeUnload(loaded.state)).toEqual({ kind: 'nothing-to-journal' });
+    const saved = stateWith([{ ...loaded.state.projects[0]!, name: 'Saved' }]);
+    await service.saveWorkbench(saved);
+    expect(service.journalBeforeUnload(saved)).toEqual({ kind: 'nothing-to-journal' });
+
+    await service.persistEmptySession(saved);
+    expect(service.journalBeforeUnload(stateWith([{ ...saved.projects[0]!, name: 'After close' }]))).toEqual({
+      kind: 'nothing-to-journal',
+    });
+
+    const other = createService(captureAccountScope(), api);
+    const otherLoaded = await other.loadWorkbench();
+    accountLifecycle.invalidate();
+    expect(other.journalBeforeUnload(stateWith([{ ...otherLoaded.state.projects[0]!, name: 'Late' }]))).toEqual({
+      kind: 'nothing-to-journal',
+    });
+  });
+
+  /** A project whose document is exactly `byteSize` bytes. */
+  const projectOfSize = (byteSize: number, others: Project[] = []): Project => {
+    const project = { ...createDraftProject(others), name: '' };
+    const base = serializeProjectDocumentV3Json(project).byteSize;
+    return { ...project, name: 'x'.repeat(byteSize - base) };
+  };
+
+  it('journals documents up to the budget together, and leaves the rest to autosave', async () => {
+    const service = createService(captureAccountScope(), createApi());
+    await service.loadWorkbench();
+    const exact = projectOfSize(PROJECT_UNLOAD_JOURNAL_MAX_BYTES);
+    const over = projectOfSize(PROJECT_UNLOAD_JOURNAL_MAX_BYTES + 1, [exact]);
+    const half = projectOfSize(PROJECT_UNLOAD_JOURNAL_MAX_BYTES / 2 + 1, [exact, over]);
+    const otherHalf = projectOfSize(PROJECT_UNLOAD_JOURNAL_MAX_BYTES / 2 + 1, [exact, over, half]);
+
+    expect(service.journalBeforeUnload(stateWith([over, exact]))).toMatchObject({
+      kind: 'journaled',
+      projectIds: [exact.id],
+      skippedOversizedProjectIds: [over.id],
+    });
+    // Each fits on its own; together they do not.
+    expect(service.journalBeforeUnload(stateWith([half, otherHalf]))).toMatchObject({
+      kind: 'journaled',
+      projectIds: [half.id],
+      skippedOversizedProjectIds: [otherHalf.id],
+    });
+  });
+
+  it('keeps a journal it could not settle and settles it on the next save', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const backing = createMemoryProjectDraftStore();
+    let settleFailures = 1;
+    const flaky: ProjectDraftStore = {
+      ...backing,
+      get availability() {
+        return backing.availability;
+      },
+      settleUnloadJournal: (...args) => {
+        if (settleFailures > 0) {
+          settleFailures -= 1;
+          return Promise.resolve({ kind: 'unavailable' });
+        }
+        return backing.settleUnloadJournal(...args);
+      },
+    };
+    const project = createDraftProject([]);
+    openSession(api, project);
+    const service = createService(owner, api, flaky);
+    const loaded = await service.loadWorkbench();
+
+    service.journalBeforeUnload(stateWith([{ ...loaded.state.projects[0]!, name: 'Typed, then undone' }]));
+    await service.saveWorkbench(loaded.state);
+    await service.saveWorkbench(loaded.state);
+
+    const reloaded = await reload(owner, api, backing).loadWorkbench();
+    expect(reloaded.state.projects).toMatchObject([{ id: project.id, name: project.name }]);
+  });
+
+  it('writes a journal again on the next hidden event when the previous write aborted', async () => {
+    const backing = createMemoryProjectDraftStore();
+    let isWritten = false;
+    const aborting: ProjectDraftStore = {
+      ...backing,
+      get availability() {
+        return backing.availability;
+      },
+      journalBeforeUnload: (write) => {
+        const started = backing.journalBeforeUnload(write);
+        return started.kind === 'started' ? { kind: 'started', written: Promise.resolve(isWritten) } : started;
+      },
+    };
+    const service = createService(captureAccountScope(), createApi(), aborting);
+    const loaded = await service.loadWorkbench();
+    const edited = stateWith([{ ...loaded.state.projects[0]!, name: 'Hidden' }]);
+
+    const first = service.journalBeforeUnload(edited);
+    await expect(first.kind === 'journaled' ? first.written : null).resolves.toBe(false);
+    isWritten = true;
+
+    expect(service.journalBeforeUnload(edited)).toMatchObject({ kind: 'journaled' });
+    expect(service.journalBeforeUnload(edited)).toEqual({ kind: 'nothing-to-journal' });
+  });
+
+  it('journals nothing for a project being deleted', async () => {
+    const api = createApi();
+    const project = createDraftProject([]);
+    api.records.set(project.id, toRecord(project));
+    const service = createService(captureAccountScope(), api);
+    const loaded = await service.loadWorkbench();
+
+    service.markProjectDeleted(project.id);
+
+    expect(service.journalBeforeUnload(stateWith([{ ...loaded.state.projects[0]!, name: 'Being deleted' }]))).toEqual({
+      kind: 'nothing-to-journal',
+    });
+  });
+
+  it('loads, saves and recovers drafts as before when the journal is unavailable', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const backing = createMemoryProjectDraftStore();
+    const withoutJournal: ProjectDraftStore = {
+      ...backing,
+      get availability() {
+        return backing.availability;
+      },
+      journalBeforeUnload: () => ({ kind: 'unavailable' }),
+      reconcileUnloadJournal: () => Promise.resolve({ kind: 'unavailable' }),
+    };
+    const project = createDraftProject([]);
+    api.records.set(project.id, toRecord(project));
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: project.id,
+      openProjectIds: [project.id],
+    });
+    const service = createService(owner, api, withoutJournal);
+    const loaded = await service.loadWorkbench();
+    expect(loaded.localDraftStatus).toBe('ok');
+
+    const edited = stateWith([{ ...loaded.state.projects[0]!, name: 'Staged only' }]);
+    expect(service.journalBeforeUnload(edited)).toEqual({ kind: 'unavailable' });
+    vi.mocked(api.updateProject).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await expect(service.saveWorkbench(edited)).resolves.toMatchObject({ localDraftStatus: 'ok', shouldRetry: true });
+
+    const recovered = await createDurableSyncedWorkbenchPersistence(owner, {
+      api,
+      draftStore: Promise.resolve(withoutJournal),
+      editorSession: Promise.resolve({ id: 'editor-1', release: () => Promise.resolve() }),
+      now: () => now,
+      writerToken: 'writer-2',
+    }).loadWorkbench();
+    expect(recovered.localDraftStatus).toBe('ok');
+    expect(recovered.state.projects).toMatchObject([{ id: project.id, name: 'Staged only' }]);
+  });
+
+  it('retires a journal with the acknowledgement that covers it, so a later load does not revive it', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const draftStore = createMemoryProjectDraftStore();
+    const project = createDraftProject([]);
+    openSession(api, project);
+    const service = createService(owner, api, draftStore);
+    const loaded = await service.loadWorkbench();
+    const hidden = stateWith([{ ...loaded.state.projects[0]!, name: 'While hidden' }]);
+
+    // Hidden into the back/forward cache, then shown again: the save requested on hiding, then a newer edit, land.
+    service.journalBeforeUnload(hidden);
+    await service.saveWorkbench(hidden);
+    await service.saveWorkbench(stateWith([{ ...hidden.projects[0]!, name: 'Newer' }]));
+
+    const reloaded = await reload(owner, api, draftStore).loadWorkbench();
+    expect(reloaded.state.projects).toMatchObject([{ id: project.id, name: 'Newer' }]);
+    expect(reloaded.conflicts).toEqual([]);
+  });
+
+  it('shares the generation of a stage still in flight, so its acknowledgement retires the journal', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const draftStore = createMemoryProjectDraftStore();
+    let releaseStage!: () => void;
+    const stageGate = new Promise<void>((resolve) => {
+      releaseStage = resolve;
+    });
+    const stage = draftStore.stage.bind(draftStore);
+    const stagesStarted: number[] = [];
+    const gatedStore: ProjectDraftStore = {
+      ...draftStore,
+      get availability() {
+        return draftStore.availability;
+      },
+      stage: async (input) => {
+        stagesStarted.push(input.generation);
+        await stageGate;
+        return stage(input);
+      },
+    };
+    const project = createDraftProject([]);
+    openSession(api, project);
+    const service = createService(owner, api, gatedStore);
+    const loaded = await service.loadWorkbench();
+    const edited = stateWith([{ ...loaded.state.projects[0]!, name: 'Saving' }]);
+
+    const saving = service.saveWorkbench(edited);
+    await vi.waitFor(() => expect(stagesStarted).toHaveLength(1));
+    expect(service.journalBeforeUnload(edited)).toMatchObject({ kind: 'journaled' });
+    releaseStage();
+    await saving;
+
+    await expect(draftStore.reconcileUnloadJournal('durable-sync-test', Date.parse(now))).resolves.toEqual({
+      kind: 'available',
+      outcomes: [],
+    });
+  });
+
+  it('discards its journal when the project is deleted, so the next load cannot bring it back', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const draftStore = createMemoryProjectDraftStore();
+    const project = createDraftProject([]);
+    openSession(api, project);
+    const service = createService(owner, api, draftStore);
+    const loaded = await service.loadWorkbench();
+
+    service.journalBeforeUnload(stateWith([{ ...loaded.state.projects[0]!, name: 'Edited, then deleted' }]));
+    await service.deleteProjectOnServer(project.id);
+
+    const reloaded = await reload(owner, api, draftStore).loadWorkbench();
+    expect(reloaded.state.projects.map(({ id }) => id)).not.toContain(project.id);
+    expect(reloaded.conflicts).toEqual([]);
   });
 });

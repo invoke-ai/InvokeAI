@@ -249,12 +249,12 @@ export const GalleryMediaSlot = ({
   const removeAction = value ? (
     isTile ? (
       <Tooltip content={labels.remove}>
-        <IconButton aria-label={labels.remove} disabled={isBusy} size="2xs" variant="solid" onClick={handleClear}>
+        <IconButton aria-label={labels.remove} disabled={isBusy} size="sm" variant="solid" onClick={handleClear}>
           <XIcon />
         </IconButton>
       </Tooltip>
     ) : (
-      <Button disabled={isBusy} size="xs" variant="ghost" onClick={handleClear}>
+      <Button disabled={isBusy} variant="ghost" onClick={handleClear}>
         <Icon as={XIcon} boxSize="3" />
         {labels.remove}
       </Button>
@@ -267,7 +267,7 @@ export const GalleryMediaSlot = ({
           <IconButton
             aria-label={t('widgets.gallery.picker.upload')}
             disabled={isBusy}
-            size="2xs"
+            size="sm"
             variant="solid"
             onClick={openUploadPicker}
           >
@@ -275,7 +275,7 @@ export const GalleryMediaSlot = ({
           </IconButton>
         </Tooltip>
       ) : (
-        <Button disabled={isBusy} size="xs" variant="ghost" onClick={openUploadPicker}>
+        <Button disabled={isBusy} variant="ghost" onClick={openUploadPicker}>
           <Icon as={UploadIcon} boxSize="3" />
           {t('widgets.gallery.picker.upload')}
         </Button>
@@ -318,11 +318,11 @@ export const GalleryMediaSlot = ({
                 ) : (
                   <Stack align="center" color="fg.muted" gap="1.5" h="full" justify="center" px="2" textAlign="center">
                     <Icon as={ImagePlusIcon} boxSize="5" />
-                    <Text color="fg" fontSize="xs" fontWeight="600">
+                    <Text color="fg" fontSize="md" fontWeight="600">
                       {labels.choose}
                     </Text>
                     {emptyHint && !isBusy ? (
-                      <Text color="fg.muted" fontSize="2xs">
+                      <Text color="fg.muted" fontSize="xs">
                         {emptyHint}
                       </Text>
                     ) : null}
@@ -330,7 +330,7 @@ export const GalleryMediaSlot = ({
                 )}
                 {isBusy ? (
                   <Stack align="center" bg="bg.muted/85" inset="0" justify="center" position="absolute">
-                    <Spinner size="sm" />
+                    <Spinner size="lg" />
                   </Stack>
                 ) : null}
               </>
@@ -340,31 +340,31 @@ export const GalleryMediaSlot = ({
                   {valueThumbnail}
                 </Box>
                 <Stack align="start" flex="1" gap="1" justify="center" minW="0">
-                  <MiddleTruncate color="fg" fontSize="xs" fontWeight="semibold" text={value.name} />
+                  <MiddleTruncate color="fg" fontSize="md" fontWeight="semibold" text={value.name} />
                   {value.width && value.height ? (
-                    <Text color="fg.muted" fontSize="2xs" fontVariantNumeric="tabular-nums">
+                    <Text color="fg.muted" fontSize="xs" fontVariantNumeric="tabular-nums">
                       {value.width} × {value.height}
                     </Text>
                   ) : null}
                   <HStack color="fg.muted" gap="1">
-                    {isBusy ? <Spinner size="xs" /> : <Icon as={RefreshCwIcon} boxSize="2.5" />}
-                    <Text fontSize="2xs">{valueHint}</Text>
+                    {isBusy ? <Spinner /> : <Icon as={RefreshCwIcon} boxSize="2.5" />}
+                    <Text fontSize="xs">{valueHint}</Text>
                   </HStack>
                 </Stack>
               </HStack>
             ) : (
               <Stack align="center" color="fg.muted" gap="1.5" justify="center" minH="20" px="4">
                 {isBusy ? (
-                  <Spinner size="sm" />
+                  <Spinner size="lg" />
                 ) : (
-                  <HStack color="fg" fontSize="xs" fontWeight="600" gap="1.5">
+                  <HStack color="fg" fontWeight="600" gap="1.5">
                     <Icon as={ImagePlusIcon} boxSize="4" />
                     {labels.choose}
                     <Icon as={ChevronDownIcon} boxSize="3" color="fg.subtle" />
                   </HStack>
                 )}
                 {emptyHint || isInDragScope ? (
-                  <Text color="fg.muted" fontSize="2xs" textAlign="center">
+                  <Text color="fg.muted" fontSize="xs" textAlign="center">
                     {emptyHint ?? t('widgets.gallery.picker.dropHint')}
                   </Text>
                 ) : null}
@@ -416,7 +416,7 @@ export const GalleryMediaSlot = ({
         </HStack>
       ) : null}
       {errorMessage ? (
-        <Text aria-live="polite" color="fg.error" fontSize="2xs" role="alert" textWrap="pretty">
+        <Text aria-live="polite" color="fg.error" fontSize="xs" role="alert" textWrap="pretty">
           {errorMessage}
         </Text>
       ) : null}

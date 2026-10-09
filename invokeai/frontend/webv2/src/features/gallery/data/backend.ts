@@ -838,7 +838,8 @@ export const searchGallerySemantic = async (
 };
 
 export interface ImageIndexAvailability {
-  state: 'disabled' | 'model_missing' | 'ready';
+  /** `switching`: an installed replacement model starts once the retired one's work drains. */
+  state: 'disabled' | 'model_missing' | 'switching' | 'ready';
   /** The configured embedding model's name; set only while it is missing. */
   modelName: string | null;
 }
@@ -846,11 +847,12 @@ export interface ImageIndexAvailability {
 interface ImageIndexStatusBody {
   enabled: boolean;
   model_name?: string | null;
+  projection?: { state?: string };
 }
 
 /**
  * Search requires indexed embeddings and their model, not map projection. model_name distinguishes a missing
- * configured model from a disabled index.
+ * configured model from a disabled index; an inactive index whose projection is computing is switching models.
  */
 export const fetchImageIndexAvailability = async (signal: AbortSignal): Promise<ImageIndexAvailability> => {
   const body = await apiFetchJson<ImageIndexStatusBody>('/api/v1/image_map/status', { signal });
@@ -858,10 +860,11 @@ export const fetchImageIndexAvailability = async (signal: AbortSignal): Promise<
   if (body.enabled) {
     return { modelName: null, state: 'ready' };
   }
+  if (body.model_name) {
+    return { modelName: body.model_name, state: 'model_missing' };
+  }
 
-  return body.model_name
-    ? { modelName: body.model_name, state: 'model_missing' }
-    : { modelName: null, state: 'disabled' };
+  return { modelName: null, state: body.projection?.state === 'computing' ? 'switching' : 'disabled' };
 };
 
 /** Kind-qualified refs retain relevance order for page hydration, range selection, and deletion neighbors. */

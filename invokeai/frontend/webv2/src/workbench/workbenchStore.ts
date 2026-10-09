@@ -9,6 +9,7 @@ import {
   type GeneratedImageContract,
 } from '@features/gallery/contracts';
 import { recordLogEvent } from '@platform/logging/logger';
+import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { createExternalStore } from '@platform/state/externalStore';
 import { closeWidgetOverlays } from '@platform/ui/widgetOverlayRegistry';
 import { hasActiveQueueRuns, hasInFlightQueueRuns } from '@workbench/queue-integration/activeQueueRuns';
@@ -18,11 +19,12 @@ import type { CanvasProjectMutation } from './canvasProjectMutations';
 
 import { clearLayerPanelStates, reconcileLayerPanelStates } from './layerPanelState';
 import { createLayoutPresetActivator, loadLayoutPresetWidgets } from './layoutPresetActivation';
-import { resolveSavedLayoutPreset } from './layoutPresetSnapshots';
+import { getLayoutPresetArrangement, resolveSavedLayoutPreset } from './layoutPresetSnapshots';
 import { getLayoutWidgetTypeIds } from './layoutWidgetSet';
 import { createBlankWorkflowDocument, findProjectWorkflow } from './projectWorkflows';
 import { getWorkbenchPreferences } from './settings/store';
 import { areWidgetsLoaded } from './widgetRegistry';
+import { getProjectWidgetValues } from './widgetState';
 import {
   createInitialWorkbenchState,
   __workbenchReducerInternal,
@@ -73,13 +75,19 @@ export type ProjectCommandResult =
   | { ok: true }
   | {
       ok: false;
-      reason: 'active-queue-runs' | 'invalid-name' | 'last-project' | 'project-not-found' | 'target-already-open';
+      reason:
+        | 'active-queue-runs'
+        | 'invalid-name'
+        | 'last-project'
+        | 'modified'
+        | 'project-not-found'
+        | 'target-already-open';
     };
 
 const createCommands = (
   dispatch: WorkbenchDispatch,
   getState: () => WorkbenchState,
-  activateLayoutPreset: ReturnType<typeof createLayoutPresetActivator>['activate']
+  layoutPresetActivator: Pick<ReturnType<typeof createLayoutPresetActivator>, 'activate' | 'invalidate'>
 ) => {
   const command = createCommandFactory(dispatch);
 
@@ -281,7 +289,12 @@ const createCommands = (
     },
     layout: {
       activatePreset: (presetId: ActionPayload<'applyPreset'>['presetId']) =>
-        activateLayoutPreset(resolveSavedLayoutPreset(getState().account, presetId)),
+        layoutPresetActivator.activate(resolveSavedLayoutPreset(getState().account, presetId)),
+      /**
+       * Drop an activation still waiting on its widgets, leaving the active preset as it is. Choosing the active preset
+       * while another is pending means "stay", not the active preset's revert.
+       */
+      cancelPresetActivation: (): void => layoutPresetActivator.invalidate(),
       applyPreset: command('applyPreset', (presetId: ActionPayload<'applyPreset'>['presetId']) => ({ presetId })),
       createPreset: command(
         'addLayoutPreset',
@@ -324,7 +337,11 @@ const createCommands = (
         (presetId: ActionPayload<'renameLayoutPreset'>['presetId'], label: string) => ({ label, presetId })
       ),
       reset: command('resetActiveLayout'),
-      /** Writes the live arrangement back onto the named preset. */
+      /** Discards the named preset's unsaved arrangement in the active project. */
+      revertPreset: command('revertLayoutPreset', (presetId: ActionPayload<'revertLayoutPreset'>['presetId']) => ({
+        presetId,
+      })),
+      /** Writes the preset's arrangement (live when active, else this project's working copy) back onto it. */
       savePreset: command('saveLayoutPreset', (presetId: ActionPayload<'saveLayoutPreset'>['presetId']) => ({
         presetId,
       })),
@@ -358,8 +375,12 @@ const createCommands = (
       ),
       reportError: command('recordError'),
     },
+    // Commands that change the active or open projects first commit drafts still held by mounted editors, so an edit
+    // made while a caller awaited (hydration, a close flush) lands on the project it was typed in.
     projects: {
-      close: (projectId: string): ProjectCommandResult => {
+      /** With `unchangedFrom`, closes only while the project, drafts included, is still exactly that version. */
+      close: (projectId: string, unchangedFrom?: Project): ProjectCommandResult => {
+        flushWorkbenchDrafts();
         const state = getState();
         const project = state.projects.find((project) => project.id === projectId);
         if (!project) {
@@ -370,6 +391,10 @@ const createCommands = (
           return { ok: false, reason: 'active-queue-runs' };
         }
 
+        if (unchangedFrom && project !== unchangedFrom) {
+          return { ok: false, reason: 'modified' };
+        }
+
         if (state.projects.length === 1) {
           return { ok: false, reason: 'last-project' };
         }
@@ -378,10 +403,14 @@ const createCommands = (
         return { ok: true };
       },
       create: (): Project => {
+        flushWorkbenchDrafts();
         dispatch({ type: 'createProject' });
         return getActiveProject(getState());
       },
-      open: command('openProject', (project: Project) => ({ project })),
+      open: (project: Project): void => {
+        flushWorkbenchDrafts();
+        dispatch({ project, type: 'openProject' });
+      },
       rename: (projectId: string, name: string): ProjectCommandResult => {
         if (!getState().projects.some((project) => project.id === projectId)) {
           return { ok: false, reason: 'project-not-found' };
@@ -398,15 +427,20 @@ const createCommands = (
           return { ok: false, reason: 'project-not-found' };
         }
 
+        flushWorkbenchDrafts();
         dispatch({ projectId, type: 'switchProject' });
         return { ok: true };
       },
     },
     queue: {
-      cancel: command('cancelQueueItem', (projectId: string | undefined, queueItemId: string) => ({
-        projectId,
-        queueItemId,
-      })),
+      cancel: command(
+        'cancelQueueItem',
+        (projectId: string | undefined, queueItemId: string, notice?: ActionPayload<'cancelQueueItem'>['notice']) => ({
+          projectId,
+          queueItemId,
+          ...(notice ? { notice } : {}),
+        })
+      ),
       cancelAll: command('cancelAllQueueItems', (projectId?: string) => ({ projectId })),
       cancelAllExceptCurrent: command(
         'cancelAllQueueItemsExceptCurrent',
@@ -445,20 +479,28 @@ const createCommands = (
           values,
         })
       ),
-      patchValues: command(
-        'patchWidgetValues',
-        (
-          widgetId: ActionPayload<'patchWidgetValues'>['widgetId'],
-          values: Record<string, unknown>,
-          projectId?: string,
-          origin?: ActionPayload<'patchWidgetValues'>['origin']
-        ) => ({
+      patchValues: (
+        widgetId: ActionPayload<'patchWidgetValues'>['widgetId'],
+        values: Record<string, unknown> | ((current: Record<string, unknown>) => Record<string, unknown>),
+        projectId?: string,
+        origin?: ActionPayload<'patchWidgetValues'>['origin']
+      ): void => {
+        const state = getState();
+        const project = state.projects.find((candidate) => candidate.id === (projectId ?? state.activeProjectId));
+
+        if (!project) {
+          return;
+        }
+
+        // Resolve before dispatch so same-turn draft commits compose, without storing callbacks in reducer actions.
+        dispatch({
           origin,
-          projectId,
-          values,
+          projectId: project.id,
+          type: 'patchWidgetValues',
+          values: typeof values === 'function' ? values(getProjectWidgetValues(project, widgetId)) : values,
           widgetId,
-        })
-      ),
+        });
+      },
       reorder: command('reorderWidgetInstances'),
       revealFloating: command('revealFloatingWidget', (instanceId: string) => ({ instanceId })),
       setAlignment: command('setWidgetInstanceAlignment'),
@@ -534,7 +576,7 @@ const createCommands = (
           return { ok: false, reason: 'invalid-name' };
         }
         dispatch({
-          action: { patch: { name: name.trim() }, type: 'setMetadata' },
+          action: { name: name.trim(), type: 'renameWorkflow' },
           projectId,
           type: 'applyWorkflowAction',
           workflowId,
@@ -885,11 +927,22 @@ export const createWorkbenchStore = (
 
       return current.id === preset.id && current.snapshot === preset.snapshot;
     },
-    isLoaded: options.isLoaded ?? ((preset) => areWidgetsLoaded(getLayoutWidgetTypeIds(preset.snapshot))),
-    load: options.loadLayoutPresetWidgets ?? loadLayoutPresetWidgets,
+    // Switching lays out the active project's working copy when it has one, so that is what has to be in memory.
+    isLoaded: (preset) => {
+      const incoming = { ...preset, snapshot: getLayoutPresetArrangement(getActiveProject(state), preset) };
+
+      return options.isLoaded
+        ? options.isLoaded(incoming)
+        : areWidgetsLoaded(getLayoutWidgetTypeIds(incoming.snapshot));
+    },
+    load: (preset) =>
+      (options.loadLayoutPresetWidgets ?? loadLayoutPresetWidgets)({
+        ...preset,
+        snapshot: getLayoutPresetArrangement(getActiveProject(state), preset),
+      }),
   });
   invalidateLayoutPresetActivation = layoutPresetActivator.invalidate;
-  const commands = createCommands(dispatch, getState, layoutPresetActivator.activate);
+  const commands = createCommands(dispatch, getState, layoutPresetActivator);
 
   return {
     commands,

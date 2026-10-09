@@ -3,6 +3,7 @@ import type { GenerateSettings, MainModelConfig } from '@features/generation/cor
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
+import { createExternalStoreCore } from '@platform/state/externalStoreCore';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
 import { act } from 'react';
@@ -13,8 +14,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GenerateDimensionFields } from './GenerateDimensionFields';
 
 vi.mock('./GenerationUiContext', () => ({
+  useGenerationQueueInsights: (select: (insights: unknown) => unknown) =>
+    select({ secondsPerRun: null, seedHistory: [] }),
   useGenerationUi: () => ({
-    queueInsights: { secondsPerRun: null, seedHistory: [] },
+    project: { invocationSourceId: 'generate' },
     sectionPreferences: { sectionsOpen: { dimensions: true }, setSectionOpen: vi.fn() },
   }),
 }));
@@ -70,9 +73,9 @@ const render = async (settings: Partial<GenerateSettings>) => {
       <ChakraProvider value={system}>
         <I18nextProvider i18n={i18n}>
           <GenerateDimensionFields
+            draft={createExternalStoreCore({ ...getDefaultGenerateSettings(sd1Model), ...settings })}
             projectId="project"
             selectedModel={sd1Model}
-            settings={{ ...getDefaultGenerateSettings(sd1Model), ...settings }}
             onCommit={onCommit}
           />
         </I18nextProvider>

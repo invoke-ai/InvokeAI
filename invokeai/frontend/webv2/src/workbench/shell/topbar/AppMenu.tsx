@@ -7,6 +7,7 @@ import { InvokeMark } from '@platform/ui/InvokeMark';
 import { MenuContent } from '@platform/ui/Menu';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { DiscordIcon, LightbulbFilamentIcon } from '@platform/ui/VendoredIcon';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { OPEN_COMMAND_PALETTE_HOTKEY } from '@workbench/hotkeys/catalog';
 import { openCommandPalette } from '@workbench/palette/paletteStore';
@@ -26,13 +27,15 @@ import {
   SettingsIcon,
   TypeIcon,
 } from 'lucide-react';
-import { useCallback, type ElementType } from 'react';
+import { useCallback, useState, type ComponentType, type ElementType } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useTopbarShortcut } from './useTopbarShortcut';
 
 const MENU_POSITIONING = { placement: 'bottom-start' } as const;
 const DISCORD_URL = 'https://discord.gg/ZmtBAhwWhy';
+// Loaded on trigger hover or focus, so neither the chunk nor its request is part of route startup.
+const loadDonationMenuItem = () => import('@workbench/shell/DonationMenuItem');
 
 export const AppMenu = () => {
   const { t } = useTranslation();
@@ -43,7 +46,7 @@ export const AppMenu = () => {
   const openWorkbenchWidget = useOpenWorkbenchWidget();
   const queuedCount = useActiveProjectSelector((project) => getQueueSummary(project.queue.items).total);
 
-  const openHome = useCallback(() => {
+  const openLaunchpad = useCallback(() => {
     void navigate({ to: '/' });
   }, [navigate]);
   const openProjects = useCallback(() => {
@@ -60,11 +63,41 @@ export const AppMenu = () => {
   }, [navigate]);
   const openQueue = useCallback(() => openWorkbenchWidget('queue'), [openWorkbenchWidget]);
   const openSettings = useCallback(() => openWorkbenchSettings(), []);
+  const queryClient = useQueryClient();
+  // Rendered only once loaded: a lazy() boundary would suspend on open and React delays its reveal, shifting rows.
+  // A chunk that fails to load (e.g. after an upgrade) leaves the optional link absent.
+  const [DonationMenuItem, setDonationMenuItem] = useState<ComponentType | null>(null);
+  const preloadDonationMenuItem = useCallback(() => {
+    void loadDonationMenuItem().then(
+      (module) => {
+        setDonationMenuItem(() => module.DonationMenuItem);
+        return module.prefetchDonationMenuItem(queryClient);
+      },
+      () => undefined
+    );
+  }, [queryClient]);
+  // Assistive technology can activate the trigger with a bare click, without hovering or focusing it first.
+  const handleOpenChange = useCallback(
+    ({ open }: { open: boolean }) => {
+      if (open) {
+        preloadDonationMenuItem();
+      }
+    },
+    [preloadDonationMenuItem]
+  );
 
   return (
-    <Menu.Root positioning={MENU_POSITIONING}>
+    <Menu.Root lazyMount positioning={MENU_POSITIONING} onOpenChange={handleOpenChange}>
       <Menu.Trigger asChild>
-        <IconButton aria-label={t('topbar.appMenu.open')} className="group" pe="1.5" size="sm" variant="ghost">
+        <IconButton
+          aria-label={t('topbar.appMenu.open')}
+          className="group"
+          pe="1.5"
+          size="lg"
+          variant="ghost"
+          onFocus={preloadDonationMenuItem}
+          onPointerEnter={preloadDonationMenuItem}
+        >
           <AppMenuGlyph />
         </IconButton>
       </Menu.Trigger>
@@ -72,21 +105,19 @@ export const AppMenu = () => {
         <Menu.Positioner>
           <MenuContent minW="15rem">
             <HStack justify="space-between" px="3" py="2">
-              <Text fontSize="xs" fontWeight="800">
-                Invoke
-              </Text>
-              <Text color="fg.subtle" fontSize="2xs">
+              <Text fontWeight="800">Invoke</Text>
+              <Text color="fg.subtle" fontSize="xs">
                 v{APP_VERSION}
               </Text>
             </HStack>
             <Menu.Separator />
-            <Menu.Item value="home" onClick={openHome}>
+            <Menu.Item value="launchpad" onClick={openLaunchpad}>
               <Icon as={HouseIcon} boxSize="3.5" />
-              <Menu.ItemText>{t('launchpad.sections.home')}</Menu.ItemText>
+              <Menu.ItemText>{t('topbar.appMenu.launchpad')}</Menu.ItemText>
             </Menu.Item>
             <Menu.Separator />
             <Menu.ItemGroup>
-              <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+              <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
                 {t('topbar.appMenu.manage')}
               </Menu.ItemGroupLabel>
               <Menu.Item value="projects" onClick={openProjects}>
@@ -113,7 +144,7 @@ export const AppMenu = () => {
                 <Icon as={ListOrderedIcon} boxSize="3.5" />
                 <Menu.ItemText>{t('widgets.labels.queue')}</Menu.ItemText>
                 {queuedCount > 0 ? (
-                  <Badge colorPalette="accent" fontSize="2xs" ms="auto" variant="surface">
+                  <Badge colorPalette="accent" fontSize="xs" ms="auto" variant="surface">
                     {queuedCount}
                   </Badge>
                 ) : null}
@@ -143,6 +174,7 @@ export const AppMenu = () => {
               />
               <AppMenuLink href={DISCORD_URL} icon={DiscordIcon} label="Discord" value="discord" />
             </HStack>
+            {DonationMenuItem ? <DonationMenuItem /> : null}
           </MenuContent>
         </Menu.Positioner>
       </Portal>
@@ -189,11 +221,11 @@ const SettingsMenuAction = ({ onClick }: { onClick: () => void }) => {
 const FOOTER_ITEM_PROPS = {
   alignItems: 'center',
   flex: '0 0 auto',
-  h: '7',
+  h: 'control.md',
   justifyContent: 'center',
-  minW: '7',
+  minW: 'control.md',
   p: '0',
-  w: '7',
+  w: 'control.md',
 } as const;
 
 const AppMenuAction = ({

@@ -1,8 +1,10 @@
-import type { ModelConfig } from '@features/models/core/types';
+import type { FoundModel, ModelConfig } from '@features/models/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { getModelsDir, listMissingModels, listModels, scanFolderForModels } from '@features/models/data/api';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { getModelsUiSnapshotForTests, updateModelsUi } from '@features/models/ui/uiStore';
+import { ApiError } from '@platform/transport/http';
 import { system } from '@theme/system';
 import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -16,7 +18,12 @@ import { AddModelsView } from './AddModelsView';
  * filtering.
  */
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, values?: { reason?: string }) =>
+      key === 'models.scanFailedDescription' ? `${key}: ${values?.reason ?? ''}` : key,
+  }),
+}));
 
 // One starter the backend marks installed by source, one it marks installed by
 // name; the library model behind each is what the row must link to.
@@ -58,6 +65,9 @@ vi.mock('@features/models/data/externalProvidersStore', async (importOriginal) =
 vi.mock('@features/models/data/api', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   getHuggingFaceModels: vi.fn(),
+  getModelsDir: vi.fn(),
+  listMissingModels: vi.fn(),
+  listModels: vi.fn(),
   scanFolderForModels: vi.fn(),
 }));
 
@@ -67,9 +77,9 @@ vi.mock('./useInstallActions', () => ({
   useInstallActions: () => ({ ...installActions, pendingSources: new Set() }),
 }));
 
-vi.mock('@features/models/ui/useModelsNotify', () => ({
-  useNotify: () => ({ error: vi.fn(), info: vi.fn(), success: vi.fn() }),
-}));
+const notify = vi.hoisted(() => ({ error: vi.fn(), info: vi.fn(), success: vi.fn() }));
+
+vi.mock('@features/models/ui/useModelsNotify', () => ({ useNotify: () => notify }));
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -253,5 +263,207 @@ describe('AddModelsView search seed', () => {
 
     await unmount();
     setModelsSnapshotForTests({ models: [], status: 'loaded' });
+  });
+});
+
+describe('AddModelsView models folder scan', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  const mount = async () => {
+    root = createRoot(host);
+
+    await act(async () => {
+      root.render(
+        <ChakraProvider value={system}>
+          <AddModelsView />
+        </ChakraProvider>
+      );
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    });
+  };
+  const buttonNamed = (label: string) =>
+    [...document.querySelectorAll('button')].find((button) => button.textContent === label) ?? null;
+  const scanModelsFolder = () => buttonNamed('models.scanModelsFolder');
+
+  /** A scan the test settles by hand; it rejects the way fetch does when its signal aborts. */
+  const holdScan = () => {
+    let settle!: (results: FoundModel[]) => void;
+    let signal!: AbortSignal;
+
+    vi.mocked(scanFolderForModels).mockImplementationOnce(
+      (_path, requestSignal) =>
+        new Promise<FoundModel[]>((resolve, reject) => {
+          settle = resolve;
+          signal = requestSignal!;
+          signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+        })
+    );
+
+    return { settle: (results: FoundModel[]) => settle(results), signal: () => signal };
+  };
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    document.body.append(host);
+    vi.mocked(scanFolderForModels).mockReset();
+    notify.error.mockClear();
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+    updateModelsUi({ hfLookup: null, scan: null });
+    setModelsSnapshotForTests({ models: [], modelsDir: null, status: 'loaded' });
+  });
+
+  it.each(['/opt/invokeai/models', '/mnt/fast disk/Invoke Models'])(
+    'scans the configured models folder %s with one click and shows what it found there',
+    async (modelsDir) => {
+      setModelsSnapshotForTests({ models: [], modelsDir, status: 'loaded' });
+      const scan = holdScan();
+      await mount();
+
+      // The resolved path is shown before scanning, and describes the button.
+      const pathText = document.getElementById(scanModelsFolder()!.getAttribute('aria-describedby')!);
+      expect(pathText?.getAttribute('title')).toBe(modelsDir);
+
+      await act(() => userEvent.click(scanModelsFolder()!));
+
+      expect(scanFolderForModels).toHaveBeenCalledExactlyOnceWith(modelsDir, expect.any(AbortSignal));
+      // Progress stays on the row that started it, as Stop.
+      expect(scanModelsFolder()).toBeNull();
+      expect(buttonNamed('models.stopScan')).not.toBeNull();
+
+      await act(async () => {
+        scan.settle([{ is_installed: false, path: `${modelsDir}/main/flux.safetensors` }]);
+        await Promise.resolve();
+      });
+
+      expect(getModelsUiSnapshotForTests().scan).toEqual({
+        path: modelsDir,
+        results: [{ is_installed: false, path: `${modelsDir}/main/flux.safetensors` }],
+      });
+    }
+  );
+
+  it('stops a models folder scan without reporting a failure, and can scan again', async () => {
+    setModelsSnapshotForTests({ models: [], modelsDir: '/opt/invokeai/models', status: 'loaded' });
+    const scan = holdScan();
+    await mount();
+
+    await act(() => userEvent.click(scanModelsFolder()!));
+    await act(() => userEvent.click(buttonNamed('models.stopScan')!));
+
+    expect(scan.signal().aborted).toBe(true);
+    await vi.waitFor(() => expect(scanModelsFolder()).not.toBeNull());
+    expect(scanModelsFolder()).not.toBeDisabled();
+    expect(notify.error).not.toHaveBeenCalled();
+    expect(getModelsUiSnapshotForTests().scan).toBeNull();
+  });
+
+  it('reports a failed scan with the server’s reason, not its raw response, and leaves the action ready to retry', async () => {
+    setModelsSnapshotForTests({ models: [], modelsDir: '/opt/invokeai/models', status: 'loaded' });
+    vi.mocked(scanFolderForModels).mockRejectedValueOnce(
+      new ApiError(JSON.stringify({ detail: "Permission denied: '/opt/invokeai/models'" }), 500)
+    );
+    await mount();
+
+    await act(() => userEvent.click(scanModelsFolder()!));
+
+    expect(notify.error).toHaveBeenCalledWith(
+      'models.scanFailed',
+      "models.scanFailedDescription: Permission denied: '/opt/invokeai/models'"
+    );
+    await vi.waitFor(() => expect(scanModelsFolder()).not.toBeDisabled());
+  });
+
+  it('shows Stop only on the control that started the scan', async () => {
+    setModelsSnapshotForTests({ models: [], modelsDir: '/opt/invokeai/models', status: 'loaded' });
+    const scan = holdScan();
+    await mount();
+    const searchBox = document.querySelector<HTMLInputElement>('input[aria-label="models.searchOrAdd"]')!;
+
+    // A folder typed in the field offers its own Scan; the models folder scan owns the one Stop.
+    await act(() => userEvent.fill(searchBox, '/data/other-models'));
+    await act(() => userEvent.click(scanModelsFolder()!));
+
+    expect(buttonNamed('models.stopScan')).not.toBeNull();
+    expect([...document.querySelectorAll('button')].filter((b) => b.textContent === 'models.stopScan')).toHaveLength(1);
+    expect(buttonNamed('models.scan')).toBeDisabled();
+    expect(scanModelsFolder()).toBeNull();
+
+    await act(async () => {
+      scan.settle([]);
+      await Promise.resolve();
+    });
+    await act(() => updateModelsUi({ scan: null }));
+    await vi.waitFor(() => expect(buttonNamed('models.scan')).not.toBeDisabled());
+
+    // Started from the field, the field's control turns into Stop and the models folder action waits.
+    const fieldScan = holdScan();
+    await act(() => userEvent.click(buttonNamed('models.scan')!));
+
+    expect([...document.querySelectorAll('button')].filter((b) => b.textContent === 'models.stopScan')).toHaveLength(1);
+    expect(buttonNamed('models.scan')).toBeNull();
+    expect(scanModelsFolder()).toBeDisabled();
+
+    await act(async () => {
+      fieldScan.settle([]);
+      await Promise.resolve();
+    });
+  });
+
+  it('keeps the models folder scan’s Stop while other results are showing', async () => {
+    setModelsSnapshotForTests({ models: [], modelsDir: '/opt/invokeai/models', status: 'loaded' });
+    const scan = holdScan();
+    await mount();
+
+    await act(() => userEvent.click(scanModelsFolder()!));
+    // Results from elsewhere arrive (a Hugging Face lookup), which would otherwise hide the models folder row.
+    await act(() => updateModelsUi({ hfLookup: { repo: 'owner/repo', urls: ['https://example/a.safetensors'] } }));
+
+    expect(buttonNamed('models.stopScan')).not.toBeNull();
+    await act(() => userEvent.click(buttonNamed('models.stopScan')!));
+    expect(scan.signal().aborted).toBe(true);
+  });
+
+  it('says the folder had nothing, naming it, when the scan finds no models', async () => {
+    setModelsSnapshotForTests({ models: [], modelsDir: '/opt/invokeai/models', status: 'loaded' });
+    vi.mocked(scanFolderForModels).mockResolvedValueOnce([]);
+    await mount();
+
+    await act(() => userEvent.click(scanModelsFolder()!));
+
+    expect(getModelsUiSnapshotForTests().scan).toEqual({ path: '/opt/invokeai/models', results: [] });
+    expect(document.body.textContent).toContain('models.noModelFilesFound');
+  });
+
+  it('turns a missing models folder into an error with a retry that asks the server again', async () => {
+    setModelsSnapshotForTests({ models: [], modelsDir: null, status: 'loaded' });
+    vi.mocked(listModels).mockResolvedValue([]);
+    vi.mocked(listMissingModels).mockResolvedValue([]);
+    vi.mocked(getModelsDir).mockResolvedValueOnce('/srv/invoke/models');
+    await mount();
+
+    expect(scanModelsFolder()).toBeNull();
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('models.modelsFolderUnavailable');
+
+    await act(() => userEvent.click(buttonNamed('common.retry')!));
+
+    await vi.waitFor(() => expect(scanModelsFolder()).not.toBeNull());
+    expect(getModelsDir).toHaveBeenCalledOnce();
+    expect(document.querySelector('[role="alert"]')).toBeNull();
+    expect(scanFolderForModels).not.toHaveBeenCalled();
+  });
+
+  it('waits for the library to locate the folder instead of offering a scan it cannot send', async () => {
+    setModelsSnapshotForTests({ models: [], modelsDir: null, status: 'loading' });
+    await mount();
+
+    expect(scanModelsFolder()).toBeDisabled();
+    expect(document.querySelector('[role="alert"]')).toBeNull();
   });
 });

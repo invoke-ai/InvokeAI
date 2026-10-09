@@ -36,6 +36,7 @@ const renderFooter = async (clusters: number[], width?: string, crowded = false)
     clusterLabelsHash: null,
     data: {
       clusterEps: 0.2,
+      modelId: null,
       modelName: null,
       pointCount: clusters.length,
       points: points(...clusters),

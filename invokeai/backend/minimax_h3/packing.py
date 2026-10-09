@@ -86,7 +86,9 @@ MINIMAX_H3_KEYFRAME_NOISE_AUG = 0.999
 MINIMAX_H3_KEYFRAME_ENCODE_SEED = 42
 
 # Reference caps of the `ref2va` task, per the reference implementation: at most 9 image, 3 video and 3 audio
-# references, and at most 12 in total. At least one reference must be visual (image or video).
+# references, and at most 12 in total. The diffusers pipeline also rejects a set of only audio references; this port
+# deliberately accepts one, which packs no visual condition rows (the generated audio and video follow the reference
+# soundtracks).
 MINIMAX_H3_MAX_IMAGE_REFERENCES = 9
 MINIMAX_H3_MAX_VIDEO_REFERENCES = 3
 MINIMAX_H3_MAX_AUDIO_REFERENCES = 3
@@ -152,8 +154,6 @@ def validate_reference_kinds(kinds: Sequence[str]) -> None:
             raise ValueError(f"A reference must be an 'image', a 'video' or an 'audio', got {kind!r}.")
     if not kinds:
         raise ValueError("Reference-to-video needs at least one reference; use the `t2va` workflow instead.")
-    if set(kinds) == {"audio"}:
-        raise ValueError("An audio reference cannot be used alone; add at least one image or video reference.")
     counts = {kind: sum(1 for k in kinds if k == kind) for kind in ("image", "video", "audio")}
     caps = {
         "image": MINIMAX_H3_MAX_IMAGE_REFERENCES,

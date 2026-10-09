@@ -5,13 +5,7 @@ import type {
   ToolPropertyGroup,
 } from '@workbench/widgets/canvas/tool-presentation/toolFormContracts';
 
-import { Text } from '@chakra-ui/react';
-import {
-  useCanvasActiveTool,
-  useCanvasHasSelection,
-  useLassoOptions,
-  useMarqueeOptions,
-} from '@workbench/widgets/canvas/engineStoreHooks';
+import { useCanvasActiveTool, useLassoOptions, useMarqueeOptions } from '@workbench/widgets/canvas/engineStoreHooks';
 import {
   PropertyControlRow,
   PropertySegmentedRow,
@@ -28,7 +22,6 @@ const SelectionModeSettings = ({ engine, isSurfaceInteractionLocked }: ToolFormP
   const isMarquee = activeTool === 'marquee';
   const lasso = useLassoOptions(engine);
   const marquee = useMarqueeOptions(engine);
-  const hasSelection = useCanvasHasSelection(engine);
   void isSurfaceInteractionLocked;
 
   const shapeOptions = useMemo(
@@ -66,12 +59,6 @@ const SelectionModeSettings = ({ engine, isSurfaceInteractionLocked }: ToolFormP
     },
     [engine, isMarquee, lasso, marquee]
   );
-  const hintKey = isMarquee
-    ? 'widgets.canvas.toolOptions.marqueeHint'
-    : lasso.shape === 'polygon'
-      ? 'widgets.canvas.toolOptions.lassoPolygonHint'
-      : 'widgets.canvas.toolOptions.lassoHint';
-
   return (
     <>
       <PropertySegmentedRow
@@ -83,11 +70,6 @@ const SelectionModeSettings = ({ engine, isSurfaceInteractionLocked }: ToolFormP
       <PropertyControlRow label={t('widgets.properties.rows.mode')}>
         <SelectionOpModeButtons mode={mode} onModeChange={onModeChange} />
       </PropertyControlRow>
-      {hasSelection ? null : (
-        <Text color="fg.muted" fontSize="2xs">
-          {t(hintKey)}
-        </Text>
-      )}
     </>
   );
 };

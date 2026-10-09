@@ -31,11 +31,11 @@ export const PreviewZoomMenu = ({ zoom }: { zoom: PreviewZoomControls }) => {
             fontVariantNumeric="tabular-nums"
             minW="0"
             px="1.5"
-            size="2xs"
+            size="sm"
             variant="ghost"
           >
             <HStack gap="1">
-              <Text fontSize="xs" fontWeight="600">
+              <Text fontSize="md" fontWeight="600">
                 {label}
               </Text>
               <ChevronDownIcon size={12} />

@@ -20,10 +20,11 @@ from invokeai.app.api.routers.videos import VIDEO_UPLOAD_OPENAPI_EXTRA, ingest_u
 from invokeai.app.services.events.events_common import (
     VideoRecallAction,
     VideoRecallConditioningRole,
+    VideoRecallImage,
     VideoRecallMode,
     VideoRecallVideo,
 )
-from invokeai.app.services.image_records.image_records_common import ImageCategory
+from invokeai.app.services.image_records.image_records_common import ImageCategory, ImageRecordNotFoundException
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
 from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
 from invokeai.app.services.videos.videos_common import VideoDTO
@@ -236,6 +237,13 @@ class VideoRecallMediaResponse(BaseModel):
     uploaded: bool = Field(description="Whether the video was uploaded into the gallery by this request")
 
 
+class VideoRecallImageResponse(BaseModel):
+    status: Literal["success"]
+    queue_id: str
+    image: VideoRecallImage
+    append: bool
+
+
 def _model_identifier(config: AnyModelConfig) -> dict[str, Any]:
     return {
         "key": config.key,
@@ -366,15 +374,18 @@ MEDIA_QUALIFIERS: dict[str, tuple[str, ...]] = {
 def apply_media_precedence(resolved: dict[str, Any]) -> dict[str, str]:
     """Drop media a higher-precedence medium in the same request excludes; returns {dropped field: winner}.
 
-    Mirrors the Video panel's reading of a record: a whole-generation conditioning clip excludes every other slot;
-    Ref2VA references replace the frame slots (an initial video rides alongside them); an initial video replaces
-    the first frame, which extend mode extracts from the clip itself.
+    Mirrors the Video panel's reading of a record: a whole-generation conditioning clip excludes every other slot,
+    except that a held soundtrack keeps the frames that anchor the picture generated for it; Ref2VA references
+    replace the frame slots (an initial video rides alongside them); an initial video replaces the first frame,
+    which extend mode extracts from the clip itself.
     """
+    clip_holds_picture = resolved.get("ltx2_conditioning_role") == "video"
     rules: list[tuple[str, bool, tuple[str, ...]]] = [
         (
             "ltx2_conditioning_video",
             "ltx2_conditioning_video" in resolved,
-            ("minimax_h3_references", "source_video", "first_frame_image", "last_frame_image"),
+            ("minimax_h3_references", "source_video")
+            + (("first_frame_image", "last_frame_image") if clip_holds_picture else ()),
         ),
         (
             "minimax_h3_references",
@@ -684,7 +695,8 @@ def recall_conditioning_video(
 ) -> VideoRecallMediaResponse:
     """Set a gallery video as the current user's conditioning clip (models that take one, e.g. LTX-2).
 
-    The clip replaces the panel's other conditioning media: frames, initial video and references.
+    The clip replaces the panel's initial video and references, and in the `video` role its first and last frames;
+    in the `audio` role the frames stay, anchoring the picture generated for the soundtrack.
     """
     return _place_gallery_video(queue_id, "conditioning_video", video_name, current_user, role)
 
@@ -705,3 +717,37 @@ async def recall_conditioning_video_upload(
 ) -> VideoRecallMediaResponse:
     """Upload a video into the gallery and set it as the current user's conditioning clip."""
     return await _place_uploaded_video(request, queue_id, "conditioning_video", board_id, current_user, role)
+
+
+@video_recall_router.post(
+    "/{queue_id}/image",
+    operation_id="recall_video_image",
+    response_model=VideoRecallImageResponse,
+)
+def recall_video_image(
+    current_user: CurrentUserOrDefault,
+    queue_id: str = Path(..., description="The queue id to perform this operation on"),
+    image_name: str = Query(..., min_length=1, max_length=255, description="The name of the gallery image"),
+    append: bool = Query(
+        default=False,
+        description="Add the image after the panel's own images instead of replacing them",
+    ),
+) -> VideoRecallImageResponse:
+    """Place a gallery image in the current user's Video panel, where the panel's model takes images.
+
+    A model that takes reference images (e.g. MiniMax H3 Ref2VA) gets it as a reference: it replaces the reference
+    images, or with `append` joins them. A model that takes frames (e.g. Wan I2V, LTX-2) gets it as the first frame,
+    clearing the last; with `append` it fills the first free frame slot, and is declined when both are set. The
+    panel's model decides, so the outcome is reported to the user there rather than in this response.
+    """
+    assert_image_move_maintenance_inactive()
+    assert_image_read_access(image_name, current_user)
+    try:
+        record = ApiDependencies.invoker.services.image_records.get(image_name)
+    except ImageRecordNotFoundException:
+        raise HTTPException(status_code=404, detail="Image not found")
+    image = VideoRecallImage(image_name=record.image_name, width=record.width, height=record.height)
+    ApiDependencies.invoker.services.events.emit_video_recall_requested(
+        queue_id, current_user.user_id, "image", image=image, append=append
+    )
+    return VideoRecallImageResponse(status="success", queue_id=queue_id, image=image, append=append)

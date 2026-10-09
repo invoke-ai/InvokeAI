@@ -149,6 +149,8 @@ export interface ModelConfig {
   repo_variant?: string | null;
   /** InvokeAI-format IP adapters: the paired image encoder's model id. */
   image_encoder_model_id?: string;
+  /** Anima ControlNet-LLLite: 3 = control image, 4 = inpainting; null when installed before it was recorded. */
+  cond_in_channels?: number | null;
   /** External API models. */
   provider_id?: string;
   provider_model_id?: string;

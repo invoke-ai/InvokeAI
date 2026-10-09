@@ -15,7 +15,7 @@ const LIST_WIDTH_PX = 260;
 const MAX_LIST_HEIGHT_PX = 220;
 const CARET_GAP_PX = 4;
 const VIEWPORT_MARGIN_PX = 8;
-const OPTION_HOVER_CSS = { bg: 'bg.emphasized' };
+const OPTION_HOVER_CSS = { bg: 'bg.hover' };
 
 export const PromptTriggerAutocomplete = ({
   activeIndex,
@@ -91,7 +91,7 @@ export const PromptTriggerAutocomplete = ({
         <Stack gap="1">
           {groups.map((group) => (
             <Stack gap="0" key={group.group}>
-              <Text color="fg.subtle" fontSize="2xs" fontWeight="700" px="2" textTransform="uppercase" truncate>
+              <Text color="fg.subtle" fontSize="xs" fontWeight="700" px="2" textTransform="uppercase" truncate>
                 {group.group}
               </Text>
               {group.options.map((option, position) => {
@@ -141,9 +141,9 @@ const AutocompleteOption = ({
   return (
     <Box
       aria-selected={isActive}
-      bg={isActive ? 'bg.emphasized' : undefined}
+      bg={isActive ? 'bg.hover' : undefined}
       color="fg"
-      fontSize="xs"
+      fontSize="md"
       id={id}
       px="2"
       py="1"
