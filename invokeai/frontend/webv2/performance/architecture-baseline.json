@@ -2,17 +2,17 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 793351,
+        "brotliBytes": 794977,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 792436,
+        "gzipBytes": 793689,
         "imageRawBytes": 44398,
-        "initialRawBytes": 2039244,
+        "initialRawBytes": 2042114,
         "largestAssetRawBytes": 749029,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 98108,
-        "requestCount": 36,
-        "scriptRequestCount": 20,
+        "ownedRawBytes": 98621,
+        "requestCount": 35,
+        "scriptRequestCount": 19,
         "sourceOwners": [
           "package:@ark-ui/react",
           "package:@chakra-ui/react",
@@ -346,17 +346,17 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1163132,
+        "brotliBytes": 1171873,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1156783,
+        "gzipBytes": 1165072,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3183475,
+        "initialRawBytes": 3208701,
         "largestAssetRawBytes": 749029,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 149407,
-        "requestCount": 73,
-        "scriptRequestCount": 57,
+        "ownedRawBytes": 150716,
+        "requestCount": 72,
+        "scriptRequestCount": 56,
         "sourceOwners": [
           "package:@ark-ui/react",
           "package:@chakra-ui/react",
@@ -1092,7 +1092,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-10-06",
+  "capturedAt": "2026-10-09",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",
