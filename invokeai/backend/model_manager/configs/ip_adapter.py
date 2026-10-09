@@ -45,11 +45,11 @@ class IPAdapter_InvokeAI_Config_Base(IPAdapter_Config_Base):
 
         cls._validate_has_weights_file(mod)
 
-        cls._validate_has_image_encoder_metadata_file(mod)
+        image_encoder_model_id = cls._get_image_encoder_model_id(mod, override_fields)
 
         cls._validate_base(mod)
 
-        return cls(**override_fields)
+        return cls(**{**override_fields, "image_encoder_model_id": image_encoder_model_id})
 
     @classmethod
     def _validate_base(cls, mod: ModelOnDisk) -> None:
@@ -66,10 +66,21 @@ class IPAdapter_InvokeAI_Config_Base(IPAdapter_Config_Base):
             raise NotAMatchError("missing ip_adapter.bin weights file")
 
     @classmethod
-    def _validate_has_image_encoder_metadata_file(cls, mod: ModelOnDisk) -> None:
+    def _get_image_encoder_model_id(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> str:
+        if "image_encoder_model_id" in override_fields:
+            override = override_fields["image_encoder_model_id"]
+            if not isinstance(override, str) or not override.strip():
+                raise NotAMatchError("empty image_encoder_model_id override")
+            return override.strip()
+
         image_encoder_metadata_file = mod.path / "image_encoder.txt"
         if not image_encoder_metadata_file.exists():
             raise NotAMatchError("missing image_encoder.txt metadata file")
+        with image_encoder_metadata_file.open(encoding="utf-8") as metadata:
+            image_encoder_model_id = metadata.readline().strip()
+        if not image_encoder_model_id:
+            raise NotAMatchError("empty image_encoder.txt metadata")
+        return image_encoder_model_id
 
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:

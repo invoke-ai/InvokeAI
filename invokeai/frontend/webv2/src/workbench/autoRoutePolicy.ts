@@ -98,6 +98,7 @@ const GRAPH_EDIT_CONFIDENCE = {
   setNodePosition: false,
   setNodeUseCache: false,
   setCallSavedWorkflowStatus: false,
+  renameWorkflow: false,
   retryCallSavedWorkflow: false,
   syncCallSavedWorkflowFields: false,
   unexposeField: false,

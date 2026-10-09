@@ -1,16 +1,12 @@
-import { Dialog, HStack, Input, Portal, Stack } from '@chakra-ui/react';
+import { HStack, Input, Portal, Stack } from '@chakra-ui/react';
 import { createProfileSchema, PASSWORD_RULES_HINT, type ProfileFormValues } from '@features/identity/core/schemas';
-import {
-  generatePassword,
-  updateCurrentUser,
-  type ProfileUpdateRequest,
-  type UserDTO,
-} from '@features/identity/data/api';
-import { setSessionUser, useAuthSession } from '@features/identity/session';
+import { generatePassword, type ProfileUpdateRequest, type UserDTO } from '@features/identity/data/api';
+import { updateOwnProfile, useAuthSession } from '@features/identity/session';
 import { useIdentityNotify } from '@features/identity/ui/useIdentityNotify';
 import { useZodForm } from '@platform/react/useZodForm';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, CloseButton, Field, FieldLabel } from '@platform/ui';
+import { Dialog } from '@platform/ui/Dialog';
 import { WandSparklesIcon } from 'lucide-react';
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -109,9 +105,7 @@ const ProfileForm = ({ onClose, user }: { onClose: () => void; user: UserDTO }) 
         }
 
         try {
-          const updated = await updateCurrentUser(changes);
-
-          setSessionUser(updated, session.accountEpoch);
+          await updateOwnProfile(changes);
         } catch (error) {
           throw new Error(getApiErrorMessage(error, t('auth.couldNotUpdateAccount')));
         }
@@ -119,7 +113,7 @@ const ProfileForm = ({ onClose, user }: { onClose: () => void; user: UserDTO }) 
         notify.success(t('auth.accountUpdated'));
         onClose();
       }),
-    [form, notify, onClose, session.accountEpoch, t, user.display_name]
+    [form, notify, onClose, t, user.display_name]
   );
   const handleDisplayNameChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => form.setValue('displayName', event.target.value),
@@ -156,7 +150,7 @@ const ProfileForm = ({ onClose, user }: { onClose: () => void; user: UserDTO }) 
           <Stack gap="3">
             <HStack justify="space-between">
               <FieldLabel>{t('auth.changePassword')}</FieldLabel>
-              <Button loading={isGenerating} size="2xs" variant="outline" onClick={handleGeneratePassword}>
+              <Button loading={isGenerating} size="sm" variant="outline" onClick={handleGeneratePassword}>
                 <WandSparklesIcon />
                 {t('users.generate')}
               </Button>
@@ -196,10 +190,10 @@ const ProfileForm = ({ onClose, user }: { onClose: () => void; user: UserDTO }) 
         </Stack>
       </Dialog.Body>
       <Dialog.Footer>
-        <Button size="xs" variant="ghost" onClick={onClose}>
+        <Button variant="ghost" onClick={onClose}>
           {t('common.cancel')}
         </Button>
-        <Button loading={form.isSubmitting} size="xs" variant="solid" onClick={handleSave}>
+        <Button loading={form.isSubmitting} variant="solid" onClick={handleSave}>
           {t('users.saveChanges')}
         </Button>
       </Dialog.Footer>

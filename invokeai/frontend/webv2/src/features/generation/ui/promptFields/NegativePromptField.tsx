@@ -141,7 +141,7 @@ export const NegativePromptField = ({
           <IconButton
             aria-label={t('widgets.generate.negativePromptHide')}
             color="fg.muted"
-            size="2xs"
+            size="sm"
             variant="ghost"
             onClick={() => onEnabledChange(false)}
           >
@@ -166,14 +166,14 @@ export const NegativePromptField = ({
         aria-label={t('widgets.generate.enableNegativePrompt')}
         color="fg.muted"
         justifyContent="flex-start"
-        size="2xs"
+        size="sm"
         variant="ghost"
         onClick={() => onEnabledChange(true)}
       >
         <PlusIcon />
         {t('widgets.generate.negativePromptAdd')}
         {value.trim() !== '' ? (
-          <Text as="span" color="fg.subtle" fontSize="2xs" fontWeight="normal" minW="0" truncate>
+          <Text as="span" color="fg.subtle" fontSize="xs" fontWeight="normal" minW="0" truncate>
             {value}
           </Text>
         ) : null}
@@ -190,7 +190,6 @@ export const NegativePromptField = ({
         defaultHeightPx={heightPx}
         minHeightPx={56}
         resizeHandleAriaLabel={t('widgets.generate.resizeNegativePrompt')}
-        size="xs"
         fontFamily="mono"
         readOnly={isViewingMerged}
         showSyntaxHighlighting={showSyntaxHighlighting}

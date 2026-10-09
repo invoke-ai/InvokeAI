@@ -28,7 +28,7 @@ import {
 } from '@workbench/WorkbenchContext';
 import {
   CheckIcon,
-  ChevronsUpDownIcon,
+  ChevronDownIcon,
   FileDownIcon,
   FolderCogIcon,
   FolderOpenIcon,
@@ -86,7 +86,6 @@ export const ProjectSwitcher = () => {
   const getProject = useCallback((projectId: string): Project | null => queries.getProject(projectId), [queries]);
 
   const createProject = useCallback(() => {
-    flushGenerateDrafts();
     projects.create();
   }, [projects]);
   const showOpenDialog = useCallback(() => setIsOpenDialogVisible(true), []);
@@ -175,22 +174,22 @@ export const ProjectSwitcher = () => {
           <Button
             ref={triggerRef}
             aria-label={t('topbar.projectSwitcher.trigger', { name: activeProjectName })}
-            size="sm"
+            size="lg"
             variant="ghost"
             onContextMenu={handleTriggerContextMenu}
           >
             <MiddleTruncate css={HIDE_BELOW_PROJECT_NAME_WIDTH} fontWeight="500" minW="0" text={activeProjectName} />
-            <Icon as={ChevronsUpDownIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
+            <Icon as={ChevronDownIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
           </Button>
         </Menu.Trigger>
         <Portal>
           <Menu.Positioner>
             <MenuContent maxW="22rem" minW="18rem">
               <Stack gap="0" px="3" py="2">
-                <Text color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                <Text color="fg.subtle" fontSize="xs" textTransform="uppercase">
                   {t('projects.projectDetails')}
                 </Text>
-                <MiddleTruncate fontSize="xs" fontWeight="700" text={activeProjectName} />
+                <MiddleTruncate fontWeight="700" text={activeProjectName} />
               </Stack>
               <Menu.Separator />
               <Menu.Item value="rename-project" onClick={renameActiveProject}>
@@ -216,7 +215,7 @@ export const ProjectSwitcher = () => {
 
               <Menu.Separator />
               <Menu.RadioItemGroup value={activeProjectId} onValueChange={selectOpenProject}>
-                <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
                   {t('projects.openProjects')}
                 </Menu.ItemGroupLabel>
                 {openProjectSummaries.map((project) => (
@@ -233,7 +232,7 @@ export const ProjectSwitcher = () => {
                 <>
                   <Menu.Separator />
                   <Menu.ItemGroup>
-                    <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                    <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
                       {t('common.recent')}
                     </Menu.ItemGroupLabel>
                     {recentSummaries.map((summary) => (
@@ -334,7 +333,7 @@ const RecentProjectRow = ({
       <Menu.ItemText flex="1" minW="0">
         <MiddleTruncate as="span" text={summary.name} />
       </Menu.ItemText>
-      <Text color="fg.subtle" flexShrink={0} fontSize="2xs">
+      <Text color="fg.subtle" flexShrink={0} fontSize="xs">
         {t('projects.editedRelative', { time: formatRelativeTime(summary.updatedAt) })}
       </Text>
     </Menu.Item>

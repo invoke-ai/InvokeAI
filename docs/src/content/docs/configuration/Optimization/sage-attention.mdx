@@ -40,8 +40,8 @@ smaller (not measured).
 ## Requirements
 
 - **An NVIDIA GPU with compute capability 8.0 or newer** — RTX 30-series, RTX 40-series, RTX 50-series, A100, H100.
-  InvokeAI has measured it on an RTX 4090; the other generations use SageAttention's own kernels for them, which
-  InvokeAI has not validated.
+  InvokeAI has measured it on an RTX 4090; the other generations use the kernels SageAttention picks for them, which
+  InvokeAI has not validated (on RTX 30-series cards, its Triton kernel). Jetson Orin is not supported.
 - **SageAttention 2.2, installed separately.** InvokeAI was validated with 2.2.0. The `sageattention` package on PyPI is
   the older SageAttention 1 and is not used. On Windows it also needs the `triton-windows` package.
 - Not available on AMD (ROCm), Apple Silicon (MPS), Intel (XPU) or CPU. There InvokeAI keeps PyTorch's attention.
@@ -114,26 +114,32 @@ calls ran on SageAttention and why the others did not. To go back, set `attentio
 SageAttention serves the attention inside the denoising model of the families under [Supported models](#supported-models).
 Everything else keeps PyTorch's attention:
 
-- **Text encoders, image encoders and VAEs.** They run outside the denoising loop.
+- **Text encoders, image encoders and VAEs.** They run outside the denoising loop. What runs inside it, such as a
+  ControlNet, is served like the model itself.
 - **Masked attention**, such as regional prompts. SageAttention has no mask input.
 - **Short sequences** — fewer than 1536 query or 512 key tokens. There the cost of quantizing the inputs outweighs the
   faster kernel.
 - **Head sizes other than 64 and 128.**
 - **Models not listed under Supported models**, such as SD 1.5 and SD 2.
 
-Pinning a PyTorch kernel through diffusers' `DIFFUSERS_ATTN_BACKEND` does not stop SageAttention; set
-`attention_backend: auto` to measure PyTorch's own kernels.
+Pinning a PyTorch kernel through diffusers' `DIFFUSERS_ATTN_BACKEND`, or in a custom node with
+`torch.nn.attention.sdpa_kernel`, does not stop SageAttention; set `attention_backend: auto` to measure PyTorch's own
+kernels.
 
 ## Notes
 
 - **The first generation pauses briefly.** SageAttention compiles a few Triton kernels on first use, about two seconds
   on an RTX 4090; they are cached on disk afterwards.
-- **Each GPU's first SageAttention call is checked against PyTorch's attention.** If the result is wrong or the kernel
-  fails, InvokeAI logs a warning once and that GPU uses PyTorch's attention until restart. A fault the GPU raises
-  later, while running a kernel, cannot be caught that way and ends the generation.
+- **Each GPU's first SageAttention call is checked against PyTorch's attention**, once for each precision and head
+  size. If the result is wrong or the kernel fails, InvokeAI logs a warning once and that GPU uses PyTorch's attention
+  until restart. Some GPU faults (an illegal memory access, for example) leave the GPU unusable for the rest of the
+  process: then PyTorch's attention fails the same way, and only a restart helps. A fault the GPU raises later, while
+  running a kernel, cannot be caught at all and ends the generation.
 - **Memory.** Peak VRAM was unchanged for every measured model. Each call holds quantized copies of its inputs, about
   1.7 bytes per element of the query, key and value together — around 70 MB for FLUX.1 at 1024×1024, and around 2 GB
-  per call for Wan 2.2 14B at 1280×720 with 81 frames (not measured).
+  per call for Wan 2.2 14B at 1280×720 with 81 frames (not measured). When a call does not fit, the rest of that
+  generation runs on PyTorch's attention, which needs less, and the log says so; the next generation tries
+  SageAttention again.
 - **Recall.** `attention_backend` is not stored in an image's metadata, so an image recalled after switching it is
   generated slightly differently.
 - **Black or noisy images** have been reported with SageAttention for some models in other applications. None appeared

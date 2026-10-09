@@ -30,7 +30,7 @@ from invokeai.app.services.session_queue.session_queue_common import SessionQueu
 def _services(multiuser: bool = True, users_by_id: dict | None = None) -> SimpleNamespace:
     users_by_id = users_by_id or {}
     return SimpleNamespace(
-        configuration=SimpleNamespace(multiuser=multiuser),
+        configuration=SimpleNamespace(multiuser=multiuser, clear_vram_after_session=False),
         users=SimpleNamespace(get=lambda user_id: users_by_id.get(user_id)),
         session_queue=MagicMock(),
         logger=MagicMock(),

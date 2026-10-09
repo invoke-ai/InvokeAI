@@ -793,8 +793,15 @@ describe('remembered window geometry', () => {
     expect(getActiveProject(state).floatingWidgets).toBeUndefined();
     expect(getActiveProject(state).lastFloatingGeometry).toEqual({ gallery: PLACED });
 
-    // Back to the layout that floats it: the window is the preset's, and no memory is kept beside it.
+    // Back to the layout that floats it: the window returns where this project left it (Compose's working copy),
+    // and no memory is kept beside it.
     state = workbenchReducer(state, { presetId: 'compose', type: 'applyPreset' });
+
+    expect(getActiveProject(state).floatingWidgets?.gallery).toMatchObject(PLACED);
+    expect(getActiveProject(state).lastFloatingGeometry).toBeUndefined();
+
+    // Reverting to the saved preset moves the open window to the saved place; still nothing is remembered beside it.
+    state = workbenchReducer(state, { presetId: 'compose', type: 'revertLayoutPreset' });
 
     expect(getActiveProject(state).floatingWidgets?.gallery).toMatchObject(savedPlace);
     expect(getActiveProject(state).lastFloatingGeometry).toBeUndefined();

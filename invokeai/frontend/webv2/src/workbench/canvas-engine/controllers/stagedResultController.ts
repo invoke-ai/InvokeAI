@@ -11,6 +11,7 @@ import type { ProjectEvent } from '@workbench/projectContracts';
 import { getDocumentLayer, getDocumentLeaves, hasDocumentNode } from '@workbench/canvas-engine/document/documentIndex';
 import { insertNodesAtAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
 import { haveSameStructure } from '@workbench/canvas-engine/document/layerStacks';
+import { selectionAfterAcceptedResult } from '@workbench/canvas-engine/document/selectionRepair';
 import { collectHistoryMediaRefs, HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbench/canvas-engine/history/history';
 import { getCanvasStagingCandidateFingerprint } from '@workbench/canvasStagingView';
 
@@ -115,7 +116,9 @@ export class StagedResultController {
     const anchor = o.ctx.captureInsertionAnchor('raster', null);
     const acceptedStacks = insertNodesAtAnchor(previousStacks, anchor, [layer]);
     const previousStagingArea = canvas.stagingArea;
-    const acceptedSelectedLayerId = continueStaging ? previousSelectedLayerId : layer.id;
+    const acceptedSelectedLayerId = continueStaging
+      ? previousSelectedLayerId
+      : selectionAfterAcceptedResult(previousStacks, previousSelectedLayerId, layer.id);
     const hasPreviousLayerStack = (document: CanvasDocumentContractV3 | null): boolean =>
       document?.selectedLayerId === previousSelectedLayerId &&
       !hasDocumentNode(document, layer.id) &&

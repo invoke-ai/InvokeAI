@@ -1,7 +1,7 @@
 import { ChakraProvider } from '@chakra-ui/react';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { isModalPresent } from '@platform/ui/modalPresence';
 import { system } from '@theme/system';
-import { isHotkeyModalLayerActive } from '@workbench/hotkeys/modalLayer';
 import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -111,7 +111,7 @@ describe('WhatsNewDialog', () => {
     await expect.element(page.getByText('v7.0.0-rc1')).toBeVisible();
     // An automatic open has no click behind it, so focus on a link would draw its keyboard ring; start on the panel.
     await expect.element(page.getByRole('dialog', { name: title() })).toHaveFocus();
-    expect(isHotkeyModalLayerActive()).toBe(true);
+    expect(isModalPresent()).toBe(true);
 
     // Every catalogued highlight renders with its title, and the smaller notes list beneath them.
     for (const { description, title } of Object.values(catalog.whatsNew.highlights)) {
@@ -131,7 +131,7 @@ describe('WhatsNewDialog', () => {
     );
     expect(page.getByRole('link', { name: i18n.t('whatsNew.readTheDocs') }).element()).toHaveAttribute(
       'href',
-      'https://invoke-ai.github.io/InvokeAI-7/'
+      'https://v7.invoke.ai/'
     );
 
     await page.getByRole('button', { name: /close/i }).click();
@@ -139,7 +139,7 @@ describe('WhatsNewDialog', () => {
 
     await setSnapshot(ready({ alphaNoticeAcknowledged: true, whatsNewSeenVersion: '7.0.0-rc1' }));
     await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
-    expect(isHotkeyModalLayerActive()).toBe(false);
+    expect(isModalPresent()).toBe(false);
   });
 
   it('waits for the alpha notice to be dismissed first', async () => {

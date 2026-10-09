@@ -1,5 +1,6 @@
 import type { LayoutPreset } from '@workbench/layoutContracts';
 
+import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { getLayoutPresetSourceOptions } from '@workbench/layoutPresetRouting';
 import { layoutPresets } from '@workbench/layoutPresets';
@@ -22,15 +23,17 @@ export const LayoutPresetAdminDialogs = () => {
   const account = useWorkbenchSelector((snapshot) => snapshot.account);
   const customPresets = account.customLayoutPresets ?? EMPTY_LAYOUT_PRESETS;
   const { deletePresetId, editPresetId } = layoutPresetManagerStore.useSelector((snapshot) => snapshot);
+  const editDialog = useExitRetainedValue(editPresetId);
   const editTarget = useMemo(() => {
-    if (!editPresetId) {
+    if (!editDialog.value) {
       return null;
     }
 
-    const exists = [...layoutPresets, ...customPresets].some((preset) => preset.id === editPresetId);
+    const presetId = editDialog.value;
+    const exists = [...layoutPresets, ...customPresets].some((preset) => preset.id === presetId);
 
-    return exists ? resolveSavedLayoutPreset(account, editPresetId) : null;
-  }, [account, customPresets, editPresetId]);
+    return exists ? resolveSavedLayoutPreset(account, presetId) : null;
+  }, [account, customPresets, editDialog.value]);
   const deleteTarget = customPresets.find((preset) => preset.id === deletePresetId) ?? null;
   const sourceOptions = useMemo(() => (editTarget ? getLayoutPresetSourceOptions(editTarget) : []), [editTarget]);
 
@@ -54,15 +57,16 @@ export const LayoutPresetAdminDialogs = () => {
     <>
       {editTarget ? (
         <LayoutPresetDialog
-          key={editTarget.id}
+          key={editDialog.generation}
           defaultRoute={editTarget.defaultRoute}
           iconId={editTarget.iconId}
-          isOpen
+          isOpen={editDialog.isOpen}
           name={editTarget.label}
           sourceOptions={sourceOptions}
           submitLabel={t('topbar.presets.save')}
           title={t('topbar.presets.edit')}
           onClose={closeLayoutPresetAdmin}
+          onExitComplete={editDialog.release}
           onSubmit={submitEdit}
         />
       ) : null}
