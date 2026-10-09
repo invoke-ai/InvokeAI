@@ -4513,6 +4513,9 @@
           "415": {
             "description": "No such job"
           },
+          "409": {
+            "description": "The job cannot be cancelled safely in its current state"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -4560,6 +4563,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "The job cannot be paused in its current state"
           },
           "415": {
             "description": "No such job"
@@ -4612,6 +4618,9 @@
               }
             }
           },
+          "409": {
+            "description": "A previous download still owns the staging directory"
+          },
           "415": {
             "description": "No such job"
           },
@@ -4662,6 +4671,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "A prior download is active or recovery data must be preserved"
           },
           "415": {
             "description": "No such job"
@@ -4727,6 +4739,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "A prior download is active or recovery data must be preserved"
           },
           "415": {
             "description": "No such job"
@@ -16701,6 +16716,79 @@
                 "type": "object",
                 "required": ["file"],
                 "title": "Body_upload_video"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/recall/video/{queue_id}/image": {
+      "post": {
+        "tags": ["recall"],
+        "summary": "Recall Video Image",
+        "description": "Place a gallery image in the current user's Video panel, where the panel's model takes images.\n\nA model that takes reference images (e.g. MiniMax H3 Ref2VA) gets it as a reference: it replaces the reference\nimages, or with `append` joins them. A model that takes frames (e.g. Wan I2V, LTX-2) gets it as the first frame,\nclearing the last; with `append` it fills the first free frame slot, and is declined when both are set. The\npanel's model decides, so the outcome is reported to the user there rather than in this response.",
+        "operationId": "recall_video_image",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "queue_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The queue id to perform this operation on",
+              "title": "Queue Id"
+            },
+            "description": "The queue id to perform this operation on"
+          },
+          {
+            "name": "image_name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "description": "The name of the gallery image",
+              "title": "Image Name"
+            },
+            "description": "The name of the gallery image"
+          },
+          {
+            "name": "append",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Add the image after the panel's own images instead of replacing them",
+              "default": false,
+              "title": "Append"
+            },
+            "description": "Add the image after the panel's own images instead of replacing them"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoRecallImageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
@@ -83240,7 +83328,7 @@
         "category": "conditioning",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Describes one video reference for MiniMax H3 Ref2VA.\n\n'Audio only' conditions on the video's soundtrack alone (the standalone audio-reference\nkind). At least one reference of the request must contribute visuals, and a conditioning\nchoice that includes audio requires the video to actually carry a soundtrack.",
+        "description": "Describes one video reference for MiniMax H3 Ref2VA.\n\n'Audio only' conditions on the video's soundtrack alone (the standalone audio-reference\nkind). A conditioning choice that includes audio requires the video to actually carry a soundtrack.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -108230,6 +108318,52 @@
         "title": "VideoOutput",
         "type": "object"
       },
+      "VideoRecallImage": {
+        "properties": {
+          "image_name": {
+            "type": "string",
+            "title": "Image Name",
+            "description": "The name of the gallery image"
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width",
+            "description": "The image's width in pixels"
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height",
+            "description": "The image's height in pixels"
+          }
+        },
+        "type": "object",
+        "required": ["image_name", "width", "height"],
+        "title": "VideoRecallImage",
+        "description": "The gallery image a video recall places into the Video panel."
+      },
+      "VideoRecallImageResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "queue_id": {
+            "type": "string",
+            "title": "Queue Id"
+          },
+          "image": {
+            "$ref": "#/components/schemas/VideoRecallImage"
+          },
+          "append": {
+            "type": "boolean",
+            "title": "Append"
+          }
+        },
+        "type": "object",
+        "required": ["status", "queue_id", "image", "append"],
+        "title": "VideoRecallImageResponse"
+      },
       "VideoRecallMediaResponse": {
         "properties": {
           "status": {
@@ -108243,7 +108377,7 @@
           },
           "action": {
             "type": "string",
-            "enum": ["parameters", "initial_video", "reference_video", "conditioning_video"],
+            "enum": ["parameters", "initial_video", "reference_video", "conditioning_video", "image"],
             "title": "Action"
           },
           "video": {
@@ -108803,7 +108937,7 @@
           },
           "action": {
             "description": "What the frontend should do with the payload",
-            "enum": ["parameters", "initial_video", "reference_video", "conditioning_video"],
+            "enum": ["parameters", "initial_video", "reference_video", "conditioning_video", "image"],
             "title": "Action",
             "type": "string"
           },
@@ -108866,6 +109000,24 @@
             "default": null,
             "description": "For `conditioning_video`: which stream of the video is the condition; the other is generated",
             "title": "Conditioning Role"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VideoRecallImage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "For `image`: the image to place"
+          },
+          "append": {
+            "default": false,
+            "description": "For `image`: add the image after the panel's own instead of replacing them -- to the reference images of a model that takes references, otherwise to the free frame slot",
+            "title": "Append",
+            "type": "boolean"
           }
         },
         "required": [
@@ -108877,7 +109029,9 @@
           "strict",
           "parameters",
           "video",
-          "conditioning_role"
+          "conditioning_role",
+          "image",
+          "append"
         ],
         "title": "VideoRecallRequestedEvent",
         "type": "object"

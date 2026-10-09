@@ -884,9 +884,18 @@ class ModelConfigFactory:
         for candidate_class in filter(lambda x: x is not Unknown_Config, Config_Base.CONFIG_CLASSES):
             candidate_name = candidate_class.__name__
             try:
+                candidate_fields = fields
+                # Preserve the explicit encoder choice for InvokeAI IP-Adapter probes; this field is not part of
+                # the common model record changes, but re-identification can carry it from the stored config.
+                if (
+                    override_fields is not None
+                    and "image_encoder_model_id" in override_fields
+                    and "image_encoder_model_id" in candidate_class.model_fields
+                ):
+                    candidate_fields = {**fields, "image_encoder_model_id": override_fields["image_encoder_model_id"]}
                 # Technically, from_model_on_disk returns a Config_Base, but in practice it will always be a member of
                 # the AnyModelConfig union.
-                candidate = candidate_class.from_model_on_disk(mod, fields)
+                candidate = candidate_class.from_model_on_disk(mod, candidate_fields)
                 ModelConfigFactory._raise_for_unsupported_gguf_quantization(mod, candidate)
                 details[candidate_name] = candidate  # type: ignore
             except NotAMatchError as e:
