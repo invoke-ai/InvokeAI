@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildHotkeysData } from './useHotkeyData';
+import { buildHotkeysData, getIsHotkeyAllowedDuringCanvasPathEdit } from './useHotkeyData';
+
+describe('getIsHotkeyAllowedDuringCanvasPathEdit', () => {
+  it('allows canvas hotkeys and blocks hotkeys owned by other app regions', () => {
+    expect(getIsHotkeyAllowedDuringCanvasPathEdit('canvas')).toBe(true);
+    expect(getIsHotkeyAllowedDuringCanvasPathEdit('app')).toBe(false);
+    expect(getIsHotkeyAllowedDuringCanvasPathEdit('viewer')).toBe(false);
+    expect(getIsHotkeyAllowedDuringCanvasPathEdit('gallery')).toBe(false);
+    expect(getIsHotkeyAllowedDuringCanvasPathEdit('workflows')).toBe(false);
+  });
+});
 
 describe('buildHotkeysData', () => {
   const t = (key: string) => key;

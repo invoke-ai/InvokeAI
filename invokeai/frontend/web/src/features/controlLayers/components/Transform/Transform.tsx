@@ -7,7 +7,7 @@ import { TransformSmoothingControls } from 'features/controlLayers/components/Tr
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { memo, useRef } from 'react';
+import { memo, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const TransformContent = memo(({ adapter }: { adapter: CanvasEntityAdapter }) => {
@@ -17,6 +17,27 @@ const TransformContent = memo(({ adapter }: { adapter: CanvasEntityAdapter }) =>
   const isCanvasFocused = useIsRegionFocused('canvas');
   const isProcessing = useStore(adapter.transformer.$isProcessing);
   const silentTransform = useStore(adapter.transformer.$silentTransform);
+  useEffect(() => {
+    if (silentTransform || !adapter.transformer.getIsTransformingVectorPath()) {
+      return;
+    }
+    // The context menu restores DOM focus in an animation frame when it closes. Take focus after that,
+    // not just the canvas hotkey region, so the previous control cannot consume the arrow keys.
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        ref.current?.focus({ preventScroll: true });
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [adapter.transformer, silentTransform]);
+  const cancelTransform = useCallback(
+    (event: KeyboardEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      adapter.transformer.stopTransform();
+    },
+    [adapter.transformer]
+  );
 
   useRegisteredHotkeys({
     id: 'applyTransform',
@@ -29,9 +50,9 @@ const TransformContent = memo(({ adapter }: { adapter: CanvasEntityAdapter }) =>
   useRegisteredHotkeys({
     id: 'cancelTransform',
     category: 'canvas',
-    callback: adapter.transformer.stopTransform,
+    callback: cancelTransform,
     options: { enabled: !isProcessing && isCanvasFocused },
-    dependencies: [adapter.transformer, isProcessing, isCanvasFocused],
+    dependencies: [cancelTransform, isProcessing, isCanvasFocused],
   });
 
   if (silentTransform) {
@@ -41,6 +62,8 @@ const TransformContent = memo(({ adapter }: { adapter: CanvasEntityAdapter }) =>
   return (
     <Flex
       ref={ref}
+      tabIndex={-1}
+      _focusVisible={{ outline: 'none' }}
       bg="base.800"
       borderRadius="base"
       p={4}
@@ -60,7 +83,7 @@ const TransformContent = memo(({ adapter }: { adapter: CanvasEntityAdapter }) =>
         <CanvasOperationIsolatedLayerPreviewSwitch />
       </Flex>
 
-      <TransformSmoothingControls />
+      {adapter.state.type !== 'vector_layer' && <TransformSmoothingControls />}
 
       <TransformFitToBboxButtons adapter={adapter} />
 

@@ -1,11 +1,15 @@
 import { MenuGroup } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { ControlLayerMenuItems } from 'features/controlLayers/components/ControlLayer/ControlLayerMenuItems';
 import { InpaintMaskMenuItems } from 'features/controlLayers/components/InpaintMask/InpaintMaskMenuItems';
 import { RasterLayerMenuItems } from 'features/controlLayers/components/RasterLayer/RasterLayerMenuItems';
 import { IPAdapterMenuItems } from 'features/controlLayers/components/RefImage/IPAdapterMenuItems';
 import { RegionalGuidanceMenuItems } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceMenuItems';
+import { VectorLayerMenuItems } from 'features/controlLayers/components/VectorLayer/VectorLayerMenuItems';
+import { VectorPathMenuItems } from 'features/controlLayers/components/VectorLayer/VectorPathMenuItems';
 import { CanvasEntityStateGate } from 'features/controlLayers/contexts/CanvasEntityStateGate';
+import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import {
   EntityIdentifierContext,
   useEntityIdentifierContext,
@@ -29,6 +33,9 @@ const CanvasContextMenuSelectedEntityMenuItemsContent = memo(() => {
   if (entityIdentifier.type === 'inpaint_mask') {
     return <InpaintMaskMenuItems />;
   }
+  if (entityIdentifier.type === 'vector_layer') {
+    return <VectorLayerMenuItems />;
+  }
   if (entityIdentifier.type === 'regional_guidance') {
     return <RegionalGuidanceMenuItems />;
   }
@@ -43,29 +50,35 @@ CanvasContextMenuSelectedEntityMenuItemsContent.displayName = 'CanvasContextMenu
 
 const CanvasContextMenuSelectedEntityMenuGroup = memo((props: PropsWithChildren) => {
   const entityIdentifier = useEntityIdentifierContext();
-  const title = useEntityTypeString(entityIdentifier.type);
+  const entityTypeTitle = useEntityTypeString(entityIdentifier.type);
 
-  return <MenuGroup title={title}>{props.children}</MenuGroup>;
+  return <MenuGroup title={entityTypeTitle}>{props.children}</MenuGroup>;
 });
 
 CanvasContextMenuSelectedEntityMenuGroup.displayName = 'CanvasContextMenuSelectedEntityMenuGroup';
 
-export const CanvasContextMenuSelectedEntityMenuItems = memo(() => {
-  const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
+export const CanvasContextMenuSelectedEntityMenuItems = memo(
+  ({ showPathActions = false }: { showPathActions?: boolean }) => {
+    const canvasManager = useCanvasManager();
+    const editSession = useStore(canvasManager.tool.tools.path.$editSession);
+    const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
+    const entityIdentifier = editSession?.entityIdentifier ?? selectedEntityIdentifier;
 
-  if (!selectedEntityIdentifier) {
-    return null;
+    if (!entityIdentifier) {
+      return null;
+    }
+
+    return (
+      <EntityIdentifierContext.Provider value={entityIdentifier}>
+        <CanvasEntityStateGate entityIdentifier={entityIdentifier}>
+          {showPathActions && entityIdentifier.type === 'vector_layer' && <VectorPathMenuItems />}
+          <CanvasContextMenuSelectedEntityMenuGroup>
+            <CanvasContextMenuSelectedEntityMenuItemsContent />
+          </CanvasContextMenuSelectedEntityMenuGroup>
+        </CanvasEntityStateGate>
+      </EntityIdentifierContext.Provider>
+    );
   }
-
-  return (
-    <EntityIdentifierContext.Provider value={selectedEntityIdentifier}>
-      <CanvasEntityStateGate entityIdentifier={selectedEntityIdentifier}>
-        <CanvasContextMenuSelectedEntityMenuGroup>
-          <CanvasContextMenuSelectedEntityMenuItemsContent />
-        </CanvasContextMenuSelectedEntityMenuGroup>
-      </CanvasEntityStateGate>
-    </EntityIdentifierContext.Provider>
-  );
-});
+);
 
 CanvasContextMenuSelectedEntityMenuItems.displayName = 'CanvasContextMenuSelectedEntityMenuItems';

@@ -13,14 +13,24 @@ import {
 } from 'features/controlLayers/konva/util';
 import { selectShapeType } from 'features/controlLayers/store/canvasSettingsSlice';
 import type {
+  CanvasBezierPointState,
   CanvasEntityIdentifier,
   CanvasPolygonState,
   CanvasRectState,
   Coordinate,
 } from 'features/controlLayers/store/types';
+import { getBezierPathState } from 'features/controlLayers/store/util';
+import {
+  anchorsToBezierPoints,
+  buildBezierPathData,
+  fitPolylineToBezierPoints,
+  ovalToBezierPoints,
+  rectToBezierPoints,
+} from 'features/controlLayers/util/bezierPath';
 import { simplifyFlatNumbersArray } from 'features/controlLayers/util/simplify';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
+import { getStrokePoints } from 'perfect-freehand';
 import type { Logger } from 'roarr';
 
 type CanvasShapeToolModuleConfig = {
@@ -32,7 +42,11 @@ type CanvasShapeToolModuleConfig = {
   MAX_FREEHAND_SEGMENT_LENGTH_PX: number;
   FREEHAND_SIMPLIFY_MIN_POINTS: number;
   FREEHAND_SIMPLIFY_TOLERANCE: number;
+  VECTOR_FREEHAND_FIT_ERROR_PX: number;
+  VECTOR_FREEHAND_MIN_FIT_ERROR: number;
+  VECTOR_FREEHAND_STREAMLINE: number;
   PREVIEW_STROKE_COLOR: string;
+  PREVIEW_STROKE_WIDTH_PX: number;
 };
 
 const DEFAULT_CONFIG: CanvasShapeToolModuleConfig = {
@@ -44,7 +58,11 @@ const DEFAULT_CONFIG: CanvasShapeToolModuleConfig = {
   MAX_FREEHAND_SEGMENT_LENGTH_PX: 2,
   FREEHAND_SIMPLIFY_MIN_POINTS: 200,
   FREEHAND_SIMPLIFY_TOLERANCE: 0.6,
+  VECTOR_FREEHAND_FIT_ERROR_PX: 2,
+  VECTOR_FREEHAND_MIN_FIT_ERROR: 0.25,
+  VECTOR_FREEHAND_STREAMLINE: 0.35,
   PREVIEW_STROKE_COLOR: rgbaColorToString({ r: 90, g: 175, b: 255, a: 1 }),
+  PREVIEW_STROKE_WIDTH_PX: 1.5,
 };
 
 const SUBTRACT_CURSOR = `url("data:image/svg+xml,${encodeURIComponent(
@@ -88,6 +106,7 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
 
   konva: {
     group: Konva.Group;
+    vectorOutlinePreview: Konva.Path;
     startPointIndicator: Konva.Circle;
   };
 
@@ -103,6 +122,16 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
 
     this.konva = {
       group: new Konva.Group({ name: `${this.type}:group`, listening: false }),
+      vectorOutlinePreview: new Konva.Path({
+        name: `${this.type}:vector_outline_preview`,
+        listening: false,
+        stroke: this.config.PREVIEW_STROKE_COLOR,
+        fillEnabled: false,
+        lineCap: 'round',
+        lineJoin: 'round',
+        visible: false,
+        perfectDrawEnabled: false,
+      }),
       startPointIndicator: new Konva.Circle({
         name: `${this.type}:start_point_indicator`,
         listening: false,
@@ -112,7 +141,7 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
         perfectDrawEnabled: false,
       }),
     };
-    this.konva.group.add(this.konva.startPointIndicator);
+    this.konva.group.add(this.konva.vectorOutlinePreview, this.konva.startPointIndicator);
 
     this.subscriptions.add(this.manager.stateApi.$altKey.listen(this.onModifierChanged));
     this.subscriptions.add(this.manager.stateApi.$ctrlKey.listen(this.onModifierChanged));
@@ -151,6 +180,10 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
     return this.polygonPoints.length > 0;
   };
 
+  hasOpenVectorPolygonSession = (): boolean => {
+    return this.getActiveEntityAdapter()?.state.type === 'vector_layer' && this.hasActivePolygonSession();
+  };
+
   isTranslatingDragSession = (): boolean => {
     return this.translatePreviousPointerPoint !== null;
   };
@@ -185,6 +218,10 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
   };
 
   syncCursorStyle = () => {
+    if (this.manager.stateApi.getSelectedEntityAdapter()?.state.type === 'vector_layer') {
+      this.manager.stage.setCursor('crosshair');
+      return;
+    }
     this.manager.stage.setCursor(this.getCompositeOperation() === 'destination-out' ? SUBTRACT_CURSOR : 'crosshair');
   };
 
@@ -196,6 +233,13 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       this.hasSuspendableSession()
     );
     if (tool !== 'rect' && !isTemporaryToolSwitch) {
+      this.konva.vectorOutlinePreview.visible(false);
+      this.konva.startPointIndicator.visible(false);
+      return;
+    }
+
+    if (!this.parent.getCanDraw()) {
+      this.konva.vectorOutlinePreview.visible(false);
       this.konva.startPointIndicator.visible(false);
       return;
     }
@@ -204,6 +248,7 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       this.syncCursorStyle();
     }
 
+    this.syncVectorOutlinePreview();
     this.syncStartPointIndicator();
   };
 
@@ -239,7 +284,11 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
     }
 
     const shapeType = this.manager.stateApi.getSettings().shapeType;
-    const point = this.getEntityRelativePoint(cursorPos.relative, selectedEntity.state.position);
+    const point = this.getEntityRelativePoint(
+      cursorPos.relative,
+      selectedEntity.state.position,
+      selectedEntity.state.type !== 'vector_layer' || shapeType !== 'freehand'
+    );
 
     if (shapeType === 'polygon') {
       await this.onPolygonPointerDown(point, selectedEntity.entityIdentifier, e.evt.shiftKey);
@@ -277,7 +326,11 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       return;
     }
 
-    const point = this.getEntityRelativePoint(cursorPos.relative, activeEntity.state.position);
+    const point = this.getEntityRelativePoint(
+      cursorPos.relative,
+      activeEntity.state.position,
+      activeEntity.state.type !== 'vector_layer' || shapeType !== 'freehand'
+    );
 
     if (shapeType === 'polygon') {
       if (!this.hasActivePolygonSession()) {
@@ -316,7 +369,11 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       return;
     }
 
-    const point = this.getEntityRelativePoint(cursorPos.relative, activeEntity.state.position);
+    const point = this.getEntityRelativePoint(
+      cursorPos.relative,
+      activeEntity.state.position,
+      activeEntity.state.type !== 'vector_layer' || shapeType !== 'freehand'
+    );
 
     if (shapeType === 'freehand') {
       await this.handleFreehandPointerMove(point);
@@ -505,7 +562,7 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
     }
 
     if (this.polygonPoints.length >= 3 && this.isPointNearStart(point)) {
-      await this.commitPolygon();
+      await this.commitPolygon(true);
       return;
     }
 
@@ -516,10 +573,41 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
     this.render();
   };
 
-  private commitPolygon = async () => {
+  onStageDoubleClick = async () => {
+    if (!this.hasOpenVectorPolygonSession()) {
+      return;
+    }
+    // Both pointerdowns have already run. Remove the second click's coincident/nearby endpoint.
+    const last = this.polygonPoints.at(-1);
+    const previous = this.polygonPoints.at(-2);
+    if (last && previous && Math.hypot(last.x - previous.x, last.y - previous.y) <= this.manager.stage.unscale(5)) {
+      this.polygonPoints.pop();
+    }
+    if (this.polygonPoints.length >= 2) {
+      await this.commitOpenPolygon();
+    }
+  };
+
+  commitOpenPolygon = async () => {
     const activeEntity = this.getActiveEntityAdapter();
-    if (!activeEntity || !this.shapeId || this.polygonPoints.length < 3) {
+    if (activeEntity?.state.type !== 'vector_layer' || !this.hasActivePolygonSession()) {
+      return;
+    }
+    await this.commitPolygon(false);
+  };
+
+  private commitPolygon = async (isClosed: boolean) => {
+    const activeEntity = this.getActiveEntityAdapter();
+    const minPointCount = isClosed ? 3 : 2;
+    if (!activeEntity || !this.shapeId || this.polygonPoints.length < minPointCount) {
       this.cancel();
+      return;
+    }
+
+    if (activeEntity.state.type === 'vector_layer') {
+      this.addVectorPath(anchorsToBezierPoints(this.polygonPoints), isClosed);
+      this.resetState();
+      this.render();
       return;
     }
 
@@ -545,6 +633,32 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
     const activeEntity = this.getActiveEntityAdapter();
     if (!activeEntity || !this.shapeId) {
       this.cancel();
+      return;
+    }
+
+    if (activeEntity.state.type === 'vector_layer') {
+      if (this.freehandPoints.length < 2) {
+        activeEntity.bufferRenderer.clearBuffer();
+        this.resetState();
+        this.render();
+        return;
+      }
+      const stabilizedPoints = this.getStabilizedVectorFreehandPoints();
+      const points = fitPolylineToBezierPoints(
+        stabilizedPoints,
+        // Bound fitting accuracy in canvas units so extreme zoom does not preserve every subpixel wobble.
+        Math.max(
+          this.config.VECTOR_FREEHAND_MIN_FIT_ERROR,
+          this.manager.stage.unscale(this.config.VECTOR_FREEHAND_FIT_ERROR_PX)
+        )
+      );
+      if (points.length >= 2) {
+        this.addVectorPath(points, false);
+      } else {
+        activeEntity.bufferRenderer.clearBuffer();
+      }
+      this.resetState();
+      this.render();
       return;
     }
 
@@ -581,6 +695,12 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       return;
     }
 
+    if (activeEntity.state.type === 'vector_layer') {
+      activeEntity.bufferRenderer.clearBuffer();
+      this.syncVectorOutlinePreview();
+      return;
+    }
+
     const rect = this.getDragRect(this.dragStartPoint, this.dragCurrentPoint, {
       fromCenter: this.manager.stateApi.$altKey.get(),
       constrainSquare: this.manager.stateApi.$shiftKey.get(),
@@ -602,6 +722,12 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       return;
     }
 
+    if (activeEntity.state.type === 'vector_layer') {
+      activeEntity.bufferRenderer.clearBuffer();
+      this.syncVectorOutlinePreview();
+      return;
+    }
+
     await activeEntity.bufferRenderer.setBuffer({
       id: this.shapeId,
       type: 'polygon',
@@ -618,12 +744,76 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       return;
     }
 
+    if (activeEntity.state.type === 'vector_layer') {
+      activeEntity.bufferRenderer.clearBuffer();
+      this.syncVectorOutlinePreview();
+      return;
+    }
+
     await activeEntity.bufferRenderer.setBuffer({
       id: this.shapeId,
       type: 'polygon',
       points: this.freehandPoints.flatMap((point) => [point.x, point.y]),
       color: this.manager.stateApi.getCurrentColor(),
       compositeOperation: this.getCompositeOperation(),
+    });
+  };
+
+  private syncVectorOutlinePreview = () => {
+    const activeEntity = this.getActiveEntityAdapter();
+    const shapeType = this.manager.stateApi.getSettings().shapeType;
+    if (!activeEntity || activeEntity.state.type !== 'vector_layer') {
+      this.konva.vectorOutlinePreview.visible(false);
+      return;
+    }
+
+    let points: CanvasBezierPointState[] = [];
+    let isClosed = false;
+
+    if ((shapeType === 'rect' || shapeType === 'oval') && this.dragStartPoint && this.dragCurrentPoint) {
+      const rect = this.getDragRect(this.dragStartPoint, this.dragCurrentPoint, {
+        fromCenter: this.manager.stateApi.$altKey.get(),
+        constrainSquare: this.manager.stateApi.$shiftKey.get(),
+      });
+      if (rect.width > 0 && rect.height > 0) {
+        points = shapeType === 'rect' ? rectToBezierPoints(rect) : ovalToBezierPoints(rect);
+        isClosed = true;
+      }
+    } else if (shapeType === 'polygon' && this.polygonPoints.length > 0) {
+      const isClosing = Boolean(
+        this.polygonPointer && this.polygonPoints.length >= 3 && this.isPointNearStart(this.polygonPointer)
+      );
+      const lastPoint = this.polygonPoints.at(-1);
+      const shouldAppendPointer = Boolean(
+        this.polygonPointer &&
+        !isClosing &&
+        (!lastPoint || lastPoint.x !== this.polygonPointer.x || lastPoint.y !== this.polygonPointer.y)
+      );
+      let previewAnchors = this.polygonPoints;
+      if (shouldAppendPointer && this.polygonPointer) {
+        previewAnchors = [...this.polygonPoints, this.polygonPointer];
+      }
+      points = anchorsToBezierPoints(previewAnchors);
+      isClosed = isClosing;
+    } else if (shapeType === 'freehand' && this.freehandPoints.length > 0) {
+      points = anchorsToBezierPoints(this.freehandPoints);
+    }
+
+    const entityPosition = activeEntity.state.position;
+    const data = buildBezierPathData(
+      points.map((point) => ({
+        ...point,
+        anchor: addCoords(point.anchor, entityPosition),
+        inHandle: point.inHandle ? addCoords(point.inHandle, entityPosition) : null,
+        outHandle: point.outHandle ? addCoords(point.outHandle, entityPosition) : null,
+      })),
+      isClosed
+    );
+
+    this.konva.vectorOutlinePreview.setAttrs({
+      data,
+      strokeWidth: this.manager.stage.unscale(this.config.PREVIEW_STROKE_WIDTH_PX),
+      visible: Boolean(data),
     });
   };
 
@@ -650,8 +840,9 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
     });
   };
 
-  private getEntityRelativePoint = (point: Coordinate, position: Coordinate): Coordinate => {
-    return floorCoord(offsetCoord(point, position));
+  private getEntityRelativePoint = (point: Coordinate, position: Coordinate, snapToPixel = true): Coordinate => {
+    const relativePoint = offsetCoord(point, position);
+    return snapToPixel ? floorCoord(relativePoint) : relativePoint;
   };
 
   private getCompositeOperation = (): CanvasRectState['compositeOperation'] => {
@@ -805,6 +996,21 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
     return simplifiedPoints;
   };
 
+  private getStabilizedVectorFreehandPoints = (): Coordinate[] => {
+    return getStrokePoints(this.freehandPoints, {
+      size: this.manager.stage.unscale(1),
+      thinning: 0,
+      smoothing: 0.5,
+      streamline: this.config.VECTOR_FREEHAND_STREAMLINE,
+      simulatePressure: false,
+      last: true,
+    }).flatMap(({ point }) => {
+      const x = point[0];
+      const y = point[1];
+      return x === undefined || y === undefined ? [] : [{ x, y }];
+    });
+  };
+
   private flatNumbersToCoords = (points: number[]): Coordinate[] => {
     const coords: Coordinate[] = [];
     for (let i = 0; i < points.length; i += 2) {
@@ -862,6 +1068,20 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       return;
     }
 
+    if (activeEntity.state.type === 'vector_layer' && this.dragStartPoint && this.dragCurrentPoint) {
+      const shapeType = this.manager.stateApi.getSettings().shapeType;
+      const rect = this.getDragRect(this.dragStartPoint, this.dragCurrentPoint, {
+        fromCenter: this.manager.stateApi.$altKey.get(),
+        constrainSquare: this.manager.stateApi.$shiftKey.get(),
+      });
+      if (rect.width > 0 && rect.height > 0 && (shapeType === 'rect' || shapeType === 'oval')) {
+        this.addVectorPath(shapeType === 'rect' ? rectToBezierPoints(rect) : ovalToBezierPoints(rect), true);
+      }
+      this.resetState();
+      this.render();
+      return;
+    }
+
     const bufferState = activeEntity.bufferRenderer.state;
     if (
       bufferState &&
@@ -879,6 +1099,23 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
     this.render();
   };
 
+  private addVectorPath = (points: CanvasBezierPointState[], isClosed: boolean) => {
+    const activeEntity = this.getActiveEntityAdapter();
+    if (activeEntity?.state.type !== 'vector_layer') {
+      return;
+    }
+
+    activeEntity.bufferRenderer.clearBuffer();
+    const path = getBezierPathState(getPrefixedId('bezier_path'), { points, isClosed });
+    if (this.manager.tool.tools.path.addPathToEditSession(path)) {
+      return;
+    }
+    this.manager.stateApi.addVectorPath({
+      entityIdentifier: { id: activeEntity.entityIdentifier.id, type: 'vector_layer' },
+      path,
+    });
+  };
+
   private clearActiveBuffer = () => {
     this.getActiveEntityAdapter()?.bufferRenderer.clearBuffer();
   };
@@ -893,6 +1130,7 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
     this.isDrawingFreehand = false;
     this.polygonPoints = [];
     this.polygonPointer = null;
+    this.konva.vectorOutlinePreview.visible(false);
     this.konva.startPointIndicator.visible(false);
   };
 }

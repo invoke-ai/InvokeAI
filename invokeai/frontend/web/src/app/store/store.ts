@@ -24,6 +24,7 @@ import { addModelSelectedListener } from 'app/store/middleware/listenerMiddlewar
 import { addModelsLoadedListener } from 'app/store/middleware/listenerMiddleware/listeners/modelsLoaded';
 import { addSetDefaultSettingsListener } from 'app/store/middleware/listenerMiddleware/listeners/setDefaultSettings';
 import { addSocketConnectedEventListener } from 'app/store/middleware/listenerMiddleware/listeners/socketConnected';
+import { vectorEditSelectionMiddleware } from 'app/store/middleware/vectorEditSelectionMiddleware';
 import { deepClone } from 'common/util/deepClone';
 import { merge } from 'es-toolkit';
 import { omit, pick } from 'es-toolkit/compat';
@@ -245,7 +246,8 @@ export const createStore = (options?: { persist?: boolean; persistDebounce?: num
       })
         .concat(api.middleware)
         // .concat(getDebugLoggerMiddleware({ withDiff: true, withNextState: true }))
-        .prepend(listenerMiddleware.middleware),
+        .prepend(listenerMiddleware.middleware)
+        .prepend(vectorEditSelectionMiddleware),
     enhancers: (getDefaultEnhancers) => {
       const enhancers = getDefaultEnhancers();
       if (options?.persist) {

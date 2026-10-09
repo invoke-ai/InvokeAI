@@ -166,7 +166,7 @@ export const CanvasEntityGroupList = memo(({ isSelected, type, children, entityI
           <Spacer />
         </Flex>
         {type === 'raster_layer' && <RasterLayerExportPSDButton />}
-        <CanvasEntityMergeVisibleButton type={type} />
+        {type !== 'vector_layer' && <CanvasEntityMergeVisibleButton type={type} />}
         <CanvasEntityTypeIsHiddenToggle type={type} />
         <CanvasEntityAddOfTypeButton type={type} />
       </Flex>

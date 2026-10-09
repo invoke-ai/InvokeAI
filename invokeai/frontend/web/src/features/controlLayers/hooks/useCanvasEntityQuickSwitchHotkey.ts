@@ -32,14 +32,11 @@ export const useCanvasEntityQuickSwitchHotkey = () => {
 
     if (bookmarked) {
       if (current?.id !== bookmarked.id) {
-        selectionHistoryRef.current = { prev: current, current: bookmarked };
         dispatch(entitySelected({ entityIdentifier: bookmarked }));
       } else if (prev) {
-        selectionHistoryRef.current = { prev, current: prev };
         dispatch(entitySelected({ entityIdentifier: prev }));
       }
     } else if (prev !== null && current !== null) {
-      selectionHistoryRef.current = { prev: current, current: prev };
       dispatch(entitySelected({ entityIdentifier: prev }));
     }
   }, [bookmarked, dispatch]);

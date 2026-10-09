@@ -1,9 +1,11 @@
 import { Menu, MenuButton, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { CanvasContextMenuItemsCropCanvasToBbox } from 'features/controlLayers/components/CanvasContextMenu/CanvasContextMenuItemsCropCanvasToBbox';
 import { NewLayerIcon } from 'features/controlLayers/components/common/icons';
 import { useLoadCanvasProjectWithDialog } from 'features/controlLayers/components/LoadCanvasProjectConfirmationAlertDialog';
 import { useSaveCanvasProjectWithDialog } from 'features/controlLayers/components/SaveCanvasProjectDialog';
+import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useCopyCanvasToClipboard } from 'features/controlLayers/hooks/copyHooks';
 import {
   useNewControlLayerFromBbox,
@@ -25,6 +27,8 @@ export const CanvasContextMenuGlobalMenuItems = memo(() => {
   const newSubMenu = useSubMenu();
   const copySubMenu = useSubMenu();
   const isBusy = useCanvasIsBusy();
+  const canvasManager = useCanvasManager();
+  const editSession = useStore(canvasManager.tool.tools.path.$editSession);
   const saveCanvasToGallery = useSaveCanvasToGallery();
   const saveBboxToGallery = useSaveBboxToGallery();
   const saveCanvasProject = useSaveCanvasProjectWithDialog();
@@ -35,6 +39,10 @@ export const CanvasContextMenuGlobalMenuItems = memo(() => {
   const newControlLayerFromBbox = useNewControlLayerFromBbox();
   const copyCanvasToClipboard = useCopyCanvasToClipboard('canvas');
   const copyBboxToClipboard = useCopyCanvasToClipboard('bbox');
+
+  if (editSession) {
+    return null;
+  }
 
   return (
     <>

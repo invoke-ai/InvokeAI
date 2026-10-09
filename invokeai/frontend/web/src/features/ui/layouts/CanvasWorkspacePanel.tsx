@@ -19,19 +19,24 @@ import { CanvasTextOverlay } from 'features/controlLayers/components/Text/Canvas
 import { PinnedFillColorPickerOverlay } from 'features/controlLayers/components/Tool/PinnedFillColorPickerOverlay';
 import { CanvasToolbar } from 'features/controlLayers/components/Toolbar/CanvasToolbar';
 import { Transform } from 'features/controlLayers/components/Transform/Transform';
-import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { VectorLayerEditFooter } from 'features/controlLayers/components/VectorLayer/VectorLayerEditFooter';
+import {
+  CanvasManagerProviderGate,
+  useCanvasManagerSafe,
+} from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectDynamicGrid, selectShowHUD } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { memo, useCallback } from 'react';
+import type { MouseEvent } from 'react';
+import { memo, useCallback, useState } from 'react';
 import { PiDotsThreeOutlineVerticalFill } from 'react-icons/pi';
 
 import { StagingArea } from './StagingArea';
 
-const MenuContent = memo(() => {
+const MenuContent = memo(({ showPathActions = false }: { showPathActions?: boolean }) => {
   return (
     <CanvasManagerProviderGate>
       <MenuList>
-        <CanvasContextMenuSelectedEntityMenuItems />
+        <CanvasContextMenuSelectedEntityMenuItems showPathActions={showPathActions} />
         <CanvasContextMenuGlobalMenuItems />
       </MenuList>
     </CanvasManagerProviderGate>
@@ -55,10 +60,32 @@ export const CanvasWorkspacePanel = memo(() => {
   const dynamicGrid = useAppSelector(selectDynamicGrid);
   const showHUD = useAppSelector(selectShowHUD);
   const sessionId = useAppSelector(selectCanvasSessionId);
+  const canvasManager = useCanvasManagerSafe();
+  const [showPathActions, setShowPathActions] = useState(false);
+
+  const onContextMenuCapture = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      if (
+        !canvasManager ||
+        !(event.target instanceof HTMLCanvasElement) ||
+        !canvasManager.stage.container.contains(event.target)
+      ) {
+        setShowPathActions(false);
+        return;
+      }
+
+      // Capture the click position before the menu opens; cursor movement must not change its contents.
+      const stage = canvasManager.stage.konva.stage;
+      stage.setPointersPositions(event.nativeEvent);
+      const position = stage.getRelativePointerPosition();
+      setShowPathActions(Boolean(position && canvasManager.tool.tools.path.isEditPathAtPosition(position)));
+    },
+    [canvasManager]
+  );
 
   const renderMenu = useCallback(() => {
-    return <MenuContent />;
-  }, []);
+    return <MenuContent showPathActions={showPathActions} />;
+  }, [showPathActions]);
 
   return (
     <StagingAreaContextProvider sessionId={sessionId}>
@@ -79,7 +106,7 @@ export const CanvasWorkspacePanel = memo(() => {
         <Divider />
         <ContextMenu<HTMLDivElement> renderMenu={renderMenu} withLongPress={false}>
           {(ref) => (
-            <Flex ref={ref} sx={canvasBgSx} data-dynamic-grid={dynamicGrid}>
+            <Flex ref={ref} sx={canvasBgSx} data-dynamic-grid={dynamicGrid} onContextMenuCapture={onContextMenuCapture}>
               <InvokeCanvasComponent />
               <CanvasManagerProviderGate>
                 <CanvasTextOverlay />
@@ -120,6 +147,7 @@ export const CanvasWorkspacePanel = memo(() => {
             <Filter />
             <Transform />
             <SelectObject />
+            <VectorLayerEditFooter />
           </CanvasManagerProviderGate>
         </Flex>
         <CanvasManagerProviderGate>

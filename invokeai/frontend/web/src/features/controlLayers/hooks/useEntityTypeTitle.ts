@@ -17,6 +17,8 @@ export const useEntityTypeTitle = (type: CanvasEntityIdentifier['type']): string
         return t('controlLayers.controlLayers_withCount', { count, context });
       case 'raster_layer':
         return t('controlLayers.rasterLayers_withCount', { count, context });
+      case 'vector_layer':
+        return t('controlLayers.vectorLayers_withCount', { count, context });
       case 'inpaint_mask':
         return t('controlLayers.inpaintMasks_withCount', { count, context });
       case 'regional_guidance':

@@ -4,6 +4,7 @@ import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/kon
 import type { CanvasEntityAdapterInpaintMask } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterInpaintMask';
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
 import type { CanvasEntityAdapterRegionalGuidance } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRegionalGuidance';
+import type { CanvasEntityAdapterVectorLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterVectorLayer';
 import { canvasToBlob } from 'features/controlLayers/konva/util';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { toast } from 'features/toast/toast';
@@ -23,6 +24,7 @@ export const useSaveLayerToAssets = () => {
       adapter:
         | CanvasEntityAdapterRasterLayer
         | CanvasEntityAdapterControlLayer
+        | CanvasEntityAdapterVectorLayer
         | CanvasEntityAdapterInpaintMask
         | CanvasEntityAdapterRegionalGuidance
         | null

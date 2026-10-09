@@ -26,6 +26,36 @@ describe('canvas merge hotkey gating', () => {
         true
       );
     });
+
+    it('returns true for vector layer merge down into another vector layer', () => {
+      expect(
+        getIsCanvasMergeDownHotkeyEnabled(
+          { id: 'vector-top', type: 'vector_layer' },
+          { id: 'vector-bottom', type: 'vector_layer' },
+          false
+        )
+      ).toBe(true);
+    });
+
+    it('returns false for vector layer merge down into a non-vector layer', () => {
+      expect(
+        getIsCanvasMergeDownHotkeyEnabled(
+          { id: 'vector-top', type: 'vector_layer' },
+          { id: 'raster-bottom', type: 'raster_layer' },
+          false
+        )
+      ).toBe(false);
+    });
+
+    it('returns false for merge down into a vector layer from a non-vector layer', () => {
+      expect(
+        getIsCanvasMergeDownHotkeyEnabled(
+          { id: 'raster-top', type: 'raster_layer' },
+          { id: 'vector-bottom', type: 'vector_layer' },
+          false
+        )
+      ).toBe(false);
+    });
   });
 
   describe('getIsCanvasMergeVisibleHotkeyEnabled', () => {
