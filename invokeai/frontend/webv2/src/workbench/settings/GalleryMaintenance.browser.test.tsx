@@ -42,7 +42,8 @@ vi.mock('@features/identity', async (importOriginal) => ({
 }));
 vi.mock('@platform/transport/http', async (importOriginal) => ({
   ...(await importOriginal<typeof HttpModule>()),
-  apiFetchJson: (...args: unknown[]) => mocks.apiFetchJson(...args),
+  apiFetchJson: (...args: unknown[]) =>
+    args[0] === '/api/v1/remote_workers/settings' ? Promise.resolve({ enabled: false }) : mocks.apiFetchJson(...args),
 }));
 vi.mock('@features/gallery/queries', async (importOriginal) => ({
   ...((actual) => ({

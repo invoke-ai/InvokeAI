@@ -37,7 +37,8 @@ export const QueueItemDetails = ({ item }: { item: QueueItemReadModel }) => {
   const { ItemActions } = useQueueUi();
   const meta = extractGenerationMeta(item);
   const duration = formatDuration(item.startedAt, item.completedAt);
-  const deviceLabel = useDeviceLabel(item.device);
+  const remoteWorkerName = item.device?.startsWith('remote:') ? item.device.slice('remote:'.length) : null;
+  const deviceLabel = useDeviceLabel(remoteWorkerName ? null : item.device);
 
   return (
     <DataList.Root gap="1.5" orientation="horizontal">
@@ -61,7 +62,9 @@ export const QueueItemDetails = ({ item }: { item: QueueItemReadModel }) => {
       {item.userDisplayName || item.userEmail ? (
         <DetailRow label={t('users.user')}>{item.userDisplayName ?? item.userEmail}</DetailRow>
       ) : null}
-      {deviceLabel ? <DetailRow label={t('widgets.queue.device.label')}>{deviceLabel.name}</DetailRow> : null}
+      {remoteWorkerName || deviceLabel ? (
+        <DetailRow label={t('widgets.queue.device.label')}>{remoteWorkerName ?? deviceLabel?.name}</DetailRow>
+      ) : null}
       {item.errorMessage ? (
         <DetailRow label={t('common.error')}>
           <Text as="span" color="fg.error">

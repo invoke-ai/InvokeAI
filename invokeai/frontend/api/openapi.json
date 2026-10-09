@@ -13559,6 +13559,443 @@
         }
       }
     },
+    "/api/v1/remote_workers/settings": {
+      "get": {
+        "tags": ["remote_workers"],
+        "summary": "Get Remote Worker Settings",
+        "operationId": "get_remote_worker_settings_api_v1_remote_workers_settings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteWorkersSettings"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": ["remote_workers"],
+        "summary": "Put Remote Worker Settings",
+        "operationId": "put_remote_worker_settings_api_v1_remote_workers_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoteWorkersSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteWorkersSettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/remote_workers/status": {
+      "get": {
+        "tags": ["remote_workers"],
+        "summary": "Get Remote Worker Status",
+        "description": "Probe this user's ability to reach a configured worker using existing InvokeAI APIs.\n\nKeep the probe short; credentials stay in the primary's per-user vault.\nDo not mistake a reachable worker with rejected credentials for an offline host.",
+        "operationId": "get_remote_worker_status_api_v1_remote_workers_status_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "url",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048,
+              "title": "Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteWorkerAvailability"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/remote_workers/credentials": {
+      "get": {
+        "tags": ["remote_workers"],
+        "summary": "Get Remote Worker Credentials Status",
+        "operationId": "get_remote_worker_credentials_status_api_v1_remote_workers_credentials_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "url",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048,
+              "title": "Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteWorkerCredentialStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["remote_workers"],
+        "summary": "Put Remote Worker Credentials",
+        "operationId": "put_remote_worker_credentials_api_v1_remote_workers_credentials_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoteWorkerCredentialRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteWorkerCredentialStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["remote_workers"],
+        "summary": "Remove Remote Worker Credentials",
+        "operationId": "remove_remote_worker_credentials_api_v1_remote_workers_credentials_delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "url",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048,
+              "title": "Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteWorkerCredentialStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/remote_workers/models/{key}/layout": {
+      "get": {
+        "tags": ["remote_workers"],
+        "summary": "Get Remote Model Layout",
+        "description": "Return a non-secret signature of one registered model's file layout.",
+        "operationId": "get_remote_model_layout_api_v1_remote_workers_models__key__layout_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteModelLayout"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/remote_workers/diffusers/install": {
+      "post": {
+        "tags": ["remote_workers"],
+        "summary": "Install Remote Directory",
+        "description": "Admin-only receiver for short-lived, manifest-verified model transfers.",
+        "operationId": "install_remote_directory_api_v1_remote_workers_diffusers_install_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object",
+                "title": "Body"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Install Remote Directory Api V1 Remote Workers Diffusers Install Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/remote_workers/diffusers/install/{job_id}": {
+      "get": {
+        "tags": ["remote_workers"],
+        "summary": "Get Remote Directory Install",
+        "description": "Poll a directory download and normal model installation.",
+        "operationId": "get_remote_directory_install_api_v1_remote_workers_diffusers_install__job_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Remote Directory Install Api V1 Remote Workers Diffusers Install  Job Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["remote_workers"],
+        "summary": "Cancel Remote Directory Install",
+        "description": "Cancel only this temporary download, preserving completed models.",
+        "operationId": "cancel_remote_directory_install_api_v1_remote_workers_diffusers_install__job_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Cancel Remote Directory Install Api V1 Remote Workers Diffusers Install  Job Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/workflows/i/{workflow_id}": {
       "get": {
         "tags": ["workflows"],
@@ -16944,6 +17381,194 @@
   },
   "components": {
     "schemas": {
+      "AAARemoteWorkerDispatchInvocation": {
+        "category": "Remote Invoke",
+        "class": "invocation",
+        "classification": "stable",
+        "description": "Internal helper that connects a normal InvokeAI queue item to the backend Remote Worker pool.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": false,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "result_destination": {
+            "default": "gallery",
+            "description": "Internal: captured InvokeAI result destination (Gallery or Canvas).",
+            "enum": ["gallery", "canvas"],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "gallery",
+            "orig_required": false,
+            "title": "Result Destination",
+            "type": "string",
+            "ui_hidden": true
+          },
+          "local_gallery_board_id": {
+            "default": "",
+            "description": "Internal: Gallery board captured when this workflow was queued.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "",
+            "orig_required": false,
+            "title": "Local Gallery Board Id",
+            "type": "string",
+            "ui_hidden": true
+          },
+          "remote_url": {
+            "default": "",
+            "description": "Internal: primary remote InvokeAI URL.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "",
+            "orig_required": false,
+            "title": "Remote Url",
+            "type": "string",
+            "ui_hidden": true
+          },
+          "additional_remote_urls": {
+            "default": "",
+            "description": "Internal: additional remote InvokeAI URLs.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "",
+            "orig_required": false,
+            "title": "Additional Remote Urls",
+            "type": "string",
+            "ui_hidden": true
+          },
+          "dispatch_mode": {
+            "default": "Distributed",
+            "description": "Internal automatic worker-pool mode.",
+            "enum": ["Distributed", "Remote Only"],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "Distributed",
+            "orig_required": false,
+            "title": "Dispatch Mode",
+            "type": "string",
+            "ui_hidden": true
+          },
+          "remote_worker_names": {
+            "default": "[]",
+            "description": "Internal JSON list of user-defined worker names aligned with the configured URLs.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "[]",
+            "orig_required": false,
+            "title": "Remote Worker Names",
+            "type": "string",
+            "ui_hidden": true
+          },
+          "keep_remote_copies": {
+            "default": false,
+            "description": "Keep generated media on remote workers after successful import.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "Keep Remote Copies",
+            "type": "boolean",
+            "ui_hidden": true
+          },
+          "auto_transfer_missing_models": {
+            "default": true,
+            "description": "Transfer supported missing models to a worker before rendering.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": true,
+            "orig_required": false,
+            "title": "Auto Transfer Missing Models",
+            "type": "boolean",
+            "ui_hidden": true
+          },
+          "model_transfer_host": {
+            "default": "",
+            "description": "Optional primary LAN host used by workers during model transfer.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "",
+            "orig_required": false,
+            "title": "Model Transfer Host",
+            "type": "string",
+            "ui_hidden": true
+          },
+          "model_transfer_timeout_seconds": {
+            "default": 7200,
+            "description": "Maximum time to wait for a remote model transfer/install job.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 86400,
+            "minimum": 60,
+            "orig_default": 7200,
+            "orig_required": false,
+            "title": "Model Transfer Timeout Seconds",
+            "type": "integer",
+            "ui_hidden": true
+          },
+          "collector_poll_interval_seconds": {
+            "default": 0.75,
+            "description": "How often worker-pool lanes poll remote progress and status.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 30.0,
+            "minimum": 0.25,
+            "orig_default": 0.75,
+            "orig_required": false,
+            "title": "Collector Poll Interval Seconds",
+            "type": "number",
+            "ui_hidden": true
+          },
+          "collector_timeout_seconds": {
+            "default": 14400,
+            "description": "Maximum wait per remote queued/rendering phase.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 86400,
+            "minimum": 10,
+            "orig_default": 14400,
+            "orig_required": false,
+            "title": "Collector Timeout Seconds",
+            "type": "integer",
+            "ui_hidden": true
+          },
+          "type": {
+            "const": "irw_builtin_remote_worker_dispatch",
+            "default": "irw_builtin_remote_worker_dispatch",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["remote", "invokeai", "worker", "parallel", "workflow"],
+        "title": "Remote Workers - Built-in Worker Pool",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/RemoteWorkerDispatchOutput"
+        }
+      },
       "AddImagesToBoardResult": {
         "properties": {
           "affected_boards": {
@@ -41890,6 +42515,9 @@
             "additionalProperties": {
               "oneOf": [
                 {
+                  "$ref": "#/components/schemas/AAARemoteWorkerDispatchInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/AddInvocation"
                 },
                 {
@@ -43313,6 +43941,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/QwenImageModelLoaderOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/RemoteWorkerDispatchOutput"
                 },
                 {
                   "$ref": "#/components/schemas/SD3ConditioningOutput"
@@ -52166,6 +52797,9 @@
             "description": "The ID of the invocation",
             "oneOf": [
               {
+                "$ref": "#/components/schemas/AAARemoteWorkerDispatchInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/AddInvocation"
               },
               {
@@ -53587,6 +54221,9 @@
                 "$ref": "#/components/schemas/QwenImageModelLoaderOutput"
               },
               {
+                "$ref": "#/components/schemas/RemoteWorkerDispatchOutput"
+              },
+              {
                 "$ref": "#/components/schemas/SD3ConditioningOutput"
               },
               {
@@ -53756,6 +54393,9 @@
           "invocation": {
             "description": "The ID of the invocation",
             "oneOf": [
+              {
+                "$ref": "#/components/schemas/AAARemoteWorkerDispatchInvocation"
+              },
               {
                 "$ref": "#/components/schemas/AddInvocation"
               },
@@ -55370,6 +56010,9 @@
           "ip_adapter": {
             "$ref": "#/components/schemas/IPAdapterOutput"
           },
+          "irw_builtin_remote_worker_dispatch": {
+            "$ref": "#/components/schemas/RemoteWorkerDispatchOutput"
+          },
           "iterate": {
             "$ref": "#/components/schemas/IterateInvocationOutput"
           },
@@ -56079,6 +56722,7 @@
           "invokeai_img_hue_adjust_plus",
           "invokeai_img_val_thresholds",
           "ip_adapter",
+          "irw_builtin_remote_worker_dispatch",
           "iterate",
           "krea2_conditioning_rebalance",
           "krea2_denoise",
@@ -56325,6 +56969,9 @@
           "invocation": {
             "description": "The ID of the invocation",
             "oneOf": [
+              {
+                "$ref": "#/components/schemas/AAARemoteWorkerDispatchInvocation"
+              },
               {
                 "$ref": "#/components/schemas/AddInvocation"
               },
@@ -57552,6 +58199,9 @@
           "invocation": {
             "description": "The ID of the invocation",
             "oneOf": [
+              {
+                "$ref": "#/components/schemas/AAARemoteWorkerDispatchInvocation"
+              },
               {
                 "$ref": "#/components/schemas/AddInvocation"
               },
@@ -95051,6 +95701,161 @@
         "required": ["url", "path"],
         "title": "RemoteModelFile",
         "description": "Information about a downloadable file that forms part of a model."
+      },
+      "RemoteModelLayout": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["file", "directory"],
+            "title": "Kind"
+          },
+          "signature": {
+            "type": "string",
+            "title": "Signature"
+          }
+        },
+        "type": "object",
+        "required": ["kind", "signature"],
+        "title": "RemoteModelLayout"
+      },
+      "RemoteWorkerAvailability": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["online", "offline", "login_required"],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": ["status"],
+        "title": "RemoteWorkerAvailability"
+      },
+      "RemoteWorkerCredentialRequest": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Url"
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 320,
+            "minLength": 1,
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Password"
+          },
+          "remember_me": {
+            "type": "boolean",
+            "title": "Remember Me",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": ["url", "email", "password"],
+        "title": "RemoteWorkerCredentialRequest"
+      },
+      "RemoteWorkerCredentialStatus": {
+        "properties": {
+          "saved": {
+            "type": "boolean",
+            "title": "Saved"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": ["saved"],
+        "title": "RemoteWorkerCredentialStatus"
+      },
+      "RemoteWorkerDispatchOutput": {
+        "class": "output",
+        "properties": {
+          "started": {
+            "description": "Whether the backend Remote Worker pool was started for this queue item.",
+            "field_kind": "output",
+            "title": "Started",
+            "type": "boolean",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "irw_builtin_remote_worker_dispatch_output",
+            "default": "irw_builtin_remote_worker_dispatch_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "started", "type", "type"],
+        "title": "RemoteWorkerDispatchOutput",
+        "type": "object"
+      },
+      "RemoteWorkersSettings": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": false
+          },
+          "dispatchMode": {
+            "type": "string",
+            "enum": ["distributed", "remote_only"],
+            "title": "Dispatchmode",
+            "default": "distributed"
+          },
+          "workerUrls": {
+            "type": "string",
+            "maxLength": 32768,
+            "title": "Workerurls",
+            "default": ""
+          },
+          "workerNames": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Workernames"
+          },
+          "disabledWorkerUrls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Disabledworkerurls"
+          },
+          "autoTransferMissingModels": {
+            "type": "boolean",
+            "title": "Autotransfermissingmodels",
+            "default": true
+          },
+          "keepRemoteCopies": {
+            "type": "boolean",
+            "title": "Keepremotecopies",
+            "default": false
+          },
+          "modelTransferHost": {
+            "type": "string",
+            "maxLength": 2048,
+            "title": "Modeltransferhost",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "RemoteWorkersSettings"
       },
       "RemoveImagesFromBoardResult": {
         "properties": {

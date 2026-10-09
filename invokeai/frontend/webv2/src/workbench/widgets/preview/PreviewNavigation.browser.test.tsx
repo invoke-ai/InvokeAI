@@ -1769,6 +1769,9 @@ describe('preview keyboard navigation boundary', () => {
       expect.any(Number),
       true
     );
+    // Test the opposite direction from live. The mocked Gallery selection is not committed here.
+    await act(() => followControls.pin('queue-item-live:2'));
+    await rerender();
     await pressArrow('ArrowRight');
     expect(mocks.commands.gallery.selectItem).toHaveBeenLastCalledWith(
       expect.objectContaining({ name: 'newest' }),

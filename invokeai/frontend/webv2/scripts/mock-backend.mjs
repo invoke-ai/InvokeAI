@@ -888,6 +888,18 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
       if (method === 'GET' && path === '/api/v1/app/runtime_config') {
         return json(200, { config: { generation_devices: 'auto' }, set_fields: [] });
       }
+      if (method === 'GET' && path === '/api/v1/remote_workers/settings') {
+        return json(200, {
+          enabled: false,
+          dispatchMode: 'distributed',
+          workerUrls: '',
+          workerNames: {},
+          disabledWorkerUrls: [],
+          autoTransferMissingModels: true,
+          keepRemoteCopies: false,
+          modelTransferHost: '',
+        });
+      }
 
       if (path.startsWith('/api/v1/app/external_providers')) {
         return json(200, []);

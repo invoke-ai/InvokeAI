@@ -1,7 +1,7 @@
 import { AppProviders } from '@app/AppProviders';
 import { ChakraProvider } from '@chakra-ui/react';
 import { useExitPresence } from '@platform/react/useExitRetainedValue';
-import { AppToaster } from '@platform/ui/toaster';
+import { AppToaster, toaster } from '@platform/ui/toaster';
 import { RouterProvider } from '@tanstack/react-router';
 import { system } from '@theme/system';
 import { useWorkbenchSettingsSelector } from '@workbench/settings/store';
@@ -49,6 +49,8 @@ const WhatsNewGate = () => {
   ) : null;
 };
 
+const ROUTER_CONTEXT = { remoteModelTransferToaster: toaster };
+
 export const App = () => (
   <AppProviders>
     <ChakraProvider value={system}>
@@ -58,7 +60,7 @@ export const App = () => (
       <AlphaNoticeGate />
       <WhatsNewGate />
       <FeatureHintsAdapterProvider>
-        <RouterProvider router={router} />
+        <RouterProvider router={router} context={ROUTER_CONTEXT} />
       </FeatureHintsAdapterProvider>
     </ChakraProvider>
   </AppProviders>

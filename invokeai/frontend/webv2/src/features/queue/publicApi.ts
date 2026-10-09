@@ -8,6 +8,7 @@ import type {
   QueueRuntime,
 } from './runtime';
 import type { QueueModelLoadPort, QueueNodeExecutionPort } from './runtime/coordinator';
+import type { RemoteModelTransferToastPort } from './runtime/remoteModelTransferToasts';
 
 import { queueBackend } from './data/httpRealtimeQueueBackend';
 import { queueReadModelOptions } from './data/queries';
@@ -63,6 +64,7 @@ export const createProductionQueueRuntime = ({
   locks,
   modelLoads,
   nodeExecution,
+  remoteModelTransferToaster,
 }: {
   destinations: QueueResultDestinationPort;
   ensureProjectPersisted?(projectId: string): Promise<'ready' | 'refused' | 'retry'>;
@@ -72,6 +74,7 @@ export const createProductionQueueRuntime = ({
   locks?: QueueRunLockPort;
   modelLoads: QueueModelLoadPort;
   nodeExecution: QueueNodeExecutionPort;
+  remoteModelTransferToaster?: RemoteModelTransferToastPort;
 }): QueueRuntime =>
   createQueueRuntime({
     backend: queueBackend,
@@ -83,4 +86,5 @@ export const createProductionQueueRuntime = ({
     locks,
     modelLoads,
     nodeExecution,
+    remoteModelTransferToaster,
   });
