@@ -21,7 +21,11 @@ import {
   galleryVideos,
   type GalleryVideoItem,
 } from '@features/gallery';
-import { getGalleryBoardLabel, getGalleryDeletionSuccessor } from '@features/gallery/contracts';
+import {
+  getGalleryBoardLabel,
+  getGalleryDeletionSuccessor,
+  getPersistedSelectedGalleryItemKeys,
+} from '@features/gallery/contracts';
 import {
   getGalleryItemBoardIdsFromCaches,
   getGalleryItemStarredFromCaches,
@@ -256,21 +260,25 @@ export const useImageActions = ({
 
       return board ? getGalleryBoardLabel(board, t) : t('widgets.gallery.uncategorized');
     };
-    const getLatestGenerateValues = () => {
+    const getLatestWidgetValues = (widgetId: 'gallery' | 'generate' | 'video') => {
       const snapshot = queries.getSnapshot();
       const project = projectId
         ? snapshot.projects.find((candidate) => candidate.id === projectId)
         : snapshot.activeProject;
 
-      return project ? getProjectWidgetValues(project, 'generate') : {};
+      return project ? getProjectWidgetValues(project, widgetId) : {};
     };
-    const getLatestVideoValues = () => {
-      const snapshot = queries.getSnapshot();
-      const project = projectId
-        ? snapshot.projects.find((candidate) => candidate.id === projectId)
-        : snapshot.activeProject;
+    const getLatestGenerateValues = () => getLatestWidgetValues('generate');
+    const getLatestVideoValues = () => getLatestWidgetValues('video');
+    // The persisted selection, primary and members, as one comparable key: a host's action context only sees
+    // loaded items, so it cannot tell a cleared selection from one moved to an item it has not loaded.
+    const getPersistedGallerySelectionKey = (): string => {
+      const values = getLatestWidgetValues('gallery');
 
-      return project ? getProjectWidgetValues(project, 'video') : {};
+      return JSON.stringify([
+        typeof values.selectedImageName === 'string' ? values.selectedImageName : null,
+        getPersistedSelectedGalleryItemKeys(values),
+      ]);
     };
     // Snapshot deletion-sensitive widget values across all projects; cache rollback cannot restore them. Diff
     // before/after values for conflict-safe restoration.
@@ -384,12 +392,14 @@ export const useImageActions = ({
 
         const current = getItemActionContext();
 
-        // The optimistic removal below clears the deleted primary from the host's selection, so an empty selection
-        // is still this deletion's; only another item selected meanwhile makes the successor stale.
+        // The optimistic removal below clears the deleted primary from the host's selection, so the selection is
+        // still this deletion's while the store holds what that removal left; anything selected since, loaded by
+        // the host or not, makes the successor stale.
         return Boolean(
           current &&
           current.filterIdentity === deletionContext.filterIdentity &&
-          (current.selectedItemKey === deletionContext.selectedItemKey || current.selectedItemKey === null)
+          (current.selectedItemKey === deletionContext.selectedItemKey ||
+            getPersistedGallerySelectionKey() === selectionAfterRemoval)
         );
       };
       const rollbackCaches = patchGalleryItemCaches(queryClient, {
@@ -410,6 +420,7 @@ export const useImageActions = ({
       // Once backend-confirmed deletion starts applying, later callback failures must not restore deleted items.
       let confirmedApplied = false;
       const galleryWidgetSnapshot = applyGalleryItemRemoval(items.map(toGalleryItemKey));
+      const selectionAfterRemoval = getPersistedGallerySelectionKey();
 
       return runItemMutation({
         action: 'delete',
@@ -452,7 +463,13 @@ export const useImageActions = ({
           }
 
           confirmedApplied = true;
-          patchGalleryItemCaches(queryClient, { kind: 'delete', result });
+          // Without a rollback the optimistic patch already lowered every page's total; only pages refetched since
+          // still count the deleted items.
+          patchGalleryItemCaches(
+            queryClient,
+            { kind: 'delete', result },
+            { totals: cachesRolledBack ? 'listing' : 'holder' }
+          );
           gallery.removeItems(result.succeeded.map(toGalleryItemKey));
           if (successor) {
             const failedKeys = new Set(result.failed.map(toGalleryItemKey));

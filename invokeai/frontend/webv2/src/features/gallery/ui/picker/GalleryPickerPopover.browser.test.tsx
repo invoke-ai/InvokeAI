@@ -401,6 +401,36 @@ describe('GalleryPickerPopover', () => {
     expect(mocks.listInfiniteItems).not.toHaveBeenCalled();
   });
 
+  it('holds the item a placeholder highlight lands on once its page loads, through a later insert', async () => {
+    let inserted = 0;
+    mocks.listItems.mockImplementation((filter: { offset: number }) => {
+      const total = 2_390 + inserted;
+      const items = Array.from({ length: Math.max(0, Math.min(60, total - filter.offset)) }, (_, index) => {
+        const position = filter.offset + index - inserted;
+
+        return image(position < 0 ? 'adopted-new.png' : `adopted-${position}.png`);
+      });
+
+      return { itemIndices: items.map((_, index) => filter.offset + index), items, offset: filter.offset, total };
+    });
+
+    const { dialog } = await openPicker();
+    const input = getSearchInput(dialog);
+
+    // End lands on a placeholder: its page is requested only now.
+    await pressKey(input, 'End');
+    await vi.waitFor(() => expect(getActiveOption(dialog)?.dataset.itemKey).toBe('image:adopted-2389.png'));
+
+    inserted = 1;
+    await act(() => queryClient!.invalidateQueries());
+    await vi.waitFor(() => expect(dialog.querySelector('[role="option"][aria-setsize="2391"]')).not.toBeNull());
+    await settle();
+
+    expect(getActiveOption(dialog)?.dataset.itemKey).toBe('image:adopted-2389.png');
+    await pressKey(input, 'Enter');
+    expect(onPick).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ name: 'adopted-2389.png' }));
+  });
+
   it('keeps both pages of a view that straddles a page edge loaded while the arrows move within it', async () => {
     const total = 120;
     mocks.listItems.mockImplementation((filter: { offset: number }) => {
@@ -519,6 +549,47 @@ describe('GalleryPickerPopover', () => {
     // The highlight moved one slot along with its item, which stays scrolled out of view.
     expect(getSearchInput(dialog).getAttribute('aria-activedescendant')).toMatch(/-slot-1$/);
     expect(viewport!.scrollTop).toBe(scrolledTop);
+  });
+
+  it('reveals an arrow move back onto the slot the highlight was first placed on before an insert shifted it', async () => {
+    let inserted = 0;
+    mocks.listItems.mockImplementation((filter: { offset: number }) => {
+      const total = 600 + inserted;
+      const items = Array.from({ length: Math.max(0, Math.min(60, total - filter.offset)) }, (_, index) => {
+        const position = filter.offset + index - inserted;
+
+        return image(position < 0 ? 'moved-new.png' : `moved-${position}.png`);
+      });
+
+      return { itemIndices: items.map((_, index) => filter.offset + index), items, offset: filter.offset, total };
+    });
+
+    const { dialog } = await openPicker();
+    let viewport: HTMLElement | null = getActiveOption(dialog)!.parentElement;
+
+    while (viewport && viewport.scrollHeight <= viewport.clientHeight) {
+      viewport = viewport.parentElement;
+    }
+
+    inserted = 1;
+    await act(() => queryClient!.invalidateQueries());
+    await vi.waitFor(() => expect(dialog.querySelector('[role="option"][aria-setsize="601"]')).not.toBeNull());
+    await settle();
+    expect(getActiveOption(dialog)?.dataset.itemKey).toBe('image:moved-0.png');
+
+    // Scroll the highlight out of view, then step back onto slot 0, where it was placed before the insert.
+    await act(() => {
+      viewport!.scrollTop = getActiveOption(dialog)!.getBoundingClientRect().height * 4;
+      viewport!.dispatchEvent(new Event('scroll'));
+    });
+    await settle();
+    expect(viewport!.scrollTop).toBeGreaterThan(0);
+
+    await pressKey(getSearchInput(dialog), 'ArrowLeft');
+    await settle();
+
+    expect(getActiveOption(dialog)?.dataset.itemKey).toBe('image:moved-new.png');
+    expect(viewport!.scrollTop).toBe(0);
   });
 
   it('keeps the highlight in view when the column count changes', async () => {

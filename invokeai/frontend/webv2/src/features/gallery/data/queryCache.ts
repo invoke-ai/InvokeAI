@@ -20,6 +20,7 @@ import {
   fetchGalleryItemsRange,
   GALLERY_PAGE_SIZE,
   galleryKeys,
+  getGalleryItemListingKey,
   getGalleryItemListQueries,
   getGalleryItemsFilterFromKey,
   isGallerySinglePageQueryKey,
@@ -215,19 +216,20 @@ const patchItemsCacheData = (
   return null;
 };
 
-const getListingHash = (queryKey: QueryKey): string => hashKey(queryKey.slice(0, 5));
+const getListingHash = (queryKey: QueryKey): string => hashKey(getGalleryItemListingKey(queryKey));
 
 /**
- * Count the removed items each listing holds anywhere in its cached pages. Every cached page of a listing reports the
- * same server total, so each must lose the same count: pages left disagreeing would make the sparse views clamp and
- * reconcile against each other.
+ * Count the removed items each listing, or each cache entry, holds in its cached pages. Every cached page of a listing
+ * reports the same server total, so each must lose the same count: pages left disagreeing would make the sparse views
+ * clamp and reconcile against each other.
  */
-const countRemovedItemsByListing = (
+const countRemovedItems = (
   queries: readonly Query[],
   patch: GalleryItemCachePatch,
-  itemKeys: ReadonlySet<GalleryItemKey>
+  itemKeys: ReadonlySet<GalleryItemKey>,
+  getCountKey: (query: Query) => string
 ): Map<string, number> => {
-  const removedKeysByListing = new Map<string, Set<GalleryItemKey>>();
+  const removedKeysByCountKey = new Map<string, Set<GalleryItemKey>>();
 
   for (const query of queries) {
     const filter = getGalleryItemsFilterFromKey(query.queryKey);
@@ -236,10 +238,10 @@ const countRemovedItemsByListing = (
       continue;
     }
 
-    const listingHash = getListingHash(query.queryKey);
-    const removedKeys = removedKeysByListing.get(listingHash) ?? new Set<GalleryItemKey>();
+    const countKey = getCountKey(query);
+    const removedKeys = removedKeysByCountKey.get(countKey) ?? new Set<GalleryItemKey>();
 
-    removedKeysByListing.set(listingHash, removedKeys);
+    removedKeysByCountKey.set(countKey, removedKeys);
     for (const page of getCachedPages(query)) {
       for (const item of page.items) {
         const key = toGalleryItemKey(item);
@@ -251,7 +253,7 @@ const countRemovedItemsByListing = (
     }
   }
 
-  return new Map([...removedKeysByListing].map(([listingHash, keys]) => [listingHash, keys.size]));
+  return new Map([...removedKeysByCountKey].map(([countKey, keys]) => [countKey, keys.size]));
 };
 
 /** An optimistic star patch, or the rollback of one, for state that retains star flags outside the item caches. */
@@ -287,11 +289,25 @@ export const subscribeGalleryItemStarPatches = (
 const emitGalleryItemStarPatch = (client: QueryClient, event: GalleryItemStarPatchEvent): void =>
   galleryItemStarPatchListeners.get(client)?.forEach((listener) => listener(event));
 
+export interface GalleryItemCachePatchOptions {
+  /**
+   * Which cached pages a removal lowers the total of. `listing` (the default) lowers every cached page of a listing
+   * that holds a removed item anywhere, as a first patch must. `holder` lowers only the cache entries that still hold a
+   * removed item, for re-applying a patch that already lowered the rest: a page refetched since then is the only one
+   * still counting the item.
+   */
+  totals?: 'holder' | 'listing';
+}
+
 /**
  * Applies only backend-confirmed successes. Failed refs are intentionally
  * ignored, and kind-qualified keys prevent same-name images/videos colliding.
  */
-export const patchGalleryItemCaches = (client: QueryClient, patch: GalleryItemCachePatch): (() => void) => {
+export const patchGalleryItemCaches = (
+  client: QueryClient,
+  patch: GalleryItemCachePatch,
+  { totals = 'listing' }: GalleryItemCachePatchOptions = {}
+): (() => void) => {
   const itemKeys = new Set(patch.result.succeeded.map(toGalleryItemKey));
 
   if (itemKeys.size === 0) {
@@ -307,11 +323,13 @@ export const patchGalleryItemCaches = (client: QueryClient, patch: GalleryItemCa
   const starPatchId = patch.kind === 'star' ? ++nextGalleryItemStarPatchId : null;
 
   const queries = getGalleryItemListQueries(client);
-  const removedCountByListing = countRemovedItemsByListing(queries, patch, itemKeys);
+  const getCountKey =
+    totals === 'listing' ? (query: Query) => getListingHash(query.queryKey) : (query: Query) => query.queryHash;
+  const removedCounts = countRemovedItems(queries, patch, itemKeys, getCountKey);
 
   for (const query of queries) {
     const filter = getGalleryItemsFilterFromKey(query.queryKey);
-    const removedItemCount = removedCountByListing.get(getListingHash(query.queryKey)) ?? 0;
+    const removedItemCount = removedCounts.get(getCountKey(query)) ?? 0;
     const patched = filter ? patchItemsCacheData(query, filter, patch, itemKeys, removedItemCount) : null;
 
     if (!patched || patched.after === patched.before) {

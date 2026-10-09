@@ -338,6 +338,7 @@ const createGallery = (overrides: Partial<GalleryStateView> = {}): GalleryStateV
     selectedBoardId: board.id,
     selectedItemKey: 'image:first.png',
     selectedItemKeys: ['image:first.png'],
+    selectionStarredOnly: false,
     semanticImageQuery: null,
     semanticSearchText: null,
     settings: { ...getGallerySettings({ paginationMode: 'paginated' }), imageDensityPercent: 0 },
@@ -1059,6 +1060,7 @@ describe('GalleryImageGrid mixed item cells', () => {
         items: loaded,
         selectedItemKey: 'image:starred-loaded-0.png',
         selectedItemKeys: ['image:starred-loaded-0.png', 'image:starred-loaded-1.png', 'image:starred-unloaded.png'],
+        selectionStarredOnly: true,
         settings: DENSE_SETTINGS,
         starredOnly: true,
       })
@@ -2927,6 +2929,44 @@ describe('GalleryImageGrid virtualization', () => {
 
     expect(actionMocks.selectItem).toHaveBeenLastCalledWith(firstNextPage, 1);
     expect(document.activeElement).toBe(getButton('Select origin-page-1-first.png for preview'));
+  });
+
+  it('does not subscribe the pages between a step and an origin loaded far down the listing', async () => {
+    const pinned = createItem('image', 'far-origin-starred.png', { starred: true });
+    const settled = { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) };
+    setStrip([pinned]);
+    const listed = createItem('image', 'far-origin-listed.png');
+    // The listing shows page 120; the strip's item is also loaded deep in the listing, where its slot is the step
+    // origin's. Stepping out of the strip lands on the unloaded row before page 120.
+    currentSparseListing = {
+      itemSlots: new Map([
+        [120, listed],
+        [6_000, pinned],
+      ]),
+      pageStates: new Map([
+        [120, settled],
+        [6_000, settled],
+      ]),
+      recentItems: [],
+      total: 12_000,
+    };
+    await renderGallery(
+      createGallery({
+        items: [listed, pinned],
+        selectedItemKey: 'image:far-origin-starred.png',
+        selectedItemKeys: ['image:far-origin-starred.png'],
+        settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' },
+      })
+    );
+    const stripTile = host!.querySelector<HTMLElement>(
+      '[data-gallery-section="starred"] button[aria-label="Select far-origin-starred.png for preview"]'
+    )!;
+    await interact(() => stripTile.focus());
+    setVisibleRange.mockClear();
+
+    await act(() => userEvent.keyboard('{ArrowRight}'));
+
+    expect(setVisibleRange).toHaveBeenCalledExactlyOnceWith({ endIndexExclusive: 120, startIndex: 60 });
   });
 
   it('lands a step whose origin page leaves the viewport while the next page loads', async () => {

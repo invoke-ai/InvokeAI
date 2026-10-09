@@ -52,6 +52,11 @@ export interface GalleryStateView {
   primarySelectedItemKey: GalleryItemKey | null;
   selectedItemKey: GalleryItemKey | null;
   selectedItemKeys: GalleryItemKey[];
+  /**
+   * The selection was made in a starred-only listing, so its members were starred when selected. A selection carried
+   * in from another listing says nothing about the star flags of members no page has loaded.
+   */
+  selectionStarredOnly: boolean;
   /** Active image-similarity query, rendered as a chip in place of the search text. */
   semanticImageQuery: GallerySemanticReference | null;
   /** The semantic field's text while the field is in semantic mode; null in metadata mode. */
@@ -378,6 +383,7 @@ export const getGalleryStateView = (
       visibleSelectedItemKey && !selectedItemKeys.includes(visibleSelectedItemKey)
         ? [visibleSelectedItemKey, ...selectedItemKeys]
         : selectedItemKeys,
+    selectionStarredOnly: selectedImageQuery.starredOnly,
     semanticImageQuery,
     semanticSearchText: getGallerySemanticSearchText(values),
     settings,

@@ -171,6 +171,7 @@ const createGallery = (items: GalleryItem[], selected: GalleryItem | null): Gall
   searchTerm: '',
   selectedBoardId: 'board-a',
   ...selectionOf(selected),
+  selectionStarredOnly: false,
   semanticImageQuery: null,
   semanticSearchText: null,
   // At the default density the harness shows three columns and a few rows of 400 items.

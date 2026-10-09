@@ -254,6 +254,9 @@ interface GalleryPageLifecycle {
 
 const lifecycles = new WeakMap<QueryClient, GalleryPageLifecycle>();
 
+/** The account-and-filter prefix that every cached window and page of one item listing shares. */
+export const getGalleryItemListingKey = (queryKey: QueryKey): QueryKey => queryKey.slice(0, 5);
+
 const getSparsePageIdentity = (queryKey: QueryKey): { listingKey: QueryKey; listingHash: string } | null => {
   if (
     queryKey.length !== 7 ||
@@ -270,7 +273,7 @@ const getSparsePageIdentity = (queryKey: QueryKey): { listingKey: QueryKey; list
     return null;
   }
 
-  const listingKey = queryKey.slice(0, 5);
+  const listingKey = getGalleryItemListingKey(queryKey);
 
   return { listingKey, listingHash: hashKey(listingKey) };
 };
@@ -353,9 +356,10 @@ const ensureLifecycle = (client: QueryClient): GalleryPageLifecycle => {
     }
 
     // A failed page waits for its own Retry only while it stays in view. Once nothing observes it, forget the failure
-    // so returning to the page reads it again.
+    // so returning to the page reads it again, whether its last observer left or it failed with none left to see it.
+    // (A read its last observer leaves mid-flight is cancelled back to its prior state before `observerRemoved`.)
     if (
-      event.type === 'observerRemoved' &&
+      (event.type === 'observerRemoved' || (event.type === 'updated' && event.action.type === 'error')) &&
       event.query.state.status === 'error' &&
       event.query.state.fetchStatus === 'idle' &&
       event.query.getObserversCount() === 0

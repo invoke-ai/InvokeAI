@@ -191,7 +191,7 @@ export const useGallerySelectionStarred = (
   selectedItems: readonly GalleryItemRef[],
   loadedItems: readonly GalleryItem[]
 ): boolean => {
-  const { filter } = useGalleryWidget();
+  const { filter, gallery } = useGalleryWidget();
   const selectedKeys = useMemo(() => selectedItems.map(toGalleryItemKey), [selectedItems]);
   const identity = useMemo(() => JSON.stringify(selectedKeys), [selectedKeys]);
   const queryClient = useQueryClient();
@@ -208,8 +208,9 @@ export const useGallerySelectionStarred = (
     () => new Map(loadedItems.map((item) => [toGalleryItemKey(item), item.starred])),
     [loadedItems]
   );
-  // In a starred-only listing every item is starred, including selected ones no page has loaded.
-  const unknownStarred = filter.starred === true;
+  // In a starred-only listing every item is starred, including selected ones no page has loaded, but only when the
+  // selection was made in such a listing: one carried in from elsewhere may hold unstarred members.
+  const unknownStarred = filter.starred === true && gallery.selectionStarredOnly;
 
   // Flags are per item, so ones known before a selection change still answer for items that stay selected.
   return selectedKeys.some((key) => !(loadedStarred.get(key) ?? snapshot.starredByKey.get(key) ?? unknownStarred));

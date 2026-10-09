@@ -418,6 +418,26 @@ describe('Gallery item cache patches', () => {
       expect(client.getQueryData<GalleryItemsPage>(firstKey)).toEqual(firstPage);
       expect(client.getQueryData<GalleryItemsPage>(lastKey)).toEqual(lastPage);
     });
+    it('re-applies a confirmed removal only to pages a mid-flight refetch restored the item to', () => {
+      const client = createClient();
+      const firstKey = getPageKey('board-1', 0);
+      const lastKey = getPageKey('board-1', 60);
+      const firstPage: GalleryItemsPage = { items: [createItem('first.png')], itemIndices: [0], offset: 0, total: 61 };
+      const lastPage: GalleryItemsPage = { items: [createItem('last.png')], itemIndices: [60], offset: 60, total: 61 };
+      const removedLastPage: GalleryItemsPage = { items: [], itemIndices: [], offset: 60, total: 60 };
+      const result = getResult([{ kind: 'image', name: 'last.png' }]);
+
+      client.setQueryData(firstKey, firstPage);
+      client.setQueryData(lastKey, lastPage);
+      patchGalleryItemCaches(client, { kind: 'delete', result });
+      // The last page is read again before the server applies the deletion, so it still holds the item and the total.
+      client.setQueryData(lastKey, lastPage);
+
+      patchGalleryItemCaches(client, { kind: 'delete', result }, { totals: 'holder' });
+
+      expect(client.getQueryData<GalleryItemsPage>(firstKey)).toEqual({ ...firstPage, total: 60 });
+      expect(client.getQueryData<GalleryItemsPage>(lastKey)).toEqual(removedLastPage);
+    });
   });
 
   describe('starred strip entries', () => {

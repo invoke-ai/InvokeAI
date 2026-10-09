@@ -250,6 +250,16 @@ describe('gallery state view', () => {
     expect(getGallerySelectedImageQuery({ starredOnly: true })).toMatchObject({ starredOnly: true });
   });
 
+  it('says whether the selection was made in a starred-only listing, by its stamp', () => {
+    const carriedIn = { selectedImageQuery: { starredOnly: false }, starredOnly: true };
+
+    expect(getGalleryStateView(carriedIn, boards, []).selectionStarredOnly).toBe(false);
+    expect(
+      getGalleryStateView({ selectedImageQuery: { starredOnly: true }, starredOnly: true }, boards, [])
+        .selectionStarredOnly
+    ).toBe(true);
+  });
+
   it('qualifies legacy names and preserves ordered mixed-media selection keys', () => {
     const gallery = getGalleryStateView(
       { selectedImageNames: ['a.png', 'video:shared', 'image:shared', 7] },

@@ -195,6 +195,7 @@ describe('GallerySelectionBar', () => {
         items: [createItem('a.png', true)],
         selectedItemKey: 'image:a.png',
         selectedItemKeys: [...selectedItemKeys],
+        selectionStarredOnly: true,
         starredOnly: true,
       })
     );
@@ -207,6 +208,27 @@ describe('GallerySelectionBar', () => {
         { kind: 'image', name: 'never-loaded-2.png' },
       ],
       false
+    );
+  });
+
+  it('stars a selection carried into Starred-only from the unfiltered listing whose members no page has loaded', async () => {
+    await renderBar(
+      createGallery({
+        items: [createItem('a.png', true)],
+        selectedItemKey: 'image:a.png',
+        selectedItemKeys: ['image:a.png', 'image:selected-unfiltered.png'],
+        selectionStarredOnly: false,
+        starredOnly: true,
+      })
+    );
+    await click(getButton('widgets.gallery.starSelection'));
+
+    expect(itemActions.setItemsStarred).toHaveBeenCalledExactlyOnceWith(
+      [
+        { kind: 'image', name: 'a.png' },
+        { kind: 'image', name: 'selected-unfiltered.png' },
+      ],
+      true
     );
   });
 

@@ -395,7 +395,7 @@ describe('useGalleryData sparse page subscriptions', () => {
   });
 
   it('settles on the clamped page when a removal empties the last paginated page', async () => {
-    const total = 61;
+    let total = 61;
     mocks.listGalleryItems.mockImplementation(({ offset, limit }: { offset: number; limit: number }) =>
       Promise.resolve({
         items: Array.from({ length: Math.max(0, Math.min(limit, total - offset)) }, (_, index) =>
@@ -422,10 +422,13 @@ describe('useGalleryData sparse page subscriptions', () => {
       )
     );
     await vi.waitFor(() => expect(latestData?.items?.map((item) => item.name)).toEqual(['image-60.png']));
+    const readsBeforeRemoval = readRequests().length;
 
     let renderError: unknown;
     try {
       await act(async () => {
+        // The server has applied the move, so only a needless read, not its result, would tell.
+        total = 60;
         patchGalleryItemCaches(queryClient!, {
           boardId: 'elsewhere',
           kind: 'move',
@@ -440,6 +443,15 @@ describe('useGalleryData sparse page subscriptions', () => {
     expect(renderError).toBeUndefined();
     await vi.waitFor(() => expect(latestData?.total).toBe(60));
     expect(latestData?.items).toHaveLength(60);
+    // Both pages lost the item together, so their totals agree and nothing is read again.
+    await act(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(resolve, 50);
+        })
+    );
+    expect(readRequests()).toHaveLength(readsBeforeRemoval);
+    expect(latestData?.total).toBe(60);
   });
 
   it('reconciles a stale page total by refetching instead of flipping between clamped pages', async () => {
@@ -476,6 +488,51 @@ describe('useGalleryData sparse page subscriptions', () => {
     });
     expect(readRequests().filter(({ limit, offset }) => limit === 60 && offset === 0)).toHaveLength(3);
     expect(readRequests().filter(({ limit, offset }) => limit === 60 && offset === 60)).toHaveLength(2);
+  });
+
+  it('stops reconciling when the requested page and the shown page keep reporting different totals', async () => {
+    // A server whose reads never agree: the first page counts 61 items, which puts the request on page 1, while
+    // page 1 counts 60, which clamps it back to page 0.
+    mocks.listGalleryItems.mockImplementation(({ offset, limit }: { offset: number; limit: number }) => {
+      const total = offset === 0 ? 61 : 60;
+
+      return Promise.resolve({
+        items: Array.from({ length: Math.max(0, Math.min(limit, total - offset)) }, (_, index) =>
+          createItem(offset + index)
+        ),
+        total,
+      });
+    });
+
+    let renderError: unknown;
+    try {
+      await renderProbe({ page: 1, paginated: true });
+      await vi.waitFor(() => expect(latestData?.items?.length).toBeGreaterThan(0));
+      await act(
+        () =>
+          new Promise((resolve) => {
+            setTimeout(resolve, 200);
+          })
+      );
+    } catch (error) {
+      renderError = error;
+    }
+
+    expect(renderError).toBeUndefined();
+    const settledReads = readRequests().length;
+    const pageReads = (offset: number) =>
+      readRequests().filter((request) => request.limit === 60 && request.offset === offset).length;
+
+    // One reconciliation reads each page again, then the disagreement is left alone.
+    expect(pageReads(0)).toBeLessThanOrEqual(2);
+    expect(pageReads(60)).toBeLessThanOrEqual(2);
+    await act(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(resolve, 200);
+        })
+    );
+    expect(readRequests()).toHaveLength(settledReads);
   });
 
   it('opens a verified paginated page past a stale retained total', async () => {

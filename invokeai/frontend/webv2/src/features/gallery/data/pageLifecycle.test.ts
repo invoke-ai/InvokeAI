@@ -92,17 +92,15 @@ describe('Gallery sparse page lifecycle', () => {
     client.clear();
   });
 
-  it('bounds failed inactive pages along with successfully loaded pages', async () => {
+  it('does not retain a page whose read fails with nothing observing it', async () => {
     const client = createQueryClient();
     backend.listGalleryItems.mockRejectedValue(new Error('temporary failure'));
 
     for (let index = 0; index < 25; index += 1) {
       await expect(fetchPage(client, index)).rejects.toThrow('temporary failure');
-      expect(pageQueries(client).length).toBeLessThanOrEqual(10);
     }
 
-    expect(pageQueries(client)).toHaveLength(10);
-    expect(pageQueries(client).every((query) => query.state.status === 'error')).toBe(true);
+    expect(pageQueries(client)).toHaveLength(0);
     client.clear();
   });
 

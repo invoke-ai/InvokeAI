@@ -876,7 +876,7 @@ export const GalleryImageGrid = () => {
   /**
    * A `verified` index comes from a reveal's locator and may exceed a total counted before another client added
    * items; its page is pinned so its fresher total reconciles the listing. `keepIndex` names a slot whose page stays
-   * subscribed alongside, as an arrow step's origin must until the step lands.
+   * subscribed alongside when it neighbors the target page, as an arrow step's origin must until the step lands.
    */
   const requestSparseAbsoluteIndex = useCallback(
     (absoluteIndex: number, { keepIndex, verified = false }: { keepIndex?: number; verified?: boolean } = {}) => {
@@ -893,8 +893,11 @@ export const GalleryImageGrid = () => {
       }
 
       const pageOffset = Math.floor(absoluteIndex / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE;
-      const keptPageOffset =
+      const keepPageOffset =
         keepIndex === undefined ? pageOffset : Math.floor(keepIndex / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE;
+      // Only a neighboring origin stays: an origin far off, such as a strip item also loaded deep in the listing,
+      // would subscribe every page between the two.
+      const keptPageOffset = Math.abs(keepPageOffset - pageOffset) <= GALLERY_PAGE_SIZE ? keepPageOffset : pageOffset;
 
       // A page already subscribed keeps the range around it; narrowing to it would drop the cursor's page.
       if (!sparseListing.pageStates.has(pageOffset)) {

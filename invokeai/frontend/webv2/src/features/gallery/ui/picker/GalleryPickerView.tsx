@@ -87,12 +87,19 @@ export const GalleryPickerView = ({
   const currentKey = gallerySelectedItem ? toGalleryItemKey(gallerySelectedItem) : null;
   const seedKey = gallerySelectedItem && accept.includes(gallerySelectedItem.kind) ? currentKey : null;
 
-  // The highlight follows its item's key when an insert shifts it; only a placeholder is held by index.
+  // The highlight follows its item's key when an insert shifts it; only a placeholder is held by index. Each
+  // deliberate placement takes a new `placement`, so it reveals even where an earlier one rested.
   const [activeCursor, setActiveCursor] = useState<{
     filterIdentity: string;
     index: number;
     key: GalleryItemKey | null;
+    placement: number;
   } | null>(null);
+  const placeActiveCursor = useCallback(
+    (filterIdentity: string, index: number, key: GalleryItemKey | null) =>
+      setActiveCursor((current) => ({ filterIdentity, index, key, placement: (current?.placement ?? 0) + 1 })),
+    []
+  );
   const [columnCount, setColumnCount] = useState(GALLERY_PICKER_MIN_COLUMNS);
   const [isUploading, setIsUploading] = useState(false);
   // Async uploads need current selection capacity.
@@ -155,7 +162,7 @@ export const GalleryPickerView = ({
 
     const index = seededIndex ?? defaultActiveIndex;
 
-    setActiveCursor({ filterIdentity, index, key: getSlotKey(index) });
+    placeActiveCursor(filterIdentity, index, getSlotKey(index));
   } else if (activeFilterCursor?.key === null && itemSlots.has(activeFilterCursor.index)) {
     // A placeholder the highlight rests on has loaded: hold its item from now on.
     setActiveCursor({ ...activeFilterCursor, key: getSlotKey(activeFilterCursor.index) });
@@ -327,7 +334,7 @@ export const GalleryPickerView = ({
         event.stopPropagation();
 
         if (nextIndex >= 0) {
-          setActiveCursor({ filterIdentity, index: nextIndex, key: getSlotKey(nextIndex) });
+          placeActiveCursor(filterIdentity, nextIndex, getSlotKey(nextIndex));
 
           // A subscribed page keeps the range around it; narrowing to the cursor would drop the rest of the view.
           if (!pageStates.has(Math.floor(nextIndex / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE)) {
@@ -359,6 +366,7 @@ export const GalleryPickerView = ({
       getSlotKey,
       pageStates,
       pickItem,
+      placeActiveCursor,
       resolvedActiveIndex,
       setVisibleRange,
       scope.pane,
@@ -372,12 +380,12 @@ export const GalleryPickerView = ({
       const index = slotIndexByKey.get(key);
 
       if (index !== undefined) {
-        setActiveCursor({ filterIdentity, index, key });
+        placeActiveCursor(filterIdentity, index, key);
       }
 
       pickItem(item);
     },
-    [filterIdentity, pickItem, slotIndexByKey]
+    [filterIdentity, pickItem, placeActiveCursor, slotIndexByKey]
   );
   const handleVisibleRangeChange = useCallback(
     (range: { endIndexExclusive: number; startIndex: number }) => setVisibleRange?.(range),
@@ -551,7 +559,7 @@ export const GalleryPickerView = ({
         ) : showsGrid ? (
           <GalleryPickerGrid
             activeIndex={resolvedActiveIndex}
-            activePlacement={`${filterIdentity}\n${activeFilterCursor?.index ?? resolvedActiveIndex}`}
+            activePlacement={`${filterIdentity}\n${activeFilterCursor ? `#${activeFilterCursor.placement}` : resolvedActiveIndex}`}
             columnCount={columnCount}
             currentKey={currentKey}
             getTileState={getTileState}
