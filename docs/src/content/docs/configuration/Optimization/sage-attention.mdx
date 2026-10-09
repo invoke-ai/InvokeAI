@@ -1,0 +1,130 @@
+---
+title: SageAttention
+sidebar:
+  order: 5
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+[SageAttention](https://github.com/thu-ml/SageAttention) is a faster attention kernel for NVIDIA GPUs. It quantizes the
+attention inputs to 8 bits inside the kernel. On an RTX 4090 under Windows that makes the attention of the image and
+video models two to three times faster than PyTorch's own kernels. How much of a generation that saves depends on how
+much of each step is attention: it grows with resolution and video length.
+
+It is **opt-in**. Because the kernel is quantized, an image made with SageAttention is not pixel-identical to one made
+without it at the same seed — composition details can shift the way they do between two GPU models. In a blind
+side-by-side comparison of 48 image pairs from six image model families, no pair was judged worse with SageAttention;
+the video models were checked against PyTorch's attention for picture changes and frame-to-frame flicker.
+
+## Supported models
+
+SageAttention is enabled per model family once that family has been measured with it. No model family uses it yet,
+so every model keeps PyTorch's attention.
+
+## Requirements
+
+- **An NVIDIA GPU with compute capability 8.0 or newer** — RTX 30-series, RTX 40-series, RTX 50-series, A100, H100.
+  InvokeAI has measured it on an RTX 4090; the other generations use the kernels SageAttention picks for them, which
+  InvokeAI has not validated (on RTX 30-series cards, its Triton kernel). Jetson Orin is not supported.
+- **SageAttention 2.2, installed separately.** InvokeAI was validated with 2.2.0. The `sageattention` package on PyPI is
+  the older SageAttention 1 and is not used. On Windows it also needs the `triton-windows` package.
+- Not available on AMD (ROCm), Apple Silicon (MPS), Intel (XPU) or CPU. There InvokeAI keeps PyTorch's attention.
+
+## Installing
+
+SageAttention goes into the Python environment InvokeAI runs from — the `.venv` folder in your install directory. The
+commands use [uv](https://docs.astral.sh/uv/), which InvokeAI's environment is managed with; install it first if
+`uv --version` does not work in your terminal.
+
+### Windows
+
+<Steps>
+1. Open a terminal in your InvokeAI install directory.
+2. Install Triton for Windows, matching the Triton version of InvokeAI's PyTorch (Triton 3.7 for PyTorch 2.13):
+
+   ```powershell
+   uv pip install --python .venv\Scripts\python.exe "triton-windows>=3.7,<3.8"
+   ```
+
+3. Install a SageAttention 2.2 wheel from the [SageAttention for Windows releases](https://github.com/woct0rdho/SageAttention/releases)
+   that matches InvokeAI's PyTorch (CUDA 13, PyTorch 2.10 or newer), without letting it touch PyTorch:
+
+   ```powershell
+   uv pip install --python .venv\Scripts\python.exe --no-deps "https://github.com/woct0rdho/SageAttention/releases/download/v2.2.0-windows.post6/sageattention-2.2.0%2Bcu130torch2.10.0andhigher.post6-cp310-abi3-win_amd64.whl"
+   ```
+</Steps>
+
+### Linux
+
+SageAttention 2 has no prebuilt wheels for Linux. Build it from source into InvokeAI's environment
+(`.venv/bin/python`) as described in [SageAttention's installation instructions](https://github.com/thu-ml/SageAttention#installation),
+with the CUDA toolkit that matches InvokeAI's PyTorch (CUDA 13) installed. InvokeAI's environment has no `pip`; use
+`uv pip install --python .venv/bin/python ...` where those instructions say `pip install`. Triton ships with PyTorch on
+Linux.
+
+:::caution[Keep it matched to InvokeAI's PyTorch]
+SageAttention is built against PyTorch, and Triton must match PyTorch's version. When an update moves InvokeAI to a new
+PyTorch, install the matching `triton-windows` again on Windows, and on Linux rebuild SageAttention. A wheel for a
+different CUDA major version, or a repair that re-creates the environment, needs a matching SageAttention too. Until
+then InvokeAI logs why it cannot use it and generates with PyTorch's attention.
+:::
+
+## Enabling
+
+Set the backend in your [`invokeai.yaml`](/configuration/invokeai-yaml/) and restart InvokeAI:
+
+```yaml
+attention_backend: sage
+```
+
+The startup log confirms it:
+
+```
+SageAttention 2.2.0+cu130torch2.10.0andhigher.post6 enabled for the attention inside supported diffusion models ...
+```
+
+and the first generation that uses it names the GPU and the kernel:
+
+```
+SageAttention 2.2.0+cu130torch2.10.0andhigher.post6 serves diffusion-model attention on cuda:0 (NVIDIA GeForce RTX 4090, sm_89, sageattn_qk_int8_pv_fp8_cuda).
+```
+
+If SageAttention cannot be used, the startup log says why — package missing, Triton missing, GPU too old — and
+InvokeAI generates with PyTorch's attention as usual. With `log_level: debug`, every generation logs how many attention
+calls ran on SageAttention and why the others did not. To go back, set `attention_backend: auto`.
+
+## What stays on PyTorch's attention
+
+SageAttention serves the attention inside the denoising model of the families under [Supported models](#supported-models).
+Everything else keeps PyTorch's attention:
+
+- **Text encoders, image encoders and VAEs.** They run outside the denoising loop. What runs inside it, such as a
+  ControlNet, is served like the model itself.
+- **Masked attention**, such as regional prompts. SageAttention has no mask input.
+- **Short sequences** — fewer than 1536 query or 512 key tokens. There the cost of quantizing the inputs outweighs the
+  faster kernel.
+- **Head sizes other than 64 and 128.**
+- **Models not listed under Supported models**, such as SD 1.5 and SD 2.
+
+Pinning a PyTorch kernel through diffusers' `DIFFUSERS_ATTN_BACKEND`, or in a custom node with
+`torch.nn.attention.sdpa_kernel`, does not stop SageAttention; set `attention_backend: auto` to measure PyTorch's own
+kernels.
+
+## Notes
+
+- **The first generation pauses briefly.** SageAttention compiles a few Triton kernels on first use, about two seconds
+  on an RTX 4090; they are cached on disk afterwards.
+- **Each GPU's first SageAttention call is checked against PyTorch's attention**, once for each precision and head
+  size. If the result is wrong or the kernel fails, InvokeAI logs a warning once and that GPU uses PyTorch's attention
+  until restart. Some GPU faults (an illegal memory access, for example) leave the GPU unusable for the rest of the
+  process: then PyTorch's attention fails the same way, and only a restart helps. A fault the GPU raises later, while
+  running a kernel, cannot be caught at all and ends the generation.
+- **Memory.** Peak VRAM was unchanged for every measured model. Each call holds quantized copies of its inputs, about
+  1.7 bytes per element of the query, key and value together — around 70 MB for FLUX.1 at 1024×1024, and around 2 GB
+  per call for Wan 2.2 14B at 1280×720 with 81 frames (not measured). When a call does not fit, the rest of that
+  generation runs on PyTorch's attention, which needs less, and the log says so; the next generation tries
+  SageAttention again.
+- **Recall.** `attention_backend` is not stored in an image's metadata, so an image recalled after switching it is
+  generated slightly differently.
+- **Black or noisy images** have been reported with SageAttention for some models in other applications. None appeared
+  in InvokeAI's tests; if you see one, set `attention_backend: auto` and report it with the model and settings.
