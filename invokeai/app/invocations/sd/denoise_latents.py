@@ -82,6 +82,7 @@ from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.fp8 import get_model_compute_dtype
 from invokeai.backend.util.hotfixes import ControlNetModel
 from invokeai.backend.util.mask import to_standard_float_mask
+from invokeai.backend.util.sage_attention import sage_attention_scope
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 
@@ -1044,7 +1045,11 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
                 sd_backend = StableDiffusionBackend(unet, scheduler)
                 denoise_ctx.unet = unet
-                result_latents = sd_backend.latents_from_embeddings(denoise_ctx, ext_manager)
+                # SageAttention is validated on SDXL only; SD1.5's head sizes never qualify, SD2 is unmeasured.
+                with (
+                    sage_attention_scope() if self.unet.unet.base == BaseModelType.StableDiffusionXL else nullcontext()
+                ):
+                    result_latents = sd_backend.latents_from_embeddings(denoise_ctx, ext_manager)
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         result_latents = result_latents.detach().to("cpu")
@@ -1198,22 +1203,26 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 if self.hidiffusion
                 else nullcontext()
             ):
-                result_latents = pipeline.latents_from_embeddings(
-                    latents=latents,
-                    timesteps=timesteps,
-                    init_timestep=init_timestep,
-                    noise=noise,
-                    seed=seed,
-                    mask=mask,
-                    masked_latents=masked_latents,
-                    is_gradient_mask=gradient_mask,
-                    scheduler_step_kwargs=scheduler_step_kwargs,
-                    conditioning_data=conditioning_data,
-                    control_data=controlnet_data,
-                    ip_adapter_data=ip_adapter_data,
-                    t2i_adapter_data=t2i_adapter_data,
-                    callback=step_callback,
-                )
+                # SageAttention is validated on SDXL only; SD1.5's head sizes never qualify, SD2 is unmeasured.
+                with (
+                    sage_attention_scope() if self.unet.unet.base == BaseModelType.StableDiffusionXL else nullcontext()
+                ):
+                    result_latents = pipeline.latents_from_embeddings(
+                        latents=latents,
+                        timesteps=timesteps,
+                        init_timestep=init_timestep,
+                        noise=noise,
+                        seed=seed,
+                        mask=mask,
+                        masked_latents=masked_latents,
+                        is_gradient_mask=gradient_mask,
+                        scheduler_step_kwargs=scheduler_step_kwargs,
+                        conditioning_data=conditioning_data,
+                        control_data=controlnet_data,
+                        ip_adapter_data=ip_adapter_data,
+                        t2i_adapter_data=t2i_adapter_data,
+                        callback=step_callback,
+                    )
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         result_latents = result_latents.to("cpu")
