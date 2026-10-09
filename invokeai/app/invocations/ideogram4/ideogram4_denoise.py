@@ -241,13 +241,13 @@ class Ideogram4DenoiseInvocation(BaseInvocation):
 
     @staticmethod
     def _dequant_transient(model: object) -> int:
-        """What an int8 build transiently needs to dequantize its largest layer, per forward.
+        """What an int8 or GGUF build transiently needs to dequantize its largest layer, per forward.
 
-        `Int8ConvrotLinear` keeps the stored codes and materializes the dequantized, derotated
-        weight inside `forward`, so that peak is not part of the model's resident size and has to
-        fit inside the caller's reservation. Zero for a bf16 or fp8 build -- which is why it is
-        measured from the model rather than from the resolution: the two branches are separate
-        models and may be different builds.
+        `Int8ConvrotLinear` keeps the stored codes and a GGUF Linear its packed blocks, and both
+        materialize the dequantized weight inside `forward`, so that peak is not part of the model's
+        resident size and has to fit inside the caller's reservation. Zero for a bf16 or fp8 build --
+        which is why it is measured from the model rather than from the resolution: the two branches
+        are separate models and may be different builds.
         """
         if not isinstance(model, torch.nn.Module):
             return 0
