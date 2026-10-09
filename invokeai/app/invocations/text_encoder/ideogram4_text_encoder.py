@@ -8,10 +8,12 @@ from invokeai.app.invocations.model import Qwen3EncoderField
 from invokeai.app.invocations.primitives import Ideogram4ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.ideogram4.text_encoding import encode_qwen3vl_prompt
+from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
     Ideogram4ConditioningInfo,
 )
+from invokeai.backend.util.devices import TorchDevice
 
 
 @invocation(
@@ -45,8 +47,15 @@ class Ideogram4TextEncoderInvocation(BaseInvocation):
         text_encoder_info = context.models.load(self.qwen3_encoder.text_encoder)
         tokenizer_info = context.models.load(self.qwen3_encoder.tokenizer)
 
+        # A GGUF build dequantizes each Linear per forward, a transient its resident size does not cover;
+        # zero for other builds.
+        dequant_bytes = peak_dequant_transient_bytes(
+            text_encoder_info.model, TorchDevice.choose_bfloat16_safe_dtype(text_encoder_info.compute_device)
+        )
         with ExitStack() as exit_stack:
-            (_, text_encoder) = exit_stack.enter_context(text_encoder_info.model_on_device())
+            (_, text_encoder) = exit_stack.enter_context(
+                text_encoder_info.model_on_device(working_mem_bytes=dequant_bytes)
+            )
             (_, tokenizer) = exit_stack.enter_context(tokenizer_info.model_on_device())
 
             context.util.signal_progress("Running Qwen3-VL text encoder")

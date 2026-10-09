@@ -458,9 +458,10 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         noisy_seq_len = latents.shape[1]
 
         transformer_config = context.models.get_config(self.transformer.transformer)
-        # An nvfp4 build dequantizes each packed Linear per forward, a transient its resident size does not cover. The
-        # cache holds back the larger of this and its default working memory, not their sum: this node has no
-        # activation estimate to add it to. Read from the unlocked model, before the lock; zero for every other build.
+        # An nvfp4 or GGUF build dequantizes each packed Linear per forward, a transient its resident size does not
+        # cover. The cache holds back the larger of this and its default working memory, not their sum: this node has
+        # no activation estimate to add it to. Read from the unlocked model, before the lock; zero for every other
+        # build.
         dequant_bytes = peak_dequant_transient_bytes(transformer_info.model, inference_dtype)
 
         with ExitStack() as exit_stack:

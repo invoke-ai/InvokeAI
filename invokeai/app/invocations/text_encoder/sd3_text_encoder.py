@@ -19,7 +19,9 @@ from invokeai.backend.model_manager.taxonomy import ModelFormat
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_CLIP_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, SD3ConditioningInfo
+from invokeai.backend.util.devices import TorchDevice
 
 # The SD3 T5 Max Sequence Length set based on the default in diffusers.
 SD3_T5_MAX_SEQ_LEN = 256
@@ -97,8 +99,13 @@ class Sd3TextEncoderInvocation(BaseInvocation):
         prompt = [self.prompt]
 
         t5_text_encoder_info = context.models.load(self.t5_encoder.text_encoder)
+        # A GGUF build dequantizes each Linear per forward, a transient its resident size does not cover;
+        # zero for other builds.
+        dequant_bytes = peak_dequant_transient_bytes(
+            t5_text_encoder_info.model, TorchDevice.choose_bfloat16_safe_dtype(t5_text_encoder_info.compute_device)
+        )
         with (
-            t5_text_encoder_info as t5_text_encoder,
+            t5_text_encoder_info.model_on_device(working_mem_bytes=dequant_bytes) as (_, t5_text_encoder),
             context.models.load(self.t5_encoder.tokenizer) as t5_tokenizer,
         ):
             context.util.signal_progress("Running T5 encoder")

@@ -104,7 +104,7 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
         # This prevents it from being evicted while we look up the tokenizer
         text_encoder_info = context.models.load(self.qwen3_encoder.text_encoder)
         text_encoder_format = context.models.get_config(self.qwen3_encoder.text_encoder).format
-        # An nvfp4 build dequantizes each packed Linear per forward, a transient its resident size does not
+        # An nvfp4 or GGUF build dequantizes each packed Linear per forward, a transient its resident size does not
         # cover. Read from the unlocked model, before the lock the reservation applies to; zero for other builds.
         dequant_bytes = peak_dequant_transient_bytes(
             text_encoder_info.model, TorchDevice.choose_bfloat16_safe_dtype(text_encoder_info.compute_device)

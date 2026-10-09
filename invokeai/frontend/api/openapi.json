@@ -1494,6 +1494,9 @@
                       "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
                     },
                     {
@@ -1964,6 +1967,9 @@
                       "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
                     },
                     {
@@ -2432,6 +2438,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
@@ -2947,6 +2956,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
@@ -3489,6 +3501,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
@@ -4903,6 +4918,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
@@ -19242,6 +19260,9 @@
           },
           {
             "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
           },
           {
             "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
@@ -45894,7 +45915,7 @@
         "category": "model",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Loads an Ideogram 4 model, outputting its submodels.\n\nTwo on-disk layouts are supported:\n\n* A diffusers pipeline bundles everything - both transformer branches, the Qwen3-VL encoder\n  + tokenizer, and the VAE - and needs nothing else selected.\n* Comfy-Org's single files hold ONE branch each, so the conditional file goes in `Model`, the\n  unconditional one in `Transformer (Unconditional)`, and the Qwen3-VL 8B encoder and the\n  32-channel VAE are selected here as well.\n\nBoth branches run at every denoising step, so the pair is not optional.",
+        "description": "Loads an Ideogram 4 model, outputting its submodels.\n\nTwo on-disk layouts are supported:\n\n* A diffusers pipeline bundles everything - both transformer branches, the Qwen3-VL encoder\n  + tokenizer, and the VAE - and needs nothing else selected.\n* Single files - Comfy-Org's safetensors or a community GGUF - hold ONE branch each, so the\n  conditional file goes in `Model`, the unconditional one in `Transformer (Unconditional)`, and\n  the Qwen3-VL 8B encoder and the 32-channel VAE are selected here as well.\n\nBoth branches run at every denoising step, so the pair is not optional.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -45923,7 +45944,7 @@
           },
           "model": {
             "$ref": "#/components/schemas/ModelIdentifierField",
-            "description": "The Ideogram 4 model to load. A diffusers pipeline provides every submodel; a single-file checkpoint is the conditional transformer alone and needs the components below.",
+            "description": "The Ideogram 4 model to load. A diffusers pipeline provides every submodel; a single file (safetensors or GGUF) is the conditional transformer alone and needs the components below.",
             "field_kind": "input",
             "input": "direct",
             "orig_required": true,
@@ -45941,14 +45962,14 @@
               }
             ],
             "default": null,
-            "description": "The unconditional branch as a single-file checkpoint. Required when Model is a single file; ignored for a diffusers pipeline, which bundles both branches.",
+            "description": "The unconditional branch as a single file (safetensors or GGUF). Required when Model is a single file; ignored for a diffusers pipeline, which bundles both branches.",
             "field_kind": "input",
             "input": "direct",
             "orig_default": null,
             "orig_required": false,
             "title": "Transformer (Unconditional)",
             "ui_model_base": ["ideogram-4"],
-            "ui_model_format": ["checkpoint"],
+            "ui_model_format": ["checkpoint", "gguf_quantized"],
             "ui_model_type": ["main"]
           },
           "qwen3_vl_encoder_model": {
@@ -45961,7 +45982,7 @@
               }
             ],
             "default": null,
-            "description": "Standalone Qwen3-VL 8B encoder. Required when Model is a single-file checkpoint; otherwise an override for the encoder bundled in the diffusers pipeline.",
+            "description": "Standalone Qwen3-VL 8B encoder. Required when Model is a single file; otherwise an override for the encoder bundled in the diffusers pipeline.",
             "field_kind": "input",
             "input": "direct",
             "orig_default": null,
@@ -45980,7 +46001,7 @@
               }
             ],
             "default": null,
-            "description": "Standalone VAE (the 32-channel one Ideogram 4 shares with FLUX.2). Required when Model is a single-file checkpoint; otherwise an override for the bundled VAE.",
+            "description": "Standalone VAE (the 32-channel one Ideogram 4 shares with FLUX.2). Required when Model is a single file; otherwise an override for the bundled VAE.",
             "field_kind": "input",
             "input": "direct",
             "orig_default": null,
@@ -75867,6 +75888,178 @@
         "title": "Main_GGUF_Flux2_Config",
         "description": "Model config for GGUF-quantized FLUX.2 checkpoint models (e.g. Klein)."
       },
+      "Main_GGUF_Ideogram4_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "ideogram-4",
+            "title": "Base",
+            "default": "ideogram-4"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          },
+          "branch": {
+            "type": "string",
+            "enum": ["conditional", "unconditional"],
+            "title": "Branch",
+            "description": "Which of Ideogram 4's two transformer branches this file holds. GGUF releases record no metadata, so it is read from the filename: anything naming 'unconditional' or 'uncond' is the unconditional branch. Rename and re-install to correct it."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format",
+          "branch"
+        ],
+        "title": "Main_GGUF_Ideogram4_Config",
+        "description": "Model config for GGUF-quantized Ideogram 4 transformers (single-file).\n\nLike the safetensors single files, one GGUF holds ONE of the two dual-branch transformers and\nthe loader node pairs them. Unlike them, no published GGUF carries any metadata (every release\nhas a key/value count of zero), so the branch comes from the filename alone: keep the files\nunder their published names."
+      },
       "Main_GGUF_Krea2_Config": {
         "properties": {
           "key": {
@@ -84299,6 +84492,9 @@
                 "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
               },
               {
@@ -85015,6 +85211,9 @@
                     "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
                   },
                   {
@@ -85616,6 +85815,9 @@
                 "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
               },
               {
@@ -86071,6 +86273,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
@@ -87018,6 +87223,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"

@@ -578,8 +578,8 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             device=device,
             dtype=inference_dtype,
         )
-        # An int8_tensorwise build stores its linears quantized and materializes the dequantized,
-        # derotated weight per forward call. That transient is alive alongside the activations above,
+        # An int8_tensorwise or GGUF build stores its linears quantized and materializes the dequantized
+        # weight per forward call. That transient is alive alongside the activations above,
         # so it is added rather than compared -- and it is invisible to an activation estimate, which
         # is how a model that loaded comfortably OOMs in its first step. Zero for any other format.
         estimated_working_memory += peak_dequant_transient_bytes(transformer_info.model, inference_dtype)
