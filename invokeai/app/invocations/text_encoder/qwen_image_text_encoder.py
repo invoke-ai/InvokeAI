@@ -21,6 +21,7 @@ from invokeai.app.invocations.primitives import QwenImageConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.load.model_cache.model_cache import MB, MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs
+from invokeai.backend.quantization.bnb_cast_notice import silence_int8_cast_notice
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.qwen2_5_vl.qwen2_5_vl_assets import (
     load_bundled_qwen2_5_vl_preprocessor_config_dict,
@@ -412,9 +413,6 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
                 bnb_4bit_quant_type="nf4",
             )
         else:  # int8
-            # Imported here: bitsandbytes is not installed on macOS, where the single-file path above still works.
-            from invokeai.backend.quantization.bnb_llm_int8 import silence_int8_cast_notice
-
             bnb_config = BitsAndBytesConfig(load_in_8bit=True)
             silence_int8_cast_notice()
 

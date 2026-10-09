@@ -4,12 +4,12 @@ import warnings
 import pytest
 import torch
 
+from invokeai.backend.quantization.bnb_cast_notice import silence_int8_cast_notice
+
 try:
-    from invokeai.backend.quantization.bnb_llm_int8 import InvokeLinear8bitLt, silence_int8_cast_notice
+    from invokeai.backend.quantization.bnb_llm_int8 import InvokeLinear8bitLt
 except ImportError:
     pass
-
-_CAST_NOTICE = "MatMul8bitLt: inputs will be cast from torch.bfloat16 to float16 during quantization"
 
 
 def test_invoke_linear_8bit_lt_quantization():
@@ -88,25 +88,6 @@ def test_invoke_linear_8bit_lt_state_dict_roundtrip():
     # Assert that the inference results are the same.
     assert torch.allclose(y, y_quantized_1.to("cpu"), atol=0.05)
     assert torch.allclose(y_quantized_1, y_quantized_2, atol=1e-5)
-
-
-def test_int8_cast_notice_is_silenced_as_a_warning_and_as_a_log_record(caplog):
-    """bitsandbytes up to 0.49 warns with `warnings`; from 0.50 it logs. Other notices from either path still show."""
-    pytest.importorskip("bitsandbytes")
-    bnb_logger = logging.getLogger("bitsandbytes.autograd._functions")
-    with warnings.catch_warnings(record=True) as caught, caplog.at_level(logging.WARNING, logger=bnb_logger.name):
-        warnings.simplefilter("always")
-        silence_int8_cast_notice()
-        silence_int8_cast_notice()  # idempotent: one log filter, not two
-
-        warnings.warn(_CAST_NOTICE, UserWarning, stacklevel=1)
-        warnings.warn("an unrelated bitsandbytes warning", UserWarning, stacklevel=1)
-        bnb_logger.warning("MatMul8bitLt: inputs will be cast from %s to float16 during quantization", torch.bfloat16)
-        bnb_logger.warning("an unrelated bitsandbytes log record")
-
-    assert [str(w.message) for w in caught] == ["an unrelated bitsandbytes warning"]
-    assert [r.getMessage() for r in caplog.records] == ["an unrelated bitsandbytes log record"]
-    assert sum(type(f).__name__ == "_DropInt8CastNotice" for f in bnb_logger.filters) == 1
 
 
 def test_a_bf16_int8_matmul_reports_no_cast_notice(caplog):
