@@ -66,7 +66,7 @@ export const PreviewActionStrip = ({
   const starLabel = t(STAR_LABEL_KEYS[item.kind][item.starred ? 'on' : 'off']);
   const starButton = (
     <Tooltip content={starLabel}>
-      <IconButton aria-label={starLabel} color="fg.muted" size="2xs" variant="ghost" onClick={toggleStar}>
+      <IconButton aria-label={starLabel} color="fg.muted" size="sm" variant="ghost" onClick={toggleStar}>
         <Icon as={StarIcon} boxSize="3.5" fill={item.starred ? 'currentColor' : 'none'} />
       </IconButton>
     </Tooltip>
@@ -116,7 +116,7 @@ const EditOnCanvasMenu = ({ onSend }: { onSend: (destination: GalleryCanvasImpor
     <Menu.Root ids={ids} positioning={CANVAS_MENU_POSITIONING}>
       <Tooltip content={t('widgets.preview.editOnCanvas')} ids={ids}>
         <Menu.Trigger asChild>
-          <Button aria-label={t('widgets.preview.editOnCanvas')} color="fg.muted" size="2xs" variant="ghost">
+          <Button aria-label={t('widgets.preview.editOnCanvas')} color="fg.muted" size="sm" variant="ghost">
             <Icon as={PencilIcon} boxSize="3.5" />
             {t('common.edit')}
             <ChevronDownIcon size={12} />
@@ -170,7 +170,7 @@ const StripIconButton = ({
   onClick: (event: MouseEvent<HTMLButtonElement>) => void;
 }) => (
   <Tooltip content={label}>
-    <IconButton aria-label={label} color="fg.muted" disabled={disabled} size="2xs" variant="ghost" onClick={onClick}>
+    <IconButton aria-label={label} color="fg.muted" disabled={disabled} size="sm" variant="ghost" onClick={onClick}>
       <Icon as={icon} boxSize="3.5" />
     </IconButton>
   </Tooltip>

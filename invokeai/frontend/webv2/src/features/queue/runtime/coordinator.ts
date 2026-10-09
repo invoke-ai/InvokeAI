@@ -710,24 +710,27 @@ export const createQueueCoordinator = (
     isSweeping = true;
 
     try {
-      await Promise.all(
-        [...waits.keys()].map(async (backendItemId) => {
-          try {
-            const queueItem = await backend.getItem(backendItemId);
+      await mapWithConcurrency([...waits.keys()], BACKEND_READ_CONCURRENCY, async (backendItemId) => {
+        // A slot that settled after the sweep began needs no read.
+        if (!isActive() || !waits.has(backendItemId)) {
+          return;
+        }
 
-            if (isActive()) {
-              settleFromQueueItem(queueItem);
-            }
-          } catch (error) {
-            if (isActive() && error instanceof ApiError && error.status === 404) {
-              settleWait(backendItemId, {
-                error: `Queue item ${backendItemId} is no longer on the backend queue.`,
-                status: 'failed',
-              });
-            }
+        try {
+          const queueItem = await backend.getItem(backendItemId);
+
+          if (isActive()) {
+            settleFromQueueItem(queueItem);
           }
-        })
-      );
+        } catch (error) {
+          if (isActive() && error instanceof ApiError && error.status === 404) {
+            settleWait(backendItemId, {
+              error: `Queue item ${backendItemId} is no longer on the backend queue.`,
+              status: 'failed',
+            });
+          }
+        }
+      });
     } finally {
       isSweeping = false;
 

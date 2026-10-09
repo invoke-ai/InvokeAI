@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 
 import { getGalleryAutoAddBoardId, toGalleryItemKey } from '@features/gallery/contracts';
 import { invalidateGallery } from '@features/gallery/queries';
-import { VideoUiProvider } from '@features/video';
+import { createDefaultVideoWidgetValues, normalizeVideoWidgetValues, VideoUiProvider } from '@features/video';
 import { useQueryClient } from '@tanstack/react-query';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
@@ -14,7 +14,7 @@ import {
   subscribeVideoSpanPlaybackState,
 } from '@workbench/widgets/preview/spanPlaybackRequest';
 import { getProjectWidgetValues } from '@workbench/widgetState';
-import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 /** Video owns its prompt in widget values; do not join the draft shared by Generate/Upscale. */
@@ -47,13 +47,28 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
     activeProjectIdRef.current = project.projectId;
   }, [project.projectId, uploadBoardId]);
   const commands = useWorkbenchCommands();
+  const queries = useWorkbenchQueries();
   const queryClient = useQueryClient();
   // Key actions by project, not values, to preserve callback identity while typing.
   const { projectId } = project;
   const patchValues = useCallback<VideoUiAdapter['patchValues']>(
-    (values, origin) => commands.widgets.patchValues('video', values, projectId, origin),
+    (values, origin) =>
+      commands.widgets.patchValues(
+        'video',
+        typeof values === 'function'
+          ? (current) => values(normalizeVideoWidgetValues(current) ?? createDefaultVideoWidgetValues())
+          : values,
+        projectId,
+        origin
+      ),
     [commands, projectId]
   );
+  // The same project patchValues writes to, so an async commit reads and writes one panel.
+  const readValues = useCallback<VideoUiAdapter['readValues']>(() => {
+    const target = queries.getProject(projectId);
+
+    return target ? getProjectWidgetValues(target, 'video') : {};
+  }, [projectId, queries]);
   const reportError = useCallback<VideoUiAdapter['reportError']>(
     (message) => commands.notifications.reportError({ area: 'video', message, namespace: 'generation' }),
     [commands]
@@ -88,6 +103,7 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
       getUploadBoardId,
       patchValues,
       playVideoSpanInPreview,
+      readValues,
       reportError,
       showPromptSyntaxHighlighting,
       touchGalleryImages,
@@ -99,6 +115,7 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
       patchValues,
       playVideoSpanInPreview,
       project,
+      readValues,
       reportError,
       showPromptSyntaxHighlighting,
       touchGalleryImages,

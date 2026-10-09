@@ -13,13 +13,17 @@ import { buildOpenSettingsEntry, buildSettingsEntries } from './entries';
 
 /** Launchpad-only palette adapter: navigation and settings, no editor providers. */
 const LaunchpadCommandPaletteDialog = ({
+  isOpen,
   modifierKeyLabel,
   onClose,
+  onExitComplete,
   preferences,
   settingsEntryDeps,
 }: {
+  isOpen: boolean;
   modifierKeyLabel: string;
   onClose: () => void;
+  onExitComplete: () => void;
   preferences: WorkbenchPreferences;
   settingsEntryDeps: SettingsEntryDeps;
 }) => {
@@ -82,7 +86,15 @@ const LaunchpadCommandPaletteDialog = ({
     t,
   ]);
 
-  return <CommandPaletteDialog entries={entries} isOpen modifierKeyLabel={modifierKeyLabel} onClose={onClose} />;
+  return (
+    <CommandPaletteDialog
+      entries={entries}
+      isOpen={isOpen}
+      modifierKeyLabel={modifierKeyLabel}
+      onClose={onClose}
+      onExitComplete={onExitComplete}
+    />
+  );
 };
 
 export default LaunchpadCommandPaletteDialog;

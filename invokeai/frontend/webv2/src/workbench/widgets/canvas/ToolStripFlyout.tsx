@@ -1,28 +1,50 @@
-import type { KeyboardEvent, PointerEvent as ReactPointerEvent } from 'react';
+import type { KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react';
 
-import { Box, Icon } from '@chakra-ui/react';
+import { Box, Icon, Menu, Portal, useMenu } from '@chakra-ui/react';
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { IconButton } from '@platform/ui/Button';
-import { Tooltip } from '@platform/ui/Tooltip';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { MenuContent } from '@platform/ui/Menu';
+import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
+import { ShortcutKeycaps } from '@workbench/hotkeys/keyGlyphs';
+import { useCallback, useRef } from 'react';
 
 const HOLD_OPEN_MS = 350;
 const TOOLTIP_POSITIONING = { placement: 'right' } as const;
-/** The flyout opens sideways, so a subtool's tooltip goes below it rather than over the next subtool. */
-const SUBTOOL_TOOLTIP_POSITIONING = { placement: 'bottom' } as const;
+/** The gutter clears the strip's padding and border, so the menu opens beside the strip rather than over it. */
+const MENU_POSITIONING = { gutter: 8, placement: 'right-start' } as const;
+const MENU_ITEM_SELECTOR = '[role="menuitemradio"][data-value]';
 
 export interface ToolFlyoutItem {
   id: string;
   icon: React.ElementType;
   label: string;
+  /** The subtool's effective hotkey, already formatted for the platform. */
+  shortcut?: readonly string[];
 }
 
+const isOverElement = (element: Element, event: ReactPointerEvent): boolean => {
+  const rect = element.getBoundingClientRect();
+  return (
+    event.clientX >= rect.left &&
+    event.clientX <= rect.right &&
+    event.clientY >= rect.top &&
+    event.clientY <= rect.bottom
+  );
+};
+
+/** The menu entry under a pointer the slot has captured; capture retargets its events to the slot. */
+const menuItemValueAt = (event: ReactPointerEvent): string | null =>
+  document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>(MENU_ITEM_SELECTOR)?.dataset.value ??
+  null;
+
 /**
- * Click selects the current subtool; hold, right-click, or keyboard opens the flyout. Release over an entry
- * selects; quick release leaves it open.
+ * A strip slot standing for a family of subtools. Click selects the current subtool; hold, right-click, ArrowRight
+ * or the context-menu key open a menu of the family. Releasing a hold over an entry selects it; releasing elsewhere
+ * leaves the menu open for a click.
  */
 export const ToolFamilyButton = ({
   currentId,
-  disabled,
+  disabled = false,
   icon,
   isActive,
   items,
@@ -30,7 +52,7 @@ export const ToolFamilyButton = ({
   onActivate,
   onSelectSubtool,
 }: {
-  /** The subtool the slot currently stands for (checked in the flyout). */
+  /** The subtool the slot currently stands for (checked in the menu). */
   currentId: string;
   disabled?: boolean;
   icon: React.ElementType;
@@ -41,9 +63,11 @@ export const ToolFamilyButton = ({
   onActivate: () => void;
   onSelectSubtool: (id: string) => void;
 }) => {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement | null>(null);
-  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  // The menu anchors to, and returns focus to, the element carrying the trigger id: the slot, through its tooltip.
+  // The slot is not a `Menu.Trigger`, whose click would open the menu instead of selecting the current subtool.
+  const ids = useTooltipTriggerIds();
+  const menuMachine = useMenu({ ids, positioning: MENU_POSITIONING });
+  const menu = menuMachine.api;
   const holdTimer = useRef<number | null>(null);
   const openedByHold = useRef(false);
 
@@ -53,66 +77,17 @@ export const ToolFamilyButton = ({
       holdTimer.current = null;
     }
   }, []);
-  const close = useCallback(() => {
-    setOpen(false);
-    openedByHold.current = false;
-  }, []);
+  useMountEffect(() => clearHoldTimer);
 
-  // Outside pointers and Escape close the flyout; the listener lives only while open.
-  useEffect(() => {
-    if (!open) {
-      return;
+  // Choosing an entry closes the menu itself; a locked slot's entries are disabled and never report a choice.
+  const onValueChange = useCallback((details: { value: string }) => onSelectSubtool(details.value), [onSelectSubtool]);
+  const openFromKeyboard = useCallback(() => {
+    menu.setOpen(true);
+    const first = items[0];
+    if (first) {
+      menu.setHighlightedValue(first.id);
     }
-    const onOutside = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        close();
-      }
-    };
-    const onEscape = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        close();
-        buttonRef.current?.focus();
-      }
-    };
-    window.addEventListener('pointerdown', onOutside, true);
-    window.addEventListener('keydown', onEscape, true);
-    return () => {
-      window.removeEventListener('pointerdown', onOutside, true);
-      window.removeEventListener('keydown', onEscape, true);
-    };
-  }, [close, open]);
-  useEffect(() => clearHoldTimer, [clearHoldTimer]);
-
-  const select = useCallback(
-    (id: string) => {
-      // The focused entry unmounts with the flyout; keep focus in the strip.
-      const restoreFocus = rootRef.current?.contains(document.activeElement) ?? false;
-      onSelectSubtool(id);
-      close();
-      if (restoreFocus) {
-        buttonRef.current?.focus();
-      }
-    },
-    [close, onSelectSubtool]
-  );
-  const onMenuKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft' && event.key !== 'Home' && event.key !== 'End') {
-      return;
-    }
-    const entries = Array.from(rootRef.current?.querySelectorAll<HTMLElement>('[data-subtool-id]') ?? []);
-    if (entries.length === 0) {
-      return;
-    }
-    event.preventDefault();
-    const index = entries.indexOf(document.activeElement as HTMLElement);
-    const next =
-      event.key === 'Home'
-        ? 0
-        : event.key === 'End'
-          ? entries.length - 1
-          : (index + (event.key === 'ArrowRight' ? 1 : -1) + entries.length) % entries.length;
-    entries[next]?.focus();
-  }, []);
+  }, [items, menu]);
 
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -122,7 +97,7 @@ export const ToolFamilyButton = ({
       openedByHold.current = false;
       clearHoldTimer();
       try {
-        // Without capture the release over a flyout entry targets the entry,
+        // Without capture the release over a menu entry targets the entry,
         // not this button, and the release-to-select path never runs.
         event.currentTarget.setPointerCapture(event.pointerId);
       } catch {
@@ -131,10 +106,10 @@ export const ToolFamilyButton = ({
       holdTimer.current = window.setTimeout(() => {
         holdTimer.current = null;
         openedByHold.current = true;
-        setOpen(true);
+        menu.setOpen(true);
       }, HOLD_OPEN_MS);
     },
-    [clearHoldTimer, disabled]
+    [clearHoldTimer, disabled, menu]
   );
   const onPointerUp = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -146,94 +121,112 @@ export const ToolFamilyButton = ({
         // Short press: an ordinary click on the slot — but only released over
         // it. Capture retargets the release here even after a drag-off, and a
         // drag-off release must cancel, like any button.
-        const rect = event.currentTarget.getBoundingClientRect();
-        const overButton =
-          event.clientX >= rect.left &&
-          event.clientX <= rect.right &&
-          event.clientY >= rect.top &&
-          event.clientY <= rect.bottom;
-        if (!overButton) {
+        if (!isOverElement(event.currentTarget, event)) {
           return;
         }
-        if (!open) {
-          onActivate();
+        if (menu.open) {
+          menu.setOpen(false);
         } else {
-          close();
+          onActivate();
         }
         return;
       }
-      if (open && openedByHold.current) {
-        // Held open: releasing over an entry selects it; elsewhere keeps the
-        // flyout open for a click.
-        const under = document.elementFromPoint(event.clientX, event.clientY);
-        const item = under?.closest<HTMLElement>('[data-subtool-id]');
-        if (item?.dataset.subtoolId) {
-          select(item.dataset.subtoolId);
-        }
+      if (menu.open && openedByHold.current) {
         openedByHold.current = false;
+        // Held open: releasing over an entry selects it; elsewhere keeps the
+        // menu open for a click.
+        const value = menuItemValueAt(event);
+        if (value !== null) {
+          onSelectSubtool(value);
+          menu.setOpen(false);
+        }
       }
     },
-    [clearHoldTimer, close, disabled, onActivate, open, select]
+    [clearHoldTimer, disabled, menu, onActivate, onSelectSubtool]
   );
   const onPointerMove = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>) => {
-      // Cancel pending hold when the pointer leaves, but preserve open flyouts; capture requires bounds checks
-      // instead of pointerleave.
-      if (holdTimer.current === null) {
+      if (holdTimer.current !== null) {
+        // Leaving the slot cancels a pending hold; capture keeps delivering
+        // moves here, so the bounds stand in for pointerleave.
+        if (!isOverElement(event.currentTarget, event)) {
+          clearHoldTimer();
+        }
         return;
       }
-      const rect = event.currentTarget.getBoundingClientRect();
-      if (
-        event.clientX < rect.left ||
-        event.clientX > rect.right ||
-        event.clientY < rect.top ||
-        event.clientY > rect.bottom
-      ) {
-        clearHoldTimer();
+      if (menu.open && openedByHold.current) {
+        // Captured moves never reach the entries, so highlight the one the
+        // drag is over the way hovering would.
+        const value = menuItemValueAt(event);
+        if (value !== null && value !== menu.highlightedValue) {
+          menu.setHighlightedValue(value);
+        }
       }
     },
-    [clearHoldTimer]
+    [clearHoldTimer, menu]
   );
   const onPointerCancel = useCallback(() => {
     // A canceled pointer (touch scroll takeover, OS gesture) must not open the
-    // flyout later; an already-open flyout stays for a click, like quick release.
+    // menu later; an already-open menu stays for a click, like quick release.
     clearHoldTimer();
     openedByHold.current = false;
   }, [clearHoldTimer]);
-  const onContextMenu = useCallback(
-    (event: ReactPointerEvent<HTMLButtonElement> | React.MouseEvent<HTMLButtonElement>) => {
-      event.preventDefault();
-      if (!disabled) {
-        setOpen(true);
+  const onClick = useCallback(
+    (event: ReactMouseEvent<HTMLButtonElement>) => {
+      // Pointer clicks are resolved on release above; a click with no pointer
+      // detail is Enter or Space on the focused slot.
+      if (event.detail === 0 && !disabled) {
+        onActivate();
       }
     },
-    [disabled]
+    [disabled, onActivate]
   );
-  const onKeyDown = useCallback((event: KeyboardEvent<HTMLButtonElement>) => {
-    if (event.key === 'ArrowRight' || event.key === 'ContextMenu') {
+  const onContextMenu = useCallback(
+    (event: ReactMouseEvent<HTMLButtonElement>) => {
       event.preventDefault();
-      setOpen(true);
-      requestAnimationFrame(() => {
-        rootRef.current?.querySelector<HTMLElement>('[data-subtool-id]')?.focus();
-      });
-    }
-  }, []);
+      if (!disabled) {
+        menu.setOpen(true);
+      }
+    },
+    [disabled, menu]
+  );
+  const onKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLButtonElement>) => {
+      if (event.key === 'ArrowRight' || event.key === 'ContextMenu') {
+        event.preventDefault();
+        // Workbench hotkeys listen on window; the key that opens the menu must not also nudge the selected layer.
+        event.stopPropagation();
+        openFromKeyboard();
+      }
+    },
+    [openFromKeyboard]
+  );
+  const onMenuKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      // The menu opens rightward from the strip, so ArrowLeft goes back to it.
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        menu.setOpen(false);
+      }
+    },
+    [menu]
+  );
 
   return (
-    <Box ref={rootRef} position="relative">
+    <Menu.RootProvider lazyMount unmountOnExit value={menuMachine}>
       {/* Forcing `open={false}` (not `disabled`) suppresses the tooltip while
-          the flyout sits in its spot: the disabled path unwraps the trigger and
-          remounts the button, dropping pointer capture mid-hold. */}
-      <Tooltip content={label} open={open ? false : undefined} positioning={TOOLTIP_POSITIONING}>
+          the menu is open: the disabled path unwraps the trigger and remounts
+          the button, dropping pointer capture mid-hold. */}
+      <Tooltip content={label} ids={ids} open={menu.open ? false : undefined} positioning={TOOLTIP_POSITIONING}>
         <IconButton
-          ref={buttonRef}
-          aria-expanded={open}
+          aria-controls={menu.open ? menu.getContentProps().id : undefined}
+          aria-expanded={menu.open}
           aria-haspopup="menu"
           aria-label={label}
           aria-pressed={isActive}
           disabled={disabled}
-          size="xs"
           variant={isActive ? 'solid' : 'ghost'}
+          onClick={onClick}
           onContextMenu={onContextMenu}
           onKeyDown={onKeyDown}
           onPointerCancel={onPointerCancel}
@@ -257,56 +250,26 @@ export const ToolFamilyButton = ({
           />
         </IconButton>
       </Tooltip>
-      {open ? (
-        <Box
-          aria-label={label}
-          bg="bg.panel"
-          borderColor="border.subtle"
-          borderWidth="1px"
-          display="flex"
-          gap="0.5"
-          left="calc(100% + 4px)"
-          p="0.5"
-          position="absolute"
-          role="menu"
-          rounded="md"
-          shadow="md"
-          top="0"
-          zIndex="3"
-          onKeyDown={onMenuKeyDown}
-        >
-          {items.map((item) => (
-            <FlyoutItem key={item.id} checked={item.id === currentId} item={item} onSelect={select} />
-          ))}
-        </Box>
-      ) : null}
-    </Box>
-  );
-};
-
-const FlyoutItem = ({
-  checked,
-  item,
-  onSelect,
-}: {
-  checked: boolean;
-  item: ToolFlyoutItem;
-  onSelect: (id: string) => void;
-}) => {
-  const onClick = useCallback(() => onSelect(item.id), [item.id, onSelect]);
-  return (
-    <Tooltip content={item.label} positioning={SUBTOOL_TOOLTIP_POSITIONING}>
-      <IconButton
-        aria-checked={checked}
-        aria-label={item.label}
-        data-subtool-id={item.id}
-        role="menuitemradio"
-        size="xs"
-        variant={checked ? 'solid' : 'ghost'}
-        onClick={onClick}
-      >
-        <Icon as={item.icon} boxSize="3.5" />
-      </IconButton>
-    </Tooltip>
+      <Portal>
+        <Menu.Positioner>
+          <MenuContent aria-label={label} minW="10rem" onKeyDown={onMenuKeyDown}>
+            <Menu.RadioItemGroup value={currentId} onValueChange={onValueChange}>
+              {items.map((item) => (
+                <Menu.RadioItem key={item.id} disabled={disabled} value={item.id}>
+                  <Menu.ItemIndicator />
+                  <Icon as={item.icon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
+                  <Menu.ItemText fontSize="md">{item.label}</Menu.ItemText>
+                  {item.shortcut && item.shortcut.length > 0 ? (
+                    <Menu.ItemCommand>
+                      <ShortcutKeycaps parts={item.shortcut} />
+                    </Menu.ItemCommand>
+                  ) : null}
+                </Menu.RadioItem>
+              ))}
+            </Menu.RadioItemGroup>
+          </MenuContent>
+        </Menu.Positioner>
+      </Portal>
+    </Menu.RootProvider>
   );
 };

@@ -4,17 +4,18 @@ import { Box, Flex, Spinner } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { defaultRangeExtractor, useVirtualizer, type Range } from 'react-hook-tanstack-virtual';
+import { useVirtualizer, type Range } from 'react-hook-tanstack-virtual';
 import { useTranslation } from 'react-i18next';
 
 import type { ListDensity } from './ListItem';
 import type { ListRow } from './listRows';
 
-import { ListDivider } from './ListDivider';
+import { IN_SLOT_DIVIDER_HIDING_CSS, ListDivider } from './ListDivider';
 import { LIST_ROW_GAP_PX as ROW_GAP_PX, LIST_ROW_INSET as INSET } from './listLayout';
 import { LIST_SECTION_HEADER_HEIGHT_PX, ListSectionHeader } from './ListSectionHeader';
+import { extractRangeKeepingPinned, getPinnedHeaderShift, lastHeaderAtOrBefore } from './virtualSections';
 
-const ITEM_HEIGHT_PX: Record<ListDensity, number> = { comfortable: 52, compact: 28, regular: 40 };
+const ITEM_HEIGHT_PX: Record<ListDensity, number> = { comfortable: 52, compact: 28, regular: 40, snug: 48 };
 const OVERSCAN_ROWS = 8;
 const PRIMARY_SELECTOR = '[data-list-primary]';
 
@@ -108,25 +109,6 @@ export interface ListProps<T> {
   onScrollOffsetPersist?: (offset: number) => void;
 }
 
-const lastHeaderAtOrBefore = (headerIndexes: readonly number[], index: number): number | null => {
-  let low = 0;
-  let high = headerIndexes.length - 1;
-  let found: number | null = null;
-
-  while (low <= high) {
-    const middle = (low + high) >> 1;
-
-    if (headerIndexes[middle]! <= index) {
-      found = headerIndexes[middle]!;
-      low = middle + 1;
-    } else {
-      high = middle - 1;
-    }
-  }
-
-  return found;
-};
-
 const findItemIndex = <T,>(rows: readonly ListRow<T>[], from: number, step: 1 | -1): number => {
   for (let index = from; index >= 0 && index < rows.length; index += step) {
     if (rows[index]?.kind === 'item') {
@@ -213,27 +195,7 @@ export const List = <T,>({
   // Keep the pinned header and the focused row mounted whatever the scroll position: focus must never fall off
   // the list, and the sticky header is the one that scrolled past the top of the visible range.
   const rangeExtractor = useCallback(
-    (range: Range) => {
-      const indexes = defaultRangeExtractor(range);
-      const pinned = lastHeaderAtOrBefore(headerIndexes, range.startIndex);
-      let changed = false;
-
-      if (pinned !== null && !indexes.includes(pinned)) {
-        indexes.push(pinned);
-        changed = true;
-      }
-
-      if (focusIndex >= 0 && !indexes.includes(focusIndex)) {
-        indexes.push(focusIndex);
-        changed = true;
-      }
-
-      if (changed) {
-        indexes.sort((a, b) => a - b);
-      }
-
-      return indexes;
-    },
+    (range: Range) => extractRangeKeepingPinned(range, headerIndexes, focusIndex),
     [focusIndex, headerIndexes]
   );
   const estimateSize = useCallback(
@@ -283,8 +245,7 @@ export const List = <T,>({
   const nextHeaderIndex = pinnedIndex === null ? undefined : headerIndexes[headerIndexes.indexOf(pinnedIndex) + 1];
   const nextHeaderStart = virtualItems.find((virtualRow) => virtualRow.index === nextHeaderIndex)?.start;
   const pinnedStyle = useMemo(() => {
-    const nextTop = nextHeaderStart === undefined ? Number.POSITIVE_INFINITY : nextHeaderStart - scrollOffset;
-    const shift = Math.min(0, nextTop - LIST_SECTION_HEADER_HEIGHT_PX);
+    const shift = getPinnedHeaderShift(nextHeaderStart, scrollOffset, LIST_SECTION_HEADER_HEIGHT_PX);
 
     return shift === 0
       ? PINNED_HEADER_WRAPPER_STYLE
@@ -414,7 +375,7 @@ export const List = <T,>({
   if (status === 'loading') {
     content = (
       <Flex align="center" aria-label={t('common.loading')} h="full" justify="center" py="8" role="status" w="full">
-        <Spinner color="fg.subtle" size="sm" />
+        <Spinner color="fg.subtle" size="lg" />
       </Flex>
     );
   } else if (status === 'error') {
@@ -432,7 +393,13 @@ export const List = <T,>({
   } else {
     content = (
       <Scrollable h="full" viewportProps={viewportProps} viewportRef={attachViewport}>
-        <div aria-busy={isBusy || undefined} aria-label={label} role="list" style={containerStyle}>
+        <Box
+          aria-busy={isBusy || undefined}
+          aria-label={label}
+          css={dividers ? IN_SLOT_DIVIDER_HIDING_CSS : undefined}
+          role="list"
+          style={containerStyle}
+        >
           {virtualItems.map((virtualRow) => {
             const row = rows[virtualRow.index];
 
@@ -482,7 +449,7 @@ export const List = <T,>({
               </div>
             );
           })}
-        </div>
+        </Box>
       </Scrollable>
     );
   }

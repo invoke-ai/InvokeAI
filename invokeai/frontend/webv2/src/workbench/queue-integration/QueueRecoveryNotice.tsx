@@ -4,7 +4,7 @@ import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -160,14 +160,18 @@ export const QueueRecoveryNotice = ({
   if (query.isPending) {
     return (
       <HStack color="fg.muted" px="4" py="2">
-        <Spinner size="xs" />
-        <Text fontSize="sm">{t('shell.queueRecovery.loading')}</Text>
+        <Spinner />
+        <Text fontSize="lg">{t('shell.queueRecovery.loading')}</Text>
       </HStack>
     );
   }
+
+  // The discard confirmation renders beside whichever notice applies, so the refetch that follows a discard can
+  // remove the notice while the dialog animates closed.
+  let notice: ReactNode = null;
   if (query.data?.kind === 'unavailable' || query.isError) {
-    return (
-      <Alert.Root borderRadius="none" status="warning" variant="surface">
+    notice = (
+      <Alert.Root borderRadius="none" size="lg" status="warning" variant="surface">
         <Alert.Indicator />
         <Alert.Content>
           <Alert.Title>{t('shell.queueRecovery.storageUnavailableTitle')}</Alert.Title>
@@ -175,14 +179,9 @@ export const QueueRecoveryNotice = ({
         </Alert.Content>
       </Alert.Root>
     );
-  }
-  if (!projectId) {
-    return null;
-  }
-
-  return (
-    <>
-      <Alert.Root borderRadius="none" status="warning" variant="surface">
+  } else if (projectId) {
+    notice = (
+      <Alert.Root borderRadius="none" size="lg" status="warning" variant="surface">
         <Alert.Indicator />
         <Alert.Content>
           <HStack align="center" flexWrap="wrap" gap="4" justify="space-between" w="full">
@@ -202,13 +201,13 @@ export const QueueRecoveryNotice = ({
             <HStack flexShrink="0" flexWrap="wrap">
               {projectIds.length > 1 ? (
                 <>
-                  <Button disabled={isBusy || visibleIndex === 0} onClick={selectPrevious} size="sm" variant="ghost">
+                  <Button disabled={isBusy || visibleIndex === 0} onClick={selectPrevious} size="lg" variant="ghost">
                     {t('shell.queueRecovery.previous')}
                   </Button>
                   <Button
                     disabled={isBusy || visibleIndex === projectIds.length - 1}
                     onClick={selectNext}
-                    size="sm"
+                    size="lg"
                     variant="ghost"
                   >
                     {t('shell.queueRecovery.next')}
@@ -216,7 +215,7 @@ export const QueueRecoveryNotice = ({
                 </>
               ) : null}
               {onOpen ? (
-                <Button disabled={isBusy} loading={pendingAction === 'open'} onClick={handleOpen} size="sm">
+                <Button disabled={isBusy} loading={pendingAction === 'open'} onClick={handleOpen} size="lg">
                   {t('shell.queueRecovery.open')}
                 </Button>
               ) : null}
@@ -224,18 +223,24 @@ export const QueueRecoveryNotice = ({
                 disabled={isBusy}
                 loading={pendingAction === 'export'}
                 onClick={handleExport}
-                size="sm"
+                size="lg"
                 variant="outline"
               >
                 {t('shell.queueRecovery.export')}
               </Button>
-              <Button disabled={isBusy} onClick={openDiscardConfirmation} size="sm" variant="ghost">
+              <Button disabled={isBusy} onClick={openDiscardConfirmation} size="lg" variant="ghost">
                 {t('shell.queueRecovery.discard')}
               </Button>
             </HStack>
           </HStack>
         </Alert.Content>
       </Alert.Root>
+    );
+  }
+
+  return (
+    <>
+      {notice}
       <ConfirmDialog
         body={t('shell.queueRecovery.discardConfirmBody')}
         confirmLabel={t('shell.queueRecovery.discard')}

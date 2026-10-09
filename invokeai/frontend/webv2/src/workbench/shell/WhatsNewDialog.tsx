@@ -1,11 +1,10 @@
 import type { LucideIcon } from 'lucide-react';
 
 import v7LogoUrl from '@assets/V7Logo.webp';
-import { Badge, Box, Dialog, Flex, Grid, Image, Link, List, Portal, Stack, Text, VStack } from '@chakra-ui/react';
-import { useMountEffect } from '@platform/react/useMountEffect';
+import { Badge, Box, Flex, Grid, Image, Link, List, Portal, Stack, Text, VStack } from '@chakra-ui/react';
 import { DOCS_URL, getReleaseNotesUrl } from '@platform/runtime/appMetadata';
 import { Button, CloseButton } from '@platform/ui';
-import { registerHotkeyModalLayer } from '@workbench/hotkeys/modalLayer';
+import { Dialog } from '@platform/ui/Dialog';
 import { patchWorkbenchPreferences } from '@workbench/settings/store';
 import { BookOpenIcon, BoxesIcon, BrushIcon, FolderIcon, PanelsTopLeftIcon, ScrollTextIcon } from 'lucide-react';
 import { useCallback, useRef } from 'react';
@@ -41,14 +40,13 @@ const HIGHLIGHTS: readonly { descriptionKey: string; icon: LucideIcon; titleKey:
 const readItems = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
 
-/** Mounted only while the notes are open: workbench hotkeys stay quiet under them, as under the other dialogs. */
-const WhatsNewModalLayer = () => {
-  useMountEffect(() => registerHotkeyModalLayer('whats-new'));
+/**
+ * The modal traps focus, so focus outside it is never the user leaving. Under StrictMode the first, lazily loaded
+ * mount restores focus to the launcher button mid-open, and the stale dismiss layer closed the notes on that.
+ */
+const keepOpenOnFocusOutside = (event: { preventDefault: () => void }) => event.preventDefault();
 
-  return null;
-};
-
-export const WhatsNewDialog = () => {
+export const WhatsNewDialog = ({ onExitComplete }: { onExitComplete?: () => void }) => {
   const { t } = useTranslation();
   const { isOpen, isUnseen, version } = useWhatsNew();
   const items = readItems(t('whatsNew.items', { returnObjects: true }));
@@ -80,9 +78,10 @@ export const WhatsNewDialog = () => {
       placement="center"
       scrollBehavior="inside"
       size="lg"
+      onExitComplete={onExitComplete}
+      onFocusOutside={keepOpenOnFocusOutside}
       onOpenChange={handleOpenChange}
     >
-      {isOpen ? <WhatsNewModalLayer /> : null}
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
@@ -91,9 +90,9 @@ export const WhatsNewDialog = () => {
               <VStack gap="3">
                 <Image alt="" boxSize="24" draggable={false} src={v7LogoUrl} />
                 <VStack gap="1.5">
-                  <Dialog.Title textStyle="xl">{t('whatsNew.whatsNewInInvoke')}</Dialog.Title>
+                  <Dialog.Title textStyle="3xl">{t('whatsNew.whatsNewInInvoke')}</Dialog.Title>
                   {version ? (
-                    <Badge fontFamily="mono" size="sm" variant="subtle">
+                    <Badge fontFamily="mono" size="lg" variant="subtle">
                       v{version}
                     </Badge>
                   ) : null}
@@ -126,10 +125,10 @@ export const WhatsNewDialog = () => {
                         <HighlightIcon aria-hidden size={16} />
                       </Flex>
                       <Box minW="0">
-                        <Text fontWeight="600" textStyle="sm">
+                        <Text fontWeight="600" textStyle="lg">
                           {t(titleKey)}
                         </Text>
-                        <Text color="fg.muted" textStyle="xs">
+                        <Text color="fg.muted" textStyle="md">
                           {t(descriptionKey)}
                         </Text>
                       </Box>
@@ -138,10 +137,10 @@ export const WhatsNewDialog = () => {
                 </Grid>
                 {items.length > 0 ? (
                   <Stack gap="1.5">
-                    <Text color="fg.subtle" fontWeight="600" textStyle="2xs" textTransform="uppercase">
+                    <Text color="fg.subtle" fontWeight="600" textStyle="xs" textTransform="uppercase">
                       {t('whatsNew.alsoNew')}
                     </Text>
-                    <List.Root color="fg.muted" gap="1" ps="4" textStyle="xs">
+                    <List.Root color="fg.muted" gap="1" ps="4" textStyle="md">
                       {items.map((item, index) => (
                         // The catalog order is fixed for a build, so the index is a stable key.
                         <List.Item key={index}>{item}</List.Item>
@@ -152,13 +151,13 @@ export const WhatsNewDialog = () => {
               </Stack>
             </Dialog.Body>
             <Dialog.Footer borderColor="border.subtle" borderTopWidth="1px" px="6" py="3">
-              <Button asChild size="xs" variant="outline">
+              <Button asChild variant="outline">
                 <Link href={DOCS_URL} rel="noreferrer" target="_blank">
                   <BookOpenIcon aria-hidden />
                   {t('whatsNew.readTheDocs')}
                 </Link>
               </Button>
-              <Button asChild size="xs" variant="solid">
+              <Button asChild variant="solid">
                 <Link href={getReleaseNotesUrl(version)} rel="noreferrer" target="_blank">
                   <ScrollTextIcon aria-hidden />
                   {t('whatsNew.readReleaseNotes')}

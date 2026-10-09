@@ -59,6 +59,7 @@ export interface LayerMutationControllerOptions {
     | 'createLayerId'
     | 'getDocument'
     | 'getEditRevision'
+    | 'getReducerDocument'
     | 'installPrepared'
     | 'isGestureActive'
     | 'isPermitCurrent'
@@ -150,7 +151,17 @@ export class LayerMutationController {
           return { status: 'stale' };
         }
       }
-      if (!ctx.isPermitCurrent(permit) || ctx.isGestureActive() || ctx.getDocument() !== document) {
+      // The commit re-reads everything else from the live document; what it must still find are the prepared roots,
+      // unchanged and in order. A preview-tolerant recheck; see `CanvasMutationContext.getReducerDocument`.
+      const liveDocument = ctx.getReducerDocument();
+      const liveRoots = liveDocument ? duplicateRoots(liveDocument, layerIds) : null;
+      if (
+        !ctx.isPermitCurrent(permit) ||
+        ctx.isGestureActive() ||
+        !liveRoots ||
+        liveRoots.length !== roots.length ||
+        liveRoots.some((entry, index) => entry.node !== roots[index]!.node || entry.stack !== roots[index]!.stack)
+      ) {
         return { status: 'stale' };
       }
       return this.commitDuplicate(layerIds);

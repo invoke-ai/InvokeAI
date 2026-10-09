@@ -6,7 +6,11 @@ import type { QueueProgressSession } from '@features/queue/contracts';
 import { createContext, use, useMemo, type ComponentType, type ReactNode } from 'react';
 
 export interface GalleryItemActions {
-  deleteItems(items: GalleryItemRef[]): Promise<void>;
+  /**
+   * `returnFocus` names where keyboard focus goes when a confirmation dialog closes, resolved then: the deletion can
+   * remove the control that opened it.
+   */
+  deleteItems(items: GalleryItemRef[], options?: { returnFocus?: () => HTMLElement | null }): Promise<void>;
   downloadItem(item: GalleryItem): Promise<void>;
   downloadItems(items: GalleryItemRef[], loadedItems?: GalleryItem[]): Promise<void>;
   moveItemsToBoard(items: GalleryItemRef[], boardId: string): Promise<void>;

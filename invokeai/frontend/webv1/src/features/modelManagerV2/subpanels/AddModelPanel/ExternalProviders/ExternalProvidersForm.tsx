@@ -31,7 +31,7 @@ import {
 import { useGetStarterModelsQuery } from 'services/api/endpoints/models';
 import type { ExternalProviderConfig, StarterModel } from 'services/api/types';
 
-const PROVIDER_SORT_ORDER = ['gemini', 'openai', 'seedream', 'alibabacloud'];
+const PROVIDER_SORT_ORDER = ['gemini', 'openai', 'seedream', 'alibabacloud', 'atlascloud'];
 
 function resolveProviderIcon(providerId: string): IconType | null {
   const provider = providerId.toLowerCase();

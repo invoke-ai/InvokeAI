@@ -111,16 +111,39 @@ describe('tool strip family slots', () => {
   };
 
   const button = (name: string) => page.getByRole('button', { name, exact: true });
+  const menu = () => page.getByRole('menu');
+  const entry = (name: string) => page.getByRole('menuitemradio', { name });
+  const openByContextMenu = async (slot: HTMLElement) => {
+    await act(() => {
+      slot.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    });
+    await expect.element(menu()).toBeVisible();
+    // The menu takes focus once it has registered its dismiss handlers.
+    await expect.poll(() => document.activeElement?.getAttribute('role')).toBe('menu');
+  };
 
-  it('selects the current subtool on a plain click and shows no flyout', async () => {
+  it('selects the current subtool on a plain click and shows no menu', async () => {
     const fake = await renderStrip();
-    await act(() => userEvent.click(button('Shape')));
+    const shape = (await button('Shape').element()) as HTMLElement;
+    await act(() => userEvent.click(shape));
     expect(fake.activeTool).toBe('shape');
     expect(fake.shapeKind).toBe('rect');
     expect(document.querySelector('[role="menu"]')).toBeNull();
+    expect(shape.getAttribute('aria-expanded')).toBe('false');
   });
 
-  it('opens on hold and selects the entry under the released pointer', async () => {
+  it('selects the current subtool from the keyboard without opening the menu', async () => {
+    const fake = await renderStrip();
+    const shape = (await button('Shape').element()) as HTMLElement;
+    await act(async () => {
+      shape.focus();
+      await userEvent.keyboard('{Enter}');
+    });
+    expect(fake.activeTool).toBe('shape');
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+  });
+
+  it('opens on hold, highlights the entry the drag is over, and selects the entry under the release', async () => {
     const fake = await renderStrip();
     const shape = (await button('Shape').element()) as HTMLElement;
     const at = centre(shape);
@@ -129,21 +152,43 @@ describe('tool strip family slots', () => {
     });
     expect(document.querySelector('[role="menu"]')).toBeNull();
     await act(() => wait(450));
-    expect(document.querySelector('[role="menu"]')).not.toBeNull();
+    await expect.element(menu()).toBeVisible();
+    expect(shape.getAttribute('aria-expanded')).toBe('true');
 
-    // Pointer capture routes the release to the button; the coordinates say
-    // which entry it landed on.
-    const triangle = (await page.getByRole('menuitemradio', { name: 'Triangle' }).element()) as HTMLElement;
+    // Pointer capture routes the moves and the release to the button; the
+    // coordinates say which entry they are over.
+    const triangle = (await entry('Triangle').element()) as HTMLElement;
     const over = centre(triangle);
+    await act(() => {
+      shape.dispatchEvent(pointerAt('pointermove', over.x, over.y));
+    });
+    expect(triangle.hasAttribute('data-highlighted')).toBe(true);
     await act(() => {
       shape.dispatchEvent(pointerAt('pointerup', over.x, over.y));
     });
     expect(fake.shapeKind).toBe('triangle');
     expect(fake.activeTool).toBe('shape');
-    expect(document.querySelector('[role="menu"]')).toBeNull();
+    await expect.element(menu()).not.toBeInTheDocument();
   });
 
-  it('keeps the flyout open after a hold released on the button, then selects by click', async () => {
+  it('cancels a hold dragged off the slot before the menu opens', async () => {
+    const fake = await renderStrip();
+    const shape = (await button('Shape').element()) as HTMLElement;
+    const at = centre(shape);
+    const rect = shape.getBoundingClientRect();
+    await act(() => {
+      shape.dispatchEvent(pointerAt('pointerdown', at.x, at.y));
+      shape.dispatchEvent(pointerAt('pointermove', rect.right + 40, at.y));
+    });
+    await act(() => wait(450));
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+    await act(() => {
+      shape.dispatchEvent(pointerAt('pointerup', rect.right + 40, at.y));
+    });
+    expect(fake.activeTool).toBe('view');
+  });
+
+  it('keeps the menu open after a hold released on the button, then selects by click', async () => {
     const fake = await renderStrip();
     const shape = (await button('Shape').element()) as HTMLElement;
     const at = centre(shape);
@@ -154,58 +199,101 @@ describe('tool strip family slots', () => {
     await act(() => {
       shape.dispatchEvent(pointerAt('pointerup', at.x, at.y));
     });
-    expect(document.querySelector('[role="menu"]')).not.toBeNull();
-    await act(() => userEvent.click(page.getByRole('menuitemradio', { name: 'Star' })));
+    await expect.element(menu()).toBeVisible();
+    expect(fake.activeTool).toBe('view');
+    await act(() => userEvent.click(entry('Star')));
     expect(fake.shapeKind).toBe('star');
     expect(fake.activeTool).toBe('shape');
-    expect(document.querySelector('[role="menu"]')).toBeNull();
+    await expect.element(menu()).not.toBeInTheDocument();
   });
 
-  it('marks the slot current entry checked, follows it on the strip icon, and cycles state via right-click', async () => {
+  it('lists every subtool as a labelled entry beside the strip and checks the current one', async () => {
     const fake = await renderStrip();
     const shape = (await button('Shape').element()) as HTMLElement;
-    await act(() => {
-      shape.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
-    });
-    expect(document.querySelector('[role="menu"]')).not.toBeNull();
+    await openByContextMenu(shape);
+    const names = Array.from(document.querySelectorAll('[role="menuitemradio"]')).map((item) =>
+      item.textContent?.trim()
+    );
+    expect(names).toEqual(['Rectangle', 'Ellipse', 'Triangle', 'Star', 'Polygon', 'Freehand']);
+    // Opens rightward, clear of the strip, starting level with the slot.
+    const content = (await menu().element()) as HTMLElement;
+    const strip = (await page.getByRole('toolbar').element()) as HTMLElement;
     await expect
-      .element(page.getByRole('menuitemradio', { name: 'Rectangle' }))
-      .toHaveAttribute('aria-checked', 'true');
-    await act(() => userEvent.click(page.getByRole('menuitemradio', { name: 'Ellipse' })));
+      .poll(() => content.getBoundingClientRect().left)
+      .toBeGreaterThanOrEqual(strip.getBoundingClientRect().right);
+    await expect
+      .poll(() => Math.abs(content.getBoundingClientRect().top - shape.getBoundingClientRect().top))
+      .toBeLessThan(8);
+
+    await expect.element(entry('Rectangle')).toHaveAttribute('aria-checked', 'true');
+    await act(() => userEvent.click(entry('Ellipse')));
     expect(fake.shapeKind).toBe('ellipse');
+    await expect.element(menu()).not.toBeInTheDocument();
 
     // The slot now stands for the ellipse: reopen and the check moved with it.
-    await act(() => {
-      shape.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
-    });
-    await expect.element(page.getByRole('menuitemradio', { name: 'Ellipse' })).toHaveAttribute('aria-checked', 'true');
-    await expect
-      .element(page.getByRole('menuitemradio', { name: 'Rectangle' }))
-      .toHaveAttribute('aria-checked', 'false');
+    await openByContextMenu(shape);
+    await expect.element(entry('Ellipse')).toHaveAttribute('aria-checked', 'true');
+    await expect.element(entry('Rectangle')).toHaveAttribute('aria-checked', 'false');
   });
 
   it('closes on Escape and returns focus to the slot', async () => {
     await renderStrip();
     const shape = (await button('Shape').element()) as HTMLElement;
-    await act(() => {
-      shape.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
-    });
-    expect(document.querySelector('[role="menu"]')).not.toBeNull();
+    await openByContextMenu(shape);
     await act(() => userEvent.keyboard('{Escape}'));
-    expect(document.querySelector('[role="menu"]')).toBeNull();
-    expect(document.activeElement).toBe(shape);
+    await expect.element(menu()).not.toBeInTheDocument();
+    await expect.poll(() => document.activeElement).toBe(shape);
   });
 
-  it('opens from the keyboard with ArrowRight and focuses the first entry', async () => {
-    await renderStrip();
+  it('closes on an outside press, which still reaches its target', async () => {
+    const fake = await renderStrip();
     const shape = (await button('Shape').element()) as HTMLElement;
+    await openByContextMenu(shape);
+    await act(() => userEvent.click(button('Brush')));
+    await expect.element(menu()).not.toBeInTheDocument();
+    expect(fake.activeTool).toBe('brush');
+  });
+
+  it('opens from the keyboard with ArrowRight, navigates, selects, and ArrowLeft returns to the slot', async () => {
+    const fake = await renderStrip();
+    const shape = (await button('Shape').element()) as HTMLElement;
+    // Workbench hotkeys (ArrowRight nudges the selected layer) listen on window.
+    const windowKeys: string[] = [];
+    const recordKey = (event: KeyboardEvent) => windowKeys.push(event.key);
+    window.addEventListener('keydown', recordKey);
     await act(async () => {
       shape.focus();
       await userEvent.keyboard('{ArrowRight}');
-      await wait(50);
     });
-    expect(document.querySelector('[role="menu"]')).not.toBeNull();
-    expect((document.activeElement as HTMLElement | null)?.dataset.subtoolId).toBe('rect');
+    window.removeEventListener('keydown', recordKey);
+    expect(windowKeys).not.toContain('ArrowRight');
+    await expect.element(menu()).toBeVisible();
+    await expect.poll(() => document.activeElement?.getAttribute('role')).toBe('menu');
+    await expect.element(entry('Rectangle')).toHaveAttribute('data-highlighted');
+
+    await act(() => userEvent.keyboard('{ArrowDown}'));
+    await expect.element(entry('Ellipse')).toHaveAttribute('data-highlighted');
+    await act(() => userEvent.keyboard('{ArrowLeft}'));
+    await expect.element(menu()).not.toBeInTheDocument();
+    await expect.poll(() => document.activeElement).toBe(shape);
+    expect(fake.shapeKind).toBe('rect');
+
+    await act(() => userEvent.keyboard('{ArrowRight}'));
+    await expect.element(entry('Rectangle')).toHaveAttribute('data-highlighted');
+    await act(() => userEvent.keyboard('{ArrowDown}{ArrowDown}'));
+    await expect.element(entry('Triangle')).toHaveAttribute('data-highlighted');
+    // Zag refocuses the menu a frame after each arrow key; a person cannot press Enter inside that frame.
+    await act(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => resolve());
+        })
+    );
+    await act(() => userEvent.keyboard('{Enter}'));
+    expect(fake.shapeKind).toBe('triangle');
+    expect(fake.activeTool).toBe('shape');
+    await expect.element(menu()).not.toBeInTheDocument();
+    await expect.poll(() => document.activeElement).toBe(shape);
   });
 
   it('remembers the last-used selection tool across tool switches', async () => {
@@ -214,10 +302,8 @@ describe('tool strip family slots', () => {
     expect(fake.activeTool).toBe('marquee');
 
     const select = (await button('Marquee select').element()) as HTMLElement;
-    await act(() => {
-      select.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
-    });
-    await act(() => userEvent.click(page.getByRole('menuitemradio', { name: 'Lasso select' })));
+    await openByContextMenu(select);
+    await act(() => userEvent.click(entry('Lasso select')));
     expect(fake.activeTool).toBe('lasso');
 
     // Leave the family and come back with a plain click: the slot restores lasso.
@@ -225,6 +311,22 @@ describe('tool strip family slots', () => {
     expect(fake.activeTool).toBe('brush');
     await act(() => userEvent.click(button('Lasso select')));
     expect(fake.activeTool).toBe('lasso');
+  });
+
+  it('disables the open menu entries when an interaction lock engages', async () => {
+    const fake = await renderStrip();
+    const shape = (await button('Shape').element()) as HTMLElement;
+    await openByContextMenu(shape);
+    await act(() => {
+      root?.render(
+        <ChakraProvider value={system}>
+          <ToolStrip isInteractionLocked engine={fake.engine} />
+        </ChakraProvider>
+      );
+    });
+    await expect.element(entry('Star')).toHaveAttribute('aria-disabled', 'true');
+    await act(() => userEvent.click(entry('Star'), { force: true }));
+    expect(fake.shapeKind).toBe('rect');
   });
 
   it('disables the family slots under an interaction lock, hold included', async () => {

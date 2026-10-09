@@ -22,7 +22,7 @@ export const AccessTokenPopover = ({
         <IconButton
           aria-label={t('models.accessTokenForDownload')}
           color={value.trim() === '' ? 'fg.muted' : 'accent.solid'}
-          size="sm"
+          size="lg"
           variant="outline"
         >
           <Icon as={KeyRoundIcon} boxSize="4" />
@@ -33,21 +33,20 @@ export const AccessTokenPopover = ({
           <PopoverContent w="20rem">
             <Popover.Body p="2.5">
               <Stack gap="2">
-                <Text color="fg.subtle" fontSize="2xs" fontWeight="700" textTransform="uppercase">
+                <Text color="fg.subtle" fontSize="xs" fontWeight="700" textTransform="uppercase">
                   {t('models.accessToken')}
                 </Text>
                 <Input
                   aria-label={t('models.accessToken')}
                   placeholder={t('models.accessTokenPlaceholder')}
-                  size="xs"
                   type="password"
                   value={value}
                   onChange={(event) => onChange(event.currentTarget.value)}
                 />
-                <Text color="fg.subtle" fontSize="2xs">
+                <Text color="fg.subtle" fontSize="xs">
                   {t('models.accessTokenHelp')}
                 </Text>
-                <Button alignSelf="start" size="2xs" variant="ghost" onClick={onManageKeys}>
+                <Button alignSelf="start" size="sm" variant="ghost" onClick={onManageKeys}>
                   {t('models.manageApiKeys')}
                   <Icon as={ArrowRightIcon} boxSize="3" />
                 </Button>

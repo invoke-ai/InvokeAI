@@ -79,14 +79,20 @@ export const getQueueItem = (itemId: number, signal?: AbortSignal): Promise<Queu
 export const listAllQueueItems = (signal?: AbortSignal): Promise<QueueServerItemDTO[]> =>
   apiFetchJson<QueueServerItemDTO[]>(buildQueueUrl('list_all'), { signal });
 
+/** Every matching id, or with `limit` (at most `QUEUE_ITEM_IDS_PER_REQUEST`) the first ids of that order. */
 export const getQueueItemIds = (
   orderDir: 'asc' | 'desc' = 'desc',
   scope: QueueQueryScope = {},
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  limit?: number
 ): Promise<QueueItemIdsResultDTO> =>
   apiFetchJson<QueueItemIdsResultDTO>(
     buildQueueUrl(
-      `item_ids${buildQueryString({ order_dir: orderDir.toUpperCase(), origin_prefix: scope.originPrefix })}`
+      `item_ids${buildQueryString({
+        limit: limit === undefined ? undefined : String(limit),
+        order_dir: orderDir.toUpperCase(),
+        origin_prefix: scope.originPrefix,
+      })}`
     ),
     { signal }
   );

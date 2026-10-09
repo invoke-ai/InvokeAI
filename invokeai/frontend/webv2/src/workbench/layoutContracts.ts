@@ -74,6 +74,12 @@ export interface LayoutPresetSnapshot {
   floatingWidgets?: Record<WidgetInstanceId, FloatingWidgetState>;
 }
 
+/** A project's unsaved arrangement of one preset; see `Project.presetWorkingLayouts`. */
+export interface LayoutPresetWorkingCopy {
+  presetId: LayoutPresetId;
+  snapshot: LayoutPresetSnapshot;
+}
+
 /**
  * The route a preset establishes when it is activated. Locks belong to the
  * live project controller and are intentionally never persisted on a preset.

@@ -77,7 +77,7 @@ const renderControl = async (state: InvocationState) => {
     root?.render(
       <ChakraProvider value={system}>
         <Group attached>
-          <Button data-routing-height-reference="" size="sm">
+          <Button data-routing-height-reference="" size="lg">
             Invoke
           </Button>
           <RoutingControl state={state} />
@@ -141,7 +141,7 @@ describe('RoutingControl', () => {
       root?.render(
         <ChakraProvider value={system}>
           <Group attached>
-            <Button data-routing-height-reference="" size="sm">
+            <Button data-routing-height-reference="" size="lg">
               Invoke
             </Button>
             <RoutingControl state={LOCKED_STATE} />
