@@ -1,0 +1,10 @@
+{
+    "name": "InvokeAI (CUDA on podman)",
+    "runArgs": [
+        // enable nvidia gpu access on podman; https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/cdi-support.html#generating-a-cdi-specification
+        "--device=nvidia.com/gpu=all"
+    ],
+    "containerEnv": {
+        "GPU_DRIVER": "cuda"
+    }
+}
