@@ -180,10 +180,12 @@ systems ROCm 10 supports. AMD lists Windows 11; the Invoke team has run it on Wi
 :::note[Integrated graphics]
   ROCm lists the Radeon graphics built into Ryzen CPUs as a GPU of its own. When a discrete GPU is
   present, Invoke leaves the integrated one out of `generation_devices: auto`. On Windows it also hides
-  it from ROCm at startup (by setting `HIP_VISIBLE_DEVICES`), as long as `device` and
-  `generation_devices` are `auto` and no `HIP_VISIBLE_DEVICES` is set: while ROCm can see the
-  integrated GPU, Task Manager shows tens of GB of shared GPU memory for Invoke that is not really in
-  use. Set `HIP_VISIBLE_DEVICES` yourself to choose the devices.
+  it from ROCm at startup (by setting `HIP_VISIBLE_DEVICES`) unless you set `HIP_VISIBLE_DEVICES`,
+  `CUDA_VISIBLE_DEVICES` or `ROCR_VISIBLE_DEVICES` yourself: while ROCm can see the integrated GPU,
+  Task Manager shows tens of GB of shared GPU memory for Invoke that is not really in use, and nothing
+  can run on it. Device names such as `cuda:1` in `device`, `generation_devices` and the settings then
+  count the discrete GPUs only, and naming the integrated GPU is refused with an error. Set
+  `HIP_VISIBLE_DEVICES` yourself to choose the devices.
 :::
 
 :::note[Wide-head attention runs on the math kernel]

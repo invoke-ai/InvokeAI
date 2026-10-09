@@ -2,7 +2,7 @@
 
 import logging
 import os
-import subprocess
+import time
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -10,6 +10,7 @@ import pytest
 from invokeai.app.util import rocm_integrated_gpu
 from invokeai.app.util.rocm_integrated_gpu import (
     VISIBILITY_ENV_VARS,
+    ProbeFailed,
     discrete_device_visibility,
     hide_integrated_gpus_on_rocm_windows,
     probe_integrated_flags,
@@ -34,32 +35,54 @@ def test_discrete_device_visibility(flags, expected):
     assert discrete_device_visibility(flags) == expected
 
 
-def _completed(stdout: str, returncode: int = 0) -> subprocess.CompletedProcess:
-    return subprocess.CompletedProcess(args=[], returncode=returncode, stdout=stdout, stderr="")
+def _child_runs(monkeypatch: pytest.MonkeyPatch, code: str, timeout: float = 60) -> None:
+    """Make the probe start a real child running `code` instead of asking torch."""
+    monkeypatch.setattr(rocm_integrated_gpu, "_PROBE", code)
+    monkeypatch.setattr(rocm_integrated_gpu, "_PROBE_TIMEOUT_SECONDS", timeout)
 
 
-def test_probe_reads_the_last_line_past_torch_warnings():
-    stdout = "W1002 flop_counter.py:29] triton not found\n[false, true]\n"
-    with patch(f"{MODULE}.subprocess.run", return_value=_completed(stdout)):
-        assert probe_integrated_flags() == [False, True]
+def test_probe_skips_what_the_child_prints_before_its_answer(monkeypatch: pytest.MonkeyPatch):
+    _child_runs(monkeypatch, "print('W1002 flop_counter.py:29] triton not found'); print('1'); print('[false, true]')")
+    assert probe_integrated_flags() == [False, True]
+
+
+def test_an_answer_followed_by_a_hang_on_exit_returns_at_once(monkeypatch: pytest.MonkeyPatch):
+    """HIP's teardown can hang after the answer (seen on Windows); startup must not wait out the timeout for it."""
+    _child_runs(monkeypatch, "import sys, time; print('[false, true]'); sys.stdout.flush(); time.sleep(600)")
+    started = time.monotonic()
+    assert probe_integrated_flags() == [False, True]
+    assert time.monotonic() - started < 30
 
 
 @pytest.mark.parametrize(
-    "outcome",
+    ("code", "timeout", "reason"),
     [
-        _completed("", returncode=1),
-        _completed("not json\n"),
-        _completed('{"devices": 2}\n'),
-        _completed(""),
-        subprocess.TimeoutExpired(cmd="python", timeout=120),
-        OSError("no interpreter"),
+        ("import sys; sys.exit(3)", 60, "exited with code 3"),
+        ("print('not json')", 60, "gave no answer"),
+        ("print('{\"devices\": 2}')", 60, "gave no answer"),
+        ("import time; time.sleep(600)", 1, "no answer within 1 s"),
     ],
-    ids=["child-failed", "garbage", "not-a-list", "empty", "timeout", "oserror"],
+    ids=["child-failed", "garbage", "not-a-list", "hangs-before-answering"],
 )
-def test_probe_answers_none_when_the_child_cannot(outcome):
-    kwargs = {"side_effect": outcome} if isinstance(outcome, BaseException) else {"return_value": outcome}
-    with patch(f"{MODULE}.subprocess.run", **kwargs):
-        assert probe_integrated_flags() is None
+def test_probe_says_why_the_child_could_not_answer(monkeypatch: pytest.MonkeyPatch, code, timeout, reason):
+    _child_runs(monkeypatch, code, timeout)
+    with pytest.raises(ProbeFailed, match=reason):
+        probe_integrated_flags()
+
+
+def test_probe_says_when_the_child_cannot_start(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(rocm_integrated_gpu.sys, "executable", "Z:/no/such/python.exe")
+    with pytest.raises(ProbeFailed, match="could not start it"):
+        probe_integrated_flags()
+
+
+def test_the_real_probe_answers_and_exits(monkeypatch: pytest.MonkeyPatch):
+    """The probe code itself, in a real child: it prints a JSON list and exits (without a ROCm GPU, maybe [])."""
+    # A cold torch import on a busy CI runner may take longer than startup should wait; this tests the code, not speed.
+    monkeypatch.setattr(rocm_integrated_gpu, "_PROBE_TIMEOUT_SECONDS", 300)
+    flags = probe_integrated_flags()
+    assert isinstance(flags, list)
+    assert all(isinstance(flag, bool) for flag in flags)
 
 
 @pytest.fixture
@@ -75,10 +98,12 @@ def windows_rocm(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv("HIP_VISIBLE_DEVICES", raising=False)
 
 
-def _hide(flags, device="auto", generation_devices="auto"):
+def _hide(flags):
+    """Run the startup step with the probe answering `flags`, or failing when `flags` is an exception."""
     logger = MagicMock(spec=logging.Logger)
-    with patch(f"{MODULE}.probe_integrated_flags", return_value=flags) as probe:
-        hide_integrated_gpus_on_rocm_windows(device, generation_devices, logger)
+    kwargs = {"side_effect": flags} if isinstance(flags, BaseException) else {"return_value": flags}
+    with patch(f"{MODULE}.probe_integrated_flags", **kwargs) as probe:
+        hide_integrated_gpus_on_rocm_windows(logger)
     return logger, probe
 
 
@@ -89,12 +114,17 @@ def test_the_ryzen_igpu_next_to_a_radeon_is_hidden(windows_rocm):
     assert "HIP_VISIBLE_DEVICES=0" in logger.info.call_args.args[0]
 
 
-@pytest.mark.parametrize(
-    "flags", [[False], [False, False], [True], None], ids=["one", "two-discrete", "apu", "unknown"]
-)
+@pytest.mark.parametrize("flags", [[False], [False, False], [True]], ids=["one", "two-discrete", "apu"])
 def test_nothing_is_hidden_without_an_igpu_next_to_a_discrete_gpu(windows_rocm, flags):
     _hide(flags)
     assert "HIP_VISIBLE_DEVICES" not in os.environ
+
+
+def test_a_failed_probe_leaves_every_gpu_visible_and_says_so(windows_rocm):
+    logger, _ = _hide(ProbeFailed("no answer within 60 s"))
+    assert "HIP_VISIBLE_DEVICES" not in os.environ
+    logger.warning.assert_called_once()
+    assert "no answer within 60 s" in logger.warning.call_args.args[0]
 
 
 @pytest.mark.parametrize("var", VISIBILITY_ENV_VARS)
@@ -103,17 +133,6 @@ def test_a_visibility_variable_already_set_wins(windows_rocm, var):
     _, probe = _hide([False, True])
     probe.assert_not_called()
     assert os.environ[var] == "1"
-
-
-@pytest.mark.parametrize(
-    ("device", "generation_devices"),
-    [("cuda:1", "auto"), ("auto", ["cuda:0", "cuda:1"])],
-    ids=["legacy-device", "explicit-list"],
-)
-def test_explicit_device_indices_are_not_renumbered(windows_rocm, device, generation_devices):
-    """`cuda:N` counts in HIP's full enumeration; hiding a device would point it at another GPU."""
-    _, probe = _hide([False, True], device=device, generation_devices=generation_devices)
-    probe.assert_not_called()
 
 
 def test_other_platforms_and_builds_are_left_alone(windows_rocm):

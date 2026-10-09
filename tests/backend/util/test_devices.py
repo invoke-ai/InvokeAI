@@ -1011,3 +1011,34 @@ def test_a_forced_empty_cache_runs_past_a_busy_peer_and_its_wrapper(monkeypatch)
     assert calls == []
     assert TorchDevice.empty_cache(force=True) is True
     assert calls == ["torch"]
+
+
+def _explicit_cuda_devices(integrated_map: dict[int, bool | None], requested: list[str], platform: str, hip):
+    with (
+        patch("invokeai.backend.util.devices.sys.platform", platform),
+        patch("invokeai.backend.util.devices.torch.version.hip", hip),
+        patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=True),
+        patch("invokeai.backend.util.devices.torch.cuda.device_count", return_value=len(integrated_map)),
+        patch("invokeai.backend.util.devices.torch.cuda.get_device_properties", _cuda_properties(integrated_map)),
+    ):
+        return TorchDevice.get_generation_devices(requested)
+
+
+def test_naming_the_igpu_beside_a_radeon_on_windows_rocm_is_refused():
+    """Every kernel on it crashed the process (Ryzen gfx1036 beside an RX 9060 XT); refuse it with a reason instead."""
+    with pytest.raises(ValueError, match="integrated GPU"):
+        _explicit_cuda_devices({0: True, 1: False}, ["cuda:0"], "win32", "7.15.26333")
+
+
+@pytest.mark.parametrize(
+    ("integrated_map", "requested", "platform", "hip"),
+    [
+        ({0: True, 1: False}, ["cuda:1"], "win32", "7.15.26333"),  # the discrete card
+        ({0: True}, ["cuda:0"], "win32", "7.15.26333"),  # an APU on its own
+        ({0: True, 1: False}, ["cuda:0"], "linux", "7.15.26333"),  # ROCm on Linux
+        ({0: True, 1: False}, ["cuda:0"], "win32", None),  # CUDA
+    ],
+    ids=["discrete", "apu-alone", "linux-rocm", "cuda"],
+)
+def test_an_explicit_device_is_kept_unless_it_is_that_igpu(integrated_map, requested, platform, hip):
+    assert _explicit_cuda_devices(integrated_map, requested, platform, hip) == [torch.device(requested[0])]

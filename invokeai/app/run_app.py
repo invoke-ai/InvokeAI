@@ -73,7 +73,7 @@ def run_app() -> None:
     # allocator configuration below imports torch. Runs a short child process on Windows ROCm.
     from invokeai.app.util.rocm_integrated_gpu import hide_integrated_gpus_on_rocm_windows
 
-    hide_integrated_gpus_on_rocm_windows(app_config.device, app_config.generation_devices, logger)
+    hide_integrated_gpus_on_rocm_windows(logger)
 
     # Configure the torch CUDA memory allocator.
     # NOTE: It is important that this happens before torch is imported.

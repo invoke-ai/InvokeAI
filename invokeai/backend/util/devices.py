@@ -1,3 +1,4 @@
+import sys
 import threading
 from collections import Counter, defaultdict
 from functools import wraps
@@ -26,6 +27,17 @@ _XPU_MEM_FALLBACK_WARNED: set[str] = set()
 def _xpu_is_available() -> bool:
     """Return True if a torch XPU (Intel GPU) device is available."""
     return hasattr(torch, "xpu") and torch.xpu.is_available()
+
+
+def _unusable_rocm_windows_igpu(device: torch.device) -> bool:
+    """Whether `device` is an integrated GPU next to a discrete one under ROCm on Windows.
+
+    Any kernel launched there crashed the process with an access violation (measured: Ryzen gfx1036 beside an RX 9060
+    XT), so naming it is refused with a clear error. An APU on its own is left alone: it is all the machine has.
+    """
+    if sys.platform != "win32" or torch.version.hip is None or device_is_integrated(device) is not True:
+        return False
+    return any(device_is_integrated(torch.device("cuda", i)) is False for i in range(torch.cuda.device_count()))
 
 
 def device_is_integrated(device: torch.device) -> Optional[bool]:
@@ -304,7 +316,8 @@ class TorchDevice:
         Two deliberate limits: a device whose type cannot be determined is kept (the probe returns
         None, and narrowing on a guess is worse than the status quo), and a machine whose only GPU
         is integrated keeps it -- otherwise there would be nothing to generate on. An explicit
-        `generation_devices` list is unaffected, so an iGPU can still be opted into.
+        `generation_devices` list is unaffected, so an iGPU can still be opted into -- except under
+        ROCm on Windows, where no kernel runs on one (see `_unusable_rocm_windows_igpu`).
         """
         integrated: list[torch.device] = []
         remaining: list[torch.device] = []
@@ -356,6 +369,13 @@ class TorchDevice:
                     raise ValueError(
                         f"generation_devices requested '{device_str}', but only {torch.cuda.device_count()} "
                         f"CUDA device(s) are available (valid indices 0-{torch.cuda.device_count() - 1})."
+                    )
+                if _unusable_rocm_windows_igpu(device):
+                    raise ValueError(
+                        f"generation_devices requested '{device_str}', which is an integrated GPU; under ROCm on "
+                        "Windows nothing can run on it. Name a discrete GPU or use 'auto'. Invoke hides the integrated "
+                        "GPU at startup, so device numbers count the discrete GPUs only, unless that failed (see the "
+                        "startup log) or HIP_VISIBLE_DEVICES was set to include it."
                     )
             elif device.type == "xpu":
                 if not _xpu_is_available():
