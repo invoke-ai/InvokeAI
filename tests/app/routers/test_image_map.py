@@ -1836,6 +1836,30 @@ def test_a_new_video_makes_the_projection_stale(mock_invoker: Invoker, client: T
     assert client.get("/api/v1/image_map/points").json()["stale"] is True
 
 
+def test_deleted_image_is_filtered_from_cached_projection_without_reembedding(
+    mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    _seed_embedded_image(mock_invoker, "kept.png")
+    _seed_embedded_image(mock_invoker, "removed.png")
+    _seed_projection(
+        mock_invoker,
+        SYSTEM_USER_ID,
+        imgs("kept.png", "removed.png"),
+        np.array([[0.0, 0.0], [10.0, 10.0]], dtype=np.float32),
+    )
+
+    mock_invoker.services.image_records.delete("removed.png")
+
+    response = client.get("/api/v1/image_map/points")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["stale"] is True
+    assert [point["image_name"] for point in body["points"]] == ["kept.png"]
+    assert image_index_service.embedded_images == []
+    assert image_index_service.projection_requests == [(SYSTEM_USER_ID, True)]
+
+
 def test_search_by_video_reference_uses_its_stored_embedding(
     image_index_service: FakeImageIndexService, mock_invoker: Invoker, client: TestClient
 ) -> None:

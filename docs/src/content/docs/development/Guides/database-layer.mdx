@@ -3,7 +3,7 @@ title: Database Layer
 lastUpdated: 2026-10-04
 ---
 
-Every SQL statement of the application belongs in `invokeai/app/services/shared/database/`. Services reach the database through `Database.queries`, never through a connection, a cursor or SQL text of their own. `tests/app/test_database_access_guard.py` fails when code elsewhere imports a database driver or SQLAlchemy, executes a statement or carries SQL.
+Every SQL statement of the application belongs in `invokeai/app/services/shared/database/`. Services reach the database through `Database.queries`, never through a connection, a cursor or SQL text of their own. `tests/app/test_database_access_guard.py` fails when code elsewhere imports a database driver or SQLAlchemy, executes a statement or carries SQL. Code that keeps a SQLite file of its own, as a scratch store in a temporary directory, is not the application's database: it is listed in the test's `NOT_THE_APPLICATION_DATABASE`, with the reason.
 
 Queries are written with SQLAlchemy Core, which compiles each statement for the backend in use. SQLite is the default backend. The layer and its tests also run on MySQL 8.4 and MariaDB 10.11; configuring InvokeAI itself to use one of them is not available yet.
 

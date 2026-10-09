@@ -1,22 +1,25 @@
-import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   toProjectDraftBody,
   toProjectDraftMetadata,
   type ProjectDraftMetadata,
+  PROJECT_UNLOAD_JOURNAL_RETENTION_MS,
   type ProjectDraftStore,
 } from './draftStore';
 import {
   createCopyReservation,
   createProjectDraft,
   createProjectDraftInput,
+  createUnloadJournalEntry,
   testProjectDraftStoreContract,
 } from './draftStore.contract';
 import { createAccountOwnedProjectDraftStore, createIndexedDbProjectDraftStore } from './indexedDbDraftStore';
 import {
   deleteWorkbenchDatabase,
   getWorkbenchDatabaseName,
+  openUnloadJournalDatabase,
   openWorkbenchDatabase,
   WORKBENCH_DATABASE_VERSION,
   type WorkbenchDatabase,
@@ -32,7 +35,10 @@ const createSuffix = (): string => {
 };
 
 const createStore = async (): Promise<ProjectDraftStore> => {
-  const store = createIndexedDbProjectDraftStore(await openWorkbenchDatabase(createSuffix()));
+  const suffix = createSuffix();
+  const journalDatabase = await openUnloadJournalDatabase(suffix);
+  stores.push(journalDatabase);
+  const store = createIndexedDbProjectDraftStore(await openWorkbenchDatabase(suffix), { journalDatabase });
   stores.push(store);
   return store;
 };
@@ -786,5 +792,126 @@ describe('IndexedDB project drafts', () => {
       kind: 'available',
       nextCursor: null,
     });
+  });
+});
+
+describe('IndexedDB unload journal', () => {
+  const createJournaledStore = async (
+    wrap: (database: WorkbenchDatabase) => WorkbenchDatabase = (database) => database
+  ) => {
+    const suffix = createSuffix();
+    const database = await openWorkbenchDatabase(suffix);
+    const journalDatabase = await openUnloadJournalDatabase(suffix);
+    stores.push(database, journalDatabase);
+    const store = createIndexedDbProjectDraftStore(wrap(database), { journalDatabase });
+    stores.push(store);
+    return { database, journalDatabase, store };
+  };
+  const outcomesOf = async (store: ProjectDraftStore, now = 1_000) => {
+    const result = await store.reconcileUnloadJournal('account-a', now);
+    return result.kind === 'available' ? result.outcomes.map(({ outcome }) => outcome) : result.kind;
+  };
+
+  it('keeps an entry for a damaged lineage on every pass until the retention period ends', async () => {
+    const { database, store } = await createJournaledStore();
+    // A draft without its writer claim.
+    await database.put('drafts', toProjectDraftMetadata(createProjectDraft(), 1));
+    await database.put('draftBodies', toProjectDraftBody(createProjectDraft()));
+    store.journalBeforeUnload({ entries: [createUnloadJournalEntry()], retired: [] });
+
+    await expect(outcomesOf(store)).resolves.toEqual(['corrupt']);
+    await expect(outcomesOf(store)).resolves.toEqual(['corrupt']);
+    await expect(outcomesOf(store, 500 + PROJECT_UNLOAD_JOURNAL_RETENTION_MS + 1)).resolves.toEqual(['expired']);
+    await expect(outcomesOf(store)).resolves.toEqual([]);
+  });
+
+  it('keeps an entry storage was too full to apply, and applies it on a later pass', async () => {
+    const { store: full } = await createJournaledStore(abortFirstBodyWriteWithQuota);
+    full.journalBeforeUnload({ entries: [createUnloadJournalEntry()], retired: [] });
+
+    await expect(outcomesOf(full)).resolves.toEqual(['quota']);
+    await expect(outcomesOf(full)).resolves.toEqual(['applied']);
+    await expect(full.get('project-1', 'session-a')).resolves.toMatchObject({
+      draft: { generation: 2 },
+      kind: 'found',
+    });
+  });
+
+  it('works as before, with the journal unavailable, when its database cannot open', async () => {
+    accountLifecycle.activate('journal-open-failure', createSuffix());
+    const store = await createAccountOwnedProjectDraftStore(captureAccountScope(), {
+      openJournalDatabase: () => Promise.reject(new DOMException('quota', 'QuotaExceededError')),
+    });
+    stores.push(store);
+
+    await expect(store.stage(createProjectDraftInput())).resolves.toEqual({ kind: 'stored' });
+    await expect(store.get('project-1', 'session-a')).resolves.toMatchObject({ kind: 'found' });
+    expect(store.journalBeforeUnload({ entries: [createUnloadJournalEntry()], retired: [] })).toEqual({
+      kind: 'unavailable',
+    });
+    await expect(store.reconcileUnloadJournal('account-a', 1_000)).resolves.toEqual({ kind: 'unavailable' });
+  });
+
+  it('journals again after one journal transaction could not be opened', async () => {
+    const suffix = createSuffix();
+    const database = await openWorkbenchDatabase(suffix);
+    const journalDatabase = await openUnloadJournalDatabase(suffix);
+    stores.push(database, journalDatabase);
+    let failuresLeft = 1;
+    const flaky = new Proxy(journalDatabase, {
+      get(target, property) {
+        if (property === 'transaction' && failuresLeft > 0) {
+          return () => {
+            failuresLeft -= 1;
+            throw new DOMException('closing', 'InvalidStateError');
+          };
+        }
+        const value = Reflect.get(target, property, target) as unknown;
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+    const store = createIndexedDbProjectDraftStore(database, { journalDatabase: flaky });
+    stores.push(store);
+
+    await expect(store.discardUnloadJournal('project-1', 'session-a', 'writer-a')).resolves.toEqual({
+      kind: 'unavailable',
+    });
+    const write = store.journalBeforeUnload({ entries: [createUnloadJournalEntry()], retired: [] });
+    expect(write.kind).toBe('started');
+    await expect(write.kind === 'started' ? write.written : null).resolves.toBe(true);
+    await expect(outcomesOf(store)).resolves.toEqual(['applied']);
+  });
+
+  it('reports a reconciliation whose read failed as unavailable, and reconciles on the next pass', async () => {
+    const suffix = createSuffix();
+    const database = await openWorkbenchDatabase(suffix);
+    const journalDatabase = await openUnloadJournalDatabase(suffix);
+    stores.push(database, journalDatabase);
+    const failing = new Set<string | symbol>();
+    const flaky = new Proxy(journalDatabase, {
+      get(target, property) {
+        if (failing.delete(property)) {
+          return () => Promise.reject(new DOMException('closing', 'InvalidStateError'));
+        }
+        const value = Reflect.get(target, property, target) as unknown;
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+    const store = createIndexedDbProjectDraftStore(database, { journalDatabase: flaky });
+    stores.push(store);
+    store.journalBeforeUnload({ entries: [createUnloadJournalEntry()], retired: [] });
+
+    failing.add('getAllKeys');
+    await expect(outcomesOf(store)).resolves.toBe('unavailable');
+    failing.add('get');
+    await expect(outcomesOf(store)).resolves.toBe('unavailable');
+    await expect(outcomesOf(store)).resolves.toEqual(['applied']);
+  });
+
+  it('reports a blind write that committed', async () => {
+    const { store } = await createJournaledStore();
+    const write = store.journalBeforeUnload({ entries: [createUnloadJournalEntry()], retired: [] });
+
+    await expect(write.kind === 'started' ? write.written : null).resolves.toBe(true);
   });
 });

@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.model_install.model_install_common import INSTALL_RECOVERY_SENTINEL
 from invokeai.app.services.model_records import ModelRecordServiceSQL
 from invokeai.app.services.orphaned_models import CONVERSION_SCRATCH_DIRNAME, OrphanedModelsService
 from invokeai.app.services.shared.database.database import Database
@@ -138,3 +139,49 @@ def test_a_directory_holding_a_registered_model_is_no_orphan_whatever_else_it_ho
     )
 
     assert _service(models_path, store).find_orphaned_models() == []
+
+
+@pytest.mark.parametrize("root_name", ["tmpinstall_recovery", "recovered-model"])
+def test_install_recovery_root_is_not_reported_or_deleted(
+    root_name: str, models_path: Path, store: ModelRecordServiceSQL
+) -> None:
+    recovery_root = models_path / root_name
+    _write_model_file(recovery_root)
+    sentinel = models_path / f".{root_name}{INSTALL_RECOVERY_SENTINEL}"
+    sentinel.write_text("preserve", encoding="utf-8")
+    service = _service(models_path, store)
+
+    assert service.find_orphaned_models() == []
+    result = service.delete_orphaned_models([root_name])
+
+    assert result[root_name].startswith("error:")
+    assert (recovery_root / "model.safetensors").exists()
+    assert sentinel.exists()
+
+
+def test_parent_of_recovery_root_cannot_be_deleted(models_path: Path, store: ModelRecordServiceSQL) -> None:
+    parent = models_path / "model-group"
+    _write_model_file(parent / "ordinary-orphan")
+    recovery_root = parent / "recovered-model"
+    _write_model_file(recovery_root)
+    sentinel = parent / f".{recovery_root.name}{INSTALL_RECOVERY_SENTINEL}"
+    sentinel.write_text("preserve", encoding="utf-8")
+
+    service = _service(models_path, store)
+
+    assert "model-group" not in {orphan.path for orphan in service.find_orphaned_models()}
+    result = service.delete_orphaned_models(["model-group"])
+
+    assert result["model-group"].startswith("error:")
+    assert (parent / "ordinary-orphan" / "model.safetensors").exists()
+    assert (recovery_root / "model.safetensors").exists()
+    assert sentinel.exists()
+
+
+def test_models_root_cannot_be_deleted_as_an_orphan(models_path: Path, store: ModelRecordServiceSQL) -> None:
+    _write_model_file(models_path / "real-model")
+
+    result = _service(models_path, store).delete_orphaned_models(["."])
+
+    assert result["."].startswith("error:")
+    assert (models_path / "real-model" / "model.safetensors").exists()

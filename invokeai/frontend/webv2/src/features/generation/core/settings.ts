@@ -77,12 +77,14 @@ export const getDynamicPromptsConfig = (
     GenerateSettings,
     | 'dynamicPromptsCombinatorial'
     | 'dynamicPromptsMaxPrompts'
+    | 'dynamicPromptsResample'
     | 'dynamicPromptsSampleSeed'
     | 'dynamicPromptsSeedBehaviour'
   >
 ): DynamicPromptsConfig => ({
   combinatorial: settings.dynamicPromptsCombinatorial,
   maxPrompts: settings.dynamicPromptsMaxPrompts,
+  resample: settings.dynamicPromptsResample,
   sampleSeed: settings.dynamicPromptsSampleSeed,
   seedBehaviour: settings.dynamicPromptsSeedBehaviour,
 });
@@ -707,6 +709,7 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
       typeof values.dynamicPromptsCombinatorial === 'boolean' ? values.dynamicPromptsCombinatorial : true,
     dynamicPromptsMaxPrompts: sanitizeMaxPrompts(values.dynamicPromptsMaxPrompts),
     dynamicPromptsSampleSeed: sanitizeSampleSeed(values.dynamicPromptsSampleSeed),
+    dynamicPromptsResample: typeof values.dynamicPromptsResample === 'boolean' ? values.dynamicPromptsResample : true,
     dynamicPromptsSeedBehaviour: isDynamicPromptsSeedBehaviour(values.dynamicPromptsSeedBehaviour)
       ? values.dynamicPromptsSeedBehaviour
       : 'per-iteration',

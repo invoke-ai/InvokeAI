@@ -5,7 +5,7 @@ sidebar:
   order: 4
 ---
 
-import { Steps } from '@astrojs/starlight/components'
+import { Steps } from '@astrojs/starlight/components';
 
 ## Overview
 
@@ -46,16 +46,16 @@ If at any time you wish to revert to single-user mode, simply comment out the `m
 
 The image generation queue is processed by a single worker, so jobs run one at a time. The `session_queue_mode` option controls the order in which pending jobs are selected:
 
-| Mode | Behavior |
-|------|----------|
+| Mode                    | Behavior                                                                                                                                                                  |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `round_robin` (default) | Interleaves jobs across users — each user is served one job before any user is served a second. A single user enqueuing a large batch can no longer monopolize the queue. |
-| `FIFO` | Strict first-come, first-serve. Jobs run in the order they were enqueued (respecting priority), so a large batch drains completely before the next user's jobs start. |
+| `FIFO`                  | Strict first-come, first-serve. Jobs run in the order they were enqueued (respecting priority), so a large batch drains completely before the next user's jobs start.     |
 
 Set it in `invokeai.yaml`:
 
 ```yaml
 multiuser: true
-session_queue_mode: round_robin   # or FIFO
+session_queue_mode: round_robin # or FIFO
 ```
 
 Or via the `INVOKEAI_SESSION_QUEUE_MODE` environment variable:
@@ -84,30 +84,27 @@ When InvokeAI starts for the first time in multi-user mode, you'll see the **Adm
     - Cannot be changed later without database access
 
 2. **Display Name**: Enter a friendly name
-
-    - Example: "System Administrator" or your real name
-    - Can be changed later in your profile
-    - Visible to other users in shared contexts
+   - Example: "System Administrator" or your real name
+   - Can be changed later in your profile
+   - Visible to other users in shared contexts
 
 3. **Password**: Create a strong administrator password
+   - **Minimum requirements:**
+     - At least 8 characters long
+     - Contains uppercase letters (A-Z)
+     - Contains lowercase letters (a-z)
+     - Contains numbers (0-9)
 
-    - **Minimum requirements:**
-
-        - At least 8 characters long
-        - Contains uppercase letters (A-Z)
-        - Contains lowercase letters (a-z)
-        - Contains numbers (0-9)
-
-    - **Recommended:**
-
-        - Use 12+ characters
-        - Include special characters (!@#$%^&*)
-        - Use a password manager to generate and store
-        - Don't reuse passwords from other services
+   - **Recommended:**
+     - Use 12+ characters
+     - Include special characters (!@#$%^&\*)
+     - Use a password manager to generate and store
+     - Don't reuse passwords from other services
 
 4. **Confirm Password**: Re-enter the password
 
 5. Click **Create Administrator Account**
+
 </Steps>
 
 :::caution[Important]
@@ -120,10 +117,10 @@ InvokeAI can run in single-user or multi-user mode, controlled by the `multiuser
 
 ```yaml
 # Enable/disable multi-user mode
-multiuser: true   # Enable multi-user mode (requires authentication)
+multiuser: true # Enable multi-user mode (requires authentication)
 
 # Optional password policy
-strict_password_checking: true  # Enforce uppercase/lowercase/number requirements
+strict_password_checking: true # Enforce uppercase/lowercase/number requirements
 ```
 
 JWT secrets are generated automatically and stored in the database. Session lifetimes default to 24 hours, or 7 days when the user selects "Remember me". See Secret Key Management below if you need to rotate the JWT secret.
@@ -139,10 +136,15 @@ JWT secrets are generated automatically and stored in the database. Session life
 When upgrading from a single-user installation or switching modes:
 
 <Steps>
+
 1. **Automatic Migration**: The database will automatically migrate to multi-user schema when multi-user mode is first enabled
+
 2. **Legacy Data Ownership**: Existing data (boards, images, workflows) created in single-user mode is assigned to an internal user named "system"
+
 3. **Administrator Access**: Only administrators will have access to legacy "system"-owned assets when in multi-user mode
+
 4. **No Data Loss**: All existing content is preserved
+
 </Steps>
 
 **Migration Process:**
@@ -188,12 +190,12 @@ All command-line arguments are optional. The scripts will prompt you to provide 
 
 The commands are:
 
-| Name               |   Function    | Example CLI Usage  |
-|--------------------|---------------|--------------------|
-|**invoke-useradd**  | add a user    | `invoke-useradd --email user@example.com --name "Example User" --password "badpassword"` |
-|**invoke-usermod**  | modify a user | `invoke-usermod --email user@example.com --name "Mr. Example User" --password "8adsf2**%"` |
-|**invoke-userdel**  | delete a user | `invoke-userdel --email user@example.com --force` |
-|**invoke-userlist** | list all users| `invoke-userlist` |
+| Name                | Function       | Example CLI Usage                                                                          |
+| ------------------- | -------------- | ------------------------------------------------------------------------------------------ |
+| **invoke-useradd**  | add a user     | `invoke-useradd --email user@example.com --name "Example User" --password "badpassword"`   |
+| **invoke-usermod**  | modify a user  | `invoke-usermod --email user@example.com --name "Mr. Example User" --password "8adsf2**%"` |
+| **invoke-userdel**  | delete a user  | `invoke-userdel --email user@example.com --force`                                          |
+| **invoke-userlist** | list all users | `invoke-userlist`                                                                          |
 
 Pass the `--help` argument to get the usage of each script. For example:
 
@@ -224,8 +226,25 @@ workflows, queue items, or style presets they created — those rows remain in t
 a user_id that no longer exists, and will not appear in other (non-admin) users' galleries.
 Administrators keep gallery visibility of the orphaned images and videos and can review or delete
 them from there. Physical media files in `outputs/images` and `outputs/videos` are also left in
-place: orphan image files can be removed with a gallery maintenance script, while video files should
-be deleted through the gallery (which removes the file along with the record) or cleaned up manually.
+place. Administrators can use **Settings > Data & workspace > Gallery maintenance** to review and
+remove database records whose image files are missing, archive image files and thumbnails that are
+not associated with database records, or regenerate missing thumbnails. These actions cover images
+across all accounts, including archived-board and intermediate images; they do not maintain videos.
+Each action scans when requested, then requires confirmation before it runs. Execution is blocking,
+so the request waits for the operation to finish. If the inventory changed since review, InvokeAI
+asks the administrator to review again.
+
+Removing a missing image record also removes its related semantic-index entries through the
+database's image-record relationship. The image record is deleted, and its thumbnail is archived
+when present; other images and their embeddings are preserved. Archive files are placed in a unique run
+directory under `<outdir>/images-archive/gallery-maintenance/`, where `<outdir>` is the configured
+`Paths.outdir` (for example, `outputs/images-archive/gallery-maintenance/remove_missing-<id>/`).
+Before making changes, the application creates a consistent database backup through its active
+database connection under `<db_dir>/backup/` (for example,
+`databases/backup/backup-<timestamp>-gallery-maintenance-<id>.db`). The result shows the exact
+backup and archive paths. Keep those files if you may need to recover database records or archived
+media. Gallery maintenance is part of the application and does not require a standalone script or
+a separate database connection.
 
 If you want their content gone as well, reassign or delete it before deleting the user. Back up the
 database first if recovery might be needed.
@@ -277,9 +296,8 @@ cannot be checked by InvokeAI. Do not enable `allow_private_download_urls` merel
 make an untrusted proxy work. The two settings are independent: `download_proxy` is
 honored whether or not `allow_private_download_urls` is enabled.
 
-
 :::note[Strict Password Checking]
-It is recommended that you enable strict password checking.  This will
+It is recommended that you enable strict password checking. This will
 force all users to select good passwords that follow the
 "minimal requirements" below. Do this by adding `strict_password_checking` to
 the `invokeai.yaml` configuration file:
@@ -287,6 +305,7 @@ the `invokeai.yaml` configuration file:
 ```
 strict_password_checking: true
 ```
+
 :::
 
 ### Password Policies
@@ -321,7 +340,7 @@ At the client side, tokens are stored in browser localStorage. Logging out clear
 
 The tokens include the user's ID, email, admin status, and a revocation counter, along with an HMAC signature.
 
-**Revocation:** A token proves *identity* only — expiry is not the only thing that can end a session. Every authenticated request re-reads the account from the database, so administrative changes take effect on the target's next request, without waiting for their token to expire and without requiring them to log out:
+**Revocation:** A token proves _identity_ only — expiry is not the only thing that can end a session. Every authenticated request re-reads the account from the database, so administrative changes take effect on the target's next request, without waiting for their token to expire and without requiring them to log out:
 
 - **Role changes.** The admin status carried in a token is ignored; each request uses the role currently recorded for the account. A demoted administrator loses administrative endpoints immediately, and a promoted user gains them without logging in again.
 - **Deactivation and deletion.** Requests from a deactivated or deleted account are rejected, its open connections are closed, and any of its queue items are canceled — a running one stops at the next node, or is canceled rather than recorded as completed if it was already on its last one, and pending ones are rejected when they reach the front of the queue. A generation that reports its progress (image generation does) stops part-way through the node instead of running it out. Work already completed is not undone.
@@ -331,7 +350,7 @@ Changes made through the web UI apply to open connections immediately. Changes m
 
 If that sweep cannot read the database at all — the server is under enough load that its reads keep timing out, say — it does not assume the connections it cannot check are still entitled to what they hold. After a few consecutive failures, open connections lose their administrator privileges and stop receiving other users' events, while staying connected; the privilege comes back on its own once the record can be read again. An administrator who sees admin-only updates go quiet during a period of database trouble is seeing this, not a change to their account.
 
-That safeguard covers administrator privileges specifically. Closing a deactivated or deleted account's connection still waits for a successful read, so while the database is unreadable such a connection keeps receiving that account's *own* events until the sweep can confirm the change — every HTTP request it makes is rejected in the meantime, and it is closed as soon as a read succeeds.
+That safeguard covers administrator privileges specifically. Closing a deactivated or deleted account's connection still waits for a successful read, so while the database is unreadable such a connection keeps receiving that account's _own_ events until the sweep can confirm the change — every HTTP request it makes is rejected in the meantime, and it is closed as soon as a read succeeds.
 
 Two limits are worth stating plainly. Revocation is enforced by this server, so a token remains cryptographically valid until it expires — anything that accepts these tokens without consulting the database would still honor it. And a session already in flight is stopped, not rewound: media already delivered to the client and outputs already written stay written.
 
@@ -506,11 +525,17 @@ Include these directories/files:
 
 <Steps>
 1. Install InvokeAI on new system
+
 2. Restore configuration file
+
 3. Restore database directory
+
 4. Restore models and outputs
+
 5. Verify file permissions
+
 6. Start InvokeAI and test
+
 </Steps>
 
 ## Troubleshooting
@@ -566,6 +591,7 @@ sqlite3 databases/invokeai.db "PRAGMA journal_mode=WAL;"
 
 <Steps>
 1. Stop InvokeAI
+
 2. Direct database access:
 
    ```bash
@@ -586,6 +612,7 @@ sqlite3 databases/invokeai.db "PRAGMA journal_mode=WAL;"
    ```
 
 4. Restart InvokeAI
+
 </Steps>
 
 :::note[Alternative Step 3]
@@ -596,8 +623,8 @@ to trigger the setup process when InvokeAI restarts:
 DELETE FROM users
 WHERE email = 'admin@example.com';
 ```
-:::
 
+:::
 
 ### Performance Issues
 
@@ -607,9 +634,13 @@ WHERE email = 'admin@example.com';
 
 <Steps>
 1. Check active generation count
+
 2. Review resource usage (CPU/GPU/RAM)
+
 3. Check database size and performance
+
 4. Review network latency
+
 </Steps>
 
 **Solutions:**
@@ -657,13 +688,13 @@ schema_version: 4.0.2
 multiuser: true
 
 # Server
-host: "0.0.0.0"
+host: '0.0.0.0'
 port: 9090
 
 # Performance
 enable_partial_loading: true
 precision: float16
-pytorch_cuda_alloc_conf: "backend:cudaMallocAsync"
+pytorch_cuda_alloc_conf: 'backend:cudaMallocAsync'
 hashing_algorithm: blake3_multi
 ```
 
@@ -699,9 +730,13 @@ Best practice:
 
 <Steps>
 1. Deactivate the account first
+
 2. Transfer ownership of shared boards
+
 3. After transition period, delete the account
+
 4. Or keep the account deactivated for audit purposes
+
 </Steps>
 
 ### What's the licensing impact of multi-user mode?

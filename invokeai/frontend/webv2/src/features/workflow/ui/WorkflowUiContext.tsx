@@ -2,7 +2,7 @@ import type { GalleryItemRef } from '@features/gallery/contracts';
 import type { ForLoopValidationReason } from '@features/workflow/core/forLoops';
 import type { ProjectGraphState, ProjectWorkflowEntry, ProjectWorkflowSource } from '@features/workflow/core/types';
 import type { WorkbenchThemeId } from '@theme/themes';
-import type { ReactNode } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 
 import { useExternalStoreSelector, type EqualityFn } from '@platform/state/selectors';
 import { createContext, use, useCallback, useSyncExternalStore } from 'react';
@@ -71,6 +71,8 @@ export interface WorkflowGraphPreviewPort {
 
 /** This UI port preserves dependency direction: Workflow cannot import Workbench. */
 export interface WorkflowUiAdapter {
+  /** Keycaps for a hotkey command's first effective binding, as the command palette shows them; nothing when unbound. */
+  CommandShortcut: ComponentType<{ commandId: string }>;
   capabilities: WorkflowReadPort<WorkflowCapabilities>;
   preferences: WorkflowReadPort<WorkflowPreferences>;
   project: WorkflowReadPort<WorkflowProjectSnapshot>;
@@ -92,7 +94,6 @@ export interface WorkflowUiAdapter {
   findInGallery(ref: GalleryItemRef): void;
   /** Leaves the editor for the model manager's Add Models section, searching for `query`. */
   openAddModels(query: string): void;
-  registerModalHotkeyLayer(id: string): () => void;
   nodeExecution: {
     get(nodeId: string): WorkflowNodeExecutionState | null;
     subscribe(nodeId: string, listener: () => void): () => void;

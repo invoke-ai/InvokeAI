@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from datetime import datetime
 from typing import Optional
 
@@ -98,6 +99,19 @@ class ImageRecordStorage(ImageRecordStorageBase):
 
     def delete_many(self, image_names: list[str]) -> None:
         self._queries.images.delete_many(image_names)
+
+    def iter_all_image_locations(self, batch_size: int = 500) -> Iterator[tuple[str, str]]:
+        """Yields every image location through bounded keyset pages, including hidden/intermediate rows."""
+        if batch_size <= 0:
+            raise ValueError("batch_size must be positive")
+        last_image_name = ""
+        while True:
+            # A transaction per page: none is held while the caller works through it.
+            locations = self._queries.images.locations_after(last_image_name, batch_size)
+            yield from locations
+            if len(locations) < batch_size:
+                return
+            last_image_name = locations[-1][0]
 
     def get_subfolders(self, image_names: list[str]) -> dict[str, str]:
         return self._queries.images.subfolders(image_names)

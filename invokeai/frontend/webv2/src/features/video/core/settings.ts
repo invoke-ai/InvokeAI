@@ -285,8 +285,9 @@ export const resolveVideoMode = (
     return 'reference';
   }
 
-  // Ahead of the frame and clip slots because a conditioning clip excludes them all: it holds one
-  // whole modality clean, which is the same mask the other conditioning modes write into.
+  // Ahead of the frame and clip slots because a conditioning clip decides the mode: it holds one
+  // whole modality clean. A soundtrack leaves the picture to be generated, so first and last frames
+  // ride along inside audio-to-video rather than naming a mode of their own.
   if (settings.conditioningClip) {
     return settings.conditioningClip.role === 'audio' ? 'audio-to-video' : 'video-to-audio';
   }
@@ -340,10 +341,13 @@ export const normalizeVideoSettings = (values: unknown): VideoSettings | null =>
   // A first frame and a source video are mutually exclusive; if a stale
   // project somehow holds both, the first frame wins deterministically.
   const sourceVideo = !firstFrameImage && isVideoSourceClip(values.sourceVideo) ? values.sourceVideo : null;
-  // One conditioning clip at a time, and never alongside a first frame or an initial video: those
-  // condition the same stream this one would hold, and the model samples exactly one modality.
+  // One conditioning clip at a time, and never alongside an initial video. A first frame excludes it
+  // only in the picture role, where both would hold the same frames; a soundtrack holds the other
+  // stream, so a first frame can anchor the picture generated for it.
   const conditioningClip =
-    !firstFrameImage && !sourceVideo && isVideoConditioningClip(values.conditioningClip)
+    !sourceVideo &&
+    isVideoConditioningClip(values.conditioningClip) &&
+    (!firstFrameImage || !isConditioningClipExcludingFrames(values.conditioningClip))
       ? values.conditioningClip
       : null;
   const loras = Array.isArray(values.loras) ? values.loras.filter(isVideoLora) : [];
@@ -548,6 +552,13 @@ export const VIDEO_SOURCE_FALLBACK_FPS = 16;
  * Estimate frames from duration/fps; backend extraction resolves exact indices. Default trim omits the final frame
  * to avoid duplicating it at the extension seam.
  */
+// Never below 1: the crossfade join needs at least a two-frame trim.
+const getDefaultSourceEndFrame = (numFrames: number): number => Math.max(1, numFrames - 2);
+
+/** Whether the initial video's window differs from the one a fresh pick gets. */
+export const isVideoSourceClipTrimmed = (clip: VideoSourceClip): boolean =>
+  clip.startFrame !== 0 || clip.endFrame !== getDefaultSourceEndFrame(clip.numFrames);
+
 export const createVideoSourceClip = (item: {
   durationSeconds: number;
   fps?: number;
@@ -559,8 +570,7 @@ export const createVideoSourceClip = (item: {
   const numFrames = Math.max(1, Math.round(item.durationSeconds * fps));
 
   return {
-    // Never below 1: the crossfade join needs at least a two-frame trim.
-    endFrame: Math.max(1, numFrames - 2),
+    endFrame: getDefaultSourceEndFrame(numFrames),
     fps,
     height: item.height,
     numFrames,
@@ -585,20 +595,27 @@ export const getDefaultReferenceConditioning = (mediaOrigin: string | null | und
 export const getDefaultConditioningRole = (mediaOrigin: string | null | undefined): VideoConditioningRole =>
   mediaOrigin === 'audio_upload' ? 'audio' : 'video';
 
-export const createVideoConditioningClip = (item: {
-  durationSeconds: number;
-  fps?: number;
-  height: number;
-  mediaOrigin?: string;
-  name: string;
-  width: number;
-}): VideoConditioningClip => {
+/**
+ * A clip in its default role. `framesHeld` puts it in the soundtrack role instead, the only one that can join start
+ * and end images already set: the picture role would clear them.
+ */
+export const createVideoConditioningClip = (
+  item: {
+    durationSeconds: number;
+    fps?: number;
+    height: number;
+    mediaOrigin?: string;
+    name: string;
+    width: number;
+  },
+  { framesHeld = false }: { framesHeld?: boolean } = {}
+): VideoConditioningClip => {
   const { endFrame: _endFrame, startFrame: _startFrame, ...clip } = createVideoSourceClip(item);
 
   return {
     clip,
     fpsKnown: typeof item.fps === 'number' && Number.isFinite(item.fps) && item.fps > 0,
-    role: getDefaultConditioningRole(item.mediaOrigin),
+    role: framesHeld ? 'audio' : getDefaultConditioningRole(item.mediaOrigin),
   };
 };
 
@@ -850,6 +867,9 @@ export const canPlaceReferenceExtendAnchor = (
   );
 };
 
+/** The conditioning a derived Initial Video anchor starts with; the user may change it. */
+export const REFERENCE_EXTEND_ANCHOR_CONDITIONING: VideoReferenceConditioning = 'video_audio';
+
 /**
  * Synchronizes the linked reference with Initial Video. Preserve explicit trims only for the same flagged source;
  * otherwise derive the default. Prefer the flagged anchor, then adopt a matching visual reference, or append if
@@ -869,7 +889,7 @@ export const applyReferenceExtendSourceVideo = (
 
   const linked: VideoReferenceItem = {
     clip: deriveReferenceExtendClip(sourceVideo, numFrames),
-    conditioning: 'video_audio',
+    conditioning: REFERENCE_EXTEND_ANCHOR_CONDITIONING,
     fromSourceVideo: true,
     kind: 'video',
   };
@@ -958,14 +978,70 @@ export const getInitialVideoPatch = ({
 };
 
 /**
- * The panel patch that sets the conditioning clip, or clears it. A clip claims a whole modality, so it displaces
- * every other conditioning slot: the frames, the initial video and the references.
+ * Whether a conditioning clip holds the picture, and so excludes the first and last frames. A clip in the soundtrack
+ * role holds only the audio stream: frames anchor the picture generated for it.
+ */
+export const isConditioningClipExcludingFrames = (
+  conditioningClip: Pick<VideoConditioningClip, 'role'> | null
+): boolean => conditioningClip?.role === 'video';
+
+/**
+ * The panel patch that sets a first or last frame, or clears it. A first frame displaces the initial video, and either
+ * frame displaces a conditioning clip that holds the picture; a soundtrack stays, since the frame anchors the picture
+ * generated for it.
+ */
+export const getFrameImagePatch = (
+  slot: 'firstFrameImage' | 'lastFrameImage',
+  image: ImageWithDims | null,
+  conditioningClip: VideoConditioningClip | null
+): Partial<VideoWidgetValues> => ({
+  [slot]: image,
+  ...(image && slot === 'firstFrameImage' ? { sourceVideo: null } : {}),
+  ...(image && isConditioningClipExcludingFrames(conditioningClip) ? { conditioningClip: null } : {}),
+});
+
+/**
+ * A first- or last-frame setter that decides what the frame displaces from the panel as it is when called, not as it
+ * was when the setter was made. Gallery drops resolve asynchronously and commit through the setter captured at drop
+ * time; the clip's role can change in between, and a stale reading would keep a picture-role clip beside the frame.
+ *
+ * The stored clip, not the normalized one: normalization hides a picture-role clip behind a first frame, and a frame
+ * that left it stored would let it resurface beside the last frame once the first is cleared.
+ */
+export const createFrameImageSetter =
+  (
+    slot: 'firstFrameImage' | 'lastFrameImage',
+    readValues: () => unknown,
+    patch: (values: Partial<VideoWidgetValues>) => void
+  ) =>
+  (image: ImageWithDims | null): void => {
+    const values = readValues();
+    const storedClip =
+      isRecord(values) && isVideoConditioningClip(values.conditioningClip) ? values.conditioningClip : null;
+
+    patch(getFrameImagePatch(slot, image, storedClip));
+  };
+
+/**
+ * Whether the panel holds a first or last frame right now. A clip dropped while either is held takes the soundtrack
+ * role; the drop resolves asynchronously, so this is read when it lands rather than when it began.
+ */
+export const areFrameImagesHeld = (values: unknown): boolean => {
+  const normalized = normalizeVideoWidgetValues(values);
+
+  return Boolean(normalized?.firstFrameImage || normalized?.lastFrameImage);
+};
+
+/**
+ * The panel patch that sets the conditioning clip, or clears it. A clip claims a whole modality, so it displaces the
+ * initial video and the references, and in the picture role the frames as well.
  */
 export const getConditioningClipPatch = (
   conditioningClip: VideoConditioningClip | null
 ): Partial<VideoWidgetValues> => ({
   conditioningClip,
-  ...(conditioningClip ? { firstFrameImage: null, lastFrameImage: null, references: [], sourceVideo: null } : {}),
+  ...(conditioningClip ? { references: [], sourceVideo: null } : {}),
+  ...(isConditioningClipExcludingFrames(conditioningClip) ? { firstFrameImage: null, lastFrameImage: null } : {}),
 });
 
 /**

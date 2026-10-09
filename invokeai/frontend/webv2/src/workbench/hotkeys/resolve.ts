@@ -1,6 +1,19 @@
 import type { HotkeyContext, RegisteredHotkey } from './types';
 
-import { isEditableHotkeyTarget, normalizeHotkeyString } from './keys';
+import { IS_MAC_OS, isEditableHotkeyTarget, normalizeHotkeyString } from './keys';
+
+/**
+ * The keys a binding presses on this platform: `mod` is Cmd on macOS and Ctrl elsewhere. The runtime fires the first
+ * binding a press matches, so `mod+arrowup` and `ctrl+arrowup` must resolve as one press and leave the choice to
+ * scope; compared by spelling, one would shadow the other everywhere.
+ */
+export const toPlatformHotkey = (hotkey: string, isMacOs = IS_MAC_OS): string =>
+  normalizeHotkeyString(
+    hotkey
+      .split('+')
+      .map((part) => (part.trim().toLowerCase() === 'mod' ? (isMacOs ? 'meta' : 'ctrl') : part))
+      .join('+')
+  );
 
 const getScopePriority = (hotkey: RegisteredHotkey, context: HotkeyContext): number => {
   const { scope } = hotkey;
@@ -47,14 +60,14 @@ export const resolveHotkey = ({
   hotkeys: RegisteredHotkey[];
   matchedKey: string;
 }): RegisteredHotkey | null => {
-  const normalized = normalizeHotkeyString(matchedKey);
+  const pressed = toPlatformHotkey(matchedKey);
   const isEditable = isEditableHotkeyTarget(event.target);
 
   return (
     hotkeys
-      .filter((hotkey) => hotkey.implemented !== false && hotkey.keys.includes(normalized))
+      .filter((hotkey) => hotkey.implemented !== false && hotkey.keys.some((key) => toPlatformHotkey(key) === pressed))
       .filter((hotkey) => hotkey.allowInEditable || !isEditable)
-      .filter((hotkey) => hotkey.allowInModal || !context.isModalLayerActive)
+      .filter((hotkey) => hotkey.allowInModal || !context.isModalPresent)
       .map((hotkey) => ({ hotkey, priority: getScopePriority(hotkey, context) }))
       .filter(({ priority }) => priority >= 0)
       .sort((left, right) => right.priority - left.priority)[0]?.hotkey ?? null

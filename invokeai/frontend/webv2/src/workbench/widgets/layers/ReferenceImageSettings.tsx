@@ -1,4 +1,4 @@
-import type { SelectValueChangeDetails, SliderValueChangeDetails } from '@chakra-ui/react';
+import type { SelectValueChangeDetails } from '@chakra-ui/react';
 import type { ModelConfig } from '@features/models';
 import type {
   CanvasRegionalGuidanceLayerContract,
@@ -21,7 +21,8 @@ import {
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
-import { Button, DropZone, Field, Select, Slider } from '@platform/ui';
+import { Button, DropZone, Field, Select } from '@platform/ui';
+import { ScrubberField } from '@platform/ui/ScrubberField';
 import { useQueryClient } from '@tanstack/react-query';
 import { type CanvasPreparedEngine, usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useWorkbenchCommands } from '@workbench/WorkbenchContext';
@@ -29,6 +30,7 @@ import { ImageIcon, UploadIcon, XIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { DEFAULT_REGIONAL_REFERENCE_WEIGHT } from './layerOps';
 import { useSelectedModelBase } from './useSelectedModelBase';
 
 /**
@@ -56,7 +58,10 @@ export const referenceImageDropId = (layerId: string, refId: string): string =>
   `regional-ref-image:${layerId}:${refId}`;
 
 interface ReferenceImageEditing {
-  commitReferenceImages(next: RegionalGuidanceReferenceImage[]): void;
+  updateReferenceImage(
+    refId: string,
+    update: (ref: RegionalGuidanceReferenceImage) => RegionalGuidanceReferenceImage
+  ): void;
   setReferenceImageAsset(refId: string, image: RegionalGuidanceReferenceImageAsset | null): void;
   uploadReferenceImageAsset(refId: string, file: File): void;
 }
@@ -69,29 +74,34 @@ const useReferenceImageEditing = (
   const commitPrepared = usePreparedCommit(engine);
   const { notifications } = useWorkbenchCommands();
   const queryClient = useQueryClient();
-  const referenceImages = layer.referenceImages;
 
-  const commitReferenceImages = useCallback(
-    (next: RegionalGuidanceReferenceImage[]) => {
-      commitPrepared(t('widgets.layers.regionalGuidance.referenceImages'), (model) =>
-        model.prepare({
-          before: { layerType: 'regional_guidance', referenceImages: [...referenceImages] },
-          config: { layerType: 'regional_guidance', referenceImages: next },
+  // Reads the references at commit time, so an edit that finishes later than it began (an upload, a weight drag)
+  // never reverts one that landed in between, and undo restores only this reference.
+  const updateReferenceImage = useCallback(
+    (refId: string, update: (ref: RegionalGuidanceReferenceImage) => RegionalGuidanceReferenceImage) => {
+      commitPrepared(t('widgets.layers.regionalGuidance.referenceImages'), (model) => {
+        const live = model.getLayer(layer.id);
+        if (live?.type !== 'regional_guidance' || !live.referenceImages.some((ref) => ref.id === refId)) {
+          return { ids: [refId], status: 'missing' };
+        }
+        return model.prepare({
+          before: { layerType: 'regional_guidance', referenceImages: [...live.referenceImages] },
+          config: {
+            layerType: 'regional_guidance',
+            referenceImages: live.referenceImages.map((ref) => (ref.id === refId ? update(ref) : ref)),
+          },
           id: layer.id,
           type: 'patch-config',
-        })
-      );
+        });
+      });
     },
-    [commitPrepared, layer.id, referenceImages, t]
+    [commitPrepared, layer.id, t]
   );
 
   const setReferenceImageAsset = useCallback(
-    (refId: string, image: RegionalGuidanceReferenceImageAsset | null) => {
-      commitReferenceImages(
-        referenceImages.map((ref) => (ref.id === refId ? { ...ref, config: { ...ref.config, image } } : ref))
-      );
-    },
-    [commitReferenceImages, referenceImages]
+    (refId: string, image: RegionalGuidanceReferenceImageAsset | null) =>
+      updateReferenceImage(refId, (ref) => ({ ...ref, config: { ...ref.config, image } })),
+    [updateReferenceImage]
   );
 
   const uploadReferenceImageAsset = useCallback(
@@ -140,8 +150,8 @@ const useReferenceImageEditing = (
   });
 
   return useMemo(
-    () => ({ commitReferenceImages, setReferenceImageAsset, uploadReferenceImageAsset }),
-    [commitReferenceImages, setReferenceImageAsset, uploadReferenceImageAsset]
+    () => ({ setReferenceImageAsset, updateReferenceImage, uploadReferenceImageAsset }),
+    [setReferenceImageAsset, updateReferenceImage, uploadReferenceImageAsset]
   );
 };
 
@@ -205,22 +215,19 @@ export const ReferenceImageSettings = ({
   layer: CanvasRegionalGuidanceLayerContract;
   refId: string;
 }) => {
-  const index = layer.referenceImages.findIndex((ref) => ref.id === refId);
-  const referenceImage = layer.referenceImages[index];
+  const referenceImage = layer.referenceImages.find((ref) => ref.id === refId);
   if (!referenceImage) {
     return null;
   }
-  return <ReferenceImageEditor engine={engine} index={index} layer={layer} referenceImage={referenceImage} />;
+  return <ReferenceImageEditor engine={engine} layer={layer} referenceImage={referenceImage} />;
 };
 
 const ReferenceImageEditor = ({
   engine,
-  index,
   layer,
   referenceImage,
 }: {
   engine: CanvasPreparedEngine | null;
-  index: number;
   layer: CanvasRegionalGuidanceLayerContract;
   referenceImage: RegionalGuidanceReferenceImage;
 }) => {
@@ -228,18 +235,16 @@ const ReferenceImageEditor = ({
   const editing = useReferenceImageEditing(engine, layer);
   const collections = useReferenceImageCollections();
   const { config } = referenceImage;
-  const referenceImages = layer.referenceImages;
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { isOver, setNodeRef } = useGalleryImageDroppable({
     data: { kind: 'regional-reference-image' },
     id: referenceImageDropId(layer.id, referenceImage.id),
   });
 
+  // Whole-reference replacement for edits that act on what is shown the moment they happen.
   const replaceRef = useCallback(
-    (next: RegionalGuidanceReferenceImage) => {
-      editing.commitReferenceImages(referenceImages.map((entry, i) => (i === index ? next : entry)));
-    },
-    [editing, index, referenceImages]
+    (next: RegionalGuidanceReferenceImage) => editing.updateReferenceImage(next.id, () => next),
+    [editing]
   );
 
   const openUpload = useCallback(() => fileInputRef.current?.click(), []);
@@ -295,26 +300,20 @@ const ReferenceImageEditor = ({
     [config, referenceImage, replaceRef]
   );
 
+  // The weight is not previewed on the canvas, so a gesture shows locally and records once when it ends. A drag
+  // keeps the handlers it started with, so the commit patches only the weight onto the references as they are then.
   const [liveWeight, setLiveWeight] = useState<number | null>(null);
 
-  const handleWeight = useCallback(({ value }: SliderValueChangeDetails) => {
-    const next = value[0];
-    if (next === undefined || !Number.isFinite(next)) {
-      return;
-    }
-    setLiveWeight(next);
-  }, []);
-
   const handleWeightEnd = useCallback(
-    ({ value }: SliderValueChangeDetails) => {
-      const next = value[0];
+    (next: number) => {
       setLiveWeight(null);
-      if (config.type !== 'ip_adapter' || next === undefined || !Number.isFinite(next)) {
-        return;
+      if (config.type === 'ip_adapter' && next !== config.weight) {
+        editing.updateReferenceImage(referenceImage.id, (ref) =>
+          ref.config.type === 'ip_adapter' ? { ...ref, config: { ...ref.config, weight: next } } : ref
+        );
       }
-      replaceRef({ ...referenceImage, config: { ...config, weight: next } });
     },
-    [config, referenceImage, replaceRef]
+    [config, editing, referenceImage.id]
   );
 
   const handleFluxReduxConfig = useCallback(
@@ -331,11 +330,6 @@ const ReferenceImageEditor = ({
     [config]
   );
   const methodValue = useMemo(() => (config.type === 'ip_adapter' ? [config.method] : []), [config]);
-  const weightValue = useMemo(
-    () => (liveWeight !== null ? [liveWeight] : config.type === 'ip_adapter' ? [config.weight] : [1]),
-    [config, liveWeight]
-  );
-  const weightAria = useMemo(() => [t('widgets.layers.regionalGuidance.weight')], [t]);
 
   const image = config.image;
   const modelName =
@@ -427,19 +421,17 @@ const ReferenceImageEditor = ({
               onValueChange={handleMethod}
             />
           </Field>
-          <Field label={t('widgets.layers.regionalGuidance.weight')}>
-            <Slider
-              aria-label={weightAria}
-              formatValue={formatWeight}
-              max={2}
-              min={-1}
-              step={0.01}
-              value={weightValue}
-              withThumbTooltip
-              onValueChange={handleWeight}
-              onValueChangeEnd={handleWeightEnd}
-            />
-          </Field>
+          <ScrubberField
+            defaultValue={DEFAULT_REGIONAL_REFERENCE_WEIGHT}
+            formatValue={formatWeight}
+            label={t('widgets.layers.regionalGuidance.weight')}
+            max={2}
+            min={-1}
+            step={0.01}
+            value={liveWeight ?? config.weight}
+            onChange={setLiveWeight}
+            onChangeEnd={handleWeightEnd}
+          />
         </>
       ) : config.type === 'flux_redux' ? (
         <FluxReduxControls config={config} disabled={false} onChange={handleFluxReduxConfig} />

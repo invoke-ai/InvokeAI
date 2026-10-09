@@ -36,7 +36,7 @@ def session_queue(mock_invoker: Invoker, mock_sqlite_database: Database) -> Sess
     return queue
 
 
-def _insert_queue_item(session_queue: SessionQueue, user_id: str, origin: str | None = None) -> int:
+def _insert_queue_item(session_queue: SessionQueue, user_id: str | None, origin: str | None = None) -> int:
     graph = Graph()
     graph.add_node(PromptTestInvocation(id="prompt", prompt="test"))
     session = GraphExecutionState(graph=graph)
@@ -72,6 +72,48 @@ def test_status_aggregate_counts_are_global_with_user_subcounts(session_queue: S
     # Per-user subcounts reflect only user A's items → badge renders "2/3".
     assert status.user_pending == 2
     assert status.user_in_progress == 0
+
+
+def test_status_counts_every_status_with_the_callers_share_inside_the_origin_scope(
+    session_queue: SessionQueue,
+) -> None:
+    items = [
+        ("alice", "project-a:1", "pending"),
+        ("alice", "project-a:2", "in_progress"),
+        ("alice", "project-a:3", "completed"),
+        ("bob", "project-a:4", "pending"),
+        ("bob", "project-a:5", "failed"),
+        ("alice", "project-b:6", "pending"),
+        ("alice", "project-b:7", "canceled"),
+        ("bob", "project-b:8", "in_progress"),
+        # An item with no owner counts toward the totals and never toward a caller's own share.
+        (None, "project-a:9", "pending"),
+    ]
+    for user_id, origin, status in items:
+        item_id = _insert_queue_item(session_queue, user_id=user_id, origin=origin)
+        with sqlite_cursor_of(session_queue) as cursor:
+            cursor.execute("UPDATE session_queue SET status = ? WHERE item_id = ?", (status, item_id))
+
+    def counts(user_id: str, origin_prefix: str | None = None) -> tuple[int, ...]:
+        status = session_queue.get_queue_status("default", user_id=user_id, origin_prefix=origin_prefix)
+        return (
+            status.pending,
+            status.in_progress,
+            status.waiting,
+            status.completed,
+            status.failed,
+            status.canceled,
+            status.total,
+            status.user_pending,
+            status.user_in_progress,
+        )
+
+    # pending, in_progress, waiting, completed, failed, canceled, total | the caller's pending, in_progress
+    assert counts("alice") == (4, 2, 0, 1, 1, 1, 9, 2, 1)
+    assert counts("bob") == (4, 2, 0, 1, 1, 1, 9, 1, 1)
+    assert counts("alice", "project-a:") == (3, 1, 0, 1, 1, 0, 6, 1, 1)
+    assert counts("bob", "project-a:") == (3, 1, 0, 1, 1, 0, 6, 1, 0)
+    assert counts("carol", "project-b:") == (1, 1, 0, 0, 0, 1, 3, 0, 0)
 
 
 def test_status_admin_global_call_omits_user_subcounts(session_queue: SessionQueue) -> None:

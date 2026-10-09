@@ -47,7 +47,7 @@ import type {
   CanvasFontReplacementSummary,
   CanvasFontReplacementTarget,
 } from './fontReferences';
-import type { CanvasProjectMutation } from './mutationContracts';
+import type { CanvasLayerPreviewMutation, CanvasProjectMutation } from './mutationContracts';
 import type { Rect, ToolId, Vec2 } from './types';
 import type { Viewport } from './viewport';
 
@@ -394,32 +394,38 @@ export interface StructuralCommitOptions {
 }
 
 /** The narrowest engine surface a structural edit needs. */
-/** The only mutations a widget may preview live; every other structural edit is prepared and committed. */
-export type CanvasLayerPreviewMutation = Extract<
-  CanvasProjectMutation,
-  { type: 'updateCanvasLayer' | 'updateCanvasLayerConfig' }
->;
+export type { CanvasLayerPreviewMutation } from './mutationContracts';
 
 export interface CanvasStructuralEngine {
   readonly layers: CanvasLayerCapability;
 }
 
 /**
- * An owned live preview of a structural edit. `apply` publishes previews at most once per frame; `commit` records
- * the gesture as one undo step from its prepared baseline, without dispatching again when the preview already
- * reached it, and returns to the baseline when it is refused; `cancel` drops pending previews and dispatches
- * `restore`, unrecorded, to return to the baseline. A newer session or any other commit ends it, and later calls are
- * refused (`commit` reports `busy`); while edits are locked, `apply` and `commit` refuse.
+ * An owned live preview of a structural edit. `apply` publishes previews at most once per frame and captures, before
+ * the first one lands, the values it replaces: the session's baseline. `commit` records the gesture as one undo step
+ * from its prepared baseline, without dispatching again when the preview already reached it, and returns to the
+ * baseline when it is refused; `cancel` drops pending previews and restores the baseline, unrecorded. A newer
+ * session, a commit from elsewhere, a history replay or disposal ends the session first, restoring its baseline and
+ * dropping pending previews, so the previewed values never land over a replayed document or inside another step;
+ * later calls on an ended session are refused (`commit` reports `busy`). While edits are locked, `apply` and
+ * `commit` refuse. A session previews one mutation kind on one node; its baseline holds every field it previewed, and
+ * a commit records from that baseline narrowed to the fields its edit names.
  */
 export interface StructuralPreviewSession {
   apply(action: CanvasLayerPreviewMutation): boolean;
+  /** The values its previews replaced, as the mutation that restores them; null until it previews, and once ended. */
+  baseline(): CanvasLayerPreviewMutation | null;
+  cancel(): void;
   commit(label: string, edit: PreparedDocumentEdit): StructuralCommitResult;
-  cancel(restore?: CanvasLayerPreviewMutation): void;
+  /** True until the session ends: its own commit or cancel, a newer session, a commit from elsewhere or a replay. */
+  isActive(): boolean;
 }
 
 export interface CanvasLayerCapability {
   /** Starts a preview session, or null while edits are refused. */
   beginStructuralPreview(): StructuralPreviewSession | null;
+  /** Ends an open preview session, restoring its baseline, so an edit prepared next sees the committed document. */
+  endStructuralPreview(): void;
   canCommitStructural(): boolean;
   commitGeneratedImageResult(options: CommitGeneratedImageOptions): Promise<CommitGeneratedImageResult>;
   commitStagedImage(options: CommitStagedImageOptions): CommitStagedImageResult;
@@ -666,6 +672,11 @@ export type {
   TransformSession,
 } from './engineStores';
 export {
+  DEFAULT_BRUSH_OPTIONS,
+  DEFAULT_ERASER_OPTIONS,
+  DEFAULT_GRADIENT_OPTIONS,
+  DEFAULT_SHAPE_OPTIONS,
+  DEFAULT_TEXT_OPTIONS,
   MAX_BRUSH_SIZE,
   MAX_SHAPE_STROKE_WIDTH,
   MAX_TEXT_FONT_SIZE,

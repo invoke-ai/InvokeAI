@@ -56,6 +56,17 @@ Index("idx_session_queue_created_priority", session_queue.c.priority)
 Index("idx_session_queue_created_status", session_queue.c.status).ddl_if(dialect="sqlite")
 # The primary key and the unique constraint cover these. Only SQLite has them, where migrations created them.
 Index("idx_session_queue_item_id", session_queue.c.item_id, unique=True).ddl_if(dialect="sqlite")
+# A queue's listing and its status counts, answered from the index alone (2026_10_04_add_session_queue_listing_index).
+# Only SQLite has it: on a server `queue_id` and `origin` are long texts, which no index holds whole.
+Index(
+    "idx_session_queue_listing",
+    session_queue.c.queue_id,
+    session_queue.c.created_at,
+    session_queue.c.item_id.desc(),
+    session_queue.c.user_id,
+    session_queue.c.origin,
+    session_queue.c.status,
+).ddl_if(dialect="sqlite")
 Index("idx_session_queue_session_id", session_queue.c.session_id, unique=True).ddl_if(dialect="sqlite")
 Index("idx_session_queue_parent_item_id", session_queue.c.parent_item_id)
 Index("idx_session_queue_parent_session_id", session_queue.c.parent_session_id)

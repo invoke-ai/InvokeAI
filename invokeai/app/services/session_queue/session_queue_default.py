@@ -957,14 +957,19 @@ class SessionQueue(SessionQueueBase):
         order_dir: SQLiteDirection = SQLiteDirection.Descending,
         user_id: Optional[str] = None,
         origin_prefix: Optional[str] = None,
+        limit: Optional[int] = None,
     ) -> ItemIdsResult:
         item_ids = self._queries.session_queue.item_ids(
             queue_id,
             descending=order_dir == SQLiteDirection.Descending,
             user_id=user_id,
             origin_prefix=origin_prefix,
+            limit=limit,
         )
         return ItemIdsResult(item_ids=item_ids, total_count=len(item_ids))
+
+    def has_active_queue_work(self) -> bool:
+        return self._queries.session_queue.has_active_work()
 
     def get_queue_item_summaries_by_ids(self, queue_id: str, item_ids: list[int]) -> list[SessionQueueItemSummary]:
         if not item_ids:

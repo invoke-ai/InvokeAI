@@ -94,6 +94,13 @@ _FILL_FILE_SIZE = (
     .values(file_size_bytes=bindparam("new_file_size_bytes"))
 )
 _DELETE = delete(images).where(_I.image_name == bindparam("image_name"))
+# Every image's location, a page at a time in name order, intermediates included.
+_LOCATIONS_AFTER = (
+    select(_I.image_name, _I.image_subfolder)
+    .where(_I.image_name > bindparam("after"))
+    .order_by(_I.image_name)
+    .limit(bindparam("limit"))
+)
 _DELETE_MANY = delete(images).where(_I.image_name.in_(bindparam("image_names", expanding=True)))
 # Locked, so that an image promoted out of the intermediates meanwhile is either seen promoted or deleted before it is.
 _LOCK_INTERMEDIATES = (
@@ -321,6 +328,12 @@ class ImageQueries(QueryModule):
         for chunk in itertools.batched(image_names, IN_CHUNK):
             subfolders.update((row[0], row[1]) for row in conn.execute(_SUBFOLDERS, {"image_names": list(chunk)}).all())
         return subfolders
+
+    @read
+    def locations_after(self, conn: Connection, after: str, limit: int) -> list[tuple[str, str]]:
+        """The name and subfolder of up to `limit` images, in name order, after the image named `after`."""
+        rows = conn.execute(_LOCATIONS_AFTER, {"after": after, "limit": limit}).all()
+        return [(str(name), str(subfolder)) for name, subfolder in rows]
 
     @mapped(_record_or_none)
     @read

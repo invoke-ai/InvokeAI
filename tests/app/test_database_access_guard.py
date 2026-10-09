@@ -19,6 +19,17 @@ DATABASE_LAYER = (
     "invokeai/app/services/shared/sqlite_migrator/",
 )
 
+# Code these rules flag that touches no application database: path -> why. Each entry must still be flagged.
+NOT_THE_APPLICATION_DATABASE = {
+    "invokeai/app/services/gallery_maintenance/gallery_maintenance_default.py": (
+        "keeps its scan inventory in a SQLite file of its own, in a temporary directory, not in the app's database"
+    ),
+    "invokeai/app/api/routers/gallery_maintenance.py": "`service.execute()` runs a gallery maintenance operation",
+    "invokeai/app/services/image_files/image_files_disk.py": (
+        "walks the output folders with their pending directories in a SQLite file of its own, in a temporary directory"
+    ),
+}
+
 _DRIVER_MODULES = ("sqlite3", "sqlalchemy", "alembic", "pymysql")
 _EXECUTE_METHODS = {"execute", "executemany", "executescript", "exec_driver_sql"}
 # Internals of the database layer that only it may import.
@@ -127,6 +138,8 @@ def _scanned_files() -> list[tuple[Path, str]]:
 def test_only_the_database_layer_touches_the_database() -> None:
     offending: list[str] = []
     for path, relative in _scanned_files():
+        if relative in NOT_THE_APPLICATION_DATABASE:
+            continue
         violations = scan(path, relative)
         if violations:
             offending.append(f"{relative}: {len(violations)} violations")
@@ -134,3 +147,9 @@ def test_only_the_database_layer_touches_the_database() -> None:
     assert not offending, "Database access outside the database layer; add a query module instead:\n" + "\n".join(
         offending
     )
+
+
+def test_every_exemption_is_still_needed() -> None:
+    scanned = {relative: path for path, relative in _scanned_files()}
+    stale = [relative for relative in NOT_THE_APPLICATION_DATABASE if not scan(scanned[relative], relative)]
+    assert not stale, f"Remove these from NOT_THE_APPLICATION_DATABASE, the rules no longer flag them: {stale}"

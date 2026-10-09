@@ -12,6 +12,8 @@ export interface HistoryControllerOptions {
   readonly inactiveByteBudget?: number;
   readonly canEdit?: () => boolean;
   readonly isGestureActive?: () => boolean;
+  /** Puts back unrecorded live state (a floating selection, a structural preview) before a replay lands over it. */
+  readonly beforeReplay?: () => void;
   readonly canUndoStore?: { set(value: boolean): void };
   readonly canRedoStore?: { set(value: boolean): void };
   /** Reports a step whose replay failed and therefore stayed where it was. */
@@ -84,6 +86,11 @@ export class HistoryController {
     if (this.disposed || !this.canEdit() || this.isGestureActive()) {
       return { status: 'refused' };
     }
+    // Nothing to replay disturbs nothing: live state is put back only for a step that will land.
+    if (!(direction === 'undo' ? this.history.canUndo() : this.history.canRedo())) {
+      return { status: 'empty' };
+    }
+    this.options.beforeReplay?.();
     const result = await (direction === 'undo' ? this.history.undo() : this.history.redo());
     if (result.status === 'failed') {
       try {

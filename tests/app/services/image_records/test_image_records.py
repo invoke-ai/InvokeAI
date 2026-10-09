@@ -1018,3 +1018,24 @@ class TestGetImageNamesQueryPlans:
         assert result.image_names == ["asset.png"]
         assert "INDEXED BY" not in statement
         assert "NOT INDEXED" not in statement
+
+
+class TestIterAllImageLocations:
+    def test_keyset_pages_keep_archived_and_intermediate_records_without_offset_skips(
+        self, store: ImageRecordStorage
+    ) -> None:
+        _save(store, "a.png", subfolder="nested", user_id="user-a")
+        _save(store, "b.png", subfolder="nested", is_intermediate=True, user_id="user-b")
+        _save(store, "c.png", subfolder="archived", user_id="user-a")
+        _save(store, "d.png", subfolder="", user_id="user-b")
+
+        locations = iter(store.iter_all_image_locations(batch_size=2))
+        assert next(locations) == ("a.png", "nested")
+        assert next(locations) == ("b.png", "nested")
+        store.delete_many(["a.png", "b.png"])
+
+        assert list(locations) == [("c.png", "archived"), ("d.png", "")]
+
+    def test_iteration_rejects_nonpositive_batch_size(self, store: ImageRecordStorage) -> None:
+        with pytest.raises(ValueError, match="batch_size"):
+            list(store.iter_all_image_locations(batch_size=0))

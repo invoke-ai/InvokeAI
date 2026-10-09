@@ -65,6 +65,9 @@ import {
 import {
   applyReferenceExtendSourceVideo,
   applyReferenceExtendNumFrames,
+  isConditioningClipExcludingFrames,
+  isVideoSourceClipTrimmed,
+  REFERENCE_EXTEND_ANCHOR_CONDITIONING,
   MIN_VIDEO_TRIM_FRAMES,
   MINIMAX_H3_HYBRID_BLOCK_RANGE,
   resolveVideoMode,
@@ -1880,20 +1883,49 @@ export const getVideoSettingsWithModelDefaults = (
   };
 };
 
-export interface VideoModelSelectionResult {
-  settings: VideoSettings;
-  clearedLabels: readonly string[];
+/**
+ * Setup the user supplied and a switch discards for good: media (with its trims), their own LoRAs, and component
+ * choices the previous model would not seed again. Switching back restores none of it, so a UI confirms these.
+ */
+export type VideoModelSwitchLossKey =
+  | 'references'
+  | 'initialVideo'
+  | 'trimmedInitialVideo'
+  | 'conditioningClip'
+  | 'firstFrame'
+  | 'lastFrame'
+  | 'loras'
+  | VideoComponentValueKey;
+
+export interface VideoModelSwitchLoss {
+  key: VideoModelSwitchLossKey;
+  /** How many items go: references or LoRAs; 1 for a single slot. */
+  count: number;
 }
 
-const addClearedLabel = (labels: string[], label: string) => {
-  if (!labels.includes(label)) {
-    labels.push(label);
-  }
-};
+/**
+ * Values the target model constrains or re-defaults. The state does not record whether the user set them, they
+ * stay on screen, and each is one number or toggle to re-enter, so they are reported rather than confirmed.
+ */
+export type VideoModelSwitchAdjustment =
+  | 'frames'
+  | 'targetResolution'
+  | 'fps'
+  | 'acceleration'
+  | 'cfgLowNoise'
+  | 'advancedGuidance'
+  | 'steps'
+  | 'autoDuration';
+
+export interface VideoModelSelectionResult {
+  settings: VideoSettings;
+  losses: readonly VideoModelSwitchLoss[];
+  adjustments: readonly VideoModelSwitchAdjustment[];
+}
 
 /**
- * Use one model-selection transition to reconcile media, sampling constraints, LoRAs, and components and report
- * cleared inputs.
+ * Use one model-selection transition to reconcile media, sampling constraints, LoRAs, and components, and report
+ * what it discards and adjusts. Previewing and applying a switch both call this, so they cannot disagree.
  */
 export const getVideoModelSelectionResult = ({
   currentSettings,
@@ -1911,23 +1943,41 @@ export const getVideoModelSelectionResult = ({
     ? currentSettings
     : getVideoSettingsWithModelDefaults(currentSettings, model, models);
   const next: VideoSettings = { ...start, modelKey: model.key };
-  const clearedLabels: string[] = [];
+  const losses: VideoModelSwitchLoss[] = [];
+  const adjustments = new Set<VideoModelSwitchAdjustment>();
   const modes = config.modes;
+  const previousModel = models.find((entry) => entry.key === currentSettings.modelKey);
+  const previousConfig = previousModel && isSupportedVideoModel(previousModel) ? getVideoConfig(previousModel) : null;
 
   if (next.references.length > 0 && !modes.includes('reference')) {
+    // An untouched Initial Video anchor is derived from the initial video and re-derived on the way back; a set
+    // trim or conditioning on it is not.
+    const supplied = next.references.filter(
+      (entry) =>
+        !(
+          entry.kind === 'video' &&
+          entry.fromSourceVideo &&
+          !entry.trimOverridden &&
+          entry.conditioning === REFERENCE_EXTEND_ANCHOR_CONDITIONING
+        )
+    ).length;
+
+    if (supplied > 0) {
+      losses.push({ count: supplied, key: 'references' });
+    }
+
     next.references = [];
-    addClearedLabel(clearedLabels, 'References');
   }
 
   if (next.sourceVideo && !modes.includes('extend') && !config.references?.extend) {
+    losses.push({ count: 1, key: isVideoSourceClipTrimmed(next.sourceVideo) ? 'trimmedInitialVideo' : 'initialVideo' });
     next.sourceVideo = null;
-    addClearedLabel(clearedLabels, 'Initial video');
   }
 
   if (next.conditioningClip && !modes.includes(resolveVideoMode(next))) {
     // Left behind, this slot would keep driving the canvas and disable the aspect-ratio control.
     next.conditioningClip = null;
-    addClearedLabel(clearedLabels, 'Conditioning clip');
+    losses.push({ count: 1, key: 'conditioningClip' });
   }
 
   // Snap frame count before deriving reference context so cross-family switches cannot retain an undersized Wan
@@ -1937,7 +1987,7 @@ export const getVideoModelSelectionResult = ({
 
   if (framesChanged) {
     next.numFrames = snappedFrames;
-    addClearedLabel(clearedLabels, 'Frames');
+    adjustments.add('frames');
   }
 
   // Derive a missing source anchor on model switch; avoid resetting hand-tuned trims on task-neutral transitions.
@@ -1961,7 +2011,7 @@ export const getVideoModelSelectionResult = ({
 
   if (next.firstFrameImage && !modes.includes('first-frame') && !modes.includes('first-last')) {
     next.firstFrameImage = null;
-    addClearedLabel(clearedLabels, 'First frame');
+    losses.push({ count: 1, key: 'firstFrame' });
   }
 
   if (next.lastFrameImage) {
@@ -1972,13 +2022,13 @@ export const getVideoModelSelectionResult = ({
 
     if (!lastFrameSupported) {
       next.lastFrameImage = null;
-      addClearedLabel(clearedLabels, 'Last frame');
+      losses.push({ count: 1, key: 'lastFrame' });
     }
   }
 
   if (!config.targetResolutions.some((option) => option.id === next.targetResolution)) {
     next.targetResolution = config.defaults.targetResolution;
-    addClearedLabel(clearedLabels, 'Target resolution');
+    adjustments.add('targetResolution');
   }
 
   const clampedFps =
@@ -1988,7 +2038,7 @@ export const getVideoModelSelectionResult = ({
 
   if (clampedFps !== next.fps) {
     next.fps = clampedFps;
-    addClearedLabel(clearedLabels, 'FPS');
+    adjustments.add('fps');
   }
 
   if (next.acceleratorEnabled) {
@@ -1999,13 +2049,13 @@ export const getVideoModelSelectionResult = ({
       const result = getAcceleratorToggleResult(next, model, models, targetEntries !== null);
 
       Object.assign(next, result.settings);
-      addClearedLabel(clearedLabels, 'Acceleration');
+      adjustments.add('acceleration');
     }
   }
 
   if (next.cfgScaleLowNoise !== null && !config.cfg.lowNoiseVisible) {
     next.cfgScaleLowNoise = null;
-    addClearedLabel(clearedLabels, 'CFG (Low Noise)');
+    adjustments.add('cfgLowNoise');
   }
 
   // The per-modality guidance scales follow the same rule as CFG (Low Noise): a
@@ -2028,7 +2078,7 @@ export const getVideoModelSelectionResult = ({
       // the control is not. One label for the section rather than one per scale, because they
       // live together under a collapsed "Advanced guidance" heading.
       if (dropped) {
-        addClearedLabel(clearedLabels, 'Advanced guidance');
+        adjustments.add('advancedGuidance');
       }
     }
   }
@@ -2046,10 +2096,7 @@ export const getVideoModelSelectionResult = ({
   // disturb the panel's. The two cannot be told apart once a panel has passed through a variant that
   // hides the field, so clearing the box, detouring through distilled and coming back restores the
   // list; dev quietly running without it is the worse failure. Filling an empty field in is not a
-  // clearing, so it takes no label.
-  const previousModel = models.find((entry) => entry.key === currentSettings.modelKey);
-  const previousConfig = previousModel && isSupportedVideoModel(previousModel) ? getVideoConfig(previousModel) : null;
-
+  // clearing, so it is not reported.
   if (config.defaultNegativePrompt && next.negativePromptEnabled && !next.negativePrompt.trim()) {
     const previousCarriesNone = previousModel ? previousConfig?.negativePrompt.usage === 'never' : true;
 
@@ -2061,7 +2108,7 @@ export const getVideoModelSelectionResult = ({
   // A fixed-schedule checkpoint's step count is not the user's to carry over.
   if (!config.stepsEditable && next.steps !== config.defaults.steps) {
     next.steps = config.defaults.steps;
-    addClearedLabel(clearedLabels, 'Steps');
+    adjustments.add('steps');
   }
 
   // Steps and CFG have no "carries none" sentinel like the scales above, so a control the previous
@@ -2101,12 +2148,16 @@ export const getVideoModelSelectionResult = ({
   const compatibleLoras = next.loras.filter((lora) => isLoraCompatibleWithModel(lora.model, model));
 
   if (compatibleLoras.length !== next.loras.length) {
+    // Accelerator LoRAs left with the acceleration reconciliation above; what remains is the user's own.
+    losses.push({ count: next.loras.length - compatibleLoras.length, key: 'loras' });
     next.loras = compatibleLoras;
-    addClearedLabel(clearedLabels, 'LoRAs');
   }
 
   const policy = getVideoComponentSectionPolicy(model, next);
   const slotsByKey = new Map(policy.slots.map((slotPolicy) => [slotPolicy.key, slotPolicy]));
+  // A component the previous model seeds from the catalog is seeded again on the way back, so dropping it loses
+  // nothing. Without a resolvable previous model every dropped component counts as the user's choice.
+  let previousSeeds: VideoSettings | null | undefined;
 
   for (const key of Object.keys(VIDEO_COMPONENT_SETTING_LABELS) as VideoComponentValueKey[]) {
     const value = next[key];
@@ -2122,13 +2173,21 @@ export const getVideoModelSelectionResult = ({
 
     if (!isCompatible) {
       next[key] = null;
-      addClearedLabel(clearedLabels, VIDEO_COMPONENT_SETTING_LABELS[key]);
+      previousSeeds ??= previousConfig ? getDefaultVideoSettings(previousModel as MainModelConfig, models) : null;
+
+      if (previousSeeds?.[key]?.key !== value.key) {
+        losses.push({ count: 1, key });
+      }
     }
   }
 
   // Auto duration belongs to the head it was turned on with. Once that head is gone, a head filled
   // in below (or picked later) must not bring the switch back on by itself.
   if (!next.ltx2DurationHeadModel) {
+    if (next.autoDuration) {
+      adjustments.add('autoDuration');
+    }
+
     next.autoDuration = false;
   }
 
@@ -2150,7 +2209,7 @@ export const getVideoModelSelectionResult = ({
     }
   }
 
-  return { clearedLabels, settings: next };
+  return { adjustments: [...adjustments], losses, settings: next };
 };
 
 const VIDEO_MODE_DESCRIPTIONS: Record<VideoGenerationMode, string> = {
@@ -2223,15 +2282,19 @@ export const getVideoValidationReasons = (model: MainModelConfig, settings: Vide
     reasons.push('A first frame and an initial video cannot be combined. Clear one of them.');
   }
 
+  if (settings.conditioningClip && (settings.sourceVideo || settings.references.length > 0)) {
+    // Both claim the run's conditioning wholesale, and `resolveVideoMode` would silently drop one
+    // rather than run something it cannot express.
+    reasons.push('A conditioning clip cannot be combined with an initial video or references. Clear one side.');
+  }
+
   if (
-    settings.conditioningClip &&
-    (settings.firstFrameImage || settings.lastFrameImage || settings.sourceVideo || settings.references.length > 0)
+    isConditioningClipExcludingFrames(settings.conditioningClip) &&
+    (settings.firstFrameImage || settings.lastFrameImage)
   ) {
-    // Every one of these writes into the same conditioning mask the clip fills wholesale, and
-    // `resolveVideoMode` would silently drop the clip rather than run something it cannot express.
-    reasons.push(
-      'A conditioning clip cannot be combined with first/last frames, an initial video or references. Clear one side.'
-    );
+    // A clip's picture already fills every frame these would hold. Its soundtrack does not, which is
+    // why the frames stay available in that role.
+    reasons.push("A conditioning clip's picture cannot be combined with first/last frames. Clear one side.");
   }
 
   if (settings.references.length > 0 && (settings.firstFrameImage || settings.lastFrameImage)) {
@@ -2245,7 +2308,7 @@ export const getVideoValidationReasons = (model: MainModelConfig, settings: Vide
   if (!config.modes.includes(mode)) {
     if (referenceOnly && settings.references.length === 0) {
       // Explain the missing reference rather than implying a defective text-to-video model.
-      reasons.push('Reference-to-video needs at least one image or video reference.');
+      reasons.push('Reference-to-video needs at least one reference.');
     } else {
       reasons.push(`${model.name} does not support ${VIDEO_MODE_DESCRIPTIONS[mode]}.`);
     }
@@ -2257,15 +2320,6 @@ export const getVideoValidationReasons = (model: MainModelConfig, settings: Vide
     const caps = config.references;
     const videoCount = settings.references.filter((reference) => reference.kind === 'video').length;
     const imageCount = settings.references.length - videoCount;
-    const allAudioOnly =
-      settings.references.length > 0 &&
-      settings.references.every((reference) => reference.kind === 'video' && reference.conditioning === 'audio');
-
-    if (allAudioOnly) {
-      reasons.push(
-        'At least one reference must contribute visuals — add an image, or set a video reference to include video.'
-      );
-    }
     if (caps && videoCount > caps.maxVideos) {
       reasons.push(`At most ${caps.maxVideos} video references are supported.`);
     }

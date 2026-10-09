@@ -1,13 +1,12 @@
 /* oxlint-disable react-perf/jsx-no-jsx-as-prop */
-import type { NumberInput as ChakraNumberInput, SliderValueChangeDetails } from '@chakra-ui/react';
-import type { KeyboardEvent, ReactNode } from 'react';
+import type { NumberInput as ChakraNumberInput } from '@chakra-ui/react';
+import type { ReactNode } from 'react';
 
 import { Box, Flex, Icon, InputGroup, NumberInput } from '@chakra-ui/react';
 import { Button } from '@platform/ui/Button';
-import { Slider } from '@platform/ui/Slider';
 import { CONTROL_HEIGHT_PX } from '@theme/scale';
 import { MoveHorizontalIcon } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /** Width of every numeric field, so X / Y / W / H line up across tools; fits "-1234.56" beside its affixes. */
@@ -136,80 +135,8 @@ export const useNumberCommit = (apply: (value: number) => void) =>
     [apply]
   );
 
-interface FormSliderProps {
-  'aria-label': string;
-  disabled?: boolean;
-  formatValue?: (value: number) => string;
-  getAriaValueText?: (value: number) => string;
-  max: number;
-  min: number;
-  step?: number;
-  value: number;
-  onKeyDownCapture?: (event: KeyboardEvent<HTMLDivElement>) => void;
-  onValueChange: (value: number) => void;
-  /** Fires once when the drag or key gesture settles; document commits belong here, not in onValueChange. */
-  onValueChangeEnd?: (value: number) => void;
-}
-
-/** A slider that fills its region; pairs with a {@link FormNumberField}. */
-export const FormSlider = ({
-  'aria-label': ariaLabel,
-  disabled,
-  formatValue,
-  getAriaValueText,
-  max,
-  min,
-  step,
-  value,
-  onKeyDownCapture,
-  onValueChange,
-  onValueChangeEnd,
-}: FormSliderProps) => {
-  const labels = useMemo(() => [ariaLabel], [ariaLabel]);
-  const values = useMemo(() => [value], [value]);
-  const valueText = useMemo(
-    () => (getAriaValueText ? ({ value: current }: { value: number }) => getAriaValueText(current) : undefined),
-    [getAriaValueText]
-  );
-  const handleChange = useCallback(
-    ({ value: next }: SliderValueChangeDetails) => {
-      const first = next[0];
-      if (first !== undefined && Number.isFinite(first)) {
-        onValueChange(first);
-      }
-    },
-    [onValueChange]
-  );
-  const handleChangeEnd = useCallback(
-    ({ value: next }: SliderValueChangeDetails) => {
-      const first = next[0];
-      if (onValueChangeEnd && first !== undefined && Number.isFinite(first)) {
-        onValueChangeEnd(first);
-      }
-    },
-    [onValueChangeEnd]
-  );
-  return (
-    <Slider
-      aria-label={labels}
-      disabled={disabled}
-      flex="1"
-      formatValue={formatValue}
-      getAriaValueText={valueText}
-      max={max}
-      min={min}
-      minW="0"
-      step={step}
-      value={values}
-      onKeyDownCapture={onKeyDownCapture}
-      onValueChange={handleChange}
-      onValueChangeEnd={onValueChangeEnd ? handleChangeEnd : undefined}
-    />
-  );
-};
-
 /**
- * Drag-gesture state for a slider whose settled value lives in the document: the
+ * Gesture state for a slider or scrubber whose settled value lives in the document: the
  * draft follows the thumb, `settle` runs ONCE on release (one history entry per
  * gesture), and optional `preview` mirrors ticks into a non-committing store.
  */

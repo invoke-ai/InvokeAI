@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from datetime import datetime
 from typing import Optional
 
@@ -91,6 +92,11 @@ class ImageRecordStorageBase(ABC):
     @abstractmethod
     def get_subfolders(self, image_names: list[str]) -> dict[str, str]:
         """Maps each existing named image to its on-disk subfolder; absent names are omitted."""
+        pass
+
+    @abstractmethod
+    def iter_all_image_locations(self, batch_size: int = 500) -> Iterator[tuple[str, str]]:
+        """Yields all image name/subfolder pairs in key order using bounded keyset pages."""
         pass
 
     @abstractmethod

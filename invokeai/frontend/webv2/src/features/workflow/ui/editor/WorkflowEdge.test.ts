@@ -1,22 +1,33 @@
 import { Position } from '@xyflow/react';
+import { createInstance } from 'i18next';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { I18nextProvider } from 'react-i18next';
 import { describe, expect, it } from 'vitest';
 
 import type { WorkflowEdgeData } from './flowAdapters';
 
 import { WorkflowEdge } from './WorkflowEdge';
 
-const data: WorkflowEdgeData = {
+const englishCatalogModules = import.meta.glob('../../../../../public/locales/en.json', {
+  eager: true,
+  import: 'default',
+});
+const testI18n = createInstance();
+await testI18n.init({
+  initAsync: false,
+  lng: 'en',
+  resources: { en: { translation: Object.values(englishCatalogModules)[0] as Record<string, unknown> } },
+});
+
+const imageEdge: WorkflowEdgeData = {
   fieldTypeLabel: 'Image',
   pathType: 'default',
   stroke: '#c4b5fd',
   strokeWidth: 2,
-  tooltip: 'Image',
 };
 
 const props = {
-  data,
   id: 'edge-1',
   markerEnd: undefined,
   selected: false,
@@ -30,12 +41,25 @@ const props = {
   targetY: 0,
 };
 
+const titlesOf = (data: WorkflowEdgeData | undefined) =>
+  [
+    ...renderToStaticMarkup(
+      createElement(I18nextProvider, { i18n: testI18n }, createElement(WorkflowEdge, { ...props, data }))
+    ).matchAll(/<title>([^<]*)<\/title>/g),
+  ].map((match) => match[1]);
+
 describe('WorkflowEdge', () => {
   it('attaches the field type tooltip to visible and interactive edge paths', () => {
-    const markup = renderToStaticMarkup(createElement(WorkflowEdge, props));
+    expect(titlesOf(imageEdge)).toEqual(['Image', 'Image']);
+  });
 
-    expect(markup).toContain('react-flow__edge-path');
-    expect(markup).toContain('react-flow__edge-interaction');
-    expect(markup.match(/<title>Image<\/title>/g)).toHaveLength(2);
+  it('names batch, loop linkage and untyped edges in the UI language', () => {
+    expect(titlesOf({ ...imageEdge, isBatch: true })).toEqual(['Image batch', 'Image batch']);
+    expect(titlesOf({ ...imageEdge, fieldTypeLabel: null, isLoopLinkage: true })).toEqual([
+      'Loop linkage',
+      'Loop linkage',
+    ]);
+    expect(titlesOf({ ...imageEdge, fieldTypeLabel: null })).toEqual(['Unknown field type', 'Unknown field type']);
+    expect(titlesOf(undefined)).toEqual(['Unknown field type', 'Unknown field type']);
   });
 });

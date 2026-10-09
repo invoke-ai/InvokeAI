@@ -1,3 +1,4 @@
+import os
 import random
 import sqlite3
 import threading
@@ -345,17 +346,24 @@ class Database:
         while the database is in use and includes what its write-ahead log holds. (A copy of the database file is
         not.) A server database is backed up by its operator; this raises there.
 
-        It holds the database's lock while it copies, so it is for startup and for tools, not for a running app's
-        requests. It refuses a destination that exists, and a caller inside a transaction of its own, whose
-        uncommitted changes the copy would hold."""
+        It holds the database's lock while it copies, so it is for startup, tools and maintenance, not for a running
+        app's requests. It creates the destination's directory, and refuses a destination that exists (the file is
+        reserved before copying, so one made meanwhile is not overwritten either) and a caller inside a transaction of
+        its own, whose uncommitted changes the copy would hold. A failed backup leaves no file."""
         sqlite = self.sqlite
-        if destination.exists():
-            raise FileExistsError(f"Backup destination {destination} exists")
-        with sqlite.lock:
-            if sqlite.conn.in_transaction:
-                raise NestedTransactionError("A backup cannot be taken inside a transaction")
-            with closing(sqlite3.connect(destination)) as target:
-                sqlite.conn.backup(target)
+        destination = Path(destination)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        os.close(os.open(destination, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600))
+        try:
+            with sqlite.lock:
+                if sqlite.conn.in_transaction:
+                    raise NestedTransactionError("A backup cannot be taken inside a transaction")
+                with closing(sqlite3.connect(destination)) as target:
+                    sqlite.conn.backup(target)
+        except BaseException:
+            for path in (destination, Path(f"{destination}-wal"), Path(f"{destination}-shm")):
+                path.unlink(missing_ok=True)
+            raise
 
     def hold_instance_lock(self) -> None:
         """Takes the lock of a server database that one process at a time holds, for as long as this database is

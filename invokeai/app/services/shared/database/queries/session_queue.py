@@ -34,6 +34,7 @@ from invokeai.app.services.shared.database.dialect import (
     CaseInsensitiveLike,
     ContainsText,
     InBoundSet,
+    Unindexed,
     bound_set,
     fixed_limit,
     like_prefix,
@@ -69,6 +70,10 @@ _SUMMARY = (
 _SUMMARY_NAMES = tuple(column.name for column in _SUMMARY)
 
 _IN_QUEUE = _Q.queue_id == bindparam("queue_id")
+# The same term kept off every index on SQLite: for statements whose rows a status, batch or item id finds. The queue's
+# listing index (queue, creation time, ...) would otherwise walk the queue's whole history for them, as SQLite, keeping
+# no statistics, takes `queue_id = ?` for selective.
+_IN_QUEUE_UNINDEXED = Unindexed(_Q.queue_id) == bindparam("queue_id")
 _PENDING = _Q.status == literal("pending")
 _IN_PROGRESS = _Q.status == literal("in_progress")
 
@@ -81,18 +86,20 @@ _ITEM_BY_ID = select(*_ITEM).select_from(_ITEMS).where(_Q.item_id == bindparam("
 _WORKFLOW = select(_Q.workflow).where(_Q.item_id == bindparam("item_id"))
 _PARENT = select(_Q.parent_item_id).where(_Q.item_id == bindparam("item_id"))
 _CHILDREN = select(_Q.item_id).where(_Q.parent_item_id == bindparam("item_id")).order_by(_Q.item_id)
-_IN_PROGRESS_IDS = select(_Q.item_id).where(_IN_QUEUE, _IN_PROGRESS).order_by(_Q.item_id)
+_IN_PROGRESS_IDS = select(_Q.item_id).where(_IN_QUEUE_UNINDEXED, _IN_PROGRESS).order_by(_Q.item_id)
 _PARENT_ROW = session_queue.alias("parent")
 # The child that would be dequeued next while its parent waits: its chain is still running between two children.
 _NEXT_WAITING_CHILD = (
     select(_Q.item_id)
     .select_from(session_queue.join(_PARENT_ROW, _PARENT_ROW.c.item_id == _Q.parent_item_id))
-    .where(_IN_QUEUE, _PENDING, _PARENT_ROW.c.status == literal("waiting"))
+    .where(_IN_QUEUE_UNINDEXED, _PENDING, _PARENT_ROW.c.status == literal("waiting"))
     .order_by(_Q.priority.desc(), _Q.created_at, _Q.item_id)
     .limit(fixed_limit(1))
 )
 _COUNT = select(func.count()).where(_IN_QUEUE)
-_SUMMARIES = select(*_SUMMARY).select_from(_ITEMS).where(_IN_QUEUE, InBoundSet(_Q.item_id, bindparam("item_ids")))
+_SUMMARIES = (
+    select(*_SUMMARY).select_from(_ITEMS).where(_IN_QUEUE_UNINDEXED, InBoundSet(_Q.item_id, bindparam("item_ids")))
+)
 
 
 def _origin_matches() -> ColumnElement[bool]:
@@ -106,7 +113,7 @@ def _origin_pattern(origin_prefix: Optional[str]) -> Optional[str]:
 @functools.cache
 def _item_by_status(status: str, by_origin: bool) -> Select[Any]:
     """The pending item to run next, or an item in progress (the earliest enqueued of several)."""
-    conditions = [_IN_QUEUE, _Q.status == literal(status)]
+    conditions = [_IN_QUEUE_UNINDEXED, _Q.status == literal(status)]
     if by_origin:
         conditions.append(_origin_matches())
     ordering = [_Q.priority.desc(), _Q.created_at, _Q.item_id] if status == "pending" else [_Q.item_id]
@@ -115,7 +122,7 @@ def _item_by_status(status: str, by_origin: bool) -> Select[Any]:
 
 @functools.cache
 def _all_items(by_destination: bool) -> Select[Any]:
-    conditions = [_IN_QUEUE]
+    conditions = [_IN_QUEUE_UNINDEXED]
     if by_destination:
         conditions.append(_Q.destination == bindparam("destination"))
     return select(*_ITEM).select_from(_ITEMS).where(*conditions).order_by(_Q.priority.desc(), _Q.item_id)
@@ -123,8 +130,10 @@ def _all_items(by_destination: bool) -> Select[Any]:
 
 @functools.cache
 def _page(by_status: bool, by_destination: bool, after: bool) -> Select[Any]:
-    """A page of the queue, highest priority first, then in enqueue order; with `after`, the items after an item."""
-    conditions = [_IN_QUEUE]
+    """A page of the queue, highest priority first, then in enqueue order; with `after`, the items after an item.
+
+    The priority index pages it on SQLite: the listing index would read and sort the whole queue for each page."""
+    conditions = [_IN_QUEUE_UNINDEXED]
     if by_status:
         conditions.append(_Q.status == bindparam("status"))
     if by_destination:
@@ -147,7 +156,9 @@ def _page(by_status: bool, by_destination: bool, after: bool) -> Select[Any]:
 
 
 @functools.cache
-def _item_ids(descending: bool, by_user: bool, by_origin: bool) -> Select[Any]:
+def _item_ids(descending: bool, by_user: bool, by_origin: bool, limited: bool) -> Select[Any]:
+    """The ids, in an order the listing index yields on SQLite without a sort (newest first), or sorting only the items
+    that share a creation time (oldest first); so a limited read stops after its window."""
     conditions = [_IN_QUEUE]
     if by_user:
         conditions.append(_Q.user_id == bindparam("user_id"))
@@ -156,28 +167,25 @@ def _item_ids(descending: bool, by_user: bool, by_origin: bool) -> Select[Any]:
     # The item id breaks ties, in enqueue order either way, as SQLite returned them before: a batch's items share
     # their creation time to the millisecond, and the queue's views show a batch in that order.
     ordering = [_Q.created_at.desc() if descending else _Q.created_at, _Q.item_id]
-    return select(_Q.item_id).where(*conditions).order_by(*ordering)
+    statement = select(_Q.item_id).where(*conditions).order_by(*ordering)
+    return statement.limit(bindparam("limit")) if limited else statement
 
 
 @functools.cache
-def _status_counts(by_user: bool, by_origin: bool) -> Select[Any]:
-    """Every status's count in the queue, or in the account's part of it.
-
-    Two statements rather than one counting both: `user_id` comes after the session in the row, which SQLite reads only
-    by walking the session's overflow pages, while the account's part is found through an index on `user_id`.
-    """
+def _status_counts(with_own: bool, by_origin: bool) -> Select[Any]:
+    """Every status's count in the queue and, `with_own`, in the account's part of it, in one pass: on SQLite the
+    listing index holds every column read, so no row is."""
     conditions = [_IN_QUEUE]
-    if by_user:
-        conditions.append(_Q.user_id == bindparam("user_id"))
     if by_origin:
         conditions.append(_origin_matches())
-    return select(_Q.status, func.count()).where(*conditions).group_by(_Q.status)
+    own = func.sum(case((_Q.user_id == bindparam("user_id"), 1), else_=0)) if with_own else literal(0)
+    return select(_Q.status, func.count(), own).where(*conditions).group_by(_Q.status)
 
 
 @functools.cache
 def _current(by_origin: bool) -> Select[Any]:
     """The identifiers of the item in progress, the earliest enqueued of several."""
-    conditions = [_IN_QUEUE, _IN_PROGRESS]
+    conditions = [_IN_QUEUE_UNINDEXED, _IN_PROGRESS]
     if by_origin:
         conditions.append(_origin_matches())
     return (
@@ -190,9 +198,10 @@ def _current(by_origin: bool) -> Select[Any]:
 
 @functools.cache
 def _batch_counts(by_user: bool) -> Select[Any]:
-    conditions = [_IN_QUEUE, _Q.batch_id == bindparam("batch_id")]
+    # The batch index finds a batch's few rows; an index on the queue or the account would read their whole history.
+    conditions = [_IN_QUEUE_UNINDEXED, _Q.batch_id == bindparam("batch_id")]
     if by_user:
-        conditions.append(_Q.user_id == bindparam("user_id"))
+        conditions.append(Unindexed(_Q.user_id) == bindparam("user_id"))
     # A batch's items share their origin and destination: its children and retries copy them.
     return (
         select(_Q.status, func.count(), func.min(_Q.origin), func.min(_Q.destination))
@@ -454,17 +463,20 @@ _WORKFLOW_CALL_ITEMS = (
 )
 
 _INSERT_ITEM = insert(session_queue)
-_PENDING_COUNT = select(func.count()).where(_IN_QUEUE, _PENDING)
-_TOP_PENDING_PRIORITY = select(func.max(_Q.priority)).where(_IN_QUEUE, _PENDING)
-_BATCH_TAKEN = (
-    select(literal(1))
-    .where(_IN_QUEUE, _Q.user_id == bindparam("user_id"), _Q.batch_id == bindparam("batch_id"))
-    .limit(fixed_limit(1))
+# Every enqueue counts the pending backlog, which the status index finds, not the queue's history.
+_PENDING_COUNT = select(func.count()).where(_IN_QUEUE_UNINDEXED, _PENDING)
+_TOP_PENDING_PRIORITY = select(func.max(_Q.priority)).where(_IN_QUEUE_UNINDEXED, _PENDING)
+# A batch is a few rows of the batch index; an index on the account would read the account's whole history.
+_IN_BATCH = and_(
+    _IN_QUEUE_UNINDEXED,
+    Unindexed(_Q.user_id) == bindparam("user_id"),
+    _Q.batch_id == bindparam("batch_id"),
 )
-_BATCH_ITEM_IDS = (
-    select(_Q.item_id)
-    .where(_IN_QUEUE, _Q.user_id == bindparam("user_id"), _Q.batch_id == bindparam("batch_id"))
-    .order_by(_Q.item_id)
+_BATCH_TAKEN = select(literal(1)).where(_IN_BATCH).limit(fixed_limit(1))
+_BATCH_ITEM_IDS = select(_Q.item_id).where(_IN_BATCH).order_by(_Q.item_id)
+# Whether any queue has work to finish, for maintenance that must not run beside it.
+_ACTIVE_WORK = (
+    select(literal(1)).where(_Q.status.in_([literal("pending"), literal("in_progress")])).limit(fixed_limit(1))
 )
 
 _THE_RECEIPT = and_(
@@ -535,13 +547,22 @@ def _scoped(
     by_batch: bool,
     statuses: tuple[str, ...],
     locked: bool,
+    ordered: bool,
 ) -> Select[Any]:
     """The (item id, owner) of the scope's items of these statuses (all, for none), locked for a change if `locked`;
     unlocked, only their ids. (`user_id` and `status` follow the session in the row, which SQLite reaches through
-    the session's overflow pages: a read of ids alone lets its status index answer the status.)"""
-    conditions: list[ColumnElement[bool]] = [_IN_QUEUE]
+    the session's overflow pages: a read of ids alone lets its status index answer the status.)
+
+    The rows come through a status index (or, for batches, the batch index), not the queue's listing index, which
+    would walk the queue's history. With `ordered` they come in id order: a server locks them in that order, which
+    keeps two such changes from deadlocking. SQLite locks no rows, and an ORDER BY there would move the plan onto an
+    index that reads the scope's whole history, so its callers sort.
+    """
+    conditions: list[ColumnElement[bool]] = [_IN_QUEUE_UNINDEXED]
     if by_user:
-        conditions.append(_Q.user_id == bindparam("user_id"))
+        # Beside a batch, the batch index finds the rows; beside a status, the status index leads with the account.
+        user: ColumnElement[Any] = Unindexed(_Q.user_id) if by_batch else _Q.user_id
+        conditions.append(user == bindparam("user_id"))
     if by_origin:
         conditions.append(_origin_matches())
     if by_destination:
@@ -551,9 +572,11 @@ def _scoped(
         conditions.append(_Q.batch_id.in_(bindparam("batch_ids", expanding=True)))
     if statuses:
         conditions.append(_Q.status.in_([literal(status) for status in statuses]))
-    if not locked:
-        return select(_Q.item_id).where(*conditions).order_by(_Q.item_id)
-    return select(_Q.item_id, _Q.user_id).where(*conditions).order_by(_Q.item_id).with_for_update()
+    statement = select(_Q.item_id) if not locked else select(_Q.item_id, _Q.user_id)
+    statement = statement.where(*conditions)
+    if ordered:
+        statement = statement.order_by(_Q.item_id)
+    return statement.with_for_update() if locked else statement
 
 
 def _scope_shape(scope: Scope) -> tuple[bool, bool, bool, bool]:
@@ -572,7 +595,8 @@ def _locked_scope(conn: Connection, scope: Scope, statuses: tuple[str, ...]) -> 
     transaction, and a child enqueue in flight has committed when the lock is granted, so the chains read are those
     the change applies against. (Read before the lock, an item could start running, or a running item enqueue its
     children, between the read and the change.)"""
-    rows = conn.execute(_scoped(*_scope_shape(scope), statuses, True), scope.parameters()).all()
+    statement = _scoped(*_scope_shape(scope), statuses, True, conn.dialect.name != "sqlite")
+    rows = sorted(conn.execute(statement, scope.parameters()).all())
     if scope.except_current and rows:
         running = _current_chain(conn, scope.queue_id)
         rows = [row for row in rows if int(row[0]) not in running]
@@ -598,8 +622,9 @@ def _delete(conn: Connection, item_ids: Iterable[int]) -> int:
 
 @functools.cache
 def _prunable(by_user: bool, latest: bool) -> Select[Any]:
-    """The ids of the queue's history (the account's, if given); with `latest`, its `keep` latest items."""
-    conditions = [_IN_QUEUE, _PRUNABLE]
+    """The ids of the queue's history (the account's, if given); with `latest`, its `keep` latest items. (Found
+    through the status index: the listing index holds no `root_item_id`, so it would read every row as well.)"""
+    conditions = [_IN_QUEUE_UNINDEXED, _PRUNABLE]
     if by_user:
         conditions.append(_Q.user_id == bindparam("user_id"))
     statement = select(_Q.item_id).where(*conditions)
@@ -746,10 +771,17 @@ class SessionQueueQueries(QueryModule):
         descending: bool,
         user_id: Optional[str],
         origin_prefix: Optional[str],
+        limit: Optional[int] = None,
     ) -> list[int]:
-        """The ids of the queue's items (the account's, with the origin, if given) by creation time."""
-        statement = _item_ids(descending, user_id is not None, origin_prefix is not None)
-        parameters = {"queue_id": queue_id, "user_id": user_id, "origin_pattern": _origin_pattern(origin_prefix)}
+        """The ids of the queue's items (the account's, with the origin, if given) by creation time; with `limit`, the
+        first `limit` of that order."""
+        statement = _item_ids(descending, user_id is not None, origin_prefix is not None, limit is not None)
+        parameters = {
+            "queue_id": queue_id,
+            "user_id": user_id,
+            "origin_pattern": _origin_pattern(origin_prefix),
+            "limit": limit,
+        }
         return list(conn.execute(statement, parameters).scalars().all())
 
     @mapped(_summaries)
@@ -764,12 +796,11 @@ class SessionQueueQueries(QueryModule):
     ) -> StatusCounts:
         by_origin = origin_prefix is not None
         parameters = {"queue_id": queue_id, "user_id": user_id, "origin_pattern": _origin_pattern(origin_prefix)}
-        counts = conn.execute(_status_counts(False, by_origin), parameters).all()
-        own_counts = conn.execute(_status_counts(True, by_origin), parameters).all() if user_id is not None else []
+        rows = conn.execute(_status_counts(user_id is not None, by_origin), parameters).all()
         current = conn.execute(_current(by_origin), parameters).first()
         return StatusCounts(
-            counts=_counts(counts),
-            own_counts=_counts(own_counts),
+            counts={str(row[0]): int(row[1]) for row in rows},
+            own_counts={str(row[0]): int(row[2]) for row in rows if row[2]},
             current=CurrentItem(current[0], current[1], current[2], current[3]) if current is not None else None,
         )
 
@@ -899,8 +930,13 @@ class SessionQueueQueries(QueryModule):
     @read
     def in_progress(self, conn: Connection, scope: Scope) -> list[int]:
         """The ids of the scope's items in progress."""
-        statement = _scoped(*_scope_shape(scope), ("in_progress",), False)
-        return [int(row[0]) for row in conn.execute(statement, scope.parameters()).all()]
+        statement = _scoped(*_scope_shape(scope), ("in_progress",), False, conn.dialect.name != "sqlite")
+        return sorted(int(row[0]) for row in conn.execute(statement, scope.parameters()).all())
+
+    @read
+    def has_active_work(self, conn: Connection) -> bool:
+        """Whether any queue has an item pending or in progress."""
+        return conn.execute(_ACTIVE_WORK).first() is not None
 
     @write
     def cancel_waiting_work(self, conn: Connection, scope: Scope) -> dict[str, list[int]]:

@@ -36,6 +36,7 @@ import {
   SelectionMode,
   applyEdgeChanges,
   applyNodeChanges,
+  getViewportForBounds,
   type Connection,
   type EdgeChange,
   type EdgeTypes,
@@ -52,6 +53,7 @@ import {
   useEffect,
   useEffectEvent,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -59,6 +61,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from 'react';
 import { flushSync } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 
 import type { WorkflowImageExportView } from './WorkflowImageExportView';
 
@@ -77,9 +80,10 @@ import {
 import {
   registerWorkflowFlowInstance,
   releaseWorkflowFlowInstance,
+  type WorkflowFitViewTarget,
   type WorkflowFlowInstance,
 } from './flowInstanceStore';
-import { InvocationFlowNode } from './InvocationFlowNode';
+import { CONTENT_VISIBILITY_ZOOM, InvocationFlowNode } from './InvocationFlowNode';
 import LoopBodyBoundaryOverlay from './LoopBodyBoundaryOverlay';
 import { NodeContextMenu, type WorkflowContextMenuState } from './NodeContextMenu';
 import { NotesFlowNode } from './NotesFlowNode';
@@ -92,6 +96,7 @@ import { reportNodeHover, reportNodeSelection, workflowSelectionStore } from './
 import { useEraser } from './useEraser';
 import { useLasso } from './useLasso';
 import { WorkflowEdge } from './WorkflowEdge';
+import { WORKFLOW_HOTKEYS } from './workflowHotkeys';
 import { WorkflowSelectionRequestRuntime } from './WorkflowSelectionRequestRuntime';
 import { getWorkflowViewport, getWorkflowViewportKey, setWorkflowViewport } from './workflowViewportStore';
 
@@ -137,6 +142,50 @@ const toDocumentEdge = (connection: Connection): WorkflowDocumentEdge | null =>
 const DEFAULT_EDGE_OPTIONS = { style: { strokeWidth: 2 } };
 // Offset fresh graphs so the floating left toolbar does not cover their first column.
 const DEFAULT_VIEWPORT = { x: 56, y: 0, zoom: 1 } as const;
+const MIN_ZOOM = 0.1;
+const MAX_ZOOM = 2;
+const FIT_PADDING = 0.1;
+
+/**
+ * Where a newly shown graph opens until its mount fit lands, or null for the default viewport. That fit waits for the
+ * nodes to be measured. When their positions alone span more than the container shows at the content-visibility zoom,
+ * it lands below that zoom whatever the nodes measure, so the editor opens at a fit of the positions instead: nodes
+ * mount as the skeletons the fitted view shows rather than mounting every field control only for the fit to replace
+ * them.
+ */
+export const getZoomedOutMountViewport = (
+  targets: readonly WorkflowFitViewTarget[],
+  container: { height: number; width: number }
+): Viewport | null => {
+  if (targets.length < 2) {
+    return null;
+  }
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const { position } of targets) {
+    minX = Math.min(minX, position.x);
+    minY = Math.min(minY, position.y);
+    maxX = Math.max(maxX, position.x);
+    maxY = Math.max(maxY, position.y);
+  }
+
+  const bounds = { height: maxY - minY, width: maxX - minX, x: minX, y: minY };
+  // The fit's zoom for these positions with its padding, as XYFlow resolves a fractional padding; node sizes only
+  // lower it.
+  const paddedSize = (size: number) => size - 2 * Math.floor((size - size / (1 + FIT_PADDING)) * 0.5);
+  const zoomUpperBound = Math.min(
+    paddedSize(container.width) / bounds.width,
+    paddedSize(container.height) / bounds.height
+  );
+
+  return zoomUpperBound < CONTENT_VISIBILITY_ZOOM
+    ? getViewportForBounds(bounds, container.width, container.height, MIN_ZOOM, MAX_ZOOM, FIT_PADDING)
+    : null;
+};
 
 interface WorkflowFlowModel {
   edges: WorkflowFlowEdge[];
@@ -195,22 +244,25 @@ const getEventClientPosition = (event: MouseEvent | TouchEvent): { x: number; y:
   return touch ? { x: touch.clientX, y: touch.clientY } : null;
 };
 
-const WorkflowEditorPreparingState = ({ edgeCount, nodeCount }: { edgeCount: number; nodeCount: number }) => (
-  <Flex align="center" bg="bg.inset" h="full" justify="center" p="6" w="full">
-    <Stack align="center" gap="3" textAlign="center">
-      <HStack color="fg.muted" gap="2">
-        <Spinner size="lg" />
-        <Text fontSize="lg" fontWeight="700">
-          Preparing workflow graph
+export const WorkflowEditorPreparingState = ({ edgeCount, nodeCount }: { edgeCount: number; nodeCount: number }) => {
+  const { t } = useTranslation();
+
+  return (
+    <Flex align="center" bg="bg.inset" h="full" justify="center" p="6" w="full">
+      <Stack align="center" gap="3" textAlign="center">
+        <HStack color="fg.muted" gap="2">
+          <Spinner size="lg" />
+          <Text fontSize="lg" fontWeight="700">
+            {t('widgets.workflow.preparingGraph')}
+          </Text>
+        </HStack>
+        <Text color="fg.subtle" fontSize="md">
+          {t('widgets.workflow.loadingGraph', { edgeCount, nodeCount })}
         </Text>
-      </HStack>
-      <Text color="fg.subtle" fontSize="md">
-        Loading {nodeCount.toLocaleString()} node{nodeCount === 1 ? '' : 's'} and {edgeCount.toLocaleString()} edge
-        {edgeCount === 1 ? '' : 's'}.
-      </Text>
-    </Stack>
-  </Flex>
-);
+      </Stack>
+    </Flex>
+  );
+};
 
 const getSelectedNodeIdSet = (nodes: WorkflowFlowNode[]): Set<string> =>
   new Set(nodes.filter((node) => node.selected).map((node) => node.id));
@@ -257,6 +309,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   const { mark: markWorkbenchPerf, measure: measureWorkbenchPerf, time: timeWorkbenchPerf } = ui.performance;
   const { editGraph, redo, undo } = useProjectGraphCommands();
   const notify = useWorkflowNotifications();
+  const { t } = useTranslation();
   const {
     reduceMotion,
     themeId,
@@ -290,11 +343,21 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
     () => getWorkflowViewportKey(projectId, workflowId, runtime.instanceId),
     [projectId, runtime.instanceId, workflowId]
   );
-  // XYFlow recreates its controller when React Activity reveals this view and reads this object on reconnect.
-  const defaultViewport = useMemo(() => getWorkflowViewport(viewportKey) ?? { ...DEFAULT_VIEWPORT }, [viewportKey]);
   // A workflow this editor has not shown yet (a load, a switch, a reload) opens fitted rather than at the origin.
   const [fitOnMount] = useState(() =>
     getWorkflowViewport(viewportKey) === null ? projectGraph.nodes.map(({ id, position }) => ({ id, position })) : null
+  );
+  // Undefined until the container is measured. Large graphs render compact nodes without a zoomed-out form, and choose
+  // their first nodes from the default viewport.
+  const [mountViewport, setMountViewport] = useState<Viewport | null | undefined>(() =>
+    fitOnMount && !isLargeGraph ? undefined : null
+  );
+  const mountContainerRef = useRef<HTMLDivElement>(null);
+  // XYFlow recreates its controller when React Activity reveals this view and reads this object on reconnect, so it is
+  // a mutable copy that tracks the view, never the state it starts from.
+  const defaultViewport = useMemo(
+    () => getWorkflowViewport(viewportKey) ?? { ...(mountViewport ?? DEFAULT_VIEWPORT) },
+    [mountViewport, viewportKey]
   );
   const perfSource = useMemo<WorkflowPerfSource>(
     () => ({
@@ -428,6 +491,19 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   );
   const renderedFlowNodes = renderedFlowModel?.nodes ?? EMPTY_FLOW_NODES;
   const renderedFlowEdges = renderedFlowModel?.edges ?? EMPTY_FLOW_EDGES;
+
+  // Measured before paint, so the flow mounts once, at the viewport its nodes first render for.
+  // An unmeasurable container opens at the default viewport.
+  useLayoutEffect(() => {
+    if (mountViewport !== undefined || !fitOnMount) {
+      return;
+    }
+
+    const height = mountContainerRef.current?.clientHeight ?? 0;
+    const width = mountContainerRef.current?.clientWidth ?? 0;
+
+    setMountViewport(width > 0 && height > 0 ? getZoomedOutMountViewport(fitOnMount, { height, width }) : null);
+  }, [fitOnMount, mountViewport]);
 
   useEffect(() => {
     markWorkbenchPerf(perfMountMarkRef.current, perfSource);
@@ -586,10 +662,10 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
       const copiedCount = copyNodesToClipboard(projectGraph, getActionNodeIds(nodeId));
 
       if (copiedCount > 0) {
-        notify.success(`Copied ${copiedCount} node${copiedCount === 1 ? '' : 's'}`);
+        notify.success(t('widgets.workflow.copiedNodes', { count: copiedCount }));
       }
     },
-    [getActionNodeIds, notify, projectGraph]
+    [getActionNodeIds, notify, projectGraph, t]
   );
 
   const pasteNodes = useCallback(() => {
@@ -691,26 +767,19 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   });
 
   useEffect(() => {
-    const hotkeys = [
-      ['workflows.addNode', 'Add workflow node', ['shift+a', 'space']],
-      ['workflows.copySelection', 'Copy workflow selection', ['mod+c']],
-      ['workflows.pasteSelection', 'Paste workflow selection', ['mod+v']],
-      ['workflows.pasteSelectionWithEdges', 'Paste workflow selection with edges', ['mod+shift+v']],
-      ['workflows.duplicateSelection', 'Duplicate workflow selection', ['mod+d']],
-      ['workflows.selectAll', 'Select all workflow nodes', ['mod+a']],
-      ['workflows.deleteSelection', 'Delete workflow selection', ['delete', 'backspace']],
-      ['workflows.undo', 'Undo workflow edit', ['mod+z']],
-      ['workflows.redo', 'Redo workflow edit', ['mod+shift+z', 'mod+y']],
-    ] as const;
-    const disposers = hotkeys.flatMap(([id, title, defaultKeys]) => [
-      runtime.commands.register({ handler: () => executeWorkflowHotkey(id), id, title }),
-      runtime.hotkeys.register({ commandId: id, defaultKeys: [...defaultKeys], id, title }),
-    ]);
+    const disposers = WORKFLOW_HOTKEYS.flatMap(({ defaultKeys, id, titleKey }) => {
+      const title = t(titleKey);
+
+      return [
+        runtime.commands.register({ handler: () => executeWorkflowHotkey(id), id, title }),
+        runtime.hotkeys.register({ commandId: id, defaultKeys: [...defaultKeys], id, title }),
+      ];
+    });
 
     return () => {
       disposers.forEach((dispose) => dispose());
     };
-  }, [runtime.commands, runtime.hotkeys]);
+  }, [runtime.commands, runtime.hotkeys, t]);
 
   const onNodesChange = useCallback(
     (changes: NodeChange<WorkflowFlowNode>[]) => {
@@ -1151,6 +1220,10 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
     return <WorkflowEditorPreparingState edgeCount={projectGraph.edges.length} nodeCount={projectGraph.nodes.length} />;
   }
 
+  if (mountViewport === undefined) {
+    return <Box ref={mountContainerRef} bg="bg.inset" h="full" w="full" />;
+  }
+
   return (
     <Box
       bg="bg.inset"
@@ -1162,7 +1235,6 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
       {...pointerToolHandlers}
     >
       <ReactFlow<WorkflowFlowNode, WorkflowFlowEdge>
-        key={viewportKey}
         colorMode={getFlowColorMode(themeId)}
         connectionLineType={edgeType === 'step' ? ConnectionLineType.Step : ConnectionLineType.Bezier}
         defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
@@ -1172,8 +1244,8 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
         edges={renderedFlowEdges}
         edgeTypes={edgeTypes}
         isValidConnection={isValidConnection}
-        maxZoom={2}
-        minZoom={0.1}
+        maxZoom={MAX_ZOOM}
+        minZoom={MIN_ZOOM}
         nodes={renderedFlowNodes}
         nodeTypes={nodeTypes}
         onlyRenderVisibleElements={isLargeGraph}
@@ -1266,10 +1338,12 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
 };
 
 export const WorkflowEditorView = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
-  // Each project workflow is its own editor mount: selection, viewport and deferred large-graph work stay with it.
+  // Each project workflow is its own editor mount (its viewport key's project, workflow and instance included):
+  // selection, viewport and deferred large-graph work stay with it. It owns its flow store too: a shared store would
+  // notify the outgoing flow's nodes of the incoming flow's updates while they unmount, each failing to find its node.
   const flowIdentity = useWorkflowProjectSelector(
     (project) =>
-      `${project.id}:${project.activeWorkflowId}:${isLargeWorkflowGraph({ edgeCount: project.projectGraph.edges.length, nodeCount: project.projectGraph.nodes.length }) ? 'large' : 'standard'}`
+      `${runtime.instanceId}:${project.id}:${project.activeWorkflowId}:${isLargeWorkflowGraph({ edgeCount: project.projectGraph.edges.length, nodeCount: project.projectGraph.nodes.length }) ? 'large' : 'standard'}`
   );
 
   useEffect(() => {
@@ -1277,12 +1351,12 @@ export const WorkflowEditorView = ({ runtime }: { runtime: WorkflowRuntimeApi })
   }, []);
 
   return (
-    <ReactFlowProvider>
-      <Flex direction="column" h="full" minH="0" w="full">
-        <Box flex="1" minH="0" position="relative">
-          <WorkflowFlow key={flowIdentity} runtime={runtime} />
-        </Box>
-      </Flex>
-    </ReactFlowProvider>
+    <Flex direction="column" h="full" minH="0" w="full">
+      <Box flex="1" minH="0" position="relative">
+        <ReactFlowProvider key={flowIdentity}>
+          <WorkflowFlow runtime={runtime} />
+        </ReactFlowProvider>
+      </Box>
+    </Flex>
   );
 };

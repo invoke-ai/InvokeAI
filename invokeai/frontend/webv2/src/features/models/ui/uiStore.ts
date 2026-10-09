@@ -25,6 +25,11 @@ export interface ModelsUiSnapshot {
   addModelsTypeSeed: ModelTaxonomyType | null;
   /** Model focused in the manager library's detail pane. */
   activeModelKey: string | null;
+  /**
+   * Whether the detail, not the library, is the pane shown when the manager is too narrow for both; null until the
+   * user opens or leaves one, when the manager decides from whether the library is empty.
+   */
+  detailOpen: boolean | null;
   /** Consume provider reveal once so returning to Keys does not replay an old highlight. */
   highlightProviderId: string | null;
   selectedKeys: ReadonlySet<string>;
@@ -52,6 +57,7 @@ const createInitialModelsUiSnapshot = (): ModelsUiSnapshot => ({
   activeTab: 'add',
   addModelsSeed: null,
   addModelsTypeSeed: null,
+  detailOpen: null,
   filters: { ...DEFAULT_LIBRARY_FILTERS },
   hfLookup: null,
   highlightProviderId: null,
@@ -72,8 +78,32 @@ registerAccountOwnedResource({
   name: 'models-ui',
 });
 
+/**
+ * Every opener reveals the detail and every clear returns to the library, so no caller has to remember the
+ * single-pane state: setting a tab or a different model opens the detail; clearing the open model while its Details
+ * tab shows closes it. An explicit `detailOpen` wins.
+ */
+const withDetailOpen = (current: ModelsUiSnapshot, next: Partial<ModelsUiSnapshot>): Partial<ModelsUiSnapshot> => {
+  if (next.detailOpen !== undefined) {
+    return next;
+  }
+
+  if (
+    next.activeTab !== undefined ||
+    (typeof next.activeModelKey === 'string' && next.activeModelKey !== current.activeModelKey)
+  ) {
+    return { ...next, detailOpen: true };
+  }
+
+  if (next.activeModelKey === null && current.activeModelKey !== null && current.activeTab === 'details') {
+    return { ...next, detailOpen: false };
+  }
+
+  return next;
+};
+
 export const updateModelsUi = (next: Partial<ModelsUiSnapshot>): void => {
-  store.patchSnapshot(next);
+  store.patchSnapshot(withDetailOpen(store.getSnapshot(), next));
 };
 
 export const toggleModelSelection = (key: string): void => {
@@ -109,6 +139,21 @@ export const openModelManagerTab = (activeTab: ModelManagerTab): void => {
 /** Focus a model and reveal it in the detail tab (e.g. from a library row). */
 export const openModelDetail = (modelKey: string): void => {
   updateModelsUi({ activeModelKey: modelKey, activeTab: 'details', queueMaximized: false });
+};
+
+/** Return a single-pane manager to its library; side by side nothing changes. */
+export const closeModelDetail = (): void => {
+  updateModelsUi({ detailOpen: false });
+};
+
+/**
+ * Decide the starting pane once, when the library first loads: an empty library opens on Add Models, any other on
+ * the list. Later installs and deletes never move the user; only openers and Back do.
+ */
+export const settleInitialModelsPane = (isLibraryEmpty: boolean): void => {
+  if (store.getSnapshot().detailOpen === null) {
+    updateModelsUi({ detailOpen: isLibraryEmpty });
+  }
 };
 
 /** Name the requested provider so its possibly offscreen key card can reveal itself. */

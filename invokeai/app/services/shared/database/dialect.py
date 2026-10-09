@@ -373,6 +373,34 @@ def _compile_case_insensitive_order(element: CaseInsensitiveOrder, compiler: SQL
     return f"lower({expression})"
 
 
+class Unindexed(FunctionElement[Any]):
+    """`column` in a WHERE term that SQLite must not look up through an index: `+column` there, `column` elsewhere.
+
+    SQLite keeps no table statistics, so it takes `queue_id = ?` (or `user_id = ?`) for a selective term and can
+    walk an index on it through a queue's whole history, when another term (a status, a batch, an id) finds the few
+    rows wanted. The unary plus keeps the term off every index.
+    """
+
+    inherit_cache = True
+    name = "unindexed"
+
+    def __init__(self, column: ColumnElement[Any]) -> None:
+        super().__init__(column)
+        self.type = column.type
+
+
+@compiles(Unindexed, "sqlite")
+def _compile_unindexed_sqlite(element: Unindexed, compiler: SQLCompiler, **kw: Any) -> str:
+    (column,) = (compiler.process(clause, **kw) for clause in element.clauses)
+    return f"+{column}"
+
+
+@compiles(Unindexed)
+def _compile_unindexed(element: Unindexed, compiler: SQLCompiler, **kw: Any) -> str:
+    (column,) = (compiler.process(clause, **kw) for clause in element.clauses)
+    return column
+
+
 class OrderedJoin(Join):
     """An inner join that SQLite plans with its left side as the outer loop.
 

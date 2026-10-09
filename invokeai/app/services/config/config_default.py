@@ -84,6 +84,7 @@ class InvokeAIAppConfig(BaseSettings):
         allow_headers: Headers allowed for CORS.
         ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.
         ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.
+        show_donation_link: Show the Donate to InvokeAI link in the frontend menus.
         log_tokenization: Enable logging of parsed prompt tokens.
         patchmatch: Enable patchmatch inpaint code.
         models_dir: Path to the models directory.
@@ -193,6 +194,7 @@ class InvokeAIAppConfig(BaseSettings):
     http_compression_level:         int = Field(default=9, ge=0, le=9,       description="Compression level for gzipped HTTP API responses. 0 disables response compression entirely, 1 is fastest, 9 (the default) is smallest. Compression runs on the event loop and blocks the whole server while it works, and level 9 costs about 5.5x the time of level 1 for 0.4 percentage points of extra compression, so lowering this makes the app noticeably more responsive on large libraries. Set to 0 when a reverse proxy already compresses responses.")
 
     # MISC FEATURES
+    show_donation_link:            bool = Field(default=True,               description="Show the Donate to InvokeAI link in the frontend menus.")
     log_tokenization:              bool = Field(default=False,              description="Enable logging of parsed prompt tokens.")
     patchmatch:                    bool = Field(default=True,               description="Enable patchmatch inpaint code.")
 

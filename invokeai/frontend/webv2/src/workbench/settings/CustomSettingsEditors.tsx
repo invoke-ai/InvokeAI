@@ -37,6 +37,9 @@ const DANGER_BUTTON_HOVER_STYLES = { bg: 'fg.error', color: 'bg.subtle' };
 const LazyDatabaseMaintenanceDialog = lazy(() =>
   import('./DatabaseMaintenanceDialog').then((module) => ({ default: module.DatabaseMaintenanceDialog }))
 );
+const LazyGalleryMaintenance = lazy(() =>
+  import('./GalleryMaintenance').then((module) => ({ default: module.GalleryMaintenance }))
+);
 
 export const ThemeSettings = () => {
   const themeId = useWorkbenchPreferenceSelector((preferences) => preferences.themeId);
@@ -232,6 +235,11 @@ export const WorkspaceSettings = ({ onReveal }: Pick<SettingFieldProps, 'onRevea
           Clear saved data…
         </Button>
       </HStack>
+      {canManageAppConfig ? (
+        <Suspense fallback={null}>
+          <LazyGalleryMaintenance />
+        </Suspense>
+      ) : null}
       <ConfirmDialog
         body={
           scope === 'user'

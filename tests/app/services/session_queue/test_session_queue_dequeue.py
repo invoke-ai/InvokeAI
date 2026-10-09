@@ -9,6 +9,8 @@ from typing import Optional
 import pytest
 from pydantic_core import to_jsonable_python
 
+from invokeai.app.invocations.logic import IfInvocation
+from invokeai.app.invocations.primitives import IntegerInvocation, StringCollectionInvocation
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.events.events_common import QueueItemsRetriedEvent
 from invokeai.app.services.invoker import Invoker
@@ -20,7 +22,14 @@ from invokeai.app.services.shared.execution_state_migration import (
     dump_execution_state,
     load_execution_state,
 )
-from invokeai.app.services.shared.graph import Graph, GraphExecutionState
+from invokeai.app.services.shared.graph import (
+    CollectInvocation,
+    Edge,
+    EdgeConnection,
+    Graph,
+    GraphExecutionState,
+    IterateInvocation,
+)
 from tests.fixtures.database import capture_statements, explain_query_plan
 from tests.fixtures.sqlite_database import sqlite_cursor_of
 from tests.test_nodes import TestEventService
@@ -193,6 +202,86 @@ def test_fifo_quarantines_unreadable_snapshot_and_dequeues_later_work(
         status, error_message = cursor.fetchone()
     assert status == "failed"
     assert "Unable to load execution state" in error_message
+
+
+def test_fifo_quarantines_snapshot_with_invalid_if_collector_roots(
+    session_queue_fifo: SessionQueue,
+) -> None:
+    nodes = [
+        IntegerInvocation(id="integer", value=1),
+        CollectInvocation(id="integer_collect"),
+        StringCollectionInvocation(id="string_collection", collection=["text"]),
+        IfInvocation(id="if"),
+        CollectInvocation(id="collect"),
+        IterateInvocation(id="iterate"),
+        IntegerInvocation(id="sink", value=0),
+    ]
+    invalid_graph = Graph(
+        nodes={node.id: node for node in nodes},
+        edges=[
+            Edge(
+                source=EdgeConnection(node_id="integer", field="value"),
+                destination=EdgeConnection(node_id="integer_collect", field="item"),
+            ),
+            Edge(
+                source=EdgeConnection(node_id="integer_collect", field="collection"),
+                destination=EdgeConnection(node_id="if", field="true_input"),
+            ),
+            Edge(
+                source=EdgeConnection(node_id="string_collection", field="collection"),
+                destination=EdgeConnection(node_id="if", field="false_input"),
+            ),
+            Edge(
+                source=EdgeConnection(node_id="if", field="value"),
+                destination=EdgeConnection(node_id="collect", field="collection"),
+            ),
+            Edge(
+                source=EdgeConnection(node_id="collect", field="collection"),
+                destination=EdgeConnection(node_id="iterate", field="collection"),
+            ),
+            Edge(
+                source=EdgeConnection(node_id="iterate", field="item"),
+                destination=EdgeConnection(node_id="sink", field="value"),
+            ),
+        ],
+    )
+    older_snapshot = json.loads(_EMPTY_SESSION_JSON)
+    older_snapshot["graph"] = to_jsonable_python(
+        invalid_graph.model_dump(mode="json", warnings=False, exclude_none=True)
+    )
+    invalid_item_id = _insert_queue_item(
+        session_queue_fifo,
+        "default",
+        "old-workflow-user",
+        session_json=json.dumps(older_snapshot),
+    )
+    valid_item_id = _insert_queue_item(session_queue_fifo, "default", "valid-user")
+
+    dequeued = session_queue_fifo.dequeue()
+
+    assert dequeued is not None
+    assert dequeued.item_id == valid_item_id
+    with sqlite_cursor_of(session_queue_fifo) as cursor:
+        cursor.execute("SELECT status, error_message FROM session_queue WHERE item_id = ?", (invalid_item_id,))
+        status, error_message = cursor.fetchone()
+    assert status == "failed"
+    assert "Invalid collector node" in error_message
+
+    completed_item_id = _insert_queue_item(
+        session_queue_fifo,
+        "default",
+        "history-user",
+        session_json=json.dumps(older_snapshot),
+    )
+    with sqlite_cursor_of(session_queue_fifo) as cursor:
+        cursor.execute("UPDATE session_queue SET status = 'completed' WHERE item_id = ?", (completed_item_id,))
+
+    history_item = session_queue_fifo.get_queue_item_for_api(completed_item_id)
+
+    assert history_item.status == "failed"
+    assert history_item.session.graph.nodes == {}
+    assert history_item.field_values is None
+    assert history_item.workflow is None
 
 
 def test_affinity_quarantines_unreadable_snapshot_and_dequeues_valid_work(
