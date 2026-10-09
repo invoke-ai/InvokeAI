@@ -128,6 +128,14 @@ describe('parseInvkBoardSnapshot', () => {
     expectRefusal({ boards: [inbox([item({ category: 'other' as never })])], version: 2 });
   });
 
+  /** The server allows 300 characters, which can be 600 UTF-16 units; a name it accepted must round-trip. */
+  it('measures a board name in characters', () => {
+    expect(
+      parseInvkBoardSnapshot({ boards: [inbox([]), member([], '😀'.repeat(300))], version: 2 }).boards[1]?.name
+    ).toBe('😀'.repeat(300));
+    expectRefusal({ boards: [inbox([]), member([], '😀'.repeat(301))], version: 2 });
+  });
+
   /** A few kilobytes must not be able to ask the importer for an unbounded number of creates and moves. */
   it('caps how many boards a file may name', () => {
     const members = (count: number) =>

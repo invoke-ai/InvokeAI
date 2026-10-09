@@ -37,8 +37,14 @@ export interface InvkBoardSnapshot {
   boards: InvkBoard[];
 }
 
-/** The longest board name the backend accepts. */
-const MAX_BOARD_NAME_LENGTH = 300;
+/** The longest board name the backend accepts, in code points: it counts characters, not UTF-16 units. */
+export const MAX_BOARD_NAME_LENGTH = 300;
+
+const boardNameLength = (name: string): number => Array.from(name).length;
+
+/** A name the backend would accept, cut by character so an emoji at the boundary is dropped rather than broken. */
+export const clampBoardName = (name: string): string =>
+  boardNameLength(name) <= MAX_BOARD_NAME_LENGTH ? name : Array.from(name).slice(0, MAX_BOARD_NAME_LENGTH).join('');
 
 /** Names must be basenames without separators, traversal, or NUL to round-trip safely as archive paths. */
 const zMediaName = z
@@ -70,7 +76,7 @@ const zBoard = z
     archived: z.boolean(),
     isInbox: z.boolean(),
     items: z.array(zBoardItem).max(INVK_MAX_ENTRIES),
-    name: z.string().max(MAX_BOARD_NAME_LENGTH),
+    name: z.string().refine((name) => boardNameLength(name) <= MAX_BOARD_NAME_LENGTH, 'Board name is too long'),
   })
   .strict();
 

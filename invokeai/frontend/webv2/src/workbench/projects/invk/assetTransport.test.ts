@@ -232,6 +232,20 @@ describe('board media transport', () => {
     expect(options.method).toBe('POST');
   });
 
+  /** The backend counts characters; a name of 300 emoji is 600 UTF-16 units and must arrive whole. */
+  it('measures a staging board name in characters, never splitting an emoji', async () => {
+    mocks.apiFetchJson.mockResolvedValue({ board_id: 'staging' });
+
+    await createStagingBoard('😀'.repeat(300));
+    await createStagingBoard(`${'x'.repeat(299)}😀😀`);
+
+    const names = mocks.apiFetchJson.mock.calls.map(([url]) =>
+      new URLSearchParams((url as string).split('?')[1]).get('board_name')
+    );
+
+    expect(names).toEqual(['😀'.repeat(300), `${'x'.repeat(299)}😀`]);
+  });
+
   it('moves a staging board into a project, archiving it only when the source had', async () => {
     mocks.apiFetchJson.mockResolvedValue({});
 
