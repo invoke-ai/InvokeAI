@@ -1,47 +1,31 @@
 import type { GenerationModelCatalogItem as ModelConfig } from '@features/generation/contracts';
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
-import type {
-  GenerateLora,
-  GenerateModelConfig,
-  GenerateSettings,
-  LoraModelConfig,
-} from '@features/generation/core/types';
+import type { GenerateLora, GenerateModelConfig, LoraModelConfig } from '@features/generation/core/types';
 
-import { Badge, HStack, Stack, Text } from '@chakra-ui/react';
+import { Box, Stack, Text } from '@chakra-ui/react';
 import { isLoraSupported } from '@features/generation/core/baseGenerationPolicies';
 import {
-  DEFAULT_LORA_WEIGHT_CONFIG,
   getDefaultLoraWeight,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
   syncGenerateLorasWithModels,
 } from '@features/generation/core/settings';
-import { Field, IconButton, Tooltip } from '@platform/ui';
-import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
-import { ScrubberField } from '@platform/ui/ScrubberField';
-import { Trash2Icon } from 'lucide-react';
-import { useMemo } from 'react';
+import { Field } from '@platform/ui';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { GenerateSettingsUpdate } from './generateDebounce';
 
-import { useRegisterGenerateDraftFlusher } from './generateDraftRegistry';
 import { GenerationModelSelect as ModelSelect, useGenerationUi } from './GenerationUiContext';
-import { GenerateFieldContextMenu } from './shared/GenerateFieldContextMenu';
-import { GenerateToggleSwitch } from './shared/GenerateToggleSwitch';
-import { useDebouncedDraftValue } from './useDebouncedDraftValue';
+import { ConceptList, ConceptRow, type ConceptUpdate } from './shared/ConceptRow';
 
 interface GenerateConceptsContentProps {
-  settings: GenerateSettings;
   loraModels: LoraModelConfig[];
+  loras: GenerateLora[];
   projectId: string;
   selectedModel: GenerateModelConfig | undefined;
   onCommit: (update: GenerateSettingsUpdate) => void;
-  onCommitImmediate: (patch: Partial<GenerateSettings>) => void;
 }
-
-const LORA_WEIGHT_MARKS = [-1, 0, 1, 2];
-const LORA_WEIGHT_DEBOUNCE_MS = 250;
 
 /** Whether the selected model's graph will load this concept: its family must take LoRAs and match the LoRA. */
 export const isCompatibleLora = (lora: GenerateLora, selectedModel: GenerateModelConfig | undefined): boolean =>
@@ -49,68 +33,84 @@ export const isCompatibleLora = (lora: GenerateLora, selectedModel: GenerateMode
 
 export const GenerateConceptsContent = ({
   loraModels,
+  loras: draftLoras,
   onCommit,
-  onCommitImmediate,
   projectId,
   selectedModel,
-  settings,
 }: GenerateConceptsContentProps) => {
   const { t } = useTranslation();
-  const loras = useMemo(() => syncGenerateLorasWithModels(settings.loras, loraModels), [loraModels, settings.loras]);
+  const models = useGenerationUi().models;
+  const loras = useMemo(() => syncGenerateLorasWithModels(draftLoras, loraModels), [draftLoras, loraModels]);
   const selectedLoraKeys = useMemo(() => new Set(loras.map((lora) => lora.model.key)), [loras]);
 
   const addLora = (model: ModelConfig | null) => {
-    if (!isLoraModelConfig(model) || selectedLoraKeys.has(model.key)) {
+    if (!isLoraModelConfig(model)) {
       return;
     }
 
-    onCommitImmediate({
-      loras: [...loras, { isEnabled: true, model, weight: getDefaultLoraWeight(model) }],
-    });
-  };
-
-  const updateLora = (modelKey: string, patch: Partial<Pick<GenerateLora, 'isEnabled' | 'weight'>>) => {
     onCommit((settings) => {
       const latestLoras = syncGenerateLorasWithModels(settings.loras, loraModels);
-      const hasLora = latestLoras.some((lora) => lora.model.key === modelKey);
 
-      if (!hasLora) {
+      if (latestLoras.some((lora) => lora.model.key === model.key)) {
         return settings;
       }
 
       return {
         ...settings,
-        loras: latestLoras.map((lora) => (lora.model.key === modelKey ? { ...lora, ...patch } : lora)),
+        loras: [...latestLoras, { isEnabled: true, model, weight: getDefaultLoraWeight(model) }],
       };
     });
   };
 
-  const removeLora = (modelKey: string) => {
-    onCommitImmediate({ loras: loras.filter((lora) => lora.model.key !== modelKey) });
-  };
+  const updateLora = useCallback(
+    (modelKey: string, patch: ConceptUpdate) => {
+      onCommit((settings) => {
+        const latestLoras = syncGenerateLorasWithModels(settings.loras, loraModels);
+        const hasLora = latestLoras.some((lora) => lora.model.key === modelKey);
+
+        if (!hasLora) {
+          return settings;
+        }
+
+        return {
+          ...settings,
+          loras: latestLoras.map((lora) => (lora.model.key === modelKey ? { ...lora, ...patch } : lora)),
+        };
+      });
+    },
+    [loraModels, onCommit]
+  );
+
+  const removeLora = useCallback(
+    (modelKey: string) => {
+      onCommit((settings) => ({ ...settings, loras: settings.loras.filter((lora) => lora.model.key !== modelKey) }));
+    },
+    [onCommit]
+  );
 
   const rows =
     loras.length > 0 ? (
-      <Stack gap="2">
-        {loras.map((lora) => (
-          <LoraRow
-            key={lora.model.key}
-            isCompatible={isCompatibleLora(lora, selectedModel)}
-            lora={lora}
-            projectId={projectId}
-            onRemove={() => removeLora(lora.model.key)}
-            onToggle={(isEnabled) => updateLora(lora.model.key, { isEnabled })}
-            onWeightChange={(weight) => updateLora(lora.model.key, { weight })}
-          />
-        ))}
-      </Stack>
+      <Box mx={-1}>
+        <ConceptList label={t('widgets.generate.concepts')} projectId={projectId}>
+          {loras.map((lora) => (
+            <ConceptRow
+              key={lora.model.key}
+              isCompatible={isCompatibleLora(lora, selectedModel)}
+              lora={lora}
+              models={models}
+              onRemove={removeLora}
+              onUpdate={updateLora}
+            />
+          ))}
+        </ConceptList>
+      </Box>
     ) : null;
 
   if (selectedModel && !isLoraSupported(selectedModel)) {
     // Rows left from another model stay listed, marked incompatible, so they can still be removed.
     return (
       <Stack gap="2">
-        <Text color="fg.muted" fontSize="2xs">
+        <Text color="fg.muted" fontSize="xs">
           {t('widgets.generate.conceptsUnsupported')}
         </Text>
         {rows}
@@ -131,139 +131,20 @@ export const GenerateConceptsContent = ({
             Boolean(selectedModel && isLoraModelConfig(model) && isLoraCompatibleWithModel(model, selectedModel))
           }
           modelTypes={['lora']}
+          scopeLabel={t('models.scopeConcepts')}
           placeholder={
             selectedModel ? t('widgets.generate.searchCompatibleConcepts') : t('widgets.generate.selectModelFirst')
           }
-          size="xs"
           value={null}
           onChange={addLora}
         />
       </Field>
 
       {rows ?? (
-        <Text color="fg.muted" fontSize="2xs">
+        <Text color="fg.muted" fontSize="xs">
           {t('widgets.generate.addConceptsHelp')}
         </Text>
       )}
-    </Stack>
-  );
-};
-
-const LoraRow = ({
-  isCompatible,
-  lora,
-  onRemove,
-  projectId,
-  onToggle,
-  onWeightChange,
-}: {
-  isCompatible: boolean;
-  lora: GenerateLora;
-  onRemove: () => void;
-  projectId: string;
-  onToggle: (isEnabled: boolean) => void;
-  onWeightChange: (weight: number) => void;
-}) => {
-  const { t } = useTranslation();
-  const { getBaseColorPalette, getBaseLabel } = useGenerationUi().models;
-  const isActive = lora.isEnabled && isCompatible;
-  const defaultWeight = getDefaultLoraWeight(lora.model);
-
-  const {
-    draftValue: draftWeight,
-    flushDraftValue,
-    setDraftValue: setWeight,
-  } = useDebouncedDraftValue({
-    delayMs: LORA_WEIGHT_DEBOUNCE_MS,
-    onCommit: onWeightChange,
-    resetKey: projectId,
-    value: lora.weight,
-  });
-
-  useRegisterGenerateDraftFlusher(flushDraftValue);
-
-  return (
-    <Stack
-      bg="bg.subtle"
-      borderColor={isActive ? 'border.emphasized' : 'border.subtle'}
-      borderWidth="1px"
-      gap="2"
-      opacity={isCompatible ? 1 : 0.68}
-      p="2"
-      rounded="md"
-    >
-      <HStack gap="2" minW="0">
-        <Stack flex="1" gap="0.5" minW="0">
-          <HStack gap="1.5" minW="0">
-            <MiddleTruncate
-              color={isActive ? 'fg' : 'fg.muted'}
-              fontSize="xs"
-              fontWeight="medium"
-              minW="0"
-              text={lora.model.name}
-            />
-            <Badge colorPalette={getBaseColorPalette(lora.model.base)} flexShrink={0} size="xs" variant="surface">
-              {getBaseLabel(lora.model.base)}
-            </Badge>
-            {!isCompatible ? (
-              <Badge colorPalette="orange" flexShrink={0} size="xs" variant="surface">
-                {t('widgets.generate.incompatible')}
-              </Badge>
-            ) : null}
-          </HStack>
-          {lora.model.trigger_phrases?.length ? (
-            <Text color="fg.muted" fontSize="2xs" truncate>
-              {lora.model.trigger_phrases.join(', ')}
-            </Text>
-          ) : null}
-        </Stack>
-
-        <HStack flexShrink="0" gap="1">
-          <GenerateToggleSwitch
-            checked={isActive}
-            disabled={!isCompatible}
-            label={
-              isActive
-                ? t('widgets.generate.disableConcept', { name: lora.model.name })
-                : t('widgets.generate.enableConcept', { name: lora.model.name })
-            }
-            onCheckedChange={onToggle}
-          />
-
-          <Tooltip content={t('widgets.generate.removeConcept')}>
-            <IconButton
-              aria-label={t('widgets.generate.removeConceptNamed', { name: lora.model.name })}
-              color="fg.muted"
-              size="2xs"
-              variant="ghost"
-              onClick={onRemove}
-            >
-              <Trash2Icon />
-            </IconButton>
-          </Tooltip>
-        </HStack>
-      </HStack>
-
-      <GenerateFieldContextMenu
-        copyValue={() => String(draftWeight)}
-        isAtDefault={draftWeight === defaultWeight}
-        onReset={() => setWeight(defaultWeight)}
-        resetLabel={t('widgets.generate.resetToConceptDefault')}
-      >
-        <ScrubberField
-          defaultValue={defaultWeight}
-          disabled={!isActive}
-          inputMax={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMax}
-          inputMin={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMin}
-          label={t('widgets.generate.weight')}
-          marks={LORA_WEIGHT_MARKS}
-          max={DEFAULT_LORA_WEIGHT_CONFIG.sliderMax}
-          min={DEFAULT_LORA_WEIGHT_CONFIG.sliderMin}
-          step={DEFAULT_LORA_WEIGHT_CONFIG.coarseStep}
-          value={draftWeight}
-          onChange={setWeight}
-        />
-      </GenerateFieldContextMenu>
     </Stack>
   );
 };

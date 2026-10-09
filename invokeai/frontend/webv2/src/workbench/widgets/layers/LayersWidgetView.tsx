@@ -156,7 +156,7 @@ export const LayersWidgetView = ({ runtime }: WidgetViewProps) => {
                 onContextMenu={handleEmptyAreaContextMenu}
               >
                 <Icon as={LayersIcon} boxSize="6" />
-                <Text fontSize="2xs" textAlign="center">
+                <Text fontSize="xs" textAlign="center">
                   {t('widgets.layers.empty')}
                 </Text>
               </Flex>

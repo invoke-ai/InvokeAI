@@ -9,15 +9,8 @@ on:
       - 'ready_for_review'
       - 'opened'
       - 'synchronize'
+  # main deploys to v7.invoke.ai (invoke-ai/docs-v7); invoke.ai is deployed from the v6-bugfixes branch.
   workflow_dispatch:
-    inputs:
-      deploy_target:
-        description: 'Deploy target (custom = invoke.ai, ghpages = invoke-ai.github.io/InvokeAI)'
-        type: choice
-        options:
-          - custom
-          - ghpages
-        default: custom
 
 permissions:
   contents: read
@@ -38,13 +31,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: mark manual run
-        if: github.event_name == 'workflow_dispatch'
+      # Deploy-branch pushes always rebuild: with cancel-in-progress, a later push that skipped
+      # the build would cancel an earlier docs push's deploy and leave its changes unpublished.
+      - name: mark push or manual run
+        if: github.event_name != 'pull_request'
         id: manual
         run: echo "docs=true" >> "$GITHUB_OUTPUT"
 
       - name: detect docs-related changes
-        if: github.event_name != 'workflow_dispatch'
+        if: github.event_name == 'pull_request'
         id: filter
         uses: dorny/paths-filter@v3
         with:
@@ -119,35 +114,62 @@ jobs:
         run: pnpm build
         working-directory: docs
         env:
-          DEPLOY_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_target || 'custom' }}
-          ENABLE_ANALYTICS: ${{ github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.deploy_target == 'custom') }}
+          DEPLOY_TARGET: custom
+          ENABLE_ANALYTICS: ${{ github.ref == 'refs/heads/main' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: verify deploy output
         run: pnpm run check-deploy-output
         working-directory: docs
         env:
-          DEPLOY_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_target || 'custom' }}
+          DEPLOY_TARGET: custom
 
       # Upload artifact for deploy (main branch only)
-      - name: upload pages artifact
+      - name: upload site artifact
         if: github.ref == 'refs/heads/main'
-        uses: actions/upload-pages-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
+          name: docs-site
           path: docs/dist
+          include-hidden-files: true
+          retention-days: 1
 
+  # GitHub Pages serves one custom domain per repository, and this repository's is invoke.ai (v6),
+  # so the v7 site is published to the gh-pages branch of invoke-ai/docs-v7 with a deploy key.
   deploy:
     if: github.ref == 'refs/heads/main'
     needs: check-and-build
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pages: write
-      id-token: write
     environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      name: docs-v7
+      url: https://v7.invoke.ai
     steps:
-      - name: deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
+      - name: download site artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: docs-site
+          path: site
+
+      - name: publish to invoke-ai/docs-v7
+        env:
+          DEPLOY_KEY: ${{ secrets.DOCS_V7_DEPLOY_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        working-directory: site
+        run: |
+          set -euo pipefail
+          # The custom domain comes from CNAME; .nojekyll keeps branch-based Pages from dropping _astro/.
+          test "$(cat CNAME)" = "v7.invoke.ai"
+          touch .nojekyll
+
+          mkdir -p ~/.ssh
+          gh api meta --jq '.ssh_keys[] | "github.com " + .' > ~/.ssh/known_hosts
+          eval "$(ssh-agent -s)"
+          ssh-add - <<< "$DEPLOY_KEY"
+
+          git init -q -b gh-pages
+          git add -A
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -q -m "Deploy invoke-ai/InvokeAI@${GITHUB_SHA}"
+          git push --force git@github.com:invoke-ai/docs-v7.git gh-pages

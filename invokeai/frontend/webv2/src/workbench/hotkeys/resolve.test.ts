@@ -2,14 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { RegisteredHotkey } from './types';
 
-import { applyCustomHotkeys, resolveHotkey } from './resolve';
+import { applyCustomHotkeys, resolveHotkey, toPlatformHotkey } from './resolve';
 
 const event = { target: null } as KeyboardEvent;
 const context = {
   activeInstanceId: null,
   activeWidgetTypeId: null,
   focusedRegion: null,
-  isModalLayerActive: false,
+  isModalPresent: false,
   projectId: 'project-1',
 } as const;
 
@@ -22,6 +22,40 @@ const base = {
 } as const;
 
 describe('resolveHotkey', () => {
+  it('treats mod and the platform key it stands for as one press, leaving the choice to scope', () => {
+    expect(toPlatformHotkey('mod+arrowup', false)).toBe('ctrl+arrowup');
+    expect(toPlatformHotkey('shift+mod+a', true)).toBe('meta+shift+a');
+
+    // The runtime hands over whichever spelling's binding fired first.
+    const platformSpelling = toPlatformHotkey('mod+arrowup');
+    const globalHotkey: RegisteredHotkey = {
+      ...base,
+      commandId: 'global',
+      id: 'global',
+      keys: [platformSpelling],
+      scope: { kind: 'global' },
+      title: 'Global',
+    };
+    const widgetHotkey: RegisteredHotkey = {
+      ...base,
+      commandId: 'widget',
+      id: 'widget',
+      keys: ['mod+arrowup'],
+      scope: { kind: 'widget', typeId: 'gallery' },
+      title: 'Widget',
+    };
+    const resolve = (activeWidgetTypeId: string | null) =>
+      resolveHotkey({
+        context: { ...context, activeInstanceId: activeWidgetTypeId && 'gallery-1', activeWidgetTypeId },
+        event,
+        hotkeys: [globalHotkey, widgetHotkey],
+        matchedKey: platformSpelling,
+      })?.commandId;
+
+    expect(resolve('gallery')).toBe('widget');
+    expect(resolve(null)).toBe('global');
+  });
+
   it('prefers active widget over global', () => {
     const globalHotkey: RegisteredHotkey = {
       ...base,
@@ -161,7 +195,7 @@ describe('resolveHotkey', () => {
     // Modal suppression is unchanged by where focus is.
     expect(
       resolveHotkey({
-        context: { ...floating, isModalLayerActive: true },
+        context: { ...floating, isModalPresent: true },
         event,
         hotkeys: [global, anyRegion, widget, instance],
         matchedKey: 'x',
@@ -233,7 +267,7 @@ describe('resolveHotkey', () => {
 
     expect(
       resolveHotkey({
-        context: { ...context, isModalLayerActive: true },
+        context: { ...context, isModalPresent: true },
         event,
         hotkeys: [hotkey],
         matchedKey: 'x',
@@ -241,7 +275,7 @@ describe('resolveHotkey', () => {
     ).toBeNull();
     expect(
       resolveHotkey({
-        context: { ...context, isModalLayerActive: true },
+        context: { ...context, isModalPresent: true },
         event,
         hotkeys: [hotkey, modalHotkey],
         matchedKey: 'x',

@@ -3,10 +3,11 @@ import io
 import json
 import os
 import shutil
+import sqlite3
 import tempfile
 import threading
 import zlib
-from collections.abc import Collection, Iterable, Sequence
+from collections.abc import Collection, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from queue import Queue
@@ -99,6 +100,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
         # Guards the cache structures (__cache / __cache_ids), which are read and mutated from
         # multiple session-processor worker threads in multi-GPU parallel mode.
         self.__cache_lock = threading.Lock()
+        self.__cache_generation = 0
 
         self.__output_folder = output_folder if isinstance(output_folder, Path) else Path(output_folder)
         self.__thumbnails_folder = self.__output_folder / "thumbnails"
@@ -117,15 +119,106 @@ class DiskImageFileStorage(ImageFileStorageBase):
     def thumbnail_root(self) -> Path:
         return self.__thumbnails_folder.resolve()
 
+    def iter_image_paths(self) -> Iterator[Path]:
+        """Walk supported image files without following symlinks or entering journals/thumbnails."""
+        yield from self.__iter_supported_paths(self.image_root, suffixes={".png"}, skip_thumbnail_root=True)
+
+    def iter_thumbnail_paths(self) -> Iterator[Path]:
+        """Walk WEBP thumbnails without following symlinks or entering reserved journals."""
+        yield from self.__iter_supported_paths(self.thumbnail_root, suffixes={".webp"})
+
+    @staticmethod
+    def __iter_supported_paths(root: Path, suffixes: set[str], skip_thumbnail_root: bool = False) -> Iterator[Path]:
+        # Inventory and traversal state stay in a temporary SQLite database. A generated gallery
+        # can contain enough files that retaining DirEntry objects or directory paths in Python
+        # would make maintenance memory usage grow with the output tree.
+        with tempfile.TemporaryDirectory(prefix="invokeai-image-path-inventory-") as inventory_dir:
+            inventory_path = Path(inventory_dir) / "inventory.sqlite"
+            connection = sqlite3.connect(inventory_path)
+            try:
+                connection.execute("PRAGMA cache_size = -2048")
+                connection.execute("PRAGMA temp_store = FILE")
+                connection.execute("PRAGMA journal_mode = OFF")
+                connection.execute("PRAGMA synchronous = OFF")
+                connection.execute("CREATE TABLE pending_directories (id INTEGER PRIMARY KEY, path BLOB NOT NULL)")
+                connection.execute(
+                    "CREATE TABLE directory_entries (path BLOB NOT NULL, sort_key BLOB NOT NULL, is_directory INTEGER NOT NULL)"
+                )
+                connection.execute("INSERT INTO pending_directories (path) VALUES (?)", (os.fsencode(root),))
+                connection.commit()
+
+                while True:
+                    pending = connection.execute(
+                        "SELECT id, path FROM pending_directories ORDER BY id DESC LIMIT 1"
+                    ).fetchone()
+                    if pending is None:
+                        break
+                    directory_id, directory_value = pending
+                    connection.execute("DELETE FROM pending_directories WHERE id = ?", (directory_id,))
+                    connection.execute("DELETE FROM directory_entries")
+                    directory = Path(os.fsdecode(directory_value))
+
+                    with os.scandir(directory) as scan:
+                        for entry in scan:
+                            if entry.name.startswith(".delete_"):
+                                continue
+                            if directory == root and skip_thumbnail_root and entry.name == "thumbnails":
+                                continue
+                            if entry.is_symlink():
+                                continue
+                            if entry.is_dir(follow_symlinks=False):
+                                is_directory = 1
+                            elif entry.is_file(follow_symlinks=False) and Path(entry.name).suffix.lower() in suffixes:
+                                is_directory = 0
+                            else:
+                                continue
+
+                            entry_path = os.fsencode(directory / entry.name)
+                            sort_key = entry.name.encode("utf-32-be", "surrogatepass")
+                            connection.execute(
+                                "INSERT INTO directory_entries (path, sort_key, is_directory) VALUES (?, ?, ?)",
+                                (entry_path, sort_key, is_directory),
+                            )
+
+                    connection.commit()
+
+                    entries = connection.execute("SELECT path, is_directory FROM directory_entries ORDER BY sort_key")
+                    for entry_path, is_directory in entries:
+                        if not is_directory:
+                            yield Path(os.fsdecode(entry_path))
+
+                    # Push children in reverse lexical order so the disk-backed LIFO stack visits
+                    # them in the same ascending order as the previous in-memory traversal.
+                    connection.execute(
+                        """--sql
+                        INSERT INTO pending_directories (path)
+                        SELECT path
+                        FROM directory_entries
+                        WHERE is_directory = 1
+                        ORDER BY sort_key DESC
+                        """
+                    )
+                    connection.commit()
+            finally:
+                connection.close()
+
     def evict_cache_paths(self, paths: list[Path]) -> None:
+        resolved_paths = [path.resolve() for path in paths]
+        with self.__cache_lock:
+            self.__invalidate_cache_paths_locked(resolved_paths)
+
+    def __invalidate_cache_paths_locked(self, paths: list[Path]) -> None:
+        if not paths:
+            return
+        self.__cache_generation += 1
         for path in paths:
-            self.__cache.pop(path.resolve(), None)
+            self.__cache.pop(path, None)
 
     def get(self, image_name: str, image_subfolder: str = "") -> PILImageType:
         try:
             image_path = self.get_path(image_name, image_subfolder=image_subfolder)
 
-            cache_item = self.__get_cache(image_path)
+            cache_item, cache_generation = self.__get_cache(image_path)
             if cache_item:
                 return cache_item
 
@@ -137,7 +230,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
             # handle and decoder state, producing "broken data stream" / "self.png is not None"
             # errors. Forcing the decode here makes the cached object safe for concurrent reads.
             image.load()
-            self.__set_cache(image_path, image)
+            self.__set_cache(image_path, image, cache_generation)
             return image
         except FileNotFoundError as e:
             raise ImageFileNotFoundException from e
@@ -215,6 +308,64 @@ class DiskImageFileStorage(ImageFileStorageBase):
             self.evict_cache_paths([path for path in (image_path, thumbnail_path) if path is not None])
             raise ImageFileSaveException from e
 
+    def generate_thumbnail_if_missing(
+        self, image_name: str, image_subfolder: str = "", thumbnail_size: int = 256
+    ) -> bool:
+        """Create a complete thumbnail at the canonical path without touching the source image."""
+        image_path = self.get_path(image_name, image_subfolder=image_subfolder)
+        thumbnail_path = self.get_path(image_name, thumbnail=True, image_subfolder=image_subfolder)
+        try:
+            thumbnail_path.stat()
+            return False
+        except FileNotFoundError:
+            pass
+
+        thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary_path: Path | None = None
+        thumbnail: PILImageType | None = None
+        published_identity: tuple[int, int] | None = None
+        try:
+            with Image.open(image_path) as source_image:
+                thumbnail = make_thumbnail(source_image, thumbnail_size)
+            descriptor, temporary_name = tempfile.mkstemp(
+                prefix=".thumbnail-", suffix=".webp", dir=thumbnail_path.parent
+            )
+            os.close(descriptor)
+            temporary_path = Path(temporary_name)
+            thumbnail.save(temporary_path, format="WEBP")
+            with open(temporary_path, "rb+") as completed_file:
+                os.fsync(completed_file.fileno())
+            temporary_stat = temporary_path.stat()
+            temporary_identity = (temporary_stat.st_dev, temporary_stat.st_ino)
+            try:
+                # Linking publishes the fully written temporary file atomically and refuses to
+                # replace a thumbnail another writer created after our first existence check.
+                os.link(temporary_path, thumbnail_path)
+            except FileExistsError:
+                return False
+            published_identity = temporary_identity
+            try:
+                self.__fsync_directory(thumbnail_path.parent)
+            except Exception:
+                try:
+                    current_stat = thumbnail_path.lstat()
+                    if (current_stat.st_dev, current_stat.st_ino) == published_identity:
+                        thumbnail_path.unlink()
+                        self.evict_cache_paths([thumbnail_path])
+                        try:
+                            self.__fsync_directory(thumbnail_path.parent)
+                        except OSError:
+                            pass
+                except OSError:
+                    pass
+                raise
+            return True
+        finally:
+            if thumbnail is not None:
+                thumbnail.close()
+            if temporary_path is not None:
+                temporary_path.unlink(missing_ok=True)
+
     def copy(
         self,
         source_image_name: str,
@@ -266,13 +417,15 @@ class DiskImageFileStorage(ImageFileStorageBase):
             # The manifest has to be durable before the files move, or a crash can leave staged
             # files in a directory that names nothing and recovery cannot put them back.
             self.__persist_journal_directory(staging_dir)
-            for index, source in enumerate(candidates):
-                with self.__cache_lock:
-                    self.__cache.pop(source, None)
-                if source.exists():
-                    destination = staging_dir / str(index)
-                    source.replace(destination)
-                    staged.append((source, destination))
+            with self.__cache_lock:
+                try:
+                    for index, source in enumerate(candidates):
+                        if source.exists():
+                            destination = staging_dir / str(index)
+                            source.replace(destination)
+                            staged.append((source, destination))
+                finally:
+                    self.__invalidate_cache_paths_locked(candidates)
             return _StagedDelete(
                 directory=staging_dir, files=staged, image_name=image_name, image_subfolder=image_subfolder
             )
@@ -395,8 +548,10 @@ class DiskImageFileStorage(ImageFileStorageBase):
         """Removes an image's file and thumbnail. Missing files are not an error."""
         for path in self.__delete_candidates(image_name, image_subfolder):
             with self.__cache_lock:
-                self.__cache.pop(path, None)
-            path.unlink(missing_ok=True)
+                try:
+                    path.unlink(missing_ok=True)
+                finally:
+                    self.__invalidate_cache_paths_locked([path])
 
     def __purge_if_record_absent(self, image_name: str, image_subfolder: str) -> None:
         try:
@@ -604,12 +759,15 @@ class DiskImageFileStorage(ImageFileStorageBase):
             return [(data["image_name"], data.get("image_subfolder", ""))]
         return [(entry["image_name"], entry.get("image_subfolder", "")) for entry in entries]
 
-    def __get_cache(self, image_name: Path) -> Optional[PILImageType]:
+    def __get_cache(self, image_name: Path) -> tuple[Optional[PILImageType], int]:
         with self.__cache_lock:
-            return None if image_name not in self.__cache else self.__cache[image_name]
+            cache_item = None if image_name not in self.__cache else self.__cache[image_name]
+            return cache_item, self.__cache_generation
 
-    def __set_cache(self, image_name: Path, image: PILImageType):
+    def __set_cache(self, image_name: Path, image: PILImageType, generation: int | None = None) -> None:
         with self.__cache_lock:
+            if generation is not None and generation != self.__cache_generation:
+                return
             if image_name not in self.__cache:
                 self.__cache[image_name] = image
                 self.__cache_ids.put(image_name)  # TODO: this should refresh position for LRU cache

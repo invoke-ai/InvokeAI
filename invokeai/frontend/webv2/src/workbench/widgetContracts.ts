@@ -281,6 +281,10 @@ export interface WidgetManifest {
   icon: WidgetIconComponent;
   /** `popover`: the compact chip opens a dismissable popover instead of claiming the bottom panel. */
   bottomPanel?: 'expandable' | 'tooltip' | 'popover';
+  /** Informational helpers keep the editing surface as the Workbench focus/hotkey target. */
+  preserveWorkbenchFocus?: boolean;
+  /** Compact content uses the strip's remaining width while keeping its trigger sized to visible content. */
+  compactSizing?: 'remaining-space';
   centerPlacement?: 'toolbar' | 'view';
   /** Opt-in: the widget can be detached into a movable floating window. */
   allowFloating?: boolean;

@@ -31,6 +31,7 @@ const config: DynamicPromptsFieldConfig = {
   isSeedFixed: false,
   maxPrompts: 100,
   onChange: vi.fn(),
+  resample: true,
   sampleSeed: 0,
   seedBehaviour: 'per-iteration',
 };

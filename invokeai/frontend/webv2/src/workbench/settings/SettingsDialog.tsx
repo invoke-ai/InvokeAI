@@ -1,8 +1,9 @@
 import type { ChangeEvent, UIEvent } from 'react';
 
-import { Box, Dialog, Flex, HStack, Icon, NativeSelect, Stack, Text, VisuallyHidden } from '@chakra-ui/react';
+import { Box, Flex, HStack, Icon, NativeSelect, Stack, Text, VisuallyHidden } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button } from '@platform/ui/Button';
+import { Dialog } from '@platform/ui/Dialog';
 import { PanelHeader } from '@platform/ui/PanelHeader';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { resolveSettingsText } from '@platform/ui/settings/contracts';
@@ -120,10 +121,10 @@ const SettingsDialog = () => {
         minH="0"
       >
         <Box p="3" pe={SEARCH_PADDING}>
-          <SettingsSearchField size="sm" value={state.query} onChange={setSettingsQuery} />
+          <SettingsSearchField size="lg" value={state.query} onChange={setSettingsQuery} />
         </Box>
         <Box display={MOBILE_DISPLAY} px="3" pb="3">
-          <NativeSelect.Root size="sm">
+          <NativeSelect.Root size="xl">
             <NativeSelect.Field
               aria-label={t('settingsDialog.section')}
               value={searching ? (state.searchSection ?? '') : active.id}
@@ -144,12 +145,12 @@ const SettingsDialog = () => {
             <Button
               w="full"
               justifyContent="space-between"
-              size="sm"
+              size="lg"
               variant={!state.searchSection ? 'subtle' : 'ghost'}
               onClick={selectAllResults}
             >
               {t('settingsDialog.allResults')}
-              <Text fontSize="xs">{count}</Text>
+              <Text fontSize="md">{count}</Text>
             </Button>
           ) : null}
           {GROUPS.map((group) => {
@@ -159,7 +160,7 @@ const SettingsDialog = () => {
             }
             return (
               <Stack key={group} gap="0.5" mt="4">
-                <Text px="2" pb="1" fontSize="2xs" fontWeight="600" color="fg.muted" textTransform="uppercase">
+                <Text px="2" pb="1" fontSize="xs" fontWeight="600" color="fg.muted" textTransform="uppercase">
                   {t(`settingsDialog.groups.${group}`)}
                 </Text>
                 {groupSections.map((section) => (
@@ -181,7 +182,7 @@ const SettingsDialog = () => {
           <PanelHeader px="4" pe="12" py="0">
             <HStack gap="2">
               <Icon as={searching ? SearchIcon : active.icon} boxSize="4" />
-              <Dialog.Title fontSize="xs" fontWeight="700">
+              <Dialog.Title fontWeight="700">
                 <VisuallyHidden>{t('settings.title')}: </VisuallyHidden>
                 {searching ? t('settingsDialog.results') : resolveSettingsText(active.label, t)}
               </Dialog.Title>
@@ -223,7 +224,7 @@ const SettingsNavigationItem = ({
     <Button
       w="full"
       justifyContent="start"
-      size="sm"
+      size="lg"
       variant={selected ? 'subtle' : 'ghost'}
       aria-current={selected ? 'page' : undefined}
       onClick={select}
@@ -232,7 +233,7 @@ const SettingsNavigationItem = ({
       <Text flex="1" textAlign="start" whiteSpace="normal">
         {resolveSettingsText(section.label, t)}
       </Text>
-      {searching ? <Text fontSize="2xs">{section.entries.length}</Text> : null}
+      {searching ? <Text fontSize="xs">{section.entries.length}</Text> : null}
     </Button>
   );
 };

@@ -1,5 +1,7 @@
 import type { HotkeyCategory, HotkeyDefinition } from './types';
 
+import { IS_MAC_OS } from './keys';
+
 /**
  * Only registered handlers intercept chords; handlerless catalog entries do not. App chords are global, other
  * chords require widget focus, and editable fields are excluded unless explicitly allowed. Overrides include
@@ -58,6 +60,10 @@ const implemented = new Set([
   'canvas.undo',
   'gallery.clearSelection',
   'gallery.deleteSelection',
+  'gallery.extendSelectionDown',
+  'gallery.extendSelectionLeft',
+  'gallery.extendSelectionRight',
+  'gallery.extendSelectionUp',
   'gallery.galleryNavDown',
   'gallery.galleryNavDownAlt',
   'gallery.galleryNavLeft',
@@ -66,9 +72,14 @@ const implemented = new Set([
   'gallery.galleryNavRightAlt',
   'gallery.galleryNavUp',
   'gallery.galleryNavUpAlt',
+  'gallery.moveFocusDown',
+  'gallery.moveFocusLeft',
+  'gallery.moveFocusRight',
+  'gallery.moveFocusUp',
   'gallery.remix',
   'gallery.selectAllOnPage',
   'gallery.starImage',
+  'gallery.toggleFocusedInSelection',
   'gallery.toggleStarredOnly',
   'viewer.nextComparisonMode',
   'viewer.deleteImage',
@@ -82,6 +93,7 @@ const implemented = new Set([
   'workflows.addNode',
   'workflows.copySelection',
   'workflows.deleteSelection',
+  'workflows.duplicateSelection',
   'workflows.pasteSelection',
   'workflows.pasteSelectionWithEdges',
   'workflows.redo',
@@ -148,8 +160,44 @@ export const OPEN_COMMAND_PALETTE_HOTKEY: HotkeyDefinition = {
   title: 'Open Command Palette',
 };
 
+export type RegionFocusDirection = 'down' | 'left' | 'right' | 'up';
+
+/**
+ * Region focus stays reachable from text fields, so its chord must be one no text field binds: Alt+Shift+Arrow,
+ * except on macOS, where most modified arrows are taken. Option+Shift+Arrow selects by word or paragraph,
+ * Control+Arrow and Control+Shift+Arrow belong to Mission Control (and never reach the page), Control+Option+Arrow
+ * is VoiceOver's navigation chord, and Command+Option+Left/Right switch browser tabs. Control+Command+Arrow has no
+ * stock macOS, browser, text-field or VoiceOver binding that we know of.
+ */
+export const getRegionFocusDefaultKey = (direction: RegionFocusDirection, isMacOs = IS_MAC_OS): string =>
+  `${isMacOs ? 'mod+ctrl' : 'alt+shift'}+arrow${direction}`;
+
+export const regionFocusHotkeys = (['left', 'right', 'up', 'down'] as const).map((direction) => ({
+  ...hotkey('app', `focusRegion${direction[0].toUpperCase()}${direction.slice(1)}`, [
+    getRegionFocusDefaultKey(direction),
+  ]),
+  allowInEditable: true,
+  direction,
+  implemented: true,
+}));
+
+export const widgetCycleHotkeys = (
+  [
+    { direction: -1, id: 'selectPreviousWidget', key: 'alt+pageup' },
+    { direction: 1, id: 'selectNextWidget', key: 'alt+pagedown' },
+  ] as const
+).map(({ direction, id, key }) => ({
+  ...hotkey('app', id, [key]),
+  allowInEditable: true,
+  direction,
+  implemented: true,
+  scope: { kind: 'focused-region' } as const,
+}));
+
 export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   OPEN_COMMAND_PALETTE_HOTKEY,
+  ...regionFocusHotkeys,
+  ...widgetCycleHotkeys,
   hotkey('app', 'invoke', ['mod+enter']),
   // Override the destination for one submission without changing the saved route.
   hotkey('app', 'invokeToOtherDestination', ['alt+mod+enter']),
@@ -228,6 +276,7 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('workflows', 'copySelection', ['mod+c']),
   hotkey('workflows', 'pasteSelection', ['mod+v']),
   hotkey('workflows', 'pasteSelectionWithEdges', ['mod+shift+v']),
+  hotkey('workflows', 'duplicateSelection', ['mod+d']),
   hotkey('workflows', 'selectAll', ['mod+a']),
   hotkey('workflows', 'deleteSelection', ['delete', 'backspace']),
   hotkey('workflows', 'undo', ['mod+z']),
@@ -252,6 +301,18 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('gallery', 'galleryNavRightAlt', ['alt+right']),
   hotkey('gallery', 'galleryNavDownAlt', ['alt+down']),
   hotkey('gallery', 'galleryNavLeftAlt', ['alt+left']),
+  // Shift extends the selection; Ctrl (Cmd on macOS) moves focus alone. Toggling the focused item has no default
+  // key: Cmd+Space is Spotlight on macOS, and Ctrl+Space already toggles by activating the focused thumbnail as a
+  // Ctrl+click. Ctrl+Enter is not used: it invokes from anywhere, the gallery included.
+  hotkey('gallery', 'extendSelectionUp', ['shift+up']),
+  hotkey('gallery', 'extendSelectionRight', ['shift+right']),
+  hotkey('gallery', 'extendSelectionDown', ['shift+down']),
+  hotkey('gallery', 'extendSelectionLeft', ['shift+left']),
+  hotkey('gallery', 'moveFocusUp', ['mod+up']),
+  hotkey('gallery', 'moveFocusRight', ['mod+right']),
+  hotkey('gallery', 'moveFocusDown', ['mod+down']),
+  hotkey('gallery', 'moveFocusLeft', ['mod+left']),
+  hotkey('gallery', 'toggleFocusedInSelection', []),
   hotkey('gallery', 'deleteSelection', ['delete', 'backspace']),
   hotkey('gallery', 'remix', ['r']),
   hotkey('gallery', 'starImage', ['.']),

@@ -66,7 +66,8 @@ export const queueBackend: QueueBackendPort = {
 
     return item ? mapQueueItemDTO(item) : null;
   },
-  readItemIds: async (order, scope, signal) => mapQueueItemIdsDTO(await getQueueItemIds(order, scope, signal)),
+  readItemIds: async (order, scope, signal, limit) =>
+    mapQueueItemIdsDTO(await getQueueItemIds(order, scope, signal, limit)),
   readItemsById: async (itemIds, signal) => (await getQueueItemsByIds(itemIds, signal)).map(mapQueueItemDTO),
   readProgressPreviews: getProgressPreviews,
   readNext: async (scope, signal) => {

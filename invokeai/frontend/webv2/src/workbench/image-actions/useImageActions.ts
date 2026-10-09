@@ -28,7 +28,7 @@ import {
   invalidateGallery,
   patchGalleryItemCaches,
 } from '@features/gallery/queries';
-import { flushGenerateDrafts, setPendingPromptTemplateDraft } from '@features/generation/react';
+import { setPendingPromptTemplateDraft } from '@features/generation/react';
 import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import { getMaxReferenceImages, isVaeModelConfig, isSupportedGenerateModel } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
@@ -235,6 +235,12 @@ export const useImageActions = ({
   useMountEffect(() => {
     void ensureModelsLoaded();
   });
+
+  // Selection-independent, so callers can hand it to every thumbnail without re-rendering them per selection.
+  const selectForCompare = useCallback(
+    (image: GalleryImage) => gallery.setCompareImage(image, projectId),
+    [gallery, projectId]
+  );
 
   return useMemo<ImageActions>(() => {
     const recordError = (error: unknown) =>
@@ -498,9 +504,9 @@ export const useImageActions = ({
         },
       });
     };
-    const deleteItems = (items: GalleryItemRef[]): Promise<void> =>
+    const deleteItems: ImageActions['deleteItems'] = (items, options) =>
       confirmImageDeletion
-        ? requestDeletionConfirmation(items, () => deleteItemsConfirmed(items))
+        ? requestDeletionConfirmation(items, () => deleteItemsConfirmed(items), options?.returnFocus)
         : deleteItemsConfirmed(items);
     const moveItemsToBoard = (items: GalleryItemRef[], boardId: string): Promise<void> => {
       // On partial move failure, restore then reapply confirmed items. Capture prior boards from cache and store,
@@ -972,12 +978,9 @@ export const useImageActions = ({
           openWorkbenchWidget('generate', { preferredRegions: ['left'] });
         }
       },
-      selectForCompare: (image) => {
-        gallery.setCompareImage(image, projectId);
-      },
+      selectForCompare,
       createCanvasFromImages: async (images) => {
         const owner = captureAccountScope();
-        flushGenerateDrafts();
         try {
           const result = await createCanvasFromImages({
             applyCanvasMutation: commands.canvas.apply,
@@ -991,7 +994,7 @@ export const useImageActions = ({
           if (result.status === 'imported' && result.failedImageNames.length === 0) {
             notifications.add({
               kind: 'success',
-              title: t('widgets.canvas.import.newCanvasSuccess', { count: result.layerIds.length }),
+              title: t('widgets.canvas.import.newProjectSuccess', { count: result.layerIds.length }),
             });
           } else {
             const notice = getCanvasImportNotice(result);
@@ -1164,6 +1167,7 @@ export const useImageActions = ({
     queryClient,
     queries,
     requestDeletionConfirmation,
+    selectForCompare,
     supportedModels,
     t,
     vaeModels,

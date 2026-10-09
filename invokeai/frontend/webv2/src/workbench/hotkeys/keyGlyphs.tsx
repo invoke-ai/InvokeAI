@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import { chakra, Icon } from '@chakra-ui/react';
+import { chakra, HStack, Icon, Kbd } from '@chakra-ui/react';
 import {
   ArrowBigUpIcon,
   ArrowDownIcon,
@@ -74,3 +74,14 @@ export const ShortcutKeyGlyph = ({ fallback, part }: { fallback?: ReactNode; par
     </>
   );
 };
+
+/** A binding's parts as a row of keycaps; a span, so it can sit inside a menu item's `kbd` command slot. */
+export const ShortcutKeycaps = ({ parts }: { parts: readonly string[] }) => (
+  <HStack as="span" flexShrink={0} gap="0.5">
+    {parts.map((part, index) => (
+      <Kbd key={`${part}:${index}`} textTransform="lowercase">
+        <ShortcutKeyGlyph fallback={part} part={part} />
+      </Kbd>
+    ))}
+  </HStack>
+);

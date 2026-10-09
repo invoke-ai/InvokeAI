@@ -1,7 +1,10 @@
 import type { LucideIcon } from 'lucide-react';
-import type { ComponentProps } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 
-import { Box, HStack, Icon, Kbd, Menu, Stack, Text, useMenuContext } from '@chakra-ui/react';
+import { Box, HStack, Icon, Menu, Stack, Text, useMenuContext } from '@chakra-ui/react';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import { createExternalStore } from '@platform/state/externalStore';
+import { useCallback, useId } from 'react';
 
 import { Tooltip } from './Tooltip';
 import { useRegisterWidgetOverlay } from './widgetOverlays';
@@ -25,8 +28,8 @@ export interface MenuActionItemProps {
   iconColor?: string;
   tone?: 'danger';
   disabled?: boolean;
-  /** Trailing keycap strings, already formatted for the platform. */
-  hintParts?: readonly string[];
+  /** Trailing keycaps; the caller renders them, since key glyphs are a workbench concern. */
+  shortcut?: ReactNode;
   onSelect: () => void;
 }
 
@@ -36,11 +39,11 @@ const TWO_LINE_ITEM = { py: '1.5' } as const;
 export const MenuActionItem = ({
   disabled,
   hint,
-  hintParts,
   icon,
   iconColor,
   label,
   onSelect,
+  shortcut,
   tone,
   value,
 }: MenuActionItemProps) => (
@@ -64,30 +67,22 @@ export const MenuActionItem = ({
       ) : null}
       {hint ? (
         <Stack flex="1" gap="0" minW="0">
-          <Text fontSize="xs">{label}</Text>
-          <Text color="fg.subtle" fontSize="2xs">
+          <Text>{label}</Text>
+          <Text color="fg.subtle" fontSize="xs">
             {hint}
           </Text>
         </Stack>
       ) : (
-        <Text flex="1" fontSize="xs">
+        <Text flex="1" fontSize="md">
           {label}
         </Text>
       )}
-      {hintParts && hintParts.length > 0 ? (
-        <HStack flexShrink={0} gap="0.5">
-          {hintParts.map((part) => (
-            <Kbd key={part} size="sm" textTransform="lowercase">
-              {part}
-            </Kbd>
-          ))}
-        </HStack>
-      ) : null}
+      {shortcut}
     </HStack>
   </Menu.Item>
 );
 
-const ICON_ITEM_TOOLTIP_CONTENT_PROPS = { fontSize: '2xs' } as const;
+const ICON_ITEM_TOOLTIP_CONTENT_PROPS = { fontSize: 'xs' } as const;
 const ICON_ITEM_TOOLTIP_POSITIONING_PROPS = { placement: 'top' } as const;
 
 export interface MenuIconItemProps {
@@ -126,3 +121,46 @@ export const MenuIconItem = ({ disabled, icon, iconFill, label, onSelect, tone, 
     </Tooltip>
   </Menu.Item>
 );
+
+interface ContextMenuAnchor {
+  x: number;
+  y: number;
+  focusTarget?: () => HTMLElement | null;
+  restoreFocus?: () => void;
+}
+
+// Only the active gesture is retained. Actions and their enabled state belong to the live menu's render.
+const activeMenu = createExternalStore<{ owner: string | null; anchor: ContextMenuAnchor | null }>({
+  owner: null,
+  anchor: null,
+});
+
+/**
+ * Menus sharing this ownership replace one another; none is a parent of the next. The layer stack dismisses every
+ * layer registered after one being torn down, so a menu that registers before its predecessor is gone (its content
+ * still mounted from an exit animation) would be closed as if nested. Pass this as the menu root's `onRequestDismiss`.
+ */
+const keepOpenThroughSiblingTeardown = (event: Event) => event.preventDefault();
+
+/** Row and field menus share ownership so a second right-click replaces the first menu. */
+export const useContextMenu = () => {
+  const owner = useId();
+  const anchor = activeMenu.useSelector((menu) => (menu.owner === owner ? menu.anchor : null));
+  const open = useCallback((anchor: ContextMenuAnchor) => activeMenu.setSnapshot({ owner, anchor }), [owner]);
+  const close = useCallback(() => {
+    const menu = activeMenu.getSnapshot();
+    if (menu.owner !== owner) {
+      return;
+    }
+    activeMenu.setSnapshot({ owner: null, anchor: null });
+    menu.anchor?.restoreFocus?.();
+  }, [owner]);
+
+  useMountEffect(() => () => {
+    if (activeMenu.getSnapshot().owner === owner) {
+      activeMenu.setSnapshot({ owner: null, anchor: null });
+    }
+  });
+
+  return { anchor, close, onRequestDismiss: keepOpenThroughSiblingTeardown, open };
+};

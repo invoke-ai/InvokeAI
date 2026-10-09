@@ -8,6 +8,7 @@ import {
   ModelActionMenuItems,
   type PendingModelAction,
 } from '@features/models/ui/shared/ModelActionsMenu';
+import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
 import { MenuContent } from '@platform/ui';
 import { useState } from 'react';
 
@@ -25,19 +26,22 @@ export const ModelRowContextMenu = ({
   const [pendingConfirm, setPendingConfirm] = useState<PendingModelAction>(null);
   // Captured with the request: the menu target clears when the menu closes, before the dialog does.
   const [confirmFocusTarget, setConfirmFocusTarget] = useState<(() => HTMLElement | null) | null>(null);
-  const model = useModelsSelector((snapshot) => (target ? (snapshot.modelsByKey.get(target.modelKey) ?? null) : null));
+  // Kept through the exit animation; keyed by model so another row's menu still opens at its own anchor.
+  const { release, value: shown } = useExitRetainedValue(target);
+  const model = useModelsSelector((snapshot) => (shown ? (snapshot.modelsByKey.get(shown.modelKey) ?? null) : null));
 
   return (
     <>
       <Menu.Root
-        key={target ? target.modelKey : 'closed'}
+        key={shown ? shown.modelKey : 'none'}
         lazyMount
         open={target !== null}
         positioning={{
-          getAnchorRect: () => (target ? { height: 1, width: 1, x: target.x, y: target.y } : null),
+          getAnchorRect: () => (shown ? { height: 1, width: 1, x: shown.x, y: shown.y } : null),
           placement: 'bottom-start',
         }}
         unmountOnExit
+        onExitComplete={release}
         onOpenChange={(event) => {
           if (!event.open) {
             onClose();
