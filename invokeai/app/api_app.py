@@ -277,13 +277,14 @@ GZIP_MINIMUM_SIZE = 1000
 def configure_gzip(app: FastAPI, compresslevel: int) -> None:
     """Install response compression, unless it is turned off.
 
-    Compression runs on the event loop, so its cost is not paid by the requesting client alone —
-    it stalls every other request and every socket.io event for its duration. That makes the
-    level a real trade-off rather than a free win.
+    Body chunks under 128 KiB are compressed on the event loop (Starlette moves larger ones to a
+    worker thread), so the cost is not paid by the requesting client alone — it stalls every other
+    request and every socket.io event for its duration, and offloaded chunks still compete for CPU.
+    That makes the level a real trade-off rather than a free win.
 
     Measured on the flat name list of a 200k-image library (8.48 MB of JSON): level 1 takes
     16.4ms and returns 6.1% of the input, level 9 takes 90.2ms and returns 5.7%. Level 9 costs
-    5.5x the event-loop time for 0.4 percentage points of bandwidth, which is a poor deal for a
+    5.5x the compression time for 0.4 percentage points of bandwidth, which is a poor deal for a
     locally-served app. The default stays at 9 so behavior is unchanged for existing installs;
     users who feel the stall on a large library can lower it.
 

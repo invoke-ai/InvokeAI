@@ -231,7 +231,10 @@ export const useGalleryActions = ({
       },
       selectBoard: gallery.selectBoard,
       selectItem: gallery.selectItem,
-      selectItemRange: (items, primaryItem) => gallery.setItemMultiSelection(items.map(toGalleryItemKey), primaryItem),
+      selectItemRange: (items, primaryItem, selectionPage) =>
+        selectionPage === undefined
+          ? gallery.setItemMultiSelection(items.map(toGalleryItemKey), primaryItem)
+          : gallery.setItemMultiSelection(items.map(toGalleryItemKey), primaryItem, selectionPage),
       setCompareItem: gallery.setCompareItem,
       setSearchTerm: gallery.setSearchTerm,
       setStarredOnly: gallery.setStarredOnly,

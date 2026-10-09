@@ -1,10 +1,11 @@
 """Linears that keep their weight quantized in buffers and materialize it on every forward.
 
-Two schemes store their Linears this way, ``int8_convrot`` and ``nvfp4``, and the code around them
-needs the same two answers about either: whether a LoRA has to ride along as a sidecar, and how much
-memory one forward needs on top of the model's resident size. Both are asked of the loaded module tree,
-so they live here beside the base class the modules share rather than inside either scheme -- a new
-scheme answers them by subclassing instead of every caller learning its name.
+Two schemes store their Linears this way, ``int8_convrot`` and ``nvfp4``; GGUF keeps a plain Linear but
+packs its weight in a ``GGMLTensor`` and dequantizes it per forward just the same. The code around them
+needs the same two answers about any of these: whether a LoRA has to ride along as a sidecar, and how
+much memory one forward needs on top of the model's resident size. Both are asked of the loaded module
+tree and live here, so callers ask once for every scheme: a module-level scheme answers by subclassing,
+GGUF -- whose quantization lives on the weight, not the module -- is delegated to.
 """
 
 import abc
@@ -14,6 +15,7 @@ import torch
 import torch.nn.functional as F
 
 from invokeai.backend.model_manager.taxonomy import ModelFormat
+from invokeai.backend.quantization.gguf.ggml_tensor import peak_ggml_linear_dequant_transient_bytes
 
 
 class DequantizingLinear(torch.nn.Module, abc.ABC):
@@ -67,15 +69,17 @@ def requires_sidecar_patching(model: Any, model_format: ModelFormat) -> bool:
 def peak_dequant_transient_bytes(model: torch.nn.Module, compute_dtype: torch.dtype) -> int:
     """Peak bytes one forward transiently needs to dequantize this model's quantized linears.
 
-    A :class:`DequantizingLinear` materializes its weight per forward, so that allocation is not covered
-    by the model's resident size and has to fit inside the calling node's working-memory reservation. The
-    layers run one after another and free their weight before the next one allocates, so the peak is the
-    largest single layer's transient. Zero when the model holds no such layer.
+    A :class:`DequantizingLinear` materializes its weight per forward, and so does a Linear whose weight
+    is a GGUF ``GGMLTensor`` (see :func:`peak_ggml_linear_dequant_transient_bytes`), so that allocation is
+    not covered by the model's resident size and has to fit inside the calling node's working-memory
+    reservation. The layers run one after another and free their weight before the next one allocates, so
+    the peak is the largest single layer's transient. Zero when the model holds no such layer.
+    ``compute_dtype`` applies to the module-level schemes; a GGUF weight carries its own.
 
     Not covered: the matmul's own cuBLAS workspace, which a dense Linear of the same shape allocates too
     and which a node's activation estimate already includes.
     """
-    return max(
+    dequantizing = max(
         (
             module.dequant_transient_bytes(compute_dtype)
             for module in model.modules()
@@ -83,3 +87,4 @@ def peak_dequant_transient_bytes(model: torch.nn.Module, compute_dtype: torch.dt
         ),
         default=0,
     )
+    return max(dequantizing, peak_ggml_linear_dequant_transient_bytes(model))

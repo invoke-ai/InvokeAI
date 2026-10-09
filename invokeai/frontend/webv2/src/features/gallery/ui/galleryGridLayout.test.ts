@@ -1,9 +1,11 @@
 import type { GalleryImageItem } from '@features/gallery/core/items';
 
+import { GALLERY_PAGE_SIZE } from '@features/gallery/core/paging';
 import { describe, expect, it } from 'vitest';
 
 import {
   buildGalleryGridRows,
+  buildSparseGalleryNavigationEntries,
   GALLERY_GRID_GAP_PX,
   GALLERY_PINNED_FOOTER_PX,
   GALLERY_STARRED_HEADER_HEIGHT_PX,
@@ -11,9 +13,14 @@ import {
   getGalleryColumnCount,
   getGalleryColumnCountForCell,
   getGalleryGridRowIndexForItemKey,
+  getGallerySparseRowIndexForItemKey,
+  getGallerySparseRowKey,
+  getGallerySparseSelectionPages,
+  getGallerySparseSlotKey,
   getGalleryPinnedHeightPx,
   getGalleryStarredLayout,
   getGalleryStarredStripItems,
+  planGalleryPageOffsets,
 } from './galleryGridLayout';
 
 const createImageItem = (name: string, starred = false): GalleryImageItem => ({
@@ -31,6 +38,36 @@ const createImageItem = (name: string, starred = false): GalleryImageItem => ({
 });
 
 const buildRows = (items: GalleryImageItem[]) => buildGalleryGridRows(items, 2);
+
+describe('planGalleryPageOffsets', () => {
+  it.each([
+    { endIndexExclusive: 0, expected: [], startIndex: 0, total: 0 },
+    { endIndexExclusive: 59, expected: [0], startIndex: 2, total: 120 },
+    { endIndexExclusive: GALLERY_PAGE_SIZE, expected: [0], startIndex: 0, total: 120 },
+    { endIndexExclusive: GALLERY_PAGE_SIZE + 1, expected: [0, GALLERY_PAGE_SIZE], startIndex: 59, total: 120 },
+    { endIndexExclusive: 1_000, expected: [0, GALLERY_PAGE_SIZE], startIndex: 58, total: 61 },
+    { endIndexExclusive: 100, expected: [], startIndex: 90, total: 61 },
+    {
+      endIndexExclusive: 721,
+      expected: Array.from({ length: 13 }, (_, index) => index * GALLERY_PAGE_SIZE),
+      startIndex: 0,
+      total: null,
+    },
+  ])(
+    'plans offsets for range [$startIndex, $endIndexExclusive) with total $total',
+    ({ endIndexExclusive, expected, startIndex, total }) => {
+      expect(planGalleryPageOffsets({ endIndexExclusive, startIndex, total })).toEqual(expected);
+    }
+  );
+
+  it('returns no offsets for empty or non-finite ranges', () => {
+    expect(planGalleryPageOffsets({ endIndexExclusive: 10, startIndex: 10, total: null })).toEqual([]);
+    expect(planGalleryPageOffsets({ endIndexExclusive: Number.POSITIVE_INFINITY, startIndex: 0, total: null })).toEqual(
+      []
+    );
+    expect(planGalleryPageOffsets({ endIndexExclusive: 4, startIndex: 5, total: null })).toEqual([]);
+  });
+});
 
 describe('getGalleryColumnCountForCell', () => {
   it('rounds to the nearest whole cell and clamps to the caller bounds', () => {
@@ -159,5 +196,137 @@ describe('getGalleryGridRowIndexForItemKey', () => {
     expect(getGalleryGridRowIndexForItemKey(items, 'image:starred-1', 2)).toBe(-1);
     expect(getGalleryGridRowIndexForItemKey(items, 'image:regular-1', 2)).toBe(0);
     expect(getGalleryGridRowIndexForItemKey(items, 'image:regular-3', 2)).toBe(1);
+  });
+});
+
+describe('sparse gallery geometry', () => {
+  it('maps loaded sparse items to their absolute selection pages', () => {
+    const infiniteItem = createImageItem('infinite');
+    const paginatedItem = createImageItem('paginated');
+
+    expect(
+      getGallerySparseSelectionPages({
+        itemSlots: new Map([[180, infiniteItem]]),
+        pageOffset: 0,
+      }).get('image:infinite')
+    ).toBe(3);
+    expect(
+      getGallerySparseSelectionPages({
+        itemSlots: new Map([[5, paginatedItem]]),
+        pageOffset: GALLERY_PAGE_SIZE * 2,
+      }).get('image:paginated')
+    ).toBe(2);
+  });
+
+  it('maps distant item positions to absolute rows and uses position-stable identities', () => {
+    const first = createImageItem('first');
+    const third = createImageItem('third');
+    const slots = new Map([
+      [120, first],
+      [122, third],
+    ]);
+
+    expect(getGallerySparseRowIndexForItemKey(slots, 'image:first', 2, 3)).toBe(63);
+    expect(getGallerySparseRowIndexForItemKey(slots, 'image:third', 2, 3)).toBe(64);
+    expect(getGallerySparseRowIndexForItemKey(slots, 'image:missing', 2, 3)).toBe(-1);
+    expect(getGallerySparseRowKey(60)).toBe('listing-row:60');
+    expect(getGallerySparseSlotKey(122)).toBe('listing-slot:122');
+  });
+
+  it('keeps keyboard row positions across page-local hydration holes', () => {
+    const first = createImageItem('first');
+    const third = createImageItem('third');
+    const entries = buildSparseGalleryNavigationEntries({
+      itemSlots: new Map([
+        [120, first],
+        [122, third],
+      ]),
+      pageOffsets: [120],
+      total: 130,
+    });
+
+    expect(entries).toHaveLength(11);
+    expect(entries[0]).toEqual({ id: 'gallery-unloaded-slot:119', kind: 'slot', navigable: true });
+    expect(entries[1]).toEqual({ item: first, kind: 'item' });
+    expect(entries[2]).toEqual({ id: 'gallery-gap-slot:121', kind: 'slot', navigable: false });
+    expect(entries[3]).toEqual({ item: third, kind: 'item' });
+  });
+
+  it('waits on the empty positions of a page that is still loading', () => {
+    const last = createImageItem('item-59');
+    const entries = buildSparseGalleryNavigationEntries({
+      itemSlots: new Map([[59, last]]),
+      pageOffsets: [0, 60],
+      pendingPageOffsets: new Set([60]),
+      total: 180,
+    });
+
+    expect(entries[59]).toEqual({ item: last, kind: 'item' });
+    expect(entries[60]).toEqual({ id: 'gallery-unloaded-slot:60', kind: 'slot', navigable: true });
+    // A settled page's empty position is a gap.
+    expect(entries[58]).toEqual({ id: 'gallery-gap-slot:58', kind: 'slot', navigable: false });
+  });
+
+  it('covers only the runs of subscribed pages, not the positions between them', () => {
+    const first = createImageItem('first');
+    const revealed = createImageItem('revealed');
+    const entries = buildSparseGalleryNavigationEntries({
+      columnCount: 2,
+      itemSlots: new Map([
+        [0, first],
+        [600_000, revealed],
+      ]),
+      pageOffsets: [0, 600_000],
+      total: 700_000,
+    });
+
+    // Each page plus one boundary row on each side of the distant run, and one after the first.
+    expect(entries).toHaveLength(60 + 2 + 2 + 60 + 2);
+    expect(entries[0]).toEqual({ item: first, kind: 'item' });
+    expect(entries[62]).toEqual({ id: 'gallery-unloaded-slot:599998', kind: 'slot', navigable: true });
+    expect(entries[64]).toEqual({ item: revealed, kind: 'item' });
+  });
+
+  it('ends a run on a whole row before the next one while the total is unknown', () => {
+    const entries = buildSparseGalleryNavigationEntries({
+      columnCount: 7,
+      itemSlots: new Map(),
+      pageOffsets: [0, 600],
+      total: null,
+    });
+
+    // 60 positions round up to 63 so the next run's rows keep their columns.
+    expect(entries[62]).toEqual({ id: 'gallery-unloaded-slot:62', kind: 'slot', navigable: true });
+    expect(entries[63]).toEqual({ id: 'gallery-unloaded-slot:588', kind: 'slot', navigable: true });
+  });
+
+  it('joins runs whose boundary rows meet without repeating positions', () => {
+    // At 40 columns the first run's trailing row reaches 120 and the second run's leading row starts at 80.
+    const entries = buildSparseGalleryNavigationEntries({
+      columnCount: 40,
+      itemSlots: new Map(),
+      pageOffsets: [0, 120],
+      total: 300,
+    });
+    const indices = entries.map((entry) => Number((entry as { id: string }).id.split(':')[1]));
+
+    expect(indices).toEqual(Array.from({ length: 240 }, (_, index) => index));
+  });
+
+  it('includes a navigable preceding row before a distant active page', () => {
+    const first = createImageItem('first');
+    const entries = buildSparseGalleryNavigationEntries({
+      columnCount: 3,
+      itemSlots: new Map([[120, first]]),
+      pageOffsets: [120],
+      total: 600,
+    });
+
+    expect(entries.slice(0, 4)).toEqual([
+      { id: 'gallery-unloaded-slot:117', kind: 'slot', navigable: true },
+      { id: 'gallery-unloaded-slot:118', kind: 'slot', navigable: true },
+      { id: 'gallery-unloaded-slot:119', kind: 'slot', navigable: true },
+      { item: first, kind: 'item' },
+    ]);
   });
 });

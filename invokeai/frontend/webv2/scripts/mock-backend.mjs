@@ -371,10 +371,18 @@ const toGalleryItem = (kind, value) =>
       };
 
 const getGalleryCandidates = (state) => [
-  ...[...state.images.values()].map((image) => ({ item: toGalleryItem('image', image), searchable: image.metadata })),
+  ...[...state.images.values()].map((image) => ({
+    item: toGalleryItem('image', image),
+    origin: image.image_origin ?? 'internal',
+    searchable: image.metadata,
+  })),
   ...[...state.videos.values()]
     .filter((video) => video.owner_user_id === MOCK_USER_ID)
-    .map((video) => ({ item: toGalleryItem('video', video), searchable: video.metadata })),
+    .map((video) => ({
+      item: toGalleryItem('video', video),
+      origin: video.video_origin ?? 'internal',
+      searchable: video.metadata,
+    })),
 ];
 
 const compareGalleryItems = (left, right, orderDir, starredFirst) => {
@@ -391,18 +399,22 @@ const compareGalleryItems = (left, right, orderDir, starredFirst) => {
   );
 };
 
-const filterGalleryItems = (state, url, { createdDate } = {}) => {
+const filterGalleryItems = (state, url, { createdDate, starredFirst } = {}) => {
   const boardId = url.searchParams.get('board_id');
   const categories = getRequestedCategories(url);
   const createdFrom = url.searchParams.get('created_from');
   const createdTo = url.searchParams.get('created_to');
   const intermediate = getOptionalBoolean(url, 'is_intermediate');
+  const origin = url.searchParams.get('origin');
   const starred = getOptionalBoolean(url, 'starred');
   const searchTerm = url.searchParams.get('search_term')?.trim().toLocaleLowerCase() ?? '';
 
   return getGalleryCandidates(state)
-    .filter(({ item, searchable }) => {
+    .filter(({ item, origin: itemOrigin, searchable }) => {
       if (boardId && (boardId === 'none' ? item.board_id !== null : item.board_id !== boardId)) {
+        return false;
+      }
+      if (origin && itemOrigin !== origin) {
         return false;
       }
       if (categories.length > 0 && !categories.includes(item.category)) {
@@ -439,9 +451,18 @@ const filterGalleryItems = (state, url, { createdDate } = {}) => {
         left,
         right,
         url.searchParams.get('order_dir')?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC',
-        url.searchParams.get('starred_first') !== 'false'
+        starredFirst ?? url.searchParams.get('starred_first') !== 'false'
       )
     );
+};
+
+const getGalleryItemLocation = (state, url) => {
+  const kind = url.searchParams.get('kind');
+  const name = url.searchParams.get('name');
+  const items = filterGalleryItems(state, url, { starredFirst: false });
+  const index = items.findIndex((item) => item.kind === kind && item.name === name);
+
+  return index === -1 ? null : { kind, name, index, total: items.length };
 };
 
 const listGalleryItems = (state, url) => {
@@ -1817,6 +1838,12 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
 
       if (method === 'GET' && path === '/api/v1/gallery/items/') {
         return json(200, listGalleryItems(state, url));
+      }
+
+      if (method === 'GET' && path === '/api/v1/gallery/items/location') {
+        const location = getGalleryItemLocation(state, url);
+
+        return location ? json(200, location) : json(404, { detail: 'Gallery item not found' });
       }
 
       if (method === 'GET' && path === '/api/v1/gallery/items/names') {

@@ -4,6 +4,8 @@ import type { WidgetRegion } from '@workbench/layoutContracts';
 import type { Project } from '@workbench/projectContracts';
 
 import { claimGalleryNavigationSequence, isGalleryNavigationCurrent } from '@features/gallery/contracts';
+import { abortGalleryLocatorRequests, createGalleryLocatorRequest } from '@features/gallery/utility';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { useQueryClient } from '@tanstack/react-query';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
@@ -49,9 +51,14 @@ export const useFindGalleryItem = (): ((ref: GalleryItemRef, options?: FindGalle
       // Minted here, not inside the import below: both the ordering and the
       // project fence describe the PRESS, and reading either after the chunk
       // lands would pin whatever the workspace had become by then.
+      const sequence = claimGalleryNavigationSequence();
+      abortGalleryLocatorRequests();
+      const locatorRequest = createGalleryLocatorRequest();
       const ticket: GalleryRevealTicket = {
+        accountScope: captureAccountScope(),
+        locatorSignal: locatorRequest.signal,
         projectId: activeProject.id,
-        sequence: claimGalleryNavigationSequence(),
+        sequence,
       };
       const galleryRegions = getGalleryRegions(activeProject);
 
@@ -69,7 +76,11 @@ export const useFindGalleryItem = (): ((ref: GalleryItemRef, options?: FindGalle
         .catch((error: unknown) => {
           // Report chunk or media failures only for the still-current gesture, since widgets already moved. Keep
           // the failed gesture's claim so older intents cannot reclaim selection.
-          if (!isGalleryNavigationCurrent(ticket.sequence) || !queries.isActiveProject(ticket.projectId)) {
+          if (
+            ticket.accountScope.signal.aborted ||
+            !isGalleryNavigationCurrent(ticket.sequence) ||
+            !queries.isActiveProject(ticket.projectId)
+          ) {
             return;
           }
 
@@ -78,7 +89,8 @@ export const useFindGalleryItem = (): ((ref: GalleryItemRef, options?: FindGalle
             message: error instanceof Error ? error.message : String(error),
             namespace: 'gallery',
           });
-        });
+        })
+        .finally(locatorRequest.release);
     },
     [commands, openWorkbenchWidget, queries, queryClient]
   );

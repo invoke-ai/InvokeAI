@@ -209,7 +209,7 @@ describe('getGalleryNavigationStep', () => {
       options
     );
 
-    return next === null ? null : next.kind === 'session' ? next.id : next.item.name;
+    return next === null ? null : next.kind === 'item' ? next.item.name : next.id;
   };
 
   it('walks left and right across every seam, skipping tiles that cannot be followed', () => {
@@ -296,5 +296,14 @@ describe('getGalleryNavigationStep', () => {
     expect(step('image:s1', 'up', { itemsOnly: true })).toBeNull();
     // With no cursor shown, the first item rather than the first session.
     expect(step(null, 'right', { itemsOnly: true })).toBe('s0');
+  });
+
+  it('treats unloaded gallery slots as item positions in range and focus navigation', () => {
+    const unloaded = { id: 'gallery-unloaded-slot:119', kind: 'slot' as const, navigable: true };
+    const sections = [[unloaded, entry('page-120')]];
+
+    expect(selection.getGalleryNavigationStep(sections, ['image:page-120'], 'left', 3, { itemsOnly: true })).toEqual(
+      unloaded
+    );
   });
 });

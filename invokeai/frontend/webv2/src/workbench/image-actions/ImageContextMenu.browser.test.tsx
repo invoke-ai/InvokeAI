@@ -610,6 +610,19 @@ describe('ImageContextMenu mixed-media action visibility', () => {
     expect(document.body.textContent).not.toContain('widgets.canvas.import.newProjectFromImage');
   });
 
+  it("offers Unstar All from the host's star answer for a selection with unloaded members", async () => {
+    const loadedImage = { ...item('image', 'starred-still.png'), starred: true };
+    const actions = createActions(vi.fn());
+    const refs = [
+      { kind: 'image' as const, name: loadedImage.name },
+      { kind: 'image' as const, name: 'starred-unloaded.png' },
+    ];
+    await renderItemMenu(actions, { allStarred: true, itemRefs: refs, items: [loadedImage], x: 20, y: 20 });
+
+    await interact(() => getMenuItem('Unstar All').click());
+    expect(actions.setItemsStarred).toHaveBeenCalledWith(refs, false);
+  });
+
   it('keeps complete mixed refs for common bulk actions and hides image-only bulk actions when a ref is unresolved', async () => {
     const loadedImage = item('image', 'still.png');
     const actions = createActions(vi.fn());

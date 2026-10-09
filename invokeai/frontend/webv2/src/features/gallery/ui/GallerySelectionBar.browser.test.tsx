@@ -4,6 +4,8 @@ import type { GalleryBoard } from '@features/gallery/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { DEFAULT_GALLERY_SETTINGS } from '@features/gallery/core/settings';
+import { patchGalleryItemCaches } from '@features/gallery/data/queryCache';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -93,6 +95,7 @@ const createGallery = (overrides: Partial<GalleryStateView> = {}): GalleryStateV
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
+let queryClient = new QueryClient();
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const renderBar = async (
@@ -101,6 +104,7 @@ const renderBar = async (
 ) => {
   const strip = starredStrip ?? EMPTY_GALLERY_STARRED_STRIP;
   const contextValue = {
+    filter: { boardId: gallery.selectedBoardId, starred: gallery.starredOnly === true },
     gallery,
     itemActions,
     loadedItems: mergeGalleryLoadedItems(strip.items, gallery.items),
@@ -112,11 +116,13 @@ const renderBar = async (
 
   await act(() =>
     root?.render(
-      <ChakraProvider value={system}>
-        <GalleryWidgetContext value={contextValue}>
-          <GallerySelectionBar />
-        </GalleryWidgetContext>
-      </ChakraProvider>
+      <QueryClientProvider client={queryClient}>
+        <ChakraProvider value={system}>
+          <GalleryWidgetContext value={contextValue}>
+            <GallerySelectionBar />
+          </GalleryWidgetContext>
+        </ChakraProvider>
+      </QueryClientProvider>
     )
   );
 };
@@ -142,6 +148,7 @@ beforeEach(() => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
+  queryClient = new QueryClient();
   Object.values(itemActions).forEach((mock) => mock.mockClear());
 });
 
@@ -183,6 +190,154 @@ describe('GallerySelectionBar', () => {
     await click(getButton('widgets.gallery.unstarSelection'));
 
     expect(itemActions.setItemsStarred).toHaveBeenCalledWith(expect.anything(), false);
+  });
+
+  it('unstars a starred-only selection whose members no page has loaded', async () => {
+    const selectedItemKeys = ['image:a.png', 'image:never-loaded-1.png', 'image:never-loaded-2.png'] as const;
+    await renderBar(
+      createGallery({
+        items: [createItem('a.png', true)],
+        selectedItemKey: 'image:a.png',
+        selectedItemKeys: [...selectedItemKeys],
+        selectionStarredOnly: true,
+        starredOnly: true,
+      })
+    );
+    await click(getButton('widgets.gallery.unstarSelection'));
+
+    expect(itemActions.setItemsStarred).toHaveBeenCalledExactlyOnceWith(
+      [
+        { kind: 'image', name: 'a.png' },
+        { kind: 'image', name: 'never-loaded-1.png' },
+        { kind: 'image', name: 'never-loaded-2.png' },
+      ],
+      false
+    );
+  });
+
+  it('stars a selection carried into Starred-only from the unfiltered listing whose members no page has loaded', async () => {
+    await renderBar(
+      createGallery({
+        items: [createItem('a.png', true)],
+        selectedItemKey: 'image:a.png',
+        selectedItemKeys: ['image:a.png', 'image:selected-unfiltered.png'],
+        selectionStarredOnly: false,
+        starredOnly: true,
+      })
+    );
+    await click(getButton('widgets.gallery.starSelection'));
+
+    expect(itemActions.setItemsStarred).toHaveBeenCalledExactlyOnceWith(
+      [
+        { kind: 'image', name: 'a.png' },
+        { kind: 'image', name: 'selected-unfiltered.png' },
+      ],
+      true
+    );
+  });
+
+  it('retains the selected item star state after its sparse page is evicted', async () => {
+    const gallery = createGallery({
+      items: [createItem('b.png', true)],
+      selectedItemKey: 'image:b.png',
+      selectedItemKeys: ['image:b.png'],
+    });
+
+    await renderBar(gallery);
+    await renderBar({ ...gallery, items: [] });
+
+    expect(getButton('widgets.gallery.unstarSelection')).toBeTruthy();
+    await click(getButton('widgets.gallery.unstarSelection'));
+
+    expect(itemActions.setItemsStarred).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: 'b.png' }], false);
+  });
+
+  it.each([
+    // A starred-only listing drops the item as the patch lands.
+    ['leaves the listing with the patch', false],
+    ['sits on a page evicted earlier', true],
+  ] as const)('follows a star patch and its rollback for a selected item that %s', async (_case, evictedFirst) => {
+    const gallery = createGallery({
+      items: [createItem('b.png', true)],
+      selectedItemKey: 'image:b.png',
+      selectedItemKeys: ['image:b.png'],
+    });
+    const unloaded = { ...gallery, items: [] };
+
+    await renderBar(gallery);
+    if (evictedFirst) {
+      await renderBar(unloaded);
+    }
+
+    let rollback = () => {};
+    await act(() => {
+      rollback = patchGalleryItemCaches(queryClient, {
+        kind: 'star',
+        result: { failed: [], succeeded: [{ kind: 'image', name: 'b.png' }] },
+        starred: false,
+      });
+    });
+    await renderBar(unloaded);
+
+    expect(getButton('widgets.gallery.starSelection')).toBeTruthy();
+    await click(getButton('widgets.gallery.starSelection'));
+    expect(itemActions.setItemsStarred).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: 'b.png' }], true);
+
+    await act(() => rollback());
+
+    expect(getButton('widgets.gallery.unstarSelection')).toBeTruthy();
+  });
+
+  it('keeps a retained star flag for an item that stays selected when the selection grows', async () => {
+    const gallery = createGallery({
+      items: [createItem('a.png', true)],
+      selectedItemKey: 'image:a.png',
+      selectedItemKeys: ['image:a.png'],
+      starredOnly: true,
+    });
+
+    await renderBar(gallery);
+    // A's page leaves the window, then starred B joins the selection.
+    await renderBar({ ...gallery, items: [] });
+    await renderBar({
+      ...gallery,
+      items: [createItem('b.png', true)],
+      selectedItemKey: 'image:b.png',
+      selectedItemKeys: ['image:a.png', 'image:b.png'],
+    });
+
+    expect(getButton('widgets.gallery.unstarSelection')).toBeTruthy();
+  });
+
+  it('restores a retained flag when a patch made before the selection grew is reverted', async () => {
+    const gallery = createGallery({
+      items: [createItem('a.png', true)],
+      selectedItemKey: 'image:a.png',
+      selectedItemKeys: ['image:a.png'],
+    });
+    const grown: GalleryStateView = {
+      ...gallery,
+      items: [createItem('b.png', true)],
+      selectedItemKey: 'image:b.png',
+      selectedItemKeys: ['image:a.png', 'image:b.png'],
+    };
+
+    await renderBar(gallery);
+    await renderBar({ ...gallery, items: [] });
+    let rollback = () => {};
+    await act(() => {
+      rollback = patchGalleryItemCaches(queryClient, {
+        kind: 'star',
+        result: { failed: [], succeeded: [{ kind: 'image', name: 'a.png' }] },
+        starred: false,
+      });
+    });
+    await renderBar(grown);
+    expect(getButton('widgets.gallery.starSelection')).toBeTruthy();
+
+    await act(() => rollback());
+
+    expect(getButton('widgets.gallery.unstarSelection')).toBeTruthy();
   });
 
   it('reads star state from the strip for a selection the listing window has not loaded', async () => {

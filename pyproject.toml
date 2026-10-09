@@ -43,13 +43,13 @@ dependencies = [
                                           # loader depends on private surface (Tekkenizer internals) that
                                           # moves across majors, so cap below 2.x (validated against 1.11.6)
   "numpy<2.0.0",
-  "onnx==1.16.1",
+  "onnx==1.21.0",
   "onnxruntime==1.19.2",
   "opencv-contrib-python",
   "imageio[ffmpeg]>=2.37",                 # video encode (for Wan 2.2 T2V/I2V output); encode behavior (macro_block_size) is version-sensitive
   "psutil>=6",                             # video decode worker process-tree termination
   "safetensors",
-  "sentencepiece==0.2.0",                 # 0.2.1 coredumps windows when loading t5 tokenizer
+  "sentencepiece==0.2.2",                 # 0.2.0 has a heap overflow; 0.2.1 coredumped on windows loading the t5 tokenizer
   "spandrel",
   # Loosely pinned, will respect requirement of `diffusers[torch]`. Split by platform: linux/win allow
   # the 2.13 line every backend extra pins (the lock itself is held there by `constraint-dependencies` in
@@ -66,7 +66,7 @@ dependencies = [
   "torch>=2.7.0,<2.8.0; sys_platform == 'darwin'",
   "torchsde",                             # diffusers needs this for SDE solvers, but it is not an explicit dep of diffusers
   "torchvision",
-  "transformers>=5.5,<5.6",
+  "transformers>=5.10.4,<5.11",
 
   # Core application dependencies, pinned for reproducible builds.
   "fastapi-events",
@@ -98,10 +98,10 @@ dependencies = [
   "fonttools[woff]",
   "passlib[bcrypt]>=1.7.4",
   "picklescan",
-  "pillow",
+  "pillow>=12.3.0",
   "prompt-toolkit",
   "pypatchmatch",
-  "python-jose[cryptography]>=3.3.0",
+  "PyJWT>=2.15.0",
   "python-multipart",
   "requests",
   "semver~=3.0.1",

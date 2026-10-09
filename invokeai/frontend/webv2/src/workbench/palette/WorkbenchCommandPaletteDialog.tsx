@@ -188,7 +188,7 @@ const WorkbenchCommandPaletteDialog = ({
     const imageEntryDeps = {
       openPreviewWidget: () => openWidget('preview'),
       revealImage: (image: GalleryImage) => findGalleryItem({ kind: 'image', name: image.imageName }),
-      selectImage: (image: GalleryImage) => gallery.selectImage(image),
+      selectImage: (image: GalleryImage) => gallery.selectImageInItsBoard(image),
       locale: i18n.resolvedLanguage,
       t,
     };

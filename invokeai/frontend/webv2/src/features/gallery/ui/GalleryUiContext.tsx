@@ -45,6 +45,8 @@ export interface GalleryItemActionsOptions {
 }
 
 export interface GalleryItemContextMenuTarget {
+  /** Whether every target is starred, when the host knows more than `items`, which omits unloaded targets. */
+  allStarred?: boolean;
   itemRefs: GalleryItemRef[];
   items: GalleryItem[];
   x: number;
@@ -61,11 +63,11 @@ export interface GalleryCommandsPort {
   clearSelection(): void;
   reconcileDeletedBoardOutcome(outcome: GalleryBoardDeletionResult): void;
   selectBoard(boardId: string): void;
-  selectItem(item: GalleryItem): void;
+  selectItem(item: GalleryItem, selectionPage?: number): void;
   selectImage(image: GalleryImage): void;
   setCompareItem(image: GalleryImageItem | null): void;
   setCompareImage(image: GalleryImage | null): void;
-  setItemMultiSelection(itemKeys: GalleryItemKey[], primaryItem: GalleryItem): void;
+  setItemMultiSelection(itemKeys: GalleryItemKey[], primaryItem: GalleryItem, selectionPage?: number): void;
   setPage(page: number): void;
   setPageInfo(totalImages: number): void;
   setSearchTerm(searchTerm: string): void;
@@ -75,7 +77,8 @@ export interface GalleryCommandsPort {
   commitSemanticSearch(text: string): void;
   clearSearch(): void;
   setView(view: GalleryView): void;
-  toggleItemSelection(item: GalleryItem, nextPrimaryItem: GalleryItem | null): void;
+  /** `selectionPage` is the grid page of whichever item becomes primary: `item` when added, else `nextPrimaryItem`. */
+  toggleItemSelection(item: GalleryItem, nextPrimaryItem: GalleryItem | null, selectionPage?: number): void;
   updateSettings(settings: Partial<GallerySettings>): void;
 }
 
