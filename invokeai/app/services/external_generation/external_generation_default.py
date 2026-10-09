@@ -3,6 +3,7 @@ from __future__ import annotations
 import dataclasses
 import math
 import time
+from collections.abc import Iterable
 from logging import Logger
 from typing import TYPE_CHECKING
 
@@ -128,11 +129,11 @@ class ExternalGenerationService(ExternalGenerationServiceBase):
 
         if capabilities.allowed_aspect_ratios:
             aspect_ratio = _format_aspect_ratio(request.width, request.height)
-            if aspect_ratio not in capabilities.allowed_aspect_ratios:
+            if _declared_ratio(aspect_ratio, capabilities.allowed_aspect_ratios) is None:
                 size_ratio = None
                 if capabilities.aspect_ratio_sizes:
                     size_ratio = _ratio_for_size(request.width, request.height, capabilities.aspect_ratio_sizes)
-                if size_ratio is None or size_ratio not in capabilities.allowed_aspect_ratios:
+                if size_ratio is None or _declared_ratio(size_ratio, capabilities.allowed_aspect_ratios) is None:
                     ratio_label = size_ratio or aspect_ratio
                     raise ExternalProviderCapabilityError(
                         f"{request.model.name} does not support aspect ratio {ratio_label}"
@@ -226,6 +227,14 @@ class ExternalGenerationService(ExternalGenerationServiceBase):
         if aspect_ratio in capabilities.allowed_aspect_ratios:
             return request
 
+        # A ratio allowed only in other terms ("21:9" for a 7:3 request) passes as-is when there is no bucket to move
+        # it to; with buckets, the closest-ratio lookup below already reaches the equivalent one.
+        if (
+            not capabilities.aspect_ratio_sizes
+            and _declared_ratio(aspect_ratio, capabilities.allowed_aspect_ratios) is not None
+        ):
+            return request
+
         closest = _select_closest_ratio(
             request.width,
             request.height,
@@ -237,7 +246,7 @@ class ExternalGenerationService(ExternalGenerationServiceBase):
         if not capabilities.aspect_ratio_sizes:
             # Without per-ratio sizes (models sized by a resolution preset), keep the requested pixel
             # area and only correct the ratio, which validation would otherwise reject.
-            snapped = _size_for_ratio(closest, request.width * request.height)
+            snapped = _size_for_ratio(closest, request.width * request.height, capabilities.max_image_size)
             if snapped is None:
                 return request
             return self._bucket_to_size(request, snapped[0], snapped[1], closest)
@@ -300,13 +309,38 @@ def _select_closest_ratio(width: int, height: int, ratios: list[str]) -> str | N
     return min(parsed, key=lambda item: abs(item[1] - ratio))[0]
 
 
-def _size_for_ratio(ratio: str, area: int) -> tuple[int, int] | None:
-    """The exact-ratio size whose pixel area is closest to `area`, for a ratio of whole numbers."""
+def _reduce_ratio(ratio: str) -> str:
+    """A "W:H" ratio of whole numbers in lowest terms; anything else is returned unchanged."""
+    left, _, right = ratio.partition(":")
+    if not (left.isdecimal() and right.isdecimal()):
+        return ratio
+    try:
+        width, height = int(left), int(right)
+    except ValueError:  # beyond int()'s digit limit
+        return ratio
+    if width == 0 or height == 0:
+        return ratio
+    return _format_aspect_ratio(width, height)
+
+
+def _declared_ratio(aspect_ratio: str, declared: Iterable[str]) -> str | None:
+    """The declared ratio equal to `aspect_ratio`, so entries such as "21:9" match a reduced "7:3"."""
+    reduced = _reduce_ratio(aspect_ratio)
+    return next((ratio for ratio in declared if _reduce_ratio(ratio) == reduced), None)
+
+
+def _size_for_ratio(ratio: str, area: int, max_size: ExternalImageSize | None = None) -> tuple[int, int] | None:
+    """The exact-ratio size whose pixel area is closest to `area` without exceeding `max_size`,
+    for a ratio of whole numbers."""
     left_text, _, right_text = ratio.partition(":")
-    if not (left_text.isdigit() and right_text.isdigit()) or int(left_text) == 0 or int(right_text) == 0:
+    if not (left_text.isdecimal() and right_text.isdecimal()) or int(left_text) == 0 or int(right_text) == 0:
         return None
     left, right = int(left_text), int(right_text)
     scale = max(1, round(math.sqrt(area / (left * right))))
+    if max_size is not None:
+        scale = min(scale, max_size.width // left, max_size.height // right)
+        if scale < 1:
+            return None
     return left * scale, right * scale
 
 
