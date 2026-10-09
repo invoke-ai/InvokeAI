@@ -42,6 +42,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContextDat
 from tests.test_nodes import (
     AnyTypeTestInvocation,
     ErrorInvocation,
+    FixedCollectionTestInvocation,
     MarkedAnyTypeTestInvocation,
     PolymorphicStringTestInvocation,
     UnionCollectionTestInvocation,
@@ -832,6 +833,104 @@ def _nested_iterate_chain_graph(*, outer_collection: list[list[str]] | None = No
     connect("inner_collection", "collection", "inner_iterate", "collection")
     connect("inner_iterate", "item", "body", "value")
     return graph
+
+
+def _nested_iterate_add_collect_graph() -> Graph:
+    graph = Graph()
+    graph.add_node(CollectionConcatInvocation(id="outer_source", first=[1, 2]))
+    graph.add_node(IterateInvocation(id="outer_iterate"))
+    graph.add_node(FixedCollectionTestInvocation(id="inner_source"))
+    graph.add_node(IterateInvocation(id="inner_iterate"))
+    graph.add_node(AddInvocation(id="add"))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_node(AnyTypeTestInvocation(id="sink"))
+
+    def connect(source: str, source_field: str, destination: str, destination_field: str) -> None:
+        graph.add_edge(create_edge(source, source_field, destination, destination_field))
+
+    connect("outer_source", "collection", "outer_iterate", "collection")
+    connect("outer_iterate", "item", "inner_source", "value")
+    connect("inner_source", "collection", "inner_iterate", "collection")
+    connect("outer_iterate", "item", "add", "a")
+    connect("inner_iterate", "item", "add", "b")
+    connect("add", "value", "collect", "item")
+    connect("collect", "collection", "sink", "value")
+    return graph
+
+
+def _add_unrelated_if(graph: Graph) -> Graph:
+    graph.add_node(BooleanInvocation(id="unrelated_condition", value=True))
+    graph.add_node(AddInvocation(id="unrelated_true", a=1, b=2))
+    graph.add_node(AddInvocation(id="unrelated_false", a=3, b=4))
+    graph.add_node(IfInvocation(id="unrelated_if"))
+    graph.add_node(AddInvocation(id="unrelated_sink", b=1))
+    graph.add_edge(create_edge("unrelated_condition", "value", "unrelated_if", "condition"))
+    graph.add_edge(create_edge("unrelated_true", "value", "unrelated_if", "true_input"))
+    graph.add_edge(create_edge("unrelated_false", "value", "unrelated_if", "false_input"))
+    graph.add_edge(create_edge("unrelated_if", "value", "unrelated_sink", "a"))
+    return graph
+
+
+def _iterate_if_collect_inner_iterate_graph() -> Graph:
+    """Build a validated nested Iterate graph with If output buffered through Collect.collection."""
+    graph = Graph()
+    graph.add_node(CollectionConcatInvocation(id="outer_source", first=[1, 2]))
+    graph.add_node(IterateInvocation(id="outer_iterate"))
+    graph.add_node(FixedCollectionTestInvocation(id="true_source"))
+    graph.add_node(FixedCollectionTestInvocation(id="false_source"))
+    graph.add_node(IfInvocation(id="select_inner"))
+    graph.add_node(CollectInvocation(id="selected_collection"))
+    graph.add_node(IterateInvocation(id="inner_iterate"))
+    graph.add_node(AddInvocation(id="add"))
+    graph.add_node(CollectInvocation(id="results"))
+    graph.add_node(AnyTypeTestInvocation(id="sink"))
+
+    def connect(source: str, source_field: str, destination: str, destination_field: str) -> None:
+        graph.add_edge(create_edge(source, source_field, destination, destination_field))
+
+    connect("outer_source", "collection", "outer_iterate", "collection")
+    connect("outer_iterate", "item", "true_source", "value")
+    connect("outer_iterate", "item", "false_source", "value")
+    connect("true_source", "condition", "select_inner", "condition")
+    connect("true_source", "collection", "select_inner", "true_input")
+    connect("false_source", "collection", "select_inner", "false_input")
+    connect("select_inner", "value", "selected_collection", "collection")
+    connect("selected_collection", "collection", "inner_iterate", "collection")
+    connect("outer_iterate", "item", "add", "a")
+    connect("inner_iterate", "item", "add", "b")
+    connect("add", "value", "results", "item")
+    connect("results", "collection", "sink", "value")
+    return graph
+
+
+def _chained_sibling_iterates_with_unrelated_if_graph() -> Graph:
+    graph = Graph()
+    graph.add_node(CollectionConcatInvocation(id="outer_source", first=[1, 2]))
+    graph.add_node(IterateInvocation(id="outer_iterate"))
+    graph.add_node(FixedCollectionTestInvocation(id="first_inner_source"))
+    graph.add_node(FixedCollectionTestInvocation(id="second_inner_source"))
+    graph.add_node(IterateInvocation(id="first_inner_iterate"))
+    graph.add_node(IterateInvocation(id="second_inner_iterate"))
+    graph.add_node(AddInvocation(id="first_add"))
+    graph.add_node(AddInvocation(id="second_add"))
+    graph.add_node(CollectInvocation(id="results"))
+    graph.add_node(AnyTypeTestInvocation(id="sink"))
+
+    def connect(source: str, source_field: str, destination: str, destination_field: str) -> None:
+        graph.add_edge(create_edge(source, source_field, destination, destination_field))
+
+    connect("outer_source", "collection", "outer_iterate", "collection")
+    connect("outer_iterate", "item", "first_inner_source", "value")
+    connect("outer_iterate", "item", "second_inner_source", "value")
+    connect("first_inner_source", "collection", "first_inner_iterate", "collection")
+    connect("second_inner_source", "collection", "second_inner_iterate", "collection")
+    connect("outer_iterate", "item", "first_add", "a")
+    connect("first_inner_iterate", "item", "first_add", "b")
+    connect("first_add", "value", "second_add", "a")
+    connect("second_inner_iterate", "item", "second_add", "b")
+    connect("second_add", "value", "results", "item")
+    connect("results", "collection", "sink", "value")
+    return _add_unrelated_if(graph)
 
 
 def _three_level_nested_iterate_chain_graph(*, outer_collection: list[list[list[str]]] | None = None) -> Graph:
@@ -3117,6 +3216,64 @@ def test_nested_iterate_chain_matches_compatibility() -> None:
     assert generic_state.is_complete()
     assert compatibility_state.is_complete()
     assert _state_projection(generic_state) == _state_projection(compatibility_state)
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True])
+def test_nested_iterate_keeps_values_in_outer_frame_with_unrelated_if(
+    force_compatibility_scheduler: bool,
+) -> None:
+    graph = _add_unrelated_if(_nested_iterate_add_collect_graph())
+    graph.validate_self()
+
+    trace, state = _run(GraphExecutionState(graph=graph), force_compatibility_scheduler=force_compatibility_scheduler)
+
+    assert trace.count("sink") == 2
+    sinks_by_outer_path = {
+        state._get_iteration_path(exec_id): state.results[exec_id].value
+        for exec_id in state._prepared_registry().get_prepared_ids("sink")
+    }
+    assert sinks_by_outer_path == {(0,): [1, 2], (1,): [2, 3]}
+    assert state.is_complete()
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True])
+def test_if_collect_collection_inner_iterate_keeps_values_in_outer_frame(
+    force_compatibility_scheduler: bool,
+) -> None:
+    graph = _iterate_if_collect_inner_iterate_graph()
+    graph.validate_self()
+
+    trace, state = _run(GraphExecutionState(graph=graph), force_compatibility_scheduler=force_compatibility_scheduler)
+
+    assert trace.count("sink") == 2
+    sinks_by_outer_path = {
+        state._get_iteration_path(exec_id): state.results[exec_id].value
+        for exec_id in state._prepared_registry().get_prepared_ids("sink")
+    }
+    assert sinks_by_outer_path == {(0,): [1, 2], (1,): [2, 3]}
+    assert state.is_complete()
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True])
+def test_chained_sibling_iterates_keep_each_outer_and_inner_frame(
+    force_compatibility_scheduler: bool,
+) -> None:
+    graph = _chained_sibling_iterates_with_unrelated_if_graph()
+    graph.validate_self()
+
+    trace, state = _run(GraphExecutionState(graph=graph), force_compatibility_scheduler=force_compatibility_scheduler)
+
+    sinks_by_iteration_path = {
+        state._get_iteration_path(exec_id): state.results[exec_id].value
+        for exec_id in state._prepared_registry().get_prepared_ids("sink")
+    }
+    assert sinks_by_iteration_path == {
+        (0, 0): [1, 2],
+        (0, 1): [2, 3],
+        (1, 0): [2, 3],
+        (1, 1): [3, 4],
+    }
+    assert state.is_complete()
 
 
 def test_nested_iterate_chain_closes_empty_inner_frame() -> None:

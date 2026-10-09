@@ -2,13 +2,10 @@ import type { GenerateLora, MainModelConfig, PromptHistoryItem } from '@features
 import type { ProjectPromptDraft, ProjectPromptDraftPatch } from '@features/generation/settings';
 import type { UpscaleWidgetValues } from '@features/upscale/core/types';
 
-import { HStack, NumberInput, Stack, Switch, Text } from '@chakra-ui/react';
+import { Stack, Text } from '@chakra-ui/react';
 import { NegativePromptField, PositivePromptField } from '@features/generation/components';
 import { areProjectPromptDraftsEqual } from '@features/generation/settings';
 import { upscaleArchitectureFor } from '@features/upscale/core/settings';
-import { IconButton } from '@platform/ui/Button';
-import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
-import { Trash2Icon } from 'lucide-react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -18,8 +15,6 @@ import { areLorasEquivalent, areModelsEquivalent } from './upscaleComparators';
  * Compare prompt/LoRA content across reconstructed values to avoid costly rerenders and disturbed autocomplete
  * state.
  */
-
-const SWITCH_CHECKED_PROPS = { bg: 'accent.solid' };
 
 export const UpscalePromptFields = memo(
   function UpscalePromptFields({
@@ -76,7 +71,7 @@ export const UpscalePromptFields = memo(
 
     return (
       <Stack gap="2" p="2">
-        <Text color="fg.muted" fontSize="2xs" textWrap="pretty">
+        <Text color="fg.muted" fontSize="xs" textWrap="pretty">
           {t('widgets.upscale.sharedPromptDescription')}
         </Text>
         <PositivePromptField
@@ -118,61 +113,3 @@ export const UpscalePromptFields = memo(
     areModelsEquivalent(previous.model, next.model) &&
     areLorasEquivalent(previous.loras, next.loras)
 );
-
-/** Bind handlers within each memoized row so editing one weight does not rerender the whole list. */
-export const UpscaleLoraRow = memo(function UpscaleLoraRow({
-  lora,
-  onRemove,
-  onUpdate,
-}: {
-  lora: GenerateLora;
-  onRemove: (key: string) => void;
-  onUpdate: (key: string, update: Partial<GenerateLora>) => void;
-}) {
-  const { t } = useTranslation();
-  const modelKey = lora.model.key;
-  const handleToggle = useCallback(
-    (details: { checked: boolean }) => onUpdate(modelKey, { isEnabled: details.checked }),
-    [modelKey, onUpdate]
-  );
-  const handleWeightChange = useCallback(
-    ({ valueAsNumber }: NumberInput.ValueChangeDetails) => {
-      if (Number.isFinite(valueAsNumber)) {
-        onUpdate(modelKey, { weight: valueAsNumber });
-      }
-    },
-    [modelKey, onUpdate]
-  );
-  const handleRemove = useCallback(() => onRemove(modelKey), [modelKey, onRemove]);
-
-  return (
-    <HStack bg="bg.subtle" gap="2" p="2" rounded="md">
-      <Switch.Root aria-label={lora.model.name} checked={lora.isEnabled} size="sm" onCheckedChange={handleToggle}>
-        <Switch.HiddenInput />
-        <Switch.Control _checked={SWITCH_CHECKED_PROPS}>
-          <Switch.Thumb />
-        </Switch.Control>
-      </Switch.Root>
-      <MiddleTruncate flex="1" fontSize="xs" minW="0" text={lora.model.name} />
-      <NumberInput.Root
-        max={10}
-        min={-10}
-        size="xs"
-        step={0.05}
-        value={String(lora.weight)}
-        w="20"
-        onValueChange={handleWeightChange}
-      >
-        <NumberInput.Input aria-label={t('widgets.upscale.loraWeight', { name: lora.model.name })} />
-      </NumberInput.Root>
-      <IconButton
-        aria-label={t('widgets.upscale.removeLora', { name: lora.model.name })}
-        size="xs"
-        variant="ghost"
-        onClick={handleRemove}
-      >
-        <Trash2Icon />
-      </IconButton>
-    </HStack>
-  );
-});

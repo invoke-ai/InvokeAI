@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AspectRatioPreview } from './AspectRatioPreview';
 
-type ControlSize = 'xs' | 'sm';
+type ControlSize = 'md' | 'lg';
 
 type AspectRatioOption = { id: AspectRatioId; ratio: number };
 
@@ -33,7 +33,7 @@ export interface AspectRatioSelectProps {
 /** Callers own dimension changes. */
 export const AspectRatioSelect = ({
   fallbackRatio,
-  size = 'xs',
+  size = 'md',
   triggerProps,
   value,
   onChange,
@@ -72,9 +72,7 @@ export const AspectRatioSelect = ({
       renderItem={(option) => (
         <HStack as="span" gap="2">
           <AspectRatioPreview boxSize="6" ratio={option.ratio} />
-          <Text as="span" fontSize="xs">
-            {option.id}
-          </Text>
+          <Text as="span">{option.id}</Text>
         </HStack>
       )}
       size={size}
@@ -83,7 +81,7 @@ export const AspectRatioSelect = ({
       valueText={
         <HStack as="span" gap="2" minW="0">
           <AspectRatioPreview boxSize="5" ratio={activePreviewRatio} />
-          <Text as="span" fontSize="xs" truncate>
+          <Text as="span" truncate>
             {value}
           </Text>
         </HStack>
@@ -95,12 +93,12 @@ export const AspectRatioSelect = ({
 
 export interface AspectRatioLockButtonProps {
   isLocked: boolean;
-  size?: '2xs' | ControlSize;
+  size?: 'sm' | ControlSize;
   onToggle: () => void;
 }
 
 /** Companion lock for {@link AspectRatioSelect}: a labelled icon button, not a bare dot. */
-export const AspectRatioLockButton = ({ isLocked, size = 'xs', onToggle }: AspectRatioLockButtonProps) => {
+export const AspectRatioLockButton = ({ isLocked, size = 'md', onToggle }: AspectRatioLockButtonProps) => {
   const { t } = useTranslation();
   const label = isLocked ? t('widgets.generate.unlockAspectRatio') : t('widgets.generate.lockAspectRatio');
 

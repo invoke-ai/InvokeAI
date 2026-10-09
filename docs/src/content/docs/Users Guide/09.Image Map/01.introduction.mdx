@@ -23,11 +23,30 @@ searches against your own, or third party images.
 
 To use the Image Map you will need to install the image encoder model
 `DFN2B-CLIP-ViT-L-14-39B` from the starter models section of the Model
-Manager. Once installed, you will need to restart the backend in order
-to initiate the indexing process. If you have a large image
+Manager. No restart is needed: indexing starts shortly while the Image
+Map or the gallery is open, or when you run a semantic search. The
+model is found by its name (`image_index_model` in `invokeai.yaml`), so
+deleting or renaming it stops indexing and the Image Map offers to
+install it again. Installing a different model under that name
+switches indexing to it on its own. If you have a large image
 collection, initial indexing may take a while -- expect a gallery of
 20,000 images to take about 15 minutes to index. After this, the index
 is updated incrementally in the background.
+
+### Embedding storage
+
+On first startup after this update, InvokeAI converts saved image and video
+embeddings in one database transaction. It reuses saved vectors and does
+not run the embedding model again. InvokeAI creates a database backup
+before conversion. Large indexes can add one-time startup time. Restore
+that pre-upgrade backup before running an older application version.
+
+New embeddings use float16 on disk and decode to float32 for search and
+projections. This halves raw embedding BLOB storage. SQLite may retain
+freed pages, so the database file may not shrink by half. Search and
+projection calculations still use float32 in memory. Float16 quantization
+can slightly change similarity scores, so items with nearly equal scores
+can change order.
 
 ### Inactivating the Image Map
 
@@ -84,4 +103,3 @@ the gallery, preview, or another browser tab) onto the search box. All
 similar images will be shown in the gallery.
 
 To exit search mode, click the "X" to the right of the search box.
-

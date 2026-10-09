@@ -39,7 +39,7 @@ export const CanvasGlobalContextMenu = ({
         <Menu.Positioner>
           <MenuContent minW="14rem" py="1">
             <Menu.ItemGroup>
-              <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+              <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
                 {t('widgets.labels.canvas')}
               </Menu.ItemGroupLabel>
               {children}

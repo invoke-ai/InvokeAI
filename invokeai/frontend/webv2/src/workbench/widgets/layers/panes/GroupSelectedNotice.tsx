@@ -14,7 +14,7 @@ export const GroupSelectedNotice = ({ hint }: { hint?: string }) => {
     return null;
   }
   return (
-    <Text color="fg.muted" fontSize="xs" minW="0">
+    <Text color="fg.muted" fontSize="md" minW="0">
       {hint ?? t('widgets.layers.groupSelectedHint')}
     </Text>
   );

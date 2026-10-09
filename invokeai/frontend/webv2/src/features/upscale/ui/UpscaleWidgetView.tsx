@@ -3,8 +3,24 @@ import type { ProjectPromptDraftPatch } from '@features/generation/settings';
 import type { ModelConfig, ModelTaxonomyType } from '@features/models';
 import type { UpscaleWidgetValues } from '@features/upscale/core/types';
 
-import { Badge, createListCollection, DataList, SegmentGroup, SimpleGrid, Stack, Text } from '@chakra-ui/react';
-import { GenerationSettingsSection, SeedField } from '@features/generation/components';
+import {
+  Badge,
+  Box,
+  createListCollection,
+  DataList,
+  SegmentGroup,
+  Separator,
+  SimpleGrid,
+  Stack,
+  Text,
+} from '@chakra-ui/react';
+import {
+  ConceptList,
+  type ConceptModelPort,
+  ConceptRow,
+  GenerationSettingsSection,
+  SeedField,
+} from '@features/generation/components';
 import {
   getDefaultLoraWeight,
   isLoraCompatibleWithModel,
@@ -14,7 +30,14 @@ import {
   isVaeModelConfig,
   SCHEDULER_OPTIONS,
 } from '@features/generation/settings';
-import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import {
+  ensureModelsLoaded,
+  getModelBaseColorPalette,
+  getModelBaseLabel,
+  getModelImageUrl,
+  useModelsSelector,
+  useOpenModelInManager,
+} from '@features/models';
 import { ModelSelect } from '@features/models/react';
 import {
   createDefaultUpscaleWidgetValues,
@@ -47,7 +70,7 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { areInputImagesEquivalent, valuesAreEqual } from './upscaleComparators';
-import { UpscaleLoraRow, UpscalePromptFields } from './UpscaleFormFields';
+import { UpscalePromptFields } from './UpscaleFormFields';
 import { UpscaleImageField } from './UpscaleImageField';
 import { useUpscaleUi, useUpscaleUiActions } from './UpscaleUiContext';
 
@@ -110,14 +133,14 @@ const UpscaleOutputPreflight = memo(
 
     return (
       <Stack bg="bg.subtle" gap="2" px="2.5" py="2" rounded="md">
-        <DataList.Root gap="1.5" orientation="horizontal" size="sm">
+        <DataList.Root gap="1.5" orientation="horizontal">
           <DataList.Item>
-            <DataList.ItemLabel color="fg.subtle" fontSize="2xs">
+            <DataList.ItemLabel color="fg.subtle" fontSize="xs">
               {t('widgets.upscale.inputSize')}
             </DataList.ItemLabel>
             <DataList.ItemValue
               fontFamily="mono"
-              fontSize="xs"
+              fontSize="md"
               fontVariantNumeric="tabular-nums"
               justifyContent="flex-end"
             >
@@ -125,12 +148,12 @@ const UpscaleOutputPreflight = memo(
             </DataList.ItemValue>
           </DataList.Item>
           <DataList.Item>
-            <DataList.ItemLabel color="fg.subtle" fontSize="2xs">
+            <DataList.ItemLabel color="fg.subtle" fontSize="xs">
               {t('widgets.upscale.scale')}
             </DataList.ItemLabel>
             <DataList.ItemValue
               fontFamily="mono"
-              fontSize="xs"
+              fontSize="md"
               fontVariantNumeric="tabular-nums"
               justifyContent="flex-end"
             >
@@ -138,12 +161,12 @@ const UpscaleOutputPreflight = memo(
             </DataList.ItemValue>
           </DataList.Item>
           <DataList.Item>
-            <DataList.ItemLabel color="fg.subtle" fontSize="2xs">
+            <DataList.ItemLabel color="fg.subtle" fontSize="xs">
               {t('widgets.upscale.outputSize')}
             </DataList.ItemLabel>
             <DataList.ItemValue
               fontFamily="mono"
-              fontSize="xs"
+              fontSize="md"
               fontVariantNumeric="tabular-nums"
               fontWeight="semibold"
               justifyContent="flex-end"
@@ -152,12 +175,12 @@ const UpscaleOutputPreflight = memo(
             </DataList.ItemValue>
           </DataList.Item>
           <DataList.Item>
-            <DataList.ItemLabel color="fg.subtle" fontSize="2xs">
+            <DataList.ItemLabel color="fg.subtle" fontSize="xs">
               {t('widgets.upscale.outputMegapixels')}
             </DataList.ItemLabel>
             <DataList.ItemValue
               fontFamily="mono"
-              fontSize="xs"
+              fontSize="md"
               fontVariantNumeric="tabular-nums"
               fontWeight="semibold"
               gap="1.5"
@@ -165,7 +188,7 @@ const UpscaleOutputPreflight = memo(
             >
               {MEGAPIXEL_FORMATTER.format(outputMegapixels)} MP
               {isLargeOutput ? (
-                <Badge colorPalette="orange" fontFamily="body" size="xs" variant="surface">
+                <Badge colorPalette="orange" fontFamily="body" variant="surface">
                   {t('widgets.upscale.largeOutput')}
                 </Badge>
               ) : null}
@@ -177,7 +200,7 @@ const UpscaleOutputPreflight = memo(
             borderTopWidth="1px"
             borderColor="border.subtle"
             color="fg.warning"
-            fontSize="2xs"
+            fontSize="xs"
             pt="2"
             textWrap="pretty"
           >
@@ -214,6 +237,16 @@ const UpscaleModelReconciler = ({
 
 export const UpscaleWidgetView = () => {
   const { t } = useTranslation();
+  const openInModelManager = useOpenModelInManager();
+  const conceptModels = useMemo<ConceptModelPort>(
+    () => ({
+      getBaseColorPalette: getModelBaseColorPalette,
+      getBaseLabel: getModelBaseLabel,
+      getImageUrl: getModelImageUrl,
+      openInModelManager: openInModelManager ?? undefined,
+    }),
+    [openInModelManager]
+  );
   const selection = useUpscaleUi();
   const models = useModelsSelector((snapshot) => snapshot.models);
   const modelsStatus = useModelsSelector((snapshot) => snapshot.status);
@@ -314,22 +347,32 @@ export const UpscaleWidgetView = () => {
 
   const addLora = useCallback(
     (model: ModelConfig | null) => {
-      if (!values.model || !isLoraModelConfig(model) || !isLoraCompatibleWithModel(model, values.model)) {
+      if (!isLoraModelConfig(model)) {
         return;
       }
 
-      patch({ loras: [...values.loras, { isEnabled: true, model, weight: getDefaultLoraWeight(model) }] });
+      patchValues((current) =>
+        current.model && isLoraCompatibleWithModel(model, current.model)
+          ? { loras: [...current.loras, { isEnabled: true, model, weight: getDefaultLoraWeight(model) }] }
+          : {}
+      );
     },
-    [patch, values.loras, values.model]
+    [patchValues]
   );
   const updateLora = useCallback(
     (key: string, update: Partial<GenerateLora>) =>
-      patch({ loras: values.loras.map((lora) => (lora.model.key === key ? { ...lora, ...update } : lora)) }),
-    [patch, values.loras]
+      // A row removed mid-edit still flushes its draft; that must not write an unchanged list.
+      patchValues((current) =>
+        current.loras.some((lora) => lora.model.key === key)
+          ? { loras: current.loras.map((lora) => (lora.model.key === key ? { ...lora, ...update } : lora)) }
+          : {}
+      ),
+    [patchValues]
   );
   const removeLora = useCallback(
-    (key: string) => patch({ loras: values.loras.filter((candidate) => candidate.model.key !== key) }),
-    [patch, values.loras]
+    (key: string) =>
+      patchValues((current) => ({ loras: current.loras.filter((candidate) => candidate.model.key !== key) })),
+    [patchValues]
   );
   const selectedLoraKeys = useMemo(() => new Set(values.loras.map((lora) => lora.model.key)), [values.loras]);
 
@@ -417,14 +460,7 @@ export const UpscaleWidgetView = () => {
     [patch]
   );
 
-  const sharedBadge = useMemo(
-    () => (
-      <Badge fontFamily="mono" size="xs">
-        {t('widgets.upscale.shared')}
-      </Badge>
-    ),
-    [t]
-  );
+  const sharedBadge = useMemo(() => <Badge fontFamily="mono">{t('widgets.upscale.shared')}</Badge>, [t]);
 
   return (
     <Stack gap={1} minW={0} p="1">
@@ -448,7 +484,6 @@ export const UpscaleWidgetView = () => {
               invalid={!values.upscaleModel}
               modelTypes={SPANDREL_MODEL_TYPES}
               placeholder={t('widgets.upscale.selectSpandrelModel')}
-              size="xs"
               value={values.upscaleModel?.key ?? null}
               onChange={set.spandrelModel}
             />
@@ -468,7 +503,6 @@ export const UpscaleWidgetView = () => {
           />
           <SegmentGroup.Root
             aria-label={t('widgets.upscale.presetsLabel')}
-            size="xs"
             value={activePresetId}
             w="full"
             onValueChange={applyPreset}
@@ -487,7 +521,7 @@ export const UpscaleWidgetView = () => {
                 <SegmentGroup.Item key={id} flex="1" minW="0" value={id}>
                   <SegmentGroup.ItemHiddenInput />
                   <Tooltip content={tooltipContent}>
-                    <SegmentGroup.ItemText fontSize="xs">{t(`widgets.upscale.presets.${id}`)}</SegmentGroup.ItemText>
+                    <SegmentGroup.ItemText fontSize="md">{t(`widgets.upscale.presets.${id}`)}</SegmentGroup.ItemText>
                   </Tooltip>
                 </SegmentGroup.Item>
               );
@@ -548,11 +582,11 @@ export const UpscaleWidgetView = () => {
               invalid={!values.model}
               modelTypes={MAIN_MODEL_TYPES}
               placeholder={t('widgets.upscale.selectMainModel')}
-              size="xs"
               value={values.model?.key ?? null}
               onChange={selectMainModel}
             />
           </Field>
+          <Separator borderColor="border.subtle" />
           {/* Iterations live in the top bar's invoke cluster, which edits this widget's batch count directly. */}
           <ScrubberField
             error={errors.steps}
@@ -580,11 +614,11 @@ export const UpscaleWidgetView = () => {
             <Combobox
               aria-label={t('widgets.upscale.scheduler')}
               options={SCHEDULER_OPTIONS}
-              size="xs"
               value={values.scheduler}
               onValueChange={set.scheduler}
             />
           </Field>
+          <Separator borderColor="border.subtle" />
           <SeedField
             batchCount={values.batchCount}
             error={errors.seed}
@@ -593,20 +627,33 @@ export const UpscaleWidgetView = () => {
             seedMode={values.seedMode}
             onCommit={patch}
           />
-          <Field hint="concepts" label={t('widgets.upscale.addLora')}>
+          <Separator borderColor="border.subtle" />
+          <Field hint="concepts" label={t('widgets.upscale.concepts')}>
             <ModelSelect
               excludeKeys={selectedLoraKeys}
               filter={loraFilter}
               modelTypes={LORA_MODEL_TYPES}
-              placeholder={t('widgets.upscale.selectLora')}
-              size="xs"
+              placeholder={t('widgets.upscale.searchCompatibleConcepts')}
+              scopeLabel={t('models.scopeConcepts')}
               value={null}
               onChange={addLora}
             />
           </Field>
-          {values.loras.map((lora) => (
-            <UpscaleLoraRow key={lora.model.key} lora={lora} onRemove={removeLora} onUpdate={updateLora} />
-          ))}
+          {values.loras.length > 0 ? (
+            <Box mx={-1}>
+              <ConceptList label={t('widgets.upscale.concepts')} projectId={projectId}>
+                {values.loras.map((lora) => (
+                  <ConceptRow
+                    key={lora.model.key}
+                    models={conceptModels}
+                    lora={lora}
+                    onRemove={removeLora}
+                    onUpdate={updateLora}
+                  />
+                ))}
+              </ConceptList>
+            </Box>
+          ) : null}
         </Stack>
       </GenerationSettingsSection>
 
@@ -624,7 +671,6 @@ export const UpscaleWidgetView = () => {
                 invalid={!values.tileControlnetModel}
                 modelTypes={CONTROLNET_MODEL_TYPES}
                 placeholder={t('widgets.upscale.selectTileControlNet')}
-                size="xs"
                 value={values.tileControlnetModel?.key ?? null}
                 onChange={setTileControlNet}
               />
@@ -641,7 +687,6 @@ export const UpscaleWidgetView = () => {
                   invalid={!values.t5EncoderModel}
                   modelTypes={T5_ENCODER_MODEL_TYPES}
                   placeholder={t('widgets.upscale.selectT5Encoder')}
-                  size="xs"
                   value={values.t5EncoderModel?.key ?? null}
                   onChange={setT5Encoder}
                 />
@@ -655,7 +700,6 @@ export const UpscaleWidgetView = () => {
                   invalid={!values.clipEmbedModel}
                   modelTypes={CLIP_EMBED_MODEL_TYPES}
                   placeholder={t('widgets.upscale.selectClipEmbed')}
-                  size="xs"
                   value={values.clipEmbedModel?.key ?? null}
                   onChange={setClipEmbed}
                 />
@@ -691,7 +735,6 @@ export const UpscaleWidgetView = () => {
               error={showComponentPickers && !values.vae ? t('widgets.upscale.vaeRequired') : undefined}
               hint="vae"
               label={t('widgets.upscale.vae')}
-              helpText={values.vae || showComponentPickers ? undefined : t('widgets.upscale.bundledVae')}
             >
               <ModelSelect
                 filter={vaeFilter}
@@ -699,7 +742,6 @@ export const UpscaleWidgetView = () => {
                 isClearable={!showComponentPickers}
                 modelTypes={VAE_MODEL_TYPES}
                 placeholder={showComponentPickers ? t('widgets.upscale.selectVae') : t('widgets.upscale.bundledVae')}
-                size="xs"
                 value={values.vae?.key ?? null}
                 onChange={set.vae}
               />
@@ -708,7 +750,6 @@ export const UpscaleWidgetView = () => {
               <Select
                 aria-label={t('widgets.upscale.vaePrecision')}
                 collection={VAE_PRECISION_COLLECTION}
-                size="xs"
                 value={vaePrecisionValue}
                 onValueChange={set.vaePrecision}
               />

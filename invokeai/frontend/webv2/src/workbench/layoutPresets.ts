@@ -14,16 +14,18 @@ import type { WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts'
 import { BUILT_IN_LAYOUT_PRESET_LABELS } from '@workbench/launchpad/intents';
 
 // Notifications read as ambient status, not a tool: they live on the right.
-const defaultBottomAlignEndInstanceIds: WidgetInstanceId[] = ['notifications'];
+const defaultBottomAlignEndInstanceIds: WidgetInstanceId[] = ['shortcuts', 'notifications'];
 const defaultBottomInstanceIds: WidgetInstanceId[] = [
   'server-status',
   'queue-status',
   'gallery:bottom',
+  'shortcuts',
   'notifications',
   'autosave-status',
 ];
 
 const defaultInstanceTypes: Record<WidgetInstanceId, WidgetTypeId> = {
+  shortcuts: 'shortcuts',
   'autosave-status': 'autosave-status',
   canvas: 'canvas',
   diagnostics: 'diagnostics',

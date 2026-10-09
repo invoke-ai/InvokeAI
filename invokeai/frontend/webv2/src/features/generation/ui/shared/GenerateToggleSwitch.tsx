@@ -26,14 +26,13 @@ export const GenerateToggleSwitch = ({
       checked={checked}
       disabled={disabled}
       ids={{ hiddenInput: id, label: `${id}-label` }}
-      size="sm"
       onCheckedChange={(event) => onCheckedChange(event.checked)}
     >
       <Switch.HiddenInput />
       <Switch.Control _checked={{ bg: 'accent.solid' }}>
         <Switch.Thumb />
       </Switch.Control>
-      <Switch.Label fontSize="xs" srOnly={!labelVisible}>
+      <Switch.Label fontSize="md" srOnly={!labelVisible}>
         {label}
       </Switch.Label>
     </Switch.Root>

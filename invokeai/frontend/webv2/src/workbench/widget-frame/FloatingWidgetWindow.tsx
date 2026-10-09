@@ -533,7 +533,9 @@ export const FloatingWidgetWindow = ({
         return;
       }
 
+      // The move consumes the key: the widget's own arrow bindings must not act on it too.
       event.preventDefault();
+      event.stopPropagation();
       // Like a pointer move: from where the window is on screen, keeping the stored size.
       commitGeometry(keepInViewport({ heightPx, widthPx, x: rendered.x + offset[0], y: rendered.y + offset[1] }));
     },
@@ -562,7 +564,9 @@ export const FloatingWidgetWindow = ({
         return;
       }
 
+      // The resize consumes the key, as the move does.
       event.preventDefault();
+      event.stopPropagation();
 
       const resized = resizeOnScreen({ heightPx, widthPx, x, y }, rendered, 'se', offset[0], offset[1]);
 
@@ -726,7 +730,7 @@ export const FloatingWidgetWindow = ({
            */}
           <HStack flex="1 1 0" gap="1.5" minW="4" overflow="hidden">
             {widget ? <WidgetIcon boxSize="4" flexShrink={0} icon={widget.manifest.icon} /> : null}
-            <Text fontSize="xs" fontWeight="700" truncate>
+            <Text fontSize="md" fontWeight="700" truncate>
               {label}
             </Text>
           </HStack>
@@ -768,7 +772,7 @@ export const FloatingWidgetWindow = ({
               <IconButton
                 aria-label={isShaded ? t('widgets.floating.unshade') : t('widgets.floating.shade')}
                 color="fg.muted"
-                size="2xs"
+                size="sm"
                 variant="ghost"
                 onClick={handleToggleShade}
               >
@@ -779,7 +783,7 @@ export const FloatingWidgetWindow = ({
               <IconButton
                 aria-label={isMaximized ? t('widgets.floating.restore') : t('widgets.floating.maximize')}
                 color="fg.muted"
-                size="2xs"
+                size="sm"
                 variant="ghost"
                 onClick={handleToggleMaximize}
               >
@@ -787,7 +791,7 @@ export const FloatingWidgetWindow = ({
               </IconButton>
             </Tooltip>
             <Tooltip content={dockLabel}>
-              <IconButton aria-label={dockLabel} color="fg.muted" size="2xs" variant="ghost" onClick={handleDock}>
+              <IconButton aria-label={dockLabel} color="fg.muted" size="sm" variant="ghost" onClick={handleDock}>
                 <Icon as={DOCK_DESTINATION_ICONS[state.returnRegion]} boxSize="3.5" />
               </IconButton>
             </Tooltip>
@@ -801,7 +805,7 @@ export const FloatingWidgetWindow = ({
             ) : (
               <HStack color="fg.error" gap="1.5" p="3">
                 <Icon as={TriangleAlertIcon} boxSize="3.5" />
-                <Text fontSize="xs">{t('widgets.failure.title', { label })}</Text>
+                <Text fontSize="md">{t('widgets.failure.title', { label })}</Text>
               </HStack>
             )}
           </Flex>

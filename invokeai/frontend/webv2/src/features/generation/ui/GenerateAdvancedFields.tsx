@@ -11,19 +11,21 @@ import {
   MAX_HIDIFFUSION_RATIO,
   MIN_HIDIFFUSION_T1_RATIO,
 } from '@features/generation/core/settings';
+import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Field, Select } from '@platform/ui';
 import { ModelDefaultButton } from '@platform/ui/ModelDefaultButton';
 import { ScrubberField } from '@platform/ui/ScrubberField';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { type GenerateDraft, pickGenerateSettings } from './generateDebounce';
 import { GenerationModelSelect as ModelSelect } from './GenerationUiContext';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 import { GenerateFieldContextMenu } from './shared/GenerateFieldContextMenu';
 import { GenerateToggleSwitch } from './shared/GenerateToggleSwitch';
 
 interface GenerateAdvancedFieldsProps {
-  settings: GenerateSettings;
+  draft: GenerateDraft;
   selectedModel: GenerateModelConfig | undefined;
   onCommit: (patch: Partial<GenerateSettings>) => void;
   onCommitImmediate: (patch: Partial<GenerateSettings>) => void;
@@ -36,16 +38,34 @@ const VAE_PRECISION_COLLECTION = createListCollection({
   ] as const,
 });
 
+const selectAdvancedSettings = pickGenerateSettings([
+  'cfgRescaleMultiplier',
+  'clipSkip',
+  'colorCompensation',
+  'hiDiffusionEnabled',
+  'hiDiffusionRauNetEnabled',
+  'hiDiffusionT1Ratio',
+  'hiDiffusionT2Ratio',
+  'hiDiffusionWindowAttentionEnabled',
+  'pidMode',
+  'pidSteps',
+  'seamlessXAxis',
+  'seamlessYAxis',
+  'vae',
+  'vaePrecision',
+]);
+
 export const GenerateAdvancedFields = ({
+  draft,
   onCommit,
   onCommitImmediate,
   selectedModel,
-  settings,
 }: GenerateAdvancedFieldsProps) => {
   const { t } = useTranslation();
+  const settings = useExternalStoreSelector(draft.subscribe, draft.getSnapshot, selectAdvancedSettings);
   const modelBase = selectedModel?.base;
   const modelDefaults = selectedModel ? getDefaultGenerateSettings(selectedModel) : null;
-  const policy = getGenerationUiPolicy(selectedModel, settings);
+  const policy = getGenerationUiPolicy(selectedModel);
   const pidHelpText =
     settings.pidMode === 'fit'
       ? t('widgets.generate.pidFitHelp')
@@ -106,9 +126,7 @@ export const GenerateAdvancedFields = ({
   ].filter(Boolean).length;
 
   const badges =
-    overrideCount > 0 ? (
-      <Badge size="xs">{t('widgets.generate.overridesCount', { count: overrideCount })}</Badge>
-    ) : null;
+    overrideCount > 0 ? <Badge>{t('widgets.generate.overridesCount', { count: overrideCount })}</Badge> : null;
 
   return (
     <GenerateCollapsibleSection
@@ -130,7 +148,6 @@ export const GenerateAdvancedFields = ({
                 <ModelSelect
                   filter={(model) => model.base === modelBase}
                   modelTypes={['vae']}
-                  size="xs"
                   placeholder={t('widgets.generate.modelDefault')}
                   value={settings.vae?.key ?? null}
                   onChange={(model) => onCommitImmediate({ vae: isVaeModelConfig(model) ? model : null })}
@@ -151,7 +168,6 @@ export const GenerateAdvancedFields = ({
                   aria-label={t('widgets.generate.vaePrecision')}
                   collection={VAE_PRECISION_COLLECTION}
                   flex="1"
-                  size="xs"
                   value={[settings.vaePrecision]}
                   onValueChange={({ value }) => {
                     const vaePrecision = value[0];
@@ -298,7 +314,6 @@ export const GenerateAdvancedFields = ({
             <Select
               aria-label={t('widgets.generate.pid')}
               collection={pidModeCollection}
-              size="xs"
               value={[settings.pidMode]}
               onValueChange={({ value }) => {
                 const mode = value[0];

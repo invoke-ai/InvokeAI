@@ -6,6 +6,7 @@ import { useState } from 'react';
 
 import { createCanvasDimsSync } from './canvasDimsSync';
 import { createWorkbenchFocusController, FocusRegionProvider } from './focusRegions';
+import { createShortcutHintSources, ShortcutHintSourcesProvider } from './hotkeys/hintSources';
 import { useWorkbenchInternalStore, useWorkbenchQueries, useWorkbenchSubscription } from './WorkbenchContext';
 
 /** Workbench-owned lifecycle adapter for aggregate-local synchronization. Cross-module adapters are constructed by App. */
@@ -34,6 +35,7 @@ export const WorkbenchRuntime = () => {
 export const WorkbenchFocusProvider = ({ children }: { children: ReactNode }) => {
   const { getSnapshot } = useWorkbenchQueries();
   const subscribe = useWorkbenchSubscription();
+  const [hintSources] = useState(createShortcutHintSources);
   const [controller] = useState(() =>
     createWorkbenchFocusController({
       getProjectId: () => getSnapshot().activeProject.id,
@@ -42,25 +44,33 @@ export const WorkbenchFocusProvider = ({ children }: { children: ReactNode }) =>
   );
 
   useMountEffect(() => {
+    const clear = () => {
+      controller.clear();
+      hintSources.focus.clear();
+    };
     let projectId = getSnapshot().activeProject.id;
     const unsubscribe = subscribe(() => {
       const nextProjectId = getSnapshot().activeProject.id;
 
       if (nextProjectId !== projectId) {
         projectId = nextProjectId;
-        controller.clear();
+        clear();
       } else {
         controller.forgetClosedWindow();
       }
     });
-    const unregister = registerAccountOwnedResource({ clear: controller.clear, name: 'workbench-focus' });
+    const unregister = registerAccountOwnedResource({ clear, name: 'workbench-focus' });
 
     return () => {
       unsubscribe();
       unregister();
-      controller.clear();
+      clear();
     };
   });
 
-  return <FocusRegionProvider controller={controller}>{children}</FocusRegionProvider>;
+  return (
+    <FocusRegionProvider controller={controller}>
+      <ShortcutHintSourcesProvider sources={hintSources}>{children}</ShortcutHintSourcesProvider>
+    </FocusRegionProvider>
+  );
 };

@@ -4,6 +4,7 @@ import { emptyModelCache } from '@features/models/data/api';
 import { getModelsSnapshot, refreshModels } from '@features/models/data/modelsStore';
 import { OrphanedModelsDialog } from '@features/models/ui/library/OrphanedModelsDialog';
 import { useNotify } from '@features/models/ui/useModelsNotify';
+import { useExitPresence } from '@platform/react/useExitRetainedValue';
 import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { ConfirmDialog, IconButton, MenuContent } from '@platform/ui';
@@ -15,6 +16,7 @@ export const MaintenanceMenu = () => {
   const { t } = useTranslation();
   const notify = useNotify();
   const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
+  const syncDialog = useExitPresence(isSyncDialogOpen);
   const [isEmptyCacheConfirmOpen, setIsEmptyCacheConfirmOpen] = useState(false);
   // Separate instances: run ignores re-entry, and a slow cache emptying must
   // not swallow a refresh (or vice versa).
@@ -54,7 +56,7 @@ export const MaintenanceMenu = () => {
     <>
       <Menu.Root positioning={{ placement: 'bottom-end' }}>
         <Menu.Trigger asChild>
-          <IconButton aria-label={t('models.libraryMaintenance')} size="2xs" variant="ghost">
+          <IconButton aria-label={t('models.libraryMaintenance')} size="sm" variant="ghost">
             <Icon as={MoreHorizontalIcon} boxSize="4" />
           </IconButton>
         </Menu.Trigger>
@@ -63,21 +65,28 @@ export const MaintenanceMenu = () => {
             <MenuContent minW="14rem">
               <Menu.Item value="refresh" onClick={() => void handleRefresh()}>
                 <Icon as={RefreshCcwIcon} boxSize="3.5" />
-                <Menu.ItemText fontSize="xs">{t('models.refreshList')}</Menu.ItemText>
+                <Menu.ItemText>{t('models.refreshList')}</Menu.ItemText>
               </Menu.Item>
               <Menu.Item value="sync" onClick={() => setIsSyncDialogOpen(true)}>
                 <Icon as={FolderSearchIcon} boxSize="3.5" />
-                <Menu.ItemText fontSize="xs">{t('models.cleanupOrphaned')}</Menu.ItemText>
+                <Menu.ItemText>{t('models.cleanupOrphaned')}</Menu.ItemText>
               </Menu.Item>
               <Menu.Item value="empty-cache" onClick={() => setIsEmptyCacheConfirmOpen(true)}>
                 <Icon as={BrushCleaningIcon} boxSize="3.5" />
-                <Menu.ItemText fontSize="xs">{t('models.emptyCache')}</Menu.ItemText>
+                <Menu.ItemText>{t('models.emptyCache')}</Menu.ItemText>
               </Menu.Item>
             </MenuContent>
           </Menu.Positioner>
         </Portal>
       </Menu.Root>
-      {isSyncDialogOpen ? <OrphanedModelsDialog onClose={() => setIsSyncDialogOpen(false)} /> : null}
+      {syncDialog.isMounted ? (
+        <OrphanedModelsDialog
+          key={syncDialog.generation}
+          isOpen={syncDialog.isOpen}
+          onClose={() => setIsSyncDialogOpen(false)}
+          onExitComplete={syncDialog.release}
+        />
+      ) : null}
       <ConfirmDialog
         body={t('models.emptyCacheConfirmBody')}
         confirmLabel={t('models.emptyCache')}

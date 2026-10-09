@@ -52,10 +52,10 @@ export const AccountMenu = () => {
             type="button"
             _hover={TRIGGER_HOVER}
           >
-            <Avatar.Root bg="accent.subtle" color="fg" size="2xs">
-              <Avatar.Fallback fontSize="2xs" name={label} />
+            <Avatar.Root bg="accent.subtle" color="fg" size="sm">
+              <Avatar.Fallback fontSize="xs" name={label} />
             </Avatar.Root>
-            <Text fontSize="xs" fontWeight="600">
+            <Text fontSize="md" fontWeight="600">
               {label}
             </Text>
             <Icon as={ChevronDownIcon} boxSize="3" color="fg.muted" />
@@ -67,15 +67,15 @@ export const AccountMenu = () => {
               <Box px="3" py="2">
                 <HStack justify="space-between">
                   <Stack gap="0">
-                    <Text fontSize="xs" fontWeight="600">
+                    <Text fontSize="md" fontWeight="600">
                       {label}
                     </Text>
-                    <Text color="fg.muted" fontSize="2xs">
+                    <Text color="fg.muted" fontSize="xs">
                       {user.email}
                     </Text>
                   </Stack>
                   {user.is_admin ? (
-                    <Badge colorPalette="purple" fontSize="2xs" variant="surface">
+                    <Badge colorPalette="purple" fontSize="xs" variant="surface">
                       {t('users.admin')}
                     </Badge>
                   ) : null}
