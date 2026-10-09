@@ -47,13 +47,19 @@ def _node(**fields) -> ErnieImageModelLoaderInvocation:
     return ErnieImageModelLoaderInvocation.model_construct(**{**defaults, **fields})
 
 
-def test_a_single_file_emits_the_chosen_encoder_and_vae() -> None:
+SINGLE_FILE_FORMATS = pytest.mark.parametrize("model_format", [ModelFormat.Checkpoint, ModelFormat.GGUFQuantized])
+
+
+@SINGLE_FILE_FORMATS
+def test_a_single_file_emits_the_chosen_encoder_and_vae(model_format: ModelFormat) -> None:
+    """A GGUF transformer is a single file like the safetensors one: taken for a pipeline, the node
+    would serve the encoder and VAE from a file that holds neither."""
     node = _node(
         text_encoder_model=_identifier("mistral", ModelType.MistralEncoder),
         vae_model=_identifier("vae", ModelType.VAE),
     )
 
-    output = node.invoke(_context(ModelFormat.Checkpoint))
+    output = node.invoke(_context(model_format))
 
     assert output.transformer.transformer.key == "transformer"
     assert output.transformer.transformer.submodel_type is SubModelType.Transformer
@@ -66,6 +72,7 @@ def test_a_single_file_emits_the_chosen_encoder_and_vae() -> None:
     assert output.prompt_enhancer is None
 
 
+@SINGLE_FILE_FORMATS
 @pytest.mark.parametrize(
     "fields, missing",
     [
@@ -74,11 +81,13 @@ def test_a_single_file_emits_the_chosen_encoder_and_vae() -> None:
         ({}, "Text Encoder and VAE"),
     ],
 )
-def test_a_single_file_without_its_companions_says_which_one_is_missing(fields: dict, missing: str) -> None:
+def test_a_single_file_without_its_companions_says_which_one_is_missing(
+    fields: dict, missing: str, model_format: ModelFormat
+) -> None:
     node = _node(**fields)
 
     with pytest.raises(ValueError, match=missing):
-        node.invoke(_context(ModelFormat.Checkpoint))
+        node.invoke(_context(model_format))
 
 
 def test_an_encoder_from_the_wrong_family_is_refused_by_name(monkeypatch) -> None:

@@ -26,6 +26,9 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 
+# A single file -- safetensors or GGUF -- holds the transformer alone; its companions are chosen on the node.
+_SINGLE_FILE_FORMATS = frozenset({ModelFormat.Checkpoint, ModelFormat.GGUFQuantized})
+
 
 @invocation_output("ernie_image_model_loader_output")
 class ErnieImageModelLoaderOutput(BaseInvocationOutput):
@@ -93,7 +96,7 @@ class ErnieImageModelLoaderInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> ErnieImageModelLoaderOutput:
         config = context.models.get_config(self.model)
-        is_single_file = config.format is ModelFormat.Checkpoint
+        is_single_file = config.format in _SINGLE_FILE_FORMATS
 
         if is_single_file:
             return self._load_from_single_file(context)
