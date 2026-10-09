@@ -61,6 +61,7 @@ const mocks = vi.hoisted(() => ({
   fetchNames: vi.fn(),
   fetchSparsePage: vi.fn<(filter: GalleryItemsFilter, offset: number) => Promise<GalleryItemsPage>>(),
   fetchSparseTotal: vi.fn<(filter: GalleryItemsFilter) => Promise<number>>(),
+  getGalleryItemByRef: vi.fn<(ref: { kind: string; name: string }, signal?: AbortSignal) => Promise<GalleryItem>>(),
   getItemLabel: vi.fn<GalleryUiAdapter['getItemLabel']>(),
   indexAvailability: { modelName: null, state: 'disabled' } as ImageIndexAvailability,
   measure: vi.fn(),
@@ -84,6 +85,11 @@ const mocks = vi.hoisted(() => ({
 const getNamesKey = (filter: unknown) => ['test-gallery-item-names', JSON.stringify(filter)] as const;
 const requestReveal = (itemKey: Parameters<typeof requestGalleryItemReveal>[0], absoluteIndex?: number) =>
   requestGalleryItemReveal(itemKey, accountLifecycle.capture().signal, absoluteIndex);
+
+vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  getGalleryItemByRef: mocks.getGalleryItemByRef,
+}));
 
 vi.mock('@features/gallery/data/queries', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -700,6 +706,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.fetchSparsePage.mockReset();
   mocks.fetchSparseTotal.mockReset();
+  mocks.getGalleryItemByRef.mockReset();
   registeredCommands.clear();
   currentGallery = createGallery();
   mocks.itemProgress = null;
@@ -2060,6 +2067,120 @@ describe('GalleryImageGrid virtualization', () => {
     await interact(() => registeredCommands.get('gallery.toggleFocusedInSelection')?.());
 
     expect(actionMocks.toggleItemInSelection).toHaveBeenCalledExactlyOnceWith(result, null, 2);
+  });
+
+  it('keeps the rest of the selection when Ctrl-click removes a primary whose next primary is unloaded', async () => {
+    const pageOne = createItem('image', 'page-one.png');
+    const pageSix = createItem('image', 'page-six.png');
+    currentSparseListing = {
+      itemSlots: new Map([[300, pageSix]]),
+      pageStates: new Map([[300, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }]]),
+      recentItems: [],
+      total: 400,
+    };
+    mocks.getGalleryItemByRef.mockResolvedValue(pageOne);
+
+    await renderGallery(
+      createGallery({
+        items: [pageSix],
+        selectedItemKey: 'image:page-six.png',
+        selectedItemKeys: ['image:page-one.png', 'image:page-six.png'],
+        settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' },
+      })
+    );
+    await click(getButton('Select page-six.png for preview'), { ctrlKey: true });
+
+    await vi.waitFor(() => expect(actionMocks.toggleItemInSelection).toHaveBeenCalledExactlyOnceWith(pageSix, pageOne));
+    expect(mocks.getGalleryItemByRef).toHaveBeenCalledWith({ kind: 'image', name: 'page-one.png' }, expect.anything());
+  });
+
+  it('still toggles when the unloaded next primary cannot be resolved', async () => {
+    const pageSix = createItem('image', 'page-six.png');
+    currentSparseListing = {
+      itemSlots: new Map([[300, pageSix]]),
+      pageStates: new Map([[300, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }]]),
+      recentItems: [],
+      total: 400,
+    };
+    mocks.getGalleryItemByRef.mockRejectedValue(new Error('Not found'));
+
+    await renderGallery(
+      createGallery({
+        items: [pageSix],
+        selectedItemKey: 'image:page-six.png',
+        selectedItemKeys: ['image:deleted-elsewhere.png', 'image:page-six.png'],
+        settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' },
+      })
+    );
+    await click(getButton('Select page-six.png for preview'), { ctrlKey: true });
+
+    await vi.waitFor(() => expect(actionMocks.toggleItemInSelection).toHaveBeenCalledExactlyOnceWith(pageSix, null));
+  });
+
+  it('abandons an unloaded next-primary lookup when the grid unmounts', async () => {
+    const pageSix = createItem('image', 'page-six.png');
+    let lookupSignal: AbortSignal | undefined;
+    currentSparseListing = {
+      itemSlots: new Map([[300, pageSix]]),
+      pageStates: new Map([[300, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }]]),
+      recentItems: [],
+      total: 400,
+    };
+    // Rejects on abort as a real fetch does, so the failure fallback must recognize the abort.
+    mocks.getGalleryItemByRef.mockImplementation((_ref, signal?: AbortSignal) => {
+      lookupSignal = signal;
+      return new Promise<GalleryItem>((_resolve, reject) => {
+        signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
+      });
+    });
+
+    await renderGallery(
+      createGallery({
+        items: [pageSix],
+        selectedItemKey: 'image:page-six.png',
+        selectedItemKeys: ['image:page-one.png', 'image:page-six.png'],
+        settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' },
+      })
+    );
+    await click(getButton('Select page-six.png for preview'), { ctrlKey: true });
+    await act(async () => {
+      root?.unmount();
+      await Promise.resolve();
+    });
+    root = null;
+
+    expect(lookupSignal?.aborted).toBe(true);
+    expect(actionMocks.toggleItemInSelection).not.toHaveBeenCalled();
+  });
+
+  it('drops an unloaded next-primary toggle when the selection changes before it resolves', async () => {
+    const pageOne = createItem('image', 'page-one.png');
+    const pageSix = createItem('image', 'page-six.png');
+    let resolveItem!: (item: GalleryItem) => void;
+    currentSparseListing = {
+      itemSlots: new Map([[300, pageSix]]),
+      pageStates: new Map([[300, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }]]),
+      recentItems: [],
+      total: 400,
+    };
+    mocks.getGalleryItemByRef.mockReturnValue(
+      new Promise<GalleryItem>((resolve) => {
+        resolveItem = resolve;
+      })
+    );
+    const gallery = createGallery({
+      items: [pageSix],
+      selectedItemKey: 'image:page-six.png',
+      selectedItemKeys: ['image:page-one.png', 'image:page-six.png'],
+      settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' },
+    });
+
+    await renderGallery(gallery);
+    await click(getButton('Select page-six.png for preview'), { ctrlKey: true });
+    await renderGallery({ ...gallery, selectedItemKeys: ['image:page-six.png'] });
+    await interact(() => resolveItem(pageOne));
+
+    expect(actionMocks.toggleItemInSelection).not.toHaveBeenCalled();
   });
 
   it('stamps the next primary with its sparse page when Ctrl-click removes the primary', async () => {

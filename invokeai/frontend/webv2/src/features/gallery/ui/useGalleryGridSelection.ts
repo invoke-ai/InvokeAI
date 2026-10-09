@@ -6,8 +6,9 @@ import {
   toGalleryItemKey,
   toGalleryItemRef,
 } from '@features/gallery/core/items';
-import { isDateBoardId, type GalleryItemNames } from '@features/gallery/data/backend';
+import { getGalleryItemByRef, isDateBoardId, type GalleryItemNames } from '@features/gallery/data/backend';
 import { galleryItemNamesOptions } from '@features/gallery/data/queries';
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState, type MouseEvent } from 'react';
@@ -54,18 +55,30 @@ export const useGalleryGridSelection = ({
   const selectedItemRefs = useMemo(() => gallery.selectedItemKeys.map(parseGalleryItemKey), [gallery.selectedItemKeys]);
 
   const filterIdentity = useMemo(() => JSON.stringify(filter), [filter]);
+  const selectionIdentity = gallery.selectedItemKeys.join('\n');
   const rangeInteractionContextRef = useRef({
     filterIdentity,
     selectedItemKey: gallery.primarySelectedItemKey,
+    selectionIdentity,
+  });
+
+  // Next-primary lookups end with the grid; a late result could otherwise toggle a selection changed elsewhere.
+  const nextPrimaryLookupsRef = useRef(new Set<AbortController>());
+  useMountEffect(() => () => {
+    nextPrimaryLookupsRef.current.forEach((controller) => controller.abort());
   });
 
   const syncRangeInteractionContext = useCallback(
     (node: HTMLDivElement | null) => {
       if (node) {
-        rangeInteractionContextRef.current = { filterIdentity, selectedItemKey: gallery.primarySelectedItemKey };
+        rangeInteractionContextRef.current = {
+          filterIdentity,
+          selectedItemKey: gallery.primarySelectedItemKey,
+          selectionIdentity,
+        };
       }
     },
-    [filterIdentity, gallery.primarySelectedItemKey]
+    [filterIdentity, gallery.primarySelectedItemKey, selectionIdentity]
   );
 
   const activeContextMenuTarget = useMemo(() => {
@@ -185,23 +198,56 @@ export const useGalleryGridSelection = ({
       const itemKey = toGalleryItemKey(item);
       const remainingItemKeys = gallery.selectedItemKeys.filter((key) => key !== itemKey);
       const isPrimary = gallery.selectedItemKey === itemKey;
-      const nextPrimaryItem = isPrimary
-        ? (loadedItems.find(
-            (candidate) => toGalleryItemKey(candidate) === remainingItemKeys[remainingItemKeys.length - 1]
-          ) ?? null)
-        : null;
-      // Stamp whichever item becomes primary where it sits, as a click or range does.
-      const selectionPage = isPrimary
-        ? nextPrimaryItem
-          ? getSelectionPage?.(nextPrimaryItem)
-          : undefined
-        : itemSelectionPage;
+      const nextPrimaryKey = isPrimary ? (remainingItemKeys.at(-1) ?? null) : null;
+      const loadedNextPrimary =
+        nextPrimaryKey === null
+          ? null
+          : (loadedItems.find((candidate) => toGalleryItemKey(candidate) === nextPrimaryKey) ?? null);
+      const toggle = (nextPrimaryItem: GalleryItem | null) => {
+        // Stamp whichever item becomes primary where it sits, as a click or range does.
+        const selectionPage = isPrimary
+          ? nextPrimaryItem
+            ? getSelectionPage?.(nextPrimaryItem)
+            : undefined
+          : itemSelectionPage;
 
-      if (selectionPage === undefined) {
-        actions.toggleItemInSelection(item, nextPrimaryItem);
-      } else {
-        actions.toggleItemInSelection(item, nextPrimaryItem, selectionPage);
+        if (selectionPage === undefined) {
+          actions.toggleItemInSelection(item, nextPrimaryItem);
+        } else {
+          actions.toggleItemInSelection(item, nextPrimaryItem, selectionPage);
+        }
+      };
+
+      if (nextPrimaryKey === null || loadedNextPrimary) {
+        toggle(loadedNextPrimary);
+        return;
       }
+
+      // The next primary's page has left the viewport. Without its item the toggle clears the whole selection, so
+      // resolve it first. A lookup that fails (the item was deleted elsewhere, or the request failed) still toggles
+      // rather than ignoring the click.
+      const owner = captureAccountScope();
+      const capturedContext = rangeInteractionContextRef.current;
+      const controller = new AbortController();
+      const signal = AbortSignal.any([owner.signal, controller.signal]);
+      const toggleIfCurrent = (nextPrimaryItem: GalleryItem | null) => {
+        const current = rangeInteractionContextRef.current;
+
+        if (
+          !signal.aborted &&
+          isAccountScopeCurrent(owner) &&
+          current.filterIdentity === capturedContext.filterIdentity &&
+          current.selectedItemKey === capturedContext.selectedItemKey &&
+          current.selectionIdentity === capturedContext.selectionIdentity
+        ) {
+          toggle(nextPrimaryItem);
+        }
+      };
+
+      nextPrimaryLookupsRef.current.add(controller);
+      void getGalleryItemByRef(parseGalleryItemKey(nextPrimaryKey), signal)
+        .then(toggleIfCurrent, () => toggleIfCurrent(null))
+        .finally(() => nextPrimaryLookupsRef.current.delete(controller));
     },
     [actions, gallery.selectedItemKey, gallery.selectedItemKeys, getSelectionPage, loadedItems]
   );
