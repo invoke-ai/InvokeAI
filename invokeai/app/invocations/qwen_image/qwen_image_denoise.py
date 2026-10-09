@@ -34,6 +34,7 @@ from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import Rec
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import QwenImageConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.sage_attention import sage_attention_scope
 
 
 @invocation(
@@ -484,6 +485,8 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                     force_sidecar_patching=model_is_quantized,
                 )
             )
+
+            exit_stack.enter_context(sage_attention_scope())
 
             for step_idx, t in enumerate(tqdm(timesteps_sched)):
                 # The pipeline passes timestep / 1000 to the transformer
