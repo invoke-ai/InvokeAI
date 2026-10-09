@@ -763,6 +763,20 @@
     },
     {
       "category": "GENERATION",
+      "default": "auto",
+      "description": "Attention kernel for the attention inside diffusion models. `auto` lets PyTorch choose among its exact SDPA kernels and never selects a quantized one. `sage` uses SageAttention 2 for the models listed in the SageAttention docs: faster, most at high resolutions and for video, but quantized, so images differ slightly from `auto` at the same seed. SageAttention is installed separately and needs an NVIDIA GPU with compute capability 8.0 or newer; masked attention, text encoders and VAEs keep PyTorch SDPA.",
+      "env_var": "INVOKEAI_ATTENTION_BACKEND",
+      "literal_values": [
+        "auto",
+        "sage"
+      ],
+      "name": "attention_backend",
+      "required": false,
+      "type": "typing.Literal['auto', 'sage']",
+      "validation": {}
+    },
+    {
+      "category": "GENERATION",
       "default": false,
       "description": "Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, Z-Image and Qwen-Image VAE nodes, the Anima encode and the Krea-2 style reference; other model families ignore it.",
       "env_var": "INVOKEAI_FORCE_TILED_DECODE",
