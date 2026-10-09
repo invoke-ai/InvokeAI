@@ -4292,6 +4292,31 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/recall/video/{queue_id}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Recall Video Image
+         * @description Place a gallery image in the current user's Video panel, where the panel's model takes images.
+         *
+         *     A model that takes reference images (e.g. MiniMax H3 Ref2VA) gets it as a reference: it replaces the reference
+         *     images, or with `append` joins them. A model that takes frames (e.g. Wan I2V, LTX-2) gets it as the first frame,
+         *     clearing the last; with `append` it fills the first free frame slot, and is declined when both are set. The
+         *     panel's model decides, so the outcome is reported to the user there rather than in this response.
+         */
+        post: operations["recall_video_image"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/custom_nodes/": {
         parameters: {
             query?: never;
@@ -35898,8 +35923,7 @@ export type components = {
          * @description Describes one video reference for MiniMax H3 Ref2VA.
          *
          *     'Audio only' conditions on the video's soundtrack alone (the standalone audio-reference
-         *     kind). At least one reference of the request must contribute visuals, and a conditioning
-         *     choice that includes audio requires the video to actually carry a soundtrack.
+         *     kind). A conditioning choice that includes audio requires the video to actually carry a soundtrack.
          */
         MiniMaxH3VideoReferenceInvocation: {
             /**
@@ -48428,6 +48452,40 @@ export type components = {
              */
             type: "video_output";
         };
+        /**
+         * VideoRecallImage
+         * @description The gallery image a video recall places into the Video panel.
+         */
+        VideoRecallImage: {
+            /**
+             * Image Name
+             * @description The name of the gallery image
+             */
+            image_name: string;
+            /**
+             * Width
+             * @description The image's width in pixels
+             */
+            width: number;
+            /**
+             * Height
+             * @description The image's height in pixels
+             */
+            height: number;
+        };
+        /** VideoRecallImageResponse */
+        VideoRecallImageResponse: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Queue Id */
+            queue_id: string;
+            image: components["schemas"]["VideoRecallImage"];
+            /** Append */
+            append: boolean;
+        };
         /** VideoRecallMediaResponse */
         VideoRecallMediaResponse: {
             /**
@@ -48441,7 +48499,7 @@ export type components = {
              * Action
              * @enum {string}
              */
-            action: "parameters" | "initial_video" | "reference_video" | "conditioning_video";
+            action: "parameters" | "initial_video" | "reference_video" | "conditioning_video" | "image";
             video: components["schemas"]["VideoDTO"];
             /**
              * Uploaded
@@ -48676,7 +48734,7 @@ export type components = {
              * @description What the frontend should do with the payload
              * @enum {string}
              */
-            action: "parameters" | "initial_video" | "reference_video" | "conditioning_video";
+            action: "parameters" | "initial_video" | "reference_video" | "conditioning_video" | "image";
             /**
              * Mode
              * @description For `parameters`: `remix` applies everything except the seed
@@ -48708,6 +48766,17 @@ export type components = {
              * @default null
              */
             conditioning_role: ("audio" | "video") | null;
+            /**
+             * @description For `image`: the image to place
+             * @default null
+             */
+            image: components["schemas"]["VideoRecallImage"] | null;
+            /**
+             * Append
+             * @description For `image`: add the image after the panel's own instead of replacing them -- to the reference images of a model that takes references, otherwise to the free frame slot
+             * @default false
+             */
+            append: boolean;
         };
         /**
          * VideoRecallVideo
@@ -53584,6 +53653,13 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
+            /** @description The job cannot be cancelled safely in its current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description No such job */
             415: {
                 headers: {
@@ -53622,6 +53698,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ModelInstallJob"];
                 };
+            };
+            /** @description The job cannot be paused in its current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description No such job */
             415: {
@@ -53662,6 +53745,13 @@ export interface operations {
                     "application/json": components["schemas"]["ModelInstallJob"];
                 };
             };
+            /** @description A previous download still owns the staging directory */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description No such job */
             415: {
                 headers: {
@@ -53700,6 +53790,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ModelInstallJob"];
                 };
+            };
+            /** @description A prior download is active or recovery data must be preserved */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description No such job */
             415: {
@@ -53743,6 +53840,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ModelInstallJob"];
                 };
+            };
+            /** @description A prior download is active or recovery data must be preserved */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description No such job */
             415: {
@@ -60424,6 +60528,43 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    recall_video_image: {
+        parameters: {
+            query: {
+                /** @description The name of the gallery image */
+                image_name: string;
+                /** @description Add the image after the panel's own images instead of replacing them */
+                append?: boolean;
+            };
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoRecallImageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

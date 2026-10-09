@@ -20,10 +20,11 @@ from invokeai.app.api.routers.videos import VIDEO_UPLOAD_OPENAPI_EXTRA, ingest_u
 from invokeai.app.services.events.events_common import (
     VideoRecallAction,
     VideoRecallConditioningRole,
+    VideoRecallImage,
     VideoRecallMode,
     VideoRecallVideo,
 )
-from invokeai.app.services.image_records.image_records_common import ImageCategory
+from invokeai.app.services.image_records.image_records_common import ImageCategory, ImageRecordNotFoundException
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
 from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
 from invokeai.app.services.videos.videos_common import VideoDTO
@@ -234,6 +235,13 @@ class VideoRecallMediaResponse(BaseModel):
     action: VideoRecallAction
     video: VideoDTO
     uploaded: bool = Field(description="Whether the video was uploaded into the gallery by this request")
+
+
+class VideoRecallImageResponse(BaseModel):
+    status: Literal["success"]
+    queue_id: str
+    image: VideoRecallImage
+    append: bool
 
 
 def _model_identifier(config: AnyModelConfig) -> dict[str, Any]:
@@ -709,3 +717,37 @@ async def recall_conditioning_video_upload(
 ) -> VideoRecallMediaResponse:
     """Upload a video into the gallery and set it as the current user's conditioning clip."""
     return await _place_uploaded_video(request, queue_id, "conditioning_video", board_id, current_user, role)
+
+
+@video_recall_router.post(
+    "/{queue_id}/image",
+    operation_id="recall_video_image",
+    response_model=VideoRecallImageResponse,
+)
+def recall_video_image(
+    current_user: CurrentUserOrDefault,
+    queue_id: str = Path(..., description="The queue id to perform this operation on"),
+    image_name: str = Query(..., min_length=1, max_length=255, description="The name of the gallery image"),
+    append: bool = Query(
+        default=False,
+        description="Add the image after the panel's own images instead of replacing them",
+    ),
+) -> VideoRecallImageResponse:
+    """Place a gallery image in the current user's Video panel, where the panel's model takes images.
+
+    A model that takes reference images (e.g. MiniMax H3 Ref2VA) gets it as a reference: it replaces the reference
+    images, or with `append` joins them. A model that takes frames (e.g. Wan I2V, LTX-2) gets it as the first frame,
+    clearing the last; with `append` it fills the first free frame slot, and is declined when both are set. The
+    panel's model decides, so the outcome is reported to the user there rather than in this response.
+    """
+    assert_image_move_maintenance_inactive()
+    assert_image_read_access(image_name, current_user)
+    try:
+        record = ApiDependencies.invoker.services.image_records.get(image_name)
+    except ImageRecordNotFoundException:
+        raise HTTPException(status_code=404, detail="Image not found")
+    image = VideoRecallImage(image_name=record.image_name, width=record.width, height=record.height)
+    ApiDependencies.invoker.services.events.emit_video_recall_requested(
+        queue_id, current_user.user_id, "image", image=image, append=append
+    )
+    return VideoRecallImageResponse(status="success", queue_id=queue_id, image=image, append=append)
