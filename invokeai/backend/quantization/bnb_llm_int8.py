@@ -1,3 +1,4 @@
+import logging
 import warnings
 
 import bitsandbytes as bnb
@@ -7,15 +8,32 @@ import torch
 # The utils in this file are partially inspired by:
 # https://github.com/Lightning-AI/pytorch-lightning/blob/1551a16b94f5234a4a78801098f64d0732ef5cb5/src/lightning/fabric/plugins/precision/bitsandbytes.py
 
-# bitsandbytes' LLM.int8 matmul kernel only supports fp16 activations. Our compute dtype for the
-# (T5) encoder is bf16, so bitsandbytes casts bf16->fp16 internally and emits this UserWarning on
-# *every* matmul of *every* layer. The cast is correct and intended for LLM.int8, so silence the
-# warning here (once, at import) to avoid flooding the logs on each text-encode.
-warnings.filterwarnings(
-    "ignore",
-    message=r"MatMul8bitLt: inputs will be cast from .* to float16 during quantization",
-    category=UserWarning,
-)
+_INT8_CAST_NOTICE = "MatMul8bitLt: inputs will be cast from"
+
+
+class _DropInt8CastNotice(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return not record.getMessage().startswith(_INT8_CAST_NOTICE)
+
+
+def silence_int8_cast_notice() -> None:
+    """Silence bitsandbytes' notice that LLM.int8 casts bf16 activations to fp16.
+
+    The int8 matmul kernel only takes fp16 activations, so for our bf16 encoders the cast is correct and intended, but
+    bitsandbytes reports it on *every* matmul of *every* layer: as a UserWarning up to 0.49, through the
+    `bitsandbytes.autograd._functions` logger from 0.50, which `warnings` filters do not reach. Idempotent.
+    """
+    warnings.filterwarnings(
+        "ignore",
+        message=r"MatMul8bitLt: inputs will be cast from .* to float16 during quantization",
+        category=UserWarning,
+    )
+    bnb_logger = logging.getLogger("bitsandbytes.autograd._functions")
+    if not any(isinstance(existing, _DropInt8CastNotice) for existing in bnb_logger.filters):
+        bnb_logger.addFilter(_DropInt8CastNotice())
+
+
+silence_int8_cast_notice()
 
 
 # NOTE(ryand): All of the custom state_dict manipulation logic in this file is pretty hacky. This could be made much

@@ -395,8 +395,6 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
         layers to the CPU, which BnB int8 refuses with "Some modules are dispatched on
         the CPU or the disk" (issue #9147).
         """
-        import warnings
-
         from transformers import BitsAndBytesConfig, Qwen2_5_VLConfig, Qwen2_5_VLForConditionalGeneration
 
         encoder_config = context.models.get_config(self.qwen_vl_encoder.text_encoder)
@@ -414,7 +412,11 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
                 bnb_4bit_quant_type="nf4",
             )
         else:  # int8
+            # Imported here: bitsandbytes is not installed on macOS, where the single-file path above still works.
+            from invokeai.backend.quantization.bnb_llm_int8 import silence_int8_cast_notice
+
             bnb_config = BitsAndBytesConfig(load_in_8bit=True)
+            silence_int8_cast_notice()
 
         # Load onto this worker's execution device, never `device_map="auto"`: "auto" sizes its plan from whatever
         # VRAM is free *right now* and quietly spills to the CPU when the cached models fill the card, and it shards
@@ -464,9 +466,7 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
             model_config = Qwen2_5_VLConfig.from_pretrained(str(encoder_path), local_files_only=True)
             state_dict = _read_checkpoint(encoder_path)
 
-            with MODEL_LOAD_LOCK.write_lock(), warnings.catch_warnings():
-                # BnB int8 internally casts bfloat16→float16; the warning is harmless
-                warnings.filterwarnings("ignore", message="MatMul8bitLt.*cast.*float16")
+            with MODEL_LOAD_LOCK.write_lock():
                 text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
                     None if state_dict is not None else str(encoder_path),
                     config=model_config,
