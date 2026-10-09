@@ -1884,6 +1884,67 @@ describe('GalleryImageGrid virtualization', () => {
     expect(actionMocks.selectItem).toHaveBeenCalledWith(result, 3);
   });
 
+  it('stamps a semantic result toggled by Ctrl-click or hotkey with its absolute sparse page', async () => {
+    const primary = createItem('image', 'semantic-3.png');
+    const result = createItem('image', 'semantic-125.png');
+    currentSparseListing = {
+      itemSlots: new Map([
+        [3, primary],
+        [125, result],
+      ]),
+      pageStates: new Map([[120, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }]]),
+      recentItems: [],
+      total: 181,
+    };
+
+    await renderGallery(
+      createGallery({
+        items: [primary, result],
+        selectedItemKey: 'image:semantic-3.png',
+        selectedItemKeys: ['image:semantic-3.png'],
+        semanticImageQuery: { kind: 'text', query: 'sunset' },
+        settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' },
+      })
+    );
+    await click(getButton('Select semantic-125.png for preview'), { ctrlKey: true });
+
+    expect(actionMocks.toggleItemInSelection).toHaveBeenCalledExactlyOnceWith(result, null, 2);
+
+    // The toggle hotkey resolves the focused tile's page itself.
+    actionMocks.toggleItemInSelection.mockClear();
+    await interact(() => getButton('Select semantic-125.png for preview').focus());
+    await interact(() => registeredCommands.get('gallery.toggleFocusedInSelection')?.());
+
+    expect(actionMocks.toggleItemInSelection).toHaveBeenCalledExactlyOnceWith(result, null, 2);
+  });
+
+  it('stamps the next primary with its sparse page when Ctrl-click removes the primary', async () => {
+    const remaining = createItem('image', 'semantic-70.png');
+    const primary = createItem('image', 'semantic-125.png');
+    currentSparseListing = {
+      itemSlots: new Map([
+        [70, remaining],
+        [125, primary],
+      ]),
+      pageStates: new Map([[60, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }]]),
+      recentItems: [],
+      total: 181,
+    };
+
+    await renderGallery(
+      createGallery({
+        items: [remaining, primary],
+        selectedItemKey: 'image:semantic-125.png',
+        selectedItemKeys: ['image:semantic-70.png', 'image:semantic-125.png'],
+        semanticImageQuery: { kind: 'text', query: 'sunset' },
+        settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' },
+      })
+    );
+    await click(getButton('Select semantic-125.png for preview'), { ctrlKey: true });
+
+    expect(actionMocks.toggleItemInSelection).toHaveBeenCalledExactlyOnceWith(primary, remaining, 1);
+  });
+
   it('keeps hydration gaps inside the selected paginated page', async () => {
     const first = createItem('image', 'page-2-first.png');
     const third = createItem('image', 'page-2-third.png');

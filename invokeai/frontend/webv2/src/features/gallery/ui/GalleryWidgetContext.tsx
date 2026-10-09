@@ -47,7 +47,7 @@ export interface GalleryActions {
   /** The semantic field's live text, ahead of the debounced commit. */
   setSemanticSearchText: (text: string) => void;
   setView: (galleryView: GalleryView) => void;
-  toggleItemInSelection: (item: GalleryItem, nextPrimaryItem: GalleryItem | null) => void;
+  toggleItemInSelection: (item: GalleryItem, nextPrimaryItem: GalleryItem | null, selectionPage?: number) => void;
   updateSettings: (settings: Partial<GallerySettings>) => void;
   /** Resolves with the confirmed uploads; empty when nothing landed. */
   uploadFiles: (files: File[]) => Promise<GalleryItem[]>;

@@ -438,6 +438,17 @@ export const GalleryImageGrid = () => {
   const usesSparseListing = sparseListing !== undefined;
   const isSparsePaginated = usesSparseListing && paginationMode === 'paginated';
   const sparsePageOffset = isSparsePaginated ? gallery.page * GALLERY_PAGE_SIZE : 0;
+  const sparseSelectionPages = useMemo(
+    () =>
+      sparseListing
+        ? getGallerySparseSelectionPages({ itemSlots: sparseListing.itemSlots, pageOffset: sparsePageOffset })
+        : new Map<GalleryItemKey, number>(),
+    [sparseListing, sparsePageOffset]
+  );
+  const getSelectionPage = useCallback(
+    (item: GalleryItem) => sparseSelectionPages.get(toGalleryItemKey(item)),
+    [sparseSelectionPages]
+  );
 
   const {
     actionSelectionRefs,
@@ -451,7 +462,7 @@ export const GalleryImageGrid = () => {
     selectItemRange,
     syncRangeInteractionContext,
     toggleItem,
-  } = useGalleryGridSelection();
+  } = useGalleryGridSelection({ getSelectionPage });
 
   const columnCount = getGalleryColumnCount({ imageDensityPercent, widthPx: viewportWidth });
   const sparseRecentItems = usesSparseListing ? sparseListing.recentItems : EMPTY_GALLERY_ITEMS;
@@ -564,17 +575,6 @@ export const GalleryImageGrid = () => {
     followedProgressSessionId !== null
       ? getGallerySessionNavigationKey(followedProgressSessionId)
       : gallery.selectedItemKey;
-  const sparseSelectionPages = useMemo(
-    () =>
-      sparseListing
-        ? getGallerySparseSelectionPages({ itemSlots: sparseListing.itemSlots, pageOffset: sparsePageOffset })
-        : new Map<GalleryItemKey, number>(),
-    [sparseListing, sparsePageOffset]
-  );
-  const getSelectionPage = useCallback(
-    (item: GalleryItem) => sparseSelectionPages.get(toGalleryItemKey(item)),
-    [sparseSelectionPages]
-  );
   // Thumbnails in visual order share one Tab stop. Sparse slots must retain their real row positions even when pages
   // are unloaded, and recent results sit at the order-dependent end of that listing.
   const sparseSlotEntries = useMemo(

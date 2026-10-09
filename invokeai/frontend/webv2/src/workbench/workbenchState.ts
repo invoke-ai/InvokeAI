@@ -450,6 +450,8 @@ type WorkbenchReducerAction =
       item: GalleryItem;
       nextPrimaryItem: GalleryItem | null;
       projectId?: string;
+      /** The grid page of whichever item becomes primary: the added item, or `nextPrimaryItem`. */
+      selectionPage?: number;
     }
   | {
       type: 'setGalleryMultiSelection';
@@ -3683,6 +3685,34 @@ export const createInitialWorkbenchState = (): WorkbenchState => {
   };
 };
 
+const hasGallerySelectionPage = (selectionPage: number | undefined): selectionPage is number =>
+  typeof selectionPage === 'number' && Number.isFinite(selectionPage);
+
+/** An explicit page for the item being selected, else the page the grid is on. */
+const getGallerySelectionPage = (values: Record<string, unknown>, selectionPage: number | undefined): number =>
+  hasGallerySelectionPage(selectionPage)
+    ? Math.max(0, Math.floor(selectionPage))
+    : typeof values.galleryPage === 'number' && Number.isFinite(values.galleryPage)
+      ? Math.max(0, Math.floor(values.galleryPage))
+      : 0;
+
+/** The listing the Gallery shows now, which a selection made in it navigates within. */
+const getCurrentGallerySelectionQuery = (values: Record<string, unknown>, page: number): Record<string, unknown> => {
+  const settings = getGallerySettings(values);
+  const semanticKey = gallerySemanticReferenceKey(parseGallerySemanticReference(values.semanticImageQuery));
+
+  return {
+    boardId: getGallerySelectionBoardId(values),
+    galleryView: values.galleryView === 'assets' ? 'assets' : 'images',
+    imageOrderDir: settings.imageOrderDir,
+    page,
+    paginationMode: settings.paginationMode,
+    searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
+    ...(semanticKey ? { semanticKey } : {}),
+    starredOnly: values.starredOnly === true,
+  };
+};
+
 export const __workbenchReducerInternal = (
   state: WorkbenchState,
   action: WorkbenchReducerAction,
@@ -4915,13 +4945,7 @@ export const __workbenchReducerInternal = (
       return updateGalleryValuesAndPauseLiveFollow(
         state,
         (values) => {
-          const selectedImagePage =
-            typeof action.selectionPage === 'number' && Number.isFinite(action.selectionPage)
-              ? Math.max(0, Math.floor(action.selectionPage))
-              : typeof values.galleryPage === 'number' && Number.isFinite(values.galleryPage)
-                ? Math.max(0, Math.floor(values.galleryPage))
-                : 0;
-          const settings = getGallerySettings(values);
+          const selectedImagePage = getGallerySelectionPage(values, action.selectionPage);
           const semanticKey = gallerySemanticReferenceKey(parseGallerySemanticReference(values.semanticImageQuery));
           const existingNavigationQuery =
             values.selectedImageQuery && typeof values.selectedImageQuery === 'object'
@@ -4939,16 +4963,7 @@ export const __workbenchReducerInternal = (
                     : { semanticKey: null }),
                   page: selectedImagePage,
                 }
-              : {
-                  boardId: getGallerySelectionBoardId(values),
-                  galleryView: values.galleryView === 'assets' ? 'assets' : 'images',
-                  imageOrderDir: settings.imageOrderDir,
-                  page: selectedImagePage,
-                  paginationMode: settings.paginationMode,
-                  searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
-                  ...(semanticKey ? { semanticKey } : {}),
-                  starredOnly: values.starredOnly === true,
-                };
+              : getCurrentGallerySelectionQuery(values, selectedImagePage);
           const itemKey = toGalleryItemKey(action.item);
 
           return {
@@ -4972,12 +4987,7 @@ export const __workbenchReducerInternal = (
           const selectedItemKeys = getPersistedSelectedGalleryItemKeys(values);
 
           if (!selectedItemKeys.includes(itemKey)) {
-            const settings = getGallerySettings(values);
-            const semanticKey = gallerySemanticReferenceKey(parseGallerySemanticReference(values.semanticImageQuery));
-            const selectedImagePage =
-              typeof values.galleryPage === 'number' && Number.isFinite(values.galleryPage)
-                ? Math.max(0, Math.floor(values.galleryPage))
-                : 0;
+            const selectedImagePage = getGallerySelectionPage(values, action.selectionPage);
 
             return {
               ...values,
@@ -4986,16 +4996,7 @@ export const __workbenchReducerInternal = (
               selectedImageName: itemKey,
               selectedImageNames: [...selectedItemKeys, itemKey],
               selectedImagePage,
-              selectedImageQuery: {
-                boardId: getGallerySelectionBoardId(values),
-                galleryView: values.galleryView === 'assets' ? 'assets' : 'images',
-                imageOrderDir: settings.imageOrderDir,
-                page: selectedImagePage,
-                paginationMode: settings.paginationMode,
-                searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
-                ...(semanticKey ? { semanticKey } : {}),
-                starredOnly: values.starredOnly === true,
-              },
+              selectedImageQuery: getCurrentGallerySelectionQuery(values, selectedImagePage),
             };
           }
 
@@ -5024,6 +5025,11 @@ export const __workbenchReducerInternal = (
               ? action.nextPrimaryItem
               : null;
           const nextPrimaryKey = nextPrimaryItem ? toGalleryItemKey(nextPrimaryItem) : null;
+          // The next primary keeps the old primary's stamp unless the grid knows where the next one sits.
+          const nextPrimaryPage =
+            nextPrimaryItem && hasGallerySelectionPage(action.selectionPage)
+              ? getGallerySelectionPage(values, action.selectionPage)
+              : null;
 
           return {
             ...values,
@@ -5031,6 +5037,12 @@ export const __workbenchReducerInternal = (
             selectedImage: nextPrimaryItem,
             selectedImageName: nextPrimaryKey,
             selectedImageNames: expectedNextPrimaryKey && !nextPrimaryItem ? [] : remainingItemKeys,
+            ...(nextPrimaryPage === null
+              ? {}
+              : {
+                  selectedImagePage: nextPrimaryPage,
+                  selectedImageQuery: getCurrentGallerySelectionQuery(values, nextPrimaryPage),
+                }),
           };
         },
         action.projectId
@@ -5040,14 +5052,8 @@ export const __workbenchReducerInternal = (
       return updateGalleryValuesAndPauseLiveFollow(
         state,
         (values) => {
-          const settings = getGallerySettings(values);
           const semanticKey = gallerySemanticReferenceKey(parseGallerySemanticReference(values.semanticImageQuery));
-          const hasSelectionPage = typeof action.selectionPage === 'number' && Number.isFinite(action.selectionPage);
-          const selectedImagePage = hasSelectionPage
-            ? Math.max(0, Math.floor(action.selectionPage as number))
-            : typeof values.galleryPage === 'number' && Number.isFinite(values.galleryPage)
-              ? Math.max(0, Math.floor(values.galleryPage))
-              : 0;
+          const selectedImagePage = getGallerySelectionPage(values, action.selectionPage);
           const existingNavigationQuery =
             values.selectedImageQuery && typeof values.selectedImageQuery === 'object'
               ? (values.selectedImageQuery as Record<string, unknown>)
@@ -5073,16 +5079,7 @@ export const __workbenchReducerInternal = (
                       : { semanticKey: null }),
                     page: selectedImagePage,
                   }
-                : {
-                    boardId: getGallerySelectionBoardId(values),
-                    galleryView: values.galleryView === 'assets' ? 'assets' : 'images',
-                    imageOrderDir: settings.imageOrderDir,
-                    page: selectedImagePage,
-                    paginationMode: settings.paginationMode,
-                    searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
-                    ...(semanticKey ? { semanticKey } : {}),
-                    starredOnly: values.starredOnly === true,
-                  },
+                : getCurrentGallerySelectionQuery(values, selectedImagePage),
           };
         },
         action.projectId

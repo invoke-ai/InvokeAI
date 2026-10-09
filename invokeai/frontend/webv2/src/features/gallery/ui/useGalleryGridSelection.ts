@@ -38,7 +38,12 @@ const getGalleryItemRange = (
  * Async range selection fetches beyond the loaded window; apply only if account, filter, and anchor still match
  * the captured context.
  */
-export const useGalleryGridSelection = () => {
+export const useGalleryGridSelection = ({
+  getSelectionPage,
+}: {
+  /** The sparse page stamp for a loaded listing item; selections without one stamp the grid's page. */
+  getSelectionPage?: (item: GalleryItem) => number | undefined;
+} = {}) => {
   // `loadedItems` includes the strip, whose starred items the listing window
   // may not hold; the context menu and ctrl-toggle must resolve those too.
   const { actions, filter, gallery, loadedItems, starredStrip } = useGalleryWidget();
@@ -176,19 +181,29 @@ export const useGalleryGridSelection = () => {
   );
 
   const toggleItem = useCallback(
-    (item: GalleryItem) => {
+    (item: GalleryItem, itemSelectionPage = getSelectionPage?.(item)) => {
       const itemKey = toGalleryItemKey(item);
       const remainingItemKeys = gallery.selectedItemKeys.filter((key) => key !== itemKey);
-      const nextPrimaryItem =
-        gallery.selectedItemKey === itemKey
-          ? (loadedItems.find(
-              (candidate) => toGalleryItemKey(candidate) === remainingItemKeys[remainingItemKeys.length - 1]
-            ) ?? null)
-          : null;
+      const isPrimary = gallery.selectedItemKey === itemKey;
+      const nextPrimaryItem = isPrimary
+        ? (loadedItems.find(
+            (candidate) => toGalleryItemKey(candidate) === remainingItemKeys[remainingItemKeys.length - 1]
+          ) ?? null)
+        : null;
+      // Stamp whichever item becomes primary where it sits, as a click or range does.
+      const selectionPage = isPrimary
+        ? nextPrimaryItem
+          ? getSelectionPage?.(nextPrimaryItem)
+          : undefined
+        : itemSelectionPage;
 
-      actions.toggleItemInSelection(item, nextPrimaryItem);
+      if (selectionPage === undefined) {
+        actions.toggleItemInSelection(item, nextPrimaryItem);
+      } else {
+        actions.toggleItemInSelection(item, nextPrimaryItem, selectionPage);
+      }
     },
-    [actions, gallery.selectedItemKey, gallery.selectedItemKeys, loadedItems]
+    [actions, gallery.selectedItemKey, gallery.selectedItemKeys, getSelectionPage, loadedItems]
   );
 
   const handleThumbnailClick = useCallback(
@@ -204,7 +219,7 @@ export const useGalleryGridSelection = () => {
       }
 
       if (event.ctrlKey || event.metaKey) {
-        toggleItem(item);
+        toggleItem(item, selectionPage);
       } else {
         if (selectionPage === undefined) {
           actions.selectItem(item);

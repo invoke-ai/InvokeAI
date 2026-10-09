@@ -69,7 +69,8 @@ export interface GalleryCommandsPort {
   commitSemanticSearch(text: string): void;
   clearSearch(): void;
   setView(view: GalleryView): void;
-  toggleItemSelection(item: GalleryItem, nextPrimaryItem: GalleryItem | null): void;
+  /** `selectionPage` is the grid page of whichever item becomes primary: `item` when added, else `nextPrimaryItem`. */
+  toggleItemSelection(item: GalleryItem, nextPrimaryItem: GalleryItem | null, selectionPage?: number): void;
   updateSettings(settings: Partial<GallerySettings>): void;
 }
 

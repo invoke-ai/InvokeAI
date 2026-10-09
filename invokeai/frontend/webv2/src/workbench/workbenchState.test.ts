@@ -5307,6 +5307,55 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     });
   });
 
+  it('stamps a toggled selection with the page of the item that becomes primary', () => {
+    const stamp = () => {
+      const values = getProjectWidgetValues(getActiveProject(state), 'gallery');
+
+      return { page: values.selectedImagePage, query: values.selectedImageQuery };
+    };
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: { semanticImageQuery: { kind: 'text', query: 'sunset' } },
+      widgetId: 'gallery',
+    });
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('ranked-3.png'),
+      selectionPage: 0,
+      type: 'selectGalleryItem',
+    });
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('ranked-125.png'),
+      nextPrimaryItem: null,
+      selectionPage: 2,
+      type: 'toggleGalleryItemInSelection',
+    });
+    expect(stamp()).toMatchObject({ page: 2, query: { page: 2, semanticKey: 'text:sunset' } });
+
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('ranked-70.png'),
+      nextPrimaryItem: null,
+      selectionPage: 1,
+      type: 'toggleGalleryItemInSelection',
+    });
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('ranked-70.png'),
+      nextPrimaryItem: createGalleryImageItem('ranked-125.png'),
+      selectionPage: 2,
+      type: 'toggleGalleryItemInSelection',
+    });
+    expect(stamp()).toMatchObject({ page: 2, query: { page: 2, semanticKey: 'text:sunset' } });
+
+    // Without a known page the next primary keeps the previous stamp.
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('ranked-125.png'),
+      nextPrimaryItem: createGalleryImageItem('ranked-3.png'),
+      type: 'toggleGalleryItemInSelection',
+    });
+    expect(stamp()).toMatchObject({ page: 2, query: { page: 2 } });
+  });
+
   it('ties a selected semantic result page to the active ranking', () => {
     let state = createInitialWorkbenchState();
 

@@ -168,11 +168,13 @@ const createCommands = (
         (
           item: ActionPayload<'toggleGalleryItemInSelection'>['item'],
           nextPrimaryItem: ActionPayload<'toggleGalleryItemInSelection'>['nextPrimaryItem'],
-          projectId?: string
+          projectId?: string,
+          selectionPage?: number
         ) => ({
           item,
           nextPrimaryItem,
           projectId,
+          selectionPage,
         })
       ),
       selectImage: (
