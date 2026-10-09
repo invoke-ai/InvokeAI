@@ -369,3 +369,55 @@ class TestTokenSecurity:
             header = json.loads(base64.urlsafe_b64decode(header_b64))
             # Should use HS256 algorithm
             assert header.get("alg") == "HS256"
+
+
+class TestTokenRemainingSeconds:
+    """Tests for the remaining-lifetime helper behind the media cookie."""
+
+    def test_numeric_string_exp_does_not_raise(self):
+        """PyJWT accepts any `exp` that `int()` takes, so a validly signed numeric-string claim reaches the arithmetic."""
+        import jwt
+
+        from invokeai.app.services.auth.token_service import ALGORITHM, get_jwt_secret, get_token_remaining_seconds
+
+        exp = int(time.time()) + 3600
+        token = jwt.encode(
+            {"user_id": "user123", "email": "test@example.com", "is_admin": False, "exp": str(exp)},
+            get_jwt_secret(),
+            algorithm=ALGORITHM,
+        )
+
+        remaining = get_token_remaining_seconds(token)
+
+        assert remaining is not None and 3500 < remaining <= 3600
+
+
+class TestTokenAlgorithmHandling:
+    """Signature checks that a corrupted-base64 token cannot exercise: these decode cleanly."""
+
+    _ADMIN_CLAIMS = {"user_id": "user123", "email": "test@example.com", "is_admin": True}
+
+    def test_rejects_token_signed_with_another_key(self):
+        import jwt
+
+        from invokeai.app.services.auth.token_service import ALGORITHM
+
+        token = jwt.encode(self._ADMIN_CLAIMS, "another-secret-key-of-sufficient-length-for-hs256", algorithm=ALGORITHM)
+
+        assert verify_token(token) is None
+
+    def test_rejects_unsigned_token(self):
+        import jwt
+
+        token = jwt.encode(self._ADMIN_CLAIMS, key=None, algorithm="none")
+
+        assert verify_token(token) is None
+
+    def test_rejects_other_hmac_algorithm_with_the_real_secret(self):
+        import jwt
+
+        from invokeai.app.services.auth.token_service import get_jwt_secret
+
+        token = jwt.encode(self._ADMIN_CLAIMS, get_jwt_secret(), algorithm="HS512")
+
+        assert verify_token(token) is None
