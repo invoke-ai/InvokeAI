@@ -1,3 +1,4 @@
+import type { BoxProps } from '@chakra-ui/react';
 import type { PanelProps } from '@platform/ui';
 
 import { Box } from '@chakra-ui/react';
@@ -14,6 +15,6 @@ export const CanvasFloatingBar = ({ children, ...rest }: PanelProps) => (
 );
 
 /** A thin vertical rule separating groups of controls inside a {@link CanvasFloatingBar}. */
-export const CanvasFloatingBarDivider = () => (
-  <Box alignSelf="stretch" bg="border.subtle" flexShrink="0" my="0.5" w="1px" />
+export const CanvasFloatingBarDivider = (props: Pick<BoxProps, 'css'>) => (
+  <Box alignSelf="stretch" bg="border.subtle" flexShrink="0" my="0.5" w="1px" {...props} />
 );

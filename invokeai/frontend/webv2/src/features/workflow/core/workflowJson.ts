@@ -11,7 +11,9 @@ import type {
   WorkflowNode,
 } from './types';
 
+import { clearSavedWorkflowDynamicFields } from './callSavedWorkflow';
 import { createWorkflowForm, createWorkflowId } from './document';
+import { isInvocationNode } from './types';
 
 /**
  * Round-trip legacy WorkflowV3 files, metadata, and library records; recover unknown elements and dangling edges
@@ -420,7 +422,12 @@ export const parseWorkflowJson = (raw: unknown): ParsedWorkflow => {
 };
 
 const serializeInvocationNode = (node: Extract<WorkflowNode, { type: 'invocation' }>) => {
-  const { callSavedWorkflowStatus: _callSavedWorkflowStatus, ...data } = structuredClone(node.data);
+  // Editor reconciliation state stays with the project; a portable document starts from its current selection.
+  const {
+    callSavedWorkflowFieldsFrom: _callSavedWorkflowFieldsFrom,
+    callSavedWorkflowStatus: _callSavedWorkflowStatus,
+    ...data
+  } = structuredClone(node.data);
 
   return {
     data: { ...data, id: node.id },
@@ -431,46 +438,66 @@ const serializeInvocationNode = (node: Extract<WorkflowNode, { type: 'invocation
 };
 
 /**
+ * A Call Saved Workflow node that is still switching (`callSavedWorkflowFieldsFrom`) holds the previous workflow's
+ * dynamic inputs under the new selection. The JSON has no switch state, so a reopen would treat those inputs as the
+ * selection's own: a refresh keeps their values and a failed load keeps their connections. A portable document
+ * therefore writes such a node as a fresh selection: no dynamic inputs, templates, connections or form fields, which a
+ * reopen builds from the selected workflow itself.
+ */
+const toPortableDocument = (document: ProjectGraphState): ProjectGraphState =>
+  document.nodes.reduce(
+    (portable, node) =>
+      isInvocationNode(node) && node.data.callSavedWorkflowFieldsFrom !== undefined
+        ? clearSavedWorkflowDynamicFields(portable, node.id)
+        : portable,
+    document
+  );
+
+/**
  * Serializes the document to legacy WorkflowV3 JSON (loadable by the v6 editor and the library backend). The JSON
  * carries a library record id only when the caller names one: a portable file or a new template has none.
  */
 export const serializeWorkflowJson = (
-  document: ProjectGraphState,
+  source: ProjectGraphState,
   options: { libraryWorkflowId?: string } = {}
-): Record<string, unknown> => ({
-  author: document.author,
-  contact: document.contact,
-  description: document.description,
-  edges: document.edges.map((edge) => ({ ...edge })),
-  exposedFields: [],
-  form: {
-    elements: structuredClone(document.form.elements),
-    rootElementId: document.form.rootElementId,
-  },
-  ...(options.libraryWorkflowId ? { id: options.libraryWorkflowId } : {}),
-  meta: { category: 'user', version: '3.0.0' },
-  name: document.name,
-  nodes: document.nodes.map((node) =>
-    node.type === 'connector'
-      ? {
-          data: { ...node.data, id: node.id, isOpen: true, type: 'connector' },
-          id: node.id,
-          position: { ...node.position },
-          type: node.type,
-        }
-      : node.type === 'notes' || node.type === 'current_image'
+): Record<string, unknown> => {
+  const document = toPortableDocument(source);
+
+  return {
+    author: document.author,
+    contact: document.contact,
+    description: document.description,
+    edges: document.edges.map((edge) => ({ ...edge })),
+    exposedFields: [],
+    form: {
+      elements: structuredClone(document.form.elements),
+      rootElementId: document.form.rootElementId,
+    },
+    ...(options.libraryWorkflowId ? { id: options.libraryWorkflowId } : {}),
+    meta: { category: 'user', version: '3.0.0' },
+    name: document.name,
+    nodes: document.nodes.map((node) =>
+      node.type === 'connector'
         ? {
-            data: { ...node.data, id: node.id, isOpen: true },
+            data: { ...node.data, id: node.id, isOpen: true, type: 'connector' },
             id: node.id,
             position: { ...node.position },
             type: node.type,
           }
-        : serializeInvocationNode(node)
-  ),
-  notes: document.notes,
-  tags: document.tags,
-  version: document.workflowVersion,
-});
+        : node.type === 'notes' || node.type === 'current_image'
+          ? {
+              data: { ...node.data, id: node.id, isOpen: true },
+              id: node.id,
+              position: { ...node.position },
+              type: node.type,
+            }
+          : serializeInvocationNode(node)
+    ),
+    notes: document.notes,
+    tags: document.tags,
+    version: document.workflowVersion,
+  };
+};
 
 /** True when the legacy WorkflowWithoutID schema can accept the workflow's output contract. */
 export const hasMultipleWorkflowReturnNodes = (document: ProjectGraphState): boolean =>

@@ -2,7 +2,7 @@ import type { CanvasLayerContract, CanvasMaskFillContract } from '@workbench/can
 import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
 import { getDocumentLayer } from '@workbench/canvas-engine/api';
-import { useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
+import { baselineConfig, useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -26,15 +26,17 @@ export interface MaskTintEditor {
 }
 
 /**
- * Capture layer, original fill, latest color, and timer together so commits survive rerenders, disarming, and
- * unmount.
+ * Capture the layer id, latest color, and timer together so commits survive rerenders, disarming, and unmount. The
+ * engine's preview session holds the fill the gesture started from.
  */
 interface TintGesture {
-  layer: MaskLayer;
-  before: CanvasMaskFillContract;
+  layerId: string;
   latestHex: string;
   timer: ReturnType<typeof setTimeout> | null;
 }
+
+const isMaskLayer = (layer: CanvasLayerContract | null): layer is MaskLayer =>
+  layer?.type === 'inpaint_mask' || layer?.type === 'regional_guidance';
 
 const configFor = (layer: MaskLayer, fill: CanvasMaskFillContract) =>
   layer.type === 'inpaint_mask'
@@ -67,17 +69,15 @@ export const useMaskTintEditor = (engine: MaskTintEngine | null): MaskTintEditor
     if (gesture.timer !== null) {
       clearTimeout(gesture.timer);
     }
-    if (gesture.before.color === gesture.latestHex) {
-      return;
-    }
-    commitPrepared(t('widgets.layers.maskFill.fill'), (model) =>
-      model.prepare({
-        before: configFor(gesture.layer, gesture.before),
-        config: configFor(gesture.layer, { ...gesture.before, color: gesture.latestHex }),
-        id: gesture.layer.id,
-        type: 'patch-config',
-      })
-    );
+    // A gesture ending on the color it started from prepares nothing, which drops its previews.
+    commitPrepared(t('widgets.layers.maskFill.fill'), (model, baseline) => {
+      const live = model.getLayer(gesture.layerId);
+      if (!isMaskLayer(live)) {
+        return { ids: [gesture.layerId], status: 'missing' };
+      }
+      const config = configFor(live, { ...live.mask.fill, color: gesture.latestHex });
+      return model.prepare({ before: baselineConfig(baseline, config), config, id: live.id, type: 'patch-config' });
+    });
   }, [commitPrepared, t]);
   const settleRef = useRef(settle);
   useEffect(() => {
@@ -113,7 +113,7 @@ export const useMaskTintEditor = (engine: MaskTintEngine | null): MaskTintEditor
         return;
       }
       if (gestureRef.current === null) {
-        gestureRef.current = { before: layer.mask.fill, latestHex: hex, layer, timer: null };
+        gestureRef.current = { latestHex: hex, layerId: layer.id, timer: null };
       } else {
         gestureRef.current.latestHex = hex;
       }

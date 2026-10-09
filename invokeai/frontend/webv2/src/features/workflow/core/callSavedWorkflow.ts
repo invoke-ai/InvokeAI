@@ -139,7 +139,11 @@ export const shouldSyncSavedWorkflowDynamicFields = ({
   workflow: ProjectGraphState | undefined;
 }): boolean => !workflowId || workflow !== undefined;
 
-/** Returns dynamic inbound edges that no longer have a compatible target field. */
+/**
+ * Returns the dynamic inbound edges the next signature cannot take: every edge into an input it does not have, and
+ * every resolvable edge whose source type it does not accept. An edge from a connector with nothing upstream yet has
+ * no type to check, so it stays while its input does.
+ */
 export const getSavedWorkflowDynamicEdgeIdsToRemove = (
   document: Pick<ProjectGraphState, 'edges' | 'nodes'>,
   nodeId: string,
@@ -147,9 +151,11 @@ export const getSavedWorkflowDynamicEdgeIdsToRemove = (
   templates: InvocationTemplates
 ): string[] => {
   const nextFieldTemplates = new Map(fields.map((field) => [field.fieldName, field.fieldTemplate]));
-  const resolvedEdges = getResolvedWorkflowEdges(document.nodes, document.edges, templates);
+  const resolvedEdges = new Map(
+    getResolvedWorkflowEdges(document.nodes, document.edges, templates).map((edge) => [edge.id, edge])
+  );
 
-  return resolvedEdges.flatMap((edge) => {
+  return document.edges.flatMap((edge) => {
     if (
       edge.type !== 'default' ||
       edge.target !== nodeId ||
@@ -159,15 +165,22 @@ export const getSavedWorkflowDynamicEdgeIdsToRemove = (
     }
 
     const targetTemplate = nextFieldTemplates.get(edge.targetHandle);
-    const sourceNode = document.nodes.find((node) => node.id === edge.source);
-    const sourceTemplate = sourceNode && isInvocationNode(sourceNode) ? templates[sourceNode.data.type] : undefined;
-    const sourceField = sourceTemplate?.outputs[edge.sourceHandle];
 
-    return targetTemplate && targetTemplate.input !== 'direct' && sourceField
-      ? validateConnectionTypes(sourceField.type, targetTemplate.type)
-        ? []
-        : [edge.id]
-      : [edge.id];
+    if (!targetTemplate || targetTemplate.input === 'direct') {
+      return [edge.id];
+    }
+
+    const resolved = resolvedEdges.get(edge.id);
+
+    if (!resolved) {
+      return [];
+    }
+
+    const sourceNode = document.nodes.find((node) => node.id === resolved.source);
+    const sourceTemplate = sourceNode && isInvocationNode(sourceNode) ? templates[sourceNode.data.type] : undefined;
+    const sourceField = sourceTemplate?.outputs[resolved.sourceHandle];
+
+    return sourceField && validateConnectionTypes(sourceField.type, targetTemplate.type) ? [] : [edge.id];
   });
 };
 
@@ -198,9 +211,11 @@ const removeFormElement = (form: WorkflowForm, elementId: string): WorkflowForm 
 };
 
 /**
- * Applies the selected child workflow's field signature to a call node.
- * Existing values survive compatible refreshes; incompatible or new fields use
- * the child workflow's initial values.
+ * Applies the selected child workflow's field signature to a call node. A refresh of the same workflow keeps
+ * compatible values and the user's label and description overrides; incompatible or new fields use the child
+ * workflow's initial values. After another workflow was selected every field starts from that workflow's own values,
+ * even where the two share field identities (copies of one template): only connections carry over, which the caller
+ * filters through `edgeIdsToRemove`.
  */
 export const syncCallSavedWorkflowFields = (
   document: ProjectGraphState,
@@ -215,22 +230,24 @@ export const syncCallSavedWorkflowFields = (
     return document;
   }
 
+  const { callSavedWorkflowFieldsFrom, ...data } = node.data;
+  const isSwitch = callSavedWorkflowFieldsFrom !== undefined;
   const uniqueFields = fields.filter(
     (field, index) => fields.findIndex((candidate) => candidate.fieldName === field.fieldName) === index
   );
   const nextFieldNames = new Set(uniqueFields.map((field) => field.fieldName));
-  const previousTemplates = node.data.dynamicInputTemplates ?? {};
-  const nextInputs: typeof node.data.inputs = {};
-  const nextTemplates: NonNullable<typeof node.data.dynamicInputTemplates> = {};
+  const previousTemplates = isSwitch ? {} : (data.dynamicInputTemplates ?? {});
+  const nextInputs: typeof data.inputs = {};
+  const nextTemplates: NonNullable<typeof data.dynamicInputTemplates> = {};
 
-  for (const [name, instance] of Object.entries(node.data.inputs)) {
+  for (const [name, instance] of Object.entries(data.inputs)) {
     if (!name.startsWith(CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX)) {
       nextInputs[name] = instance;
     }
   }
 
   for (const field of uniqueFields) {
-    const previous = node.data.inputs[field.fieldName];
+    const previous = isSwitch ? undefined : data.inputs[field.fieldName];
     const previousTemplate = previousTemplates[field.fieldName];
     const keepValue =
       previous !== undefined &&
@@ -264,7 +281,7 @@ export const syncCallSavedWorkflowFields = (
 
   const nextNode: WorkflowInvocationNode = {
     ...node,
-    data: { ...node.data, callSavedWorkflowStatus: status, dynamicInputTemplates: nextTemplates, inputs: nextInputs },
+    data: { ...data, callSavedWorkflowStatus: status, dynamicInputTemplates: nextTemplates, inputs: nextInputs },
   };
 
   const removedEdgeIds = new Set(edgeIdsToRemove);
@@ -286,8 +303,15 @@ export const syncCallSavedWorkflowFields = (
   };
 };
 
-/** Used when a call node is cleared or retargeted before the next child query resolves. */
-export const clearSavedWorkflowDynamicFields = (document: ProjectGraphState, nodeId: string): ProjectGraphState => {
+/**
+ * Removes a call node's dynamic inputs and every connection into them: its selection was cleared, or the newly
+ * selected workflow could not be loaded and the inputs left describe the previous one.
+ */
+export const clearSavedWorkflowDynamicFields = (
+  document: ProjectGraphState,
+  nodeId: string,
+  status: CallSavedWorkflowStatus = 'ready'
+): ProjectGraphState => {
   const node = document.nodes.find((candidate) => candidate.id === nodeId);
 
   if (!node || !isInvocationNode(node) || node.data.type !== 'call_saved_workflow') {
@@ -309,8 +333,45 @@ export const clearSavedWorkflowDynamicFields = (document: ProjectGraphState, nod
     },
     nodeId,
     [],
-    edgeIds
+    edgeIds,
+    status
   );
+};
+
+const getSelectedWorkflowId = (node: WorkflowInvocationNode): string => {
+  const value = node.data.inputs.workflow_id?.value;
+
+  return typeof value === 'string' ? value : '';
+};
+
+/**
+ * Starts loading another selected workflow. The current dynamic inputs and their connections stay until its signature
+ * arrives, remembered as built from the workflow they came from; selecting that workflow again before then makes them
+ * current once more.
+ */
+export const beginCallSavedWorkflowSwitch = (
+  document: ProjectGraphState,
+  nodeId: string,
+  workflowId: string
+): ProjectGraphState => {
+  const node = document.nodes.find((candidate) => candidate.id === nodeId);
+
+  if (!node || !isInvocationNode(node) || node.data.type !== 'call_saved_workflow') {
+    return document;
+  }
+
+  const { callSavedWorkflowFieldsFrom, ...data } = node.data;
+  const fieldsFrom = callSavedWorkflowFieldsFrom ?? getSelectedWorkflowId(node);
+  const nextNode: WorkflowInvocationNode = {
+    ...node,
+    data: {
+      ...data,
+      callSavedWorkflowStatus: 'loading',
+      ...(fieldsFrom === workflowId ? {} : { callSavedWorkflowFieldsFrom: fieldsFrom }),
+    },
+  };
+
+  return { ...document, nodes: document.nodes.map((candidate) => (candidate.id === nodeId ? nextNode : candidate)) };
 };
 
 export const setCallSavedWorkflowStatus = (
@@ -322,6 +383,13 @@ export const setCallSavedWorkflowStatus = (
 
   if (!node || !isInvocationNode(node) || node.data.type !== 'call_saved_workflow') {
     return document;
+  }
+
+  // A workflow that cannot be loaded leaves no signature to replace the previous workflow's inputs with, and those no
+  // longer describe the selection. Inputs built from the selection itself stay through a failure: a transient
+  // revalidation error must not cost the user's connections.
+  if (status === 'error' && node.data.callSavedWorkflowFieldsFrom !== undefined) {
+    return clearSavedWorkflowDynamicFields(document, nodeId, 'error');
   }
 
   if (node.data.callSavedWorkflowStatus === status) {

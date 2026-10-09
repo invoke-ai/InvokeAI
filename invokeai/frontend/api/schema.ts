@@ -2335,6 +2335,74 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/app/gallery/maintenance/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Gallery Maintenance */
+        post: operations["preview_gallery_maintenance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/gallery/maintenance/remove-missing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Remove Missing Images */
+        post: operations["remove_missing_images"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/gallery/maintenance/archive-untracked": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive Untracked Images */
+        post: operations["archive_untracked_images"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/gallery/maintenance/regenerate-thumbnails": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Regenerate Missing Thumbnails */
+        post: operations["regenerate_missing_thumbnails"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/boards/": {
         parameters: {
             query?: never;
@@ -2597,6 +2665,23 @@ export type paths = {
          * @description Retrieves all **unique related model keys** for a list of given models. This is useful for contextual suggestions or filtering.
          */
         post: operations["get_related_models_batch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/frontend_config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Frontend Config */
+        get: operations["get_frontend_config"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2948,7 +3033,12 @@ export type paths = {
         };
         /**
          * Get Queue Item Ids
-         * @description Gets all queue item ids that match the given parameters.
+         * @description Gets the queue item ids that match the given parameters, ordered by creation time.
+         *
+         *     `total_count` is the number of ids in `item_ids`. Without `limit`, every matching id is returned, so it
+         *     equals the number of matching items. With `limit`, only the first `limit` ids of the same order are
+         *     returned, and it is not a total (counting every match would read the whole queue history); use the queue
+         *     status for totals.
          *
          *     IDs for every user's items are returned (item ids carry no sensitive data on their own).
          *     When the corresponding items are hydrated via get_queue_items_by_item_ids, those belonging
@@ -4172,7 +4262,8 @@ export type paths = {
          * Recall Conditioning Video
          * @description Set a gallery video as the current user's conditioning clip (models that take one, e.g. LTX-2).
          *
-         *     The clip replaces the panel's other conditioning media: frames, initial video and references.
+         *     The clip replaces the panel's initial video and references, and in the `video` role its first and last frames;
+         *     in the `audio` role the frames stay, anchoring the picture generated for the soundtrack.
          */
         post: operations["recall_conditioning_video"];
         delete?: never;
@@ -4195,6 +4286,31 @@ export type paths = {
          * @description Upload a video into the gallery and set it as the current user's conditioning clip.
          */
         post: operations["recall_conditioning_video_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recall/video/{queue_id}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Recall Video Image
+         * @description Place a gallery image in the current user's Video panel, where the panel's model takes images.
+         *
+         *     A model that takes reference images (e.g. MiniMax H3 Ref2VA) gets it as a reference: it replaces the reference
+         *     images, or with `append` joins them. A model that takes frames (e.g. Wan I2V, LTX-2) gets it as the first frame,
+         *     clearing the last; with `append` it fills the first free frame slot, and is declined when both are set. The
+         *     panel's model decides, so the outcome is reported to the user there rather than in this response.
+         */
+        post: operations["recall_video_image"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5554,7 +5670,7 @@ export type components = {
              * Control Kinds
              * @description Sorted.
              */
-            control_kinds?: ("controlnet" | "t2i_adapter" | "control_lora" | "z_image_control")[];
+            control_kinds?: ("controlnet" | "t2i_adapter" | "control_lora" | "z_image_control" | "anima_lllite")[];
             /**
              * Max Reference Images
              * @default 0
@@ -16113,6 +16229,17 @@ export type components = {
             type: "freeu";
         };
         /**
+         * FrontendConfig
+         * @description Presentation settings any signed-in user may read; never include private runtime configuration here.
+         */
+        FrontendConfig: {
+            /**
+             * Show Donation Link
+             * @description Whether to show the Donate to InvokeAI menu link
+             */
+            show_donation_link: boolean;
+        };
+        /**
          * GalleryItem
          * @description A gallery item — either an image or a video, with shared fields and a discriminator.
          *
@@ -16252,6 +16379,67 @@ export type components = {
              * @description The unique name of the image or video.
              */
             name: string;
+        };
+        /** GalleryMaintenanceExecuteRequest */
+        GalleryMaintenanceExecuteRequest: {
+            /** Fingerprint */
+            fingerprint: string;
+        };
+        /**
+         * GalleryMaintenanceOperation
+         * @enum {string}
+         */
+        GalleryMaintenanceOperation: "remove_missing" | "archive_untracked" | "regenerate_thumbnails";
+        /** GalleryMaintenancePreview */
+        GalleryMaintenancePreview: {
+            operation: components["schemas"]["GalleryMaintenanceOperation"];
+            /** Fingerprint */
+            fingerprint: string;
+            /** Examined Count */
+            examined_count: number;
+            /** Affected Count */
+            affected_count: number;
+            /** Skipped Count */
+            skipped_count: number;
+            /** Error Count */
+            error_count: number;
+            /** Errors */
+            errors?: string[];
+            /** Archive Path */
+            archive_path?: string | null;
+        };
+        /** GalleryMaintenancePreviewRequest */
+        GalleryMaintenancePreviewRequest: {
+            operation: components["schemas"]["GalleryMaintenanceOperation"];
+        };
+        /** GalleryMaintenanceResult */
+        GalleryMaintenanceResult: {
+            operation: components["schemas"]["GalleryMaintenanceOperation"];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "completed" | "partial" | "no_op" | "failed";
+            /** Examined Count */
+            examined_count: number;
+            /** Skipped Count */
+            skipped_count: number;
+            /** Failed Count */
+            failed_count: number;
+            /** Records Removed */
+            records_removed: number;
+            /** Images Archived */
+            images_archived: number;
+            /** Thumbnails Archived */
+            thumbnails_archived: number;
+            /** Thumbnails Regenerated */
+            thumbnails_regenerated: number;
+            /** Archive Path */
+            archive_path?: string | null;
+            /** Backup Path */
+            backup_path?: string | null;
+            /** Errors */
+            errors?: string[];
         };
         /**
          * Gemini Image Generation
@@ -22325,6 +22513,7 @@ export type components = {
          *         allow_headers: Headers allowed for CORS.
          *         ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.
          *         ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.
+         *         show_donation_link: Show the Donate to InvokeAI link in the frontend menus.
          *         log_tokenization: Enable logging of parsed prompt tokens.
          *         patchmatch: Enable patchmatch inpaint code.
          *         models_dir: Path to the models directory.
@@ -22487,6 +22676,12 @@ export type components = {
              * @default 9
              */
             http_compression_level?: number;
+            /**
+             * Show Donation Link
+             * @description Show the Donate to InvokeAI link in the frontend menus.
+             * @default true
+             */
+            show_donation_link?: boolean;
             /**
              * Log Tokenization
              * @description Enable logging of parsed prompt tokens.
@@ -23540,7 +23735,7 @@ export type components = {
             item_ids: number[];
             /**
              * Total Count
-             * @description Total number of queue items matching the query
+             * @description Number of ids in item_ids. Equals the number of matching items only when no limit is given; use the queue status for totals
              */
             total_count: number;
         };
@@ -35729,8 +35924,7 @@ export type components = {
          * @description Describes one video reference for MiniMax H3 Ref2VA.
          *
          *     'Audio only' conditions on the video's soundtrack alone (the standalone audio-reference
-         *     kind). At least one reference of the request must contribute visuals, and a conditioning
-         *     choice that includes audio requires the video to actually carry a soundtrack.
+         *     kind). A conditioning choice that includes audio requires the video to actually carry a soundtrack.
          */
         MiniMaxH3VideoReferenceInvocation: {
             /**
@@ -48259,6 +48453,40 @@ export type components = {
              */
             type: "video_output";
         };
+        /**
+         * VideoRecallImage
+         * @description The gallery image a video recall places into the Video panel.
+         */
+        VideoRecallImage: {
+            /**
+             * Image Name
+             * @description The name of the gallery image
+             */
+            image_name: string;
+            /**
+             * Width
+             * @description The image's width in pixels
+             */
+            width: number;
+            /**
+             * Height
+             * @description The image's height in pixels
+             */
+            height: number;
+        };
+        /** VideoRecallImageResponse */
+        VideoRecallImageResponse: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Queue Id */
+            queue_id: string;
+            image: components["schemas"]["VideoRecallImage"];
+            /** Append */
+            append: boolean;
+        };
         /** VideoRecallMediaResponse */
         VideoRecallMediaResponse: {
             /**
@@ -48272,7 +48500,7 @@ export type components = {
              * Action
              * @enum {string}
              */
-            action: "parameters" | "initial_video" | "reference_video" | "conditioning_video";
+            action: "parameters" | "initial_video" | "reference_video" | "conditioning_video" | "image";
             video: components["schemas"]["VideoDTO"];
             /**
              * Uploaded
@@ -48507,7 +48735,7 @@ export type components = {
              * @description What the frontend should do with the payload
              * @enum {string}
              */
-            action: "parameters" | "initial_video" | "reference_video" | "conditioning_video";
+            action: "parameters" | "initial_video" | "reference_video" | "conditioning_video" | "image";
             /**
              * Mode
              * @description For `parameters`: `remix` applies everything except the seed
@@ -48539,6 +48767,17 @@ export type components = {
              * @default null
              */
             conditioning_role: ("audio" | "video") | null;
+            /**
+             * @description For `image`: the image to place
+             * @default null
+             */
+            image: components["schemas"]["VideoRecallImage"] | null;
+            /**
+             * Append
+             * @description For `image`: add the image after the panel's own instead of replacing them -- to the reference images of a model that takes references, otherwise to the free frame slot
+             * @default false
+             */
+            append: boolean;
         };
         /**
          * VideoRecallVideo
@@ -56088,6 +56327,278 @@ export interface operations {
             };
         };
     };
+    preview_gallery_maintenance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GalleryMaintenancePreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GalleryMaintenancePreview"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Admin privileges required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Gallery maintenance is already active */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Gallery maintenance preview failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Gallery maintenance unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    remove_missing_images: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GalleryMaintenanceExecuteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GalleryMaintenanceResult"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Admin privileges required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Preview is stale or image storage is busy */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Gallery maintenance failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Gallery maintenance unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    archive_untracked_images: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GalleryMaintenanceExecuteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GalleryMaintenanceResult"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Admin privileges required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Preview is stale or image storage is busy */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Gallery maintenance failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Gallery maintenance unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    regenerate_missing_thumbnails: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GalleryMaintenanceExecuteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GalleryMaintenanceResult"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Admin privileges required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Preview is stale or image storage is busy */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Gallery maintenance failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Gallery maintenance unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     list_boards: {
         parameters: {
             query?: {
@@ -56731,6 +57242,26 @@ export interface operations {
             };
         };
     };
+    get_frontend_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FrontendConfig"];
+                };
+            };
+        };
+    };
     app_version: {
         parameters: {
             query?: never;
@@ -57302,6 +57833,8 @@ export interface operations {
                 order_dir?: components["schemas"]["SQLiteDirection"];
                 /** @description Only include queue items whose origin starts with this prefix */
                 origin_prefix?: string | null;
+                /** @description Return at most this many ids, from the start of the requested order. Omit to return every matching id */
+                limit?: number | null;
             };
             header?: never;
             path: {
@@ -59961,6 +60494,43 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    recall_video_image: {
+        parameters: {
+            query: {
+                /** @description The name of the gallery image */
+                image_name: string;
+                /** @description Add the image after the panel's own images instead of replacing them */
+                append?: boolean;
+            };
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoRecallImageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

@@ -1,7 +1,6 @@
-import { Dialog, Link, Portal, Stack, Text } from '@chakra-ui/react';
-import { useMountEffect } from '@platform/react/useMountEffect';
+import { Link, Portal, Stack, Text } from '@chakra-ui/react';
 import { Button } from '@platform/ui/Button';
-import { registerHotkeyModalLayer } from '@workbench/hotkeys/modalLayer';
+import { Dialog } from '@platform/ui/Dialog';
 import { patchWorkbenchPreferences, useWorkbenchSettingsSelector } from '@workbench/settings/store';
 import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,13 +8,6 @@ import { useTranslation } from 'react-i18next';
 const ISSUES_URL = 'https://github.com/invoke-ai/InvokeAI/issues';
 
 const acknowledge = () => void patchWorkbenchPreferences({ alphaNoticeAcknowledged: true });
-
-/** Mounted only while the notice is open: workbench hotkeys stay quiet under it, as under the other dialogs. */
-const AlphaNoticeModalLayer = () => {
-  useMountEffect(() => registerHotkeyModalLayer('alpha-notice'));
-
-  return null;
-};
 
 /** Wait for account preferences before showing the notice; dismissal follows the account. */
 export const AlphaNoticeDialog = ({ onExitComplete }: { onExitComplete?: () => void }) => {
@@ -41,7 +33,6 @@ export const AlphaNoticeDialog = ({ onExitComplete }: { onExitComplete?: () => v
       onExitComplete={onExitComplete}
       onOpenChange={handleOpenChange}
     >
-      {isOpen ? <AlphaNoticeModalLayer /> : null}
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
