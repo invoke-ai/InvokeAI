@@ -50,7 +50,11 @@ def _make_video(tmp_dir: Path, wavs: list[tuple[np.ndarray, int]]) -> Path:
     args += ["-map", "0:v:0"]
     for index in range(len(wav_paths)):
         args += ["-map", f"{index + 1}:a:0"]
-    args += ["-c:v", "copy", "-c:a", "aac", str(out)]
+    args += ["-c:v", "copy", "-c:a", "aac"]
+    if len(wav_paths) > 1:
+        # Default stream 1 forces ffmpeg's automatic selection away from stream 0.
+        args += ["-disposition:a:0", "0", "-disposition:a:1", "default"]
+    args += [str(out)]
     subprocess.run(args, check=True, capture_output=True, timeout=120)
     return out
 

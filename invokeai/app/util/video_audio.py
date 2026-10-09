@@ -64,6 +64,7 @@ def extract_audio_pcm(video_path: Path, *, float_pcm: bool = False) -> tuple[np.
                     "error",
                     "-i",
                     str(video_path),
+                    *(["-map", "0:a:0?"] if float_pcm else []),
                     "-vn",
                     "-ac",
                     "2",
