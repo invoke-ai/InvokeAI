@@ -453,6 +453,11 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
         # invokeai_diffuser has batched timesteps, but diffusers schedulers expect a single value
         timestep = t[0]
 
+        # HiDiffusion modules share this dictionary. Setting the logical step here prevents separate CFG forwards from
+        # advancing the RAU-Net schedule independently and lets window attention reuse one shift for the whole step.
+        if hasattr(self.unet, "info"):
+            self.unet.info["step_index"] = step_index
+
         # Handle masked image-to-image (a.k.a inpainting).
         if mask_guidance is not None:
             # NOTE: This is intentionally done *before* self.scheduler.scale_model_input(...).

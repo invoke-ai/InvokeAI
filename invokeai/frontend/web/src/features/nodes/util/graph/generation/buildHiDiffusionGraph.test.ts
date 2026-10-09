@@ -32,6 +32,7 @@ const defaultParams = {
   cfgRescaleMultiplier: 0,
   hiDiffusionEnabled: false,
   hiDiffusionRauNetEnabled: false,
+  hiDiffusionAutoRatios: false,
   hiDiffusionT1Ratio: 0.25,
   hiDiffusionT2Ratio: 0.1,
   hiDiffusionWindowAttnEnabled: false,
@@ -192,5 +193,43 @@ describe('HiDiffusion graph metadata', () => {
     expect(metadata.hidiffusion_window_attn).toBe(false);
     expect(metadata.hidiffusion_t1_ratio).toBe(0.25);
     expect(metadata.hidiffusion_t2_ratio).toBe(0.1);
+  });
+
+  it('omits automatic ratio overrides from the SDXL denoise and metadata nodes', async () => {
+    currentModel = sdxlModel;
+    params.hiDiffusionEnabled = true;
+    params.hiDiffusionRauNetEnabled = true;
+    params.hiDiffusionAutoRatios = true;
+    params.hiDiffusionT1Ratio = 0.65;
+    params.hiDiffusionT2Ratio = 0.2;
+
+    const { g } = await buildSDXLGraph(buildGraphArg());
+    const denoise = g.getNodes().find((node) => node.type === 'denoise_latents');
+    const metadata = getMetadata(g);
+
+    expect(denoise?.hidiffusion_t1_ratio).toBeUndefined();
+    expect(denoise?.hidiffusion_t2_ratio).toBeUndefined();
+    expect(metadata.hidiffusion_t1_ratio).toBeNull();
+    expect(metadata.hidiffusion_t2_ratio).toBeNull();
+  });
+
+  it('omits automatic ratio overrides from the SD1 denoise while retaining manual slider values', async () => {
+    currentModel = sd1Model;
+    params.hiDiffusionEnabled = true;
+    params.hiDiffusionRauNetEnabled = true;
+    params.hiDiffusionAutoRatios = true;
+    params.hiDiffusionT1Ratio = 0.65;
+    params.hiDiffusionT2Ratio = 0.2;
+
+    const { g } = await buildSD1Graph(buildGraphArg());
+    const denoise = g.getNodes().find((node) => node.type === 'denoise_latents');
+    const metadata = getMetadata(g);
+
+    expect(denoise?.hidiffusion_t1_ratio).toBeUndefined();
+    expect(denoise?.hidiffusion_t2_ratio).toBeUndefined();
+    expect(metadata.hidiffusion_t1_ratio).toBeNull();
+    expect(metadata.hidiffusion_t2_ratio).toBeNull();
+    expect(params.hiDiffusionT1Ratio).toBe(0.65);
+    expect(params.hiDiffusionT2Ratio).toBe(0.2);
   });
 });

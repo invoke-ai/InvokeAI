@@ -1,7 +1,9 @@
 HiDiffusion - License notice
 
 Original project: https://github.com/megvii-research/HiDiffusion
-Vendored from:    https://github.com/monofy-org/HiDiffusion
+Intermediate fork: https://github.com/monofy-org/HiDiffusion
+Vendored implementation baseline:
+    https://github.com/Teriks/dgenerate/tree/d83b839033cc22c5101fb0f987bd4eb2de3d5d12/dgenerate/extras/hidiffusion
 Vendored under:   invokeai/backend/hidiffusion/
 
 ================================================================================
@@ -13,6 +15,18 @@ Version 2.0. The Apache 2.0 license text is available in the root LICENSE file
 and at:
 
     https://www.apache.org/licenses/LICENSE-2.0
+
+The dgenerate distribution includes the following NOTICE for its HiDiffusion
+fork:
+
+    This code is vendored from: https://github.com/monofy-org/HiDiffusion
+
+    This repository is a fork which implements some fixes to HiDiffusion.
+
+    It further modifies HiDiffusion so that apply_hidiffusion accepts a
+    torch.Generator object, enabling deterministic images based on a seed.
+
+    HiDiffusion is here: https://github.com/megvii-research/HiDiffusion
 
 ================================================================================
 MODULE KEYS (BSD 3-Clause License)
@@ -59,7 +73,9 @@ LOCAL MODIFICATIONS
 The following changes were applied when integrating HiDiffusion into InvokeAI:
 
 * The code was vendored under the invokeai.backend.hidiffusion package.
-* apply_hidiffusion() was extended to accept a torch.Generator, enabling
-  deterministic image generation from a seed.
 * HiDiffusion patching was integrated with InvokeAI's model loading and
   generation lifecycle.
+* Automatic model- and resolution-specific ratios can be overridden per
+  invocation without mutating the vendored global preset tables.
+* Inpainting, guidance, adapter, and cached-model lifecycle behavior was
+  adapted to InvokeAI's denoising pipelines.
