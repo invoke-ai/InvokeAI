@@ -468,7 +468,7 @@ export const useImageActions = ({
               if (selectionPage === undefined) {
                 gallery.setItemMultiSelection(itemKeys, successor, projectId);
               } else {
-                gallery.setItemMultiSelection(itemKeys, successor, projectId, selectionPage);
+                gallery.setItemMultiSelection(itemKeys, successor, projectId, selectionPage, true);
               }
             } else if (selectionPage === undefined) {
               gallery.selectItem(successor, projectId);

@@ -859,6 +859,119 @@ describe('preview keyboard navigation boundary', () => {
     }
   );
 
+  it.each(['arrow key', 'swipe'] as const)(
+    'waits for a missing succeeding page before a %s steps to a newer local item in oldest-first order',
+    async (input) => {
+      const pageItem = (index: number) =>
+        createImageItem(`page-item-${index}`, new Date(Date.UTC(2026, 7, 1) + index * 1_000).toISOString());
+      // Stored newest first; the mock reverses each page for oldest-first listings.
+      const storedPage = (start: number) => ({
+        items: Array.from({ length: 60 }, (_, index) => pageItem(start + 59 - index)),
+        total: 180,
+      });
+      const nextItems = Array.from({ length: 60 }, (_, index) => pageItem(index + 120));
+      const selected = pageItem(119);
+      let resolveNext!: (page: GalleryItemsPage) => void;
+      const nextPage = new Promise<GalleryItemsPage>((resolve) => {
+        resolveNext = resolve;
+      });
+
+      mocks.galleryItemPages = [storedPage(0), storedPage(60), storedPage(120)];
+      mocks.deferredPageFetches.set(120, { promise: nextPage, resolve: resolveNext });
+      setGalleryValues({
+        galleryPage: 1,
+        recentImages: [legacyImage('recent-newer', '2026-09-01T00:00:00.000Z')],
+        selectedImage: selected,
+        selectedImageName: selected.name,
+        selectedImageQuery: { ...deepQuery, imageOrderDir: 'ASC', page: 1 },
+      });
+
+      await render();
+      await vi.waitFor(() => expect(mocks.galleryItemPageOffsets).toContain(120));
+
+      if (input === 'arrow key') {
+        await pressArrow('ArrowRight');
+      } else {
+        await flickPreview(1);
+      }
+
+      // A swipe commits once its settle animation ends; either way the step waits on the pending page.
+      await vi.waitFor(() => expect(mocks.galleryPageFetchSignals).toHaveLength(1));
+      expect(mocks.commands.gallery.selectItem).not.toHaveBeenCalled();
+
+      await act(async () => {
+        resolveNext({ items: nextItems, offset: 120, total: 180 });
+        await Promise.resolve();
+      });
+
+      await vi.waitFor(() =>
+        expect(mocks.commands.gallery.selectItem).toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({ name: 'page-item-120' }),
+          undefined,
+          2,
+          true
+        )
+      );
+    }
+  );
+
+  it('retries a failed succeeding page before stepping to a newer local item in oldest-first order', async () => {
+    const pageItem = (index: number) =>
+      createImageItem(`page-item-${index}`, new Date(Date.UTC(2026, 7, 1) + index * 1_000).toISOString());
+    const storedPage = (start: number) => ({
+      items: Array.from({ length: 60 }, (_, index) => pageItem(start + 59 - index)),
+      total: 180,
+    });
+    const nextItems = Array.from({ length: 60 }, (_, index) => pageItem(index + 120));
+    const selected = pageItem(119);
+    let rejectNext!: (error: Error) => void;
+    const failedPage = new Promise<GalleryItemsPage>((_resolve, reject) => {
+      rejectNext = reject;
+    });
+    let resolveRetry!: (page: GalleryItemsPage) => void;
+    const retriedPage = new Promise<GalleryItemsPage>((resolve) => {
+      resolveRetry = resolve;
+    });
+
+    mocks.galleryItemPages = [storedPage(0), storedPage(60), storedPage(120)];
+    mocks.deferredPageFetches.set(120, { promise: failedPage, reject: rejectNext, resolve: () => {} });
+    setGalleryValues({
+      galleryPage: 1,
+      recentImages: [legacyImage('recent-newer', '2026-09-01T00:00:00.000Z')],
+      selectedImage: selected,
+      selectedImageName: selected.name,
+      selectedImageQuery: { ...deepQuery, imageOrderDir: 'ASC', page: 1 },
+    });
+
+    await render(new QueryClient({ defaultOptions: { queries: { retry: false } } }));
+    await vi.waitFor(() => expect(mocks.galleryItemPageOffsets).toContain(120));
+    await act(async () => {
+      rejectNext(new Error('temporary page failure'));
+      await Promise.resolve();
+    });
+
+    mocks.deferredPageFetches.set(120, { promise: retriedPage, resolve: resolveRetry });
+    await pressArrow('ArrowRight');
+
+    expect(mocks.commands.gallery.selectItem).not.toHaveBeenCalled();
+    await vi.waitFor(() =>
+      expect(mocks.galleryItemPageOffsets.filter((pageOffset) => pageOffset === 120)).toHaveLength(2)
+    );
+    await act(async () => {
+      resolveRetry({ items: nextItems, offset: 120, total: 180 });
+      await Promise.resolve();
+    });
+
+    await vi.waitFor(() =>
+      expect(mocks.commands.gallery.selectItem).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ name: 'page-item-120' }),
+        undefined,
+        2,
+        true
+      )
+    );
+  });
+
   it('retries a failed preceding page before entering a recent section', async () => {
     const previousItems = Array.from({ length: 60 }, (_, index) =>
       createImageItem(`page-item-${index + 60}`, new Date(Date.UTC(2026, 7, 1) - (index + 60) * 1_000).toISOString())

@@ -1326,7 +1326,8 @@ describe('primary successor after confirmed deletion', () => {
       ['image:failed.png', 'image:successor.png'],
       successor,
       'project-1',
-      30
+      30,
+      true
     );
   });
 

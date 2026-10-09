@@ -4,6 +4,8 @@ import type { GalleryBoard } from '@features/gallery/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { DEFAULT_GALLERY_SETTINGS } from '@features/gallery/core/settings';
+import { patchGalleryItemCaches } from '@features/gallery/data/queryCache';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -92,6 +94,7 @@ const createGallery = (overrides: Partial<GalleryStateView> = {}): GalleryStateV
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
+let queryClient = new QueryClient();
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const renderBar = async (
@@ -108,11 +111,13 @@ const renderBar = async (
 
   await act(() =>
     root?.render(
-      <ChakraProvider value={system}>
-        <GalleryWidgetContext value={contextValue}>
-          <GallerySelectionBar />
-        </GalleryWidgetContext>
-      </ChakraProvider>
+      <QueryClientProvider client={queryClient}>
+        <ChakraProvider value={system}>
+          <GalleryWidgetContext value={contextValue}>
+            <GallerySelectionBar />
+          </GalleryWidgetContext>
+        </ChakraProvider>
+      </QueryClientProvider>
     )
   );
 };
@@ -138,6 +143,7 @@ beforeEach(() => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
+  queryClient = new QueryClient();
   Object.values(itemActions).forEach((mock) => mock.mockClear());
 });
 
@@ -195,6 +201,42 @@ describe('GallerySelectionBar', () => {
     await click(getButton('widgets.gallery.unstarSelection'));
 
     expect(itemActions.setItemsStarred).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: 'b.png' }], false);
+  });
+
+  it.each([
+    // A starred-only listing drops the item as the patch lands.
+    ['leaves the listing with the patch', false],
+    ['sits on a page evicted earlier', true],
+  ] as const)('follows a star patch and its rollback for a selected item that %s', async (_case, evictedFirst) => {
+    const gallery = createGallery({
+      items: [createItem('b.png', true)],
+      selectedItemKey: 'image:b.png',
+      selectedItemKeys: ['image:b.png'],
+    });
+    const unloaded = { ...gallery, items: [] };
+
+    await renderBar(gallery);
+    if (evictedFirst) {
+      await renderBar(unloaded);
+    }
+
+    let rollback = () => {};
+    await act(() => {
+      rollback = patchGalleryItemCaches(queryClient, {
+        kind: 'star',
+        result: { failed: [], succeeded: [{ kind: 'image', name: 'b.png' }] },
+        starred: false,
+      });
+    });
+    await renderBar(unloaded);
+
+    expect(getButton('widgets.gallery.starSelection')).toBeTruthy();
+    await click(getButton('widgets.gallery.starSelection'));
+    expect(itemActions.setItemsStarred).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: 'b.png' }], true);
+
+    await act(() => rollback());
+
+    expect(getButton('widgets.gallery.unstarSelection')).toBeTruthy();
   });
 
   it('reads star state from the strip for a selection the listing window has not loaded', async () => {

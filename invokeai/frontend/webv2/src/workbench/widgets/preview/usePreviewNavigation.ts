@@ -551,25 +551,33 @@ export const usePreviewNavigation = ({
   const selectedListingPage = boardPageResults.find(({ data }) =>
     data.items.some((item) => toGalleryItemKey(item) === selectedItemKey)
   );
-  const selectedItemStartsPage =
-    selectedListingPage !== undefined &&
-    selectedListingPage.data.items[0] !== undefined &&
-    toGalleryItemKey(selectedListingPage.data.items[0]) === selectedItemKey;
-  const previousListingPageOffset = selectedItemPageOffset - GALLERY_PAGE_SIZE;
-  const previousListingPageQueryIndex = adjacentPageOffsets.indexOf(previousListingPageOffset);
-  const previousListingPageQuery =
-    previousListingPageOffset === selectedPageOffset
-      ? selectedPageQuery
-      : previousListingPageQueryIndex >= 0
-        ? adjacentPageQueries[previousListingPageQueryIndex]
-        : undefined;
+  const selectedListingPageItems = selectedListingPage?.data.items ?? EMPTY_PREVIEW_ITEMS;
+  const isSelectedListingItem = (item: GalleryItem | undefined): boolean =>
+    item !== undefined && toGalleryItemKey(item) === selectedItemKey;
+  const selectedItemStartsPage = isSelectedListingItem(selectedListingPageItems[0]);
+  const selectedItemEndsPage = isSelectedListingItem(selectedListingPageItems.at(-1));
+  // A recent local item or another section can sit just past a page edge; while the neighboring page is missing,
+  // loading, or failed, a loaded step would skip that page's items.
+  const isListingPageUnresolved = (pageOffset: number): boolean => {
+    if (pageOffset < 0 || (listingTotal !== undefined && pageOffset >= listingTotal)) {
+      return false;
+    }
+
+    const pageQuery =
+      pageOffset === selectedPageOffset
+        ? selectedPageQuery
+        : adjacentPageQueries[adjacentPageOffsets.indexOf(pageOffset)];
+
+    return (
+      !boardPageResults.some(({ offset }) => offset === pageOffset) ||
+      pageQuery?.isFetching === true ||
+      pageQuery?.isError === true
+    );
+  };
   const hasUnresolvedPreviousListingPage =
-    selectedItemStartsPage &&
-    previousListingPageOffset >= 0 &&
-    (listingTotal === undefined || previousListingPageOffset < listingTotal) &&
-    (!boardPageResults.some(({ offset }) => offset === previousListingPageOffset) ||
-      previousListingPageQuery?.isFetching === true ||
-      previousListingPageQuery?.isError === true);
+    selectedItemStartsPage && isListingPageUnresolved(selectedItemPageOffset - GALLERY_PAGE_SIZE);
+  const hasUnresolvedNextListingPage =
+    selectedItemEndsPage && isListingPageUnresolved(selectedItemPageOffset + GALLERY_PAGE_SIZE);
   const selectedItemIsMissingFromStampedPage =
     selectedItem !== null &&
     selectedItemKey !== null &&
@@ -608,7 +616,11 @@ export const usePreviewNavigation = ({
 
       const loadedEntry = getGalleryNavigationStep(navigationSections, cursorKeys, direction);
 
-      if (loadedEntry !== null && !selectedItemNeedsLocation && !(offset === -1 && hasUnresolvedPreviousListingPage)) {
+      if (
+        loadedEntry !== null &&
+        !selectedItemNeedsLocation &&
+        !(offset === 1 ? hasUnresolvedNextListingPage : hasUnresolvedPreviousListingPage)
+      ) {
         pageFetchRequestRef.current?.controller.abort();
         pageFetchRequestRef.current = null;
         pendingNavigationContextRef.current = null;
@@ -795,6 +807,7 @@ export const usePreviewNavigation = ({
       selectedPageOffset,
       selectedItem,
       selectedItemNeedsLocation,
+      hasUnresolvedNextListingPage,
       hasUnresolvedPreviousListingPage,
       navigationSemanticQuery,
       pendingNavigationContextRef,
@@ -816,7 +829,10 @@ export const usePreviewNavigation = ({
     }
 
     const resolve = (offset: -1 | 1): PreviewNeighbor => {
-      if (offset === -1 && !selectedItemNeedsLocation && hasUnresolvedPreviousListingPage) {
+      if (
+        !selectedItemNeedsLocation &&
+        (offset === 1 ? hasUnresolvedNextListingPage : hasUnresolvedPreviousListingPage)
+      ) {
         return { kind: 'more' };
       }
 
@@ -834,6 +850,7 @@ export const usePreviewNavigation = ({
     return { next: resolve(1), previous: resolve(-1) };
   }, [
     cursorKeys,
+    hasUnresolvedNextListingPage,
     hasUnresolvedPreviousListingPage,
     isComparing,
     listingTotal,

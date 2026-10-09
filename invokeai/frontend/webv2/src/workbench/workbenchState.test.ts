@@ -5250,7 +5250,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(getProjectWidgetValues(getActiveProject(state), 'gallery').liveFollowPausedAt).toBeUndefined();
   });
 
-  it('stamps an explicit page into the navigation query already on a multi-selection', () => {
+  it('stamps a host page into the navigation query already on a multi-selection', () => {
     // Host navigation uses the selection's query and page, which may differ from the gallery's current
     // board/search.
     let state = createInitialWorkbenchState();
@@ -5266,6 +5266,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     state = workbenchReducer(state, { searchTerm: 'sunset', type: 'setGallerySearchTerm' });
     state = workbenchReducer(state, {
       itemKeys: ['image:failed.png', 'image:successor.png'],
+      preserveNavigationQuery: true,
       primaryItem: createGalleryImageItem('successor.png'),
       selectionPage: 30,
       type: 'setGalleryMultiSelection',
@@ -5279,6 +5280,31 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(query.boardId).toBe('board-deep');
     expect(query.searchTerm).toBe('');
     expect(values.galleryPage).toBe(0);
+  });
+
+  it('stamps a Gallery range with the listing the grid shows now', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, { item: createGalleryImageItem('anchor.png'), type: 'selectGalleryItem' });
+    state = workbenchReducer(state, { settings: { imageOrderDir: 'ASC' }, type: 'updateGallerySettings' });
+    state = workbenchReducer(state, { starredOnly: true, type: 'setGalleryStarredOnly' });
+    state = workbenchReducer(state, { searchTerm: 'sunset', type: 'setGallerySearchTerm' });
+    state = workbenchReducer(state, {
+      itemKeys: ['image:anchor.png', 'image:range-end.png'],
+      primaryItem: createGalleryImageItem('range-end.png'),
+      selectionPage: 2,
+      type: 'setGalleryMultiSelection',
+    });
+
+    const values = getProjectWidgetValues(getActiveProject(state), 'gallery');
+
+    expect(values.selectedImagePage).toBe(2);
+    expect(values.selectedImageQuery).toMatchObject({
+      imageOrderDir: 'ASC',
+      page: 2,
+      searchTerm: 'sunset',
+      starredOnly: true,
+    });
   });
 
   it('ties a selected semantic result page to the active ranking', () => {

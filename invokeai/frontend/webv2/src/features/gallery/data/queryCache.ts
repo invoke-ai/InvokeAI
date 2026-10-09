@@ -231,6 +231,39 @@ const patchItemsCacheData = (
   return null;
 };
 
+/** An optimistic star patch, or the rollback of one, for state that retains star flags outside the item caches. */
+export type GalleryItemStarPatchEvent =
+  | { itemKeys: ReadonlySet<GalleryItemKey>; kind: 'apply'; patchId: number; starred: boolean }
+  | { kind: 'revert'; patchId: number };
+
+type GalleryItemStarPatchListener = (event: GalleryItemStarPatchEvent) => void;
+
+const galleryItemStarPatchListeners = new WeakMap<QueryClient, Set<GalleryItemStarPatchListener>>();
+let nextGalleryItemStarPatchId = 0;
+
+/**
+ * Observe star patches on `client`'s item caches. An unstarred item leaves starred-only listings, and an item on an
+ * evicted page is in no cache at all, so its flag can only be reconciled from the patch itself.
+ */
+export const subscribeGalleryItemStarPatches = (
+  client: QueryClient,
+  listener: GalleryItemStarPatchListener
+): (() => void) => {
+  let listeners = galleryItemStarPatchListeners.get(client);
+
+  if (!listeners) {
+    listeners = new Set();
+    galleryItemStarPatchListeners.set(client, listeners);
+  }
+
+  listeners.add(listener);
+
+  return () => listeners.delete(listener);
+};
+
+const emitGalleryItemStarPatch = (client: QueryClient, event: GalleryItemStarPatchEvent): void =>
+  galleryItemStarPatchListeners.get(client)?.forEach((listener) => listener(event));
+
 /**
  * Applies only backend-confirmed successes. Failed refs are intentionally
  * ignored, and kind-qualified keys prevent same-name images/videos colliding.
@@ -248,6 +281,7 @@ export const patchGalleryItemCaches = (client: QueryClient, patch: GalleryItemCa
   const rollbackClusterMembers =
     patch.kind === 'delete' ? pruneImageClusterMembers(patch.result.succeeded.map(toGalleryItemKey)) : null;
   const rollbackEntries: ItemCacheRollbackEntry[] = [];
+  const starPatchId = patch.kind === 'star' ? ++nextGalleryItemStarPatchId : null;
 
   for (const query of getGalleryItemListQueries(client)) {
     const filter = getGalleryItemsFilterFromKey(query.queryKey);
@@ -264,6 +298,10 @@ export const patchGalleryItemCaches = (client: QueryClient, patch: GalleryItemCa
     }
   }
 
+  if (patch.kind === 'star' && starPatchId !== null) {
+    emitGalleryItemStarPatch(client, { itemKeys, kind: 'apply', patchId: starPatchId, starred: patch.starred });
+  }
+
   return () => {
     rollbackClusterMembers?.();
     rollBackUnclaimedEntries(
@@ -271,6 +309,10 @@ export const patchGalleryItemCaches = (client: QueryClient, patch: GalleryItemCa
       (entry) => client.getQueryData<GalleryItemsCacheData>(entry.queryKey),
       (entry) => client.setQueryData(entry.queryKey, entry.before)
     );
+
+    if (starPatchId !== null) {
+      emitGalleryItemStarPatch(client, { kind: 'revert', patchId: starPatchId });
+    }
   };
 };
 

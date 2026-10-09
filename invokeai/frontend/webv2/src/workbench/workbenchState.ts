@@ -455,8 +455,10 @@ type WorkbenchReducerAction =
       type: 'setGalleryMultiSelection';
       itemKeys: GalleryItemKey[];
       primaryItem: GalleryItem;
+      /** Keep the navigation query already on the selection, as `selectGalleryItem` does for a host's own window. */
+      preserveNavigationQuery?: boolean;
       projectId?: string;
-      /** Stamps this page, in the navigation query already on the selection, instead of the grid's. */
+      /** Stamps this page instead of the grid's. */
       selectionPage?: number;
     }
   | { type: 'setGalleryCompareImage'; image: GalleryImageItem | null; projectId?: string }
@@ -5058,9 +5060,9 @@ export const __workbenchReducerInternal = (
             selectedImageName: toGalleryItemKey(action.primaryItem),
             selectedImageNames: action.itemKeys,
             selectedImagePage,
-            // An explicit host page belongs to the selection's query, matching preserveNavigationQuery.
+            // A Gallery range captures the current listing; only a host stepping within its own window keeps the old one.
             selectedImageQuery:
-              hasSelectionPage && existingNavigationQuery
+              action.preserveNavigationQuery && existingNavigationQuery
                 ? {
                     ...existingNavigationQuery,
                     ...(semanticKey

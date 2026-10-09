@@ -3,8 +3,12 @@ import type { GallerySemanticReference } from '@features/gallery/core/semanticIm
 import type { GallerySettings } from '@features/gallery/core/settings';
 import type { GalleryView } from '@features/gallery/core/types';
 import type { GalleryItemsFilter } from '@features/gallery/data/queries';
+import type { GalleryItemStarPatchEvent } from '@features/gallery/data/queryCache';
 
 import { toGalleryItemKey } from '@features/gallery/core/items';
+import { subscribeGalleryItemStarPatches } from '@features/gallery/data/queryCache';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import { useQueryClient } from '@tanstack/react-query';
 import { createContext, use, useEffect, useMemo, useSyncExternalStore } from 'react';
 
 import type { GalleryReadState, GalleryStateView } from './galleryStateView';
@@ -93,24 +97,75 @@ interface SelectionStarSnapshot {
 
 interface SelectionStarStore {
   getSnapshot: () => SelectionStarSnapshot;
+  /** Applies a star patch to the selection, or restores the flags a reverted patch replaced. */
+  reconcilePatch: (event: GalleryItemStarPatchEvent) => void;
   subscribe: (listener: () => void) => () => void;
   sync: (identity: string, selectedKeys: readonly string[], loadedItems: readonly GalleryItem[]) => void;
 }
 
 const createSelectionStarStore = (): SelectionStarStore => {
   let snapshot: SelectionStarSnapshot = { identity: '', starredByKey: new Map() };
+  let selectedKeySet: ReadonlySet<string> = new Set();
+  // What each key held before the latest patch that set it; only that patch's rollback restores it.
+  let patchedFrom = new Map<string, { patchId: number; starred: boolean | undefined }>();
   const listeners = new Set<() => void>();
+  const publish = (identity: string, starredByKey: ReadonlyMap<string, boolean>) => {
+    if (
+      snapshot.identity === identity &&
+      starredByKey.size === snapshot.starredByKey.size &&
+      [...starredByKey].every(([key, starred]) => snapshot.starredByKey.get(key) === starred)
+    ) {
+      return;
+    }
+
+    snapshot = { identity, starredByKey };
+    listeners.forEach((listener) => listener());
+  };
 
   return {
     getSnapshot: () => snapshot,
+    reconcilePatch: (event) => {
+      const starredByKey = new Map(snapshot.starredByKey);
+
+      if (event.kind === 'apply') {
+        for (const key of event.itemKeys) {
+          if (selectedKeySet.has(key)) {
+            patchedFrom.set(key, { patchId: event.patchId, starred: starredByKey.get(key) });
+            starredByKey.set(key, event.starred);
+          }
+        }
+      } else {
+        for (const [key, { patchId, starred }] of patchedFrom) {
+          if (patchId !== event.patchId) {
+            continue;
+          }
+
+          patchedFrom.delete(key);
+
+          if (starred === undefined) {
+            starredByKey.delete(key);
+          } else {
+            starredByKey.set(key, starred);
+          }
+        }
+      }
+
+      publish(snapshot.identity, starredByKey);
+    },
     subscribe: (listener) => {
       listeners.add(listener);
 
       return () => listeners.delete(listener);
     },
     sync: (identity, selectedKeys, loadedItems) => {
-      const selectedKeySet = new Set(selectedKeys);
-      const starredByKey = new Map(snapshot.identity === identity ? snapshot.starredByKey : []);
+      const isSameSelection = snapshot.identity === identity;
+      const starredByKey = new Map(isSameSelection ? snapshot.starredByKey : []);
+
+      selectedKeySet = new Set(selectedKeys);
+
+      if (!isSameSelection) {
+        patchedFrom = new Map();
+      }
 
       for (const item of loadedItems) {
         const key = toGalleryItemKey(item);
@@ -120,29 +175,26 @@ const createSelectionStarStore = (): SelectionStarStore => {
         }
       }
 
-      if (
-        snapshot.identity === identity &&
-        starredByKey.size === snapshot.starredByKey.size &&
-        [...starredByKey].every(([key, starred]) => snapshot.starredByKey.get(key) === starred)
-      ) {
-        return;
-      }
-
-      snapshot = { identity, starredByKey };
-      listeners.forEach((listener) => listener());
+      publish(identity, starredByKey);
     },
   };
 };
 
-/** Retains star flags for the current selection while sparse listing pages leave the loaded window. */
+/**
+ * Retains star flags for the current selection while sparse listing pages leave the loaded window, and follows star
+ * patches from any surface for selected items no loaded page holds.
+ */
 export const useGallerySelectionStarred = (
   selectedItems: readonly GalleryItemRef[],
   loadedItems: readonly GalleryItem[]
 ): boolean => {
   const selectedKeys = selectedItems.map(toGalleryItemKey);
   const identity = JSON.stringify(selectedKeys);
+  const queryClient = useQueryClient();
   const store = useMemo(() => createSelectionStarStore(), []);
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+
+  useMountEffect(() => subscribeGalleryItemStarPatches(queryClient, store.reconcilePatch));
 
   useEffect(() => {
     store.sync(identity, selectedKeys, loadedItems);
