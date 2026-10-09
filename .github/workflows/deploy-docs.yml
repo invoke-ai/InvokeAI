@@ -1,23 +1,16 @@
 name: 'docs'
 
 on:
+  # invoke.ai serves the v6 docs from this branch; main deploys v7 to v7.invoke.ai.
   push:
     branches:
-      - 'main'
+      - 'v6-bugfixes'
   pull_request:
     types:
       - 'ready_for_review'
       - 'opened'
       - 'synchronize'
   workflow_dispatch:
-    inputs:
-      deploy_target:
-        description: 'Deploy target (custom = invoke.ai, ghpages = invoke-ai.github.io/InvokeAI)'
-        type: choice
-        options:
-          - custom
-          - ghpages
-        default: custom
 
 permissions:
   contents: read
@@ -38,13 +31,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: mark manual run
-        if: github.event_name == 'workflow_dispatch'
+      # Deploy-branch pushes always rebuild: with cancel-in-progress, a later push that skipped
+      # the build would cancel an earlier docs push's deploy and leave its changes unpublished.
+      - name: mark push or manual run
+        if: github.event_name != 'pull_request'
         id: manual
         run: echo "docs=true" >> "$GITHUB_OUTPUT"
 
       - name: detect docs-related changes
-        if: github.event_name != 'workflow_dispatch'
+        if: github.event_name == 'pull_request'
         id: filter
         uses: dorny/paths-filter@v3
         with:
@@ -115,25 +110,25 @@ jobs:
         run: pnpm build
         working-directory: docs
         env:
-          DEPLOY_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_target || 'custom' }}
-          ENABLE_ANALYTICS: ${{ github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.deploy_target == 'custom') }}
+          DEPLOY_TARGET: custom
+          ENABLE_ANALYTICS: ${{ github.ref == 'refs/heads/v6-bugfixes' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: verify deploy output
         run: pnpm run check-deploy-output
         working-directory: docs
         env:
-          DEPLOY_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_target || 'custom' }}
+          DEPLOY_TARGET: custom
 
-      # Upload artifact for deploy (main branch only)
+      # Upload artifact for deploy (v6-bugfixes branch only)
       - name: upload pages artifact
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/v6-bugfixes'
         uses: actions/upload-pages-artifact@v5
         with:
           path: docs/dist
 
   deploy:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/v6-bugfixes'
     needs: check-and-build
     runs-on: ubuntu-latest
     permissions:
