@@ -198,49 +198,76 @@ export const getGallerySparseSlotKey = (itemIndex: number): string => `listing-s
 
 /**
  * Include empty positions from active pages so arrow navigation retains real row and column geometry across
- * hydration gaps. The number of placeholders is bounded by the currently subscribed page range.
+ * hydration gaps. Entries cover each contiguous run of subscribed pages plus a boundary row, so a page retained far
+ * from the viewport (a reveal) adds its own run rather than every position between them.
  */
 export const buildSparseGalleryNavigationEntries = ({
   columnCount = 1,
   includeUnloadedBoundaries = true,
   itemSlots,
   pageOffsets,
+  pendingPageOffsets,
   total,
 }: {
   columnCount?: number;
   includeUnloadedBoundaries?: boolean;
   itemSlots: ReadonlyMap<number, GalleryItem>;
   pageOffsets: readonly number[];
+  /** Active pages still fetching: their empty positions wait for data instead of being skipped as gaps. */
+  pendingPageOffsets?: ReadonlySet<number>;
   total: number | null;
 }): GalleryNavigationEntry[] => {
   if (pageOffsets.length === 0) {
     return [];
   }
 
-  const activePages = new Set(pageOffsets);
-  const firstPageOffset = pageOffsets.reduce((first, offset) => Math.min(first, offset), Number.POSITIVE_INFINITY);
-  const lastPageOffset = Math.max(...pageOffsets);
-  const activeStartIndex = Math.floor(firstPageOffset / columnCount) * columnCount;
-  const startIndex =
-    includeUnloadedBoundaries && firstPageOffset > 0 ? Math.max(0, activeStartIndex - columnCount) : activeStartIndex;
-  const activeEndIndex = Math.min(total ?? Number.POSITIVE_INFINITY, lastPageOffset + GALLERY_PAGE_SIZE);
-  const endIndex =
-    includeUnloadedBoundaries && total !== null
-      ? Math.min(total, Math.ceil(activeEndIndex / columnCount) * columnCount + columnCount)
-      : activeEndIndex;
+  const sortedOffsets = [...new Set(pageOffsets)].sort((left, right) => left - right);
+  const runs: { first: number; last: number }[] = [];
+
+  for (const offset of sortedOffsets) {
+    const run = runs.at(-1);
+
+    if (run && offset === run.last + GALLERY_PAGE_SIZE) {
+      run.last = offset;
+    } else {
+      runs.push({ first: offset, last: offset });
+    }
+  }
+
+  const activePages = new Set(sortedOffsets);
   const entries: GalleryNavigationEntry[] = [];
+  let nextIndex = 0;
 
-  for (let index = startIndex; index < endIndex; index += 1) {
-    const item = itemSlots.get(index);
-    const isActivePage = activePages.has(Math.floor(index / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE);
+  for (const [runIndex, run] of runs.entries()) {
+    const activeStartIndex = Math.floor(run.first / columnCount) * columnCount;
+    const startIndex =
+      includeUnloadedBoundaries && run.first > 0 ? Math.max(0, activeStartIndex - columnCount) : activeStartIndex;
+    const activeEndIndex = Math.min(total ?? Number.POSITIVE_INFINITY, run.last + GALLERY_PAGE_SIZE);
+    const isFollowedByRun = runIndex < runs.length - 1;
+    // Navigation chunks entries into rows, so a run followed by another must end on a whole row.
+    const endIndex =
+      includeUnloadedBoundaries && total !== null
+        ? Math.min(total, Math.ceil(activeEndIndex / columnCount) * columnCount + columnCount)
+        : isFollowedByRun
+          ? Math.ceil(activeEndIndex / columnCount) * columnCount
+          : activeEndIndex;
 
-    entries.push(
-      item
-        ? { item, kind: 'item' }
-        : isActivePage
-          ? { id: `gallery-loading-slot:${index}`, kind: 'slot', navigable: false }
-          : { id: `gallery-unloaded-slot:${index}`, kind: 'slot', navigable: true }
-    );
+    // Runs whose boundary rows meet continue without repeating positions.
+    for (let index = Math.max(startIndex, nextIndex); index < endIndex; index += 1) {
+      const item = itemSlots.get(index);
+      const pageOffset = Math.floor(index / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE;
+      const isSettledActivePage = activePages.has(pageOffset) && !pendingPageOffsets?.has(pageOffset);
+
+      entries.push(
+        item
+          ? { item, kind: 'item' }
+          : isSettledActivePage
+            ? { id: `gallery-gap-slot:${index}`, kind: 'slot', navigable: false }
+            : { id: `gallery-unloaded-slot:${index}`, kind: 'slot', navigable: true }
+      );
+    }
+
+    nextIndex = Math.max(nextIndex, endIndex);
   }
 
   return entries;

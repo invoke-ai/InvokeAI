@@ -1742,6 +1742,103 @@ describe('GalleryImageGrid reveal requests', () => {
     expect(mocks.scrollToIndex).not.toHaveBeenCalled();
   });
 
+  it('waits for a loading page instead of stepping over it', async () => {
+    const item59 = createItem('image', 'item-59.png');
+    const item60 = createItem('image', 'item-60.png');
+    const item120 = createItem('image', 'item-120.png');
+    const settled = { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) };
+    currentSparseListing = {
+      itemSlots: new Map([
+        [59, item59],
+        [120, item120],
+      ]),
+      pageStates: new Map([
+        [0, settled],
+        [60, { ...settled, isLoading: true }],
+        [120, settled],
+      ]),
+      recentItems: [],
+      total: 180,
+    };
+    const gallery = createGallery({
+      items: [item59, item120],
+      selectedItemKey: 'image:item-59.png',
+      selectedItemKeys: ['image:item-59.png'],
+      settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' },
+    });
+    await renderGallery(gallery);
+    setVisibleRange.mockClear();
+
+    await interact(() => registeredCommands.get('gallery.galleryNavRight')?.());
+
+    expect(actionMocks.selectItem).not.toHaveBeenCalled();
+    // The loading page is already subscribed, so the range around the cursor stays.
+    expect(setVisibleRange).not.toHaveBeenCalledWith({ endIndexExclusive: 120, startIndex: 60 });
+
+    currentSparseListing = {
+      ...currentSparseListing,
+      itemSlots: new Map([
+        [59, item59],
+        [60, item60],
+        [120, item120],
+      ]),
+      pageStates: new Map([
+        [0, settled],
+        [60, settled],
+        [120, settled],
+      ]),
+    };
+    await renderGallery({ ...gallery, items: [item59, item60, item120] });
+
+    expect(actionMocks.selectItem).toHaveBeenCalledExactlyOnceWith(item60, 1);
+  });
+
+  it('drops a step whose loading page settles without its target, so a later refresh cannot land it', async () => {
+    const item59 = createItem('image', 'item-59.png');
+    const item61 = createItem('image', 'item-61.png');
+    const late = createItem('image', 'late.png');
+    const settled = { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) };
+    const listing = (slots: [number, GalleryItem][], pageSixtyLoading: boolean): GallerySparseListing => ({
+      itemSlots: new Map(slots),
+      pageStates: new Map([
+        [0, settled],
+        [60, { ...settled, isLoading: pageSixtyLoading }],
+      ]),
+      recentItems: [],
+      total: 120,
+    });
+    currentSparseListing = listing([[59, item59]], true);
+    const gallery = createGallery({
+      items: [item59],
+      selectedItemKey: 'image:item-59.png',
+      selectedItemKeys: ['image:item-59.png'],
+      settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' },
+    });
+    await renderGallery(gallery);
+    await interact(() => registeredCommands.get('gallery.galleryNavRight')?.());
+
+    // Position 60 turns out to be a gap.
+    currentSparseListing = listing(
+      [
+        [59, item59],
+        [61, item61],
+      ],
+      false
+    );
+    await renderGallery({ ...gallery, items: [item59, item61] });
+    currentSparseListing = listing(
+      [
+        [59, item59],
+        [60, late],
+        [61, item61],
+      ],
+      false
+    );
+    await renderGallery({ ...gallery, items: [item59, late, item61] });
+
+    expect(actionMocks.selectItem).not.toHaveBeenCalled();
+  });
+
   it('pins a verified reveal index past a stale total and scrolls to it once its page lands', async () => {
     const firstPageItem = createItem('image', 'first.png');
     const added = createItem('image', 'added.png');

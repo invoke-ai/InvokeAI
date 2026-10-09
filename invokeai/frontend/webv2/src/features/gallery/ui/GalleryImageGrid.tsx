@@ -535,6 +535,13 @@ export const GalleryImageGrid = () => {
       stripEntries.push({ item: hiddenStripSelection, kind: 'item' });
     }
 
+    const loadingPageOffsets = [...(sparseListing?.pageStates ?? [])]
+      .filter(([, pageState]) => pageState.isLoading)
+      .map(([offset]) => offset);
+    // Paginated slots are page-local and that mode subscribes one page, which is offset 0 here.
+    const pendingPageOffsets = new Set(
+      isSparsePaginated ? (loadingPageOffsets.length > 0 ? [0] : []) : loadingPageOffsets
+    );
     const listingEntries =
       usesSparseListing && sparseListing
         ? buildSparseGalleryNavigationEntries({
@@ -542,6 +549,7 @@ export const GalleryImageGrid = () => {
             includeUnloadedBoundaries: !isSparsePaginated,
             itemSlots: sparseListing.itemSlots,
             pageOffsets: isSparsePaginated ? [0] : [...sparseListing.pageStates.keys()],
+            pendingPageOffsets,
             total: isSparsePaginated ? sparseBackendItemCount : sparseListing.total,
           })
         : gallery.items.map((item) => ({ item, kind: 'item' }) as const);
@@ -867,10 +875,14 @@ export const GalleryImageGrid = () => {
       }
 
       const pageOffset = Math.floor(absoluteIndex / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE;
-      setVisibleRange({
-        endIndexExclusive: Math.min(sparseListing.total ?? Number.POSITIVE_INFINITY, pageOffset + GALLERY_PAGE_SIZE),
-        startIndex: pageOffset,
-      });
+
+      // A page already subscribed keeps the range around it; narrowing to it would drop the cursor's page.
+      if (!sparseListing.pageStates.has(pageOffset)) {
+        setVisibleRange({
+          endIndexExclusive: Math.min(sparseListing.total ?? Number.POSITIVE_INFINITY, pageOffset + GALLERY_PAGE_SIZE),
+          startIndex: pageOffset,
+        });
+      }
       virtualizer.scrollToIndex(leadingRecentRows + Math.floor(absoluteIndex / columnCount));
     },
     [columnCount, isSparsePaginated, leadingRecentRows, pinRevealIndex, setVisibleRange, sparseListing, virtualizer]
@@ -1139,6 +1151,15 @@ export const GalleryImageGrid = () => {
     }
 
     const item = sparseListing?.itemSlots.get(pending.index);
+    const targetPageState = isSparsePaginated
+      ? sparseListing?.pageStates.get(sparsePageOffset)
+      : sparseListing?.pageStates.get(Math.floor(pending.index / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE);
+
+    // A target page that settled or failed without the item leaves a gap; a later refresh must not land the step.
+    if (!item && targetPageState && !targetPageState.isLoading) {
+      pendingSparseNavigationRef.current = null;
+      return;
+    }
 
     if (item) {
       pendingSparseNavigationRef.current = null;
@@ -1174,7 +1195,7 @@ export const GalleryImageGrid = () => {
 
   useEffect(() => {
     settlePendingSparseNavigation();
-  }, [cursorKey, sparseFilterIdentity, sparseListing?.itemSlots]);
+  }, [cursorKey, sparseFilterIdentity, sparseListing?.itemSlots, sparseListing?.pageStates]);
 
   useLayoutEffect(() => {
     const pending = pendingSparseFocusRef.current;
