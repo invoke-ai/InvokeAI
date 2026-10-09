@@ -371,3 +371,99 @@ def test_explicit_krea2_override_accepts_single_module_native_lora(_raise_if_not
     config = LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS, "base": BaseModelType.Krea2})
 
     assert config.base is BaseModelType.Krea2
+
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_automatic_probe_accepts_pure_lokr_lora(_raise_if_not_file) -> None:
+    # A Krea-2 LoRA that uses LyCORIS LoKr (lokr_w1 + lokr_w2) instead of lora_A/B must be
+    # auto-detected when it carries Krea-2 signature keys (text_fusion / txtfusion / wq+gate).
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        "diffusion_model.blocks.0.attn.wq.lokr_w1": object(),
+        "diffusion_model.blocks.0.attn.wq.lokr_w2": object(),
+        "diffusion_model.blocks.0.attn.gate.lokr_w1": object(),
+        "diffusion_model.blocks.0.attn.gate.lokr_w2": object(),
+    }
+    config = LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
+    assert config.base is BaseModelType.Krea2
+
+
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_automatic_probe_accepts_lokr_with_text_fusion(_raise_if_not_file) -> None:
+    # text_fusion is the primary Krea-2 signature; LoKr layers on it must also be accepted.
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        "transformer.text_fusion.0.attn.to_q.lokr_w1": object(),
+        "transformer.text_fusion.0.attn.to_q.lokr_w2": object(),
+        "transformer.text_fusion.0.attn.to_q.alpha": object(),
+    }
+    config = LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
+    assert config.base is BaseModelType.Krea2
+
+
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_automatic_probe_rejects_lokr_without_krea2_signature(_raise_if_not_file) -> None:
+    # A pure LoKr file that has no Krea-2 distinguishing keys (no text_fusion / txtfusion /
+    # wq+gate combo) must NOT auto-match Krea-2.
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        "transformer.transformer_blocks.0.attn.to_q.lokr_w1": object(),
+        "transformer.transformer_blocks.0.attn.to_q.lokr_w2": object(),
+    }
+    with pytest.raises(NotAMatchError):
+        LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
+
+
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_automatic_probe_rejects_incomplete_lokr_only_w1(_raise_if_not_file) -> None:
+    # lokr_w1 without a matching lokr_w2 is not a complete LoKr layer; reject it.
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        "transformer.text_fusion.0.attn.to_q.lokr_w1": object(),
+        # no lokr_w2
+    }
+    with pytest.raises(NotAMatchError):
+        LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
+
+
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_explicit_krea2_override_accepts_lokr_with_diffusion_model_prefix(_raise_if_not_file) -> None:
+    # The explicit override path must also admit LoKr layers under the diffusion_model. prefix.
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        "diffusion_model.blocks.0.attn.gate.lokr_w1": object(),
+        "diffusion_model.blocks.0.attn.gate.lokr_w2": object(),
+        "diffusion_model.blocks.0.attn.wq.lokr_w1": object(),
+        "diffusion_model.blocks.0.attn.wq.lokr_w2": object(),
+    }
+    config = LoRA_LyCORIS_Krea2_Config.from_model_on_disk(
+        mod, {**_REQUIRED_FIELDS, "base": BaseModelType.Krea2}
+    )
+    assert config.base is BaseModelType.Krea2
+
+
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_automatic_probe_accepts_factored_lokr_w1_a_b(_raise_if_not_file) -> None:
+    # The factored form (lokr_w1_a + lokr_w1_b instead of lokr_w1) is also a complete LoKr layer.
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        "transformer.text_fusion.0.attn.to_q.lokr_w1_a": object(),
+        "transformer.text_fusion.0.attn.to_q.lokr_w1_b": object(),
+        "transformer.text_fusion.0.attn.to_q.lokr_w2": object(),
+    }
+    config = LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
+    assert config.base is BaseModelType.Krea2
+
+
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_automatic_probe_accepts_mixed_lora_and_lokr(_raise_if_not_file) -> None:
+    # A file that mixes standard lora_A/B layers with LoKr layers must be accepted;
+    # this is a valid LyCORIS per-module-algorithm file.
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        "transformer.text_fusion.0.attn.to_q.lora_A.weight": object(),
+        "transformer.text_fusion.0.attn.to_q.lora_B.weight": object(),
+        "transformer.text_fusion.0.attn.to_k.lokr_w1": object(),
+        "transformer.text_fusion.0.attn.to_k.lokr_w2": object(),
+    }
+    config = LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
+    assert config.base is BaseModelType.Krea2
