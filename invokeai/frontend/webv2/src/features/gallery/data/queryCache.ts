@@ -176,32 +176,16 @@ const patchItemPage = (
   });
 };
 
-const countRemovedItems = (page: GalleryItemsPage, itemKeys: ReadonlySet<GalleryItemKey>): number =>
-  page.items.filter((item) => itemKeys.has(toGalleryItemKey(item))).length;
-
 const patchItemsInfiniteData = (
   data: InfiniteData<GalleryItemsPage, number>,
   filter: CanonicalGalleryItemsFilter,
   patch: GalleryItemCachePatch,
-  itemKeys: ReadonlySet<GalleryItemKey>
+  itemKeys: ReadonlySet<GalleryItemKey>,
+  removedItemCount: number
 ): InfiniteData<GalleryItemsPage, number> => {
-  const removedItemKeys = new Set<GalleryItemKey>();
-
-  if (patchRemovesItems(filter, patch)) {
-    for (const page of data.pages) {
-      for (const item of page.items) {
-        const key = toGalleryItemKey(item);
-
-        if (itemKeys.has(key)) {
-          removedItemKeys.add(key);
-        }
-      }
-    }
-  }
-
   let changed = false;
   const pages = data.pages.map((page) => {
-    const nextPage = patchItemPage(page, filter, patch, itemKeys, removedItemKeys.size);
+    const nextPage = patchItemPage(page, filter, patch, itemKeys, removedItemCount);
     changed ||= nextPage !== page;
 
     return nextPage;
@@ -214,21 +198,60 @@ const patchItemsCacheData = (
   query: Query,
   filter: CanonicalGalleryItemsFilter,
   patch: GalleryItemCachePatch,
-  itemKeys: ReadonlySet<GalleryItemKey>
+  itemKeys: ReadonlySet<GalleryItemKey>,
+  removedItemCount: number
 ): { after: GalleryItemsCacheData; before: GalleryItemsCacheData } | null => {
   const before = query.state.data;
 
   if (isGalleryItemsData(before)) {
-    return { after: patchItemsInfiniteData(before, filter, patch, itemKeys), before };
+    return { after: patchItemsInfiniteData(before, filter, patch, itemKeys, removedItemCount), before };
   }
 
   // New items are left to the trailing refetch so their server ordering is preserved.
   if (isGallerySinglePageQueryKey(query.queryKey) && isGalleryItemsPage(before)) {
-    const removedCount = patchRemovesItems(filter, patch) ? countRemovedItems(before, itemKeys) : 0;
-    return { after: patchItemPage(before, filter, patch, itemKeys, removedCount), before };
+    return { after: patchItemPage(before, filter, patch, itemKeys, removedItemCount), before };
   }
 
   return null;
+};
+
+const getListingHash = (queryKey: QueryKey): string => hashKey(queryKey.slice(0, 5));
+
+/**
+ * Count the removed items each listing holds anywhere in its cached pages. Every cached page of a listing reports the
+ * same server total, so each must lose the same count: pages left disagreeing would make the sparse views clamp and
+ * reconcile against each other.
+ */
+const countRemovedItemsByListing = (
+  queries: readonly Query[],
+  patch: GalleryItemCachePatch,
+  itemKeys: ReadonlySet<GalleryItemKey>
+): Map<string, number> => {
+  const removedKeysByListing = new Map<string, Set<GalleryItemKey>>();
+
+  for (const query of queries) {
+    const filter = getGalleryItemsFilterFromKey(query.queryKey);
+
+    if (!filter || !patchRemovesItems(filter, patch)) {
+      continue;
+    }
+
+    const listingHash = getListingHash(query.queryKey);
+    const removedKeys = removedKeysByListing.get(listingHash) ?? new Set<GalleryItemKey>();
+
+    removedKeysByListing.set(listingHash, removedKeys);
+    for (const page of getCachedPages(query)) {
+      for (const item of page.items) {
+        const key = toGalleryItemKey(item);
+
+        if (itemKeys.has(key)) {
+          removedKeys.add(key);
+        }
+      }
+    }
+  }
+
+  return new Map([...removedKeysByListing].map(([listingHash, keys]) => [listingHash, keys.size]));
 };
 
 /** An optimistic star patch, or the rollback of one, for state that retains star flags outside the item caches. */
@@ -283,9 +306,13 @@ export const patchGalleryItemCaches = (client: QueryClient, patch: GalleryItemCa
   const rollbackEntries: ItemCacheRollbackEntry[] = [];
   const starPatchId = patch.kind === 'star' ? ++nextGalleryItemStarPatchId : null;
 
-  for (const query of getGalleryItemListQueries(client)) {
+  const queries = getGalleryItemListQueries(client);
+  const removedCountByListing = countRemovedItemsByListing(queries, patch, itemKeys);
+
+  for (const query of queries) {
     const filter = getGalleryItemsFilterFromKey(query.queryKey);
-    const patched = filter ? patchItemsCacheData(query, filter, patch, itemKeys) : null;
+    const removedItemCount = removedCountByListing.get(getListingHash(query.queryKey)) ?? 0;
+    const patched = filter ? patchItemsCacheData(query, filter, patch, itemKeys, removedItemCount) : null;
 
     if (!patched || patched.after === patched.before) {
       continue;

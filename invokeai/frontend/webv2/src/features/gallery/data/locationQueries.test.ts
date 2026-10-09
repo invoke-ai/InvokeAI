@@ -156,6 +156,28 @@ describe('fetchVerifiedGalleryItemPage', () => {
     queryClient.clear();
   });
 
+  it('reads again when a gallery invalidation cancels its page read', async () => {
+    backend.getGalleryItemLocation.mockResolvedValue({ ...ref, index: 127, total: 200 });
+    backend.listGalleryItems
+      .mockImplementationOnce(
+        () =>
+          new Promise(() => {
+            // Held until the invalidation cancels it.
+          })
+      )
+      .mockResolvedValueOnce(createPage(120, 200, 127));
+    const queryClient = createQueryClient();
+    const verified = fetchVerifiedGalleryItemPage(queryClient, filter, ref);
+
+    await vi.waitFor(() => expect(backend.listGalleryItems).toHaveBeenCalledOnce());
+    await queryClient.cancelQueries({ queryKey: ['gallery', 'items', 'list'] });
+
+    await expect(verified).resolves.toMatchObject({ index: 127, offset: 120 });
+    expect(backend.getGalleryItemLocation).toHaveBeenCalledTimes(2);
+    expect(backend.listGalleryItems).toHaveBeenCalledTimes(2);
+    queryClient.clear();
+  });
+
   it('abandons location work owned by an account epoch after that account changes', async () => {
     let resolveLocation!: (location: { kind: 'video'; name: string; index: number; total: number }) => void;
     backend.getGalleryItemLocation.mockReturnValue(

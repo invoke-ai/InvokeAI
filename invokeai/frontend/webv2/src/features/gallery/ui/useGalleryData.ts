@@ -373,19 +373,28 @@ export const useGalleryData = ({
   const stableTotal =
     retainedTotal ?? cachedFirstPage?.total ?? (isInitialTotalDiscovery ? queriedTotal : undefined) ?? null;
   const knownTotal = stableTotal;
-  const maxPaginatedPage =
-    knownTotal === null || !Number.isFinite(knownTotal)
-      ? null
-      : Math.max(0, Math.ceil(Math.max(0, knownTotal) / GALLERY_PAGE_SIZE) - 1);
-  const selectedPageOffset =
-    (maxPaginatedPage === null ? Math.max(0, page) : Math.min(Math.max(0, page), maxPaginatedPage)) * GALLERY_PAGE_SIZE;
+  const requestedPageOffset = Math.max(0, page) * GALLERY_PAGE_SIZE;
+  const getCachedPageTotal = (offset: number) =>
+    queryClient.getQueryData<{ total: number }>(galleryItemsPageOptions(filter, offset).queryKey)?.total;
+  // A cached requested page's own total says whether that page exists, and is fresher than the retained total when
+  // Find in Gallery has just verified it. Clamping by it also keeps the selection independent of observed totals.
+  const requestedPageTotal = sparseViewport && isPaginated ? getCachedPageTotal(requestedPageOffset) : undefined;
+  const paginatedTotal = requestedPageTotal ?? knownTotal;
+  const clampPaginatedOffset = (total: number | null) =>
+    total === null || !Number.isFinite(total)
+      ? requestedPageOffset
+      : Math.min(
+          requestedPageOffset,
+          Math.max(0, Math.ceil(Math.max(0, total) / GALLERY_PAGE_SIZE) - 1) * GALLERY_PAGE_SIZE
+        );
+  const selectedPageOffset = clampPaginatedOffset(paginatedTotal);
   const pageOffsets = useMemo(() => {
     if (!sparseViewport) {
       return [];
     }
 
     if (isPaginated) {
-      if (knownTotal === 0) {
+      if (paginatedTotal === 0) {
         // Keep page zero observed so gallery invalidation can discover items added after an empty result.
         return [0];
       }
@@ -419,6 +428,7 @@ export const useGalleryData = ({
     isFetchingTotal,
     hasUnresolvedTotalError,
     page,
+    paginatedTotal,
     revealPinOffset,
     selectedPageOffset,
     sparseViewport,
@@ -451,18 +461,40 @@ export const useGalleryData = ({
     },
     [filterIdentity]
   );
-  const pageOptions = sparseViewport
-    ? pageOffsets.map((offset) => {
-        const options = galleryItemsPageOptions(filter, offset);
+  // A paginated view shows one page but also observes the pages its clamp points at: the requested page, and the page
+  // the shown page's own total clamps to. Their totals must agree before the retained total moves, so disagreeing
+  // totals reconcile through one refetch instead of flipping the selected page on every render.
+  const totalCheckOffsets = new Set<number>();
 
-        // Failed pages wait for their own Retry; broad invalidation must not silently retry visible failures.
-        return { ...options, enabled: queryClient.getQueryState(options.queryKey)?.status !== 'error' };
-      })
-    : [];
-  const pageResults = useQueries({ queries: pageOptions });
-  const loadedPageTotals = pageResults.flatMap((result) => (result.data ? [result.data.total] : []));
+  if (sparseViewport && isPaginated && pageOffsets[0] === selectedPageOffset) {
+    const selectedPageTotal = getCachedPageTotal(selectedPageOffset);
+
+    if (requestedPageTotal !== undefined) {
+      totalCheckOffsets.add(requestedPageOffset);
+    }
+    if (selectedPageTotal !== undefined) {
+      totalCheckOffsets.add(clampPaginatedOffset(selectedPageTotal));
+    }
+    totalCheckOffsets.delete(selectedPageOffset);
+  }
+
+  const toPageOptions = (offset: number) => {
+    const options = galleryItemsPageOptions(filter, offset);
+
+    // Failed pages wait for their own Retry; broad invalidation must not silently retry visible failures.
+    return { ...options, enabled: queryClient.getQueryState(options.queryKey)?.status !== 'error' };
+  };
+  const pageOptions = sparseViewport ? pageOffsets.map(toPageOptions) : [];
+  const observedPageOptions = [...pageOptions, ...[...totalCheckOffsets].map(toPageOptions)];
+  const observedPageResults = useQueries({ queries: observedPageOptions });
+  const pageResults = observedPageResults.slice(0, pageOptions.length);
+  const loadedPageTotals = observedPageResults.flatMap((result) => (result.data ? [result.data.total] : []));
   const hasConflictingPageTotals = new Set(loadedPageTotals).size > 1;
-  const pageResultsSettled = pageResults.every((result) => !result.isFetching);
+  // A paginated page still loading its first data has no total to disagree with. Agreement alone cannot flip the
+  // selection back: a page loaded later is checked against the page its total clamps to before the total moves.
+  const pageResultsSettled = observedPageResults.every(
+    (result) => !result.isFetching || (isPaginated && result.data === undefined)
+  );
   const observedTotal =
     sparseViewport && pageResultsSettled && !hasConflictingPageTotals ? loadedPageTotals[0] : undefined;
   const [pageTotalReconciliation, setPageTotalReconciliation] = useState({
@@ -477,7 +509,7 @@ export const useGalleryData = ({
 
   // A settled agreement ends the current conflict generation. The next conflict can then reconcile even when its
   // filter, total, and active page offsets match an earlier generation.
-  if (sparseViewport && !isPaginated && pageResultsSettled && loadedPageTotals.length > 0) {
+  if (sparseViewport && pageResultsSettled && loadedPageTotals.length > 0) {
     if (hasConflictingPageTotals && !currentPageTotalReconciliation.conflictObserved) {
       setPageTotalReconciliation({ ...currentPageTotalReconciliation, conflictObserved: true });
     } else if (!hasConflictingPageTotals && currentPageTotalReconciliation.conflictObserved) {
@@ -490,10 +522,10 @@ export const useGalleryData = ({
   }
 
   useQuery({
-    enabled: sparseViewport && !isPaginated && pageResultsSettled && hasConflictingPageTotals,
+    enabled: sparseViewport && pageResultsSettled && hasConflictingPageTotals,
     gcTime: 0,
     queryFn: async ({ client }) => {
-      await Promise.all(pageOptions.map(({ queryKey }) => client.invalidateQueries({ exact: true, queryKey })));
+      await Promise.all(observedPageOptions.map(({ queryKey }) => client.invalidateQueries({ exact: true, queryKey })));
 
       return true;
     },
@@ -506,7 +538,7 @@ export const useGalleryData = ({
       filterIdentity,
       stableTotal,
       currentPageTotalReconciliation.generation,
-      pageOffsets,
+      observedPageOptions.map(({ queryKey }) => queryKey[6]),
     ],
     staleTime: Infinity,
   });

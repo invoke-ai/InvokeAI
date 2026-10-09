@@ -371,6 +371,53 @@ describe('Gallery item cache patches', () => {
       rollbackMove();
       expect(client.getQueryData<GalleryItemsPage>(key)).toEqual(before);
     });
+    it('decrements every cached page of a listing by the items removed from any of them', () => {
+      const client = createClient();
+      const firstKey = getPageKey('board-1', 0);
+      const lastKey = getPageKey('board-1', 60);
+      const otherListingKey = getPageKey('board-2', 0);
+      const firstPage: GalleryItemsPage = {
+        items: [createItem('first.png')],
+        itemIndices: [0],
+        offset: 0,
+        total: 61,
+      };
+      const lastPage: GalleryItemsPage = {
+        items: [createItem('last.png')],
+        itemIndices: [60],
+        offset: 60,
+        total: 61,
+      };
+      const otherListingPage: GalleryItemsPage = {
+        items: [createItem('elsewhere.png', 'board-2')],
+        itemIndices: [0],
+        offset: 0,
+        total: 1,
+      };
+
+      client.setQueryData(firstKey, firstPage);
+      client.setQueryData(lastKey, lastPage);
+      client.setQueryData(otherListingKey, otherListingPage);
+
+      const rollback = patchGalleryItemCaches(client, {
+        boardId: 'board-3',
+        kind: 'move',
+        result: getResult([{ kind: 'image', name: 'last.png' }]),
+      });
+
+      expect(client.getQueryData<GalleryItemsPage>(firstKey)).toEqual({ ...firstPage, total: 60 });
+      expect(client.getQueryData<GalleryItemsPage>(lastKey)).toEqual({
+        items: [],
+        itemIndices: [],
+        offset: 60,
+        total: 60,
+      });
+      expect(client.getQueryData<GalleryItemsPage>(otherListingKey)).toBe(otherListingPage);
+
+      rollback();
+      expect(client.getQueryData<GalleryItemsPage>(firstKey)).toEqual(firstPage);
+      expect(client.getQueryData<GalleryItemsPage>(lastKey)).toEqual(lastPage);
+    });
   });
 
   describe('starred strip entries', () => {

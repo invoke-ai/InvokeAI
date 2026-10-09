@@ -2,7 +2,8 @@ import type { GalleryItem } from '@features/gallery/core/items';
 import type { GalleryImage } from '@features/gallery/core/types';
 
 import { getGallerySettings } from '@features/gallery/core/settings';
-import { invalidateGallery } from '@features/gallery/data/queryCache';
+import { fetchGalleryItemsPage } from '@features/gallery/data/queries';
+import { invalidateGallery, patchGalleryItemCaches } from '@features/gallery/data/queryCache';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, useEffect } from 'react';
@@ -90,6 +91,33 @@ const Probe = ({
     </>
   );
 };
+
+const renderProbe = (props: Parameters<typeof Probe>[0] = {}) =>
+  act(() =>
+    root?.render(
+      <QueryClientProvider client={queryClient!}>
+        <Probe {...props} />
+      </QueryClientProvider>
+    )
+  );
+
+const findPageQuery = (offset: number) =>
+  queryClient
+    ?.getQueryCache()
+    .findAll({ queryKey: ['gallery', 'items', 'list'] })
+    .find((query) => query.queryKey[5] === 'page' && query.queryKey[6] === offset);
+
+const mockListingTotal = (getTotal: () => number) =>
+  mocks.listGalleryItems.mockImplementation(({ offset, limit }: { offset: number; limit: number }) => {
+    const total = getTotal();
+
+    return Promise.resolve({
+      items: Array.from({ length: Math.max(0, Math.min(limit, total - offset)) }, (_, index) =>
+        createItem(offset + index)
+      ),
+      total,
+    });
+  });
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -364,6 +392,158 @@ describe('useGalleryData sparse page subscriptions', () => {
     await vi.waitFor(() => expect(latestData?.items).toHaveLength(60));
     expect(latestData?.total).toBe(60);
     expect(readRequests().filter(({ limit, offset }) => limit === 60 && offset === 120)).toHaveLength(1);
+  });
+
+  it('settles on the clamped page when a removal empties the last paginated page', async () => {
+    const total = 61;
+    mocks.listGalleryItems.mockImplementation(({ offset, limit }: { offset: number; limit: number }) =>
+      Promise.resolve({
+        items: Array.from({ length: Math.max(0, Math.min(limit, total - offset)) }, (_, index) =>
+          createItem(offset + index)
+        ),
+        total,
+      })
+    );
+
+    // Page zero is cached from an earlier visit.
+    await act(() =>
+      root?.render(
+        <QueryClientProvider client={queryClient!}>
+          <Probe paginated />
+        </QueryClientProvider>
+      )
+    );
+    await vi.waitFor(() => expect(latestData?.items).toHaveLength(60));
+    await act(() =>
+      root?.render(
+        <QueryClientProvider client={queryClient!}>
+          <Probe page={1} paginated />
+        </QueryClientProvider>
+      )
+    );
+    await vi.waitFor(() => expect(latestData?.items?.map((item) => item.name)).toEqual(['image-60.png']));
+
+    let renderError: unknown;
+    try {
+      await act(async () => {
+        patchGalleryItemCaches(queryClient!, {
+          boardId: 'elsewhere',
+          kind: 'move',
+          result: { failed: [], succeeded: [{ kind: 'image', name: 'image-60.png' }] },
+        });
+        await Promise.resolve();
+      });
+    } catch (error) {
+      renderError = error;
+    }
+
+    expect(renderError).toBeUndefined();
+    await vi.waitFor(() => expect(latestData?.total).toBe(60));
+    expect(latestData?.items).toHaveLength(60);
+  });
+
+  it('reconciles a stale page total by refetching instead of flipping between clamped pages', async () => {
+    // The server has not applied the move yet, so every read still reports 61 items.
+    mockListingTotal(() => 61);
+    await renderProbe({ paginated: true });
+    await vi.waitFor(() => expect(latestData?.items).toHaveLength(60));
+    await renderProbe({ page: 1, paginated: true });
+    await vi.waitFor(() => expect(latestData?.items?.map((item) => item.name)).toEqual(['image-60.png']));
+    await act(async () => {
+      patchGalleryItemCaches(queryClient!, {
+        boardId: 'elsewhere',
+        kind: 'move',
+        result: { failed: [], succeeded: [{ kind: 'image', name: 'image-60.png' }] },
+      });
+      await Promise.resolve();
+    });
+    await vi.waitFor(() => expect(latestData?.total).toBe(60));
+
+    let renderError: unknown;
+    try {
+      await act(async () => {
+        // A refetch of the shown page lands before the mutation and reports the old total.
+        await queryClient!.invalidateQueries({ exact: true, queryKey: findPageQuery(0)!.queryKey });
+      });
+    } catch (error) {
+      renderError = error;
+    }
+
+    expect(renderError).toBeUndefined();
+    await vi.waitFor(() => {
+      expect(latestData?.total).toBe(61);
+      expect(latestData?.items?.map((item) => item.name)).toEqual(['image-60.png']);
+    });
+    expect(readRequests().filter(({ limit, offset }) => limit === 60 && offset === 0)).toHaveLength(3);
+    expect(readRequests().filter(({ limit, offset }) => limit === 60 && offset === 60)).toHaveLength(2);
+  });
+
+  it('opens a verified paginated page past a stale retained total', async () => {
+    let total = 60;
+    mockListingTotal(() => total);
+    await renderProbe({ paginated: true });
+    await vi.waitFor(() => expect(latestData?.total).toBe(60));
+
+    // Another client adds a 61st item; Find in Gallery verifies it on page 1 before selecting that page.
+    total = 61;
+    await act(() => fetchGalleryItemsPage(queryClient!, latestData!.filter, 60, { staleTime: 0 }));
+    await renderProbe({ page: 1, paginated: true });
+
+    await vi.waitFor(() => expect(latestData?.items?.map((item) => item.name)).toEqual(['image-60.png']));
+    expect(latestData?.total).toBe(61);
+  });
+
+  it('does not reconcile page totals after an optimistic removal across subscribed pages', async () => {
+    await renderProbe();
+    await vi.waitFor(() => expect(latestData?.total).toBe(TOTAL));
+    await act(() => latestData?.setVisibleRange?.({ endIndexExclusive: 120, startIndex: 0 }));
+    await vi.waitFor(() => {
+      expect(latestData?.sparseListing?.itemSlots.get(60)?.name).toBe('image-60.png');
+      expect(latestData?.isLoadingItems).toBe(false);
+    });
+    const requestCount = readRequests().length;
+
+    await act(async () => {
+      patchGalleryItemCaches(queryClient!, {
+        kind: 'delete',
+        result: { failed: [], succeeded: [{ kind: 'image', name: 'image-5.png' }] },
+      });
+      await new Promise((resolve) => {
+        setTimeout(resolve, 50);
+      });
+    });
+
+    expect(latestData?.total).toBe(TOTAL - 1);
+    expect(readRequests()).toHaveLength(requestCount);
+  });
+
+  it('reads a failed page again when it is subscribed after leaving the view, but not while it stays visible', async () => {
+    let distantPageReads = 0;
+    mocks.listGalleryItems.mockImplementation(({ offset, limit }: { offset: number; limit: number }) => {
+      if (offset === 6_000 && ++distantPageReads === 1) {
+        return Promise.reject(new Error('temporary page failure'));
+      }
+
+      return Promise.resolve({
+        items: Array.from({ length: limit }, (_, index) => createItem(offset + index)),
+        total: TOTAL,
+      });
+    });
+    await renderProbe();
+    await vi.waitFor(() => expect(latestData?.total).toBe(TOTAL));
+    await act(() => latestData?.setVisibleRange?.({ endIndexExclusive: 6_060, startIndex: 6_000 }));
+    await vi.waitFor(() =>
+      expect(latestData?.sparseListing?.pageStates.get(6_000)?.error?.message).toBe('temporary page failure')
+    );
+
+    await act(() => invalidateGallery(queryClient!));
+    expect(distantPageReads).toBe(1);
+
+    await act(() => latestData?.setVisibleRange?.({ endIndexExclusive: 60, startIndex: 0 }));
+    await act(() => latestData?.setVisibleRange?.({ endIndexExclusive: 6_060, startIndex: 6_000 }));
+
+    await vi.waitFor(() => expect(latestData?.sparseListing?.itemSlots.get(6_000)?.name).toBe('image-6000.png'));
+    expect(distantPageReads).toBe(2);
   });
 
   it('surfaces count errors and retries count discovery before loading a clamped page', async () => {

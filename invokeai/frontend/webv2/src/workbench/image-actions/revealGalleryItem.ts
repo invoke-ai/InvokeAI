@@ -142,6 +142,7 @@ export const revealGalleryItem = (
     const page = boardIndex !== null ? Math.floor(boardIndex / GALLERY_PAGE_SIZE) : null;
 
     if (page !== null && settingsNow.paginationMode === 'paginated') {
+      // The verified page is cached, and its own total lets the listing open it past a stale retained total.
       commands.gallery.setPage(page);
     }
 

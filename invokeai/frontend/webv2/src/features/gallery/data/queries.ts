@@ -16,6 +16,7 @@ import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/
 import {
   hashKey,
   infiniteQueryOptions,
+  isCancelledError,
   queryOptions,
   type InfiniteData,
   type Query,
@@ -348,6 +349,18 @@ const ensureLifecycle = (client: QueryClient): GalleryPageLifecycle => {
     const identity = getSparsePageIdentity(event.query.queryKey);
 
     if (!identity) {
+      return;
+    }
+
+    // A failed page waits for its own Retry only while it stays in view. Once nothing observes it, forget the failure
+    // so returning to the page reads it again.
+    if (
+      event.type === 'observerRemoved' &&
+      event.query.state.status === 'error' &&
+      event.query.state.fetchStatus === 'idle' &&
+      event.query.getObserversCount() === 0
+    ) {
+      client.removeQueries({ exact: true, queryKey: event.query.queryKey });
       return;
     }
 
@@ -698,6 +711,9 @@ const isValidLocation = (location: GalleryItemLocation, ref: GalleryItemRef): bo
   location.index >= 0 &&
   location.index < location.total;
 
+/** Gallery invalidation cancels in-flight list reads; a locator re-reads after that many before giving up. */
+const MAX_CANCELLED_LOCATOR_READS = 2;
+
 /**
  * Resolve the target's current rank and fetch only its aligned page. A mismatch means the listing shifted between
  * the rank and page reads; refresh both once, then leave failure to the caller without changing Gallery state.
@@ -724,7 +740,10 @@ export const fetchVerifiedGalleryItemPage = async (
       throw error;
     });
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  let cancelledReads = 0;
+  let misalignedReads = 0;
+
+  while (misalignedReads < 2) {
     assertAccountScopeCurrent(owner);
     requestSignal.throwIfAborted();
     const locationOptions = galleryItemLocationOptionsForOwner(owner, filter, ref);
@@ -739,6 +758,7 @@ export const fetchVerifiedGalleryItemPage = async (
     requestSignal.throwIfAborted();
 
     if (!isValidLocation(location, ref)) {
+      misalignedReads += 1;
       continue;
     }
 
@@ -751,12 +771,25 @@ export const fetchVerifiedGalleryItemPage = async (
 
     // A cached page can have a fresh staleTime while an external insert/delete has shifted its offsets. Always read
     // the one resolved page from the backend before treating a locator result as verified.
-    const page = await fenceError(
-      fetchGalleryItemsPage(queryClient, filter, offset, {
-        signal: requestSignal,
-        staleTime: 0,
-      })
-    );
+    let page: GalleryItemsPage;
+
+    try {
+      page = await fenceError(
+        fetchGalleryItemsPage(queryClient, filter, offset, {
+          signal: requestSignal,
+          staleTime: 0,
+        })
+      );
+    } catch (error: unknown) {
+      // An invalidation cancelled the read because the listing changed; its rank may have moved too, so both are
+      // read again. Account and navigation aborts were already rethrown by the fence.
+      if (isCancelledError(error) && cancelledReads < MAX_CANCELLED_LOCATOR_READS) {
+        cancelledReads += 1;
+        continue;
+      }
+
+      throw error;
+    }
 
     assertAccountScopeCurrent(owner);
     requestSignal.throwIfAborted();
@@ -765,7 +798,8 @@ export const fetchVerifiedGalleryItemPage = async (
       return { index: location.index, offset, page, total: location.total };
     }
 
-    if (attempt === 0) {
+    misalignedReads += 1;
+    if (misalignedReads === 1) {
       await queryClient.invalidateQueries({ exact: true, queryKey: pageOptions.queryKey, refetchType: 'none' });
     }
   }
