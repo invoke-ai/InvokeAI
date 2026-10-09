@@ -167,8 +167,9 @@ dependencies = [
   "rocm==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
   "rocm-sdk-core==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
   "rocm-sdk-libraries==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
-  # The first release with a Windows ROCm binary.
-  "bitsandbytes>=0.50.2; sys_platform == 'win32'",
+  # 0.50.2 is the first release with a Windows ROCm binary, and the first that finds its Linux one for these wheels:
+  # they report HIP 7.15, which 0.49 turns into `libbitsandbytes_rocm85.so` (7 * 10 + 15) where 0.50 ships `rocm715`.
+  "bitsandbytes>=0.50.2; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
   # GPU kernels: per target, torch's, torchvision's and the ROCm runtime's; gfx110x, gfx115x and gfx12-0
   # are torch's kernels shared by a whole family.
   "amd-torch-device-gfx1010==2.13.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
