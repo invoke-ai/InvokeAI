@@ -47,7 +47,7 @@ export const VideoHeaderActions = () => {
       <IconButton
         aria-label={label}
         disabled={isAtModelDefaults}
-        size="2xs"
+        size="sm"
         variant="ghost"
         onClick={resetToModelDefaults}
       >

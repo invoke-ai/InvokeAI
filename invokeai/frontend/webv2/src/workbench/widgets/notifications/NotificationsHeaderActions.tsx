@@ -9,10 +9,10 @@ export const NotificationsHeaderActions = () => {
 
   return (
     <HStack gap="2">
-      <Button size="2xs" variant="outline" onClick={notifications.markAllRead}>
+      <Button size="sm" variant="outline" onClick={notifications.markAllRead}>
         {t('notifications.markRead')}
       </Button>
-      <Button size="2xs" variant="outline" onClick={notifications.clear}>
+      <Button size="sm" variant="outline" onClick={notifications.clear}>
         {t('common.clear')}
       </Button>
     </HStack>

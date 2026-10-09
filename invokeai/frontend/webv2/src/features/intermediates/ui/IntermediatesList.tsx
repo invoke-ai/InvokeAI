@@ -63,14 +63,14 @@ const Figure = ({ label, value }: { label: string; value: number }) => (
   <Stack align="flex-end" flexShrink={0} gap="0" minW="3.25rem">
     <Text
       color={value === 0 ? 'fg.muted' : 'fg'}
-      fontSize="xs"
+      fontSize="md"
       fontVariantNumeric="tabular-nums"
       fontWeight="600"
       lineHeight="shorter"
     >
       {formatCount(value)}
     </Text>
-    <Text color="fg.muted" fontSize="2xs" lineHeight="shorter">
+    <Text color="fg.muted" fontSize="xs" lineHeight="shorter">
       {label}
     </Text>
   </Stack>
@@ -122,7 +122,7 @@ export const IntermediatesList = ({
         {...rowProps}
         badges={
           row.projectId === null ? (
-            <Badge fontSize="2xs" variant="surface">
+            <Badge fontSize="xs" variant="surface">
               {t('intermediates.list.unassignedBadge')}
             </Badge>
           ) : undefined

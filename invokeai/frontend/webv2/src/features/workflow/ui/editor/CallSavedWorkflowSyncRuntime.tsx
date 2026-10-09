@@ -1,6 +1,7 @@
 import type { ProjectGraphState } from '@features/workflow/core/types';
 import type { ParsedWorkflow } from '@features/workflow/core/workflowJson';
 import type { WorkflowRecordDTO } from '@features/workflow/data/api';
+import type { ProjectGraphAction } from '@features/workflow/utility';
 
 import { onWorkflowLibraryCacheInvalidated } from '@features/workflow/data/libraryCache';
 import {
@@ -23,6 +24,7 @@ import {
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export const createSavedWorkflowDocumentParser = (
   parse: (workflow: Record<string, unknown>) => ParsedWorkflow = parseWorkflowJson
@@ -149,7 +151,8 @@ const needsDynamicFieldSync = (
 /** Reconciles asynchronously loaded child workflow forms into the project document. */
 export const CallSavedWorkflowSyncRuntime = () => {
   const queryClient = useQueryClient();
-  const { commands, project: projectPort } = useWorkflowUi();
+  const { t } = useTranslation();
+  const { commands, notifications: notify, project: projectPort } = useWorkflowUi();
   const retryableDetailWorkflowIds = useRef(new Map<string, RetryableDetailWorkflowNode>());
   const retryableDetailWorkflowQueries = useRef(new Map<string, number>());
   const nextRetryToken = useRef(0);
@@ -184,6 +187,19 @@ export const CallSavedWorkflowSyncRuntime = () => {
     pruneStaleCallSavedWorkflowNodeState(previousDetailStatuses.current, currentNodeIds);
     pruneStaleCallSavedWorkflowNodeState(previousDetailWorkflowIds.current, currentNodeIds);
 
+    /** Applies a reconciliation edit; connections it had to drop are named rather than lost silently. */
+    const editReportingDroppedConnections = (action: ProjectGraphAction) => {
+      const edgeCount = projectPort.getSnapshot().projectGraph.edges.length;
+
+      commands.editGraph(action);
+
+      const dropped = edgeCount - projectPort.getSnapshot().projectGraph.edges.length;
+
+      if (dropped > 0) {
+        notify.info(t('nodes.savedWorkflowDroppedEdges', { count: dropped }));
+      }
+    };
+
     const setStatus = (nodeId: string, workflowId: string, status: 'loading' | 'ready' | 'error') => {
       const currentDocument = projectPort.getSnapshot().projectGraph;
       const currentNode = currentDocument.nodes.find((candidate) => candidate.id === nodeId);
@@ -194,7 +210,8 @@ export const CallSavedWorkflowSyncRuntime = () => {
         currentNode.data.inputs.workflow_id?.value === workflowId &&
         currentNode.data.callSavedWorkflowStatus !== status
       ) {
-        commands.editGraph({ nodeId, status, type: 'setCallSavedWorkflowStatus' });
+        // An error after a switch also removes the previous workflow's inputs and their connections.
+        editReportingDroppedConnections({ nodeId, status, type: 'setCallSavedWorkflowStatus' });
       }
     };
 
@@ -221,8 +238,8 @@ export const CallSavedWorkflowSyncRuntime = () => {
           Object.keys(node.data.inputs).some((name) => name.startsWith(CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX));
 
         if (hasDynamicFields || node.data.callSavedWorkflowStatus !== 'ready') {
-          commands.editGraph({
-            edgeIdsToRemove: [],
+          editReportingDroppedConnections({
+            edgeIdsToRemove: getSavedWorkflowDynamicEdgeIdsToRemove(document, node.id, [], templatesSnapshot.templates),
             fields: [],
             nodeId: node.id,
             status: 'ready',
@@ -363,7 +380,7 @@ export const CallSavedWorkflowSyncRuntime = () => {
         node.data.callSavedWorkflowStatus !== 'ready' ||
         needsDynamicFieldSync(node, fields, edgeIdsToRemove, document.edges)
       ) {
-        commands.editGraph({
+        editReportingDroppedConnections({
           edgeIdsToRemove,
           fields,
           nodeId: node.id,

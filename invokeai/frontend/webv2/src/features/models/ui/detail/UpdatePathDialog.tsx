@@ -1,7 +1,7 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-function-as-prop */
 import type { ModelConfig } from '@features/models/core/types';
 
-import { Dialog, Input, Portal, Stack, Text } from '@chakra-ui/react';
+import { Input, Portal, Stack, Text } from '@chakra-ui/react';
 import { modelPathSchema } from '@features/models/core/schemas';
 import { updateModel } from '@features/models/data/api';
 import { replaceModelInStore } from '@features/models/data/modelsStore';
@@ -9,16 +9,22 @@ import { useNotify } from '@features/models/ui/useModelsNotify';
 import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Button, CloseButton, Field } from '@platform/ui';
+import { Dialog } from '@platform/ui/Dialog';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /** Update only the record's absolute path; never move files or repoint managed relative paths. */
 export const UpdatePathDialog = ({
+  isOpen,
   model,
   onClose,
+  onExitComplete,
 }: {
+  isOpen: boolean;
   model: Pick<ModelConfig, 'key' | 'name' | 'path'>;
   onClose: () => void;
+  /** After the close animation; the host releases the retained dialog here. */
+  onExitComplete: () => void;
 }) => {
   const { t } = useTranslation();
   const notify = useNotify();
@@ -50,8 +56,9 @@ export const UpdatePathDialog = ({
 
   return (
     <Dialog.Root
-      open
+      open={isOpen}
       size="md"
+      onExitComplete={onExitComplete}
       onOpenChange={(event) => {
         if (!event.open) {
           onClose();
@@ -71,7 +78,7 @@ export const UpdatePathDialog = ({
             <Dialog.Body>
               <Stack gap="3">
                 <Field label={t('models.currentPath')}>
-                  <Text color="fg.muted" fontSize="2xs" overflowWrap="anywhere">
+                  <Text color="fg.muted" fontSize="xs" overflowWrap="anywhere">
                     {model.path}
                   </Text>
                 </Field>
@@ -79,7 +86,7 @@ export const UpdatePathDialog = ({
                   <Input
                     aria-invalid={validationError ? true : undefined}
                     placeholder={t('models.newPathPlaceholder')}
-                    size="sm"
+                    size="lg"
                     value={path}
                     onChange={(event) => {
                       setPath(event.currentTarget.value);
@@ -90,13 +97,12 @@ export const UpdatePathDialog = ({
               </Stack>
             </Dialog.Body>
             <Dialog.Footer>
-              <Button disabled={isBusy} size="xs" variant="ghost" onClick={onClose}>
+              <Button disabled={isBusy} variant="ghost" onClick={onClose}>
                 {t('common.cancel')}
               </Button>
               <Button
                 disabled={path.trim() === model.path}
                 loading={isBusy}
-                size="xs"
                 variant="solid"
                 onClick={() => void handleSave()}
               >

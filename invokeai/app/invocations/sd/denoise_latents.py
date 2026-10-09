@@ -68,6 +68,7 @@ from invokeai.backend.stable_diffusion.extensions.freeu import FreeUExt
 from invokeai.backend.stable_diffusion.extensions.hidiffusion import HiDiffusionExt
 from invokeai.backend.stable_diffusion.extensions.inpaint import InpaintExt
 from invokeai.backend.stable_diffusion.extensions.inpaint_model import InpaintModelExt
+from invokeai.backend.stable_diffusion.extensions.ip_adapter import IPAdapterExt
 from invokeai.backend.stable_diffusion.extensions.lora import LoRAExt
 from invokeai.backend.stable_diffusion.extensions.preview import PreviewExt
 from invokeai.backend.stable_diffusion.extensions.rescale_cfg import RescaleCFGExt
@@ -591,6 +592,36 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 )
             )
 
+    @staticmethod
+    def parse_ip_adapter_field(
+        exit_stack: ExitStack,
+        context: InvocationContext,
+        ip_adapters: Optional[Union[IPAdapterField, list[IPAdapterField]]],
+        ext_manager: ExtensionsManager,
+    ):
+        if ip_adapters is None:
+            return
+
+        # Handle the possibility that ip_adapters could be a list or a single IPAdapterField.
+        if isinstance(ip_adapters, IPAdapterField):
+            ip_adapters = [ip_adapters]
+
+        for ip_adapter_field in ip_adapters:
+            ext_manager.add_extension(
+                IPAdapterExt(
+                    node_context=context,
+                    model_id=ip_adapter_field.ip_adapter_model,
+                    image_encoder_id=ip_adapter_field.image_encoder_model,
+                    images=ip_adapter_field.image,
+                    weight=ip_adapter_field.weight,
+                    begin_step_percent=ip_adapter_field.begin_step_percent,
+                    end_step_percent=ip_adapter_field.end_step_percent,
+                    target_blocks=ip_adapter_field.target_blocks,
+                    method=ip_adapter_field.method,
+                    mask=ip_adapter_field.mask,
+                )
+            )
+
     def prep_ip_adapter_image_prompts(
         self,
         context: InvocationContext,
@@ -963,23 +994,27 @@ class DenoiseLatentsInvocation(BaseInvocation):
         latents = latents.to(device=device, dtype=dtype)
         if noise is not None:
             noise = noise.to(device=device, dtype=dtype)
-        denoise_ctx = DenoiseContext(
-            inputs=DenoiseInputs(
-                orig_latents=latents,
-                timesteps=timesteps,
-                init_timestep=init_timestep,
-                noise=noise,
-                seed=seed,
-                scheduler_step_kwargs=scheduler_step_kwargs,
-                conditioning_data=conditioning_data,
-                attention_processor_cls=CustomAttnProcessor2_0,
-            ),
-            unet=None,
-            scheduler=scheduler,
-        )
 
         # context for loading additional models
         with ExitStack() as exit_stack:
+            denoise_ctx = DenoiseContext(
+                dtype=dtype,
+                device=device,
+                exit_stack=exit_stack,
+                inputs=DenoiseInputs(
+                    orig_latents=latents,
+                    timesteps=timesteps,
+                    init_timestep=init_timestep,
+                    noise=noise,
+                    seed=seed,
+                    scheduler_step_kwargs=scheduler_step_kwargs,
+                    conditioning_data=conditioning_data,
+                    attention_processor_cls=CustomAttnProcessor2_0,
+                ),
+                unet=None,
+                scheduler=scheduler,
+            )
+
             # later should be smth like:
             # for extension_field in self.extensions:
             #    ext = extension_field.to_extension(exit_stack, context, ext_manager)
@@ -992,6 +1027,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
             # one declaration.
             bgr_mode = self.unet.unet.base == BaseModelType.StableDiffusionXL
             self.parse_t2i_adapter_field(exit_stack, context, self.t2i_adapter, ext_manager, bgr_mode)
+            self.parse_ip_adapter_field(exit_stack, context, self.ip_adapter, ext_manager)
 
             # ext: t2i/ip adapter
             ext_manager.run_callback(ExtensionCallbackType.SETUP, denoise_ctx)

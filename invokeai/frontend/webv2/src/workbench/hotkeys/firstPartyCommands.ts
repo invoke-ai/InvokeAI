@@ -19,18 +19,22 @@ import {
 } from '@platform/state/accountLifecycle';
 import { useQueryClient } from '@tanstack/react-query';
 import { submitActiveInvocation } from '@workbench/activeInvocationSubmission';
+import { describeControlLayerIssue } from '@workbench/controlLayerChecks';
+import { useWorkbenchFocus, useWorkbenchFocusTarget } from '@workbench/focusRegions';
 import { builtInLayoutPresetDescriptors } from '@workbench/layoutPresets';
 import { toggleCommandPalette } from '@workbench/palette/paletteStore';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { getWorkbenchPreferences } from '@workbench/settings/store';
 import { openProjectSwitcher } from '@workbench/shell/topbar/projectSwitcherStore';
-import { openWidgetPlacement, toggleCenterPreview } from '@workbench/widgetPlacementCommands';
+import { cycleRegionWidget, openWidgetPlacement, toggleCenterPreview } from '@workbench/widgetPlacementCommands';
 import { getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useWorkbenchCommands, useWorkbenchExtensions, useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { resolvePanelToggle } from '@workbench/workbenchState';
 import { useTranslation } from 'react-i18next';
+
+import { regionFocusHotkeys, widgetCycleHotkeys } from './catalog';
 
 const layoutPresetCommands = builtInLayoutPresetDescriptors.map(({ hotkeyId, preset }) => ({
   id: `app.${hotkeyId}`,
@@ -48,6 +52,8 @@ const imageRecallCommands: Record<string, ImageRecallKind> = {
 };
 
 export const FIRST_PARTY_APP_COMMAND_IDS = [
+  ...regionFocusHotkeys.map(({ commandId }) => commandId),
+  ...widgetCycleHotkeys.map(({ commandId }) => commandId),
   'app.invoke',
   'app.invokeFront',
   'app.invokeToOtherDestination',
@@ -94,6 +100,8 @@ export const useRegisterFirstPartyCommands = () => {
   const commands = useWorkbenchCommands();
   const { commands: commandApi } = useWorkbenchExtensions();
   const queries = useWorkbenchQueries();
+  const focus = useWorkbenchFocus();
+  const getFocusTarget = useWorkbenchFocusTarget();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { layout, notifications, queue, widgets } = commands;
@@ -109,7 +117,13 @@ export const useRegisterFirstPartyCommands = () => {
    * gallery" must not silently retarget every subsequent invoke.
    */
   const submitInvocation = async (destinationOverride?: ResultDestination) => {
-    await submitActiveInvocation({ commands, destinationOverride, getModels: getAvailableModels, queries });
+    await submitActiveInvocation({
+      commands,
+      destinationOverride,
+      formatControlLayerError: (rejection) => describeControlLayerIssue(t, rejection),
+      getModels: getAvailableModels,
+      queries,
+    });
   };
 
   const notifyNoImageSelected = () =>
@@ -210,6 +224,44 @@ export const useRegisterFirstPartyCommands = () => {
 
   useMountEffect(() => {
     const disposers = [
+      ...regionFocusHotkeys.map(({ commandId, direction, title }) =>
+        commandApi.register({
+          handler: () => focus.focusAdjacentRegion(direction),
+          id: commandId,
+          title,
+        })
+      ),
+      ...widgetCycleHotkeys.map(({ commandId, direction, title }) =>
+        commandApi.register({
+          handler: () => {
+            const target = getFocusTarget();
+            if (target?.kind !== 'region') {
+              return;
+            }
+            const project = queries.getSnapshot().activeProject;
+            const { region } = target;
+            const panels = project.layout.panels;
+            const isOpen =
+              region === 'center' ||
+              (region === 'left' ? panels.isLeftOpen : region === 'right' ? panels.isRightOpen : panels.isBottomOpen);
+            if (!isOpen || project.widgetRegions[region].isCollapsed) {
+              return;
+            }
+            const instanceId = cycleRegionWidget({
+              direction,
+              getWidgetsForRegion,
+              project: getWidgetPlacementProject(project),
+              region,
+              widgets,
+            });
+            if (instanceId) {
+              focus.focusRegion(region, undefined, instanceId);
+            }
+          },
+          id: commandId,
+          title,
+        })
+      ),
       commandApi.register({ handler: () => submitInvocation(), id: 'app.invoke', title: 'Invoke' }),
       commandApi.register({ handler: () => submitInvocation(), id: 'app.invokeFront', title: 'Invoke front' }),
       commandApi.register({

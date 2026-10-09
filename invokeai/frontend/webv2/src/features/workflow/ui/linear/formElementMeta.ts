@@ -8,16 +8,17 @@ export type FormElementMetaKey = 'container-column' | 'container-row' | 'divider
 
 export interface FormElementMeta {
   icon: LucideIcon;
-  label: string;
+  /** Translation key of the element's display name. */
+  labelKey: string;
 }
 
 export const FORM_ELEMENT_META: Record<FormElementMetaKey, FormElementMeta> = {
-  'container-column': { icon: Columns2Icon, label: 'Container (column)' },
-  'container-row': { icon: Rows2Icon, label: 'Container (row)' },
-  divider: { icon: MinusIcon, label: 'Divider' },
-  heading: { icon: HeadingIcon, label: 'Heading' },
-  'node-field': { icon: CrosshairIcon, label: 'Node Field' },
-  text: { icon: TextIcon, label: 'Text' },
+  'container-column': { icon: Columns2Icon, labelKey: 'widgets.workflow.formBuilder.elements.containerColumn' },
+  'container-row': { icon: Rows2Icon, labelKey: 'widgets.workflow.formBuilder.elements.containerRow' },
+  divider: { icon: MinusIcon, labelKey: 'widgets.workflow.formBuilder.elements.divider' },
+  heading: { icon: HeadingIcon, labelKey: 'widgets.workflow.formBuilder.elements.heading' },
+  'node-field': { icon: CrosshairIcon, labelKey: 'widgets.workflow.formBuilder.elements.nodeField' },
+  text: { icon: TextIcon, labelKey: 'widgets.workflow.formBuilder.elements.text' },
 };
 
 /** Exclude node-field from Add because fields enter forms by dragging from their owning nodes. */
@@ -34,6 +35,6 @@ export type AddableFormElementKey = (typeof ADDABLE_FORM_ELEMENT_KEYS)[number];
 export const getFormElementMetaKey = (element: WorkflowFormElement): FormElementMetaKey =>
   element.type === 'container' ? (element.data.layout === 'row' ? 'container-row' : 'container-column') : element.type;
 
-/** Title shown in a card's title bar and the drag ghost. Shared so the two never drift. */
-export const getFormElementTitle = (element: WorkflowFormElement): string =>
-  FORM_ELEMENT_META[getFormElementMetaKey(element)].label;
+/** Translation key of the title shown in a card's title bar and the drag ghost. Shared so the two never drift. */
+export const getFormElementTitleKey = (element: WorkflowFormElement): string =>
+  FORM_ELEMENT_META[getFormElementMetaKey(element)].labelKey;

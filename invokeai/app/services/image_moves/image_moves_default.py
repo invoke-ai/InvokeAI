@@ -14,7 +14,6 @@ from PIL import Image, UnidentifiedImageError
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
 from invokeai.app.services.image_records.image_records_common import ImageCategory
-from invokeai.app.services.session_queue.session_queue_common import DEFAULT_QUEUE_ID
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.util.thumbnails import make_thumbnail
 
@@ -86,6 +85,7 @@ class ImageMoveService:
         self._future_lock = threading.Lock()
         self._future: Future | None = None
         self._future_operation: ImageMoveBackgroundOperation | None = None
+        self._gallery_maintenance_reserved = False
         self._last_background_error: str | None = None
         # Serializes the move service's relocate-and-repoint units against the image delete
         # units in ImageService. See image_mutation_lock() for the interleaving it prevents.
@@ -111,7 +111,7 @@ class ImageMoveService:
         self._executor.shutdown(wait=True, cancel_futures=False)
 
     @contextmanager
-    def image_mutation_lock(self) -> Iterator[None]:
+    def image_mutation_lock(self, *, blocking: bool = True) -> Iterator[bool]:
         """Serializes image delete units against subfolder relocation units.
 
         An image delete reads an image's subfolder, deletes its record, then purges its files
@@ -119,17 +119,56 @@ class ImageMoveService:
         the record. If the two interleave, the delete purges the path its snapshot named while
         the files sit at the new one — permanent orphans, unrecoverable because the record is
         gone and a clean purge drops the journal (JPPhoto, PR #9361). ``ImageService`` holds
-        this lock across each of its delete units, and the move service holds it across each
-        plan-relocate-repoint cycle below, so neither can observe the other half-done.
+        this lock across each delete and copy unit, and the move service holds it across each
+        plan-relocate-repoint cycle below. Session workers hold it across the maintenance check
+        and queue claim, so maintenance either observes a claimed item or prevents the claim.
 
         It is a reentrant lock because both sides run their units to completion in one thread;
         nothing inside a unit may block on another thread that needs this lock. It is also
         process-local: two Invoke processes sharing one output folder and database are not
         serialized by it — the same limitation the route guard has, which the delete journal's
         startup recovery re-check papers over for deletes.
+
+        Nonblocking callers receive ``False`` when another unit holds the lock and do not own
+        it. Queue workers use that path so shutdown can wake a worker even during a long scan.
         """
-        with self._image_mutation_lock:
-            yield
+        acquired = self._image_mutation_lock.acquire(blocking=blocking)
+        try:
+            yield acquired
+        finally:
+            if acquired:
+                self._image_mutation_lock.release()
+
+    @contextmanager
+    def reserve_gallery_maintenance(self) -> Iterator[None]:
+        """Excludes image moves and queue claims while gallery maintenance runs.
+
+        This process-local reservation is visible before waiting for the mutation lock, so
+        session workers cannot claim new work while this operation waits for a claim already
+        in flight. The future lock is released before acquiring the mutation lock; workers take
+        the locks in the opposite order when they atomically check maintenance state and dequeue.
+        """
+        with self._future_lock:
+            self._refresh_finished_future_locked()
+            if (
+                self._gallery_maintenance_reserved
+                or self._future_operation is not None
+                or (self._future is not None and not self._future.done())
+            ):
+                raise ImageMoveJobAlreadyRunning("An image storage maintenance operation is already running")
+            if self._get_active_job_id() is not None:
+                raise ImageMoveJobAlreadyRunning("An image move job is already active")
+            self._gallery_maintenance_reserved = True
+
+        try:
+            with self.image_mutation_lock():
+                self._assert_no_active_queue_work()
+                yield
+        finally:
+            # Release only after the mutation lock is gone. Queue workers acquire that lock
+            # before consulting this flag, so this order cannot deadlock with a worker claim.
+            with self._future_lock:
+                self._gallery_maintenance_reserved = False
 
     def start_background_move_all(self) -> ImageMoveBackgroundStatus:
         return self._start_background_operation("move_all", self.move_all_images, require_idle_queue=True)
@@ -147,7 +186,8 @@ class ImageMoveService:
             self._refresh_finished_future_locked()
             is_running = self._future is not None and not self._future.done()
             operation_reserved = self._future_operation is not None
-        return operation_reserved or is_running or self._get_active_job_id() is not None
+            gallery_maintenance_reserved = self._gallery_maintenance_reserved
+        return gallery_maintenance_reserved or operation_reserved or is_running or self._get_active_job_id() is not None
 
     def _assert_no_active_queue_work(self) -> None:
         session_queue = self._session_queue
@@ -155,8 +195,7 @@ class ImageMoveService:
             session_queue = getattr(self._invoker.services, "session_queue", None)
         if session_queue is None:
             return
-        queue_status = session_queue.get_queue_status(DEFAULT_QUEUE_ID)
-        if queue_status.pending > 0 or queue_status.in_progress > 0:
+        if session_queue.has_active_queue_work():
             raise ImageMoveQueueActive("Cannot start image move while queue work is active")
 
     def _start_background_operation(
@@ -167,6 +206,8 @@ class ImageMoveService:
     ) -> ImageMoveBackgroundStatus:
         with self._future_lock:
             self._refresh_finished_future_locked()
+            if self._gallery_maintenance_reserved:
+                raise ImageMoveJobAlreadyRunning("An image storage maintenance operation is already running")
             if self._future_operation is not None or (self._future is not None and not self._future.done()):
                 raise ImageMoveJobAlreadyRunning("An image move job is already running")
             active_job_id = self._get_active_job_id()

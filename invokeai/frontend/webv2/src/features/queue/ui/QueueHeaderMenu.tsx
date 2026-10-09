@@ -66,7 +66,7 @@ export const QueueHeaderMenu = () => {
       <QueueMenuItems actions={actions} label={t('widgets.labels.queue')} />
       <Menu.Separator />
       <Menu.ItemGroup>
-        <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+        <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
           {t('common.clear')}
         </Menu.ItemGroupLabel>
         <Menu.Item data-danger="" disabled={counts.failed === 0} value="clear-failed-items" onClick={onClearFailed}>

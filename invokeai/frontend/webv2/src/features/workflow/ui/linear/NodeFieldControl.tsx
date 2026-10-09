@@ -113,7 +113,6 @@ export const NodeFieldControl = ({
     (seedMode: SeedMode) => editGraph({ fieldName, nodeId, seedMode, type: 'setFieldSeedMode' }),
     [editGraph, fieldName, nodeId]
   );
-  const resetAriaLabel = useMemo(() => `Reset ${label} to default value`, [label]);
   const showsShuffle =
     element.data.showShuffle &&
     !!template &&
@@ -128,20 +127,19 @@ export const NodeFieldControl = ({
 
   if (!invocationNode || !template) {
     return (
-      <Alert.Root status="error" size="sm" variant="surface">
+      <Alert.Root status="error" variant="surface">
         <Alert.Indicator />
-        <Alert.Title>This field no longer exists in the project graph.</Alert.Title>
+        <Alert.Title>{t('nodes.fieldUnavailable')}</Alert.Title>
       </Alert.Root>
     );
   }
   const resetButton = canReset ? (
-    <Tooltip content="Reset to default value">
+    <Tooltip content={t('nodes.resetToDefault')}>
       <IconButton
-        aria-label={resetAriaLabel}
+        aria-label={t('nodes.resetFieldToDefault', { label })}
         color="fg.subtle"
         flexShrink={0}
-        size="2xs"
-        title="Reset to default value"
+        size="sm"
         variant="ghost"
         onClick={onResetClick}
       >
@@ -156,14 +154,13 @@ export const NodeFieldControl = ({
         {isLabelEditable ? (
           <HStack gap="1" minW="0" w="full">
             <Input
-              aria-label="Field label"
+              aria-label={t('nodes.fieldLabel')}
               color={isInvalid ? 'fg.error' : 'fg.muted'}
-              fontSize="2xs"
+              fontSize="xs"
               fontWeight="600"
               h="5"
               id={labelInputId}
               placeholder={template.title}
-              size="2xs"
               value={draftLabel ?? label}
               variant="flushed"
               w="full"
@@ -184,12 +181,12 @@ export const NodeFieldControl = ({
           </HStack>
         )}
         {element.data.showDescription && description ? (
-          <Text color="fg.subtle" fontSize="2xs">
+          <Text color="fg.subtle" fontSize="xs">
             {description}
           </Text>
         ) : null}
         {isConnected ? (
-          <Text color="fg.subtle" fontSize="2xs">
+          <Text color="fg.subtle" fontSize="xs">
             {t('nodes.providedByConnection')}
           </Text>
         ) : (
@@ -210,10 +207,9 @@ export const NodeFieldControl = ({
             {showsShuffle ? (
               <Tooltip content={t('common.shuffle')}>
                 <IconButton
-                  aria-label={`${t('common.shuffle')} ${label}`}
+                  aria-label={t('nodes.shuffleField', { label })}
                   color="fg.muted"
                   flexShrink={0}
-                  size="xs"
                   variant="outline"
                   onClick={onShuffleClick}
                 >
@@ -223,7 +219,7 @@ export const NodeFieldControl = ({
             ) : null}
           </HStack>
         )}
-        {invalidReason ? <Field.ErrorText fontSize="2xs">{invalidReason}</Field.ErrorText> : null}
+        {invalidReason ? <Field.ErrorText fontSize="xs">{invalidReason}</Field.ErrorText> : null}
       </Stack>
     </Field.Root>
   );

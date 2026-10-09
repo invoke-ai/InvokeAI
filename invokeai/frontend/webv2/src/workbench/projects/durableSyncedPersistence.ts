@@ -2,7 +2,8 @@ import type { HydratedWorkbenchSnapshot } from '@workbench/persistenceContracts'
 import type { Project, ProjectLoadResult, RefusedWorkbenchProject, WorkbenchState } from '@workbench/projectContracts';
 
 import { createUuid } from '@platform/browser/randomUuid';
-import { assertAccountScopeCurrent, type AccountScope } from '@platform/state/accountLifecycle';
+import { createLogger } from '@platform/logging/logger';
+import { assertAccountScopeCurrent, isAccountScopeCurrent, type AccountScope } from '@platform/state/accountLifecycle';
 import {
   getProjectCanvasSchemaRequirement,
   isCanvasSchemaVersionSupported,
@@ -25,6 +26,9 @@ import type {
   ProjectDraftRetargetHandoff,
   ProjectDraftStore,
   ProjectDraftSummary,
+  ProjectUnloadJournalEntry,
+  ProjectUnloadJournalKey,
+  ProjectUnloadJournalReconciliation,
 } from './draftStore';
 import type { EditorSession } from './editorSession';
 import type { ProjectPushOutcome, ProjectSchemaRefusal } from './projectFlush';
@@ -50,11 +54,13 @@ import {
   getUtf8ByteSize,
   getCopySourceProjectName,
   PROJECT_DRAFT_PROJECT_LIMIT,
+  PROJECT_UNLOAD_JOURNAL_MAX_BYTES,
+  PROJECT_UNLOAD_JOURNAL_SCHEMA_VERSION,
   toConflictProjectDraft,
   toDirtyProjectDraft,
   toSchemaRefusedProjectDraft,
 } from './draftStore';
-import { getEditorSession } from './editorSession';
+import { createEditorSessionLivenessCheck, getEditorSession, isEditorSessionLive } from './editorSession';
 import { createDeterministicProjectId } from './ids';
 import { createAccountOwnedProjectDraftStore } from './indexedDbDraftStore';
 import { seedProjectLibrary, upsertProjectSummary } from './library';
@@ -195,6 +201,16 @@ export interface DurableWorkbenchSaveResult {
   snapshot: HydratedWorkbenchSnapshot;
 }
 
+export type UnloadJournalOutcome =
+  | {
+      kind: 'journaled';
+      projectIds: string[];
+      skippedOversizedProjectIds: string[];
+      /** Settles true once the write commits, false if it aborted. */
+      written: Promise<boolean>;
+    }
+  | { kind: 'nothing-to-journal' | 'unavailable' };
+
 export interface QueueRecoveryProject {
   projectId: string;
   reason: 'open-limit' | 'project-unavailable';
@@ -249,6 +265,8 @@ interface DurableSyncedPersistenceDependencies {
   deleteDatabase?: typeof deleteWorkbenchDatabase;
   draftStore?: Promise<ProjectDraftStore>;
   editorSession?: Promise<EditorSession>;
+  /** Whether another page still holds the editor session, so its unload journal is left for it to settle. */
+  isEditorSessionLive?: (editorSessionId: string) => Promise<boolean>;
   now?: () => string;
   projectMutationLock?: (projectId: string) => ReturnType<typeof acquireProjectMutationLock>;
   queueRunJournal?: typeof createAccountOwnedQueueRunJournal;
@@ -379,12 +397,25 @@ export interface DurableSyncedWorkbenchPersistence {
   flushProjectToServer(project: Project): Promise<ProjectPushOutcome>;
   getProjectDraftDocument(projectId: string): Promise<string | null>;
   getRecoverableDraftDocument(projectId: string, editorSessionId: string): Promise<string | null>;
+  /** True from `persistEmptySession` until `reopenSession`: the editor is leaving and its session must stay empty. */
+  hasClosedSession(): boolean;
+  /**
+   * Synchronously journals every open project whose document is not yet in local recovery, for a page that may unload
+   * before an asynchronous save can stage it. The next load reconciles the journal under the draft store's rules.
+   */
+  journalBeforeUnload(state: WorkbenchState): UnloadJournalOutcome;
   hasPendingChanges(): boolean;
   hydrateProjectFromServer(projectId: string, projectName?: string): Promise<ProjectLoadResult>;
   loadWorkbench(options?: { createNew?: boolean; openProjectId?: string }): Promise<DurableHydratedWorkbenchSnapshot>;
   listRecoverableDrafts(options?: { after?: [string, string]; limit?: number }): Promise<RecoverableProjectDraftPage>;
   markProjectDeleted(projectId: string): void;
   persistEmptySession(state: WorkbenchState): Promise<void>;
+  /** Releases cross-tab project locks held for unfinished resolutions once a newer editor in this tab takes over. */
+  releaseMutationLocks(): void;
+  /** Undoes `persistEmptySession` when the editor stays open after all, writing its session again. */
+  reopenSession(state: WorkbenchState): Promise<DurableWorkbenchSaveResult>;
+  /** Called after `reopenSession` has reopened the session, so saves held back while it was closed can resume. */
+  subscribeSessionReopened(listener: () => void): () => void;
   resolveConflictDiscard(projectId: string): Promise<void>;
   resolveConflictSaveAsNew(project: Project): Promise<{
     boardId: string;
@@ -396,7 +427,8 @@ export interface DurableSyncedWorkbenchPersistence {
   }>;
   resolveConflictUseServer(projectId: string): Promise<ProjectLoadResult>;
   releaseProjectSync(projectId: string): void;
-  retain(): () => void;
+  /** The release resolves once this service has either been retained again or released all of its resources. */
+  retain(): () => Promise<void>;
   saveWorkbench(state: WorkbenchState): Promise<DurableWorkbenchSaveResult>;
   unmarkProjectDeleted(projectId: string): void;
 }
@@ -406,6 +438,7 @@ export const createDurableSyncedWorkbenchPersistence = (
   dependencies: DurableSyncedPersistenceDependencies = {}
 ): DurableSyncedWorkbenchPersistence => {
   const api = dependencies.api ?? productionApi;
+  const logger = createLogger({ area: 'autosave', namespace: 'persistence' }, { owner });
   const autoOpenDraftByteLimit = dependencies.autoOpenDraftByteLimit ?? 64 * 1024 * 1024;
   const autoOpenDraftLimit = dependencies.autoOpenDraftLimit ?? 8;
   const requestedQueueRunProjectLimit = dependencies.autoOpenQueueRunProjectLimit ?? 8;
@@ -427,9 +460,12 @@ export const createDurableSyncedWorkbenchPersistence = (
     });
   let draftStorePromise: Promise<ProjectDraftStore> | null = null;
   let editorSessionPromise: Promise<EditorSession> | null = null;
+  /** The resolved store and editor session, for the synchronous unload journal; set once loading has them. */
+  let unloadJournalTarget: { editorSessionId: string; store: ProjectDraftStore } | null = null;
   const getDraftStore = () =>
     (draftStorePromise ??= dependencies.draftStore ?? createAccountOwnedProjectDraftStore(owner));
   const getEditorSessionForService = () => (editorSessionPromise ??= dependencies.editorSession ?? getEditorSession());
+  const isOtherEditorSessionLive = dependencies.isEditorSessionLive ?? isEditorSessionLive;
   const now = dependencies.now ?? (() => new Date().toISOString());
   const getProjectMutationLock =
     dependencies.projectMutationLock ??
@@ -476,6 +512,17 @@ export const createDurableSyncedWorkbenchPersistence = (
   const conflicts = new Map<string, ProjectConflictInfo>();
   const schemaRefusals = new Map<string, ProjectSchemaRefusal>();
   const generations = new Map<string, number>();
+  /**
+   * The highest generation this writer has used per project, never reset: the claim's unload journal mark is compared
+   * with this writer's generations, so they must not restart when a project is closed and reopened.
+   */
+  const issuedGenerations = new Map<string, number>();
+  const noteGeneration = (projectId: string, generation: number): void => {
+    generations.set(projectId, generation);
+    issuedGenerations.set(projectId, Math.max(issuedGenerations.get(projectId) ?? 0, generation));
+  };
+  const nextGeneration = (projectId: string): number =>
+    Math.max(generations.get(projectId) ?? 0, issuedGenerations.get(projectId) ?? 0) + 1;
   const deletedProjectIds = new Set<string>();
   const serverDeletedProjectIds = new Set<string>();
   const pendingProjectIds = new Set<string>();
@@ -506,8 +553,20 @@ export const createDurableSyncedWorkbenchPersistence = (
   let lastKnownState: WorkbenchState | null = null;
   let hasPending = false;
   let sessionSavePending = false;
+  let isSessionClosed = false;
+  const sessionReopenedListeners = new Set<() => void>();
   let localDraftStatus: LocalDraftStatus = 'ok';
   const localDraftFailures = new Set<string>();
+  /** Documents this writer journaled and has not yet seen acknowledged, by resolved project id. */
+  const journaledDocuments = new Map<string, ProjectUnloadJournalEntry>();
+  /**
+   * Projects whose journal record no longer stands for a stored entry, so its document is journaled again: retired at
+   * a hidden event (the record stays, so the next save writes the settled mark), or being settled right now.
+   */
+  const retiredJournalProjectIds = new Set<string>();
+  const settlingJournalProjectIds = new Set<string>();
+  /** Stages started but not finished, by project id: the page may unload before they commit. */
+  const stagingDocuments = new Map<string, { documentJson: string; generation: number }>();
   let mutationTail: Promise<void> = Promise.resolve();
   let loadPromise: Promise<DurableHydratedWorkbenchSnapshot> | null = null;
 
@@ -568,21 +627,26 @@ export const createDurableSyncedWorkbenchPersistence = (
     );
     return result;
   };
-  const close = (): void => {
-    if (isClosed) {
-      return;
+  const releaseAllMutationLocks = (): Promise<unknown>[] =>
+    [...projectMutationLocks].map(([projectId, lock]) => {
+      projectMutationLocks.delete(projectId);
+      return lock.release();
+    });
+  let closed: Promise<void> | null = null;
+  const close = (): Promise<void> => {
+    if (closed) {
+      return closed;
     }
     isClosed = true;
-    for (const [projectId, lock] of projectMutationLocks) {
-      projectMutationLocks.delete(projectId);
-      void lock.release().catch(() => undefined);
-    }
+    const releases = releaseAllMutationLocks();
     if (draftStorePromise) {
-      void draftStorePromise.then((store) => store.close());
+      releases.push(draftStorePromise.then((store) => store.close()));
     }
     if (editorSessionPromise) {
-      void editorSessionPromise.then((session) => session.release());
+      releases.push(editorSessionPromise.then((session) => session.release()));
     }
+    closed = Promise.allSettled(releases).then(() => undefined);
+    return closed;
   };
 
   const getOwnedDraft = async (store: ProjectDraftStore, projectId: string, editorSessionId: string) => {
@@ -714,22 +778,42 @@ export const createDurableSyncedWorkbenchPersistence = (
     return getOwnedDraft(store, projectId, activeEditorSessionId);
   };
 
-  const listDraftProjectCandidates = async (store: ProjectDraftStore): Promise<ProjectDraftSummary[]> => {
-    const candidates: ProjectDraftSummary[] = [];
+  /**
+   * The drafts this page may take. A lineage named after another running page's editor session is that page's to stage
+   * and save, so this page neither adopts it, opens its project for it, nor offers it for recovery, as with that page's
+   * unload journal: an edit adopted here could never be retired by an undo there. A draft records its lineage, not the
+   * page staging it, so a lineage named after no session (one isolated for an unopenable draft) is taken as before, as
+   * is every draft when liveness cannot be told (no Web Locks).
+   */
+  const withoutLivePagesDrafts = async (
+    items: readonly ProjectDraftSummary[],
+    editorSessionId: string
+  ): Promise<ProjectDraftSummary[]> => {
+    const isOtherPageLive = createEditorSessionLivenessCheck(editorSessionId, isOtherEditorSessionLive);
+    const verdicts = await Promise.all(items.map((item) => isOtherPageLive(item.editorSessionId)));
+    const candidates = items.filter((_, index) => !verdicts[index]);
+    for (const item of candidates) {
+      rememberFutureDraft(item);
+    }
+    return candidates;
+  };
+
+  const listDraftProjectCandidates = async (
+    store: ProjectDraftStore,
+    editorSessionId: string
+  ): Promise<ProjectDraftSummary[]> => {
+    const items: ProjectDraftSummary[] = [];
     let after: [string, string] | undefined;
     for (;;) {
       const page = await store.list({ ...(after ? { after } : {}), limit: 100 });
       if (page.kind !== 'available') {
         markLocalDraftFailure('list:drafts');
-        return candidates;
+        return withoutLivePagesDrafts(items, editorSessionId);
       }
-      for (const item of page.items) {
-        rememberFutureDraft(item);
-        candidates.push(item);
-      }
+      items.push(...page.items);
       if (!page.nextCursor) {
         clearLocalDraftFailure('list:drafts');
-        return candidates;
+        return withoutLivePagesDrafts(items, editorSessionId);
       }
       after = page.nextCursor;
     }
@@ -737,9 +821,10 @@ export const createDurableSyncedWorkbenchPersistence = (
 
   const listProjectDraftCandidates = async (
     store: ProjectDraftStore,
-    projectId: string
+    projectId: string,
+    editorSessionId: string
   ): Promise<ProjectDraftSummary[]> => {
-    const candidates: ProjectDraftSummary[] = [];
+    const items: ProjectDraftSummary[] = [];
     let after: string | undefined;
     for (;;) {
       const page = await store.listForProject(projectId, {
@@ -748,15 +833,12 @@ export const createDurableSyncedWorkbenchPersistence = (
       });
       if (page.kind !== 'available') {
         markLocalDraftFailure(`list:${projectId}`);
-        return candidates;
+        return withoutLivePagesDrafts(items, editorSessionId);
       }
-      for (const item of page.items) {
-        rememberFutureDraft(item);
-        candidates.push(item);
-      }
+      items.push(...page.items);
       if (!page.nextCursor) {
         clearLocalDraftFailure(`list:${projectId}`);
-        return candidates;
+        return withoutLivePagesDrafts(items, editorSessionId);
       }
       after = page.nextCursor;
     }
@@ -860,8 +942,8 @@ export const createDurableSyncedWorkbenchPersistence = (
       hasPending = true;
       throw new ProjectDocumentTooLargeError(serialized.byteSize);
     }
-    const generation = (generations.get(project.id) ?? 0) + 1;
-    generations.set(project.id, generation);
+    const generation = nextGeneration(project.id);
+    noteGeneration(project.id, generation);
     const entry = syncEntries.get(project.id);
     if (!entry || entry.pushedDoc !== serialized.documentJson) {
       pendingProjectIds.add(project.id);
@@ -878,21 +960,29 @@ export const createDurableSyncedWorkbenchPersistence = (
       updatedAt: Date.parse(now()),
       writerToken,
     };
-    let result = await store.stage(draftInput);
-    if (result.kind === 'corrupt') {
-      markLocalDraftFailure(projectDraftFailureKey(project.id));
-      const corruptKey = `corrupt:${project.id}:${draftInput.editorSessionId}`;
-      const cleanup = await store.deleteCorrupt(project.id, draftInput.editorSessionId);
-      if (cleanup.kind === 'deleted') {
-        clearLocalDraftFailure(corruptKey);
-      } else {
-        markLocalDraftFailure(corruptKey);
-      }
-      draftInput = {
-        ...draftInput,
-        editorSessionId: isolateUnopenableDraft(project.id, session.id),
-      };
+    stagingDocuments.set(project.id, { documentJson: serialized.documentJson, generation });
+    let result: Awaited<ReturnType<ProjectDraftStore['stage']>>;
+    try {
       result = await store.stage(draftInput);
+      if (result.kind === 'corrupt') {
+        markLocalDraftFailure(projectDraftFailureKey(project.id));
+        const corruptKey = `corrupt:${project.id}:${draftInput.editorSessionId}`;
+        const cleanup = await store.deleteCorrupt(project.id, draftInput.editorSessionId);
+        if (cleanup.kind === 'deleted') {
+          clearLocalDraftFailure(corruptKey);
+        } else {
+          markLocalDraftFailure(corruptKey);
+        }
+        draftInput = {
+          ...draftInput,
+          editorSessionId: isolateUnopenableDraft(project.id, session.id),
+        };
+        result = await store.stage(draftInput);
+      }
+    } finally {
+      if (stagingDocuments.get(project.id)?.generation === generation) {
+        stagingDocuments.delete(project.id);
+      }
     }
     if (['corrupt', 'fenced', 'generation-conflict', 'stale'].includes(result.kind)) {
       markLocalDraftFailure(projectDraftFailureKey(project.id));
@@ -922,6 +1012,13 @@ export const createDurableSyncedWorkbenchPersistence = (
       markLocalDraftFailure(projectDraftFailureKey(project.id));
     } else {
       clearLocalDraftFailure(projectDraftFailureKey(project.id));
+      // The lineage now holds this generation, which supersedes the writer's journal through it.
+      const journaled = journaledDocuments.get(project.id);
+      if (journaled && journaled.generation <= generation && journaled.editorSessionId === draftInput.editorSessionId) {
+        journaledDocuments.delete(project.id);
+        retiredJournalProjectIds.delete(project.id);
+        await store.discardUnloadJournal(project.id, journaled.editorSessionId, writerToken, journaled.generation);
+      }
     }
     return { editorSessionId: draftInput.editorSessionId, generation, serialized, store };
   };
@@ -953,6 +1050,7 @@ export const createDurableSyncedWorkbenchPersistence = (
     schemaRefusals.delete(project.id);
     projectsRequiringDocumentUpgrade.delete(project.id);
     pendingProjectIds.delete(project.id);
+    // Also settles the writer's unload journal through `sentGeneration`, in the same transaction.
     const settled = await store.settleAcknowledgement(
       project.id,
       editorSessionId,
@@ -961,6 +1059,25 @@ export const createDurableSyncedWorkbenchPersistence = (
       record.revision,
       record.minimum_canvas_schema_version
     );
+    const journaled = journaledDocuments.get(project.id);
+    if (journaled && journaled.generation <= sentGeneration) {
+      await settleJournaledDocument(project.id, store);
+    } else if (
+      journaled &&
+      journaled.editorSessionId === editorSessionId &&
+      journaled.baseRevision !== record.revision
+    ) {
+      // A newer journaled document builds on the acknowledged one: rebase it, as a newer staged draft is rebased.
+      const rebased = {
+        ...journaled,
+        baseMinimumCanvasSchemaVersion: record.minimum_canvas_schema_version,
+        baseRevision: record.revision,
+      };
+      const write = store.journalBeforeUnload({ entries: [rebased], retired: [] });
+      if (write.kind === 'started' && (await write.written) && journaledDocuments.get(project.id) === journaled) {
+        journaledDocuments.set(project.id, rebased);
+      }
+    }
     if (settled.kind === 'rebased') {
       pendingProjectIds.add(project.id);
       hasPending = true;
@@ -1257,6 +1374,10 @@ export const createDurableSyncedWorkbenchPersistence = (
     plan: ProjectSavePlan,
     staged?: Awaited<ReturnType<typeof stageProject>>
   ): Promise<ProjectPushOutcome> => {
+    // The document went back to what recovery holds (an undo, say): the journal of a later state must not return.
+    if (journaledDocuments.has(plan.project.id) && isInRecovery(plan.project.id, plan.serialized.documentJson)) {
+      await settleJournaledDocument(plan.project.id, await getDraftStore());
+    }
     if (deletedProjectIds.has(plan.project.id)) {
       return { documentJson: plan.serialized.documentJson, kind: 'superseded' };
     }
@@ -1442,13 +1563,59 @@ export const createDurableSyncedWorkbenchPersistence = (
     return { draft: availableDraft, editorSessionId, store };
   };
 
+  /**
+   * What the next load would restore for a project is exactly `documentJson`: its newest staged draft when it has one
+   * (and that stage was durable), otherwise the acknowledged server document.
+   */
+  const isInRecovery = (projectId: string, documentJson: string): boolean => {
+    const volatile = volatileDrafts.get(projectId);
+    return volatile
+      ? volatile.documentJson === documentJson && !localDraftFailures.has(projectDraftFailureKey(projectId))
+      : syncEntries.get(projectId)?.pushedDoc === documentJson;
+  };
+
+  /**
+   * Settles this writer's journal of a project in its lineage's claim (the mark makes a deletion that fails moot), then
+   * deletes it. The record is kept, for a later retry, until the mark commits. A fenced lineage needs no mark: its
+   * entries are discarded anyway. False while the journal could still come back.
+   */
+  const settleJournaledDocument = async (projectId: string, store: ProjectDraftStore): Promise<boolean> => {
+    const journaled = journaledDocuments.get(projectId);
+    if (!journaled) {
+      return true;
+    }
+    settlingJournalProjectIds.add(projectId);
+    let settled: Awaited<ReturnType<ProjectDraftStore['settleUnloadJournal']>>;
+    try {
+      settled = await store.settleUnloadJournal(
+        projectId,
+        journaled.editorSessionId,
+        writerToken,
+        journaled.generation
+      );
+    } finally {
+      settlingJournalProjectIds.delete(projectId);
+    }
+    if (settled.kind !== 'settled' && settled.kind !== 'fenced') {
+      return false;
+    }
+    // A hidden event meanwhile journaled a newer generation, which this settlement does not cover.
+    if (journaledDocuments.get(projectId) === journaled) {
+      journaledDocuments.delete(projectId);
+      retiredJournalProjectIds.delete(projectId);
+    }
+    return true;
+  };
+
   const deleteDraft = async (projectId: string): Promise<void> => {
     const { draft, editorSessionId, store } = await requireDraft(projectId);
-    const result = await store.delete(projectId, editorSessionId, draft.writerToken);
+    // Settling the journal in the deleting transaction keeps a discarded edit from coming back.
+    const result = await store.delete(projectId, editorSessionId, draft.writerToken, issuedGenerations.get(projectId));
     if (result.kind !== 'deleted') {
       throw new Error('The local project draft could not be deleted.');
     }
     volatileDrafts.delete(projectId);
+    await settleJournaledDocument(projectId, store);
   };
 
   const alignLoadedDraftWithProject = async (
@@ -1462,7 +1629,7 @@ export const createDurableSyncedWorkbenchPersistence = (
       volatileDrafts.set(project.id, draft);
       return draft;
     }
-    const generation = draft.generation + 1;
+    const generation = Math.max(draft.generation, issuedGenerations.get(project.id) ?? 0) + 1;
     let input = {
       baseMinimumCanvasSchemaVersion: draft.baseMinimumCanvasSchemaVersion,
       baseRevision: draft.baseRevision,
@@ -1502,7 +1669,7 @@ export const createDurableSyncedWorkbenchPersistence = (
       ...input,
       documentByteSize: serialized.byteSize,
     } as ProjectDraft;
-    generations.set(project.id, generation);
+    noteGeneration(project.id, generation);
     volatileDrafts.set(project.id, aligned);
     return aligned;
   };
@@ -1510,7 +1677,7 @@ export const createDurableSyncedWorkbenchPersistence = (
   const hydrateProjectWithDraft = async (projectId: string, projectName: string): Promise<ProjectLoadResult> => {
     assertOwner();
     const [store, session] = await Promise.all([getDraftStore(), getEditorSessionForService()]);
-    const draftSummaries = await listProjectDraftCandidates(store, projectId);
+    const draftSummaries = await listProjectDraftCandidates(store, projectId, session.id);
     const draft = await adoptNewestDraft(store, projectId, session.id, draftSummaries);
     assertOwner();
     const reportOwnedProjectSync = (): void => {
@@ -1519,7 +1686,7 @@ export const createDurableSyncedWorkbenchPersistence = (
     };
     let loadedDraft: LoadedDraft | null = null;
     if (draft) {
-      generations.set(projectId, draft.generation);
+      noteGeneration(projectId, draft.generation);
       volatileDrafts.set(projectId, draft);
       const project = loadDraftProject(draft);
       if (project) {
@@ -1693,7 +1860,7 @@ export const createDurableSyncedWorkbenchPersistence = (
     return { project: localProject, status: 'loaded' };
   };
 
-  return {
+  const service: DurableSyncedWorkbenchPersistence = {
     acknowledgeProjectResolution: (projectId) => {
       projectResolutionFences.delete(projectId);
       releaseProjectMutation(projectId);
@@ -1844,12 +2011,23 @@ export const createDurableSyncedWorkbenchPersistence = (
           serverDeleteCommitted = true;
           serverDeletedProjectIds.add(resolvedProjectId);
           if (ownedDraft) {
-            const deleted = await store.delete(resolvedProjectId, editorSessionId, writerToken);
+            const deleted = await store.delete(
+              resolvedProjectId,
+              editorSessionId,
+              writerToken,
+              issuedGenerations.get(resolvedProjectId)
+            );
             if (deleted.kind !== 'deleted') {
               throw new Error(
                 'The server project was deleted, but its local draft could not be removed. Retry deletion.'
               );
             }
+          }
+          // A journal from an earlier hidden page would otherwise bring the deleted project back on the next load.
+          if (!(await settleJournaledDocument(resolvedProjectId, store))) {
+            throw new Error(
+              'The server project was deleted, but its local recovery could not be removed. Retry deletion.'
+            );
           }
           volatileDrafts.delete(resolvedProjectId);
           draftEditorSessionIds.delete(resolvedProjectId);
@@ -1942,7 +2120,136 @@ export const createDurableSyncedWorkbenchPersistence = (
       const result = await store.get(projectId, editorSessionId);
       return result.kind === 'found' ? result.draft.documentJson : null;
     },
+    hasClosedSession: () => isSessionClosed,
     hasPendingChanges: () => hasPending,
+    journalBeforeUnload: (state) => {
+      const target = unloadJournalTarget;
+      // Nothing of a closed session, a cleared workbench, or an ended account lifetime may be written.
+      if (
+        !target ||
+        isClosed ||
+        isTerminallyCleared ||
+        isSessionClosed ||
+        owner.accountId === null ||
+        !isAccountScopeCurrent(owner)
+      ) {
+        return { kind: 'nothing-to-journal' };
+      }
+      const entries: ProjectUnloadJournalEntry[] = [];
+      const retired: ProjectUnloadJournalKey[] = [];
+      const skippedOversizedProjectIds: string[] = [];
+      const journaledAt = Date.parse(now());
+      let remainingBytes = PROJECT_UNLOAD_JOURNAL_MAX_BYTES;
+      for (const inputProject of applyProjectResolutionFences(state).projects) {
+        const project = resolveInputProject(inputProject);
+        // Deletion owns this project's recovery: it must not come back from a journal.
+        if (deletedProjectIds.has(project.id)) {
+          continue;
+        }
+        const serialized = serializeProjectDocumentV3Json(project);
+        const journaled = journaledDocuments.get(project.id);
+        const isJournalStored = !retiredJournalProjectIds.has(project.id) && !settlingJournalProjectIds.has(project.id);
+        if (serialized.documentJson === journaled?.documentJson && isJournalStored) {
+          continue;
+        }
+        if (isInRecovery(project.id, serialized.documentJson)) {
+          // Back to what recovery holds: the journal of a later state must not come back as a newer draft. The record
+          // stays, so the next save also settles it, should this blind deletion be lost.
+          if (journaled && isJournalStored) {
+            retired.push([project.id, journaled.editorSessionId, writerToken, journaled.generation]);
+          }
+          continue;
+        }
+        if (serialized.byteSize > remainingBytes) {
+          skippedOversizedProjectIds.push(project.id);
+          continue;
+        }
+        remainingBytes -= serialized.byteSize;
+        // A stage of this very document that is still in flight shares its generation: whichever lands first, the
+        // lineage ends with one copy, and the acknowledgement of that stage also settles the journal.
+        const staging = stagingDocuments.get(project.id);
+        const entry = syncEntries.get(project.id);
+        entries.push({
+          accountId: owner.accountId,
+          baseMinimumCanvasSchemaVersion:
+            entry?.minimumCanvasSchemaVersion ?? getProjectCanvasSchemaRequirement(serialized.document),
+          baseRevision: entry?.revision ?? null,
+          documentByteSize: serialized.byteSize,
+          documentJson: serialized.documentJson,
+          documentSchemaVersion: PROJECT_DOCUMENT_SCHEMA_VERSION,
+          editorSessionId: getDraftEditorSessionId(project.id, target.editorSessionId),
+          generation:
+            staging?.documentJson === serialized.documentJson ? staging.generation : nextGeneration(project.id),
+          journaledAt,
+          // The lineage above may be named after another tab's session; this page is the one that must still run.
+          ownerEditorSessionId: target.editorSessionId,
+          projectId: project.id,
+          recordType: 'unload-journal',
+          schemaVersion: PROJECT_UNLOAD_JOURNAL_SCHEMA_VERSION,
+          writerToken,
+        });
+      }
+      if (entries.length === 0 && retired.length === 0) {
+        return skippedOversizedProjectIds.length > 0
+          ? { kind: 'journaled', projectIds: [], skippedOversizedProjectIds, written: Promise.resolve(true) }
+          : { kind: 'nothing-to-journal' };
+      }
+      const write = target.store.journalBeforeUnload({ entries, retired });
+      if (write.kind !== 'started') {
+        return { kind: 'unavailable' };
+      }
+      // Remembered at once, so becoming hidden right after `pagehide` does not write it again; an aborted write puts
+      // back what was there, so the next hidden event writes again.
+      const replaced = new Map<
+        string,
+        {
+          after: ProjectUnloadJournalEntry | undefined;
+          before: ProjectUnloadJournalEntry | undefined;
+          wasRetired: boolean;
+        }
+      >();
+      for (const [projectId] of retired) {
+        const record = journaledDocuments.get(projectId);
+        replaced.set(projectId, { after: record, before: record, wasRetired: false });
+        retiredJournalProjectIds.add(projectId);
+      }
+      for (const entry of entries) {
+        replaced.set(entry.projectId, {
+          after: entry,
+          before: journaledDocuments.get(entry.projectId),
+          wasRetired: retiredJournalProjectIds.has(entry.projectId),
+        });
+        journaledDocuments.set(entry.projectId, entry);
+        retiredJournalProjectIds.delete(entry.projectId);
+        // Never reused: a journal settled at this generation must not swallow a later edit journaled next.
+        issuedGenerations.set(entry.projectId, Math.max(issuedGenerations.get(entry.projectId) ?? 0, entry.generation));
+      }
+      const written = write.written.then((isWritten) => {
+        if (!isWritten) {
+          for (const [projectId, { after, before, wasRetired }] of replaced) {
+            if (journaledDocuments.get(projectId) === after) {
+              if (before) {
+                journaledDocuments.set(projectId, before);
+              } else {
+                journaledDocuments.delete(projectId);
+              }
+              if (wasRetired) {
+                retiredJournalProjectIds.add(projectId);
+              } else {
+                retiredJournalProjectIds.delete(projectId);
+              }
+            }
+          }
+        }
+        return isWritten;
+      });
+      return {
+        kind: 'journaled',
+        projectIds: entries.map((entry) => entry.projectId),
+        skippedOversizedProjectIds,
+        written,
+      };
+    },
     hydrateProjectFromServer: (projectId, projectName = projectId) =>
       enqueue(() => {
         if (
@@ -1968,6 +2275,18 @@ export const createDurableSyncedWorkbenchPersistence = (
         clearLegacyStorage();
         const store = await getDraftStore();
         const session = await getEditorSessionForService();
+        assertOwner();
+        // Before this writer claims any lineage, so a journal is judged against the lineage its writer left behind;
+        // before the backend is asked, so a journaled document can be exported even when it is unreachable. A journal
+        // of a page that still runs (hidden, not unloaded) is left to that page, which settles it with its own saves.
+        const reconciledJournal =
+          owner.accountId === null
+            ? ({ kind: 'unavailable' } as const)
+            : await store.reconcileUnloadJournal(owner.accountId, Date.parse(now()), {
+                isEditorSessionLive: createEditorSessionLivenessCheck(session.id, isOtherEditorSessionLive),
+              });
+        assertOwner();
+        unloadJournalTarget = { editorSessionId: session.id, store };
         let summaries: ProjectSummaryDTO[];
         let sessionBlob: WorkbenchSessionBlob | null;
         let queueRunProjects: Awaited<ReturnType<typeof listQueueRunProjectIds>>;
@@ -1996,8 +2315,37 @@ export const createDurableSyncedWorkbenchPersistence = (
         closedRetargetTargetsAwaitingAck.clear();
         projectResolutionFences.clear();
         draftEditorSessionIds.clear();
+        journaledDocuments.clear();
+        retiredJournalProjectIds.clear();
+        settlingJournalProjectIds.clear();
         localDraftFailures.clear();
         localDraftStatus = 'ok';
+        // Without its journal, recovery works as it did before the journal existed: that is logged, not reported. An
+        // entry the draft store could not take is a draft-store failure for its project, which its next stage clears.
+        const journalReplacedDrafts = new Map<string, ProjectUnloadJournalReconciliation>();
+        if (reconciledJournal.kind === 'unavailable') {
+          logger.info({
+            message: 'The unload journal is unavailable; recovery relies on staged drafts alone.',
+            name: 'persistence.unload-journal-unavailable',
+          });
+        } else {
+          for (const reconciled of reconciledJournal.outcomes) {
+            if (reconciled.outcome === 'corrupt' || reconciled.outcome === 'quota') {
+              markLocalDraftFailure(projectDraftFailureKey(reconciled.projectId));
+            } else if (reconciled.replacedDraft) {
+              journalReplacedDrafts.set(reconciled.projectId, reconciled);
+            }
+          }
+          if (reconciledJournal.outcomes.length > 0) {
+            logger.info({
+              context: {
+                outcomes: reconciledJournal.outcomes.map(({ outcome, projectId }) => ({ outcome, projectId })),
+              },
+              message: 'Reconciled the unload journal.',
+              name: 'persistence.unload-journal-reconciled',
+            });
+          }
+        }
         for (const [projectId, editorSessionId] of Object.entries(sessionBlob?.draftEditorSessionIds ?? {})) {
           draftEditorSessionIds.set(projectId, editorSessionId);
         }
@@ -2005,7 +2353,7 @@ export const createDurableSyncedWorkbenchPersistence = (
         sessionSavePending = false;
         seedProjectLibrary(summaries, owner);
         const [draftCandidates, retargetHandoffs] = await Promise.all([
-          listDraftProjectCandidates(store),
+          listDraftProjectCandidates(store, session.id),
           listRetargetHandoffs(store),
         ]);
         const draftCandidatesByProject = groupDraftCandidatesByProject(draftCandidates);
@@ -2119,7 +2467,7 @@ export const createDurableSyncedWorkbenchPersistence = (
             draftCandidatesByProject.get(projectId) ?? []
           );
           if (draft) {
-            generations.set(projectId, draft.generation);
+            noteGeneration(projectId, draft.generation);
             volatileDrafts.set(projectId, draft);
           }
           const summary = summaryById.get(projectId);
@@ -2276,6 +2624,28 @@ export const createDurableSyncedWorkbenchPersistence = (
             loadedProjects.set(projectId, serverLoad.project);
             return;
           }
+          // The journal replaced a staged draft whose save reached the server without its answer reaching the page:
+          // the server holds exactly that document, so the journal is its successor, as if the answer had arrived.
+          const replaced = journalReplacedDrafts.get(projectId)?.replacedDraft;
+          if (
+            replaced?.documentJson === serverJson &&
+            journalReplacedDrafts.get(projectId)?.editorSessionId === loadedDraft.draft.editorSessionId &&
+            loadedDraft.draft.state === 'dirty' &&
+            loadedDraft.draft.baseRevision !== record.revision
+          ) {
+            const rebased = await store.settleAcknowledgement(
+              projectId,
+              loadedDraft.draft.editorSessionId,
+              writerToken,
+              replaced.generation,
+              record.revision,
+              record.minimum_canvas_schema_version
+            );
+            if (rebased.kind === 'rebased') {
+              loadedDraft.draft = rebased.draft;
+              volatileDrafts.set(projectId, rebased.draft);
+            }
+          }
           if (
             loadedDraft.draft.state === 'schema-refused' &&
             loadedDraft.draft.refusal.kind === 'canvas' &&
@@ -2408,6 +2778,8 @@ export const createDurableSyncedWorkbenchPersistence = (
       if (isTerminallyCleared) {
         return Promise.reject(new Error('Workbench persistence was cleared and must be reloaded.'));
       }
+      // Set before the write is queued, so no save requested meanwhile can put the project back.
+      isSessionClosed = true;
       return enqueue(async () => {
         const emptyState = { ...state, activeProjectId: '', projects: [] };
         const session = await getEditorSessionForService();
@@ -2694,7 +3066,7 @@ export const createDurableSyncedWorkbenchPersistence = (
               : volatileRetargeted
             : (durableRetargeted ?? volatileRetargeted);
         if (survivingDraft) {
-          generations.set(copyProjectId, survivingDraft.generation);
+          noteGeneration(copyProjectId, survivingDraft.generation);
           pendingProjectIds.add(copyProjectId);
         } else {
           generations.delete(projectId);
@@ -2789,6 +3161,11 @@ export const createDurableSyncedWorkbenchPersistence = (
         throw error;
       });
     },
+    releaseMutationLocks: () => {
+      for (const release of releaseAllMutationLocks()) {
+        void release.catch(() => undefined);
+      }
+    },
     releaseProjectSync: (projectId) => {
       projectEnsureFailures.delete(projectId);
       if ([...pendingRetargetHandoffs.values()].some((handoff) => handoff.targetProjectId === projectId)) {
@@ -2818,16 +3195,34 @@ export const createDurableSyncedWorkbenchPersistence = (
       let isReleased = false;
       return () => {
         if (isReleased) {
-          return;
+          return Promise.resolve();
         }
         isReleased = true;
         retainCount -= 1;
         const generation = ++releaseGeneration;
-        queueMicrotask(() => {
-          if (retainCount === 0 && releaseGeneration === generation) {
-            close();
-          }
+        return new Promise<void>((resolve) => {
+          queueMicrotask(() => {
+            if (retainCount === 0 && releaseGeneration === generation) {
+              void close().then(resolve);
+            } else {
+              resolve();
+            }
+          });
         });
+      };
+    },
+    reopenSession: (state) => {
+      isSessionClosed = false;
+      const saved = service.saveWorkbench(state);
+      for (const listener of sessionReopenedListeners) {
+        listener();
+      }
+      return saved;
+    },
+    subscribeSessionReopened: (listener) => {
+      sessionReopenedListeners.add(listener);
+      return () => {
+        sessionReopenedListeners.delete(listener);
       };
     },
     saveWorkbench: (state) => {
@@ -2927,4 +3322,5 @@ export const createDurableSyncedWorkbenchPersistence = (
       }
     },
   };
+  return service;
 };

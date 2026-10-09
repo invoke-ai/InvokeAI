@@ -6,6 +6,7 @@ import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { getGalleryUploadAccept, toGalleryItemKey } from '@features/gallery/core/items';
 import { BoardCover, BoardCoverIcon } from '@features/gallery/ui/GalleryBoardCover';
 import { getGalleryBoardGroups } from '@features/gallery/ui/galleryBoardGroups';
+import { GalleryAnnouncer, GalleryLoadErrorState, GalleryLoadNotice } from '@features/gallery/ui/GalleryLoadError';
 import { GallerySearchField } from '@features/gallery/ui/GallerySearchField';
 import { GallerySearchHelp } from '@features/gallery/ui/GallerySearchHelp';
 import { getGalleryProjectBoardId, getGallerySelectedBoardId } from '@features/gallery/ui/galleryStateView';
@@ -14,6 +15,7 @@ import { getGalleryUploadTargetLabel } from '@features/gallery/ui/GalleryUploadB
 import { GalleryViewSegmentTabs } from '@features/gallery/ui/GalleryViewTabs';
 import { useGalleryUploadAction } from '@features/gallery/ui/useGalleryUploadAction';
 import { useGalleryUploadInput } from '@features/gallery/ui/useGalleryUploadInput';
+import { isImeComposing } from '@platform/browser/imeComposition';
 import { Button, CloseButton, IconButton } from '@platform/ui/Button';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { segmentTabsPanelId, segmentTabsTabId } from '@platform/ui/SegmentTabs';
@@ -40,7 +42,7 @@ import { GalleryPickerBoards, type GalleryPickerBoardGroup } from './GalleryPick
 import { galleryPickerOptionId, GalleryPickerGrid } from './GalleryPickerGrid';
 import { useGalleryPickerScope } from './useGalleryPickerScope';
 
-const BOARD_BUTTON_EXPANDED_PROPS = { bg: 'bg.emphasized' } as const;
+const BOARD_BUTTON_EXPANDED_PROPS = { bg: 'bg.hover' } as const;
 
 /** Unseeded until the first page loads; then the Gallery's selection if it is on that page, else nothing. */
 type ActiveKeyState = GalleryItemKey | null | undefined;
@@ -76,20 +78,17 @@ export const GalleryPickerView = ({
   // Async uploads need current selection capacity; the sentinel needs a stable callback across page fetches.
   const selectionRef = useRef(selection);
   const loadMoreRef = useRef(data.loadMore);
-  // Keep prior items dimmed during scope changes; show skeletons only before the first result.
-  const [lastItems, setLastItems] = useState<GalleryItem[] | null>(null);
 
   // eslint-disable-next-line react/refs
   selectionRef.current = selection;
   // eslint-disable-next-line react/refs
   loadMoreRef.current = data.loadMore;
 
-  if (data.items !== null && data.items !== lastItems) {
-    setLastItems(data.items);
-  }
-
-  const isStale = data.items === null && lastItems !== null;
-  const items = data.items ?? lastItems;
+  // The previous scope's items stay dimmed while the new scope loads; skeletons show only before any result. A
+  // failed scope shows its failure, never the previous scope's items.
+  const { listing } = data;
+  const isStale = data.items === null && data.previousScopeItems !== null;
+  const items = data.items ?? data.previousScopeItems;
 
   // Seed once the first page is in, so a selection past it never yanks the
   // highlight (and the scroll) when a later page happens to contain it.
@@ -105,7 +104,8 @@ export const GalleryPickerView = ({
   const selectedBoard = data.boards.find((board) => board.id === data.selectedBoardId);
   const boardName = selectedBoard ? getGalleryBoardLabel(selectedBoard, t) : t('widgets.gallery.selectedBoardFallback');
   const uploadTarget = getGalleryUploadTargetLabel(data.boards, data.selectedBoardId, t);
-  const showsGrid = scope.pane === 'items' && (items === null || items.length > 0);
+  const showsGrid = scope.pane === 'items' && listing.status !== 'error' && (items === null || items.length > 0);
+  const isBoardListUnavailable = data.boardsState.status === 'error';
 
   const getTileState = useCallback(
     (item: GalleryItem) => getGalleryPickerTileState(item, accept, selection),
@@ -221,7 +221,7 @@ export const GalleryPickerView = ({
 
   const handleSearchKeyDown = useCallback(
     (event: KeyboardEvent<HTMLInputElement>) => {
-      if (event.nativeEvent.isComposing) {
+      if (isImeComposing(event.nativeEvent)) {
         return;
       }
 
@@ -244,7 +244,8 @@ export const GalleryPickerView = ({
         return;
       }
 
-      if (!items) {
+      // The previous scope's items are on screen only as a placeholder; nothing in them is pickable.
+      if (!items || isStale) {
         return;
       }
 
@@ -273,6 +274,7 @@ export const GalleryPickerView = ({
       columnCount,
       handleSelectBoard,
       isSearching,
+      isStale,
       items,
       pickItem,
       resolvedActiveIndex,
@@ -299,25 +301,37 @@ export const GalleryPickerView = ({
     }
   }, [data.boards, data.selectedBoardId, galleryValues, onClose, revealInGallery, scope.galleryView]);
 
-  const status = getGalleryPickerStatus({
-    accept,
-    activeItem,
-    isSearching,
-    isWindowTruncated: data.isWindowTruncated,
-    loadedCount: items?.length ?? 0,
-    pane: scope.pane,
-    remaining: getGalleryPickerRemaining(accept, selection),
-    total: data.total,
-    visibleBoardCount,
-  })
-    .map((part) => t(`widgets.gallery.picker.${part.kind}`, 'count' in part ? { count: part.count } : undefined))
-    .join(' · ');
+  const pickerNotice =
+    scope.pane !== 'items'
+      ? null
+      : listing.status === 'more-error'
+        ? { message: 'widgets.gallery.listingLoadMoreFailed', retryLabel: 'widgets.gallery.retryLoadingMoreItems' }
+        : listing.status === 'stale-error'
+          ? { message: 'widgets.gallery.listingRefreshFailed', retryLabel: 'widgets.gallery.retryLoadingItems' }
+          : null;
+  // Counts of a list that failed to load would claim it is empty.
+  const isCurrentPaneUnavailable = scope.pane === 'boards' ? isBoardListUnavailable : listing.status === 'error';
+  const status = isCurrentPaneUnavailable
+    ? ''
+    : getGalleryPickerStatus({
+        accept,
+        activeItem,
+        isSearching,
+        isWindowTruncated: data.isWindowTruncated,
+        loadedCount: items?.length ?? 0,
+        pane: scope.pane,
+        remaining: getGalleryPickerRemaining(accept, selection),
+        total: data.total,
+        visibleBoardCount,
+      })
+        .map((part) => t(`widgets.gallery.picker.${part.kind}`, 'count' in part ? { count: part.count } : undefined))
+        .join(' · ');
 
   const searchEndElement = useMemo(
     () => (
       <HStack flexShrink={0} gap="0">
         {scope.searchTerm ? (
-          <CloseButton aria-label={t('common.clearSearch')} size="2xs" onClick={handleClearSearch} />
+          <CloseButton aria-label={t('common.clearSearch')} size="sm" onClick={handleClearSearch} />
         ) : null}
         {scope.pane === 'items' ? <GallerySearchHelp /> : null}
       </HStack>
@@ -330,13 +344,12 @@ export const GalleryPickerView = ({
         ? { 'aria-controls': boardsId }
         : showsGrid
           ? {
-              'aria-activedescendant': resolvedActiveKey
-                ? galleryPickerOptionId(listboxId, resolvedActiveKey)
-                : undefined,
+              'aria-activedescendant':
+                resolvedActiveKey && !isStale ? galleryPickerOptionId(listboxId, resolvedActiveKey) : undefined,
               'aria-controls': listboxId,
             }
           : undefined,
-    [boardsId, listboxId, resolvedActiveKey, scope.pane, showsGrid]
+    [boardsId, isStale, listboxId, resolvedActiveKey, scope.pane, showsGrid]
   );
   const searchLabel =
     scope.pane === 'boards'
@@ -357,7 +370,6 @@ export const GalleryPickerView = ({
           justifyContent="flex-start"
           minW="0"
           ps="1"
-          size="xs"
           variant="ghost"
           onClick={togglePane}
         >
@@ -383,7 +395,6 @@ export const GalleryPickerView = ({
             aria-label={uploadTarget.label}
             color="fg.muted"
             disabled={!uploadTarget.isAvailable || isUploading}
-            size="xs"
             variant="ghost"
             onClick={openUploadPicker}
           >
@@ -411,9 +422,18 @@ export const GalleryPickerView = ({
         minH="0"
         role="tabpanel"
       >
-        {scope.pane === 'boards' ? (
+        {scope.pane === 'boards' && isBoardListUnavailable ? (
+          <GalleryLoadErrorState
+            read={data.boardsState}
+            retryLabel={t('widgets.gallery.retryLoadingBoards')}
+            title={t('widgets.gallery.boardsLoadFailed')}
+            onFocusLost={focusSearch}
+          />
+        ) : scope.pane === 'boards' ? (
           <GalleryPickerBoards
-            emptyMessage={t('widgets.gallery.noBoardsMatchSearch')}
+            emptyMessage={
+              data.boardsState.status === 'loading' ? t('common.loading') : t('widgets.gallery.noBoardsMatchSearch')
+            }
             galleryView={scope.galleryView}
             groups={boardGroups}
             id={boardsId}
@@ -421,6 +441,13 @@ export const GalleryPickerView = ({
             selectedBoardId={data.selectedBoardId}
             onExitTop={focusSearch}
             onSelect={handleSelectBoard}
+          />
+        ) : listing.status === 'error' ? (
+          <GalleryLoadErrorState
+            read={listing}
+            retryLabel={t('widgets.gallery.retryLoadingItems')}
+            title={t('widgets.gallery.listingLoadFailed')}
+            onFocusLost={focusSearch}
           />
         ) : showsGrid ? (
           <GalleryPickerGrid
@@ -440,35 +467,49 @@ export const GalleryPickerView = ({
         ) : (
           <Stack align="center" color="fg.muted" gap="2" justify="center" minH="7rem" px="4" py="6">
             <Icon as={ImageIcon} boxSize="4" color="fg.subtle" />
-            <Text fontSize="xs" textAlign="center" textWrap="pretty">
+            <Text fontSize="md" textAlign="center" textWrap="pretty">
               {isSearching
                 ? t('widgets.gallery.noImagesMatch')
                 : t('widgets.gallery.picker.empty', { name: boardName })}
             </Text>
             {!isSearching && uploadTarget.isAvailable ? (
-              <Button disabled={isUploading} size="xs" variant="outline" onClick={openUploadPicker}>
+              <Button disabled={isUploading} variant="outline" onClick={openUploadPicker}>
                 <Icon as={UploadIcon} boxSize="3.5" />
                 {t('widgets.gallery.picker.upload')}
               </Button>
             ) : null}
           </Stack>
         )}
+        {pickerNotice ? (
+          <GalleryLoadNotice
+            borderColor="border.subtle"
+            borderTopWidth="1px"
+            message={t(pickerNotice.message)}
+            pe="1"
+            ps="2"
+            py="1"
+            read={listing}
+            retryLabel={t(pickerNotice.retryLabel)}
+            onFocusLost={focusSearch}
+          />
+        ) : null}
       </Stack>
       <HStack borderColor="border.subtle" borderTopWidth="1px" gap="2" justify="space-between" pe="1" ps="2" py="1">
-        <Text color="fg.subtle" fontSize="2xs" fontVariantNumeric="tabular-nums" minW="0" role="status" truncate>
+        <Text color="fg.subtle" fontSize="xs" fontVariantNumeric="tabular-nums" minW="0" role="status" truncate>
           {status}
         </Text>
         {isMultiple ? (
-          <Button flexShrink={0} size="2xs" variant="subtle" onClick={onClose}>
+          <Button flexShrink={0} size="sm" variant="subtle" onClick={onClose}>
             {t('common.done')}
           </Button>
         ) : revealInGallery ? (
-          <Button color="fg.muted" flexShrink={0} size="2xs" variant="ghost" onClick={openGallery}>
+          <Button color="fg.muted" flexShrink={0} size="sm" variant="ghost" onClick={openGallery}>
             {t('widgets.gallery.picker.openGallery')}
             <Icon as={ExternalLinkIcon} boxSize="3" />
           </Button>
         ) : null}
       </HStack>
+      <GalleryAnnouncer message={pickerNotice ? t(pickerNotice.message) : ''} />
     </Stack>
   );
 };

@@ -191,6 +191,8 @@ export interface GenerateSettings {
   dynamicPromptsMaxPrompts: number;
   /** Seeds the random sampler so the preview matches what generates. */
   dynamicPromptsSampleSeed: number;
+  /** Draw a new sample seed after each queued random-mode submission. */
+  dynamicPromptsResample: boolean;
   dynamicPromptsSeedBehaviour: DynamicPromptsSeedBehaviour;
   width: number;
   height: number;

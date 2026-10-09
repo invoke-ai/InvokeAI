@@ -2,7 +2,7 @@ import type { WidgetRegion } from '@workbench/layoutContracts';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 import type { NormalizedWidgetManifest, RegisteredWidget } from '@workbench/widgetContracts';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { WorkbenchAction } from './workbenchState.testing';
 import type { WorkbenchWidgetCommands } from './workbenchStore';
@@ -11,6 +11,7 @@ import { createWidgetImplementationResource } from './widgetImplementationResour
 import {
   activateRailPlacement,
   closeWidgetPlacement,
+  cycleRegionWidget,
   dockFloatingPlacement,
   getCenterPreviewToggleState,
   openWidgetPlacement,
@@ -78,7 +79,7 @@ const createWidgetCommands = (dispatch: (action: WorkbenchAction) => void): Work
   open: (options) => dispatch({ ...options, type: 'openRegionWidget' }),
   patchInstanceValues: (instanceId, values, projectId) =>
     dispatch({ instanceId, projectId, type: 'patchWidgetInstanceValues', values }),
-  patchValues: (widgetId, values, projectId) => dispatch({ projectId, type: 'patchWidgetValues', values, widgetId }),
+  patchValues: vi.fn(),
   reorder: (options) => dispatch({ ...options, type: 'reorderWidgetInstances' }),
   revealFloating: (instanceId) => dispatch({ instanceId, type: 'revealFloatingWidget' }),
   select: (options) => dispatch({ ...options, type: 'selectRegionWidget' }),
@@ -91,6 +92,93 @@ const createWidgetCommands = (dispatch: (action: WorkbenchAction) => void): Work
 });
 
 describe('widget placement commands', () => {
+  it('cycles eligible docked widgets in both directions, wrapping without moving or selecting other regions', () => {
+    const initial = createInitialWorkbenchState();
+    const project = getActiveProject(initial);
+    project.widgetRegions.left = {
+      ...project.widgetRegions.left,
+      activeInstanceId: 'generate',
+      instanceIds: ['generate', 'missing', 'upscale', 'queue'],
+      isCollapsed: false,
+    };
+    const registry = createRegistry({
+      left: [
+        createWidget({ id: 'generate', label: 'Generate' }),
+        { ...createWidget({ id: 'upscale', label: 'Upscale' }), status: 'disabled' },
+        createWidget({ id: 'queue', label: 'Queue' }),
+      ],
+    });
+    const cycle = (state: WorkbenchState, direction: -1 | 1) =>
+      applyCommand(state, (widgets) => {
+        cycleRegionWidget({
+          direction,
+          getWidgetsForRegion: registry,
+          project: getWidgetPlacementProject(getActiveProject(state)),
+          region: 'left',
+          widgets,
+        });
+      });
+    const next = cycle(initial, 1);
+    expect(getActiveProject(next).widgetRegions.left.activeInstanceId).toBe('queue');
+    expect(getActiveProject(next).widgetRegions.left.instanceIds).toEqual(['generate', 'missing', 'upscale', 'queue']);
+    expect(getActiveProject(next).widgetRegions.right).toBe(project.widgetRegions.right);
+    const wrapped = cycle(next, 1);
+    expect(getActiveProject(wrapped).widgetRegions.left.activeInstanceId).toBe('generate');
+    expect(getActiveProject(cycle(wrapped, -1)).widgetRegions.left.activeInstanceId).toBe('queue');
+  });
+
+  it('does nothing with one eligible widget, so cycling cannot collapse the active panel', () => {
+    const initial = createInitialWorkbenchState();
+    const project = getActiveProject(initial);
+    project.widgetRegions.left = {
+      ...project.widgetRegions.left,
+      activeInstanceId: 'generate',
+      instanceIds: ['generate'],
+      isCollapsed: false,
+    };
+    const next = applyCommand(initial, (widgets) => {
+      expect(
+        cycleRegionWidget({
+          direction: 1,
+          getWidgetsForRegion: createRegistry({ left: [createWidget({ id: 'generate', label: 'Generate' })] }),
+          project: getWidgetPlacementProject(project),
+          region: 'left',
+          widgets,
+        })
+      ).toBeNull();
+    });
+    expect(next).toBe(initial);
+    expect(getActiveProject(next).widgetRegions.left.isCollapsed).toBe(false);
+  });
+
+  it.each(['center', 'bottom'] as const)('skips non-panel controls when cycling the %s region', (region) => {
+    const initial = createInitialWorkbenchState();
+    const project = getActiveProject(initial);
+    project.widgetRegions[region] = {
+      ...project.widgetRegions[region],
+      activeInstanceId: 'gallery',
+      instanceIds: ['gallery', 'generate', 'queue', 'preview'],
+    };
+    const registry = createRegistry({
+      [region]: [
+        createWidget({ id: 'gallery', label: 'Gallery' }),
+        createWidget({ bottomPanel: 'tooltip', centerPlacement: 'toolbar', id: 'generate', label: 'Generate' }),
+        createWidget({ bottomPanel: 'popover', centerPlacement: 'toolbar', id: 'queue', label: 'Queue' }),
+        createWidget({ id: 'preview', label: 'Preview' }),
+      ],
+    });
+    const next = applyCommand(initial, (widgets) => {
+      cycleRegionWidget({
+        direction: 1,
+        getWidgetsForRegion: registry,
+        project: getWidgetPlacementProject(project),
+        region,
+        widgets,
+      });
+    });
+    expect(getActiveProject(next).widgetRegions[region].activeInstanceId).toBe('preview');
+  });
+
   it('opens a singleton already in the target region without duplicating it', () => {
     const state = createInitialWorkbenchState();
     const widget = createWidget({ id: 'queue', label: 'Queue' });

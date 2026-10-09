@@ -221,17 +221,13 @@ export const ClusterStrengthField = ({ field, surface, target }: SettingFieldPro
     >
       <Stack flex="1" gap="1">
         <HStack gap="2">
-          <Field.Label fontSize={surface === 'quick' ? 'xs' : 'sm'} fontWeight="500">
+          <Field.Label fontSize={surface === 'quick' ? 'md' : 'lg'} fontWeight="500">
             {label}
           </Field.Label>
           {chosen !== null ? <ModifiedSettingIndicator label={label} /> : null}
         </HStack>
-        {description ? (
-          <Field.HelperText color="fg.muted" fontSize="xs">
-            {description}
-          </Field.HelperText>
-        ) : null}
-        {invalid ? <Field.ErrorText fontSize="xs">{invalid}</Field.ErrorText> : null}
+        {description ? <Field.HelperText color="fg.muted">{description}</Field.HelperText> : null}
+        {invalid ? <Field.ErrorText fontSize="md">{invalid}</Field.ErrorText> : null}
       </Stack>
       <HStack flexShrink={0} gap="2">
         <Input
@@ -241,7 +237,7 @@ export const ClusterStrengthField = ({ field, surface, target }: SettingFieldPro
           max={MAX_CLUSTER_EPS}
           min={MIN_CLUSTER_EPS}
           ref={input}
-          size="sm"
+          size="lg"
           step="0.01"
           type="number"
           w="24"
@@ -252,7 +248,7 @@ export const ClusterStrengthField = ({ field, surface, target }: SettingFieldPro
             one are the same digits in the same box. */}
         <Badge
           data-testid="cluster-strength-auto"
-          size="sm"
+          size="lg"
           variant="subtle"
           visibility={chosen === null ? 'visible' : 'hidden'}
         >

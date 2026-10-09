@@ -47,7 +47,7 @@ const MENU_ITEM_DISABLED_PROPS = { opacity: 0.4 };
 const getWidgetEnableMenuTriggerButton = (label: string, trigger: WidgetEnableMenuTrigger) => {
   if (trigger.kind === 'center') {
     return (
-      <IconButton aria-label={label} size="xs" variant="ghost">
+      <IconButton aria-label={label} variant="ghost">
         <Icon as={MoreHorizontalIcon} boxSize="4" />
       </IconButton>
     );
@@ -58,12 +58,12 @@ const getWidgetEnableMenuTriggerButton = (label: string, trigger: WidgetEnableMe
   return (
     <Flex
       align="center"
-      // Center the fixed-size trigger within full-width rail drop targets.
-      alignSelf={isBottom ? undefined : 'center'}
+      // Center the fixed-size trigger within full-width rail drop targets; fill the status bar inside its border.
+      alignSelf={isBottom ? 'stretch' : 'center'}
       aria-label={label}
       as="button"
       color="fg"
-      h={isBottom ? '6' : '9'}
+      h={isBottom ? undefined : '9'}
       justify="center"
       rounded={isBottom ? 'sm' : 'md'}
       transition="background var(--wb-motion-duration-fast) ease, color var(--wb-motion-duration-fast) ease"
@@ -91,7 +91,7 @@ export const WidgetEnableMenu = ({
   const content = (
     <MenuContent minW="12rem">
       <Menu.ItemGroup>
-        <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+        <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
           {groupLabel}
         </Menu.ItemGroupLabel>
         {items.map((item) => {
@@ -172,7 +172,7 @@ const WidgetEnableMenuRow = ({
       <WidgetIcon icon={item.icon} boxSize="3.5" />
       <Menu.ItemText>{item.label}</Menu.ItemText>
       {meta ? (
-        <Text color="fg.subtle" fontSize="2xs" ms="auto">
+        <Text color="fg.subtle" fontSize="xs" ms="auto">
           {meta}
         </Text>
       ) : null}

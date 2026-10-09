@@ -1,4 +1,5 @@
 import sqlite3
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Union, cast
@@ -473,6 +474,37 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 for row in cursor.fetchall():
                     subfolders[cast(str, row[0])] = cast(str, row[1])
         return subfolders
+
+    def iter_all_image_locations(self, batch_size: int = 500) -> Iterator[tuple[str, str]]:
+        """Yields every image location through bounded keyset pages, including hidden/intermediate rows."""
+        if batch_size <= 0:
+            raise ValueError("batch_size must be positive")
+
+        last_image_name = ""
+        while True:
+            with self._db.transaction() as cursor:
+                cursor.execute(
+                    """--sql
+                    SELECT image_name, image_subfolder
+                    FROM images
+                    WHERE image_name > ?
+                    ORDER BY image_name
+                    LIMIT ?;
+                    """,
+                    (last_image_name, batch_size),
+                )
+                rows = cursor.fetchall()
+
+            if not rows:
+                return
+
+            locations = [(cast(str, row[0]), cast(str, row[1])) for row in rows]
+            for image_name, image_subfolder in locations:
+                last_image_name = image_name
+                yield image_name, image_subfolder
+
+            if len(rows) < batch_size:
+                return
 
     def delete_intermediates_by_names(
         self, image_names: list[str], guard: Optional[IntermediateDeleteGuard] = None

@@ -22,6 +22,7 @@
       "@assets/*": ["./src/assets/*"],
       "@app": ["./src/app"],
       "@app/*": ["./src/app/*"],
+      "@api/*": ["../api/*"],
       "@features": ["./src/features"],
       "@features/*": ["./src/features/*"],
       "@platform": ["./src/platform"],
