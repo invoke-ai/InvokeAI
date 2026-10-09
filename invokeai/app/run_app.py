@@ -103,7 +103,7 @@ def run_app() -> None:
         logger.warning(f"Port {orig_config_port} is already in use. Using port {app_config.port}.")
 
     # Miscellaneous startup tasks.
-    apply_monkeypatches()
+    apply_monkeypatches(app_config.attention_backend)
     register_mime_types()
     check_cudnn(logger)
     check_cuda_build_compatibility(logger)
