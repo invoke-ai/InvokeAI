@@ -36,6 +36,7 @@ from typing import Any
 import torch
 
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.util.oom import is_oom_error
 
 logger = InvokeAILogger.get_logger(__name__)
 
@@ -60,10 +61,10 @@ _FIRST_CALL_MAX_ERROR = 0.5
 # tile is among them. A kernel that never ran garbles every row, so a slice catches what the whole output would; the
 # whole output costs ~14 bytes per element to compare -- about 5 GB for one call of Wan 2.2 14B at 720p.
 _FIRST_CALL_ROWS = 1024
-# Failures that say nothing about the kernel -- Triton running out of memory while loading a compiled kernel, or losing
-# a race for its cache file to a compile on another GPU -- fall back for that call only. A device that keeps failing
-# that way is retired like any other, so a broken Triton cache does not recompile on every call.
-_MAX_TRANSIENT_FAILURES = 3
+# Triton failing to write a compiled kernel to its cache (on Windows, when two GPUs compile the same kernel at once)
+# says nothing about the kernel: that call falls back and the next tries again. A device that fails this way this many
+# times in a row is retired like any other, so a cache that can never be written does not recompile on every call.
+_MAX_CACHE_FAILURES = 3
 
 DOCS_URL = "https://invoke-ai.github.io/InvokeAI-7/configuration/optimization/sage-attention/"
 
@@ -74,6 +75,8 @@ class _Usage:
 
     served: int = 0
     fell_back: Counter[str] = field(default_factory=Counter)
+    # Set once SageAttention's quantized copies did not fit; the rest of the scope then stays on SDPA.
+    memory_short: bool = False
 
 
 _scope: ContextVar[_Usage | None] = ContextVar("invokeai_sage_attention_scope", default=None)
@@ -81,7 +84,7 @@ _lock = threading.Lock()
 _disabled_devices: set[int] = set()
 # (device, dtype, head size): the kernel variants whose first result was compared with SDPA.
 _validated: set[tuple[int, torch.dtype, int]] = set()
-_transient_failures: Counter[int] = Counter()
+_cache_failures: Counter[int] = Counter()
 _announced_devices: set[int] = set()
 
 
@@ -131,11 +134,13 @@ def _kernel(
     without saying why; neither has been measured here, so upstream's choice stands. From the Windows build come the
     sm100 kernel and the choice by the CUDA version torch was built for: the FP16 accumulation inside the FP8 kernels
     needs CUDA 12.8 to compile, and below that the build replaces it with a trap. Every kernel is called with
-    ``smooth_k`` off, which ``sageattn`` always leaves on and has no argument to change. Smoothing subtracts K's mean over the sequence before quantizing; in the first
-    block of Qwen-Image and Krea-2, where one channel of Q and K sits near +600 for every image token, that leaves the
-    INT8 product Q.K no precision for the rest: cosine 0.18 and 0.53 against a float32 reference, 0.997 and 0.988 with
-    smoothing off. Everywhere else measured it changes nothing, and off is 2-11 % faster (RTX 4090). Only sm_89 has been
-    measured in InvokeAI.
+    ``smooth_k`` off, which ``sageattn`` always leaves on and has no argument to change.
+
+    Smoothing subtracts K's mean over the sequence before quantizing; in the first block of Qwen-Image and Krea-2,
+    where one channel of Q and K sits near +600 for every image token, that leaves the INT8 product Q.K no precision for
+    the rest: cosine 0.18 and 0.53 against a float32 reference, 0.997 and 0.988 with smoothing off. Everywhere else
+    measured it changes nothing, and off is 2-11 % faster (RTX 4090). Only sm_89 has been measured in InvokeAI; the
+    sm86 Triton kernel was checked for accuracy on it.
     """
     major, minor = capability
     recent_cuda = cuda >= (12, 8)
@@ -171,7 +176,7 @@ def _cuda_index(query: torch.Tensor, key: torch.Tensor, value: torch.Tensor) -> 
     single-device install with `device: cuda:1` does not.
     """
     device = query.device
-    if device.type != "cuda" or device.index is None or key.device != device or value.device != device:
+    if device.type != "cuda" or key.device != device or value.device != device:
         return None
     return device.index
 
@@ -254,20 +259,11 @@ def _check_first_result(
         _validated.add((index, query.dtype, query.shape[-1]))
 
 
-def _transient(error: Exception) -> bool:
-    """Whether a failure says nothing about the kernel: memory, or a file Triton could not write.
-
-    A CUDA fault that poisons the context (illegal address, a trap) is not among them; torch's fallback then raises the
-    same error, and a restart is the only way out.
-    """
-    return isinstance(error, OSError) or "out of memory" in str(error).lower()
-
-
-def _transient_failure(index: int) -> bool:
-    """Count a transient failure on this device; True once there were too many to keep retrying."""
+def _cache_failure(index: int) -> bool:
+    """Count a Triton cache failure on this device; True once it failed too often in a row to keep retrying."""
     with _lock:
-        _transient_failures[index] += 1
-        return _transient_failures[index] >= _MAX_TRANSIENT_FAILURES
+        _cache_failures[index] += 1
+        return _cache_failures[index] >= _MAX_CACHE_FAILURES
 
 
 def _disable(index: int, error: Exception, query: torch.Tensor, key: torch.Tensor) -> None:
@@ -374,6 +370,8 @@ def install_sage_attention() -> None:
         usage = _scope.get()
         if usage is not None:
             reason = _ineligible(query, key, value, attn_mask, dropout_p, is_causal, enable_gqa, bool(args or kwargs))
+            if reason is None and usage.memory_short:
+                reason = "memory"
             if reason is None:
                 index = _cuda_index(query, key, value)
                 kernel = kernels.get(index) if index is not None and index not in _disabled_devices else None
@@ -393,14 +391,26 @@ def install_sage_attention() -> None:
                             if (index, query.dtype, query.shape[-1]) not in _validated:
                                 _check_first_result(index, original, query, key, value, scale, out)
                     except Exception as e:
-                        # SageAttention's quantized copies did not fit, or Triton could not load or cache a kernel:
-                        # this call uses SDPA, which needs less memory, and the next tries SageAttention again.
-                        if _transient(e) and not _transient_failure(index):
-                            reason = "transient"
+                        if isinstance(e, RuntimeError) and is_oom_error(e):
+                            # SageAttention's quantized copies did not fit. SDPA needs less; the rest of this scope
+                            # uses it rather than flushing the allocator's cache on every call, and the next
+                            # generation tries SageAttention again. A CUDA fault that poisons the context is no OOM:
+                            # it retires the device below, and SDPA then fails the same way.
+                            usage.memory_short = True
+                            reason = "memory"
+                            logger.info(
+                                f"SageAttention ran out of memory on cuda:{index} for query {tuple(query.shape)}; "
+                                "the rest of this generation uses PyTorch SDPA."
+                            )
+                        elif isinstance(e, OSError) and not _cache_failure(index):
+                            reason = "cache"
                         else:
                             _disable(index, e, query, key)
                             reason = "error"
                     else:
+                        if _cache_failures[index]:
+                            with _lock:
+                                _cache_failures.pop(index, None)
                         usage.served += 1
                         _announce(index, version, kernel)
                         return out

@@ -121,8 +121,9 @@ kernels.
   running a kernel, cannot be caught at all and ends the generation.
 - **Memory.** Peak VRAM was unchanged for every measured model. Each call holds quantized copies of its inputs, about
   1.7 bytes per element of the query, key and value together — around 70 MB for FLUX.1 at 1024×1024, and around 2 GB
-  per call for Wan 2.2 14B at 1280×720 with 81 frames (not measured). A call that does not fit runs on PyTorch's
-  attention instead, which needs less.
+  per call for Wan 2.2 14B at 1280×720 with 81 frames (not measured). When a call does not fit, the rest of that
+  generation runs on PyTorch's attention, which needs less, and the log says so; the next generation tries
+  SageAttention again.
 - **Recall.** `attention_backend` is not stored in an image's metadata, so an image recalled after switching it is
   generated slightly differently.
 - **Black or noisy images** have been reported with SageAttention for some models in other applications. None appeared
