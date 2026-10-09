@@ -19,7 +19,12 @@ from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.sd3.sd3_denoise import SD3DenoiseInvocation
 from invokeai.app.invocations.z_image.z_image_denoise import ZImageDenoiseInvocation
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional, get_schedule
-from invokeai.backend.flux.schedulers import ANIMA_SCHEDULER_MAP, FLUX_SCHEDULER_MAP, ZIMAGE_SCHEDULER_MAP
+from invokeai.backend.flux.schedulers import (
+    ANIMA_SCHEDULER_MAP,
+    FLUX_SCHEDULER_MAP,
+    ZIMAGE_SCHEDULER_MAP,
+    set_heun_timesteps_from_sigmas,
+)
 from invokeai.backend.flux2.sampling_utils import get_schedule_flux2
 from invokeai.backend.model_manager.taxonomy import BaseModelType, FluxVariantType, ModelType
 
@@ -591,8 +596,17 @@ def test_denoise_metadata_persists_hidiffusion_fields_when_disabled():
 
 
 def _get_first_scheduler_sigma(
-    scheduler, *, scheduler_name: str, sigmas: list[float], mu: float | None = None
+    scheduler,
+    *,
+    scheduler_name: str,
+    sigmas: list[float],
+    mu: float | None = None,
+    use_flux_heun_schedule: bool = False,
 ) -> float:
+    if scheduler_name == "heun" and use_flux_heun_schedule:
+        set_heun_timesteps_from_sigmas(scheduler, sigmas[:-1], sigmas[-1], "cpu")
+        return float(scheduler.sigmas[0])
+
     set_timesteps_signature = inspect.signature(scheduler.set_timesteps)
     if scheduler_name != "lcm" and "sigmas" in set_timesteps_signature.parameters:
         kwargs: dict[str, object] = {"sigmas": sigmas, "device": "cpu"}
@@ -611,13 +625,7 @@ def _get_first_scheduler_sigma(
     "scheduler_name",
     [
         "euler",
-        pytest.param(
-            "heun",
-            marks=pytest.mark.xfail(
-                reason="Known img2img preblend mismatch for FLUX with scheduler-defined first step.",
-                strict=True,
-            ),
-        ),
+        "heun",
         pytest.param(
             "lcm",
             marks=pytest.mark.xfail(
@@ -633,7 +641,12 @@ def test_flux_img2img_preblend_matches_scheduler_first_sigma(scheduler_name: str
     scheduler = scheduler_class(num_train_timesteps=1000)
 
     assert sigmas[0] == pytest.approx(
-        _get_first_scheduler_sigma(scheduler, scheduler_name=scheduler_name, sigmas=sigmas)
+        _get_first_scheduler_sigma(
+            scheduler,
+            scheduler_name=scheduler_name,
+            sigmas=sigmas,
+            use_flux_heun_schedule=True,
+        )
     )
 
 
