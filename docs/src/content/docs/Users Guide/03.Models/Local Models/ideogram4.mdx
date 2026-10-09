@@ -1,7 +1,7 @@
 ---
 title: Ideogram 4
 description: Generate images with the Ideogram 4 text-to-image models.
-lastUpdated: 2026-09-30
+lastUpdated: 2026-10-08
 sidebar:
   order: 6
 ---
@@ -37,7 +37,7 @@ Pick the unconditional branch, the encoder and the VAE in the **Components** sec
 
 Which branch a file holds is read from the file itself, and from the filename for a build that does not record it, so keep these names as published.
 
-Two builds of the transformers are supported, and they behave differently in memory:
+Two safetensors builds of the transformers are supported, and they behave differently in memory:
 
 | | download, per branch | resident, per branch |
 |---|---|---|
@@ -53,8 +53,25 @@ Both branches are resident at once, so double those figures for the pair.
 
 **Use int8 where FP8 Storage is not available.** It requires a CUDA or Intel XPU device; on anything else the fp8 build falls back to the expanded path, while int8 keeps its stored codes and dequantizes them per forward on any device with no setting to turn on.
 
-On a 24 GB NVIDIA card without the fp8 matmul (RTX 30-series), the int8 pair plus the 8B encoder still adds up to more than the card holds, so the bundled [nf4 build](#installing-ideogram-4) remains the smaller option there.
+On a 24 GB NVIDIA card without the fp8 matmul (RTX 30-series), the int8 pair plus the 8B encoder still adds up to more than the card holds, so the bundled [nf4 build](#installing-ideogram-4) or a [GGUF](#gguf) pair is the smaller option there.
 :::
+
+#### GGUF
+
+Community GGUF conversions of the same two transformers load too, and they are the smallest builds. The weights stay packed in memory and are unpacked layer by layer during generation, on every device, so the download size is about the resident size. Three pairs are available as starter models, each of which installs its unconditional branch, the Qwen3-VL 8B encoder and the VAE with it:
+
+| | download, per branch | 1024px, 12 steps, 4090 |
+|---|---|---|
+| **Ideogram 4 (GGUF, Q4_0)** — [`molbal/ideogram-4-gguf`](https://huggingface.co/molbal/ideogram-4-gguf) | 5.6 GB | 27.9 s |
+| **Ideogram 4 (GGUF, Q5_K)** — [`rectangleworm/ideogram-4-gguf`](https://huggingface.co/rectangleworm/ideogram-4-gguf) | 6.4 GB | 32.2 s |
+| **Ideogram 4 (GGUF, Q5_1)** — [`molbal/ideogram-4-gguf`](https://huggingface.co/molbal/ideogram-4-gguf) | 7.3 GB | not measured |
+
+For comparison, the fp8 single-file pair took 37–38 s on the same card. Both GGUF pairs stay fully on the GPU next to the encoder (5.3 and 6.0 GB per branch), where the fp8 pair has to stream part of its second branch. Q5_K is the closer of the two to the fp8 build's images.
+
+Pick the model and the unconditional branch in **Components** exactly as for the safetensors builds. Two things are different:
+
+- **The branch comes from the filename alone.** No published GGUF records which branch it holds, so a file whose name contains `unconditional` or `uncond` installs as the unconditional branch and anything else as the conditional one. Keep the published names; to fix a renamed file, remove the model, give the file its published name back and install it again.
+- Other GGUF repositories of Ideogram 4 (for example leejet's or stduhpf's) load as well. `IQ4_NL` files work but are unpacked on the CPU at every step, which is much slower. Q8_0 is not offered as a starter: at about 10.1 GB per branch it is larger than the fp8 build.
 
 ### Memory use during generation
 
