@@ -25,7 +25,7 @@ const renderSegments = async (): Promise<{ checked: HTMLElement; count: HTMLElem
   await act(() => {
     root?.render(
       <ChakraProvider value={system}>
-        <SegmentGroup.Root size="xs" value="media">
+        <SegmentGroup.Root value="media">
           <SegmentGroup.Indicator data-testid="indicator" />
           {['media', 'assets'].map((value) => (
             <SegmentGroup.Item key={value} data-testid={value} value={value}>

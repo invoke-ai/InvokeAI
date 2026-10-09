@@ -31,12 +31,17 @@ const REJECTION_KEY: Record<WildcardImportRejection, string> = {
 /** Default conflicts to skip and show explicit rejection reasons. */
 export const WildcardImportDialog = ({
   entries,
+  isOpen,
   onCancel,
   onConfirm,
+  onExitComplete,
 }: {
   entries: readonly WildcardImportEntry[];
+  isOpen: boolean;
   onCancel: () => void;
   onConfirm: (resolutions: Record<string, WildcardImportResolution>) => Promise<void>;
+  /** After the close animation; the host releases the retained import here. */
+  onExitComplete?: () => void;
 }) => {
   const { t } = useTranslation();
   const [resolutions, setResolutions] = useState<Record<string, WildcardImportResolution>>({});
@@ -76,14 +81,14 @@ export const WildcardImportDialog = ({
   // oxlint-disable-next-line react-perf/jsx-no-jsx-as-prop
   const body = (
     <Stack gap="3">
-      <Text color="fg.subtle" fontSize="xs">
+      <Text color="fg.subtle" fontSize="md">
         {t('widgets.generate.dynamicPrompts.importSummary', { conflicts: conflicts.length, fresh: freshCount })}
       </Text>
 
       {conflicts.length > 0 ? (
         <Stack gap="2">
           <HStack justify="space-between">
-            <Text fontSize="xs" fontWeight="600">
+            <Text fontSize="md" fontWeight="600">
               {t('widgets.generate.dynamicPrompts.importAlreadyExist')}
             </Text>
             {/* One decision for a folder of forty; the rows below still win. */}
@@ -107,7 +112,7 @@ export const WildcardImportDialog = ({
 
       {rejected.length > 0 ? (
         <Stack gap="1">
-          <Text fontSize="xs" fontWeight="600">
+          <Text fontSize="md" fontWeight="600">
             {t('widgets.generate.dynamicPrompts.importCannotImport')}
           </Text>
           {/* Bound rejected-file lists so dialog actions remain reachable. */}
@@ -117,10 +122,10 @@ export const WildcardImportDialog = ({
                 <HStack justify="space-between" key={`${entry.name}-${index}`}>
                   <MiddleTruncate
                     fontFamily="mono"
-                    fontSize="2xs"
+                    fontSize="xs"
                     text={entry.name || t('widgets.generate.dynamicPrompts.importUnnamed')}
                   />
-                  <Text color="fg.subtle" fontSize="2xs" flexShrink="0">
+                  <Text color="fg.subtle" fontSize="xs" flexShrink="0">
                     {t(REJECTION_KEY[entry.rejection])}
                   </Text>
                 </HStack>
@@ -137,10 +142,11 @@ export const WildcardImportDialog = ({
       body={body}
       confirmLabel={t('widgets.generate.dynamicPrompts.import')}
       isDestructive={false}
-      isOpen
+      isOpen={isOpen}
       title={t('widgets.generate.dynamicPrompts.importWildcards')}
       onClose={onCancel}
       onConfirm={handleConfirm}
+      onExitComplete={onExitComplete}
     />
   );
 };
@@ -163,7 +169,7 @@ const ResolutionControl = ({
   );
 
   return (
-    <SegmentGroup.Root size="xs" value={value ?? null} onValueChange={handleValueChange}>
+    <SegmentGroup.Root value={value ?? null} onValueChange={handleValueChange}>
       <SegmentGroup.Indicator />
       {RESOLUTIONS.map((resolution) => (
         <SegmentGroup.Item key={resolution} value={resolution}>
@@ -192,8 +198,8 @@ const ConflictRow = ({
   return (
     <HStack gap="2" justify="space-between">
       <Stack gap="0" minW="0">
-        <MiddleTruncate fontFamily="mono" fontSize="2xs" text={`__${name}__`} />
-        <Text color="fg.subtle" fontSize="2xs">
+        <MiddleTruncate fontFamily="mono" fontSize="xs" text={`__${name}__`} />
+        <Text color="fg.subtle" fontSize="xs">
           {t('widgets.generate.dynamicPrompts.importValueCount', { count: valueCount })}
         </Text>
       </Stack>

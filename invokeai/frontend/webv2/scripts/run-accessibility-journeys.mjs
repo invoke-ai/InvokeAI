@@ -67,15 +67,29 @@ const waitForSettledDocument = async (page) => {
   });
 };
 
-const openRepresentativePage = async (browser, path, viewport = { height: 1_000, width: 1_440 }) => {
+const openRepresentativePage = async (browser, path, viewport = { height: 1_000, width: 1_440 }, themeId) => {
   const resetResponse = await fetch(`${backendOrigin}/__reset?profile=representative`, { method: 'POST' });
 
   if (!resetResponse.ok) {
     throw new Error(`Could not reset representative backend: ${resetResponse.status}.`);
   }
 
+  if (themeId) {
+    const response = await fetch(
+      `${backendOrigin}/api/v1/client_state/default/set_by_key?key=webv2%3Aworkbench-settings`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(
+          JSON.stringify({ alphaNoticeAcknowledged: true, whatsNewSeenVersion: 'fixture', themeId })
+        ),
+      }
+    );
+    assert.ok(response.ok, `Could not set ${themeId} accessibility fixture theme.`);
+  }
+
   const context = await browser.newContext({
-    colorScheme: 'dark',
+    colorScheme: themeId === 'light' ? 'light' : 'dark',
     reducedMotion: 'reduce',
     viewport,
   });
@@ -214,7 +228,7 @@ const surfaces = [
       await selectLayoutPreset(page, 'Edit', 'Canvas');
       // The Layers panel's Properties pane is the canvas's settings surface; the journey must scan it, not a fallback.
       await page.getByRole('tab', { exact: true, name: 'Properties', selected: true }).waitFor();
-      await page.getByRole('tabpanel').getByText('Tool', { exact: true }).waitFor();
+      await page.getByRole('tabpanel').getByRole('group', { exact: true, name: 'Layer' }).waitFor();
     },
   },
   {
@@ -224,8 +238,8 @@ const surfaces = [
       await waitForWorkbench(page);
       await selectLayoutPreset(page, 'Compose', 'Preview');
       await selectCenterView(page, 'Preview', 'Gallery');
-      // The default project board is empty; scan the populated fixture gallery.
-      await centerRegion(page).getByRole('button').filter({ hasText: 'Uncategorized' }).click();
+      // Choose the populated board row; the disclosure also names the currently selected board.
+      await centerRegion(page).locator('button:not([aria-expanded])').filter({ hasText: 'Uncategorized' }).click();
       await centerRegion(page).getByRole('list', { exact: true, name: 'Gallery items' }).waitFor();
     },
   },
@@ -306,6 +320,54 @@ const expectFocused = async (locator, message) => {
       setTimeout(resolveWait, 25);
     });
   }
+};
+
+const runShortcutGuideJourney = async (browser) => {
+  for (const themeId of ['classic', 'light']) {
+    const { context, page, pageErrors } = await openRepresentativePage(
+      browser,
+      representativeProjectPath,
+      undefined,
+      themeId
+    );
+    try {
+      await waitForWorkbench(page);
+      await page.waitForFunction((theme) => document.documentElement.dataset.theme === theme, themeId);
+      await selectLayoutPreset(page, 'Edit', 'Canvas');
+      const viewTool = page
+        .getByRole('toolbar', { exact: true, name: 'Tools' })
+        .getByRole('button', { exact: true, name: 'View' });
+      await viewTool.click();
+      const guide = page.locator('footer').getByRole('button', { exact: true, name: 'Shortcuts' });
+      await guide.waitFor();
+      await waitForSettledDocument(page);
+      await assertNoAxeViolations(page, `shortcuts-${themeId}-compact`, { include: ['footer [data-shortcut-guide]'] });
+      await guide.focus();
+      await guide.press('Enter');
+      const popup = page
+        .getByRole('dialog')
+        .filter({ has: page.getByRole('button', { exact: true, name: 'Keyboard shortcut settings' }) });
+      await popup.waitFor();
+      await waitForSettledDocument(page);
+      await assertNoAxeViolations(page, `shortcuts-${themeId}-expanded`, {
+        include: ['[data-scope="popover"][data-part="content"][data-state="open"][data-workbench-focus-preserve]'],
+      });
+      await popup.getByRole('button', { exact: true, name: 'Keyboard shortcut settings' }).press('Escape');
+      await popup.waitFor({ state: 'hidden' });
+      await expectFocused(viewTool, 'Closing the guide should restore its editing origin.');
+      if (pageErrors.length > 0) {
+        throw new AggregateError(pageErrors, `shortcuts-${themeId} raised uncaught browser errors.`);
+      }
+    } catch (error) {
+      const directory = resolve(root, 'artifacts/accessibility');
+      await mkdir(directory, { recursive: true });
+      await page.screenshot({ path: resolve(directory, `shortcuts-${themeId}.png`) }).catch(() => undefined);
+      throw error;
+    } finally {
+      await context.close();
+    }
+  }
+  return { id: 'workbench-shortcuts', status: 'passed' };
 };
 
 const runKeyboardJourney = async (browser) => {
@@ -429,6 +491,15 @@ const runResponsiveTopbarJourney = async (browser) => {
       });
 
       assert.equal(metrics.scrollWidth, metrics.clientWidth, `The topbar must not overflow at ${width}px.`);
+      const documentHeights = await page.evaluate(() => ({
+        clientHeight: document.documentElement.clientHeight,
+        scrollHeight: document.documentElement.scrollHeight,
+      }));
+      assert.equal(
+        documentHeights.scrollHeight,
+        documentHeights.clientHeight,
+        `The workbench must not scroll the document at ${width}px.`
+      );
       assert.equal(metrics.controlsInsideHeader, true, `Every topbar control must remain visible at ${width}px.`);
       assert.equal(metrics.zonesDoNotOverlap, true, `Topbar zones must not overlap at ${width}px.`);
       assert.ok(
@@ -537,15 +608,22 @@ const runTopbarMenuJourney = async (browser) => {
     const whatsNewItem = page.getByRole('menuitem', { exact: true, name: "What's New in Invoke" });
     const documentationItem = page.getByRole('menuitem', { exact: true, name: 'Documentation' });
     const discordItem = page.getByRole('menuitem', { exact: true, name: 'Discord' });
+    const donationItem = appMenu.getByRole('menuitem', { exact: true, name: 'Donate to InvokeAI' });
     await commandPaletteItem.waitFor();
     await settingsItem.waitFor();
     await whatsNewItem.waitFor();
     await documentationItem.waitFor();
     await discordItem.waitFor();
+    await donationItem.waitFor();
+    assert.equal(await donationItem.getAttribute('href'), 'https://github.com/sponsors/invoke-ai');
+    assert.equal(await donationItem.getAttribute('target'), '_blank');
 
     const footerMetrics = await appMenu.evaluate((menu) => {
       const menuBounds = menu.getBoundingClientRect();
-      const footerItems = [...menu.querySelectorAll('[role="menuitem"]')].slice(-5);
+      const footerValues = ['command-palette', 'settings', 'whats-new', 'documentation', 'discord'];
+      const footerItems = [...menu.querySelectorAll('[role="menuitem"]')].filter((item) =>
+        footerValues.includes(item.getAttribute('data-value'))
+      );
 
       return {
         itemsFit: footerItems.every((item) => {
@@ -568,6 +646,8 @@ const runTopbarMenuJourney = async (browser) => {
     assert.equal(await page.getByRole('tooltip', { name: /^Command palette/ }).count(), 0);
 
     await appMenu.press('End');
+    assert.equal(await appMenu.getAttribute('aria-activedescendant'), await donationItem.getAttribute('id'));
+    await appMenu.press('ArrowUp');
     assert.equal(await appMenu.getAttribute('aria-activedescendant'), await discordItem.getAttribute('id'));
     for (const item of [documentationItem, whatsNewItem, settingsItem, commandPaletteItem]) {
       await appMenu.press('ArrowUp');
@@ -668,7 +748,7 @@ const runVideoPreviewJourney = async (browser) => {
     await selectLayoutPreset(page, 'Compose', 'Preview');
 
     const rightPanel = page.getByRole('complementary', { exact: true, name: 'right widget panel' });
-    await rightPanel.getByRole('button').filter({ hasText: 'Uncategorized' }).click();
+    await rightPanel.locator('button:not([aria-expanded])').filter({ hasText: 'Uncategorized' }).click();
     const gallery = rightPanel.getByRole('list', { exact: true, name: 'Gallery items' });
     const selectVideo = rightPanel.getByRole('button', {
       exact: true,
@@ -774,7 +854,7 @@ const runKeepAliveStateJourney = async (browser) => {
     await selectLayoutPreset(page, 'Compose', 'Preview');
 
     const rightPanel = page.getByRole('complementary', { exact: true, name: 'right widget panel' });
-    await rightPanel.getByRole('button').filter({ hasText: 'Uncategorized' }).click();
+    await rightPanel.locator('button:not([aria-expanded])').filter({ hasText: 'Uncategorized' }).click();
     const galleryItems = rightPanel.getByRole('list', { exact: true, name: 'Gallery items' });
     await galleryItems.waitFor();
 
@@ -889,7 +969,10 @@ const runLayersPanesJourney = async (browser) => {
     // Tool switching swaps the Tool section's rows in place.
     const tools = page.getByRole('toolbar', { exact: true, name: 'Tools' });
     await tools.getByRole('button', { exact: true, name: 'Brush' }).click();
-    await page.getByRole('tabpanel', { exact: true, name: 'Properties' }).getByText('Size', { exact: true }).waitFor();
+    await page
+      .getByRole('tabpanel', { exact: true, name: 'Properties' })
+      .getByRole('slider', { exact: true, name: 'Brush size' })
+      .waitFor();
     await tools.getByRole('button', { exact: true, name: 'View' }).click();
     await page.getByRole('tabpanel', { exact: true, name: 'Properties' }).waitFor();
 
@@ -1211,6 +1294,9 @@ try {
 
   if (!requestedJourney || requestedJourney === 'keyboard-critical-journey') {
     reports.push(await runKeyboardJourney(browser));
+  }
+  if (!requestedJourney || requestedJourney === 'workbench-shortcuts') {
+    reports.push(await runShortcutGuideJourney(browser));
   }
   if (!requestedJourney || requestedJourney === 'workbench-topbar-responsive') {
     reports.push(await runResponsiveTopbarJourney(browser));

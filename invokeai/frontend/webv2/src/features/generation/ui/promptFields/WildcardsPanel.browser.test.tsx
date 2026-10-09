@@ -4,6 +4,7 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { WildcardsPanel } from '@features/generation/ui/promptFields/WildcardsPanel';
 import { WILDCARD_COLLECTION_FORMATS } from '@features/generation/ui/wildcardFiles';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -135,6 +136,28 @@ it('quietly refuses a conflict-dialog import after its originating account rotat
   });
 
   expect(applyWrites).not.toHaveBeenCalled();
+});
+
+it('animates the conflict dialog out instead of unmounting it on cancel', async () => {
+  accountLifecycle.activate('wildcard-dialog-exit', ':user:wildcard-dialog-exit');
+  await renderPanel();
+
+  const input = host!.querySelector<HTMLInputElement>(
+    `input[accept="${'.txt,.yaml,.yml,.json,text/plain,application/json'}"]`
+  )!;
+  await act(async () => {
+    await userEvent.upload(input, new File(['blue'], 'colors.txt', { type: 'text/plain' }));
+  });
+  await expect.poll(() => document.querySelector('[role="alertdialog"]')?.getAttribute('data-state')).toBe('open');
+  const dialog = document.querySelector('[role="alertdialog"]')!;
+
+  const frames = closingFrames(await recordDialogExit(dialog, () => act(() => userEvent.keyboard('{Escape}'))));
+  await expect.poll(() => document.querySelector('[role="alertdialog"]')).toBeNull();
+
+  expect(frames).not.toHaveLength(0);
+  for (const frame of frames) {
+    expect(frame.text).toContain('colors');
+  }
 });
 
 describe('wildcard values editor', () => {

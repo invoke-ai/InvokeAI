@@ -7,7 +7,6 @@ import type {
 import type { WorkflowNodeExecutionState } from '@features/workflow/ui/contracts';
 import type { WorkflowUiAdapter } from '@features/workflow/ui/WorkflowUiContext';
 import type { ProjectGraphAction } from '@features/workflow/utility';
-import type { toBlob as RasterizeBlob } from 'html-to-image';
 
 /* eslint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-array-as-prop -- each render mounts a fresh flow on purpose */
 import { ChakraProvider } from '@chakra-ui/react';
@@ -34,23 +33,30 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
+import type { rasterizeWorkflowImage as RasterizeWorkflowImage } from './workflowImageRaster';
+
 import { ConnectorFlowNode } from './ConnectorFlowNode';
 import { CurrentImageFlowNode } from './CurrentImageFlowNode';
 import { toFlowEdges, toFlowNodes } from './flowAdapters';
 import { InvocationFlowNode } from './InvocationFlowNode';
 import { LoopBodyBoundaryOverlay } from './LoopBodyBoundaryOverlay';
 import { NotesFlowNode } from './NotesFlowNode';
-import { exportWorkflowAsPng, getWorkflowContentBounds, WORKFLOW_EXPORT_TIMEOUT_MS } from './workflowImageExport';
+import {
+  EXPORT_SCALE,
+  exportWorkflowAsPng,
+  getWorkflowContentBounds,
+  WORKFLOW_EXPORT_TIMEOUT_MS,
+} from './workflowImageExport';
 import { WorkflowImageExportView } from './WorkflowImageExportView';
 
 import '@xyflow/react/dist/style.css';
 
 const exportMocks = vi.hoisted(() => ({
   progressImage: null as null | { dataUrl: string; height: number; width: number },
-  toBlob: vi.fn(),
+  rasterize: vi.fn(),
   translate: ((key: string) => key) as (key: string, options?: Record<string, unknown>) => string,
 }));
-vi.mock('html-to-image', () => ({ toBlob: exportMocks.toBlob }));
+vi.mock('./workflowImageRaster', () => ({ rasterizeWorkflowImage: exportMocks.rasterize }));
 vi.mock('@platform/browser/downloadBlob', () => ({ downloadBlob: vi.fn() }));
 vi.mock('@features/queue/react', () => ({ useProgressImage: () => exportMocks.progressImage }));
 vi.mock('@features/generation/queries', () => ({
@@ -277,7 +283,6 @@ const createAdapter = (
     },
     preferences: { getSnapshot: () => preferencesSnapshot, subscribe: () => () => {} },
     project: { getSnapshot: () => snapshot, subscribe: () => () => {} },
-    registerModalHotkeyLayer: vi.fn(() => vi.fn()),
     widgets: { open: vi.fn(), patchValues: vi.fn() },
   }) as unknown as WorkflowUiAdapter;
 
@@ -350,7 +355,7 @@ describe('InvocationFlowNode chrome and export', () => {
     execution.set(completed(outputImage(400, 800)));
     const adapter = createAdapter(execution.port);
     let capturedHeight: number | undefined;
-    exportMocks.toBlob.mockImplementation((_clone: HTMLElement, options: { height: number }) => {
+    exportMocks.rasterize.mockImplementation((_clone: HTMLElement, options: { height: number }) => {
       capturedHeight = options.height;
       return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
     });
@@ -369,7 +374,7 @@ describe('InvocationFlowNode chrome and export', () => {
       workflowName: 'Pristine bounds',
     });
 
-    expect(capturedHeight).toBe(Math.ceil(snapshotRect.height + 200));
+    expect(capturedHeight).toBe(Math.ceil(snapshotRect.height + 200) * EXPORT_SCALE);
   });
 
   it.each([
@@ -398,7 +403,7 @@ describe('InvocationFlowNode chrome and export', () => {
     const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(graph));
     let capturedText: string | null | undefined;
     let capturedBorderWidth: string | undefined;
-    exportMocks.toBlob.mockImplementation((clone: HTMLElement) => {
+    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
       const entryBox = clone.querySelector<HTMLElement>('[data-workflow-export-field-value="true"]');
       capturedText = entryBox?.textContent;
       capturedBorderWidth = entryBox ? getComputedStyle(entryBox).borderTopWidth : undefined;
@@ -436,7 +441,7 @@ describe('InvocationFlowNode chrome and export', () => {
     const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(graph));
     let capturedClone: HTMLElement | undefined;
     let capturedOptions: { height?: number } | undefined;
-    exportMocks.toBlob.mockImplementation((clone: HTMLElement, options: { height?: number }) => {
+    exportMocks.rasterize.mockImplementation((clone: HTMLElement, options: { height?: number }) => {
       capturedClone = clone;
       capturedOptions = options;
       return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
@@ -478,7 +483,7 @@ describe('InvocationFlowNode chrome and export', () => {
     const nodes = toFlowNodes(graph, [], { txt2img: imageTemplate });
     const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(graph));
     let capturedClone: HTMLElement | undefined;
-    exportMocks.toBlob.mockImplementation((clone: HTMLElement) => {
+    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
       capturedClone = clone;
       return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
     });
@@ -491,8 +496,8 @@ describe('InvocationFlowNode chrome and export', () => {
       workflowName: 'Image output',
     });
 
-    expect(capturedClone?.textContent).not.toContain('Use Cache');
-    expect(capturedClone?.textContent).not.toContain('Save to Gallery');
+    expect(capturedClone?.textContent).not.toContain(i18n.t('nodes.useCache'));
+    expect(capturedClone?.textContent).not.toContain(i18n.t('nodes.saveToGallery'));
     expect(capturedClone?.querySelector('input[type="checkbox"]')).toBeNull();
   });
 
@@ -536,7 +541,7 @@ describe('InvocationFlowNode chrome and export', () => {
     const execution = createExecutionPort();
     const adapter = createAdapter(execution.port);
     let capturedClone: HTMLElement | undefined;
-    exportMocks.toBlob.mockImplementation((clone: HTMLElement) => {
+    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
       capturedClone = clone;
       return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
     });
@@ -617,7 +622,7 @@ describe('InvocationFlowNode chrome and export', () => {
     const nodes = toFlowNodes(graph, [], { preview: template });
     const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(graph));
     let capturedClone: HTMLElement | undefined;
-    exportMocks.toBlob.mockImplementation((clone: HTMLElement) => {
+    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
       capturedClone = clone;
       return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
     });
@@ -811,11 +816,13 @@ describe('InvocationFlowNode chrome and export', () => {
       execution.set(completed(outputImage(100, 100)));
       const adapter = createAdapter(execution.port, projectSnapshotFor(graph));
       let capturedClone: HTMLElement | undefined;
-      let exportedBlob: Blob | null | undefined;
-      exportMocks.toBlob.mockImplementation(async (clone: HTMLElement, options: unknown) => {
+      let exportedBlob: Blob | undefined;
+      exportMocks.rasterize.mockImplementation(async (clone: HTMLElement, options: unknown) => {
         capturedClone = clone;
-        const { toBlob } = await vi.importActual<{ toBlob: typeof RasterizeBlob }>('html-to-image');
-        exportedBlob = await toBlob(clone, options as Parameters<typeof toBlob>[1]);
+        const { rasterizeWorkflowImage } = await vi.importActual<{
+          rasterizeWorkflowImage: typeof RasterizeWorkflowImage;
+        }>('./workflowImageRaster');
+        exportedBlob = await rasterizeWorkflowImage(clone, options as Parameters<typeof RasterizeWorkflowImage>[1]);
         return exportedBlob;
       });
       try {
@@ -852,12 +859,9 @@ describe('InvocationFlowNode chrome and export', () => {
           flowElement,
           workflowName: 'Authored source image',
         });
-        const outcome = exportPromise.then(
-          () => null,
-          (error: Error) => error
-        );
+
         await vi.waitFor(() => expect(decodeSpy).toHaveBeenCalledOnce());
-        expect(exportMocks.toBlob).not.toHaveBeenCalled();
+        expect(exportMocks.rasterize).not.toHaveBeenCalled();
         if (teardown) {
           await act(() => root.unmount());
           root = createRoot(host);
@@ -868,17 +872,16 @@ describe('InvocationFlowNode chrome and export', () => {
           expect(host.querySelector('.react-flow')?.isConnected).toBe(true);
         }
         releaseImage();
-        const error = await outcome;
+        const outcome = await exportPromise;
         decodeSpy.mockRestore();
         naturalWidthSpy.mockRestore();
         if (teardown) {
-          expect(error).toBeInstanceOf(Error);
-          expect(error?.message).toContain('canceled');
-          expect(exportMocks.toBlob).not.toHaveBeenCalled();
+          expect(outcome).toEqual({ status: 'canceled' });
+          expect(exportMocks.rasterize).not.toHaveBeenCalled();
           expect(downloadBlob).not.toHaveBeenCalled();
           return;
         }
-        expect(error).toBeNull();
+        expect(outcome).toMatchObject({ status: 'exported', reduced: false });
         expect(exportedBlob?.type).toBe('image/png');
         const bitmap = await createImageBitmap(exportedBlob!);
         const canvas = document.createElement('canvas');
@@ -921,7 +924,7 @@ describe('InvocationFlowNode chrome and export', () => {
     const execution = createExecutionPort();
     const adapter = createAdapter(execution.port);
     let capturedClone: HTMLElement | undefined;
-    exportMocks.toBlob.mockImplementation((clone: HTMLElement) => {
+    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
       capturedClone = clone;
       return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
     });
@@ -964,7 +967,7 @@ describe('InvocationFlowNode chrome and export', () => {
     const nodes = toFlowNodes({ ...projectGraph, nodes: [incompleteNode] }, [], { preview: requiredTemplate });
     const adapter = createAdapter(createExecutionPort().port);
     let capturedClone: HTMLElement | undefined;
-    exportMocks.toBlob.mockImplementation((clone: HTMLElement) => {
+    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
       capturedClone = clone;
       return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
     });
@@ -1007,13 +1010,14 @@ describe('InvocationFlowNode chrome and export', () => {
     const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(graph));
     queryClient.setQueryData(['generation', 'promptTemplates', 'list'], []);
     let capturedClone: HTMLElement | undefined;
-    exportMocks.toBlob.mockImplementation((clone: HTMLElement) => {
+    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
       capturedClone = clone;
       return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
     });
 
     await render(adapter, 1, false, nodes);
-    await vi.waitFor(() => expect(host.textContent).toContain(i18n.t('nodes.stylePresetMissing')));
+    // The record lookup settles asynchronously; the default one-second wait is too short on a loaded machine.
+    await vi.waitFor(() => expect(host.textContent).toContain(i18n.t('nodes.stylePresetMissing')), { timeout: 5_000 });
     await render(adapter, 1, true, nodes);
     await exportWorkflowAsPng({
       bounds: { x: 20, y: 20, width: 300, height: 260 },
@@ -1055,7 +1059,7 @@ describe('InvocationFlowNode chrome and export', () => {
     const nodes = toFlowNodes(graph, [], { preview: colorTemplate });
     const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(graph));
     let capturedClone: HTMLElement | undefined;
-    exportMocks.toBlob.mockImplementation((clone: HTMLElement) => {
+    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
       capturedClone = clone;
       return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
     });
@@ -1107,7 +1111,7 @@ describe('InvocationFlowNode chrome and export', () => {
     });
     const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(graph));
     let capturedClone: HTMLElement | undefined;
-    exportMocks.toBlob.mockImplementation((clone: HTMLElement) => {
+    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
       capturedClone = clone;
       return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
     });
@@ -1161,7 +1165,7 @@ describe('InvocationFlowNode chrome and export', () => {
     const nodes = toFlowNodes(graph, [], { preview: generatorTemplate });
     const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(graph));
     let capturedClone: HTMLElement | undefined;
-    exportMocks.toBlob.mockImplementation((clone: HTMLElement) => {
+    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
       capturedClone = clone;
       return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
     });
@@ -1263,7 +1267,7 @@ describe('InvocationFlowNode chrome and export', () => {
     const savedImageUrl = 'data:image/png;base64,c2F2ZWQ=';
     let capturedClone: HTMLElement | undefined;
     exportMocks.progressImage = { dataUrl: liveImageUrl, height: 2, width: 2 };
-    exportMocks.toBlob.mockImplementation((clone: HTMLElement) => {
+    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
       capturedClone = clone;
       return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
     });
@@ -1311,7 +1315,7 @@ describe('InvocationFlowNode chrome and export', () => {
     });
     const adapter = createAdapter(execution.port);
     let capturedClone: HTMLElement | undefined;
-    exportMocks.toBlob.mockImplementation((clone: HTMLElement) => {
+    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
       capturedClone = clone;
       return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
     });
@@ -1343,7 +1347,7 @@ describe('InvocationFlowNode chrome and export', () => {
     const nodes = toFlowNodes(graph, [], { preview: template });
     const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(graph));
     let capturedClone: HTMLElement | undefined;
-    exportMocks.toBlob.mockImplementation((clone: HTMLElement) => {
+    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
       capturedClone = clone;
       return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
     });
@@ -1460,7 +1464,7 @@ describe('InvocationFlowNode chrome and export', () => {
     expect(beforeHeight).toBeGreaterThan(0);
     let finish: (blob: Blob) => void = () => {};
     let capturedClone: HTMLElement | undefined;
-    exportMocks.toBlob.mockImplementation((clone: HTMLElement) => {
+    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
       capturedClone = clone;
       return new Promise<Blob>((resolve) => {
         finish = resolve;
@@ -1504,7 +1508,7 @@ describe('InvocationFlowNode chrome and export', () => {
     expect(host.textContent).not.toContain('previous result');
     await act(() => execution.set({ ...completed, status }));
     let capturedClone: HTMLElement | undefined;
-    exportMocks.toBlob.mockImplementation((clone: HTMLElement) => {
+    exportMocks.rasterize.mockImplementation((clone: HTMLElement) => {
       capturedClone = clone;
       return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
     });
@@ -1521,15 +1525,16 @@ describe('InvocationFlowNode chrome and export', () => {
 
   it('blocks a third capture after two timeouts and recovers when one rasterization settles', async () => {
     vi.useFakeTimers();
-    exportMocks.toBlob.mockClear();
-    const finishRasterizations: Array<(blob: Blob | null) => void> = [];
+    exportMocks.rasterize.mockClear();
+    const finishRasterizations: Array<(blob: Blob) => void> = [];
+    const lateBlob = new Blob(['late'], { type: 'image/png' });
     let signalBothStarted: () => void = () => {};
     const bothStarted = new Promise<void>((resolve) => {
       signalBothStarted = resolve;
     });
-    exportMocks.toBlob.mockImplementation(
+    exportMocks.rasterize.mockImplementation(
       () =>
-        new Promise<Blob | null>((resolve) => {
+        new Promise<Blob>((resolve) => {
           finishRasterizations.push(resolve);
           if (finishRasterizations.length === 2) {
             signalBothStarted();
@@ -1554,23 +1559,23 @@ describe('InvocationFlowNode chrome and export', () => {
       const secondTimedOut = expect(secondExport).rejects.toThrow('timed out');
 
       await bothStarted;
-      expect(exportMocks.toBlob).toHaveBeenCalledTimes(2);
+      expect(exportMocks.rasterize).toHaveBeenCalledTimes(2);
       await vi.advanceTimersByTimeAsync(WORKFLOW_EXPORT_TIMEOUT_MS);
       await Promise.all([firstTimedOut, secondTimedOut]);
 
-      await expect(exportWorkflowAsPng(exportOptions)).rejects.toThrow('still running');
-      expect(exportMocks.toBlob).toHaveBeenCalledTimes(2);
+      await expect(exportWorkflowAsPng(exportOptions)).resolves.toEqual({ status: 'busy' });
+      expect(exportMocks.rasterize).toHaveBeenCalledTimes(2);
 
-      finishRasterizations[0]!(null);
+      finishRasterizations[0]!(lateBlob);
       await vi.advanceTimersByTimeAsync(0);
-      exportMocks.toBlob.mockResolvedValueOnce(new Blob(['png'], { type: 'image/png' }));
+      exportMocks.rasterize.mockResolvedValueOnce(new Blob(['png'], { type: 'image/png' }));
       await exportWorkflowAsPng(exportOptions);
-      expect(exportMocks.toBlob).toHaveBeenCalledTimes(3);
+      expect(exportMocks.rasterize).toHaveBeenCalledTimes(3);
 
-      finishRasterizations[1]!(null);
+      finishRasterizations[1]!(lateBlob);
       await vi.advanceTimersByTimeAsync(0);
     } finally {
-      finishRasterizations.forEach((finish) => finish(null));
+      finishRasterizations.forEach((finish) => finish(lateBlob));
       await vi.advanceTimersByTimeAsync(0);
       vi.useRealTimers();
     }
@@ -2163,7 +2168,7 @@ describe('InvocationFlowNode batch nodes', () => {
     expect(host.querySelector<HTMLElement>('.react-flow__handle[data-handleid="floats"]')?.style.transform).toContain(
       'rotate(45deg)'
     );
-    expect(host.textContent).not.toContain('Use Cache');
+    expect(host.textContent).not.toContain(i18n.t('nodes.useCache'));
 
     await render('None');
     expect(header().textContent).toContain('(no group)');

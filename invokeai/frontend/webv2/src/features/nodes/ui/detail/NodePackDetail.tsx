@@ -3,22 +3,28 @@ import type { NodePackInfo } from '@features/nodes/core/catalog';
 
 import { Badge, Box, Flex, HStack, Icon, Spinner, Stack, Text } from '@chakra-ui/react';
 import { isProblemPack } from '@features/nodes/core/library';
-import { UninstallPackDialog } from '@features/nodes/ui/shared/UninstallPackDialog';
 import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSelector } from '@features/workflow/react';
 import { Button } from '@platform/ui';
 import { EmptyState } from '@platform/ui/EmptyState';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { BlocksIcon, TriangleAlertIcon, Trash2Icon } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { NodePreviewCard } from './NodePreviewCard';
 
 /**
  * Build previews from backend invocation templates; nodeTypes are invocation keys and nodePack identifies their
- * owning pack.
+ * owning pack. The host owns the uninstall confirmation because an uninstall unmounts this detail before the dialog
+ * finishes closing.
  */
-export const NodePackDetail = ({ onUninstalled, pack }: { onUninstalled: () => void; pack: NodePackInfo }) => {
+export const NodePackDetail = ({
+  onRequestUninstall,
+  pack,
+}: {
+  onRequestUninstall: (pack: NodePackInfo) => void;
+  pack: NodePackInfo;
+}) => {
   const { t } = useTranslation();
   const status = useInvocationTemplatesSelector((snapshot) => snapshot.status);
   const templates = useInvocationTemplatesSelector((snapshot) => snapshot.templates);
@@ -40,38 +46,41 @@ export const NodePackDetail = ({ onUninstalled, pack }: { onUninstalled: () => v
         <Stack flex="1" gap="1.5" minW="0">
           <HStack gap="2" minW="0">
             <Icon as={BlocksIcon} boxSize="4" color="fg.muted" flexShrink={0} />
-            <MiddleTruncate fontSize="sm" fontWeight="700" minW="0" text={pack.name} />
+            <MiddleTruncate fontSize="lg" fontWeight="700" minW="0" text={pack.name} />
           </HStack>
-          <Text color="fg.muted" fontFamily="mono" fontSize="2xs" overflowWrap="anywhere">
+          <Text color="fg.muted" fontFamily="mono" fontSize="xs" overflowWrap="anywhere">
             {pack.path}
           </Text>
           <HStack gap="1.5" wrap="wrap">
             {isProblemPack(pack) ? (
-              <Badge colorPalette="orange" fontSize="2xs" variant="surface">
+              <Badge colorPalette="orange" fontSize="xs" variant="surface">
                 {t('nodes.noNodesRegistered')}
               </Badge>
             ) : (
-              <Badge colorPalette="blue" fontSize="2xs" variant="surface">
+              <Badge colorPalette="blue" fontSize="xs" variant="surface">
                 {t('nodes.nodeCount', { count: pack.nodeCount })}
               </Badge>
             )}
           </HStack>
           {isProblemPack(pack) ? (
-            <Text color="fg.muted" fontSize="2xs">
+            <Text color="fg.muted" fontSize="xs">
               {t('nodes.noNodesRegisteredHint')}
             </Text>
           ) : null}
         </Stack>
-        <UninstallButton onUninstalled={onUninstalled} pack={pack} />
+        <Button colorPalette="red" flexShrink={0} variant="outline" onClick={() => onRequestUninstall(pack)}>
+          <Icon as={Trash2Icon} boxSize="3" />
+          {t('nodes.uninstall')}
+        </Button>
       </HStack>
 
       <Stack gap="2">
-        <Text color="fg.muted" fontSize="2xs" fontWeight="600" textTransform="uppercase">
+        <Text color="fg.muted" fontSize="xs" fontWeight="600" textTransform="uppercase">
           {t('nodes.nodesInPack')}
         </Text>
         {isLoadingTemplates ? (
           <Flex align="center" justify="center" py="10">
-            <Spinner color="fg.subtle" size="sm" />
+            <Spinner color="fg.subtle" size="lg" />
           </Flex>
         ) : packTemplates.length === 0 ? (
           <EmptyState
@@ -82,7 +91,7 @@ export const NodePackDetail = ({ onUninstalled, pack }: { onUninstalled: () => v
         ) : (
           <Flex gap="8" wrap="wrap" px="2">
             {packTemplates.map((template) => (
-              <Box key={template.type} flexShrink={0} w="18rem">
+              <Box key={template.type} flexShrink={0} maxW="full" w="18rem">
                 <NodePreviewCard template={template} />
               </Box>
             ))}
@@ -90,24 +99,5 @@ export const NodePackDetail = ({ onUninstalled, pack }: { onUninstalled: () => v
         )}
       </Stack>
     </Stack>
-  );
-};
-
-const UninstallButton = ({ onUninstalled, pack }: { onUninstalled: () => void; pack: NodePackInfo }) => {
-  const { t } = useTranslation();
-  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-
-  return (
-    <>
-      <Button colorPalette="red" flexShrink={0} size="xs" variant="outline" onClick={() => setIsConfirmOpen(true)}>
-        <Icon as={Trash2Icon} boxSize="3" />
-        {t('nodes.uninstall')}
-      </Button>
-      <UninstallPackDialog
-        pack={isConfirmOpen ? pack : null}
-        onClose={() => setIsConfirmOpen(false)}
-        onUninstalled={onUninstalled}
-      />
-    </>
   );
 };

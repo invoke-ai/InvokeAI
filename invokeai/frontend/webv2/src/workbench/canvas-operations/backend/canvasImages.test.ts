@@ -1,31 +1,32 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CanvasImageUploadError, uploadCanvasImage } from './canvasImages';
 
-/** A minimal `Response`-shaped fake for the injected fetch. */
-const jsonResponse = (body: unknown, init: { ok?: boolean; status?: number; statusText?: string } = {}): Response =>
-  ({
-    json: () => Promise.resolve(body),
-    ok: init.ok ?? true,
-    status: init.status ?? 200,
-    statusText: init.statusText ?? 'OK',
-    text: () => Promise.resolve(typeof body === 'string' ? body : JSON.stringify(body)),
-  }) as unknown as Response;
+const jsonResponse = (body: unknown, status = 200): Response =>
+  new Response(typeof body === 'string' ? body : JSON.stringify(body), { status });
+
+const stubFetch = (implementation: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>) => {
+  const fetchMock = vi.fn(implementation);
+
+  vi.stubGlobal('fetch', fetchMock);
+
+  return fetchMock;
+};
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('uploadCanvasImage', () => {
   it('forwards an abort signal to fetch', async () => {
     const controller = new AbortController();
-    const fetchMock = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
+    const fetchMock = stubFetch(() =>
       Promise.resolve(jsonResponse({ height: 1, image_name: 'uploaded.png', width: 1 }))
     );
-    const fetchImpl = fetchMock as unknown as typeof fetch;
 
-    await uploadCanvasImage(new Blob(['pixels'], { type: 'image/png' }), {
-      fetch: fetchImpl,
-      signal: controller.signal,
-    });
+    await uploadCanvasImage(new Blob(['pixels'], { type: 'image/png' }), { signal: controller.signal });
 
-    const signal = (fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.signal;
+    const signal = fetchMock.mock.calls[0]?.[1]?.signal;
 
     expect(signal).toBeInstanceOf(AbortSignal);
     expect(signal?.aborted).toBe(false);
@@ -34,17 +35,17 @@ describe('uploadCanvasImage', () => {
   });
 
   it('POSTs a multipart file to the upload endpoint with the persistence params', async () => {
-    const fetchImpl = vi.fn(() =>
-      Promise.resolve(jsonResponse({ height: 64, image_name: 'paint-1.png', width: 128 }, { status: 201 }))
+    const fetchMock = stubFetch(() =>
+      Promise.resolve(jsonResponse({ height: 64, image_name: 'paint-1.png', width: 128 }, 201))
     );
     const blob = new Blob(['png-bytes'], { type: 'image/png' });
 
-    const result = await uploadCanvasImage(blob, { fetch: fetchImpl });
+    const result = await uploadCanvasImage(blob);
 
     expect(result).toEqual({ height: 64, imageName: 'paint-1.png', width: 128 });
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
 
-    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toContain('/api/v1/images/upload');
     expect(url).toContain('image_category=other');
     expect(url).toContain('is_intermediate=false');
@@ -56,20 +57,17 @@ describe('uploadCanvasImage', () => {
   });
 
   it('honors overrides for category, intermediate flag, board, metadata, and resize dimensions', async () => {
-    const fetchImpl = vi.fn(() =>
-      Promise.resolve(jsonResponse({ height: 1, image_name: 'x', width: 1 }, { status: 201 }))
-    );
+    const fetchMock = stubFetch(() => Promise.resolve(jsonResponse({ height: 1, image_name: 'x', width: 1 }, 201)));
 
     await uploadCanvasImage(new Blob([''], { type: 'image/png' }), {
       boardId: 'board-9',
-      fetch: fetchImpl,
       imageCategory: 'user',
       isIntermediate: true,
       metadata: { seed: 42 },
       resizeTo: { width: 1024, height: 768 },
     });
 
-    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toContain('image_category=user');
     expect(url).toContain('is_intermediate=true');
     expect(url).toContain('board_id=board-9');
@@ -79,22 +77,18 @@ describe('uploadCanvasImage', () => {
   });
 
   it('throws a typed error with the status on a non-ok response', async () => {
-    const fetchImpl = vi.fn(() =>
-      Promise.resolve(jsonResponse('Not an image', { ok: false, status: 415, statusText: 'Unsupported Media Type' }))
-    );
+    stubFetch(() => Promise.resolve(jsonResponse('Not an image', 415)));
 
-    await expect(uploadCanvasImage(new Blob([''], { type: 'image/png' }), { fetch: fetchImpl })).rejects.toMatchObject({
+    await expect(uploadCanvasImage(new Blob([''], { type: 'image/png' }))).rejects.toMatchObject({
       name: 'CanvasImageUploadError',
       status: 415,
     });
   });
 
   it('wraps a network failure in a CanvasImageUploadError', async () => {
-    const fetchImpl = vi.fn(() => Promise.reject(new Error('network down')));
+    stubFetch(() => Promise.reject(new Error('network down')));
 
-    const error = await uploadCanvasImage(new Blob([''], { type: 'image/png' }), { fetch: fetchImpl }).catch(
-      (caught: unknown) => caught
-    );
+    const error = await uploadCanvasImage(new Blob([''], { type: 'image/png' })).catch((caught: unknown) => caught);
 
     expect(error).toBeInstanceOf(CanvasImageUploadError);
     expect((error as CanvasImageUploadError).status).toBeNull();

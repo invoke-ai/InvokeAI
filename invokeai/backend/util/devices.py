@@ -383,8 +383,14 @@ class TorchDevice:
         return device
 
     @classmethod
-    def empty_cache(cls) -> bool:
+    def empty_cache(cls, force: bool = False) -> bool:
         """Clear the GPU device cache — unless another generation device is mid-session. Says whether it ran.
+
+        `force` runs it regardless, for callers whose alternative is worse than stalling a busy peer for the rest of
+        its current step: a model about to run without the driver-free working memory it needs, which on Windows
+        hangs instead of failing (see `ModelCache._release_allocator_blocks_for_reserve`), and the opt-in
+        `clear_vram_after_session` release, whose next session would otherwise budget its first load against memory
+        the allocator still holds.
 
         ``torch.cuda.empty_cache()`` is process-global: it takes EVERY device's
         caching-allocator mutex and cudaFree/hipFrees their cached blocks, and a free on a
@@ -411,7 +417,7 @@ class TorchDevice:
         quiet moment. Without that, VRAM freed on one GPU stayed resident until the peer's
         whole render finished and something else happened to call empty_cache.
         """
-        if cls._another_generation_device_busy():
+        if not force and cls._another_generation_device_busy():
             cls._empty_cache_deferred.set()
             InvokeAILogger.get_logger(cls.__name__).debug(
                 "Deferring empty_cache: another generation device is mid-session."
@@ -423,7 +429,9 @@ class TorchDevice:
         if torch.backends.mps.is_available():
             torch.mps.empty_cache()
         if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+            # A forced call must get past `install_peer_aware_empty_cache`'s wrapper, which would defer it again.
+            cuda_empty_cache = torch.cuda.empty_cache
+            (getattr(cuda_empty_cache, "__wrapped__", cuda_empty_cache) if force else cuda_empty_cache)()
         if _xpu_is_available():
             torch.xpu.empty_cache()
         return True

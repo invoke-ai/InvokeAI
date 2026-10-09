@@ -46,13 +46,35 @@ const harness = vi.hoisted(() => ({
 }));
 
 vi.mock('@platform/browser/downloadBlob', () => ({ downloadText: harness.downloadText }));
+// Exposes whether the host keeps the dialog mounted (the real one needs that to animate out); like the real dialog,
+// it closes after confirming even when the confirmation fails.
 vi.mock('@platform/ui/ConfirmDialog', () => ({
-  ConfirmDialog: ({ isOpen, onConfirm }: { isOpen: boolean; onConfirm(): Promise<void> | void }) =>
-    isOpen ? (
-      <button data-testid="confirm-resolution" onClick={() => void onConfirm()}>
-        confirm
-      </button>
-    ) : null,
+  ConfirmDialog: ({
+    isOpen,
+    onClose,
+    onConfirm,
+  }: {
+    isOpen: boolean;
+    onClose(): void;
+    onConfirm(): Promise<void> | void;
+  }) => (
+    <div data-open={String(isOpen)} data-testid="resolution-dialog">
+      {isOpen ? (
+        <button
+          data-testid="confirm-resolution"
+          onClick={async () => {
+            try {
+              await onConfirm();
+            } finally {
+              onClose();
+            }
+          }}
+        >
+          confirm
+        </button>
+      ) : null}
+    </div>
+  ),
 }));
 vi.mock('@workbench/projects/syncStore', () => ({
   useProjectSyncSelector: (selector: (snapshot: unknown) => unknown) =>
@@ -194,6 +216,24 @@ describe('ProjectConflictBanner', () => {
     expect(harness.replaceProjectFromServer.mock.invocationCallOrder[0]).toBeLessThan(
       harness.acknowledgeProjectResolution.mock.invocationCallOrder[0]!
     );
+  });
+
+  it('keeps the confirmation mounted to animate out after resolving clears the banner', async () => {
+    harness.conflict = { detectedAt: '2026-09-03T12:00:00.000Z', kind: 'revision', serverRevision: 2 };
+    harness.replaceProjectFromServer.mockImplementationOnce(() => {
+      harness.conflict = undefined;
+    });
+    await renderBanner();
+    const useServer = Array.from(document.querySelectorAll('button')).find(
+      (button) => button.textContent === 'shell.projectConflict.useServer'
+    );
+
+    await act(() => userEvent.click(useServer!));
+    await act(() => userEvent.click(document.querySelector<HTMLButtonElement>('[data-testid="confirm-resolution"]')!));
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-testid="resolution-dialog"]')).toHaveAttribute('data-open', 'false')
+    );
+    expect(document.body.textContent).not.toContain('shell.projectConflict.revisionTitle');
   });
 
   it('keeps the fence when use-server resolution fails', async () => {

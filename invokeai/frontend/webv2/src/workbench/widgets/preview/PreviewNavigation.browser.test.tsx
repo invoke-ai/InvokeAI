@@ -1,20 +1,31 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type { GalleryImage, GalleryImageItem, GalleryItemsPage, GalleryVideoItem } from '@features/gallery';
 import type { InvocationProgressEvent, QueueItem, QueueItemStatusChangedEvent } from '@features/queue/contracts';
-import type { WidgetViewProps } from '@workbench/widgetContracts';
+import type { ExtensionRegistry } from '@workbench/extensions/extensionRegistry';
+import type * as DeletionConfirmationModule from '@workbench/image-actions/useDeletionConfirmation';
+import type * as projectsApi from '@workbench/projects/api';
+import type { WidgetContributionSource, WidgetViewProps } from '@workbench/widgetContracts';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext, useSensor, useSensors, type DndContextProps } from '@dnd-kit/core';
 import { requestGalleryItemReveal } from '@features/gallery/contracts';
 import { createQueueCoordinator, type QueueCoordinatorBackendPort } from '@features/queue/runtime/coordinator';
+import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
 import { QueryClient, QueryClientProvider, type InfiniteData } from '@tanstack/react-query';
 import { system } from '@theme/system';
+import { createExtensionRegistry } from '@workbench/extensions/extensionRegistry';
+import { useFocusRegionProps } from '@workbench/focusRegions';
+import { WorkbenchHotkeyRuntime } from '@workbench/hotkeys/WorkbenchHotkeyRuntime';
+import { DEFAULT_PREFERENCES, patchWorkbenchPreferences } from '@workbench/settings/store';
 import { HoldToDragSensor, PrimaryMouseSensor } from '@workbench/shell/holdToDragSensor';
+import { WorkbenchFocusProvider } from '@workbench/WorkbenchRuntime';
 import i18next from 'i18next';
 import { act, useCallback } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import { LivePreviewFollowProvider, useLivePreviewFollow } from './livePreviewFollow';
 
@@ -95,8 +106,11 @@ const mocks = vi.hoisted(() => {
       notifications: { reportError: vi.fn() },
       widgets: { patchValues: vi.fn() },
     },
+    extensions: null as unknown as ExtensionRegistry,
     project: {
       id: 'project-1',
+      // Preview is the center region's active widget, as the shell places it.
+      widgetRegions: { center: { activeInstanceId: 'preview-instance', instanceIds: ['preview-instance'] } },
       queue: { items: [] as unknown[] },
       settings: { antialiasProgressImages: false, showProgressImagesInViewer: false },
       widgetInstances: {
@@ -111,6 +125,7 @@ const mocks = vi.hoisted(() => {
           typeId: 'gallery',
         },
         preview: { state: { values: {} }, typeId: 'preview' },
+        'preview-instance': { id: 'preview-instance', typeId: 'preview' },
       },
     },
     galleryItemFilters: [] as Array<{ boardId: string; starred?: boolean }>,
@@ -127,6 +142,7 @@ const mocks = vi.hoisted(() => {
         selectedItemKey: string | null;
       };
       onImagesDeleted?: (imageNames: string[]) => void;
+      requestDeletionConfirmation?: DeletionConfirmationModule.RequestDeletionConfirmation;
     },
     recentImages,
     bridgeProgressImage: null as unknown,
@@ -140,9 +156,14 @@ const mocks = vi.hoisted(() => {
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectId: () => 'project-1',
   useActiveProjectSelector: (selector: (project: typeof mocks.project) => unknown) => selector(mocks.project),
+  useOptionalWorkbenchExtensions: () => mocks.extensions,
   useWidgetValuesSelector: () => ({}),
   useWorkbenchCommands: () => mocks.commands,
+  useWorkbenchExtensions: () => mocks.extensions,
+  // Imported beside the focus provider; only the workbench runtime component, not rendered here, reads it.
+  useWorkbenchInternalStore: () => null,
   useWorkbenchQueries: () => ({ getSnapshot: () => ({ activeProject: mocks.project }) }),
+  useWorkbenchSubscription: () => () => () => {},
   useWorkbenchSelector: (selector: (snapshot: unknown) => unknown) =>
     selector({ backendConnection: { status: 'connected' } }),
 }));
@@ -176,6 +197,14 @@ vi.mock('@features/queue/react', async (importOriginal) => ({
     return latest?.target?.queueItemId === queueItemId && latest.target.itemIndex === itemIndex ? latest : null;
   },
 }));
+
+// Hotkey preferences save as Settings saves them; the backend round trip is not under test.
+vi.mock('@workbench/projects/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof projectsApi>()),
+  setClientStateValue: async () => {},
+}));
+// They need the whole application; Preview registers its own commands.
+vi.mock('@workbench/hotkeys/firstPartyCommands', () => ({ useRegisterFirstPartyCommands: () => {} }));
 
 vi.mock('@features/gallery/queries', () => ({
   GALLERY_MAX_ROWS: 600,
@@ -236,7 +265,7 @@ vi.mock('@features/gallery/contracts', async (importOriginal) => ({
   requestGalleryItemReveal: vi.fn(),
 }));
 
-vi.mock('@workbench/image-actions', () => ({
+vi.mock('@workbench/image-actions', async () => ({
   EMPTY_IMAGE_RECALL_CAPABILITIES: {},
   ImageContextMenu: () => null,
   RecallActionButtons: () => null,
@@ -252,10 +281,9 @@ vi.mock('@workbench/image-actions', () => ({
   getImageRecallTitle: () => '',
   getSelectedGalleryImage: () => null,
   getSelectedGalleryImageFromValues: () => null,
-  useDeletionConfirmation: () => ({
-    dialog: null,
-    requestDeletionConfirmation: (_itemRefs: unknown, executeDeletion: () => Promise<void>) => executeDeletion(),
-  }),
+  useDeletionConfirmation: (
+    await vi.importActual<typeof DeletionConfirmationModule>('@workbench/image-actions/useDeletionConfirmation')
+  ).useDeletionConfirmation,
   useImageActions: (options: typeof mocks.imageActionOptions) => {
     mocks.imageActionOptions = options;
     return {};
@@ -298,11 +326,22 @@ await i18n.use(initReactI18next).init({
 
 const registeredCommands = new Map<string, () => void>();
 const registeredHotkeys = new Map<string, readonly string[]>();
+const previewSource: WidgetContributionSource = {
+  instanceId: 'preview-instance',
+  projectId: 'project-1',
+  region: 'center',
+  typeId: 'preview',
+};
+// Recorded for assertions and registered with the workbench registry, whose hotkey runtime routes real key presses.
 const runtime = {
   commands: {
-    register: ({ handler, id }: { handler: () => void; id: string }) => {
+    register: (command: { handler: () => void; id: string; title: string }) => {
+      const { handler, id } = command;
+      const unregister = mocks.extensions.commands.register({ ...command, source: previewSource });
+
       registeredCommands.set(id, handler);
       return () => {
+        unregister();
         if (registeredCommands.get(id) === handler) {
           registeredCommands.delete(id);
         }
@@ -310,9 +349,18 @@ const runtime = {
     },
   },
   hotkeys: {
-    register: ({ defaultKeys, id }: { defaultKeys: readonly string[]; id: string }) => {
+    register: (hotkey: { commandId: string; defaultKeys: readonly string[]; id: string; title: string }) => {
+      const { defaultKeys, id } = hotkey;
+      const unregister = mocks.extensions.hotkeys.register({
+        ...hotkey,
+        defaultKeys: [...defaultKeys],
+        scope: 'widget',
+        source: previewSource,
+      });
+
       registeredHotkeys.set(id, defaultKeys);
       return () => {
+        unregister();
         if (registeredHotkeys.get(id) === defaultKeys) {
           registeredHotkeys.delete(id);
         }
@@ -349,18 +397,36 @@ const ShellDndContext = ({ children }: Pick<DndContextProps, 'children'>) => {
   return <DndContext sensors={sensors}>{children}</DndContext>;
 };
 
+/** The center region as the shell frames it: the focusable region container around the widget's own frame. */
+const CenterRegion = ({ children }: Pick<DndContextProps, 'children'>) => (
+  <section data-testid="center-region" {...useFocusRegionProps('center')} tabIndex={-1}>
+    <div
+      data-hotkey-widget-instance-id="preview-instance"
+      data-hotkey-widget-region="center"
+      data-hotkey-widget-type-id="preview"
+    >
+      {children}
+    </div>
+  </section>
+);
+
 const renderTree = async (client: QueryClient) => {
   await act(async () => {
     root?.render(
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
           <QueryClientProvider client={client}>
-            <ShellDndContext>
-              <LivePreviewFollowProvider>
-                <FollowProbe />
-                <PreviewWidgetView instance={instance} manifest={manifest} region="center" runtime={runtime} />
-              </LivePreviewFollowProvider>
-            </ShellDndContext>
+            <WorkbenchFocusProvider>
+              <WorkbenchHotkeyRuntime />
+              <ShellDndContext>
+                <LivePreviewFollowProvider>
+                  <FollowProbe />
+                  <CenterRegion>
+                    <PreviewWidgetView instance={instance} manifest={manifest} region="center" runtime={runtime} />
+                  </CenterRegion>
+                </LivePreviewFollowProvider>
+              </ShellDndContext>
+            </WorkbenchFocusProvider>
           </QueryClientProvider>
         </ChakraProvider>
       </I18nextProvider>
@@ -370,6 +436,12 @@ const renderTree = async (client: QueryClient) => {
 };
 
 const render = async () => {
+  // A fresh mount replaces the last one: two mounted hotkey runtimes would each handle every key.
+  await act(async () => {
+    root?.unmount();
+    await Promise.resolve();
+  });
+  host?.remove();
   host = document.createElement('div');
   host.style.cssText = 'height:320px;width:480px;';
   document.body.append(host);
@@ -513,14 +585,30 @@ const flickPreview = async (direction: -1 | 1) => {
   await step('pointerup', image.ownerDocument);
 };
 
-const pressArrow = async (key: 'ArrowLeft' | 'ArrowRight') => {
+/** A key press where keyboard focus rests, routed by the workbench hotkey runtime as in the app. */
+const pressKeyOn = async (target: HTMLElement, key: string): Promise<KeyboardEvent> => {
+  let pressed: KeyboardEvent | null = null;
+  const capture = (event: KeyboardEvent) => {
+    pressed = event;
+  };
+
+  target.addEventListener('keydown', capture, { once: true });
   await act(async () => {
-    getBoundary().dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key }));
-    await Promise.resolve();
+    target.focus();
+    await userEvent.keyboard(`{${key}}`);
   });
+
+  if (!pressed) {
+    throw new Error(`Expected ${key} to reach the focused element.`);
+  }
+
+  return pressed;
 };
 
+const pressArrow = (key: 'ArrowLeft' | 'ArrowRight') => pressKeyOn(getBoundary(), key);
+
 beforeEach(() => {
+  mocks.extensions = createExtensionRegistry();
   registeredCommands.clear();
   registeredHotkeys.clear();
   mocks.commands.account.updateProjectPreferences.mockClear();
@@ -697,25 +785,69 @@ describe('preview keyboard navigation boundary', () => {
     );
   });
 
-  it('handles one arrow press as exactly one selection and stops propagation', async () => {
-    const documentKeydown = vi.fn();
-    document.addEventListener('keydown', documentKeydown);
+  it('handles one arrow press as exactly one selection and claims the key', async () => {
+    await render();
+    const event = await pressArrow('ArrowRight');
+
+    expect(mocks.commands.gallery.selectItem).toHaveBeenCalledTimes(1);
+    expect(mocks.commands.gallery.selectItem).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'image', name: 'oldest' }),
+      undefined,
+      expect.any(Number),
+      true
+    );
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('steps with a key the user assigned, and not at all once the step is unbound', async () => {
+    // Preferences belong to an account.
+    accountLifecycle.activate('preview-navigation-user');
+    await patchWorkbenchPreferences({ customHotkeys: { 'viewer.nextItem': ['n'], 'viewer.previousItem': [] } });
 
     try {
       await render();
       await pressArrow('ArrowRight');
+      expect(mocks.commands.gallery.selectItem).not.toHaveBeenCalled();
 
-      expect(mocks.commands.gallery.selectItem).toHaveBeenCalledTimes(1);
-      expect(mocks.commands.gallery.selectItem).toHaveBeenCalledWith(
-        expect.objectContaining({ kind: 'image', name: 'oldest' }),
+      await pressKeyOn(getBoundary(), 'n');
+      expect(mocks.commands.gallery.selectItem).toHaveBeenLastCalledWith(
+        expect.objectContaining({ name: 'oldest' }),
         undefined,
         expect.any(Number),
         true
       );
-      expect(documentKeydown).not.toHaveBeenCalled();
+
+      await commitLastSelection();
+      await pressArrow('ArrowLeft');
+      expect(mocks.commands.gallery.selectItem).toHaveBeenCalledTimes(1);
     } finally {
-      document.removeEventListener('keydown', documentKeydown);
+      await patchWorkbenchPreferences(DEFAULT_PREFERENCES);
     }
+  });
+
+  it('steps with the arrows while focus rests on the region Preview was opened in', async () => {
+    await render();
+    // Opening Preview from the gallery (a running tile, a double-click, Enter) leaves focus on its region container.
+    const region = host!.querySelector<HTMLElement>('[data-testid="center-region"]')!;
+
+    await pressKeyOn(region, 'ArrowRight');
+    expect(document.activeElement).toBe(region);
+    expect(mocks.commands.gallery.selectItem).toHaveBeenLastCalledWith(
+      expect.objectContaining({ name: 'oldest' }),
+      undefined,
+      expect.any(Number),
+      true
+    );
+
+    await commitLastSelection();
+    await pressKeyOn(region, 'ArrowLeft');
+    expect(mocks.commands.gallery.selectItem).toHaveBeenLastCalledWith(
+      expect.objectContaining({ name: 'newest' }),
+      undefined,
+      expect.any(Number),
+      true
+    );
+    expect(mocks.commands.gallery.selectItem).toHaveBeenCalledTimes(2);
   });
 
   it('reveals each navigated item so the gallery grid can follow', async () => {
@@ -1609,6 +1741,60 @@ describe('preview keyboard navigation boundary', () => {
     );
   });
 
+  it('steps off the live session in the grid order, then from the selection through a batch handoff', async () => {
+    mocks.galleryStripItems = [
+      { ...createImageItem('starred-top', '2026-07-23T00:00:00.000Z'), starred: true },
+      { ...createImageItem('starred-next', '2026-07-22T00:00:00.000Z'), starred: true },
+    ];
+    // A batch of three: the first slot finished, the second runs, the third waits.
+    mocks.project.queue.items = [{ ...queueItem, backendItemIds: [1, 2, 3], completedBackendItemIds: [1] }];
+    mocks.project.settings.showProgressImagesInViewer = true;
+    mocks.runningProgressTargets = [{ itemIndex: 2, queueItemId: queueItem.id }];
+    await render();
+
+    // The filmstrip lays out what the gallery grid does: the starred strip, in progress, then the listing.
+    const filmstripOrder = () =>
+      [...host!.querySelectorAll<HTMLElement>('[data-preview-filmstrip] button')].map(
+        (button) => button.dataset.previewLiveThumb ?? button.getAttribute('aria-label')
+      );
+    await expect
+      .poll(filmstripOrder)
+      .toEqual(['starred-top', 'starred-next', 'queue-item-live:2', 'queue-item-live:3', 'newest', 'oldest']);
+
+    // Off the live slot, left reaches the last starred item and right the newest saved one, past the waiting slot.
+    await pressArrow('ArrowLeft');
+    expect(mocks.commands.gallery.selectItem).toHaveBeenLastCalledWith(
+      expect.objectContaining({ name: 'starred-next' }),
+      undefined,
+      expect.any(Number),
+      true
+    );
+    await pressArrow('ArrowRight');
+    expect(mocks.commands.gallery.selectItem).toHaveBeenLastCalledWith(
+      expect.objectContaining({ name: 'newest' }),
+      undefined,
+      expect.any(Number),
+      true
+    );
+
+    // Stepping away pauses live-follow, as any deliberate selection does in the workbench.
+    mocks.project.settings.showProgressImagesInViewer = false;
+    await commitLastSelection();
+    // The batch hands off between presses: the second slot finishes and the third starts.
+    mocks.project.queue.items = [{ ...queueItem, backendItemIds: [1, 2, 3], completedBackendItemIds: [1, 2] }];
+    mocks.runningProgressTargets = [{ itemIndex: 3, queueItemId: queueItem.id }];
+    await rerender();
+
+    await pressArrow('ArrowRight');
+    expect(mocks.commands.gallery.selectItem).toHaveBeenLastCalledWith(
+      expect.objectContaining({ name: 'oldest' }),
+      undefined,
+      expect.any(Number),
+      true
+    );
+    expect(mocks.commands.account.updateProjectPreferences).not.toHaveBeenCalled();
+  });
+
   it('renders the live frame with the standard media chrome: footer up, no badge, item border', async () => {
     mocks.project.queue.items = [queueItem];
     mocks.project.settings.showProgressImagesInViewer = true;
@@ -2086,18 +2272,11 @@ describe('preview keyboard navigation boundary', () => {
     (mocks.project.widgetInstances.gallery.state.values as Record<string, unknown>).compareImage = {
       ...mocks.project.widgetInstances.gallery.state.values.recentImages[1],
     };
-    const documentKeydown = vi.fn();
-    document.addEventListener('keydown', documentKeydown);
+    await render();
+    const event = await pressArrow('ArrowRight');
 
-    try {
-      await render();
-      await pressArrow('ArrowRight');
-
-      expect(mocks.commands.gallery.selectItem).not.toHaveBeenCalled();
-      expect(documentKeydown).toHaveBeenCalledTimes(1);
-    } finally {
-      document.removeEventListener('keydown', documentKeydown);
-    }
+    expect(mocks.commands.gallery.selectItem).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
   });
 
   it('renders and navigates same-name image and video items independently in server order', async () => {
@@ -2137,19 +2316,27 @@ describe('preview keyboard navigation boundary', () => {
     galleryValues.recentImages = [];
     galleryValues.selectedImage = videoItem;
     galleryValues.selectedImageName = 'video:native-controls';
-    mocks.galleryItemPages = [{ items: [videoItem], total: 1 }];
+    // A neighbour on each side, so an arrow the video lost to the workbench would select one.
+    mocks.galleryItemPages = [
+      {
+        items: [
+          createImageItem('newer-neighbor', '2026-07-30T13:00:00Z'),
+          videoItem,
+          createImageItem('older-neighbor', '2026-07-30T11:00:00Z'),
+        ],
+        total: 3,
+      },
+    ];
 
     await render();
 
     const video = host?.querySelector<HTMLVideoElement>('video');
     expect(video).not.toBeNull();
 
-    for (const key of ['ArrowLeft', 'ArrowRight', 'f', '1']) {
-      const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key });
-      await act(async () => {
-        video?.dispatchEvent(event);
-        await Promise.resolve();
-      });
+    // The video seeks with the arrows itself; Preview's own image-only keys are not registered for it at all.
+    for (const key of ['ArrowLeft', 'ArrowRight']) {
+      const event = await pressKeyOn(video!, key);
+
       expect(event.defaultPrevented).toBe(false);
     }
 
@@ -2241,5 +2428,41 @@ describe('preview keyboard navigation boundary', () => {
       [...host!.querySelectorAll('[data-swipe-neighbor="next"] img')].map((image) => image.getAttribute('src'))
     ).toContain('/images/oldest/full');
     expect(host?.querySelector('[data-swipe-neighbor="previous"] img')).toBeNull();
+  });
+});
+
+describe('preview deletion confirmation', () => {
+  it('stays open while a live session takes over the preview, then animates out on close', async () => {
+    await render();
+    await act(() => {
+      void mocks.imageActionOptions!.requestDeletionConfirmation!([{ kind: 'image', name: 'newest' }], () =>
+        Promise.resolve()
+      );
+    });
+    await expect.poll(() => document.querySelector('[role="alertdialog"]')?.getAttribute('data-state')).toBe('open');
+    const dialog = document.querySelector('[role="alertdialog"]')!;
+    const confirmation = dialog.textContent;
+
+    mocks.project.queue.items = [queueItem];
+    mocks.project.settings.showProgressImagesInViewer = true;
+    mocks.useActiveProgressTarget.mockReturnValue({ itemIndex: 1, queueItemId: 'queue-item-live' });
+    mocks.useProgressImage.mockReturnValue({
+      dataUrl: 'data:image/png;base64,',
+      height: 64,
+      target: { itemIndex: 1, queueItemId: 'queue-item-live' },
+      width: 64,
+    });
+    await rerender();
+    expect(host?.querySelector('img[src^="data:image/png"]')).not.toBeNull();
+    expect(dialog.isConnected).toBe(true);
+    expect(dialog).toHaveAttribute('data-state', 'open');
+
+    const frames = closingFrames(await recordDialogExit(dialog, () => act(() => userEvent.keyboard('{Escape}'))));
+
+    expect(frames).not.toHaveLength(0);
+    for (const frame of frames) {
+      expect(frame.text).toBe(confirmation);
+    }
+    await expect.poll(() => document.querySelector('[role="alertdialog"]')).toBeNull();
   });
 });

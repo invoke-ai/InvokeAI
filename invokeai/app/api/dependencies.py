@@ -18,6 +18,7 @@ from invokeai.app.services.events.events_fastapievents import FastAPIEventServic
 from invokeai.app.services.external_generation.external_generation_default import ExternalGenerationService
 from invokeai.app.services.external_generation.providers import (
     AlibabaCloudProvider,
+    AtlasCloudProvider,
     GeminiProvider,
     OpenAIProvider,
     SeedreamProvider,
@@ -25,6 +26,7 @@ from invokeai.app.services.external_generation.providers import (
 from invokeai.app.services.external_generation.startup import sync_configured_external_starter_models
 from invokeai.app.services.fonts.fonts_default import FontService
 from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
+from invokeai.app.services.gallery_maintenance.gallery_maintenance_default import GalleryMaintenanceService
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.image_index.image_index_default import ImageIndexService, warm_up_attention
 from invokeai.app.services.image_index.image_index_records_sqlite import ImageIndexRecordsSqlite
@@ -151,6 +153,7 @@ class ApiDependencies:
         videos = VideoService()
         board_video_records = SqliteBoardVideoRecordStorage(db=db)
         gallery = SqliteGalleryService(db=db)
+        gallery_maintenance = GalleryMaintenanceService()
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
         tensors = ObjectSerializerForwardCache(
             ObjectSerializerDisk[torch.Tensor](
@@ -182,6 +185,7 @@ class ApiDependencies:
         external_generation = ExternalGenerationService(
             providers={
                 AlibabaCloudProvider.provider_id: AlibabaCloudProvider(app_config=configuration, logger=logger),
+                AtlasCloudProvider.provider_id: AtlasCloudProvider(app_config=configuration, logger=logger),
                 GeminiProvider.provider_id: GeminiProvider(app_config=configuration, logger=logger),
                 OpenAIProvider.provider_id: OpenAIProvider(app_config=configuration, logger=logger),
                 SeedreamProvider.provider_id: SeedreamProvider(app_config=configuration, logger=logger),
@@ -225,6 +229,7 @@ class ApiDependencies:
             boards=boards,
             bulk_download=bulk_download,
             configuration=configuration,
+            database=db,
             events=events,
             image_files=image_files,
             image_moves=image_moves,
@@ -264,6 +269,7 @@ class ApiDependencies:
             image_index=image_index,
             fonts=fonts,
             intermediates=intermediates,
+            gallery_maintenance=gallery_maintenance,
         )
 
         # Constructing the Invoker starts every service, including the session
@@ -283,7 +289,6 @@ class ApiDependencies:
             model_manager=model_manager,
             logger=logger,
         )
-        db.clean()
 
     @staticmethod
     def shutdown() -> None:
