@@ -50,7 +50,7 @@ export const GalleryBoardSection = ({
           </Collapsible.Indicator>
           <Text
             as="span"
-            fontSize="2xs"
+            fontSize="xs"
             fontWeight="600"
             letterSpacing="wide"
             lineHeight="1"

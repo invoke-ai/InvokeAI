@@ -42,9 +42,13 @@ describe('tool presentation adapters', () => {
     }
   });
 
-  it('gives every tool a form with at least one group', () => {
+  it('keeps property groups for configurable tools and omits sections whose only content was gesture guidance', () => {
     for (const toolId of TOOL_IDS) {
-      expect(TOOL_PRESENTATION_ADAPTERS[toolId].groups.length, toolId).toBeGreaterThan(0);
+      if (toolId === 'view' || toolId === 'colorPicker' || toolId === 'sam') {
+        expect(TOOL_PRESENTATION_ADAPTERS[toolId].groups, toolId).toEqual([]);
+      } else {
+        expect(TOOL_PRESENTATION_ADAPTERS[toolId].groups.length, toolId).toBeGreaterThan(0);
+      }
     }
   });
 

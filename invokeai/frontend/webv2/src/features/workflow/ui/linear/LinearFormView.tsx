@@ -5,6 +5,7 @@ import { useWorkflowHostCommands } from '@features/workflow/ui/WorkflowUiContext
 import { getFormChildren } from '@features/workflow/utility';
 import { Button } from '@platform/ui';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { NodeFieldControl } from './NodeFieldControl';
 
@@ -22,13 +23,13 @@ const ViewElement = ({ element, projectGraph }: { element: WorkflowFormElement; 
       return <NodeFieldControl element={element} projectGraph={projectGraph} />;
     case 'heading':
       return (
-        <Text fontSize="sm" fontWeight="700">
+        <Text fontSize="lg" fontWeight="700">
           {element.data.content}
         </Text>
       );
     case 'text':
       return (
-        <Text color="fg.muted" fontSize="2xs" whiteSpace="pre-wrap">
+        <Text color="fg.muted" fontSize="xs" whiteSpace="pre-wrap">
           {element.data.content}
         </Text>
       );
@@ -38,6 +39,7 @@ const ViewElement = ({ element, projectGraph }: { element: WorkflowFormElement; 
 };
 
 export const LinearFormView = ({ projectGraph }: { projectGraph: ProjectGraphState }) => {
+  const { t } = useTranslation();
   const { widgets } = useWorkflowHostCommands();
   const rootChildren = getFormChildren(projectGraph.form);
   const onOpenWorkflowEditorClick = useCallback(
@@ -49,12 +51,11 @@ export const LinearFormView = ({ projectGraph }: { projectGraph: ProjectGraphSta
     return (
       // Same inset and color as the Edit tab's empty state and as this view once it has fields.
       <Stack gap="2" p="3">
-        <Text color="fg.muted" fontSize="2xs">
-          No fields are exposed yet. Pin fields in the Workflow editor, or switch to Edit mode to build this form — it
-          maps the project graph to simple controls, like the legacy Linear UI.
+        <Text color="fg.muted" fontSize="xs">
+          {t('widgets.workflow.formView.empty')}
         </Text>
-        <Button size="2xs" variant="outline" w="fit-content" onClick={onOpenWorkflowEditorClick}>
-          Open Workflow Editor
+        <Button size="sm" variant="outline" w="fit-content" onClick={onOpenWorkflowEditorClick}>
+          {t('widgets.workflow.formView.openEditor')}
         </Button>
       </Stack>
     );

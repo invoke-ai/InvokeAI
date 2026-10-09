@@ -1,6 +1,12 @@
 import { expect, it } from 'vitest';
 
-import { getUtf8ByteSize, type ProjectDraft, type ProjectDraftInput, type ProjectDraftStore } from './draftStore';
+import {
+  getUtf8ByteSize,
+  type ProjectDraft,
+  type ProjectDraftInput,
+  type ProjectDraftStore,
+  type ProjectUnloadJournalEntry,
+} from './draftStore';
 
 const DEFAULT_DOCUMENT = '{"id":"project-1","name":"Project"}';
 export const createCopyReservation = (copyProjectId: string) => ({
@@ -33,6 +39,29 @@ export const createProjectDraft = (overrides: Partial<ProjectDraft> = {}): Proje
     state: 'dirty',
     ...overrides,
   } as ProjectDraft;
+};
+
+export const createUnloadJournalEntry = (
+  overrides: Partial<ProjectUnloadJournalEntry> = {}
+): ProjectUnloadJournalEntry => {
+  const documentJson = overrides.documentJson ?? '{"id":"project-1","name":"Journaled"}';
+  return {
+    accountId: 'account-a',
+    baseMinimumCanvasSchemaVersion: 3,
+    baseRevision: 3,
+    documentByteSize: getUtf8ByteSize(documentJson),
+    documentJson,
+    documentSchemaVersion: 2,
+    editorSessionId: 'session-a',
+    generation: 2,
+    journaledAt: 500,
+    ownerEditorSessionId: 'session-a',
+    projectId: 'project-1',
+    recordType: 'unload-journal',
+    schemaVersion: 1,
+    writerToken: 'writer-a',
+    ...overrides,
+  };
 };
 
 export const testProjectDraftStoreContract = (createStore: () => Promise<ProjectDraftStore>): void => {
@@ -512,6 +541,331 @@ export const testProjectDraftStoreContract = (createStore: () => Promise<Project
         nextCursor: null,
       });
     }
+    store.close();
+  });
+
+  const journal = (store: ProjectDraftStore, ...entries: ProjectUnloadJournalEntry[]) =>
+    store.journalBeforeUnload({ entries, retired: [] });
+  const reconcile = (store: ProjectDraftStore) => store.reconcileUnloadJournal('account-a', 1_000);
+  const outcomesOf = async (store: ProjectDraftStore) => {
+    const result = await reconcile(store);
+    return result.kind === 'available' ? result.outcomes.map(({ outcome }) => outcome) : result.kind;
+  };
+
+  it('reconciles an unload journal into its lineage as the next staged generation, once', async () => {
+    const store = await createStore();
+    await store.stage(createProjectDraftInput());
+    expect(journal(store, createUnloadJournalEntry({ baseRevision: 1 }))).toMatchObject({ kind: 'started' });
+
+    await expect(reconcile(store)).resolves.toEqual({
+      kind: 'available',
+      outcomes: [
+        {
+          editorSessionId: 'session-a',
+          outcome: 'applied',
+          projectId: 'project-1',
+          replacedDraft: { documentJson: createProjectDraftInput().documentJson, generation: 1 },
+        },
+      ],
+    });
+    // The staged base revision is kept, as staging a newer generation keeps it.
+    await expect(store.get('project-1', 'session-a')).resolves.toEqual({
+      draft: createProjectDraft({
+        documentJson: createUnloadJournalEntry().documentJson,
+        generation: 2,
+        updatedAt: 500,
+      }),
+      kind: 'found',
+    });
+    await expect(reconcile(store)).resolves.toEqual({ kind: 'available', outcomes: [] });
+    // The lineage is consistent: the next load claims it and stages on top.
+    await expect(store.claimWriter('project-1', 'session-a', 'writer-a', 'writer-b')).resolves.toEqual({
+      kind: 'claimed',
+    });
+    await expect(store.stage(createProjectDraftInput({ generation: 3, writerToken: 'writer-b' }))).resolves.toEqual({
+      kind: 'stored',
+    });
+    store.close();
+  });
+
+  it('finds an entry it already applied superseded, leaving the draft as it was', async () => {
+    const store = await createStore();
+    journal(store, createUnloadJournalEntry());
+    await reconcile(store);
+    journal(store, createUnloadJournalEntry());
+
+    await expect(outcomesOf(store)).resolves.toEqual(['superseded']);
+    await expect(store.get('project-1', 'session-a')).resolves.toMatchObject({
+      draft: { documentJson: createUnloadJournalEntry().documentJson, generation: 2 },
+      kind: 'found',
+    });
+    store.close();
+  });
+
+  it("keeps one entry per lineage and writer: a write replaces the writer's lower generations", async () => {
+    const store = await createStore();
+    journal(store, createUnloadJournalEntry({ baseRevision: null, generation: 2 }));
+    journal(
+      store,
+      createUnloadJournalEntry({
+        baseRevision: null,
+        documentJson: '{"id":"project-1","name":"Later"}',
+        generation: 3,
+      }),
+      createUnloadJournalEntry({ writerToken: 'writer-other' })
+    );
+
+    await expect(outcomesOf(store)).resolves.toEqual(['applied', 'fenced']);
+    await expect(store.get('project-1', 'session-a')).resolves.toMatchObject({
+      draft: { baseRevision: null, documentJson: '{"id":"project-1","name":"Later"}', generation: 3, state: 'dirty' },
+      kind: 'found',
+    });
+    store.close();
+  });
+
+  it("retires a writer's entries for a lineage in the same blind write", async () => {
+    const store = await createStore();
+    journal(store, createUnloadJournalEntry({ generation: 2 }), createUnloadJournalEntry({ projectId: 'project-2' }));
+    store.journalBeforeUnload({ entries: [], retired: [['project-1', 'session-a', 'writer-a', 2]] });
+
+    await expect(reconcile(store)).resolves.toMatchObject({ outcomes: [{ projectId: 'project-2' }] });
+    store.close();
+  });
+
+  it('discards a journal that staging already superseded', async () => {
+    const store = await createStore();
+    await store.stage(createProjectDraftInput());
+    journal(store, createUnloadJournalEntry({ generation: 2 }));
+    await store.stage(createProjectDraftInput({ documentJson: '{"newer":true}', generation: 3 }));
+
+    await expect(outcomesOf(store)).resolves.toEqual(['superseded']);
+    await expect(store.get('project-1', 'session-a')).resolves.toMatchObject({
+      draft: { documentJson: '{"newer":true}', generation: 3 },
+      kind: 'found',
+    });
+    store.close();
+  });
+
+  it('settles the journal with an acknowledgement, even when no draft is left to say so', async () => {
+    const store = await createStore();
+    await store.stage(createProjectDraftInput({ generation: 2 }));
+    journal(store, createUnloadJournalEntry({ generation: 2 }));
+    await expect(store.settleAcknowledgement('project-1', 'session-a', 'writer-a', 2, 4)).resolves.toEqual({
+      kind: 'deleted',
+    });
+    // Another tab reconciling after the acknowledgement must not bring the acknowledged document back.
+    await expect(outcomesOf(store)).resolves.toEqual(['settled']);
+    await expect(store.get('project-1', 'session-a')).resolves.toMatchObject({ kind: 'empty' });
+
+    // With nothing staged at all, an acknowledgement still settles what it covers.
+    journal(store, createUnloadJournalEntry({ generation: 3 }));
+    await expect(store.settleAcknowledgement('project-1', 'session-a', 'writer-a', 3, 5)).resolves.toEqual({
+      kind: 'missing',
+    });
+    await expect(outcomesOf(store)).resolves.toEqual(['settled']);
+    store.close();
+  });
+
+  it('keeps a journal newer than the acknowledged generation', async () => {
+    const store = await createStore();
+    await store.stage(createProjectDraftInput());
+    journal(store, createUnloadJournalEntry({ generation: 3 }));
+    await store.settleAcknowledgement('project-1', 'session-a', 'writer-a', 1, 4);
+
+    await expect(outcomesOf(store)).resolves.toEqual(['applied']);
+    await expect(store.get('project-1', 'session-a')).resolves.toMatchObject({
+      draft: { baseRevision: 3, generation: 3 },
+      kind: 'found',
+    });
+    store.close();
+  });
+
+  it('settles a journal in the claim, so an entry whose deletion failed stays settled', async () => {
+    const store = await createStore();
+    const entry = createUnloadJournalEntry({ baseRevision: null });
+    journal(store, entry);
+    // The lineage was never staged: settling claims it for the writer.
+    await expect(store.settleUnloadJournal('project-1', 'session-a', 'writer-a', 2)).resolves.toEqual({
+      kind: 'settled',
+    });
+    await expect(reconcile(store)).resolves.toEqual({ kind: 'available', outcomes: [] });
+    journal(store, entry);
+    await expect(outcomesOf(store)).resolves.toEqual(['settled']);
+    await expect(store.get('project-1', 'session-a')).resolves.toMatchObject({ kind: 'empty' });
+
+    // Deleting a draft settles through the generation it is given, in the same transaction.
+    await store.stage(createProjectDraftInput({ generation: 3 }));
+    journal(store, createUnloadJournalEntry({ generation: 4 }));
+    await store.delete('project-1', 'session-a', 'writer-a', 4);
+    journal(store, createUnloadJournalEntry({ generation: 4 }));
+    await expect(outcomesOf(store)).resolves.toEqual(['settled']);
+    // A later generation of the same writer is not affected.
+    journal(store, createUnloadJournalEntry({ generation: 5 }));
+    await expect(outcomesOf(store)).resolves.toEqual(['applied']);
+    store.close();
+  });
+
+  it("ignores an earlier writer's settlement once the lineage changed hands", async () => {
+    const store = await createStore();
+    await store.stage(createProjectDraftInput());
+    await store.settleUnloadJournal('project-1', 'session-a', 'writer-a', 9);
+    await store.claimWriter('project-1', 'session-a', 'writer-a', 'writer-b');
+    journal(store, createUnloadJournalEntry({ generation: 2, writerToken: 'writer-b' }));
+
+    await expect(outcomesOf(store)).resolves.toEqual(['applied']);
+    await expect(store.settleUnloadJournal('project-1', 'session-a', 'writer-a', 9)).resolves.toEqual({
+      kind: 'fenced',
+    });
+    store.close();
+  });
+
+  it('never applies a journal to a lineage another editor adopted', async () => {
+    const store = await createStore();
+    await store.stage(createProjectDraftInput());
+    journal(store, createUnloadJournalEntry({ documentJson: '{"stale":true}' }));
+    await store.adopt('project-1', 'session-a', 'session-b', 'writer-b');
+    await store.stage(
+      createProjectDraftInput({
+        documentJson: '{"adopter":true}',
+        editorSessionId: 'session-b',
+        generation: 2,
+        writerToken: 'writer-b',
+      })
+    );
+
+    await expect(outcomesOf(store)).resolves.toEqual(['fenced']);
+    await expect(store.get('project-1', 'session-b')).resolves.toMatchObject({
+      draft: { documentJson: '{"adopter":true}', generation: 2 },
+      kind: 'found',
+    });
+    await expect(store.get('project-1', 'session-a')).resolves.toMatchObject({ kind: 'empty', writerState: 'fenced' });
+    await expect(reconcile(store)).resolves.toEqual({ kind: 'available', outcomes: [] });
+    store.close();
+  });
+
+  it('leaves the entries written by a live page in place, and reconciles them once it is gone', async () => {
+    const store = await createStore();
+    journal(
+      store,
+      // Written by page A under its own lineage.
+      createUnloadJournalEntry(),
+      // Written by page B under a lineage named after page A, which the session blob handed on.
+      createUnloadJournalEntry({ editorSessionId: 'session-a:writer:w', ownerEditorSessionId: 'session-b' }),
+      // Written by page A under a lineage named after page B.
+      createUnloadJournalEntry({ editorSessionId: 'session-b', ownerEditorSessionId: 'session-a' }),
+      // Written before entries named their page.
+      createUnloadJournalEntry({
+        editorSessionId: 'session-c',
+        ownerEditorSessionId: undefined,
+        projectId: 'project-2',
+      })
+    );
+    const asked: string[] = [];
+    const isEditorSessionLive = (editorSessionId: string) => {
+      asked.push(editorSessionId);
+      return Promise.resolve(editorSessionId === 'session-a');
+    };
+
+    await expect(store.reconcileUnloadJournal('account-a', 1_000, { isEditorSessionLive })).resolves.toEqual({
+      kind: 'available',
+      outcomes: [
+        { editorSessionId: 'session-a', outcome: 'live', projectId: 'project-1' },
+        { editorSessionId: 'session-a:writer:w', outcome: 'applied', projectId: 'project-1' },
+        { editorSessionId: 'session-b', outcome: 'live', projectId: 'project-1' },
+        { editorSessionId: 'session-c', outcome: 'applied', projectId: 'project-2' },
+      ],
+    });
+    // Asked once per page, never about a lineage.
+    expect(asked).toEqual(['session-a', 'session-b']);
+    await expect(store.get('project-1', 'session-a')).resolves.toEqual({ kind: 'missing' });
+    await expect(store.get('project-1', 'session-a:writer:w')).resolves.toMatchObject({ kind: 'found' });
+    // The peek skips the live page's entries the same way, and keeps looking past them.
+    await expect(store.peekUnloadJournalProjectIds(1)).resolves.toEqual({
+      kind: 'available',
+      projectIds: ['project-1'],
+    });
+    journal(
+      store,
+      createUnloadJournalEntry({
+        editorSessionId: 'session-c',
+        ownerEditorSessionId: 'session-c',
+        projectId: 'project-3',
+      })
+    );
+    await expect(store.peekUnloadJournalProjectIds(2, { isEditorSessionLive })).resolves.toEqual({
+      kind: 'available',
+      projectIds: ['project-3'],
+    });
+    // The page is gone: its entries are recovery material now.
+    await expect(outcomesOf(store)).resolves.toEqual(['applied', 'applied', 'applied']);
+    await expect(store.get('project-1', 'session-a')).resolves.toMatchObject({
+      draft: { documentJson: createUnloadJournalEntry().documentJson, generation: 2 },
+      kind: 'found',
+    });
+    store.close();
+  });
+
+  it("discards one writer's journal of a lineage through a generation, blind", async () => {
+    const store = await createStore();
+    journal(
+      store,
+      createUnloadJournalEntry({ generation: 2 }),
+      createUnloadJournalEntry({ projectId: 'project-2' }),
+      createUnloadJournalEntry({ writerToken: 'writer-b' })
+    );
+    journal(store, createUnloadJournalEntry({ documentJson: '{"id":"project-1","name":"Newer"}', generation: 4 }));
+
+    await expect(store.discardUnloadJournal('project-1', 'session-a', 'writer-a', 3)).resolves.toEqual({
+      kind: 'deleted',
+    });
+    await expect(store.discardUnloadJournal('project-2', 'session-a', 'writer-a')).resolves.toEqual({
+      kind: 'deleted',
+    });
+
+    await expect(outcomesOf(store)).resolves.toEqual(['applied', 'fenced']);
+    await expect(store.get('project-1', 'session-a')).resolves.toMatchObject({
+      draft: { documentJson: '{"id":"project-1","name":"Newer"}', generation: 4, writerToken: 'writer-a' },
+      kind: 'found',
+    });
+    store.close();
+  });
+
+  it('discards journals of another account or record schema without touching drafts', async () => {
+    const store = await createStore();
+    await store.stage(createProjectDraftInput());
+    journal(store, createUnloadJournalEntry({ accountId: 'account-b' }), {
+      ...createUnloadJournalEntry({ projectId: 'project-2' }),
+      schemaVersion: 0,
+    } as unknown as ProjectUnloadJournalEntry);
+
+    await expect(reconcile(store)).resolves.toEqual({
+      kind: 'available',
+      outcomes: [
+        { editorSessionId: 'session-a', outcome: 'foreign-account', projectId: 'project-1' },
+        { editorSessionId: 'session-a', outcome: 'invalid', projectId: 'project-2' },
+      ],
+    });
+    await expect(store.get('project-1', 'session-a')).resolves.toEqual({ draft: createProjectDraft(), kind: 'found' });
+    await expect(store.get('project-2', 'session-a')).resolves.toEqual({ kind: 'missing' });
+    await expect(reconcile(store)).resolves.toEqual({ kind: 'available', outcomes: [] });
+    store.close();
+    expect(journal(store, createUnloadJournalEntry())).toEqual({ kind: 'unavailable' });
+  });
+
+  it('reconciles every entry past one page, and peeks at which projects have them', async () => {
+    const store = await createStore();
+    const projectIds = Array.from({ length: 105 }, (_, index) => `project-${index.toString().padStart(3, '0')}`);
+    journal(store, ...projectIds.map((projectId) => createUnloadJournalEntry({ projectId })));
+
+    await expect(store.peekUnloadJournalProjectIds(1)).resolves.toEqual({
+      kind: 'available',
+      projectIds: ['project-000'],
+    });
+    const outcomes = await outcomesOf(store);
+    expect(outcomes).toHaveLength(105);
+    expect(new Set(outcomes)).toEqual(new Set(['applied']));
+    await expect(store.get('project-104', 'session-a')).resolves.toMatchObject({ kind: 'found' });
+    await expect(store.peekUnloadJournalProjectIds(1)).resolves.toEqual({ kind: 'available', projectIds: [] });
     store.close();
   });
 

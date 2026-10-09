@@ -21,7 +21,7 @@ export const GallerySearchHelp = () => {
   return (
     <Popover.Root positioning={HELP_POSITIONING}>
       <Popover.Trigger asChild>
-        <IconButton aria-label={t('widgets.gallery.searchHelpTitle')} color="fg.subtle" size="2xs" variant="ghost">
+        <IconButton aria-label={t('widgets.gallery.searchHelpTitle')} color="fg.subtle" size="sm" variant="ghost">
           <Icon as={CircleHelpIcon} boxSize="3.5" />
         </IconButton>
       </Popover.Trigger>
@@ -29,19 +29,19 @@ export const GallerySearchHelp = () => {
         <Popover.Positioner>
           <PopoverContent maxW="18rem" p="3">
             <Stack gap="2">
-              <Text fontSize="xs" fontWeight="600">
+              <Text fontSize="md" fontWeight="600">
                 {t('widgets.gallery.searchHelpTitle')}
               </Text>
-              <Text color="fg.muted" fontSize="2xs">
+              <Text color="fg.muted" fontSize="xs">
                 {t('widgets.gallery.searchHelpIntro')}
               </Text>
               <Stack gap="1.5">
                 {DATE_TOKEN_EXAMPLES.map(({ descriptionKey, key }) => (
                   <HStack key={key} align="start" gap="2">
-                    <Code flexShrink={0} fontSize="2xs" px="1">
+                    <Code flexShrink={0} fontSize="xs" px="1">
                       {key}
                     </Code>
-                    <Text color="fg.muted" fontSize="2xs">
+                    <Text color="fg.muted" fontSize="xs">
                       {t(descriptionKey)}
                     </Text>
                   </HStack>

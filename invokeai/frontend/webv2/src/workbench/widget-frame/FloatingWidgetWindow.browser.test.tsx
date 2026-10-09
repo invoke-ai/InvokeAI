@@ -4,6 +4,7 @@ import type { FloatingWidgetState } from '@workbench/layoutContracts';
 import type * as settingsStore from '@workbench/settings/store';
 import type {
   RegisteredWidget,
+  WidgetContributionSource,
   WidgetImplementation,
   WidgetManifest,
   WidgetViewProps,
@@ -11,6 +12,7 @@ import type {
 
 import { ChakraProvider, HStack } from '@chakra-ui/react';
 import { system } from '@theme/system';
+import { createExtensionRegistry, type ExtensionRegistry } from '@workbench/extensions/extensionRegistry';
 import { FocusRegionProvider, type WorkbenchFocusController } from '@workbench/focusRegions';
 import { createTestFocusController } from '@workbench/focusRegions.testing';
 import { closeWorkbenchSettings, settingsDialogStore } from '@workbench/settings/settingsDialogStore';
@@ -29,6 +31,7 @@ import { page, userEvent } from 'vitest/browser';
 
 const windowMocks = vi.hoisted(() => ({
   actionsRegion: null as string | null,
+  extensions: null as unknown as ExtensionRegistry,
   dockFloating: vi.fn(),
   flushWorkbenchDrafts: vi.fn(),
   layout: { setRegionCollapsed: vi.fn(), setRegionSize: vi.fn() },
@@ -65,7 +68,11 @@ vi.mock('@workbench/WorkbenchContext', () => ({
     isActiveProject: (projectId: string) => projectId === project.id,
   }),
   useWorkbenchCommands: () => ({ layout: windowMocks.layout, widgets: windowMocks }),
+  useOptionalWorkbenchExtensions: () => windowMocks.extensions,
+  useWorkbenchExtensions: () => windowMocks.extensions,
 }));
+// They need the whole application; the test registers the one binding it needs.
+vi.mock('@workbench/hotkeys/firstPartyCommands', () => ({ useRegisterFirstPartyCommands: () => {} }));
 
 vi.mock('@platform/react/draftRegistry', async (importOriginal) => ({
   ...(await importOriginal<typeof draftRegistry>()),
@@ -95,6 +102,8 @@ vi.mock('@workbench/WorkbenchWidgetRegistryContext', () => ({
 // The runtime needs the workbench store; the window's chrome is what is under
 // test, and neither the stub view nor the stub actions touch the runtime.
 vi.mock('./createWidgetRuntime', () => ({ useWidgetRuntime: () => ({}) }));
+
+import { WorkbenchHotkeyRuntime } from '@workbench/hotkeys/WorkbenchHotkeyRuntime';
 
 import { FloatingWidgetWindow } from './FloatingWidgetWindow';
 import { MissingWidgetFrame } from './WidgetRenderer';
@@ -220,6 +229,7 @@ const renderWindow = async (
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
           <FocusRegionProvider controller={controller}>
+            <WorkbenchHotkeyRuntime />
             {showUnavailablePanel ? (
               <MissingWidgetFrame instanceId="image-map-instance" label="Image Map" region="right" typeId="image-map" />
             ) : null}
@@ -246,6 +256,7 @@ beforeEach(async () => {
   windowMocks.useWideActions = false;
   windowMocks.showFocusHighlight = true;
   testController = createTestFocusController();
+  windowMocks.extensions = createExtensionRegistry();
   windowMocks.flushWorkbenchDrafts.mockClear();
   windowMocks.setFloatingMode.mockClear();
   windowMocks.dockFloating.mockClear();
@@ -345,6 +356,44 @@ describe('FloatingWidgetWindow chrome', () => {
     });
 
     expect(windowMocks.setFloatingGeometry).toHaveBeenCalled();
+  });
+
+  it('moves and resizes from the keyboard without the arrow keys also reaching the widget', async () => {
+    // A widget-scoped arrow binding, as Preview and the gallery register theirs.
+    const source: WidgetContributionSource = {
+      instanceId: 'image-map-instance',
+      projectId: 'project-1',
+      region: 'floating',
+      typeId: 'image-map',
+    };
+    const step = vi.fn();
+    windowMocks.extensions.commands.register({ handler: step, id: 'image-map.step', source, title: 'Step' });
+    windowMocks.extensions.hotkeys.register({
+      commandId: 'image-map.step',
+      defaultKeys: ['arrowright'],
+      id: 'image-map.step',
+      scope: 'widget',
+      source,
+      title: 'Step',
+    });
+    await renderWindow();
+    const press = async (target: HTMLElement) => {
+      await act(async () => {
+        target.focus();
+        await userEvent.keyboard('{ArrowRight}');
+      });
+    };
+
+    // Inside the widget the binding is live, so a key the frame let through would reach it.
+    await press(host!.querySelector<HTMLElement>('[data-testid="map-body"]')!);
+    expect(step).toHaveBeenCalledTimes(1);
+
+    await press(host!.querySelector<HTMLElement>('[aria-label="Move Image Map window"]')!);
+    expect(windowMocks.setFloatingGeometry).toHaveBeenCalledTimes(1);
+
+    await press(host!.querySelector<HTMLElement>('[role="separator"][aria-valuemin]')!);
+    expect(windowMocks.setFloatingGeometry).toHaveBeenCalledTimes(2);
+    expect(step).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the widget actions reachable while the window is shaded', async () => {

@@ -9,11 +9,13 @@ to 0% VRAM residency while the allocator happily reused the "missing" memory for
 """
 
 import logging
+import sys
 from unittest.mock import MagicMock
 
 import pytest
 import torch
 
+from invokeai.backend.model_manager.load.model_cache import model_cache as model_cache_module
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.util.devices import TorchDevice
 
@@ -258,3 +260,118 @@ def test_offloading_under_expandable_segments_stops_once_enough_is_free(monkeypa
     # 2 GB needed + 1 GB working memory: one 4 GB model is enough.
     assert cache._offload_unlocked_models(2 * GB) == 4 * GB
     assert cache._move_model_to_ram.call_count == 1
+
+
+class TestReserveRelease:
+    """When a lock hands torch's cached blocks back to the driver (`_release_allocator_blocks_for_reserve`).
+
+    The reserve a lock budgets must be free for the driver too: cuDNN loads a convolution engine's kernel module into
+    driver memory on first use, and on Windows a driver allocation that does not fit is retried indefinitely instead of
+    failing. The driver's and torch's figures are faked, so this runs without a GPU.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _windows(self, monkeypatch):
+        monkeypatch.setattr(sys, "platform", "win32")
+
+    @staticmethod
+    def _cache(device: str) -> ModelCache:
+        """A cache with the 0.1 GB default reserve, built for the CPU: a CUDA cache reads the card's properties."""
+        cache = ModelCache(
+            execution_device_working_mem_gb=0.1,
+            enable_partial_loading=True,
+            keep_ram_copy_of_weights=True,
+            execution_device="cpu",
+            storage_device="cpu",
+            logger=MagicMock(),
+            shared_cpu_weights=None,
+        )
+        cache._execution_device = torch.device(device)
+        return cache
+
+    def _release(self, monkeypatch, *, driver_free_mb: int, releasable_mb: int, working_mb, device="cuda") -> list:
+        cache = self._cache(device)
+        calls: list = []
+        monkeypatch.setattr(
+            TorchDevice, "cuda_mem_get_info", classmethod(lambda cls, d: (driver_free_mb * MB, 24 * GB))
+        )
+        monkeypatch.setattr(cache, "_get_reclaimable_allocator_bytes", lambda: releasable_mb * MB)
+        monkeypatch.setattr(model_cache_module, "_expandable_segments_enabled", lambda: False)
+        monkeypatch.setattr(TorchDevice, "empty_cache", classmethod(lambda cls, force=False: calls.append(force)))
+        cache._release_allocator_blocks_for_reserve(None if working_mb is None else working_mb * MB)
+        return calls
+
+    def test_a_short_reserve_with_releasable_blocks_is_released_past_a_busy_peer(self, monkeypatch):
+        assert self._release(monkeypatch, driver_free_mb=2048, releasable_mb=3072, working_mb=4096) == [True]
+
+    def test_a_reserve_that_is_driver_free_costs_nothing(self, monkeypatch):
+        assert self._release(monkeypatch, driver_free_mb=4096, releasable_mb=3072, working_mb=4096) == []
+
+    def test_slivers_left_by_a_partial_load_are_not_worth_a_sync(self, monkeypatch):
+        assert self._release(monkeypatch, driver_free_mb=2048, releasable_mb=64, working_mb=4096) == []
+
+    @pytest.mark.parametrize(("driver_free_mb", "expected"), [(80, [True]), (120, [])])
+    def test_no_request_means_the_default_reserve(self, monkeypatch, driver_free_mb, expected):
+        assert (
+            self._release(monkeypatch, driver_free_mb=driver_free_mb, releasable_mb=1024, working_mb=None) == expected
+        )
+
+    @pytest.mark.parametrize("device", ["xpu", "mps"])
+    def test_other_devices_are_left_alone(self, monkeypatch, device):
+        assert self._release(monkeypatch, driver_free_mb=0, releasable_mb=4096, working_mb=4096, device=device) == []
+
+    def test_off_windows_the_release_waits_for_a_busy_peer(self, monkeypatch):
+        """Where a driver allocation that does not fit fails instead of hanging, a forced release would only bring
+        back the cross-GPU empty_cache convoy."""
+        monkeypatch.setattr(sys, "platform", "linux")
+        assert self._release(monkeypatch, driver_free_mb=2048, releasable_mb=3072, working_mb=4096) == [False]
+
+    def test_under_expandable_segments_the_unused_reserved_pages_count(self, monkeypatch):
+        """The allocator's reclaimable figure is 0 there, but empty_cache() unmaps freed pages inside segments
+        (the default on ROCm under Windows)."""
+        cache = self._cache("cuda")
+        calls: list = []
+        monkeypatch.setattr(TorchDevice, "cuda_mem_get_info", classmethod(lambda cls, d: (2 * GB, 24 * GB)))
+        monkeypatch.setattr(model_cache_module, "_expandable_segments_enabled", lambda: True)
+        monkeypatch.setattr(cache, "_get_reclaimable_allocator_bytes", lambda: 0)
+        monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device=None: 9 * GB)
+        monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device=None: 6 * GB)
+        monkeypatch.setattr(TorchDevice, "empty_cache", classmethod(lambda cls, force=False: calls.append(force)))
+
+        cache._release_allocator_blocks_for_reserve(4 * GB)
+
+        assert calls == [True]
+
+
+@pytest.mark.slow
+@requires_cuda
+def test_lock_hands_cached_blocks_back_when_the_reserve_is_not_driver_free():
+    """On a real card: torch holds most of the free memory in cached blocks, then a lock asks for a reserve that only
+    those blocks can cover; afterwards torch holds nothing worth releasing. Needs a quiet GPU (it fills the card to
+    within 1 GiB), hence `slow`.
+    """
+    torch.cuda.empty_cache()
+    device = torch.device("cuda:0")
+    # Slack in segments that other live tensors keep, which no release can return.
+    baseline_unused = torch.cuda.memory_reserved(device) - torch.cuda.memory_allocated(device)
+    free, _total = torch.cuda.mem_get_info(device)
+    if free < 4 * GB:
+        pytest.skip("needs at least 4 GiB of free VRAM")
+    cache = _make_cache()
+    cache.put("A", BigModule(64))
+    record = cache.get("A")
+    chunk = 256 * MB
+    blocks = [torch.empty(chunk, dtype=torch.uint8, device=device) for _ in range(int((free - GB) // chunk))]
+    del blocks
+    driver_free = torch.cuda.mem_get_info(device)[0]
+    held_unused = torch.cuda.memory_reserved(device) - torch.cuda.memory_allocated(device)
+
+    cache.lock(record, driver_free + held_unused // 2)
+    try:
+        # Process-local, so another program on the card cannot decide the outcome. Read from the allocator itself: the
+        # cache's reclaimable figure is 0 under expandable segments whether or not anything was released.
+        unused = torch.cuda.memory_reserved(device) - torch.cuda.memory_allocated(device)
+        assert unused - baseline_unused < 256 * MB
+    finally:
+        cache.unlock(record)
+        torch.cuda.empty_cache()

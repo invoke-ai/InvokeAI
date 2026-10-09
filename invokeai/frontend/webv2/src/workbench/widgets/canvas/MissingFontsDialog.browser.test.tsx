@@ -5,6 +5,8 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { auditAccessibility } from '@platform/browser/auditAccessibility.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
+import { closingFrames, recordDialogExit, type DialogExitFrame } from '@platform/ui/dialogExit.testing';
+import { isModalPresent } from '@platform/ui/modalPresence';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { createEmptyCanvasState } from '@workbench/canvasMigration';
@@ -96,6 +98,43 @@ it('groups affected layers, keeps a warning after dismissal, and reopens recover
   await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
   await act(() => page.getByRole('button', { name: 'Missing font — review' }).click());
   await expect.element(page.getByRole('dialog')).toBeVisible();
+});
+
+/** Every frame recovery showed while closing must still show its row, so it animated out whole. */
+const expectRowWhileClosing = (frames: readonly DialogExitFrame[]) => {
+  const closing = closingFrames(frames);
+  expect(closing).not.toHaveLength(0);
+  for (const frame of closing) {
+    expect(frame.text).toContain('Used by 3 text layers');
+  }
+};
+
+it('animates recovery out on dismissal and returns workbench hotkeys as it starts closing', async () => {
+  await render();
+  await expect.element(page.getByRole('dialog', { name: 'Missing fonts' })).toBeVisible();
+  expect(isModalPresent()).toBe(true);
+
+  const frames = await recordDialogExit(document.querySelector('[role="dialog"]')!, async () => {
+    await act(() => page.getByRole('button', { name: 'Continue with previews' }).click());
+    expect(isModalPresent()).toBe(false);
+  });
+
+  expectRowWhileClosing(frames);
+  await expect.poll(() => document.querySelector('[role="dialog"]')).toBeNull();
+});
+
+it('animates out with its rows once a retry finds every font', async () => {
+  await render();
+  await expect.element(page.getByRole('dialog', { name: 'Missing fonts' })).toBeVisible();
+
+  api.getFont.mockResolvedValue({ ...missing });
+  const frames = await recordDialogExit(document.querySelector('[role="dialog"]')!, () =>
+    act(() => page.getByRole('button', { name: 'Retry', exact: true }).click())
+  );
+
+  expectRowWhileClosing(frames);
+  await expect.poll(() => document.querySelector('[role="dialog"]')).toBeNull();
+  expect(isModalPresent()).toBe(false);
 });
 
 it('replaces every use through the undoable Canvas capability with target axis limits', async () => {

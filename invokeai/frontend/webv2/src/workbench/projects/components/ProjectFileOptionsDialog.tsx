@@ -1,16 +1,22 @@
-import { Checkbox, Dialog, Portal, Stack, Text } from '@chakra-ui/react';
-import { useMountEffect } from '@platform/react/useMountEffect';
+import { Checkbox, Portal, Stack, Text } from '@chakra-ui/react';
 import { Button, CloseButton } from '@platform/ui';
-import { registerHotkeyModalLayer } from '@workbench/hotkeys/modalLayer';
+import { Dialog } from '@platform/ui/Dialog';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { ProjectFileOptionsRequest } from './ProjectFileOptionsProvider';
 
-export const ProjectFileOptionsDialog = ({ request }: { request: ProjectFileOptionsRequest }) => {
+export const ProjectFileOptionsDialog = ({
+  isOpen,
+  onExitComplete,
+  request,
+}: {
+  isOpen: boolean;
+  onExitComplete: () => void;
+  request: ProjectFileOptionsRequest;
+}) => {
   const { t } = useTranslation();
   const [includeFonts, setIncludeFonts] = useState(false);
-  useMountEffect(() => registerHotkeyModalLayer('project-file-options'));
   const close = useCallback(() => request.settle(null), [request]);
   const isExport = request.kind === 'export';
   const returnFocus = useCallback(
@@ -32,7 +38,14 @@ export const ProjectFileOptionsDialog = ({ request }: { request: ProjectFileOpti
   const confirm = useCallback(() => request.settle({ includeFonts }), [includeFonts, request]);
 
   return (
-    <Dialog.Root open placement="center" size="sm" finalFocusEl={returnFocus} onOpenChange={handleOpenChange}>
+    <Dialog.Root
+      open={isOpen}
+      placement="center"
+      size="sm"
+      finalFocusEl={returnFocus}
+      onExitComplete={onExitComplete}
+      onOpenChange={handleOpenChange}
+    >
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
@@ -53,13 +66,13 @@ export const ProjectFileOptionsDialog = ({ request }: { request: ProjectFileOpti
                       </Checkbox.Control>
                       <Checkbox.Label>{t('projects.fonts.includeFiles')}</Checkbox.Label>
                     </Checkbox.Root>
-                    <Text color="fg.muted" fontSize="sm">
+                    <Text color="fg.muted" fontSize="lg">
                       {t('projects.fonts.exportDescription')}
                     </Text>
-                    {includeFonts ? <Text fontSize="sm">{t('projects.fonts.rightsReminder')}</Text> : null}
+                    {includeFonts ? <Text fontSize="lg">{t('projects.fonts.rightsReminder')}</Text> : null}
                   </>
                 ) : (
-                  <Text fontSize="sm">{t('projects.fonts.quotaDescription')}</Text>
+                  <Text fontSize="lg">{t('projects.fonts.quotaDescription')}</Text>
                 )}
               </Stack>
             </Dialog.Body>

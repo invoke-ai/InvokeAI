@@ -43,12 +43,12 @@ export const InputShell = ({ children, endElement, ref, startElement, tone, ...b
     cursor="text"
     display="flex"
     gap="1.5"
-    h="7"
+    h="control.md"
     minW="0"
     // Trailing buttons own their inset; omit duplicate end padding.
     pe={endElement ? '1' : '2'}
     ps="2"
-    textStyle="xs"
+    textStyle="md"
     w="full"
     onPointerDown={focusInnerInput}
     {...boxProps}

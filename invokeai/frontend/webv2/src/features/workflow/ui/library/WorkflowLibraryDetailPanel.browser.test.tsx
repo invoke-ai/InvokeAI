@@ -3,12 +3,14 @@ import type { StarterModel } from '@features/models';
 import type { WorkflowModelRequirement } from '@features/workflow/core/modelRequirements';
 import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
 import type { WorkflowLibraryEntry, WorkflowLibraryEntryEnrichment } from '@features/workflow/data/libraryBrowseStore';
+import type { LibraryWorkflowReadOptions } from '@features/workflow/data/libraryCache';
 import type { WorkflowGraphPreviewPort, WorkflowUiAdapter } from '@features/workflow/ui/WorkflowUiContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { GalleryHostProvider } from '@features/gallery/picker';
 import { WorkflowGraphPreviewProvider, WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
 import { createProjectGraph, serializeWorkflowJson } from '@features/workflow/utility';
+import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
 import { system } from '@theme/system';
 import { act, StrictMode, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -64,13 +66,13 @@ const queries = vi.hoisted(() => ({
   ),
   deleteLibraryWorkflow: vi.fn((_workflowId: string, _signal?: AbortSignal) => Promise.resolve()),
   deleteLibraryWorkflowThumbnail: vi.fn((_workflowId: string, _signal?: AbortSignal) => Promise.resolve()),
-  getLibraryWorkflowCached: vi.fn((_workflowId: string, _signal?: AbortSignal) =>
+  getLibraryWorkflowCached: vi.fn((_workflowId: string, _options?: LibraryWorkflowReadOptions) =>
     Promise.resolve({} as Record<string, unknown>)
   ),
   getLibraryWorkflowRecord: vi.fn((_workflowId: string, _signal?: AbortSignal) =>
     Promise.resolve({} as Record<string, unknown>)
   ),
-  getLibraryWorkflowRecordCached: vi.fn((_workflowId: string, _signal?: AbortSignal) =>
+  getLibraryWorkflowRecordCached: vi.fn((_workflowId: string, _options?: LibraryWorkflowReadOptions) =>
     Promise.resolve({} as Record<string, unknown>)
   ),
   invalidateWorkflowLibraryCache: vi.fn(),
@@ -362,35 +364,37 @@ describe('WorkflowLibraryDetailPanel', () => {
       setTimeout(resolve, 0);
     });
 
+  const panelTree = (selected: WorkflowLibraryEntry | null, projectWorkflows: readonly ProjectWorkflowEntry[]) => (
+    <StrictMode>
+      <ChakraProvider value={system}>
+        <WorkflowUiProvider adapter={ADAPTER}>
+          <GalleryHostProvider host={GALLERY_HOST}>
+            <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
+              <WorkflowLibraryDetailPanel
+                contextMenuPoint={null}
+                contextMenuTriggerId={null}
+                entry={selected}
+                projectWorkflows={projectWorkflows}
+                onClose={onClose}
+                onContextMenuClose={NOOP}
+                onDeleted={onDeleted}
+                onDuplicated={onDuplicated}
+                onOpen={onOpen}
+                onPreview={onPreview}
+              />
+            </WorkflowGraphPreviewProvider>
+          </GalleryHostProvider>
+        </WorkflowUiProvider>
+      </ChakraProvider>
+    </StrictMode>
+  );
+
   const renderPanel = async (
     selected: WorkflowLibraryEntry | null,
     projectWorkflows: readonly ProjectWorkflowEntry[] = NO_COPIES
   ) => {
     await act(async () => {
-      root.render(
-        <StrictMode>
-          <ChakraProvider value={system}>
-            <WorkflowUiProvider adapter={ADAPTER}>
-              <GalleryHostProvider host={GALLERY_HOST}>
-                <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
-                  <WorkflowLibraryDetailPanel
-                    contextMenuPoint={null}
-                    contextMenuTriggerId={null}
-                    entry={selected}
-                    projectWorkflows={projectWorkflows}
-                    onClose={onClose}
-                    onContextMenuClose={NOOP}
-                    onDeleted={onDeleted}
-                    onDuplicated={onDuplicated}
-                    onOpen={onOpen}
-                    onPreview={onPreview}
-                  />
-                </WorkflowGraphPreviewProvider>
-              </GalleryHostProvider>
-            </WorkflowUiProvider>
-          </ChakraProvider>
-        </StrictMode>
-      );
+      root.render(panelTree(selected, projectWorkflows));
       await settleFrame();
     });
   };
@@ -835,6 +839,35 @@ describe('WorkflowLibraryDetailPanel', () => {
     expect(queries.deleteLibraryWorkflow).toHaveBeenCalledWith('wf-text-to-image', expect.anything());
     expect(queries.invalidateWorkflowLibraryCache).toHaveBeenCalledTimes(1);
     expect(onDeleted).toHaveBeenCalledTimes(1);
+  });
+
+  it('animates the delete confirmation out when the deleted workflow leaves the panel', async () => {
+    // As in the library dialog: the delete clears the selection, and with no other workflow the panel empties.
+    onDeleted = vi.fn(() => root.render(panelTree(null, NO_COPIES)));
+    await renderPanel(TEXT_TO_IMAGE);
+    await clickMenuItem('delete');
+
+    const confirm = document.querySelector<HTMLElement>('[role="alertdialog"]')!;
+    const confirmButton = [...confirm.querySelectorAll('button')].find(
+      (candidate) => (candidate.textContent ?? '').trim() === 'Delete'
+    );
+
+    const frames = closingFrames(
+      await recordDialogExit(confirm, () =>
+        act(async () => {
+          confirmButton?.click();
+          await settleFrame();
+        })
+      )
+    );
+
+    expect(onDeleted).toHaveBeenCalledTimes(1);
+    expect(panel()).toBeNull();
+    expect(frames).not.toHaveLength(0);
+    // It still names the workflow it deleted while it animates out.
+    for (const frame of frames) {
+      expect(frame.text).toContain('Delete "Text to image"');
+    }
   });
 
   it('reports a failed delete without claiming the workflow is gone', async () => {

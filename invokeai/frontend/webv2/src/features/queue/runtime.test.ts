@@ -1350,6 +1350,132 @@ describe('queue runtime', () => {
     await runtime.dispose();
   });
 
+  /** Two running batches whose cancellations fail `failures[queueItemId]` times before the backend accepts. */
+  const createFailingCancelHarness = (failures: Record<string, number>) => {
+    const items = ['batch-eyes', 'batch-mouth'].map((id): QueueItem => ({ ...createPendingQueueItem(), id }));
+    const project = { id: 'project-1', queue: { items } };
+    const listeners = new Set<() => void>();
+    const notify = () => listeners.forEach((listener) => listener());
+    const byBackendId = new Map<number, QueueItem>();
+    let nextBackendId = 88;
+    const enqueueGenerate = vi.fn(() => {
+      const backendId = nextBackendId++;
+      return Promise.resolve({ batchId: `backend-${backendId}`, enqueued: 1, itemIds: [backendId], requested: 1 });
+    });
+    const cancelQueueItemsByBatchIds = vi.fn(([batchId]: string[]) => {
+      const item = items.find((candidate) => candidate.backendBatchId === batchId)!;
+      const left = failures[item.id] ?? 0;
+      failures[item.id] = left - 1;
+      return left > 0 ? Promise.reject(new Error(`${item.id} unavailable`)) : Promise.resolve();
+    });
+    const recordError = vi.fn();
+    const commands = createTestCommands({
+      markBackendSubmitted: ({ backendBatchId, backendItemIds, queueItemId }) => {
+        const item = items.find((candidate) => candidate.id === queueItemId)!;
+        Object.assign(item, { backendBatchId, backendItemIds, status: 'running' });
+        backendItemIds.forEach((backendId) => byBackendId.set(backendId, item));
+        notify();
+      },
+      recordError,
+      setCancellationPending: ({ pending, queueItemId }) => {
+        items.find((candidate) => candidate.id === queueItemId)!.cancellationPending = pending || undefined;
+        notify();
+      },
+    });
+    const runtime = createQueueRuntime({
+      ...runtimeServices,
+      backend: createTestBackend({
+        cancelQueueItemsByBatchIds,
+        enqueueGenerate,
+        // Retries reconcile against the backend, which still reports each batch running.
+        getItem: vi.fn((backendId: number) =>
+          Promise.resolve({
+            id: backendId,
+            origin: buildQueueItemOrigin(byBackendId.get(backendId)!.id, project.id),
+            status: 'in_progress' as const,
+          })
+        ),
+      }),
+      history: {
+        commands,
+        getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
+        subscribe: (listener) => {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+      },
+      journal: createTestJournal(),
+    });
+    const cancel = (queueItemId: string) => {
+      Object.assign(
+        items.find((item) => item.id === queueItemId)!,
+        { cancellationPending: true, status: 'cancelled' }
+      );
+      notify();
+    };
+    const settled = (queueItemId: string) =>
+      vi.waitFor(() => expect(items.find((item) => item.id === queueItemId)!.cancellationPending).toBeUndefined(), {
+        timeout: 3000,
+      });
+    const reportedFor = () =>
+      recordError.mock.calls.map(
+        ([payload]) => /queue item (\S+) yet/.exec(String((payload as { message: string }).message))?.[1]
+      );
+    return { cancel, cancelQueueItemsByBatchIds, items, project, recordError, reportedFor, runtime, settled };
+  };
+
+  it('reports a failing batch cancellation once and keeps retrying until the backend stops it', async () => {
+    const h = createFailingCancelHarness({ 'batch-eyes': 2 });
+    h.runtime.start();
+    await vi.waitFor(() => expect(h.items.every((item) => item.backendBatchId)).toBe(true));
+
+    h.cancel('batch-eyes');
+    await h.settled('batch-eyes');
+
+    expect(
+      h.cancelQueueItemsByBatchIds.mock.calls.filter(([[batchId]]) => batchId === h.items[0]!.backendBatchId)
+    ).toHaveLength(3);
+    expect(h.recordError).toHaveBeenCalledOnce();
+    expect(h.recordError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        area: 'queue-cancel',
+        message: 'Could not stop queue item batch-eyes yet; retrying automatically. batch-eyes unavailable',
+        projectId: h.project.id,
+      })
+    );
+    expect(h.items[1]!.status).toBe('running');
+    await h.runtime.dispose();
+  });
+
+  it('reports each batch whose cancellation fails, whether at the same time or after another settled', async () => {
+    const h = createFailingCancelHarness({ 'batch-eyes': 1, 'batch-mouth': 1 });
+    h.runtime.start();
+    await vi.waitFor(() => expect(h.items.every((item) => item.backendBatchId)).toBe(true));
+
+    h.cancel('batch-eyes');
+    await h.settled('batch-eyes');
+    expect(h.reportedFor()).toEqual(['batch-eyes']);
+
+    h.cancel('batch-mouth');
+    await h.settled('batch-mouth');
+    expect(h.reportedFor()).toEqual(['batch-eyes', 'batch-mouth']);
+    await h.runtime.dispose();
+  });
+
+  it('reports a second batch that fails while the first is still retrying', async () => {
+    const h = createFailingCancelHarness({ 'batch-eyes': 2, 'batch-mouth': 2 });
+    h.runtime.start();
+    await vi.waitFor(() => expect(h.items.every((item) => item.backendBatchId)).toBe(true));
+
+    h.cancel('batch-eyes');
+    h.cancel('batch-mouth');
+    await h.settled('batch-eyes');
+    await h.settled('batch-mouth');
+
+    expect(h.reportedFor().sort()).toEqual(['batch-eyes', 'batch-mouth']);
+    await h.runtime.dispose();
+  });
+
   it('cancels an enqueue accepted after local cancellation before settling recovery', async () => {
     const queueItem: QueueItem = createPendingQueueItem();
     const project = { id: 'project-1', queue: { items: [queueItem] } };
@@ -2084,7 +2210,10 @@ describe('queue runtime video board routing', () => {
     getResultImages?: QueueBackendPort['getResultImages'];
     /** Nodes of the compiled submission graph — media values here mark run INPUTS. */
     graphNodes?: Record<string, QueueBackendInvocation>;
+    /** Backend board of each video already on one; attaching records here and video reads report it. */
+    videoBoards?: Record<string, string>;
   }) => {
+    const videoBoards = new Map(Object.entries(options.videoBoards ?? {}));
     const queueItem = createPendingQueueItem();
     queueItem.snapshot.destination = 'gallery';
     queueItem.snapshot.galleryBoardId = options.galleryBoardId === undefined ? 'board-1' : options.galleryBoardId;
@@ -2111,7 +2240,12 @@ describe('queue runtime video board routing', () => {
       getResultVideos:
         options.getResultVideos ??
         vi.fn((videoNames: string[], sourceQueueItemId: string, queuedAt: string) =>
-          Promise.resolve(videoNames.map((videoName) => resultVideo(videoName, sourceQueueItemId, queuedAt)))
+          Promise.resolve(
+            videoNames.map((videoName) => {
+              const boardId = videoBoards.get(videoName);
+              return { ...resultVideo(videoName, sourceQueueItemId, queuedAt), ...(boardId ? { boardId } : {}) };
+            })
+          )
         ),
       // Reconcile an already-completed backend run to exercise both settlement paths without sockets.
       listItems: vi.fn().mockResolvedValue([
@@ -2126,7 +2260,7 @@ describe('queue runtime video board routing', () => {
       onConnectionChange: vi.fn(() => vi.fn()),
       pauseProcessor: vi.fn(),
       readCurrent: vi.fn().mockResolvedValue(null),
-      readItemIds: vi.fn().mockResolvedValue({ itemIds: [], totalCount: 0 }),
+      readItemIds: vi.fn().mockResolvedValue({ itemIds: [] }),
       readItemsById: vi.fn().mockResolvedValue([]),
       readNext: vi.fn().mockResolvedValue(null),
       readStatus: vi.fn().mockResolvedValue({
@@ -2164,7 +2298,15 @@ describe('queue runtime video board routing', () => {
       setConnectionStatus: vi.fn(),
       setStatus: vi.fn(),
     };
-    const destinations = { addImagesToGalleryBoard: vi.fn(), addVideosToGalleryBoard: vi.fn() };
+    const destinations = {
+      addImagesToGalleryBoard: vi.fn(),
+      addVideosToGalleryBoard: vi.fn((boardId: string, videoNames: string[]) => {
+        for (const videoName of videoNames) {
+          videoBoards.set(videoName, boardId);
+        }
+        return Promise.resolve();
+      }),
+    };
     const runtime = createQueueRuntime({
       backend,
       destinations,
@@ -2186,7 +2328,7 @@ describe('queue runtime video board routing', () => {
       },
     });
 
-    return { backend, commands, destinations, runtime };
+    return { backend, commands, destinations, runtime, videoBoards };
   };
 
   const resultVideo = (videoName: string, sourceQueueItemId: string, queuedAt: string): QueueResultVideo => ({
@@ -2209,15 +2351,15 @@ describe('queue runtime video board routing', () => {
     runtime.start();
 
     await vi.waitFor(() => {
-      expect(destinations.addVideosToGalleryBoard).toHaveBeenCalledWith('board-1', ['clip-1.mp4']);
+      const routedClip = expect.objectContaining({
+        videos: [expect.objectContaining({ boardId: 'board-1', videoName: 'clip-1.mp4' })],
+      });
       // Both passes queue follow-up reads while earlier ones drain; none may be stranded.
-      expect(commands.routePartialResults).toHaveBeenCalledWith(
-        expect.objectContaining({ videos: [expect.objectContaining({ videoName: 'clip-1.mp4' })] })
-      );
-      expect(commands.routeResults).toHaveBeenCalledWith(
-        expect.objectContaining({ videos: [expect.objectContaining({ videoName: 'clip-1.mp4' })] })
-      );
+      expect(commands.routePartialResults).toHaveBeenCalledWith(routedClip);
+      expect(commands.routeResults).toHaveBeenCalledWith(routedClip);
     });
+    // The final pass finds the clip already on its board and does not move it again.
+    expect(destinations.addVideosToGalleryBoard).toHaveBeenCalledExactlyOnceWith('board-1', ['clip-1.mp4']);
     // filterIntermediateResults on the snapshot maps to the video-side intermediate filter.
     expect(getResultVideoNames).toHaveBeenCalledWith(77, expect.objectContaining({ excludeIntermediate: true }));
 
@@ -2242,22 +2384,31 @@ describe('queue runtime video board routing', () => {
     runtime.dispose();
   });
 
-  it("routes an uncategorized run's videos for display without a board attach", async () => {
-    const getResultVideoNames = vi.fn().mockResolvedValue(['clip-1.mp4']);
-    const { commands, destinations, runtime } = createHarness({ galleryBoardId: null, getResultVideoNames });
-    const routedClip = expect.objectContaining({ videos: [expect.objectContaining({ videoName: 'clip-1.mp4' })] });
+  it.each([null, 'none'])(
+    "routes an uncategorized (%s) run's results for display without a board attach",
+    async (galleryBoardId) => {
+      const { commands, destinations, runtime } = createHarness({
+        galleryBoardId,
+        getResultImages: vi.fn().mockResolvedValue([resultImage('generated.png')]),
+        getResultVideoNames: vi.fn().mockResolvedValue(['clip-1.mp4']),
+      });
+      const routedClip = expect.objectContaining({
+        images: [expect.objectContaining({ imageName: 'generated.png' })],
+        videos: [expect.objectContaining({ videoName: 'clip-1.mp4' })],
+      });
 
-    runtime.start();
+      runtime.start();
 
-    await vi.waitFor(() => {
-      expect(commands.routePartialResults).toHaveBeenCalledWith(routedClip);
-      expect(commands.routeResults).toHaveBeenCalledWith(routedClip);
-    });
-    expect(destinations.addImagesToGalleryBoard).not.toHaveBeenCalled();
-    expect(destinations.addVideosToGalleryBoard).not.toHaveBeenCalled();
+      await vi.waitFor(() => {
+        expect(commands.routePartialResults).toHaveBeenCalledWith(routedClip);
+        expect(commands.routeResults).toHaveBeenCalledWith(routedClip);
+      });
+      expect(destinations.addImagesToGalleryBoard).not.toHaveBeenCalled();
+      expect(destinations.addVideosToGalleryBoard).not.toHaveBeenCalled();
 
-    runtime.dispose();
-  });
+      runtime.dispose();
+    }
+  );
 
   it('still shows a finished video when its board attach fails', async () => {
     const { commands, destinations, runtime } = createHarness({
@@ -2268,11 +2419,147 @@ describe('queue runtime video board routing', () => {
     runtime.start();
 
     await vi.waitFor(() => {
-      expect(commands.routePartialResults).toHaveBeenCalledWith(
+      expect(commands.routeResults).toHaveBeenCalled();
+    });
+    // The clip is shown on both passes and, never having reached the board, does not claim one.
+    const unassignedClip = resultVideo('clip-1.mp4', 'local-queue-item', '2026-07-17T00:00:00.000Z');
+    for (const route of [commands.routePartialResults, commands.routeResults]) {
+      expect(route).toHaveBeenCalledWith(expect.objectContaining({ videos: [unassignedClip] }));
+    }
+    expect(commands.recordError).toHaveBeenCalledWith(expect.objectContaining({ message: 'attach failed' }));
+
+    runtime.dispose();
+  });
+
+  it('reports the board each video reached when an attach partly fails, then retries only the rest', async () => {
+    const { commands, destinations, runtime, videoBoards } = createHarness({
+      getResultVideoNames: vi.fn().mockResolvedValue(['clip-1.mp4', 'clip-2.mp4']),
+    });
+    destinations.addVideosToGalleryBoard.mockImplementationOnce((boardId) => {
+      videoBoards.set('clip-1.mp4', boardId);
+      return Promise.reject(new Error('1 of 2 video(s) could not be added to the board.'));
+    });
+
+    runtime.start();
+
+    await vi.waitFor(() => {
+      expect(commands.routeResults).toHaveBeenCalledWith(
+        expect.objectContaining({
+          videos: [
+            expect.objectContaining({ boardId: 'board-1', videoName: 'clip-1.mp4' }),
+            expect.objectContaining({ boardId: 'board-1', videoName: 'clip-2.mp4' }),
+          ],
+        })
+      );
+    });
+    expect(commands.routePartialResults).toHaveBeenCalledWith(
+      expect.objectContaining({
+        videos: [
+          expect.objectContaining({ boardId: 'board-1', videoName: 'clip-1.mp4' }),
+          resultVideo('clip-2.mp4', 'local-queue-item', '2026-07-17T00:00:00.000Z'),
+        ],
+      })
+    );
+    expect(destinations.addVideosToGalleryBoard.mock.calls).toEqual([
+      ['board-1', ['clip-1.mp4', 'clip-2.mp4']],
+      ['board-1', ['clip-2.mp4']],
+    ]);
+
+    runtime.dispose();
+  });
+
+  it('reports no board when the destination port attaches nothing (virtual board)', async () => {
+    const { commands, destinations, runtime } = createHarness({
+      getResultVideoNames: vi.fn().mockResolvedValue(['clip-1.mp4']),
+    });
+    destinations.addVideosToGalleryBoard.mockResolvedValue(undefined);
+
+    runtime.start();
+
+    await vi.waitFor(() => {
+      expect(commands.routeResults).toHaveBeenCalledWith(
+        expect.objectContaining({
+          videos: [resultVideo('clip-1.mp4', 'local-queue-item', '2026-07-17T00:00:00.000Z')],
+        })
+      );
+    });
+    expect(destinations.addVideosToGalleryBoard).toHaveBeenCalledWith('board-1', ['clip-1.mp4']);
+
+    runtime.dispose();
+  });
+
+  it('records unreadable result videos and attaches only the readable ones', async () => {
+    const { commands, destinations, runtime } = createHarness({
+      getResultVideoNames: vi.fn().mockResolvedValue(['clip-1.mp4', 'gone.mp4']),
+      getResultVideos: vi.fn((videoNames: string[], sourceQueueItemId: string, queuedAt: string) =>
+        Promise.resolve(
+          videoNames
+            .filter((videoName) => videoName !== 'gone.mp4')
+            .map((videoName) => resultVideo(videoName, sourceQueueItemId, queuedAt))
+        )
+      ),
+    });
+
+    runtime.start();
+
+    await vi.waitFor(() => {
+      expect(commands.routeResults).toHaveBeenCalledWith(
         expect.objectContaining({ videos: [expect.objectContaining({ videoName: 'clip-1.mp4' })] })
       );
     });
-    expect(commands.recordError).toHaveBeenCalledWith(expect.objectContaining({ message: 'attach failed' }));
+    expect(commands.recordError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        area: 'queue-results',
+        message: '1 of 2 result video(s) could not be read; they were not added to the board.',
+      })
+    );
+    expect(destinations.addVideosToGalleryBoard).toHaveBeenCalledWith('board-1', ['clip-1.mp4']);
+    expect(destinations.addVideosToGalleryBoard).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.arrayContaining(['gone.mp4'])
+    );
+
+    runtime.dispose();
+  });
+
+  it('records a failed video read without attaching or routing the videos', async () => {
+    const { commands, destinations, runtime } = createHarness({
+      getResultVideoNames: vi.fn().mockResolvedValue(['clip-1.mp4']),
+      getResultVideos: vi.fn().mockRejectedValue(new Error('video read failed')),
+    });
+
+    runtime.start();
+
+    await vi.waitFor(() => {
+      expect(commands.routeResults).toHaveBeenCalledWith(expect.objectContaining({ videos: [] }));
+    });
+    expect(commands.recordError).toHaveBeenCalledWith(expect.objectContaining({ message: 'video read failed' }));
+    expect(destinations.addVideosToGalleryBoard).not.toHaveBeenCalled();
+    expect(commands.setStatus).not.toHaveBeenCalledWith(expect.objectContaining({ status: 'failed' }));
+
+    runtime.dispose();
+  });
+
+  it('still shows a video when its post-attach re-read fails', async () => {
+    const clip = resultVideo('clip-1.mp4', 'local-queue-item', '2026-07-17T00:00:00.000Z');
+    const { commands, destinations, runtime } = createHarness({
+      getResultVideoNames: vi.fn().mockResolvedValue(['clip-1.mp4']),
+      // Partial pass: first read, then the post-attach re-read; the final pass finds the clip on its board.
+      getResultVideos: vi
+        .fn()
+        .mockResolvedValueOnce([clip])
+        .mockRejectedValueOnce(new Error('re-read failed'))
+        .mockResolvedValue([{ ...clip, boardId: 'board-1' }]),
+    });
+
+    runtime.start();
+
+    await vi.waitFor(() => {
+      expect(commands.routeResults).toHaveBeenCalled();
+    });
+    expect(commands.routePartialResults).toHaveBeenCalledWith(expect.objectContaining({ videos: [clip] }));
+    expect(commands.recordError).toHaveBeenCalledWith(expect.objectContaining({ message: 're-read failed' }));
+    expect(destinations.addVideosToGalleryBoard).toHaveBeenCalledExactlyOnceWith('board-1', ['clip-1.mp4']);
 
     runtime.dispose();
   });
@@ -2315,7 +2602,7 @@ describe('queue runtime video board routing', () => {
   });
 
   it('never routes an input video echoed into the results (extend-video source clip)', async () => {
-    const { destinations, runtime } = createHarness({
+    const { commands, destinations, runtime } = createHarness({
       getResultVideoNames: vi.fn().mockResolvedValue(['source.mp4', 'extended.mp4']),
       graphNodes: {
         source_clip: { id: 'source_clip', type: 'video', video: { video_name: 'source.mp4' } },
@@ -2326,11 +2613,78 @@ describe('queue runtime video board routing', () => {
 
     await vi.waitFor(() => {
       expect(destinations.addVideosToGalleryBoard).toHaveBeenCalledWith('board-1', ['extended.mp4']);
+      expect(commands.routeResults).toHaveBeenCalledWith(
+        expect.objectContaining({ videos: [expect.objectContaining({ videoName: 'extended.mp4' })] })
+      );
     });
     expect(destinations.addVideosToGalleryBoard).not.toHaveBeenCalledWith(
       'board-1',
       expect.arrayContaining(['source.mp4'])
     );
+
+    runtime.dispose();
+  });
+
+  it('leaves a video on the board its node saved it to', async () => {
+    const { commands, destinations, runtime } = createHarness({
+      getResultVideoNames: vi.fn().mockResolvedValue(['node-board.mp4']),
+      videoBoards: { 'node-board.mp4': 'board-b' },
+    });
+
+    runtime.start();
+
+    await vi.waitFor(() => {
+      expect(commands.routeResults).toHaveBeenCalledWith(
+        expect.objectContaining({
+          videos: [expect.objectContaining({ boardId: 'board-b', videoName: 'node-board.mp4' })],
+        })
+      );
+    });
+    expect(destinations.addVideosToGalleryBoard).not.toHaveBeenCalled();
+
+    runtime.dispose();
+  });
+
+  it('attaches only the unassigned videos of a mixed batch and reports each final board', async () => {
+    const { commands, destinations, runtime } = createHarness({
+      getResultVideoNames: vi.fn().mockResolvedValue(['node-board.mp4', 'unassigned.mp4']),
+      videoBoards: { 'node-board.mp4': 'board-b' },
+    });
+
+    runtime.start();
+
+    await vi.waitFor(() => {
+      expect(commands.routeResults).toHaveBeenCalledWith(
+        expect.objectContaining({
+          videos: [
+            expect.objectContaining({ boardId: 'board-b', videoName: 'node-board.mp4' }),
+            expect.objectContaining({ boardId: 'board-1', videoName: 'unassigned.mp4' }),
+          ],
+        })
+      );
+    });
+    expect(destinations.addVideosToGalleryBoard).toHaveBeenCalledExactlyOnceWith('board-1', ['unassigned.mp4']);
+
+    runtime.dispose();
+  });
+
+  it('does not move a video back after the user moves it between partial and final settlement', async () => {
+    const { commands, destinations, runtime, videoBoards } = createHarness({
+      getResultVideoNames: vi.fn().mockResolvedValue(['clip-1.mp4']),
+    });
+    vi.mocked(commands.routePartialResults).mockImplementation(() => {
+      videoBoards.set('clip-1.mp4', 'board-c');
+    });
+
+    runtime.start();
+
+    await vi.waitFor(() => {
+      expect(commands.routeResults).toHaveBeenCalledWith(
+        expect.objectContaining({ videos: [expect.objectContaining({ boardId: 'board-c', videoName: 'clip-1.mp4' })] })
+      );
+    });
+    expect(commands.routePartialResults).toHaveBeenCalledBefore(vi.mocked(commands.routeResults));
+    expect(destinations.addVideosToGalleryBoard).toHaveBeenCalledExactlyOnceWith('board-1', ['clip-1.mp4']);
 
     runtime.dispose();
   });

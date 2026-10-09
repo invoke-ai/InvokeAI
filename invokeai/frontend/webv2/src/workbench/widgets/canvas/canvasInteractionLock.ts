@@ -1,16 +1,46 @@
 import type { CanvasStateContractV3, ToolId } from '@workbench/canvas-engine/api';
 import type { WorkbenchQueueItem as QueueItem } from '@workbench/queueHistoryContracts';
 
-import { getCanvasStagingSlots } from '@workbench/canvasStagingView';
-
 export const isCanvasInteractionLocked = (canvas: CanvasStateContractV3, queueItems: readonly QueueItem[]): boolean =>
-  getCanvasStagingSlots(canvas, queueItems).length > 0 ||
+  // Every staged candidate produces a slot; active queue work locks even when its placeholders are exhausted.
+  canvas.stagingArea.pendingImages.length > 0 ||
   queueItems.some(
     (item) =>
       item.snapshot.destination === 'canvas' &&
       item.snapshot.canvas.documentRevision === canvas.documentRevision &&
       (item.status === 'pending' || item.status === 'running')
   );
+
+/** Aggregate notifications can change prompts/layout without changing lock inputs. Reuse unchanged reads. */
+export const createCanvasInteractionLockReader = (
+  getProject: () => { canvas: CanvasStateContractV3; queue: { items: readonly QueueItem[] } } | null | undefined
+): (() => boolean) => {
+  let revision: number | undefined;
+  let candidates: CanvasStateContractV3['stagingArea']['pendingImages'] | undefined;
+  let items: readonly QueueItem[] | undefined;
+  let locked = true;
+  return () => {
+    const project = getProject();
+    if (!project) {
+      revision = undefined;
+      candidates = undefined;
+      items = undefined;
+      return true;
+    }
+    const { canvas, queue } = project;
+    if (
+      revision !== canvas.documentRevision ||
+      candidates !== canvas.stagingArea.pendingImages ||
+      items !== queue.items
+    ) {
+      revision = canvas.documentRevision;
+      candidates = canvas.stagingArea.pendingImages;
+      items = queue.items;
+      locked = isCanvasInteractionLocked(canvas, items);
+    }
+    return locked;
+  };
+};
 
 export const isCanvasStagingActive = ({
   hasStagedCandidates,
