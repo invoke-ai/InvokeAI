@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Callable, ContextManager, Optional
 
+from invokeai.app.services.model_load.model_load_common import RecordEdit
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load import LoadedModel, LoadedModelWithoutConfig
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
@@ -30,11 +31,12 @@ class ModelLoadServiceBase(ABC):
         """
 
     @abstractmethod
-    def record_edit(self, key: str) -> ContextManager[None]:
+    def record_edit(self, key: str) -> ContextManager[RecordEdit]:
         """Bracket a write of `key`'s record that may change how it loads, from before it commits until
-        after any cache invalidation it performs, so that loads which read the record meanwhile re-check it
-        under MODEL_LOAD_LOCK. Every writer of load-affecting settings must use it: a cold load trusts its
-        pre-lock record read unless a bracket was open at that read or opened since."""
+        after any cache invalidation it performs. Cold loads of `key` wait for open brackets before reading
+        the record, and are rejected if a bracket is still open, or a load-affecting one has closed, by the
+        time construction is serialized against invalidation. Every writer of load-affecting settings must
+        use it, and should clear `load_affecting` on the yielded edit when it changed nothing that loads."""
 
     @property
     @abstractmethod

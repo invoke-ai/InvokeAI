@@ -1,11 +1,12 @@
 """A load that read a model record before a load-affecting edit must not repopulate the cache after
 that edit's invalidation; later loads must build from the updated record."""
 
+import contextlib
 import threading
 import time
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Callable, Optional
+from typing import Callable, Iterator, Optional
 
 import pytest
 import torch
@@ -101,6 +102,36 @@ def _is_cached(cache: ModelCache) -> bool:
     return True
 
 
+@pytest.fixture
+def record_reads_under_lock(harness, monkeypatch) -> list[bool]:
+    """For each read of the model record by a worker thread (the test's own edits run on the main thread),
+    whether the reading thread held MODEL_LOAD_LOCK's write lock."""
+    _, store, _, _ = harness
+    holders: set[int] = set()
+    write_lock = MODEL_LOAD_LOCK.write_lock
+
+    @contextlib.contextmanager
+    def tracked_write_lock() -> Iterator[None]:
+        with write_lock():
+            holders.add(threading.get_ident())
+            try:
+                yield
+            finally:
+                holders.discard(threading.get_ident())
+
+    reads: list[bool] = []
+    store_get_model = store.get_model
+
+    def get_model(key: str) -> AnyModelConfig:
+        if threading.current_thread() is not threading.main_thread():
+            reads.append(threading.get_ident() in holders)
+        return store_get_model(key)
+
+    monkeypatch.setattr(MODEL_LOAD_LOCK, "write_lock", tracked_write_lock)
+    monkeypatch.setattr(store, "get_model", get_model)
+    return reads
+
+
 def test_load_from_record_read_before_invalidating_edit_loads_the_updated_record(harness):
     service, store, cache, events = harness
     stale = store.get_model(KEY)
@@ -115,16 +146,31 @@ def test_load_from_record_read_before_invalidating_edit_loads_the_updated_record
     assert events.log == [("started", "siglip"), ("complete", "siglip")]
 
 
-def test_load_from_record_read_before_metadata_only_edit_still_loads(harness):
-    service, store, cache, _ = harness
-    previous = store.get_model(KEY)
+def test_metadata_only_edit_while_a_load_waits_on_construction_lock_does_not_reject_it(harness, monkeypatch):
+    """A rename changes nothing that loads, so a load that read the old name and is queued behind an
+    unrelated construction while the rename lands is built as it is, without a retry."""
+    service, store, cache, events = harness
+    waits = _waits_for_edits(service, monkeypatch)
+    outcome: list[LoadedModel] = []
+    loader = threading.Thread(target=lambda: outcome.append(service.load_model(store.get_model(KEY))))
 
-    # A rename does not invalidate the cache, so nothing fences a load that read the old name.
-    store.update_model(KEY, changes=ModelRecordChanges(name="renamed"))
+    with MODEL_LOAD_LOCK.write_lock():  # an unrelated construction in progress
+        loader.start()
+        deadline = time.monotonic() + 10
+        while MODEL_LOAD_LOCK._writers_waiting == 0:
+            assert time.monotonic() < deadline, "loader never queued for the construction lock"
+            time.sleep(0.001)
+        # As `update_model_record` performs a rename: bracketed, and cleared as changing nothing that loads.
+        with service.record_edit(KEY) as edit:
+            store.update_model(KEY, changes=ModelRecordChanges(name="renamed"))
+            edit.load_affecting = False
+    loader.join(timeout=10)
 
-    service.load_model(previous)
+    assert len(outcome) == 1
     assert _RecordingLoader.built_from == [None]
     assert _is_cached(cache)
+    # Checked once, never retried.
+    assert waits.acquire(timeout=0) and not waits.acquire(timeout=0)
 
 
 def _run_with_edit_while_queued_on_construction_lock(
@@ -155,7 +201,9 @@ def _run_with_edit_while_queued_on_construction_lock(
     return outcome[0]
 
 
-def test_load_waiting_on_construction_lock_during_invalidating_edit_loads_the_updated_record(harness):
+def test_load_waiting_on_construction_lock_during_invalidating_edit_loads_the_updated_record(
+    harness, record_reads_under_lock
+):
     service, store, cache, events = harness
 
     outcome = _run_with_edit_while_queued_on_construction_lock(
@@ -168,30 +216,106 @@ def test_load_waiting_on_construction_lock_during_invalidating_edit_loads_the_up
     assert _RecordingLoader.built_from == [True]
     # One load as far as the UI can tell: a retry that re-announced itself would leave a load showing.
     assert events.log == [("started", "siglip"), ("complete", "siglip")]
+    # Rejected without reading the record under the lock: that read would stall every MODEL_LOAD_LOCK user
+    # behind any long DB transaction.
+    assert record_reads_under_lock and not any(record_reads_under_lock)
 
 
-def test_edit_committed_while_load_waits_but_invalidating_after_it_is_not_built_from_the_old_record(harness):
-    """The load reads a current record and queues behind an unrelated construction; the edit commits
-    meanwhile but reaches its invalidation only after the load holds the construction lock."""
+def _waits_for_edits(service: ModelLoadService, monkeypatch) -> threading.Semaphore:
+    """Released each time a load starts waiting for edits of its model to finish."""
+    entered = threading.Semaphore(0)
+    generation_when_idle = service._record_edits.generation_when_idle
+
+    def observed(key: str) -> int:
+        entered.release()
+        return generation_when_idle(key)
+
+    monkeypatch.setattr(service._record_edits, "generation_when_idle", observed)
+    return entered
+
+
+@pytest.mark.parametrize("commit_before_rejection", [True, False])
+def test_edit_starting_while_load_waits_but_invalidating_after_it_is_not_built_from_the_old_record(
+    harness, monkeypatch, record_reads_under_lock, commit_before_rejection: bool
+):
+    """The load checks a current record and queues behind an unrelated construction; an edit then starts,
+    and reaches its invalidation only after the load holds the construction lock. Its commit lands either
+    before the load is rejected or while the rejected load waits to retry."""
     service, store, cache, _ = harness
+    waits = _waits_for_edits(service, monkeypatch)
     outcome: list[LoadedModel] = []
     loader = threading.Thread(target=lambda: outcome.append(service.load_model(store.get_model(KEY))))
 
-    with service.record_edit(KEY):
-        with MODEL_LOAD_LOCK.write_lock():  # an unrelated construction in progress
-            loader.start()
-            deadline = time.monotonic() + 10
-            while MODEL_LOAD_LOCK._writers_waiting == 0:
-                assert time.monotonic() < deadline, "loader never queued for the construction lock"
-                time.sleep(0.001)
+    with MODEL_LOAD_LOCK.write_lock():  # an unrelated construction in progress
+        loader.start()
+        deadline = time.monotonic() + 10
+        while MODEL_LOAD_LOCK._writers_waiting == 0:
+            assert time.monotonic() < deadline, "loader never queued for the construction lock"
+            time.sleep(0.001)
+        edit = service.record_edit(KEY)
+        edit.__enter__()
+        if commit_before_rejection:
             store.update_model(KEY, changes=ModelRecordChanges(cpu_only=True))
-        loader.join(timeout=10)
+    try:
+        # Rejected under the lock, the load waits for the edit before reading the record again.
+        assert waits.acquire(timeout=10) and waits.acquire(timeout=10)
+        if not commit_before_rejection:
+            store.update_model(KEY, changes=ModelRecordChanges(cpu_only=True))
         with MODEL_LOAD_LOCK.write_lock():
             cache.drop_model(KEY)
+    finally:
+        edit.__exit__(None, None, None)
+    loader.join(timeout=10)
 
     assert len(outcome) == 1
     assert outcome[0].config.cpu_only is True
     assert _RecordingLoader.built_from == [True]
+    assert not any(record_reads_under_lock)
+
+
+def test_load_overlapping_an_edit_stuck_on_the_database_does_not_hold_the_model_load_lock(
+    harness, monkeypatch, record_reads_under_lock
+):
+    """A cold load of a model whose edit is waiting out a long DB transaction (e.g. VACUUM) waits too, but
+    without MODEL_LOAD_LOCK, so unrelated model builds and VRAM moves carry on; it then loads the edit."""
+    service, store, cache, events = harness
+    waits = _waits_for_edits(service, monkeypatch)
+    stale = store.get_model(KEY)
+    committing = threading.Event()
+
+    def edit() -> None:
+        with service.record_edit(KEY):
+            committing.set()
+            store.update_model(KEY, changes=ModelRecordChanges(cpu_only=True))
+            with MODEL_LOAD_LOCK.write_lock():
+                cache.drop_model(KEY)
+
+    loads: list[LoadedModel] = []
+    acquired = threading.Event()
+
+    def take_model_load_lock() -> None:
+        with MODEL_LOAD_LOCK.write_lock():
+            acquired.set()
+
+    editor = threading.Thread(target=edit)
+    loader = threading.Thread(target=lambda: loads.append(service.load_model(stale)))
+    other = threading.Thread(target=take_model_load_lock)
+    with store._db._lock:  # the transaction the edit's commit waits on
+        editor.start()
+        assert committing.wait(timeout=10)
+        loader.start()
+        assert waits.acquire(timeout=10)
+        other.start()
+        lock_was_free = acquired.wait(timeout=5)
+    editor.join(timeout=10)
+    loader.join(timeout=10)
+    other.join(timeout=10)
+
+    assert lock_was_free
+    assert len(loads) == 1 and loads[0].config.cpu_only is True
+    assert _RecordingLoader.built_from == [True]
+    assert events.log == [("started", "siglip"), ("complete", "siglip")]
+    assert not any(record_reads_under_lock)
 
 
 def test_config_object_reused_after_eviction_still_loads(harness):
@@ -212,7 +336,7 @@ def test_config_object_reused_after_eviction_still_loads(harness):
 
 
 def test_record_superseded_again_during_retry_raises(harness, monkeypatch):
-    service, store, _, _ = harness
+    service, store, _, events = harness
     fence_checks: list[str] = []
 
     def never_current(config: AnyModelConfig) -> bool:
@@ -225,6 +349,8 @@ def test_record_superseded_again_during_retry_raises(harness, monkeypatch):
         service.load_model(store.get_model(KEY))
     assert fence_checks == [KEY, KEY]
     assert _RecordingLoader.built_from == []
+    # The load ended, so it must not be left showing as in progress.
+    assert events.log == [("started", "siglip"), ("complete", "siglip")]
 
 
 def test_database_transaction_starting_while_a_cold_load_is_queued_does_not_hold_the_model_load_lock(
@@ -276,3 +402,25 @@ def test_database_transaction_starting_while_a_cold_load_is_queued_does_not_hold
     assert lock_was_free
     assert len(loads) == 1
     assert _is_cached(cache)
+
+
+def test_load_from_record_read_before_the_model_was_moved_loads_from_its_new_path(harness, tmp_path):
+    service, store, cache, events = harness
+    stale = store.get_model(KEY)
+    (tmp_path / "siglip").rename(tmp_path / "moved")
+    _edit_and_invalidate(service, store, cache, ModelRecordChanges(path="moved"))
+
+    loaded = service.load_model(stale)
+
+    assert Path(loaded.config.path) == tmp_path / "moved"
+    assert events.log == [("started", "siglip"), ("complete", "siglip")]
+
+
+def test_missing_files_under_an_unchanged_record_still_fail(harness, tmp_path):
+    service, store, _, events = harness
+    (tmp_path / "siglip").rmdir()
+
+    with pytest.raises(FileNotFoundError):
+        service.load_model(store.get_model(KEY))
+    assert _RecordingLoader.built_from == []
+    assert events.log == [("started", "siglip"), ("complete", "siglip")]

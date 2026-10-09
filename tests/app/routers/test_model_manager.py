@@ -10,6 +10,7 @@ from PIL import Image
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api_app import app
+from invokeai.app.services.model_load.model_load_common import RecordEdit
 from invokeai.backend.model_manager.configs.external_api import (
     ExternalApiModelConfig,
     ExternalModelCapabilities,
@@ -380,7 +381,8 @@ async def test_update_model_record_runs_sync_work_off_the_event_loop(monkeypatch
     services = SimpleNamespace(
         logger=MagicMock(),
         model_manager=SimpleNamespace(
-            store=Store(), load=SimpleNamespace(ram_caches={}, record_edit=lambda key: contextlib.nullcontext())
+            store=Store(),
+            load=SimpleNamespace(ram_caches={}, record_edit=lambda key: contextlib.nullcontext(RecordEdit())),
         ),
     )
     invoker = DummyInvoker(services)
@@ -411,10 +413,10 @@ async def test_update_model_record_brackets_commit_and_cache_drop_as_a_record_ed
     observed: list[tuple[str, list[str]]] = []
 
     @contextlib.contextmanager
-    def record_edit(key: str) -> Iterator[None]:
+    def record_edit(key: str) -> Iterator[RecordEdit]:
         open_edits.append(key)
         try:
-            yield
+            yield RecordEdit()
         finally:
             open_edits.remove(key)
 
@@ -1045,10 +1047,10 @@ def test_reidentify_keeps_a_backbone_only_the_install_source_names(
     edits_at_replace: list[list[str]] = []
 
     @contextlib.contextmanager
-    def record_edit(key: str) -> Iterator[None]:
+    def record_edit(key: str) -> Iterator[RecordEdit]:
         open_edits.append(key)
         try:
-            yield
+            yield RecordEdit()
         finally:
             open_edits.remove(key)
 

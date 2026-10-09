@@ -9,11 +9,12 @@ from unittest.mock import MagicMock
 import pytest
 
 from invokeai.app.api.routers import model_manager as model_manager_router
+from invokeai.app.services.model_load.model_load_common import RecordEdit
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 
 
-def _no_record_edit(_key: str) -> contextlib.AbstractContextManager[None]:
-    return contextlib.nullcontext()
+def _no_record_edit(_key: str) -> contextlib.AbstractContextManager[RecordEdit]:
+    return contextlib.nullcontext(RecordEdit())
 
 
 def _config(*, fp8: bool | None = None, cpu_only: bool | None = None, **fields):
@@ -44,6 +45,7 @@ def _config(*, fp8: bool | None = None, cpu_only: bool | None = None, **fields):
     ],
 )
 def test_update_only_evicts_caches_for_load_affecting_changes(field: str, monkeypatch: pytest.MonkeyPatch):
+    edit = RecordEdit()
     previous = _config(**{field: "old"})
     updated = _config(**{field: "new"})
     record_store = SimpleNamespace(
@@ -56,7 +58,9 @@ def test_update_only_evicts_caches_for_load_affecting_changes(field: str, monkey
         logger=MagicMock(),
         model_manager=SimpleNamespace(
             store=record_store,
-            load=SimpleNamespace(record_edit=_no_record_edit, ram_caches={"cuda:0": cache_a, "cuda:1": cache_b}),
+            load=SimpleNamespace(
+                record_edit=lambda _key: contextlib.nullcontext(edit), ram_caches={"cuda:0": cache_a, "cuda:1": cache_b}
+            ),
         ),
     )
     monkeypatch.setattr(
@@ -84,6 +88,8 @@ def test_update_only_evicts_caches_for_load_affecting_changes(field: str, monkey
             cache.drop_model.assert_not_called()
         else:
             cache.drop_model.assert_called_once_with("model-key")
+    # Loads that overlapped the edit are re-checked only when it changed how the model loads.
+    assert edit.load_affecting is (field in {"path", "base", "type", "format", "variant", "repo_variant"})
 
 
 def test_cache_invalidation_holds_model_load_write_lock(monkeypatch: pytest.MonkeyPatch) -> None:

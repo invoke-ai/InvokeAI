@@ -512,9 +512,9 @@ def _reidentify_model(key: str) -> AnyModelConfig:
     result.config.source_type = config.source_type
 
     # The probe can reset load-affecting settings (cpu_only, default_settings), so in-flight loads must re-check.
-    with ApiDependencies.invoker.services.model_manager.load.record_edit(config.key):
+    with ApiDependencies.invoker.services.model_manager.load.record_edit(config.key) as edit:
         updated = ApiDependencies.invoker.services.model_manager.store.replace_model(config.key, result.config)
-        _invalidate_model_load_caches(config.key, config, updated)
+        edit.load_affecting = _invalidate_model_load_caches(config.key, config, updated)
     return updated
 
 
@@ -650,14 +650,14 @@ def _update_model_record(key: str, changes: ModelRecordChanges) -> AnyModelConfi
     # Claimed for the whole update: a conversion running on this key carries a snapshot of the
     # record taken before it started and writes it into the replacement, so an edit accepted
     # meanwhile would be reported as saved and then silently dropped.
-    with _claim_model_key(key), ApiDependencies.invoker.services.model_manager.load.record_edit(key):
+    with _claim_model_key(key), ApiDependencies.invoker.services.model_manager.load.record_edit(key) as edit:
         try:
             previous_config = record_store.get_model(key)
             config = record_store.update_model(key, changes=changes, allow_class_change=True)
             # Settings that change how the model loads (e.g. fp8_storage, cpu_only) are baked into the cached
             # nn.Module at load time, so toggling them on a cached model is otherwise silently a no-op until
             # the entry is evicted. Drop any unlocked cached entries for this model so the next load rebuilds.
-            _invalidate_model_load_caches(key, previous_config, config)
+            edit.load_affecting = _invalidate_model_load_caches(key, previous_config, config)
             config = prepare_model_config_for_response(config, ApiDependencies)
             logger.info(f"Updated model: {key}")
         except UnknownModelException as e:
@@ -698,10 +698,10 @@ async def update_model_record(
     return await asyncio.to_thread(_update_model_record, key, changes)
 
 
-def _invalidate_model_load_caches(key: str, previous: AnyModelConfig, updated: AnyModelConfig) -> None:
-    """Drop cached instances when a record change affects how the model is loaded."""
+def _invalidate_model_load_caches(key: str, previous: AnyModelConfig, updated: AnyModelConfig) -> bool:
+    """Drop cached instances when a record change affects how the model is loaded; return whether it did."""
     if not load_settings_changed(previous, updated):
-        return
+        return False
     services = ApiDependencies.invoker.services
     # Prevent a concurrent load from re-registering state built from the previous model identity.
     with MODEL_LOAD_LOCK.write_lock():
@@ -710,6 +710,7 @@ def _invalidate_model_load_caches(key: str, previous: AnyModelConfig, updated: A
         services.logger.info(
             f"Dropped {dropped} cached entr{'y' if dropped == 1 else 'ies'} for model {key} after settings change."
         )
+    return True
 
 
 @model_manager_router.get(

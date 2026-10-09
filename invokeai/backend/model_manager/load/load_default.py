@@ -249,8 +249,9 @@ class ModelLoader(ModelLoaderBase):
     """Default implementation of ModelLoaderBase."""
 
     # Optionally set on an instance before `load_model()`: on a cache miss, called with the caller's config
-    # before MODEL_LOAD_LOCK is taken; the callable it returns is called once construction is serialized
-    # against cache invalidation, and False rejects the load with StaleModelConfigError. An attribute
+    # before MODEL_LOAD_LOCK is taken (it may block); the callable it returns is called once construction is
+    # serialized against cache invalidation, must not block, and False rejects the load with
+    # StaleModelConfigError. An attribute
     # rather than a constructor argument so that registered loaders overriding `__init__` keep working.
     config_check: Optional[Callable[[AnyModelConfig], Callable[[], bool]]] = None
 
