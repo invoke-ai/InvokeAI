@@ -6,15 +6,16 @@ import {
   toGalleryItemKey,
   toGalleryItemRef,
 } from '@features/gallery/core/items';
-import { isDateBoardId, type GalleryItemNames } from '@features/gallery/data/backend';
+import { getGalleryItemByRef, isDateBoardId, type GalleryItemNames } from '@features/gallery/data/backend';
 import { galleryItemNamesOptions } from '@features/gallery/data/queries';
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState, type MouseEvent } from 'react';
 
 import type { GalleryItemContextMenuTarget } from './GalleryUiContext';
 
-import { useGalleryWidget } from './GalleryWidgetContext';
+import { useGallerySelectionStarred, useGalleryWidget } from './GalleryWidgetContext';
 
 const getGalleryItemRange = (
   orderedRefs: readonly GalleryItemRef[],
@@ -38,7 +39,12 @@ const getGalleryItemRange = (
  * Async range selection fetches beyond the loaded window; apply only if account, filter, and anchor still match
  * the captured context.
  */
-export const useGalleryGridSelection = () => {
+export const useGalleryGridSelection = ({
+  getSelectionPage,
+}: {
+  /** The sparse page stamp for a loaded listing item; selections without one stamp the grid's page. */
+  getSelectionPage?: (item: GalleryItem) => number | undefined;
+} = {}) => {
   // `loadedItems` includes the strip, whose starred items the listing window
   // may not hold; the context menu and ctrl-toggle must resolve those too.
   const { actions, filter, gallery, loadedItems, starredStrip } = useGalleryWidget();
@@ -49,15 +55,30 @@ export const useGalleryGridSelection = () => {
   const selectedItemRefs = useMemo(() => gallery.selectedItemKeys.map(parseGalleryItemKey), [gallery.selectedItemKeys]);
 
   const filterIdentity = useMemo(() => JSON.stringify(filter), [filter]);
-  const rangeInteractionContextRef = useRef({ filterIdentity, selectedItemKey: gallery.selectedItemKey });
+  const selectionIdentity = gallery.selectedItemKeys.join('\n');
+  const rangeInteractionContextRef = useRef({
+    filterIdentity,
+    selectedItemKey: gallery.primarySelectedItemKey,
+    selectionIdentity,
+  });
+
+  // Next-primary lookups end with the grid; a late result could otherwise toggle a selection changed elsewhere.
+  const nextPrimaryLookupsRef = useRef(new Set<AbortController>());
+  useMountEffect(() => () => {
+    nextPrimaryLookupsRef.current.forEach((controller) => controller.abort());
+  });
 
   const syncRangeInteractionContext = useCallback(
     (node: HTMLDivElement | null) => {
       if (node) {
-        rangeInteractionContextRef.current = { filterIdentity, selectedItemKey: gallery.selectedItemKey };
+        rangeInteractionContextRef.current = {
+          filterIdentity,
+          selectedItemKey: gallery.primarySelectedItemKey,
+          selectionIdentity,
+        };
       }
     },
-    [filterIdentity, gallery.selectedItemKey]
+    [filterIdentity, gallery.primarySelectedItemKey, selectionIdentity]
   );
 
   const activeContextMenuTarget = useMemo(() => {
@@ -74,21 +95,49 @@ export const useGalleryGridSelection = () => {
 
   /** Selects from the anchor (the primary selection unless a keyboard range names its own) through `item`. */
   const selectItemRange = useCallback(
-    async (item: GalleryItem, anchorKey?: GalleryItemKey | null) => {
+    async (
+      item: GalleryItem,
+      {
+        anchorKey,
+        isFocusCurrent,
+        isNavigationCurrent,
+        selectionPage,
+      }: {
+        anchorKey?: GalleryItemKey | null;
+        isFocusCurrent?: () => boolean;
+        isNavigationCurrent?: () => boolean;
+        selectionPage?: number;
+      } = {}
+    ) => {
       const owner = captureAccountScope();
       const capturedContext = rangeInteractionContextRef.current;
       const anchorItemKey = anchorKey ?? capturedContext.selectedItemKey;
       const targetItemKey = toGalleryItemKey(item);
-
-      if (!anchorItemKey) {
-        actions.selectItem(item);
-        return;
-      }
-
-      const isInteractionCurrent = () =>
+      const isInteractionContextCurrent = () =>
         isAccountScopeCurrent(owner) &&
         rangeInteractionContextRef.current.filterIdentity === capturedContext.filterIdentity &&
         rangeInteractionContextRef.current.selectedItemKey === capturedContext.selectedItemKey;
+      const isInteractionCurrent = (requireFocusedTarget = false) =>
+        isNavigationCurrent?.() !== false &&
+        (!requireFocusedTarget || isFocusCurrent?.() !== false) &&
+        isInteractionContextCurrent();
+      const selectSingleItem = () => {
+        if (selectionPage === undefined) {
+          actions.selectItem(item);
+        } else {
+          actions.selectItem(item, selectionPage);
+        }
+      };
+
+      if (!isInteractionContextCurrent()) {
+        return;
+      }
+
+      if (!anchorItemKey) {
+        selectSingleItem();
+        return;
+      }
+
       const selectFromRefs = (refs: readonly GalleryItemRef[]): boolean => {
         const range = getGalleryItemRange(refs, anchorItemKey, targetItemKey);
 
@@ -96,18 +145,29 @@ export const useGalleryGridSelection = () => {
           return false;
         }
 
-        actions.selectItemRange(range, item);
+        if (selectionPage === undefined) {
+          actions.selectItemRange(range, item);
+        } else {
+          actions.selectItemRange(range, item, selectionPage);
+        }
         return true;
       };
       const materializedRefs = gallery.items.map(toGalleryItemRef);
       const namesOptions = galleryItemNamesOptions(filter);
+      const usesSynchronousNames = isDateBoardId(filter.boardId);
+      let hasAwaitedNames = false;
 
       try {
-        const orderedRefs = isDateBoardId(filter.boardId)
-          ? queryClient.getQueryData<GalleryItemNames>(namesOptions.queryKey)?.items
-          : (await queryClient.fetchQuery(namesOptions)).items;
+        let orderedRefs: readonly GalleryItemRef[] | undefined;
+        if (usesSynchronousNames) {
+          orderedRefs = queryClient.getQueryData<GalleryItemNames>(namesOptions.queryKey)?.items;
+        } else {
+          const namesPromise = queryClient.fetchQuery(namesOptions);
+          hasAwaitedNames = true;
+          orderedRefs = (await namesPromise).items;
+        }
 
-        if (!isInteractionCurrent()) {
+        if (!isInteractionCurrent(hasAwaitedNames)) {
           return;
         }
 
@@ -115,40 +175,87 @@ export const useGalleryGridSelection = () => {
           return;
         }
       } catch {
-        if (!isInteractionCurrent()) {
+        if (!isInteractionCurrent(hasAwaitedNames)) {
           return;
         }
       }
 
       // The names list describes the listing only; a range inside the strip
       // resolves against the strip's own order.
+      if (!isInteractionCurrent(hasAwaitedNames)) {
+        return;
+      }
+
       if (!selectFromRefs(materializedRefs) && !selectFromRefs(starredStrip.items.map(toGalleryItemRef))) {
-        actions.selectItem(item);
+        selectSingleItem();
       }
     },
     [actions, filter, gallery.items, queryClient, starredStrip.items]
   );
 
   const toggleItem = useCallback(
-    (item: GalleryItem) => {
+    (item: GalleryItem, itemSelectionPage = getSelectionPage?.(item)) => {
       const itemKey = toGalleryItemKey(item);
       const remainingItemKeys = gallery.selectedItemKeys.filter((key) => key !== itemKey);
-      const nextPrimaryItem =
-        gallery.selectedItemKey === itemKey
-          ? (loadedItems.find(
-              (candidate) => toGalleryItemKey(candidate) === remainingItemKeys[remainingItemKeys.length - 1]
-            ) ?? null)
-          : null;
+      const isPrimary = gallery.selectedItemKey === itemKey;
+      const nextPrimaryKey = isPrimary ? (remainingItemKeys.at(-1) ?? null) : null;
+      const loadedNextPrimary =
+        nextPrimaryKey === null
+          ? null
+          : (loadedItems.find((candidate) => toGalleryItemKey(candidate) === nextPrimaryKey) ?? null);
+      const toggle = (nextPrimaryItem: GalleryItem | null) => {
+        // Stamp whichever item becomes primary where it sits, as a click or range does.
+        const selectionPage = isPrimary
+          ? nextPrimaryItem
+            ? getSelectionPage?.(nextPrimaryItem)
+            : undefined
+          : itemSelectionPage;
 
-      actions.toggleItemInSelection(item, nextPrimaryItem);
+        if (selectionPage === undefined) {
+          actions.toggleItemInSelection(item, nextPrimaryItem);
+        } else {
+          actions.toggleItemInSelection(item, nextPrimaryItem, selectionPage);
+        }
+      };
+
+      if (nextPrimaryKey === null || loadedNextPrimary) {
+        toggle(loadedNextPrimary);
+        return;
+      }
+
+      // The next primary's page has left the viewport. Without its item the toggle clears the whole selection, so
+      // resolve it first. A lookup that fails (the item was deleted elsewhere, or the request failed) still toggles
+      // rather than ignoring the click.
+      const owner = captureAccountScope();
+      const capturedContext = rangeInteractionContextRef.current;
+      const controller = new AbortController();
+      const signal = AbortSignal.any([owner.signal, controller.signal]);
+      const toggleIfCurrent = (nextPrimaryItem: GalleryItem | null) => {
+        const current = rangeInteractionContextRef.current;
+
+        if (
+          !signal.aborted &&
+          isAccountScopeCurrent(owner) &&
+          current.filterIdentity === capturedContext.filterIdentity &&
+          current.selectedItemKey === capturedContext.selectedItemKey &&
+          current.selectionIdentity === capturedContext.selectionIdentity
+        ) {
+          toggle(nextPrimaryItem);
+        }
+      };
+
+      nextPrimaryLookupsRef.current.add(controller);
+      void getGalleryItemByRef(parseGalleryItemKey(nextPrimaryKey), signal)
+        .then(toggleIfCurrent, () => toggleIfCurrent(null))
+        .finally(() => nextPrimaryLookupsRef.current.delete(controller));
     },
-    [actions, gallery.selectedItemKey, gallery.selectedItemKeys, loadedItems]
+    [actions, gallery.selectedItemKey, gallery.selectedItemKeys, getSelectionPage, loadedItems]
   );
 
   const handleThumbnailClick = useCallback(
-    (item: GalleryItem, event: MouseEvent) => {
+    (item: GalleryItem, event: MouseEvent, selectionPage?: number) => {
       if (event.shiftKey) {
-        void selectItemRange(item);
+        void selectItemRange(item, { selectionPage });
         return;
       }
 
@@ -158,13 +265,29 @@ export const useGalleryGridSelection = () => {
       }
 
       if (event.ctrlKey || event.metaKey) {
-        toggleItem(item);
+        toggleItem(item, selectionPage);
       } else {
-        actions.selectItem(item);
+        if (selectionPage === undefined) {
+          actions.selectItem(item);
+        } else {
+          actions.selectItem(item, selectionPage);
+        }
       }
     },
     [actions, selectItemRange, toggleItem]
   );
+
+  /** Falls back to the primary selection so hotkeys work before a multi-select. */
+  const actionSelectionRefs = useMemo(
+    () =>
+      selectedItemRefs.length > 0
+        ? selectedItemRefs
+        : gallery.selectedItemKey
+          ? [parseGalleryItemKey(gallery.selectedItemKey)]
+          : [],
+    [gallery.selectedItemKey, selectedItemRefs]
+  );
+  const shouldStarSelection = useGallerySelectionStarred(actionSelectionRefs, loadedItems);
 
   const handleThumbnailContextMenu = useCallback(
     (item: GalleryItem, x: number, y: number) => {
@@ -178,13 +301,20 @@ export const useGalleryGridSelection = () => {
           ),
         ];
 
-        setContextMenuTarget({ itemRefs: selectedItemRefs, items: selectionItems, x, y });
+        // The menu sees only loaded items; the star answer also covers selected items no page holds.
+        setContextMenuTarget({
+          allStarred: !shouldStarSelection,
+          itemRefs: selectedItemRefs,
+          items: selectionItems,
+          x,
+          y,
+        });
         return;
       }
 
       setContextMenuTarget({ itemRefs: [toGalleryItemRef(item)], items: [item], x, y });
     },
-    [loadedItems, selectedItemKeys, selectedItemRefs]
+    [loadedItems, selectedItemKeys, selectedItemRefs, shouldStarSelection]
   );
 
   const getDragItems = useCallback(
@@ -202,17 +332,6 @@ export const useGalleryGridSelection = () => {
 
   const handleCloseContextMenu = useCallback(() => setContextMenuTarget(null), []);
 
-  /** Falls back to the primary selection so hotkeys work before a multi-select. */
-  const actionSelectionRefs = useMemo(
-    () =>
-      selectedItemRefs.length > 0
-        ? selectedItemRefs
-        : gallery.selectedItemKey
-          ? [parseGalleryItemKey(gallery.selectedItemKey)]
-          : [],
-    [gallery.selectedItemKey, selectedItemRefs]
-  );
-
   return {
     actionSelectionRefs,
     activeContextMenuTarget,
@@ -223,6 +342,7 @@ export const useGalleryGridSelection = () => {
     loadedItems,
     selectedItemKeys,
     selectItemRange,
+    shouldStarSelection,
     syncRangeInteractionContext,
     toggleItem,
   };

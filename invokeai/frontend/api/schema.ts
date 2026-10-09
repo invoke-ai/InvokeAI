@@ -2287,6 +2287,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/gallery/items/location": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Gallery Item Location
+         * @description Returns exact item's position in an ordinary filtered gallery listing.
+         */
+        get: operations["get_gallery_item_location"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/gallery/item_names": {
         parameters: {
             query?: never;
@@ -16317,6 +16337,29 @@ export type components = {
          * @enum {string}
          */
         GalleryItemKind: "image" | "video";
+        /**
+         * GalleryItemLocation
+         * @description A gallery item's position in a filtered, ordered listing.
+         */
+        GalleryItemLocation: {
+            /** @description Whether the item is an image or video. */
+            kind: components["schemas"]["GalleryItemKind"];
+            /**
+             * Name
+             * @description The unique name of the image or video.
+             */
+            name: string;
+            /**
+             * Index
+             * @description The item's zero-based index in the listing.
+             */
+            index: number;
+            /**
+             * Total
+             * @description Number of items matching the listing filters.
+             */
+            total: number;
+        };
         /**
          * GalleryItemNames
          * @description Ordered flat list of gallery item names plus counts for optimistic UI.
@@ -56345,6 +56388,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OffsetPaginatedResults_GalleryItem_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_gallery_item_location: {
+        parameters: {
+            query: {
+                /** @description Whether the target is an image or video. */
+                kind: components["schemas"]["GalleryItemKind"];
+                /** @description The target image or video name. */
+                name: string;
+                /** @description The origin of items to list. */
+                origin?: components["schemas"]["ResourceOrigin"] | null;
+                /** @description The categories to include. Shared between images and videos. */
+                categories?: components["schemas"]["ImageCategory"][] | null;
+                /** @description Whether to list intermediate items. */
+                is_intermediate?: boolean | null;
+                /** @description The board id to filter by. Use 'none' to find items without a board. */
+                board_id?: string | null;
+                /** @description The order of sort */
+                order_dir?: components["schemas"]["SQLiteDirection"];
+                /** @description Filter by starred state: true for starred items only, false for unstarred only. Omit to include both. */
+                starred?: boolean | null;
+                /** @description The term to search for */
+                search_term?: string | null;
+                /** @description Inclusive start date (YYYY-MM-DD) to filter by created_at. */
+                created_from?: string | null;
+                /** @description Inclusive end date (YYYY-MM-DD) to filter by created_at. */
+                created_to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GalleryItemLocation"];
                 };
             };
             /** @description Validation Error */
