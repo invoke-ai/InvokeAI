@@ -41,6 +41,7 @@ const deferred = <T>(): { promise: Promise<T>; resolve: (value: T) => void } => 
 };
 
 class FakeSocket implements BackendSocket {
+  readonly active = true;
   readonly emitted: { event: string; payload: unknown }[] = [];
   private readonly handlers = new Map<string, ((payload: never) => void)[]>();
 
@@ -703,6 +704,42 @@ describe('queueCoordinator', () => {
 
     await expect(resultsPromise).resolves.toEqual([expect.objectContaining({ imageName: 'image-1.png' })]);
     expect(harness.api.getItem).toHaveBeenCalledTimes(2);
+  });
+
+  it('bounds sweep reads over many tracked slots and still runs a sweep requested mid-sweep', async () => {
+    const itemIds = Array.from({ length: 256 }, (_, index) => index + 1);
+    const firstSweepGate = deferred<void>();
+    const readItemIds = new Set<number>();
+    let activeReads = 0;
+    let maxActiveReads = 0;
+
+    harness.api.enqueueGenerate.mockResolvedValue({ batchId: 'batch-1', enqueued: 256, itemIds, requested: 256 });
+    harness.coordinator.connect();
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+    harness.api.getItem.mockImplementation(async (itemId: number) => {
+      const isFirstSweep = !readItemIds.has(itemId);
+      readItemIds.add(itemId);
+      activeReads += 1;
+      maxActiveReads = Math.max(maxActiveReads, activeReads);
+      await (isFirstSweep ? firstSweepGate.promise : Promise.resolve());
+      activeReads -= 1;
+      return createQueueBackendItem({ id: itemId, status: isFirstSweep ? 'in_progress' : 'completed' });
+    });
+    const resultsPromise = harness.coordinator.waitForResults('local-1', '2026-06-10T00:00:00Z');
+
+    harness.hub.disconnect();
+    harness.hub.connect();
+    await Promise.resolve();
+    // A slot settled by its socket event after the sweep began is not read.
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 256 }));
+    harness.hub.disconnect();
+    harness.hub.connect();
+    firstSweepGate.resolve();
+
+    await expect(resultsPromise).resolves.toHaveLength(256);
+    expect(maxActiveReads).toBe(16);
+    expect(harness.api.getItem).toHaveBeenCalledTimes(2 * 255);
+    expect(harness.api.getItem).not.toHaveBeenCalledWith(256);
   });
 
   it('applies the preview snapshot on visibility and lets the revision gate drop replays', async () => {

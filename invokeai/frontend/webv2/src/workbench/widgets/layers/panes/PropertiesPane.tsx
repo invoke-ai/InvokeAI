@@ -1,4 +1,4 @@
-import { Flex, Heading, Stack } from '@chakra-ui/react';
+import { Flex, Stack } from '@chakra-ui/react';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { useCanvasEngine, type CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import { isCanvasInteractionLocked } from '@workbench/widgets/canvas/canvasInteractionLock';
@@ -13,44 +13,13 @@ import { useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { GroupSelectedNotice } from './GroupSelectedNotice';
-import { LayerSection, selectSelectedNode } from './LayerSection';
+import { LayerSection } from './LayerSection';
 import { PropertiesSection } from './PropertiesSection';
 
 const OPERATION_TITLE_KEYS = {
   filter: 'widgets.layers.rasterFilter.title',
   'select-object': 'widgets.layers.selectObject.title',
 } as const;
-
-/** Name what the pane is editing: the running operation, else the selected layer or group. */
-const PropertiesTitle = ({ operationName }: { operationName: string | null }) => {
-  const { t } = useTranslation();
-  const node = useActiveProjectSelector(selectSelectedNode);
-  const title =
-    operationName !== null
-      ? t('widgets.properties.title.operation', { name: operationName })
-      : node
-        ? t(node.type === 'group' ? 'widgets.properties.title.group' : 'widgets.properties.title.layer', {
-            name: node.name,
-          })
-        : t('widgets.transform.noSelection');
-  return (
-    <Flex
-      bg="bg.panel"
-      borderBottomWidth="1px"
-      borderColor="border.subtle"
-      minW="0"
-      position="sticky"
-      px="3"
-      py="2"
-      top="0"
-      zIndex="1"
-    >
-      <Heading as="h2" fontSize="sm" fontWeight="semibold" lineClamp={2} minW="0" wordBreak="break-word">
-        {title}
-      </Heading>
-    </Flex>
-  );
-};
 
 /** Show active operation before tool forms; use existing engine stores/transactions without mirrored state. */
 export const PropertiesPane = () => {
@@ -62,7 +31,7 @@ export const PropertiesPane = () => {
 
   if (!engine) {
     return (
-      <Flex align="center" color="fg.muted" fontSize="xs" h="full" justify="center" p="4">
+      <Flex align="center" color="fg.muted" fontSize="md" h="full" justify="center" p="4">
         {t('widgets.properties.noCanvas')}
       </Flex>
     );
@@ -105,9 +74,11 @@ const ConnectedProperties = ({
 
   return (
     <Stack ref={root} gap="0">
-      <PropertiesTitle operationName={running ? t(OPERATION_TITLE_KEYS[running.kind]) : null} />
       {running ? (
-        <PropertiesSection headerHidden title={t('widgets.properties.sections.operation')}>
+        <PropertiesSection
+          subtitle={t(OPERATION_TITLE_KEYS[running.kind])}
+          title={t('widgets.properties.sections.operation')}
+        >
           {running.groups.map((group) => (
             <PropertyGroup key={group.id} collapsible={group.collapsible} id={group.id} label={t(group.labelKey)}>
               <group.body {...regionProps} />
@@ -115,22 +86,24 @@ const ConnectedProperties = ({
           ))}
         </PropertiesSection>
       ) : null}
-      <PropertiesSection
-        ref={toolSection}
-        disabled={isSurfaceInteractionLocked || running !== null}
-        subtitle={toolName}
-        title={t('widgets.properties.sections.tool')}
-      >
-        {tool.paintsLeaf && !running ? <GroupSelectedNotice /> : null}
-        {Preview ? <Preview engine={engine} isExternalInteractionLocked={isSurfaceInteractionLocked} /> : null}
-        {tool.groups.map((group) => (
-          // Keyed by GROUP id, not tool id: tools sharing a group keep its
-          // DOM (and collapse state) alive across the tool switch.
-          <PropertyGroup key={group.id} collapsible={group.collapsible} id={group.id} label={t(group.labelKey)}>
-            <group.body {...regionProps} />
-          </PropertyGroup>
-        ))}
-      </PropertiesSection>
+      {tool.groups.length > 0 || Preview ? (
+        <PropertiesSection
+          ref={toolSection}
+          disabled={isSurfaceInteractionLocked || running !== null}
+          subtitle={toolName}
+          title={t('widgets.properties.sections.tool')}
+        >
+          {tool.paintsLeaf && !running ? <GroupSelectedNotice /> : null}
+          {Preview ? <Preview engine={engine} isExternalInteractionLocked={isSurfaceInteractionLocked} /> : null}
+          {tool.groups.map((group) => (
+            // Keyed by GROUP id, not tool id: tools sharing a group keep its
+            // DOM (and collapse state) alive across the tool switch.
+            <PropertyGroup key={group.id} collapsible={group.collapsible} id={group.id} label={t(group.labelKey)}>
+              <group.body {...regionProps} />
+            </PropertyGroup>
+          ))}
+        </PropertiesSection>
+      ) : null}
       <LayerSection disabled={isSurfaceInteractionLocked || running !== null} />
       {Footer ? (
         <Flex

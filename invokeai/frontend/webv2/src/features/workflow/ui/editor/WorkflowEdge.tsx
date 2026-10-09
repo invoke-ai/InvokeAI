@@ -2,15 +2,15 @@ import type { EdgeProps } from '@xyflow/react';
 
 import { getBezierPath, getSmoothStepPath } from '@xyflow/react';
 import { memo, type CSSProperties } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { WorkflowEdgeData } from './flowAdapters';
 
 const FALLBACK_EDGE_DATA: WorkflowEdgeData = {
-  fieldTypeLabel: 'Unknown',
+  fieldTypeLabel: null,
   pathType: 'default',
   stroke: 'var(--xy-edge-stroke)',
   strokeWidth: 2,
-  tooltip: 'Unknown field type',
 };
 
 const WorkflowEdgeComponent = ({
@@ -27,7 +27,16 @@ const WorkflowEdgeComponent = ({
   targetX,
   targetY,
 }: EdgeProps) => {
+  const { t } = useTranslation();
   const edgeData = (data as WorkflowEdgeData | undefined) ?? FALLBACK_EDGE_DATA;
+  // Worded as the handle tooltips word the same type.
+  const tooltip = edgeData.isLoopLinkage
+    ? t('nodes.loopLinkage')
+    : edgeData.fieldTypeLabel === null
+      ? t('nodes.unknownFieldType')
+      : edgeData.isBatch
+        ? `${edgeData.fieldTypeLabel} ${t('nodes.batch')}`
+        : edgeData.fieldTypeLabel;
   const [edgePath] =
     edgeData.pathType === 'step'
       ? getSmoothStepPath({
@@ -60,9 +69,9 @@ const WorkflowEdgeComponent = ({
   };
 
   return (
-    <g aria-label={edgeData.tooltip} role="img">
+    <g aria-label={tooltip} role="img">
       <path
-        aria-label={edgeData.tooltip}
+        aria-label={tooltip}
         className="react-flow__edge-path"
         d={edgePath}
         fill="none"
@@ -70,18 +79,18 @@ const WorkflowEdgeComponent = ({
         markerStart={markerStart}
         style={edgeStyle}
       >
-        <title>{edgeData.tooltip}</title>
+        <title>{tooltip}</title>
       </path>
       {interactionWidth ? (
         <path
-          aria-label={edgeData.tooltip}
+          aria-label={tooltip}
           className="react-flow__edge-interaction"
           d={edgePath}
           fill="none"
           strokeOpacity={0}
           strokeWidth={interactionWidth}
         >
-          <title>{edgeData.tooltip}</title>
+          <title>{tooltip}</title>
         </path>
       ) : null}
     </g>

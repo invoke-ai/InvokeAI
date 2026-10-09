@@ -225,6 +225,18 @@ An empty collection is a successful loop with zero body iterations:
 Set `ForReturn.continue_condition` to `False` when the loop should stop after the current item. The results and state
 from completed iterations remain available through the normal final outputs.
 
+## Collection Type Checks
+
+Before a workflow runs, InvokeAI checks the item types flowing through `Collect`, `Iterate`, and connected `If` nodes.
+An `int` and a `float` collected together have the common item type `float`, so an iterator consumer must accept a
+float. If both resolved branches of an `If` feed one `Collect.collection`, their possible item types must share one
+compatible root. For example, `If(Collect[int], StringCollection) -> Collect.collection` is rejected even though only
+one branch runs at a time; the resulting collection cannot have one statically known item type. Complete both `If`
+branches before relying on strict type validation or queueing the workflow.
+
+A workflow saved before stricter collection checks may now fail validation when queued. Follow the validation error to
+the collector or iterator connection, then update the workflow so its collection item types and consumers agree.
+
 ## Common Wiring Mistakes
 
 - Connect the collection to `For.collection`, not to `For.item`.

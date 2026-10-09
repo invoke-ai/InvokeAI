@@ -30,24 +30,24 @@ export const InstallOptions = ({
         <Checkbox.Root
           checked={inplace}
           colorPalette="accent"
-          size="xs"
+          size="sm"
           onCheckedChange={(event) => onSetInplace(event.checked === true)}
         >
           <Checkbox.HiddenInput />
           <Checkbox.Control />
-          <Checkbox.Label fontSize="2xs">{t('models.installInPlace')}</Checkbox.Label>
+          <Checkbox.Label fontSize="xs">{t('models.installInPlace')}</Checkbox.Label>
         </Checkbox.Root>
       )}
       <Tooltip content={t('models.installFp8StorageTooltip')}>
         <Checkbox.Root
           checked={fp8Storage}
           colorPalette="accent"
-          size="xs"
+          size="sm"
           onCheckedChange={(event) => onSetFp8Storage(event.checked === true)}
         >
           <Checkbox.HiddenInput aria-describedby={fp8StorageDescriptionId} />
           <Checkbox.Control />
-          <Checkbox.Label fontSize="2xs">{t('models.installFp8Storage')}</Checkbox.Label>
+          <Checkbox.Label fontSize="xs">{t('models.installFp8Storage')}</Checkbox.Label>
         </Checkbox.Root>
       </Tooltip>
       <VisuallyHidden id={fp8StorageDescriptionId}>{t('models.installFp8StorageTooltip')}</VisuallyHidden>

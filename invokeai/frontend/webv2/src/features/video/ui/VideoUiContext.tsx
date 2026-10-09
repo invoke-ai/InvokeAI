@@ -10,7 +10,11 @@ export interface VideoUiAdapter {
   findInGallery(ref: GalleryItemRef): void;
   /** Read the selected upload board at upload time without subscribing to board changes. */
   getUploadBoardId(): string;
-  patchValues(values: Partial<VideoWidgetValues>, origin?: 'user' | 'system'): void;
+  /** Functional patches run synchronously against the originating project's latest normalized values. */
+  patchValues(
+    values: Partial<VideoWidgetValues> | ((current: VideoWidgetValues) => Partial<VideoWidgetValues>),
+    origin?: 'user' | 'system'
+  ): void;
   /**
    * Select item in Preview and request looping this window. Returns its playback token, or null if Preview could
    * not be raised and no request was made.
@@ -18,6 +22,8 @@ export interface VideoUiAdapter {
   playVideoSpanInPreview(span: { endSeconds: number; item: GalleryVideoItem; startSeconds: number }): number | null;
   projectId: string;
   rawValues: Record<string, unknown>;
+  /** Read this project's raw panel values at call time without subscribing, for writes that complete asynchronously. */
+  readValues(): Record<string, unknown>;
   reportError(message: string): void;
   showPromptSyntaxHighlighting: boolean;
   touchGalleryImages(): void;
@@ -47,6 +53,7 @@ export type VideoUiActions = Pick<
   | 'getUploadBoardId'
   | 'patchValues'
   | 'playVideoSpanInPreview'
+  | 'readValues'
   | 'reportError'
   | 'touchGalleryImages'
   | 'videoSpanPlayback'
@@ -62,6 +69,7 @@ export const VideoUiProvider = ({ adapter, children }: { adapter: VideoUiAdapter
     getUploadBoardId,
     patchValues,
     playVideoSpanInPreview,
+    readValues,
     reportError,
     touchGalleryImages,
     videoSpanPlayback,
@@ -72,6 +80,7 @@ export const VideoUiProvider = ({ adapter, children }: { adapter: VideoUiAdapter
       getUploadBoardId,
       patchValues,
       playVideoSpanInPreview,
+      readValues,
       reportError,
       touchGalleryImages,
       videoSpanPlayback,
@@ -81,6 +90,7 @@ export const VideoUiProvider = ({ adapter, children }: { adapter: VideoUiAdapter
       getUploadBoardId,
       patchValues,
       playVideoSpanInPreview,
+      readValues,
       reportError,
       touchGalleryImages,
       videoSpanPlayback,

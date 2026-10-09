@@ -3,19 +3,9 @@ import type { InvocationSourceId, ResultDestination } from '@workbench/invocatio
 import type { LayoutPresetRoute } from '@workbench/layoutContracts';
 import type { FormEvent, KeyboardEvent } from 'react';
 
-import {
-  chakra,
-  createListCollection,
-  Dialog,
-  HStack,
-  Icon,
-  Input,
-  Portal,
-  SimpleGrid,
-  Stack,
-  Text,
-} from '@chakra-ui/react';
+import { chakra, createListCollection, HStack, Icon, Input, Portal, SimpleGrid, Stack, Text } from '@chakra-ui/react';
 import { Button, CloseButton, IconButton } from '@platform/ui/Button';
+import { Dialog } from '@platform/ui/Dialog';
 import { Field } from '@platform/ui/Field';
 import { Select } from '@platform/ui/Select';
 import { Tooltip } from '@platform/ui/Tooltip';
@@ -68,6 +58,7 @@ export const LayoutPresetDialog = ({
   isOpen,
   name: initialName,
   onClose,
+  onExitComplete,
   onSubmit,
   sourceOptions,
   submitLabel,
@@ -78,6 +69,8 @@ export const LayoutPresetDialog = ({
   isOpen: boolean;
   name: string;
   onClose: () => void;
+  /** Called once the close animation finishes; hosts release the retained dialog here. */
+  onExitComplete?: () => void;
   onSubmit: (value: LayoutPresetDialogValue) => void;
   sourceOptions: readonly GraphWidgetSource[];
   submitLabel: string;
@@ -167,7 +160,14 @@ export const LayoutPresetDialog = ({
   }, []);
 
   return (
-    <Dialog.Root initialFocusEl={initialFocusEl} open={isOpen} lazyMount unmountOnExit onOpenChange={handleOpenChange}>
+    <Dialog.Root
+      initialFocusEl={initialFocusEl}
+      open={isOpen}
+      lazyMount
+      unmountOnExit
+      onExitComplete={onExitComplete}
+      onOpenChange={handleOpenChange}
+    >
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
@@ -186,7 +186,7 @@ export const LayoutPresetDialog = ({
                       ref={nameRef}
                       autoComplete="off"
                       name="layout-preset-name"
-                      size="sm"
+                      size="lg"
                       value={name}
                       onChange={handleNameChange}
                     />
@@ -198,7 +198,7 @@ export const LayoutPresetDialog = ({
                     tabIndex={-1}
                     onKeyDown={handleIconKeyDown}
                   >
-                    <Text color="fg.subtle" fontSize="2xs" fontWeight="700" textTransform="uppercase">
+                    <Text color="fg.subtle" fontSize="xs" fontWeight="700" textTransform="uppercase">
                       {t('topbar.presets.icon')}
                     </Text>
                     <SimpleGrid columns={8} gap="1">
@@ -222,7 +222,6 @@ export const LayoutPresetDialog = ({
                       collection={sourceCollection}
                       disabled={sourceOptions.length === 0}
                       renderItem={renderSourceOption}
-                      size="xs"
                       triggerProps={sourceTriggerProps}
                       value={sourceValue}
                       valueText={
@@ -244,10 +243,10 @@ export const LayoutPresetDialog = ({
                 </Stack>
               </Dialog.Body>
               <Dialog.Footer>
-                <Button size="xs" type="button" variant="ghost" onClick={onClose}>
+                <Button type="button" variant="ghost" onClick={onClose}>
                   {t('common.cancel')}
                 </Button>
-                <Button disabled={!canSubmit} size="xs" type="submit">
+                <Button disabled={!canSubmit} type="submit">
                   {submitLabel}
                 </Button>
               </Dialog.Footer>
@@ -282,7 +281,7 @@ const IconOption = ({
         colorPalette={isSelected ? 'accent' : undefined}
         data-icon-id={iconId}
         role="radio"
-        size="sm"
+        size="lg"
         tabIndex={isSelected ? 0 : -1}
         type="button"
         variant={isSelected ? 'solid' : 'ghost'}

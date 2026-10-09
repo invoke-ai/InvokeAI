@@ -19,6 +19,10 @@ import { createEmptyStacks, isGroupNode } from '@workbench/canvas-engine/documen
 import { getSourceContentRect } from '@workbench/canvas-engine/document/sources';
 import { isEmpty } from '@workbench/canvas-engine/math/rect';
 import { compositeDocument } from '@workbench/canvas-engine/render/compositor';
+import {
+  collectCompositedGroups,
+  planGroupCompositeScopes,
+} from '@workbench/canvas-engine/render/groupCompositeScopes';
 
 import type { CanvasMutationContext } from './mutationContext';
 
@@ -45,7 +49,13 @@ export interface ExtractMaskedAreaControllerOptions {
   readonly ctx: LayerStepContext &
     Pick<
       CanvasMutationContext,
-      'begin' | 'capturePermit' | 'captureInsertionAnchor' | 'createLayerId' | 'getDocument' | 'isPermitCurrent'
+      | 'begin'
+      | 'capturePermit'
+      | 'captureInsertionAnchor'
+      | 'createLayerId'
+      | 'getDocument'
+      | 'getReducerDocument'
+      | 'isPermitCurrent'
     >;
   readonly backend: RasterBackend;
   readonly layers: LayerCacheStore;
@@ -70,6 +80,13 @@ const filterRasterForest = (nodes: readonly CanvasNodeContract[], keep: Readonly
     }
     return keep.has(node.id) ? [node] : [];
   });
+
+/** The group compositing `layers` pass through (ancestor opacity, blend and adjustments), for comparison. */
+const groupScopesKey = (document: CanvasDocumentContractV3, layers: readonly CanvasLayerContract[]): string => {
+  const ids = new Set(layers.map((layer) => layer.id));
+  const leaves = compileDocumentLeaves(document).filter((leaf) => ids.has(leaf.id));
+  return JSON.stringify(planGroupCompositeScopes(leaves, collectCompositedGroups(document)));
+};
 
 const contributingRasters = (
   document: CanvasDocumentContractV3,
@@ -149,7 +166,8 @@ export class ExtractMaskedAreaController {
       if (maskPixels.guard.layer !== mask || !this.deps.isGuardCurrent(maskPixels.guard)) {
         return { status: 'not-ready' };
       }
-      const liveDocument = ctx.getDocument();
+      // A preview-tolerant recheck; see `CanvasMutationContext.getReducerDocument`.
+      const liveDocument = ctx.getReducerDocument();
       const liveMaskIndex =
         getDocumentLeaves(liveDocument ?? null).findIndex((layer) => layer.id === maskLayerId) ?? -1;
       const currentMask = getDocumentLeaves(liveDocument ?? null)[liveMaskIndex];
@@ -163,7 +181,9 @@ export class ExtractMaskedAreaController {
       if (
         liveMaskIndex !== maskIndex ||
         liveContributors.some((layer, index) => layer !== contributors[index]) ||
-        liveContributors.length !== contributors.length
+        liveContributors.length !== contributors.length ||
+        // The composite below reads the pre-await groups around the contributors.
+        groupScopesKey(liveDocument, liveContributors) !== groupScopesKey(document, contributors)
       ) {
         return { status: 'not-ready' };
       }

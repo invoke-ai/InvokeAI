@@ -61,13 +61,13 @@ const SystemPromptRow = ({
 
   return (
     <HStack justify="space-between" px="1" py="0.5">
-      <MiddleTruncate fontSize="xs" minW="0" text={prompt.name} />
+      <MiddleTruncate fontSize="md" minW="0" text={prompt.name} />
       <HStack gap="0.5">
         {/* Copying remains available without edit rights over the source. */}
         <Tooltip content={t('widgets.generate.systemPrompts.duplicate')}>
           <IconButton
             aria-label={t('widgets.generate.systemPrompts.duplicate')}
-            size="2xs"
+            size="sm"
             variant="ghost"
             onClick={handleDuplicate}
           >
@@ -77,19 +77,19 @@ const SystemPromptRow = ({
         {canEdit ? (
           <>
             <Tooltip content={t('common.edit')}>
-              <IconButton aria-label={t('common.edit')} size="2xs" variant="ghost" onClick={handleEdit}>
+              <IconButton aria-label={t('common.edit')} size="sm" variant="ghost" onClick={handleEdit}>
                 <PencilIcon />
               </IconButton>
             </Tooltip>
             <Tooltip content={t('common.delete')}>
-              <IconButton aria-label={t('common.delete')} size="2xs" variant="ghost" onClick={handleDelete}>
+              <IconButton aria-label={t('common.delete')} size="sm" variant="ghost" onClick={handleDelete}>
                 <TrashIcon />
               </IconButton>
             </Tooltip>
           </>
         ) : (
           // Shared by someone else. Says why it has no edit controls without adding colour.
-          <Text color="fg.subtle" fontSize="2xs">
+          <Text color="fg.subtle" fontSize="xs">
             {t('widgets.generate.systemPrompts.shared')}
           </Text>
         )}
@@ -265,7 +265,7 @@ export const SystemPromptsField = ({ catalog, onSelect, selectedId }: SystemProm
           }
         />
         {editorTarget.record?.isPublic ? (
-          <Text color="fg.muted" fontSize="2xs">
+          <Text color="fg.muted" fontSize="xs">
             {t('widgets.generate.systemPrompts.sharedEditWarning')}
           </Text>
         ) : null}
@@ -273,7 +273,6 @@ export const SystemPromptsField = ({ catalog, onSelect, selectedId }: SystemProm
           <Input
             id={nameFieldId}
             placeholder={t('widgets.generate.systemPrompts.namePlaceholder')}
-            size="xs"
             value={draft.name}
             onChange={handleNameChange}
           />
@@ -282,7 +281,6 @@ export const SystemPromptsField = ({ catalog, onSelect, selectedId }: SystemProm
           aria-label={t('widgets.generate.systemPrompts.content')}
           minH="6rem"
           placeholder={t('widgets.generate.systemPrompts.contentPlaceholder')}
-          size="xs"
           value={draft.content}
           onChange={handleContentChange}
         />
@@ -297,24 +295,22 @@ export const SystemPromptsField = ({ catalog, onSelect, selectedId }: SystemProm
             // Use inputMode instead of number input so empty-means-default drafts survive.
             inputMode="numeric"
             placeholder={String(SYSTEM_PROMPT_MAX_TOKENS_DEFAULT)}
-            size="xs"
             value={draft.maxTokens}
             onChange={handleMaxTokensChange}
           />
         </Field>
         {error ? (
-          <Text color="fg.error" fontSize="xs">
+          <Text color="fg.error" fontSize="md">
             {error}
           </Text>
         ) : null}
         <HStack justify="flex-end">
-          <Button size="xs" variant="ghost" onClick={closeEditor}>
+          <Button variant="ghost" onClick={closeEditor}>
             {t('common.cancel')}
           </Button>
           <Button
             disabled={!draft.name.trim() || !draft.content.trim() || isMaxTokensInvalid}
             loading={isSaving}
-            size="xs"
             onClick={handleSave}
           >
             {t('common.save')}
@@ -328,13 +324,13 @@ export const SystemPromptsField = ({ catalog, onSelect, selectedId }: SystemProm
     return (
       <Stack gap="2">
         <PromptPanelHeader label={t('widgets.generate.systemPrompts.title')}>
-          <Button h={PANEL_HEADER_CONTROL_HEIGHT} size="2xs" variant="ghost" onClick={startCreate}>
+          <Button h={PANEL_HEADER_CONTROL_HEIGHT} size="sm" variant="ghost" onClick={startCreate}>
             <PlusIcon />
             {t('widgets.generate.systemPrompts.new')}
           </Button>
         </PromptPanelHeader>
         {prompts.length === 0 ? (
-          <Text color="fg.subtle" fontSize="xs">
+          <Text color="fg.subtle" fontSize="md">
             {t('widgets.generate.systemPrompts.none')}
           </Text>
         ) : (
@@ -354,11 +350,11 @@ export const SystemPromptsField = ({ catalog, onSelect, selectedId }: SystemProm
           </Scrollable>
         )}
         {error ? (
-          <Text color="fg.error" fontSize="xs">
+          <Text color="fg.error" fontSize="md">
             {error}
           </Text>
         ) : null}
-        <Button size="xs" variant="ghost" onClick={toggleManaging}>
+        <Button variant="ghost" onClick={toggleManaging}>
           {t('common.done')}
         </Button>
         <ConfirmDialog
@@ -382,7 +378,6 @@ export const SystemPromptsField = ({ catalog, onSelect, selectedId }: SystemProm
           disabled={prompts.length === 0}
           flex="1"
           id={selectId}
-          size="xs"
           value={selectValue}
           valueText={selectedName ?? t('widgets.generate.systemPrompts.none')}
           onValueChange={handleSelectChange}
@@ -390,7 +385,7 @@ export const SystemPromptsField = ({ catalog, onSelect, selectedId }: SystemProm
         <Tooltip content={t('widgets.generate.systemPrompts.manage')}>
           <IconButton
             aria-label={t('widgets.generate.systemPrompts.manage')}
-            size="2xs"
+            size="sm"
             variant="ghost"
             onClick={toggleManaging}
           >

@@ -7,8 +7,8 @@ import { useMemo, type MouseEvent, type ReactNode, type Ref } from 'react';
 const ROW_CONTAINER_CSS = {
   '&:hover .board-row-actions, &:focus-within .board-row-actions': { opacity: 1 },
   '&:hover .board-row-hover, &:focus-within .board-row-hover': { opacity: 1 },
-  // A tint rather than a surface token: the picker popover's own background is bg.muted, which hid the hover there.
-  _hover: { bg: 'gray.hoverTint/10' },
+  // A translucent tint, not an opaque surface: the picker popover's own background is bg.muted, which hid one there.
+  _hover: { bg: 'bg.hover' },
   borderRadius: 'sm',
   transition: 'background var(--wb-motion-duration-fast) ease',
 } as const;
@@ -78,12 +78,7 @@ export const GalleryBoardRowShell = ({
         >
           {cover}
           <Stack align="stretch" flex="1" gap="0" minW="0" textAlign="start">
-            <MiddleTruncate
-              fontSize="xs"
-              fontWeight={labelWeight ?? (isSelected ? '600' : '500')}
-              minW="0"
-              text={label}
-            />
+            <MiddleTruncate fontWeight={labelWeight ?? (isSelected ? '600' : '500')} minW="0" text={label} />
             {subtitle}
           </Stack>
           {children}

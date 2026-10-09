@@ -1,19 +1,14 @@
-import { Dialog, HStack, Input, Portal, Stack, Switch, Text } from '@chakra-ui/react';
+import { HStack, Input, Portal, Stack, Switch, Text } from '@chakra-ui/react';
 import { createUserFormSchema, PASSWORD_RULES_HINT, type UserFormValues } from '@features/identity/core/schemas';
-import {
-  createUser,
-  generatePassword,
-  updateUser,
-  type UserDTO,
-  type UserUpdateRequest,
-} from '@features/identity/data/api';
-import { useAuthSession } from '@features/identity/session';
+import { createUser, generatePassword, type UserDTO, type UserUpdateRequest } from '@features/identity/data/api';
+import { updateManagedUser, useAuthSession } from '@features/identity/session';
 import { AuthFormAlert } from '@features/identity/ui/AuthScreen';
 import { PasswordInput, PasswordStrengthMeter } from '@features/identity/ui/PasswordInput';
 import { useIdentityNotify } from '@features/identity/ui/useIdentityNotify';
 import { useZodForm } from '@platform/react/useZodForm';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, CloseButton, Field } from '@platform/ui';
+import { Dialog } from '@platform/ui/Dialog';
 import { WandSparklesIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -155,7 +150,7 @@ const UserForm = ({
               return;
             }
 
-            await updateUser(editedUser.user_id, changes);
+            await updateManagedUser(editedUser.user_id, changes);
           }
         } catch (error) {
           throw new Error(getApiErrorMessage(error, isCreate ? t('users.couldNotCreate') : t('users.couldNotUpdate')));
@@ -227,7 +222,7 @@ const UserForm = ({
                   value={form.values.password}
                   onChange={handlePasswordChange}
                 />
-                <Button loading={isGenerating} size="xs" variant="outline" onClick={handleGeneratedPasswordClick}>
+                <Button loading={isGenerating} variant="outline" onClick={handleGeneratedPasswordClick}>
                   <WandSparklesIcon />
                   {t('users.generate')}
                 </Button>
@@ -245,10 +240,10 @@ const UserForm = ({
             onCheckedChange={handleAdminCheckedChange}
           >
             <Stack gap="0.5">
-              <Switch.Label color="fg" fontSize="sm" fontWeight="500" m="0">
+              <Switch.Label color="fg" fontSize="lg" fontWeight="500" m="0">
                 {t('users.administrator')}
               </Switch.Label>
-              <Text color="fg.subtle" fontSize="xs">
+              <Text color="fg.subtle" fontSize="md">
                 {isSelf ? t('users.cannotChangeSelfRole') : t('users.administratorHelp')}
               </Text>
             </Stack>
@@ -260,10 +255,10 @@ const UserForm = ({
         </Stack>
       </Dialog.Body>
       <Dialog.Footer>
-        <Button size="xs" variant="ghost" onClick={onClose}>
+        <Button variant="ghost" onClick={onClose}>
           {t('common.cancel')}
         </Button>
-        <Button loading={form.isSubmitting} size="xs" variant="solid" onClick={handleSubmitClick}>
+        <Button loading={form.isSubmitting} variant="solid" onClick={handleSubmitClick}>
           {isCreate ? t('users.createUser') : t('users.saveChanges')}
         </Button>
       </Dialog.Footer>

@@ -9,9 +9,12 @@ CPU tensors stand in for the CUDA device and a fake `sageattention` module for t
 how the real kernels behave; `TestOnNvidiaHardware` does, on a GPU with SageAttention installed (`-m slow`).
 """
 
+import contextlib
+import functools
 import importlib.util
 import logging
 import threading
+from collections import Counter
 from importlib.metadata import PackageNotFoundError
 from pathlib import Path
 from types import SimpleNamespace
@@ -28,6 +31,7 @@ TORCH_SDPA = F.scaled_dot_product_attention
 VERSION = "2.2.0+cu130torch2.10.0andhigher.post6"
 KERNELS = (
     "sageattn_qk_int8_pv_fp16_cuda",
+    "sageattn_qk_int8_pv_fp16_triton",
     "sageattn_qk_int8_pv_fp8_cuda",
     "sageattn_qk_int8_pv_fp8_cuda_sm90",
 )
@@ -115,9 +119,18 @@ def _cuda_build(
     monkeypatch.setattr(sage, "_import_sageattention", lambda: (VERSION, module))
     monkeypatch.setattr(sage, "_cuda_index", lambda q, k, v: 0)
     monkeypatch.setattr(sage, "_disabled_devices", set())
-    monkeypatch.setattr(sage, "_validated_devices", set(capabilities))
+    monkeypatch.setattr(sage, "_validated", _all_variants(capabilities))
+    monkeypatch.setattr(sage, "_cache_failures", Counter())
     monkeypatch.setattr(sage, "_announced_devices", set())
+    monkeypatch.setattr(torch.cuda, "device", lambda index: contextlib.nullcontext())
     return module, torch_calls
+
+
+def _all_variants(devices) -> set:
+    """Every kernel variant of these devices, as if each had passed its first-call check."""
+    return {
+        (index, dtype, head_dim) for index in devices for dtype in sage._HALF_PRECISION for head_dim in sage._HEAD_DIMS
+    }
 
 
 @pytest.fixture
@@ -135,7 +148,8 @@ class TestKernelTable:
         ("capability", "cuda", "kernel", "options"),
         [
             ((8, 0), (13, 0), "sageattn_qk_int8_pv_fp16_cuda", {"pv_accum_dtype": "fp32"}),
-            ((8, 6), (13, 0), "sageattn_qk_int8_pv_fp16_cuda", {"pv_accum_dtype": "fp32"}),
+            # Upstream's `sageattn` picks the Triton kernel here; the Windows build moved sm86 to CUDA unexplained.
+            ((8, 6), (13, 0), "sageattn_qk_int8_pv_fp16_triton", {}),
             ((8, 9), (13, 0), "sageattn_qk_int8_pv_fp8_cuda", {"pv_accum_dtype": "fp32+fp16"}),
             ((8, 9), (12, 6), "sageattn_qk_int8_pv_fp8_cuda", {"pv_accum_dtype": "fp32+fp32"}),
             ((9, 0), (13, 0), "sageattn_qk_int8_pv_fp8_cuda_sm90", {"pv_accum_dtype": "fp32+fp32"}),
@@ -155,7 +169,9 @@ class TestKernelTable:
         assert module.calls[0]["kernel"] == kernel
         assert {name: module.calls[0][name] for name in (*options, "smooth_k")} == options | {"smooth_k": False}
 
-    @pytest.mark.parametrize("capability", [(7, 5), (10, 3), (11, 0)], ids=["turing", "sm103", "sm110"])
+    @pytest.mark.parametrize(
+        "capability", [(7, 5), (8, 7), (10, 3), (11, 0)], ids=["turing", "jetson-orin", "sm103", "sm110"]
+    )
     def test_gpus_sageattention_has_no_kernel_for_get_none(self, capability):
         assert sage._kernel(FakeSageAttention(), capability, (13, 0)) is None
 
@@ -255,6 +271,24 @@ class TestRouting:
 
         assert module.calls == [] and len(torch_calls) == 1
 
+    def test_a_call_under_cuda_autocast_reaches_torch(self, installed, monkeypatch):
+        """Autocast would hand SageAttention whatever dtype it picks; torch's SDPA applies autocast's rules itself."""
+        module, torch_calls = installed
+        monkeypatch.setattr(torch, "is_autocast_enabled", lambda device_type=None: device_type == "cuda")
+        q, k = _q(1, 2, QUERY_LEN, 64), _q(1, 2, KEY_LEN, 64)
+
+        with sage_attention_scope():
+            F.scaled_dot_product_attention(q, k, k)
+
+        assert module.calls == [] and len(torch_calls) == 1
+
+    @pytest.mark.filterwarnings("ignore:The PyTorch API of nested tensors")
+    def test_a_nested_query_is_not_eligible(self):
+        """Nested (jagged) tensors report four dimensions but have no fixed sequence length to quantize over."""
+        q = torch.nested.nested_tensor([_q(2, QUERY_LEN, 64), _q(2, QUERY_LEN + 1, 64)])
+        k = _q(2, 2, KEY_LEN, 64)
+        assert sage._ineligible(q, k, k, None, 0.0, False, False, False) == "shape"
+
     def test_an_unknown_keyword_reaches_torch_rather_than_being_dropped(self, installed):
         module, torch_calls = installed
         q, k = _q(1, 2, QUERY_LEN, 64), _q(1, 2, KEY_LEN, 64)
@@ -278,7 +312,7 @@ class TestRouting:
 class TestFirstCallCheck:
     def test_a_devices_first_result_is_compared_with_torch_once(self, monkeypatch):
         module, torch_calls = _cuda_build(monkeypatch, {0: (8, 9)})
-        monkeypatch.setattr(sage, "_validated_devices", set())
+        monkeypatch.setattr(sage, "_validated", set())
         install_sage_attention()
         q, k = _q(1, 2, QUERY_LEN, 64), _q(1, 2, KEY_LEN, 64)
 
@@ -289,11 +323,41 @@ class TestFirstCallCheck:
         assert len(module.calls) == 2, "both calls ran on the kernel"
         assert len(torch_calls) == 1, "only the first was also computed by torch, for the comparison"
 
+    def test_the_check_pairs_a_gqa_query_group_with_its_own_kv_head(self, monkeypatch):
+        """Query heads 0-3 attend to K/V head 0; comparing them with head 1 instead would retire a correct kernel."""
+        module, torch_calls = _cuda_build(monkeypatch, {0: (8, 9)})
+        monkeypatch.setattr(sage, "_validated", set())
+        install_sage_attention()
+        q, k, v = _q(1, 8, QUERY_LEN, 64), _q(1, 2, KEY_LEN, 64), _q(1, 2, KEY_LEN, 64)
+        v[:, 1] += 3.0  # a K/V head unlike head 0, so a wrong pairing cannot pass
+
+        with sage_attention_scope():
+            F.scaled_dot_product_attention(q, k, v, enable_gqa=True)
+            F.scaled_dot_product_attention(q, k, v, enable_gqa=True)
+
+        assert len(module.calls) == 2, "the check passed, so the device stays on the kernel"
+        assert len(torch_calls) == 1 and torch_calls[0]["gqa"] and torch_calls[0]["q"] == (1, 4, 1024, 64)
+
+    def test_each_precision_and_head_size_is_checked_on_its_first_call(self, monkeypatch):
+        """They select different compiled kernels; one passing says nothing about the others."""
+        module, torch_calls = _cuda_build(monkeypatch, {0: (8, 9)})
+        monkeypatch.setattr(sage, "_validated", set())
+        install_sage_attention()
+        hd64, hd128 = _q(1, 2, QUERY_LEN, 64), _q(1, 2, QUERY_LEN, 128)
+        bf16 = _q(1, 2, QUERY_LEN, 64, dtype=torch.bfloat16)
+
+        with sage_attention_scope():
+            for q in (hd64, hd64, hd128, hd128, bf16, bf16):
+                F.scaled_dot_product_attention(q, q, q)
+
+        assert len(module.calls) == 6
+        assert len(torch_calls) == 3, "one comparison per variant"
+
     @pytest.mark.parametrize("garbage", [torch.nan, 50.0], ids=["non-finite", "wrong"])
     def test_a_wrong_first_result_retires_the_device_and_returns_torchs(self, monkeypatch, caplog, garbage):
         """A kernel the build lacks for this GPU returns uninitialized memory instead of raising."""
         module, torch_calls = _cuda_build(monkeypatch, {0: (8, 9)})
-        monkeypatch.setattr(sage, "_validated_devices", set())
+        monkeypatch.setattr(sage, "_validated", set())
         install_sage_attention()
         q, k = _q(1, 2, QUERY_LEN, 64), _q(1, 2, KEY_LEN, 64)
         module.result = torch.full((1, 2, QUERY_LEN, 64), garbage, dtype=torch.float16)
@@ -333,18 +397,73 @@ class TestFailures:
             F.scaled_dot_product_attention(q, k, k)
         assert len(module.calls) == 2, "another device is unaffected"
 
-    def test_out_of_memory_propagates_and_does_not_retire_the_device(self, installed):
-        module, _ = installed
-        module.error = torch.OutOfMemoryError("CUDA out of memory")
+    @pytest.mark.parametrize(
+        "error",
+        [
+            torch.OutOfMemoryError("CUDA out of memory. Tried to allocate 1.50 GiB"),
+            RuntimeError("Triton Error [CUDA]: out of memory"),
+        ],
+        ids=["torch-oom", "triton-oom"],
+    )
+    def test_running_out_of_memory_moves_the_rest_of_the_scope_to_torch_only(self, installed, caplog, error):
+        """SDPA needs less memory. Retrying every call would flush the allocator's cache each time; retiring the
+        device would cost every later, smaller generation SageAttention."""
+        module, torch_calls = installed
+        module.error = error
         q, k = _q(1, 2, QUERY_LEN, 64), _q(1, 2, KEY_LEN, 64)
+        caplog.set_level(logging.INFO, logger=sage.__name__)
 
-        with sage_attention_scope(), pytest.raises(torch.OutOfMemoryError):
+        with sage_attention_scope():
+            out = F.scaled_dot_product_attention(q, k, k)
+            module.error = None
             F.scaled_dot_product_attention(q, k, k)
+        assert len(module.calls) == 1 and len(torch_calls) == 2, "after the OOM, this scope stayed on torch"
+        torch.testing.assert_close(out.float(), _reference(q, k, k), atol=2e-3, rtol=2e-3)
 
-        module.error = None
         with sage_attention_scope():
             F.scaled_dot_product_attention(q, k, k)
-        assert len(module.calls) == 2
+        assert len(module.calls) == 2, "the next scope tries SageAttention again"
+        assert any("ran out of memory" in r.message for r in caplog.records if r.levelno == logging.INFO)
+        assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+
+    def test_a_triton_cache_failure_falls_back_for_that_call_only(self, installed, caplog):
+        """On Windows two GPUs compiling the same kernel can race for its cache file; that says nothing about it."""
+        module, torch_calls = installed
+        module.error = PermissionError("[WinError 5] Access is denied: 'triton\\cache\\tmp.pid_123'")
+        q, k = _q(1, 2, QUERY_LEN, 64), _q(1, 2, KEY_LEN, 64)
+        caplog.set_level(logging.WARNING, logger=sage.__name__)
+
+        with sage_attention_scope():
+            out = F.scaled_dot_product_attention(q, k, k)
+            module.error = None
+            F.scaled_dot_product_attention(q, k, k)
+
+        torch.testing.assert_close(out.float(), _reference(q, k, k), atol=2e-3, rtol=2e-3)
+        assert len(module.calls) == 2 and len(torch_calls) == 1
+        assert not caplog.records
+
+    def test_only_cache_failures_in_a_row_retire_the_device(self, installed, caplog):
+        """A cache that can never be written would recompile on every call; one that failed now and then is fine."""
+        module, torch_calls = installed
+        q, k = _q(1, 2, QUERY_LEN, 64), _q(1, 2, KEY_LEN, 64)
+        caplog.set_level(logging.WARNING, logger=sage.__name__)
+
+        def call(error):
+            module.error = error
+            with sage_attention_scope():
+                F.scaled_dot_product_attention(q, k, k)
+
+        for error in [PermissionError("denied")] * (sage._MAX_CACHE_FAILURES - 1) + [None]:
+            call(error)
+        for _ in range(sage._MAX_CACHE_FAILURES - 1):
+            call(PermissionError("denied"))
+        assert not caplog.records and 0 not in sage._disabled_devices, "the success in between reset the count"
+
+        call(PermissionError("denied"))
+        call(None)
+        assert 0 in sage._disabled_devices
+        assert len(module.calls) == 2 * sage._MAX_CACHE_FAILURES, "the last call no longer reached the kernel"
+        assert any("cuda:0" in r.message for r in caplog.records if r.levelno == logging.WARNING)
 
     def test_the_scope_closes_when_its_block_raises(self, installed):
         module, torch_calls = installed
@@ -397,20 +516,42 @@ class TestDeviceRule:
     def _on(index: int) -> SimpleNamespace:
         return SimpleNamespace(device=torch.device("cuda", index))
 
-    def test_tensors_on_the_threads_current_device_are_eligible(self, monkeypatch):
-        monkeypatch.setattr(torch.cuda, "current_device", lambda: 1)
+    def test_tensors_on_one_cuda_device_give_its_index(self):
         assert sage._cuda_index(self._on(1), self._on(1), self._on(1)) == 1
 
-    def test_tensors_on_another_device_are_not(self, monkeypatch):
-        """SageAttention launches on the thread's current device; tensors elsewhere would be read from the wrong GPU."""
-        monkeypatch.setattr(torch.cuda, "current_device", lambda: 0)
-        assert sage._cuda_index(self._on(1), self._on(1), self._on(1)) is None
-
-    def test_mixed_devices_and_cpu_are_not(self, monkeypatch):
-        monkeypatch.setattr(torch.cuda, "current_device", lambda: 0)
+    def test_mixed_devices_and_cpu_do_not(self):
         assert sage._cuda_index(self._on(0), self._on(1), self._on(0)) is None
         cpu = SimpleNamespace(device=torch.device("cpu"))
         assert sage._cuda_index(cpu, cpu, cpu) is None
+
+    def test_the_kernel_runs_with_the_tensors_device_current(self, monkeypatch):
+        """SageAttention launches on the thread's current device. A single-device install with `device: cuda:1` never
+        makes that device current, so the wrapper does, for the call only."""
+        module, _ = _cuda_build(monkeypatch, {0: (8, 9), 1: (8, 9)})
+        events: list[str] = []
+        kernel = module.sageattn_qk_int8_pv_fp8_cuda
+
+        @functools.wraps(kernel)
+        def recording_kernel(*args, **kwargs):
+            events.append("kernel")
+            return kernel(*args, **kwargs)
+
+        @contextlib.contextmanager
+        def recording_device(index):
+            events.append(f"enter cuda:{index}")
+            yield
+            events.append("exit")
+
+        module.sageattn_qk_int8_pv_fp8_cuda = recording_kernel
+        monkeypatch.setattr(torch.cuda, "device", recording_device)
+        monkeypatch.setattr(sage, "_cuda_index", lambda q, k, v: 1)
+        install_sage_attention()
+        q, k = _q(1, 2, QUERY_LEN, 64), _q(1, 2, KEY_LEN, 64)
+
+        with sage_attention_scope():
+            F.scaled_dot_product_attention(q, k, k)
+
+        assert events == ["enter cuda:1", "kernel", "exit"]
 
 
 def _raise(error: Exception):
@@ -543,16 +684,23 @@ class TestOnNvidiaHardware:
     """Real kernels: needs CUDA, `sageattention` >= 2.2 and compute capability 8.0+, and about 10 GB of free VRAM for
     the float32 references. Measured on an RTX 4090."""
 
-    @pytest.fixture
-    def kernel(self, monkeypatch):
+    @pytest.fixture(params=["own", "sm86-triton"])
+    def kernel(self, request, monkeypatch):
+        """The kernel this GPU gets, or the Triton kernel an sm86 card gets: it runs on any Ampere or newer GPU, so this
+        one stands in for an sm86 card that is not here."""
         import sageattention
 
         capability = torch.cuda.get_device_capability(0)
         if capability < (8, 0):
             pytest.skip("SageAttention 2 needs compute capability 8.0 or newer")
+        if request.param == "sm86-triton":
+            pick = sage._kernel
+            monkeypatch.setattr(sage, "_kernel", lambda module, _capability, cuda: pick(module, (8, 6), cuda))
         monkeypatch.setattr(F, "scaled_dot_product_attention", TORCH_SDPA)
         monkeypatch.setattr(sage, "_disabled_devices", set())
-        monkeypatch.setattr(sage, "_validated_devices", set())
+        monkeypatch.setattr(sage, "_validated", set())
+        monkeypatch.setattr(sage, "_cache_failures", Counter())
+        monkeypatch.setattr(sage, "_announced_devices", set())
         install_sage_attention()
         if not getattr(F.scaled_dot_product_attention, sage._SENTINEL, False):
             pytest.skip("the installed sageattention is not one InvokeAI uses (see the startup warning)")
@@ -560,10 +708,11 @@ class TestOnNvidiaHardware:
         assert cuda is not None
         return sage._kernel(sageattention, capability, cuda[:2])
 
-    def test_every_kernel_takes_the_arguments_it_is_given(self, kernel):
+    def test_every_kernel_takes_the_arguments_it_is_given(self, kernel, monkeypatch):
         import sageattention
 
-        for capability in ((8, 0), (8, 9), (9, 0), (12, 0)):
+        monkeypatch.undo()  # the real table, not the fixture's stand-in
+        for capability in ((8, 0), (8, 6), (8, 9), (9, 0), (12, 0)):
             assert sage._unaccepted_arguments(sage._kernel(sageattention, capability, (13, 0))) == []
 
     @pytest.mark.parametrize(
@@ -572,8 +721,10 @@ class TestOnNvidiaHardware:
             ((1, 24, 4608, 128), (1, 24, 4608, 128), torch.bfloat16, False),  # FLUX.1 1024^2
             ((2, 10, 4096, 64), (2, 10, 4096, 64), torch.float16, False),  # SDXL 1024^2, level 1
             ((1, 48, 4608, 128), (1, 12, 4608, 128), torch.bfloat16, True),  # Krea-2 GQA
+            # Lengths that are no multiple of a tile, and cross-attention to a shorter key.
+            ((1, 24, 4429, 128), (1, 24, 845, 128), torch.bfloat16, False),
         ],
-        ids=["flux", "sdxl", "krea2-gqa"],
+        ids=["flux", "sdxl", "krea2-gqa", "partial-tile-cross"],
     )
     def test_output_stays_close_to_a_float32_reference(self, kernel, shape_q, shape_kv, dtype, gqa):
         g = torch.Generator(device="cuda").manual_seed(0)
@@ -585,6 +736,8 @@ class TestOnNvidiaHardware:
         with sage_attention_scope():
             out = F.scaled_dot_product_attention(q, k, v, enable_gqa=gqa)
 
+        # SDPA would pass the bounds below too; the kernel must have served the call.
+        assert torch.equal(out, kernel(q, k, v, tensor_layout="HND", is_causal=False, sm_scale=shape_q[-1] ** -0.5))
         ref = _reference(q, k, v)
         assert torch.isfinite(out).all()
         cos = F.cosine_similarity(out.float().flatten(2), ref.flatten(2), dim=-1)

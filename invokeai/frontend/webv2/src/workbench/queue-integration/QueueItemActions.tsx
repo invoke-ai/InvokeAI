@@ -1,7 +1,8 @@
 import type { QueueItemReadModel } from '@features/queue/contracts';
 
-import { ButtonGroup, Dialog, Icon, Portal } from '@chakra-ui/react';
+import { ButtonGroup, Icon, Portal } from '@chakra-ui/react';
 import { Button, CloseButton } from '@platform/ui/Button';
+import { Dialog } from '@platform/ui/Dialog';
 import { JsonPreview } from '@platform/ui/JsonPreview';
 import { useNotify } from '@workbench/useNotify';
 import { FileTextIcon, WandSparklesIcon } from 'lucide-react';
@@ -23,7 +24,7 @@ export const QueueItemActions = ({ item }: { item: QueueItemReadModel }) => {
 
   return (
     <>
-      <ButtonGroup flexWrap="wrap" minW="0" rowGap="1" size="2xs" variant="subtle" w="full">
+      <ButtonGroup flexWrap="wrap" minW="0" rowGap="1" size="sm" variant="subtle" w="full">
         <Button disabled variant="ghost" onClick={onSendToCanvas}>
           <Icon as={WandSparklesIcon} boxSize="3" />
           {t('widgets.queue.sendToCanvas')}

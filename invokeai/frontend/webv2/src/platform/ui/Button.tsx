@@ -38,8 +38,8 @@ export const IconButton = ({ colorPalette, ...props }: IconButtonProps) => (
   <ChakraIconButton colorPalette={colorPalette ?? defaultPalette(props.variant)} {...props} />
 );
 
-/** Chakra defaults close buttons to a full `md` control; dismissal chrome here is small and muted. */
-export const CloseButton = (props: CloseButtonProps) => <ChakraCloseButton color="fg.muted" size="xs" {...props} />;
+/** Dismissal chrome is muted. */
+export const CloseButton = (props: CloseButtonProps) => <ChakraCloseButton color="fg.muted" {...props} />;
 
 export interface ToggleIconButtonProps extends Omit<
   IconButtonProps,
@@ -70,7 +70,7 @@ export const ToggleIconButton = ({
         aria-label={label}
         aria-pressed={checked}
         color={checked ? undefined : 'fg.muted'}
-        size="2xs"
+        size="sm"
         variant={checked ? 'solid' : 'ghost'}
         {...props}
         onClick={handleClick}

@@ -4,7 +4,7 @@ import { isLoginAttemptSupersededError, loginWithCredentials, useAuthSession } f
 import { useZodForm } from '@platform/react/useZodForm';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, Field } from '@platform/ui';
-import { useNavigate } from '@tanstack/react-router';
+import { Navigate } from '@tanstack/react-router';
 import { useCallback, type ChangeEvent, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -15,7 +15,6 @@ import { PasswordInput } from './PasswordInput';
 export const LoginScreen = () => {
   const { t } = useTranslation();
   const session = useAuthSession();
-  const navigate = useNavigate();
   const form = useZodForm(loginSchema, { email: '', password: '', rememberMe: false });
 
   const submit = useCallback(
@@ -32,10 +31,8 @@ export const LoginScreen = () => {
 
           throw new Error(getApiErrorMessage(error, t('auth.signInFailed')));
         }
-
-        await navigate({ to: '/' });
       }),
-    [form, navigate, t]
+    [form, t]
   );
 
   const handleSubmit = useCallback(
@@ -61,6 +58,11 @@ export const LoginScreen = () => {
     [form]
   );
 
+  // Leave once signed in, whether by this form or by following a sign-in in another tab.
+  if (session.multiuserEnabled && session.user !== null) {
+    return <Navigate replace to="/" />;
+  }
+
   return (
     <AuthScreen subtitle={t('auth.signInSubtitle')} title={t('auth.welcomeTitle')}>
       <chakra.form display="flex" flexDirection="column" gap="4" onSubmit={handleSubmit}>
@@ -72,6 +74,7 @@ export const LoginScreen = () => {
             autoComplete="email"
             autoFocus
             placeholder="you@example.com"
+            size="lg"
             value={form.values.email}
             onChange={handleEmailChange}
           />
@@ -81,18 +84,19 @@ export const LoginScreen = () => {
             aria-invalid={form.errors.password ? true : undefined}
             autoComplete="current-password"
             placeholder={t('auth.yourPassword')}
+            size="lg"
             value={form.values.password}
             onChange={handlePasswordChange}
           />
         </Field>
-        <Checkbox.Root checked={form.values.rememberMe} size="sm" onCheckedChange={handleRememberMeChange}>
+        <Checkbox.Root checked={form.values.rememberMe} onCheckedChange={handleRememberMeChange}>
           <Checkbox.HiddenInput />
           <Checkbox.Control />
           <Checkbox.Label color="fg.muted" fontWeight="400">
             {t('auth.keepSignedIn')}
           </Checkbox.Label>
         </Checkbox.Root>
-        <Button loading={form.isSubmitting} size="sm" type="submit" variant="solid">
+        <Button loading={form.isSubmitting} size="lg" type="submit" variant="solid">
           {t('auth.signIn')}
         </Button>
       </chakra.form>

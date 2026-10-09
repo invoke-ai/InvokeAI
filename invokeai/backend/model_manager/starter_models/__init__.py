@@ -76,6 +76,18 @@ from invokeai.backend.model_manager.starter_models.external import (
     alibabacloud_qwen_image_edit_max,
     alibabacloud_qwen_image_max,
     alibabacloud_wan26_t2i,
+    atlascloud_flux_2_pro,
+    atlascloud_flux_dev,
+    atlascloud_flux_schnell,
+    atlascloud_grok_imagine_image_2,
+    atlascloud_hidream_o1_1_5,
+    atlascloud_ideogram_v4_quality,
+    atlascloud_ideogram_v4_turbo,
+    atlascloud_krea_2_turbo,
+    atlascloud_mai_image_2_5,
+    atlascloud_nano_banana_2,
+    atlascloud_qwen_image_3,
+    atlascloud_z_image_turbo,
     gemini_3_1_flash_image_preview,
     gemini_flash_image,
     gemini_pro_image_preview,
@@ -155,6 +167,7 @@ from invokeai.backend.model_manager.starter_models.ltx_2 import (
     ltx2_5_dev_transformer_int8,
     ltx2_5_distilled_lora,
     ltx2_5_distilled_transformer_int8,
+    ltx2_5_distilled_transformer_nvfp4,
     ltx2_5_duration_head,
     ltx2_5_prompt_enhancer,
     ltx2_5_text_encoder_bf16,
@@ -475,6 +488,7 @@ STARTER_MODELS: list[StarterModel] = [
     minimax_h3_lightx2v_ref2v_turbo_lora,
     ltx2_5_dev_transformer_int8,
     ltx2_5_distilled_transformer_int8,
+    ltx2_5_distilled_transformer_nvfp4,
     ltx2_5_distilled_lora,
     ltx2_5_dev_transformer_bf16,
     ltx2_5_text_encoder_int8,
@@ -485,6 +499,18 @@ STARTER_MODELS: list[StarterModel] = [
     gemini_flash_image,
     gemini_pro_image_preview,
     gemini_3_1_flash_image_preview,
+    atlascloud_flux_schnell,
+    atlascloud_flux_dev,
+    atlascloud_flux_2_pro,
+    atlascloud_qwen_image_3,
+    atlascloud_z_image_turbo,
+    atlascloud_mai_image_2_5,
+    atlascloud_ideogram_v4_turbo,
+    atlascloud_ideogram_v4_quality,
+    atlascloud_krea_2_turbo,
+    atlascloud_hidream_o1_1_5,
+    atlascloud_grok_imagine_image_2,
+    atlascloud_nano_banana_2,
     openai_gpt_image_2,
     openai_gpt_image_1_5,
     openai_gpt_image_1,
@@ -585,10 +611,17 @@ zimage_bundle: list[StarterModel] = [
     flux_vae,
 ]
 
-flux2_klein_bundle: list[StarterModel] = [
+# Klein 4B and 9B (each with its Qwen3 encoder), the PiD super-resolution decoder for their latents, and FLUX.2 [dev]
+# at GGUF Q4 with its cow-mistral encoder. [dev] is non-commercial; the Klein models are not.
+flux2_bundle: list[StarterModel] = [
     flux2_klein_4b_gguf_q4,
-    flux2_vae,
     flux2_klein_qwen3_4b_encoder,
+    flux2_klein_9b_gguf_q4,
+    flux2_klein_qwen3_8b_encoder,
+    flux2_vae,
+    pid_decoder_flux2_2k,
+    flux2_dev_gguf_q4_k_m,
+    flux2_dev_cow_mistral_q4,
 ]
 
 # Turbo only: both checkpoints are 8B and the full pipeline is a large download, so the bundle
@@ -630,13 +663,10 @@ krea2_bundle: list[StarterModel] = [
     krea2_turbo_nvfp4,
 ]
 
-# Wan 2.2 starter bundles. Split into T2V and I2V so users only pay for the
-# capability they need: a 12 GB card can install just the T2V bundle and have
-# both text-to-video (T2V-A14B) and a low-VRAM image-to-video option (via
-# TI2V-5B, which handles both modes in one ~3.4 GB model). The I2V bundle adds
-# the heavier I2V-A14B path for users with more headroom. Q8 variants and full
-# Diffusers builds stay available as a-la-carte starters.
-wan_t2v_bundle: list[StarterModel] = [
+# Wan 2.2: text-to-video (T2V-A14B), image-to-video (I2V-A14B), and the low-VRAM TI2V-5B that
+# handles both modes in one ~3.4 GB model, each A14B pair with its Lightning LoRAs. Q8 variants and
+# full Diffusers builds stay available as a-la-carte starters.
+wan_bundle: list[StarterModel] = [
     wan_22_t5_encoder,
     wan_22_a14b_vae,
     wan_22_5b_vae,
@@ -645,11 +675,6 @@ wan_t2v_bundle: list[StarterModel] = [
     wan_22_t2v_a14b_low_gguf_q4_k_m,
     wan_22_t2v_lightning_high,
     wan_22_t2v_lightning_low,
-]
-
-wan_i2v_bundle: list[StarterModel] = [
-    wan_22_t5_encoder,
-    wan_22_a14b_vae,
     wan_22_i2v_a14b_gguf_q4_k_m,
     wan_22_i2v_a14b_low_gguf_q4_k_m,
     wan_22_i2v_lightning_high,
@@ -683,19 +708,18 @@ ltx2_bundle: list[StarterModel] = [
 ]
 
 STARTER_BUNDLES: dict[str, StarterModelBundle] = {
-    BaseModelType.StableDiffusion1: StarterModelBundle(name="Stable Diffusion 1.5", models=sd1_bundle),
+    BaseModelType.StableDiffusion1: StarterModelBundle(name="SD 1.5", models=sd1_bundle),
     BaseModelType.StableDiffusionXL: StarterModelBundle(name="SDXL", models=sdxl_bundle),
-    BaseModelType.Flux: StarterModelBundle(name="FLUX.1 dev", models=flux_bundle),
-    BaseModelType.Flux2: StarterModelBundle(name="FLUX.2 Klein", models=flux2_klein_bundle),
-    BaseModelType.ZImage: StarterModelBundle(name="Z-Image Turbo", models=zimage_bundle),
+    BaseModelType.Flux: StarterModelBundle(name="FLUX.1", models=flux_bundle),
+    BaseModelType.Flux2: StarterModelBundle(name="FLUX.2", models=flux2_bundle),
+    BaseModelType.ZImage: StarterModelBundle(name="Z-Image", models=zimage_bundle),
     BaseModelType.ErnieImage: StarterModelBundle(name="ERNIE-Image", models=ernie_image_bundle),
     BaseModelType.QwenImage: StarterModelBundle(name="Qwen Image", models=qwen_image_bundle),
     BaseModelType.Anima: StarterModelBundle(name="Anima", models=anima_bundle),
-    BaseModelType.Krea2: StarterModelBundle(name="Krea-2", models=krea2_bundle),
-    "wan_t2v": StarterModelBundle(name="Wan 2.2 Text-to-Video", models=wan_t2v_bundle),
-    "wan_i2v": StarterModelBundle(name="Wan 2.2 Image-to-Video", models=wan_i2v_bundle),
+    BaseModelType.Krea2: StarterModelBundle(name="Krea 2", models=krea2_bundle),
+    BaseModelType.Wan: StarterModelBundle(name="Wan 2.2", models=wan_bundle),
     BaseModelType.MiniMaxH3: StarterModelBundle(name="MiniMax H3", models=minimax_h3_bundle),
-    BaseModelType.LTX2: StarterModelBundle(name="LTX-2.5", models=ltx2_bundle),
+    BaseModelType.LTX2: StarterModelBundle(name="LTX 2.5", models=ltx2_bundle),
     BaseModelType.Ideogram4: StarterModelBundle(name="Ideogram 4", models=ideogram_bundle),
 }
 

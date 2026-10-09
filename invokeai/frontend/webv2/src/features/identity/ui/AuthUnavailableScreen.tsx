@@ -13,7 +13,9 @@ export const AuthUnavailableScreen = ({ onRetry }: { onRetry: () => Promise<void
 
   return (
     <AuthScreen subtitle={t('widgets.serverStatus.disconnected')} title={t('common.somethingWentWrong')}>
-      <Button onClick={handleRetry}>{t('common.retry')}</Button>
+      <Button size="lg" onClick={handleRetry}>
+        {t('common.retry')}
+      </Button>
     </AuthScreen>
   );
 };

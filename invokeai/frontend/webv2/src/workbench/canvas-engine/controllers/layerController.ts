@@ -20,6 +20,7 @@ export type LayerControllerDeps = Omit<
   | 'commitPrepared'
   | 'commitStagedImage'
   | 'commitStructural'
+  | 'endStructuralPreview'
   | 'invertMask'
 > &
   Omit<CanvasPreviewCapability, 'drawLayerThumbnail' | 'requestLayerThumbnail'> & {
@@ -64,6 +65,11 @@ export class LayerController {
     this.newRasterLayer = new NewRasterLayerController(deps.newRasterLayer);
     this.layers = {
       beginStructuralPreview: () => (this.disposed ? null : this.structural.beginPreview()),
+      endStructuralPreview: () => {
+        if (!this.disposed) {
+          this.structural.endPreview();
+        }
+      },
       canCommitStructural: () => this.structural.canCommit(),
       commitGeneratedImageResult: (options) =>
         this.disposed ? Promise.resolve({ status: 'aborted' }) : deps.commitGeneratedImageResult(options),

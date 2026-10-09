@@ -131,21 +131,21 @@ export const AddNodesView = () => {
   return (
     <Scrollable h="full" label={t('nodes.addNodes')} minH="0" p="3">
       <Stack gap="4" maxW="44rem">
-        <Alert.Root borderRadius="md" size="sm" status="warning" variant="surface">
+        <Alert.Root borderRadius="md" status="warning" variant="surface">
           <Alert.Indicator />
-          <Alert.Title fontSize="xs">{t('nodes.trustWarning')}</Alert.Title>
+          <Alert.Title>{t('nodes.trustWarning')}</Alert.Title>
         </Alert.Root>
         <Field error={fieldError} helpText={t('nodes.gitUrlHelp')} label={t('nodes.gitUrl')}>
           <HStack align="start" gap="2" w="full">
             <Input
               aria-invalid={fieldError ? true : undefined}
               placeholder="https://github.com/owner/invokeai-node-pack.git"
-              size="sm"
+              size="lg"
               value={source}
               onChange={handleSourceChange}
               onKeyDown={handleKeyDown}
             />
-            <Button disabled={validation.issue !== null} loading={isInstalling} size="sm" onClick={handleInstall}>
+            <Button disabled={validation.issue !== null} loading={isInstalling} size="lg" onClick={handleInstall}>
               {t('nodes.install')}
             </Button>
           </HStack>
@@ -153,29 +153,27 @@ export const AddNodesView = () => {
         <Stack gap="2">
           <HStack gap="1.5">
             <Icon as={FolderOpenIcon} boxSize="3.5" color="fg.muted" />
-            <Text color="fg.muted" fontSize="2xs" fontWeight="600" textTransform="uppercase">
+            <Text color="fg.muted" fontSize="xs" fontWeight="600" textTransform="uppercase">
               {t('nodes.installManually')}
             </Text>
           </HStack>
-          <Text color="fg.muted" fontSize="xs">
-            {t('nodes.scanFolderDescription')}
-          </Text>
+          <Text color="fg.muted">{t('nodes.scanFolderDescription')}</Text>
           {customNodesPath ? (
             <Box bg="bg.subtle" borderColor="border.subtle" borderWidth="1px" p="3" rounded="md">
               <HStack justify="space-between">
-                <Text color="fg.muted" fontSize="2xs" fontWeight="600" textTransform="uppercase">
+                <Text color="fg.muted" fontSize="xs" fontWeight="600" textTransform="uppercase">
                   {t('nodes.nodesDirectory')}
                 </Text>
                 <IconButton
                   aria-label={t('nodes.copyPath')}
-                  size="2xs"
+                  size="sm"
                   variant="ghost"
                   onClick={() => void handleCopyPath(customNodesPath)}
                 >
                   <Icon as={ClipboardCopyIcon} boxSize="3" />
                 </IconButton>
               </HStack>
-              <Text fontFamily="mono" fontSize="xs" mt="1" overflowWrap="anywhere">
+              <Text fontFamily="mono" mt="1" overflowWrap="anywhere">
                 {customNodesPath}
               </Text>
             </Box>

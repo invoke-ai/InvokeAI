@@ -21,7 +21,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { LayerRowCommands } from './layerRowCommands';
 
-import { LayerActiveDot, ROW_SELECTION_FOCUS } from './LayerActiveDot';
+import { LayerActiveDot, TREE_ROW_FOCUS } from './LayerActiveDot';
 import { childRowNameKey, isOrderedChildKind, type LayerChildRowKind, type ProjectedChildRow } from './layerChildRows';
 import { recordLayerRowCommit } from './layerPanelDiagnostics';
 import { LAYER_TREE_INDENT_PX } from './layerPanelRows';
@@ -238,10 +238,11 @@ const LayerChildRowComponent = ({
       h="full"
       opacity={dimmed ? 0.4 : undefined}
       pb="0.5"
+      position="relative"
       role="treeitem"
       rounded="sm"
       tabIndex={focused ? 0 : -1}
-      _focusVisible={ROW_SELECTION_FOCUS}
+      _focusVisible={TREE_ROW_FOCUS}
       onClick={handleSelect}
       onContextMenu={handleContextMenu}
       onDoubleClick={startRename}
@@ -284,7 +285,6 @@ const LayerChildRowComponent = ({
             defaultValue={name}
             flex="1"
             minW="0"
-            size="2xs"
             userSelect="text"
             onBlur={handleNameBlur}
             onClick={stopPropagation}
@@ -292,12 +292,12 @@ const LayerChildRowComponent = ({
             onPointerDown={stopPropagation}
           />
         ) : (
-          <Text color={muted ? 'fg.muted' : undefined} flex="1" fontSize="2xs" fontWeight="600" minW="0" truncate>
+          <Text color={muted ? 'fg.muted' : undefined} flex="1" fontSize="xs" fontWeight="600" minW="0" truncate>
             {name}
           </Text>
         )}
         {child.detail !== null && !renaming ? (
-          <Text color="fg.subtle" flexShrink={0} fontSize="2xs" fontVariantNumeric="tabular-nums">
+          <Text color="fg.subtle" flexShrink={0} fontSize="xs" fontVariantNumeric="tabular-nums">
             {child.detail}
           </Text>
         ) : null}
@@ -325,7 +325,7 @@ export const ChildDragGhost = ({ child }: { child: ProjectedChildRow }) => {
       rounded="sm"
     >
       <Icon as={CHILD_ROW_GLYPHS[child.kind]} boxSize="3" color="fg.muted" flexShrink={0} />
-      <Text fontSize="2xs" fontWeight="700" truncate>
+      <Text fontSize="xs" fontWeight="700" truncate>
         {childRowName(child, t)}
       </Text>
     </HStack>
