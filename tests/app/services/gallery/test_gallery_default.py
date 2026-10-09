@@ -713,29 +713,28 @@ class TestGalleryQueryPlans:
         )
 
 
+def _seed_same_timestamp(services) -> None:
+    _save_image(services["images"], "b.png", user_id="alice")
+    _save_image(services["images"], "a.png", user_id="alice")
+    _save_video(services["videos"], "b.mp4", user_id="alice")
+    _save_video(services["videos"], "a.mp4", user_id="alice")
+    for table, col, name in [
+        ("images", "image_name", "a.png"),
+        ("images", "image_name", "b.png"),
+        ("videos", "video_name", "a.mp4"),
+        ("videos", "video_name", "b.mp4"),
+    ]:
+        _backdate(services, table, col, name, "2026-01-05 12:00:00")
+
+
 class TestOrderingTieBreakers:
     """PR #9163 review fix: ordering only by (starred, created_at) left images and videos
     created within the same timestamp granularity with no defined relative order — rows
     could reorder across refetches or shift between offset pages, and the virtual-board
     cover could flicker between equally-new items."""
 
-    SAME_TS = "2026-01-05 12:00:00"
-
-    def _seed_same_timestamp(self, services) -> None:
-        _save_image(services["images"], "b.png", user_id="alice")
-        _save_image(services["images"], "a.png", user_id="alice")
-        _save_video(services["videos"], "b.mp4", user_id="alice")
-        _save_video(services["videos"], "a.mp4", user_id="alice")
-        for table, col, name in [
-            ("images", "image_name", "a.png"),
-            ("images", "image_name", "b.png"),
-            ("videos", "video_name", "a.mp4"),
-            ("videos", "video_name", "b.mp4"),
-        ]:
-            _backdate(services, table, col, name, self.SAME_TS)
-
     def test_same_timestamp_order_is_deterministic(self, services) -> None:
-        self._seed_same_timestamp(services)
+        _seed_same_timestamp(services)
         gallery = services["gallery"]
 
         first = [(i.kind, i.name) for i in gallery.list_item_names(user_id="alice", is_admin=False).items]
@@ -754,7 +753,7 @@ class TestOrderingTieBreakers:
     def test_ascending_is_mirror_of_descending(self, services) -> None:
         from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
-        self._seed_same_timestamp(services)
+        _seed_same_timestamp(services)
         gallery = services["gallery"]
 
         desc = [(i.kind, i.name) for i in gallery.list_item_names(user_id="alice", is_admin=False).items]
@@ -765,7 +764,7 @@ class TestOrderingTieBreakers:
         assert asc == list(reversed(desc))
 
     def test_same_timestamp_cover_is_deterministic(self, services) -> None:
-        self._seed_same_timestamp(services)
+        _seed_same_timestamp(services)
         gallery = services["gallery"]
 
         covers = set()
@@ -776,6 +775,119 @@ class TestOrderingTieBreakers:
 
         # One stable choice across refetches: the kind/name-descending winner (b.mp4).
         assert covers == {(None, "b.mp4")}
+
+
+class TestGetItemLocation:
+    def _assert_locations_match_listing(self, services, **filters) -> list[tuple[GalleryItemKind, str]]:
+        gallery = services["gallery"]
+        listing = gallery.list_item_names(starred_first=False, **filters)
+        refs = [(item.kind, item.name) for item in listing.items]
+
+        for index, (kind, name) in enumerate(refs):
+            location = gallery.get_item_location(kind=kind, name=name, **filters)
+            assert location is not None
+            assert (location.kind, location.name, location.index, location.total) == (
+                kind,
+                name,
+                index,
+                len(refs),
+            )
+
+        return refs
+
+    @pytest.mark.parametrize("order_dir", [SQLiteDirection.Descending, SQLiteDirection.Ascending])
+    def test_location_matches_exact_order_with_equal_timestamp_tie_breakers(self, services, order_dir) -> None:
+        _seed_same_timestamp(services)
+        refs = self._assert_locations_match_listing(
+            services,
+            user_id="alice",
+            is_admin=False,
+            order_dir=order_dir,
+        )
+
+        descending = [
+            (GalleryItemKind.VIDEO, "b.mp4"),
+            (GalleryItemKind.VIDEO, "a.mp4"),
+            (GalleryItemKind.IMAGE, "b.png"),
+            (GalleryItemKind.IMAGE, "a.png"),
+        ]
+        assert refs == (descending if order_dir == SQLiteDirection.Descending else list(reversed(descending)))
+
+    def test_location_uses_board_category_view_search_date_star_and_user_filters(self, services) -> None:
+        _save_image(services["images"], "general.png", user_id="alice")
+        _save_image(services["images"], "control.png", user_id="alice", category=ImageCategory.CONTROL)
+        _save_image(services["images"], "bob.png", user_id="bob")
+        _save_video(services["videos"], "general.mp4", user_id="alice")
+        _save_marked_video(services["videos"], "external.mp4", user_id="alice", metadata=None)
+        board = services["boards"].save("Gallery", "alice")
+        services["board_images"].add_image_to_board(board.board_id, "general.png")
+        services["board_videos"].add_video_to_board(board.board_id, "general.mp4")
+
+        for table, name_col, name, created_at in [
+            ("images", "image_name", "general.png", "2026-05-02 10:00:00"),
+            ("images", "image_name", "control.png", "2026-05-03 10:00:00"),
+            ("images", "image_name", "bob.png", "2026-05-02 10:00:00"),
+            ("videos", "video_name", "general.mp4", "2026-05-02 11:00:00"),
+            ("videos", "video_name", "external.mp4", "2026-05-02 12:00:00"),
+        ]:
+            _backdate(services, table, name_col, name, created_at)
+        _star(services, "videos", "video_name", "general.mp4")
+        with services["images"]._db.transaction() as cursor:
+            cursor.execute("UPDATE images SET is_intermediate = 1 WHERE image_name = ?", ("control.png",))
+
+        common = {"user_id": "alice", "is_admin": False}
+        filter_sets = [
+            {"board_id": board.board_id},
+            {"board_id": "none"},
+            {"origin": ResourceOrigin.EXTERNAL},
+            {"categories": [ImageCategory.GENERAL]},
+            {"categories": [ImageCategory.CONTROL], "is_intermediate": True},
+            {"is_intermediate": False},
+            {"search_term": "2026-05-02"},
+            {"created_from": "2026-05-02", "created_to": "2026-05-02"},
+            {"starred": True},
+            {"starred": False},
+            {
+                "board_id": board.board_id,
+                "categories": [ImageCategory.GENERAL],
+                "is_intermediate": False,
+                "search_term": "2026-05-02",
+                "created_from": "2026-05-02",
+                "created_to": "2026-05-02",
+                "starred": True,
+            },
+        ]
+        for filters in filter_sets:
+            self._assert_locations_match_listing(services, **common, **filters)
+
+        assert (
+            services["gallery"].get_item_location(
+                kind=GalleryItemKind.IMAGE,
+                name="bob.png",
+                **common,
+            )
+            is None
+        )
+        assert (
+            services["gallery"].get_item_location(
+                kind=GalleryItemKind.IMAGE,
+                name="control.png",
+                categories=[ImageCategory.GENERAL],
+                **common,
+            )
+            is None
+        )
+
+    def test_missing_target_returns_none(self, services) -> None:
+        assert (
+            services["gallery"].get_item_location(
+                kind=GalleryItemKind.IMAGE,
+                name="missing.png",
+                user_id="alice",
+                is_admin=False,
+            )
+            is None
+        )
 
 
 def _save_marked_video(store: SqliteVideoRecordStorage, name: str, user_id: str, metadata: str | None) -> None:

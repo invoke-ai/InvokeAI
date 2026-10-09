@@ -6,6 +6,7 @@ from invokeai.app.services.gallery.gallery_common import (
     BoardMediaSummary,
     GalleryItem,
     GalleryItemKind,
+    GalleryItemLocation,
     GalleryItemNames,
     GalleryItemNamesResult,
     GalleryItemRef,
@@ -122,6 +123,86 @@ class SqliteGalleryService(GalleryServiceABC):
             offset=offset,
             limit=limit,
             total=image_count + video_count,
+        )
+
+    def get_item_location(
+        self,
+        kind: GalleryItemKind,
+        name: str,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        origin: Optional[ResourceOrigin] = None,
+        categories: Optional[list[ImageCategory]] = None,
+        is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
+        starred: Optional[bool] = None,
+    ) -> Optional[GalleryItemLocation]:
+        """Finds item's exact rank without building or returning the full name list."""
+        image_half, image_params, _ = self._build_half(
+            kind="image",
+            origin=origin,
+            categories=categories,
+            is_intermediate=is_intermediate,
+            board_id=board_id,
+            search_term=search_term,
+            user_id=user_id,
+            is_admin=is_admin,
+            names_only=True,
+            created_from=created_from,
+            created_to=created_to,
+            starred=starred,
+        )
+        video_half, video_params, _ = self._build_half(
+            kind="video",
+            origin=origin,
+            categories=categories,
+            is_intermediate=is_intermediate,
+            board_id=board_id,
+            search_term=search_term,
+            user_id=user_id,
+            is_admin=is_admin,
+            names_only=True,
+            created_from=created_from,
+            created_to=created_to,
+            starred=starred,
+        )
+
+        # Keep ranking expressions identical to paged listing order. Window rank avoids
+        # materializing every matching name in Python while still computing exact index and total.
+        order_clause = self._build_order_clause(starred_first=False, order_dir=order_dir)
+        query = f"""--sql
+        SELECT kind, name, item_index, total
+        FROM (
+            SELECT
+                kind,
+                name,
+                ROW_NUMBER() OVER ({order_clause}) - 1 AS item_index,
+                COUNT(*) OVER () AS total
+            FROM (
+                {image_half}
+                UNION ALL
+                {video_half}
+            )
+        )
+        WHERE kind = ? AND name = ?
+        LIMIT 1;
+        """
+
+        with self._db.transaction() as cursor:
+            cursor.execute(query, image_params + video_params + [kind.value, name])
+            row = cursor.fetchone()
+
+        if row is None:
+            return None
+        return GalleryItemLocation(
+            kind=GalleryItemKind(row["kind"]),
+            name=row["name"],
+            index=row["item_index"],
+            total=row["total"],
         )
 
     def _query_name_rows(

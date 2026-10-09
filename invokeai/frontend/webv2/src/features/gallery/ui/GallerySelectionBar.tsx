@@ -2,7 +2,7 @@ import type { GalleryBoard } from '@features/gallery/core/types';
 
 import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
-import { parseGalleryItemKey, shouldStarSelection } from '@features/gallery/core/items';
+import { parseGalleryItemKey } from '@features/gallery/core/items';
 import { IconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
 import { Tooltip } from '@platform/ui/Tooltip';
@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next';
 
 import { BoardCover } from './GalleryBoardCover';
 import { useMenuTriggerIds } from './galleryMenuIds';
-import { useGalleryWidget } from './GalleryWidgetContext';
+import { useGallerySelectionStarred, useGalleryWidget } from './GalleryWidgetContext';
 
 const MOVE_MENU_POSITIONING = { placement: 'top-end' } as const;
 
@@ -27,7 +27,7 @@ export const GallerySelectionBar = () => {
 
   // Star acts on the whole selection: only "unstar all" when every selected
   // item is already starred, matching the `.` hotkey.
-  const shouldStar = useMemo(() => shouldStarSelection(loadedItems, selectedItemRefs), [loadedItems, selectedItemRefs]);
+  const shouldStar = useGallerySelectionStarred(selectedItemRefs, loadedItems);
 
   const moveTargets = useMemo(
     () =>
