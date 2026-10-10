@@ -4932,6 +4932,10 @@
       "projects": {
         "description": "Autosaving projects keep your canvas, settings, and workflows together, and export as .invk files.",
         "title": "Projects"
+      },
+      "sharing": {
+        "description": "Choose who can open your boards from their Access menu. Boards others share with you appear under Shared with me.",
+        "title": "Share boards"
       }
     },
     "items": [
@@ -4945,7 +4949,11 @@
       "Multi-GPU support.",
       "Interactive intermediates manager.",
       "Full tablet support.",
+      "Your layout, generation settings and prompt history stay yours in each project; export asks whether to include them.",
       "And much more!"
+    ],
+    "multiuserItems": [
+      "Public boards are now Everyone can contribute: others can add media and remove only what they added."
     ],
     "readReleaseNotes": "Read Release Notes",
     "readTheDocs": "Read the Docs",
