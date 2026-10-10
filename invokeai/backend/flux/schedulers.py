@@ -6,6 +6,7 @@ This module provides the scheduler types and mapping for Flow Matching models
 
 from typing import Any, Literal, Type
 
+import torch
 from diffusers import (
     DPMSolverMultistepScheduler,
     FlowMatchEulerDiscreteScheduler,
@@ -41,6 +42,37 @@ FLUX_SCHEDULER_MAP: dict[str, Type[SchedulerMixin]] = {
 
 if _HAS_LCM:
     FLUX_SCHEDULER_MAP["lcm"] = FlowMatchLCMScheduler
+
+
+def set_heun_timesteps_from_sigmas(
+    scheduler: FlowMatchHeunDiscreteScheduler,
+    sigmas: list[float],
+    terminal_sigma: float,
+    device: str | torch.device | None,
+) -> None:
+    """Set the pinned Diffusers Heun layout from InvokeAI's shifted model sigmas."""
+    if not sigmas:
+        raise ValueError("At least one model-evaluation sigma is required")
+
+    # Diffusers 0.40.0 evaluates the first sigma once, later sigmas twice, then
+    # uses one terminal interval without a second-order evaluation.
+    model_sigmas = torch.tensor(sigmas, dtype=torch.float32, device=device)
+    expanded_sigmas = torch.cat((model_sigmas[:1], model_sigmas[1:].repeat_interleave(2)))
+    scheduler.num_inference_steps = len(sigmas)
+    scheduler.timesteps = expanded_sigmas * scheduler.config.num_train_timesteps
+    scheduler.sigmas = torch.cat((expanded_sigmas, model_sigmas.new_tensor([terminal_sigma])))
+
+    # Reset the state used by Diffusers step() and state_in_first_order.
+    scheduler.prev_derivative = None
+    scheduler.dt = None
+    scheduler.sample = None
+    scheduler._step_index = None
+    scheduler._begin_index = None
+
+
+def is_flow_match_lcm_scheduler(scheduler: SchedulerMixin) -> bool:
+    """Check the optional LCM scheduler without requiring it in older Diffusers builds."""
+    return _HAS_LCM and isinstance(scheduler, FlowMatchLCMScheduler)
 
 
 # Z-Image scheduler types (Flow Matching schedulers)
