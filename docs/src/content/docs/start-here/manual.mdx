@@ -111,6 +111,13 @@ The following commands vary depending on the version of Invoke being installed a
               --torch-backend=xpu
               ```
             </TabItem>
+            <TabItem label="AMD GPU">
+              Do not use a torch backend. AMD publishes its ROCm wheels on its own index, with the GPU kernels in a separate package per GPU target. In the next step, pin them for your GPU's target and point `uv` at that index instead:
+              ```sh
+              uv pip install <PACKAGE_SPECIFIER>==<VERSION> "torch[device-<TARGET>]==2.13.0+rocm10.0.0" "torchvision[device-<TARGET>]==0.28.0+rocm10.0.0" --index https://stable.repo.amd.com/rocm/whl-next/ --index-strategy unsafe-best-match --python 3.12 --python-preference only-managed --force-reinstall
+              ```
+              `<TARGET>` is `gfx1201` for the RX 9070 series and Radeon AI PRO R9700, `gfx1200` for the RX 9060 series, `gfx1100` for the RX 7900 series, `gfx1101` for the RX 7700 and 7800 series, `gfx1102` for the RX 7600 series, and `gfx1151` for Ryzen AI Max. For other GPUs, see AMD's [GPU target table](https://github.com/ROCm/TheRock/blob/main/RELEASES.md#gfx-target-lookup-table).
+            </TabItem>
             <TabItem label="Other / no GPU">
               Do not use a torch backend.
             </TabItem>
@@ -133,7 +140,13 @@ The following commands vary depending on the version of Invoke being installed a
               On ARM64 (`aarch64`, e.g. Raspberry Pi 5), do **not** use a torch backend. The default PyPI wheels are CPU-only on ARM64 and work out of the box.
             </TabItem>
             <TabItem label="Linux + AMD GPU">
-              Use:
+              Do not use a torch backend. Install AMD's ROCm 10 wheels from AMD's index, as the launcher does, with the GPU kernels pinned for your GPU's target:
+              ```sh
+              uv pip install <PACKAGE_SPECIFIER>==<VERSION> "torch[device-<TARGET>]==2.13.0+rocm10.0.0" "torchvision[device-<TARGET>]==0.28.0+rocm10.0.0" --index https://stable.repo.amd.com/rocm/whl-next/ --index-strategy unsafe-best-match --python 3.12 --python-preference only-managed --force-reinstall
+              ```
+              `<TARGET>` is `gfx1201` for the RX 9070 series and Radeon AI PRO R9700, `gfx1200` for the RX 9060 series, `gfx1100` for the RX 7900 series, `gfx1101` for the RX 7700 and 7800 series, `gfx1102` for the RX 7600 series, and `gfx1151` for Ryzen AI Max. For other GPUs, see AMD's [GPU target table](https://github.com/ROCm/TheRock/blob/main/RELEASES.md#gfx-target-lookup-table).
+
+              ROCm 10 has no kernels for Vega-based cards (gfx900/gfx906). For those, use PyTorch's ROCm 7.2 build instead:
               ```sh
               --torch-backend=rocm7.2
               ```
