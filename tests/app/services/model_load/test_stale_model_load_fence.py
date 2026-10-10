@@ -6,7 +6,7 @@ import threading
 import time
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Callable, Iterator, Optional
+from typing import Callable, ContextManager, Iterator, Optional
 
 import pytest
 import torch
@@ -92,6 +92,12 @@ def _edit_and_invalidate(
         store.update_model(KEY, changes=changes, allow_class_change=True)
         with MODEL_LOAD_LOCK.write_lock():
             cache.drop_model(KEY)
+
+
+def _long_transaction(store: ModelRecordServiceSQL) -> ContextManager[object]:
+    """A write transaction held open, as VACUUM holds the database for its whole run; on SQLite it blocks every
+    other transaction, reads included."""
+    return store._queries._database.begin(write=True)
 
 
 def _is_cached(cache: ModelCache) -> bool:
@@ -224,13 +230,19 @@ def test_load_waiting_on_construction_lock_during_invalidating_edit_loads_the_up
 def _waits_for_edits(service: ModelLoadService, monkeypatch) -> threading.Semaphore:
     """Released each time a load starts waiting for edits of its model to finish."""
     entered = threading.Semaphore(0)
-    generation_when_idle = service._record_edits.generation_when_idle
+    record_edits = service._record_edits
+    watch, wait_idle = record_edits.watch, record_edits.wait_idle
 
-    def observed(key: str) -> int:
+    def observed_watch(key: str):
         entered.release()
-        return generation_when_idle(key)
+        return watch(key)
 
-    monkeypatch.setattr(service._record_edits, "generation_when_idle", observed)
+    def observed_wait_idle(key: str) -> None:
+        entered.release()
+        wait_idle(key)
+
+    monkeypatch.setattr(record_edits, "watch", observed_watch)
+    monkeypatch.setattr(record_edits, "wait_idle", observed_wait_idle)
     return entered
 
 
@@ -300,7 +312,7 @@ def test_load_overlapping_an_edit_stuck_on_the_database_does_not_hold_the_model_
     editor = threading.Thread(target=edit)
     loader = threading.Thread(target=lambda: loads.append(service.load_model(stale)))
     other = threading.Thread(target=take_model_load_lock)
-    with store._db._lock:  # the transaction the edit's commit waits on
+    with _long_transaction(store):  # the transaction the edit's commit waits on
         editor.start()
         assert committing.wait(timeout=10)
         loader.start()
@@ -385,7 +397,8 @@ def test_database_transaction_starting_while_a_cold_load_is_queued_does_not_hold
         while MODEL_LOAD_LOCK._writers_waiting == 0:
             assert time.monotonic() < deadline, "loader never queued for the construction lock"
             time.sleep(0.001)
-        store._db._lock.acquire()  # the transaction starts; VACUUM holds this for its whole run
+        transaction = _long_transaction(store)
+        transaction.__enter__()
     try:
         # The loader now holds the construction lock: it either finishes without the database, or reads
         # its record again under the lock and blocks there.
@@ -395,7 +408,7 @@ def test_database_transaction_starting_while_a_cold_load_is_queued_does_not_hold
         other.start()
         lock_was_free = acquired.wait(timeout=5)
     finally:
-        store._db._lock.release()
+        transaction.__exit__(None, None, None)
     loader.join(timeout=10)
     other.join(timeout=10)
 
@@ -424,3 +437,50 @@ def test_missing_files_under_an_unchanged_record_still_fail(harness, tmp_path):
         service.load_model(store.get_model(KEY))
     assert _RecordingLoader.built_from == []
     assert events.log == [("started", "siglip"), ("complete", "siglip")]
+
+
+def test_edit_tracking_is_retired_once_no_edit_or_load_needs_it(harness):
+    """Edited and deleted keys must not accumulate: a key is tracked only while an edit of it is in progress
+    or a load is between its record read and its check under the construction lock."""
+    service, store, _, _ = harness
+    for i in range(100):
+        with service.record_edit(f"deleted-{i}"):
+            pass
+    service.load_model(store.get_model(KEY))
+    with service.record_edit(KEY):
+        pass
+
+    assert service._record_edits._keys == {}
+
+
+def test_rename_then_load_affecting_edit_while_a_load_waits_rejects_it(harness, monkeypatch):
+    """A load stays tracked between its record read and its check: the rename ending must not retire what the
+    load watches, or the load-affecting edit that follows would go unnoticed."""
+    service, store, cache, _ = harness
+    waits = _waits_for_edits(service, monkeypatch)
+    outcome: list[LoadedModel] = []
+    loader = threading.Thread(target=lambda: outcome.append(service.load_model(store.get_model(KEY))))
+
+    with MODEL_LOAD_LOCK.write_lock():  # an unrelated construction in progress
+        loader.start()
+        deadline = time.monotonic() + 10
+        while MODEL_LOAD_LOCK._writers_waiting == 0:
+            assert time.monotonic() < deadline, "loader never queued for the construction lock"
+            time.sleep(0.001)
+        with service.record_edit(KEY) as rename:
+            store.update_model(KEY, changes=ModelRecordChanges(name="renamed"))
+            rename.load_affecting = False
+        edit = service.record_edit(KEY)
+        edit.__enter__()
+        store.update_model(KEY, changes=ModelRecordChanges(cpu_only=True))
+    try:
+        # Rejected under the lock, the load waits for the edit before reading the record again.
+        assert waits.acquire(timeout=10) and waits.acquire(timeout=10)
+        with MODEL_LOAD_LOCK.write_lock():
+            cache.drop_model(KEY)
+    finally:
+        edit.__exit__(None, None, None)
+    loader.join(timeout=10)
+
+    assert len(outcome) == 1 and outcome[0].config.cpu_only is True
+    assert _RecordingLoader.built_from == [True]

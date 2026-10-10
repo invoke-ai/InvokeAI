@@ -2,6 +2,7 @@
 
 import threading
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, ContextManager, Iterator, Optional, Type
 
@@ -30,42 +31,71 @@ from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 
 
+@dataclass
+class _KeyEdits:
+    in_progress: int = 0
+    # Loads between their record read and their check under MODEL_LOAD_LOCK.
+    watchers: int = 0
+    # Bumped as each edit that changed how the model loads ends.
+    generation: int = 0
+
+
 class _RecordEdits:
-    """Per model key: how many record edits are in progress, and a generation bumped as each edit that changed
-    how the model loads ends."""
+    """Per model key: record edits in progress, and whether one that changed how the model loads has ended since a
+    load read the record. A key is tracked only while it has edits in progress or loads watching it: a load that
+    starts later waits for in-progress edits, so it reads their result."""
 
     def __init__(self) -> None:
         self._changed = threading.Condition(threading.Lock())
-        # Never pruned: one int per model key ever edited.
-        self._generations: dict[str, int] = {}
-        self._in_progress: dict[str, int] = {}
+        self._keys: dict[str, _KeyEdits] = {}
+
+    def _retire_if_unused(self, key: str) -> None:
+        state = self._keys[key]
+        if not state.in_progress and not state.watchers:
+            del self._keys[key]
 
     @contextmanager
     def edit(self, key: str) -> Iterator[RecordEdit]:
         record_edit = RecordEdit()
         with self._changed:
-            self._in_progress[key] = self._in_progress.get(key, 0) + 1
+            self._keys.setdefault(key, _KeyEdits()).in_progress += 1
         try:
             yield record_edit
         finally:
             with self._changed:
+                state = self._keys[key]
                 if record_edit.load_affecting:
-                    self._generations[key] = self._generations.get(key, 0) + 1
-                self._in_progress[key] -= 1
-                if not self._in_progress[key]:
-                    del self._in_progress[key]
+                    state.generation += 1
+                state.in_progress -= 1
+                if not state.in_progress:
                     self._changed.notify_all()
+                self._retire_if_unused(key)
 
-    def generation_when_idle(self, key: str) -> int:
-        """Wait until no edit of `key` is in progress, then return its generation."""
+    def wait_idle(self, key: str) -> None:
+        """Wait until no edit of `key` is in progress."""
         with self._changed:
-            self._changed.wait_for(lambda: key not in self._in_progress)
-            return self._generations.get(key, 0)
+            self._changed.wait_for(lambda: key not in self._keys or not self._keys[key].in_progress)
 
-    def unchanged_since(self, key: str, generation: int) -> bool:
-        """Whether no edit of `key` is in progress and none that changed how it loads has ended since `generation`."""
+    @contextmanager
+    def watch(self, key: str) -> Iterator[Callable[[], bool]]:
+        """Wait until no edit of `key` is in progress, then yield a callable telling whether `key` is still unedited:
+        no edit in progress, and none that changed how it loads ended since the wait."""
         with self._changed:
-            return key not in self._in_progress and self._generations.get(key, 0) == generation
+            self._changed.wait_for(lambda: key not in self._keys or not self._keys[key].in_progress)
+            state = self._keys.setdefault(key, _KeyEdits())
+            state.watchers += 1
+            generation = state.generation
+
+        def unchanged() -> bool:
+            with self._changed:
+                return not state.in_progress and state.generation == generation
+
+        try:
+            yield unchanged
+        finally:
+            with self._changed:
+                state.watchers -= 1
+                self._retire_if_unused(key)
 
 
 class ModelLoadService(ModelLoadServiceBase):
@@ -172,7 +202,7 @@ class ModelLoadService(ModelLoadServiceBase):
 
     def _current_record(self, key: str) -> AnyModelConfig:
         """The stored record for `key`, read once no edit of it is in progress."""
-        self._record_edits.generation_when_idle(key)
+        self._record_edits.wait_idle(key)
         return self._invoker.services.model_manager.store.get_model(key)
 
     def _moved_record(self, config: AnyModelConfig) -> Optional[AnyModelConfig]:
@@ -187,8 +217,9 @@ class ModelLoadService(ModelLoadServiceBase):
             return current
         return None
 
-    def _check_config(self, config: AnyModelConfig) -> Callable[[], bool]:
-        """Check `config` against its record; the returned callable completes the check under MODEL_LOAD_LOCK.
+    @contextmanager
+    def _check_config(self, config: AnyModelConfig) -> Iterator[Callable[[], bool]]:
+        """Check `config` against its record; the yielded callable completes the check under MODEL_LOAD_LOCK.
 
         Nothing here touches the database under that lock, so a long DB transaction (e.g. VACUUM) stalls only
         this load. The record is read here, once no edit of it is in progress; edits bracket their commit and
@@ -197,9 +228,9 @@ class ModelLoadService(ModelLoadServiceBase):
         progress or has ended; either way the load is rejected, unless it ended having changed nothing that
         loads (e.g. a rename).
         """
-        generation = self._record_edits.generation_when_idle(config.key)
-        current = self._config_is_current(config)
-        return lambda: current and self._record_edits.unchanged_since(config.key, generation)
+        with self._record_edits.watch(config.key) as unedited:
+            current = self._config_is_current(config)
+            yield lambda: current and unedited()
 
     def _config_is_current(self, config: AnyModelConfig) -> bool:
         """Whether `config` still loads the same model as the stored record for its key."""
