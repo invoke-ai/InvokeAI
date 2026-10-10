@@ -180,6 +180,10 @@ def run_app() -> None:
 
     try:
         loop.run_until_complete(server.serve())
+        if not server.started:
+            # The app refused to start (its log says why, e.g. a database another process serves); uvicorn returns
+            # normally, so name the failure to whatever runs this process. 3 is uvicorn's own startup-failure code.
+            raise SystemExit(3)
     except KeyboardInterrupt:
         logger.info("InvokeAI shutting down...")
         # Gracefully shut down services (e.g. model download and install managers) so that any

@@ -10,11 +10,8 @@ they get an index of their own.
 import sqlite3
 from logging import Logger
 
-from invokeai.app.services.shared.media_references import (
-    MediaReferenceOwnerKind,
-    extract_media_references_from_json,
-    replace_media_references,
-)
+from invokeai.app.services.shared.media_references import MediaReferenceOwnerKind, extract_media_references_from_json
+from invokeai.app.services.shared.sqlite_migrator.migrations._media_references_v1 import replace_media_references
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
 
 

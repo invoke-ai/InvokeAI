@@ -1506,6 +1506,28 @@ def _ideogram4_branch_from_filename(filename: str) -> Ideogram4Branch:
     return "unconditional" if "unconditional" in lowered or "uncond" in lowered else "conditional"
 
 
+def _ideogram4_branch_or_raise(mod: ModelOnDisk) -> Ideogram4Branch:
+    """The branch, from the file's own declaration where it has one.
+
+    A declaration this does not recognise is refused rather than ignored. Falling back to the
+    filename there would quietly classify a future release (an `ideogram4_5_cond`, an edit
+    build) as one of *these* two branches, and the loader node trusts the recorded branch
+    precisely because it came from the file — which is how a wrong model would end up guiding
+    against a right one with nothing in the log.
+    """
+    declared = mod.metadata().get(_IDEOGRAM4_METADATA_KEY)
+    if not declared:
+        return _ideogram4_branch_from_filename(mod.path.name)
+    branch = _IDEOGRAM4_BRANCH_BY_METADATA.get(declared)
+    if branch is None:
+        raise InvalidMatchError(
+            f"this file declares model_type '{declared}', which is not one of Ideogram 4's two "
+            f"transformer branches ({', '.join(sorted(_IDEOGRAM4_BRANCH_BY_METADATA))}). It is most "
+            "likely a newer or different Ideogram model that this version cannot run."
+        )
+    return branch
+
+
 class Main_Checkpoint_Ideogram4_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
     """Model config for Ideogram 4 single-file transformer checkpoints (safetensors).
 
@@ -1539,35 +1561,13 @@ class Main_Checkpoint_Ideogram4_Config(Checkpoint_Config_Base, Main_Config_Base,
             raise NotAMatchError("state dict does not look like an Ideogram 4 transformer")
 
         if _has_ggml_tensors(state_dict):
-            raise NotAMatchError("GGUF-quantized Ideogram 4 checkpoints are not supported yet")
+            raise NotAMatchError("state dict looks like GGUF quantized")
 
         cls._raise_for_unsupported_quantization(mod, state_dict)
 
-        branch = override_fields.pop("branch", None) or cls._branch_or_raise(mod)
+        branch = override_fields.pop("branch", None) or _ideogram4_branch_or_raise(mod)
 
         return cls(**override_fields, branch=branch)
-
-    @classmethod
-    def _branch_or_raise(cls, mod: ModelOnDisk) -> Ideogram4Branch:
-        """The branch, from the file's own declaration where it has one.
-
-        A declaration this does not recognise is refused rather than ignored. Falling back to the
-        filename there would quietly classify a future release (an `ideogram4_5_cond`, an edit
-        build) as one of *these* two branches, and the loader node trusts the recorded branch
-        precisely because it came from the file — which is how a wrong model would end up guiding
-        against a right one with nothing in the log.
-        """
-        declared = mod.metadata().get(_IDEOGRAM4_METADATA_KEY)
-        if not declared:
-            return _ideogram4_branch_from_filename(mod.path.name)
-        branch = _IDEOGRAM4_BRANCH_BY_METADATA.get(declared)
-        if branch is None:
-            raise InvalidMatchError(
-                f"this file declares model_type '{declared}', which is not one of Ideogram 4's two "
-                f"transformer branches ({', '.join(sorted(_IDEOGRAM4_BRANCH_BY_METADATA))}). It is most "
-                "likely a newer or different Ideogram model that this version cannot run."
-            )
-        return branch
 
     @classmethod
     def _raise_for_unsupported_quantization(cls, mod: ModelOnDisk, state_dict: dict[str | int, Any]) -> None:
@@ -1623,6 +1623,41 @@ class Main_Checkpoint_Ideogram4_Config(Checkpoint_Config_Base, Main_Config_Base,
                 f"'{INT8_TENSORWISE_FORMAT}' marker (e.g. '{unmarked[0]}'), so the quantization scheme "
                 "cannot be identified. Only Comfy-Org's int8_convrot build is supported."
             )
+
+
+class Main_GGUF_Ideogram4_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized Ideogram 4 transformers (single-file).
+
+    Like the safetensors single files, one GGUF holds ONE of the two dual-branch transformers and
+    the loader node pairs them. Unlike them, no published GGUF carries any metadata (every release
+    has a key/value count of zero), so the branch comes from the filename alone: keep the files
+    under their published names.
+    """
+
+    base: Literal[BaseModelType.Ideogram4] = Field(default=BaseModelType.Ideogram4)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+    branch: Ideogram4Branch = Field(
+        description="Which of Ideogram 4's two transformer branches this file holds. GGUF releases "
+        "record no metadata, so it is read from the filename: anything naming 'unconditional' or "
+        "'uncond' is the unconditional branch. Rename and re-install to correct it."
+    )
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        state_dict = mod.load_state_dict()
+        if not _has_ideogram4_keys(state_dict):
+            raise NotAMatchError("state dict does not look like an Ideogram 4 transformer")
+
+        if not _has_ggml_tensors(state_dict):
+            raise NotAMatchError("state dict does not look like GGUF quantized")
+
+        branch = override_fields.pop("branch", None) or _ideogram4_branch_or_raise(mod)
+
+        return cls(**override_fields, branch=branch)
 
 
 class Main_Diffusers_Krea2_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):

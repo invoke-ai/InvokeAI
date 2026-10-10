@@ -36,20 +36,20 @@ dependencies = [
   "accelerate",
   "bitsandbytes; sys_platform!='darwin'",
   "compel>=2.4.0,<3",
-  "diffusers[torch]==0.40.0",
+  "diffusers[torch]==0.41.0",
   "gguf",
   "mediapipe==0.10.14",                   # needed for "mediapipeface" controlnet model
   "mistral-common>=1.5.4,<2",             # canonical Tekken tokenizer for FLUX.2 [dev] Mistral encoder; the
                                           # loader depends on private surface (Tekkenizer internals) that
                                           # moves across majors, so cap below 2.x (validated against 1.11.6)
   "numpy<2.0.0",
-  "onnx==1.16.1",
+  "onnx==1.21.0",
   "onnxruntime==1.19.2",
   "opencv-contrib-python",
   "imageio[ffmpeg]>=2.37",                 # video encode (for Wan 2.2 T2V/I2V output); encode behavior (macro_block_size) is version-sensitive
   "psutil>=6",                             # video decode worker process-tree termination
   "safetensors",
-  "sentencepiece==0.2.0",                 # 0.2.1 coredumps windows when loading t5 tokenizer
+  "sentencepiece==0.2.2",                 # 0.2.0 has a heap overflow; 0.2.1 coredumped on windows loading the t5 tokenizer
   "spandrel",
   # Loosely pinned, will respect requirement of `diffusers[torch]`. Split by platform: linux/win allow
   # the 2.13 line every backend extra pins (the lock itself is held there by `constraint-dependencies` in
@@ -65,7 +65,7 @@ dependencies = [
   "torch>=2.7.0,<2.8.0; sys_platform == 'darwin'",
   "torchsde",                             # diffusers needs this for SDE solvers, but it is not an explicit dep of diffusers
   "torchvision",
-  "transformers>=5.5,<5.6",
+  "transformers>=5.10.4,<5.11",
 
   # Core application dependencies, pinned for reproducible builds.
   "fastapi-events",
@@ -84,6 +84,12 @@ dependencies = [
   "pydantic-settings",
   "pydantic",
   "python-socketio",
+  # Schema migrations that run on every database backend are written with Alembic's operations (no Alembic
+  # environment or revision scripts).
+  "alembic>=1.20,<2",
+  # The database layer compiles every query through SQLAlchemy Core. Keep the minor-version bound: dialect
+  # compilation and the pysqlite transaction handling it relies on are exactly what changes between minors.
+  "sqlalchemy>=2.1,<2.2",
   "uvicorn[standard]",
 
   # Auxiliary dependencies, pinned only if necessary.
@@ -97,10 +103,10 @@ dependencies = [
   "fonttools[woff]",
   "passlib[bcrypt]>=1.7.4",
   "picklescan",
-  "pillow",
+  "pillow>=12.3.0",
   "prompt-toolkit",
   "pypatchmatch",
-  "python-jose[cryptography]>=3.3.0",
+  "PyJWT>=2.15.0",
   "python-multipart",
   "requests",
   "semver~=3.0.1",
@@ -274,6 +280,8 @@ dependencies = [
   "torchvision==0.22.1; sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'aarch64')",
 ]
 
+# Driver for running the application database on MySQL or MariaDB instead of SQLite.
+"mysql" = ["pymysql>=1.2.3,<2"]
 "onnx" = ["onnxruntime"]
 "onnx-cuda" = ["onnxruntime-gpu"]
 "onnx-directml" = ["onnxruntime-directml"]
@@ -503,6 +511,7 @@ explicit = true
 "invoke-userdel" = "invokeai.app.util.user_management:userdel"
 "invoke-userlist" = "invokeai.app.util.user_management:userlist"
 "invoke-usermod" = "invokeai.app.util.user_management:usermod"
+"invoke-db-copy" = "invokeai.app.util.database_copy:main"
 
 [project.urls]
 "Homepage" = "https://invoke.ai/"
@@ -567,7 +576,11 @@ addopts = "--strict-markers --dist loadfile -m \"not slow\""
 markers = [
   "slow: Marks tests as slow. Disabled by default. To run all tests, use -m \"\". To run only slow tests, use -m \"slow\".",
   "timeout: Marks the timeout override.",
+  "uses_database: Runs on the `empty_database` fixture, which targets INVOKEAI_TEST_DB_URL when it is set and SQLite otherwise. Applied by the collection hook in tests/conftest.py.",
+  "sqlite_only: Depends on SQLite internals (query plans, PRAGMAs, the single connection); skipped when INVOKEAI_TEST_DB_URL targets another backend.",
 ]
+# A cache-key or other SQLAlchemy warning is a bug in the query layer, not noise.
+filterwarnings = ["error::sqlalchemy.exc.SAWarning"]
 [tool.coverage.run]
 branch = true
 source = ["invokeai"]

@@ -65,21 +65,17 @@ def _remap_qwen_vl_checkpoint_keys(sd: dict) -> dict:
     `Qwen2_5_VLForConditionalGeneration.from_pretrained` would, since
     `load_state_dict` does not.
 
-    transformers ≤4.x exposed this as `_checkpoint_conversion_mapping`, but 5.x
-    dropped it (returns `{}`), so we fall back to the legacy mapping ourselves. The
-    negative lookahead keeps already-converted keys untouched, so the remap is safe
-    (and idempotent) for both legacy and new-layout single-file checkpoints.
+    transformers ≤4.x exposed this mapping as `_checkpoint_conversion_mapping`; 5.x
+    emptied and then removed it, so we carry it ourselves. The negative lookahead keeps
+    already-converted keys untouched, so the remap is safe (and idempotent) for both
+    legacy and new-layout single-file checkpoints.
     """
     import re
 
-    from transformers import Qwen2_5_VLForConditionalGeneration
-
-    key_mapping = Qwen2_5_VLForConditionalGeneration._checkpoint_conversion_mapping or {
+    key_mapping = {
         r"^visual": "model.visual",
         r"^model(?!\.(language_model|visual))": "model.language_model",
     }
-    if not key_mapping:
-        return sd
 
     remapped_sd: dict = {}
     for old_key, tensor in sd.items():
