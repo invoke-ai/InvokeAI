@@ -10,9 +10,14 @@ from typing import Any
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
-from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
+from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import MigrationBase
 
 DEFAULT_MIGRATIONS_PACKAGE = "invokeai.app.services.shared.sqlite_migrator.migrations"
+
+# The last migration that runs on SQLite only. Every migration after it is portable (a `portable_callback`), so
+# that it runs on every database backend.
+PORTABLE_CUTOVER = "2026_10_01_add_anima_variant"
+
 _MIGRATION_MODULE_RE = re.compile(r"^migration_(\d+)$")
 _DATED_MIGRATION_MODULE_RE = re.compile(r"^migration_(\d{4}_\d{2}_\d{2}_[a-z0-9][a-z0-9_]*)$")
 
@@ -39,7 +44,7 @@ class MigrationBuildContext:
         raise MigrationLoaderError(f"Migration builder requested unknown dependency '{name}'")
 
 
-MigrationBuilder = Callable[..., Migration]
+MigrationBuilder = Callable[..., MigrationBase]
 
 
 @dataclass(frozen=True)
@@ -91,12 +96,14 @@ def discover_migration_builders(package_name: str = DEFAULT_MIGRATIONS_PACKAGE) 
     return sorted(discovered, key=lambda discovered_builder: discovered_builder.sort_key)
 
 
-def build_migrations(context: MigrationBuildContext, package_name: str = DEFAULT_MIGRATIONS_PACKAGE) -> list[Migration]:
-    migrations: list[Migration] = []
+def build_migrations(
+    context: MigrationBuildContext, package_name: str = DEFAULT_MIGRATIONS_PACKAGE
+) -> list[MigrationBase]:
+    migrations: list[MigrationBase] = []
     for discovered_builder in discover_migration_builders(package_name):
         kwargs = _get_builder_kwargs(discovered_builder.builder, context, discovered_builder.module_name)
         migration = discovered_builder.builder(**kwargs)
-        if not isinstance(migration, Migration):
+        if not isinstance(migration, MigrationBase):
             raise MigrationLoaderError(
                 f"Migration builder '{discovered_builder.builder.__name__}' in "
                 f"'{discovered_builder.module_name}' must return Migration"

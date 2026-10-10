@@ -17,7 +17,7 @@ The requirements below are rough guidelines for best performance. GPUs with less
 
 - All Apple Silicon (M1, M2, etc) Macs work, but 16GB+ memory is recommended.
 - Nvidia GPUs need compute capability 7.5 or newer (GTX 16xx, RTX 20xx and everything after) and a driver from the R580 series or newer. Maxwell, Pascal and Volta cards (GTX 9xx/10xx, Titan V, Tesla P40/P100/V100) are not supported by Invoke's CUDA build: stay on the previous Invoke release, or do a [manual install](../manual) with `--torch-backend=cu126`, whose PyTorch build still includes these GPUs (not tested by the Invoke team). With a driver that is too old, Invoke starts on the CPU and logs an error saying so; on an unsupported GPU it logs an error at startup and generation fails.
-- AMD GPUs are supported on Linux only. The VRAM requirements are the same as Nvidia GPUs.
+- AMD GPUs are supported on Windows and Linux `x86_64` through ROCm 10 (see [AMD](#amd) below for the GPUs and drivers). On Linux, Vega-based cards (gfx900/gfx906) are no longer supported. The VRAM requirements are the same as Nvidia GPUs.
 - Intel Arc GPUs (Alchemist, Battlemage and newer) are supported on Windows and Linux `x86_64`. The VRAM requirements are the same as Nvidia GPUs.
 - Linux ARM64 (`aarch64`) devices — e.g. Raspberry Pi 5, other SBCs, ARM servers — are supported in CPU-only mode. Local generation is slow without a GPU, but API-backed models (e.g. GPT Image, Gemini) work well.
 
@@ -146,8 +146,15 @@ If, after restarting the app, this doesn't improve your performance, either rest
 
 ### AMD
 
-:::tip[Linux Only]{icon="linux"}
-  AMD GPUs are supported on Linux only, due to ROCm (the AMD equivalent of CUDA) support being Linux only.
+Invoke installs AMD's ROCm 10 build of PyTorch on Windows and Linux. It brings the ROCm runtime with it, so
+there is no separate ROCm or HIP SDK to install, but the GPU needs an up-to-date driver: [AMD Software: Adrenalin
+Edition] on Windows, AMD's kernel driver on Linux (see [Linux](#linux) below). AMD's [ROCm compatibility matrix] lists the GPUs and operating
+systems ROCm 10 supports. AMD lists Windows 11; the Invoke team has run it on Windows 10 with an RX 9060 XT.
+
+:::caution[Vega-based cards on Linux]
+  ROCm 10 has no kernels for gfx900 and gfx906 (Radeon RX Vega 56/64, Radeon VII, Instinct MI25/MI50/MI60).
+  Stay on the previous Invoke release, or do a [manual install](../manual) with `--torch-backend=rocm7.2`,
+  whose PyTorch build still includes them (not tested by the Invoke team).
 :::
 
 :::caution[Bumps Ahead]
@@ -161,11 +168,33 @@ If, after restarting the app, this doesn't improve your performance, either rest
   (for example `MIOPEN_FIND_MODE=NORMAL` to let MIOpen re-tune its kernel database).
 :::
 
+:::note[Fused attention on newer Radeon GPUs]
+  On some GPUs - among them the RX 7600/7700/7800 series, Ryzen AI 300/Max and the RX 9060 series -
+  PyTorch uses its fused attention kernels only when `TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL` is set.
+  Without them, attention runs on the slower math kernel, which also needs far more memory. The
+  `rocm_aotriton_experimental` setting decides. Its default, `auto`, turns the kernels on where they
+  were measured correct with ROCm 10: so far the RX 9060 series (gfx1200), where Z-Image at 1024px
+  takes 17 s instead of 36 s. Set it to `on` to try them on another GPU, and back to `auto` if images
+  come out wrong or generation fails. The startup log says whether they are on.
+:::
+
+:::note[Integrated graphics]
+  ROCm lists the Radeon graphics built into Ryzen CPUs as a GPU of its own. When a discrete GPU is
+  present, Invoke leaves the integrated one out of `generation_devices: auto`. On Windows it also hides
+  it from ROCm at startup (by setting `HIP_VISIBLE_DEVICES`) unless you set `HIP_VISIBLE_DEVICES`,
+  `CUDA_VISIBLE_DEVICES` or `ROCR_VISIBLE_DEVICES` yourself: while ROCm can see the integrated GPU,
+  Task Manager shows tens of GB of shared GPU memory for Invoke that is not really in use, and nothing
+  can run on it. Device names such as `cuda:1` in `device`, `generation_devices` and the settings then
+  count the discrete GPUs only, and naming the integrated GPU is refused with an error. Set
+  `HIP_VISIBLE_DEVICES` yourself to choose the devices.
+:::
+
 :::note[Wide-head attention runs on the math kernel]
   On ROCm builds Invoke routes attention whose head dimension exceeds 256 to PyTorch's math kernel.
   The fused kernels return wrong output there on torch 2.13 / ROCm 7.2 (measured on a W7900), which
   showed up as black or noisy images from the image VAEs - their mid-block attention is one 512-wide
-  head. The math kernel builds the whole attention matrix (about 4 GB for a 1024px VAE decode, 21 GB
+  head. With ROCm 10 they were correct on an RX 9060 XT, but RDNA3 cards have not been measured
+  again, so the threshold stays. The math kernel builds the whole attention matrix (about 4 GB for a 1024px VAE decode, 21 GB
   at 1536px), so Invoke computes it in pieces of at most 1 GB. The result can differ from a single
   math call in the last bit of a bf16 value, and each such call is roughly 10% slower. Export
   `INVOKE_ROCM_FUSED_SDPA_MAX_HEAD_DIM` to raise the threshold on a build whose fused kernels are
@@ -188,11 +217,11 @@ If, after restarting the app, this doesn't improve your performance, either rest
   `rocprof`/ROCTracer-based kernel profiling, which this disables.
 :::
 
-Run `rocm-smi` on your system's command line verify that drivers and ROCm are installed. If this command fails, or doesn't report versions, you will need to install them.
+#### Linux
 
-Go to the [ROCm Documentation] and carefully follow the instructions for your system to get everything installed.
-
-Confirm that `rocm-smi` displays driver and CUDA versions after installation.
+The ROCm libraries come with Invoke's PyTorch packages, so ROCm itself does not need to be installed. The GPU needs
+AMD's `amdgpu` kernel driver; on the distributions in AMD's [ROCm compatibility matrix], the driver that comes with
+the kernel is enough. For other distributions, follow the [ROCm Documentation] to install the driver.
 
 #### Linux - via Docker Container
 
@@ -210,6 +239,8 @@ An alternative to installing ROCm locally is to use a [ROCm docker container] to
 [Intel Arc & Iris Xe Graphics driver]: https://www.intel.com/content/www/us/en/download/785597/intel-arc-iris-xe-graphics-windows.html
 [Intel client GPU install guide]: https://dgpu-docs.intel.com/driver/client/overview.html
 [ROCm Documentation]: https://rocmdocs.amd.com
+[ROCm compatibility matrix]: https://rocm.docs.amd.com/en/docs-10.0.0/compatibility/compatibility-matrix.html
+[AMD Software: Adrenalin Edition]: https://www.amd.com/en/support/download/drivers.html
 [ROCm docker container]: https://rocmdocs.amd.com/en/latest/Deep_learning/Deep_learning.html#docker-containers
 [ROCm/ROCm#6522]: https://github.com/ROCm/ROCm/issues/6522
 [ROCm/TheRock#7051]: https://github.com/ROCm/TheRock/issues/7051

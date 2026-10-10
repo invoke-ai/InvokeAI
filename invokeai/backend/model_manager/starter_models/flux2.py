@@ -33,7 +33,31 @@ pid_decoder_flux2_2kto4k = StarterModel(
     name="PiD Decoder FLUX.2 (2K to 4K)",
     base=BaseModelType.Flux2,
     source="nvidia/PiD::checkpoints_deprecated/PiD_res2kto4k_sr4x_official_flux2_distill_4step/model_ema_bf16.pth",
-    description="NVIDIA PiD 4x super-resolution decoder for FLUX.2 Klein latents, 2K-to-4K preset (legacy architecture; NVIDIA's newer v1.5 checkpoint uses a different network that is not yet supported). ~5GB",
+    description="NVIDIA PiD 4x super-resolution decoder for FLUX.2 Klein latents, 2K-to-4K preset (first-generation architecture; see PiD 1.5 for the newer one). ~5GB",
+    type=ModelType.PiDDecoder,
+    format=ModelFormat.Checkpoint,
+    variant=PiDDecoderVariantType.Res2kTo4k_Sr4x,
+    dependencies=[gemma2_2b_encoder],
+)
+
+# Comfy-Org's single-file builds of PiD 1.5, pinned to a commit. Only the 4-step (distilled) files: the repo's
+# names without `_4step` are the undistilled teachers, which the config refuses.
+pid_1_5_decoder_flux2_2kto4k = StarterModel(
+    name="PiD 1.5 Decoder FLUX.2 (2K to 4K)",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/Comfy-Org/PixelDiT/resolve/f1aa9118da0a0b53a4433e5de9a4de2e9aae2193/diffusion_models/pid_1.5_flux2_1024_to_4096_4step_bf16.safetensors",
+    description="NVIDIA PiD 1.5 4x super-resolution decoder for FLUX.2 Klein latents, 2K-to-4K preset, in Comfy-Org's single-file build. ~2.8GB",
+    type=ModelType.PiDDecoder,
+    format=ModelFormat.Checkpoint,
+    variant=PiDDecoderVariantType.Res2kTo4k_Sr4x,
+    dependencies=[gemma2_2b_encoder],
+)
+
+pid_1_5_decoder_flux2_2kto4k_int8 = StarterModel(
+    name="PiD 1.5 Decoder FLUX.2 (2K to 4K, int8)",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/Comfy-Org/PixelDiT/resolve/f1aa9118da0a0b53a4433e5de9a4de2e9aae2193/diffusion_models/pid_1.5_flux2_1024_to_4096_4step_int8_convrot.safetensors",
+    description="PiD 1.5 FLUX.2 decoder in Comfy-Org's int8_convrot build: its transformer layers stay int8, about 2GB once loaded instead of 5.6GB. ~1.6GB",
     type=ModelType.PiDDecoder,
     format=ModelFormat.Checkpoint,
     variant=PiDDecoderVariantType.Res2kTo4k_Sr4x,

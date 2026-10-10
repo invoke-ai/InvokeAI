@@ -12,6 +12,7 @@ from invokeai.app.services.config.config_default import (
     ensure_fonts_dir,
     get_config,
     load_and_migrate_config,
+    load_config_from_root,
 )
 from invokeai.app.services.shared.graph import Graph
 from invokeai.frontend.cli.arg_parser import InvokeAIArgs
@@ -90,6 +91,21 @@ def test_wan_memory_optimization_defaults_to_false_and_loads_from_yaml(tmp_path:
     assert load_and_migrate_config(temp_config_file).wan_memory_optimization is True
 
 
+@pytest.mark.parametrize(
+    ("yaml_value", "expected"),
+    [("on", "on"), ("off", "off"), ('"on"', "on"), ("auto", "auto")],
+    ids=["unquoted-on", "unquoted-off", "quoted", "auto"],
+)
+def test_rocm_aotriton_experimental_loads_unquoted_on_and_off(
+    tmp_path: Path, patch_rootdir: None, yaml_value: str, expected: str
+) -> None:
+    """YAML 1.1 reads an unquoted `on`/`off` as a boolean; the startup log tells users to write exactly that."""
+    temp_config_file = tmp_path / "temp_invokeai.yaml"
+    temp_config_file.write_text(f'schema_version: "4.0.3"\nrocm_aotriton_experimental: {yaml_value}\n')
+
+    assert load_and_migrate_config(temp_config_file).rocm_aotriton_experimental == expected
+
+
 def test_db_synchronous_defaults_to_full_and_loads_from_yaml(tmp_path: Path, patch_rootdir: None) -> None:
     # The default must stay `full`: anything else would quietly reduce durability for every existing
     # install on upgrade.
@@ -99,6 +115,30 @@ def test_db_synchronous_defaults_to_full_and_loads_from_yaml(tmp_path: Path, pat
     temp_config_file.write_text('schema_version: "4.0.3"\ndb_synchronous: normal\n')
 
     assert load_and_migrate_config(temp_config_file).db_synchronous == "normal"
+
+
+def test_load_config_from_root_reads_that_roots_file_and_writes_nothing(tmp_path: Path, patch_rootdir: None) -> None:
+    root = tmp_path / "install"
+    root.mkdir()
+    (root / "invokeai.yaml").write_text(
+        'schema_version: "4.0.3"\ndb_dir: elsewhere\noutputs_dir: pictures\ndb_synchronous: normal\n'
+    )
+
+    config = load_config_from_root(root)
+
+    assert config.db_path == (root / "elsewhere" / "invokeai.db").resolve()
+    assert config.outputs_path == (root / "pictures").resolve()
+    assert config.db_synchronous == "normal"
+    assert [path.name for path in root.iterdir()] == ["invokeai.yaml"]
+
+
+def test_load_config_from_root_lets_the_environment_win_over_the_file(
+    tmp_path: Path, patch_rootdir: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "invokeai.yaml").write_text('schema_version: "4.0.3"\ndb_synchronous: normal\n')
+    monkeypatch.setenv("INVOKEAI_DB_SYNCHRONOUS", "full")
+
+    assert load_config_from_root(tmp_path).db_synchronous == "full"
 
 
 def test_read_config_from_file(tmp_path: Path, patch_rootdir: None):

@@ -29,6 +29,7 @@ import {
   getVideoModes,
   getVideoPromptPolicy,
   getVideoValidationReasons,
+  getAutoDurationBounds,
   isAutoDurationActive,
   isAutoDurationSupportedForMode,
   getWanExpertWiringWarning,
@@ -2560,11 +2561,14 @@ describe('auto duration', () => {
     }
   );
 
-  it('has none for a continuation: its length is the new material the user asked for', () => {
+  it('sizes a continuation at the source rate, with the context counted against the ceiling', () => {
     const extending = settings({
+      fps: 24,
+      ltx2ExtendContextFrames: 25,
+      numFrames: 121,
       sourceVideo: {
         endFrame: 48,
-        fps: 24,
+        fps: 30,
         height: 704,
         numFrames: 49,
         startFrame: 0,
@@ -2573,8 +2577,38 @@ describe('auto duration', () => {
       },
     } as Partial<VideoSettings>);
 
-    expect(isAutoDurationSupportedForMode(extending)).toBe(false);
-    expect(isAutoDurationActive(extending)).toBe(false);
+    expect(isAutoDurationSupportedForMode(extending)).toBe(true);
+    // 25 held frames leave 121 - 24 = 97 for the prediction, at 30 fps; the total is back at 121.
+    expect(getAutoDurationBounds(ltx2('ltx2_dev'), extending)).toEqual({
+      contextFrames: 25,
+      fps: 30,
+      maxFrames: 121,
+      maxNewFrames: 96,
+      maxSeconds: 97 / 30,
+      minSeconds: 1,
+    });
+  });
+
+  it('holds a continuation inside the trained range of the head, below the Frames ceiling', () => {
+    const extending = settings({
+      ltx2ExtendContextFrames: 17,
+      numFrames: 481,
+      sourceVideo: {
+        endFrame: 48,
+        fps: 20,
+        height: 704,
+        numFrames: 49,
+        startFrame: 0,
+        video_name: 's.mp4',
+        width: 1248,
+      },
+    } as Partial<VideoSettings>);
+    const bounds = getAutoDurationBounds(ltx2('ltx2_dev'), extending);
+
+    // 465 frames of room is 23 s at 20 fps; the head stops at 20 s, i.e. 393 frames on the grid.
+    expect(bounds?.maxSeconds).toBe(20);
+    expect(bounds?.maxNewFrames).toBe(392);
+    expect(bounds?.maxFrames).toBe(17 + 392);
   });
 
   it('is inactive without a head, however the flag is stored', () => {

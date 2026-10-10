@@ -22,7 +22,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
 )
 from invokeai.app.services.shared.execution_state_migration import load_execution_state
 from invokeai.app.services.shared.graph import GraphExecutionState, WorkflowCallFrame
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.services.shared.workflow_graph_builder import (
     UnsupportedWorkflowNodeError,
     apply_workflow_inputs_to_workflow,

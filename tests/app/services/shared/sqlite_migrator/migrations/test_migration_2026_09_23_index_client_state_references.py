@@ -4,7 +4,7 @@ import json
 import sqlite3
 from logging import getLogger
 
-from invokeai.app.services.shared.media_references import create_media_references_table
+from invokeai.app.services.shared.sqlite_migrator.migrations._media_references_v1 import create_media_references_table
 from invokeai.app.services.shared.sqlite_migrator.migrations.migration_2026_09_23_index_client_state_references import (
     build_migration,
 )

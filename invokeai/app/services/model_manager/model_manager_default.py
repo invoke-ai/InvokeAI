@@ -100,6 +100,7 @@ class ModelManagerService(ModelManagerServiceBase):
                 keep_ram_copy_of_weights=app_config.keep_ram_copy_of_weights,
                 max_ram_cache_size_gb=app_config.max_cache_ram_gb,
                 max_vram_cache_size_gb=app_config.max_cache_vram_gb,
+                reserve_vram_gb=app_config.reserve_vram_gb,
                 execution_device=device,
                 storage_device="cpu",
                 log_memory_usage=app_config.log_memory_usage,

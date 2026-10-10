@@ -60,8 +60,7 @@ dependencies = [
   # `--torch-backend=<x>` with no extra (see docs/start-here/manual), so a blanket cap would also
   # reject torch>=2.12 on Windows/Linux CUDA, CPU and ARM64, where 2.12 has no known problem.
   # The ROCm path is constrained where it can actually be targeted: the `rocm` extra below pins an
-  # exact version — 2.13.0+rocm7.2, validated end-to-end on gfx1100 (W7900), where its bundled
-  # AOTriton 0.12b also triples flash-attention throughput vs the 2.10.0+rocm7.1 pin.
+  # exact version, AMD's 2.13.0+rocm10.0.0.
   "torch>=2.7.0,<3.0; sys_platform != 'darwin'",
   "torch>=2.7.0,<2.8.0; sys_platform == 'darwin'",
   "torchsde",                             # diffusers needs this for SDE solvers, but it is not an explicit dep of diffusers
@@ -85,6 +84,12 @@ dependencies = [
   "pydantic-settings",
   "pydantic",
   "python-socketio",
+  # Schema migrations that run on every database backend are written with Alembic's operations (no Alembic
+  # environment or revision scripts).
+  "alembic>=1.20,<2",
+  # The database layer compiles every query through SQLAlchemy Core. Keep the minor-version bound: dialect
+  # compilation and the pysqlite transaction handling it relies on are exactly what changes between minors.
+  "sqlalchemy>=2.1,<2.2",
   "uvicorn[standard]",
 
   # Auxiliary dependencies, pinned only if necessary.
@@ -125,9 +130,9 @@ dependencies = [
   # torch 2.4+cu carries its own triton dependency
 ]
 
-# The +cpu/+cu130/+rocm7.2 pins live on PyTorch's WHL indexes and are gated to the
-# platforms the project resolves and tests them on: Windows and Linux x86_64 (rocm: Linux
-# only). macOS is capped below torch 2.8 (see the base requirement), and linux_aarch64 stays
+# The +cpu/+cu130/+xpu pins live on PyTorch's WHL indexes, the +rocm10.0.0 pins on AMD's, and
+# all are gated to the platforms the project resolves and tests them on: Windows and Linux
+# x86_64. macOS is capped below torch 2.8 (see the base requirement), and linux_aarch64 stays
 # on the CPU-only PyPI 2.7.1 it was set up with (an aarch64 install requesting `cuda` gets
 # CPU torch), so both fall back to the base `torch` / `torchvision` from PyPI. The index has
 # carried aarch64 torchvision since 0.28, so moving aarch64 onto the pinned pairs -- and real
@@ -153,17 +158,108 @@ dependencies = [
   "torch==2.7.1; sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'aarch64')",
   "torchvision==0.22.1; sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'aarch64')",
 ]
+# ROCm 10 for Linux x86_64 and Windows, from AMD's index (PyTorch publishes no ROCm wheels for Windows, and none
+# built against ROCm 10). AMD splits the build: torch/torchvision and the ROCm runtime (`rocm-sdk-core`,
+# `rocm-sdk-libraries`) are shared, the GPU kernels come in one package per target and library. uv applies an
+# index source to direct requirements only, so every package that exists only on AMD's index is listed here.
+# The extra installs the kernels of every target AMD builds; the launcher leaves out the targets the machine
+# does not have (`uv sync --no-install-package`). ROCm 10 dropped gfx900/gfx906 (Vega 10/20, MI25/MI50), which
+# the previous 2.13.0+rocm7.2 pin from PyTorch's index still covered.
 "rocm" = [
-  # ROCm wheels are x86_64-linux-only; gate by platform so macOS/win/linux-aarch64 resolution is unaffected.
-  # 2.13.0+rocm7.2 bundles AOTriton 0.12b, whose regenerated gfx1100 tuning database triples
-  # flash-attention throughput on RDNA3 vs the previous 2.10.0+rocm7.1 pin (measured 17.9 ->
-  # 57.3 TFLOPS effective at the MiniMax H3 attention shape on a W7900).
-  "torch==2.13.0+rocm7.2; sys_platform == 'linux' and platform_machine != 'aarch64'",
-  "torchvision==0.28.0+rocm7.2; sys_platform == 'linux' and platform_machine != 'aarch64'",
-  "triton-rocm==3.7.1; sys_platform == 'linux' and platform_machine != 'aarch64'",
-  # linux_aarch64 fallback, see note under "cpu"
-  "torch==2.7.1; sys_platform == 'linux' and platform_machine == 'aarch64'",
-  "torchvision==0.22.1; sys_platform == 'linux' and platform_machine == 'aarch64'",
+  "torch==2.13.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "torchvision==0.28.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  # The Linux torch wheel requires AMD's triton build; the Windows wheel requires none.
+  "triton==3.8.0+git4cff872c.rocm10.0.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "rocm==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "rocm-sdk-core==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "rocm-sdk-libraries==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  # 0.50.2 is the first release with a Windows ROCm binary, and the first that finds its Linux one for these wheels:
+  # they report HIP 7.15, which 0.49 turns into `libbitsandbytes_rocm85.so` (7 * 10 + 15) where 0.50 ships `rocm715`.
+  "bitsandbytes>=0.50.2; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  # GPU kernels: per target, torch's, torchvision's and the ROCm runtime's; gfx110x, gfx115x and gfx12-0
+  # are torch's kernels shared by a whole family.
+  "amd-torch-device-gfx1010==2.13.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torchvision-device-gfx1010==0.28.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "rocm-sdk-device-gfx1010==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torch-device-gfx1011==2.13.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torchvision-device-gfx1011==0.28.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "rocm-sdk-device-gfx1011==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torch-device-gfx1012==2.13.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torchvision-device-gfx1012==0.28.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "rocm-sdk-device-gfx1012==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torch-device-gfx1030==2.13.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torchvision-device-gfx1030==0.28.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "rocm-sdk-device-gfx1030==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torch-device-gfx1031==2.13.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torchvision-device-gfx1031==0.28.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "rocm-sdk-device-gfx1031==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torch-device-gfx1032==2.13.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torchvision-device-gfx1032==0.28.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "rocm-sdk-device-gfx1032==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torch-device-gfx1033==2.13.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torchvision-device-gfx1033==0.28.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "rocm-sdk-device-gfx1033==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torch-device-gfx1034==2.13.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torchvision-device-gfx1034==0.28.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "rocm-sdk-device-gfx1034==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torch-device-gfx1035==2.13.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torchvision-device-gfx1035==0.28.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "rocm-sdk-device-gfx1035==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torch-device-gfx1036==2.13.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torchvision-device-gfx1036==0.28.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "rocm-sdk-device-gfx1036==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torch-device-gfx110x==2.13.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torch-device-gfx1100==2.13.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torchvision-device-gfx1100==0.28.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "rocm-sdk-device-gfx1100==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torch-device-gfx1101==2.13.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torchvision-device-gfx1101==0.28.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "rocm-sdk-device-gfx1101==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torch-device-gfx1102==2.13.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torchvision-device-gfx1102==0.28.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "rocm-sdk-device-gfx1102==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torch-device-gfx1103==2.13.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torchvision-device-gfx1103==0.28.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "rocm-sdk-device-gfx1103==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torch-device-gfx115x==2.13.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torch-device-gfx1150==2.13.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torchvision-device-gfx1150==0.28.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "rocm-sdk-device-gfx1150==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torch-device-gfx1151==2.13.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torchvision-device-gfx1151==0.28.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "rocm-sdk-device-gfx1151==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torch-device-gfx1152==2.13.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torchvision-device-gfx1152==0.28.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "rocm-sdk-device-gfx1152==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torch-device-gfx1153==2.13.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torchvision-device-gfx1153==0.28.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "rocm-sdk-device-gfx1153==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torch-device-gfx12-0==2.13.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torch-device-gfx1200==2.13.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torchvision-device-gfx1200==0.28.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "rocm-sdk-device-gfx1200==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torch-device-gfx1201==2.13.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torchvision-device-gfx1201==0.28.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "rocm-sdk-device-gfx1201==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torch-device-gfx908==2.13.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torchvision-device-gfx908==0.28.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "rocm-sdk-device-gfx908==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torch-device-gfx90a==2.13.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "amd-torchvision-device-gfx90a==0.28.0+rocm10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "rocm-sdk-device-gfx90a==10.0.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  # Targets AMD builds for Linux only.
+  "amd-torch-device-gfx1250==2.13.0+rocm10.0.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "amd-torchvision-device-gfx1250==0.28.0+rocm10.0.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "rocm-sdk-device-gfx1250==10.0.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "amd-torch-device-gfx942==2.13.0+rocm10.0.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "amd-torchvision-device-gfx942==0.28.0+rocm10.0.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "rocm-sdk-device-gfx942==10.0.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "amd-torch-device-gfx950==2.13.0+rocm10.0.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "amd-torchvision-device-gfx950==0.28.0+rocm10.0.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "rocm-sdk-device-gfx950==10.0.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  # macOS / linux_aarch64 fallback, see note under "cpu"
+  "torch==2.7.1; sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'aarch64')",
+  "torchvision==0.22.1; sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'aarch64')",
 ]
 # Intel XPU (Arc / Battlemage) wheels are published only for linux-x86_64 and
 # windows-amd64 on PyTorch's WHL index. Gate the +xpu pins to those platforms; the
@@ -184,6 +280,8 @@ dependencies = [
   "torchvision==0.22.1; sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'aarch64')",
 ]
 
+# Driver for running the application database on MySQL or MariaDB instead of SQLite.
+"mysql" = ["pymysql>=1.2.3,<2"]
 "onnx" = ["onnxruntime"]
 "onnx-cuda" = ["onnxruntime-gpu"]
 "onnx-directml" = ["onnxruntime-directml"]
@@ -220,7 +318,7 @@ environments = ["sys_platform == 'win32' or sys_platform == 'darwin' or (sys_pla
 # there, or move it to the newest PyPI release, independently of the extras. `tool.uv` never reaches the
 # published metadata, so installing the released package with `--torch-backend` keeps the open range of the base
 # requirement; only `uv pip install` inside a checkout is held to it.
-# `==2.13.0` also matches the local builds (+cpu, +cu130, +rocm7.2, +xpu).
+# `==2.13.0` also matches the local builds (+cpu, +cu130, +rocm10.0.0, +xpu).
 constraint-dependencies = [
   "torch==2.13.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
   "torchvision==0.28.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
@@ -238,26 +336,139 @@ constraint-dependencies = [
 # lockfile regenerated by a uv too old to honor this.
 exclude-dependencies = ["notebook"]
 
+# The Linux and Windows wheels of this build share a version but not their requirements: only the Linux wheel
+# requires (AMD's) triton, without a marker. uv reads one wheel's metadata for both, so restate the union here.
+[[tool.uv.dependency-metadata]]
+name = "torch"
+version = "2.13.0+rocm10.0.0"
+requires-dist = [
+  "filelock",
+  "typing-extensions>=4.10.0",
+  "setuptools>=77.0.3",
+  "sympy>=1.13.3",
+  "networkx>=2.5.1",
+  "jinja2",
+  "fsspec>=0.8.5",
+  "rocm[libraries]==10.0.0",
+  "rocm-bootstrap",
+  "triton==3.8.0+git4cff872c.rocm10.0.0; sys_platform == 'linux'",
+]
+
+# `rocm` is published only as an sdist whose build asks the machine's GPU which kernel package to require, so the
+# lock would depend on the machine that wrote it. Its target-independent requirements, from rocm_sdk._dist_info;
+# the kernel packages are listed in the rocm extra instead.
+[[tool.uv.dependency-metadata]]
+name = "rocm"
+version = "10.0.0"
+requires-dist = [
+  "rocm-sdk-core==10.0.0",
+  "rocm-sdk-libraries==10.0.0; extra == 'libraries'",
+]
+provides-extras = ["libraries"]
+
 [tool.uv.sources]
-# Keep linux_aarch64 (and, for cpu/cuda, macOS) off the PyTorch WHL indexes so that uv
-# resolves their 2.7.1 fallback pins from PyPI; see the note above the extras.
+# Keep linux_aarch64 and macOS off the PyTorch and AMD indexes so that uv resolves their
+# 2.7.1 fallback pins from PyPI; see the note above the extras.
 torch = [
   { index = "torch-cpu", extra = "cpu", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'" },
   { index = "torch-cuda", extra = "cuda", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'" },
-  { index = "torch-rocm", extra = "rocm", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
+  { index = "torch-rocm", extra = "rocm", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'" },
   { index = "torch-xpu", extra = "xpu", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'" },
   { index = "pypi", marker = "sys_platform == 'linux' and platform_machine == 'aarch64'" },
 ]
 torchvision = [
   { index = "torch-cpu", extra = "cpu", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'" },
   { index = "torch-cuda", extra = "cuda", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'" },
-  { index = "torch-rocm", extra = "rocm", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
+  { index = "torch-rocm", extra = "rocm", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'" },
   { index = "torch-xpu", extra = "xpu", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'" },
   { index = "pypi", marker = "sys_platform == 'linux' and platform_machine == 'aarch64'" },
 ]
-triton-rocm = [
-  { index = "torch-rocm", marker = "sys_platform == 'linux' and platform_machine != 'aarch64'" },
+# Only the rocm extra takes AMD's triton; cuda and the no-extra resolution keep PyPI's.
+triton = [
+  { index = "torch-rocm", extra = "rocm", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
 ]
+# Packages that exist only on AMD's index.
+rocm                           = { index = "torch-rocm" }
+rocm-sdk-core                  = { index = "torch-rocm" }
+rocm-sdk-libraries             = { index = "torch-rocm" }
+amd-torch-device-gfx1010       = { index = "torch-rocm" }
+amd-torchvision-device-gfx1010 = { index = "torch-rocm" }
+rocm-sdk-device-gfx1010        = { index = "torch-rocm" }
+amd-torch-device-gfx1011       = { index = "torch-rocm" }
+amd-torchvision-device-gfx1011 = { index = "torch-rocm" }
+rocm-sdk-device-gfx1011        = { index = "torch-rocm" }
+amd-torch-device-gfx1012       = { index = "torch-rocm" }
+amd-torchvision-device-gfx1012 = { index = "torch-rocm" }
+rocm-sdk-device-gfx1012        = { index = "torch-rocm" }
+amd-torch-device-gfx1030       = { index = "torch-rocm" }
+amd-torchvision-device-gfx1030 = { index = "torch-rocm" }
+rocm-sdk-device-gfx1030        = { index = "torch-rocm" }
+amd-torch-device-gfx1031       = { index = "torch-rocm" }
+amd-torchvision-device-gfx1031 = { index = "torch-rocm" }
+rocm-sdk-device-gfx1031        = { index = "torch-rocm" }
+amd-torch-device-gfx1032       = { index = "torch-rocm" }
+amd-torchvision-device-gfx1032 = { index = "torch-rocm" }
+rocm-sdk-device-gfx1032        = { index = "torch-rocm" }
+amd-torch-device-gfx1033       = { index = "torch-rocm" }
+amd-torchvision-device-gfx1033 = { index = "torch-rocm" }
+rocm-sdk-device-gfx1033        = { index = "torch-rocm" }
+amd-torch-device-gfx1034       = { index = "torch-rocm" }
+amd-torchvision-device-gfx1034 = { index = "torch-rocm" }
+rocm-sdk-device-gfx1034        = { index = "torch-rocm" }
+amd-torch-device-gfx1035       = { index = "torch-rocm" }
+amd-torchvision-device-gfx1035 = { index = "torch-rocm" }
+rocm-sdk-device-gfx1035        = { index = "torch-rocm" }
+amd-torch-device-gfx1036       = { index = "torch-rocm" }
+amd-torchvision-device-gfx1036 = { index = "torch-rocm" }
+rocm-sdk-device-gfx1036        = { index = "torch-rocm" }
+amd-torch-device-gfx110x       = { index = "torch-rocm" }
+amd-torch-device-gfx1100       = { index = "torch-rocm" }
+amd-torchvision-device-gfx1100 = { index = "torch-rocm" }
+rocm-sdk-device-gfx1100        = { index = "torch-rocm" }
+amd-torch-device-gfx1101       = { index = "torch-rocm" }
+amd-torchvision-device-gfx1101 = { index = "torch-rocm" }
+rocm-sdk-device-gfx1101        = { index = "torch-rocm" }
+amd-torch-device-gfx1102       = { index = "torch-rocm" }
+amd-torchvision-device-gfx1102 = { index = "torch-rocm" }
+rocm-sdk-device-gfx1102        = { index = "torch-rocm" }
+amd-torch-device-gfx1103       = { index = "torch-rocm" }
+amd-torchvision-device-gfx1103 = { index = "torch-rocm" }
+rocm-sdk-device-gfx1103        = { index = "torch-rocm" }
+amd-torch-device-gfx115x       = { index = "torch-rocm" }
+amd-torch-device-gfx1150       = { index = "torch-rocm" }
+amd-torchvision-device-gfx1150 = { index = "torch-rocm" }
+rocm-sdk-device-gfx1150        = { index = "torch-rocm" }
+amd-torch-device-gfx1151       = { index = "torch-rocm" }
+amd-torchvision-device-gfx1151 = { index = "torch-rocm" }
+rocm-sdk-device-gfx1151        = { index = "torch-rocm" }
+amd-torch-device-gfx1152       = { index = "torch-rocm" }
+amd-torchvision-device-gfx1152 = { index = "torch-rocm" }
+rocm-sdk-device-gfx1152        = { index = "torch-rocm" }
+amd-torch-device-gfx1153       = { index = "torch-rocm" }
+amd-torchvision-device-gfx1153 = { index = "torch-rocm" }
+rocm-sdk-device-gfx1153        = { index = "torch-rocm" }
+amd-torch-device-gfx12-0       = { index = "torch-rocm" }
+amd-torch-device-gfx1200       = { index = "torch-rocm" }
+amd-torchvision-device-gfx1200 = { index = "torch-rocm" }
+rocm-sdk-device-gfx1200        = { index = "torch-rocm" }
+amd-torch-device-gfx1201       = { index = "torch-rocm" }
+amd-torchvision-device-gfx1201 = { index = "torch-rocm" }
+rocm-sdk-device-gfx1201        = { index = "torch-rocm" }
+amd-torch-device-gfx908        = { index = "torch-rocm" }
+amd-torchvision-device-gfx908  = { index = "torch-rocm" }
+rocm-sdk-device-gfx908         = { index = "torch-rocm" }
+amd-torch-device-gfx90a        = { index = "torch-rocm" }
+amd-torchvision-device-gfx90a  = { index = "torch-rocm" }
+rocm-sdk-device-gfx90a         = { index = "torch-rocm" }
+amd-torch-device-gfx1250       = { index = "torch-rocm" }
+amd-torchvision-device-gfx1250 = { index = "torch-rocm" }
+rocm-sdk-device-gfx1250        = { index = "torch-rocm" }
+amd-torch-device-gfx942        = { index = "torch-rocm" }
+amd-torchvision-device-gfx942  = { index = "torch-rocm" }
+rocm-sdk-device-gfx942         = { index = "torch-rocm" }
+amd-torch-device-gfx950        = { index = "torch-rocm" }
+amd-torchvision-device-gfx950  = { index = "torch-rocm" }
+rocm-sdk-device-gfx950         = { index = "torch-rocm" }
 # PyPI's xformers wheels are built against CUDA 12.8 and cannot load their extension next to a CUDA 13 torch (every
 # memory-efficient attention call then fails); PyTorch's cu130 index carries the CUDA 13 build of the same release.
 # Not scoped to the `cuda` extra: uv only allows that for packages the extra itself lists, and the CUDA 13 torch that
@@ -283,9 +494,10 @@ name = "torch-cuda"
 url = "https://download.pytorch.org/whl/cu130"
 explicit = true
 
+# AMD's index also mirrors PyPI packages (numpy, pillow, sympy, ...) without hashes, so it must stay explicit.
 [[tool.uv.index]]
 name = "torch-rocm"
-url = "https://download.pytorch.org/whl/rocm7.2"
+url = "https://stable.repo.amd.com/rocm/whl-next/"
 explicit = true
 
 [[tool.uv.index]]
@@ -299,6 +511,7 @@ explicit = true
 "invoke-userdel" = "invokeai.app.util.user_management:userdel"
 "invoke-userlist" = "invokeai.app.util.user_management:userlist"
 "invoke-usermod" = "invokeai.app.util.user_management:usermod"
+"invoke-db-copy" = "invokeai.app.util.database_copy:main"
 
 [project.urls]
 "Homepage" = "https://invoke.ai/"
@@ -363,7 +576,11 @@ addopts = "--strict-markers --dist loadfile -m \"not slow\""
 markers = [
   "slow: Marks tests as slow. Disabled by default. To run all tests, use -m \"\". To run only slow tests, use -m \"slow\".",
   "timeout: Marks the timeout override.",
+  "uses_database: Runs on the `empty_database` fixture, which targets INVOKEAI_TEST_DB_URL when it is set and SQLite otherwise. Applied by the collection hook in tests/conftest.py.",
+  "sqlite_only: Depends on SQLite internals (query plans, PRAGMAs, the single connection); skipped when INVOKEAI_TEST_DB_URL targets another backend.",
 ]
+# A cache-key or other SQLAlchemy warning is a bug in the query layer, not noise.
+filterwarnings = ["error::sqlalchemy.exc.SAWarning"]
 [tool.coverage.run]
 branch = true
 source = ["invokeai"]
