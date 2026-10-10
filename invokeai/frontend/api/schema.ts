@@ -6730,7 +6730,7 @@ export type components = {
         };
         /**
          * Boolean Logic
-         * @description Performs Boolean AND, OR, XOR, or NOT operations.
+         * @description Performs Boolean AND, OR, XOR, NOT, NAND, NOR, or XNOR operations. NOT uses only A.
          */
         BooleanLogicInvocation: {
             /**
@@ -6756,7 +6756,7 @@ export type components = {
              * @default AND
              * @enum {string}
              */
-            operation?: "AND" | "OR" | "XOR" | "NOT";
+            operation?: "AND" | "OR" | "XOR" | "NAND" | "NOR" | "XNOR" | "NOT";
             /**
              * A
              * @description First Boolean input

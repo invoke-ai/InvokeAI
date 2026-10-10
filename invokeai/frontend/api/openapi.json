@@ -22093,7 +22093,7 @@
         "category": "math",
         "class": "invocation",
         "classification": "stable",
-        "description": "Performs Boolean AND, OR, XOR, or NOT operations.",
+        "description": "Performs Boolean AND, OR, XOR, NOT, NAND, NOR, or XNOR operations. NOT uses only A.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -22123,7 +22123,7 @@
           "operation": {
             "default": "AND",
             "description": "The logical operation to perform",
-            "enum": ["AND", "OR", "XOR", "NOT"],
+            "enum": ["AND", "OR", "XOR", "NAND", "NOR", "XNOR", "NOT"],
             "field_kind": "input",
             "input": "any",
             "orig_default": "AND",
@@ -22132,8 +22132,11 @@
             "type": "string",
             "ui_choice_labels": {
               "AND": "A AND B",
+              "NAND": "A NAND B",
+              "NOR": "A NOR B",
               "NOT": "NOT A",
               "OR": "A OR B",
+              "XNOR": "A XNOR B",
               "XOR": "A XOR B"
             }
           },
