@@ -21,7 +21,11 @@ import {
   galleryVideos,
   type GalleryVideoItem,
 } from '@features/gallery';
-import { getGalleryBoardLabel, getGalleryDeletionSuccessor } from '@features/gallery/contracts';
+import {
+  getGalleryBoardLabel,
+  getGalleryDeletionSuccessor,
+  getPersistedSelectedGalleryItemKeys,
+} from '@features/gallery/contracts';
 import {
   getGalleryItemBoardIdsFromCaches,
   getGalleryItemStarredFromCaches,
@@ -256,21 +260,25 @@ export const useImageActions = ({
 
       return board ? getGalleryBoardLabel(board, t) : t('widgets.gallery.uncategorized');
     };
-    const getLatestGenerateValues = () => {
+    const getLatestWidgetValues = (widgetId: 'gallery' | 'generate' | 'video') => {
       const snapshot = queries.getSnapshot();
       const project = projectId
         ? snapshot.projects.find((candidate) => candidate.id === projectId)
         : snapshot.activeProject;
 
-      return project ? getProjectWidgetValues(project, 'generate') : {};
+      return project ? getProjectWidgetValues(project, widgetId) : {};
     };
-    const getLatestVideoValues = () => {
-      const snapshot = queries.getSnapshot();
-      const project = projectId
-        ? snapshot.projects.find((candidate) => candidate.id === projectId)
-        : snapshot.activeProject;
+    const getLatestGenerateValues = () => getLatestWidgetValues('generate');
+    const getLatestVideoValues = () => getLatestWidgetValues('video');
+    // The persisted selection, primary and members, as one comparable key: a host's action context only sees
+    // loaded items, so it cannot tell a cleared selection from one moved to an item it has not loaded.
+    const getPersistedGallerySelectionKey = (): string => {
+      const values = getLatestWidgetValues('gallery');
 
-      return project ? getProjectWidgetValues(project, 'video') : {};
+      return JSON.stringify([
+        typeof values.selectedImageName === 'string' ? values.selectedImageName : null,
+        getPersistedSelectedGalleryItemKeys(values),
+      ]);
     };
     // Snapshot deletion-sensitive widget values across all projects; cache rollback cannot restore them. Diff
     // before/after values for conflict-safe restoration.
@@ -373,8 +381,8 @@ export const useImageActions = ({
       reportMutationOutcome(action, requested.length, result, boardId);
     };
     const deleteItemsConfirmed = (items: GalleryItemRef[]): Promise<void> => {
-      // Capture successor context before optimistic removal. Partial failures reconcile via invalidation; total
-      // failures restore widget snapshots directly.
+      // Capture successor context before optimistic removal. Any rejected items restore the widget snapshot; the
+      // confirmed removals then apply again.
       const deletionContext = getItemActionContext?.() ?? null;
       let orderedRefs: GalleryItemRef[] | null = null;
       const isDeletionContextCurrent = (): boolean => {
@@ -384,10 +392,14 @@ export const useImageActions = ({
 
         const current = getItemActionContext();
 
+        // The optimistic removal below clears the deleted primary from the host's selection, so the selection is
+        // still this deletion's while the store holds what that removal (or restoring rejected items) left;
+        // anything selected since, loaded by the host or not, makes the successor stale.
         return Boolean(
           current &&
           current.filterIdentity === deletionContext.filterIdentity &&
-          current.selectedItemKey === deletionContext.selectedItemKey
+          (current.selectedItemKey === deletionContext.selectedItemKey ||
+            getPersistedGallerySelectionKey() === selectionAfterRemoval)
         );
       };
       const rollbackCaches = patchGalleryItemCaches(queryClient, {
@@ -408,12 +420,24 @@ export const useImageActions = ({
       // Once backend-confirmed deletion starts applying, later callback failures must not restore deleted items.
       let confirmedApplied = false;
       const galleryWidgetSnapshot = applyGalleryItemRemoval(items.map(toGalleryItemKey));
+      let selectionAfterRemoval = getPersistedGallerySelectionKey();
 
       return runItemMutation({
         action: 'delete',
         applyConfirmed: async (result, signal) => {
+          // A rejected request reports its items as failed rather than throwing. Those items remain, so restore what
+          // the optimistic removal cleared; confirmed removals are applied again below.
           if (result.failed.length > 0) {
+            // Restoring changes the persisted selection the successor fence compares against: adopt it only when
+            // the selection was still this deletion's, so a choice made meanwhile still wins.
+            const wasCurrent = isDeletionContextCurrent();
+
             rollbackCachesOnce();
+            restoreGalleryItemRemoval(galleryWidgetSnapshot);
+
+            if (wasCurrent) {
+              selectionAfterRemoval = getPersistedGallerySelectionKey();
+            }
           }
 
           if (result.succeeded.length === 0) {
@@ -450,7 +474,13 @@ export const useImageActions = ({
           }
 
           confirmedApplied = true;
-          patchGalleryItemCaches(queryClient, { kind: 'delete', result });
+          // Without a rollback the optimistic patch already lowered every page's total; only pages refetched since
+          // still count the deleted items.
+          patchGalleryItemCaches(
+            queryClient,
+            { kind: 'delete', result },
+            { totals: cachesRolledBack ? 'listing' : 'holder' }
+          );
           gallery.removeItems(result.succeeded.map(toGalleryItemKey));
           if (successor) {
             const failedKeys = new Set(result.failed.map(toGalleryItemKey));
@@ -468,7 +498,7 @@ export const useImageActions = ({
               if (selectionPage === undefined) {
                 gallery.setItemMultiSelection(itemKeys, successor, projectId);
               } else {
-                gallery.setItemMultiSelection(itemKeys, successor, projectId, selectionPage);
+                gallery.setItemMultiSelection(itemKeys, successor, projectId, selectionPage, true);
               }
             } else if (selectionPage === undefined) {
               gallery.selectItem(successor, projectId);

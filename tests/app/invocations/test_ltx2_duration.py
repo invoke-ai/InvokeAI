@@ -13,6 +13,7 @@ from unittest.mock import MagicMock
 import pytest
 import torch
 from diffusers.pipelines.ltx2.duration_head import LTX2DurationHead
+from pydantic import ValidationError
 
 from invokeai.app.invocations.fields import LTX2ConditioningField
 from invokeai.app.invocations.ltx2.ltx2_duration import LTX2DurationInvocation
@@ -134,3 +135,66 @@ def test_it_refuses_a_batch_of_prompts(monkeypatch: pytest.MonkeyPatch) -> None:
     head = _head(monkeypatch, seconds=5.0)
     with pytest.raises(ValueError, match="exactly one conditioning"):
         _node().invoke(_context(head, conditioning_count=2))
+
+
+def test_an_extension_s_context_is_added_in_front_of_the_predicted_continuation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The prompt sizes the new material: 5s at 24 fps is 113 frames, i.e. 112 after the first, behind 17 held ones."""
+    head = _head(monkeypatch, seconds=5.0)
+    output = _node(fps=24.0, context_frames=17).invoke(_context(head))
+
+    assert output.num_frames == 17 + 112
+    assert (output.num_frames - 1) % 8 == 0
+
+
+def test_an_extension_always_keeps_one_group_of_new_material(monkeypatch: pytest.MonkeyPatch) -> None:
+    """At 1 fps a 1s floor is one frame; added naively that is the context alone, a continuation of nothing."""
+    head = _head(monkeypatch, seconds=0.3)
+    output = _node(fps=1.0, min_seconds=1.0, max_seconds=5.0, context_frames=17).invoke(_context(head))
+
+    assert output.num_frames == 17 + 8
+
+
+@pytest.mark.parametrize("context_frames", [0, 17])
+def test_the_frame_ceiling_holds_when_the_rate_is_higher_than_the_bounds_assumed(
+    monkeypatch: pytest.MonkeyPatch, context_frames: int
+) -> None:
+    """Bounds sized at a guessed 24 fps, read at a real 48: the seconds clamp alone would double the run."""
+    head = _head(monkeypatch, seconds=30.0)
+    output = _node(fps=48.0, max_seconds=5.0, context_frames=context_frames, max_num_frames=124).invoke(_context(head))
+
+    assert output.num_frames == 121  # 124 snapped down onto the grid
+
+
+def test_the_frame_ceiling_is_reached_when_the_rate_is_lower_than_the_caller_assumed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A source recorded at 24 fps that really plays at 16: seconds sized at 24 would stop at 81 of 121 frames."""
+    head = _head(monkeypatch, seconds=30.0)
+    output = _node(fps=16.0, context_frames=17, max_num_frames=121).invoke(_context(head))
+
+    assert output.num_frames == 121
+
+
+def test_a_standalone_extension_stays_within_the_family_s_longest_clip(monkeypatch: pytest.MonkeyPatch) -> None:
+    """241 held frames plus a 20 s prediction at 24 fps would be 713 frames, past what LTX-2 generates."""
+    head = _head(monkeypatch, seconds=30.0)
+    output = _node(fps=24.0, context_frames=241).invoke(_context(head))
+
+    assert output.num_frames == 481
+    # Nor can a caller ask for more: no LTX-2 run goes past it.
+    with pytest.raises(ValidationError):
+        _node(max_num_frames=482)
+
+
+@pytest.mark.parametrize(
+    ("context_frames", "max_num_frames", "match"),
+    [(16, 481, "8k\\+1 grid"), (17, 20, "leaves no room")],
+)
+def test_it_refuses_a_context_it_cannot_continue_from(
+    monkeypatch: pytest.MonkeyPatch, context_frames: int, max_num_frames: int, match: str
+) -> None:
+    head = _head(monkeypatch, seconds=5.0)
+    with pytest.raises(ValueError, match=match):
+        _node(context_frames=context_frames, max_num_frames=max_num_frames).invoke(_context(head))

@@ -1,9 +1,11 @@
 """Conditional intermediate deletion shared by the image and video services.
 
-A guard runs on the deleting transaction's cursor, immediately before the `DELETE`, and returns
-the subset of the candidate names that may still go. Because the database serializes writers
-through one connection and lock, nothing — a project save, an enqueue, a promotion — can make a
-name protected between the guard's answer and the record's removal.
+A guard runs on the deleting transaction, immediately before the `DELETE`, and returns the subset
+of the candidate names that may still go. That transaction holds the `media_protection` lock, which
+every write that makes media protected (a reference, a hold) shares: nothing — a project save, a
+browser hold, a reused cached output — can make a name protected between the guard's answer and the
+record's removal. (On SQLite the database serializes all writers anyway; the session queue, which makes
+media active as well, runs only there until it is ported, and then shares the lock too.)
 
 Records go first and files second, with a durable journal spanning the two. Staging files before
 a conditional record delete would need a restore for every survivor, and a concurrent delete of a
@@ -12,14 +14,16 @@ rows this call removed are touched; if the process dies between the commit and t
 recovery finishes the purge for every journalled name whose record is gone.
 """
 
-import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Optional, Protocol, Sequence
+from typing import TYPE_CHECKING, Optional, Protocol, Sequence
+
+if TYPE_CHECKING:
+    from invokeai.app.services.shared.database.queries import Queries
 
 
 class IntermediateDeleteGuard(Protocol):
-    def __call__(self, cursor: sqlite3.Cursor, names: Sequence[str]) -> list[str]: ...
+    def __call__(self, q: "Queries", names: Sequence[str]) -> list[str]: ...
 
 
 @dataclass

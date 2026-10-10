@@ -85,8 +85,9 @@ you wish.
 LTX-2.5 ships with a small **duration head** that reads your prompt, as the model will see it, and predicts how long the shot it describes should run. With a duration head in the **Duration head** slot of **Model components**, an **Auto duration** switch appears above Frames:
 
 * With it on, the head chooses the clip's length, and **Frames becomes Max frames** — the longest clip it may choose. That number still sizes the run's memory, so it stays editable, and its help text shows the range in seconds. Raise it to allow longer shots.
-* The head chooses between one second (or the shortest clip LTX-2 makes) and Max frames, at the panel's FPS, and lands on the 8·n + 1 frame grid. If Max frames is too short to leave it a choice, the clip simply runs at that length.
-* It is off for audio-to-video, video-to-audio and extensions, where the source clip decides the length.
+* The head chooses between one second (or the shortest clip LTX-2 makes) and Max frames, at the clip's frame rate (the panel's FPS, or the source's for an extension), and lands on the 8·n + 1 frame grid. If Max frames is too short to leave it a choice, the clip simply runs at that length.
+* For an [extension](#extending-with-ltx-2) the prompt describes the continuation, so the head chooses the length of the new material, at the source clip's frame rate, and the Context Frames are added in front of it. Max frames still counts the whole generated clip, context included.
+* It is off for audio-to-video and video-to-audio, where the conditioning clip decides the length.
 * The length that ran is what the video records, so recalling it reproduces that exact clip; recall turns Auto duration off for that reason.
 
 The duration head is a separate, optional 3.6 MB install (**LTX-2.5 Duration Head** in the starter models). It is fetched from Lightricks' own repository, which is license-gated: the install needs a Hugging Face token from an account that has accepted the LTX-2.5 license. Once installed it is selected automatically; the switch stays off until you turn it on.
@@ -95,7 +96,7 @@ The duration head is a separate, optional 3.6 MB install (**LTX-2.5 Duration Hea
 
 LTX-2 continues a clip from its **closing frames and closing sound**, not from a single still. The final *Context Frames* of the trimmed source (default **17**, about 0.7 s at 24 fps) are held fixed at the start of the new clip, picture and audio together, so the model sees the motion and sound it is continuing. The same span is then cross-faded to join the new clip to the source, so the join blends two copies of the same moment rather than two different ones.
 
-Context comes out of the frame budget: the extension adds **Frames − Context Frames** new frames, and the Context Frames help text shows that number. Trade-offs when choosing it:
+Context comes out of the frame budget: the extension adds **Frames − Context Frames** new frames, and the Context Frames help text shows that number. Under [Auto duration](#auto-duration) that is the most it can add; the head may choose fewer. Trade-offs when choosing it:
 
 * **Longer context carries more of the source.** 17 frames is enough for motion and the *tone* of a sound, but only about a syllable of it: extending a song at 17 tends to flatten the continuation into a sustained note. Raising context to 33–49 restores rhythm and cadence.
 * **Raise Frames with it.** At 121 frames, context 17 adds 104 new frames; context 49 adds only 72.

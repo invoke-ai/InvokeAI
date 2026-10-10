@@ -26,6 +26,3 @@ class ModelRelationshipsService(ModelRelationshipsServiceABC):
 
     def get_related_keys_from_model(self, model: AnyModelConfig) -> list[str]:
         return self.get_related_model_keys(model.key)
-
-    def get_related_model_keys_batch(self, model_keys: list[str]) -> list[str]:
-        return self.__invoker.services.model_relationship_records.get_related_model_keys_batch(model_keys)

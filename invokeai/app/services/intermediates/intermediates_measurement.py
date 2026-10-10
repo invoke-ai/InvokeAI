@@ -11,7 +11,7 @@ import threading
 import time
 from typing import TYPE_CHECKING, Callable, Optional, cast
 
-from invokeai.app.services.intermediates.intermediates_records_sqlite import IntermediatesRecordsSqlite, MediaKind
+from invokeai.app.services.intermediates.intermediates_records_default import IntermediatesRecords, MediaKind
 
 if TYPE_CHECKING:
     from invokeai.app.services.invocation_services import InvocationServices
@@ -24,7 +24,7 @@ MEASURE_MIN_AGE_SECONDS = 10
 class IntermediatesSizeMeasurer:
     def __init__(
         self,
-        records: IntermediatesRecordsSqlite,
+        records: IntermediatesRecords,
         services: Callable[[], "InvocationServices"],
         stop: threading.Event,
         logger: logging.Logger,

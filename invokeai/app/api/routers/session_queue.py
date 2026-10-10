@@ -37,16 +37,16 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueStatus,
 )
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
 
 session_queue_router = APIRouter(prefix="/v1/queue", tags=["queue"])
 
 # Upper bound on the number of item ids a client may ask about in one request. Without it a
-# caller can post tens of thousands of ids, which the SQLite layer would either expand past the
-# per-statement bind limit or grind through in a long-running query. The list is meant to cover
-# the rows a client actually has on screen, so this is far above any legitimate use. A limited id
-# listing is capped at the same size, since its ids are fetched to be hydrated that way.
+# caller can post tens of thousands of ids and make the database grind through a long-running
+# query. The list is meant to cover the rows a client actually has on screen, so this is far
+# above any legitimate use. A limited id listing is capped at the same size, since its ids are
+# fetched to be hydrated that way.
 MAX_QUEUE_ITEM_IDS_PER_REQUEST = 1000
 
 
@@ -249,7 +249,7 @@ def get_queue_item_for_mutation(queue_id: str, item_id: int, current_user: Curre
 )
 async def enqueue_batch(
     current_user: CurrentUserOrDefault,
-    queue_id: str = Path(description="The queue id to perform this operation on"),
+    queue_id: str = Path(description="The queue id to perform this operation on", max_length=255),
     batch: Batch = Body(description="Batch to process"),
     prepend: bool = Body(default=False, description="Whether or not to prepend this batch in the queue"),
 ) -> EnqueueBatchResult:

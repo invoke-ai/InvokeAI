@@ -60,6 +60,8 @@ Any environment variables supported by InvokeAI can be set here - please see the
 At the very least, you might want to set the `INVOKEAI_ROOT` environment variable
 to point to the location where you wish to store your InvokeAI models, configuration, and outputs.
 
+The image includes the driver for a [MySQL or MariaDB database](/configuration/external-database/): set `INVOKEAI_DB_URL` to use one instead of the SQLite file in the root directory.
+
 | Environment Variable | Default value | Description |
 | --- | --- | --- |
 | `INVOKEAI_ROOT` | `~/invokeai` | **Required** - the location of your InvokeAI root directory. It will be created if it does not exist. |

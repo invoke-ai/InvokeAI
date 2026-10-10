@@ -12,6 +12,7 @@ from invokeai.app.services.config.config_default import (
     ensure_fonts_dir,
     get_config,
     load_and_migrate_config,
+    load_config_from_root,
 )
 from invokeai.app.services.shared.graph import Graph
 from invokeai.frontend.cli.arg_parser import InvokeAIArgs
@@ -99,6 +100,30 @@ def test_db_synchronous_defaults_to_full_and_loads_from_yaml(tmp_path: Path, pat
     temp_config_file.write_text('schema_version: "4.0.3"\ndb_synchronous: normal\n')
 
     assert load_and_migrate_config(temp_config_file).db_synchronous == "normal"
+
+
+def test_load_config_from_root_reads_that_roots_file_and_writes_nothing(tmp_path: Path, patch_rootdir: None) -> None:
+    root = tmp_path / "install"
+    root.mkdir()
+    (root / "invokeai.yaml").write_text(
+        'schema_version: "4.0.3"\ndb_dir: elsewhere\noutputs_dir: pictures\ndb_synchronous: normal\n'
+    )
+
+    config = load_config_from_root(root)
+
+    assert config.db_path == (root / "elsewhere" / "invokeai.db").resolve()
+    assert config.outputs_path == (root / "pictures").resolve()
+    assert config.db_synchronous == "normal"
+    assert [path.name for path in root.iterdir()] == ["invokeai.yaml"]
+
+
+def test_load_config_from_root_lets_the_environment_win_over_the_file(
+    tmp_path: Path, patch_rootdir: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "invokeai.yaml").write_text('schema_version: "4.0.3"\ndb_synchronous: normal\n')
+    monkeypatch.setenv("INVOKEAI_DB_SYNCHRONOUS", "full")
+
+    assert load_config_from_root(tmp_path).db_synchronous == "full"
 
 
 def test_read_config_from_file(tmp_path: Path, patch_rootdir: None):

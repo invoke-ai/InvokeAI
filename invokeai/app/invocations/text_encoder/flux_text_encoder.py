@@ -21,7 +21,9 @@ from invokeai.backend.model_manager.taxonomy import ModelFormat
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_CLIP_PREFIX, FLUX_LORA_T5_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, FLUXConditioningInfo
+from invokeai.backend.util.devices import TorchDevice
 
 
 @invocation(
@@ -81,8 +83,13 @@ class FluxTextEncoderInvocation(BaseInvocation):
         t5_encoder_config = t5_encoder_info.config
         assert t5_encoder_config is not None
 
+        # A GGUF build dequantizes each Linear per forward, a transient its resident size does not cover;
+        # zero for other builds.
+        dequant_bytes = peak_dequant_transient_bytes(
+            t5_encoder_info.model, TorchDevice.choose_bfloat16_safe_dtype(t5_encoder_info.compute_device)
+        )
         with (
-            t5_encoder_info.model_on_device() as (cached_weights, t5_text_encoder),
+            t5_encoder_info.model_on_device(working_mem_bytes=dequant_bytes) as (cached_weights, t5_text_encoder),
             context.models.load(self.t5_encoder.tokenizer) as t5_tokenizer,
             ExitStack() as exit_stack,
         ):

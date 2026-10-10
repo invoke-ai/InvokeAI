@@ -378,11 +378,19 @@ const GalleryThumbnail = ({
 export const GalleryThumbnailCell = ({
   getDragItems,
   item,
+  onClick,
+  selectionPage,
   ...props
-}: Omit<Parameters<typeof GalleryThumbnail>[0], 'dragItems'> & {
+}: Omit<Parameters<typeof GalleryThumbnail>[0], 'dragItems' | 'onClick'> & {
   getDragItems: (item: GalleryItem) => GalleryItemRef[];
+  onClick: (item: GalleryItem, event: MouseEvent, selectionPage?: number) => void;
+  selectionPage?: number;
 }) => {
   const dragItems = useMemo(() => getDragItems(item), [getDragItems, item]);
+  const handleClick = useCallback(
+    (clickedItem: GalleryItem, event: MouseEvent) => onClick(clickedItem, event, selectionPage),
+    [onClick, selectionPage]
+  );
 
-  return <GalleryThumbnail {...props} dragItems={dragItems} item={item} />;
+  return <GalleryThumbnail {...props} dragItems={dragItems} item={item} onClick={handleClick} />;
 };

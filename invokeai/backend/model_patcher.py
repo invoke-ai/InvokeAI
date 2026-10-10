@@ -146,16 +146,18 @@ class ModelPatcher:
         text_encoder: Union[CLIPTextModel, CLIPTextModelWithProjection],
         clip_skip: int,
     ) -> Generator[None, Any, Any]:
+        # transformers >=5.6 flattened CLIPTextModel (no `text_model` wrapper); CLIPTextModelWithProjection still wraps.
+        layers = getattr(text_encoder, "text_model", text_encoder).encoder.layers
         skipped_layers = []
         try:
             for _i in range(clip_skip):
-                skipped_layers.append(text_encoder.text_model.encoder.layers.pop(-1))
+                skipped_layers.append(layers.pop(-1))
 
             yield
 
         finally:
             while len(skipped_layers) > 0:
-                text_encoder.text_model.encoder.layers.append(skipped_layers.pop())
+                layers.append(skipped_layers.pop())
 
     @classmethod
     @contextmanager

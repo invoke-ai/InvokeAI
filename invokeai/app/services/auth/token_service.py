@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import cast
 
-from jose import JWTError, jwt
+import jwt
 from pydantic import BaseModel
 
 ALGORITHM = "HS256"
@@ -83,29 +83,11 @@ def verify_token(token: str) -> TokenData | None:
         TokenData if valid, None if invalid or expired
     """
     try:
-        # python-jose 3.5.0 has a bug where exp verification doesn't work properly
-        # We need to manually check expiration, but MUST verify signature first
-        # to prevent accepting tokens with valid payloads but invalid signatures
-
-        # First, verify the signature - this will raise JWTError if signature is invalid
-        # Note: python-jose won't reject expired tokens here due to the bug
-        payload = jwt.decode(
-            token,
-            get_jwt_secret(),
-            algorithms=[ALGORITHM],
-        )
-
-        # Now manually check expiration (because python-jose 3.5.0 doesn't do this properly)
-        if "exp" in payload:
-            exp_timestamp = payload["exp"]
-            current_timestamp = datetime.now(timezone.utc).timestamp()
-            if current_timestamp >= exp_timestamp:
-                # Token is expired
-                return None
-
+        # PyJWT verifies the signature before the claims, and rejects an expired `exp`.
+        payload = jwt.decode(token, get_jwt_secret(), algorithms=[ALGORITHM])
         return TokenData(**payload)
-    except JWTError:
-        # Token is invalid (bad signature, malformed, etc.)
+    except jwt.PyJWTError:
+        # Token is invalid (bad signature, expired, malformed, etc.)
         return None
     except Exception:
         # Catch any other exceptions (e.g., Pydantic validation errors)
@@ -122,11 +104,12 @@ def get_token_remaining_seconds(token: str) -> int | None:
     if verify_token(token) is None:
         return None
     try:
-        claims = jwt.get_unverified_claims(token)
-    except JWTError:
+        claims = jwt.decode(token, options={"verify_signature": False})
+    except jwt.PyJWTError:
         return None
     exp = claims.get("exp")
     if exp is None:
         return int(timedelta(hours=DEFAULT_EXPIRATION_HOURS).total_seconds())
-    remaining = int(cast(float, exp) - datetime.now(timezone.utc).timestamp())
+    # PyJWT accepted the claim only if `int(exp)` succeeds, which also admits a numeric string.
+    remaining = int(float(exp) - datetime.now(timezone.utc).timestamp())
     return remaining if remaining > 0 else None

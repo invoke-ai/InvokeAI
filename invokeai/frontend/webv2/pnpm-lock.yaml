@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   react-hook-tanstack-virtual:
-    hash: 2d69c3f291348e61b3d4e3f96732527872259fee1c4df92376fff4ebc8432072
+    hash: 6e0c46d85d50489bc6f6a0350c74c496a26fb3652c08061377650d9a40872da0
     path: patches/react-hook-tanstack-virtual.patch
 
 importers:
@@ -84,7 +84,7 @@ importers:
         version: 19.3.0(react@19.3.0)
       react-hook-tanstack-virtual:
         specifier: ^0.0.4
-        version: 0.0.4(patch_hash=2d69c3f291348e61b3d4e3f96732527872259fee1c4df92376fff4ebc8432072)(@tanstack/react-virtual@3.14.13(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@tanstack/virtual-core@3.17.11)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.0.4(patch_hash=6e0c46d85d50489bc6f6a0350c74c496a26fb3652c08061377650d9a40872da0)(@tanstack/react-virtual@3.14.13(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@tanstack/virtual-core@3.17.11)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       react-i18next:
         specifier: ^17.0.14
         version: 17.0.14(i18next@26.4.2(typescript@7.0.2))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@7.0.2)
@@ -4416,7 +4416,7 @@ snapshots:
       react: 19.3.0
       scheduler: 0.28.0
 
-  react-hook-tanstack-virtual@0.0.4(patch_hash=2d69c3f291348e61b3d4e3f96732527872259fee1c4df92376fff4ebc8432072)(@tanstack/react-virtual@3.14.13(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@tanstack/virtual-core@3.17.11)(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
+  react-hook-tanstack-virtual@0.0.4(patch_hash=6e0c46d85d50489bc6f6a0350c74c496a26fb3652c08061377650d9a40872da0)(@tanstack/react-virtual@3.14.13(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@tanstack/virtual-core@3.17.11)(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
     dependencies:
       '@tanstack/react-virtual': 3.14.13(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@tanstack/virtual-core': 3.17.11
