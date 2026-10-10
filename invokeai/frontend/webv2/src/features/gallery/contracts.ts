@@ -1,5 +1,7 @@
 export type {
   GalleryBoard,
+  GalleryBoardAccess,
+  GalleryBoardAction,
   GalleryBoardDeletionResult,
   GalleryBoardKind,
   GalleryBoardOrderBy,
@@ -11,6 +13,7 @@ export type {
   GeneratedImageContract,
   GeneratedVideoContract,
 } from './core/types';
+export { canOnBoard, isOwnGalleryBoard } from './core/boardAccess';
 export {
   getGalleryBoardDestinationGroups,
   getGalleryBoardLabel,

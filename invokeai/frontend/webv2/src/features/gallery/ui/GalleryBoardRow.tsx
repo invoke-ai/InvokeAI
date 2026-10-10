@@ -13,6 +13,7 @@ import { useCallback, useMemo, type MouseEvent, type PointerEvent } from 'react'
 import { useTranslation } from 'react-i18next';
 
 import { BoardCover } from './GalleryBoardCover';
+import { getGalleryBoardOwnerLabel } from './galleryBoardLabels';
 import { GalleryBoardRowShell } from './GalleryBoardRowShell';
 import {
   acceptsGalleryItemMoves,
@@ -25,6 +26,7 @@ import { getBoardCounts } from './galleryStateView';
 export const GalleryBoardRow = ({
   accessibleName,
   board,
+  autoAddRedirectedFrom,
   isAutoAddTarget = false,
   isMenuOpen,
   isSelected,
@@ -37,6 +39,8 @@ export const GalleryBoardRow = ({
   board: GalleryBoard;
   /** Results without a board of their own land here (the gallery is not following its selection). */
   isAutoAddTarget?: boolean;
+  /** The view-only board whose results come here instead, named in the Auto badge's tooltip. */
+  autoAddRedirectedFrom?: string;
   /** Its own menu is showing, so the trigger must not fade out from under it. */
   isMenuOpen?: boolean;
   isSelected: boolean;
@@ -52,7 +56,7 @@ export const GalleryBoardRow = ({
   const spokenLabel = accessibleName ?? boardLabel;
 
   const canDropItems =
-    acceptsGalleryItemMoves(board.kind) &&
+    acceptsGalleryItemMoves(board) &&
     isGalleryItemDragData(dragData) &&
     dragData.items.some((ref) => loadedItemBoardIds.get(toGalleryItemKey(ref)) !== board.id);
 
@@ -103,18 +107,19 @@ export const GalleryBoardRow = ({
   const stopPropagation = useCallback((event: MouseEvent | PointerEvent) => event.stopPropagation(), []);
 
   const cover = useMemo(() => <BoardCover board={board} />, [board]);
+  const ownerLabel = getGalleryBoardOwnerLabel(board, t);
   const subtitle = useMemo(
     () =>
-      board.ownerName ? (
+      ownerLabel ? (
         <MiddleTruncate
           color={isSelected ? 'inherit' : 'fg.muted'}
           fontSize="xs"
           lineHeight="shorter"
           minW="0"
-          text={board.ownerName}
+          text={ownerLabel}
         />
       ) : null,
-    [board.ownerName, isSelected]
+    [ownerLabel, isSelected]
   );
   const actions = useMemo(
     () =>
@@ -165,7 +170,13 @@ export const GalleryBoardRow = ({
         onSelect={handleSelect}
       >
         {isAutoAddTarget ? (
-          <Tooltip content={t('widgets.gallery.autoAddBadgeTooltip')}>
+          <Tooltip
+            content={
+              autoAddRedirectedFrom === undefined
+                ? t('widgets.gallery.autoAddBadgeTooltip')
+                : t('widgets.gallery.autoAddRedirectedTooltip', { name: autoAddRedirectedFrom })
+            }
+          >
             <Badge colorPalette={isSelected ? undefined : 'accent'} flexShrink={0} variant="subtle">
               {t('widgets.gallery.autoAddBadge')}
             </Badge>

@@ -267,6 +267,8 @@ export const GalleryPickerView = ({
         id: `project:${group.projectId}`,
         label: getGalleryProjectGroupLabel(group.projectId, group.boards, projectNames, t),
       })),
+      { boards: groups.sharedBoards, id: 'shared', label: t('widgets.gallery.boardGroups.shared') },
+      { boards: groups.otherUsersBoards, id: 'other-users', label: t('widgets.gallery.boardGroups.otherUsers') },
       { boards: groups.dateBoards, id: 'dates', label: t('widgets.gallery.boardGroups.byDate') },
       { boards: groups.archivedBoards, id: 'archived', label: t('common.archived') },
     ].filter((group) => group.boards.length > 0);

@@ -3,8 +3,9 @@ import type { GalleryBoardSectionId } from '@features/gallery/core/settings';
 import type { GalleryBoard } from '@features/gallery/core/types';
 
 import { HStack, Icon, ScrollArea, Stack, Text } from '@chakra-ui/react';
-import { getGalleryProjectGroupLabel } from '@features/gallery/core/boardLabels';
+import { getGalleryBoardLabel, getGalleryProjectGroupLabel } from '@features/gallery/core/boardLabels';
 import { toGalleryItemKey } from '@features/gallery/core/items';
+import { isGalleryBoardSectionOpen, toggleGalleryBoardSection } from '@features/gallery/core/settings';
 import { usePreservedScrollOffset } from '@platform/react/usePreservedScrollOffset';
 import { IconButton } from '@platform/ui/Button';
 import { RenameDialog } from '@platform/ui/RenameDialog';
@@ -23,6 +24,7 @@ import { GalleryBoardRow } from './GalleryBoardRow';
 import { GalleryBoardRowShell } from './GalleryBoardRowShell';
 import { GalleryBoardSection } from './GalleryBoardSection';
 import { focusVisibleOperable, GalleryLoadNotice } from './GalleryLoadError';
+import { getGalleryRedirectedDestination } from './galleryStateView';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 const SCROLL_CONTENT_PROPS = { py: '1' } as const;
@@ -44,7 +46,7 @@ export const GalleryBoardsPanel = () => {
   // container that stops being rendered loses its offset outright.
   usePreservedScrollOffset(boardsViewportRef);
 
-  const { collapsedBoardSections, showArchivedBoards, showDateBoards, showOtherProjectBoards } = gallery.settings;
+  const { showArchivedBoards, showDateBoards, showOtherProjectBoards } = gallery.settings;
 
   const groups = useMemo(
     () =>
@@ -146,29 +148,29 @@ export const GalleryBoardsPanel = () => {
   const handleBoardMenuClose = useCallback(() => setBoardMenuTarget(null), []);
 
   const handleToggleSection = useCallback(
-    (sectionId: GalleryBoardSectionId, isOpen: boolean) => {
-      const nextSections = isOpen
-        ? collapsedBoardSections.filter((entry) => entry !== sectionId)
-        : [...collapsedBoardSections, sectionId];
-
-      actions.updateSettings({ collapsedBoardSections: nextSections });
-    },
-    [actions, collapsedBoardSections]
+    (sectionId: GalleryBoardSectionId, isOpen: boolean) =>
+      actions.updateSettings(toggleGalleryBoardSection(gallery.settings, sectionId, isOpen)),
+    [actions, gallery.settings]
   );
 
-  const isSectionOpen = (sectionId: GalleryBoardSectionId) => !collapsedBoardSections.includes(sectionId);
+  const isSectionOpen = (sectionId: GalleryBoardSectionId) => isGalleryBoardSectionOpen(gallery.settings, sectionId);
   // Without the backend's list, the placeholder Uncategorized row (and "no matches") would claim there is nothing
   // else; the failure takes the rows' place instead. While it loads, the fixed rows alone would read as empty tiers.
   const isBoardListUnavailable = boardsState.status === 'error';
   const isBoardListSettled = boardsState.status !== 'loading' && !isBoardListUnavailable;
   const focusBoardList = useCallback(() => focusVisibleOperable(boardsViewportRef.current), []);
 
+  // Results the selected or auto-add board refuses (someone else's, view-only) go to the inbox, and its row says so.
+  const redirected = getGalleryRedirectedDestination(gallery);
   const renderRow = (board: GalleryBoard, accessibleName?: string) => (
     <GalleryBoardRow
       key={board.id}
       accessibleName={accessibleName}
+      autoAddRedirectedFrom={
+        redirected?.boardId === board.id ? getGalleryBoardLabel(redirected.refusedBoard, t) : undefined
+      }
       board={board}
-      isAutoAddTarget={board.id === gallery.settings.autoAddBoardId}
+      isAutoAddTarget={redirected ? board.id === redirected.boardId : board.id === gallery.settings.autoAddBoardId}
       isMenuOpen={boardMenuTarget?.board.id === board.id}
       isSelected={board.id === gallery.selectedBoardId}
       loadedItemBoardIds={loadedItemBoardIds}
@@ -249,6 +251,30 @@ export const GalleryBoardsPanel = () => {
                 ? renderHint(t('widgets.gallery.libraryBoardsHint'))
                 : null}
             </GalleryBoardSection>
+
+            {!isBoardListUnavailable && groups.sharedBoards.length > 0 ? (
+              <GalleryBoardSection
+                count={groups.sharedBoards.length}
+                isOpen={isSectionOpen('shared')}
+                label={t('widgets.gallery.boardGroups.shared')}
+                sectionId="shared"
+                onToggle={handleToggleSection}
+              >
+                {groups.sharedBoards.map((board) => renderRow(board))}
+              </GalleryBoardSection>
+            ) : null}
+
+            {!isBoardListUnavailable && groups.otherUsersBoards.length > 0 ? (
+              <GalleryBoardSection
+                count={groups.otherUsersBoards.length}
+                isOpen={isSectionOpen('other-users')}
+                label={t('widgets.gallery.boardGroups.otherUsers')}
+                sectionId="other-users"
+                onToggle={handleToggleSection}
+              >
+                {groups.otherUsersBoards.map((board) => renderRow(board))}
+              </GalleryBoardSection>
+            ) : null}
 
             {!isBoardListUnavailable && groups.otherProjects.length > 0 ? (
               <GalleryBoardSection

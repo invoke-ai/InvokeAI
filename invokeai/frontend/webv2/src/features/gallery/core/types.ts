@@ -72,6 +72,36 @@ export interface GalleryBoard {
   projectId: string | null;
   /** Its project's inbox: named after the project and only renamed, archived, moved or deleted through it. */
   isInbox: boolean;
+  /** What the caller may do with a real board, as the server says. Absent for virtual boards. */
+  access?: GalleryBoardAccess;
+}
+
+/** A caller's role on a board; each allows everything the ones before it allow. */
+export type GalleryBoardRole = 'viewer' | 'contributor' | 'editor' | 'owner';
+
+/** The role every other account gets on a board. */
+export type GalleryGeneralAccess = 'restricted' | 'viewer' | 'contributor';
+
+/** What a caller can do to a board as a whole. */
+export type GalleryBoardAction =
+  | 'read'
+  | 'add_media'
+  | 'manage_items'
+  | 'rename'
+  | 'set_cover'
+  | 'archive'
+  | 'set_general_access'
+  | 'move'
+  | 'delete';
+
+export interface GalleryBoardAccess {
+  /** The caller's own role, for display; null when only admin rights give access. Gate on `actions`. */
+  role: GalleryBoardRole | null;
+  /** The board actions the caller may take. An array, not a set, so query caches share it structurally. */
+  actions: readonly GalleryBoardAction[];
+  /** Admin rights give the caller more than `role` does. */
+  adminOverride: boolean;
+  generalAccess: GalleryGeneralAccess;
 }
 
 export interface GalleryImage extends GeneratedImageContract {

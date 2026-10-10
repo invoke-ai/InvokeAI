@@ -12,7 +12,7 @@ import {
   getGalleryView,
   isGalleryImageItem,
 } from '@features/gallery/contracts';
-import { galleryBoardsOptions } from '@features/gallery/queries';
+import { canAddToCachedGalleryBoard, galleryBoardsOptions } from '@features/gallery/queries';
 import { useGalleryUploadAction } from '@features/gallery/react';
 import { createGenerateFormValuesSelector } from '@features/generation/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
@@ -124,7 +124,7 @@ export const PasteMediaDialog = ({
     ).data ?? EMPTY_BOARDS;
   // Uploads land where generation results do: the auto-add board — never a
   // date bucket, which cannot hold items.
-  const destinationBoardId = getGalleryAutoAddBoardId(galleryValues) ?? 'none';
+  const destinationBoardId = getGalleryAutoAddBoardId(galleryValues, canAddToCachedGalleryBoard) ?? 'none';
   const selectedBoardId = getGallerySelectedBoardId(galleryValues, boards);
   const galleryView = getGalleryView(galleryValues);
   const getCurrentGalleryLocation = useCallback(

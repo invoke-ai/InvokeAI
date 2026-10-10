@@ -1,3 +1,4 @@
+import type { GalleryBoard, GalleryBoardAction } from '@features/gallery/contracts';
 import type { GenerateModelConfig, GenerateWidgetValues, MainModelConfig } from '@features/generation/contracts';
 import type { CanvasDocumentContractV3 } from '@workbench/canvas-engine/contracts';
 import type { CanvasEngine } from '@workbench/canvas-engine/engine';
@@ -5,15 +6,17 @@ import type { RasterCompositeExportResult } from '@workbench/canvas-engine/expor
 import type { Rect } from '@workbench/canvas-engine/types';
 import type { Project } from '@workbench/projectContracts';
 
+import { galleryKeys } from '@features/gallery/queries';
 import { getDefaultGenerateSettings } from '@features/generation/settings';
-import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { queryClient } from '@platform/query/client';
+import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { getProjectWidgetInstance } from '@workbench/widgetState';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { uploadCanvasImage } from './backend/canvasImages';
 
-import { saveCanvasToGallery } from './saveCanvasToGallery';
+import { getCanvasSaveBoardId, saveCanvasToGallery } from './saveCanvasToGallery';
 
 const model: MainModelConfig = {
   base: 'sd-1',
@@ -309,5 +312,55 @@ describe('saveCanvasToGallery', () => {
 
     await expect(save).resolves.toEqual({ status: 'stale' });
     expect(harness.uploadImage).not.toHaveBeenCalled();
+  });
+});
+
+describe('getCanvasSaveBoardId', () => {
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('saves to the project inbox while the selected board is one the caller may only view', () => {
+    accountLifecycle.activate('save-canvas-destination');
+    const board = (id: string, actions: GalleryBoardAction[]): GalleryBoard => ({
+      access: {
+        actions,
+        adminOverride: false,
+        generalAccess: 'viewer',
+        role: actions.includes('rename') ? 'owner' : 'viewer',
+      },
+      archived: false,
+      assetCount: 0,
+      assetVideoCount: 0,
+      id,
+      imageCount: 0,
+      isInbox: id === 'inbox',
+      kind: 'board',
+      name: id,
+      projectId: null,
+      videoCount: 0,
+    });
+    queryClient.setQueryData(
+      galleryKeys.boards(captureAccountScope(), {
+        includeArchived: false,
+        includeDateBoards: false,
+        orderBy: 'created_at',
+        orderDir: 'DESC',
+      }),
+      [
+        board('inbox', ['read', 'add_media', 'rename']),
+        board('shared', ['read']),
+        board('moodboard', ['read', 'add_media']),
+      ]
+    );
+    const withInbox = (selected: string) => {
+      const project = createProject(selected);
+      const gallery = getProjectWidgetInstance(project, 'gallery')!;
+      gallery.state.values = { ...gallery.state.values, projectBoardId: 'inbox' };
+      return project;
+    };
+
+    expect(getCanvasSaveBoardId(withInbox('shared'))).toBe('inbox');
+    expect(getCanvasSaveBoardId(withInbox('moodboard'))).toBe('moodboard');
   });
 });

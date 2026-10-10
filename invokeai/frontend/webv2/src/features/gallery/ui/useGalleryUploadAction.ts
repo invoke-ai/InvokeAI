@@ -1,6 +1,7 @@
 import type { GalleryItem } from '@features/gallery/core/items';
 import type { GalleryBoard, GalleryView } from '@features/gallery/core/types';
 
+import { canOnBoard } from '@features/gallery/core/boardAccess';
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import {
   classifyGalleryUpload,
@@ -81,6 +82,16 @@ export const useGalleryUploadAction = ({
       const targetBoardName = selectedBoard
         ? getGalleryBoardLabel(selectedBoard, t)
         : t('widgets.gallery.uncategorized');
+
+      // Refused before any upload: the server would refuse each file, leaving nothing but errors.
+      if (selectedBoard && !canOnBoard(selectedBoard, 'add_media')) {
+        notifications.reportError({
+          area: 'gallery-upload',
+          message: t('widgets.gallery.uploadsUnavailableForViewOnlyBoard', { name: targetBoardName }),
+          namespace: 'gallery',
+        });
+        return [];
+      }
       const formatImageCount = (count: number) => t('widgets.gallery.imageCount', { count });
       const formatVideoCount = (count: number) => t('widgets.gallery.videoCount', { count });
       const recordError = (error: unknown) =>

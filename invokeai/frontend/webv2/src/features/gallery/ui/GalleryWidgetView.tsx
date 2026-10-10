@@ -90,6 +90,7 @@ export const useGallerySemanticImageQuery = (value: unknown) =>
 
 export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidgetProps) => {
   const {
+    boardSharing = false,
     gallery: galleryCommands,
     galleryValues,
     generateValues,
@@ -243,6 +244,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     >
       <GalleryWidgetContent
         actions={actions}
+        boardSharing={boardSharing}
         boardsState={data.boardsState}
         filter={data.filter}
         gallery={gallery}
@@ -295,6 +297,7 @@ const getGalleryFailureAnnouncement = (
 
 const GalleryWidgetContent = ({
   actions,
+  boardSharing,
   boardsState,
   filter,
   gallery,
@@ -312,6 +315,7 @@ const GalleryWidgetContent = ({
   starredStrip,
 }: {
   actions: GalleryActions;
+  boardSharing: boolean;
   boardsState: GalleryReadState;
   filter: GalleryItemsFilter;
   gallery: GalleryStateView;
@@ -334,6 +338,7 @@ const GalleryWidgetContent = ({
   const contextValue = useMemo<GalleryWidgetContextValue>(
     () => ({
       actions,
+      boardSharing,
       boardsState,
       filter,
       gallery,
@@ -353,6 +358,7 @@ const GalleryWidgetContent = ({
     }),
     [
       actions,
+      boardSharing,
       boardsState,
       filter,
       gallery,

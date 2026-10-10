@@ -21,6 +21,8 @@ import {
   type GalleryItemsFilter,
 } from './queries';
 import {
+  addGalleryBoardToCaches,
+  canAddToCachedGalleryBoard,
   getGalleryItemBoardIdsFromCaches,
   getGalleryItemStarredFromCaches,
   invalidateGallery,
@@ -656,6 +658,100 @@ describe('patchGalleryBoardCaches', () => {
     // untouched board's identity.
     expect(client.getQueryData(key)).toEqual(before);
     expect(client.getQueryData<GalleryBoard[]>(key)?.[1]).toBe(untouched);
+  });
+
+  it('patches general access inside the board’s access, and leaves a virtual board without one alone', () => {
+    const client = createClient();
+    const key = getBoardsKey();
+    const access = {
+      actions: ['read' as const],
+      adminOverride: false,
+      generalAccess: 'restricted' as const,
+      role: 'owner' as const,
+    };
+    client.setQueryData(key, [{ ...createBoard('board-1'), access }, createBoard('none')]);
+
+    patchGalleryBoardCaches(client, 'board-1', { generalAccess: 'contributor' });
+    patchGalleryBoardCaches(client, 'none', { generalAccess: 'contributor' });
+
+    const [patched, virtual] = client.getQueryData<GalleryBoard[]>(key)!;
+    expect(patched?.access).toEqual({ ...access, generalAccess: 'contributor' });
+    expect(virtual).not.toHaveProperty('access');
+    expect(virtual).not.toHaveProperty('generalAccess');
+  });
+
+  it('answers from the newest listing: a view-only or vanished board takes nothing, and with no listing the server decides', () => {
+    const client = createClient();
+    const viewOnly = {
+      ...createBoard('viewed'),
+      access: {
+        actions: ['read' as const],
+        adminOverride: false,
+        generalAccess: 'viewer' as const,
+        role: 'viewer' as const,
+      },
+    };
+
+    expect(canAddToCachedGalleryBoard('anything', client)).toBe(true);
+
+    // An older listing still holds a board the newer one no longer does: revoked since.
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(1_000);
+      client.setQueryData(
+        galleryKeys.boards(captureAccountScope(), {
+          includeArchived: true,
+          includeDateBoards: false,
+          orderBy: 'created_at',
+          orderDir: 'DESC',
+        }),
+        [createBoard('revoked'), viewOnly]
+      );
+      vi.setSystemTime(2_000);
+      client.setQueryData(getBoardsKey(), [viewOnly, createBoard('own')]);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(canAddToCachedGalleryBoard('own', client)).toBe(true);
+    expect(canAddToCachedGalleryBoard('viewed', client)).toBe(false);
+    expect(canAddToCachedGalleryBoard('revoked', client)).toBe(false);
+  });
+
+  it('takes an archived board missing from a listing of live boards as there, and a newly missing live one as gone', () => {
+    const client = createClient();
+    const archivedKey = galleryKeys.boards(captureAccountScope(), {
+      includeArchived: true,
+      includeDateBoards: true,
+      orderBy: 'created_at',
+      orderDir: 'DESC',
+    });
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(1_000);
+      client.setQueryData(archivedKey, [{ ...createBoard('archived'), archived: true }, createBoard('revoked')]);
+      // The listing of live boards settles last: an archived board is not in it by design.
+      vi.setSystemTime(2_000);
+      client.setQueryData(getBoardsKey(), [createBoard('own')]);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(canAddToCachedGalleryBoard('archived', client)).toBe(true);
+    expect(canAddToCachedGalleryBoard('revoked', client)).toBe(false);
+  });
+
+  it('lists a board created a moment ago, so it takes results before the refetch', () => {
+    const client = createClient();
+    client.setQueryData(getBoardsKey(), [createBoard('own')]);
+
+    addGalleryBoardToCaches(client, createBoard('just-created'));
+
+    expect(canAddToCachedGalleryBoard('just-created', client)).toBe(true);
+    expect(client.getQueryData<GalleryBoard[]>(getBoardsKey())?.map((board) => board.id)).toEqual([
+      'own',
+      'just-created',
+    ]);
   });
 
   it('does not let rollback clobber a later concurrent boards update', () => {

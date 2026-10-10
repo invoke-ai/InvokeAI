@@ -10,6 +10,7 @@ import type {
 import type { GallerySemanticQuery } from '@features/gallery/core/semanticImageQuery';
 import type {
   GalleryBoard,
+  GalleryGeneralAccess,
   GalleryBoardDeletionResult,
   GalleryBoardOrderBy,
   GalleryDeletionResult,
@@ -40,27 +41,7 @@ import {
 import { getGalleryImageThumbnailUrl } from './imageUrls';
 import { getGalleryVideoThumbnailUrl } from './videoUrls';
 
-interface BackendBoardDTO {
-  board_id: string;
-  board_name: string;
-  image_count: number;
-  asset_count: number;
-  /** Videos on the board. Counted separately from `image_count` by the backend. */
-  video_count?: number;
-  /** Asset-category (non-'general') videos on the board; uploaded videos are assets. */
-  asset_video_count?: number;
-  archived: boolean;
-  cover_image_name?: string | null;
-  /** Set instead of `cover_image_name` when the board's most recent item is a video. */
-  cover_video_name?: string | null;
-  created_at?: string | null;
-  /** Board owner's display name; populated only for admins on multi-user backends. */
-  owner_username?: string | null;
-  /** The project this board belongs to; absent or null for a Library board. */
-  project_id?: string | null;
-  /** Its project's inbox, which only the project routes may rename, archive, move or delete. */
-  is_inbox?: boolean;
-}
+type BackendBoardDTO = components['schemas']['BoardDTO'];
 
 /**
  * 'board' is a real backend board; 'uncategorized' is the pseudo-board for
@@ -160,9 +141,10 @@ const toSearchParams = (entries: Record<string, boolean | number | string | stri
  * kind the board's most recent item is. Both resolve to a static WebP thumbnail, so the cover
  * renders identically either way.
  */
-const getBoardCoverThumbnailUrl = (
-  board: Pick<BackendBoardDTO, 'cover_image_name' | 'cover_video_name'>
-): string | undefined => {
+const getBoardCoverThumbnailUrl = (board: {
+  cover_image_name?: string | null;
+  cover_video_name?: string | null;
+}): string | undefined => {
   if (board.cover_image_name) {
     return getGalleryImageThumbnailUrl(board.cover_image_name);
   }
@@ -186,6 +168,16 @@ const mapBoard = (board: BackendBoardDTO): GalleryBoard => ({
   ownerName: board.owner_username ?? null,
   projectId: board.project_id ?? null,
   videoCount: board.video_count ?? 0,
+  ...(board.allowed_actions === undefined
+    ? {}
+    : {
+        access: {
+          actions: board.allowed_actions,
+          adminOverride: board.admin_override ?? false,
+          generalAccess: board.general_access ?? 'restricted',
+          role: board.my_role ?? null,
+        },
+      }),
 });
 
 const getGalleryTotal = async ({
@@ -1087,7 +1079,7 @@ export const createGalleryBoard = async (
 /** `projectId` moves the board: a project id, or null for the Library. Undefined, like the others, means unchanged. */
 export const updateGalleryBoard = async (
   boardId: string,
-  changes: { name?: string; archived?: boolean; projectId?: string | null },
+  changes: { name?: string; archived?: boolean; generalAccess?: GalleryGeneralAccess; projectId?: string | null },
   signal?: AbortSignal
 ): Promise<GalleryBoard> => {
   const body = await apiFetchJson<BackendBoardDTO>(`/api/v1/boards/${encodeURIComponent(boardId)}`, {
@@ -1095,6 +1087,7 @@ export const updateGalleryBoard = async (
     body: JSON.stringify({
       archived: changes.archived,
       board_name: changes.name,
+      general_access: changes.generalAccess,
       ...(changes.projectId !== undefined ? { project_id: changes.projectId } : {}),
     }),
     method: 'PATCH',

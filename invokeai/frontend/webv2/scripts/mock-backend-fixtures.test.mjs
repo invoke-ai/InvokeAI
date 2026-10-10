@@ -938,3 +938,53 @@ test('workflow thumbnails round-trip their bytes and refresh the listed URL on e
     assert.equal(await listedUrl(), null);
   });
 });
+
+test('shared boards answer as the backend role table does', async () => {
+  const backend = await startMockBackend(0, { profile: 'representative' });
+  const call = (path, init) =>
+    fetch(`${backend.origin}${path}`, {
+      ...init,
+      headers: { 'content-type': 'application/json' },
+      ...(init?.body === undefined ? {} : { body: JSON.stringify(init.body) }),
+    });
+
+  try {
+    await call('/__faults', { body: { intermediatesCaller: 'user', sharedBoards: true }, method: 'POST' });
+    const listed = await (await call('/api/v1/boards/')).json();
+    const byId = new Map(listed.map((board) => [board.board_id, board]));
+
+    // Membership, general access, and nothing for a restricted board of someone else's.
+    assert.deepEqual(byId.get('shared-editor').allowed_actions, [
+      'read',
+      'add_media',
+      'manage_items',
+      'rename',
+      'set_cover',
+      'archive',
+    ]);
+    assert.deepEqual(byId.get('shared-viewer').allowed_actions, ['read']);
+    assert.equal(byId.get('shared-contributor').my_role, 'contributor');
+    assert.equal(byId.has('others-private'), false);
+    assert.equal((await call('/api/v1/boards/others-private')).status, 404);
+
+    // The role is refused before anything else; an inbox's own refusal comes after it.
+    assert.equal(
+      (await call('/api/v1/boards/shared-viewer', { body: { board_name: 'x' }, method: 'PATCH' })).status,
+      403
+    );
+    const inbox = listed.find((board) => board.is_inbox);
+    assert.equal(
+      (await call(`/api/v1/boards/${inbox.board_id}`, { body: { board_name: 'x' }, method: 'PATCH' })).status,
+      409
+    );
+
+    // A revocation behind the page's back makes the board unreadable.
+    await call('/__board-access', { body: { board_id: 'shared-editor', member_role: null }, method: 'POST' });
+    assert.equal(
+      (await call('/api/v1/boards/shared-editor', { body: { board_name: 'x' }, method: 'PATCH' })).status,
+      404
+    );
+  } finally {
+    await backend.close();
+  }
+});

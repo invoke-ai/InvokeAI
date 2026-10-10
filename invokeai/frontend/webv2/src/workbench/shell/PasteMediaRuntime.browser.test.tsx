@@ -40,6 +40,7 @@ vi.mock('@features/gallery/react', () => ({
   },
 }));
 vi.mock('@features/gallery/queries', () => ({
+  canAddToCachedGalleryBoard: () => true,
   galleryBoardsOptions: () => ({
     queryFn: () =>
       Promise.resolve([

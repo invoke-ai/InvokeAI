@@ -425,6 +425,50 @@ describe('GalleryBoardsPanel', () => {
     expect(actions.createBoard).toHaveBeenCalledWith('birds', 'p1');
   });
 
+  it('lists other people’s boards apart, an admin’s view of them closed until opened', async () => {
+    const shared = createBoard({
+      access: { actions: ['read'], adminOverride: false, generalAccess: 'viewer', role: 'viewer' },
+      id: 'refs',
+      name: 'Client references',
+      ownerName: 'Cleo',
+    });
+    const adminOnly = createBoard({
+      access: { actions: ['read', 'add_media'], adminOverride: true, generalAccess: 'restricted', role: null },
+      id: 'sketches',
+      name: 'Private sketches',
+      ownerName: 'Dee',
+    });
+    await renderPanel({ ...createGallery(), boards: [...boards, shared, adminOnly] });
+
+    const sections = getRowsBySection();
+    expect(sections['widgets.gallery.boardGroups.shared']).toEqual([
+      'Client referenceswidgets.gallery.boardAccess.ownerAndAccess',
+    ]);
+    expect(sections.Library).not.toContain('Client references');
+    const otherUsers = Array.from(
+      host?.querySelectorAll<HTMLElement>('[data-scope="collapsible"][data-part="trigger"]') ?? []
+    ).find((trigger) => trigger.textContent?.startsWith('widgets.gallery.boardGroups.otherUsers'));
+    expect(otherUsers?.getAttribute('aria-expanded')).toBe('false');
+
+    await click(otherUsers!);
+    expect(actions.updateSettings).toHaveBeenCalledWith({ expandedBoardSections: ['other-users'] });
+  });
+
+  it('marks the inbox Auto when the selected board is one the caller may only view', async () => {
+    const shared = createBoard({
+      access: { actions: ['read'], adminOverride: false, generalAccess: 'viewer', role: 'viewer' },
+      id: 'refs',
+      name: 'Client references',
+      ownerName: 'Cleo',
+    });
+    await renderPanel({ ...createGallery(), boards: [...boards, shared], selectedBoardId: 'refs' });
+
+    const inboxRow = getBoardRows().find((row) => row.textContent?.startsWith('Inbox'));
+    const sharedRow = getBoardRows().find((row) => row.textContent?.startsWith('Client references'));
+    expect(inboxRow?.textContent).toContain('widgets.gallery.autoAddBadge');
+    expect(sharedRow?.textContent).not.toContain('widgets.gallery.autoAddBadge');
+  });
+
   it('persists a collapsed section', async () => {
     await renderPanel();
 

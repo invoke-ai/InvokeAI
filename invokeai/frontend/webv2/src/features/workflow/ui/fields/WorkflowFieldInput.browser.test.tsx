@@ -57,6 +57,7 @@ vi.mock('@features/gallery', () => ({
   formatGalleryVideoDuration: (seconds: number) => `${seconds}s`,
   galleryDestinations: { list: () => Promise.resolve([]) },
   galleryItems: { resolve: (...args: unknown[]) => resolveItemMock(...args) },
+  isGalleryBoardAttachable: (boardId: string) => boardId !== 'none' && !boardId.startsWith('by_date:'),
   galleryTransfers: {
     upload: (...args: unknown[]) => uploadImageMock(...args),
     uploadVideo: (...args: unknown[]) => uploadVideoMock(...args),

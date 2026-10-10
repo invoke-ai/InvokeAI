@@ -19,6 +19,7 @@ export {
   imageIndexAvailabilityOptions,
 } from './data/queries';
 export { abortGalleryLocatorRequests, createGalleryLocatorRequest } from './core/selection';
+export { canAddToCachedGalleryBoard } from './data/queryCache';
 export type {
   CanonicalGalleryItemsFilter,
   GalleryBoardsQuery,

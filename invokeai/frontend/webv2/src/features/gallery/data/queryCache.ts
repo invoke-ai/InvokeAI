@@ -5,12 +5,14 @@ import type {
   GalleryItemRef,
   GalleryItemsPage,
 } from '@features/gallery/core/items';
-import type { GalleryBoard } from '@features/gallery/core/types';
+import type { GalleryBoard, GalleryGeneralAccess } from '@features/gallery/core/types';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { InfiniteData, Query, QueryClient, QueryKey } from '@tanstack/react-query';
 
+import { canOnBoard } from '@features/gallery/core/boardAccess';
 import { toGalleryItemKey } from '@features/gallery/core/items';
 import { pruneImageClusterMembers } from '@features/gallery/core/semanticImageQuery';
+import { queryClient } from '@platform/query/client';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { rollBackUnclaimedEntries } from '@platform/state/compareAndSwapRollback';
 import { hashKey } from '@tanstack/react-query';
@@ -428,6 +430,49 @@ const isGalleryBoardsData = (value: unknown): value is GalleryBoard[] =>
   Array.isArray(value) && value.every((board) => typeof board === 'object' && board !== null && 'id' in board);
 
 /**
+ * Whether the account may add media to a board, as its board listings say, newest first: a board listed with
+ * `add_media`. A board a listing no longer holds was deleted or stopped being readable: not a destination either, so
+ * results are redirected rather than run and then refused. Absence counts only from a listing that would have held
+ * the board: one of archived boards too, or a newer listing of live boards than one that held it live. With no
+ * listing yet, the server decides.
+ */
+export const canAddToCachedGalleryBoard = (boardId: string, client: QueryClient = queryClient): boolean => {
+  const owner = captureAccountScope();
+  const listings = client
+    .getQueryCache()
+    .findAll({ queryKey: galleryKeys.boardsForAccount(owner) })
+    .filter((query) => query.state.status === 'success' && isGalleryBoardsData(query.state.data))
+    .sort((left, right) => right.state.dataUpdatedAt - left.state.dataUpdatedAt);
+  let isMissingFromNewerLiveListing = false;
+
+  for (const listing of listings) {
+    const board = (listing.state.data as GalleryBoard[]).find((candidate) => candidate.id === boardId);
+    if (board) {
+      return !(isMissingFromNewerLiveListing && !board.archived) && canOnBoard(board, 'add_media');
+    }
+    if ((listing.queryKey.at(-1) as { includeArchived?: boolean } | undefined)?.includeArchived === true) {
+      return false;
+    }
+    isMissingFromNewerLiveListing = true;
+  }
+  return listings.length === 0;
+};
+
+/**
+ * Lists a board the account just created in every cached board listing of the account's, ahead of the refetch that
+ * orders it properly: a board selected as it is created is already where new results go.
+ */
+export const addGalleryBoardToCaches = (client: QueryClient, board: GalleryBoard): void => {
+  const owner = captureAccountScope();
+  for (const query of client.getQueryCache().findAll({ queryKey: galleryKeys.boardsForAccount(owner) })) {
+    const boards = query.state.data;
+    if (isGalleryBoardsData(boards) && !boards.some((candidate) => candidate.id === board.id)) {
+      client.setQueryData<GalleryBoard[]>(query.queryKey, [...boards, board]);
+    }
+  }
+};
+
+/**
  * Patches one board across every cached board list and returns a rollback
  * that restores the prior lists — skipping any list something else has
  * written to since, the same conflict rule as `patchGalleryItemCaches`.
@@ -435,8 +480,9 @@ const isGalleryBoardsData = (value: unknown): value is GalleryBoard[] =>
 export const patchGalleryBoardCaches = (
   client: QueryClient,
   boardId: string,
-  changes: Partial<Pick<GalleryBoard, 'archived' | 'name' | 'projectId'>>
+  changes: Partial<Pick<GalleryBoard, 'archived' | 'name' | 'projectId'>> & { generalAccess?: GalleryGeneralAccess }
 ): (() => void) => {
+  const { generalAccess, ...fields } = changes;
   const owner = captureAccountScope();
   const rollbackEntries: BoardCacheRollbackEntry[] = [];
 
@@ -454,7 +500,11 @@ export const patchGalleryBoardCaches = (
       }
 
       changed = true;
-      return { ...board, ...changes };
+      return {
+        ...board,
+        ...fields,
+        ...(generalAccess !== undefined && board.access ? { access: { ...board.access, generalAccess } } : {}),
+      };
     });
 
     if (!changed) {

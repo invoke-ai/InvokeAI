@@ -1,5 +1,6 @@
 import type { GalleryBoard } from '@features/gallery/core/types';
 
+import { isOtherUsersGalleryBoard, isOwnGalleryBoard, isSharedGalleryBoard } from '@features/gallery/core/boardAccess';
 import { getGalleryBoardLabel, inboxFirst, type GalleryBoardTranslate } from '@features/gallery/core/boardLabels';
 
 /** One other project's boards: its inbox first, named after the project, then the rest. */
@@ -22,12 +23,17 @@ export interface GalleryBoardGroups {
   otherProjects: GalleryBoardProjectGroup[];
   /** The open project's inbox first, then its other boards. */
   projectBoards: GalleryBoard[];
+  /** Other people's boards the caller has a role on, by name; never in the caller's own tiers. */
+  sharedBoards: GalleryBoard[];
+  /** Other people's boards an admin sees only through admin rights, by name. */
+  otherUsersBoards: GalleryBoard[];
 }
 
 /**
  * Apply visibility filters while grouping; GET /boards/ cannot filter by project and returns the complete list.
  * Membership is the board's own `projectId`; `projectBoardId` also claims the open project's inbox, which a draft
- * project can know before the listing does.
+ * project can know before the listing does. Only the caller's own boards join those tiers: someone else's board is
+ * listed as shared, or for an admin as another user's, whatever project of theirs it is in.
  */
 export const getGalleryBoardGroups = ({
   boards,
@@ -50,14 +56,22 @@ export const getGalleryBoardGroups = ({
   t: GalleryBoardTranslate;
 }): GalleryBoardGroups => {
   const normalizedSearchTerm = searchTerm.trim().toLowerCase();
+  // Someone else's board is also found by its owner's name, which its row shows.
   const matchesBoardSearch = (board: GalleryBoard) =>
-    !normalizedSearchTerm || getGalleryBoardLabel(board, t).toLowerCase().includes(normalizedSearchTerm);
+    !normalizedSearchTerm ||
+    getGalleryBoardLabel(board, t).toLowerCase().includes(normalizedSearchTerm) ||
+    (!isOwnGalleryBoard(board) && (board.ownerName ?? '').toLowerCase().includes(normalizedSearchTerm));
   const isOpenProjectBoard = (board: GalleryBoard) =>
     board.id === projectBoardId || (projectId !== null && board.projectId === projectId);
+  const byName = (left: GalleryBoard, right: GalleryBoard) => left.name.localeCompare(right.name);
 
   const uncategorizedBoard = boards.find((board) => board.kind === 'uncategorized') ?? null;
   const regularBoards = boards.filter((board) => board.kind === 'board' && matchesBoardSearch(board));
-  const liveBoards = regularBoards.filter((board) => !board.archived);
+  const liveBoards = regularBoards.filter((board) => !board.archived && isOwnGalleryBoard(board));
+  const sharedBoards = regularBoards.filter((board) => !board.archived && isSharedGalleryBoard(board)).sort(byName);
+  const otherUsersBoards = regularBoards
+    .filter((board) => !board.archived && isOtherUsersGalleryBoard(board))
+    .sort(byName);
 
   const projectBoards = inboxFirst(liveBoards.filter(isOpenProjectBoard));
   const libraryBoards = [
@@ -90,7 +104,9 @@ export const getGalleryBoardGroups = ({
   const dateBoards = showDates ? boards.filter((board) => board.kind === 'date' && matchesBoardSearch(board)) : [];
   const archivedBoards = showArchived
     ? regularBoards.filter(
-        (board) => board.archived && (showOtherProjects || board.projectId === null || isOpenProjectBoard(board))
+        (board) =>
+          board.archived &&
+          (!isOwnGalleryBoard(board) || showOtherProjects || board.projectId === null || isOpenProjectBoard(board))
       )
     : [];
 
@@ -98,16 +114,19 @@ export const getGalleryBoardGroups = ({
     projectBoards.length > 0 ||
     libraryBoards.length > 0 ||
     otherProjects.length > 0 ||
+    sharedBoards.length > 0 ||
+    otherUsersBoards.length > 0 ||
     dateBoards.length > 0 ||
     archivedBoards.length > 0;
-  // Only the rows on screen count as taken: a name in a hidden project (or an archived board while archived boards
-  // are hidden) may legitimately be reused, and refusing it would leave the search with nothing to do.
+  // Only the caller's own rows on screen count as taken: a name in a hidden project (or an archived board while
+  // archived boards are hidden), or someone else's board, may legitimately be reused, and refusing it would leave the
+  // search with nothing to do.
   const hasExactMatch = [
     ...projectBoards,
     ...libraryBoards,
     ...otherProjects.flatMap((group) => group.boards),
     ...dateBoards,
-    ...archivedBoards,
+    ...archivedBoards.filter(isOwnGalleryBoard),
   ].some((board) => getGalleryBoardLabel(board, t).toLowerCase() === normalizedSearchTerm);
 
   return {
@@ -117,6 +136,8 @@ export const getGalleryBoardGroups = ({
     hasAnyMatch,
     libraryBoards,
     otherProjects,
+    otherUsersBoards,
     projectBoards,
+    sharedBoards,
   };
 };

@@ -44,7 +44,7 @@ vi.mock('@features/video', async (importOriginal) => ({
     return children;
   },
 }));
-vi.mock('@features/gallery/queries', () => ({ invalidateGallery: vi.fn() }));
+vi.mock('@features/gallery/queries', () => ({ canAddToCachedGalleryBoard: () => true, invalidateGallery: vi.fn() }));
 vi.mock('@workbench/image-actions/revealGalleryItem', () => ({ revealGalleryItem }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({}) }));
 vi.mock('@workbench/settings/store', () => ({ useWorkbenchPreferenceSelector: () => false }));

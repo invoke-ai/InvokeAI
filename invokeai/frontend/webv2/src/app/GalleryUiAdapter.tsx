@@ -4,6 +4,7 @@ import type { ProjectLibrarySnapshot } from '@workbench/projects/library';
 import type { ReactNode } from 'react';
 
 import { GalleryUiProvider } from '@features/gallery/react';
+import { useAuthSession } from '@features/identity';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { useProjectLibrarySelector } from '@workbench/projects/library';
@@ -55,6 +56,7 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
       liveFollowEnabled: project.settings.showProgressImagesInViewer,
     }));
   const livePreview = useLivePreviewFollow();
+  const boardSharing = useAuthSession().multiuserEnabled;
   const { gallery, notifications, widgets } = useWorkbenchCommands();
   const queries = useWorkbenchQueries();
   const accountScope = captureAccountScope();
@@ -72,6 +74,7 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
   const adapter = useMemo<GalleryUiAdapter>(
     () => ({
       antialiasProgressImages,
+      boardSharing,
       exportProject,
       gallery: {
         ...gallery,
@@ -130,6 +133,7 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
     [
       accountScope,
       antialiasProgressImages,
+      boardSharing,
       exportProject,
       gallery,
       galleryValues,

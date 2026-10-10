@@ -3997,6 +3997,7 @@
       "archivedBoards": "Archived boards",
       "autoAddBadge": "Auto",
       "autoAddBadgeTooltip": "New generations, canvas saves and pasted uploads land here, as do workflow nodes whose board is Auto.",
+      "autoAddRedirectedTooltip": "You can only view {{name}}, so new generations, canvas saves and pasted uploads land here instead, as do workflow nodes whose board is Auto.",
       "autoAddToBoard": "Auto-add to this board",
       "stopAutoAdd": "Stop auto-adding here",
       "assetCount_one": "{{count}} upload",
@@ -4010,7 +4011,39 @@
       "boardGroups": {
         "byDate": "By Date",
         "library": "Library",
-        "otherProjects": "Other projects"
+        "otherProjects": "Other projects",
+        "otherUsers": "Other users' boards",
+        "shared": "Shared with me"
+      },
+      "boardAccess": {
+        "admin": "Admin access",
+        "askToAdd": "Ask {{owner}} to let you add media.",
+        "changed": "Access set to {{access}}",
+        "contributor": "Can add",
+        "deletedOwner": "Deleted user",
+        "editor": "Can edit",
+        "general": {
+          "contributor": "Everyone can contribute",
+          "contributorDescription": "Everyone can view it and add media. They can remove only what they added.",
+          "label": "Who can open this board",
+          "restricted": "Restricted",
+          "restrictedDescription": "Only you, plus admins.",
+          "restrictedDescriptionOther": "Only {{owner}}, plus admins.",
+          "viewer": "Everyone can view",
+          "viewerDescription": "Everyone signed in can open it and download its media."
+        },
+        "header": {
+          "admin": "{{owner}}'s board · admin access",
+          "contributor": "{{owner}}'s board · you can add to it",
+          "editor": "{{owner}}'s board · you can edit it",
+          "viewer": "{{owner}}'s board · you can view it"
+        },
+        "gone": "This board no longer exists",
+        "lost": "You no longer have access to this board",
+        "menu": "Access",
+        "ownerAndAccess": "{{owner}} · {{access}}",
+        "stale": "Your access to this board changed",
+        "viewer": "Can view"
       },
       "boardMoved": "Moved board \"{{name}}\" to {{destination}}",
       "changeBoard": "Change Board",
@@ -4287,6 +4320,7 @@
       "uploadSuccessTitle_other": "Uploaded {{count}} files",
       "uploadSummary": "{{images}} and {{videos}} uploaded to {{board}}. {{failed}} failed.",
       "uploadsUnavailableForDateBoards": "Uploads are unavailable for date boards",
+      "uploadsUnavailableForViewOnlyBoard": "You can view {{name}} but not add to it",
       "uploadUnsupported": "No supported media files to upload (PNG, JPEG, or WebP images; video files; or audio files).",
       "videoCount_one": "{{count}} video",
       "videoCount_other": "{{count}} videos",

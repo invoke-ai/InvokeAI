@@ -107,6 +107,8 @@ export interface GalleryUiAdapter {
   ItemActionsProvider: ComponentType<GalleryItemActionsOptions & { children: ReactNode }>;
   ImageContextMenu: ComponentType<GalleryItemContextMenuProps>;
   antialiasProgressImages: boolean;
+  /** The server has more than one account, so boards can be shared. Absent (off) for hosts without one. */
+  boardSharing?: boolean;
   gallery: GalleryCommandsPort;
   galleryValues: Record<string, unknown>;
   generateValues: Record<string, unknown>;

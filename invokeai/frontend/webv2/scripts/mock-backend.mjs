@@ -71,14 +71,100 @@ const ARCHITECTURE_CAPABILITIES = JSON.parse(
 );
 
 /**
- * POST /__faults sets capabilities to error, empty, or ok, and `intermediatesCaller` to admin or user, until POST
- * /__reset; independent of workload profile. `user` also turns on multi-user auth with a non-admin session: sign in
- * with any email and password (or reload a page that already holds the token) to reach the non-admin UI.
+ * POST /__faults sets capabilities to error, empty, or ok, and `intermediatesCaller` to admin, user or
+ * multiuser-admin, until POST /__reset; independent of workload profile. `user` and `multiuser-admin` also turn on
+ * multi-user auth, with a non-admin or an admin session: sign in with any email and password (or reload a page that
+ * already holds the token). `sharedBoards: true` adds boards other accounts own (`SHARED_BOARD_FIXTURES`), which the
+ * caller sees through general access, a membership, or admin rights.
  */
 const CAPABILITY_FAULTS = new Set(['ok', 'error', 'empty']);
-const INTERMEDIATES_CALLERS = new Set(['admin', 'user']);
+const INTERMEDIATES_CALLERS = new Set(['admin', 'user', 'multiuser-admin']);
 
 const createFaults = () => ({ capabilities: 'ok', intermediatesCaller: 'admin' });
+
+const isAdminCaller = (faults) => faults.intermediatesCaller !== 'user';
+const isMultiuserCaller = (faults) => faults.intermediatesCaller !== 'admin';
+
+/** Mirrors `board_access_common.py`: the least role each board action needs. */
+const BOARD_ROLE_RANK = { contributor: 2, editor: 3, owner: 4, viewer: 1 };
+const BOARD_ACTION_MINIMUM_ROLE = {
+  read: 'viewer',
+  add_media: 'contributor',
+  manage_items: 'editor',
+  rename: 'editor',
+  set_cover: 'editor',
+  archive: 'editor',
+  set_general_access: 'owner',
+  move: 'owner',
+  delete: 'owner',
+};
+/** A project's inbox is managed through its project, by everyone, admins included. */
+const INBOX_MANAGED_ACTIONS = new Set(['rename', 'archive', 'set_general_access', 'move', 'delete']);
+
+const OTHER_USER_NAMES = { 'user-ana': 'Ana', 'user-ben': 'Ben', 'user-cleo': 'Cleo', 'user-dee': 'Dee' };
+
+/** Boards other accounts own: one per way the caller can see one, and one only an admin sees. */
+const SHARED_BOARD_FIXTURES = [
+  {
+    board_id: 'shared-editor',
+    board_name: 'Brand kit',
+    general_access: 'restricted',
+    member_role: 'editor',
+    user_id: 'user-ana',
+  },
+  { board_id: 'shared-contributor', board_name: 'Team moodboard', general_access: 'contributor', user_id: 'user-ben' },
+  { board_id: 'shared-viewer', board_name: 'Client references', general_access: 'viewer', user_id: 'user-cleo' },
+  { board_id: 'others-private', board_name: 'Private sketches', general_access: 'restricted', user_id: 'user-dee' },
+];
+
+const seedSharedBoards = (state) => {
+  for (const fixture of SHARED_BOARD_FIXTURES) {
+    const { member_role: memberRole, ...board } = fixture;
+    state.boards.set(board.board_id, {
+      ...board,
+      archived: false,
+      created_at: '2026-01-02T00:00:00.000Z',
+      deleted_at: null,
+      project_id: null,
+      updated_at: '2026-01-02T00:00:00.000Z',
+    });
+    if (memberRole) {
+      state.boardMembers.set(board.board_id, new Map([[MOCK_USER_ID, memberRole]]));
+    }
+  }
+};
+
+/** The caller's access to a board, as `BoardAccessService` reports it. */
+const boardAccessFor = (state, faults, board, { ignoreInbox = false } = {}) => {
+  const ownerId = board.user_id ?? MOCK_USER_ID;
+  const isAdmin = isAdminCaller(faults);
+  const candidates = [
+    ...(ownerId === MOCK_USER_ID ? ['owner'] : []),
+    ...[state.boardMembers.get(board.board_id)?.get(MOCK_USER_ID)].filter(Boolean),
+    ...((board.general_access ?? 'restricted') === 'restricted' ? [] : [board.general_access]),
+  ];
+  const role = candidates.sort((left, right) => BOARD_ROLE_RANK[right] - BOARD_ROLE_RANK[left])[0] ?? null;
+  const isInbox = !ignoreInbox && inboxProjectIdForBoard(state, board.board_id) !== null;
+  const allows = (action) =>
+    !(isInbox && INBOX_MANAGED_ACTIONS.has(action)) &&
+    (isAdmin || (role !== null && BOARD_ROLE_RANK[role] >= BOARD_ROLE_RANK[BOARD_ACTION_MINIMUM_ROLE[action]]));
+  return {
+    actions: Object.keys(BOARD_ACTION_MINIMUM_ROLE).filter(allows),
+    adminOverride: isAdmin && role !== 'owner',
+    allows,
+    readable: isAdmin || role !== null,
+    role,
+  };
+};
+
+/** 404 for a board the caller cannot read, 403 for an action their role does not allow, else null. */
+const boardRefusal = (state, faults, board, action) => {
+  const access = boardAccessFor(state, faults, board);
+  if (!access.readable) {
+    return [404, { detail: 'Board not found' }];
+  }
+  return access.allows(action) ? null : [403, { detail: `Not allowed to ${action} on board ${board.board_id}` }];
+};
 
 const MOCK_USER_ID = 'fixture-user';
 
@@ -139,6 +225,7 @@ const createState = (profile) => {
   const fixture = assertMockBackendFixture(createMockBackendFixture(profile));
 
   return {
+    boardMembers: new Map(),
     boards: new Map(fixture.boards.map((board) => [board.board_id, clone(board)])),
     // Dismiss the alpha notice and What's New notes so journeys start on the requested page.
     clientState: new Map([
@@ -607,7 +694,7 @@ const boardSnapshotItems = (state, boardId) => {
   return items.sort((left, right) => left.kind.localeCompare(right.kind) || left.name.localeCompare(right.name));
 };
 
-const boardDto = (state, board) => {
+const boardDto = (state, board, faults) => {
   const images = [...state.images.values()].filter((image) => image.board_id === board.board_id);
   const videos = [...state.videos.values()].filter(
     (video) => video.board_id === board.board_id && video.owner_user_id === MOCK_USER_ID
@@ -634,16 +721,27 @@ const boardDto = (state, board) => {
   )[0];
 
   const projectId = board.project_id ?? null;
+  const access = boardAccessFor(state, faults, board);
+  const ownerId = board.user_id ?? MOCK_USER_ID;
+  const generalAccess = board.general_access ?? 'restricted';
 
   return {
     ...board,
+    admin_override: access.adminOverride,
+    allowed_actions: access.actions,
+    board_visibility: { contributor: 'public', restricted: 'private', viewer: 'shared' }[generalAccess],
+    general_access: generalAccess,
+    my_role: access.role,
+    owner_username: ownerId === MOCK_USER_ID ? 'Fixture User' : (OTHER_USER_NAMES[ownerId] ?? 'Unknown user'),
+    user_id: ownerId,
     asset_count: images.filter((image) => image.image_category !== 'general').length,
     cover_image_name: cover?.kind === 'image' ? cover.name : null,
     cover_video_name: cover?.kind === 'video' ? cover.name : null,
     image_count: images.filter((image) => image.image_category === 'general').length,
     is_inbox: inboxProjectIdForBoard(state, board.board_id) !== null,
-    // Membership is stored on the board; the backend sends null for a Library board.
-    project_id: projectId,
+    // Membership is stored on the board; the backend sends null for a Library board, and to anyone but the owner
+    // and admins.
+    project_id: access.role === 'owner' || isAdminCaller(faults) ? projectId : null,
     video_count: videos.length,
   };
 };
@@ -824,6 +922,10 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           const requested = url.searchParams.get('capabilities') ?? body.capabilities;
           const caller = url.searchParams.get('intermediatesCaller') ?? body.intermediatesCaller;
 
+          if (body.sharedBoards === true && !state.boards.has(SHARED_BOARD_FIXTURES[0].board_id)) {
+            seedSharedBoards(state);
+          }
+
           if (requested !== undefined && requested !== null) {
             if (!CAPABILITY_FAULTS.has(requested)) {
               return json(400, { detail: `Unknown capabilities fault: ${String(requested)}` });
@@ -844,6 +946,28 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         return json(200, { ok: true, faults: { ...faults } });
       }
 
+      // Changes what another account's board grants the caller behind the page's back: a share or a revocation.
+      if (method === 'POST' && path === '/__board-access') {
+        const body = await readJsonBody(request);
+        const board = state.boards.get(body.board_id);
+        if (!board) {
+          return json(404, { detail: 'Board not found' });
+        }
+        if (body.general_access !== undefined) {
+          board.general_access = body.general_access;
+        }
+        if (body.member_role !== undefined) {
+          const members = state.boardMembers.get(board.board_id) ?? new Map();
+          if (body.member_role === null) {
+            members.delete(MOCK_USER_ID);
+          } else {
+            members.set(MOCK_USER_ID, body.member_role);
+          }
+          state.boardMembers.set(board.board_id, members);
+        }
+        return json(200, { ok: true });
+      }
+
       if (method === 'GET' && path === '/openapi.json') {
         return json(200, state.openApiDocument);
       }
@@ -851,19 +975,20 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
       if (method === 'GET' && path === '/api/v1/auth/status') {
         return json(200, {
           admin_email: null,
-          multiuser_enabled: faults.intermediatesCaller === 'user',
+          multiuser_enabled: isMultiuserCaller(faults),
           setup_required: false,
           strict_password_checking: false,
         });
       }
 
-      if (faults.intermediatesCaller === 'user' && path.startsWith('/api/v1/auth/')) {
+      if (isMultiuserCaller(faults) && path.startsWith('/api/v1/auth/')) {
+        const sessionUser = { ...mockNonAdminUser(), is_admin: isAdminCaller(faults) };
         if (method === 'POST' && path === '/api/v1/auth/login') {
-          return json(200, { expires_in: 86_400, token: MOCK_USER_TOKEN, user: mockNonAdminUser() });
+          return json(200, { expires_in: 86_400, token: MOCK_USER_TOKEN, user: sessionUser });
         }
         if (method === 'GET' && path === '/api/v1/auth/me') {
           return request.headers.authorization === `Bearer ${MOCK_USER_TOKEN}`
-            ? json(200, mockNonAdminUser())
+            ? json(200, sessionUser)
             : json(401, { detail: 'Not authenticated' });
         }
         if (method === 'POST' && (path === '/api/v1/auth/media-cookie' || path === '/api/v1/auth/logout')) {
@@ -1350,7 +1475,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
 
       if (method === 'GET' && path === '/api/v1/intermediates/summary') {
         // Mirrors IntermediatesService.get_summary: non-admins see only their rows and may not name another owner.
-        const isAdmin = faults.intermediatesCaller === 'admin';
+        const isAdmin = isAdminCaller(faults);
         const ownerId = url.searchParams.get('owner_id');
         if (!isAdmin && ownerId !== null && ownerId !== MOCK_USER_ID) {
           return json(403, { detail: 'Only administrators can inspect other accounts' });
@@ -1408,7 +1533,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
       if (method === 'POST' && path === '/api/v1/intermediates/previews') {
         const requested = await readJsonBody(request);
         // Mirrors IntermediatesService._authorize_scope.
-        const isAdmin = faults.intermediatesCaller === 'admin';
+        const isAdmin = isAdminCaller(faults);
         const scope = requested?.scope ?? {};
         if (scope.kind === 'everyone' && !isAdmin) {
           return json(403, { detail: "Only administrators can clear everyone's intermediates" });
@@ -1618,7 +1743,9 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         if (method === 'GET') {
           return json(
             200,
-            [...state.boards.values()].map((board) => boardDto(state, board))
+            [...state.boards.values()]
+              .filter((board) => boardAccessFor(state, faults, board).readable)
+              .map((board) => boardDto(state, board, faults))
           );
         }
         if (method === 'POST') {
@@ -1644,7 +1771,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           state.nextBoardNumber += 1;
           state.boards.set(boardId, board);
 
-          return json(201, boardDto(state, board));
+          return json(201, boardDto(state, board, faults));
         }
       }
 
@@ -1653,36 +1780,47 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         const boardId = decodeURIComponent(boardMatch[1]);
         const board = state.boards.get(boardId);
 
-        if (!board) {
+        if (!board || !boardAccessFor(state, faults, board).readable) {
           return json(404, { detail: 'Board not found' });
         }
         if (method === 'GET') {
-          return json(200, boardDto(state, board));
+          return json(200, boardDto(state, board, faults));
         }
         if (method === 'PATCH') {
           const changes = await readJsonBody(request);
           const moves = Object.hasOwn(changes, 'project_id');
-
-          // An inbox takes its name, archived state and visibility from the project and cannot move.
+          const requiredActions = [
+            ...(changes.board_name !== undefined ? ['rename'] : []),
+            ...(changes.archived !== undefined ? ['archive'] : []),
+            ...(changes.cover_image_name !== undefined ? ['set_cover'] : []),
+            ...(changes.general_access !== undefined ? ['set_general_access'] : []),
+            ...(moves ? ['move'] : []),
+          ];
+          // As the router does: the caller's role first, as if the board were not an inbox; then the inbox, which takes
+          // its name, archived state and access from the project and cannot move, refuses what its project owns.
+          for (const action of requiredActions) {
+            if (!boardAccessFor(state, faults, board).readable) {
+              return json(404, { detail: 'Board not found' });
+            }
+            if (!boardAccessFor(state, faults, board, { ignoreInbox: true }).allows(action)) {
+              return json(403, { detail: `Not allowed to ${action} on board ${board.board_id}` });
+            }
+          }
           if (
             inboxProjectIdForBoard(state, boardId) !== null &&
             (changes.board_name !== undefined ||
               changes.archived !== undefined ||
-              changes.board_visibility !== undefined ||
+              changes.general_access !== undefined ||
               moves)
           ) {
             return json(409, { detail: "This board is the project's inbox" });
           }
           const nextProjectId = moves ? changes.project_id : (board.project_id ?? null);
-          const nextVisibility = changes.board_visibility ?? board.board_visibility;
-          if (nextProjectId !== null && nextVisibility !== 'private') {
-            return json(409, { detail: 'Boards in a project must be private and unshared' });
-          }
           if (nextProjectId !== null && !state.projects.has(nextProjectId)) {
             return json(404, { detail: 'Project not found' });
           }
 
-          for (const key of ['archived', 'board_name', 'board_visibility', 'cover_image_name']) {
+          for (const key of ['archived', 'board_name', 'cover_image_name', 'general_access']) {
             if (changes[key] !== undefined) {
               board[key] = changes[key];
             }
@@ -1692,9 +1830,12 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           }
           board.updated_at = timestamp(state);
 
-          return json(201, boardDto(state, board));
+          return json(201, boardDto(state, board, faults));
         }
         if (method === 'DELETE') {
+          if (!boardAccessFor(state, faults, board, { ignoreInbox: true }).allows('delete')) {
+            return json(403, { detail: `Not allowed to delete on board ${board.board_id}` });
+          }
           if (inboxProjectIdForBoard(state, boardId) !== null) {
             // Refused before any media is touched — the whole point of the ordering.
             return json(409, { detail: "This board is the project's inbox" });
@@ -1784,6 +1925,11 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         const suffix = String(state.nextImageNumber).padStart(3, '0');
         const imageName = `fixture-upload-${suffix}-${requestedName.replaceAll(/[^a-zA-Z0-9._-]/g, '-')}.png`;
         const boardId = url.searchParams.get('board_id');
+        const uploadBoard = boardId ? state.boards.get(boardId) : undefined;
+        const uploadRefusal = uploadBoard ? boardRefusal(state, faults, uploadBoard, 'add_media') : null;
+        if (uploadRefusal) {
+          return json(...uploadRefusal);
+        }
         const now = timestamp(state);
         const image = {
           board_id: boardId && state.boards.has(boardId) ? boardId : null,
@@ -1971,6 +2117,11 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         const suffix = String(state.nextVideoNumber).padStart(3, '0');
         const videoName = `fixture-upload-${suffix}-${requestedName.replaceAll(/[^a-zA-Z0-9._-]/g, '-')}`;
         const boardId = url.searchParams.get('board_id');
+        const uploadBoard = boardId ? state.boards.get(boardId) : undefined;
+        const uploadRefusal = uploadBoard ? boardRefusal(state, faults, uploadBoard, 'add_media') : null;
+        if (uploadRefusal) {
+          return json(...uploadRefusal);
+        }
         const video = {
           board_id: boardId && state.boards.has(boardId) ? boardId : null,
           created_at: timestamp(state),

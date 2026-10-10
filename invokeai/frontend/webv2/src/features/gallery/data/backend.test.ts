@@ -1015,4 +1015,29 @@ describe('board membership transport', () => {
 
     expect(board).toMatchObject({ id: 'b1', isInbox: true, projectId: 'p1' });
   });
+
+  it('reads the caller’s access, and reports none for a server that sends no actions', async () => {
+    mocks.apiFetchJson.mockResolvedValueOnce({
+      ...dto,
+      admin_override: false,
+      allowed_actions: ['read', 'add_media'],
+      general_access: 'contributor',
+      my_role: 'contributor',
+      owner_username: 'Ana',
+    });
+
+    const shared = await createGalleryBoard('B');
+    const unreported = await createGalleryBoard('B');
+
+    expect(shared).toMatchObject({
+      access: {
+        actions: ['read', 'add_media'],
+        adminOverride: false,
+        generalAccess: 'contributor',
+        role: 'contributor',
+      },
+      ownerName: 'Ana',
+    });
+    expect(unreported.access).toBeUndefined();
+  });
 });
