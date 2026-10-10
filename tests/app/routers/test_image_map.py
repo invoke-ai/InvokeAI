@@ -1459,7 +1459,7 @@ def test_multiuser_board_scoped_search_requires_read_access(
 
     response = client.get("/api/v1/image_map/search", params={"q": "boats", "board_id": board}, headers=user2_headers)
 
-    assert response.status_code == 403
+    assert response.status_code == 404
     # Refused before the query is embedded or ranked.
     assert image_index_service.embedded_texts == []
     assert image_index_service.search_calls == []

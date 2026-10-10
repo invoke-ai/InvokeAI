@@ -3,8 +3,10 @@
 import pytest
 from sqlalchemy import insert, select
 
+from invokeai.app.services.board_access.board_access_common import GeneralAccess
 from invokeai.app.services.board_image_records.board_image_records_default import BoardImageRecordStorage
 from invokeai.app.services.board_records.board_records_common import (
+    VISIBILITY_BY_GENERAL_ACCESS,
     BoardChanges,
     BoardRecordInboxException,
     BoardRecordNotFoundException,
@@ -171,9 +173,6 @@ def test_users_list_their_own_shared_and_public_boards(database: Database, board
     assert listed(is_admin=False) == {"Own", "Shared with Alice", "Shared", "Public"}
     assert listed(is_admin=False, include_archived=True) == {"Own", "Shared with Alice", "Shared", "Public", "Archived"}
     assert listed(is_admin=True) == {"Own", "Shared with Alice", "Shared with Carol", "Shared", "Public", "Private"}
-    assert board_records.is_board_shared_with_user(shared_with_carol, CAROL) is True
-    assert board_records.is_board_shared_with_user(shared_with_carol, ALICE) is False
-    assert board_records.get_shared_user_ids(shared_with_carol) == [CAROL]
 
 
 def _insert_boards(database: Database, boards: list[tuple[str, str, str]]) -> None:
@@ -263,10 +262,10 @@ def test_a_project_board_keeps_what_its_project_owns(database: Database, board_r
             board_records.update(board.board_id, changes)
     updated = board_records.update(board.board_id, BoardChanges(cover_image_name="cover.png"))
 
-    assert (updated.board_name, updated.archived, updated.board_visibility) == (
+    assert (updated.board_name, updated.archived, updated.general_access) == (
         "Project",
         False,
-        BoardVisibility.Private,
+        GeneralAccess.Restricted,
     )
     assert updated.cover_image_name == "cover.png"
     with pytest.raises(BoardRecordNotFoundException):
@@ -458,4 +457,4 @@ def test_board_visibility_is_stored_as_the_matching_general_access(
         )
 
     assert stored == general_access
-    assert board_records.get("stored").board_visibility == visibility
+    assert VISIBILITY_BY_GENERAL_ACCESS[board_records.get("stored").general_access] == visibility

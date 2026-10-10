@@ -10781,7 +10781,7 @@
       "patch": {
         "tags": ["boards"],
         "summary": "Update Board",
-        "description": "Updates a board (user must have access to it).\n\nA project's inbox takes its name, archived state and visibility from the project and cannot be\nmoved, so those changes are refused for it \u2014 for admins too; its cover is still fair game. A\nboard in a project is private and unshared, so a move into a project, or a visibility change on\na member, is refused when the result would be otherwise. The storage decides all of this in one\ntransaction; the DTO read here is only for the ownership check.",
+        "description": "Updates a board. Each field takes its own board action: renaming, setting the cover and archiving need an\neditor; general access and moving between the Library and a project need the owner.\n\nA project's inbox takes its name, archived state and general access from the project and cannot be moved,\nso those changes are refused for it \u2014 for admins too; its cover is still fair game. The storage decides\nthat in one transaction.",
         "operationId": "update_board",
         "security": [
           {
@@ -10838,7 +10838,7 @@
       "delete": {
         "tags": ["boards"],
         "summary": "Delete Board",
-        "description": "Deletes a board (user must have access to it)",
+        "description": "Deletes a board: its owner's, or an admin's, to do",
         "operationId": "delete_board",
         "security": [
           {
@@ -21102,6 +21102,22 @@
           "$ref": "#/components/schemas/LatentsOutput"
         }
       },
+      "BoardAction": {
+        "type": "string",
+        "enum": [
+          "read",
+          "add_media",
+          "manage_items",
+          "rename",
+          "set_cover",
+          "archive",
+          "set_general_access",
+          "move",
+          "delete"
+        ],
+        "title": "BoardAction",
+        "description": "What a caller can do to a board as a whole."
+      },
       "BoardChanges": {
         "properties": {
           "board_name": {
@@ -21142,6 +21158,17 @@
             "title": "Archived",
             "description": "Whether or not the board is archived"
           },
+          "general_access": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GeneralAccess"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The role every other account gets on the board. Only its owner may change it."
+          },
           "board_visibility": {
             "anyOf": [
               {
@@ -21151,7 +21178,8 @@
                 "type": "null"
               }
             ],
-            "description": "The visibility of the board."
+            "description": "Deprecated, to be removed in 8.0: general access under its old name. Send `general_access`.",
+            "deprecated": true
           },
           "project_id": {
             "anyOf": [
@@ -21246,10 +21274,10 @@
             "title": "Archived",
             "description": "Whether or not the board is archived."
           },
-          "board_visibility": {
-            "$ref": "#/components/schemas/BoardVisibility",
-            "description": "The visibility of the board.",
-            "default": "private"
+          "general_access": {
+            "$ref": "#/components/schemas/GeneralAccess",
+            "description": "The role every other account gets on the board: none (restricted), viewer or contributor.",
+            "default": "restricted"
           },
           "project_id": {
             "anyOf": [
@@ -21307,7 +21335,38 @@
               }
             ],
             "title": "Owner Username",
-            "description": "The username of the board owner (for admin view)."
+            "description": "The board owner's display name. Admins get the email of an owner without one; other callers get 'Unknown user'. Null when the owner's account no longer exists."
+          },
+          "board_visibility": {
+            "$ref": "#/components/schemas/BoardVisibility",
+            "description": "Deprecated, to be removed in 8.0: `general_access` under its old name.",
+            "default": "private",
+            "deprecated": true
+          },
+          "my_role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardRole"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The caller's own role on the board; null when only admin rights give access."
+          },
+          "allowed_actions": {
+            "items": {
+              "$ref": "#/components/schemas/BoardAction"
+            },
+            "type": "array",
+            "title": "Allowed Actions",
+            "description": "The board actions the caller may take. Gate interfaces on these."
+          },
+          "admin_override": {
+            "type": "boolean",
+            "title": "Admin Override",
+            "description": "Whether admin rights give the caller more than `my_role` does.",
+            "default": false
           },
           "is_inbox": {
             "type": "boolean",
@@ -21350,11 +21409,17 @@
         "title": "BoardRecordOrderBy",
         "description": "The order by options for board records"
       },
+      "BoardRole": {
+        "type": "string",
+        "enum": ["viewer", "contributor", "editor", "owner"],
+        "title": "BoardRole",
+        "description": "A caller's role on a board. Each role allows everything the roles before it allow."
+      },
       "BoardVisibility": {
         "type": "string",
         "enum": ["private", "shared", "public"],
         "title": "BoardVisibility",
-        "description": "The visibility options for a board."
+        "description": "Deprecated: a board's general access under its pre-7.0 name. Kept until 8.0 for older clients."
       },
       "Body_acknowledge_enqueue_batch": {
         "properties": {
@@ -42039,6 +42104,12 @@
         "title": "Gemma4Encoder_Gemma4Encoder_LTX2_Config",
         "description": "The LTX-2.5 Gemma-4-12B text encoder as a folder (config, tokenizer, one weight file)."
       },
+      "GeneralAccess": {
+        "type": "string",
+        "enum": ["restricted", "viewer", "contributor"],
+        "title": "GeneralAccess",
+        "description": "The role every other account gets on a board: none, viewer or contributor."
+      },
       "GeneratePasswordResponse": {
         "properties": {
           "password": {
@@ -50317,39 +50388,6 @@
             "description": "The board the media was added to, if any",
             "title": "Board Id"
           },
-          "board_owner_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "The owner of that board, who may differ from the uploader; None for no board",
-            "title": "Board Owner Id"
-          },
-          "board_visibility": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BoardVisibility"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "The visibility of that board; None when the media landed on no board"
-          },
-          "shared_user_ids": {
-            "description": "Users a private board is explicitly shared with, who can see this media too",
-            "items": {
-              "type": "string"
-            },
-            "title": "Shared User Ids",
-            "type": "array"
-          },
           "image_name": {
             "description": "The name of the uploaded image",
             "title": "Image Name",
@@ -50360,16 +50398,7 @@
             "description": "The category of the uploaded image"
           }
         },
-        "required": [
-          "timestamp",
-          "user_id",
-          "board_id",
-          "board_owner_id",
-          "board_visibility",
-          "shared_user_ids",
-          "image_name",
-          "image_category"
-        ],
+        "required": ["timestamp", "user_id", "board_id", "image_name", "image_category"],
         "title": "ImageUploadedEvent",
         "type": "object"
       },
@@ -109786,39 +109815,6 @@
             "description": "The board the media was added to, if any",
             "title": "Board Id"
           },
-          "board_owner_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "The owner of that board, who may differ from the uploader; None for no board",
-            "title": "Board Owner Id"
-          },
-          "board_visibility": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BoardVisibility"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "The visibility of that board; None when the media landed on no board"
-          },
-          "shared_user_ids": {
-            "description": "Users a private board is explicitly shared with, who can see this media too",
-            "items": {
-              "type": "string"
-            },
-            "title": "Shared User Ids",
-            "type": "array"
-          },
           "video_name": {
             "description": "The name of the uploaded video",
             "title": "Video Name",
@@ -109829,16 +109825,7 @@
             "description": "The category of the uploaded video"
           }
         },
-        "required": [
-          "timestamp",
-          "user_id",
-          "board_id",
-          "board_owner_id",
-          "board_visibility",
-          "shared_user_ids",
-          "video_name",
-          "video_category"
-        ],
+        "required": ["timestamp", "user_id", "board_id", "video_name", "video_category"],
         "title": "VideoUploadedEvent",
         "type": "object"
       },

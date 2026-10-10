@@ -1,7 +1,9 @@
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
+from invokeai.app.services.board_access.board_access_common import BoardAccessDeniedError, BoardAction
 from invokeai.app.services.session_processor.workflow_call_batch import (
     build_child_workflow_session_results,
     build_child_workflow_sessions,
@@ -110,6 +112,33 @@ def _call_frame() -> WorkflowCallFrame:
         workflow_id="workflow-batch",
         depth=1,
     )
+
+
+def test_a_deactivated_callers_expansion_reads_no_board() -> None:
+    from invokeai.app.services.session_processor.workflow_call_batch import (
+        UnsupportedWorkflowNodeError,
+        _assert_user_can_access_board,
+    )
+
+    services = SimpleNamespace(
+        users=SimpleNamespace(get=lambda user_id: SimpleNamespace(is_admin=True, is_active=False)),
+        board_access=_board_access(allows_read=True),
+    )
+
+    with pytest.raises(UnsupportedWorkflowNodeError, match="does not have access"):
+        _assert_user_can_access_board("board", services, "caller-1")
+
+
+def _board_access(allows_read: bool) -> Any:
+    """The board access service, answering every read as given: the expansion's part is asking it."""
+
+    def require(board_id: str, user_id: str, is_admin: bool, action: BoardAction) -> None:
+        # The callers in these tests are ordinary accounts; an expansion must ask as one, for a read.
+        assert (is_admin, action) == (False, BoardAction.Read)
+        if not allows_read:
+            raise BoardAccessDeniedError(board_id, action, readable=False)
+
+    return SimpleNamespace(require=require)
 
 
 def test_build_child_workflow_sessions_expands_direct_integer_batch() -> None:
@@ -305,19 +334,7 @@ def test_build_child_workflow_sessions_rejects_inaccessible_image_generator_boar
                     )
                 },
             )(),
-            "board_records": type(
-                "BoardRecords",
-                (),
-                {
-                    "get": staticmethod(
-                        lambda board_id: type(
-                            "BoardRecord",
-                            (),
-                            {"board_id": board_id, "user_id": "owner-1", "board_visibility": "private"},
-                        )()
-                    )
-                },
-            )(),
+            "board_access": _board_access(allows_read=False),
             "users": type(
                 "Users",
                 (),
@@ -403,19 +420,7 @@ def test_build_child_workflow_sessions_allows_shared_image_generator_board() -> 
                     )
                 },
             )(),
-            "board_records": type(
-                "BoardRecords",
-                (),
-                {
-                    "get": staticmethod(
-                        lambda board_id: type(
-                            "BoardRecord",
-                            (),
-                            {"board_id": board_id, "user_id": "owner-1", "board_visibility": "shared"},
-                        )()
-                    )
-                },
-            )(),
+            "board_access": _board_access(allows_read=True),
             "users": type(
                 "Users",
                 (),
@@ -1402,7 +1407,8 @@ def test_build_child_workflow_sessions_supports_image_generator_from_board() -> 
                         lambda board_id, categories, is_intermediate: ["img-a", "img-b"]
                     )
                 },
-            )()
+            )(),
+            "board_access": _board_access(allows_read=True),
         },
     )()
 

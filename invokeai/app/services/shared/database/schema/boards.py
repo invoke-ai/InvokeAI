@@ -3,7 +3,6 @@
 from sqlalchemy import Boolean, CheckConstraint, Column, ForeignKey, Index
 
 from invokeai.app.services.shared.database.schema.metadata import (
-    ENUM_LENGTH,
     USER_ID_LENGTH,
     default,
     inserted_at,
@@ -28,14 +27,13 @@ boards = table(
     # clear it instead.
     Column("project_id", Key()),
     # The role every other account has on the board: 'restricted' (none), 'viewer' or 'contributor'.
-    Column("general_access", Key(ENUM_LENGTH), nullable=False, server_default=default("restricted")),
+    Column("general_access", LongText(), nullable=False, server_default=default("restricted")),
     CheckConstraint("general_access IN ('restricted', 'viewer', 'contributor')", name="general_access"),
 )
 
 Index("idx_boards_created_at", boards.c.created_at)
 Index("idx_boards_user_id", boards.c.user_id)
 Index("idx_boards_project_id", boards.c.project_id)
-Index("idx_boards_general_access", boards.c.general_access)
 
 # The accounts a board is shared with, and their role. The owner is never a member: `boards.user_id` is.
 board_members = table(

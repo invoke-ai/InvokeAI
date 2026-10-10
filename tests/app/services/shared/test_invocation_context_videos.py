@@ -3,14 +3,23 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from invokeai.app.services.board_records.board_records_common import BoardVisibility
+from invokeai.app.services.board_access.board_access_common import (
+    BoardAccessDeniedError,
+    BoardAction,
+    ItemAccessDeniedError,
+    ItemAction,
+)
 from invokeai.app.services.shared.invocation_context import VideosInterface
 
 
-def _make_interface(visibility: BoardVisibility, owner_id: str = "owner") -> tuple[VideosInterface, MagicMock]:
+def _make_interface(allowed: bool) -> tuple[VideosInterface, MagicMock]:
+    """The board access service decides; these tests check how generation asks it and acts on the answer."""
     services = MagicMock()
     services.users.get.return_value = MagicMock(is_admin=False)
-    services.boards.get_dto.return_value = MagicMock(user_id=owner_id, board_visibility=visibility)
+    if not allowed:
+        services.board_access.require.side_effect = BoardAccessDeniedError("board", BoardAction.AddMedia, True)
+        services.board_access.require_image.side_effect = ItemAccessDeniedError("item", ItemAction.Read)
+        services.board_access.require_video.side_effect = ItemAccessDeniedError("item", ItemAction.Read)
     data = MagicMock()
     data.queue_item.user_id = "queue-user"
     data.queue_item.workflow = None
@@ -21,8 +30,8 @@ def _make_interface(visibility: BoardVisibility, owner_id: str = "owner") -> tup
     return VideosInterface(services, data, MagicMock()), services
 
 
-def test_video_save_rejects_foreign_private_board() -> None:
-    videos, services = _make_interface(BoardVisibility.Private)
+def test_video_save_rejects_a_board_the_user_cannot_add_to() -> None:
+    videos, services = _make_interface(allowed=False)
 
     with pytest.raises(PermissionError, match="not authorized"):
         videos.save(Path("output.mp4"), width=64, height=64, duration=1.0, board_id="foreign-board")
@@ -30,25 +39,17 @@ def test_video_save_rejects_foreign_private_board() -> None:
     services.videos.create.assert_not_called()
 
 
-@pytest.mark.parametrize("visibility", [BoardVisibility.Public])
-def test_video_save_allows_writable_foreign_board(visibility: BoardVisibility) -> None:
-    videos, services = _make_interface(visibility)
+def test_video_save_allows_a_board_the_user_can_add_to() -> None:
+    videos, services = _make_interface(allowed=True)
 
     videos.save(Path("output.mp4"), width=64, height=64, duration=1.0, board_id="public-board")
 
     services.videos.create.assert_called_once()
-
-
-def test_video_save_allows_board_owner() -> None:
-    videos, services = _make_interface(BoardVisibility.Private, owner_id="queue-user")
-
-    videos.save(Path("output.mp4"), width=64, height=64, duration=1.0, board_id="owned-board")
-
-    services.videos.create.assert_called_once()
+    services.board_access.require.assert_called_once_with("public-board", "queue-user", False, BoardAction.AddMedia)
 
 
 def test_video_path_rejects_foreign_private_video() -> None:
-    videos, services = _make_interface(BoardVisibility.Private)
+    videos, services = _make_interface(allowed=False)
     services.video_records.get_user_id.return_value = "owner"
     services.board_video_records.get_board_for_video.return_value = "foreign-board"
 
@@ -59,18 +60,20 @@ def test_video_path_rejects_foreign_private_video() -> None:
 
 
 def test_video_dto_allows_foreign_shared_video() -> None:
-    videos, services = _make_interface(BoardVisibility.Shared)
+    videos, services = _make_interface(allowed=True)
     services.video_records.get_user_id.return_value = "owner"
     services.board_video_records.get_board_for_video.return_value = "shared-board"
 
     videos.get_dto("shared.mp4")
 
     services.videos.get_dto.assert_called_once_with("shared.mp4")
+    services.board_access.require_video.assert_called_once_with("shared.mp4", "queue-user", False, ItemAction.Read)
+    services.board_access.require_image.assert_not_called()
 
 
 def test_video_read_rejects_deactivated_queue_user() -> None:
     """A deactivated account keeps no queue-time privileges, even for its own videos."""
-    videos, services = _make_interface(BoardVisibility.Private)
+    videos, services = _make_interface(allowed=False)
     services.users.get.return_value = MagicMock(is_admin=False, is_active=False)
     services.video_records.get_user_id.return_value = "queue-user"
 
@@ -82,7 +85,7 @@ def test_video_read_rejects_deactivated_queue_user() -> None:
 
 def test_video_save_rejects_deactivated_queue_user() -> None:
     """No output may be saved on behalf of a deactivated account — even uncategorized."""
-    videos, services = _make_interface(BoardVisibility.Private)
+    videos, services = _make_interface(allowed=False)
     services.users.get.return_value = MagicMock(is_admin=False, is_active=False)
 
     with pytest.raises(PermissionError, match="not authorized"):
@@ -92,7 +95,7 @@ def test_video_save_rejects_deactivated_queue_user() -> None:
 
 
 def test_video_save_allows_active_queue_user_without_board() -> None:
-    videos, services = _make_interface(BoardVisibility.Private)
+    videos, services = _make_interface(allowed=False)
     services.users.get.return_value = MagicMock(is_admin=False, is_active=True)
 
     videos.save(Path("output.mp4"), width=64, height=64, duration=1.0)
@@ -101,7 +104,7 @@ def test_video_save_allows_active_queue_user_without_board() -> None:
 
 
 def test_videos_save_attributes_the_output_to_the_queue_items_project() -> None:
-    videos, services = _make_interface(BoardVisibility.Private, owner_id="queue-user")
+    videos, services = _make_interface(allowed=True)
 
     videos.save(Path("output.mp4"), width=64, height=64, duration=1.0)
 

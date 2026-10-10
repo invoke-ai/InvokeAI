@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers.boards import delete_board
 from invokeai.app.api_app import app
+from invokeai.app.services.board_access.board_access_common import BoardViewer
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.users.users_common import UserCreateRequest
@@ -274,7 +275,7 @@ def test_get_board_other_user_forbidden(client: TestClient, user1_token: str, us
         f"/api/v1/boards/{board_id}",
         headers={"Authorization": f"Bearer {user2_token}"},
     )
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 def test_get_board_admin_can_access_any_board(client: TestClient, admin_token: str, user1_token: str):
@@ -330,7 +331,7 @@ def test_update_board_other_user_forbidden(client: TestClient, user1_token: str,
         json={"board_name": "Hijacked Name"},
         headers={"Authorization": f"Bearer {user2_token}"},
     )
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 def test_update_board_admin_can_update_any_board(client: TestClient, admin_token: str, user1_token: str):
@@ -386,7 +387,7 @@ def test_delete_board_other_user_forbidden(client: TestClient, user1_token: str,
         f"/api/v1/boards/{board_id}",
         headers={"Authorization": f"Bearer {user2_token}"},
     )
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 def test_delete_board_admin_can_delete_any_board(client: TestClient, admin_token: str, user1_token: str):
@@ -440,7 +441,7 @@ def test_list_board_image_names_other_user_forbidden(client: TestClient, user1_t
         f"/api/v1/boards/{board_id}/image_names",
         headers={"Authorization": f"Bearer {user2_token}"},
     )
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 def test_list_board_image_names_admin_can_access_any_board(client: TestClient, admin_token: str, user1_token: str):
@@ -655,7 +656,7 @@ def test_private_board_not_visible_after_privacy_change(client: TestClient, user
         f"/api/v1/boards/{board_id}",
         headers={"Authorization": f"Bearer {user2_token}"},
     )
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 def test_non_owner_cannot_change_board_visibility(client: TestClient, user1_token: str, user2_token: str):
@@ -674,7 +675,7 @@ def test_non_owner_cannot_change_board_visibility(client: TestClient, user1_toke
         json={"board_visibility": "public"},
         headers={"Authorization": f"Bearer {user2_token}"},
     )
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 def test_shared_board_image_names_visible_to_other_users(client: TestClient, user1_token: str, user2_token: str):
@@ -1017,7 +1018,7 @@ def test_board_update_cannot_race_a_project_claim(
 ):
     """The claimed-board check and mutation must be one database decision.
 
-    Returning an unclaimed DTO and claiming the board immediately afterwards pins the race without
+    Deciding access on an unclaimed board and claiming it immediately afterwards pins the race without
     sleeps or threads: an unconditional update sees stale state, while a conditional write cannot.
     """
     created = client.post(
@@ -1026,11 +1027,12 @@ def test_board_update_cannot_race_a_project_claim(
     ).json()
     board_id = created["board_id"]
     original_get_dto = mock_invoker.services.boards.get_dto
+    original_access = mock_invoker.services.board_access.get
     did_claim = False
 
-    def get_then_claim(*, board_id: str):
+    def get_then_claim(board_id: str, user_id: str, is_admin: bool):
         nonlocal did_claim
-        board = original_get_dto(board_id)
+        access = original_access(board_id, user_id, is_admin)
         if not did_claim:
             did_claim = True
             mock_invoker.services.project_records.create(
@@ -1039,9 +1041,9 @@ def test_board_update_cannot_race_a_project_claim(
                 data={},
                 board_id=board_id,
             )
-        return board
+        return access
 
-    monkeypatch.setattr(mock_invoker.services.boards, "get_dto", get_then_claim)
+    monkeypatch.setattr(mock_invoker.services.board_access, "get", get_then_claim)
 
     response = client.patch(
         f"/api/v1/boards/{board_id}",
@@ -1050,7 +1052,7 @@ def test_board_update_cannot_race_a_project_claim(
     )
 
     assert response.status_code == status.HTTP_409_CONFLICT
-    board = original_get_dto(board_id)
+    board = original_get_dto(board_id, viewer=BoardViewer(user_id=created["user_id"], is_admin=False))
     for field, value in unchanged.items():
         assert getattr(board, field) == value
 
@@ -1112,4 +1114,163 @@ def test_generic_deletion_of_a_project_board_is_refused_without_touching_media(
     assert (
         client.get(f"/api/v1/boards/{board_id}", headers={"Authorization": f"Bearer {user1_token}"}).status_code
         == status.HTTP_200_OK
+    )
+
+
+# --- Roles in the board DTO --------------------------------------------------------------------
+
+
+def _auth(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _create(client: TestClient, token: str, name: str, project_id: str | None = None) -> dict[str, Any]:
+    query = f"board_name={name}" + (f"&project_id={project_id}" if project_id else "")
+    response = client.post(f"/api/v1/boards/?{query}", headers=_auth(token))
+    assert response.status_code == status.HTTP_201_CREATED
+    return response.json()
+
+
+def test_the_board_dto_describes_the_callers_access(
+    client: TestClient, user1_token: str, user2_token: str, admin_token: str
+):
+    """Clients gate their interface on allowed_actions; my_role and admin_override are for display."""
+    board = _create(client, user1_token, "Contributions")
+    client.patch(
+        f"/api/v1/boards/{board['board_id']}", json={"general_access": "contributor"}, headers=_auth(user1_token)
+    )
+
+    def described(token: str) -> tuple[Any, ...]:
+        dto = client.get(f"/api/v1/boards/{board['board_id']}", headers=_auth(token)).json()
+        return dto["my_role"], set(dto["allowed_actions"]), dto["admin_override"], dto["owner_username"]
+
+    assert described(user1_token) == ("owner", _ALL_ACTIONS, False, "User One")
+    assert described(user2_token) == ("contributor", {"read", "add_media"}, False, "User One")
+    assert described(admin_token) == ("contributor", _ALL_ACTIONS, True, "User One")
+
+
+_ALL_ACTIONS = {
+    "read",
+    "add_media",
+    "manage_items",
+    "rename",
+    "set_cover",
+    "archive",
+    "set_general_access",
+    "move",
+    "delete",
+}
+
+
+def test_only_the_owner_and_admins_learn_a_shared_boards_project(
+    client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str, admin_token: str
+):
+    user1 = client.get("/api/v1/auth/me", headers=_auth(user1_token)).json()["user_id"]
+    project = mock_invoker.services.project_records.create(user1, "Atlas", {}).model_dump()
+    board = _create(client, user1_token, "Panels", project["project_id"])
+    client.patch(f"/api/v1/boards/{board['board_id']}", json={"general_access": "viewer"}, headers=_auth(user1_token))
+
+    def project_of(token: str) -> Any:
+        return client.get(f"/api/v1/boards/{board['board_id']}", headers=_auth(token)).json().get("project_id")
+
+    assert (project_of(user1_token), project_of(admin_token), project_of(user2_token)) == (
+        project["project_id"],
+        project["project_id"],
+        None,
+    )
+    listed = client.get("/api/v1/boards/?all=true", headers=_auth(user2_token)).json()
+    assert [dto.get("project_id") for dto in listed if dto["board_id"] == board["board_id"]] == [None]
+
+
+@pytest.mark.parametrize(
+    ("visibility", "general_access"), [("private", "restricted"), ("shared", "viewer"), ("public", "contributor")]
+)
+def test_the_deprecated_board_visibility_is_general_access_under_its_old_name(
+    client: TestClient, user1_token: str, visibility: str, general_access: str
+):
+    board = _create(client, user1_token, "Legacy")
+
+    updated = client.patch(
+        f"/api/v1/boards/{board['board_id']}", json={"board_visibility": visibility}, headers=_auth(user1_token)
+    ).json()
+
+    assert (updated["general_access"], updated["board_visibility"]) == (general_access, visibility)
+
+
+def test_a_change_may_name_general_access_once(client: TestClient, user1_token: str):
+    board = _create(client, user1_token, "Both")
+
+    response = client.patch(
+        f"/api/v1/boards/{board['board_id']}",
+        json={"board_visibility": "public", "general_access": "viewer"},
+        headers=_auth(user1_token),
+    )
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+
+def test_editors_manage_a_board_but_only_its_owner_changes_who_can_open_it(
+    client: TestClient, mock_sqlite_database: Database, user1_token: str, user2_token: str
+):
+    board = _create(client, user1_token, "Managed")
+    user2 = client.get("/api/v1/auth/me", headers=_auth(user2_token)).json()["user_id"]
+    with sqlite_cursor(mock_sqlite_database) as cursor:
+        cursor.execute(
+            "INSERT INTO board_members (board_id, user_id, role) VALUES (?, ?, 'editor')", (board["board_id"], user2)
+        )
+
+    def patch_as_editor(changes: dict[str, Any]) -> int:
+        return client.patch(f"/api/v1/boards/{board['board_id']}", json=changes, headers=_auth(user2_token)).status_code
+
+    assert patch_as_editor({"board_name": "Renamed by editor", "archived": True}) == status.HTTP_201_CREATED
+    with sqlite_cursor(mock_sqlite_database) as cursor:
+        cursor.execute(
+            "INSERT INTO images (image_name, image_origin, image_category, width, height, user_id) "
+            "VALUES ('cover.png', 'internal', 'general', 1, 1, ?)",
+            (user2,),
+        )
+    assert patch_as_editor({"cover_image_name": "cover.png"}) == status.HTTP_201_CREATED
+    assert patch_as_editor({"general_access": "viewer"}) == status.HTTP_403_FORBIDDEN
+    # Moving between the Library and a project is the owner's, in either direction.
+    assert patch_as_editor({"project_id": None}) == status.HTTP_403_FORBIDDEN
+    assert (
+        client.delete(f"/api/v1/boards/{board['board_id']}", headers=_auth(user2_token)).status_code
+        == status.HTTP_403_FORBIDDEN
+    )
+
+
+def test_an_update_that_changes_nothing_still_takes_an_editor(
+    client: TestClient, mock_sqlite_database: Database, user1_token: str, user2_token: str
+):
+    board = _create(client, user1_token, "Untouched")
+    user2 = client.get("/api/v1/auth/me", headers=_auth(user2_token)).json()["user_id"]
+    with sqlite_cursor(mock_sqlite_database) as cursor:
+        cursor.execute(
+            "INSERT INTO board_members (board_id, user_id, role) VALUES (?, ?, 'viewer')", (board["board_id"], user2)
+        )
+
+    response = client.patch(f"/api/v1/boards/{board['board_id']}", json={}, headers=_auth(user2_token))
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_a_board_shared_with_someone_else_stays_closed_to_everyone_else(
+    client: TestClient, mock_invoker: Invoker, mock_sqlite_database: Database, user1_token: str, user2_token: str
+):
+    board = _create(client, user1_token, "Shared with one")
+    setup_test_user(mock_invoker, "user3@test.com", "User Three", is_admin=False)
+    user3_token = get_user_token(client, "user3@test.com")
+    user2 = client.get("/api/v1/auth/me", headers=_auth(user2_token)).json()["user_id"]
+    with sqlite_cursor(mock_sqlite_database) as cursor:
+        cursor.execute(
+            "INSERT INTO board_members (board_id, user_id, role) VALUES (?, ?, 'editor')", (board["board_id"], user2)
+        )
+
+    assert client.get(f"/api/v1/boards/{board['board_id']}", headers=_auth(user2_token)).status_code == 200
+    assert client.get(f"/api/v1/boards/{board['board_id']}", headers=_auth(user3_token)).status_code == 404
+    assert (
+        client.patch(
+            f"/api/v1/boards/{board['board_id']}", json={"board_name": "Taken"}, headers=_auth(user3_token)
+        ).status_code
+        == 404
     )

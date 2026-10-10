@@ -171,13 +171,11 @@ def test_missing_filtered_and_cross_user_targets_share_same_not_found(
     assert responses == [(status.HTTP_404_NOT_FOUND, "Gallery item not found")] * 3
 
 
-def test_inaccessible_explicit_board_keeps_existing_forbidden_behavior(
-    enable_multiuser: Any, mock_invoker: Invoker
-) -> None:
+def test_an_unreadable_explicit_board_answers_as_missing(enable_multiuser: Any, mock_invoker: Invoker) -> None:
     board = mock_invoker.services.board_records.save("Private", "bob")
 
     with pytest.raises(HTTPException) as error:
         _locate("alice", GalleryItemKind.IMAGE, "anything.png", board_id=board.board_id)
 
-    assert error.value.status_code == status.HTTP_403_FORBIDDEN
-    assert error.value.detail == "Not authorized to access this board"
+    assert error.value.status_code == status.HTTP_404_NOT_FOUND
+    assert error.value.detail == "Board not found"

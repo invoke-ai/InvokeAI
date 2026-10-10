@@ -214,9 +214,23 @@ def test_copying_into_a_board_you_cannot_write_is_refused(
     refused = _copy_images(client, user1_token, image_names=[source.image_name], board_id=theirs)
     missing = _copy_images(client, user1_token, image_names=[source.image_name], board_id="no-such-board")
 
-    assert refused.status_code == status.HTTP_403_FORBIDDEN
+    assert refused.status_code == status.HTTP_404_NOT_FOUND
     assert missing.status_code == status.HTTP_404_NOT_FOUND
     # The refusal lands before anything is copied.
+    assert set(mock_invoker.services.image_records.get_image_names().image_names) == before
+
+
+def test_copying_into_a_board_you_can_only_view_is_refused(
+    client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str, real_images: DiskImageFileStorage
+):
+    viewable = _create_board(client, user2_token, "Viewable")
+    client.patch(f"/api/v1/boards/{viewable}", json={"general_access": "viewer"}, headers=_auth(user2_token))
+    source = _create_source_image(mock_invoker, _owner_id(client, user1_token))
+    before = set(mock_invoker.services.image_records.get_image_names().image_names)
+
+    refused = _copy_images(client, user1_token, image_names=[source.image_name], board_id=viewable)
+
+    assert refused.status_code == status.HTTP_403_FORBIDDEN
     assert set(mock_invoker.services.image_records.get_image_names().image_names) == before
 
 

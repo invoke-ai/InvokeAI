@@ -128,7 +128,10 @@ def test_moving_into_someone_elses_project_is_a_404_and_moves_nothing(
     assert _get_board(client, user1_token, board_id).get("project_id") is None
 
 
-@pytest.mark.parametrize("changes", [{"board_name": "Renamed"}, {"archived": True}, {"board_visibility": "public"}])
+@pytest.mark.parametrize(
+    "changes",
+    [{"board_name": "Renamed"}, {"archived": True}, {"board_visibility": "public"}, {"general_access": "viewer"}],
+)
 def test_an_inbox_cannot_be_changed_or_moved_through_the_board_routes(
     client: TestClient, user1_token: str, admin_token: str, changes: dict[str, Any]
 ):
@@ -141,30 +144,35 @@ def test_an_inbox_cannot_be_changed_or_moved_through_the_board_routes(
             assert response.status_code == status.HTTP_409_CONFLICT, body
 
     inbox = _get_board(client, user1_token, project["board_id"])
+    # Clients are told up front which changes the project owns.
+    assert set(inbox["allowed_actions"]) == {"read", "add_media", "manage_items", "set_cover"}
     assert inbox["board_name"] == "Owning project"
     assert inbox["archived"] is False
     assert inbox["board_visibility"] == "private"
     assert inbox["project_id"] == project["project_id"]
 
 
-@pytest.mark.parametrize("visibility", ["shared", "public"])
-def test_a_non_private_board_cannot_enter_a_project(client: TestClient, user1_token: str, visibility: str):
+@pytest.mark.parametrize("general_access", ["viewer", "contributor"])
+def test_a_board_keeps_its_general_access_when_it_enters_a_project(
+    client: TestClient, user1_token: str, general_access: str
+):
     project = _create_project(client, user1_token)
     board_id = _create_board(client, user1_token, "Visible")
     assert (
         client.patch(
-            f"/api/v1/boards/{board_id}", json={"board_visibility": visibility}, headers=_auth(user1_token)
+            f"/api/v1/boards/{board_id}", json={"general_access": general_access}, headers=_auth(user1_token)
         ).status_code
         == status.HTTP_201_CREATED
     )
 
-    refused = _move(client, user1_token, board_id, project["project_id"])
+    moved = _move(client, user1_token, board_id, project["project_id"])
 
-    assert refused.status_code == status.HTTP_409_CONFLICT
-    assert _get_board(client, user1_token, board_id).get("project_id") is None
+    assert moved.status_code == status.HTTP_201_CREATED
+    board = _get_board(client, user1_token, board_id)
+    assert (board["project_id"], board["general_access"]) == (project["project_id"], general_access)
 
 
-def test_an_explicitly_shared_board_cannot_enter_a_project(
+def test_a_board_keeps_its_members_when_it_enters_a_project(
     client: TestClient, mock_sqlite_database: Database, user1_token: str, user2_token: str
 ):
     project = _create_project(client, user1_token)
@@ -173,36 +181,41 @@ def test_an_explicitly_shared_board_cannot_enter_a_project(
     with mock_sqlite_database.begin(write=True) as conn:
         conn.execute(insert(board_members).values(board_id=board_id, user_id=recipient, role="viewer"))
 
-    assert _move(client, user1_token, board_id, project["project_id"]).status_code == status.HTTP_409_CONFLICT
+    assert _move(client, user1_token, board_id, project["project_id"]).status_code == status.HTTP_201_CREATED
+    # The member still reads it; the project it is in stays the owner's to know.
+    shared = _get_board(client, user2_token, board_id)
+    assert (shared["my_role"], shared.get("project_id")) == ("viewer", None)
+
+    assert _move(client, user1_token, board_id, None).status_code == status.HTTP_201_CREATED
+    assert _get_board(client, user2_token, board_id)["my_role"] == "viewer"
 
 
-@pytest.mark.parametrize("visibility", ["shared", "public"])
-def test_a_member_cannot_be_published(client: TestClient, user1_token: str, visibility: str):
+def test_a_board_released_by_a_deleted_project_keeps_its_members(
+    client: TestClient, mock_sqlite_database: Database, user1_token: str, user2_token: str
+):
+    project = _create_project(client, user1_token)
+    member = _create_member(client, user1_token, project["project_id"])
+    recipient = client.get("/api/v1/auth/me", headers=_auth(user2_token)).json()["user_id"]
+    with mock_sqlite_database.begin(write=True) as conn:
+        conn.execute(insert(board_members).values(board_id=member["board_id"], user_id=recipient, role="editor"))
+
+    deleted = client.delete(f"/api/v1/projects/{project['project_id']}?boards=release", headers=_auth(user1_token))
+
+    assert deleted.status_code == status.HTTP_204_NO_CONTENT
+    assert _get_board(client, user2_token, member["board_id"])["my_role"] == "editor"
+
+
+@pytest.mark.parametrize("general_access", ["viewer", "contributor"])
+def test_a_member_can_be_shared(client: TestClient, user1_token: str, general_access: str):
     project = _create_project(client, user1_token)
     member = _create_member(client, user1_token, project["project_id"])
 
-    refused = client.patch(
-        f"/api/v1/boards/{member['board_id']}", json={"board_visibility": visibility}, headers=_auth(user1_token)
+    shared = client.patch(
+        f"/api/v1/boards/{member['board_id']}", json={"general_access": general_access}, headers=_auth(user1_token)
     )
 
-    assert refused.status_code == status.HTTP_409_CONFLICT
-    assert _get_board(client, user1_token, member["board_id"])["board_visibility"] == "private"
-
-
-def test_publishing_and_leaving_a_project_in_one_request_is_allowed(client: TestClient, user1_token: str):
-    """The rules apply to the board as it will be, not as it is."""
-    project = _create_project(client, user1_token)
-    member = _create_member(client, user1_token, project["project_id"])
-
-    response = client.patch(
-        f"/api/v1/boards/{member['board_id']}",
-        json={"board_visibility": "public", "project_id": None},
-        headers=_auth(user1_token),
-    )
-
-    assert response.status_code == status.HTTP_201_CREATED
-    assert response.json()["board_visibility"] == "public"
-    assert response.json().get("project_id") is None
+    assert shared.status_code == status.HTTP_201_CREATED
+    assert _get_board(client, user1_token, member["board_id"])["general_access"] == general_access
 
 
 # --- members are ordinary boards -------------------------------------------------------------

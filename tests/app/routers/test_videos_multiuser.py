@@ -179,7 +179,7 @@ def test_list_video_dtos_forbidden_for_other_users_private_board(
         f"/api/v1/videos/?board_id={user1_private_board}",
         headers={"Authorization": f"Bearer {user2_token}"},
     )
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 def test_get_video_names_forbidden_for_other_users_private_board(
@@ -189,7 +189,7 @@ def test_get_video_names_forbidden_for_other_users_private_board(
         f"/api/v1/videos/names?board_id={user1_private_board}",
         headers={"Authorization": f"Bearer {user2_token}"},
     )
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 def test_owner_can_list_videos_on_their_private_board(client: TestClient, user1_private_board: str, user1_token: str):
@@ -336,7 +336,7 @@ def test_unreadable_board_does_not_read_as_unavailable_for_videos(
 
     mock_invoker.services.video_records.get_user_id.return_value = "someone-else"
     mock_invoker.services.board_video_records.get_board_for_video.return_value = "board-1"
-    mock_invoker.services.board_records.get = MagicMock(side_effect=sqlite3.OperationalError("database is locked"))
+    mock_invoker.services.board_access.get = MagicMock(side_effect=sqlite3.OperationalError("database is locked"))
 
     # The storage error leaves the route uncaught, which is a 500 in production; the test client
     # re-raises unhandled server exceptions instead of rendering them. Either way the one thing
@@ -1010,57 +1010,49 @@ def test_remove_video_from_board_succeeds_for_board_owner_of_non_owned_video(
 ):
     """user1 owns the board; user2 owns the video sitting on it. user1 must be able to
     detach the foreign video from their board even though they are not the video owner."""
-    from invokeai.app.services.board_records.board_records_common import BoardVisibility
-
     user1 = mock_invoker.services.users.get_by_email("user1@test.com")
     user2 = mock_invoker.services.users.get_by_email("user2@test.com")
     assert user1 is not None and user2 is not None
 
+    board_id = mock_invoker.services.board_records.save("User1 board", user1.user_id).board_id
     mock_invoker.services.video_records.get_user_id.return_value = user2.user_id
-    mock_invoker.services.board_video_records.get_board_for_video.return_value = "user1-board"
+    mock_invoker.services.board_video_records.get_board_for_video.return_value = board_id
 
-    # _assert_board_write_access reads the lightweight board record to check ownership/visibility.
-    fake_board = MagicMock()
-    fake_board.user_id = user1.user_id
-    fake_board.board_visibility = BoardVisibility.Private
-    with patch.object(mock_invoker.services.board_records, "get", return_value=fake_board):
-        response = client.request(
-            "DELETE",
-            "/api/v1/videos/board",
-            json={"video_name": "stranded.mp4"},
-            headers={"Authorization": f"Bearer {user1_token}"},
-        )
+    response = client.request(
+        "DELETE",
+        "/api/v1/videos/board",
+        json={"video_name": "stranded.mp4"},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
     assert response.status_code == status.HTTP_200_OK
     mock_invoker.services.board_video_records.remove_video_from_board.assert_called_once_with(video_name="stranded.mp4")
 
 
-def test_remove_video_from_board_rejects_third_party(
-    client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+@pytest.mark.parametrize("general_access", ["restricted", "viewer", "contributor"])
+def test_remove_video_from_board_rejects_anyone_below_editor(
+    client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str, general_access: str
 ):
-    """A user who is neither the video owner nor a board write-access holder must be
-    rejected — the relaxed path is a stranded-contributor escape hatch, not an open door."""
-    from invokeai.app.services.board_records.board_records_common import BoardVisibility
+    """Removing someone else's video from a board takes an editor: a viewer or contributor may not, and on a board
+    they cannot open the answer is a refusal all the same."""
+    from invokeai.app.services.board_access.board_access_common import GeneralAccess
+    from invokeai.app.services.board_records.board_records_common import BoardChanges
 
     admin = mock_invoker.services.users.get_by_email("admin@test.com")
     user1 = mock_invoker.services.users.get_by_email("user1@test.com")
     assert admin is not None and user1 is not None
+    board_id = mock_invoker.services.board_records.save("User1 board", user1.user_id).board_id
+    mock_invoker.services.board_records.update(board_id, BoardChanges(general_access=GeneralAccess(general_access)))
 
-    # Video is owned by admin; board is owned by user1 and is Private.
+    # The video is the admin's, on user1's board; user2 has only what general access gives.
     mock_invoker.services.video_records.get_user_id.return_value = admin.user_id
-    mock_invoker.services.board_video_records.get_board_for_video.return_value = "user1-board"
+    mock_invoker.services.board_video_records.get_board_for_video.return_value = board_id
 
-    fake_board = MagicMock()
-    fake_board.user_id = user1.user_id
-    fake_board.board_visibility = BoardVisibility.Private
-
-    # user2 has no claim to either resource.
-    with patch.object(mock_invoker.services.board_records, "get", return_value=fake_board):
-        response = client.request(
-            "DELETE",
-            "/api/v1/videos/board",
-            json={"video_name": "not_mine.mp4"},
-            headers={"Authorization": f"Bearer {user2_token}"},
-        )
+    response = client.request(
+        "DELETE",
+        "/api/v1/videos/board",
+        json={"video_name": "not_mine.mp4"},
+        headers={"Authorization": f"Bearer {user2_token}"},
+    )
     assert response.status_code == status.HTTP_403_FORBIDDEN
     mock_invoker.services.board_video_records.remove_video_from_board.assert_not_called()
 

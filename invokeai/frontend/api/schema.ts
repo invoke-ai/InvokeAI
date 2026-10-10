@@ -2463,20 +2463,19 @@ export type paths = {
         post?: never;
         /**
          * Delete Board
-         * @description Deletes a board (user must have access to it)
+         * @description Deletes a board: its owner's, or an admin's, to do
          */
         delete: operations["delete_board"];
         options?: never;
         head?: never;
         /**
          * Update Board
-         * @description Updates a board (user must have access to it).
+         * @description Updates a board. Each field takes its own board action: renaming, setting the cover and archiving need an
+         *     editor; general access and moving between the Library and a project need the owner.
          *
-         *     A project's inbox takes its name, archived state and visibility from the project and cannot be
-         *     moved, so those changes are refused for it — for admins too; its cover is still fair game. A
-         *     board in a project is private and unshared, so a move into a project, or a visibility change on
-         *     a member, is refused when the result would be otherwise. The storage decides all of this in one
-         *     transaction; the DTO read here is only for the ownership check.
+         *     A project's inbox takes its name, archived state and general access from the project and cannot be moved,
+         *     so those changes are refused for it — for admins too; its cover is still fair game. The storage decides
+         *     that in one transaction.
          */
         patch: operations["update_board"];
         trace?: never;
@@ -6175,6 +6174,12 @@ export type components = {
              */
             type: "lblend";
         };
+        /**
+         * BoardAction
+         * @description What a caller can do to a board as a whole.
+         * @enum {string}
+         */
+        BoardAction: "read" | "add_media" | "manage_items" | "rename" | "set_cover" | "archive" | "set_general_access" | "move" | "delete";
         /** BoardChanges */
         BoardChanges: {
             /**
@@ -6192,7 +6197,12 @@ export type components = {
              * @description Whether or not the board is archived
              */
             archived?: boolean | null;
-            /** @description The visibility of the board. */
+            /** @description The role every other account gets on the board. Only its owner may change it. */
+            general_access?: components["schemas"]["GeneralAccess"] | null;
+            /**
+             * @deprecated
+             * @description Deprecated, to be removed in 8.0: general access under its old name. Send `general_access`.
+             */
             board_visibility?: components["schemas"]["BoardVisibility"] | null;
             /**
              * Project Id
@@ -6246,10 +6256,10 @@ export type components = {
              */
             archived: boolean;
             /**
-             * @description The visibility of the board.
-             * @default private
+             * @description The role every other account gets on the board: none (restricted), viewer or contributor.
+             * @default restricted
              */
-            board_visibility?: components["schemas"]["BoardVisibility"];
+            general_access?: components["schemas"]["GeneralAccess"];
             /**
              * Project Id
              * @description The id of the owner's project this board belongs to; absent for a Library board.
@@ -6284,9 +6294,28 @@ export type components = {
             asset_video_count?: number;
             /**
              * Owner Username
-             * @description The username of the board owner (for admin view).
+             * @description The board owner's display name. Admins get the email of an owner without one; other callers get 'Unknown user'. Null when the owner's account no longer exists.
              */
             owner_username?: string | null;
+            /**
+             * @deprecated
+             * @description Deprecated, to be removed in 8.0: `general_access` under its old name.
+             * @default private
+             */
+            board_visibility?: components["schemas"]["BoardVisibility"];
+            /** @description The caller's own role on the board; null when only admin rights give access. */
+            my_role?: components["schemas"]["BoardRole"] | null;
+            /**
+             * Allowed Actions
+             * @description The board actions the caller may take. Gate interfaces on these.
+             */
+            allowed_actions?: components["schemas"]["BoardAction"][];
+            /**
+             * Admin Override
+             * @description Whether admin rights give the caller more than `my_role` does.
+             * @default false
+             */
+            admin_override?: boolean;
             /**
              * Is Inbox
              * @description Whether this board is its project's inbox, which only the project APIs may change.
@@ -6312,8 +6341,14 @@ export type components = {
          */
         BoardRecordOrderBy: "created_at" | "board_name";
         /**
+         * BoardRole
+         * @description A caller's role on a board. Each role allows everything the roles before it allow.
+         * @enum {string}
+         */
+        BoardRole: "viewer" | "contributor" | "editor" | "owner";
+        /**
          * BoardVisibility
-         * @description The visibility options for a board.
+         * @description Deprecated: a board's general access under its pre-7.0 name. Kept until 8.0 for older clients.
          * @enum {string}
          */
         BoardVisibility: "private" | "shared" | "public";
@@ -16946,6 +16981,12 @@ export type components = {
             cpu_only: boolean | null;
         };
         /**
+         * GeneralAccess
+         * @description The role every other account gets on a board: none, viewer or contributor.
+         * @enum {string}
+         */
+        GeneralAccess: "restricted" | "viewer" | "contributor";
+        /**
          * GeneratePasswordResponse
          * @description Response containing a generated password.
          */
@@ -20630,22 +20671,6 @@ export type components = {
              * @default null
              */
             board_id: string | null;
-            /**
-             * Board Owner Id
-             * @description The owner of that board, who may differ from the uploader; None for no board
-             * @default null
-             */
-            board_owner_id: string | null;
-            /**
-             * @description The visibility of that board; None when the media landed on no board
-             * @default null
-             */
-            board_visibility: components["schemas"]["BoardVisibility"] | null;
-            /**
-             * Shared User Ids
-             * @description Users a private board is explicitly shared with, who can see this media too
-             */
-            shared_user_ids: string[];
             /**
              * Image Name
              * @description The name of the uploaded image
@@ -49094,22 +49119,6 @@ export type components = {
              * @default null
              */
             board_id: string | null;
-            /**
-             * Board Owner Id
-             * @description The owner of that board, who may differ from the uploader; None for no board
-             * @default null
-             */
-            board_owner_id: string | null;
-            /**
-             * @description The visibility of that board; None when the media landed on no board
-             * @default null
-             */
-            board_visibility: components["schemas"]["BoardVisibility"] | null;
-            /**
-             * Shared User Ids
-             * @description Users a private board is explicitly shared with, who can see this media too
-             */
-            shared_user_ids: string[];
             /**
              * Video Name
              * @description The name of the uploaded video

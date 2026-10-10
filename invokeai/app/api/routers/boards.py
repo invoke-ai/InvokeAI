@@ -6,14 +6,18 @@ from pydantic import BaseModel, Field
 
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.api.routers._access import assert_board_changes as _assert_board_changes
 from invokeai.app.api.routers._access import assert_board_read_access as _assert_board_read_access
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
+from invokeai.app.services.board_access.board_access_common import (
+    BoardAction,
+    BoardViewer,
+)
 from invokeai.app.services.board_records.board_records_common import (
     BoardChanges,
     BoardRecordInboxException,
     BoardRecordOrderBy,
     BoardRecordProjectNotFoundException,
-    BoardRecordProjectUnavailableException,
 )
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.image_records.image_records_common import ImageCategory
@@ -66,7 +70,7 @@ def create_board(
     """Creates a board for the current user, in one of their projects or in the Library"""
     try:
         return ApiDependencies.invoker.services.boards.create(
-            board_name=board_name, user_id=current_user.user_id, project_id=project_id
+            board_name=board_name, user_id=current_user.user_id, project_id=project_id, viewer=_viewer(current_user)
         )
     except BoardRecordProjectNotFoundException:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -84,9 +88,30 @@ def get_board(
     _assert_board_read_access(board_id, current_user)
 
     try:
-        return ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
+        return ApiDependencies.invoker.services.boards.get_dto(board_id=board_id, viewer=_viewer(current_user))
     except Exception:
         raise HTTPException(status_code=404, detail="Board not found")
+
+
+def _viewer(current_user: CurrentUserOrDefault) -> BoardViewer:
+    return BoardViewer(user_id=current_user.user_id, is_admin=current_user.is_admin)
+
+
+def _actions_for(changes: BoardChanges) -> list[BoardAction]:
+    """The board actions a change takes, one per field it sets."""
+    actions: list[BoardAction] = []
+    if changes.board_name is not None:
+        actions.append(BoardAction.Rename)
+    if changes.cover_image_name is not None:
+        actions.append(BoardAction.SetCover)
+    if changes.archived is not None:
+        actions.append(BoardAction.Archive)
+    if changes.general_access is not None:
+        actions.append(BoardAction.SetGeneralAccess)
+    if changes.moves_board:
+        actions.append(BoardAction.Move)
+    # An update that names no field still writes the board: it takes an editor, as any change does.
+    return actions or [BoardAction.Rename]
 
 
 @boards_router.patch(
@@ -105,24 +130,19 @@ def update_board(
     board_id: str = Path(description="The id of board to update"),
     changes: BoardChanges = Body(description="The changes to apply to the board"),
 ) -> BoardDTO:
-    """Updates a board (user must have access to it).
+    """Updates a board. Each field takes its own board action: renaming, setting the cover and archiving need an
+    editor; general access and moving between the Library and a project need the owner.
 
-    A project's inbox takes its name, archived state and visibility from the project and cannot be
-    moved, so those changes are refused for it — for admins too; its cover is still fair game. A
-    board in a project is private and unshared, so a move into a project, or a visibility change on
-    a member, is refused when the result would be otherwise. The storage decides all of this in one
-    transaction; the DTO read here is only for the ownership check.
+    A project's inbox takes its name, archived state and general access from the project and cannot be moved,
+    so those changes are refused for it — for admins too; its cover is still fair game. The storage decides
+    that in one transaction.
     """
-    try:
-        board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
-    except Exception:
-        raise HTTPException(status_code=404, detail="Board not found")
-
-    if not current_user.is_admin and board.user_id != current_user.user_id:
-        raise HTTPException(status_code=403, detail="Not authorized to update this board")
+    _assert_board_changes(board_id, current_user, _actions_for(changes))
 
     try:
-        return ApiDependencies.invoker.services.boards.update(board_id=board_id, changes=changes)
+        return ApiDependencies.invoker.services.boards.update(
+            board_id=board_id, changes=changes, viewer=_viewer(current_user)
+        )
     except BoardRecordInboxException:
         raise HTTPException(
             status_code=409,
@@ -130,8 +150,6 @@ def update_board(
         )
     except BoardRecordProjectNotFoundException:
         raise HTTPException(status_code=404, detail="Project not found")
-    except BoardRecordProjectUnavailableException:
-        raise HTTPException(status_code=409, detail="Boards in a project must be private and unshared")
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to update board")
 
@@ -144,14 +162,8 @@ def delete_board(
         description="Permanently delete all images and videos on the board", default=False
     ),
 ) -> DeleteBoardResult:
-    """Deletes a board (user must have access to it)"""
-    try:
-        board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
-    except Exception:
-        raise HTTPException(status_code=404, detail="Board not found")
-
-    if not current_user.is_admin and board.user_id != current_user.user_id:
-        raise HTTPException(status_code=403, detail="Not authorized to delete this board")
+    """Deletes a board: its owner's, or an admin's, to do"""
+    _assert_board_changes(board_id, current_user, [BoardAction.Delete])
 
     # Admins delete everything on the board; regular owners only delete their own
     # contributions so that contributions from other users to a public/shared board
@@ -188,7 +200,7 @@ def delete_board(
         )
 
         if not ApiDependencies.invoker.services.boards.delete_if_unclaimed(board_id=board_id):
-            # `get_dto` above proved the board existed, so it is either an inbox now or it vanished
+            # The access check above found the board, so it is either an inbox now or it vanished
             # in between. Ask again rather than trusting the DTO, which predates any concurrent claim.
             if board_id in ApiDependencies.invoker.services.board_records.get_inbox_board_ids([board_id]):
                 raise HTTPException(

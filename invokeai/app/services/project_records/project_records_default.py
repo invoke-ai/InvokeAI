@@ -2,7 +2,8 @@ import json
 import uuid
 from typing import Any, Literal, Optional
 
-from invokeai.app.services.board_records.board_records_common import BOARD_NAME_MAX_LENGTH, BoardVisibility
+from invokeai.app.services.board_access.board_access_common import GeneralAccess
+from invokeai.app.services.board_records.board_records_common import BOARD_NAME_MAX_LENGTH
 from invokeai.app.services.project_records.project_records_base import ProjectRecordsStorageBase
 from invokeai.app.services.project_records.project_records_common import (
     DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
@@ -80,7 +81,7 @@ def _claim_board(q: Queries, *, user_id: str, board_id: str, board_name: str, pr
     board = q.boards.lock(board_id)
     if board is None:
         raise ProjectBoardNotFoundError(board_id)
-    owner, visibility = board
+    owner, general_access = board
     if owner != user_id:
         raise ProjectBoardNotFoundError(board_id)
     claimant = q.projects.claimant(board_id)
@@ -88,7 +89,7 @@ def _claim_board(q: Queries, *, user_id: str, board_id: str, board_name: str, pr
     assert record is not None
     if (
         record.project_id not in (None, project_id)
-        or visibility != BoardVisibility.Private.value
+        or general_access != GeneralAccess.Restricted.value
         or claimant not in (None, (user_id, project_id))
         or q.boards.is_shared(board_id)
     ):

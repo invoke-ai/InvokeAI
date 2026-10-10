@@ -24,7 +24,7 @@ from sqlalchemy import (
     table,
 )
 
-from invokeai.app.services.shared.database.schema.metadata import ENUM_LENGTH, USER_ID_LENGTH, default, inserted_at
+from invokeai.app.services.shared.database.schema.metadata import USER_ID_LENGTH, default, inserted_at
 from invokeai.app.services.shared.database.types import Key, LongText
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import (
     PortableMigration,
@@ -84,7 +84,7 @@ def _board_roles(context: PortableMigrationContext) -> None:
     columns = {entry["name"] for entry in inspect(context.conn).get_columns("boards")}
     if "general_access" not in columns:
         context.op.add_column(
-            "boards", Column("general_access", Key(ENUM_LENGTH), nullable=False, server_default=default("restricted"))
+            "boards", Column("general_access", LongText(), nullable=False, server_default=default("restricted"))
         )
     if "board_visibility" in columns:
         # Repeated by a run that resumes before the column is dropped, with the same result.
@@ -116,8 +116,6 @@ def _board_roles(context: PortableMigrationContext) -> None:
             if not has_check:
                 batch.create_check_constraint("general_access", _GENERAL_ACCESS_CHECK)
 
-    if "idx_boards_general_access" not in {index["name"] for index in inspect(context.conn).get_indexes("boards")}:
-        context.op.create_index("idx_boards_general_access", "boards", ["general_access"])
     if "idx_board_members_user_id" not in {
         index["name"] for index in inspect(context.conn).get_indexes("board_members")
     }:

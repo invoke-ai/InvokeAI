@@ -528,7 +528,7 @@ Resources are now filtered by the authenticated user:
 GET /api/v1/boards/?all=true  # Returns all boards
 
 # After (multi-user)
-GET /api/v1/boards/?all=true  # Returns boards the current user can access, including their own boards plus shared/public boards; admins can see all boards
+GET /api/v1/boards/?all=true  # Returns boards the current user can access, including their own boards, boards they are a member of and boards with general access; admins can see all boards
 ```
 
 **Images:**
@@ -859,7 +859,11 @@ On an error, it returns `422 Unprocessable Content` and  the following JSON:
       "deleted_at": "2026-05-07T03:04:00.738Z",
       "cover_image_name": "string",
       "archived": false,
+      "general_access": "restricted",
       "board_visibility": "private",
+      "my_role": "owner",
+      "allowed_actions": ["read", "add_media", "manage_items", "rename", "set_cover", "archive", "set_general_access", "move", "delete"],
+      "admin_override": false,
       "image_count": 0,
       "asset_count": 0,
       "owner_username": "string"
@@ -869,11 +873,20 @@ On an error, it returns `422 Unprocessable Content` and  the following JSON:
 ```
 
 This returns a paged response. See the swagger page (`http://localhost:9090/docs#/boards/list_boards`) for details.
-The `board_visibility` field will be one of:
+Each board describes the caller's access to it:
 
-- `private` -- private to the owner and administrator
-- `shared` -- read/write to the owner and administrator, read-only to everyone else
-- `public` -- read/write by everyone
+- `general_access` -- the role every other user gets: `restricted` (none), `viewer` or `contributor`. Only the owner or an administrator may change it, with `PATCH /api/v1/boards/{board_id}`.
+- `my_role` -- the caller's own role: `viewer`, `contributor`, `editor` or `owner`; `null` when only administrator rights give access.
+- `allowed_actions` -- the board actions the caller may take. Clients should decide what to offer from this list rather than from `my_role`.
+- `admin_override` -- `true` when administrator rights give the caller more than `my_role` does.
+- `owner_username` -- the owner's display name. Administrators see the email of an owner without one; other users see `Unknown user`.
+- `project_id` -- shown only to the board's owner and administrators.
+
+A board the caller cannot open answers `404`, the same as one that does not exist; an action the caller's role does not allow answers `403`. A project's inbox refuses renaming, archiving, moving, deleting and a change of general access with `409`; those follow its project.
+
+:::caution[Deprecated]
+`board_visibility` is `general_access` under its pre-7.0 name (`private` = `restricted`, `shared` = `viewer`, `public` = `contributor`). It is still returned and accepted on update, but sending it together with `general_access` is refused with `422`. It will be removed in 8.0.
+:::
 
 #### Get One Board
 
@@ -891,10 +904,14 @@ The `board_visibility` field will be one of:
   "deleted_at": null,
   "cover_image_name": "08689e4b-f084-4c49-83a8-4fc1edb167c4.png",
   "archived": false,
+  "general_access": "viewer",
   "board_visibility": "shared",
+  "my_role": "viewer",
+  "allowed_actions": ["read"],
+  "admin_override": false,
   "image_count": 55,
   "asset_count": 0,
-  "owner_username": null
+  "owner_username": "Sam"
 }
 ```
 
