@@ -1,7 +1,8 @@
-import type { ProjectBoardSnapshotBoardDTO, ProjectRecordDTO } from '@workbench/projects/api';
+import type { ProjectBoardSnapshotBoardDTO, ProjectWithWorkspaceDTO } from '@workbench/projects/api';
+import type { ProjectDocumentV3 } from '@workbench/projects/projectDocument';
 
 import { type AccountScope, assertAccountScopeCurrent, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
-import { createProjectSettled } from '@workbench/projects/api';
+import { createProjectSettled, saveFirstProjectWorkspace } from '@workbench/projects/api';
 import { createProjectId } from '@workbench/projects/ids';
 import {
   collectLiveAssetRefs,
@@ -32,7 +33,7 @@ export interface DuplicateProjectInput {
   boards: readonly ProjectBoardSnapshotBoardDTO[];
   owner: AccountScope;
   /** The acknowledged source record — for an open project, flushed first. */
-  record: ProjectRecordDTO;
+  record: ProjectWithWorkspaceDTO;
   /** Stable identity reserved before the operation, used by retry-safe conflict copies. */
   identity?: { id: string; name: string };
 }
@@ -46,7 +47,7 @@ export interface DuplicateProjectDeps {
 export interface DuplicateProjectResult extends ProjectTransferIssues {
   /** The cover to record for the copy, or `null` when the source had none this server can serve. */
   coverImageName: string | null;
-  record: ProjectRecordDTO;
+  record: ProjectWithWorkspaceDTO;
 }
 
 /**
@@ -104,12 +105,18 @@ export const duplicateProjectRecord = async (
 
   assertAccountScopeCurrent(owner);
 
-  // Canonicalize with a fresh project identity and reset source board/selection state.
-  const { deserializeProjectDocument } = await import('@workbench/projects/syncedPersistence');
+  // Canonicalize with a fresh project identity and reset source board/selection state. The copy carries the
+  // duplicating account's workspace, never another member's: the source record's is the caller's own.
+  const [{ deserializeProjectDocument, joinProjectRecord }, { splitProjectDocument, toProjectCreation }] =
+    await Promise.all([import('@workbench/projects/projectHydration'), import('@workbench/projects/projectHalves')]);
 
   assertAccountScopeCurrent(owner);
 
-  const loaded = deserializeProjectDocument({ ...stripInstallationState(input.record.data), id, name });
+  const source = joinProjectRecord(input.record);
+  if (source.status === 'malformed') {
+    throw new InvkFormatError('damaged', source.reason);
+  }
+  const loaded = deserializeProjectDocument({ ...stripInstallationState(source.document), id, name });
 
   if (loaded.status === 'refused') {
     throw new InvkFormatError(toInvkFormatReason(loaded.refused), 'The project document was refused.');
@@ -179,10 +186,13 @@ export const duplicateProjectRecord = async (
     assertAccountScopeCurrent(owner);
     didAttemptProjectCreate = true;
 
+    const copied = remapAssetRefs(canonicalDocument, restored.mappings) as unknown as ProjectDocumentV3;
+    const creation = toProjectCreation(copied);
     const record = await createProjectSettled(
       {
-        data: remapAssetRefs(canonicalDocument, restored.mappings),
+        data: creation.data as unknown as Record<string, unknown>,
         minimum_canvas_schema_version: input.record.minimum_canvas_schema_version,
+        minimum_document_schema_version: creation.documentSchemaVersion,
         name,
         project_id: id,
         ...(inboxStagingBoardId === null ? {} : { board_id: inboxStagingBoardId }),
@@ -195,16 +205,33 @@ export const duplicateProjectRecord = async (
     // The copy exists; its other boards can now belong to it. Reported, never fatal, from here on.
     const boardIssues = await placeMemberBoards(stagedBoards, record.project_id, { signal: owner.signal });
     assertAccountScopeCurrent(owner);
+    // The duplicating account's workspace, opening on the copy's own inbox, which only the created record names.
+    // Never fatal either: without it the copy opens on the workspace a new project starts with. A copy created whole
+    // carries its workspace inside.
+    const saveOwnWorkspace = () =>
+      saveFirstProjectWorkspace(
+        record,
+        splitProjectDocument(
+          applyAuthoritativeProjectBoard(copied as unknown as Record<string, unknown>, record.board_id, {
+            selectBoard: true,
+          }) as unknown as ProjectDocumentV3
+        ).workspace as unknown as Record<string, unknown>,
+        owner.signal
+      ).catch((error: unknown) => {
+        if (isRequestCancellation(error) || !isAccountScopeCurrent(owner)) {
+          throw error;
+        }
+        return { ...record, workspace: null };
+      });
+    const copy = creation.workspace ? await saveOwnWorkspace() : { ...record, workspace: null };
+    assertAccountScopeCurrent(owner);
 
     return {
       boardIssues,
       boardItemIssues: restored.boardItemIssues,
       coverImageName: restored.coverImageName,
       documentReferenceIssues: restored.documentReferenceIssues,
-      record: {
-        ...record,
-        data: applyAuthoritativeProjectBoard(record.data, record.board_id, { selectBoard: true }),
-      },
+      record: copy,
     };
   } catch (error) {
     const rollback = () => rollbackRestoredMedia(ledger, { signal: owner.signal });

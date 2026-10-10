@@ -20,6 +20,7 @@ import {
   listProjects,
   updateProject as apiUpdateProject,
   type ProjectRecordDTO,
+  type ProjectWithWorkspaceDTO,
   type ProjectSummaryDTO,
 } from './api';
 import {
@@ -30,6 +31,7 @@ import {
   recordProjectCover,
   subscribeProjectCovers,
 } from './covers';
+import { PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION } from './documentSchemaVersion';
 import { refreshOpenProjects } from './openProjects';
 import { assertProjectFlushed } from './projectFlush';
 import { pruneSessionProject } from './session';
@@ -42,7 +44,10 @@ export interface ProjectSummary {
   name: string;
   revision: number;
   minimumCanvasSchemaVersion: number;
+  /** Absent before the server reported it: a project saved whole. */
+  minimumDocumentSchemaVersion?: number;
   createdAt: string;
+  /** The later of the content's save and the caller's own workspace save: when they last worked on it. */
   updatedAt: string;
   /** The cover index is independent of document-free listings; absent entries yield no cover. */
   coverUrl?: string;
@@ -77,9 +82,13 @@ const toSummary = (dto: ProjectSummaryDTO): ProjectSummary =>
     createdAt: normalizeServerTimestamp(dto.created_at),
     id: dto.project_id,
     minimumCanvasSchemaVersion: dto.minimum_canvas_schema_version,
+    minimumDocumentSchemaVersion: dto.minimum_document_schema_version,
     name: dto.name,
     revision: dto.revision,
-    updatedAt: normalizeServerTimestamp(dto.updated_at),
+    updatedAt: [dto.updated_at, dto.workspace_updated_at]
+      .filter((timestamp): timestamp is string => typeof timestamp === 'string')
+      .map(normalizeServerTimestamp)
+      .reduce((latest, timestamp) => (timestamp > latest ? timestamp : latest)),
   });
 
 /** Recompute summaries when the independent cover index changes. */
@@ -176,7 +185,8 @@ export const upsertProjectSummary = (
 };
 
 export const isProjectSummaryCompatible = (summary: ProjectSummary): boolean =>
-  isCanvasSchemaVersionSupported(summary.minimumCanvasSchemaVersion);
+  isCanvasSchemaVersionSupported(summary.minimumCanvasSchemaVersion) &&
+  (summary.minimumDocumentSchemaVersion ?? 0) <= PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION;
 
 /** Open projects mutate through their sync engine; closed projects use the HTTP API directly. */
 
@@ -271,7 +281,10 @@ export const renameLibraryProject = async (projectId: string, name: string): Pro
 };
 
 /** Export/copy requires the paint barrier and an acknowledged flush before reading server bytes. */
-export const readAcknowledgedProject = async (projectId: string, owner: AccountScope): Promise<ProjectRecordDTO> => {
+export const readAcknowledgedProject = async (
+  projectId: string,
+  owner: AccountScope
+): Promise<ProjectWithWorkspaceDTO> => {
   const openProject = getOpenProject(projectId);
 
   if (openProject) {

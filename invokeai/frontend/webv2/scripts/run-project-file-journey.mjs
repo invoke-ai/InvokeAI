@@ -199,6 +199,11 @@ const writeArchiveWithout = async (entries, omitted, targetPath) => {
 };
 
 const getBoardSnapshot = (projectId) => fetchJson(`/api/v1/projects/${encodeURIComponent(projectId)}/board-snapshot`);
+/** A project as this build reads it: content and the caller's workspace. */
+const getProjectRecord = (projectId) =>
+  fetchJson(
+    `/api/v1/projects/${encodeURIComponent(projectId)}?max_canvas_schema_version=4&max_document_schema_version=4`
+  );
 
 const getLayerImageNames = (project) =>
   collectCanvasLeaves(project.data.canvas.document).map((layer) => layer.source.image.imageName);
@@ -235,7 +240,7 @@ const waitForSavedWorkflows = async (projectId, predicate, label) => {
   const deadline = Date.now() + 15_000;
 
   while (Date.now() < deadline) {
-    const record = await fetchJson(`/api/v1/projects/${encodeURIComponent(projectId)}`);
+    const record = await getProjectRecord(projectId);
 
     if (predicate(record)) {
       return record;
@@ -385,7 +390,12 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
   await importPage.getByRole('main', { exact: true, name: summary.name }).waitFor();
   assert.equal(new URL(importPage.url()).hash, '#/app');
 
-  const imported = await fetchJson(`/api/v1/projects/${encodeURIComponent(summary.project_id)}`);
+  // Read between the split's content and workspace saves, the record would hold content with no workspace yet.
+  const imported = await waitForSavedWorkflows(
+    summary.project_id,
+    (record) => record.data.documentSchemaVersion !== 4 || record.workspace !== null,
+    'the imported project whole, or split with its workspace'
+  );
   const importedBoard = await getBoardSnapshot(summary.project_id);
   const importedBoardNames = snapshotItems(importedBoard).map((item) => item.name);
 
@@ -455,10 +465,15 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
   assertNoBrowserErrors(errors);
 
   // The fixture was a schema-2 document with one `projectGraph`; import canonicalizes it into the current
-  // schema with that graph as the only workflow and no library write target.
-  assert.equal(imported.data.documentSchemaVersion, 3);
+  // schema with that graph as the only workflow and no library write target. Import creates the project whole and
+  // the editor splits it with its first save, which may already have happened: either shape holds the same.
+  assert.ok([3, 4].includes(imported.data.documentSchemaVersion), `schema ${imported.data.documentSchemaVersion}`);
+  const importedActiveWorkflowId =
+    imported.data.documentSchemaVersion === 4
+      ? imported.workspace?.data.workflows.activeWorkflowId
+      : imported.data.workflows.activeWorkflowId;
   assert.equal(imported.data.workflows.entries.length, 1);
-  assert.equal(imported.data.workflows.activeWorkflowId, imported.data.workflows.entries[0].document.id);
+  assert.equal(importedActiveWorkflowId, imported.data.workflows.entries[0].document.id);
   assert.equal(imported.data.workflows.entries[0].source, undefined);
 
   await runDuplication({ browser, contexts, errors, imported, importedBoardNames });
@@ -524,7 +539,7 @@ const runDuplication = async ({ browser, contexts, errors, imported, importedBoa
     assert.equal(importedBoardNames.includes(name), false, `${name} is shared with the project it was copied from.`);
   }
 
-  const copiedRecord = await fetchJson(`/api/v1/projects/${encodeURIComponent(copy.project_id)}`);
+  const copiedRecord = await getProjectRecord(copy.project_id);
   const copiedLayers = getLayerImageNames(copiedRecord);
   const importedLayers = getLayerImageNames(imported);
 
@@ -681,13 +696,14 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
     'two workflows with the saved copy linked to its new template'
   );
 
-  assert.equal(record.data.documentSchemaVersion, 3);
+  // Saved split: the content holds the workflows, and the workspace which one this account has open.
+  assert.equal(record.data.documentSchemaVersion, 4);
   assert.deepEqual(
     record.data.workflows.entries.map((entry) => entry.document.name),
     ['Empty Workflow', 'Journey Saved']
   );
   assert.deepEqual(record.data.workflows.entries[1].source, { libraryWorkflowId: saved.workflow_id, revision: 1 });
-  assert.equal(record.data.workflows.activeWorkflowId, record.data.workflows.entries[1].document.id);
+  assert.equal(record.workspace.data.workflows.activeWorkflowId, record.data.workflows.entries[1].document.id);
 
   // Restart: both workflows and the active selection come back from the server.
   await page.reload({ waitUntil: 'domcontentloaded' });

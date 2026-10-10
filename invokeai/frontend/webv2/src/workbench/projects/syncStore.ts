@@ -16,7 +16,13 @@ export interface ProjectSyncInfo {
   /** Present when the server requires a newer canvas schema than this client supports. */
   schemaRefusal?: ProjectSchemaRefusal;
   /** Divergent local work awaits an explicit user decision. */
-  conflict?: { detectedAt: string; kind: 'deleted' | 'revision'; serverRevision?: number };
+  conflict?: {
+    detectedAt: string;
+    /** For a revision conflict: the caller's workspace diverged, not the project content. */
+    half?: 'workspace';
+    kind: 'deleted' | 'revision';
+    serverRevision?: number;
+  };
 }
 
 export interface ProjectSyncSnapshot {

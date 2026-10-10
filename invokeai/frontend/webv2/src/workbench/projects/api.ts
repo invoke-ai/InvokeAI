@@ -8,6 +8,8 @@ import {
   MAX_SUPPORTED_CANVAS_SCHEMA_VERSION,
 } from '@workbench/canvasSchemaVersion';
 
+import { PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION } from './documentSchemaVersion';
+
 /** Project records and client state are scoped to the authenticated account. */
 
 const PROJECTS_BASE = '/api/v1/projects';
@@ -23,12 +25,29 @@ export interface ProjectSummaryDTO {
   name: string;
   revision: number;
   minimum_canvas_schema_version: number;
+  /** The oldest project document schema a client must read; 3 for a project saved whole, 4 once split. */
+  minimum_document_schema_version: number;
   created_at: string;
+  /** When the project content was last saved. */
+  updated_at: string;
+  /** When the caller last saved their workspace in the project; null before they have. */
+  workspace_updated_at: string | null;
+}
+
+export interface ProjectWorkspaceDTO {
+  data: Record<string, unknown>;
+  revision: number;
   updated_at: string;
 }
 
+/** What a write answers: the project content (from document schema 4; the whole document before it). */
 export interface ProjectRecordDTO extends ProjectSummaryDTO {
   data: Record<string, unknown>;
+}
+
+/** What a read answers: the content and the caller's workspace beside it, null until their first save. */
+export interface ProjectWithWorkspaceDTO extends ProjectRecordDTO {
+  workspace: ProjectWorkspaceDTO | null;
 }
 
 export interface ProjectCreateRequest {
@@ -39,6 +58,8 @@ export interface ProjectCreateRequest {
   data: Record<string, unknown>;
   /** Raise the server's compatibility floor atomically with this document. */
   minimum_canvas_schema_version?: number;
+  /** 4 when `data` is project content, which every save of a split project is; omitted for a document saved whole. */
+  minimum_document_schema_version?: number;
 }
 
 export type ProjectBoardItemKind = 'image' | 'video';
@@ -70,14 +91,23 @@ export interface ProjectUpdateRequest {
   expected_revision: number;
   /** Raise the compatibility floor atomically with this save; omission preserves the stored floor. */
   minimum_canvas_schema_version?: number;
+  /** 4 when `data` is project content, which splits a project saved whole; omission preserves the stored floor. */
+  minimum_document_schema_version?: number;
+}
+
+export interface ProjectWorkspaceSaveRequest {
+  data: Record<string, unknown>;
+  /** The workspace revision this save replaces, or null for the caller's first workspace in the project. */
+  expected_revision: number | null;
 }
 
 export const listProjects = (signal?: AbortSignal): Promise<ProjectSummaryDTO[]> =>
   apiFetchJson<ProjectSummaryDTO[]>(`${PROJECTS_BASE}/`, { signal });
 
-export const getProject = (projectId: string, signal?: AbortSignal): Promise<ProjectRecordDTO> =>
-  apiFetchJson<ProjectRecordDTO>(
-    `${PROJECTS_BASE}/${encodeURIComponent(projectId)}?max_canvas_schema_version=${MAX_SUPPORTED_CANVAS_SCHEMA_VERSION}`,
+export const getProject = (projectId: string, signal?: AbortSignal): Promise<ProjectWithWorkspaceDTO> =>
+  apiFetchJson<ProjectWithWorkspaceDTO>(
+    `${PROJECTS_BASE}/${encodeURIComponent(projectId)}?max_canvas_schema_version=${MAX_SUPPORTED_CANVAS_SCHEMA_VERSION}` +
+      `&max_document_schema_version=${PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION}`,
     { signal }
   );
 
@@ -150,6 +180,7 @@ const serializeCreateProjectRequest = (request: ProjectCreateRequest): string =>
   JSON.stringify({
     ...request,
     max_canvas_schema_version: MAX_SUPPORTED_CANVAS_SCHEMA_VERSION,
+    max_document_schema_version: PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION,
     minimum_canvas_schema_version: request.minimum_canvas_schema_version ?? DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
   });
 
@@ -162,7 +193,8 @@ const projectRecordMatchesCreate = (record: ProjectRecordDTO, requestBody: strin
     JSON.stringify(record.data) === JSON.stringify(request.data) &&
     (request.board_id === undefined || record.board_id === request.board_id) &&
     record.minimum_canvas_schema_version >=
-      (request.minimum_canvas_schema_version ?? DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION)
+      (request.minimum_canvas_schema_version ?? DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION) &&
+    record.minimum_document_schema_version >= (request.minimum_document_schema_version ?? 1)
   );
 };
 
@@ -190,11 +222,52 @@ export const updateProject = (
   request: ProjectUpdateRequest,
   signal?: AbortSignal
 ): Promise<ProjectRecordDTO> => {
-  const body = JSON.stringify({ ...request, max_canvas_schema_version: MAX_SUPPORTED_CANVAS_SCHEMA_VERSION });
+  const body = JSON.stringify({
+    ...request,
+    max_canvas_schema_version: MAX_SUPPORTED_CANVAS_SCHEMA_VERSION,
+    max_document_schema_version: PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION,
+  });
 
   return requestProjectWrite(
     () =>
       apiFetchJson<ProjectRecordDTO>(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}`, {
+        body,
+        method: 'PUT',
+        signal,
+      }),
+    signal,
+    createProjectWriteRetryBudget()
+  );
+};
+
+/**
+ * The caller's first workspace in a project just created with its content, saved beside it. A retried create that
+ * found its first attempt committed answers with a read, which carries that attempt's workspace if it got as far.
+ */
+export const saveFirstProjectWorkspace = async (
+  record: ProjectRecordDTO,
+  data: Record<string, unknown>,
+  signal?: AbortSignal,
+  save: typeof saveProjectWorkspace = saveProjectWorkspace
+): Promise<ProjectWithWorkspaceDTO> => {
+  const found = (record as Partial<ProjectWithWorkspaceDTO>).workspace;
+  return {
+    ...record,
+    workspace: found ?? (await save(record.project_id, { data, expected_revision: null }, signal)),
+  };
+};
+
+/** Saves the caller's workspace in a project; its revision is its own, apart from the content's. */
+export const saveProjectWorkspace = (
+  projectId: string,
+  request: ProjectWorkspaceSaveRequest,
+  signal?: AbortSignal
+): Promise<ProjectWorkspaceDTO> => {
+  const body = JSON.stringify({ ...request, max_document_schema_version: PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION });
+
+  return requestProjectWrite(
+    () =>
+      apiFetchJson<ProjectWorkspaceDTO>(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}/workspace`, {
         body,
         method: 'PUT',
         signal,
@@ -263,6 +336,31 @@ export const getProjectCanvasSchemaCompatibilityRefusal = (
       maximum >= 1 &&
       minimum > maximum
       ? { maxCanvasSchemaVersion: maximum, minimumCanvasSchemaVersion: minimum }
+      : null;
+  } catch {
+    return null;
+  }
+};
+
+export interface ProjectDocumentSchemaRefusal {
+  minimumDocumentSchemaVersion: number;
+  maxDocumentSchemaVersion: number;
+}
+
+/** The server refused a project whose document schema this build predates: a newer Invoke split it further. */
+export const getProjectDocumentSchemaRefusal = (error: unknown): ProjectDocumentSchemaRefusal | null => {
+  if (!(error instanceof ApiError) || error.status !== 412) {
+    return null;
+  }
+  try {
+    const detail = (JSON.parse(error.message) as { detail?: Record<string, unknown> }).detail;
+    const minimum = detail?.minimum_document_schema_version;
+    const maximum = detail?.max_document_schema_version;
+    return detail?.code === 'document_schema_unsupported' &&
+      Number.isSafeInteger(minimum) &&
+      Number.isSafeInteger(maximum) &&
+      (minimum as number) > (maximum as number)
+      ? { maxDocumentSchemaVersion: maximum as number, minimumDocumentSchemaVersion: minimum as number }
       : null;
   } catch {
     return null;

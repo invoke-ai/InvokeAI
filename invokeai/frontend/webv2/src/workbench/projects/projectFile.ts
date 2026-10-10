@@ -12,7 +12,7 @@ import { getProjectCanvasSchemaRequirement, MAX_SUPPORTED_CANVAS_SCHEMA_VERSION 
 
 import type { ProjectTransferIssues } from './invk/transfer';
 
-import { createProjectSettled, getProjectBoardSnapshot, type ProjectRecordDTO } from './api';
+import { createProjectSettled, getProjectBoardSnapshot, type ProjectWithWorkspaceDTO } from './api';
 import { recordProjectCover } from './covers';
 import { createProjectId } from './ids';
 import { INVK_EXTENSION, InvkFormatError, toInvkFormatReason } from './invk/format';
@@ -77,7 +77,7 @@ export interface ProjectExportOutcome extends ProjectTransferIssues {
 }
 
 export interface ProjectImportOutcome extends ProjectTransferIssues {
-  record: ProjectRecordDTO;
+  record: ProjectWithWorkspaceDTO;
 }
 
 const readProjectDocument = async (file: File) => {
@@ -160,11 +160,11 @@ export const exportLibraryProject = async (
 
   assertAccountScopeCurrent(owner);
 
-  const [{ deserializeProjectDocument }, { serializeProjectDocumentV3 }] = await Promise.all([
+  const [{ deserializeProjectRecord }, { serializeProjectDocumentV3 }] = await Promise.all([
     import('./projectHydration'),
     import('./projectDocument'),
   ]);
-  const loaded = deserializeProjectDocument(record.data);
+  const loaded = deserializeProjectRecord(record);
   const document = loaded.status === 'loaded' ? serializeProjectDocumentV3(loaded.project) : record.data;
 
   return exportProjectDocument(record.name, record.project_id, document, record.minimum_canvas_schema_version, {
@@ -362,10 +362,12 @@ export const importProjectFile = async (
       boardIssues,
       boardItemIssues: restored?.boardItemIssues ?? [],
       documentReferenceIssues: restored?.documentReferenceIssues ?? [],
-      // Bind the initial selection to the authoritative returned board ID, not the requested ID.
+      // Bind the initial selection to the authoritative returned board ID, not the requested ID. Created whole, the
+      // project has no workspace until its first save splits it.
       record: {
         ...record,
         data: applyAuthoritativeProjectBoard(record.data, record.board_id, { selectBoard: true }),
+        workspace: null,
       },
     };
   } catch (error) {

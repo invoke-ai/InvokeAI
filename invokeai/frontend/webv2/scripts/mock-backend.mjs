@@ -16,17 +16,42 @@ import {
 const DEFAULT_CANVAS_SCHEMA_VERSION = 3;
 
 /** The 412 the real router raises when a client's maximum is below a project's floor. */
-const schemaUnsupported = (minimum, maximum) =>
-  json(412, {
+const schemaUnsupported = (minimum, maximum) => [
+  412,
+  {
     detail: {
       code: 'canvas_schema_unsupported',
       max_canvas_schema_version: maximum,
       message: `Project requires canvas schema ${minimum}; client supports up to ${maximum}.`,
       minimum_canvas_schema_version: minimum,
     },
-  });
+  },
+];
 
 const clientMaximum = (value) => (Number.isInteger(value) && value >= 1 ? value : DEFAULT_CANVAS_SCHEMA_VERSION);
+
+/** A project saved whole; from 4 the record holds its content and each member's workspace apart. */
+const DEFAULT_DOCUMENT_SCHEMA_VERSION = 3;
+
+const documentSchemaUnsupported = (minimum, maximum) => [
+  412,
+  {
+    detail: {
+      code: 'document_schema_unsupported',
+      max_document_schema_version: maximum,
+      message: `Project requires document schema ${minimum}; client supports up to ${maximum}.`,
+      minimum_document_schema_version: minimum,
+    },
+  },
+];
+
+const documentMaximum = (value) => (Number.isInteger(value) && value >= 1 ? value : DEFAULT_DOCUMENT_SCHEMA_VERSION);
+
+/** A write's answer: the content, never the caller's workspace, as the real server returns it. */
+const writtenRecordOf = ({ workspace, ...project }) => ({
+  ...project,
+  workspace_updated_at: workspace?.updated_at ?? null,
+});
 
 /** In-memory test backend; no Socket.IO. POST /__reset restores the startup profile unless ?profile= overrides it. */
 
@@ -202,10 +227,12 @@ const summaryOf = (project) => ({
   board_id: project.board_id,
   created_at: project.created_at,
   minimum_canvas_schema_version: project.minimum_canvas_schema_version ?? DEFAULT_CANVAS_SCHEMA_VERSION,
+  minimum_document_schema_version: project.minimum_document_schema_version ?? DEFAULT_DOCUMENT_SCHEMA_VERSION,
   name: project.name,
   project_id: project.project_id,
   revision: project.revision,
   updated_at: project.updated_at,
+  workspace_updated_at: project.workspace?.updated_at ?? null,
 });
 
 const readBody = (request) =>
@@ -967,7 +994,13 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           const minimum = requested.minimum_canvas_schema_version ?? DEFAULT_CANVAS_SCHEMA_VERSION;
           const maximum = clientMaximum(requested.max_canvas_schema_version);
           if (minimum > maximum) {
-            return schemaUnsupported(minimum, maximum);
+            return json(...schemaUnsupported(minimum, maximum));
+          }
+          const documentFloor = requested.minimum_document_schema_version ?? DEFAULT_DOCUMENT_SCHEMA_VERSION;
+          if (documentFloor > documentMaximum(requested.max_document_schema_version)) {
+            return json(
+              ...documentSchemaUnsupported(documentFloor, documentMaximum(requested.max_document_schema_version))
+            );
           }
 
           const project = {
@@ -975,16 +1008,18 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             created_at: now,
             data: requested.data ?? {},
             minimum_canvas_schema_version: minimum,
+            minimum_document_schema_version: documentFloor,
             name,
             project_id: projectId,
             revision: 1,
             updated_at: now,
+            workspace: null,
           };
 
           state.nextProjectNumber += 1;
           state.projects.set(project.project_id, project);
 
-          return json(200, project);
+          return json(200, writtenRecordOf(project));
         }
       }
 
@@ -1000,9 +1035,14 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           const maximum = clientMaximum(
             Number(url.searchParams.get('max_canvas_schema_version') ?? DEFAULT_CANVAS_SCHEMA_VERSION)
           );
-          return project.minimum_canvas_schema_version > maximum
-            ? schemaUnsupported(project.minimum_canvas_schema_version, maximum)
-            : json(200, project);
+          const documentFloor = project.minimum_document_schema_version ?? DEFAULT_DOCUMENT_SCHEMA_VERSION;
+          const documentClient = documentMaximum(Number(url.searchParams.get('max_document_schema_version')));
+          if (project.minimum_canvas_schema_version > maximum) {
+            return json(...schemaUnsupported(project.minimum_canvas_schema_version, maximum));
+          }
+          return documentFloor > documentClient
+            ? json(...documentSchemaUnsupported(documentFloor, documentClient))
+            : json(200, { ...writtenRecordOf(project), workspace: project.workspace ?? null });
         }
         if (method === 'PUT') {
           if (!project) {
@@ -1016,8 +1056,28 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           }
           const maximum = clientMaximum(requested.max_canvas_schema_version);
           if (project.minimum_canvas_schema_version > maximum) {
-            return schemaUnsupported(project.minimum_canvas_schema_version, maximum);
+            return json(...schemaUnsupported(project.minimum_canvas_schema_version, maximum));
           }
+          const documentClient = documentMaximum(requested.max_document_schema_version);
+          const currentDocumentFloor = project.minimum_document_schema_version ?? DEFAULT_DOCUMENT_SCHEMA_VERSION;
+          if (currentDocumentFloor > documentClient) {
+            return json(...documentSchemaUnsupported(currentDocumentFloor, documentClient));
+          }
+          const requestedDocumentFloor = requested.minimum_document_schema_version ?? currentDocumentFloor;
+          if (requestedDocumentFloor < currentDocumentFloor) {
+            return json(400, {
+              detail: {
+                code: 'document_schema_downgrade',
+                current_minimum_document_schema_version: currentDocumentFloor,
+                message: 'A project never lowers its document schema floor.',
+                requested_minimum_document_schema_version: requestedDocumentFloor,
+              },
+            });
+          }
+          if (requestedDocumentFloor > documentClient) {
+            return json(...documentSchemaUnsupported(requestedDocumentFloor, documentClient));
+          }
+          const documentFloor = requestedDocumentFloor;
           const requestedMinimum = requested.minimum_canvas_schema_version;
           if (requestedMinimum !== undefined && requestedMinimum < project.minimum_canvas_schema_version) {
             return json(400, {
@@ -1030,12 +1090,13 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             });
           }
           if (requestedMinimum !== undefined && requestedMinimum > maximum) {
-            return schemaUnsupported(requestedMinimum, maximum);
+            return json(...schemaUnsupported(requestedMinimum, maximum));
           }
 
           project.data = requested.data ?? project.data;
           project.name = requested.name ?? project.name;
           project.minimum_canvas_schema_version = requestedMinimum ?? project.minimum_canvas_schema_version;
+          project.minimum_document_schema_version = documentFloor;
           project.revision += 1;
           project.updated_at = timestamp(state);
 
@@ -1046,7 +1107,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             board.updated_at = project.updated_at;
           }
 
-          return json(200, project);
+          return json(200, writtenRecordOf(project));
         }
         if (method === 'DELETE') {
           if (project) {
@@ -1083,6 +1144,31 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           }
           return json(200, { ok: true });
         }
+      }
+
+      const workspaceMatch = /^\/api\/v1\/projects\/([^/]+)\/workspace$/.exec(path);
+      if (method === 'PUT' && workspaceMatch) {
+        const project = state.projects.get(decodeURIComponent(workspaceMatch[1]));
+        if (!project) {
+          return json(404, { detail: 'Project not found' });
+        }
+        const requested = await readJsonBody(request);
+        const documentFloor = project.minimum_document_schema_version ?? DEFAULT_DOCUMENT_SCHEMA_VERSION;
+        if (documentFloor > documentMaximum(requested.max_document_schema_version)) {
+          return json(
+            ...documentSchemaUnsupported(documentFloor, documentMaximum(requested.max_document_schema_version))
+          );
+        }
+        const current = project.workspace?.revision ?? null;
+        if (current !== (requested.expected_revision ?? null)) {
+          return json(409, { detail: { current_revision: current, message: 'Workspace revision conflict' } });
+        }
+        project.workspace = {
+          data: requested.data ?? {},
+          revision: (current ?? 0) + 1,
+          updated_at: timestamp(state),
+        };
+        return json(200, project.workspace);
       }
 
       const boardSnapshotMatch = /^\/api\/v1\/projects\/([^/]+)\/board-snapshot$/.exec(path);
