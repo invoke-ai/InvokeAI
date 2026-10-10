@@ -24,6 +24,7 @@ from invokeai.backend.flux.schedulers import (
     ERNIE_IMAGE_SHIFT,
 )
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
+from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ErnieImageConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
@@ -100,9 +101,15 @@ class ErnieImageDenoiseInvocation(BaseInvocation):
             neg_info = self._load_conditioning(context, self.negative_conditioning, dtype, device)
 
         transformer_info = context.models.load(self.transformer.transformer)
+        # A GGUF build dequantizes each Linear per forward, a transient its resident size does not cover.
+        # Passed alone because this node has no activation estimate, so the cache floors it at
+        # `device_working_mem_gb`; zero for other builds. Read from the unlocked model, before the lock.
+        dequant_bytes = peak_dequant_transient_bytes(transformer_info.model, dtype)
 
         with ExitStack() as exit_stack:
-            (_, transformer) = exit_stack.enter_context(transformer_info.model_on_device())
+            (_, transformer) = exit_stack.enter_context(
+                transformer_info.model_on_device(working_mem_bytes=dequant_bytes)
+            )
 
             text_in_dim = int(transformer.config.text_in_dim)
             in_channels = int(transformer.config.in_channels)  # 128 -- already patched

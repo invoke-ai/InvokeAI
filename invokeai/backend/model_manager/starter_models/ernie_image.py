@@ -4,6 +4,7 @@ from invokeai.backend.model_manager.starter_models.flux2 import flux2_vae
 from invokeai.backend.model_manager.starter_models.types import StarterModel
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
+    ModelFormat,
     ModelType,
 )
 
@@ -65,5 +66,67 @@ ernie_image_turbo_single_file = StarterModel(
         "Installs with the Ministral 3B encoder and the FLUX.2 VAE. ~16GB"
     ),
     type=ModelType.Main,
+    dependencies=[ernie_image_mistral_encoder, flux2_vae],
+)
+
+# unsloth's GGUF conversions of the same transformers, pinned to a commit. The Linear weights stay
+# packed and dequantize per forward, so the download size is about the resident size on every device.
+_UNSLOTH_TURBO_GGUF = (
+    "https://huggingface.co/unsloth/ERNIE-Image-Turbo-GGUF/resolve/a38270280633a5d318a9f51c18ef95eefb07c423"
+)
+_UNSLOTH_GGUF = "https://huggingface.co/unsloth/ERNIE-Image-GGUF/resolve/7b6dfaae7389b463d7fb4669e33c560d36ad108c"
+
+ernie_image_turbo_gguf_q4_k_m = StarterModel(
+    name="ERNIE-Image Turbo (GGUF, Q4_K_M)",
+    base=BaseModelType.ErnieImage,
+    source=f"{_UNSLOTH_TURBO_GGUF}/ernie-image-turbo-Q4_K_M.gguf",
+    description=(
+        "unsloth GGUF of ERNIE-Image-Turbo in Q4_K_M: a 5.0GB file and about as much in memory on every device, "
+        "against 16GB for the safetensors file. Installs with the Ministral 3B encoder and the FLUX.2 VAE. ~13GB "
+        "total"
+    ),
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    dependencies=[ernie_image_mistral_encoder, flux2_vae],
+)
+
+ernie_image_turbo_gguf_q8_0 = StarterModel(
+    name="ERNIE-Image Turbo (GGUF, Q8_0)",
+    base=BaseModelType.ErnieImage,
+    source=f"{_UNSLOTH_TURBO_GGUF}/ernie-image-turbo-Q8_0.gguf",
+    description=(
+        "unsloth GGUF of ERNIE-Image-Turbo in Q8_0, closest to the full-precision weights at about half their "
+        "size: an 8.7GB file and about as much in memory on every device. Installs with the Ministral 3B encoder "
+        "and the FLUX.2 VAE. ~17GB total"
+    ),
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    dependencies=[ernie_image_mistral_encoder, flux2_vae],
+)
+
+ernie_image_gguf_q4_k_m = StarterModel(
+    name="ERNIE-Image (GGUF, Q4_K_M)",
+    base=BaseModelType.ErnieImage,
+    source=f"{_UNSLOTH_GGUF}/ernie-image-Q4_K_M.gguf",
+    description=(
+        "unsloth GGUF of ERNIE-Image in Q4_K_M: a 5.0GB file and about as much in memory on every device, against "
+        "16GB for the safetensors file. Installs with the Ministral 3B encoder and the FLUX.2 VAE. ~13GB total"
+    ),
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    dependencies=[ernie_image_mistral_encoder, flux2_vae],
+)
+
+ernie_image_gguf_q8_0 = StarterModel(
+    name="ERNIE-Image (GGUF, Q8_0)",
+    base=BaseModelType.ErnieImage,
+    source=f"{_UNSLOTH_GGUF}/ernie-image-Q8_0.gguf",
+    description=(
+        "unsloth GGUF of ERNIE-Image in Q8_0, closest to the full-precision weights at about half their size: an "
+        "8.7GB file and about as much in memory on every device. Installs with the Ministral 3B encoder and the "
+        "FLUX.2 VAE. ~17GB total"
+    ),
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
     dependencies=[ernie_image_mistral_encoder, flux2_vae],
 )

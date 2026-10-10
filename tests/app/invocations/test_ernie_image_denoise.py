@@ -86,3 +86,43 @@ def test_mismatched_init_latents_are_rejected(shape: tuple[int, ...]) -> None:
 def test_add_noise_defaults_to_on() -> None:
     """A clean VAE-encoded latent is the common case, and it has to be noised to be usable."""
     assert ErnieImageDenoiseInvocation.model_fields["add_noise"].default is True
+
+
+class _StopBeforeLoad(Exception):
+    """Raised out of the mocked `model_on_device()` so the node stops at the reservation."""
+
+
+def test_a_gguf_transformer_reserves_its_dequant_transient(monkeypatch) -> None:
+    """The node has no activation estimate, so the GGUF dequantization copy is the whole request; it
+    only binds where `device_working_mem_gb` was lowered, which is exactly when dropping it would hurt."""
+    from unittest.mock import MagicMock
+
+    import gguf
+    import numpy as np
+
+    from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+
+    linear = torch.nn.Linear(64, 128, bias=False)
+    raw = gguf.quantize(np.zeros((128, 64), np.float32), gguf.GGMLQuantizationType.Q8_0)
+    linear.weight = torch.nn.Parameter(
+        GGMLTensor(torch.from_numpy(raw), gguf.GGMLQuantizationType.Q8_0, torch.Size((128, 64)), torch.bfloat16),
+        requires_grad=False,
+    )
+    transformer_info = MagicMock()
+    transformer_info.model = torch.nn.Sequential(linear)
+    transformer_info.model_on_device = MagicMock(side_effect=_StopBeforeLoad)
+    context = MagicMock()
+    context.models.load.return_value = transformer_info
+    invocation = ErnieImageDenoiseInvocation.model_construct(
+        transformer=SimpleNamespace(transformer=SimpleNamespace()),
+        positive_conditioning=SimpleNamespace(conditioning_name="pos"),
+        negative_conditioning=None,
+        guidance_scale=1.0,
+    )
+    monkeypatch.setattr(ErnieImageDenoiseInvocation, "_load_conditioning", lambda *args, **kwargs: None)
+
+    with pytest.raises(_StopBeforeLoad):
+        invocation.invoke(context)
+
+    # At least the bfloat16 copy of the weight it dequantizes on every forward.
+    assert transformer_info.model_on_device.call_args.kwargs["working_mem_bytes"] > 128 * 64 * 2

@@ -3,7 +3,7 @@ import json
 import math
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Callable, Literal
 
 import gguf
 import numpy as np
@@ -221,3 +221,72 @@ def gguf_sd_loader(path: Path, compute_dtype: torch.dtype, *, q8_cr: Q8CRMode = 
             marker_key = f"{weight_name[: -len('.weight')]}{COMFY_QUANT_SUFFIX}"
             sd[marker_key] = torch.frombuffer(bytearray(raw), dtype=torch.uint8)
         return sd
+
+
+# GGUF's unquantized storage types. `gguf_sd_loader` wraps BF16 like a quantized type (torch has no
+# GGML-side view for it), so here it is as packed as Q4_0 -- but dequantizing it changes no byte count.
+_UNQUANTIZED_GGML_TYPES = frozenset(
+    {gguf.GGMLQuantizationType.F32, gguf.GGMLQuantizationType.F16, gguf.GGMLQuantizationType.BF16}
+)
+
+
+def unpack_ggml_at_load(
+    sd: dict[str, torch.Tensor],
+    model: torch.nn.Module,
+    skip_patterns: tuple[str, ...],
+    reserve: Callable[[int], None],
+) -> int:
+    """Replace, in `sd`, the GGUF tensors that must not -- or need not -- stay packed. Returns the count.
+
+    Must not: `GGMLTensor` only works where torch dispatches the op to it (a Linear's matmul, `mul`,
+    `add`). An embedding lookup is not dispatched at all, `F.rms_norm` and `F.layer_norm` see the
+    packed buffer, a convolution is not a Linear, and a model that reads its compute dtype off a
+    weight reads the *storage* dtype -- `uint8` -- and casts its activations to it. So everything
+    that is not a Linear weight or bias, plus `skip_patterns` (the model's own precision-sensitive
+    modules, see `_model_declared_skip_patterns`). Releases differ in which of these they quantize,
+    hence a rule by module rather than by quantization type.
+
+    Need not: an unquantized tensor (F32/F16/BF16) is no larger unpacked, but kept packed it is
+    dequantized on every forward -- for a 53248-wide BF16 projection, a measured 1.87 GB transient
+    per call.
+
+    The reservation is absolute, because `make_room` makes that much room rather than adding to the
+    file-size reservation the framework made before the loader ran: everything that stays packed at
+    its packed size, everything replaced at its unpacked size, and one replacement in flight. BF16 is
+    reinterpreted rather than run through the GGML kernel, which widens through int32 and float32 on
+    the way -- about 8 bytes per element.
+    """
+    linear_params = {
+        f"{module_name}.{param_name}"
+        for module_name, module in model.named_modules()
+        if isinstance(module, torch.nn.Linear)
+        for param_name, _ in module.named_parameters(recurse=False)
+    }
+    keys = [
+        key
+        for key, value in sd.items()
+        if isinstance(value, GGMLTensor)
+        and (
+            value._ggml_quantization_type in _UNQUANTIZED_GGML_TYPES
+            or key not in linear_params
+            or any(pattern in key for pattern in skip_patterns)
+        )
+    ]
+    unpacked = {key: sd[key].tensor_shape.numel() * sd[key].compute_dtype.itemsize for key in keys}
+    kept = sum(
+        value.quantized_data.nbytes if isinstance(value, GGMLTensor) else value.nbytes
+        for key, value in sd.items()
+        if key not in unpacked
+    )
+    reserve(kept + sum(unpacked.values()) + max(unpacked.values(), default=0))
+    # One at a time, so each packed original is released as its replacement lands.
+    for key in keys:
+        sd[key] = _unpack(sd[key])
+    return len(keys)
+
+
+def _unpack(value: GGMLTensor) -> torch.Tensor:
+    """`value` as a plain tensor in its compute dtype; BF16 as a view of its bytes, not a decode."""
+    if value._ggml_quantization_type is gguf.GGMLQuantizationType.BF16:
+        return value.quantized_data.view(torch.bfloat16).reshape(value.tensor_shape).to(value.compute_dtype)
+    return value.get_dequantized_tensor()
