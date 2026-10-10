@@ -1,4 +1,7 @@
+import ast
+import importlib
 from inspect import signature
+from pathlib import Path
 from types import SimpleNamespace
 
 import accelerate
@@ -7,11 +10,81 @@ import pytest
 import torch
 from packaging.version import Version
 
+import invokeai
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
+
+_DiffusersImport = tuple[str, str, str]  # module, name, location
+
+
+def _is_diffusers_import(node: ast.AST) -> bool:
+    return isinstance(node, ast.ImportFrom) and node.level == 0 and (node.module or "").split(".")[0] == "diffusers"
+
+
+def _is_version_gate(node: ast.If) -> bool:
+    return any("version" in getattr(n, "id", getattr(n, "attr", "")) for n in ast.walk(node.test))
+
+
+def _imports_in(statements: list[ast.stmt], path: Path) -> list[_DiffusersImport]:
+    return [
+        (node.module, alias.name, f"{path}:{node.lineno}")
+        for statement in statements
+        for node in ast.walk(statement)
+        if _is_diffusers_import(node)
+        for alias in node.names
+    ]
+
+
+def _collect_diffusers_imports(
+    node: ast.AST, path: Path, plain: list[_DiffusersImport], gated: list[list[list[_DiffusersImport]]]
+) -> None:
+    """Collects `from diffusers... import X`, including function-local ones.
+
+    A branch on a diffusers version only has to resolve on one side, so its two sides are kept as alternatives.
+    """
+    for child in ast.iter_child_nodes(node):
+        if isinstance(child, ast.If) and _is_version_gate(child):
+            gated.append([_imports_in(child.body, path), _imports_in(child.orelse, path)])
+            continue
+        if _is_diffusers_import(child):
+            plain.extend(_imports_in([child], path))
+        _collect_diffusers_imports(child, path, plain, gated)
+
+
+def _unresolved(imports: list[_DiffusersImport]) -> list[str]:
+    failures = []
+    for module_name, name, location in imports:
+        try:
+            module = importlib.import_module(module_name)
+            if name != "*" and not hasattr(module, name):
+                importlib.import_module(f"{module_name}.{name}")
+        except ImportError as e:
+            failures.append(f"{location}: from {module_name} import {name} ({e})")
+    return failures
+
+
+def test_every_diffusers_import_in_invokeai_resolves() -> None:
+    # Most loaders import diffusers inside functions, so a module that moves upstream only fails when a user
+    # loads that model. Resolving every import here catches it at the next bump instead.
+    package_dir = Path(invokeai.__file__).parent
+    plain: list[_DiffusersImport] = []
+    gated: list[list[list[_DiffusersImport]]] = []
+    for path in sorted(package_dir.rglob("*.py")):
+        if "node_modules" in path.parts:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        _collect_diffusers_imports(tree, path.relative_to(package_dir), plain, gated)
+    assert plain
+
+    unresolved = _unresolved(plain)
+    for branches in gated:
+        failures = [_unresolved(branch) for branch in branches]
+        if all(failures):
+            unresolved.extend(failure for branch_failures in failures for failure in branch_failures)
+    assert not unresolved, "\n".join(unresolved)
 
 
 def test_pinned_diffusers_exposes_existing_and_krea_model_contracts() -> None:
-    assert Version(diffusers.__version__) == Version("0.40.0")
+    assert Version(diffusers.__version__) == Version("0.41.0")
 
     expected_symbols = (
         "AutoencoderKLFlux2",
