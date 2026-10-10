@@ -22089,6 +22089,94 @@
           "$ref": "#/components/schemas/BooleanOutput"
         }
       },
+      "BooleanLogicInvocation": {
+        "category": "math",
+        "class": "invocation",
+        "classification": "stable",
+        "description": "Performs Boolean AND, OR, XOR, NOT, NAND, NOR, or XNOR operations. NOT uses only A.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "operation": {
+            "default": "AND",
+            "description": "The logical operation to perform",
+            "enum": ["AND", "OR", "XOR", "NAND", "NOR", "XNOR", "NOT"],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "AND",
+            "orig_required": false,
+            "title": "Operation",
+            "type": "string",
+            "ui_choice_labels": {
+              "AND": "A AND B",
+              "NAND": "A NAND B",
+              "NOR": "A NOR B",
+              "NOT": "NOT A",
+              "OR": "A OR B",
+              "XNOR": "A XNOR B",
+              "XOR": "A XOR B"
+            }
+          },
+          "a": {
+            "default": false,
+            "description": "First Boolean input",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "A",
+            "type": "boolean"
+          },
+          "b": {
+            "default": false,
+            "description": "Second Boolean input (ignored for NOT)",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "B",
+            "type": "boolean"
+          },
+          "type": {
+            "const": "boolean_logic",
+            "default": "boolean_logic",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["logic", "boolean"],
+        "title": "Boolean Logic",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/BooleanOutput"
+        }
+      },
       "BooleanOutput": {
         "class": "output",
         "description": "Base class for nodes that output a single boolean",
@@ -42224,6 +42312,9 @@
                   "$ref": "#/components/schemas/BooleanInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/BooleanLogicInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/BoundingBoxInvocation"
                 },
                 {
@@ -52500,6 +52591,9 @@
                 "$ref": "#/components/schemas/BooleanInvocation"
               },
               {
+                "$ref": "#/components/schemas/BooleanLogicInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/BoundingBoxInvocation"
               },
               {
@@ -54091,6 +54185,9 @@
                 "$ref": "#/components/schemas/BooleanInvocation"
               },
               {
+                "$ref": "#/components/schemas/BooleanLogicInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/BoundingBoxInvocation"
               },
               {
@@ -55209,6 +55306,9 @@
           "boolean_collection": {
             "$ref": "#/components/schemas/BooleanCollectionOutput"
           },
+          "boolean_logic": {
+            "$ref": "#/components/schemas/BooleanOutput"
+          },
           "bounding_box": {
             "$ref": "#/components/schemas/BoundingBoxOutput"
           },
@@ -56210,6 +56310,7 @@
           "blank_image",
           "boolean",
           "boolean_collection",
+          "boolean_logic",
           "bounding_box",
           "calculate_image_tiles",
           "calculate_image_tiles_even_split",
@@ -56658,6 +56759,9 @@
               },
               {
                 "$ref": "#/components/schemas/BooleanInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/BooleanLogicInvocation"
               },
               {
                 "$ref": "#/components/schemas/BoundingBoxInvocation"
@@ -57885,6 +57989,9 @@
               },
               {
                 "$ref": "#/components/schemas/BooleanInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/BooleanLogicInvocation"
               },
               {
                 "$ref": "#/components/schemas/BoundingBoxInvocation"
