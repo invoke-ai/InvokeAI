@@ -4303,6 +4303,7 @@
       "fps": "FPS",
       "extendContext": "Context Frames",
       "extendContextHelp": "Frames of the initial video carried in. Adds {{frames}} new frames ({{seconds}}s).",
+      "extendContextHelpAuto": "Frames of the initial video carried in. Adds up to {{frames}} new frames ({{seconds}}s).",
       "frames": "Frames",
       "maxFrames": "Max frames",
       "framesDuration": "{{seconds}} s at the current frame rate",
