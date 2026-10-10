@@ -185,6 +185,7 @@ const zReferenceImage = z.object({
     }),
     z.object({ image: zGeneratedImage.nullable(), type: z.literal('flux2_reference_image') }),
     z.object({ image: zGeneratedImage.nullable(), type: z.literal('qwen_image_reference_image') }),
+    z.object({ image: zGeneratedImage.nullable(), type: z.literal('qwen_image_2_1_reference_image') }),
     z.object({ image: zGeneratedImage.nullable(), type: z.literal('external_reference_image') }),
   ]),
   id: z.string(),

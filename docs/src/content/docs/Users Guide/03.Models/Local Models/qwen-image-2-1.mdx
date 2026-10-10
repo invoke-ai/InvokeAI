@@ -1,0 +1,79 @@
+---
+title: Qwen-Image-2.1
+description: Generate images with Qwen-Image-2.1 and its 8-step Turbo variant, from the Diffusers folders or a GGUF transformer, including transparent (RGBA) output.
+lastUpdated: 2026-10-10
+sidebar:
+  order: 8
+---
+## Qwen-Image-2.1
+
+Qwen-Image-2.1 is a 7B text-to-image model from the Qwen team with strong text rendering. It is a different model from [Qwen Image](/users-guide/models/local-models/qwen-image/) (2512 and Edit 2511), not an update you can swap in: it encodes prompts with the **Qwen3-VL 8B** model, the same encoder [Ideogram 4](/users-guide/models/local-models/ideogram4/) uses, and decodes with its own 64-channel VAE, which can produce images with a transparent background.
+
+Two variants are available, and the variant is detected on install:
+
+- **Qwen-Image-2.1** — the base model. 40 steps by default.
+- **Qwen-Image-2.1 Turbo** — distilled for 8 steps on a fixed schedule of its own.
+
+Text-to-image, image-to-image, inpainting and outpainting on the Canvas are supported, and with the Diffusers models also edits from [reference images](#reference-images). LoRAs and regional guidance are not supported yet.
+
+### License
+
+Qwen-Image-2.1 is released under the **Qwen Research License**, which allows use for research and evaluation only. Commercial use needs a separate license from Alibaba's Tongyi Lab. The same license covers the Comfy-Org and community repackages of the weights.
+
+This is a summary, not legal advice. Read the full license on the model's HuggingFace page before using a model commercially.
+
+### Installing Qwen-Image-2.1
+
+The starter models install the complete Diffusers folders, which carry the transformer, the VAE and the Qwen3-VL 8B encoder:
+
+- [`Qwen/Qwen-Image-2.1`](https://huggingface.co/Qwen/Qwen-Image-2.1) — the base model, ~31 GB.
+- [`Qwen/Qwen-Image-2.1-Turbo`](https://huggingface.co/Qwen/Qwen-Image-2.1-Turbo) — the Turbo variant, ~30 GB.
+
+You can also paste either repo ID into the Model Manager's HuggingFace / URL field.
+
+#### GGUF and single files
+
+A GGUF or single-file transformer carries only the transformer. Pick the other two parts in the **Components** section next to the model; until both are set, the Invoke button tells you which one is missing:
+
+- **VAE** — the Qwen-Image-2.1 VAE, from Comfy-Org's [`vae/qwen_image_2.1_vae_bf16.safetensors`](https://huggingface.co/Comfy-Org/Qwen-Image-2.1) or the `vae` folder of a Diffusers download. The VAEs of Qwen Image, Wan and FLUX do not fit and are not offered.
+- **Qwen3-VL Encoder** — the Qwen3-VL **8B** encoder, for example the **Qwen3-VL 8B Encoder** starter model, which Ideogram 4 uses as well. The 4B encoder Krea-2 uses does not work and is not offered. A llama.cpp GGUF of the 8B encoder works too; see [Qwen3-VL GGUF encoders](/users-guide/models/local-models/krea-2/#qwen3-vl-gguf-encoders).
+
+The **Qwen-Image-2.1 (Q4_K_M GGUF)** starter model, from [`unsloth/Qwen-Image-2.1-GGUF`](https://huggingface.co/unsloth/Qwen-Image-2.1-GGUF), installs the VAE and the 8B encoder with it, ~15 GB in all. Other quantization levels from that repository load the same way.
+
+Single-file transformers in bf16, scaled fp8 or `int8_convrot` (ComfyUI repackages) load as well. nvfp4 files, and int8 files without ComfyUI's `int8_convrot` marker, are refused at install. GGUF files with int8 layers (ComfyUI-GGUF's `Q8_CR`) are refused too.
+
+The Turbo variant is recognized from the filename: a single file or GGUF whose name contains `turbo` installs as Turbo, anything else as the base model. If a file was detected as the wrong variant, edit the model in the Model Manager and change its **Variant**. The default settings were chosen at install, so also set **Steps** under **Default Settings**: 8 for Turbo, 40 for the base model.
+
+### Memory and speed
+
+Measured on an RTX 4090 at 1024×1024:
+
+| Transformer | Resident | Time per image |
+|---|---|---|
+| bf16 (Diffusers) | 13.9 GB during denoising | 0.62 s per step, about 25 s for 40 steps |
+| GGUF Q4_K_M | 4.0 GB | about 40 s for 40 steps |
+
+The text encoder runs first and is unloaded from the GPU when the transformer needs the room. At 2048×2048 the bf16 transformer needs 15.5 GB and 3.7 s per step.
+
+The VAE needs about 8 GB of working memory to decode a 1024×1024 image, and is priced the same to encode one for image-to-image, inpainting or outpainting (twice that with `precision: float32`). When an image is too large for the card to handle in one piece, Invoke decodes and encodes it in tiles; see [Large decodes](/configuration/optimization/low-vram-mode/). Invoke picks 1024-pixel tiles, and 768 or 512 only on cards with less memory: measured at 2048×2048, 1024-pixel tiles came close to an untiled decode (47.7 dB PSNR), while the 256-pixel tiles other VAEs default to left visible seams (35.6 dB).
+
+### Reference images
+
+With a Qwen-Image-2.1 **Diffusers** model, add up to four images with **Add reference image** in the Guidance section (see [Adding reference images](/users-guide/image-generation/generate-panel/#adding-reference-images)) and say in the prompt what to do with them, for example *put the jacket from the first image on the person in the second* or *the same cat, as a watercolor*. The model reads each reference twice: its Qwen3-VL encoder looks at it alongside the prompt, and the transformer sees it as clean latents next to the image it generates.
+
+- **Diffusers models only.** Only the encoder that comes with the Diffusers model keeps the Qwen3-VL vision tower, which reads the images. A single-file or GGUF transformer with a standalone encoder does not offer reference images, and on a Diffusers model the references refuse to run while a standalone **Qwen3-VL Encoder** is selected under **Components**; clear it to edit.
+- **Size.** Each reference is read at about one megapixel at its own aspect ratio, whatever its size. The generated image takes the size set in the panel; **Use size** on a reference's thumbnail matches it.
+- **Transparency.** The encoder sees a transparent reference over white, as the model was trained; its latents keep the transparency.
+- **Memory.** The vision tower adds about 1.1 GB to the Diffusers model's encoder, on every generation with it. Each reference adds about 4,100 tokens to the start of the sequence, which the model keeps for the whole generation: about 2 GB per reference, twice that with **CFG** above 1. Where that would take more than half of the GPU, Invoke reprocesses the references at every step instead of keeping them, which uses less memory but takes several times as long.
+
+### Transparent images
+
+The Qwen-Image-2.1 VAE decodes an alpha channel along with the colors, so a prompt such as *a sticker of a red fox on a transparent background* produces a cut-out image. An image is saved with transparency only when it has some: when more than 0.1% of its pixels are noticeably transparent. Opaque images are saved as ordinary RGB, so the faint edges tiled decoding leaves in the alpha channel never turn an opaque image transparent.
+
+Image-to-image, inpainting and outpainting read the colors of the input image and treat it as fully opaque, whatever its alpha channel holds.
+
+### Generation settings
+
+- **Steps** — 40 for the base model and 8 for Turbo. Turbo's schedule is tuned for 8 steps; other step counts are spread over the same curve and work, but 8 is what it was distilled for.
+- **CFG** — 1 by default, which runs one prompt per step. Above 1, the negative prompt is used and each step costs about twice as long.
+- There is no scheduler setting: both variants use the schedule they were trained with.

@@ -28,6 +28,7 @@ from invokeai.app.invocations.fields import (
     LatentsField,
     MiniMaxH3ConditioningField,
     OutputField,
+    QwenImage21ConditioningField,
     QwenImageConditioningField,
     SD3ConditioningField,
     TensorField,
@@ -537,6 +538,17 @@ class Krea2ConditioningOutput(BaseInvocationOutput):
     @classmethod
     def build(cls, conditioning_name: str, mask: TensorField | None = None) -> "Krea2ConditioningOutput":
         return cls(conditioning=Krea2ConditioningField(conditioning_name=conditioning_name, mask=mask))
+
+
+@invocation_output("qwen_image_2_1_conditioning_output")
+class QwenImage21ConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output a Qwen-Image-2.1 conditioning tensor."""
+
+    conditioning: QwenImage21ConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "QwenImage21ConditioningOutput":
+        return cls(conditioning=QwenImage21ConditioningField(conditioning_name=conditioning_name))
 
 
 @invocation_output("anima_conditioning_output")

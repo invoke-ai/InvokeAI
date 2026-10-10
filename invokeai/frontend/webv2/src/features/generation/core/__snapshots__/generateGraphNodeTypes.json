@@ -227,6 +227,24 @@
         "string"
       ]
     },
+    "qwen-image-2-1": {
+      "componentsFilled": {
+        "diffusers": [],
+        "standalone-components": [
+          "qwen3VLEncoderModel",
+          "vae"
+        ]
+      },
+      "nodeTypes": [
+        "core_metadata",
+        "integer",
+        "qwen_image_2_1_denoise",
+        "qwen_image_2_1_l2i",
+        "qwen_image_2_1_model_loader",
+        "qwen_image_2_1_text_encoder",
+        "string"
+      ]
+    },
     "wan": {
       "componentsFilled": {
         "diffusers": [],
@@ -530,6 +548,7 @@
           "flux2_txt2img",
           "ideogram4_txt2img",
           "krea2_txt2img",
+          "qwen_image_2_1_txt2img",
           "qwen_image_txt2img",
           "sd3_txt2img",
           "sdxl_txt2img",
@@ -1255,6 +1274,88 @@
       },
       "outputs": [
         "noise"
+      ]
+    },
+    "qwen_image_2_1_denoise": {
+      "inputs": [
+        "positive_conditioning",
+        "seed",
+        "transformer"
+      ],
+      "literalInputs": {
+        "cfg_scale": [
+          1
+        ],
+        "height": [
+          1024
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "steps": [
+          40
+        ],
+        "use_cache": [
+          true
+        ],
+        "width": [
+          1024
+        ]
+      },
+      "outputs": [
+        "latents"
+      ]
+    },
+    "qwen_image_2_1_l2i": {
+      "inputs": [
+        "latents",
+        "metadata",
+        "vae"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          false
+        ],
+        "use_cache": [
+          false
+        ]
+      },
+      "outputs": []
+    },
+    "qwen_image_2_1_model_loader": {
+      "inputs": [],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "model": [],
+        "qwen3_vl_encoder_model": [],
+        "use_cache": [
+          true
+        ],
+        "vae_model": []
+      },
+      "outputs": [
+        "qwen3_vl_encoder",
+        "transformer",
+        "vae"
+      ]
+    },
+    "qwen_image_2_1_text_encoder": {
+      "inputs": [
+        "prompt",
+        "qwen3_vl_encoder"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "conditioning"
       ]
     },
     "qwen_image_denoise": {

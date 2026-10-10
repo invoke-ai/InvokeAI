@@ -300,3 +300,24 @@ def test_the_folder_loader_drops_the_tower(tmp_path: Path) -> None:
     model = loader._load_model(config, SubModelType.TextEncoder)
 
     _assert_tower_gone(model)
+
+
+def test_the_qwen_image_2_1_pipeline_encoder_keeps_the_tower(monkeypatch, tmp_path: Path) -> None:
+    """The one encoder that keeps it: Qwen-Image-2.1 reads reference images through it, and the node refuses an
+    encoder without it."""
+    from transformers import Qwen3VLModel
+
+    from invokeai.backend.model_manager.configs.main import Main_Diffusers_QwenImage21_Config
+    from invokeai.backend.model_manager.load.model_loaders.qwen_image_2_1 import QwenImage21DiffusersModel
+    from invokeai.backend.qwen_image_2_1.text_encoding import has_vision_tower
+
+    encoder = _tiny_encoder()
+    config = Main_Diffusers_QwenImage21_Config.model_construct(path=str(tmp_path), repo_variant=None)
+    loader = object.__new__(QwenImage21DiffusersModel)
+    loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
+    monkeypatch.setattr(Qwen3VLModel, "from_pretrained", classmethod(lambda _cls, *_a, **_k: encoder))
+
+    model = loader._load_model(config, SubModelType.TextEncoder)
+
+    assert has_vision_tower(model)
+    assert list(model.visual.parameters())

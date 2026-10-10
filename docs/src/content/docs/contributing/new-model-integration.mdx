@@ -882,8 +882,8 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
 
 ### Reference images
 
-- Backend: set `FeaturesFacet.max_reference_images` (and `reference_images_require_variant` if only one variant supports them). Wire the images into the text encoder and/or the denoise node, as the reference pipeline does.
-- webv2: extend the reference-image config union (`types.ts`), `getDefaultReferenceImageConfig` and `getReferenceImageConfigSupported` (`baseGenerationPolicies.ts`), and wire the images in the builder.
+- Backend: set `FeaturesFacet.max_reference_images`, plus `reference_images_require_variant` if only one variant supports them or `reference_images_require_format` if only one format does. Wire the images into the text encoder and/or the denoise node, as the reference pipeline does.
+- webv2: extend the reference-image config union (`types.ts`); the config-type set and the normalize, clone and sync switches in `settings.ts`; the persisted union in `src/workbench/canvasMigration.ts`; and `getDefaultReferenceImageConfig` and `getReferenceImageConfigSupported` (`baseGenerationPolicies.ts`). Wire the images in the builder, and report any setting that keeps them from running in `getReferenceImageValidationReasons`, not only from the builder.
 
 ### Control and regional guidance
 

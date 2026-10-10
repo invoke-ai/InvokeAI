@@ -12,7 +12,8 @@ used through the same encode/decode path without rebuilding it. Both default con
 Qwen-Image ``latents_mean`` / ``latents_std`` / ``z_dim`` values read by the Qwen encode/decode nodes.
 
 Also holds the tiling helpers those nodes share, since the tile geometry has to be applied identically
-on both classes and restored afterwards — see ``patch_qwen_image_vae_tiling``.
+on both classes and restored afterwards — see ``patch_qwen_image_vae_tiling``. Qwen-Image-2.1's RGBA VAE
+names its tiling state the same way and tiles through the same helper, at its 16x spatial scale.
 """
 
 from collections.abc import Iterator
@@ -21,6 +22,7 @@ from typing import Any
 
 from diffusers.models.autoencoders import AutoencoderKLWan
 from diffusers.models.autoencoders.autoencoder_kl_qwenimage import AutoencoderKLQwenImage
+from diffusers.models.autoencoders.autoencoder_kl_qwenimage21 import AutoencoderKLQwenImage21
 
 QwenImageCompatibleVAE = AutoencoderKLQwenImage | AutoencoderKLWan
 
@@ -94,20 +96,24 @@ def resolve_qwen_image_vae_tile_size(tile_size: int) -> int:
     return max(tile_size, QWEN_IMAGE_VAE_MIN_TILE_SIZE)
 
 
-def _tile_stride_for(tile_size: int) -> int:
+def _tile_stride_for(tile_size: int, spatial_scale: int = _QWEN_IMAGE_VAE_SPATIAL_SCALE) -> int:
     """Return the tile stride to pair with ``tile_size``, keeping the stock 3/4 ratio.
 
-    Rounded down to a multiple of the VAE's 8x spatial compression: ``tiled_encode``/``tiled_decode``
+    Rounded down to a multiple of the VAE's spatial compression: ``tiled_encode``/``tiled_decode``
     step the tile loop in one space (pixels for encode, latents for decode) while slicing the
-    accumulated tile in the other, so the pixel stride must be exactly 8x the latent stride or the
-    two disagree and the output is misaligned.
+    accumulated tile in the other, so the pixel stride must be exactly ``spatial_scale`` times the
+    latent stride or the two disagree and the output is misaligned.
     """
     stride = tile_size * _QWEN_IMAGE_VAE_TILE_STRIDE_NUMERATOR // _QWEN_IMAGE_VAE_TILE_STRIDE_DENOMINATOR
-    return max(_QWEN_IMAGE_VAE_SPATIAL_SCALE, stride // _QWEN_IMAGE_VAE_SPATIAL_SCALE * _QWEN_IMAGE_VAE_SPATIAL_SCALE)
+    return max(spatial_scale, stride // spatial_scale * spatial_scale)
 
 
 @contextmanager
-def patch_qwen_image_vae_tiling(vae: QwenImageCompatibleVAE, tile_size: int | None) -> Iterator[None]:
+def patch_qwen_image_vae_tiling(
+    vae: QwenImageCompatibleVAE | AutoencoderKLQwenImage21,
+    tile_size: int | None,
+    spatial_scale: int = _QWEN_IMAGE_VAE_SPATIAL_SCALE,
+) -> Iterator[None]:
     """Set the VAE's tiling state for the duration of the block, then restore it.
 
     Two things make this a context manager rather than a bare ``enable_tiling()`` call:
@@ -124,7 +130,8 @@ def patch_qwen_image_vae_tiling(vae: QwenImageCompatibleVAE, tile_size: int | No
       inherited 192px stride silently drops whole bands of the image, and a ``min`` above it grows
       every tile without removing any, making compute scale with ``tile_size**2``.
 
-    ``tile_size=None`` disables tiling for the block.
+    ``tile_size=None`` disables tiling for the block. ``spatial_scale`` is the VAE's pixels per latent: 8, or
+    16 for Qwen-Image-2.1's VAE.
     """
     original = (
         vae.use_tiling,
@@ -137,7 +144,7 @@ def patch_qwen_image_vae_tiling(vae: QwenImageCompatibleVAE, tile_size: int | No
         if tile_size is None:
             vae.disable_tiling()
         else:
-            stride = _tile_stride_for(tile_size)
+            stride = _tile_stride_for(tile_size, spatial_scale)
             vae.enable_tiling(
                 tile_sample_min_height=tile_size,
                 tile_sample_min_width=tile_size,

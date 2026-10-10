@@ -37,6 +37,7 @@ const CANVAS_I2L_NODE_TYPES: Partial<Record<SupportedGenerateBase, string>> = {
   'z-image': 'z_image_i2l',
   // Krea-2 shares the Qwen-Image VAE, so it encodes with that family's node too.
   'krea-2': 'qwen_image_i2l',
+  'qwen-image-2-1': 'qwen_image_2_1_i2l',
   anima: 'anima_i2l',
   wan: 'wan_i2l',
   // Ideogram lacks an encode node; reject these modes with an actionable error.

@@ -11,10 +11,12 @@ from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.vae import (
     VAE_Checkpoint_Anima_Config,
     VAE_Checkpoint_Config_Base,
+    VAE_Checkpoint_QwenImage21_Config,
     VAE_Checkpoint_QwenImage_Config,
     VAE_Checkpoint_SD3_Config,
     VAE_Checkpoint_Wan_Config,
     VAE_Diffusers_FLUX_Config,
+    VAE_Diffusers_QwenImage21_Config,
     VAE_Diffusers_Wan_Config,
 )
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
@@ -254,6 +256,8 @@ class VAELoader(GenericDiffusersLoader):
             return self._load_wan_vae_diffusers(config)
         elif isinstance(config, VAE_Checkpoint_QwenImage_Config):
             return self._load_qwen_image_vae(config)
+        elif isinstance(config, VAE_Checkpoint_QwenImage21_Config):
+            return self._load_qwen_image21_vae(config)
         elif isinstance(config, VAE_Checkpoint_SD3_Config):
             return self._load_sd3_vae(config)
         elif isinstance(config, VAE_Checkpoint_Config_Base):
@@ -268,6 +272,13 @@ class VAELoader(GenericDiffusersLoader):
         if model_path.is_dir() and _is_sdnq_vae_folder(model_path):
             return self._load_sdnq_vae(model_path)
 
+        if isinstance(config, VAE_Diffusers_QwenImage21_Config):
+            from diffusers import AutoencoderKLQwenImage21
+
+            return AutoencoderKLQwenImage21.from_pretrained(
+                model_path, torch_dtype=_wan_family_dtype(self._torch_dtype), local_files_only=True
+            )
+
         if isinstance(config, VAE_Diffusers_FLUX_Config):
             # In the dtype every other FLUX.1 VAE path uses: the generic loader below would take float16,
             # which `precision: auto` picks on CUDA and MPS and which this autoencoder is broken in.
@@ -281,6 +292,45 @@ class VAELoader(GenericDiffusersLoader):
         if submodel_type is SubModelType.VAE:
             submodel_type = None
         return super()._load_model(config, submodel_type)
+
+    def _load_qwen_image21_vae(self, config: VAE_Checkpoint_QwenImage21_Config) -> AnyModel:
+        """Load Qwen-Image-2.1's RGBA VAE from a single file, in the diffusers or the ComfyUI layout.
+
+        Builds `AutoencoderKLQwenImage21()` from its defaults, which are the released config. The ComfyUI
+        export stores the 2-D convolutions 5-D and the norms' gammas with an extra axis; both are reshaped
+        to the module's own shapes. It belongs to the Wan 2.2 family and shares its precision policy: the
+        configured dtype, except float16 -- see `_wan_family_dtype`.
+        """
+        from diffusers import AutoencoderKLQwenImage21
+
+        from invokeai.backend.qwen_image_2_1.checkpoint_layout import (
+            convert_comfy_vae_to_diffusers,
+            fit_to_module_shapes,
+            is_comfy_vae_layout,
+        )
+
+        name = Path(config.path).name
+        dtype = _wan_family_dtype(self._torch_dtype)
+        sd = _read_checkpoint(config.path)
+        reject_quantized_side_channel(sd, f"Qwen-Image-2.1 VAE checkpoint {name}")
+        if is_comfy_vae_layout(sd):
+            sd = convert_comfy_vae_to_diffusers(sd)
+        sd = {k: v.to(dtype) if v.is_floating_point() else v for k, v in sd.items()}
+        self._ram_cache.make_room(sum(t.nelement() * t.element_size() for t in sd.values()))
+
+        with accelerate.init_empty_weights():
+            model = AutoencoderKLQwenImage21()
+        fit_to_module_shapes(sd, model)
+        missing, unexpected = model.load_state_dict(sd, strict=False, assign=True)
+        if missing:
+            raise ValueError(
+                f"{name} does not load as a complete Qwen-Image-2.1 VAE: {len(missing)} tensors are missing, "
+                f"starting with {sorted(missing)[:5]}."
+            )
+        if unexpected:
+            self._logger.warning(f"{name} carries {len(unexpected)} tensors the Qwen-Image-2.1 VAE does not use.")
+        model.eval()
+        return model
 
     def _load_sd3_vae(self, config: VAE_Checkpoint_SD3_Config) -> AnyModel:
         """Load a single-file SD3 VAE into an `AutoencoderKL` built with SD3's constants.

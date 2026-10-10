@@ -97,6 +97,12 @@ export const MODEL_BASES = {
     label: 'Qwen Image',
     colorPalette: 'cyan',
   },
+  'qwen-image-2-1': {
+    base: 'qwen-image-2-1',
+    label: 'Qwen-Image-2.1',
+    // The Qwen-Image family's colour; the architecture is a different one.
+    colorPalette: 'cyan',
+  },
   'z-image': {
     base: 'z-image',
     label: 'Z-Image',

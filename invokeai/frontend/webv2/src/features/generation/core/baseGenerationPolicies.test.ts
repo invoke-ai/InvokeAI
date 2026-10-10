@@ -34,6 +34,7 @@ import {
   isReferenceImageSupported,
   isGenerateModelSelectable,
   isSupportedGenerateModel,
+  QWEN_IMAGE_21_STANDALONE_ENCODER_REASON,
 } from './baseGenerationPolicies';
 import { SUPPORTED_GENERATE_BASES } from './supportedBases';
 
@@ -976,6 +977,15 @@ describe('component policies', () => {
     expect(isReferenceImageSupported(undefined)).toBe(false);
   });
 
+  it('offers Qwen-Image-2.1 reference images only on its Diffusers pipeline, whose encoder reads images', () => {
+    const diffusers = createModel('qwen-image-2-1', { format: 'diffusers' });
+
+    expect(isReferenceImageSupported(diffusers)).toBe(true);
+    expect(getMaxReferenceImages(diffusers)).toBe(4);
+    expect(isReferenceImageSupported(createModel('qwen-image-2-1', { format: 'gguf_quantized' }))).toBe(false);
+    expect(isReferenceImageSupported(createModel('qwen-image-2-1', { format: 'checkpoint' }))).toBe(false);
+  });
+
   it('derives the reference image limit from external provider capabilities', () => {
     expect(getMaxReferenceImages(createModel('sdxl'))).toBe(5);
     expect(getMaxReferenceImages(createModel('cogview4'))).toBe(0);
@@ -1039,6 +1049,31 @@ describe('component policies', () => {
         })
       )
     ).toContain('Reference Image #1 is not supported by sd-3 model.');
+  });
+
+  it('blocks Qwen-Image-2.1 references while a standalone encoder replaces the one that reads them', () => {
+    const model = createModel('qwen-image-2-1', { format: 'diffusers' });
+    const encoder = {
+      base: 'any',
+      key: 'qwen3-vl-8b',
+      name: 'Qwen3-VL 8B',
+      type: 'qwen3_vl_encoder',
+      variant: 'qwen3_vl_8b',
+    } as const;
+    const referenceImages = [
+      {
+        config: { image: referenceImage, type: 'qwen_image_2_1_reference_image' as const },
+        id: 'ref-1',
+        isEnabled: true,
+      },
+    ];
+
+    expect(
+      getGenerationValidationReasons(model, createSettings(model, { qwen3VLEncoderModel: encoder, referenceImages }))
+    ).toContain(QWEN_IMAGE_21_STANDALONE_ENCODER_REASON);
+    expect(getGenerationValidationReasons(model, createSettings(model, { referenceImages }))).not.toContain(
+      QWEN_IMAGE_21_STANDALONE_ENCODER_REASON
+    );
   });
 
   it('reports missing reference image model dependencies', () => {

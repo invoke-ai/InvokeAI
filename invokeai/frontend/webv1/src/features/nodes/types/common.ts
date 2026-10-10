@@ -117,6 +117,7 @@ export const zBaseModelType = z.enum([
   'ernie-image',
   'krea-2',
   'ideogram-4',
+  'qwen-image-2-1',
   'external',
   'anima',
   'wan',
@@ -208,6 +209,7 @@ export const zFlux2VariantType = z.enum(['klein_4b', 'klein_4b_base', 'klein_9b'
 export const zZImageVariantType = z.enum(['turbo', 'zbase']);
 export const zKrea2VariantType = z.enum(['krea2_turbo', 'krea2_base']);
 const zQwenImageVariantType = z.enum(['generate', 'edit']);
+const zQwenImage21VariantType = z.enum(['qwen_image_21_base', 'qwen_image_21_turbo']);
 const zWanVariantType = z.enum(['t2v_a14b', 'i2v_a14b', 'ti2v_5b']);
 /** Wan LoRA variant — identifies which model FAMILY (inner_dim) a LoRA
  *  targets. A14B = inner_dim 5120 (both T2V and I2V), 5B = inner_dim 3072. */
@@ -228,6 +230,7 @@ export const zAnyModelVariant = z.union([
   zZImageVariantType,
   zKrea2VariantType,
   zQwenImageVariantType,
+  zQwenImage21VariantType,
   zWanVariantType,
   zWanLoRAVariantType,
   zQwen3VariantType,

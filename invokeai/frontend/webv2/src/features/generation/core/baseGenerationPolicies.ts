@@ -38,7 +38,7 @@ import {
   isErnieImageMistralEncoder,
   isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
-  isIdeogram4Qwen3VlEncoder,
+  isQwen3Vl8bEncoder,
   isIdeogram4UnconditionalBranch,
   isKrea2Qwen3VlEncoder,
   isNonAnimaQwen3Encoder,
@@ -980,6 +980,28 @@ const getBaseComponentSectionPolicy = (
           missingMessage: 'Generate needs a Qwen3-VL Encoder for non-Diffusers Krea-2 models.',
         },
       ]);
+    case 'qwen-image-2-1':
+      // A Diffusers pipeline brings its own VAE and encoder; single-file and GGUF transformers need both.
+      return createPolicy(model.format !== 'diffusers', [
+        {
+          ...vaeSlot(
+            'Qwen-Image-2.1 decodes with its own 64-channel RGBA VAE. Required for non-Diffusers Qwen-Image-2.1 models.',
+            isAcceptedVae
+          ),
+          required: (ctx) => ctx.model.format !== 'diffusers',
+          missingMessage: 'Generate needs a VAE for non-Diffusers Qwen-Image-2.1 models.',
+        },
+        {
+          ...qwen3VlEncoderSlot(
+            'Qwen-Image-2.1 conditions on the Qwen3-VL 8B encoder, not the 4B one Krea-2 uses. Required for ' +
+              "non-Diffusers Qwen-Image-2.1 models. On a Diffusers model it replaces the model's own encoder, the " +
+              'only one that reads reference images.',
+            isQwen3Vl8bEncoder
+          ),
+          required: (ctx) => ctx.model.format !== 'diffusers',
+          missingMessage: 'Generate needs a Qwen3-VL 8B Encoder for non-Diffusers Qwen-Image-2.1 models.',
+        },
+      ]);
     case 'ernie-image':
       // Bundled ERNIE models supply components; standalone models need explicit components.
       return createPolicy(model.format !== 'diffusers', [
@@ -1015,7 +1037,7 @@ const getBaseComponentSectionPolicy = (
           ...qwen3VlEncoderSlot(
             'Ideogram 4 conditions on the Qwen3-VL 8B encoder, not the 4B one Krea-2 uses. Required ' +
               'for non-Diffusers Ideogram 4 models.',
-            isIdeogram4Qwen3VlEncoder
+            isQwen3Vl8bEncoder
           ),
           required: (ctx) => ctx.model.format !== 'diffusers',
           missingMessage: 'Generate needs a Qwen3-VL 8B Encoder for non-Diffusers Ideogram 4 models.',
@@ -1230,9 +1252,11 @@ export const isReferenceImageSupported = (model: GenerateModelConfig | undefined
     return false;
   }
 
-  // The backend declares which reference-image features require a specific variant.
+  // The backend declares which reference-image features require a specific variant or format.
   return (
-    features.reference_images_require_variant === null || model.variant === features.reference_images_require_variant
+    (features.reference_images_require_variant === null ||
+      model.variant === features.reference_images_require_variant) &&
+    (features.reference_images_require_format === null || model.format === features.reference_images_require_format)
   );
 };
 
@@ -1270,6 +1294,10 @@ export const getDefaultReferenceImageConfig = (
     return { image, type: 'qwen_image_reference_image' };
   }
 
+  if (modelBase === 'qwen-image-2-1') {
+    return { image, type: 'qwen_image_2_1_reference_image' };
+  }
+
   if (isFluxKontextModel(model)) {
     return { image, model, type: 'flux_kontext_reference_image' };
   }
@@ -1299,6 +1327,10 @@ const getReferenceImageConfigSupported = (
       return model.type !== 'external_image_generator' && model.base === 'flux2';
     case 'qwen_image_reference_image':
       return model.type !== 'external_image_generator' && model.base === 'qwen-image' && model.variant === 'edit';
+    case 'qwen_image_2_1_reference_image':
+      return (
+        model.type !== 'external_image_generator' && model.base === 'qwen-image-2-1' && isReferenceImageSupported(model)
+      );
     case 'flux_kontext_reference_image':
       return isFluxKontextModel(model);
     case 'flux_redux':
@@ -1567,6 +1599,11 @@ const getPidValidationReasons = (model: GenerateModelConfig, settings: GenerateS
   return reasons;
 };
 
+/** Only the encoder of a Qwen-Image-2.1 Diffusers model keeps the vision tower that reads references. */
+export const QWEN_IMAGE_21_STANDALONE_ENCODER_REASON =
+  "Reference images need the Qwen-Image-2.1 model's own encoder, the only one with a vision tower. " +
+  'Clear the Qwen3-VL Encoder component.';
+
 const getReferenceImageValidationReasons = (model: GenerateModelConfig, settings: GenerateSettings): string[] => {
   const reasons: string[] = [];
   const enabled = settings.referenceImages.filter((referenceImage) => referenceImage.isEnabled);
@@ -1608,6 +1645,17 @@ const getReferenceImageValidationReasons = (model: GenerateModelConfig, settings
       }
     }
   });
+
+  // The encoder slot stays filled across models (Ideogram 4 and the GGUF builds share it), so a Diffusers model can
+  // inherit one that cannot read the references.
+  if (
+    model.base === 'qwen-image-2-1' &&
+    settings.qwen3VLEncoderModel &&
+    isQwen3Vl8bEncoder(settings.qwen3VLEncoderModel) &&
+    enabled.some((referenceImage) => referenceImage.config.type === 'qwen_image_2_1_reference_image')
+  ) {
+    reasons.push(QWEN_IMAGE_21_STANDALONE_ENCODER_REASON);
+  }
 
   return reasons;
 };
