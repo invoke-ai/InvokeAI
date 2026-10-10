@@ -1,6 +1,6 @@
 """Router-level tests for /api/v1/style_presets.
 
-Backed by a real SqliteStylePresetRecordsStorage from the shared conftest, so SQL
+Backed by a real StylePresetRecordsStorage from the shared conftest, so SQL
 filtering and ownership rules are exercised end-to-end. style_preset_image_files
 remains a MagicMock — file IO is not under test here.
 

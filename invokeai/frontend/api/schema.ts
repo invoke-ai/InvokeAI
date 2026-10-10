@@ -2287,6 +2287,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/gallery/items/location": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Gallery Item Location
+         * @description Returns exact item's position in an ordinary filtered gallery listing.
+         */
+        get: operations["get_gallery_item_location"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/gallery/item_names": {
         parameters: {
             query?: never;
@@ -16318,6 +16338,29 @@ export type components = {
          */
         GalleryItemKind: "image" | "video";
         /**
+         * GalleryItemLocation
+         * @description A gallery item's position in a filtered, ordered listing.
+         */
+        GalleryItemLocation: {
+            /** @description Whether the item is an image or video. */
+            kind: components["schemas"]["GalleryItemKind"];
+            /**
+             * Name
+             * @description The unique name of the image or video.
+             */
+            name: string;
+            /**
+             * Index
+             * @description The item's zero-based index in the listing.
+             */
+            index: number;
+            /**
+             * Total
+             * @description Number of items matching the listing filters.
+             */
+            total: number;
+        };
+        /**
          * GalleryItemNames
          * @description Ordered flat list of gallery item names plus counts for optimistic UI.
          *
@@ -22521,6 +22564,7 @@ export type components = {
          *         download_cache_dir: Path to the directory that contains dynamically downloaded models.
          *         legacy_conf_dir: Path to directory of legacy checkpoint config files.
          *         db_dir: Path to InvokeAI databases directory.
+         *         db_url: URL of a MySQL 8.4+ or MariaDB 10.11+ database to use instead of the SQLite database in `db_dir`, e.g. `mariadb+pymysql://invokeai:password@db.example/invokeai`. Needs the `mysql` extra. One InvokeAI process uses a database at a time. Read at startup only.
          *         db_synchronous: SQLite durability setting. `full`, the default and what InvokeAI has always used, flushes every commit to disk. `normal` acknowledges commits without waiting for that flush - measured at roughly 12x shorter commits on an SSD - and cannot corrupt the database under WAL, which is why it is refused, with a warning, when WAL is unavailable for the database file. What `normal` gives up is the most recent transactions on a power loss or OS crash: a just-written image record or queue status, not the image file itself.<br>Valid values: `full`, `normal`
          *         outputs_dir: Path to directory for outputs.
          *         image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.<br>Valid values: `flat`, `date`, `type`, `hash`
@@ -22539,6 +22583,7 @@ export type components = {
          *         profiles_dir: Path to profiles output directory.
          *         max_cache_ram_gb: The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.
          *         max_cache_vram_gb: The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.
+         *         reserve_vram_gb: The amount of VRAM (in GB) to subtract from the model cache's available memory budget. Defaults to 0.
          *         log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.
          *         model_cache_keep_alive_min: How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.
          *         device_working_mem_gb: The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.
@@ -22730,6 +22775,11 @@ export type components = {
              */
             db_dir?: string;
             /**
+             * Db Url
+             * @description URL of a MySQL 8.4+ or MariaDB 10.11+ database to use instead of the SQLite database in `db_dir`, e.g. `mariadb+pymysql://invokeai:password@db.example/invokeai`. Needs the `mysql` extra. One InvokeAI process uses a database at a time. Read at startup only.
+             */
+            db_url?: string | null;
+            /**
              * Db Synchronous
              * @description SQLite durability setting. `full`, the default and what InvokeAI has always used, flushes every commit to disk. `normal` acknowledges commits without waiting for that flush - measured at roughly 12x shorter commits on an SSD - and cannot corrupt the database under WAL, which is why it is refused, with a warning, when WAL is unavailable for the database file. What `normal` gives up is the most recent transactions on a power loss or OS crash: a just-written image record or queue status, not the image file itself.
              * @default full
@@ -22872,6 +22922,12 @@ export type components = {
              * @description The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.
              */
             max_cache_vram_gb?: number | null;
+            /**
+             * Reserve Vram Gb
+             * @description The amount of VRAM (in GB) to subtract from the model cache's available memory budget. Defaults to 0.
+             * @default 0
+             */
+            reserve_vram_gb?: number;
             /**
              * Log Memory Usage
              * @description If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.
@@ -56374,6 +56430,58 @@ export interface operations {
             };
         };
     };
+    get_gallery_item_location: {
+        parameters: {
+            query: {
+                /** @description Whether the target is an image or video. */
+                kind: components["schemas"]["GalleryItemKind"];
+                /** @description The target image or video name. */
+                name: string;
+                /** @description The origin of items to list. */
+                origin?: components["schemas"]["ResourceOrigin"] | null;
+                /** @description The categories to include. Shared between images and videos. */
+                categories?: components["schemas"]["ImageCategory"][] | null;
+                /** @description Whether to list intermediate items. */
+                is_intermediate?: boolean | null;
+                /** @description The board id to filter by. Use 'none' to find items without a board. */
+                board_id?: string | null;
+                /** @description The order of sort */
+                order_dir?: components["schemas"]["SQLiteDirection"];
+                /** @description Filter by starred state: true for starred items only, false for unstarred only. Omit to include both. */
+                starred?: boolean | null;
+                /** @description The term to search for */
+                search_term?: string | null;
+                /** @description Inclusive start date (YYYY-MM-DD) to filter by created_at. */
+                created_from?: string | null;
+                /** @description Inclusive end date (YYYY-MM-DD) to filter by created_at. */
+                created_to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GalleryItemLocation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_gallery_item_names: {
         parameters: {
             query?: {
@@ -58898,7 +59006,7 @@ export interface operations {
             query?: {
                 /** @description The page to get */
                 page?: number;
-                /** @description The number of workflows per page */
+                /** @description The number of workflows per page; all of them when omitted */
                 per_page?: number | null;
                 /** @description The attribute to order by */
                 order_by?: components["schemas"]["WorkflowRecordOrderBy"];

@@ -4,17 +4,17 @@ from invokeai.app.services.board_records.board_records_common import (
     BoardRecordNotFoundException,
     BoardRecordOrderBy,
 )
-from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
+from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
 
 
-def _create_board_storage() -> SqliteBoardRecordStorage:
+def _create_board_storage() -> BoardRecordStorage:
     config = InvokeAIAppConfig(use_memory_db=True)
     db = create_mock_sqlite_database(config=config, logger=InvokeAILogger.get_logger())
-    return SqliteBoardRecordStorage(db=db)
+    return BoardRecordStorage(db)
 
 
 def test_sql_injection_payload_in_board_name_is_stored_as_plain_text() -> None:

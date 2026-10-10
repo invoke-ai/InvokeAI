@@ -41,8 +41,7 @@ from invokeai.app.api.routers._limits import MAX_COPY_BATCH_SIZE
 from invokeai.app.api.routers.images import WorkflowAndGraphResponse
 from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidator
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin, is_gallery_category
-from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults, SQLiteDirection
 from invokeai.app.services.video_records.video_records_common import (
     VideoNamesResult,
     VideoRecordChanges,

@@ -492,14 +492,14 @@ def test_the_tokenizer_comes_from_the_same_folder(monkeypatch, tmp_path) -> None
 
 
 @pytest.fixture
-def unregistered_tokenizer_folder(tmp_path: Path) -> Path:
-    """A folder that trips both of the heuristics the released Gemma-4 encoder trips.
+def gemma4_tokenizer_folder(tmp_path: Path) -> Path:
+    """A folder that trips the Mistral-regex heuristic the released Gemma-4 encoder trips.
 
-    Real transformers, no weights: an unregistered ``model_type`` so ``AutoConfig`` falls back to the
-    base config, no ``transformers_version`` so the Mistral-regex heuristic cannot short-circuit, and
-    a vocabulary over 100k with a pre-tokenizer, which is what gates that heuristic at all. Written
-    here rather than mocked so the warnings are the ones transformers actually emits: a reworded
-    message or a renamed kwarg has to fail a test instead of silently returning the noise.
+    Real transformers, no weights: the release's ``model_type`` and no ``transformers_version`` so
+    the heuristic cannot short-circuit, and a vocabulary over 100k with a
+    pre-tokenizer, which is what gates that heuristic at all. Written here rather than mocked so the
+    warnings are the ones transformers actually emits: a reworded message or a renamed kwarg has to
+    fail a test instead of silently returning the advice.
     """
     from tokenizers import Tokenizer, models, pre_tokenizers
 
@@ -541,49 +541,26 @@ def transformers_warnings():
         transformers.utils.logging.set_verbosity(previous)
 
 
-def test_the_release_s_two_tokenizer_warnings_are_both_answered(unregistered_tokenizer_folder, transformers_warnings):
-    """One is noise about a config that is discarded; the other is advice that would mis-tokenize
-    every prompt if taken. Loading the same folder directly is the baseline: both fire there, so an
-    empty capture after the loader means they were answered, not that they never happen."""
+def test_the_release_s_mistral_regex_advice_is_declined(gemma4_tokenizer_folder, transformers_warnings):
+    """The advice would mis-tokenize every prompt if taken. Loading the same folder directly is the
+    baseline: it fires there, so an empty capture after the loader means it was answered, not that it
+    never happens."""
     from transformers import AutoTokenizer
 
-    direct = AutoTokenizer.from_pretrained(unregistered_tokenizer_folder, local_files_only=True)
+    direct = AutoTokenizer.from_pretrained(gemma4_tokenizer_folder, local_files_only=True)
     baseline = list(transformers_warnings)
-    assert sum("to instantiate a model of type" in message for message in baseline) == 1
     assert sum("fix_mistral_regex=True" in message for message in baseline) == 1
 
     transformers_warnings.clear()
     loader = object.__new__(LTX2Gemma4EncoderModel)
     config = Gemma4Encoder_Gemma4Encoder_LTX2_Config.model_construct(
-        path=str(unregistered_tokenizer_folder.parent), subfolder="gemma4-12b-ltx-v1", weight_file="te.safetensors"
+        path=str(gemma4_tokenizer_folder.parent), subfolder="gemma4-12b-ltx-v1", weight_file="te.safetensors"
     )
     tokenizer = loader._load_model(config, SubModelType.Tokenizer)
 
     assert transformers_warnings == []
     # Declining the advice is not the same as taking it: the pre-tokenizer is the released one.
     assert str(tokenizer._tokenizer.pre_tokenizer) == str(direct._tokenizer.pre_tokenizer)
-
-
-def test_a_mismatch_naming_another_model_type_survives_the_tokenizer_load(
-    unregistered_tokenizer_folder, transformers_warnings
-):
-    """The probe matches a folder on its ``architectures`` alone, so a repack can declare anything.
-    The message naming what it declares is the only signal at load time that it is not the release,
-    and dropping the whole family of mismatch messages would eat it."""
-    logger = logging.getLogger(ltx2._CONFIG_LOGGER_NAME)
-    other = "You are using a model of type `mystery_arch_v9` to instantiate a model of type ``."
-
-    with ltx2._quiet_unregistered_model_type():
-        logger.warning(other)
-    assert transformers_warnings == [other]
-
-    transformers_warnings.clear()
-    from transformers import AutoTokenizer
-
-    AutoTokenizer.from_pretrained(unregistered_tokenizer_folder, local_files_only=True)
-    assert any("to instantiate a model of type" in message for message in transformers_warnings), (
-        "the release's own mismatch reaches the log outside a tokenizer load"
-    )
 
 
 def test_the_encoder_sizes_its_weight_file_one_directory_down(tmp_path) -> None:

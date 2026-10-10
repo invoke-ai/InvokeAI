@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from invokeai.app.services.image_index.image_index_common import blob_to_embedding, embedding_to_blob
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.sqlite_migrator.migration_loader import (
     MigrationBuildContext,
     build_migrations,
@@ -16,7 +16,7 @@ from invokeai.app.services.shared.sqlite_migrator.migrations.migration_2026_09_3
     build_migration,
 )
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration, MigrationError
-from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import SqliteMigrator
+from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import Migrator
 
 MIGRATION_ID = "2026_09_30_store_embeddings_fp16"
 DEPENDENCY_ID = "2026_09_12_add_video_embeddings"
@@ -72,14 +72,14 @@ def _create_schema(connection: sqlite3.Connection, *, image_encoding: bool = Fal
     connection.commit()
 
 
-def _make_db(tmp_path: Path) -> SqliteDatabase:
-    db = SqliteDatabase(db_path=tmp_path / "embeddings.db", logger=logging.getLogger(__name__))
-    _create_schema(db._conn)
+def _make_db(tmp_path: Path) -> Database:
+    db = Database.open_sqlite(tmp_path / "embeddings.db", logging.getLogger(__name__))
+    _create_schema(db.sqlite.conn)
     return db
 
 
-def _migrator(db: SqliteDatabase) -> SqliteMigrator:
-    migrator = SqliteMigrator(db)
+def _migrator(db: Database) -> Migrator:
+    migrator = Migrator(db)
     migrator.register_migration(Migration(id=DEPENDENCY_ID, callback=lambda cursor: None))
     migrator.register_migration(build_migration(logger=logging.getLogger(__name__)))
     return migrator
@@ -134,7 +134,7 @@ def test_migration_is_discovered_with_stable_id_and_dependency(tmp_path: Path) -
 
 def test_actual_migrator_converts_both_tables_and_preserves_metadata_and_relations(tmp_path: Path) -> None:
     db = _make_db(tmp_path)
-    connection = db._conn
+    connection = db.sqlite.conn
     image_vector = _vector(1)
     video_vector = _vector(2)
     image_blob = image_vector.astype(np.float32).tobytes()
@@ -186,13 +186,13 @@ def test_actual_migrator_converts_both_tables_and_preserves_metadata_and_relatio
     connection.execute("DELETE FROM videos WHERE video_name = 'video.mp4';")
     assert tuple(connection.execute("SELECT COUNT(*) FROM image_embeddings;").fetchone()) == (0,)
     assert tuple(connection.execute("SELECT COUNT(*) FROM video_embeddings;").fetchone()) == (0,)
-    db._conn.close()
+    db.dispose()
 
 
 def test_empty_and_mixed_rows_are_safe_and_callback_is_idempotent(tmp_path: Path) -> None:
-    db = SqliteDatabase(db_path=tmp_path / "mixed.db", logger=logging.getLogger(__name__))
-    _create_schema(db._conn, image_encoding=True)
-    connection = db._conn
+    db = Database.open_sqlite(tmp_path / "mixed.db", logging.getLogger(__name__))
+    _create_schema(db.sqlite.conn, image_encoding=True)
+    connection = db.sqlite.conn
     preserved_blob = embedding_to_blob(_vector(4))
     _insert(connection, "image_embeddings", "already-fp16.png", "model-a", preserved_blob, encoding="float16")
     legacy_vector = _vector(5)
@@ -220,13 +220,13 @@ def test_empty_and_mixed_rows_are_safe_and_callback_is_idempotent(tmp_path: Path
     assert after_repeat[0][2] == "float16"
     assert after_repeat[1][2] == "float16"
     assert tuple(connection.execute("SELECT COUNT(*) FROM video_embeddings;").fetchone()) == (0,)
-    db._conn.rollback()
-    db._conn.close()
+    db.sqlite.conn.rollback()
+    db.dispose()
 
 
 def test_keyset_batches_convert_more_than_two_batches_across_models(tmp_path: Path) -> None:
     db = _make_db(tmp_path)
-    connection = db._conn
+    connection = db.sqlite.conn
     row_count = 514
     for index in range(257):
         vector = _vector(index + 20)
@@ -261,12 +261,12 @@ def test_keyset_batches_convert_more_than_two_batches_across_models(tmp_path: Pa
     assert len(selects) >= 3
     assert all("limit 256" in statement for statement in selects)
     assert all("offset" not in statement for statement in selects)
-    db._conn.close()
+    db.dispose()
 
 
 def test_migration_logs_progress_and_row_totals(caplog: pytest.LogCaptureFixture, tmp_path: Path) -> None:
     db = _make_db(tmp_path)
-    connection = db._conn
+    connection = db.sqlite.conn
     vector_blob = _vector(30).astype(np.float32).tobytes()
     names = [(f"image-{index:05d}.png",) for index in range(10_001)]
     connection.executemany("INSERT INTO images (image_name) VALUES (?);", names)
@@ -287,12 +287,12 @@ def test_migration_logs_progress_and_row_totals(caplog: pytest.LogCaptureFixture
         "elapsed=" in message
         for message in messages
     )
-    db._conn.close()
+    db.dispose()
 
 
 def test_late_bad_video_rolls_back_schema_and_prior_updates_then_retries(tmp_path: Path) -> None:
     db = _make_db(tmp_path)
-    connection = db._conn
+    connection = db.sqlite.conn
     image_blob = _vector(6).astype(np.float32).tobytes()
     video_blob = _vector(7).astype(np.float32).tobytes()
     for index in range(257):
@@ -338,4 +338,4 @@ def test_late_bad_video_rolls_back_schema_and_prior_updates_then_retries(tmp_pat
     assert connection.execute(
         "SELECT migration_id FROM applied_migrations WHERE migration_id = ?;", (MIGRATION_ID,)
     ).fetchone()
-    db._conn.close()
+    db.dispose()
