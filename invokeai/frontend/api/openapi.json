@@ -12420,7 +12420,7 @@
       "get": {
         "tags": ["queue"],
         "summary": "Get Queue Item Ids",
-        "description": "Gets the queue item ids that match the given parameters, ordered by creation time.\n\n`total_count` is the number of ids in `item_ids`. Without `limit`, every matching id is returned, so it\nequals the number of matching items. With `limit`, only the first `limit` ids of the same order are\nreturned, and it is not a total (counting every match would read the whole queue history); use the queue\nstatus for totals.\n\nIDs for every user's items are returned (item ids carry no sensitive data on their own).\nWhen the corresponding items are hydrated via get_queue_items_by_item_ids, those belonging\nto other users are redacted by sanitize_queue_item_for_user. This lets a non-admin see\npartially-redacted entries for other users' jobs in the queue list, while still revealing\nonly timestamps and status for items they do not own.\n\ncurrent_user is required so the endpoint stays behind authentication in multiuser mode.",
+        "description": "Gets the queue item ids that match the given parameters, ordered by creation time.\n\n`total_count` is the number of ids in `item_ids`. Without `limit`, every matching id is returned, so it\nequals the number of matching items. With `limit`, only the first `limit` ids of the same order are\nreturned, and it is not a total (counting every match would read the whole queue history); use the queue\nstatus for totals.\n\nWithout `origin_prefix`, IDs for every user's items are returned (item ids carry no sensitive data on their\nown); with it, a non-admin gets only their own.\nWhen the corresponding items are hydrated via get_queue_items_by_item_ids, those belonging\nto other users are redacted by sanitize_queue_item_for_user. This lets a non-admin see\npartially-redacted entries for other users' jobs in the queue list, while still revealing\nonly timestamps and status for items they do not own.\n\ncurrent_user is required so the endpoint stays behind authentication in multiuser mode.",
         "operationId": "get_queue_item_ids",
         "security": [
           {
@@ -12463,10 +12463,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Only include queue items whose origin starts with this prefix",
+              "description": "Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own items match",
               "title": "Origin Prefix"
             },
-            "description": "Only include queue items whose origin starts with this prefix"
+            "description": "Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own items match"
           },
           {
             "name": "limit",
@@ -13225,10 +13225,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Only include queue items whose origin starts with this prefix",
+              "description": "Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own items match",
               "title": "Origin Prefix"
             },
-            "description": "Only include queue items whose origin starts with this prefix"
+            "description": "Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own items match"
           }
         ],
         "responses": {
@@ -13357,10 +13357,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Only include queue items whose origin starts with this prefix",
+              "description": "Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own items match",
               "title": "Origin Prefix"
             },
-            "description": "Only include queue items whose origin starts with this prefix"
+            "description": "Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own items match"
           }
         ],
         "responses": {
@@ -13405,7 +13405,7 @@
       "get": {
         "tags": ["queue"],
         "summary": "Get Queue Status",
-        "description": "Gets the status of the session queue. Returns global counts; every user additionally gets\ntheir own pending/in_progress counts (so the UI can show an X/Y badge and scope personal UI\nlike the progress bar to the user's own activity). Non-admin users cannot see the current\nitem's identifiers unless they own it.",
+        "description": "Gets the status of the session queue. Returns global counts (a non-admin's counts are their own when\n`origin_prefix` is given); every user additionally gets their own pending/in_progress counts (so the UI\ncan show an X/Y badge and scope personal UI like the progress bar to the user's own activity). Non-admin\nusers cannot see the current item's identifiers unless they own it.",
         "operationId": "get_queue_status",
         "security": [
           {
@@ -13437,10 +13437,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Only include queue items whose origin starts with this prefix",
+              "description": "Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own items match",
               "title": "Origin Prefix"
             },
-            "description": "Only include queue items whose origin starts with this prefix"
+            "description": "Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own items match"
           }
         ],
         "responses": {

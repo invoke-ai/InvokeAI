@@ -88,6 +88,7 @@ import { planSeedSubmission } from '@platform/core/seed';
 import { describeError } from '@platform/logging/normalize';
 import { WIDGET_REGIONS } from '@workbench/layoutContracts';
 import { prependProjectEvent, PROJECT_EVENT_LIMIT } from '@workbench/projectEvents';
+import { createProjectId } from '@workbench/projects/ids';
 
 import type { WorkbenchQueueItem as QueueItem } from './queueHistoryContracts';
 
@@ -1825,11 +1826,11 @@ const getNextProjectIndex = (projects: Project[]): number => {
   return Math.max(0, ...usedIndices) + 1;
 };
 
-/** Use collision-resistant ids so a draft autosave cannot overwrite an existing server project. */
+/** Project ids are global across accounts, so a draft takes a UUID one like every other new project. */
 export const createDraftProject = (projects: Project[], account?: WorkbenchState['account']): Project =>
   createProject(
     getNextProjectIndex(projects),
-    createId('project'),
+    createProjectId(),
     account ? resolveSavedLayoutPreset(normalizeWorkbenchAccount(account), defaultLayoutPreset.id) : defaultLayoutPreset
   );
 

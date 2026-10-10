@@ -1291,6 +1291,20 @@ describe('adopting a project from another realm', () => {
   });
 });
 
+describe('new projects', () => {
+  it('take a global UUID id, since another account may hold any other', () => {
+    const initial = createInitialWorkbenchState();
+    const first = workbenchReducer(initial, { type: 'createProject' });
+    const second = workbenchReducer(first, { type: 'createProject' });
+    const ids = second.projects.slice(-2).map((project) => project.id);
+
+    for (const id of ids) {
+      expect(id).toMatch(/^project-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    }
+    expect(new Set(ids).size).toBe(2);
+  });
+});
+
 describe('workbench widget alignment', () => {
   it('moves a bottom widget between the strip clusters and back', () => {
     const initial = createInitialWorkbenchState();

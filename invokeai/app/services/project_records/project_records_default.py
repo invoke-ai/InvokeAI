@@ -158,10 +158,10 @@ class ProjectRecordsStorage(ProjectRecordsStorageBase):
                     minimum_canvas_schema_version=minimum_canvas_schema_version,
                 )
             except UniqueViolation as error:
-                # The account has a project with this id, created meanwhile or, when the create brings no board,
-                # before. It cannot be the board: a new board is the project's alone, and a claimed one is locked and
-                # claimed by no other project. The board insert or rename rolls back with the project insert, so a
-                # refused create changes no board.
+                # A project has this id: the account's own, created meanwhile or, when the create brings no board,
+                # before; or another account's, since ids are global. It cannot be the board: a new board is the
+                # project's alone, and a claimed one is locked and claimed by no other project. The board insert or
+                # rename rolls back with the project insert, so a refused create changes no board.
                 raise ProjectRecordExistsError(new_project_id) from error
             # Indexed in the document's own transaction: a reader never sees a saved project whose media the
             # intermediates cleanup does not know about.

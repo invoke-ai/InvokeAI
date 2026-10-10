@@ -551,6 +551,9 @@ GET /api/v1/workflows/
 # Regular users see their own queue items in full and may see redacted details for other users' items on queue-status endpoints
 GET /api/v1/queue/...  # Queue data, sanitized for non-admin viewers
 
+# With origin_prefix, item_ids, current, next and status cover only the caller's own items
+GET /api/v1/queue/{queue_id}/status?origin_prefix=webv2:p:<project_id>:q:
+
 # Administrators see all queue items in full
 GET /api/v1/queue/...  # Full queue data
 ```

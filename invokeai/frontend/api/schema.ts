@@ -3065,7 +3065,8 @@ export type paths = {
          *     returned, and it is not a total (counting every match would read the whole queue history); use the queue
          *     status for totals.
          *
-         *     IDs for every user's items are returned (item ids carry no sensitive data on their own).
+         *     Without `origin_prefix`, IDs for every user's items are returned (item ids carry no sensitive data on their
+         *     own); with it, a non-admin gets only their own.
          *     When the corresponding items are hydrated via get_queue_items_by_item_ids, those belonging
          *     to other users are redacted by sanitize_queue_item_for_user. This lets a non-admin see
          *     partially-redacted entries for other users' jobs in the queue list, while still revealing
@@ -3399,10 +3400,10 @@ export type paths = {
         };
         /**
          * Get Queue Status
-         * @description Gets the status of the session queue. Returns global counts; every user additionally gets
-         *     their own pending/in_progress counts (so the UI can show an X/Y badge and scope personal UI
-         *     like the progress bar to the user's own activity). Non-admin users cannot see the current
-         *     item's identifiers unless they own it.
+         * @description Gets the status of the session queue. Returns global counts (a non-admin's counts are their own when
+         *     `origin_prefix` is given); every user additionally gets their own pending/in_progress counts (so the UI
+         *     can show an X/Y badge and scope personal UI like the progress bar to the user's own activity). Non-admin
+         *     users cannot see the current item's identifiers unless they own it.
          */
         get: operations["get_queue_status"];
         put?: never;
@@ -58124,7 +58125,7 @@ export interface operations {
             query?: {
                 /** @description The order of sort */
                 order_dir?: components["schemas"]["SQLiteDirection"];
-                /** @description Only include queue items whose origin starts with this prefix */
+                /** @description Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own items match */
                 origin_prefix?: string | null;
                 /** @description Return at most this many ids, from the start of the requested order. Omit to return every matching id */
                 limit?: number | null;
@@ -58570,7 +58571,7 @@ export interface operations {
     get_current_queue_item: {
         parameters: {
             query?: {
-                /** @description Only include queue items whose origin starts with this prefix */
+                /** @description Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own items match */
                 origin_prefix?: string | null;
             };
             header?: never;
@@ -58637,7 +58638,7 @@ export interface operations {
     get_next_queue_item: {
         parameters: {
             query?: {
-                /** @description Only include queue items whose origin starts with this prefix */
+                /** @description Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own items match */
                 origin_prefix?: string | null;
             };
             header?: never;
@@ -58672,7 +58673,7 @@ export interface operations {
     get_queue_status: {
         parameters: {
             query?: {
-                /** @description Only include queue items whose origin starts with this prefix */
+                /** @description Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own items match */
                 origin_prefix?: string | null;
             };
             header?: never;

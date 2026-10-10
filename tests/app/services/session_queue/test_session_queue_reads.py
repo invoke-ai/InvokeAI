@@ -179,10 +179,10 @@ class TestListings:
         _item(database, queue_id="other", created_at="2026-01-04 00:00:00.000")
 
         newest_first = database.queries.session_queue.item_ids(
-            QUEUE, descending=True, user_id="alice", origin_prefix=None
+            QUEUE, descending=True, owner_id="alice", origin_prefix=None
         )
         oldest_first = database.queries.session_queue.item_ids(
-            QUEUE, descending=False, user_id="alice", origin_prefix=None
+            QUEUE, descending=False, owner_id="alice", origin_prefix=None
         )
 
         assert newest_first == [*batch, old]
@@ -193,7 +193,7 @@ class TestListings:
         _item(database, origin="canvas:1")
 
         assert database.queries.session_queue.item_ids(
-            QUEUE, descending=True, user_id=None, origin_prefix="WORKFLOWS"
+            QUEUE, descending=True, owner_id=None, origin_prefix="WORKFLOWS"
         ) == [wanted]
 
     def test_summaries_are_of_the_named_items_of_the_queue(self, database: Database) -> None:

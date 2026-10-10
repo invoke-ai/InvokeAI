@@ -380,6 +380,35 @@ def test_projects_stay_private_to_their_owner(client: TestClient, user1_token: s
     )
 
 
+def test_admins_cannot_open_someone_elses_project(client: TestClient, user1_token: str, admin_token: str):
+    project_id = _create_project(client, user1_token).json()["project_id"]
+
+    assert client.get(f"/api/v1/projects/{project_id}", headers=_auth(admin_token)).status_code == (
+        status.HTTP_404_NOT_FOUND
+    )
+
+
+def test_a_project_id_another_account_holds_is_a_409_that_changes_nothing(
+    client: TestClient, user1_token: str, user2_token: str
+):
+    """Project ids are global. Taking one that is already held is refused as a conflict; the holder's project and
+    the refused caller's boards are as they were."""
+    held = _create_project(client, user1_token, name="Held").json()
+    adoptable = _create_board(client, user2_token, "Imported")
+    boards_before = client.get("/api/v1/boards/?all=true", headers=_auth(user2_token)).json()
+
+    for claim in ({}, {"board_id": adoptable}):
+        refused = _create_project(client, user2_token, name="Taken", project_id=held["project_id"], **claim)
+        assert refused.status_code == status.HTTP_409_CONFLICT, claim
+
+    assert client.get(f"/api/v1/projects/{held['project_id']}", headers=_auth(user2_token)).status_code == (
+        status.HTTP_404_NOT_FOUND
+    )
+    kept = client.get(f"/api/v1/projects/{held['project_id']}", headers=_auth(user1_token)).json()
+    assert (kept["name"], kept["revision"]) == ("Held", held["revision"])
+    assert client.get("/api/v1/boards/?all=true", headers=_auth(user2_token)).json() == boards_before
+
+
 def _create_board_in_project(client: TestClient, token: str, project_id: str, name: str) -> str:
     response = client.post(f"/api/v1/boards/?board_name={name}&project_id={project_id}", headers=_auth(token))
     assert response.status_code == status.HTTP_201_CREATED

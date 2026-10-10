@@ -325,7 +325,8 @@ export class ProjectCreateAbsentError extends Error {
 
 /**
  * Settle ambiguous creates with a second POST: SQLite serializes writers, while GET 404 can race the initial
- * commit. A 201 succeeds; after 409, GET distinguishes an existing project from a board conflict. Other
+ * commit. A 201 succeeds; after 409, GET distinguishes an existing project from a board conflict or an id another
+ * account holds. Other
  * deterministic rejections prove absence. Transport failure remains unknown and must never authorize deletion.
  */
 const settleProjectCreate = async (request: ProjectCreateRequest, owner: AccountScope): Promise<ProjectRecordDTO> => {
@@ -333,7 +334,10 @@ const settleProjectCreate = async (request: ProjectCreateRequest, owner: Account
   const body = serializeCreateProjectRequest(request);
   const writeBudget = createProjectWriteRetryBudget();
 
-  /** The settled 409 makes this lookup decisive: an existing project committed; 404 means a board conflict. */
+  /**
+   * The settled 409 makes this lookup decisive: an existing project committed; 404 means a board conflict, or an id
+   * another account holds.
+   */
   const settleConflict = async (conflict: unknown): Promise<ProjectRecordDTO> => {
     if (projectId === undefined) {
       throw conflict;
