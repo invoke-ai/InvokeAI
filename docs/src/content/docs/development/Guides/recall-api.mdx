@@ -250,12 +250,13 @@ separate adapter model:
 - **FLUX.2 Klein** — built-in reference image support.
 - **FLUX Kontext** — reference image associated with the main model.
 - **Qwen Image Edit** — reference image associated with the main model.
+- **Qwen-Image-2.1** — reference images read by its own encoder, on the Diffusers model only.
 
 Because there is no adapter model to resolve, these entries carry only
 `image_name`. When the frontend receives them, it picks the appropriate
 config flavor (`flux2_reference_image`, `flux_kontext_reference_image`,
-or `qwen_image_reference_image`) based on the currently-selected main
-model, matching the behavior of a manual drag-and-drop.
+`qwen_image_reference_image` or `qwen_image_2_1_reference_image`) based on
+the currently-selected main model, matching the behavior of a manual drag-and-drop.
 
 ## Usage Examples
 

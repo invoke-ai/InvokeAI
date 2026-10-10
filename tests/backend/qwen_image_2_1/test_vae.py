@@ -1,4 +1,5 @@
-"""Qwen-Image-2.1's RGBA VAE: how a decode becomes an image, what an encode reads, and the tile geometry it runs in."""
+"""Qwen-Image-2.1's RGBA VAE: how a decode becomes an image, what an encode reads -- a canvas image or an edit's
+reference -- and the tile geometry it runs in."""
 
 import pytest
 import torch
@@ -10,7 +11,9 @@ from invokeai.backend.qwen_image_2_1.vae import (
     MIN_TILE_SIZE,
     SPATIAL_SCALE,
     choose_tile_size,
+    reference_size,
     to_image,
+    to_reference,
     to_vae_input,
     working_memory_bytes,
 )
@@ -108,3 +111,34 @@ def test_nothing_is_tiled_unless_asked_or_too_large(monkeypatch: pytest.MonkeyPa
 def test_a_tile_size_field_below_the_floor_is_raised_to_it() -> None:
     assert choose_tile_size(2048, 2048, 2, CPU, tiled=True, tile_size=16, auto_tile=False) == MIN_TILE_SIZE
     assert choose_tile_size(2048, 2048, 2, CPU, tiled=True, tile_size=768, auto_tile=False) == 768
+
+
+@pytest.mark.parametrize(
+    ("size", "expected"),
+    [
+        # sqrt(1024^2 * 5/3) = 1322.0 -> 41.3 x 32 -> 1312; 1322.0 / (5/3) = 793.2 -> 24.8 x 32 -> 800.
+        ((500, 300), (1312, 800)),
+        ((1024, 1024), (1024, 1024)),
+        # sqrt(1024^2 * 3) = 1773.6 -> 1760; 591.2 -> 576.
+        ((3000, 1000), (1760, 576)),
+    ],
+)
+def test_a_reference_is_read_at_one_megapixel_on_the_32px_grid(
+    size: tuple[int, int], expected: tuple[int, int]
+) -> None:
+    assert reference_size(*size) == expected
+
+
+def test_a_reference_encodes_exactly_as_the_pipeline_preprocesses_it() -> None:
+    from diffusers.image_processor import VaeImageProcessor
+
+    generator = torch.Generator().manual_seed(0)
+    pixels = torch.randint(0, 256, (300, 500, 4), generator=generator, dtype=torch.uint8).numpy()
+    image = Image.fromarray(pixels, mode="RGBA")
+    width, height = reference_size(*image.size)
+    expected = VaeImageProcessor(vae_scale_factor=16, vae_latent_channels=64).preprocess(
+        image, width=width, height=height
+    )
+
+    # The alpha is the reference's own, unlike a canvas encode.
+    assert torch.equal(to_vae_input(to_reference(image), keep_alpha=True), expected.float())

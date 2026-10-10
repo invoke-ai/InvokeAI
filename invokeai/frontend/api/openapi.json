@@ -20264,6 +20264,18 @@
             "title": "Reference Images Require Variant",
             "description": "If set, reference images are only accepted for models of this variant."
           },
+          "reference_images_require_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Images Require Format",
+            "description": "If set, reference images are only accepted for models of this format."
+          },
           "supports_regional_guidance": {
             "type": "boolean",
             "title": "Supports Regional Guidance",
@@ -93901,6 +93913,29 @@
             "orig_default": null,
             "orig_required": false
           },
+          "reference_latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LatentsField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents of the reference images an edit reads, from Image to Latents in reference mode, in the order the prompts were encoded with them.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Reference Latents"
+          },
           "denoising_start": {
             "default": 0.0,
             "description": "When to start denoising, expressed a percentage of total steps",
@@ -94049,7 +94084,7 @@
         "tags": ["image", "qwen_image_2_1", "qwen-image-2.1"],
         "title": "Denoise - Qwen-Image-2.1",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -94058,7 +94093,7 @@
         "category": "image",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Encodes an image into Qwen-Image-2.1 latents. The image is encoded opaque; its alpha is not read.",
+        "description": "Encodes an image into Qwen-Image-2.1 latents.\n\nFor image-to-image and the canvas, the image is encoded opaque at its own size; its alpha is not read. As a\nreference for an edit, it is resized to the area the text encoder reads it at and keeps its alpha.",
         "node_pack": "invokeai",
         "properties": {
           "board": {
@@ -94169,6 +94204,16 @@
             "title": "Tile Size",
             "type": "integer"
           },
+          "reference": {
+            "default": false,
+            "description": "Encode as a reference image for the denoise node's reference latents: resized to ~1 megapixel, as the text encoder reads it, with its alpha kept.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "Reference",
+            "type": "boolean"
+          },
           "type": {
             "const": "qwen_image_2_1_i2l",
             "default": "qwen_image_2_1_i2l",
@@ -94181,7 +94226,7 @@
         "tags": ["image", "latents", "vae", "i2l", "qwen_image_2_1"],
         "title": "Image to Latents - Qwen-Image-2.1",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -94455,7 +94500,7 @@
         "category": "conditioning",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Encodes a text prompt for Qwen-Image-2.1 with its Qwen3-VL-8B encoder.",
+        "description": "Encodes a prompt for Qwen-Image-2.1 with its Qwen3-VL-8B encoder, with the reference images an edit reads.\n\nEach reference also goes to the denoise node, encoded by Image to Latents in its reference mode, in the same\norder.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -94515,6 +94560,19 @@
             "orig_required": true,
             "title": "Qwen3-VL Encoder"
           },
+          "reference_images": {
+            "default": [],
+            "description": "Reference images to edit or draw from, in the order the denoise node receives their latents. Needs a Qwen-Image-2.1 Diffusers model's own encoder.",
+            "field_kind": "input",
+            "input": "any",
+            "items": {
+              "$ref": "#/components/schemas/ImageField"
+            },
+            "orig_default": [],
+            "orig_required": false,
+            "title": "Reference Images",
+            "type": "array"
+          },
           "type": {
             "const": "qwen_image_2_1_text_encoder",
             "default": "qwen_image_2_1_text_encoder",
@@ -94527,7 +94585,7 @@
         "tags": ["prompt", "conditioning", "qwen_image_2_1", "qwen-image-2.1"],
         "title": "Prompt - Qwen-Image-2.1",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/QwenImage21ConditioningOutput"
         }

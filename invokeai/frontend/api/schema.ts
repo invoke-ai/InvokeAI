@@ -5702,6 +5702,11 @@ export type components = {
              */
             reference_images_require_variant?: string | null;
             /**
+             * Reference Images Require Format
+             * @description If set, reference images are only accepted for models of this format.
+             */
+            reference_images_require_format?: string | null;
+            /**
              * Supports Regional Guidance
              * @default false
              */
@@ -40506,6 +40511,12 @@ export type components = {
              */
             denoise_mask?: components["schemas"]["DenoiseMaskField"] | null;
             /**
+             * Reference Latents
+             * @description Latents of the reference images an edit reads, from Image to Latents in reference mode, in the order the prompts were encoded with them.
+             * @default null
+             */
+            reference_latents?: components["schemas"]["LatentsField"] | components["schemas"]["LatentsField"][] | null;
+            /**
              * Denoising Start
              * @description When to start denoising, expressed a percentage of total steps
              * @default 0
@@ -40572,7 +40583,10 @@ export type components = {
         };
         /**
          * Image to Latents - Qwen-Image-2.1
-         * @description Encodes an image into Qwen-Image-2.1 latents. The image is encoded opaque; its alpha is not read.
+         * @description Encodes an image into Qwen-Image-2.1 latents.
+         *
+         *     For image-to-image and the canvas, the image is encoded opaque at its own size; its alpha is not read. As a
+         *     reference for an edit, it is resized to the area the text encoder reads it at and keeps its alpha.
          */
         QwenImage21ImageToLatentsInvocation: {
             /**
@@ -40624,6 +40638,12 @@ export type components = {
              * @default 0
              */
             tile_size?: number;
+            /**
+             * Reference
+             * @description Encode as a reference image for the denoise node's reference latents: resized to ~1 megapixel, as the text encoder reads it, with its alpha kept.
+             * @default false
+             */
+            reference?: boolean;
             /**
              * type
              * @default qwen_image_2_1_i2l
@@ -40770,7 +40790,10 @@ export type components = {
         };
         /**
          * Prompt - Qwen-Image-2.1
-         * @description Encodes a text prompt for Qwen-Image-2.1 with its Qwen3-VL-8B encoder.
+         * @description Encodes a prompt for Qwen-Image-2.1 with its Qwen3-VL-8B encoder, with the reference images an edit reads.
+         *
+         *     Each reference also goes to the denoise node, encoded by Image to Latents in its reference mode, in the same
+         *     order.
          */
         QwenImage21TextEncoderInvocation: {
             /**
@@ -40802,6 +40825,12 @@ export type components = {
              * @default null
              */
             qwen3_vl_encoder?: components["schemas"]["Qwen3VLEncoderField"] | null;
+            /**
+             * Reference Images
+             * @description Reference images to edit or draw from, in the order the denoise node receives their latents. Needs a Qwen-Image-2.1 Diffusers model's own encoder.
+             * @default []
+             */
+            reference_images?: components["schemas"]["ImageField"][];
             /**
              * type
              * @default qwen_image_2_1_text_encoder

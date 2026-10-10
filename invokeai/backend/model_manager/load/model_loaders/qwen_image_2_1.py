@@ -18,7 +18,6 @@ from invokeai.backend.model_manager.load.load_default import ModelLoader, _model
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
-from invokeai.backend.model_manager.util.qwen3_vl import drop_qwen3vl_visual_tower
 from invokeai.backend.quantization.fp8_scaled import (
     attach_fp8_scales,
     cast_state_dict,
@@ -63,10 +62,13 @@ def _build_transformer(sd: dict[str, Any]) -> torch.nn.Module:
 class QwenImage21DiffusersModel(GenericDiffusersLoader):
     """Loads the submodels of a Qwen-Image-2.1 diffusers pipeline.
 
-    The tokenizer lives in `processor/` (the pipeline declares a `Qwen3VLProcessor`, of which text prompts
-    need only the tokenizer). The text encoder loads as `Qwen3VLModel` rather than the declared
-    `Qwen3VLForConditionalGeneration`: the LM head is ~1.2 GiB the encoder never runs, and `Qwen3VLModel` is
-    what the standalone Qwen3-VL loaders return, so the text encoder node sees one class.
+    The tokenizer lives in `processor/` (the pipeline declares a `Qwen3VLProcessor`); the processor itself, which
+    also cuts reference images into patches, loads only for an edit. The text encoder loads as `Qwen3VLModel`
+    rather than the declared `Qwen3VLForConditionalGeneration`: the LM head is ~1.2 GiB the encoder never runs,
+    and `Qwen3VLModel` is what the standalone Qwen3-VL loaders return, so the text encoder node sees one class.
+
+    Unlike those loaders, this one keeps the vision tower (~1.1 GiB): reference images reach the encoder only
+    through it, and only this pipeline's encoder carries one into Qwen-Image-2.1.
     """
 
     def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:
@@ -80,6 +82,10 @@ class QwenImage21DiffusersModel(GenericDiffusersLoader):
         model_path = Path(config.path)
         if submodel_type is SubModelType.Tokenizer:
             return AutoTokenizer.from_pretrained(model_path / "processor", local_files_only=True)
+        if submodel_type is SubModelType.Processor:
+            from transformers import AutoProcessor
+
+            return AutoProcessor.from_pretrained(model_path / "processor", local_files_only=True)
 
         dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
         repo_variant = config.repo_variant if isinstance(config, Diffusers_Config_Base) else None
@@ -103,10 +109,6 @@ class QwenImage21DiffusersModel(GenericDiffusersLoader):
                 )
             else:
                 raise
-
-        if submodel_type is SubModelType.TextEncoder:
-            # Text prompts never reach the vision tower; reference images (which would) are not wired up.
-            drop_qwen3vl_visual_tower(result)
 
         return self._apply_fp8_layerwise_casting(result, config, submodel_type)
 

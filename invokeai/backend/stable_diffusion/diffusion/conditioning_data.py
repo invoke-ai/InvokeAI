@@ -166,8 +166,18 @@ class QwenImage21ConditioningInfo:
     prompt_embeds: torch.Tensor
     """Shape: (1, seq_len, hidden=4096). One prompt, so no padding and no mask."""
 
+    image_pad_mask: torch.Tensor | None = None
+    """Shape: (1, seq_len), True at the reference images' `<|image_pad|>` slots; None without references. Each
+    slot stands for 2x2 latent tokens of a reference, in the order the references were encoded."""
+
+    reference_grids: tuple[tuple[int, int], ...] = ()
+    """Per reference, in order: its slots as (rows, columns), so the denoise node can match each reference's
+    latents by shape, not only by count."""
+
     def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
         self.prompt_embeds = self.prompt_embeds.to(device=device, dtype=dtype)
+        if self.image_pad_mask is not None:
+            self.image_pad_mask = self.image_pad_mask.to(device=device)
         return self
 
 

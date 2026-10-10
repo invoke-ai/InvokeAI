@@ -4,6 +4,8 @@ The tile geometry itself is applied by `patch_qwen_image_vae_tiling`, which this
 and Wan VAEs (same tiling attributes, 16x instead of 8x).
 """
 
+import math
+
 import numpy as np
 import torch
 from PIL import Image
@@ -91,11 +93,38 @@ def to_image(decoded: torch.Tensor) -> Image.Image:
     return Image.fromarray(pixels, mode="RGBA")
 
 
-def to_vae_input(image: Image.Image) -> torch.Tensor:
-    """An image as the VAE's `(1, 4, H, W)` input in [-1, 1], encoded opaque.
+def to_vae_input(image: Image.Image, keep_alpha: bool = False) -> torch.Tensor:
+    """An image as the VAE's `(1, 4, H, W)` input in [-1, 1].
 
-    Alpha is set to 1 rather than read from the image: the canvas hands its masks over in alpha, and a
-    transparent region there means "repaint", not "transparent pixels".
+    For image-to-image and the canvas, alpha is set to 1 rather than read from the image: the canvas hands its masks
+    over in alpha, and a transparent region there means "repaint", not "transparent pixels". A reference image keeps
+    its alpha (`keep_alpha`), as the pipeline encodes it.
     """
-    rgb = torch.from_numpy(np.asarray(image.convert("RGB"), dtype=np.float32)).permute(2, 0, 1) / 127.5 - 1
-    return torch.cat([rgb, torch.ones_like(rgb[:1])], dim=0)[None]
+    rgba = image.convert("RGBA")
+    # In the pipeline's `VaeImageProcessor` order, so the result matches it to the bit.
+    pixels = torch.from_numpy(np.asarray(rgba).astype(np.float32) / 255.0).permute(2, 0, 1) * 2.0 - 1.0
+    if not keep_alpha:
+        pixels[3] = 1.0
+    return pixels[None]
+
+
+# The area every reference image is resized to, as the pipeline's default `output_resolution` sets it.
+REFERENCE_AREA = 1024 * 1024
+
+
+def reference_size(width: int, height: int) -> tuple[int, int]:
+    """The size a `width` x `height` reference is read at: `REFERENCE_AREA` at its aspect ratio, on the 32px grid.
+
+    The text encoder and the VAE must both read it at this size: each `<|image_pad|>` slot the encoder emits
+    stands for 2x2 of the reference's latents, and the transformer drops the latents into those slots.
+    """
+    ratio = width / height
+    scaled_width = math.sqrt(REFERENCE_AREA * ratio)
+    # Python's round (half to even) is the pipeline's `calculate_dimensions`.
+    return round(scaled_width / 32) * 32, round(scaled_width / ratio / 32) * 32
+
+
+def to_reference(image: Image.Image) -> Image.Image:
+    """A reference image as both the text encoder and the VAE read it: RGBA, resized to `reference_size`."""
+    rgba = image.convert("RGBA")
+    return rgba.resize(reference_size(*rgba.size), resample=Image.LANCZOS)

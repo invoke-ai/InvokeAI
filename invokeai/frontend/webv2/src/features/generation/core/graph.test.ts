@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type {
   ComponentModelConfig,
   GenerateModelConfig,
+  GenerateReferenceImage,
   GenerateSettings,
   LoraModelConfig,
   MainModelConfig,
@@ -732,6 +733,65 @@ describe('compileGenerateGraph', () => {
 
     expect(getEdge(graph, 'pos_cond', 'reference_images')).toBeDefined();
     expect(getEdge(graph, 'denoise_latents', 'reference_latents')).toBeDefined();
+  });
+
+  describe('Qwen-Image-2.1 reference images', () => {
+    const qwenImage21Model: MainModelConfig = {
+      base: 'qwen-image-2-1',
+      format: 'diffusers',
+      key: 'qwen21',
+      name: 'Qwen-Image-2.1',
+      type: 'main',
+    };
+    const references = (...names: string[]): GenerateReferenceImage[] =>
+      names.map((name) => ({
+        config: {
+          image: { original: { image: { height: 768, image_name: name, width: 512 } } },
+          type: 'qwen_image_2_1_reference_image',
+        },
+        id: name,
+        isEnabled: true,
+      }));
+
+    it('reads each reference in both prompts and, in the same order, as latents in denoise', () => {
+      const graph = compile(qwenImage21Model, { cfgScale: 4, referenceImages: references('a.png', 'b.png') });
+
+      const nameOf = (imageNode: string) =>
+        (graph.nodes[imageNode]?.image as { image_name: string } | undefined)?.image_name;
+      // Each chain is followed back from its end: the last collect holds b, the one before it a.
+      const chain = (lastCollect: string) => [
+        getEdge(graph, lastCollect, 'collection')?.source.node_id ?? '',
+        lastCollect,
+      ];
+
+      const imagesInto = getEdge(graph, 'pos_cond', 'reference_images')?.source.node_id ?? '';
+      expect(getEdge(graph, 'neg_cond', 'reference_images')?.source.node_id).toBe(imagesInto);
+      expect(chain(imagesInto).map((collect) => nameOf(getEdge(graph, collect, 'item')?.source.node_id ?? ''))).toEqual(
+        ['a.png', 'b.png']
+      );
+
+      const latentsInto = getEdge(graph, 'denoise_latents', 'reference_latents')?.source.node_id ?? '';
+      const latentImages = chain(latentsInto).map((collect) => {
+        const i2l = getEdge(graph, collect, 'item')?.source.node_id ?? '';
+        expect(graph.nodes[i2l]).toMatchObject({ reference: true, type: 'qwen_image_2_1_i2l' });
+        return nameOf(getEdge(graph, i2l, 'image')?.source.node_id ?? '');
+      });
+      expect(latentImages).toEqual(['a.png', 'b.png']);
+    });
+
+    it('refuses references with a standalone encoder, which has no vision tower', () => {
+      const encoder: ComponentModelConfig = {
+        base: 'any',
+        key: 'qwen3-vl-8b',
+        name: 'Qwen3-VL 8B',
+        type: 'qwen3_vl_encoder',
+        variant: 'qwen3_vl_8b',
+      };
+
+      expect(() =>
+        compile(qwenImage21Model, { qwen3VLEncoderModel: encoder, referenceImages: references('a.png') })
+      ).toThrow(/vision tower/);
+    });
   });
 });
 

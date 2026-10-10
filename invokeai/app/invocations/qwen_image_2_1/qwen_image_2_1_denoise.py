@@ -1,3 +1,4 @@
+import itertools
 import math
 from typing import Optional
 
@@ -55,6 +56,61 @@ def clip_sigmas(sigmas: list[float], denoising_start: float, denoising_end: floa
     return clipped, first_step
 
 
+def slot_runs(image_pad_mask: torch.Tensor | None) -> list[int]:
+    """The lengths of the runs of image slots in a prompt's mask: one run per reference image, in order."""
+    if image_pad_mask is None:
+        return []
+    return [len(list(run)) for is_slot, run in itertools.groupby(image_pad_mask[0].tolist()) if is_slot]
+
+
+def _describe_grids(grids: list[tuple[int, int]]) -> str:
+    # A slot is 32x32 pixels of the reference as the encoder read it.
+    return ", ".join(f"{columns * 32}x{rows * 32}" for rows, columns in grids) or "none"
+
+
+def check_reference_slots(
+    info: QwenImage21ConditioningInfo, reference_shapes: list[tuple[int, int, int]], prompt: str
+) -> None:
+    """Refuse references whose latents do not match the prompt's image slots, reference by reference.
+
+    Each reference's latents fill one run of the prompt's slots, 2x2 latents per slot, at the slot grid the
+    encoder read it at. A mismatch means the prompt was encoded with other images, in another order or at another
+    size than the latents: the transformer would place one reference's latents in another's slots.
+    """
+    expected = [(h // 2, w // 2) for _, h, w in reference_shapes]
+    found = list(info.reference_grids)
+    if found != expected or slot_runs(info.image_pad_mask) != [rows * columns for rows, columns in found]:
+        raise ValueError(
+            f"The {prompt} prompt was encoded with {len(found)} reference image(s) ({_describe_grids(found)}), but "
+            f"the denoise node received {len(expected)} reference latent(s) ({_describe_grids(expected)}). Encode "
+            "each reference with Image to Latents in reference mode, from the same images and in the same order "
+            "as the prompts."
+        )
+
+
+def prefix_length(info: QwenImage21ConditioningInfo) -> int:
+    """Tokens before the target in the joint sequence: the prompt, each reference slot widened to 2x2 latents."""
+    slots = 0 if info.image_pad_mask is None else int(info.image_pad_mask.sum())
+    return info.prompt_embeds.shape[1] + (TOKENS_PER_SLOT - 1) * slots
+
+
+# K and V of one prefix token in all 32 blocks: 2 x 4096 x 32 x 2 bytes in bf16.
+KV_BYTES_PER_PREFIX_TOKEN = 2 * 4096 * 32 * 2
+
+
+def prefix_cache_fits(cache_bytes: int, device: torch.device) -> bool:
+    """Whether the prefix caches can stay on the GPU for the whole run.
+
+    They cannot be offloaded the way the transformer's weights can, so caches larger than half the card would
+    leave too little for the model however it streams: four references at CFG above 1 hold ~16 GiB. Past that the
+    prefix is recomputed every step instead -- slower, but within the memory of an ordinary run. Memory that is
+    not a dedicated card's (CPU, MPS) is not limited here.
+    """
+    if device.type != "cuda":
+        return True
+    return cache_bytes <= torch.cuda.get_device_properties(device).total_memory // 2
+
+
 def pack_latents(latents: torch.Tensor) -> torch.Tensor:
     """(B, C, h, w) -> (B, h*w, C): one token per latent pixel, in raster order (patch size 1)."""
     batch, channels, height, width = latents.shape
@@ -72,7 +128,7 @@ def unpack_latents(latents: torch.Tensor, height: int, width: int) -> torch.Tens
     title="Denoise - Qwen-Image-2.1",
     tags=["image", "qwen_image_2_1", "qwen-image-2.1"],
     category="image",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -83,6 +139,13 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     )
     denoise_mask: Optional[DenoiseMaskField] = InputField(
         default=None, description=FieldDescriptions.denoise_mask, input=Input.Connection
+    )
+    reference_latents: LatentsField | list[LatentsField] | None = InputField(
+        default=None,
+        description="Latents of the reference images an edit reads, from Image to Latents in reference mode, in the "
+        "order the prompts were encoded with them.",
+        input=Input.Connection,
+        title="Reference Latents",
     )
     denoising_start: float = InputField(default=0.0, ge=0, le=1, description=FieldDescriptions.denoising_start)
     denoising_end: float = InputField(default=1.0, ge=0, le=1, description=FieldDescriptions.denoising_end)
@@ -127,11 +190,30 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     def _load_conditioning(
         self, context: InvocationContext, field: QwenImage21ConditioningField, dtype: torch.dtype, device: torch.device
-    ) -> torch.Tensor:
+    ) -> QwenImage21ConditioningInfo:
         data = context.conditioning.load(field.conditioning_name)
         if len(data.conditionings) != 1 or not isinstance(data.conditionings[0], QwenImage21ConditioningInfo):
             raise ValueError("Expected exactly one Qwen-Image-2.1 conditioning.")
-        return data.conditionings[0].to(dtype=dtype, device=device).prompt_embeds
+        return data.conditionings[0].to(dtype=dtype, device=device)
+
+    def _load_references(self, context: InvocationContext, device: torch.device) -> list[torch.Tensor]:
+        """The reference latents, `(1, C, h, w)` each, in the order the prompts were encoded with them."""
+        if self.reference_latents is None:
+            return []
+        fields = self.reference_latents if isinstance(self.reference_latents, list) else [self.reference_latents]
+        references = []
+        for field in fields:
+            reference = context.tensors.load(field.latents_name).to(device=device, dtype=torch.float32)
+            if reference.dim() == 5:
+                reference = reference.squeeze(2)
+            if reference.shape[1] != LATENT_CHANNELS or reference.shape[-2] % 2 or reference.shape[-1] % 2:
+                raise ValueError(
+                    f"Reference latents are {tuple(reference.shape[1:])}; Qwen-Image-2.1 reads {LATENT_CHANNELS} "
+                    "channels with even sides. Encode the reference with Image to Latents - Qwen-Image-2.1 in "
+                    "reference mode."
+                )
+            references.append(reference)
+        return references
 
     def _prepare_cfg_scale(self, num_steps: int) -> list[float]:
         if isinstance(self.cfg_scale, list):
@@ -166,7 +248,6 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         device = TorchDevice.choose_torch_device()
         dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
         transformer_config = context.models.get_config(self.transformer.transformer)
-        transformer_info = context.models.load(self.transformer.transformer)
 
         latent_height, latent_width = self.height // VAE_SCALE_FACTOR, self.width // VAE_SCALE_FACTOR
         image_seq_len = latent_height * latent_width
@@ -176,13 +257,26 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         sigmas = torch.tensor(sigmas, dtype=torch.float32, device=device)
         cfg_scale = self._prepare_cfg_scale(len(full_sigmas) - 1)[first_step : first_step + len(sigmas) - 1]
 
-        pos_embeds = self._load_conditioning(context, self.positive_conditioning, dtype, device)
+        pos = self._load_conditioning(context, self.positive_conditioning, dtype, device)
         do_cfg = self.negative_conditioning is not None and any(value > 1.0 for value in cfg_scale)
-        neg_embeds = (
+        neg = (
             self._load_conditioning(context, self.negative_conditioning, dtype, device)
             if do_cfg and self.negative_conditioning is not None
             else None
         )
+        pos_embeds = pos.prompt_embeds
+        neg_embeds = neg.prompt_embeds if neg is not None else None
+
+        references = self._load_references(context, device)
+        reference_shapes = [(1, r.shape[-2], r.shape[-1]) for r in references]
+        check_reference_slots(pos, reference_shapes, "positive")
+        if neg is not None:
+            check_reference_slots(neg, reference_shapes, "negative")
+        # Clean latents, condition images first: the transformer drops them into the prompt's image slots.
+        reference_tokens = torch.cat([pack_latents(r) for r in references], dim=1).to(dtype) if references else None
+
+        # Only now, with every input checked: loading reads the whole transformer into RAM.
+        transformer_info = context.models.load(self.transformer.transformer)
 
         # Drawn as the pipeline draws it, (B, frame, C, h, w), on the CPU so a seed means the same on any device.
         noise = torch.randn(
@@ -220,25 +314,39 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # upcast); matching that is what makes this node reproduce its outputs.
         latents = pack_latents(latents).to(dtype)
 
-        def image_slot_mask(text_len: int) -> torch.Tensor:
-            # The joint sequence's slots: the text, then one slot per 2x2 group of target latents. Condition
-            # images would sit between the two.
-            text = torch.zeros(1, text_len, dtype=torch.bool, device=device)
+        def image_slot_mask(info: QwenImage21ConditioningInfo) -> torch.Tensor:
+            # The joint sequence's slots: the prompt with its reference slots, then one slot per 2x2 group of
+            # target latents.
+            text_len = info.prompt_embeds.shape[1]
+            prompt = (
+                info.image_pad_mask.bool()
+                if info.image_pad_mask is not None
+                else torch.zeros(1, text_len, dtype=torch.bool, device=device)
+            )
             target = torch.ones(1, image_seq_len // TOKENS_PER_SLOT, dtype=torch.bool, device=device)
-            return torch.cat([text, target], dim=1)
+            return torch.cat([prompt, target], dim=1)
 
-        img_shapes = [[(1, latent_height, latent_width)]]
-        pos_img_mask = image_slot_mask(pos_embeds.shape[1])
-        neg_img_mask = image_slot_mask(neg_embeds.shape[1]) if neg_embeds is not None else None
+        img_shapes = [[*reference_shapes, (1, latent_height, latent_width)]]
+        pos_img_mask = image_slot_mask(pos)
+        neg_img_mask = image_slot_mask(neg) if neg is not None else None
 
-        working_memory = self._estimate_working_memory(
-            image_seq_len, pos_embeds.shape[1], None if neg_embeds is None else neg_embeds.shape[1], do_cfg
-        )
+        # Each reference slot widens to 2x2 latent tokens in the joint sequence; with the text they are the
+        # prefix the cache holds.
+        pos_prefix = prefix_length(pos)
+        neg_prefix = prefix_length(neg) if neg is not None else None
+        # Text and reference keys and values do not depend on the step under `causal_condition`: the first step
+        # prefills them, the rest compute the image tokens only -- when the caches fit.
+        cache_bytes = KV_BYTES_PER_PREFIX_TOKEN * (pos_prefix + (neg_prefix or 0))
+        use_cache = bool(getattr(transformer_info.model.config, "causal_condition", False))
+        if use_cache and not prefix_cache_fits(cache_bytes, device):
+            use_cache = False
+            logger.info(
+                f"Qwen-Image-2.1: the prefix caches would hold {cache_bytes / 1024**3:.1f} GiB, more than half of "
+                "this GPU; recomputing the prefix every step instead, which is slower."
+            )
+        working_memory = self._estimate_working_memory(image_seq_len, pos_prefix, neg_prefix, do_cfg, use_cache)
         working_memory += self._attention_score_bytes(
-            transformer_info.model,
-            image_seq_len + max(pos_embeds.shape[1], 0 if neg_embeds is None else neg_embeds.shape[1]),
-            device,
-            dtype,
+            transformer_info.model, image_seq_len, max(pos_prefix, neg_prefix or 0), device, dtype
         )
         working_memory += peak_dequant_transient_bytes(transformer_info.model, dtype)
         log_attention_backends(logger, device)
@@ -256,16 +364,15 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         )
 
         with transformer_info.model_on_device(working_mem_bytes=working_memory) as (_, transformer):
-            # Text keys and values do not depend on the step under `causal_condition`: the first step prefills
-            # them, the rest compute the image tokens only. One cache per guidance branch, for this run only.
+            # One cache per guidance branch, for this run only.
             num_blocks = len(transformer.transformer_blocks)
-            use_cache = bool(transformer.config.causal_condition)
             pos_cache = QwenImage21KVCache(num_blocks) if use_cache else None
             neg_cache = QwenImage21KVCache(num_blocks) if use_cache and neg_embeds is not None else None
 
             def predict(embeds: torch.Tensor, img_mask: torch.Tensor, cache, mode, timestep) -> torch.Tensor:
+                hidden_states = latents if reference_tokens is None else torch.cat([reference_tokens, latents], dim=1)
                 out = transformer(
-                    hidden_states=latents,
+                    hidden_states=hidden_states,
                     encoder_hidden_states=embeds,
                     encoder_hidden_states_mask=None,
                     timestep=timestep,
@@ -316,23 +423,28 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         return unpack_latents(latents, latent_height, latent_width).float()
 
     @staticmethod
-    def _estimate_working_memory(image_seq_len: int, pos_text_len: int, neg_text_len: int | None, do_cfg: bool) -> int:
+    def _estimate_working_memory(
+        image_seq_len: int, pos_prefix: int, neg_prefix: int | None, do_cfg: bool, use_cache: bool
+    ) -> int:
         """Peak transformer activations, in bytes, for the model cache to keep free.
 
         Measured on an RTX 4090 in bf16 with the transformer fully resident: 0.55 GiB of activations at
         1024x1024 (4096 image tokens) and 2.2 GiB at 2048x2048 (16384), about 0.14 MiB per token. 0.25 MiB per
         token plus a 1 GiB base leaves room for the allocator and the prefix cache, which holds K and V of every
-        text token in all 32 blocks (~0.5 MiB per text token, per guidance branch).
+        prefix token -- text and reference latents -- in all 32 blocks (~0.5 MiB per token, per guidance branch).
         """
         mib, gib = 1024**2, 1024**3
-        text_len = max(pos_text_len, neg_text_len or 0)
-        estimated = int((image_seq_len + text_len) * 0.25 * mib) + gib
-        branches = 2 if do_cfg else 1
-        estimated += int(branches * (pos_text_len if neg_text_len is None else text_len) * 0.5 * mib)
+        prefix = max(pos_prefix, neg_prefix or 0)
+        estimated = int((image_seq_len + prefix) * 0.25 * mib) + gib
+        if use_cache:
+            branches = 2 if do_cfg else 1
+            estimated += branches * (pos_prefix if neg_prefix is None else prefix) * KV_BYTES_PER_PREFIX_TOKEN
         return estimated
 
     @staticmethod
-    def _attention_score_bytes(transformer: object, seq_len: int, device: torch.device, dtype: torch.dtype) -> int:
+    def _attention_score_bytes(
+        transformer: object, image_seq_len: int, prefix: int, device: torch.device, dtype: torch.dtype
+    ) -> int:
         """The score matrix attention materializes on a build without a fused kernel for it (0 where it has one)."""
         config = getattr(transformer, "config", None)
         num_heads = getattr(config, "num_attention_heads", None)
@@ -341,13 +453,14 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             return 0
         # The largest call, the image queries over every key, goes unmasked both in the prefill and on decode steps:
         # only the text segments carry a mask, and they are as short as the prompt. All of them go through diffusers'
-        # attention dispatch.
+        # attention dispatch. Its score matrix is image x (prefix + image), which the square helper prices at the
+        # side with the same area.
         return sdpa_score_matrix_bytes(
             device=device,
             dtype=dtype,
             num_heads=num_heads,
             head_dim=head_dim,
-            seq_len=seq_len,
+            seq_len=math.isqrt(image_seq_len * (image_seq_len + prefix)),
             via_diffusers_dispatch=True,
         )
 

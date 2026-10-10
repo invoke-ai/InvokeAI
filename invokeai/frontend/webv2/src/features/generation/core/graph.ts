@@ -25,6 +25,7 @@ import {
   getFlux2DiffusersComponentSource,
   getGenerationDimensions,
   getGenerationValidationReasons,
+  QWEN_IMAGE_21_STANDALONE_ENCODER_REASON,
   type SupportedGenerateBase,
 } from './baseGenerationPolicies';
 import {
@@ -1336,12 +1337,84 @@ const buildQwenImage21Graph = (
   }
   addEdge(graph, seed, 'value', denoise, 'seed');
   addEdge(graph, denoise, 'latents', output, 'latents');
+  addQwenImage21ReferenceImages(graph, settings, {
+    conditionings: negCond ? [posCond, negCond] : [posCond],
+    denoise,
+    hasStandaloneEncoder: Boolean(qwen3VlEncoderModel),
+    modelLoader,
+  });
   addMetadata(graph, output, settings, model, 'qwen_image_2_1_txt2img', projectSettings, {
     qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
     vae: vaeModel ?? undefined,
   });
+  addReferenceImageMetadata(graph, output, settings);
 
   return graph;
+};
+
+/**
+ * Qwen-Image-2.1 reads each reference twice, at one size: the prompt encoder sees it through the vision tower, and
+ * the denoise node places its clean latents in the prompt's image slots. Both prompts are encoded with the
+ * references, and the latents follow in the same order.
+ */
+const addQwenImage21ReferenceImages = (
+  graph: BackendGraphContract,
+  settings: GenerateSettings,
+  nodes: {
+    conditionings: BackendInvocationContract[];
+    denoise: BackendInvocationContract;
+    hasStandaloneEncoder: boolean;
+    modelLoader: BackendInvocationContract;
+  }
+): void => {
+  const referenceImages = getEnabledReferenceImages(settings, 'qwen_image_2_1_reference_image');
+  if (referenceImages.length === 0) {
+    return;
+  }
+  // A backstop: validation reports this before Invoke.
+  if (nodes.hasStandaloneEncoder) {
+    throw new Error(QWEN_IMAGE_21_STANDALONE_ENCODER_REASON);
+  }
+
+  let imageCollect: BackendInvocationContract | null = null;
+  let latentsCollect: BackendInvocationContract | null = null;
+
+  for (const { config } of referenceImages) {
+    if (!config.image) {
+      continue;
+    }
+
+    const imageNode = addNode(graph, {
+      id: createId('qwen21_ref_img'),
+      image: toImageField(config.image),
+      type: 'image',
+    });
+    const i2l = addNode(graph, { id: createId('qwen21_ref_i2l'), reference: true, type: 'qwen_image_2_1_i2l' });
+    addEdge(graph, imageNode, 'image', i2l, 'image');
+    addEdge(graph, nodes.modelLoader, 'vae', i2l, 'vae');
+
+    const nextImageCollect = addNode(graph, { id: createId('qwen21_ref_img_collect'), type: 'collect' });
+    addEdge(graph, imageNode, 'image', nextImageCollect, 'item');
+    if (imageCollect) {
+      addEdge(graph, imageCollect, 'collection', nextImageCollect, 'collection');
+    }
+    imageCollect = nextImageCollect;
+
+    const nextLatentsCollect = addNode(graph, { id: createId('qwen21_ref_latents_collect'), type: 'collect' });
+    addEdge(graph, i2l, 'latents', nextLatentsCollect, 'item');
+    if (latentsCollect) {
+      addEdge(graph, latentsCollect, 'collection', nextLatentsCollect, 'collection');
+    }
+    latentsCollect = nextLatentsCollect;
+  }
+
+  if (!imageCollect || !latentsCollect) {
+    return;
+  }
+  for (const conditioning of nodes.conditionings) {
+    addEdge(graph, imageCollect, 'collection', conditioning, 'reference_images');
+  }
+  addEdge(graph, latentsCollect, 'collection', nodes.denoise, 'reference_latents');
 };
 
 const buildIdeogram4Graph = (

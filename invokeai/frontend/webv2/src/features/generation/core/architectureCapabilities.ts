@@ -26,6 +26,7 @@ export interface ArchitectureCapabilitiesRow {
     control_kinds: string[];
     max_reference_images: number;
     reference_images_require_variant: string | null;
+    reference_images_require_format: string | null;
     supports_regional_guidance: boolean;
     regional_negative: boolean;
     clip_skip_max: number | null;

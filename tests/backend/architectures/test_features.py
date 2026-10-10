@@ -80,13 +80,20 @@ def test_control_kinds_match_the_frontend_policy(kind: ControlKind, expected: se
     assert declared == expected
 
 
-def test_reference_images_and_the_one_variant_condition() -> None:
-    """Qwen-Image is the only base whose answer depends on the variant, so it is the only one with
-    `reference_images_require_variant` set."""
+def test_reference_images_and_the_conditions_on_them() -> None:
+    """Qwen-Image is the only base whose answer depends on the variant, and Qwen-Image-2.1 the only one whose
+    answer depends on the format."""
     supported = {
         b.value for b in generative_bases() if (f := get(b, FeaturesFacet)) is not None and f.supports_reference_images
     }
-    assert supported == {"flux", "flux2", "sd-1", "sdxl", "qwen-image"}
+    assert supported == {"flux", "flux2", "sd-1", "sdxl", "qwen-image", "qwen-image-2-1"}
+
+    by_format = {
+        b.value: f.reference_images_require_format
+        for b in generative_bases()
+        if (f := get(b, FeaturesFacet)) is not None and f.reference_images_require_format is not None
+    }
+    assert by_format == {"qwen-image-2-1": "diffusers"}
 
     conditional = {
         b.value

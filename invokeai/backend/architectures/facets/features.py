@@ -111,8 +111,11 @@ class FeaturesFacet(Facet):
     control_kinds: frozenset[ControlKind] = frozenset()
     max_reference_images: int = 0
     reference_images_require_variant: str | None = None
-    """Qwen-Image accepts reference images only as the `edit` variant — the one feature in this
+    """Qwen-Image accepts reference images only as the `edit` variant — one of the two features in this
     table that a base alone cannot answer."""
+    reference_images_require_format: str | None = None
+    """The other: Qwen-Image-2.1 reads reference images only as a Diffusers pipeline, whose encoder is
+    the only one that keeps the vision tower."""
 
     supports_regional_guidance: bool = False
     regional_negative: bool = False
