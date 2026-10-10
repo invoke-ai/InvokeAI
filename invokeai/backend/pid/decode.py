@@ -40,6 +40,7 @@ from invokeai.backend.quantization.int8_convrot import (
     split_int8_convrot_layers,
     swap_in_int8_linears,
 )
+from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.state_dict_loading import log_unexpected_keys
 
@@ -158,30 +159,52 @@ PID_MODEL_MAX_LENGTH: int = 300
 # PiD runs a multi-step pixel-diffusion in float32 at the full super-resolved output resolution, so its peak
 # activation memory scales with the total OUTPUT pixel count across the batch.
 #
-# This is working-memory headroom reserved for the decode itself - it does NOT do the heavy lifting of evicting
-# the main transformer/encoders (the nodes call context.models.offload_all_from_vram() for that before loading
-# PidNet).
-# The cache uses max(this_estimate, device_working_mem_gb=3GB), and an over-large value pushes the working set
-# negative and forces PidNet to partial-load onto the CPU (slow). Experimentally-tunable; calibrate to peak.
-_PID_DECODE_WORKING_MEMORY_SCALING_CONSTANT = 260
+# The estimate is the headroom the cache keeps free for the decode, and so also what evicts the main transformer:
+# the decode nodes offload only the Gemma encoder, and the cache offloads exactly as much of every other model as
+# this reservation leaves no room for. Too low, and the main transformer stays resident into the decode's peak —
+# on Windows the driver then spills to shared memory instead of raising OOM, so the allocator never frees its pool
+# and the decode crawls. Too high, and PidNet partial-loads onto the CPU on small cards.
+#
+# Calibrated to what the decode takes off the device — peak (total - free) from cudaMemGetInfo, polled every 5 ms,
+# over a baseline taken after empty_cache() with PidNet resident — not to torch.cuda.max_memory_allocated: the
+# allocator's pool and fragmentation sit 25-30% (cudaMallocAsync) to 60-75% (native) above the tensors themselves,
+# and that memory is just as unavailable to the cache's models. Measured on an RTX 4090 under Windows, FLUX latent,
+# 4 steps, B=1; the max of a v1 and a v1.5 decoder (neither generation is consistently larger once the allocator is
+# counted), in GiB:
+#
+#                       chunked (pid_memory_optimization)        unchunked
+#   output px           1024   2048   3072   4096                1024   2048   3072
+#   cudaMallocAsync     0.77   2.49   5.89  10.24                1.33   5.17  12.18
+#   native              0.81   3.20   7.11  13.19                1.43   5.70  13.36
+#
+# With U = out_h * out_w * 4 bytes, each formula below keeps about 0.4-0.9 GiB over those peaks from 2048px up. The
+# fixed term is the chunk working set (constant because `_PID_ACTIVATION_CHUNK_SIZE` is fixed). Unchunked 4096px
+# (only reachable on 32 GB cards) is extrapolated. The cudaMallocAsync calibration applies to CUDA builds only, where
+# it was measured; `native` stands for everything else — expandable segments (unsupported on Windows, so unmeasured),
+# ROCm, XPU, MPS — since it is the worst case measured, and an unmeasured allocator must err towards reserving too
+# much.
+@dataclass(frozen=True)
+class _PiDWorkingMemoryCalibration:
+    unchunked_per_output_byte: int
+    chunked_per_output_byte: int
+    chunked_fixed_bytes: int = 224 * 2**20
 
-# The same estimate for `pid_memory_optimization=True`. Chunking bounds the per-block activations to a fixed
-# working set, so the peak stops being a pure multiple of the output size: it is a smaller per-pixel term plus a
-# constant for the chunk working set (constant because `_PID_ACTIVATION_CHUNK_SIZE` is fixed).
-#
-# Measured peaks on an RTX 4090 (fp32 PidNet, bf16 autocast, 4 steps, B=1), against U = out_h * out_w * 4 bytes:
-#   1024px  509 MiB (127.2 * U)   1536px  934 MiB (103.8 * U)   2048px  1533 MiB (95.8 * U)
-# Least-squares fit: 85.3 * U + 167 MiB. The earlier 95 * U + 224 MiB calibration carried ~15% headroom
-# over that fit at the measured sizes.
-# The fit underestimates the larger-output path; 120 * U + 224 MiB keeps a small safety margin over the
-# measured 2048px-4096px peaks.
-#
-# Keeping the unoptimized constant here would be the bug the flag is supposed to avoid: the cache takes
-# max(this_estimate, device_working_mem_gb) and subtracts it from the weight budget, so reserving 4GB for a decode
-# that peaks at 1.5GB withholds VRAM that PidNet could have stayed resident in - exactly the partial-load-to-CPU
-# outcome the comment above warns about, on the low-VRAM systems this feature exists for.
-_PID_DECODE_CHUNKED_SCALING_CONSTANT = 120
-_PID_DECODE_CHUNKED_FIXED_BYTES = 224 * 2**20
+
+_PID_WORKING_MEMORY_CUDA_MALLOC_ASYNC = _PiDWorkingMemoryCalibration(
+    unchunked_per_output_byte=360, chunked_per_output_byte=175
+)
+_PID_WORKING_MEMORY_NATIVE = _PiDWorkingMemoryCalibration(unchunked_per_output_byte=395, chunked_per_output_byte=215)
+
+
+def _pid_working_memory_calibration() -> _PiDWorkingMemoryCalibration:
+    """The calibration for the allocator the decode will run under."""
+    if (
+        TorchDevice.choose_torch_device().type == "cuda"
+        and torch.version.hip is None
+        and torch.cuda.get_allocator_backend() == "cudaMallocAsync"
+    ):
+        return _PID_WORKING_MEMORY_CUDA_MALLOC_ASYNC
+    return _PID_WORKING_MEMORY_NATIVE
 
 
 def estimate_pid_decode_working_memory(
@@ -226,7 +249,8 @@ def _estimate_pid_activation_memory(
     element_size = 4  # PidNet runs in float32 (see model_loaders/pid_decoder.py)
     batch_size = int(latent.shape[0])
     output_bytes = batch_size * out_h * out_w * element_size
-    unoptimized = int(output_bytes * _PID_DECODE_WORKING_MEMORY_SCALING_CONSTANT)
+    calibration = _pid_working_memory_calibration()
+    unoptimized = output_bytes * calibration.unchunked_per_output_byte
     if not pid_memory_optimization:
         return unoptimized
     patch_size = int(_PID_SR4X_BASE["patch_size"])
@@ -234,7 +258,7 @@ def _estimate_pid_activation_memory(
     if patch_tokens <= _PID_ACTIVATION_CHUNK_SIZE:
         # The pixel blocks take the unchunked path at and below the threshold.
         return unoptimized
-    chunked = int(output_bytes * _PID_DECODE_CHUNKED_SCALING_CONSTANT + _PID_DECODE_CHUNKED_FIXED_BYTES)
+    chunked = output_bytes * calibration.chunked_per_output_byte + calibration.chunked_fixed_bytes
     # The fixed term makes the calibrated chunked formula temporarily greater than the unoptimized
     # formula just after chunking engages. Keep the unoptimized estimate until the formulas cross;
     # after that point the chunked estimate is the lower (optimized) reservation.
