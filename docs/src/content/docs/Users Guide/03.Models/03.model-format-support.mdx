@@ -1,7 +1,7 @@
 ---
 title: Model Format Support
 description: Which file formats and quantizations InvokeAI loads for every model family, text encoder, VAE and adapter.
-lastUpdated: 2026-10-09
+lastUpdated: 2026-10-10
 sidebar:
   order: 3
 ---
@@ -11,8 +11,14 @@ lists which formats load for which model. What each format is, and how it behave
 [Quantized formats](/users-guide/models/model-families/#quantized-formats). Sizes, starter models and measured
 speeds are on each family's own page.
 
-**Legend:** ✓ loads · ✗ not supported · **R** refused at install with a message naming the reason · – no such
-build exists
+**Legend:**
+
+- ✓ loads
+- **L** installs, but loading it for generation fails with a message naming the reason
+- **R** the install fails with a message naming the reason
+- ✗ not supported: InvokeAI does not recognize the file, so it installs as an unknown model (the reason, if any, is
+  only in the server log)
+- – no such build exists
 
 ## Main models
 
@@ -28,16 +34,17 @@ build exists
 | [Anima](/users-guide/models/local-models/anima/) | – | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ |
 | [Krea-2](/users-guide/models/local-models/krea-2/) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ |
 | [Ideogram 4](/users-guide/models/local-models/ideogram4/) | ✓ | ✓ | ✓ | ✓ | R | ✓ | ✓ | ✗ | inside the Diffusers folder |
-| [ERNIE-Image](/users-guide/models/local-models/ernie-image/) | ✓ | ✓ | R | R | R | ✗ | ✗ | ✗ | ✗ |
-| [Wan 2.2](/users-guide/video-generation/wan-22/) | ✓ | ✓ | ✓ | R | R | R | ✓ | ✗ | ✗ |
-| [LTX-2](/users-guide/video-generation/ltx-2/) (2.5 only) | official layout ✓, Diffusers layout R | ✓ | R | ✓ | ✓ | ✗ | R | ✗ | ✗ |
-| [MiniMax H3](/users-guide/video-generation/minimax-h3/) | ✓ | ✓ | R | ✓ | R | ✗ | R | ✗ | ✗ |
+| [ERNIE-Image](/users-guide/models/local-models/ernie-image/) | ✓ | ✓ | L | L | L | ✗ | ✗ | ✗ | ✗ |
+| [Wan 2.2](/users-guide/video-generation/wan-22/) | ✓ | ✓ | ✓ | L | L | L | ✓ | ✗ | ✗ |
+| [LTX-2](/users-guide/video-generation/ltx-2/) (2.5 only) | official layout ✓, Diffusers layout ✗ | ✓ | L | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| [MiniMax H3](/users-guide/video-generation/minimax-h3/) | ✓ | ✓ | L | ✓ | L | ✗ | ✗ | ✗ | ✗ |
 
 - **int8** means ComfyUI's `int8_convrot` (`int8_tensorwise`) builds. **nvfp4** and **fp8 scaled** mean ComfyUI's
-  checkpoint layouts; other exports of the same schemes (AWQ, ModelOpt) are refused.
+  checkpoint layouts; other exports of the same schemes (AWQ, ModelOpt) fail when the model loads.
 - **GGUF** covers the llama.cpp types (Q4_0 through Q8_0, the K-quants, BF16). ComfyUI-GGUF's `Q8_CR` files load
-  for Krea-2 only and are refused for every other model.
-- Wan 2.1, Wan Animate, S2V, Fun-Control and VACE builds are refused, as are LTX-2.0/2.3 files.
+  for Krea-2 only; for every other model with GGUF support the install fails.
+- LTX-2.0/2.3 files fail to install with a message. Wan 2.1, Wan Animate, S2V, Fun-Control and VACE files are not
+  recognized as Wan 2.2 and install as unknown models.
 
 ## Text encoders
 
@@ -47,17 +54,19 @@ build exists
 | CLIP-L / CLIP-G | SD, SDXL, FLUX.1, SD 3 | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | Qwen3 0.6B / 4B / 8B | Z-Image, FLUX.2 Klein, Anima | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Qwen3-VL 4B / 8B | Krea-2, Ideogram 4 | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ |
-| Qwen3-VL 32B (truncated) | MiniMax H3 | in the Diffusers folder | ✓ | R | ✓ | R | ✗ | ✗ |
-| Qwen3.5 4B | Anima 3.8B | ✗ | ✓ | R | R | R | ✗ | ✗ |
-| Qwen2.5-VL | Qwen-Image | ✓ | ✓ | ✓ | R | ✓ | ✗ | ✗ |
-| Mistral Small 3 | FLUX.2 dev | ✓ | ✓ | ✓ | R | ✓ | ✓ | ✗ |
-| Ministral 3B | ERNIE-Image | ✓ | ✓ | ✓ | R | R | R | ✗ |
+| Qwen3-VL 32B (truncated) | MiniMax H3 | in the Diffusers folder | ✓ | L | ✓ | L | ✗ | ✗ |
+| Qwen3.5 4B | Anima 3.8B | ✗ | ✓ | L | L | L | ✗ | ✗ |
+| Qwen2.5-VL | Qwen-Image | ✓ | ✓ | ✓ | L | ✓ | ✗ | ✗ |
+| Mistral Small 3 | FLUX.2 dev | ✓ | ✓ | ✓ | L | ✓ | ✓ | ✗ |
+| Ministral 3B | ERNIE-Image | ✓ | ✓ | ✓ | L | L | ✗ | ✗ |
 | Gemma-2 2B | PiD decoders | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ |
-| Gemma-4 12B | LTX-2 | ✓ | ✓ | R | ✓ | R | ✗ | ✗ |
+| Gemma-4 12B | LTX-2 | ✓ (bf16 or int8) | ✗ | L | in the folder | L | ✗ | ✗ |
 | UMT5 | Wan 2.2 | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 
 The Qwen3-VL GGUF encoder is the language model only; a separate `mmproj` vision file is refused, and split
-multi-part GGUFs have to be joined before installing.
+multi-part GGUFs have to be joined before installing. The Gemma-4 encoder installs only as a folder: its
+`config.json` and tokenizer files next to exactly one weight file, bf16 or int8. A standalone `.safetensors` file is
+not recognized.
 
 ## VAEs
 
@@ -69,7 +78,9 @@ multi-part GGUFs have to be joined before installing.
 | Qwen-Image | ✓ | ✗ | Qwen-Image, Krea-2 |
 | CogView4, LTX-2, MiniMax H3 | – | bundled | taken from the model's own folder |
 
-Quantized VAE files (fp8, int8, nvfp4) are refused for every family.
+Quantized VAE files (fp8, int8, nvfp4) are not supported; use the unquantized VAE. The SD 3, FLUX.2, Qwen-Image,
+Wan, Anima and Ideogram 4 VAEs fail with a message when they load. The FLUX.1 and SD 1.x / SDXL single-file VAEs do
+not check, so a quantized file there fails with an unclear error or decodes incorrectly.
 
 ## LoRAs and adapters
 
