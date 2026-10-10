@@ -96,6 +96,13 @@ const createData = (pages: GalleryItem[][]): GalleryItemsData => {
 const getItemsKey = (boardId: string, owner: AccountScope = captureAccountScope()) =>
   galleryKeys.items(owner, canonicalizeGalleryItemsFilter({ boardId, galleryView: 'images', searchTerm: '' }));
 
+const getPageKey = (boardId: string, offset = 60, owner: AccountScope = captureAccountScope()) =>
+  galleryKeys.itemPage(
+    owner,
+    canonicalizeGalleryItemsFilter({ boardId, galleryView: 'images', searchTerm: '' }),
+    offset
+  );
+
 const getData = (client: QueryClient, queryKey: ReturnType<typeof getItemsKey>): GalleryItemsData => {
   const data = client.getQueryData<GalleryItemsData>(queryKey);
 
@@ -300,6 +307,137 @@ describe('Gallery item cache patches', () => {
     expect(ranked.pages.map((page) => page.total)).toEqual([1]);
     expect(cluster.pages.flatMap((page) => page.items)).toEqual([{ ...target, boardId: 'board-2' }, untouched]);
     expect(cluster.pages.map((page) => page.total)).toEqual([2]);
+  });
+
+  describe('sparse page entries', () => {
+    it('patches star, delete, and move results and restores each page on rollback', () => {
+      const client = createClient();
+      const target = createItem('sparse-target.png', 'board-1', false);
+      const deleted = createItem('sparse-deleted.png', 'board-1', false, 'video');
+      const moved = createItem('sparse-moved.png', 'board-1', false);
+      const other = createItem('sparse-other.png', 'board-1', false);
+      const key = getPageKey('board-1');
+      const before: GalleryItemsPage = {
+        items: [target, deleted, moved, other],
+        itemIndices: [60, 62, 64, 65],
+        offset: 60,
+        total: 12,
+      };
+
+      client.setQueryData(key, before);
+
+      expect(getGalleryItemStarredFromCaches(client, [{ kind: 'image', name: target.name }])).toEqual(
+        new Map([[`image:${target.name}`, false]])
+      );
+      expect(getGalleryItemBoardIdsFromCaches(client, [{ kind: 'image', name: moved.name }])).toEqual(
+        new Map([[`image:${moved.name}`, 'board-1']])
+      );
+
+      const rollbackStar = patchGalleryItemCaches(client, {
+        kind: 'star',
+        result: getResult([{ kind: 'image', name: target.name }]),
+        starred: true,
+      });
+      expect(client.getQueryData<GalleryItemsPage>(key)?.items[0]).toEqual({ ...target, starred: true });
+      expect(client.getQueryData<GalleryItemsPage>(key)?.itemIndices).toEqual([60, 62, 64, 65]);
+      expect(client.getQueryData<GalleryItemsPage>(key)?.total).toBe(12);
+      rollbackStar();
+      expect(client.getQueryData<GalleryItemsPage>(key)).toEqual(before);
+
+      const rollbackDelete = patchGalleryItemCaches(client, {
+        kind: 'delete',
+        result: getResult([{ kind: 'video', name: deleted.name }]),
+      });
+      expect(client.getQueryData<GalleryItemsPage>(key)).toEqual({
+        items: [target, moved, other],
+        itemIndices: [60, 64, 65],
+        offset: 60,
+        total: 11,
+      });
+      rollbackDelete();
+      expect(client.getQueryData<GalleryItemsPage>(key)).toEqual(before);
+
+      const rollbackMove = patchGalleryItemCaches(client, {
+        boardId: 'board-2',
+        kind: 'move',
+        result: getResult([{ kind: 'image', name: moved.name }]),
+      });
+      expect(client.getQueryData<GalleryItemsPage>(key)).toEqual({
+        items: [target, deleted, other],
+        itemIndices: [60, 62, 65],
+        offset: 60,
+        total: 11,
+      });
+      rollbackMove();
+      expect(client.getQueryData<GalleryItemsPage>(key)).toEqual(before);
+    });
+    it('decrements every cached page of a listing by the items removed from any of them', () => {
+      const client = createClient();
+      const firstKey = getPageKey('board-1', 0);
+      const lastKey = getPageKey('board-1', 60);
+      const otherListingKey = getPageKey('board-2', 0);
+      const firstPage: GalleryItemsPage = {
+        items: [createItem('first.png')],
+        itemIndices: [0],
+        offset: 0,
+        total: 61,
+      };
+      const lastPage: GalleryItemsPage = {
+        items: [createItem('last.png')],
+        itemIndices: [60],
+        offset: 60,
+        total: 61,
+      };
+      const otherListingPage: GalleryItemsPage = {
+        items: [createItem('elsewhere.png', 'board-2')],
+        itemIndices: [0],
+        offset: 0,
+        total: 1,
+      };
+
+      client.setQueryData(firstKey, firstPage);
+      client.setQueryData(lastKey, lastPage);
+      client.setQueryData(otherListingKey, otherListingPage);
+
+      const rollback = patchGalleryItemCaches(client, {
+        boardId: 'board-3',
+        kind: 'move',
+        result: getResult([{ kind: 'image', name: 'last.png' }]),
+      });
+
+      expect(client.getQueryData<GalleryItemsPage>(firstKey)).toEqual({ ...firstPage, total: 60 });
+      expect(client.getQueryData<GalleryItemsPage>(lastKey)).toEqual({
+        items: [],
+        itemIndices: [],
+        offset: 60,
+        total: 60,
+      });
+      expect(client.getQueryData<GalleryItemsPage>(otherListingKey)).toBe(otherListingPage);
+
+      rollback();
+      expect(client.getQueryData<GalleryItemsPage>(firstKey)).toEqual(firstPage);
+      expect(client.getQueryData<GalleryItemsPage>(lastKey)).toEqual(lastPage);
+    });
+    it('re-applies a confirmed removal only to pages a mid-flight refetch restored the item to', () => {
+      const client = createClient();
+      const firstKey = getPageKey('board-1', 0);
+      const lastKey = getPageKey('board-1', 60);
+      const firstPage: GalleryItemsPage = { items: [createItem('first.png')], itemIndices: [0], offset: 0, total: 61 };
+      const lastPage: GalleryItemsPage = { items: [createItem('last.png')], itemIndices: [60], offset: 60, total: 61 };
+      const removedLastPage: GalleryItemsPage = { items: [], itemIndices: [], offset: 60, total: 60 };
+      const result = getResult([{ kind: 'image', name: 'last.png' }]);
+
+      client.setQueryData(firstKey, firstPage);
+      client.setQueryData(lastKey, lastPage);
+      patchGalleryItemCaches(client, { kind: 'delete', result });
+      // The last page is read again before the server applies the deletion, so it still holds the item and the total.
+      client.setQueryData(lastKey, lastPage);
+
+      patchGalleryItemCaches(client, { kind: 'delete', result }, { totals: 'holder' });
+
+      expect(client.getQueryData<GalleryItemsPage>(firstKey)).toEqual({ ...firstPage, total: 60 });
+      expect(client.getQueryData<GalleryItemsPage>(lastKey)).toEqual(removedLastPage);
+    });
   });
 
   describe('starred strip entries', () => {
@@ -596,6 +734,10 @@ describe('Gallery window rebuild', () => {
     expect(data.pages[1]?.items).toHaveLength(40);
     expect(data.pages[0]?.items[0]?.name).toBe('fresh-0.png');
     expect(data.pages.every((page) => page.total === 100)).toBe(true);
+    expect(data.pages.map((page) => Object.keys(page).sort())).toEqual([
+      ['itemIndices', 'items', 'offset', 'total'],
+      ['itemIndices', 'items', 'offset', 'total'],
+    ]);
     expect(client.getQueryState(key)?.isInvalidated).toBe(false);
     unsubscribe();
   });
@@ -655,13 +797,17 @@ describe('Gallery window rebuild', () => {
   it('rebuilds an observed date-board window through a fresh name list and one span hydration', async () => {
     const { client, key } = setUpStaleWindow(dateFilter);
     const unsubscribe = observeItems(client, dateFilter);
+    const freshItems = createPageItems('fresh', 120).filter((_, index) => index !== 61);
+    const freshIndices = freshItems.map((_, index) => (index < 61 ? index : index + 1));
 
     vi.mocked(listGalleryDateBoardItemNames).mockResolvedValue({
       items: createPageItems('fresh', 130).map(({ kind, name }) => ({ kind, name })),
       total: 130,
     });
     vi.mocked(hydrateGalleryDateBoardItemPage).mockResolvedValue({
-      items: createPageItems('fresh', 120),
+      items: freshItems,
+      itemIndices: freshIndices,
+      offset: 0,
       total: 130,
     });
 
@@ -676,7 +822,13 @@ describe('Gallery window rebuild', () => {
     const data = getData(client, key);
 
     expect(data.pageParams).toEqual([0, 60]);
-    expect(data.pages[1]?.items).toHaveLength(60);
+    expect(data.pages[1]?.items).toHaveLength(59);
+    expect(data.pages[1]).toMatchObject({
+      items: expect.any(Array),
+      itemIndices: [60, ...Array.from({ length: 58 }, (_, index) => index + 62)],
+      offset: 60,
+      total: 130,
+    });
     expect(client.getQueryState(key)?.isInvalidated).toBe(false);
     unsubscribe();
   });
@@ -724,7 +876,7 @@ describe('Gallery window rebuild', () => {
     const data = getData(client, key);
 
     expect(data.pageParams).toEqual([0]);
-    expect(data.pages).toEqual([{ items: [], total: 0 }]);
+    expect(data.pages).toEqual([{ items: [], itemIndices: [], offset: 0, total: 0 }]);
     expect(client.getQueryState(key)?.isInvalidated).toBe(false);
     unsubscribe();
   });

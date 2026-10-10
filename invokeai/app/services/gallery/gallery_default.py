@@ -5,6 +5,7 @@ from invokeai.app.services.gallery.gallery_common import (
     BoardMediaSummary,
     GalleryItem,
     GalleryItemKind,
+    GalleryItemLocation,
     GalleryItemNames,
     GalleryItemNamesResult,
     GalleryItemRef,
@@ -68,6 +69,45 @@ class GalleryService(GalleryServiceABC):
         )
         items = [self._to_item(row) for row in rows]
         return OffsetPaginatedResults[GalleryItem](items=items, offset=offset, limit=limit, total=total)
+
+    def get_item_location(
+        self,
+        kind: GalleryItemKind,
+        name: str,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        origin: Optional[ResourceOrigin] = None,
+        categories: Optional[list[ImageCategory]] = None,
+        is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
+        starred: Optional[bool] = None,
+    ) -> Optional[GalleryItemLocation]:
+        """Finds item's exact rank without building or returning the full name list."""
+        filters = Filters(
+            origin=origin,
+            categories=categories,
+            is_intermediate=is_intermediate,
+            board_id=board_id,
+            search_term=search_term,
+            user_id=user_id,
+            is_admin=is_admin,
+            created_from=created_from,
+            created_to=created_to,
+            starred=starred,
+        )
+        row = self._queries.gallery.location(
+            filters, kind=kind.value, name=name, descending=order_dir == SQLiteDirection.Descending
+        )
+        if row is None:
+            return None
+        found_kind, found_name, index, total = row
+        return GalleryItemLocation(
+            kind=GalleryItemKind(found_kind), name=found_name, index=int(index), total=int(total)
+        )
 
     def _names(self, filters: Filters, starred_first: bool, order_dir: SQLiteDirection) -> tuple[Sequence[Any], int]:
         """The ordered (kind, name, starred) rows and the starred count. Shared by both name-list shapes so the

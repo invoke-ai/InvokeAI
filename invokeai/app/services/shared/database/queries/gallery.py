@@ -41,6 +41,7 @@ from invokeai.app.services.shared.database.dialect import (
     CaseInsensitiveLike,
     JsonString,
     OrderedJoin,
+    fixed_limit,
     like_contains,
 )
 from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, day_after, read
@@ -357,6 +358,24 @@ class BoardSummary(NamedTuple):
     cover_video_name: Optional[str]
 
 
+@functools.lru_cache(maxsize=256)
+def _location(shape: _Shape, descending: bool) -> Select[Any]:
+    """An item's zero-based index in the listing `_names` orders (starred items not first), and how many items match:
+    ranked in the database, so no list of names is built. (Bind names other than the filters' own.)"""
+    items = union_all(_half("image", shape, True), _half("video", shape, True)).subquery("items")
+    ranked = select(
+        items.c.kind,
+        items.c.name,
+        (func.row_number().over(order_by=_ordering(items, False, descending)) - 1).label("item_index"),
+        func.count().over().label("total"),
+    ).subquery("ranked")
+    return (
+        select(ranked.c.kind, ranked.c.name, ranked.c.item_index, ranked.c.total)
+        .where(ranked.c.kind == bindparam("location_kind"), ranked.c.name == bindparam("location_name"))
+        .limit(fixed_limit(1))
+    )
+
+
 class GalleryQueries(QueryModule):
     @read
     def page(
@@ -374,6 +393,14 @@ class GalleryQueries(QueryModule):
     def names(self, conn: Connection, filters: Filters, *, starred_first: bool, descending: bool) -> Sequence[Row[Any]]:
         """(kind, name, starred) of every item that matches, in order."""
         return conn.execute(_names(filters.shape(), starred_first, descending), filters.parameters()).all()
+
+    @read
+    def location(
+        self, conn: Connection, filters: Filters, *, kind: str, name: str, descending: bool
+    ) -> Optional[Row[Any]]:
+        """(kind, name, index, total) of the named item in the listing, or None when the filters leave it out."""
+        parameters = {**filters.parameters(), "location_kind": kind, "location_name": name}
+        return conn.execute(_location(filters.shape(), descending), parameters).first()
 
     @read
     def date_counts(

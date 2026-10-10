@@ -322,7 +322,8 @@ class ZImageDenoiseInvocation(BaseInvocation):
         and 3.85 GiB at 2048px (16896) -- 0.22 to 0.23 MB per token, unchanged between 2 and 4 blocks, because a
         no-grad forward frees each block's intermediates. 0.25 MB per token bounds every point on its own, with
         room for the ~5% more ROCm needed on FLUX.2. The fixed base covers what does not scale with the sequence
-        -- GGUF and fp8 weights cast per forward, and allocator slack across steps. Conditional and unconditional
+        -- fp8 weights cast per forward, and allocator slack across steps; the caller adds the dequantization copy
+        of an int8, nvfp4 or GGUF build. Conditional and unconditional
         passes run one after the other, so only the longer caption counts.
 
         Where SDPA has no fused kernel for these shapes it materializes the score matrices, and those dominate:
@@ -565,7 +566,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 device=device,
                 dtype=inference_dtype,
             )
-            # An int8_tensorwise or nvfp4 build materializes each quantized linear's weight per forward, alive
+            # An int8_tensorwise, nvfp4 or GGUF build materializes each quantized linear's weight per forward, alive
             # alongside the activations above and invisible to them. Read from the unlocked model; zero for
             # every other build.
             working_mem_bytes += peak_dequant_transient_bytes(transformer_info.model, inference_dtype)
