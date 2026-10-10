@@ -49,8 +49,8 @@ from invokeai.app.services.intermediates.intermediates_common import (
     IntermediatesUnavailableError,
 )
 from invokeai.app.services.intermediates.intermediates_measurement import IntermediatesSizeMeasurer
-from invokeai.app.services.intermediates.intermediates_records_sqlite import (
-    IntermediatesRecordsSqlite,
+from invokeai.app.services.intermediates.intermediates_records_default import (
+    IntermediatesRecords,
     MediaKind,
     ReferenceOwner,
     ScopeTarget,
@@ -111,7 +111,7 @@ class _Operation:
 
 
 class IntermediatesService(IntermediatesServiceBase):
-    def __init__(self, records: IntermediatesRecordsSqlite, logger: Optional[logging.Logger] = None) -> None:
+    def __init__(self, records: IntermediatesRecords, logger: Optional[logging.Logger] = None) -> None:
         self._records = records
         self._logger = logger or logging.getLogger(__name__)
         self._invoker: Optional[Invoker] = None
@@ -129,6 +129,7 @@ class IntermediatesService(IntermediatesServiceBase):
     def start(self, invoker: Invoker) -> None:
         self._invoker = invoker
         self._stop.clear()
+        self._records.start()
         self._measurer.reset()
 
     def stop(self, invoker: Optional[Invoker] = None) -> None:

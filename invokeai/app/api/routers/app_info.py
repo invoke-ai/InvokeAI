@@ -27,6 +27,7 @@ from invokeai.app.services.external_generation.external_generation_common import
 from invokeai.app.services.external_generation.startup import sync_configured_external_starter_models
 from invokeai.app.services.invocation_cache.invocation_cache_common import InvocationCacheStatus
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
+from invokeai.app.services.shared.database.startup import redacted_database_url
 from invokeai.backend.image_util.infill_methods.patchmatch import PatchMatch
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from invokeai.backend.util.devices import TorchDevice
@@ -237,6 +238,9 @@ def _redact_config_secrets(config: InvokeAIAppConfig) -> InvokeAIAppConfig:
 
     if config.download_proxy and "@" in config.download_proxy:
         updates["download_proxy"] = REDACTED_SECRET
+
+    if config.db_url:
+        updates["db_url"] = redacted_database_url(config.db_url)
 
     return config.model_copy(update=updates) if updates else config
 

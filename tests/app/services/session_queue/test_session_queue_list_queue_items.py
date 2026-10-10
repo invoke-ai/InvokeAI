@@ -1,38 +1,43 @@
 """Queue listings stay inside their filters: cursor pages of list_queue_items, and the item id listing whose
 limited form is the head of its full order."""
 
-import json
 import uuid
+from typing import Any
 
 import pytest
-from pydantic_core import to_jsonable_python
+from sqlalchemy import insert
 
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
+from invokeai.app.services.session_queue.session_queue_common import QUEUE_ITEM_STATUS
+from invokeai.app.services.session_queue.session_queue_default import SessionQueue
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.schema.session_queue import session_queue as session_queue_table
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 
-_SESSION_JSON = json.dumps(to_jsonable_python(GraphExecutionState(graph=Graph()).model_dump()))
+_SESSION_JSON = GraphExecutionState(graph=Graph()).model_dump_json()
 
 
 @pytest.fixture
-def session_queue(mock_invoker: Invoker) -> SqliteSessionQueue:
-    return SqliteSessionQueue(db=mock_invoker.services.board_records._db)
+def session_queue(mock_invoker: Invoker, database: Database) -> SessionQueue:
+    queue = SessionQueue(database)
+    queue.start(mock_invoker)
+    return queue
 
 
-def _insert(session_queue: SqliteSessionQueue, queue_id: str, status: str, destination: str, priority: int = 0) -> int:
-    with session_queue._db.transaction() as cursor:
-        cursor.execute(
-            """--sql
-            INSERT INTO session_queue (queue_id, session, session_id, batch_id, priority, status, destination)
-            VALUES (?, ?, ?, 'batch', ?, ?, ?);
-            """,
-            (queue_id, _SESSION_JSON, str(uuid.uuid4()), priority, status, destination),
-        )
-        return cursor.lastrowid  # type: ignore[return-value]
+def _insert_row(session_queue: SessionQueue, **values: Any) -> int:
+    row = {"session": _SESSION_JSON, "session_id": str(uuid.uuid4()), "batch_id": "batch", **values}
+    with session_queue._queries._database.begin(write=True) as conn:
+        return int(conn.execute(insert(session_queue_table).values(row)).inserted_primary_key[0])
 
 
-def test_cursor_page_excludes_items_outside_the_filters(session_queue: SqliteSessionQueue) -> None:
+def _insert(
+    session_queue: SessionQueue, queue_id: str, status: QUEUE_ITEM_STATUS, destination: str, priority: int = 0
+) -> int:
+    return _insert_row(session_queue, queue_id=queue_id, status=status, destination=destination, priority=priority)
+
+
+def test_cursor_page_excludes_items_outside_the_filters(session_queue: SessionQueue) -> None:
     first = _insert(session_queue, "q1", "pending", "canvas", priority=1)
     second = _insert(session_queue, "q1", "pending", "canvas", priority=1)
     _insert(session_queue, "q2", "pending", "canvas", priority=1)
@@ -63,16 +68,8 @@ LISTED_ROWS = [
 ]
 
 
-def _insert_listed(session_queue: SqliteSessionQueue, queue_id: str, created_at: str, user_id: str, origin: str) -> int:
-    with session_queue._db.transaction() as cursor:
-        cursor.execute(
-            """--sql
-            INSERT INTO session_queue (queue_id, session, session_id, batch_id, created_at, user_id, origin)
-            VALUES (?, ?, ?, 'batch', ?, ?, ?);
-            """,
-            (queue_id, _SESSION_JSON, str(uuid.uuid4()), created_at, user_id, origin),
-        )
-        return cursor.lastrowid  # type: ignore[return-value]
+def _insert_listed(session_queue: SessionQueue, queue_id: str, created_at: str, user_id: str, origin: str) -> int:
+    return _insert_row(session_queue, queue_id=queue_id, created_at=created_at, user_id=user_id, origin=origin)
 
 
 @pytest.mark.parametrize(
@@ -90,7 +87,7 @@ def _insert_listed(session_queue: SqliteSessionQueue, queue_id: str, created_at:
     ],
 )
 def test_limited_item_ids_are_the_head_of_the_filtered_order(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
     direction: SQLiteDirection,
     filters: dict[str, str],
     expected_rows: list[int],

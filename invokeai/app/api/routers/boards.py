@@ -17,8 +17,7 @@ from invokeai.app.services.board_records.board_records_common import (
 )
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.image_records.image_records_common import ImageCategory
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults, SQLiteDirection
 
 boards_router = APIRouter(prefix="/v1/boards", tags=["boards"])
 
@@ -254,8 +253,8 @@ def list_boards(
     order_by: BoardRecordOrderBy = Query(default=BoardRecordOrderBy.CreatedAt, description="The attribute to order by"),
     direction: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The direction to order by"),
     all: Optional[bool] = Query(default=None, description="Whether to list all boards"),
-    offset: Optional[int] = Query(default=None, description="The page offset"),
-    limit: Optional[int] = Query(default=None, description="The number of boards per page"),
+    offset: Optional[int] = Query(default=None, ge=0, description="The page offset"),
+    limit: Optional[int] = Query(default=None, ge=0, le=MAX_PAGE_SIZE, description="The number of boards per page"),
     include_archived: bool = Query(default=False, description="Whether or not to include archived boards in list"),
 ) -> Union[OffsetPaginatedResults[BoardDTO], list[BoardDTO]]:
     """Gets a list of boards for the current user, including shared boards. Admin users see all boards."""

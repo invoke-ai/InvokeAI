@@ -1,22 +1,31 @@
-"""An existing queue gains the listing index without any queue read changing what it returns."""
+"""An existing queue gains the listing index without any queue read changing what it returns.
+
+The index exists only on SQLite; on a server the migration does nothing.
+"""
 
 import uuid
-from logging import Logger
+from collections.abc import Iterator, Sequence
+from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock
+from unittest import mock
 
-from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+import pytest
+from sqlalchemy import delete, insert, inspect
+
+from invokeai.app.services.config.config_default import DefaultInvokeAIAppConfig
+from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
+from invokeai.app.services.session_queue.session_queue_default import SessionQueue
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.schema.migrator import applied_migrations
+from invokeai.app.services.shared.database.schema.session_queue import session_queue as session_queue_table
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.services.shared.sqlite_migrator.migration_loader import MigrationBuildContext, build_migrations
-from invokeai.app.services.shared.sqlite_migrator.migrations.migration_2026_10_04_add_session_queue_listing_index import (
-    build_migration,
-)
-from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
-from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import SqliteMigrator
+from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import MigrationBase
+from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import Migrator
+from invokeai.backend.util.logging import InvokeAILogger
 
 MIGRATION_ID = "2026_10_04_add_session_queue_listing_index"
+INDEX = "idx_session_queue_listing"
 PREFIX = "webv2:p:project-1:q:"
 
 # (created_at, user_id, origin, status), inserted in this order. One enqueue writes its rows within the
@@ -32,18 +41,41 @@ ROWS = [
 ]
 
 
-def _run(db: SqliteDatabase, migrations: list[Migration]) -> bool:
-    migrator = SqliteMigrator(db=db)
+@pytest.fixture
+def migrations(tmp_path: Path) -> list[MigrationBase]:
+    # Migrations clean up legacy files under the root. No settings from the environment or a config file may
+    # point them anywhere else.
+    config = DefaultInvokeAIAppConfig()
+    config._root = tmp_path
+    context = MigrationBuildContext(
+        app_config=config,
+        logger=InvokeAILogger.get_logger("test_listing_index_migration"),
+        image_files=mock.Mock(spec=ImageFileStorageBase),
+    )
+    return build_migrations(context)
+
+
+@pytest.fixture
+def sqlite_database() -> Iterator[Database]:
+    database = Database.open_sqlite(None, InvokeAILogger.get_logger("test_listing_index_migration"))
+    try:
+        yield database
+    finally:
+        database.dispose()
+
+
+def _run(database: Database, migrations: Sequence[MigrationBase]) -> bool:
+    migrator = Migrator(database)
     for migration in migrations:
         migrator.register_migration(migration)
     return migrator.run_migrations()
 
 
-def _previous_state(migrations: list[Migration]) -> list[Migration]:
+def _previous_state(migrations: list[MigrationBase]) -> list[MigrationBase]:
     """Every migration except this one and those that depend on it, directly or not."""
     by_id = {migration.id: migration for migration in migrations}
 
-    def depends_on_this(migration: Migration) -> bool:
+    def depends_on_this(migration: MigrationBase) -> bool:
         current: str | None = migration.id
         while current is not None:
             if current == MIGRATION_ID:
@@ -54,12 +86,12 @@ def _previous_state(migrations: list[Migration]) -> list[Migration]:
     return [migration for migration in migrations if not depends_on_this(migration)]
 
 
-def _has_index(db: SqliteDatabase) -> bool:
-    row = db._conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'idx_session_queue_listing';").fetchone()
-    return row is not None
+def _has_index(database: Database) -> bool:
+    with database.begin(write=False) as conn:
+        return any(index["name"] == INDEX for index in inspect(conn).get_indexes("session_queue"))
 
 
-def _reads(queue: SqliteSessionQueue) -> dict[str, Any]:
+def _reads(queue: SessionQueue) -> dict[str, Any]:
     def ids(direction: SQLiteDirection, **filters: str) -> list[int]:
         return queue.get_queue_item_ids("default", direction, **filters).item_ids
 
@@ -79,25 +111,30 @@ def _reads(queue: SqliteSessionQueue) -> dict[str, Any]:
     }
 
 
-def test_indexes_an_existing_queue_without_changing_its_reads() -> None:
-    logger = Logger("test")
-    context = MigrationBuildContext(
-        app_config=InvokeAIAppConfig(use_memory_db=True, node_cache_size=0), logger=logger, image_files=MagicMock()
-    )
-    migrations = build_migrations(context)
-    db = SqliteDatabase(db_path=None, logger=logger)
-    assert _run(db, _previous_state(migrations))
-    assert not _has_index(db)
+def test_indexes_an_existing_queue_without_changing_its_reads(
+    sqlite_database: Database, migrations: list[MigrationBase]
+) -> None:
+    assert _run(sqlite_database, _previous_state(migrations))
+    assert not _has_index(sqlite_database)
 
-    with db.transaction() as cursor:
-        cursor.executemany(
-            """--sql
-            INSERT INTO session_queue (queue_id, session, session_id, batch_id, created_at, user_id, origin, status)
-            VALUES ('default', '{}', ?, 'batch', ?, ?, ?, ?);
-            """,
-            [(str(uuid.uuid4()), *row) for row in ROWS],
+    with sqlite_database.begin(write=True) as conn:
+        conn.execute(
+            insert(session_queue_table),
+            [
+                {
+                    "queue_id": "default",
+                    "session": "{}",
+                    "session_id": str(uuid.uuid4()),
+                    "batch_id": "batch",
+                    "created_at": created_at,
+                    "user_id": user_id,
+                    "origin": origin,
+                    "status": status,
+                }
+                for created_at, user_id, origin, status in ROWS
+            ],
         )
-    queue = SqliteSessionQueue(db=db)
+    queue = SessionQueue(sqlite_database)
     before = _reads(queue)
 
     # Newest first; rows enqueued together keep their enqueue order in either direction.
@@ -110,10 +147,15 @@ def test_indexes_an_existing_queue_without_changing_its_reads() -> None:
     # In the requested order; an unknown id is skipped.
     assert before["summaries"] == [(3, "completed", f"{PREFIX}c"), (1, "completed", f"{PREFIX}a")]
 
-    assert _run(db, migrations)
-    assert _has_index(db)
+    assert _run(sqlite_database, migrations)
+    assert _has_index(sqlite_database)
     assert _reads(queue) == before
 
-    assert not _run(db, migrations)
-    build_migration().callback(db._conn.cursor())
+    assert not _run(sqlite_database, migrations)
+    # Run again with its record lost, as a run that failed after creating the index leaves it: the migration finds
+    # the index and keeps it.
+    with sqlite_database.begin(write=True) as conn:
+        conn.execute(delete(applied_migrations).where(applied_migrations.c.migration_id == MIGRATION_ID))
+    assert _run(sqlite_database, migrations)
+    assert _has_index(sqlite_database)
     assert _reads(queue) == before

@@ -14,7 +14,9 @@ from PIL import Image, UnidentifiedImageError
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
 from invokeai.app.services.image_records.image_records_common import ImageCategory
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.queries import Queries
+from invokeai.app.services.shared.database.queries.image_moves import MoveItem
 from invokeai.app.util.thumbnails import make_thumbnail
 
 MoveJobState = Literal["planned", "moving", "moved", "committed", "error"]
@@ -69,15 +71,28 @@ class UnreadableImageError(Exception):
     pass
 
 
+def _journaled(move: PlannedImageMove) -> MoveItem:
+    return MoveItem(
+        image_name=move.image_name,
+        old_subfolder=move.old_subfolder,
+        new_subfolder=move.new_subfolder,
+        is_intermediate=move.is_intermediate,
+        old_path=str(move.old_path),
+        new_path=str(move.new_path),
+        old_thumbnail_path=str(move.old_thumbnail_path),
+        new_thumbnail_path=str(move.new_thumbnail_path),
+    )
+
+
 class ImageMoveService:
     def __init__(
         self,
-        db: SqliteDatabase,
+        database: Database,
         image_files: ImageFileStorageBase,
         config: InvokeAIAppConfig,
         logger,
     ) -> None:
-        self._db = db
+        self._queries = database.queries
         self.image_files = image_files
         self._config = config
         self._logger = logger
@@ -156,7 +171,7 @@ class ImageMoveService:
                 or (self._future is not None and not self._future.done())
             ):
                 raise ImageMoveJobAlreadyRunning("An image storage maintenance operation is already running")
-            if self._get_active_job_id() is not None:
+            if self._queries.image_moves.active_job_id() is not None:
                 raise ImageMoveJobAlreadyRunning("An image move job is already active")
             self._gallery_maintenance_reserved = True
 
@@ -187,7 +202,12 @@ class ImageMoveService:
             is_running = self._future is not None and not self._future.done()
             operation_reserved = self._future_operation is not None
             gallery_maintenance_reserved = self._gallery_maintenance_reserved
-        return gallery_maintenance_reserved or operation_reserved or is_running or self._get_active_job_id() is not None
+        return (
+            gallery_maintenance_reserved
+            or operation_reserved
+            or is_running
+            or self._queries.image_moves.active_job_id() is not None
+        )
 
     def _assert_no_active_queue_work(self) -> None:
         session_queue = self._session_queue
@@ -210,7 +230,7 @@ class ImageMoveService:
                 raise ImageMoveJobAlreadyRunning("An image storage maintenance operation is already running")
             if self._future_operation is not None or (self._future is not None and not self._future.done()):
                 raise ImageMoveJobAlreadyRunning("An image move job is already running")
-            active_job_id = self._get_active_job_id()
+            active_job_id = self._queries.image_moves.active_job_id()
             if operation != "recovery" and active_job_id is not None:
                 raise ImageMoveJobAlreadyRunning("An image move job is already active")
             self._last_background_error = None
@@ -239,7 +259,7 @@ class ImageMoveService:
     def _record_background_error(self, message: str) -> None:
         with self._future_lock:
             self._last_background_error = message
-        active_job_id = self._get_active_job_id()
+        active_job_id = self._queries.image_moves.active_job_id()
         if active_job_id is not None:
             try:
                 self.record_job_error_message(active_job_id, message)
@@ -257,7 +277,7 @@ class ImageMoveService:
         return ImageMoveBackgroundStatus(
             is_running=self._future is not None and not self._future.done(),
             operation=self._future_operation,
-            active_job_id=self._get_active_job_id(),
+            active_job_id=self._queries.image_moves.active_job_id(),
             latest_job=latest_job,
             last_error=self._last_background_error,
             needs_move_count=self.count_images_needing_move(),
@@ -284,7 +304,7 @@ class ImageMoveService:
                 )
                 errors += plan_errors
                 if not moves:
-                    next_name = self._next_image_name(last_image_name)
+                    next_name = self._queries.image_moves.next_image_name(last_image_name)
                     if next_name is None:
                         break
                     last_image_name = next_name
@@ -295,7 +315,7 @@ class ImageMoveService:
                 try:
                     self.perform_filesystem_moves(job_id)
                     committed += self.commit_database_updates(job_id)
-                    errors += self._count_job_errors(job_id)
+                    errors += self._queries.image_moves.error_count(job_id)
                 except Exception as e:
                     errors += 1
                     self.record_job_error_message(job_id, str(e))
@@ -305,15 +325,7 @@ class ImageMoveService:
         return ImageMoveResult(planned=planned, committed=committed, errors=errors)
 
     def startup_recovery(self) -> ImageMoveResult:
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT id FROM image_subfolder_move_jobs
-                WHERE state IN ('planned', 'moving', 'moved')
-                ORDER BY id;
-                """
-            )
-            job_ids = [cast(int, row[0]) for row in cursor.fetchall()]
+        job_ids = self._queries.image_moves.recoverable_job_ids()
 
         committed = 0
         errors = 0
@@ -329,12 +341,12 @@ class ImageMoveService:
             except Exception as e:
                 if self._is_unrecoverable_error(e):
                     self.mark_job_unrecoverable(job_id, str(e))
-                    errors += max(1, self._count_job_errors(job_id))
+                    errors += max(1, self._queries.image_moves.error_count(job_id))
                 else:
                     errors += 1
                     self.record_job_error_message(job_id, str(e))
             else:
-                errors += self._count_job_errors(job_id)
+                errors += self._queries.image_moves.error_count(job_id)
         return ImageMoveResult(committed=committed, errors=errors)
 
     def plan_batch(self, last_image_name: str, limit: int) -> list[PlannedImageMove]:
@@ -342,74 +354,34 @@ class ImageMoveService:
         return moves
 
     def count_images_needing_move(self) -> int:
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT image_name, image_subfolder, image_category, is_intermediate, created_at
-                FROM images
-                WHERE deleted_at IS NULL;
-                """
-            )
-            rows = cursor.fetchall()
-
+        # Runs over every image on each status poll, so it calls the subfolder rule directly.
         count = 0
-        for row in rows:
-            old_subfolder = cast(str, row["image_subfolder"] or "")
+        for image_name, subfolder, category, is_intermediate, created_at in self._queries.image_moves.placements():
             new_subfolder = self._get_new_subfolder(
-                image_name=cast(str, row["image_name"]),
-                image_category=ImageCategory(row["image_category"]),
-                is_intermediate=bool(row["is_intermediate"]),
-                created_at=row["created_at"],
+                image_name=image_name,
+                image_category=ImageCategory(category),
+                is_intermediate=is_intermediate,
+                created_at=created_at,
             )
-            if new_subfolder != old_subfolder:
+            if new_subfolder != subfolder:
                 count += 1
         return count
 
     def _plan_batch(
         self, last_image_name: str, limit: int, record_missing_errors: bool
     ) -> tuple[list[PlannedImageMove], int]:
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT image_name, image_subfolder, image_category, is_intermediate, created_at
-                FROM images
-                WHERE image_name > ?
-                  AND deleted_at IS NULL
-                ORDER BY image_name
-                LIMIT ?;
-                """,
-                (last_image_name, limit),
-            )
-            rows = cursor.fetchall()
-
         moves: list[PlannedImageMove] = []
-        for row in rows:
-            image_name = cast(str, row["image_name"])
-            old_subfolder = cast(str, row["image_subfolder"] or "")
+        for image_name, subfolder, category, is_intermediate, created_at in self._queries.image_moves.placements_after(
+            last_image_name, limit
+        ):
             new_subfolder = self._get_new_subfolder(
                 image_name=image_name,
-                image_category=ImageCategory(row["image_category"]),
-                is_intermediate=bool(row["is_intermediate"]),
-                created_at=row["created_at"],
+                image_category=ImageCategory(category),
+                is_intermediate=is_intermediate,
+                created_at=created_at,
             )
-            if new_subfolder == old_subfolder:
-                continue
-            moves.append(
-                PlannedImageMove(
-                    image_name=image_name,
-                    old_subfolder=old_subfolder,
-                    new_subfolder=new_subfolder,
-                    is_intermediate=bool(row["is_intermediate"]),
-                    old_path=self.image_files.get_path(image_name, image_subfolder=old_subfolder),
-                    new_path=self.image_files.get_path(image_name, image_subfolder=new_subfolder),
-                    old_thumbnail_path=self.image_files.get_path(
-                        image_name, thumbnail=True, image_subfolder=old_subfolder
-                    ),
-                    new_thumbnail_path=self.image_files.get_path(
-                        image_name, thumbnail=True, image_subfolder=new_subfolder
-                    ),
-                )
-            )
+            if new_subfolder != subfolder:
+                moves.append(self._planned_move(image_name, subfolder, new_subfolder, is_intermediate))
         errors = 0
         if record_missing_errors:
             moves, errors = self._record_missing_source_errors(moves)
@@ -419,88 +391,13 @@ class ImageMoveService:
     def create_move_job(self, moves: Sequence[PlannedImageMove]) -> int:
         if not moves:
             raise ValueError("Cannot create an image move job with no items")
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT 1
-                FROM image_subfolder_move_jobs
-                WHERE state NOT IN ('committed', 'error')
-                LIMIT 1;
-                """
-            )
-            if cursor.fetchone() is not None:
-                raise ValueError("Cannot create image move job while another active image move job exists")
-            cursor.execute("INSERT INTO image_subfolder_move_jobs (state) VALUES ('planned');")
-            job_id = cast(int, cursor.lastrowid)
-            cursor.executemany(
-                """--sql
-                INSERT INTO image_subfolder_move_items (
-                    job_id,
-                    image_name,
-                    old_subfolder,
-                    new_subfolder,
-                    is_intermediate,
-                    old_path,
-                    new_path,
-                    old_thumbnail_path,
-                    new_thumbnail_path,
-                    state
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'planned');
-                """,
-                [
-                    (
-                        job_id,
-                        move.image_name,
-                        move.old_subfolder,
-                        move.new_subfolder,
-                        int(move.is_intermediate),
-                        str(move.old_path),
-                        str(move.new_path),
-                        str(move.old_thumbnail_path),
-                        str(move.new_thumbnail_path),
-                    )
-                    for move in moves
-                ],
-            )
-            return job_id
+        job_id = self._queries.image_moves.create_job([_journaled(move) for move in moves])
+        if job_id is None:
+            raise ValueError("Cannot create image move job while another active image move job exists")
+        return job_id
 
     def create_error_move_job(self, move: PlannedImageMove, message: str) -> int:
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                "INSERT INTO image_subfolder_move_jobs (state, error_message) VALUES ('error', ?);",
-                (message,),
-            )
-            job_id = cast(int, cursor.lastrowid)
-            cursor.execute(
-                """--sql
-                INSERT INTO image_subfolder_move_items (
-                    job_id,
-                    image_name,
-                    old_subfolder,
-                    new_subfolder,
-                    is_intermediate,
-                    old_path,
-                    new_path,
-                    old_thumbnail_path,
-                    new_thumbnail_path,
-                    state,
-                    error_message
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'error', ?);
-                """,
-                (
-                    job_id,
-                    move.image_name,
-                    move.old_subfolder,
-                    move.new_subfolder,
-                    int(move.is_intermediate),
-                    str(move.old_path),
-                    str(move.new_path),
-                    str(move.old_thumbnail_path),
-                    str(move.new_thumbnail_path),
-                    message,
-                ),
-            )
-            return job_id
+        return self._queries.image_moves.create_failed_job(_journaled(move), message)
 
     def preflight_moves(self, moves: Sequence[PlannedImageMove]) -> None:
         destinations: set[Path] = set()
@@ -520,7 +417,7 @@ class ImageMoveService:
             if move.new_thumbnail_path in thumbnail_destinations:
                 raise ValueError(f"Duplicate destination thumbnail path: {move.new_thumbnail_path}")
             thumbnail_destinations.add(move.new_thumbnail_path)
-            if self._has_active_job_for_image(move.image_name):
+            if self._queries.image_moves.has_active_job_for_image(move.image_name):
                 raise ValueError(f"Image {move.image_name} already has an active image move job")
             self._assert_same_filesystem(move.old_path, move.new_path)
             if move.old_thumbnail_path.exists():
@@ -542,10 +439,10 @@ class ImageMoveService:
         return remaining_moves, errors
 
     def perform_filesystem_moves(self, job_id: int) -> None:
-        self._set_job_state(job_id, "moving")
+        self._queries.image_moves.set_job_state(job_id, "moving")
         self.complete_partial_filesystem_moves(job_id)
         self.cleanup_empty_source_dirs(job_id)
-        self._set_job_state(job_id, "moved")
+        self._queries.image_moves.set_job_state(job_id, "moved")
 
     def complete_partial_filesystem_moves(self, job_id: int) -> None:
         items = self._get_items(job_id, include_terminal=False)
@@ -636,16 +533,7 @@ class ImageMoveService:
         new_path = self.image_files.get_path(item.image_name, image_subfolder=item.new_subfolder)
         if old_path.exists() or not new_path.exists():
             return
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                UPDATE images
-                SET image_subfolder = ?
-                WHERE image_name = ?
-                  AND image_subfolder = ?;
-                """,
-                (item.new_subfolder, item.image_name, item.old_subfolder),
-            )
+        self._queries.image_moves.repoint_image(item.image_name, item.old_subfolder, item.new_subfolder)
 
     def cleanup_empty_source_dirs(self, job_id: int) -> None:
         for item in self._get_items(job_id):
@@ -659,154 +547,45 @@ class ImageMoveService:
             )
 
     def commit_database_updates(self, job_id: int) -> int:
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                UPDATE images
-                SET image_subfolder = (
-                    SELECT item.new_subfolder
-                    FROM image_subfolder_move_items AS item
-                    WHERE item.job_id = ?
-                      AND item.image_name = images.image_name
-                )
-                WHERE image_name IN (
-                    SELECT image_name
-                    FROM image_subfolder_move_items
-                    WHERE job_id = ?
-                      AND state = 'moved'
-                )
-                AND image_subfolder = (
-                    SELECT item.old_subfolder
-                    FROM image_subfolder_move_items AS item
-                    WHERE item.job_id = ?
-                      AND item.image_name = images.image_name
-                );
-                """,
-                (job_id, job_id, job_id),
-            )
-            cursor.execute(
-                """--sql
-                SELECT COUNT(*)
-                FROM image_subfolder_move_items AS item
-                LEFT JOIN images ON images.image_name = item.image_name
-                WHERE item.job_id = ?
-                  AND item.state = 'moved'
-                  AND (
-                    images.image_name IS NULL
-                    OR images.deleted_at IS NOT NULL
-                    OR images.image_subfolder != item.new_subfolder
-                  );
-                """,
-                (job_id,),
-            )
-            invalid_count = cast(int, cursor.fetchone()[0])
-            if invalid_count:
+        def commit(q: Queries) -> int:
+            moved_count = q.image_moves.repoint_moved_images(job_id)
+            if q.image_moves.invalid_move_count(job_id):
+                # Raised inside the transaction, so that no record is repointed.
                 raise RuntimeError(f"Image move job {job_id} failed commit validation")
-            cursor.execute(
-                "SELECT COUNT(*) FROM image_subfolder_move_items WHERE job_id = ? AND state = 'moved';",
-                (job_id,),
-            )
-            moved_count = cast(int, cursor.fetchone()[0])
-            cursor.execute(
-                """--sql
-                SELECT error_message
-                FROM image_subfolder_move_items
-                WHERE job_id = ? AND state = 'error'
-                ORDER BY image_name;
-                """,
-                (job_id,),
-            )
-            error_rows = cursor.fetchall()
-            error_messages = [cast(str, row[0]) for row in error_rows if row[0]]
-            cursor.execute(
-                "UPDATE image_subfolder_move_items SET state = 'committed' WHERE job_id = ? AND state = 'moved';",
-                (job_id,),
-            )
-            if not error_rows:
-                cursor.execute(
-                    "UPDATE image_subfolder_move_jobs SET state = 'committed', error_message = NULL WHERE id = ?;",
-                    (job_id,),
+            error_messages = q.image_moves.error_messages(job_id)
+            error_message = None
+            if error_messages:
+                error_message = "\n".join(message for message in error_messages if message) or (
+                    "One or more image move items could not be completed"
                 )
-            else:
-                cursor.execute(
-                    "UPDATE image_subfolder_move_jobs SET state = 'error', error_message = ? WHERE id = ?;",
-                    ("\n".join(error_messages) or "One or more image move items could not be completed", job_id),
-                )
-        return moved_count
+            q.image_moves.finish_job(job_id, error_message=error_message)
+            return moved_count
 
-    def _count_job_errors(self, job_id: int) -> int:
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                "SELECT COUNT(*) FROM image_subfolder_move_items WHERE job_id = ? AND state = 'error';",
-                (job_id,),
-            )
-            return cast(int, cursor.fetchone()[0])
+        return self._queries.run(commit)
 
     def mark_item_moved(self, job_id: int, image_name: str) -> None:
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                "UPDATE image_subfolder_move_items SET state = 'moved' WHERE job_id = ? AND image_name = ?;",
-                (job_id, image_name),
-            )
+        self._queries.image_moves.mark_item_moved(job_id, image_name)
 
     def record_job_error_message(self, job_id: int, message: str) -> None:
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                "UPDATE image_subfolder_move_jobs SET error_message = ? WHERE id = ?;",
-                (message, job_id),
-            )
+        self._queries.image_moves.set_job_error_message(job_id, message)
 
     def mark_item_unrecoverable(self, job_id: int, image_name: str, message: str) -> None:
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                UPDATE image_subfolder_move_items
-                SET state = 'error', error_message = ?
-                WHERE job_id = ? AND image_name = ?;
-                """,
-                (message, job_id, image_name),
-            )
+        self._queries.image_moves.fail_item(job_id, image_name, message)
 
     def mark_job_unrecoverable(self, job_id: int, message: str) -> None:
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                "UPDATE image_subfolder_move_jobs SET state = 'error', error_message = ? WHERE id = ?;",
-                (message, job_id),
-            )
-            cursor.execute(
-                "UPDATE image_subfolder_move_items SET state = 'error', error_message = ? WHERE job_id = ?;",
-                (message, job_id),
-            )
+        self._queries.image_moves.fail_job(job_id, message)
 
     def get_job(self, job_id: int) -> ImageMoveJob:
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                "SELECT id, state, error_message FROM image_subfolder_move_jobs WHERE id = ?;",
-                (job_id,),
-            )
-            row = cursor.fetchone()
-        if row is None:
+        job = self._queries.image_moves.job(job_id)
+        if job is None:
             raise ValueError(f"Image move job not found: {job_id}")
-        return ImageMoveJob(
-            id=cast(int, row["id"]), state=cast(MoveJobState, row["state"]), error_message=row["error_message"]
-        )
+        return ImageMoveJob(id=job.id, state=cast(MoveJobState, job.state), error_message=job.error_message)
 
     def get_latest_job(self) -> ImageMoveJob | None:
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT id, state, error_message
-                FROM image_subfolder_move_jobs
-                ORDER BY id DESC
-                LIMIT 1;
-                """
-            )
-            row = cursor.fetchone()
-        if row is None:
+        job = self._queries.image_moves.latest_job()
+        if job is None:
             return None
-        return ImageMoveJob(
-            id=cast(int, row["id"]), state=cast(MoveJobState, row["state"]), error_message=row["error_message"]
-        )
+        return ImageMoveJob(id=job.id, state=cast(MoveJobState, job.state), error_message=job.error_message)
 
     def _get_new_subfolder(
         self, image_name: str, image_category: ImageCategory, is_intermediate: bool, created_at: str | datetime
@@ -824,83 +603,26 @@ class ImageMoveService:
         raise ValueError(f"Unknown image subfolder strategy: {strategy}")
 
     def _get_items(self, job_id: int, include_terminal: bool = True) -> list[PlannedImageMove]:
-        with self._db.transaction() as cursor:
-            query = """--sql
-                SELECT image_name, old_subfolder, new_subfolder, is_intermediate
-                FROM image_subfolder_move_items
-                WHERE job_id = ?
-            """
-            params: tuple[object, ...] = (job_id,)
-            if not include_terminal:
-                query += " AND state NOT IN ('committed', 'error')"
-            query += " ORDER BY image_name;"
-            cursor.execute(query, params)
-            rows = cursor.fetchall()
         return [
-            PlannedImageMove(
-                image_name=row["image_name"],
-                old_subfolder=row["old_subfolder"],
-                new_subfolder=row["new_subfolder"],
-                is_intermediate=bool(row["is_intermediate"]),
-                old_path=self.image_files.get_path(row["image_name"], image_subfolder=row["old_subfolder"]),
-                new_path=self.image_files.get_path(row["image_name"], image_subfolder=row["new_subfolder"]),
-                old_thumbnail_path=self.image_files.get_path(
-                    row["image_name"], thumbnail=True, image_subfolder=row["old_subfolder"]
-                ),
-                new_thumbnail_path=self.image_files.get_path(
-                    row["image_name"], thumbnail=True, image_subfolder=row["new_subfolder"]
-                ),
+            self._planned_move(image_name, old_subfolder, new_subfolder, is_intermediate)
+            for image_name, old_subfolder, new_subfolder, is_intermediate in self._queries.image_moves.items(
+                job_id, unfinished_only=not include_terminal
             )
-            for row in rows
         ]
 
-    def _set_job_state(self, job_id: int, state: MoveJobState) -> None:
-        with self._db.transaction() as cursor:
-            cursor.execute("UPDATE image_subfolder_move_jobs SET state = ? WHERE id = ?;", (state, job_id))
-
-    def _has_active_job_for_image(self, image_name: str) -> bool:
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT 1
-                FROM image_subfolder_move_items AS item
-                JOIN image_subfolder_move_jobs AS job ON job.id = item.job_id
-                WHERE item.image_name = ?
-                  AND job.state NOT IN ('committed', 'error')
-                LIMIT 1;
-                """,
-                (image_name,),
-            )
-            return cursor.fetchone() is not None
-
-    def _get_active_job_id(self) -> int | None:
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT id
-                FROM image_subfolder_move_jobs
-                WHERE state NOT IN ('committed', 'error')
-                ORDER BY id
-                LIMIT 1;
-                """
-            )
-            row = cursor.fetchone()
-        return None if row is None else cast(int, row["id"])
-
-    def _next_image_name(self, last_image_name: str) -> str | None:
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT image_name FROM images
-                WHERE image_name > ?
-                  AND deleted_at IS NULL
-                ORDER BY image_name
-                LIMIT 1;
-                """,
-                (last_image_name,),
-            )
-            row = cursor.fetchone()
-        return None if row is None else cast(str, row[0])
+    def _planned_move(
+        self, image_name: str, old_subfolder: str, new_subfolder: str, is_intermediate: bool
+    ) -> PlannedImageMove:
+        return PlannedImageMove(
+            image_name=image_name,
+            old_subfolder=old_subfolder,
+            new_subfolder=new_subfolder,
+            is_intermediate=is_intermediate,
+            old_path=self.image_files.get_path(image_name, image_subfolder=old_subfolder),
+            new_path=self.image_files.get_path(image_name, image_subfolder=new_subfolder),
+            old_thumbnail_path=self.image_files.get_path(image_name, thumbnail=True, image_subfolder=old_subfolder),
+            new_thumbnail_path=self.image_files.get_path(image_name, thumbnail=True, image_subfolder=new_subfolder),
+        )
 
     def _regenerate_thumbnail(self, image_path: Path, thumbnail_path: Path) -> None:
         thumbnail_path.parent.mkdir(parents=True, exist_ok=True)

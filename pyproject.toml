@@ -36,7 +36,7 @@ dependencies = [
   "accelerate",
   "bitsandbytes; sys_platform!='darwin'",
   "compel>=2.4.0,<3",
-  "diffusers[torch]==0.40.0",
+  "diffusers[torch]==0.41.0",
   "gguf",
   "mediapipe==0.10.14",                   # needed for "mediapipeface" controlnet model
   "mistral-common>=1.5.4,<2",             # canonical Tekken tokenizer for FLUX.2 [dev] Mistral encoder; the
@@ -85,6 +85,12 @@ dependencies = [
   "pydantic-settings",
   "pydantic",
   "python-socketio",
+  # Schema migrations that run on every database backend are written with Alembic's operations (no Alembic
+  # environment or revision scripts).
+  "alembic>=1.20,<2",
+  # The database layer compiles every query through SQLAlchemy Core. Keep the minor-version bound: dialect
+  # compilation and the pysqlite transaction handling it relies on are exactly what changes between minors.
+  "sqlalchemy>=2.1,<2.2",
   "uvicorn[standard]",
 
   # Auxiliary dependencies, pinned only if necessary.
@@ -184,6 +190,8 @@ dependencies = [
   "torchvision==0.22.1; sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'aarch64')",
 ]
 
+# Driver for running the application database on MySQL or MariaDB instead of SQLite.
+"mysql" = ["pymysql>=1.2.3,<2"]
 "onnx" = ["onnxruntime"]
 "onnx-cuda" = ["onnxruntime-gpu"]
 "onnx-directml" = ["onnxruntime-directml"]
@@ -299,6 +307,7 @@ explicit = true
 "invoke-userdel" = "invokeai.app.util.user_management:userdel"
 "invoke-userlist" = "invokeai.app.util.user_management:userlist"
 "invoke-usermod" = "invokeai.app.util.user_management:usermod"
+"invoke-db-copy" = "invokeai.app.util.database_copy:main"
 
 [project.urls]
 "Homepage" = "https://invoke.ai/"
@@ -363,7 +372,11 @@ addopts = "--strict-markers --dist loadfile -m \"not slow\""
 markers = [
   "slow: Marks tests as slow. Disabled by default. To run all tests, use -m \"\". To run only slow tests, use -m \"slow\".",
   "timeout: Marks the timeout override.",
+  "uses_database: Runs on the `empty_database` fixture, which targets INVOKEAI_TEST_DB_URL when it is set and SQLite otherwise. Applied by the collection hook in tests/conftest.py.",
+  "sqlite_only: Depends on SQLite internals (query plans, PRAGMAs, the single connection); skipped when INVOKEAI_TEST_DB_URL targets another backend.",
 ]
+# A cache-key or other SQLAlchemy warning is a bug in the query layer, not noise.
+filterwarnings = ["error::sqlalchemy.exc.SAWarning"]
 [tool.coverage.run]
 branch = true
 source = ["invokeai"]

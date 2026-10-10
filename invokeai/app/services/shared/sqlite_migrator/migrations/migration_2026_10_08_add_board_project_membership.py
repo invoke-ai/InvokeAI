@@ -16,37 +16,35 @@ those orphans keep a `project_id` nothing resolves; readers treat an unresolvabl
 other board, and `is_inbox` is derived from `projects`, so it turns false and admins can delete them.
 """
 
-import sqlite3
+from sqlalchemy import Column, column, exists, inspect, select, table, update
 
-from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
+from invokeai.app.services.shared.database.types import Key
+from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import (
+    PortableMigration,
+    PortableMigrationContext,
+)
 
-
-class AddBoardProjectMembershipCallback:
-    def __call__(self, cursor: sqlite3.Cursor) -> None:
-        cursor.execute("PRAGMA table_info(boards);")
-        if not any(row[1] == "project_id" for row in cursor.fetchall()):
-            cursor.execute("ALTER TABLE boards ADD COLUMN project_id TEXT;")
-
-        cursor.execute(
-            """--sql
-            CREATE INDEX IF NOT EXISTS idx_boards_project_id ON boards(project_id);
-            """
-        )
-        # Every inbox is a member of its own project. Rows that already say so are left alone, so
-        # a board the user has since moved is not dragged back.
-        cursor.execute(
-            """--sql
-            UPDATE boards
-            SET project_id = (SELECT projects.project_id FROM projects WHERE projects.board_id = boards.board_id)
-            WHERE project_id IS NULL
-              AND EXISTS (SELECT 1 FROM projects WHERE projects.board_id = boards.board_id);
-            """
-        )
+_boards = table("boards", column("board_id"), column("project_id"))
+_projects = table("projects", column("board_id"), column("project_id"))
 
 
-def build_migration() -> Migration:
-    return Migration(
+def _add_board_project_membership(context: PortableMigrationContext) -> None:
+    if "project_id" not in {column["name"] for column in inspect(context.conn).get_columns("boards")}:
+        context.op.add_column("boards", Column("project_id", Key()))
+    if "idx_boards_project_id" not in {index["name"] for index in inspect(context.conn).get_indexes("boards")}:
+        context.op.create_index("idx_boards_project_id", "boards", ["project_id"])
+    # Safe after an interrupted DDL run, and on a database already upgraded by this feature branch.
+    inbox_project = select(_projects.c.project_id).where(_projects.c.board_id == _boards.c.board_id)
+    context.conn.execute(
+        update(_boards)
+        .where(_boards.c.project_id.is_(None), exists(inbox_project))
+        .values(project_id=inbox_project.scalar_subquery())
+    )
+
+
+def build_migration() -> PortableMigration:
+    return PortableMigration(
         id="2026_10_08_add_board_project_membership",
-        depends_on="2026_08_27_add_project_canvas_schema_floor",
-        callback=AddBoardProjectMembershipCallback(),
+        depends_on="2026_10_07_add_session_queue_admission_lock",
+        callback=_add_board_project_membership,
     )
