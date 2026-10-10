@@ -42,7 +42,7 @@ class IfInvocation(BaseInvocation):
         return IfInvocationOutput(value=self.true_input if self.condition else self.false_input)
 
 
-BOOLEAN_OPERATIONS = Literal["AND", "OR", "XOR", "NOT", "NAND", "NOR", "XNOR"]
+BOOLEAN_OPERATIONS = Literal["AND", "OR", "XOR", "NAND", "NOR", "XNOR", "NOT"]
 
 
 @invocation("boolean_logic", title="Boolean Logic", tags=["logic", "boolean"], category="math", version="1.0.0")
@@ -56,10 +56,10 @@ class BooleanLogicInvocation(BaseInvocation):
             "AND": "A AND B",
             "OR": "A OR B",
             "XOR": "A XOR B",
-            "NOT": "NOT A",
             "NAND": "A NAND B",
             "NOR": "A NOR B",
             "XNOR": "A XNOR B",
+            "NOT": "NOT A",
         },
     )
     a: bool = InputField(default=False, description="First Boolean input")
@@ -72,12 +72,12 @@ class BooleanLogicInvocation(BaseInvocation):
             result = self.a or self.b
         elif self.operation == "XOR":
             result = self.a != self.b
-        elif self.operation == "NOT":
-            result = not self.a
         elif self.operation == "NAND":
             result = not (self.a and self.b)
         elif self.operation == "NOR":
             result = not (self.a or self.b)
-        else:  # self.operation == "XNOR"
+        elif self.operation == "XNOR":
             result = self.a == self.b
+        else:  # self.operation == "NOT":
+            result = not self.a
         return BooleanOutput(value=result)
