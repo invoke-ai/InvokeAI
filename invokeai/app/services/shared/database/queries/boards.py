@@ -32,9 +32,22 @@ from invokeai.app.services.board_records.board_records_common import (
 from invokeai.app.services.shared.database.dialect import CaseInsensitiveOrder
 from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, locking, mapped, read, write
 from invokeai.app.services.shared.database.queries.board_access import readable_board
-from invokeai.app.services.shared.database.schema.boards import boards, shared_boards
+from invokeai.app.services.shared.database.schema.boards import board_members, boards
 from invokeai.app.services.shared.database.schema.projects import projects
 from invokeai.app.services.shared.pagination import SQLiteDirection
+
+# Board visibility as the services still see it, read from and written to general access: private is restricted,
+# shared is viewer, public is contributor.
+_GENERAL_ACCESS_BY_VISIBILITY = {
+    BoardVisibility.Private: "restricted",
+    BoardVisibility.Shared: "viewer",
+    BoardVisibility.Public: "contributor",
+}
+_VISIBILITY = case(
+    (boards.c.general_access == "viewer", BoardVisibility.Shared.value),
+    (boards.c.general_access == "contributor", BoardVisibility.Public.value),
+    else_=BoardVisibility.Private.value,
+).label("board_visibility")
 
 _BOARD_COLUMNS = (
     boards.c.board_id,
@@ -45,7 +58,7 @@ _BOARD_COLUMNS = (
     boards.c.deleted_at,
     boards.c.cover_image_name,
     boards.c.archived,
-    boards.c.board_visibility,
+    _VISIBILITY,
     boards.c.project_id,
 )
 _CLAIMED = exists().where(projects.c.board_id == boards.c.board_id)
@@ -57,21 +70,17 @@ _GET_WITH_INBOX_PROJECT = (
     .where(boards.c.board_id == bindparam("board_id"))
 )
 _EXISTS = select(literal(1)).where(boards.c.board_id == bindparam("board_id"))
-_LOCK = (
-    select(boards.c.user_id, boards.c.board_visibility)
-    .where(boards.c.board_id == bindparam("board_id"))
-    .with_for_update()
-)
+_LOCK = select(boards.c.user_id, _VISIBILITY).where(boards.c.board_id == bindparam("board_id")).with_for_update()
 _PROJECT_IDS = select(projects.c.board_id, projects.c.project_id).where(
     projects.c.board_id.in_(bindparam("board_ids", expanding=True))
 )
 _INSERT = insert(boards)
 _DELETE_IF_UNCLAIMED = delete(boards).where(boards.c.board_id == bindparam("board_id"), ~_CLAIMED)
 _IS_SHARED_WITH = select(literal(1)).where(
-    shared_boards.c.board_id == bindparam("board_id"), shared_boards.c.user_id == bindparam("user_id")
+    board_members.c.board_id == bindparam("board_id"), board_members.c.user_id == bindparam("user_id")
 )
-_SHARED_USER_IDS = select(shared_boards.c.user_id).where(shared_boards.c.board_id == bindparam("board_id"))
-_IS_SHARED = select(exists().where(shared_boards.c.board_id == bindparam("board_id")))
+_SHARED_USER_IDS = select(board_members.c.user_id).where(board_members.c.board_id == bindparam("board_id"))
+_IS_SHARED = select(exists().where(board_members.c.board_id == bindparam("board_id")))
 _RENAME = (
     update(boards)
     .where(boards.c.board_id == bindparam("target_board_id"))
@@ -89,6 +98,11 @@ _OTHER_MEMBERS = (
     boards.c.board_id != bindparam("inbox_id"),
 )
 _RELEASE_MEMBERS = update(boards).where(*_OTHER_MEMBERS).values(project_id=None)
+_RELEASE_OWNED = (
+    update(boards)
+    .where(boards.c.user_id == bindparam("target_user_id"), boards.c.project_id.is_not(None))
+    .values(project_id=None)
+)
 _DELETE_MEMBERS = delete(boards).where(*_OTHER_MEMBERS)
 
 
@@ -157,8 +171,8 @@ def _update(changes_owned_state: bool) -> Update:
                 (bindparam("moves_board"), bindparam("new_project_id", type_=boards.c.project_id.type)),
                 else_=boards.c.project_id,
             ),
-            board_visibility=func.coalesce(
-                bindparam("new_board_visibility", type_=boards.c.board_visibility.type), boards.c.board_visibility
+            general_access=func.coalesce(
+                bindparam("new_general_access", type_=boards.c.general_access.type), boards.c.general_access
             ),
         )
     )
@@ -317,8 +331,10 @@ class BoardQueries(QueryModule):
                 "new_board_name": changes.board_name,
                 "new_cover_image_name": changes.cover_image_name,
                 "new_archived": changes.archived,
-                "new_board_visibility": (
-                    changes.board_visibility.value if changes.board_visibility is not None else None
+                "new_general_access": (
+                    _GENERAL_ACCESS_BY_VISIBILITY[changes.board_visibility]
+                    if changes.board_visibility is not None
+                    else None
                 ),
             },
         )
@@ -346,6 +362,11 @@ class BoardQueries(QueryModule):
             _DELETE_MEMBERS if delete_members else _RELEASE_MEMBERS,
             {"target_user_id": user_id, "target_project_id": project_id, "inbox_id": inbox_id},
         )
+
+    @write
+    def release_owned(self, conn: Connection, user_id: str) -> None:
+        """Moves every board the account owns to its Library: for the account's deletion, which takes its projects."""
+        conn.execute(_RELEASE_OWNED, {"target_user_id": user_id})
 
     @write
     def delete_if_unclaimed(self, conn: Connection, board_id: str) -> bool:

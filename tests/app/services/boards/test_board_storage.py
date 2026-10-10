@@ -19,9 +19,9 @@ from invokeai.app.services.shared.database.queries import board_images as board_
 from invokeai.app.services.shared.database.queries import board_videos as board_video_queries
 from invokeai.app.services.shared.database.queries import boards as board_queries
 from invokeai.app.services.shared.database.schema.boards import board_images as board_images_table
+from invokeai.app.services.shared.database.schema.boards import board_members
 from invokeai.app.services.shared.database.schema.boards import board_videos as board_videos_table
 from invokeai.app.services.shared.database.schema.boards import boards as boards_table
-from invokeai.app.services.shared.database.schema.boards import shared_boards
 from invokeai.app.services.shared.database.schema.images import images
 from invokeai.app.services.shared.database.schema.projects import projects
 from invokeai.app.services.shared.database.schema.users import users
@@ -150,8 +150,11 @@ def test_users_list_their_own_shared_and_public_boards(database: Database, board
     board_records.update(archived, BoardChanges(archived=True))
     with database.begin(write=True) as conn:
         conn.execute(
-            insert(shared_boards),
-            [{"board_id": shared_with_alice, "user_id": ALICE}, {"board_id": shared_with_carol, "user_id": CAROL}],
+            insert(board_members),
+            [
+                {"board_id": shared_with_alice, "user_id": ALICE, "role": "viewer"},
+                {"board_id": shared_with_carol, "user_id": CAROL, "role": "viewer"},
+            ],
         )
 
     def listed(*, is_admin: bool, include_archived: bool = False) -> set[str]:
@@ -427,3 +430,32 @@ def test_video_names_follow_the_filters(
 
 
 # endregion
+
+
+@pytest.mark.parametrize(
+    ("visibility", "general_access"),
+    [
+        (BoardVisibility.Private, "restricted"),
+        (BoardVisibility.Shared, "viewer"),
+        (BoardVisibility.Public, "contributor"),
+    ],
+)
+def test_board_visibility_is_stored_as_the_matching_general_access(
+    database: Database, visibility: BoardVisibility, general_access: str
+) -> None:
+    """The mapping the migration converted existing boards with: a board written one way reads back the other."""
+    board_records = BoardRecordStorage(database)
+    written = board_records.save("Written", ALICE).board_id
+    board_records.update(written, BoardChanges(board_visibility=visibility))
+    with database.begin(write=True) as conn:
+        stored = conn.execute(
+            select(boards_table.c.general_access).where(boards_table.c.board_id == written)
+        ).scalar_one()
+        conn.execute(
+            insert(boards_table).values(
+                board_id="stored", board_name="Stored", user_id=ALICE, general_access=general_access
+            )
+        )
+
+    assert stored == general_access
+    assert board_records.get("stored").board_visibility == visibility

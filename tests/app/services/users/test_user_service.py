@@ -6,8 +6,10 @@ import pytest
 from pydantic import ValidationError
 from sqlalchemy import insert, select, update
 
+from invokeai.app.services.project_records.project_records_default import ProjectRecordsStorage
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries.base import IN_CHUNK
+from invokeai.app.services.shared.database.schema.boards import boards
 from invokeai.app.services.shared.database.schema.media_references import media_references
 from invokeai.app.services.shared.database.schema.users import users as users_table
 from invokeai.app.services.users import users_default
@@ -181,6 +183,23 @@ def test_delete_user_drops_references_only_of_documents_that_cascade(user_servic
             for user_id, kind in conn.execute(select(media_references.c.user_id, media_references.c.owner_kind))
         }
     assert remaining == {(leaving, "quarantined_project"), (leaving, "workflow")} | {(staying, kind) for kind in kinds}
+
+
+def test_delete_user_moves_its_boards_out_of_the_projects_that_go_with_it(
+    user_service: UserService, database: Database
+):
+    leaving = user_service.create(UserCreateRequest(email="leaving@example.com", password="TestPassword123")).user_id
+    staying = user_service.create(UserCreateRequest(email="staying@example.com", password="TestPassword123")).user_id
+    projects = ProjectRecordsStorage(database)
+    theirs = projects.create(leaving, "Leaving", {})
+    kept = projects.create(staying, "Staying", {})
+
+    user_service.delete(leaving)
+
+    with database.begin(write=False) as conn:
+        membership = dict(conn.execute(select(boards.c.board_id, boards.c.project_id)).all())
+    # The account's boards stay, for admins, in no project; nobody else's move.
+    assert membership == {theirs.board_id: None, kept.board_id: kept.project_id}
 
 
 def test_an_account_created_meanwhile_with_the_same_email_is_refused(

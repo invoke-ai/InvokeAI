@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import insert
 
 from invokeai.app.services.shared.database.database import Database
-from invokeai.app.services.shared.database.schema.boards import shared_boards
+from invokeai.app.services.shared.database.schema.boards import board_members
 from tests.app.routers.conftest import _auth, _create_board
 
 
@@ -171,7 +171,7 @@ def test_an_explicitly_shared_board_cannot_enter_a_project(
     board_id = _create_board(client, user1_token, "Shared+with+two")
     recipient = client.get("/api/v1/auth/me", headers=_auth(user2_token)).json()["user_id"]
     with mock_sqlite_database.begin(write=True) as conn:
-        conn.execute(insert(shared_boards).values(board_id=board_id, user_id=recipient))
+        conn.execute(insert(board_members).values(board_id=board_id, user_id=recipient, role="viewer"))
 
     assert _move(client, user1_token, board_id, project["project_id"]).status_code == status.HTTP_409_CONFLICT
 

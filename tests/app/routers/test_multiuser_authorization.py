@@ -249,10 +249,10 @@ def _share_board(client: TestClient, token: str, board_id: str) -> None:
 
 
 def _share_board_with_user(db: Database, board_id: str, user_id: str) -> None:
-    """Insert an explicit per-user share row directly into the shared_boards table."""
+    """Insert an explicit per-user share row directly into the board_members table."""
     with sqlite_cursor(db) as cursor:
         cursor.execute(
-            "INSERT OR IGNORE INTO shared_boards (board_id, user_id) VALUES (?, ?)",
+            "INSERT OR IGNORE INTO board_members (board_id, user_id, role) VALUES (?, ?, 'viewer')",
             (board_id, user_id),
         )
 

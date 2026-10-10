@@ -155,6 +155,8 @@ class UserService(UserServiceBase):
             q.locks.acquire(DatabaseLock.ADMIN_ACCOUNTS)
             self._assert_not_last_admin(q, user_id, is_deleting=True)
             q.users.delete(user_id)
+            # The account's projects cascade with it; its boards stay, for admins, in no project.
+            q.boards.release_owned(user_id)
             # Projects and client state cascade with the account; the media references they held
             # would otherwise protect a departed account's intermediates from every cleanup forever.
             # Workflows and quarantined projects do not cascade, so their references stay with them.
