@@ -9636,6 +9636,224 @@
         }
       }
     },
+    "/api/v1/gallery/items/location": {
+      "get": {
+        "tags": ["gallery"],
+        "summary": "Get Gallery Item Location",
+        "description": "Returns exact item's position in an ordinary filtered gallery listing.",
+        "operationId": "get_gallery_item_location",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/GalleryItemKind",
+              "description": "Whether the target is an image or video."
+            },
+            "description": "Whether the target is an image or video."
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The target image or video name.",
+              "title": "Name"
+            },
+            "description": "The target image or video name."
+          },
+          {
+            "name": "origin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ResourceOrigin"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The origin of items to list.",
+              "title": "Origin"
+            },
+            "description": "The origin of items to list."
+          },
+          {
+            "name": "categories",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ImageCategory"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The categories to include. Shared between images and videos.",
+              "title": "Categories"
+            },
+            "description": "The categories to include. Shared between images and videos."
+          },
+          {
+            "name": "is_intermediate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Whether to list intermediate items.",
+              "title": "Is Intermediate"
+            },
+            "description": "Whether to list intermediate items."
+          },
+          {
+            "name": "board_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The board id to filter by. Use 'none' to find items without a board.",
+              "title": "Board Id"
+            },
+            "description": "The board id to filter by. Use 'none' to find items without a board."
+          },
+          {
+            "name": "order_dir",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SQLiteDirection",
+              "description": "The order of sort",
+              "default": "DESC"
+            },
+            "description": "The order of sort"
+          },
+          {
+            "name": "starred",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by starred state: true for starred items only, false for unstarred only. Omit to include both.",
+              "title": "Starred"
+            },
+            "description": "Filter by starred state: true for starred items only, false for unstarred only. Omit to include both."
+          },
+          {
+            "name": "search_term",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The term to search for",
+              "title": "Search Term"
+            },
+            "description": "The term to search for"
+          },
+          {
+            "name": "created_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive start date (YYYY-MM-DD) to filter by created_at.",
+              "title": "Created From"
+            },
+            "description": "Inclusive start date (YYYY-MM-DD) to filter by created_at."
+          },
+          {
+            "name": "created_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive end date (YYYY-MM-DD) to filter by created_at.",
+              "title": "Created To"
+            },
+            "description": "Inclusive end date (YYYY-MM-DD) to filter by created_at."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GalleryItemLocation"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/gallery/item_names": {
       "get": {
         "tags": ["gallery"],
@@ -40685,6 +40903,33 @@
         "enum": ["image", "video"],
         "title": "GalleryItemKind",
         "description": "Discriminator for polymorphic gallery items."
+      },
+      "GalleryItemLocation": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/GalleryItemKind",
+            "description": "Whether the item is an image or video."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The unique name of the image or video."
+          },
+          "index": {
+            "type": "integer",
+            "title": "Index",
+            "description": "The item's zero-based index in the listing."
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Number of items matching the listing filters."
+          }
+        },
+        "type": "object",
+        "required": ["kind", "name", "index", "total"],
+        "title": "GalleryItemLocation",
+        "description": "A gallery item's position in a filtered, ordered listing."
       },
       "GalleryItemNames": {
         "properties": {

@@ -37,6 +37,7 @@ import {
   useQueueItemProgressImage,
   useQueueItemSwapProgressImage,
 } from '@features/queue/react';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import {
   imageUrlToStreamingSource,
   progressImageToStreamingSource,
@@ -243,10 +244,10 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   );
 
   const selectGalleryItemAtPage = useCallback(
-    (item: GalleryItem, selectionPage: number) => {
+    (item: GalleryItem, selectionPage: number, absoluteIndex?: number) => {
       gallery.selectItem(item, undefined, selectionPage, true);
       // Deliberate navigation: the grid follows it, unlike auto-selection.
-      requestGalleryItemReveal(toGalleryItemKey(item));
+      requestGalleryItemReveal(toGalleryItemKey(item), captureAccountScope().signal, absoluteIndex);
     },
     [gallery]
   );
@@ -254,10 +255,11 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     boardItems,
     getSelectionPage,
     isLoadingBoard,
+    loadOrderedRefs,
     navigate,
-    navigationCursor,
     navigationQueryKey,
     neighbors,
+    position,
     selectPreviewItem,
     stripItemCount,
   } = usePreviewNavigation({
@@ -288,13 +290,10 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       filterIdentity: navigationQueryKey,
       getItemSelectionPage: getSelectionPage,
       items: boardItems,
-      loadOrderedRefs: (signal: AbortSignal) => {
-        signal.throwIfAborted();
-        return Promise.resolve(boardItems.map(toGalleryItemRef));
-      },
+      loadOrderedRefs,
       selectedItemKey,
     }),
-    [boardItems, getSelectionPage, navigationQueryKey, selectedItemKey]
+    [boardItems, getSelectionPage, loadOrderedRefs, navigationQueryKey, selectedItemKey]
   );
   const projectId = useActiveProjectId();
   const { dialog: deletionConfirmationDialog, requestDeletionConfirmation } = useDeletionConfirmation();
@@ -521,14 +520,13 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       itemName: headerItemName,
       openItemMenu: shouldFollowLive ? null : openItemContextMenu,
       position: hasHeaderItem
-        ? { boardItemCount: boardItems.length, isLoadingBoard, selectedIndex: navigationCursor }
+        ? { boardItemCount: position.total, isLoadingBoard, selectedIndex: position.index }
         : null,
       // Only the single image frame carries a loupe: videos have none and
       // compare has its own synced pair.
       zoom: hasHeaderItem && !isComparing && contextMenuItem.kind === 'image' ? zoomCommands : null,
     });
   }, [
-    boardItems.length,
     boardName,
     contextMenuItem,
     copyCurrentVideoFrame,
@@ -538,8 +536,8 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     isComparing,
     isLoadingBoard,
     isVideoFrameCopyAvailable,
-    navigationCursor,
     openItemContextMenu,
+    position,
     shouldFollowLive,
     zoomCommands,
   ]);
