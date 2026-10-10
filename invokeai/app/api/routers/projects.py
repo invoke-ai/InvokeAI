@@ -8,6 +8,7 @@ from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.project_records.project_records_common import (
     DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
+    DEFAULT_PROJECT_DOCUMENT_SCHEMA_VERSION,
     PROJECT_DOCUMENT_MAX_BYTES,
     ProjectBoardNotFoundError,
     ProjectBoardSnapshotDTO,
@@ -16,12 +17,17 @@ from invokeai.app.services.project_records.project_records_common import (
     ProjectCanvasSchemaDowngradeError,
     ProjectCanvasSchemaUnsupportedError,
     ProjectDocumentInvalidError,
+    ProjectDocumentSchemaDowngradeError,
+    ProjectDocumentSchemaUnsupportedError,
     ProjectDocumentTooLargeError,
     ProjectRecordConflictError,
     ProjectRecordDTO,
     ProjectRecordExistsError,
     ProjectRecordNotFoundError,
     ProjectSummaryDTO,
+    ProjectWithWorkspaceDTO,
+    ProjectWorkspaceConflictError,
+    ProjectWorkspaceDTO,
 )
 
 projects_router = APIRouter(prefix="/v1/projects", tags=["projects"])
@@ -61,6 +67,16 @@ class ProjectCreateRequest(BaseModel):
         ge=1,
         description="Newest canvas schema understood by this client",
     )
+    minimum_document_schema_version: int = Field(
+        default=DEFAULT_PROJECT_DOCUMENT_SCHEMA_VERSION,
+        ge=1,
+        description="Oldest project document schema that can read this document",
+    )
+    max_document_schema_version: int = Field(
+        default=DEFAULT_PROJECT_DOCUMENT_SCHEMA_VERSION,
+        ge=1,
+        description="Newest project document schema understood by this client",
+    )
 
 
 class ProjectUpdateRequest(BaseModel):
@@ -78,6 +94,55 @@ class ProjectUpdateRequest(BaseModel):
         default=DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
         ge=1,
         description="Newest canvas schema understood by this client",
+    )
+    minimum_document_schema_version: int | None = Field(
+        default=None,
+        ge=1,
+        description=(
+            "New document schema floor to store atomically with this content; omitted to keep the current floor"
+        ),
+    )
+    max_document_schema_version: int = Field(
+        default=DEFAULT_PROJECT_DOCUMENT_SCHEMA_VERSION,
+        ge=1,
+        description="Newest project document schema understood by this client",
+    )
+
+
+class ProjectWorkspaceSaveRequest(BaseModel):
+    """Request body for saving the caller's workspace in a project with optimistic concurrency."""
+
+    data: dict[str, Any] = Field(description="The opaque client-owned workspace document")
+    expected_revision: int | None = Field(
+        description="The workspace revision this save is based on, or null for the caller's first workspace in the"
+        " project; a mismatch returns 409"
+    )
+    max_document_schema_version: int = Field(
+        ge=1, description="Newest project document schema understood by this client"
+    )
+
+
+def _document_schema_precondition_failed(error: ProjectDocumentSchemaUnsupportedError) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_412_PRECONDITION_FAILED,
+        detail={
+            "code": "document_schema_unsupported",
+            "message": str(error),
+            "minimum_document_schema_version": error.minimum_version,
+            "max_document_schema_version": error.client_maximum_version,
+        },
+    )
+
+
+def _document_schema_downgrade(error: ProjectDocumentSchemaDowngradeError) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail={
+            "code": "document_schema_downgrade",
+            "message": str(error),
+            "current_minimum_document_schema_version": error.current_version,
+            "requested_minimum_document_schema_version": error.requested_version,
+        },
     )
 
 
@@ -135,6 +200,8 @@ def create_project(
             board_id=request.board_id,
             minimum_canvas_schema_version=request.minimum_canvas_schema_version,
             max_canvas_schema_version=request.max_canvas_schema_version,
+            minimum_document_schema_version=request.minimum_document_schema_version,
+            max_document_schema_version=request.max_document_schema_version,
         )
     except (ProjectRecordExistsError, ProjectBoardUnavailableError) as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
@@ -142,13 +209,15 @@ def create_project(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ProjectCanvasSchemaUnsupportedError as e:
         raise _schema_precondition_failed(e)
+    except ProjectDocumentSchemaUnsupportedError as e:
+        raise _document_schema_precondition_failed(e)
     except ProjectDocumentTooLargeError as e:
         raise _document_too_large(e)
     except ProjectDocumentInvalidError as e:
         raise _document_invalid(e)
 
 
-@projects_router.get("/{project_id}", operation_id="get_project", response_model=ProjectRecordDTO)
+@projects_router.get("/{project_id}", operation_id="get_project", response_model=ProjectWithWorkspaceDTO)
 def get_project(
     current_user: CurrentUserOrDefault,
     project_id: str = Path(description="The id of the project to get"),
@@ -157,16 +226,26 @@ def get_project(
         ge=1,
         description="Newest canvas schema understood by this client",
     ),
-) -> ProjectRecordDTO:
-    """Gets one of the current user's projects, including its document."""
+    max_document_schema_version: int = Query(
+        default=DEFAULT_PROJECT_DOCUMENT_SCHEMA_VERSION,
+        ge=1,
+        description="Newest project document schema understood by this client",
+    ),
+) -> ProjectWithWorkspaceDTO:
+    """Gets one of the current user's projects: its content and the caller's workspace in it."""
     try:
         return ApiDependencies.invoker.services.project_records.get(
-            current_user.user_id, project_id, max_canvas_schema_version=max_canvas_schema_version
+            current_user.user_id,
+            project_id,
+            max_canvas_schema_version=max_canvas_schema_version,
+            max_document_schema_version=max_document_schema_version,
         )
     except ProjectRecordNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ProjectCanvasSchemaUnsupportedError as e:
         raise _schema_precondition_failed(e)
+    except ProjectDocumentSchemaUnsupportedError as e:
+        raise _document_schema_precondition_failed(e)
 
 
 @projects_router.put("/{project_id}", operation_id="update_project", response_model=ProjectRecordDTO)
@@ -185,6 +264,8 @@ def update_project(
             data=request.data,
             minimum_canvas_schema_version=request.minimum_canvas_schema_version,
             max_canvas_schema_version=request.max_canvas_schema_version,
+            minimum_document_schema_version=request.minimum_document_schema_version,
+            max_document_schema_version=request.max_document_schema_version,
         )
     except ProjectRecordNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -203,8 +284,46 @@ def update_project(
                 "requested_minimum_canvas_schema_version": e.requested_version,
             },
         )
+    except ProjectDocumentSchemaDowngradeError as e:
+        raise _document_schema_downgrade(e)
     except ProjectCanvasSchemaUnsupportedError as e:
         raise _schema_precondition_failed(e)
+    except ProjectDocumentSchemaUnsupportedError as e:
+        raise _document_schema_precondition_failed(e)
+    except ProjectDocumentTooLargeError as e:
+        raise _document_too_large(e)
+    except ProjectDocumentInvalidError as e:
+        raise _document_invalid(e)
+
+
+@projects_router.put(
+    "/{project_id}/workspace", operation_id="save_project_workspace", response_model=ProjectWorkspaceDTO
+)
+def save_project_workspace(
+    current_user: CurrentUserOrDefault,
+    project_id: str = Path(description="The id of the project whose workspace to save"),
+    request: ProjectWorkspaceSaveRequest = Body(description="The workspace and the revision it is based on"),
+) -> ProjectWorkspaceDTO:
+    """Saves the caller's workspace in one of their projects: their layout, widgets and generation settings, apart
+    from the project content, so that saving one never conflicts with the other. Returns 409 with the current
+    revision (null when there is none) when the save is based on another."""
+    try:
+        return ApiDependencies.invoker.services.project_records.save_workspace(
+            user_id=current_user.user_id,
+            project_id=project_id,
+            expected_revision=request.expected_revision,
+            data=request.data,
+            max_document_schema_version=request.max_document_schema_version,
+        )
+    except ProjectRecordNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ProjectWorkspaceConflictError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"message": str(e), "current_revision": e.current_revision},
+        )
+    except ProjectDocumentSchemaUnsupportedError as e:
+        raise _document_schema_precondition_failed(e)
     except ProjectDocumentTooLargeError as e:
         raise _document_too_large(e)
     except ProjectDocumentInvalidError as e:

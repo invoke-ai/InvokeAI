@@ -1,6 +1,6 @@
 """Common types and errors for the project records service."""
 
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -14,6 +14,16 @@ upgraded, the floor only moves forward.
 """
 
 
+DEFAULT_PROJECT_DOCUMENT_SCHEMA_VERSION = 3
+"""The document schema floor of projects saved before the floor existed, and the newest schema a client that does
+not say is assumed to understand.
+
+Schema 4 split the document into the project content, in `projects.data`, and each member's workspace, in
+`project_workspaces`. A client that does not name the newest schema it understands predates the split, so it is
+refused a split project rather than handed half of one.
+"""
+
+
 class ProjectRecordNotFoundError(Exception):
     """Raised when a project record is not found for the requesting user."""
 
@@ -22,7 +32,7 @@ class ProjectRecordNotFoundError(Exception):
 
 
 class ProjectRecordExistsError(Exception):
-    """Raised when creating a project with an id the user already has."""
+    """Raised when creating a project with an id a project already has: ids are unique across accounts."""
 
     def __init__(self, project_id: str) -> None:
         super().__init__(f"Project {project_id} already exists")
@@ -68,6 +78,44 @@ class ProjectCanvasSchemaUnsupportedError(Exception):
         super().__init__(
             f"Project {project_id} requires canvas schema {minimum_version}, but this client supports up to"
             f" schema {client_maximum_version}. Update the client before opening or editing this project."
+        )
+
+
+class ProjectDocumentSchemaUnsupportedError(Exception):
+    """Raised before a client may read or write a project whose document schema it does not understand."""
+
+    def __init__(self, project_id: str, minimum_version: int, client_maximum_version: int) -> None:
+        self.project_id = project_id
+        self.minimum_version = minimum_version
+        self.client_maximum_version = client_maximum_version
+        super().__init__(
+            f"Project {project_id} requires document schema {minimum_version}, but this client supports up to"
+            f" schema {client_maximum_version}. Update the client before opening or editing this project."
+        )
+
+
+class ProjectDocumentSchemaDowngradeError(Exception):
+    """Raised when a save tries to lower a project's document schema floor."""
+
+    def __init__(self, project_id: str, current_version: int, requested_version: int) -> None:
+        self.project_id = project_id
+        self.current_version = current_version
+        self.requested_version = requested_version
+        super().__init__(
+            f"Project {project_id} requires document schema {current_version}; its floor cannot be lowered to"
+            f" schema {requested_version}"
+        )
+
+
+class ProjectWorkspaceConflictError(Exception):
+    """Raised when a workspace save is based on a revision other than the stored one (another tab or device saved
+    first), or expects a workspace where there is none or none where there is one."""
+
+    def __init__(self, project_id: str, expected_revision: Optional[int], current_revision: Optional[int]) -> None:
+        self.current_revision = current_revision
+        super().__init__(
+            f"The workspace in project {project_id} is at revision {current_revision}; the save expected revision"
+            f" {expected_revision}"
         )
 
 
@@ -134,14 +182,37 @@ class ProjectSummaryDTO(BaseModel):
     minimum_canvas_schema_version: int = Field(
         ge=1, description="Oldest canvas schema a client must support before it may read or write this project"
     )
+    minimum_document_schema_version: int = Field(
+        ge=1,
+        description="Oldest project document schema a client must support before it may read or write this project",
+    )
     created_at: str = Field(description="When the project was created")
-    updated_at: str = Field(description="When the project was last saved")
+    updated_at: str = Field(description="When the project content was last saved")
+    workspace_updated_at: Optional[str] = Field(
+        default=None, description="When the caller last saved their workspace in the project; null if they have none"
+    )
 
 
 class ProjectRecordDTO(ProjectSummaryDTO):
     """Full project record including the client-owned document."""
 
-    data: dict[str, Any] = Field(description="The opaque client-owned project document")
+    data: dict[str, Any] = Field(description="The opaque client-owned project content (document schema 4 on)")
+
+
+class ProjectWorkspaceDTO(BaseModel):
+    """One account's workspace in a project: how they work on it (layout, widgets, generation settings)."""
+
+    data: dict[str, Any] = Field(description="The opaque client-owned workspace document")
+    revision: int = Field(description="Monotonic revision, incremented on every save of this workspace")
+    updated_at: str = Field(description="When the workspace was last saved")
+
+
+class ProjectWithWorkspaceDTO(ProjectRecordDTO):
+    """A project's content together with the caller's workspace in it."""
+
+    workspace: Optional[ProjectWorkspaceDTO] = Field(
+        description="The caller's workspace; null until they save one, when the client builds a default"
+    )
 
 
 class ProjectBoardItemDTO(BaseModel):

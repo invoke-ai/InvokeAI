@@ -7,6 +7,7 @@ from invokeai.app.services.board_records.board_records_common import BOARD_NAME_
 from invokeai.app.services.project_records.project_records_base import ProjectRecordsStorageBase
 from invokeai.app.services.project_records.project_records_common import (
     DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
+    DEFAULT_PROJECT_DOCUMENT_SCHEMA_VERSION,
     PROJECT_BOARD_SNAPSHOT_MAX_ITEMS,
     PROJECT_DOCUMENT_MAX_BYTES,
     ProjectBoardNotFoundError,
@@ -16,12 +17,17 @@ from invokeai.app.services.project_records.project_records_common import (
     ProjectCanvasSchemaDowngradeError,
     ProjectCanvasSchemaUnsupportedError,
     ProjectDocumentInvalidError,
+    ProjectDocumentSchemaDowngradeError,
+    ProjectDocumentSchemaUnsupportedError,
     ProjectDocumentTooLargeError,
     ProjectRecordConflictError,
     ProjectRecordDTO,
     ProjectRecordExistsError,
     ProjectRecordNotFoundError,
     ProjectSummaryDTO,
+    ProjectWithWorkspaceDTO,
+    ProjectWorkspaceConflictError,
+    ProjectWorkspaceDTO,
 )
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.errors import UniqueViolation
@@ -51,6 +57,26 @@ def _require_supported_schema(*, project_id: str, minimum_version: int, client_m
             minimum_version=minimum_version,
             client_maximum_version=client_maximum_version,
         )
+
+
+def _require_supported_document_schema(*, project_id: str, minimum_version: int, client_maximum_version: int) -> None:
+    if client_maximum_version < minimum_version:
+        raise ProjectDocumentSchemaUnsupportedError(
+            project_id=project_id,
+            minimum_version=minimum_version,
+            client_maximum_version=client_maximum_version,
+        )
+
+
+def _next_document_floor(project_id: str, current: int, requested: Optional[int]) -> int:
+    """The document schema floor a save leaves: the requested one, which may only raise it, or the current one."""
+    if requested is None:
+        return current
+    if requested < current:
+        raise ProjectDocumentSchemaDowngradeError(
+            project_id=project_id, current_version=current, requested_version=requested
+        )
+    return requested
 
 
 def _record(summary: Optional[ProjectSummaryDTO], project_id: str, data: dict[str, Any]) -> ProjectRecordDTO:
@@ -124,12 +150,19 @@ class ProjectRecordsStorage(ProjectRecordsStorageBase):
         board_id: str | None = None,
         minimum_canvas_schema_version: int = DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
         max_canvas_schema_version: int = DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
+        minimum_document_schema_version: int = DEFAULT_PROJECT_DOCUMENT_SCHEMA_VERSION,
+        max_document_schema_version: int = DEFAULT_PROJECT_DOCUMENT_SCHEMA_VERSION,
     ) -> ProjectRecordDTO:
         new_project_id = project_id or uuid.uuid4().hex
         _require_supported_schema(
             project_id=new_project_id,
             minimum_version=minimum_canvas_schema_version,
             client_maximum_version=max_canvas_schema_version,
+        )
+        _require_supported_document_schema(
+            project_id=new_project_id,
+            minimum_version=minimum_document_schema_version,
+            client_maximum_version=max_document_schema_version,
         )
         document_json, document_bytes = _serialize_project_document(data)
         _require_project_document_size(document_bytes)
@@ -156,6 +189,7 @@ class ProjectRecordsStorage(ProjectRecordsStorageBase):
                     data=document_json,
                     board_id=project_board_id,
                     minimum_canvas_schema_version=minimum_canvas_schema_version,
+                    minimum_document_schema_version=minimum_document_schema_version,
                 )
             except UniqueViolation as error:
                 # A project has this id: the account's own, created meanwhile or, when the create brings no board,
@@ -177,8 +211,13 @@ class ProjectRecordsStorage(ProjectRecordsStorageBase):
         user_id: str,
         project_id: str,
         max_canvas_schema_version: int = DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
-    ) -> ProjectRecordDTO:
-        record = self._queries.projects.get(user_id, project_id)
+        max_document_schema_version: int = DEFAULT_PROJECT_DOCUMENT_SCHEMA_VERSION,
+    ) -> ProjectWithWorkspaceDTO:
+        def read(q: Queries) -> tuple[Optional[ProjectRecordDTO], Optional[ProjectWorkspaceDTO]]:
+            # One snapshot: both rows as they stood at one instant, though each half is saved on its own.
+            return q.projects.get(user_id, project_id), q.projects.workspace(user_id, project_id)
+
+        record, workspace = self._queries.run(read, read_only=True)
         if record is None:
             raise ProjectRecordNotFoundError(project_id)
         _require_supported_schema(
@@ -186,7 +225,13 @@ class ProjectRecordsStorage(ProjectRecordsStorageBase):
             minimum_version=record.minimum_canvas_schema_version,
             client_maximum_version=max_canvas_schema_version,
         )
-        return record
+        _require_supported_document_schema(
+            project_id=project_id,
+            minimum_version=record.minimum_document_schema_version,
+            client_maximum_version=max_document_schema_version,
+        )
+        # Shallow: `model_dump` would copy the whole decoded content, which can run to tens of megabytes.
+        return ProjectWithWorkspaceDTO(**dict(record), workspace=workspace)
 
     def list(self, user_id: str) -> list[ProjectSummaryDTO]:
         return self._queries.projects.summaries(user_id)
@@ -200,6 +245,8 @@ class ProjectRecordsStorage(ProjectRecordsStorageBase):
         data: dict[str, Any],
         minimum_canvas_schema_version: int | None = None,
         max_canvas_schema_version: int = DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
+        minimum_document_schema_version: int | None = None,
+        max_document_schema_version: int = DEFAULT_PROJECT_DOCUMENT_SCHEMA_VERSION,
     ) -> ProjectRecordDTO:
         document_json, document_bytes = _serialize_project_document(data)
         references = extract_media_references(data)
@@ -217,6 +264,11 @@ class ProjectRecordsStorage(ProjectRecordsStorageBase):
                 minimum_version=current_minimum_version,
                 client_maximum_version=max_canvas_schema_version,
             )
+            _require_supported_document_schema(
+                project_id=project_id,
+                minimum_version=project.minimum_document_schema_version,
+                client_maximum_version=max_document_schema_version,
+            )
             if project.revision != expected_revision:
                 raise ProjectRecordConflictError(project_id, expected_revision, project.revision)
             next_minimum_version = (
@@ -233,6 +285,14 @@ class ProjectRecordsStorage(ProjectRecordsStorageBase):
                 minimum_version=next_minimum_version,
                 client_maximum_version=max_canvas_schema_version,
             )
+            next_document_floor = _next_document_floor(
+                project_id, project.minimum_document_schema_version, minimum_document_schema_version
+            )
+            _require_supported_document_schema(
+                project_id=project_id,
+                minimum_version=next_document_floor,
+                client_maximum_version=max_document_schema_version,
+            )
             _require_project_document_size(document_bytes)
 
             q.projects.save(
@@ -241,6 +301,7 @@ class ProjectRecordsStorage(ProjectRecordsStorageBase):
                 name=name,
                 data=document_json,
                 minimum_canvas_schema_version=next_minimum_version,
+                minimum_document_schema_version=next_document_floor,
             )
             q.boards.rename(project.board_id, name[:BOARD_NAME_MAX_LENGTH])
             q.media_references.replace(
@@ -250,6 +311,48 @@ class ProjectRecordsStorage(ProjectRecordsStorageBase):
 
         return _record(self._queries.run(save), project_id, data)
 
+    def save_workspace(
+        self,
+        user_id: str,
+        project_id: str,
+        expected_revision: Optional[int],
+        data: dict[str, Any],
+        max_document_schema_version: int,
+    ) -> ProjectWorkspaceDTO:
+        document_json, document_bytes = _serialize_project_document(data)
+        _require_project_document_size(document_bytes)
+        references = extract_media_references(data)
+
+        def save(q: Queries) -> Optional[tuple[int, str]]:
+            q.locks.acquire(DatabaseLock.MEDIA_PROTECTION, shared=True)
+            # The project's row is the lock for its workspaces too: every workspace write takes it first, so the
+            # revision read below is the one this write replaces, and a deletion of the project waits for it.
+            project = q.projects.lock(user_id, project_id)
+            if project is None:
+                raise ProjectRecordNotFoundError(project_id)
+            _require_supported_document_schema(
+                project_id=project_id,
+                minimum_version=project.minimum_document_schema_version,
+                client_maximum_version=max_document_schema_version,
+            )
+            current = q.projects.workspace_stamp(user_id, project_id)
+            current_revision = current[0] if current is not None else None
+            if current_revision != expected_revision:
+                raise ProjectWorkspaceConflictError(project_id, expected_revision, current_revision)
+            if current_revision is None:
+                q.projects.insert_workspace(user_id=user_id, project_id=project_id, data=document_json)
+            else:
+                q.projects.save_workspace(user_id=user_id, project_id=project_id, data=document_json)
+            q.media_references.replace(
+                owner_kind="project_workspace", user_id=user_id, owner_id=project_id, references=references
+            )
+            return q.projects.workspace_stamp(user_id, project_id)
+
+        stamp = self._queries.run(save)
+        assert stamp is not None, "the workspace was written in this transaction"
+        # The document the client sent, not a decode of the stored one: the same JSON, and the larger part.
+        return ProjectWorkspaceDTO(data=data, revision=stamp[0], updated_at=stamp[1])
+
     def delete(self, user_id: str, project_id: str, boards: Literal["release", "delete"] = "release") -> None:
         def delete(q: Queries) -> None:
             # The project's row, then its board's, as every write of a project locks them: the board deleted below
@@ -258,9 +361,12 @@ class ProjectRecordsStorage(ProjectRecordsStorageBase):
             if project is None:
                 return
             q.boards.lock(project.board_id)
+            # Read before the project's row goes, and its workspaces with it; its lock keeps new ones from being saved.
+            members = q.projects.workspace_members(project_id)
             q.boards.remove_project_members(user_id, project_id, project.board_id, delete_members=boards == "delete")
             q.projects.delete(user_id, project_id)
             q.media_references.delete(owner_kind="project", user_id=user_id, owner_id=project_id)
+            q.media_references.delete_many_owners(owner_kind="project_workspace", user_ids=members, owner_id=project_id)
             # Only after the project is gone: a claimed board cannot be deleted. Deleting the board deletes its
             # memberships, returning the media to Uncategorized; the image and video records and their files are
             # untouched.

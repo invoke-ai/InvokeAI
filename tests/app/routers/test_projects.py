@@ -457,3 +457,108 @@ def test_the_board_snapshot_lists_member_boards_after_the_inbox(client: TestClie
         (created["board_id"], True, "Project"),
         (member, False, "Member"),
     ]
+
+
+# region workspaces
+
+
+def _split_project(client: TestClient, token: str) -> dict[str, Any]:
+    response = _create_project(
+        client, token, data={"canvas": {}}, minimum_document_schema_version=4, max_document_schema_version=4
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    return response.json()
+
+
+def _put_workspace(client: TestClient, token: str, project_id: str, expected: int | None, data: dict[str, Any]):
+    return client.put(
+        f"/api/v1/projects/{project_id}/workspace",
+        json={"data": data, "expected_revision": expected, "max_document_schema_version": 4},
+        headers=_auth(token),
+    )
+
+
+def test_a_project_is_read_with_the_callers_workspace(client: TestClient, user1_token: str):
+    project = _split_project(client, user1_token)
+    saved = _put_workspace(client, user1_token, project["project_id"], None, {"layout": "mine"})
+
+    fetched = client.get(
+        f"/api/v1/projects/{project['project_id']}?max_document_schema_version=4", headers=_auth(user1_token)
+    ).json()
+
+    assert saved.status_code == status.HTTP_200_OK
+    assert fetched["data"] == {"canvas": {}}
+    assert fetched["workspace"] == saved.json()
+    assert (saved.json()["revision"], saved.json()["data"]) == (1, {"layout": "mine"})
+
+
+def test_a_stale_workspace_save_is_a_409_with_the_current_revision(client: TestClient, user1_token: str):
+    project_id = _split_project(client, user1_token)["project_id"]
+    _put_workspace(client, user1_token, project_id, None, {"v": 1})
+
+    stale = _put_workspace(client, user1_token, project_id, None, {"v": "lost"})
+
+    assert stale.status_code == status.HTTP_409_CONFLICT
+    assert stale.json()["detail"]["current_revision"] == 1
+
+
+def test_a_client_that_predates_the_split_gets_a_412_naming_the_document_schema(client: TestClient, user1_token: str):
+    project_id = _split_project(client, user1_token)["project_id"]
+
+    refused = client.get(f"/api/v1/projects/{project_id}", headers=_auth(user1_token))
+
+    assert refused.status_code == status.HTTP_412_PRECONDITION_FAILED
+    assert refused.json()["detail"]["code"] == "document_schema_unsupported"
+    assert (
+        refused.json()["detail"]["minimum_document_schema_version"],
+        refused.json()["detail"]["max_document_schema_version"],
+    ) == (4, 3)
+
+
+def test_a_save_from_a_client_that_predates_the_split_is_a_412(client: TestClient, user1_token: str):
+    """Both halves: the content save today's client sends, with no `max_document_schema_version`, and a workspace
+    save that declares too old a schema."""
+    project_id = _split_project(client, user1_token)["project_id"]
+
+    content = client.put(
+        f"/api/v1/projects/{project_id}",
+        json={"name": "Whole", "data": {"whole": True}, "expected_revision": 1},
+        headers=_auth(user1_token),
+    )
+    workspace = client.put(
+        f"/api/v1/projects/{project_id}/workspace",
+        json={"data": {}, "expected_revision": None, "max_document_schema_version": 3},
+        headers=_auth(user1_token),
+    )
+
+    for refused in (content, workspace):
+        assert refused.status_code == status.HTTP_412_PRECONDITION_FAILED
+        assert refused.json()["detail"]["code"] == "document_schema_unsupported"
+
+
+def test_lowering_the_document_schema_floor_is_a_400(client: TestClient, user1_token: str):
+    project_id = _split_project(client, user1_token)["project_id"]
+
+    lowered = client.put(
+        f"/api/v1/projects/{project_id}",
+        json={
+            "name": "Project",
+            "data": {},
+            "expected_revision": 1,
+            "minimum_document_schema_version": 3,
+            "max_document_schema_version": 4,
+        },
+        headers=_auth(user1_token),
+    )
+
+    assert lowered.status_code == status.HTTP_400_BAD_REQUEST
+    assert lowered.json()["detail"]["code"] == "document_schema_downgrade"
+
+
+def test_no_one_else_can_save_a_workspace_in_a_project(client: TestClient, user1_token: str, user2_token: str):
+    project_id = _split_project(client, user1_token)["project_id"]
+
+    assert _put_workspace(client, user2_token, project_id, None, {}).status_code == status.HTTP_404_NOT_FOUND
+
+
+# endregion

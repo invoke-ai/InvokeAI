@@ -66,6 +66,20 @@ client from opening a v3 project: it is treated as v2, not as unrestricted. The 
 forward-version gate and the project API adapter consume the same constant so advertised support
 cannot drift from actual parsing support.
 
+## Project content and workspaces
+
+From document schema 4 a project is two documents. The server stores and serves both halves; webv2 still saves whole schema 3 documents through `PUT /projects/{id}` until it adopts the split, and in 7.0 only a project's owner can save a workspace in it (anyone else gets `404`). Its **content** is what the project is: the shared work a collaborator would review, export or edit. Each member's **workspace** is how they work on it: layout, widgets and their generation settings, and their selection and staging. The content stays in `projects.data`; each workspace is a row of `project_workspaces`, keyed by project and account, which deleting either removes.
+
+- `GET /projects/{id}` returns the content and, as `workspace`, the caller's workspace with its own `revision` (or `null` before they have saved one).
+- `PUT /projects/{id}` saves the content, revision-checked as before.
+- `PUT /projects/{id}/workspace` saves the caller's workspace against its own `expected_revision` (`null` for the first save); a mismatch is `409` with the `current_revision`. The two halves never conflict with each other, and no request saves both.
+- Both halves have the 32 MiB limit, and both pass through the project write limiter, which runs one write per account at a time, so a client saves the halves one after the other.
+- The listing gives each project's `workspace_updated_at` for the caller beside the content's `updated_at`.
+
+Each half indexes the media it names separately (`project` and `project_workspace` references), so saving one never drops what only the other names, such as a staged candidate the intermediates cleanup would otherwise delete.
+
+`minimum_document_schema_version` is a second floor beside the canvas one, with the same rules: reads declare `max_document_schema_version` as a query parameter and content saves in their body (both default to 3; workspace saves must declare it), a save may raise the floor but not above its own maximum and never lower it (`400` with the code `document_schema_downgrade`), and a client below it gets `412` with the code `document_schema_unsupported`. Projects saved before the split are at 3; the first save that splits one raises it to 4, so a client that predates the split, which would read the content as a whole document and save it back without the workspace, is refused instead.
+
 ## Custom fonts
 
 Webv2 exports font dependencies in the manifest's optional `fonts` array. Each dependency records a SHA-256 content hash, readable family and face labels, source reference IDs, and an optional `fonts/<hash>.<extension>` entry. The Canvas schema compatibility floor protects the newer editable text fields; the ZIP manifest remains version 2.

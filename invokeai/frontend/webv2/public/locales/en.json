@@ -4782,6 +4782,8 @@
       "affected": "Documents that will lose references",
       "affectedProject_one": "Project “{{name}}” ({{count, number}} item)",
       "affectedProject_other": "Project “{{name}}” ({{count, number}} items)",
+      "affectedProjectWorkspace_one": "Workspace in project “{{name}}” ({{count, number}} item)",
+      "affectedProjectWorkspace_other": "Workspace in project “{{name}}” ({{count, number}} items)",
       "affectedWorkflow_one": "Workflow “{{name}}” ({{count, number}} item)",
       "affectedWorkflow_other": "Workflow “{{name}}” ({{count, number}} items)",
       "affectedOwner": "· {{owner}}",

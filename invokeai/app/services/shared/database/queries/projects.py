@@ -8,6 +8,7 @@ from sqlalchemy import (
     ColumnElement,
     Connection,
     Row,
+    and_,
     bindparam,
     case,
     delete,
@@ -27,12 +28,13 @@ from invokeai.app.services.project_records.project_records_common import (
     ProjectBoardSnapshotDTO,
     ProjectRecordDTO,
     ProjectSummaryDTO,
+    ProjectWorkspaceDTO,
 )
 from invokeai.app.services.shared.database.dialect import OrderedJoin
 from invokeai.app.services.shared.database.queries.base import QueryModule, locking, mapped, read, write
 from invokeai.app.services.shared.database.schema.boards import board_images, board_videos, boards
 from invokeai.app.services.shared.database.schema.images import images
-from invokeai.app.services.shared.database.schema.projects import projects
+from invokeai.app.services.shared.database.schema.projects import project_workspaces, projects
 from invokeai.app.services.shared.database.schema.videos import videos
 
 
@@ -41,34 +43,63 @@ class LockedProject(NamedTuple):
 
     revision: int
     minimum_canvas_schema_version: int
+    minimum_document_schema_version: int
     board_id: str
 
 
+_W = project_workspaces.c
 _SUMMARY_COLUMNS = (
     projects.c.project_id,
     projects.c.board_id,
     projects.c.name,
     projects.c.revision,
     projects.c.minimum_canvas_schema_version,
+    projects.c.minimum_document_schema_version,
     projects.c.created_at,
     projects.c.updated_at,
+    _W.updated_at,
+)
+# The caller's workspace beside each project: `user_id` is the caller, who in 7.0 is always the owner.
+_WITH_CALLERS_WORKSPACE = projects.outerjoin(
+    project_workspaces, and_(_W.project_id == projects.c.project_id, _W.user_id == bindparam("user_id"))
 )
 _THE_PROJECT = (projects.c.user_id == bindparam("user_id"), projects.c.project_id == bindparam("project_id"))
 
 
-_GET = select(*_SUMMARY_COLUMNS, projects.c.data).where(*_THE_PROJECT)
-_SUMMARY = select(*_SUMMARY_COLUMNS).where(*_THE_PROJECT)
+_GET = select(*_SUMMARY_COLUMNS, projects.c.data).select_from(_WITH_CALLERS_WORKSPACE).where(*_THE_PROJECT)
+_SUMMARY = select(*_SUMMARY_COLUMNS).select_from(_WITH_CALLERS_WORKSPACE).where(*_THE_PROJECT)
 # Oldest first. Projects created in the same millisecond come in the order of their ids.
 _SUMMARIES = (
     select(*_SUMMARY_COLUMNS)
+    .select_from(_WITH_CALLERS_WORKSPACE)
     .where(projects.c.user_id == bindparam("user_id"))
     .order_by(projects.c.created_at, projects.c.project_id)
 )
 _BOARD_ID = select(projects.c.board_id).where(*_THE_PROJECT)
 _LOCK = (
-    select(projects.c.revision, projects.c.minimum_canvas_schema_version, projects.c.board_id)
+    select(
+        projects.c.revision,
+        projects.c.minimum_canvas_schema_version,
+        projects.c.minimum_document_schema_version,
+        projects.c.board_id,
+    )
     .where(*_THE_PROJECT)
     .with_for_update()
+)
+_THE_WORKSPACE = (_W.project_id == bindparam("project_id"), _W.user_id == bindparam("user_id"))
+_WORKSPACE_MEMBERS = select(_W.user_id).where(_W.project_id == bindparam("project_id"))
+_WORKSPACES_IN_OWNED = (
+    select(_W.user_id, _W.project_id)
+    .select_from(projects.join(project_workspaces, _W.project_id == projects.c.project_id))
+    .where(projects.c.user_id == bindparam("user_id"))
+)
+_WORKSPACE = select(_W.data, _W.revision, _W.updated_at).where(*_THE_WORKSPACE)
+_WORKSPACE_STAMP = select(_W.revision, _W.updated_at).where(*_THE_WORKSPACE)
+_INSERT_WORKSPACE = insert(project_workspaces)
+_SAVE_WORKSPACE = (
+    update(project_workspaces)
+    .where(_W.project_id == bindparam("target_project_id"), _W.user_id == bindparam("target_user_id"))
+    .values(data=bindparam("new_data"), revision=_W.revision + 1)
 )
 _CLAIMANT = select(projects.c.user_id, projects.c.project_id).where(projects.c.board_id == bindparam("board_id"))
 _INSERT = insert(projects)
@@ -79,6 +110,7 @@ _SAVE = (
         name=bindparam("new_name"),
         data=bindparam("new_data"),
         minimum_canvas_schema_version=bindparam("new_minimum_canvas_schema_version"),
+        minimum_document_schema_version=bindparam("new_minimum_document_schema_version"),
         revision=projects.c.revision + 1,
     )
 )
@@ -139,17 +171,27 @@ _ITEMS = union_all(
 _BOARD_ITEMS = _ITEMS.limit(bindparam("limit"))
 
 
+# The fields `_SUMMARY_COLUMNS` select, in their order.
+_SUMMARY_FIELDS = (
+    "project_id",
+    "board_id",
+    "name",
+    "revision",
+    "minimum_canvas_schema_version",
+    "minimum_document_schema_version",
+    "created_at",
+    "updated_at",
+    "workspace_updated_at",
+)
+assert len(_SUMMARY_FIELDS) == len(_SUMMARY_COLUMNS)
+
+
+def _summary_fields(row: Sequence[Any]) -> dict[str, Any]:
+    return dict(zip(_SUMMARY_FIELDS, row[: len(_SUMMARY_FIELDS)], strict=True))
+
+
 def _summary(row: Sequence[Any]) -> ProjectSummaryDTO:
-    project_id, board_id, name, revision, minimum_canvas_schema_version, created_at, updated_at = row
-    return ProjectSummaryDTO(
-        project_id=project_id,
-        board_id=board_id,
-        name=name,
-        revision=revision,
-        minimum_canvas_schema_version=minimum_canvas_schema_version,
-        created_at=created_at,
-        updated_at=updated_at,
-    )
+    return ProjectSummaryDTO(**_summary_fields(row))
 
 
 def _summary_or_none(row: Optional[Sequence[Any]]) -> Optional[ProjectSummaryDTO]:
@@ -163,17 +205,14 @@ def _summaries(rows: Sequence[Sequence[Any]]) -> list[ProjectSummaryDTO]:
 def _record_or_none(row: Optional[Sequence[Any]]) -> Optional[ProjectRecordDTO]:
     if row is None:
         return None
-    project_id, board_id, name, revision, minimum_canvas_schema_version, created_at, updated_at, data = row
-    return ProjectRecordDTO(
-        project_id=project_id,
-        board_id=board_id,
-        name=name,
-        revision=revision,
-        minimum_canvas_schema_version=minimum_canvas_schema_version,
-        created_at=created_at,
-        updated_at=updated_at,
-        data=json.loads(data),
-    )
+    return ProjectRecordDTO(**_summary_fields(row), data=json.loads(row[-1]))
+
+
+def _workspace_or_none(row: Optional[Sequence[Any]]) -> Optional[ProjectWorkspaceDTO]:
+    if row is None:
+        return None
+    data, revision, updated_at = row
+    return ProjectWorkspaceDTO(data=json.loads(data), revision=revision, updated_at=updated_at)
 
 
 def _board_snapshot_or_none(
@@ -223,8 +262,7 @@ class ProjectQueries(QueryModule):
         row: Optional[Sequence[Any]] = conn.execute(_LOCK, {"user_id": user_id, "project_id": project_id}).first()
         if row is None:
             return None
-        revision, minimum_canvas_schema_version, board_id = row
-        return LockedProject(revision, minimum_canvas_schema_version, board_id)
+        return LockedProject(*row)
 
     @read
     def claimant(self, conn: Connection, board_id: str) -> Optional[tuple[str, str]]:
@@ -261,6 +299,7 @@ class ProjectQueries(QueryModule):
         data: str,
         board_id: str,
         minimum_canvas_schema_version: int,
+        minimum_document_schema_version: int,
     ) -> None:
         conn.execute(
             _INSERT,
@@ -271,6 +310,7 @@ class ProjectQueries(QueryModule):
                 "data": data,
                 "board_id": board_id,
                 "minimum_canvas_schema_version": minimum_canvas_schema_version,
+                "minimum_document_schema_version": minimum_document_schema_version,
             },
         )
 
@@ -284,6 +324,7 @@ class ProjectQueries(QueryModule):
         name: str,
         data: str,
         minimum_canvas_schema_version: int,
+        minimum_document_schema_version: int,
     ) -> None:
         """Writes the project as its next revision. The caller has locked it and checked the revision it saves over."""
         conn.execute(
@@ -294,8 +335,43 @@ class ProjectQueries(QueryModule):
                 "new_name": name,
                 "new_data": data,
                 "new_minimum_canvas_schema_version": minimum_canvas_schema_version,
+                "new_minimum_document_schema_version": minimum_document_schema_version,
             },
         )
+
+    @mapped(_workspace_or_none)
+    @read
+    def workspace(self, conn: Connection, user_id: str, project_id: str) -> Optional[Row[Any]]:
+        """The account's workspace in the project, if it has saved one."""
+        return conn.execute(_WORKSPACE, {"user_id": user_id, "project_id": project_id}).first()
+
+    @read
+    def workspace_members(self, conn: Connection, project_id: str) -> list[str]:
+        """The accounts with a workspace in the project."""
+        return list(conn.execute(_WORKSPACE_MEMBERS, {"project_id": project_id}).scalars().all())
+
+    @read
+    def workspaces_in_owned(self, conn: Connection, user_id: str) -> list[tuple[str, str]]:
+        """(member, project) of every workspace in the account's projects, the account's own among them."""
+        rows: Sequence[Sequence[Any]] = conn.execute(_WORKSPACES_IN_OWNED, {"user_id": user_id}).all()
+        return [(row[0], row[1]) for row in rows]
+
+    @read
+    def workspace_stamp(self, conn: Connection, user_id: str, project_id: str) -> Optional[tuple[int, str]]:
+        """The workspace's revision and when it was saved, without its document."""
+        row: Optional[Sequence[Any]] = conn.execute(
+            _WORKSPACE_STAMP, {"user_id": user_id, "project_id": project_id}
+        ).first()
+        return (row[0], row[1]) if row is not None else None
+
+    @write
+    def insert_workspace(self, conn: Connection, *, user_id: str, project_id: str, data: str) -> None:
+        conn.execute(_INSERT_WORKSPACE, {"project_id": project_id, "user_id": user_id, "data": data})
+
+    @write
+    def save_workspace(self, conn: Connection, *, user_id: str, project_id: str, data: str) -> None:
+        """Writes the workspace as its next revision. The caller has locked the project and checked the revision."""
+        conn.execute(_SAVE_WORKSPACE, {"target_project_id": project_id, "target_user_id": user_id, "new_data": data})
 
     @write
     def delete(self, conn: Connection, user_id: str, project_id: str) -> None:

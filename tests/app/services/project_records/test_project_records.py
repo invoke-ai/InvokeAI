@@ -28,6 +28,7 @@ from invokeai.app.services.project_records.project_records_common import (
     ProjectRecordConflictError,
     ProjectRecordExistsError,
     ProjectRecordNotFoundError,
+    ProjectWithWorkspaceDTO,
 )
 from invokeai.app.services.project_records.project_records_default import ProjectRecordsStorage
 from invokeai.app.services.shared.database.database import Database
@@ -70,7 +71,7 @@ def test_create_and_get_roundtrip(project_records: ProjectRecordsStorage) -> Non
     assert created.data == data
 
     fetched = project_records.get(SYSTEM_USER_ID, created.project_id)
-    assert fetched == created
+    assert fetched == ProjectWithWorkspaceDTO(**created.model_dump(), workspace=None)
 
 
 def test_oversized_documents_are_rejected_before_a_board_is_created(
@@ -212,7 +213,9 @@ def test_update_increments_revision(project_records: ProjectRecordsStorage) -> N
     assert updated.revision == 2
     assert updated.name == "Renamed"
     assert updated.data == {"v": 2}
-    assert project_records.get(SYSTEM_USER_ID, created.project_id) == updated
+    assert project_records.get(SYSTEM_USER_ID, created.project_id) == ProjectWithWorkspaceDTO(
+        **updated.model_dump(), workspace=None
+    )
 
 
 def test_a_save_renews_when_the_project_was_updated(project_records: ProjectRecordsStorage, database: Database) -> None:
@@ -693,6 +696,7 @@ def _replace_project(q: Queries, *, minimum_canvas_schema_version: int = 2) -> N
         data='{"new":true}',
         board_id="new-board",
         minimum_canvas_schema_version=minimum_canvas_schema_version,
+        minimum_document_schema_version=3,
     )
 
 

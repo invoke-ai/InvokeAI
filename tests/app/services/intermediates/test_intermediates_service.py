@@ -1565,6 +1565,25 @@ def test_quarantined_projects_are_named_when_a_force_clear_would_break_them(
     assert [(doc.kind, doc.name) for doc in force.affected_documents] == [("quarantined_project", "Before boards")]
 
 
+def test_a_workspace_is_named_after_its_project_when_a_force_clear_would_break_it(
+    invoker: Invoker, service: IntermediatesService
+) -> None:
+    _seed_image(invoker, "staged.png")
+    project = invoker.services.project_records.create(
+        "alice", "Poster", {}, minimum_document_schema_version=4, max_document_schema_version=4
+    )
+    invoker.services.project_records.save_workspace(
+        "alice", project.project_id, None, {"staged": {"imageName": "staged.png"}}, max_document_schema_version=4
+    )
+
+    safe, _ = _run(service, ALICE, _owner("alice"))
+    assert safe.impact.keep_referenced_images == 1
+    force = service.create_preview(IntermediatesPreviewRequest(mode="force", scope=_owner("alice")), ALICE)
+    assert [(doc.kind, doc.owner_id, doc.name) for doc in force.affected_documents] == [
+        ("project_workspace", project.project_id, "Poster")
+    ]
+
+
 # ── bounds ──
 
 

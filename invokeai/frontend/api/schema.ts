@@ -4061,7 +4061,7 @@ export type paths = {
         };
         /**
          * Get Project
-         * @description Gets one of the current user's projects, including its document.
+         * @description Gets one of the current user's projects: its content and the caller's workspace in it.
          */
         get: operations["get_project"];
         /**
@@ -4081,6 +4081,28 @@ export type paths = {
          *     Nothing is reported back for the same reason: nothing was destroyed to report.
          */
         delete: operations["delete_project"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/workspace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save Project Workspace
+         * @description Saves the caller's workspace in one of their projects: their layout, widgets and generation settings, apart
+         *     from the project content, so that saving one never conflicts with the other. Returns 409 with the current
+         *     revision (null when there is none) when the save is based on another.
+         */
+        put: operations["save_project_workspace"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -21316,10 +21338,10 @@ export type components = {
         IntermediatesAffectedDocument: {
             /**
              * Kind
-             * @description `client_state` is the legacy editor's persisted state; `quarantined_project` is a project kept for repair
+             * @description `project_workspace` is one account's workspace in a project; `client_state` is the legacy editor's persisted state; `quarantined_project` is a project kept for repair
              * @enum {string}
              */
-            kind: "project" | "workflow" | "client_state" | "quarantined_project";
+            kind: "project" | "project_workspace" | "workflow" | "client_state" | "quarantined_project";
             /** User Id */
             user_id: string;
             /**
@@ -38814,6 +38836,18 @@ export type components = {
              * @default 2
              */
             max_canvas_schema_version?: number;
+            /**
+             * Minimum Document Schema Version
+             * @description Oldest project document schema that can read this document
+             * @default 3
+             */
+            minimum_document_schema_version?: number;
+            /**
+             * Max Document Schema Version
+             * @description Newest project document schema understood by this client
+             * @default 3
+             */
+            max_document_schema_version?: number;
         };
         /**
          * ProjectRecordDTO
@@ -38846,18 +38880,28 @@ export type components = {
              */
             minimum_canvas_schema_version: number;
             /**
+             * Minimum Document Schema Version
+             * @description Oldest project document schema a client must support before it may read or write this project
+             */
+            minimum_document_schema_version: number;
+            /**
              * Created At
              * @description When the project was created
              */
             created_at: string;
             /**
              * Updated At
-             * @description When the project was last saved
+             * @description When the project content was last saved
              */
             updated_at: string;
             /**
+             * Workspace Updated At
+             * @description When the caller last saved their workspace in the project; null if they have none
+             */
+            workspace_updated_at?: string | null;
+            /**
              * Data
-             * @description The opaque client-owned project document
+             * @description The opaque client-owned project content (document schema 4 on)
              */
             data: {
                 [key: string]: unknown;
@@ -38894,15 +38938,25 @@ export type components = {
              */
             minimum_canvas_schema_version: number;
             /**
+             * Minimum Document Schema Version
+             * @description Oldest project document schema a client must support before it may read or write this project
+             */
+            minimum_document_schema_version: number;
+            /**
              * Created At
              * @description When the project was created
              */
             created_at: string;
             /**
              * Updated At
-             * @description When the project was last saved
+             * @description When the project content was last saved
              */
             updated_at: string;
+            /**
+             * Workspace Updated At
+             * @description When the caller last saved their workspace in the project; null if they have none
+             */
+            workspace_updated_at?: string | null;
         };
         /**
          * ProjectUpdateRequest
@@ -38937,6 +38991,123 @@ export type components = {
              * @default 2
              */
             max_canvas_schema_version?: number;
+            /**
+             * Minimum Document Schema Version
+             * @description New document schema floor to store atomically with this content; omitted to keep the current floor
+             */
+            minimum_document_schema_version?: number | null;
+            /**
+             * Max Document Schema Version
+             * @description Newest project document schema understood by this client
+             * @default 3
+             */
+            max_document_schema_version?: number;
+        };
+        /**
+         * ProjectWithWorkspaceDTO
+         * @description A project's content together with the caller's workspace in it.
+         */
+        ProjectWithWorkspaceDTO: {
+            /**
+             * Project Id
+             * @description The project's client-generated identifier
+             */
+            project_id: string;
+            /**
+             * Board Id
+             * @description The project's private board; only project APIs may rename or delete it
+             */
+            board_id: string;
+            /**
+             * Name
+             * @description The project's display name
+             */
+            name: string;
+            /**
+             * Revision
+             * @description Monotonic revision, incremented on every save
+             */
+            revision: number;
+            /**
+             * Minimum Canvas Schema Version
+             * @description Oldest canvas schema a client must support before it may read or write this project
+             */
+            minimum_canvas_schema_version: number;
+            /**
+             * Minimum Document Schema Version
+             * @description Oldest project document schema a client must support before it may read or write this project
+             */
+            minimum_document_schema_version: number;
+            /**
+             * Created At
+             * @description When the project was created
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * @description When the project content was last saved
+             */
+            updated_at: string;
+            /**
+             * Workspace Updated At
+             * @description When the caller last saved their workspace in the project; null if they have none
+             */
+            workspace_updated_at?: string | null;
+            /**
+             * Data
+             * @description The opaque client-owned project content (document schema 4 on)
+             */
+            data: {
+                [key: string]: unknown;
+            };
+            /** @description The caller's workspace; null until they save one, when the client builds a default */
+            workspace: components["schemas"]["ProjectWorkspaceDTO"] | null;
+        };
+        /**
+         * ProjectWorkspaceDTO
+         * @description One account's workspace in a project: how they work on it (layout, widgets, generation settings).
+         */
+        ProjectWorkspaceDTO: {
+            /**
+             * Data
+             * @description The opaque client-owned workspace document
+             */
+            data: {
+                [key: string]: unknown;
+            };
+            /**
+             * Revision
+             * @description Monotonic revision, incremented on every save of this workspace
+             */
+            revision: number;
+            /**
+             * Updated At
+             * @description When the workspace was last saved
+             */
+            updated_at: string;
+        };
+        /**
+         * ProjectWorkspaceSaveRequest
+         * @description Request body for saving the caller's workspace in a project with optimistic concurrency.
+         */
+        ProjectWorkspaceSaveRequest: {
+            /**
+             * Data
+             * @description The opaque client-owned workspace document
+             */
+            data: {
+                [key: string]: unknown;
+            };
+            /**
+             * Expected Revision
+             * @description The workspace revision this save is based on, or null for the caller's first workspace in the project; a mismatch returns 409
+             */
+            expected_revision: number | null;
+            /**
+             * Max Document Schema Version
+             * @description Newest project document schema understood by this client
+             */
+            max_document_schema_version: number;
         };
         /**
          * PromptEnhancerField
@@ -60232,6 +60403,8 @@ export interface operations {
             query?: {
                 /** @description Newest canvas schema understood by this client */
                 max_canvas_schema_version?: number;
+                /** @description Newest project document schema understood by this client */
+                max_document_schema_version?: number;
             };
             header?: never;
             path: {
@@ -60248,7 +60421,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProjectRecordDTO"];
+                    "application/json": components["schemas"]["ProjectWithWorkspaceDTO"];
                 };
             };
             /** @description Validation Error */
@@ -60319,6 +60492,42 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_project_workspace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The id of the project whose workspace to save */
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectWorkspaceSaveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectWorkspaceDTO"];
+                };
             };
             /** @description Validation Error */
             422: {

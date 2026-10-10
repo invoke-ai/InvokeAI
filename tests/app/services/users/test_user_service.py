@@ -11,6 +11,7 @@ from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries.base import IN_CHUNK
 from invokeai.app.services.shared.database.schema.boards import boards
 from invokeai.app.services.shared.database.schema.media_references import media_references
+from invokeai.app.services.shared.database.schema.projects import project_workspaces, projects
 from invokeai.app.services.shared.database.schema.users import users as users_table
 from invokeai.app.services.users import users_default
 from invokeai.app.services.users.users_common import (
@@ -161,10 +162,32 @@ def test_delete_user(user_service: UserService):
     assert retrieved_user is None
 
 
+def test_delete_user_drops_every_members_workspace_references_in_their_projects(
+    user_service: UserService, database: Database
+):
+    """A member's workspace in a departing owner's project cascades with it; its references must not outlive it."""
+    owner = user_service.create(UserCreateRequest(email="owner@example.com", password="TestPassword123")).user_id
+    member = user_service.create(UserCreateRequest(email="member@example.com", password="TestPassword123")).user_id
+    with database.begin(write=True) as conn:
+        conn.execute(insert(boards).values(board_id="inbox", board_name="P", user_id=owner))
+        conn.execute(insert(projects).values(project_id="p", user_id=owner, name="P", data="{}", board_id="inbox"))
+        conn.execute(insert(project_workspaces).values(project_id="p", user_id=member, data="{}"))
+        conn.execute(
+            insert(media_references).values(
+                owner_kind="project_workspace", user_id=member, owner_id="p", media_kind="image", media_name="a.png"
+            )
+        )
+
+    user_service.delete(owner)
+
+    with database.begin(write=False) as conn:
+        assert conn.execute(select(media_references.c.owner_kind)).all() == []
+
+
 def test_delete_user_drops_references_only_of_documents_that_cascade(user_service: UserService, database: Database):
     leaving = user_service.create(UserCreateRequest(email="leaving@example.com", password="TestPassword123")).user_id
     staying = user_service.create(UserCreateRequest(email="staying@example.com", password="TestPassword123")).user_id
-    kinds = ("project", "client_state", "workflow", "quarantined_project")
+    kinds = ("project", "project_workspace", "client_state", "workflow", "quarantined_project")
     with database.begin(write=True) as conn:
         conn.execute(
             insert(media_references),

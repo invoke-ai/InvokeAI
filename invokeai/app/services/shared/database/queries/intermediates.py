@@ -135,6 +135,10 @@ _CLEAR_UNMEASURABLE = delete(intermediates_unmeasurable)
 
 _DOCUMENT_NAMES = {
     "project": select(_P.user_id, _P.project_id, _P.name).where(_P.project_id.in_(bindparam("ids", expanding=True))),
+    # A workspace is named after its project, whose owner need not be the workspace's.
+    "project_workspace": select(null(), _P.project_id, _P.name).where(
+        _P.project_id.in_(bindparam("ids", expanding=True))
+    ),
     "quarantined_project": select(
         orphaned_projects_2026_08_06.c.user_id,
         orphaned_projects_2026_08_06.c.project_id,
