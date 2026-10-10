@@ -35,7 +35,7 @@ class AudioExtractionError(RuntimeError):
 
 
 def extract_audio_pcm(video_path: Path, *, float_pcm: bool = False) -> tuple[np.ndarray, int] | None:
-    """Decode ``video_path``'s audio track to float32 stereo PCM at its native sample rate.
+    """Decode ``video_path``'s first audio stream to float32 stereo PCM at its native sample rate.
 
     Returns ``(samples, sample_rate)`` with ``samples`` shaped ``(2, n)`` in [-1, 1], or
     ``None`` when the container has no audio stream. Mono sources are upmixed to stereo by
@@ -64,7 +64,8 @@ def extract_audio_pcm(video_path: Path, *, float_pcm: bool = False) -> tuple[np.
                     "error",
                     "-i",
                     str(video_path),
-                    *(["-map", "0:a:0?"] if float_pcm else []),
+                    "-map",
+                    "0:a:0?",
                     "-vn",
                     "-ac",
                     "2",
