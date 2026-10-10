@@ -15,7 +15,7 @@ from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api_app import app
 from invokeai.app.services.board_records.board_records_common import BoardRecordOrderBy
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.services.users.users_common import UserCreateRequest
 
 

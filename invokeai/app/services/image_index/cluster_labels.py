@@ -8,6 +8,7 @@ image embeddings.
 """
 
 import hashlib
+import unicodedata
 from pathlib import Path
 
 import numpy as np
@@ -39,9 +40,9 @@ MAX_CUSTOM_VOCAB_TERM_LENGTH = 64
 def normalize_custom_vocab_terms(raw: list[str]) -> list[str]:
     """Normalize user-supplied vocabulary terms for storage and embedding.
 
-    Whitespace is collapsed, terms are lowercased to match the bundled
-    vocabulary's convention, empties are dropped, and duplicates are removed
-    (first occurrence wins, order preserved).
+    Terms are NFKC-normalized, whitespace is collapsed, terms are lowercased to
+    match the bundled vocabulary's convention, empties are dropped, and
+    duplicates are removed (first occurrence wins, order preserved).
 
     Raises:
         ValueError: A term exceeds MAX_CUSTOM_VOCAB_TERM_LENGTH after
@@ -58,7 +59,9 @@ def normalize_custom_vocab_terms(raw: list[str]) -> list[str]:
         # term lists could hash identically and serve each other's cached
         # embeddings.
         cleaned = "".join(ch for ch in entry if ch.isprintable() or ch.isspace())
-        term = " ".join(cleaned.split()).lower()
+        # NFKC makes one term of the spellings MySQL's and MariaDB's case-insensitive collations equate (composed
+        # and decomposed accents, ligatures, full-width letters), so every backend stores the same terms.
+        term = " ".join(unicodedata.normalize("NFKC", cleaned).split()).lower()
         if not term:
             continue
         if len(term) > MAX_CUSTOM_VOCAB_TERM_LENGTH:

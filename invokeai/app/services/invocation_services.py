@@ -47,7 +47,7 @@ if TYPE_CHECKING:
     from invokeai.app.services.project_records.project_records_base import ProjectRecordsStorageBase
     from invokeai.app.services.session_processor.session_processor_base import SessionProcessorBase
     from invokeai.app.services.session_queue.session_queue_base import SessionQueueBase
-    from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+    from invokeai.app.services.shared.database.database import Database
     from invokeai.app.services.urls.urls_base import UrlServiceBase
     from invokeai.app.services.users.users_base import UserServiceBase
     from invokeai.app.services.video_files.video_files_base import VideoFileStorageBase
@@ -75,7 +75,7 @@ class InvocationServices:
         board_records: "BoardRecordStorageBase",
         bulk_download: "BulkDownloadBase",
         configuration: "InvokeAIAppConfig",
-        database: "SqliteDatabase",
+        database: "Database",
         events: "EventServiceBase",
         images: "ImageServiceABC",
         image_files: "ImageFileStorageBase",

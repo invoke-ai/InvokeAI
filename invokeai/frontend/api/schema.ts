@@ -22564,6 +22564,7 @@ export type components = {
          *         download_cache_dir: Path to the directory that contains dynamically downloaded models.
          *         legacy_conf_dir: Path to directory of legacy checkpoint config files.
          *         db_dir: Path to InvokeAI databases directory.
+         *         db_url: URL of a MySQL 8.4+ or MariaDB 10.11+ database to use instead of the SQLite database in `db_dir`, e.g. `mariadb+pymysql://invokeai:password@db.example/invokeai`. Needs the `mysql` extra. One InvokeAI process uses a database at a time. Read at startup only.
          *         db_synchronous: SQLite durability setting. `full`, the default and what InvokeAI has always used, flushes every commit to disk. `normal` acknowledges commits without waiting for that flush - measured at roughly 12x shorter commits on an SSD - and cannot corrupt the database under WAL, which is why it is refused, with a warning, when WAL is unavailable for the database file. What `normal` gives up is the most recent transactions on a power loss or OS crash: a just-written image record or queue status, not the image file itself.<br>Valid values: `full`, `normal`
          *         outputs_dir: Path to directory for outputs.
          *         image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.<br>Valid values: `flat`, `date`, `type`, `hash`
@@ -22772,6 +22773,11 @@ export type components = {
              * @default databases
              */
             db_dir?: string;
+            /**
+             * Db Url
+             * @description URL of a MySQL 8.4+ or MariaDB 10.11+ database to use instead of the SQLite database in `db_dir`, e.g. `mariadb+pymysql://invokeai:password@db.example/invokeai`. Needs the `mysql` extra. One InvokeAI process uses a database at a time. Read at startup only.
+             */
+            db_url?: string | null;
             /**
              * Db Synchronous
              * @description SQLite durability setting. `full`, the default and what InvokeAI has always used, flushes every commit to disk. `normal` acknowledges commits without waiting for that flush - measured at roughly 12x shorter commits on an SSD - and cannot corrupt the database under WAL, which is why it is refused, with a warning, when WAL is unavailable for the database file. What `normal` gives up is the most recent transactions on a power loss or OS crash: a just-written image record or queue status, not the image file itself.
@@ -58977,7 +58983,7 @@ export interface operations {
             query?: {
                 /** @description The page to get */
                 page?: number;
-                /** @description The number of workflows per page */
+                /** @description The number of workflows per page; all of them when omitted */
                 per_page?: number | null;
                 /** @description The attribute to order by */
                 order_by?: components["schemas"]["WorkflowRecordOrderBy"];
