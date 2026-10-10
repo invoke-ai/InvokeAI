@@ -22564,6 +22564,7 @@ export type components = {
          *         download_cache_dir: Path to the directory that contains dynamically downloaded models.
          *         legacy_conf_dir: Path to directory of legacy checkpoint config files.
          *         db_dir: Path to InvokeAI databases directory.
+         *         db_url: URL of a MySQL 8.4+ or MariaDB 10.11+ database to use instead of the SQLite database in `db_dir`, e.g. `mariadb+pymysql://invokeai:password@db.example/invokeai`. Needs the `mysql` extra. One InvokeAI process uses a database at a time. Read at startup only.
          *         db_synchronous: SQLite durability setting. `full`, the default and what InvokeAI has always used, flushes every commit to disk. `normal` acknowledges commits without waiting for that flush - measured at roughly 12x shorter commits on an SSD - and cannot corrupt the database under WAL, which is why it is refused, with a warning, when WAL is unavailable for the database file. What `normal` gives up is the most recent transactions on a power loss or OS crash: a just-written image record or queue status, not the image file itself.<br>Valid values: `full`, `normal`
          *         outputs_dir: Path to directory for outputs.
          *         image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.<br>Valid values: `flat`, `date`, `type`, `hash`
@@ -22582,6 +22583,7 @@ export type components = {
          *         profiles_dir: Path to profiles output directory.
          *         max_cache_ram_gb: The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.
          *         max_cache_vram_gb: The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.
+         *         reserve_vram_gb: The amount of VRAM (in GB) to subtract from the model cache's available memory budget. Defaults to 0.
          *         log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.
          *         model_cache_keep_alive_min: How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.
          *         device_working_mem_gb: The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.
@@ -22773,6 +22775,11 @@ export type components = {
              */
             db_dir?: string;
             /**
+             * Db Url
+             * @description URL of a MySQL 8.4+ or MariaDB 10.11+ database to use instead of the SQLite database in `db_dir`, e.g. `mariadb+pymysql://invokeai:password@db.example/invokeai`. Needs the `mysql` extra. One InvokeAI process uses a database at a time. Read at startup only.
+             */
+            db_url?: string | null;
+            /**
              * Db Synchronous
              * @description SQLite durability setting. `full`, the default and what InvokeAI has always used, flushes every commit to disk. `normal` acknowledges commits without waiting for that flush - measured at roughly 12x shorter commits on an SSD - and cannot corrupt the database under WAL, which is why it is refused, with a warning, when WAL is unavailable for the database file. What `normal` gives up is the most recent transactions on a power loss or OS crash: a just-written image record or queue status, not the image file itself.
              * @default full
@@ -22915,6 +22922,12 @@ export type components = {
              * @description The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.
              */
             max_cache_vram_gb?: number | null;
+            /**
+             * Reserve Vram Gb
+             * @description The amount of VRAM (in GB) to subtract from the model cache's available memory budget. Defaults to 0.
+             * @default 0
+             */
+            reserve_vram_gb?: number;
             /**
              * Log Memory Usage
              * @description If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.
@@ -25157,10 +25170,14 @@ export type components = {
          *     The duration head reads the same connector outputs the transformer's prompt cross-attention
          *     consumes, so it judges the prompt the model will actually see rather than its raw text. The
          *     prediction is clamped to `min_seconds`/`max_seconds` and then snapped down onto the VAE's
-         *     causal temporal grid (`8k + 1`), which is the only frame count a generation can run at.
+         *     causal temporal grid (`8k + 1`), which is the only frame count a generation can run at. The
+         *     total is then capped at `max_num_frames` (by default LTX-2's longest clip), which can be
+         *     shorter than `max_seconds` at a high frame rate.
          *
-         *     Conditioning clips and video extension fix the frame count by construction -- the source
-         *     footage decides it -- so this node has nothing to say about those graphs.
+         *     For an extension, the prompt describes the continuation rather than the frames it opens with,
+         *     so the prediction sizes the new material and `context_frames` is added in front of it.
+         *     Conditioning clips fix the frame count by construction -- the clip decides it -- so this node
+         *     has nothing to say about those graphs.
          */
         LTX2DurationInvocation: {
             /**
@@ -25211,6 +25228,18 @@ export type components = {
              */
             max_seconds?: number;
             /**
+             * Context Frames
+             * @description Source frames the run opens with, as an extension's `context_frames`. The prediction covers what follows them, so they are added to it. 0 when nothing is held.
+             * @default 0
+             */
+            context_frames?: number;
+            /**
+             * Max Num Frames
+             * @description Longest total frame count, context included, the run was sized for. The result is capped at it, so it holds at whatever `fps` the run turns out to have.
+             * @default 481
+             */
+            max_num_frames?: number;
+            /**
              * type
              * @default ltx2_duration
              * @constant
@@ -25224,7 +25253,7 @@ export type components = {
         LTX2DurationOutput: {
             /**
              * Num Frames
-             * @description Frame count on LTX-2's 8k+1 grid. Wire into the denoise node's `num_frames`.
+             * @description Frame count on LTX-2's 8k+1 grid, including any context frames. Wire into the denoise node's `num_frames`.
              */
             num_frames: number;
             /**
@@ -58977,7 +59006,7 @@ export interface operations {
             query?: {
                 /** @description The page to get */
                 page?: number;
-                /** @description The number of workflows per page */
+                /** @description The number of workflows per page; all of them when omitted */
                 per_page?: number | null;
                 /** @description The attribute to order by */
                 order_by?: components["schemas"]["WorkflowRecordOrderBy"];

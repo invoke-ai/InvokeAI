@@ -10,8 +10,7 @@ from invokeai.app.services.gallery.gallery_common import (
     GalleryItemNamesResult,
 )
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults, SQLiteDirection
 from invokeai.app.services.virtual_boards.virtual_boards_common import VirtualSubBoardDTO
 
 

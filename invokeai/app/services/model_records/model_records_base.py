@@ -5,12 +5,11 @@ Abstract base class for storing and retrieving model configuration records.
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import Any, List, Optional, Set, Union
+from typing import Any, List, Optional, Union
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, field_validator
 
-from invokeai.app.services.shared.pagination import PaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
 from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefaultSettings
 from invokeai.backend.model_manager.configs.external_api import (
@@ -74,18 +73,6 @@ class ModelRecordOrderBy(str, Enum):
     DateAdded = "created_at"
     DateModified = "updated_at"
     Path = "path"
-
-
-class ModelSummary(BaseModel):
-    """A short summary of models for UI listing purposes."""
-
-    key: str = Field(description="model key")
-    type: ModelType = Field(description="model type")
-    base: BaseModelType = Field(description="base model")
-    format: ModelFormat = Field(description="model format")
-    name: str = Field(description="model name")
-    description: str = Field(description="short description of model")
-    tags: Set[str] = Field(description="tags associated with model")
 
 
 class ModelRecordChanges(BaseModelExcludeNull):
@@ -175,13 +162,11 @@ class ModelRecordServiceBase(ABC):
     @abstractmethod
     def add_model(self, config: AnyModelConfig) -> AnyModelConfig:
         """
-        Add a model to the database.
+        Add a model to the database; the config's key becomes the record's key.
 
-        :param key: Unique key for the model
-        :param config: Model configuration record, either a dict with the
-         required fields or a ModelConfigBase instance.
+        :param config: Model configuration record.
 
-        Can raise DuplicateModelException and InvalidModelConfigException exceptions.
+        Raises DuplicateModelException when a model with the same path or key is installed.
         """
         pass
 
@@ -232,25 +217,8 @@ class ModelRecordServiceBase(ABC):
         pass
 
     @abstractmethod
-    def get_model_by_hash(self, hash: str) -> AnyModelConfig:
-        """
-        Retrieve the configuration for the indicated model.
-
-        :param hash: Hash of model config to be fetched.
-
-        Exceptions: UnknownModelException
-        """
-        pass
-
-    @abstractmethod
-    def list_models(
-        self,
-        page: int = 0,
-        per_page: int = 10,
-        order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default,
-        direction: SQLiteDirection = SQLiteDirection.Ascending,
-    ) -> PaginatedResults[ModelSummary]:
-        """Return a paginated summary listing of each model in the database."""
+    def get_model_paths(self) -> list[str]:
+        """Return the path of every model record, also of a record whose config no longer validates."""
         pass
 
     @abstractmethod

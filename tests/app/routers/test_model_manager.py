@@ -14,7 +14,8 @@ from invokeai.backend.model_manager.configs.external_api import (
     ExternalModelCapabilities,
     ExternalModelPanelSchema,
 )
-from invokeai.backend.model_manager.taxonomy import ModelType
+from invokeai.backend.model_manager.configs.textual_inversion import TI_File_SD1_Config
+from invokeai.backend.model_manager.taxonomy import ModelSourceType, ModelType
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -1413,3 +1414,40 @@ def test_an_encoded_key_reaches_the_image_route_intact(client: TestClient, tmp_p
 
     assert response.status_code == 200
     deps.invoker.services.model_images.get_path.assert_called_once_with("X?y")
+
+
+def test_the_orphan_routes_scan_with_the_model_records(
+    monkeypatch: Any, client: TestClient, mm2_model_manager: Any, mm2_app_config: Any
+) -> None:
+    models_path: Path = mm2_app_config.models_path
+    for directory in ("registered", "unregistered"):
+        (models_path / directory).mkdir(parents=True, exist_ok=True)
+        (models_path / directory / "model.safetensors").write_bytes(b"not really a model")
+    mm2_model_manager.store.add_model(
+        TI_File_SD1_Config(
+            path="registered/model.safetensors",
+            name="registered",
+            hash="ABC123",
+            file_size=18,
+            source="test/source/",
+            source_type=ModelSourceType.Path,
+        )
+    )
+    services = type("Services", (), {})()
+    services.model_manager = mm2_model_manager
+    services.configuration = mm2_app_config
+    invoker = DummyInvoker(services)
+    monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(invoker))
+
+    found = client.get("/api/v2/models/sync/orphaned")
+
+    assert found.status_code == 200, found.text
+    reported = {orphan["path"] for orphan in found.json()}
+    assert "unregistered" in reported and "registered" not in reported
+
+    deleted = client.request("DELETE", "/api/v2/models/sync/orphaned", json={"paths": ["unregistered"]})
+
+    assert deleted.status_code == 200, deleted.text
+    assert deleted.json() == {"deleted": ["unregistered"], "errors": {}}
+    assert (models_path / "registered").exists() and not (models_path / "unregistered").exists()

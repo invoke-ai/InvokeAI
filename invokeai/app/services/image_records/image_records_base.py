@@ -12,9 +12,7 @@ from invokeai.app.services.image_records.image_records_common import (
     ResourceOrigin,
 )
 from invokeai.app.services.shared.intermediate_delete import IntermediateDeleteGuard
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
-from invokeai.app.services.virtual_boards.virtual_boards_common import VirtualSubBoardDTO
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults, SQLiteDirection
 
 
 class ImageRecordStorageBase(ABC):
@@ -175,15 +173,6 @@ class ImageRecordStorageBase(ABC):
 
         created_from/created_to are inclusive YYYY-MM-DD bounds on created_at (UTC days).
         """
-        pass
-
-    @abstractmethod
-    def get_image_dates(
-        self,
-        user_id: Optional[str] = None,
-        is_admin: bool = False,
-    ) -> list[VirtualSubBoardDTO]:
-        """Gets a list of dates with image counts, grouped by DATE(created_at)."""
         pass
 
     @abstractmethod

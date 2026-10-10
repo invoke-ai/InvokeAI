@@ -381,7 +381,7 @@ Then cut and paste the printed secret into this Sqlite3 command:
 sqlite3 INVOKE_ROOT/databases/invokeai.db 'update app_settings set value="THE_SECRET" where key="jwt_secret"'
 ```
 
-(replace INVOKE_ROOT with your InvokeAI root directory and THE_SECRET with the new secret).
+(replace INVOKE_ROOT with your InvokeAI root directory and THE_SECRET with the new secret). With a [MySQL or MariaDB database](/configuration/external-database/), run the same `UPDATE` in the server's client instead, with the value in single quotes.
 
 After this, restart the server. All logged in users will be logged out and will need to provide their usernames and passwords again.
 
@@ -451,7 +451,7 @@ It is best to restrict access to trusted networks and remote IP addresses, or us
 **Backup and Recovery:**
 
 It is always a good idea to periodically backup your InvokeAI database and images, but especially
-so if the server is publicly accessible to the Internet.
+so if the server is publicly accessible to the Internet. The commands below back up a SQLite database; back up a [MySQL or MariaDB database](/configuration/external-database/) with the server's own tools, such as `mysqldump` or `mariadb-dump`.
 
 **Manual Backup:**
 
