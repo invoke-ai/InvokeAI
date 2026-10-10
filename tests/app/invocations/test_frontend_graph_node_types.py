@@ -101,7 +101,7 @@ def test_every_connection_the_panel_compiles_is_one_the_queue_will_accept(contra
 # The number of architectures each panel supports. A contract that silently stopped being
 # regenerated would make every assertion below vacuous, so the count is pinned: a new architecture
 # updates this number and the fixture in the same commit.
-SUPPORTED_BASE_COUNTS = {"generate": 14, "video": 3}
+SUPPORTED_BASE_COUNTS = {"generate": 15, "video": 3}
 
 # Floors separating "the fixture records literals" from "it records a fraction of them". Set just
 # under the current numbers (generate: 58 node types carrying 252 scalar values; video: 25 carrying

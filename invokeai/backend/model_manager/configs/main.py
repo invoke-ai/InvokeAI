@@ -54,6 +54,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelRepoVariant,
     ModelType,
     ModelVariantType,
+    QwenImage21VariantType,
     QwenImageVariantType,
     SchedulerPredictionType,
     SubModelType,
@@ -763,6 +764,8 @@ class Main_GGUF_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Bas
 
         cls._validate_looks_like_gguf_quantized(mod)
 
+        cls._validate_has_flux_blocks(mod)
+
         cls._validate_is_not_flux2(mod)
 
         variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
@@ -794,6 +797,17 @@ class Main_GGUF_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Bas
         has_ggml_tensors = _has_ggml_tensors(mod.load_state_dict())
         if not has_ggml_tensors:
             raise NotAMatchError("state dict does not look like GGUF quantized")
+
+    @classmethod
+    def _validate_has_flux_blocks(cls, mod: ModelOnDisk) -> None:
+        # `_has_main_keys` accepts any ComfyUI-prefixed transformer, and `_get_flux_variant` then calls
+        # anything with 64 input channels and no guidance embedding Schnell: a Qwen-Image-2.1 GGUF was
+        # filed as FLUX.1 Schnell that way. FLUX.1 GGUFs keep BFL's `double_blocks` naming.
+        if not any(
+            isinstance(k, str) and _strip_comfyui_key_prefix(k).startswith("double_blocks.")
+            for k in mod.load_state_dict()
+        ):
+            raise NotAMatchError("state dict has no FLUX double_blocks")
 
     @classmethod
     def _validate_is_not_flux2(cls, mod: ModelOnDisk) -> None:
@@ -1528,6 +1542,59 @@ def _ideogram4_branch_or_raise(mod: ModelOnDisk) -> Ideogram4Branch:
     return branch
 
 
+def _raise_for_unsupported_comfy_quantization(mod: ModelOnDisk, state_dict: dict[str | int, Any], family: str) -> None:
+    """Refuse the ComfyUI quantization schemes the Ideogram 4 and Qwen-Image-2.1 single-file loaders cannot build.
+
+    `InvalidMatchError`, not `NotAMatchError`: the file *is* a `family` transformer, so the
+    right outcome is a refusal the installer shows, not a fall-through to `Unknown_Config` that
+    registers it as a model nothing can load.
+
+    Two of them. nvfp4 packs two codes per byte, so its uint8 weights are indistinguishable from
+    the `comfy_quant` markers every repack carries -- including the two supported ones; the
+    per-tensor `weight_scale_2` is what only nvfp4 writes.
+
+    And int8 weights *without* a readable `int8_tensorwise` marker: the loader refuses those
+    (`reject_unmarked_int8_weights`), because a rotated weight loaded as if it were not one
+    generates noise. Refusing them here too is what keeps that refusal at install time -- a
+    torchao or `int8_dynamic` repack would otherwise register as a multi-GiB model, pull in its
+    starter dependencies, and fail at the first render.
+
+    The markers come from the file's header rather than from `state_dict`: identification loads
+    tensors on the meta device, so it has every dtype and shape but no bytes to parse. That read
+    is a header parse plus one seek per marker, and it only happens for a file that has int8
+    weights to explain in the first place.
+    """
+    if any(isinstance(key, str) and key.endswith(".weight_scale_2") for key in state_dict):
+        raise InvalidMatchError(
+            f"this is an nvfp4-quantized {family} transformer, which is not supported yet. "
+            "Install the fp8_scaled or int8_convrot build instead."
+        )
+
+    int8_weights = sorted(
+        key
+        for key, value in state_dict.items()
+        if isinstance(key, str) and key.endswith(".weight") and getattr(value, "dtype", None) is torch.int8
+    )
+    if not int8_weights:
+        return
+
+    try:
+        markers = read_comfy_quant_markers(mod.path)
+    except Exception:
+        # Not readable safetensors, so there are no markers to find and nothing explains the
+        # int8 weights. The refusal below is the right answer for that file too.
+        markers = {}
+    unmarked = [
+        key for key in int8_weights if markers.get(key[: -len(".weight")], {}).get("format") != INT8_TENSORWISE_FORMAT
+    ]
+    if unmarked:
+        raise InvalidMatchError(
+            f"{len(unmarked)} int8 weight(s) in this {family} transformer carry no readable "
+            f"'{INT8_TENSORWISE_FORMAT}' marker (e.g. '{unmarked[0]}'), so the quantization scheme "
+            "cannot be identified. Only Comfy-Org's int8_convrot build is supported."
+        )
+
+
 class Main_Checkpoint_Ideogram4_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
     """Model config for Ideogram 4 single-file transformer checkpoints (safetensors).
 
@@ -1563,66 +1630,11 @@ class Main_Checkpoint_Ideogram4_Config(Checkpoint_Config_Base, Main_Config_Base,
         if _has_ggml_tensors(state_dict):
             raise NotAMatchError("state dict looks like GGUF quantized")
 
-        cls._raise_for_unsupported_quantization(mod, state_dict)
+        _raise_for_unsupported_comfy_quantization(mod, state_dict, "Ideogram 4")
 
         branch = override_fields.pop("branch", None) or _ideogram4_branch_or_raise(mod)
 
         return cls(**override_fields, branch=branch)
-
-    @classmethod
-    def _raise_for_unsupported_quantization(cls, mod: ModelOnDisk, state_dict: dict[str | int, Any]) -> None:
-        """Refuse the quantization schemes this loader cannot build.
-
-        `InvalidMatchError`, not `NotAMatchError`: the file *is* an Ideogram 4 transformer, so the
-        right outcome is a refusal the installer shows, not a fall-through to `Unknown_Config` that
-        registers it as a model nothing can load.
-
-        Two of them. nvfp4 packs two codes per byte, so its uint8 weights are indistinguishable from
-        the `comfy_quant` markers every repack carries -- including the two supported ones; the
-        per-tensor `weight_scale_2` is what only nvfp4 writes.
-
-        And int8 weights *without* a readable `int8_tensorwise` marker: the loader refuses those
-        (`reject_unmarked_int8_weights`), because a rotated weight loaded as if it were not one
-        generates noise. Refusing them here too is what keeps that refusal at install time -- a
-        torchao or `int8_dynamic` repack of this architecture would otherwise register as a 9 GiB
-        model, pull in its three starter dependencies, and fail at the first render.
-
-        The markers come from the file's header rather than from `state_dict`: identification loads
-        tensors on the meta device, so it has every dtype and shape but no bytes to parse. That read
-        is a header parse plus one seek per marker, and it only happens for a file that has int8
-        weights to explain in the first place.
-        """
-        if any(isinstance(key, str) and key.endswith(".weight_scale_2") for key in state_dict):
-            raise InvalidMatchError(
-                "this is an nvfp4-quantized Ideogram 4 transformer, which is not supported yet. "
-                "Install the fp8_scaled or int8_convrot build instead."
-            )
-
-        int8_weights = sorted(
-            key
-            for key, value in state_dict.items()
-            if isinstance(key, str) and key.endswith(".weight") and getattr(value, "dtype", None) is torch.int8
-        )
-        if not int8_weights:
-            return
-
-        try:
-            markers = read_comfy_quant_markers(mod.path)
-        except Exception:
-            # Not readable safetensors, so there are no markers to find and nothing explains the
-            # int8 weights. The refusal below is the right answer for that file too.
-            markers = {}
-        unmarked = [
-            key
-            for key in int8_weights
-            if markers.get(key[: -len(".weight")], {}).get("format") != INT8_TENSORWISE_FORMAT
-        ]
-        if unmarked:
-            raise InvalidMatchError(
-                f"{len(unmarked)} int8 weight(s) in this Ideogram 4 transformer carry no readable "
-                f"'{INT8_TENSORWISE_FORMAT}' marker (e.g. '{unmarked[0]}'), so the quantization scheme "
-                "cannot be identified. Only Comfy-Org's int8_convrot build is supported."
-            )
 
 
 class Main_GGUF_Ideogram4_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
@@ -2183,7 +2195,13 @@ def _has_qwen_image_keys(state_dict: dict[str | int, Any]) -> bool:
     has_img_in = any(k.startswith("img_in.") for k in keys)
     # Must NOT have context_embedder (which would indicate FLUX)
     has_context_embedder = any("context_embedder" in k for k in keys)
-    return has_txt_in and has_txt_norm and has_img_in and not has_context_embedder
+    return (
+        has_txt_in
+        and has_txt_norm
+        and has_img_in
+        and not has_context_embedder
+        and not _has_qwen_image21_keys(state_dict)
+    )
 
 
 # Matches "edit" as a standalone token (delimited by start/end or any non-alphanumeric
@@ -2262,6 +2280,120 @@ class Main_GGUF_QwenImage_Config(Checkpoint_Config_Base, Main_Config_Base, Confi
         explicit_variant = override_fields.pop("variant", None) or _infer_qwen_image_variant(sd, mod.path)
 
         return cls(**override_fields, variant=explicit_variant)
+
+
+_LORA_KEY_SUFFIXES = (
+    ".lora_down.weight",
+    ".lora_up.weight",
+    ".lora_A.weight",
+    ".lora_B.weight",
+    ".dora_scale",
+    ".alpha",
+)
+
+
+def _has_qwen_image21_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Whether the state dict is a Qwen-Image-2.1 transformer (any layout), and not a LoRA for one.
+
+    Its `txt_in` is a module with its own `text_norm`, where Qwen-Image's is a plain Linear beside a
+    top-level `txt_norm`. The MLP is gated: diffusers names the halves `gate_layer`/`proj`, ComfyUI fuses
+    them into `gate_up`.
+    """
+    keys = [_strip_comfyui_key_prefix(k) for k in state_dict.keys() if isinstance(k, str)]
+    if any(k.endswith(_LORA_KEY_SUFFIXES) for k in keys):
+        return False
+    has_text_norm = "txt_in.text_norm.weight" in keys
+    has_gated_mlp = any(".img_mlp.gate_up." in k or ".img_mlp.gate_layer." in k for k in keys)
+    has_img_in = any(k.startswith("img_in.") for k in keys)
+    return has_text_norm and has_gated_mlp and has_img_in
+
+
+def _get_qwen_image21_variant_from_name(name: str) -> QwenImage21VariantType:
+    """Turbo and Base share every tensor shape, so a single file says which it is by its name only.
+
+    "turbo" anywhere in the name means Turbo (`Qwen-Image-2.1-Turbo`, `qwen_image_2.1_turbo_bf16`);
+    anything else is the released base model. The model manager can override it.
+    """
+    return QwenImage21VariantType.Turbo if "turbo" in name.lower() else QwenImage21VariantType.Base
+
+
+class Main_Diffusers_QwenImage21_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Qwen-Image-2.1 diffusers pipelines."""
+
+    base: Literal[BaseModelType.QwenImage21] = Field(BaseModelType.QwenImage21)
+    variant: QwenImage21VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        # The pipeline class implies the base.
+        raise_for_class_name(common_config_paths(mod.path), {"QwenImage21Pipeline"})
+
+        variant = override_fields.pop("variant", None) or cls._get_variant(mod)
+
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+
+        return cls(**override_fields, variant=variant, repo_variant=repo_variant)
+
+    @classmethod
+    def _get_variant(cls, mod: ModelOnDisk) -> QwenImage21VariantType:
+        """Turbo ships the sigma table it was distilled for as `sample_sigmas` in model_index.json."""
+        config = get_config_dict_or_raise(mod.path / "model_index.json")
+        if config.get("sample_sigmas"):
+            return QwenImage21VariantType.Turbo
+        return QwenImage21VariantType.Base
+
+
+class Main_Checkpoint_QwenImage21_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Qwen-Image-2.1 single-file transformers (bf16, ComfyUI fp8 scaled or int8 convrot)."""
+
+    base: Literal[BaseModelType.QwenImage21] = Field(default=BaseModelType.QwenImage21)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    variant: QwenImage21VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        sd = mod.load_state_dict()
+        if not _has_qwen_image21_keys(sd):
+            raise NotAMatchError("state dict does not look like a Qwen-Image-2.1 transformer")
+        if _has_ggml_tensors(sd):
+            raise NotAMatchError("state dict looks like GGUF quantized")
+        _raise_for_unsupported_comfy_quantization(mod, sd, "Qwen-Image-2.1")
+
+        variant = override_fields.pop("variant", None) or _get_qwen_image21_variant_from_name(mod.path.name)
+
+        return cls(**override_fields, variant=variant)
+
+
+class Main_GGUF_QwenImage21_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized Qwen-Image-2.1 transformers."""
+
+    base: Literal[BaseModelType.QwenImage21] = Field(default=BaseModelType.QwenImage21)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+    variant: QwenImage21VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        sd = mod.load_state_dict()
+        if not _has_qwen_image21_keys(sd):
+            raise NotAMatchError("state dict does not look like a Qwen-Image-2.1 transformer")
+        if not _has_ggml_tensors(sd):
+            raise NotAMatchError("state dict does not look like GGUF quantized")
+
+        variant = override_fields.pop("variant", None) or _get_qwen_image21_variant_from_name(mod.path.name)
+
+        return cls(**override_fields, variant=variant)
 
 
 def _has_wan_keys(state_dict: dict[str | int, Any]) -> bool:

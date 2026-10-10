@@ -1,5 +1,6 @@
 """Ideogram 4 starter models."""
 
+from invokeai.backend.model_manager.starter_models.common import qwen3_vl_encoder_8b
 from invokeai.backend.model_manager.starter_models.flux2 import flux2_vae
 from invokeai.backend.model_manager.starter_models.types import StarterModel
 from invokeai.backend.model_manager.taxonomy import (
@@ -50,16 +51,6 @@ ideogram_4_unconditional_single_file = StarterModel(
     format=ModelFormat.Checkpoint,
 )
 
-ideogram_4_qwen3_vl_encoder_8b = StarterModel(
-    name="Qwen3-VL 8B Encoder (Ideogram 4)",
-    base=BaseModelType.Any,
-    source="https://huggingface.co/Comfy-Org/Ideogram-4/resolve/main/text_encoders/qwen3vl_8b_fp8_scaled.safetensors",
-    description="Qwen3-VL 8B text encoder for Ideogram 4, in ComfyUI scaled fp8. Distinct from the 4B "
-    "encoder Krea-2 uses; Ideogram 4 taps 13 of its layers and the two are not interchangeable. ~9.9GB",
-    type=ModelType.Qwen3VLEncoder,
-    format=ModelFormat.Checkpoint,
-)
-
 ideogram_4_unconditional_int8 = StarterModel(
     name="Ideogram 4 Unconditional (single file, int8)",
     base=BaseModelType.Ideogram4,
@@ -80,7 +71,7 @@ ideogram_4_int8 = StarterModel(
     "branch, the Qwen3-VL 8B encoder and the VAE with it. Non-commercial license. ~28GB total",
     type=ModelType.Main,
     format=ModelFormat.Checkpoint,
-    dependencies=[ideogram_4_unconditional_int8, ideogram_4_qwen3_vl_encoder_8b, flux2_vae],
+    dependencies=[ideogram_4_unconditional_int8, qwen3_vl_encoder_8b, flux2_vae],
 )
 
 ideogram_4_single_file = StarterModel(
@@ -93,7 +84,7 @@ ideogram_4_single_file = StarterModel(
     "stay resident during generation. Non-commercial license. ~27GB total",
     type=ModelType.Main,
     format=ModelFormat.Checkpoint,
-    dependencies=[ideogram_4_unconditional_single_file, ideogram_4_qwen3_vl_encoder_8b, flux2_vae],
+    dependencies=[ideogram_4_unconditional_single_file, qwen3_vl_encoder_8b, flux2_vae],
 )
 
 # Community GGUF conversions of the same per-branch files, paired the same way. They are the smallest
@@ -129,7 +120,7 @@ ideogram_4_gguf_q4_0 = StarterModel(
     "branch, the Qwen3-VL 8B encoder and the VAE with it. Non-commercial license. ~21GB total",
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
-    dependencies=[ideogram_4_unconditional_gguf_q4_0, ideogram_4_qwen3_vl_encoder_8b, flux2_vae],
+    dependencies=[ideogram_4_unconditional_gguf_q4_0, qwen3_vl_encoder_8b, flux2_vae],
 )
 
 ideogram_4_unconditional_gguf_q5_k = StarterModel(
@@ -151,7 +142,7 @@ ideogram_4_gguf_q5_k = StarterModel(
     "license. ~23GB total",
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
-    dependencies=[ideogram_4_unconditional_gguf_q5_k, ideogram_4_qwen3_vl_encoder_8b, flux2_vae],
+    dependencies=[ideogram_4_unconditional_gguf_q5_k, qwen3_vl_encoder_8b, flux2_vae],
 )
 
 ideogram_4_unconditional_gguf_q5_1 = StarterModel(
@@ -173,5 +164,5 @@ ideogram_4_gguf_q5_1 = StarterModel(
     "encoder and the VAE with it. Non-commercial license. ~25GB total",
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
-    dependencies=[ideogram_4_unconditional_gguf_q5_1, ideogram_4_qwen3_vl_encoder_8b, flux2_vae],
+    dependencies=[ideogram_4_unconditional_gguf_q5_1, qwen3_vl_encoder_8b, flux2_vae],
 )

@@ -47,7 +47,7 @@ describe('variant options', () => {
   it('offers both Qwen3-VL sizes, because the field is required on the config', () => {
     // Required variants must not offer None, which would send invalid null during save.
     expect(getVariantOptionsFor('any', 'qwen3_vl_encoder')).toEqual(['qwen3_vl_4b', 'qwen3_vl_8b']);
-    expect(getModelVariantLabel('qwen3_vl_8b')).toBe('Qwen3-VL 8B (Ideogram 4)');
+    expect(getModelVariantLabel('qwen3_vl_8b')).toBe('Qwen3-VL 8B (Ideogram 4, Qwen-Image-2.1)');
     // MiniMax H3 shares the encoder type but lacks a variant field; size choices would fail saving.
     expect(getVariantOptionsFor('minimax-h3', 'qwen3_vl_encoder')).toEqual([]);
   });

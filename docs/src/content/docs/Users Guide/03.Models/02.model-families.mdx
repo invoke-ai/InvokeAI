@@ -44,15 +44,15 @@ page lists the builds it supports.
 
 InvokeAI recognizes the format from the file's contents, so you install them like any other model:
 
-- **GGUF** (`.gguf`, llama.cpp quantization such as Q4_K or Q8_0): weights stay packed in memory and are unpacked layer by layer during generation. Supported for the FLUX.1, FLUX.2, Z-Image, Krea-2, Qwen-Image, Ideogram 4 and Wan transformers, and for the T5, Qwen3, Qwen3-VL, Mistral and Gemma 2 text encoders. ComfyUI-GGUF's `Q8_CR` files, which store int8 (`int8_convrot`) layers inside a `.gguf`, load for the Krea-2 transformer; for other models, and for ComfyUI-GGUF's `Q4_CR`, installation is refused with a message saying so.
+- **GGUF** (`.gguf`, llama.cpp quantization such as Q4_K or Q8_0): weights stay packed in memory and are unpacked layer by layer during generation. Supported for the FLUX.1, FLUX.2, Z-Image, Krea-2, Qwen-Image, Qwen-Image-2.1, Ideogram 4 and Wan transformers, and for the T5, Qwen3, Qwen3-VL, Mistral and Gemma 2 text encoders. ComfyUI-GGUF's `Q8_CR` files, which store int8 (`int8_convrot`) layers inside a `.gguf`, load for the Krea-2 transformer; for other models, and for ComfyUI-GGUF's `Q4_CR`, installation is refused with a message saying so.
 - **NF4** (bitsandbytes): 4-bit, CUDA only.
 - **SDNQ**: see [SDNQ Quantization](/configuration/optimization/sdnq-quantization/).
-- **int8** (`int8_convrot`, from ComfyUI repackages): the weights stay int8 in memory on every device, including Apple Silicon, and need no setting to turn on. Supported for FLUX.1, FLUX.2 Klein, Z-Image, Krea-2, Ideogram 4, MiniMax H3, LTX-2 and the PiD decoders, and for the Qwen3 8B, Qwen3-VL and LTX-2 Gemma encoders.
-- **nvfp4** (4-bit, in ComfyUI's checkpoint format, such as Comfy-Org's builds; other nvfp4 exports such as AWQ are refused): the weights stay packed in memory and are unpacked per layer, so no special GPU is needed. Supported for the Z-Image, Krea-2, Qwen-Image and LTX-2 transformers and for the Qwen3, Qwen2.5-VL and FLUX.2 Mistral encoders; the Ideogram 4 nvfp4 files are refused at install.
+- **int8** (`int8_convrot`, from ComfyUI repackages): the weights stay int8 in memory on every device, including Apple Silicon, and need no setting to turn on. Supported for FLUX.1, FLUX.2 Klein, Z-Image, Krea-2, Qwen-Image-2.1, Ideogram 4, MiniMax H3, LTX-2 and the PiD decoders, and for the Qwen3 8B, Qwen3-VL and LTX-2 Gemma encoders.
+- **nvfp4** (4-bit, in ComfyUI's checkpoint format, such as Comfy-Org's builds; other nvfp4 exports such as AWQ are refused): the weights stay packed in memory and are unpacked per layer, so no special GPU is needed. Supported for the Z-Image, Krea-2, Qwen-Image and LTX-2 transformers and for the Qwen3, Qwen2.5-VL and FLUX.2 Mistral encoders; the Ideogram 4 and Qwen-Image-2.1 nvfp4 files are refused at install.
 - **fp8** (plain or `fp8_scaled`): InvokeAI keeps the weights in fp8 when [FP8 Storage](/configuration/optimization/fp8-storage/) is on, which installation does for you, or when `fp8_compute` is enabled.
 - **MXFP8** (fp8 with one scale per block of 32 weights): loaded by unpacking to BF16. Turn FP8 Storage off for these; see the [FP8 Storage caution](/configuration/optimization/fp8-storage/).
 
-Text encoders for Qwen-Image, Z-Image, Krea-2 and Ideogram 4 bring their tokenizer and configuration with InvokeAI, so single-file and GGUF encoders load without network access.
+Text encoders for Qwen-Image, Z-Image, Krea-2, Ideogram 4 and Qwen-Image-2.1 bring their tokenizer and configuration with InvokeAI, so single-file and GGUF encoders load without network access.
 
 ### Converting to Diffusers
 
@@ -78,7 +78,8 @@ yourself. They appear as separate models in the Model Manager, and
 generation panels show slots for them (for example **VAE**, **Text
 encoder** or **Model components**) when the selected model needs
 them. Several families share components: FLUX.2 and Ideogram 4 use
-the same VAE, for example, so one download can serve both.
+the same VAE, for example, and Ideogram 4 and Qwen-Image-2.1 the same Qwen3-VL 8B
+encoder, so one download can serve both.
 
 | Component | What it does |
 |---|---|
@@ -122,6 +123,7 @@ faster generation.
 | **Z-Image** | Images | 6B model in a fast, few-step Turbo variant and a Base variant. Understands English and Chinese prompts, with ControlNets. | Apache 2.0 | [Z-Image](/users-guide/models/local-models/z-image/)  |
 | **ERNIE-Image** | Images | Baidu's 8B text-to-image model, in standard and distilled Turbo variants. | Apache 2.0 | [ERNIE-Image](/users-guide/models/local-models/ernie-image/)  |
 | **Qwen Image** | Images | Text-to-image (2512) and instruction-based image editing (Edit 2511), with fast Lightning variants. | Apache 2.0 | [Qwen Image](/users-guide/models/local-models/qwen-image/)  |
+| **Qwen-Image-2.1** | Images | 7B text-to-image model with strong text rendering and transparent (RGBA) output, in a base and an 8-step Turbo variant. | Non-commercial | [Qwen-Image-2.1](/users-guide/models/local-models/qwen-image-2-1/)  |
 | **Krea-2** | Images | 12B model in fast Turbo and undistilled Raw variants, with training-free style reference. | Community, free under $1M revenue | [Krea-2](/users-guide/models/local-models/krea-2/)  |
 | **Ideogram 4** | Images | Structured prompts that place described elements in regions of the image. | Non-commercial | [Ideogram 4](/users-guide/models/local-models/ideogram4/)  |
 | **Anima** | Images | Compact 2B anime-focused model, with ControlNet-LLLite adapters for inpainting and sketch guidance. | Non-commercial | [Anima](/users-guide/models/local-models/anima/)  |

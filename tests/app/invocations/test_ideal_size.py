@@ -62,6 +62,8 @@ IDEAL_SIZE_AT_NODE_DEFAULTS: dict[BaseModelType, tuple[int, int]] = {
     # because their declared defaults are square.
     BaseModelType.MiniMaxH3: (1344, 736),
     BaseModelType.QwenImage: (1360, 768),
+    # A 32-pixel grid, as CogView4: 1365.3 -> 1365 -> 1344.
+    BaseModelType.QwenImage21: (1344, 768),
     BaseModelType.StableDiffusion1: (680, 384),
     BaseModelType.StableDiffusion2: (1024, 576),
     BaseModelType.StableDiffusion3: (1360, 768),
