@@ -119,6 +119,27 @@ def _latent_channels(state_dict: dict[str | int, Any]) -> int | None:
     return None if weight is None else int(weight.shape[1])
 
 
+def _is_qwen_image21_vae(state_dict: dict[str | int, Any]) -> bool:
+    """Whether the state dict is Qwen-Image-2.1's RGBA VAE (AutoencoderKLQwenImage21), in either layout.
+
+    It decodes 64 latent channels into 4 (RGBA). Its convolutions are 2-D: the diffusers export stores
+    them as 4-D weights, ComfyUI's Wan-style export as 5-D with a temporal extent of 1. That temporal
+    extent is what separates the ComfyUI file from a Wan or Anima VAE, whose causal convolutions are 3 deep.
+    """
+
+    def shape(key: str) -> tuple[int, ...] | None:
+        weight = state_dict.get(key)
+        return None if weight is None else tuple(weight.shape)
+
+    diffusers_in, diffusers_out = shape("decoder.conv_in.weight"), shape("encoder.conv_in.weight")
+    if diffusers_in is not None and diffusers_out is not None:
+        return len(diffusers_in) == 4 and diffusers_in[1] == 64 and diffusers_out[1] == 4
+    comfy_in, comfy_out = shape("decoder.conv1.weight"), shape("encoder.conv1.weight")
+    if comfy_in is not None and comfy_out is not None:
+        return len(comfy_in) == 5 and comfy_in[1] == 64 and comfy_in[2] == 1 and comfy_out[1] == 4
+    return False
+
+
 def _is_flux2_vae(state_dict: dict[str | int, Any]) -> bool:
     """Check if state dict is a FLUX.2 VAE (AutoencoderKLFlux2).
 
@@ -192,6 +213,13 @@ class VAE_Checkpoint_Config_Base(Checkpoint_Config_Base):
         # architecture and each has its own config class.
         if _is_qwen_image_vae(state_dict) or _wan_vae_z_dim(state_dict) is not None:
             raise NotAMatchError("model is a Wan-family VAE, not a standard VAE")
+
+        # A latent width no AutoencoderKL family has is not one of these VAEs, whatever its name says.
+        # Without this, `_get_base_or_raise` falls through to the name and files a 64-channel
+        # `qwen_image_2.1_vae.safetensors` as SD1 because the name contains "vae".
+        latent_channels = _latent_channels(state_dict)
+        if latent_channels is not None and latent_channels not in _VAE_FAMILIES:
+            raise NotAMatchError(f"{latent_channels} latent channels is not a standard VAE")
 
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> BaseModelType:
@@ -404,7 +432,10 @@ def _has_anima_vae_keys(state_dict: dict[str | int, Any]) -> bool:
         "decoder.upsamples.",
         "decoder.middle.",
     }
-    return all(any(str(k).startswith(prefix) for k in state_dict) for prefix in required_prefixes)
+    # Qwen-Image-2.1's ComfyUI export shares these block names; its 64-channel RGBA latent does not.
+    return all(any(str(k).startswith(prefix) for k in state_dict) for prefix in required_prefixes) and not (
+        _is_qwen_image21_vae(state_dict)
+    )
 
 
 class VAE_Checkpoint_Anima_Config(Checkpoint_Config_Base, Config_Base):
@@ -424,6 +455,45 @@ class VAE_Checkpoint_Anima_Config(Checkpoint_Config_Base, Config_Base):
         state_dict = mod.load_state_dict()
         if not _has_anima_vae_keys(state_dict):
             raise NotAMatchError("state dict does not look like an Anima QwenImage VAE")
+
+        return cls(**override_fields)
+
+
+class VAE_Checkpoint_QwenImage21_Config(Checkpoint_Config_Base, Config_Base):
+    """Model config for Qwen-Image-2.1 VAE single files (AutoencoderKLQwenImage21, diffusers or ComfyUI layout)."""
+
+    type: Literal[ModelType.VAE] = Field(default=ModelType.VAE)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    base: Literal[BaseModelType.QwenImage21] = Field(default=BaseModelType.QwenImage21)
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        if not _is_qwen_image21_vae(mod.load_state_dict()):
+            raise NotAMatchError("state dict does not look like a Qwen-Image-2.1 VAE")
+
+        return cls(**override_fields)
+
+
+class VAE_Diffusers_QwenImage21_Config(Diffusers_Config_Base, Config_Base):
+    """Model config for a Qwen-Image-2.1 VAE folder in diffusers format (AutoencoderKLQwenImage21)."""
+
+    type: Literal[ModelType.VAE] = Field(default=ModelType.VAE)
+    format: Literal[ModelFormat.Diffusers] = Field(default=ModelFormat.Diffusers)
+    base: Literal[BaseModelType.QwenImage21] = Field(default=BaseModelType.QwenImage21)
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        raise_for_class_name(common_config_paths(mod.path), {"AutoencoderKLQwenImage21"})
 
         return cls(**override_fields)
 

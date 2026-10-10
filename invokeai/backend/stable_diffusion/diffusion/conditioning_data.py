@@ -157,6 +157,21 @@ class Krea2ConditioningInfo:
 
 
 @dataclass
+class QwenImage21ConditioningInfo:
+    """Qwen-Image-2.1 text conditioning from the Qwen3-VL-8B encoder.
+
+    The last decoder layer's output before the final norm, with the system-prompt prefix removed.
+    """
+
+    prompt_embeds: torch.Tensor
+    """Shape: (1, seq_len, hidden=4096). One prompt, so no padding and no mask."""
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.prompt_embeds = self.prompt_embeds.to(device=device, dtype=dtype)
+        return self
+
+
+@dataclass
 class AnimaConditioningInfo:
     """Anima text conditioning information from Qwen3 0.6B encoder + T5-XXL tokenizer.
 
@@ -298,6 +313,7 @@ class ConditioningFieldData:
         | List[Ideogram4ConditioningInfo]
         | List[QwenImageConditioningInfo]
         | List[Krea2ConditioningInfo]
+        | List[QwenImage21ConditioningInfo]
         | List[AnimaConditioningInfo]
         | List[WanConditioningInfo]
         | List[MiniMaxH3ConditioningInfo]

@@ -46,6 +46,7 @@ from invokeai.backend.model_manager.starter_models.common import (
     qwen2_5_1_5b_instruct,
     qwen2_5_3b_instruct,
     qwen3_vl_encoder_4b,
+    qwen3_vl_encoder_8b,
     qwen_vl_encoder_diffusers,
     qwen_vl_encoder_fp8,
     qwen_vl_encoder_nvfp4,
@@ -156,7 +157,6 @@ from invokeai.backend.model_manager.starter_models.ideogram_4 import (
     ideogram_4_gguf_q5_k,
     ideogram_4_int8,
     ideogram_4_nf4,
-    ideogram_4_qwen3_vl_encoder_8b,
     ideogram_4_single_file,
     ideogram_4_unconditional_gguf_q4_0,
     ideogram_4_unconditional_gguf_q5_1,
@@ -211,6 +211,12 @@ from invokeai.backend.model_manager.starter_models.qwen_image import (
     qwen_image_lightning_4step,
     qwen_image_lightning_8step,
     qwen_image_vae,
+)
+from invokeai.backend.model_manager.starter_models.qwen_image_2_1 import (
+    qwen_image_2_1,
+    qwen_image_2_1_gguf_q4_k_m,
+    qwen_image_2_1_turbo,
+    qwen_image_2_1_vae,
 )
 from invokeai.backend.model_manager.starter_models.sd_1 import (
     canny_sd1,
@@ -331,7 +337,6 @@ STARTER_MODELS: list[StarterModel] = [
     ideogram_4_unconditional_gguf_q5_k,
     ideogram_4_gguf_q5_1,
     ideogram_4_unconditional_gguf_q5_1,
-    ideogram_4_qwen3_vl_encoder_8b,
     cyberrealistic_sd1,
     rev_animated_sd1,
     dreamshaper_8_sd1,
@@ -475,6 +480,11 @@ STARTER_MODELS: list[StarterModel] = [
     krea2_turbo_gguf_q8_0,
     krea2_turbo_nvfp4,
     qwen3_vl_encoder_4b,
+    qwen_image_2_1_turbo,
+    qwen_image_2_1,
+    qwen_image_2_1_gguf_q4_k_m,
+    qwen_image_2_1_vae,
+    qwen3_vl_encoder_8b,
     wan_22_t5_encoder,
     wan_22_a14b_vae,
     wan_22_5b_vae,

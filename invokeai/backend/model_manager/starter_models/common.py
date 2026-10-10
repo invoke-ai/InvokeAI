@@ -376,6 +376,17 @@ qwen3_vl_encoder_4b = StarterModel(
     format=ModelFormat.Qwen3VLEncoder,
 )
 
+qwen3_vl_encoder_8b = StarterModel(
+    name="Qwen3-VL 8B Encoder",
+    previous_names=["Qwen3-VL 8B Encoder (Ideogram 4)"],
+    base=BaseModelType.Any,
+    source="https://huggingface.co/Comfy-Org/Ideogram-4/resolve/main/text_encoders/qwen3vl_8b_fp8_scaled.safetensors",
+    description="Qwen3-VL 8B text encoder in ComfyUI scaled fp8, the encoder Ideogram 4 and Qwen-Image-2.1 condition "
+    "on. Distinct from the 4B encoder Krea-2 uses; the two are not interchangeable. ~9.9GB",
+    type=ModelType.Qwen3VLEncoder,
+    format=ModelFormat.Checkpoint,
+)
+
 # region Wan 2.2 (local)
 # Shared components — all Wan 2.2 variants use the UMT5-XXL text encoder. A14B
 # (both T2V and I2V) uses a 16-channel VAE; TI2V-5B uses a 48-channel VAE. The

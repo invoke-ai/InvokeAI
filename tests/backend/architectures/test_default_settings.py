@@ -18,6 +18,7 @@ from invokeai.backend.model_manager.taxonomy import (
     FluxVariantType,
     Krea2VariantType,
     LTX2VariantType,
+    QwenImage21VariantType,
     WanVariantType,
     ZImageVariantType,
 )
@@ -86,6 +87,8 @@ _SQUARE_1024 = {"width": 1024, "height": 1024}
 #             with no CFG. 48 steps is the preset default, V4_QUALITY_48.
 # krea-2:     Diffusers' Krea-2 guidance 4.5 uses cond + 4.5 * (cond - uncond), equivalent to
 #             InvokeAI's CFG convention at 5.5. Turbo is distilled; cfg_scale's floor is 1.
+# qwen-image-2-1: the pipeline's num_inference_steps=40 and true_cfg_scale=1.0 (the model card samples
+#             without guidance); Turbo's card: 8 steps on its shipped sigma table, CFG 1.
 DEFAULT_SETTINGS_MATRIX: list[tuple[str, BaseModelType, AnyVariant | None, str | None, dict[str, Any]]] = [
     (
         "sd-1",
@@ -225,6 +228,20 @@ DEFAULT_SETTINGS_MATRIX: list[tuple[str, BaseModelType, AnyVariant | None, str |
         "krea-2-turbo",
         BaseModelType.Krea2,
         None,
+        None,
+        {"scheduler": "euler", "steps": 8, "cfg_scale": 1.0, **_SQUARE_1024},
+    ),
+    (
+        "qwen-image-2-1-base",
+        BaseModelType.QwenImage21,
+        None,
+        None,
+        {"scheduler": "euler", "steps": 40, "cfg_scale": 1.0, **_SQUARE_1024},
+    ),
+    (
+        "qwen-image-2-1-turbo",
+        BaseModelType.QwenImage21,
+        QwenImage21VariantType.Turbo,
         None,
         {"scheduler": "euler", "steps": 8, "cfg_scale": 1.0, **_SQUARE_1024},
     ),

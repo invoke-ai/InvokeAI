@@ -1,7 +1,7 @@
 """The latent-space facet: the projection maths, and what each architecture declares.
 
-Two tables carry this file. `DECLARED_LATENT_SPACES` says which space each of the sixteen
-architectures denoises in; `PINNED_PREVIEW_PIXELS` says what each of the nine spaces actually
+Two tables carry this file. `DECLARED_LATENT_SPACES` says which space each of the eighteen
+architectures denoises in; `PINNED_PREVIEW_PIXELS` says what each of the eleven spaces actually
 computes. Together they are what stops a wrong space reaching generation: swapping `FLUX_16` for
 `SD3_16` in `defs/flux.py` moves one row of the first table, and the second table is what proves
 the two rows are not interchangeable.
@@ -18,6 +18,7 @@ from invokeai.backend.architectures.facets.latent_space import (
     FLUX_16,
     LTX2_128,
     MINIMAX_H3_24,
+    QWEN_IMAGE21_64,
     SD3_16,
     SD15_4,
     SDXL_4,
@@ -67,6 +68,7 @@ DECLARED_LATENT_SPACES: dict[BaseModelType, tuple[LatentSpace, ...]] = {
     BaseModelType.LTX2: (LTX2_128,),
     BaseModelType.MiniMaxH3: (MINIMAX_H3_24,),
     BaseModelType.QwenImage: (WAN21_16,),
+    BaseModelType.QwenImage21: (QWEN_IMAGE21_64,),
     BaseModelType.StableDiffusion1: (SD15_4,),
     BaseModelType.StableDiffusion2: (SD15_4,),
     BaseModelType.StableDiffusion3: (SD3_16,),
@@ -119,6 +121,9 @@ PINNED_PREVIEW_PIXELS: list[tuple[LatentSpace, float, tuple[int, int, int], tupl
     (WAN22_48, 1.0, (65, 91, 227), (131, 116, 109)),
     # colsums (-0.0698, -0.0317, 0.0266), bias (-0.2223, -0.2864, -0.2917)
     (LTX2_128, 0.25, (96, 89, 91), (99, 90, 90)),
+    # colsums (-0.0175, 0.2169, -0.1644), bias (-0.1543, -0.1408, -0.2869). B lands at 69.96, so the
+    # truncating cast is again what makes it 69.
+    (QWEN_IMAGE21_64, 1.0, (105, 137, 69), (107, 109, 90)),
 ]
 
 

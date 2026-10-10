@@ -828,6 +828,88 @@
     }
   },
   {
+    "base": "qwen-image-2-1",
+    "variant": null,
+    "features": {
+      "negative_prompt": {
+        "visible": true,
+        "usage": "cfg-gated"
+      },
+      "dimension_grid": 32,
+      "guidance_label": "CFG",
+      "guidance_min": 1.0,
+      "guidance_max": null,
+      "scheduler_set": "flow",
+      "scheduler_applies_to_graph": false,
+      "control_kinds": [],
+      "max_reference_images": 0,
+      "reference_images_require_variant": null,
+      "supports_regional_guidance": false,
+      "regional_negative": false,
+      "clip_skip_max": null,
+      "supports_seamless": false,
+      "supports_cfg_rescale": false,
+      "sd_vae_override": false,
+      "color_compensation": false,
+      "vae_precision": false
+    },
+    "defaults": {
+      "vae": null,
+      "vae_precision": null,
+      "scheduler": "euler",
+      "steps": 40,
+      "cfg_scale": 1.0,
+      "cfg_rescale_multiplier": null,
+      "width": 1024,
+      "height": 1024,
+      "guidance": null,
+      "cpu_only": null,
+      "fp8_storage": null
+    },
+    "vae": null
+  },
+  {
+    "base": "qwen-image-2-1",
+    "variant": "qwen_image_21_turbo",
+    "features": {
+      "negative_prompt": {
+        "visible": true,
+        "usage": "cfg-gated"
+      },
+      "dimension_grid": 32,
+      "guidance_label": "CFG",
+      "guidance_min": 1.0,
+      "guidance_max": null,
+      "scheduler_set": "flow",
+      "scheduler_applies_to_graph": false,
+      "control_kinds": [],
+      "max_reference_images": 0,
+      "reference_images_require_variant": null,
+      "supports_regional_guidance": false,
+      "regional_negative": false,
+      "clip_skip_max": null,
+      "supports_seamless": false,
+      "supports_cfg_rescale": false,
+      "sd_vae_override": false,
+      "color_compensation": false,
+      "vae_precision": false
+    },
+    "defaults": {
+      "vae": null,
+      "vae_precision": null,
+      "scheduler": "euler",
+      "steps": 8,
+      "cfg_scale": 1.0,
+      "cfg_rescale_multiplier": null,
+      "width": 1024,
+      "height": 1024,
+      "guidance": null,
+      "cpu_only": null,
+      "fp8_storage": null
+    },
+    "vae": null
+  },
+  {
     "base": "sd-1",
     "variant": null,
     "features": {

@@ -58,6 +58,13 @@ const krea2Model: MainModelConfig = {
   name: 'Krea-2',
   type: 'main',
 };
+const qwenImage21Model: MainModelConfig = {
+  base: 'qwen-image-2-1',
+  format: 'diffusers',
+  key: 'qwen-image-2-1-model',
+  name: 'Qwen-Image-2.1',
+  type: 'main',
+};
 const externalModel: GenerateModelConfig = {
   base: 'external',
   capabilities: { modes: ['txt2img'], supports_seed: true },
@@ -263,6 +270,15 @@ const BASE_CASES: BaseCase[] = [
     denoiseType: 'anima_denoise',
     txt2imgMode: 'anima_txt2img',
     img2imgMode: 'anima_img2img',
+    optimizedDenoising: false,
+  },
+  {
+    model: qwenImage21Model,
+    encodeType: 'qwen_image_2_1_i2l',
+    outputType: 'qwen_image_2_1_l2i',
+    denoiseType: 'qwen_image_2_1_denoise',
+    txt2imgMode: 'qwen_image_2_1_txt2img',
+    img2imgMode: 'qwen_image_2_1_img2img',
     optimizedDenoising: false,
   },
 ];

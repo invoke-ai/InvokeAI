@@ -15,6 +15,7 @@ export const SUPPORTED_GENERATE_BASES = [
   'z-image',
   'ideogram-4',
   'krea-2',
+  'qwen-image-2-1',
   'wan',
   'anima',
 ] as const satisfies readonly KnownGenerationModelBase[];

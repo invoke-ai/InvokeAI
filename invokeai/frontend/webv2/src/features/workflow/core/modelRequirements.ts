@@ -40,6 +40,7 @@ const BASE_LABELS: Record<string, string> = {
   'krea-2': 'Krea-2',
   'minimax-h3': 'MiniMax H3',
   'qwen-image': 'Qwen Image',
+  'qwen-image-2-1': 'Qwen-Image-2.1',
   'sd-1': 'SD 1.x',
   'sd-2': 'SD 2.x',
   'sd-3': 'SD 3.x',
