@@ -574,11 +574,10 @@ wheels = [
 
 [[package]]
 name = "diffusers"
-version = "0.40.0"
+version = "0.41.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "filelock" },
-    { name = "httpx" },
     { name = "huggingface-hub" },
     { name = "importlib-metadata" },
     { name = "numpy" },
@@ -587,9 +586,9 @@ dependencies = [
     { name = "requests" },
     { name = "safetensors" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/59/32/b9c6a198812e2a7d2c2828a850dba384306f9af285eac23e35e89d5b008a/diffusers-0.40.0.tar.gz", hash = "sha256:49f112ce52ff6d332ab68afec01f79a53e6489b42cb69104444c98b4a2f64af8", size = 4886420, upload-time = "2026-08-20T14:30:40.923Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a8/bc/34a91d366fe8e546637d702403e4d8cd5dbdf705a15fb3725d34a7ab3416/diffusers-0.41.0.tar.gz", hash = "sha256:69dcced7230b6bc0b70b5c6cfdff1aa62da487ab52ae74b642e46b1b9bfacc47", size = 5026281, upload-time = "2026-10-06T06:24:14.884Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/db/df/ffb593ebed2a068d2d6be44261283f39a6b809c0fcdfdcafbd448cbeec77/diffusers-0.40.0-py3-none-any.whl", hash = "sha256:5b5da7c3ddb62152fa4afc577f02e050af688c797375c34fb2d01006da3f3541", size = 5911654, upload-time = "2026-08-20T14:30:38.422Z" },
+    { url = "https://files.pythonhosted.org/packages/fe/c4/5bf8afd1ff3a8d99da7a18b1067ae0b4e2a037c38f3851890a989c511fd3/diffusers-0.41.0-py3-none-any.whl", hash = "sha256:ea8918b7dfd92ce793b6db689a551b8cd25d52c6c0fcd3ade0706a5fd2a25990", size = 6063887, upload-time = "2026-10-06T06:24:12.455Z" },
 ]
 
 [package.optional-dependencies]
@@ -868,7 +867,7 @@ wheels = [
 
 [[package]]
 name = "huggingface-hub"
-version = "1.30.0"
+version = "1.33.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -881,9 +880,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/35/97/2eb4abaa5b969ed385066a0496a3823b3ff467fc1082e2202955f1867d60/huggingface_hub-1.30.0.tar.gz", hash = "sha256:e6a6120bc8c8e2723d03648434ee247088cceb55ba7067e7d34d692cad5fdb57", size = 964291, upload-time = "2026-09-03T10:05:14.053Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/25/2a/484d112c0d8fc5f665d7b65137ac9cdb2953c982391598c3597968a12ee7/huggingface_hub-1.33.0.tar.gz", hash = "sha256:367be21a201db9523eddf8aeac7048f2602c1b308691c97640d5e72ed188007e", size = 1043548, upload-time = "2026-09-24T09:49:29.971Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c3/0e/3e45bbe0dd48f4e56b1d46649d342de853cd1c7e815323472ab62687f153/huggingface_hub-1.30.0-py3-none-any.whl", hash = "sha256:96ae0a8e99a234374a6fe43e989ebd21c04640b91ab2927e7e5773ba1131ca59", size = 796795, upload-time = "2026-09-03T10:05:12.21Z" },
+    { url = "https://files.pythonhosted.org/packages/fc/16/963096d224b80909432dc16561a615fd33d2d13beef3ce4c63fa25e40867/huggingface_hub-1.33.0-py3-none-any.whl", hash = "sha256:04e434b06e100eddbce9a6e817d72693a7884b10a79bd67ab48080d5c07eb899", size = 846435, upload-time = "2026-09-24T09:49:28.059Z" },
 ]
 
 [[package]]
@@ -1218,7 +1217,7 @@ requires-dist = [
     { name = "blake3" },
     { name = "compel", specifier = ">=2.4.0,<3" },
     { name = "deprecated" },
-    { name = "diffusers", extras = ["torch"], specifier = "==0.40.0" },
+    { name = "diffusers", extras = ["torch"], specifier = "==0.41.0" },
     { name = "dnspython" },
     { name = "dynamicprompts" },
     { name = "einops" },

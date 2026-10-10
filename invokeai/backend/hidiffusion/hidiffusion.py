@@ -9,8 +9,8 @@ import torch.nn.functional as F
 from diffusers.image_processor import PipelineImageInput
 from diffusers.models import ControlNetModel
 from diffusers.models.attention import _chunked_feed_forward
+from diffusers.models.controlnets.multicontrolnet import MultiControlNetModel
 from diffusers.pipelines import auto_pipeline
-from diffusers.pipelines.controlnet.multicontrolnet import MultiControlNetModel
 from diffusers.pipelines.stable_diffusion_xl.pipeline_output import StableDiffusionXLPipelineOutput
 from diffusers.utils import USE_PEFT_BACKEND, deprecate, scale_lora_layers, unscale_lora_layers
 from diffusers.utils.torch_utils import apply_freeu, is_compiled_module, is_torch_version
