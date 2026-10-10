@@ -862,6 +862,7 @@ class ImageHueAdjustmentInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         pil_image = context.images.get_pil(self.image.image_name)
+        alpha_channel = _extract_alpha_channel(pil_image)
 
         # Convert image to HSV color space
         hsv_image = numpy.array(pil_image.convert("HSV"))
@@ -874,6 +875,10 @@ class ImageHueAdjustmentInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         # Convert back to PIL format and to original color mode
         pil_image = Image.fromarray(hsv_image, mode="HSV").convert("RGBA")
+
+        # HSV has no alpha channel, so restore the original one
+        if alpha_channel is not None:
+            pil_image.putalpha(alpha_channel)
 
         image_dto = context.images.save(image=pil_image)
 

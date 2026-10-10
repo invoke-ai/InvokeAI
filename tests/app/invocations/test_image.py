@@ -7,7 +7,12 @@ import numpy
 import torch
 from PIL import Image, ImageFilter
 
-from invokeai.app.invocations.image import ImageField, OklabUnsharpMaskInvocation, OklchImageHueAdjustmentInvocation
+from invokeai.app.invocations.image import (
+    ImageField,
+    ImageHueAdjustmentInvocation,
+    OklabUnsharpMaskInvocation,
+    OklchImageHueAdjustmentInvocation,
+)
 from invokeai.app.invocations.primitives import ImageCollectionInvocation
 from invokeai.backend.image_util.color_conversion import (
     linear_srgb_from_oklab,
@@ -155,6 +160,28 @@ def test_oklch_hue_adjustment_invocation_preserves_alpha_and_rotates_hue_in_oklc
         expected_rgb.permute(1, 2, 0).numpy(),
         atol=1 / 255.0,
     )
+
+
+def test_hue_adjustment_invocation_preserves_alpha() -> None:
+    input_image = Image.new("RGBA", (2, 1))
+    input_image.putdata(
+        [
+            (210, 80, 30, 0),
+            (40, 160, 220, 128),
+        ]
+    )
+
+    context = _build_context(input_image)
+    ImageHueAdjustmentInvocation(image=ImageField(image_name="in"), hue=90).invoke(context)
+    saved_image = context.images.save.call_args.kwargs["image"]
+
+    rgb_context = _build_context(input_image.convert("RGB"))
+    ImageHueAdjustmentInvocation(image=ImageField(image_name="in"), hue=90).invoke(rgb_context)
+    rgb_saved_image = rgb_context.images.save.call_args.kwargs["image"]
+
+    assert saved_image.mode == "RGBA"
+    assert numpy.asarray(saved_image.getchannel("A")).reshape(-1).tolist() == [0, 128]
+    assert _max_abs_diff_uint8(saved_image.convert("RGB"), rgb_saved_image.convert("RGB")) == 0
 
 
 def test_oklab_unsharp_mask_invocation_zero_strength_returns_original_image() -> None:
