@@ -90,6 +90,24 @@ def _h3_turbo_keys(prefix: str = "") -> dict[str, torch.Tensor]:
     return sd
 
 
+def _h3_kohya_keys() -> dict[str, torch.Tensor]:
+    """Realistic key shape of a kohya / musubi-tuner H3 LoRA (flattened ``lora_unet_`` paths,
+    ``lora_down``/``lora_up`` plus ``.alpha``; attention + MLP only)."""
+    sd: dict[str, torch.Tensor] = {}
+    for block in range(2):
+        for module, out_features, in_features in (
+            ("attn_qkv_proj", 21504, 5376),
+            ("attn_out_proj", 5376, 7168),
+            ("mlp_fc1", 28672, 5376),
+            ("mlp_fc2", 5376, 14336),
+        ):
+            base = f"lora_unet_blocks_{block}_{module}"
+            sd[f"{base}.lora_down.weight"] = _z(16, in_features)
+            sd[f"{base}.lora_up.weight"] = _z(out_features, 16)
+            sd[f"{base}.alpha"] = torch.tensor(16.0)
+    return sd
+
+
 def _wan_native_keys() -> dict[str, torch.Tensor]:
     sd: dict[str, torch.Tensor] = {}
     for block in range(2):
@@ -118,11 +136,17 @@ def test_h3_lora_identifies_as_h3():
         assert result.base is BaseModelType.MiniMaxH3
 
 
+def test_h3_kohya_lora_identifies_as_h3():
+    accepted, result = _probe(LoRA_LyCORIS_MiniMaxH3_Config, _h3_kohya_keys())
+    assert accepted, f"H3 probe rejected the kohya layout: {result}"
+    assert result.base is BaseModelType.MiniMaxH3
+
+
 def test_h3_lora_rejected_by_other_probes():
-    sd = _h3_turbo_keys()
-    for cls in (LoRA_LyCORIS_Wan_Config, LoRA_LyCORIS_Anima_Config, LoRA_LyCORIS_Krea2_Config):
-        accepted, result = _probe(cls, sd)
-        assert not accepted, f"{cls.__name__} wrongly accepted an H3 LoRA: {result}"
+    for sd in (_h3_turbo_keys(), _h3_kohya_keys()):
+        for cls in (LoRA_LyCORIS_Wan_Config, LoRA_LyCORIS_Anima_Config, LoRA_LyCORIS_Krea2_Config):
+            accepted, result = _probe(cls, sd)
+            assert not accepted, f"{cls.__name__} wrongly accepted an H3 LoRA: {result}"
 
 
 def test_wan_lora_rejected_by_h3_probe():

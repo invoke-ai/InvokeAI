@@ -1,7 +1,8 @@
 """MiniMax H3 LoRA conversion utilities.
 
 H3 LoRAs (e.g. larryvrh/MiniMax-H3-Turbo-Lora) target the original remote-code /
-Comfy single-file transformer layout. We normalise them to the parameter paths the
+Comfy single-file transformer layout, with dotted PEFT keys or kohya-flattened
+``lora_unet_*`` keys (un-flattened first). We normalise them to the parameter paths the
 vendored ``MiniMaxH3Transformer3DModel`` uses at runtime, mirroring the base-model
 state-dict converter in
 ``invokeai.backend.model_manager.load.model_loaders.minimax_h3_state_dict_utils``:
@@ -38,6 +39,7 @@ from invokeai.backend.patches.lora_conversions.minimax_h3_lora_constants import 
     has_minimax_h3_lora_keys,
     has_non_minimax_h3_architecture_keys,
     has_unsupported_minimax_h3_lora_variant_keys,
+    normalize_minimax_h3_lora_key,
 )
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
@@ -101,6 +103,10 @@ def lora_model_from_minimax_h3_state_dict(
             "MiniMax H3 LoRAs must be plain low-rank (lora_A/lora_B); LoKR/LoHA/DoRA variants are not "
             "supported on H3's fused transformer layers."
         )
+
+    # Kohya-flattened keys (``lora_unet_blocks_0_attn_qkv_proj.lora_down.weight``) become dotted
+    # native keys; their ``lora_down``/``lora_up``/``alpha`` names already match the layer factory.
+    state_dict = {normalize_minimax_h3_lora_key(k) if isinstance(k, str) else k: v for k, v in state_dict.items()}
 
     layers: dict[str, BaseLayerPatch] = {}
 

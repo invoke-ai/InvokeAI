@@ -68512,7 +68512,7 @@
           "base"
         ],
         "title": "LoRA_LyCORIS_MiniMaxH3_Config",
-        "description": "Model config for MiniMax H3 LoRA models in LyCORIS (single-file PEFT) format.\n\nH3 LoRAs (e.g. the MiniMax-H3 Turbo step-distillation LoRA) target the\n``MiniMaxH3Transformer3DModel`` in the checkpoint's native single-file layout.\nDetection keys on H3-exclusive submodule names (the fused ``attn.qkv_proj``\nunder a bare ``attn.``, and ``adaln_proj.linear``) and rejects any state dict\ncarrying another architecture's signature \u2014 see\n``minimax_h3_lora_constants`` for the exact patterns and why ``mlp.fc1``\nalone would not be safe."
+        "description": "Model config for MiniMax H3 LoRA models in LyCORIS (single-file PEFT or kohya) format.\n\nH3 LoRAs (e.g. the MiniMax-H3 Turbo step-distillation LoRA) target the\n``MiniMaxH3Transformer3DModel`` in the checkpoint's native single-file layout,\nwith dotted keys or kohya-flattened ``lora_unet_*`` keys.\nDetection keys on H3-exclusive submodule names (the fused ``attn.qkv_proj``\nunder a bare ``attn.``, and ``adaln_proj.linear``) and rejects any state dict\ncarrying another architecture's signature \u2014 see\n``minimax_h3_lora_constants`` for the exact patterns and why ``mlp.fc1``\nalone would not be safe."
       },
       "LoRA_LyCORIS_QwenImage_Config": {
         "properties": {

@@ -191,9 +191,10 @@ class LoRALoader(ModelLoader):
             # WanTransformer3DModel attention (attn1/attn2) and FFN blocks.
             model = lora_model_from_wan_state_dict(state_dict=state_dict, alpha=None)
         elif self._model_base == BaseModelType.MiniMaxH3:
-            # MiniMax H3 LoRAs use PEFT lora_A/lora_B keys in the checkpoint's native
-            # single-file layout (fused qkv_proj / SwiGLU fc1, adaln_proj). alpha=None
-            # -> alpha=rank, matching the published Turbo LoRA's "no extra scaling".
+            # MiniMax H3 LoRAs use PEFT lora_A/lora_B or kohya-flattened keys in the
+            # checkpoint's native single-file layout (fused qkv_proj / SwiGLU fc1, adaln_proj).
+            # alpha=None -> a file's own .alpha tensors, else alpha=rank, matching the
+            # published Turbo LoRA's "no extra scaling".
             model = lora_model_from_minimax_h3_state_dict(state_dict=state_dict, alpha=None)
         elif self._model_base == BaseModelType.LTX2:
             # LTX-2 LoRAs use PEFT lora_A/lora_B keys in the official Lightricks single-file
