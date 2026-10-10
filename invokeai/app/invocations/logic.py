@@ -42,17 +42,25 @@ class IfInvocation(BaseInvocation):
         return IfInvocationOutput(value=self.true_input if self.condition else self.false_input)
 
 
-BOOLEAN_OPERATIONS = Literal["AND", "OR", "XOR", "NOT"]
+BOOLEAN_OPERATIONS = Literal["AND", "OR", "XOR", "NOT", "NAND", "NOR", "XNOR"]
 
 
 @invocation("boolean_logic", title="Boolean Logic", tags=["logic", "boolean"], category="math", version="1.0.0")
 class BooleanLogicInvocation(BaseInvocation):
-    """Performs Boolean AND, OR, XOR, or NOT operations."""
+    """Performs Boolean AND, OR, XOR, NOT, NAND, NOR, or XNOR operations. NOT uses only A."""
 
     operation: BOOLEAN_OPERATIONS = InputField(
         default="AND",
         description="The logical operation to perform",
-        ui_choice_labels={"AND": "A AND B", "OR": "A OR B", "XOR": "A XOR B", "NOT": "NOT A"},
+        ui_choice_labels={
+            "AND": "A AND B",
+            "OR": "A OR B",
+            "XOR": "A XOR B",
+            "NOT": "NOT A",
+            "NAND": "A NAND B",
+            "NOR": "A NOR B",
+            "XNOR": "A XNOR B",
+        },
     )
     a: bool = InputField(default=False, description="First Boolean input")
     b: bool = InputField(default=False, description="Second Boolean input (ignored for NOT)")
@@ -64,6 +72,12 @@ class BooleanLogicInvocation(BaseInvocation):
             result = self.a or self.b
         elif self.operation == "XOR":
             result = self.a != self.b
-        else:  # self.operation == "NOT"
+        elif self.operation == "NOT":
             result = not self.a
+        elif self.operation == "NAND":
+            result = not (self.a and self.b)
+        elif self.operation == "NOR":
+            result = not (self.a or self.b)
+        else:  # self.operation == "XNOR"
+            result = self.a == self.b
         return BooleanOutput(value=result)
