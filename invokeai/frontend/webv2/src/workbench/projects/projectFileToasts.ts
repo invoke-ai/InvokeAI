@@ -25,6 +25,7 @@ export interface ProjectFileReporter {
 const MISSING_REASONS: ReadonlySet<InvkMediaIssueReason> = new Set(['fetch-failed', 'missing-entry', 'upload-failed']);
 
 const countIssues = (issues: ProjectTransferIssues) => ({
+  boards: issues.boardIssues.length,
   boardItems: issues.boardItemIssues.filter((issue) => MISSING_REASONS.has(issue.reason)).length,
   documentReferences: issues.documentReferenceIssues.filter((issue) => MISSING_REASONS.has(issue.reason)).length,
   unstarred: issues.boardItemIssues.filter((issue) => issue.reason === 'star-failed').length,
@@ -120,9 +121,9 @@ export const startProjectFileReport = (
       }, PROGRESS_REDRAW_INTERVAL_MS);
     },
     succeed: (successTitle, issues) => {
-      const { boardItems, documentReferences, unstarred } = countIssues(issues);
+      const { boardItems, boards, documentReferences, unstarred } = countIssues(issues);
 
-      if (boardItems === 0 && documentReferences === 0 && unstarred === 0) {
+      if (boards === 0 && boardItems === 0 && documentReferences === 0 && unstarred === 0) {
         settle({ title: successTitle, type: 'success' });
 
         return;
@@ -130,6 +131,7 @@ export const startProjectFileReport = (
 
       // Keep toasts bounded to counts; detailed losses remain on the outcome.
       const parts = [
+        ...(boards === 0 ? [] : [t('projects.file.unplacedBoards', { count: boards })]),
         ...(boardItems === 0 ? [] : [t('projects.file.missingBoardItems', { count: boardItems })]),
         ...(documentReferences === 0 ? [] : [t('projects.file.missingReferences', { count: documentReferences })]),
         ...(unstarred === 0 ? [] : [t('projects.file.unstarredItems', { count: unstarred })]),

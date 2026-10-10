@@ -9,13 +9,16 @@ from sqlalchemy import func, insert, select, update
 from invokeai.app.services.board_records.board_records_common import (
     BOARD_NAME_MAX_LENGTH,
     BoardChanges,
-    BoardRecordProjectOwnedException,
+    BoardRecordInboxException,
+    BoardRecordProjectNotFoundException,
     BoardVisibility,
 )
 from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
 from invokeai.app.services.project_records import project_records_default
 from invokeai.app.services.project_records.project_records_common import (
+    ProjectBoardItemDTO,
     ProjectBoardNotFoundError,
+    ProjectBoardSnapshotDTO,
     ProjectBoardTooLargeError,
     ProjectBoardUnavailableError,
     ProjectCanvasSchemaDowngradeError,
@@ -38,6 +41,7 @@ from invokeai.app.services.shared.database.schema.media_references import media_
 from invokeai.app.services.shared.database.schema.projects import projects
 from invokeai.app.services.shared.database.schema.users import users
 from invokeai.app.services.shared.database.schema.videos import videos
+from tests.fixtures.database import capture_statements, explain_query_plan
 from tests.fixtures.races import when_called, while_in_flight
 
 SYSTEM_USER_ID = "system"
@@ -746,7 +750,7 @@ def test_a_board_change_waits_for_a_claim_in_flight_and_then_finds_the_board_cla
     if change == "delete":
         assert (errors, deleted) == ([], [False])
     else:
-        assert [type(e) for e in errors] == [BoardRecordProjectOwnedException]
+        assert [type(e) for e in errors] == [BoardRecordInboxException]
     assert lost_races == []
     assert _board(database, "staging") == ("First", False)
     assert project_records.get_board_id(SYSTEM_USER_ID, "first") == "staging"
@@ -875,6 +879,75 @@ def test_a_board_delete_waits_for_a_delete_of_its_project_in_flight(
 # region board snapshot
 
 
+def _inbox_items(snapshot: ProjectBoardSnapshotDTO) -> list[ProjectBoardItemDTO]:
+    """The inbox always leads the snapshot."""
+    assert snapshot.boards[0].is_inbox
+    return snapshot.boards[0].items
+
+
+def _member_board(database: Database, board_id: str, *, project_id: str, name: str, archived: bool = False) -> str:
+    _insert_board(database, board_id, name=name, archived=archived)
+    with database.begin(write=True) as conn:
+        conn.execute(update(boards).where(boards.c.board_id == board_id).values(project_id=project_id))
+    return board_id
+
+
+def test_the_snapshot_lists_every_board_of_the_project_inbox_first(
+    project_records: ProjectRecordsStorage, database: Database, other_user_id: str
+) -> None:
+    created = project_records.create(SYSTEM_USER_ID, "Mine", {}, project_id="shared-id")
+    # The other account's same-id project has members of its own, which must not leak in.
+    theirs = project_records.create(other_user_id, "Theirs", {}, project_id="shared-id")
+    _member_board(database, "later", project_id="shared-id", name="Site plan refs")
+    _member_board(database, "old", project_id="shared-id", name="Old façades", archived=True)
+    _insert_board(database, "their-member", user_id=other_user_id, name="Stripes")
+    with database.begin(write=True) as conn:
+        conn.execute(update(boards).where(boards.c.board_id == "their-member").values(project_id="shared-id"))
+        conn.execute(update(boards).where(boards.c.board_id == "old").values(created_at="2020-01-01 00:00:00.000"))
+    _put_image(database, "inbox.png", created.board_id)
+    _put_image(database, "later.png", "later")
+    _put_video(database, "old.mp4", "old")
+    _put_image(database, "theirs.png", "their-member")
+
+    snapshot = project_records.get_board_snapshot(SYSTEM_USER_ID, created.project_id)
+
+    assert [(board.board_id, board.name, board.is_inbox, board.archived) for board in snapshot.boards] == [
+        (created.board_id, "Mine", True, False),
+        ("old", "Old façades", False, True),
+        ("later", "Site plan refs", False, False),
+    ]
+    assert [[item.name for item in board.items] for board in snapshot.boards] == [
+        ["inbox.png"],
+        ["old.mp4"],
+        ["later.png"],
+    ]
+    assert [
+        board.board_id for board in project_records.get_board_snapshot(other_user_id, theirs.project_id).boards
+    ] == [
+        theirs.board_id,
+        "their-member",
+    ]
+
+
+def test_the_snapshot_ceiling_counts_every_board_together(
+    project_records: ProjectRecordsStorage, database: Database, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(project_records_default, "PROJECT_BOARD_SNAPSHOT_MAX_ITEMS", 2)
+    created = project_records.create(SYSTEM_USER_ID, "Full", {})
+    _member_board(database, "member", project_id=created.project_id, name="Member")
+    _put_image(database, "a.png", created.board_id)
+    _put_image(database, "b.png", "member")
+    assert (
+        sum(len(board.items) for board in project_records.get_board_snapshot(SYSTEM_USER_ID, created.project_id).boards)
+        == 2
+    )
+
+    _put_image(database, "c.png", "member")
+
+    with pytest.raises(ProjectBoardTooLargeError):
+        project_records.get_board_snapshot(SYSTEM_USER_ID, created.project_id)
+
+
 def _put_image(
     database: Database,
     name: str,
@@ -933,7 +1006,7 @@ def test_the_snapshot_lists_every_visible_category_of_both_kinds(
 
     snapshot = project_records.get_board_snapshot(SYSTEM_USER_ID, created.project_id)
 
-    assert {(item.kind, item.name, item.category) for item in snapshot.items} == {
+    assert {(item.kind, item.name, item.category) for item in _inbox_items(snapshot)} == {
         (kind, f"{category}.{ext}", category)
         for category in ("general", "control", "mask", "user")
         for kind, ext in (("image", "png"), ("video", "mp4"))
@@ -954,7 +1027,7 @@ def test_the_snapshot_excludes_what_the_gallery_does_not_show(
 
     snapshot = project_records.get_board_snapshot(SYSTEM_USER_ID, created.project_id)
 
-    assert [item.name for item in snapshot.items] == ["shown.png", "shown.mp4"]
+    assert [item.name for item in _inbox_items(snapshot)] == ["shown.png", "shown.mp4"]
 
 
 def test_the_snapshot_excludes_media_on_other_boards(
@@ -967,7 +1040,7 @@ def test_the_snapshot_excludes_media_on_other_boards(
 
     snapshot = project_records.get_board_snapshot(SYSTEM_USER_ID, mine.project_id)
 
-    assert [item.name for item in snapshot.items] == ["mine.png"]
+    assert [item.name for item in _inbox_items(snapshot)] == ["mine.png"]
 
 
 def test_the_snapshot_carries_starring_and_is_ordered_by_kind_then_name(
@@ -982,7 +1055,7 @@ def test_the_snapshot_carries_starring_and_is_ordered_by_kind_then_name(
 
     snapshot = project_records.get_board_snapshot(SYSTEM_USER_ID, created.project_id)
 
-    assert [(item.kind, item.name, item.starred) for item in snapshot.items] == [
+    assert [(item.kind, item.name, item.starred) for item in _inbox_items(snapshot)] == [
         ("image", "C.png", False),
         ("image", "a.png", False),
         ("image", "b.png", True),
@@ -1000,13 +1073,13 @@ def test_a_same_name_image_and_video_are_separate_entries(
 
     snapshot = project_records.get_board_snapshot(SYSTEM_USER_ID, created.project_id)
 
-    assert [(item.kind, item.name) for item in snapshot.items] == [("image", "twin"), ("video", "twin")]
+    assert [(item.kind, item.name) for item in _inbox_items(snapshot)] == [("image", "twin"), ("video", "twin")]
 
 
 def test_an_empty_board_snapshots_to_an_empty_list(project_records: ProjectRecordsStorage) -> None:
     created = project_records.create(SYSTEM_USER_ID, "Empty", {})
 
-    assert project_records.get_board_snapshot(SYSTEM_USER_ID, created.project_id).items == []
+    assert _inbox_items(project_records.get_board_snapshot(SYSTEM_USER_ID, created.project_id)) == []
 
 
 def test_a_board_over_the_snapshot_limit_is_refused(
@@ -1018,7 +1091,7 @@ def test_a_board_over_the_snapshot_limit_is_refused(
     _put_video(database, "c.mp4", created.board_id)
 
     monkeypatch.setattr(project_records_default, "PROJECT_BOARD_SNAPSHOT_MAX_ITEMS", 3)
-    assert len(project_records.get_board_snapshot(SYSTEM_USER_ID, created.project_id).items) == 3
+    assert len(_inbox_items(project_records.get_board_snapshot(SYSTEM_USER_ID, created.project_id))) == 3
 
     monkeypatch.setattr(project_records_default, "PROJECT_BOARD_SNAPSHOT_MAX_ITEMS", 2)
     with pytest.raises(ProjectBoardTooLargeError):
@@ -1116,4 +1189,193 @@ def test_deleting_a_project_drops_its_references(database: Database, project_rec
     assert _media_references(database, created.project_id) == set()
 
 
-# endregion
+# --- board membership -------------------------------------------------------------------------
+
+
+def _board_project(database: Database, board_id: str) -> str | None:
+    with database.begin(write=False) as conn:
+        return conn.execute(select(boards.c.project_id).where(boards.c.board_id == board_id)).scalar_one_or_none()
+
+
+def test_a_new_inbox_is_a_member_of_its_project(project_records: ProjectRecordsStorage, database: Database) -> None:
+    created = project_records.create(SYSTEM_USER_ID, "Fresh", {})
+
+    assert _board_project(database, created.board_id) == created.project_id
+
+
+def test_a_claimed_inbox_joins_its_project(project_records: ProjectRecordsStorage, database: Database) -> None:
+    _insert_board(database, "staging")
+
+    created = project_records.create(SYSTEM_USER_ID, "Imported", {}, board_id="staging")
+
+    assert _board_project(database, "staging") == created.project_id
+
+
+def test_a_board_in_another_project_cannot_become_an_inbox(
+    project_records: ProjectRecordsStorage, database: Database
+) -> None:
+    """Adopting a member would silently demote the inbox the other project already has."""
+    other = project_records.create(SYSTEM_USER_ID, "Other", {})
+    _insert_board(database, "member")
+    with database.begin(write=True) as conn:
+        conn.execute(update(boards).where(boards.c.board_id == "member").values(project_id=other.project_id))
+
+    with pytest.raises(ProjectBoardUnavailableError):
+        project_records.create(SYSTEM_USER_ID, "Claimant", {}, board_id="member")
+
+    assert _board_project(database, "member") == other.project_id
+
+
+def test_deleting_a_project_releases_its_other_boards_to_the_library_by_default(
+    project_records: ProjectRecordsStorage, database: Database, other_user_id: str
+) -> None:
+    created = project_records.create(SYSTEM_USER_ID, "Doomed", {}, project_id="shared-id")
+    # The other account's same-id project is untouched: membership is keyed by owner too.
+    theirs = project_records.create(other_user_id, "Theirs", {}, project_id="shared-id")
+    _insert_board(database, "member")
+    _insert_board(database, "their-member", user_id=other_user_id)
+    with database.begin(write=True) as conn:
+        conn.execute(
+            update(boards).where(boards.c.board_id.in_(["member", "their-member"])).values(project_id="shared-id")
+        )
+    _put_image(database, "kept.png", "member")
+
+    project_records.delete(SYSTEM_USER_ID, created.project_id)
+
+    assert _board(database, created.board_id) is None
+    assert _board_project(database, "member") is None
+    assert _board_project(database, "their-member") == theirs.project_id
+    with database.begin(write=False) as conn:
+        assert (
+            conn.execute(select(board_images.c.board_id).where(board_images.c.image_name == "kept.png")).scalar_one()
+            == "member"
+        )
+
+
+def test_deleting_a_project_can_take_its_other_boards_but_never_their_media(
+    project_records: ProjectRecordsStorage, database: Database, other_user_id: str
+) -> None:
+    created = project_records.create(SYSTEM_USER_ID, "Doomed", {}, project_id="shared-id")
+    project_records.create(other_user_id, "Theirs", {}, project_id="shared-id")
+    _insert_board(database, "member")
+    _insert_board(database, "their-member", user_id=other_user_id)
+    with database.begin(write=True) as conn:
+        conn.execute(
+            update(boards).where(boards.c.board_id.in_(["member", "their-member"])).values(project_id="shared-id")
+        )
+    _put_image(database, "kept.png", "member")
+
+    project_records.delete(SYSTEM_USER_ID, created.project_id, boards="delete")
+
+    assert _board(database, "member") is None
+    assert _board(database, "their-member") is not None
+    with database.begin(write=False) as conn:
+        assert (
+            conn.execute(
+                select(func.count()).select_from(board_images).where(board_images.c.image_name == "kept.png")
+            ).scalar_one()
+            == 0
+        )
+        assert (
+            conn.execute(select(images.c.image_name).where(images.c.image_name == "kept.png")).scalar_one()
+            == "kept.png"
+        )
+
+
+@pytest.mark.parametrize("operation", ["create", "move"])
+@pytest.mark.parametrize("disposition", ["release", "delete"])
+def test_a_board_cannot_join_a_project_deleted_while_it_waits(
+    project_records: ProjectRecordsStorage,
+    database: Database,
+    monkeypatch: pytest.MonkeyPatch,
+    operation: str,
+    disposition: str,
+) -> None:
+    project_records.create(SYSTEM_USER_ID, "Doomed", {}, project_id="project")
+    board_records = BoardRecordStorage(database)
+    loose = board_records.save("Loose", SYSTEM_USER_ID)
+
+    def join() -> None:
+        if operation == "create":
+            board_records.save("New", SYSTEM_USER_ID, project_id="project")
+        else:
+            board_records.update(loose.board_id, BoardChanges(project_id="project"))
+
+    ended = when_called(monkeypatch, ProjectQueries, "delete", join)
+    project_records.delete(SYSTEM_USER_ID, "project", boards=disposition)
+
+    assert [type(error) for error in ended()] == [BoardRecordProjectNotFoundException]
+    assert board_records.get(loose.board_id).project_id is None
+    assert [
+        record.board_name
+        for record in board_records.get_all(SYSTEM_USER_ID, False, "board_name", "ASC", include_archived=True)
+    ] == ["Loose"]
+
+
+@pytest.mark.parametrize("operation", ["create", "move"])
+@pytest.mark.parametrize("disposition", ["release", "delete"])
+def test_project_deletion_includes_a_board_join_that_commits_first(
+    project_records: ProjectRecordsStorage,
+    database: Database,
+    monkeypatch: pytest.MonkeyPatch,
+    operation: str,
+    disposition: str,
+) -> None:
+    project_records.create(SYSTEM_USER_ID, "Doomed", {}, project_id="project")
+    board_records = BoardRecordStorage(database)
+    if operation == "create":
+        method = "insert"
+    else:
+        loose = board_records.save("Member", SYSTEM_USER_ID)
+        method = "update"
+    ended = when_called(
+        monkeypatch, BoardQueries, method, lambda: project_records.delete(SYSTEM_USER_ID, "project", boards=disposition)
+    )
+    if operation == "create":
+        member = board_records.save("Member", SYSTEM_USER_ID, project_id="project")
+    else:
+        member = board_records.update(loose.board_id, BoardChanges(project_id="project"))
+
+    assert ended() == []
+    with database.begin(write=False) as conn:
+        remaining = conn.execute(select(boards.c.board_id, boards.c.project_id)).all()
+    assert remaining == ([(member.board_id, None)] if disposition == "release" else [])
+
+
+@pytest.mark.sqlite_only
+def test_snapshot_reads_media_through_project_board_memberships(
+    project_records: ProjectRecordsStorage,
+    database: Database,
+) -> None:
+    """A small project must not walk every gallery image through the category index."""
+    target = project_records.create(SYSTEM_USER_ID, "Small", {})
+    unrelated = project_records.create(SYSTEM_USER_ID, "Large", {})
+    _put_image(database, "mine.png", target.board_id)
+    with database.begin(write=True) as conn:
+        conn.execute(
+            insert(images),
+            [
+                {
+                    "image_name": f"other-{i}.png",
+                    "image_origin": "internal",
+                    "image_category": "general",
+                    "width": 1,
+                    "height": 1,
+                    "is_intermediate": False,
+                    "user_id": SYSTEM_USER_ID,
+                }
+                for i in range(1000)
+            ],
+        )
+        conn.execute(
+            insert(board_images),
+            [{"image_name": f"other-{i}.png", "board_id": unrelated.board_id} for i in range(1000)],
+        )
+    with capture_statements(database) as statements:
+        snapshot = project_records.get_board_snapshot(SYSTEM_USER_ID, target.project_id)
+    assert [item.name for item in _inbox_items(snapshot)] == ["mine.png"]
+    sql, parameters = next((sql, parameters) for sql, parameters in statements if "UNION ALL" in sql)
+    plan = explain_query_plan(database, sql, parameters)
+    for membership, media, key in (("board_images", "images", "image_name"), ("board_videos", "videos", "video_name")):
+        assert any(f"SEARCH {membership}" in step and "board_id=?" in step for step in plan), plan
+        assert any(f"SEARCH {media}" in step and f"{key}=?" in step for step in plan), plan

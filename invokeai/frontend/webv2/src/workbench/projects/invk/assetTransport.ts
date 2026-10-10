@@ -10,6 +10,7 @@ import {
 import type { InvkMediaCategory } from './board';
 
 import { INVK_MAX_ARCHIVE_BYTES } from './archive';
+import { clampBoardName } from './board';
 import { InvkFormatError } from './format';
 
 /** Launchpad-safe transport. Document references upload privately; board items retain their archived categories. */
@@ -20,9 +21,6 @@ export const INVK_TRANSFER_CONCURRENCY = 5;
 const BOARDS_BASE = '/api/v1/boards';
 const IMAGES_BASE = '/api/v1/images';
 const VIDEOS_BASE = '/api/v1/videos';
-
-/** The backend truncates board names at 300 characters; doing it here keeps the name we chose. */
-const MAX_BOARD_NAME_LENGTH = 300;
 
 /** Cancellation aborts the operation rather than reporting remaining assets as missing. */
 export const isRequestCancellation = (error: unknown): boolean =>
@@ -636,13 +634,30 @@ export const starVideos = async (videoNames: readonly string[], signal?: AbortSi
 
 /** Atomically claiming the staging board is the project-create commit point. */
 export const createStagingBoard = async (boardName: string, signal?: AbortSignal): Promise<string> => {
-  const query = new URLSearchParams({ board_name: boardName.slice(0, MAX_BOARD_NAME_LENGTH) });
+  const query = new URLSearchParams({ board_name: clampBoardName(boardName) });
   const dto = await apiFetchJson<{ board_id: string }>(`${BOARDS_BASE}/?${query.toString()}`, {
     method: 'POST',
     signal,
   });
 
   return dto.board_id;
+};
+
+/**
+ * Move a staging board that holds a member board's media into the project it now belongs to, and archive it if
+ * the source had. Only after the project exists: a board is a member of a project the server already has.
+ */
+export const placeBoardInProject = async (
+  boardId: string,
+  projectId: string,
+  archived: boolean,
+  signal?: AbortSignal
+): Promise<void> => {
+  await apiFetchJson<unknown>(`${BOARDS_BASE}/${encodeURIComponent(boardId)}`, {
+    body: JSON.stringify({ project_id: projectId, ...(archived ? { archived: true } : {}) }),
+    method: 'PATCH',
+    signal,
+  });
 };
 
 /**

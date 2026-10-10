@@ -84,6 +84,7 @@ describe('createTransferIssueLog', () => {
     log.addBoardItemIssue({ kind: 'image', name: 'a.png' }, 'star-failed');
 
     expect(log.toIssues()).toEqual({
+      boardIssues: [],
       boardItemIssues: [
         { kind: 'image', name: 'a.png', reason: 'star-failed' },
         { kind: 'image', name: 'z.png', reason: 'upload-failed' },
@@ -93,7 +94,11 @@ describe('createTransferIssueLog', () => {
   });
 
   it('reports nothing for a clean transfer', () => {
-    expect(createTransferIssueLog().toIssues()).toEqual({ boardItemIssues: [], documentReferenceIssues: [] });
+    expect(createTransferIssueLog().toIssues()).toEqual({
+      boardIssues: [],
+      boardItemIssues: [],
+      documentReferenceIssues: [],
+    });
   });
 });
 

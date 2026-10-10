@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Literal
 
 from invokeai.app.services.project_records.project_records_common import (
     DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
@@ -16,9 +16,11 @@ class ProjectRecordsStorageBase(ABC):
     another user's projects. Saves use optimistic concurrency via the
     project's monotonic revision.
 
-    Every project owns exactly one private board, and this storage is the only
-    thing allowed to create, rename or delete it. The board's name tracks the
-    project's name; the two always commit together.
+    Every project has exactly one inbox: a private board that this storage alone
+    creates, renames and deletes. Its name tracks the project's name; the two
+    always commit together. The project's other boards are ordinary boards whose
+    `project_id` names it; they are created and moved through the board service
+    and only leave with the project, released to the Library or deleted.
     """
 
     @abstractmethod
@@ -32,16 +34,17 @@ class ProjectRecordsStorageBase(ABC):
         minimum_canvas_schema_version: int = DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
         max_canvas_schema_version: int = DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
     ) -> ProjectRecordDTO:
-        """Create a project for the user, with a board.
+        """Create a project for the user, with its inbox.
 
         Args:
             user_id: The owning user.
             name: The project's display name.
             data: The opaque client-owned project document.
             project_id: Client-generated id (e.g. for imports); generated when omitted.
-            board_id: An existing unclaimed private board to adopt, renamed to `name`. Omit to
-                create one. Restoration uses this to upload media before the project exists, so
-                that creating the project is the single commit point for an import.
+            board_id: An existing unclaimed private Library board to adopt as the inbox, renamed
+                to `name`. Omit to create one. Restoration uses this to upload media before the
+                project exists, so that creating the project is the single commit point for an
+                import.
             minimum_canvas_schema_version: Compatibility floor stored with the project.
             max_canvas_schema_version: Newest canvas schema understood by the caller.
 
@@ -89,7 +92,7 @@ class ProjectRecordsStorageBase(ABC):
         minimum_canvas_schema_version: int | None = None,
         max_canvas_schema_version: int = DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
     ) -> ProjectRecordDTO:
-        """Save a project if the caller's revision is current, renaming its board to match.
+        """Save a project if the caller's revision is current, renaming its inbox to match.
 
         A save that loses the revision race renames nothing.
 
@@ -104,21 +107,22 @@ class ProjectRecordsStorageBase(ABC):
         pass
 
     @abstractmethod
-    def delete(self, user_id: str, project_id: str) -> None:
-        """Delete one of the user's projects and its board.
+    def delete(self, user_id: str, project_id: str, boards: Literal["release", "delete"] = "release") -> None:
+        """Delete one of the user's projects and its inbox, in one transaction.
 
-        Idempotent: deleting a missing project is a no-op. The board's media is not deleted — losing
-        the board returns it to Uncategorized.
+        Idempotent: deleting a missing project is a no-op. The project's other boards are either
+        released to the Library, where they keep their media, or deleted with the project. No media
+        is ever deleted here — losing a board returns its items to Uncategorized.
         """
         pass
 
     @abstractmethod
     def get_board_snapshot(self, user_id: str, project_id: str) -> ProjectBoardSnapshotDTO:
-        """Enumerate everything on the project's board that the gallery would show.
+        """Enumerate everything on the project's boards that the gallery would show, inbox first.
 
-        Excludes intermediates and the canvas's private `other` category, so the result is exactly
-        the board as the user sees it. Exports use this to carry a project's whole workspace rather
-        than only the media its document references.
+        Excludes intermediates and the canvas's private `other` category, so each board is exactly
+        what the user sees on it. Exports use this to carry a project's whole workspace rather than
+        only the media its document references.
 
         Raises:
             ProjectRecordNotFoundError: No such project for this user.
@@ -127,7 +131,7 @@ class ProjectRecordsStorageBase(ABC):
 
     @abstractmethod
     def get_board_id(self, user_id: str, project_id: str) -> str:
-        """Get the project's board id without loading its document.
+        """Get the project's inbox board id without loading its document.
 
         Raises:
             ProjectRecordNotFoundError: No such project for this user.

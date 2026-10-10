@@ -1,5 +1,6 @@
 import type { Project } from '@workbench/projectContracts';
 
+import type { DeleteProjectBoards } from './api';
 import type { ProjectPushOutcome } from './projectFlush';
 
 import { type OpenProjectHandle, registerOpenProject, unregisterOpenProject } from './syncStore';
@@ -9,7 +10,7 @@ export interface OpenProjectBrokerDeps {
   /** Drop the tab. Called after the project is already gone from the server. */
   closeProject: (projectId: string) => void;
   /** Remove the project from the server, in the sync engine's own queue. */
-  deleteProject: (projectId: string) => Promise<void>;
+  deleteProject: (projectId: string, boards?: DeleteProjectBoards) => Promise<void>;
   /** Push this project's live document and report whether the server took it. */
   flushProject: (projectId: string) => Promise<ProjectPushOutcome>;
   /** Persist the project's unsaved canvas pixels into its document. */
@@ -33,7 +34,7 @@ export const createOpenProjectBroker = (deps: OpenProjectBrokerDeps): OpenProjec
 
   const buildHandle = (projectId: string): OpenProjectHandle => ({
     close: () => deps.closeProject(projectId),
-    deleteOnServer: () => deps.deleteProject(projectId),
+    deleteOnServer: (boards) => deps.deleteProject(projectId, boards),
     flush: () => deps.flushProject(projectId),
     current: () => deps.getProject(projectId),
     flushPixels: () => deps.flushPixels(projectId),

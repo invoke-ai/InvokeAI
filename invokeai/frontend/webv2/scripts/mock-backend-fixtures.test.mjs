@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import {
+  PROJECT_FILE_MEMBER_BOARD,
   assertMockBackendFixture,
   collectCanvasLeaves,
   createMockBackendFixture,
@@ -645,26 +646,34 @@ test('the representative video accessibility journey owns the only generated-med
   assert.match(source, /INVOKEAI_ACCESSIBILITY_JOURNEY/);
 });
 
-test('project boards are owned, protected from the generic board routes, and enumerable', async () => {
+test('project inboxes are protected from the generic board routes, and members are not', async () => {
   await withRepresentativeBackend(async (backend) => {
     const projects = await getJson(backend, '/api/v1/projects/');
     const project = projects.find((entry) => entry.project_id === 'fixture-project-002');
 
-    // Every project owns exactly one board, and no two share one.
+    // Every project has exactly one inbox, and no two share one.
     assert.equal(new Set(projects.map((entry) => entry.board_id)).size, projects.length);
     assert.ok(project.board_id);
 
     const board = await getJson(backend, `/api/v1/boards/${project.board_id}`);
     assert.equal(board.project_id, project.project_id);
+    assert.equal(board.is_inbox, true);
     assert.equal(board.board_name, project.name);
 
-    // An unclaimed board omits the key entirely, matching the backend's null-excluding DTO.
+    // A Library board belongs to no project and is nobody's inbox.
     const plainBoard = await getJson(backend, '/api/v1/boards/fixture-board-02');
-    assert.equal('project_id' in plainBoard, false);
+    assert.equal(plainBoard.project_id, null);
+    assert.equal(plainBoard.is_inbox, false);
 
-    // The generic routes refuse a claimed board; only the project APIs may touch it.
+    // A member is an ordinary board that happens to belong to the project.
+    const member = await getJson(backend, '/api/v1/boards/fixture-member-board-02');
+    assert.equal(member.project_id, project.project_id);
+    assert.equal(member.is_inbox, false);
+
+    // The generic routes refuse to rename, move or delete an inbox; only the project APIs may touch it.
     for (const [method, path, body] of [
       ['PATCH', `/api/v1/boards/${project.board_id}`, { board_name: 'Renamed' }],
+      ['PATCH', `/api/v1/boards/${project.board_id}`, { project_id: null }],
       ['DELETE', `/api/v1/boards/${project.board_id}?include_images=true`, undefined],
     ]) {
       const refused = await fetch(`${backend.origin}${path}`, {
@@ -683,6 +692,54 @@ test('project boards are owned, protected from the generic board routes, and enu
       method: 'PUT',
     });
     assert.equal((await getJson(backend, `/api/v1/boards/${project.board_id}`)).board_name, 'Renamed Project');
+  });
+});
+
+test('boards are created in a project or the Library, move between them, and follow a deleted project', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const projects = await getJson(backend, '/api/v1/projects/');
+    const [first, second] = projects;
+
+    const created = await getJson(backend, `/api/v1/boards/?board_name=Kitchen&project_id=${first.project_id}`, {
+      method: 'POST',
+    });
+    assert.equal(created.project_id, first.project_id);
+    assert.equal(created.is_inbox, false);
+    assert.equal(
+      (
+        await fetch(`${backend.origin}/api/v1/boards/?board_name=Nowhere&project_id=no-such-project`, {
+          method: 'POST',
+        })
+      ).status,
+      404
+    );
+
+    const move = (projectId) =>
+      getJson(backend, `/api/v1/boards/${created.board_id}`, {
+        body: JSON.stringify({ project_id: projectId }),
+        headers: { 'content-type': 'application/json' },
+        method: 'PATCH',
+      });
+    assert.equal((await move(second.project_id)).project_id, second.project_id);
+    assert.equal((await move(null)).project_id, null);
+    // A rename without the key leaves membership alone.
+    const renamed = await getJson(backend, `/api/v1/boards/${created.board_id}`, {
+      body: JSON.stringify({ board_name: 'Pantry' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH',
+    });
+    assert.equal(renamed.project_id, null);
+    assert.equal(renamed.board_name, 'Pantry');
+
+    // Deleting a project releases its other boards by default, and takes them when asked.
+    await move(second.project_id);
+    await fetch(`${backend.origin}/api/v1/projects/${second.project_id}`, { method: 'DELETE' });
+    assert.equal((await getJson(backend, `/api/v1/boards/${created.board_id}`)).project_id, null);
+    assert.equal((await fetch(`${backend.origin}/api/v1/boards/${second.board_id}`)).status, 404);
+
+    await fetch(`${backend.origin}/api/v1/projects/${first.project_id}?boards=delete`, { method: 'DELETE' });
+    assert.equal((await fetch(`${backend.origin}/api/v1/boards/fixture-member-board-01`)).status, 404);
+    assert.equal((await fetch(`${backend.origin}/api/v1/boards/${created.board_id}`)).status, 200);
   });
 });
 
@@ -709,10 +766,12 @@ test('the board snapshot lists only what the gallery would show on a project boa
     const snapshot = await getJson(backend, `/api/v1/projects/${project.project_id}/board-snapshot`);
 
     // `other` is the canvas's private category and intermediates are hidden — neither travels.
-    assert.deepEqual(snapshot.items.map((item) => item.name).sort(), [control, general].sort());
-    assert.deepEqual(snapshot.items.map((item) => item.category).sort(), ['control', 'general']);
+    const [inbox] = snapshot.boards;
+    assert.equal(inbox.is_inbox, true);
+    assert.deepEqual(inbox.items.map((item) => item.name).sort(), [control, general].sort());
+    assert.deepEqual(inbox.items.map((item) => item.category).sort(), ['control', 'general']);
     assert.equal(
-      snapshot.items.every((item) => item.kind === 'image' && item.starred === false),
+      inbox.items.every((item) => item.kind === 'image' && item.starred === false),
       true
     );
 
@@ -722,9 +781,27 @@ test('the board snapshot lists only what the gallery would show on a project boa
       method: 'POST',
     });
     const starred = await getJson(backend, `/api/v1/projects/${project.project_id}/board-snapshot`);
-    assert.equal(starred.items.find((item) => item.name === general).starred, true);
+    assert.equal(starred.boards[0].items.find((item) => item.name === general).starred, true);
 
     assert.equal((await fetch(`${backend.origin}/api/v1/projects/nope/board-snapshot`)).status, 404);
+  });
+});
+
+test('the board snapshot lists the project other boards after the inbox, with their own items', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const snapshot = await getJson(backend, '/api/v1/projects/fixture-project-002/board-snapshot');
+
+    assert.deepEqual(
+      snapshot.boards.map((board) => [board.board_id, board.is_inbox, board.name, board.items.length]),
+      [
+        [PROJECT_FILE_BOARD_ID, true, 'Fixture Project 002', 6],
+        [PROJECT_FILE_MEMBER_BOARD.id, false, PROJECT_FILE_MEMBER_BOARD.name, 2],
+      ]
+    );
+    assert.deepEqual(
+      snapshot.boards[1].items.map((item) => item.name).sort(),
+      [...PROJECT_FILE_BOARD.memberImages].sort()
+    );
   });
 });
 

@@ -121,7 +121,12 @@ const exportProjectDocument = async (
 
   const plan = planInvkExport({
     appVersion: APP_VERSION,
-    boardItems: snapshot.items,
+    boards: snapshot.boards.map((board) => ({
+      archived: board.archived,
+      isInbox: board.is_inbox,
+      items: board.items,
+      name: board.name,
+    })),
     createdAt: new Date().toISOString(),
     minimumCanvasSchemaVersion,
     name,
@@ -138,6 +143,7 @@ const exportProjectDocument = async (
   assertAccountScopeCurrent(owner);
 
   return {
+    boardIssues: result.boardIssues,
     boardItemIssues: result.boardItemIssues,
     documentReferenceIssues: result.documentReferenceIssues,
     fileName: plan.fileName,
@@ -257,16 +263,11 @@ export const importProjectFile = async (
 
   assertAccountScopeCurrent(owner);
 
-  // Create staging boards only when media needs one.
-  const stagingBoardId =
-    archive?.boardSnapshot && archive.boardSnapshot.items.length > 0
-      ? await (async () => {
-          const { createStagingBoard } = await import('./invk/assetTransport');
-
-          return createStagingBoard(name, owner.signal);
-        })()
-      : null;
-  const ledger = restoreMedia?.createRestoredMediaLedger(stagingBoardId) ?? null;
+  const archiveBoards = archive?.boardSnapshot?.boards ?? [];
+  const memberBoards = archiveBoards.length === 0 ? null : await import('./invk/memberBoards');
+  // Made before anything is staged: every staging board joins it as it is created, so a restore abandoned at any
+  // point can delete them all.
+  const ledger = restoreMedia?.createRestoredMediaLedger([]) ?? null;
   let didCreateProject = false;
   let didAttemptProjectCreate = false;
 
@@ -284,6 +285,15 @@ export const importProjectFile = async (
       assertAccountScopeCurrent(owner);
     }
 
+    // One staging board per archive board; the inbox's rides the create, the rest are placed after.
+    const stagedBoards =
+      memberBoards === null || ledger === null
+        ? []
+        : await memberBoards.createStagingBoards(archiveBoards, name, ledger, owner.signal);
+    const inboxStagingBoardId = memberBoards?.findInboxStagingBoardId(stagedBoards) ?? null;
+
+    assertAccountScopeCurrent(owner);
+
     const restored =
       archive === null || ledger === null
         ? null
@@ -292,7 +302,7 @@ export const importProjectFile = async (
 
             return restoreArchiveMedia(
               archive,
-              { boardId: stagingBoardId, ledger, projectDocument: canonicalDocument, projectId: id },
+              { ledger, projectDocument: canonicalDocument, projectId: id, stagedBoards },
               {
                 signal: owner.signal,
                 ...(options.onProgress === undefined
@@ -321,12 +331,18 @@ export const importProjectFile = async (
         minimum_canvas_schema_version: minimumCanvasSchemaVersion,
         name,
         project_id: id,
-        ...(stagingBoardId === null ? {} : { board_id: stagingBoardId }),
+        ...(inboxStagingBoardId === null ? {} : { board_id: inboxStagingBoardId }),
       },
       owner
     );
 
     didCreateProject = true;
+    assertAccountScopeCurrent(owner);
+    // The project exists; its other boards can now belong to it. Reported, never fatal, from here on.
+    const boardIssues =
+      memberBoards === null
+        ? []
+        : await memberBoards.placeMemberBoards(stagedBoards, record.project_id, { signal: owner.signal });
     assertAccountScopeCurrent(owner);
     upsertProjectSummary(
       {
@@ -343,6 +359,7 @@ export const importProjectFile = async (
     }
 
     return {
+      boardIssues,
       boardItemIssues: restored?.boardItemIssues ?? [],
       documentReferenceIssues: restored?.documentReferenceIssues ?? [],
       // Bind the initial selection to the authoritative returned board ID, not the requested ID.

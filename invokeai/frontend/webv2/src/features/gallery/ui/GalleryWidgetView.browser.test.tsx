@@ -124,6 +124,7 @@ const adapter: GalleryUiAdapter = {
   progressSessions: [],
   projectId: 'project-1',
   projectName: 'Project',
+  projects: [],
   widgets: { openGallery: () => true, patchGalleryValues: noop },
 };
 const runtime = { commands: { register: noop }, hotkeys: { register: noop } };

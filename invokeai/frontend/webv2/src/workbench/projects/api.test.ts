@@ -18,6 +18,7 @@ vi.mock('@platform/transport/http', async (importOriginal) => ({
 }));
 
 import {
+  deleteProject,
   createProject,
   createProjectSettled,
   getProjectWriteSizeRefusal,
@@ -425,5 +426,24 @@ describe('project write size refusals', () => {
     ],
   ])('rejects %s', (_name, error) => {
     expect(getProjectWriteSizeRefusal(error)).toBeNull();
+  });
+});
+
+describe('deleteProject', () => {
+  it('asks the server to release the boards unless told to delete them', async () => {
+    transport.apiFetch.mockResolvedValue(undefined);
+
+    await deleteProject('project-1');
+    await deleteProject('project-1', undefined, 'release');
+    await deleteProject('project-1', undefined, 'delete');
+
+    expect(transport.apiFetch.mock.calls.map(([url]) => url)).toEqual([
+      '/api/v1/projects/project-1',
+      '/api/v1/projects/project-1',
+      '/api/v1/projects/project-1?boards=delete',
+    ]);
+    expect(transport.apiFetch.mock.calls.every(([, init]) => (init as { method: string }).method === 'DELETE')).toBe(
+      true
+    );
   });
 });

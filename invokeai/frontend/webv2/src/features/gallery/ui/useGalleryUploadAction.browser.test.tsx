@@ -102,6 +102,7 @@ const adapter: GalleryUiAdapter = {
   },
   projectId: 'project-1',
   projectName: 'Project',
+  projects: [],
   widgets: { openGallery: () => true, patchGalleryValues: noop },
 };
 
@@ -129,6 +130,7 @@ const Probe = ({
         imageCount: 2,
         kind: 'board',
         name: 'Board 1',
+        isInbox: false,
         projectId: null,
         videoCount: 1,
       },
@@ -140,6 +142,7 @@ const Probe = ({
         imageCount: 0,
         kind: 'uncategorized',
         name: '',
+        isInbox: false,
         projectId: null,
         videoCount: 0,
       },

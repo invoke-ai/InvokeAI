@@ -2,7 +2,7 @@ import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixt
 import { createDraftProject } from '@workbench/workbenchState';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ProjectBoardItemDTO } from './api';
+import type { ProjectBoardItemDTO, ProjectBoardSnapshotDTO } from './api';
 import type * as apiModule from './api';
 import type * as coversModule from './covers';
 import type * as assetTransportModule from './invk/assetTransport';
@@ -20,7 +20,9 @@ const api = vi.hoisted(() => ({
   getClientStateValue: vi.fn(() => Promise.resolve(null)),
   getProject: vi.fn(),
   // Every export enumerates the project's board; most of these cases do not care what is on it.
-  getProjectBoardSnapshot: vi.fn((): Promise<{ items: ProjectBoardItemDTO[] }> => Promise.resolve({ items: [] })),
+  getProjectBoardSnapshot: vi.fn((): Promise<ProjectBoardSnapshotDTO> =>
+    Promise.resolve({ boards: [{ archived: false, board_id: 'inbox', is_inbox: true, items: [], name: 'Project' }] })
+  ),
   isProjectNotFoundError: (error: unknown) =>
     typeof error === 'object' && error !== null && 'status' in error && error.status === 404,
   setClientStateValue: vi.fn(() => Promise.resolve()),
@@ -58,6 +60,7 @@ const transport = vi.hoisted(() => ({
   findExistingImageNames: vi.fn((_names: readonly string[]) => Promise.resolve(new Set<string>())),
   findExistingVideoNames: vi.fn((_names: readonly string[]) => Promise.resolve(new Set<string>())),
   mimeForEntryName: () => 'image/png',
+  placeBoardInProject: vi.fn(() => Promise.resolve()),
   starImages: vi.fn((_names: readonly string[]) => Promise.resolve({ failed: [] as string[] })),
   starVideos: vi.fn((_names: readonly string[]) => Promise.resolve({ failed: [] as string[] })),
   uploadArchiveImage: vi.fn((_bytes: Uint8Array, fileName: string) =>
@@ -484,14 +487,14 @@ describe('importing a project board', () => {
     };
   };
 
-  const boardSnapshot = (): { items: ProjectBoardItemDTO[] } => ({
-    items: [
-      { category: 'general', kind: 'image', name: 'shared.png', starred: true },
-      { category: 'user', kind: 'image', name: 'unreferenced.png', starred: false },
-      { category: 'general', kind: 'video', name: 'clip.mp4', starred: false },
-    ],
+  const inboxItems: ProjectBoardItemDTO[] = [
+    { category: 'general', kind: 'image', name: 'shared.png', starred: true },
+    { category: 'user', kind: 'image', name: 'unreferenced.png', starred: false },
+    { category: 'general', kind: 'video', name: 'clip.mp4', starred: false },
+  ];
+  const boardSnapshot = (): ProjectBoardSnapshotDTO => ({
+    boards: [{ archived: false, board_id: 'source-inbox', is_inbox: true, items: inboxItems, name: 'Board project' }],
   });
-
   const exportedBoardArchive = async (): Promise<File> => {
     api.getProjectBoardSnapshot.mockResolvedValue(boardSnapshot());
     await projectFile.exportOpenProject(boardProject());
@@ -609,14 +612,17 @@ describe('importing a project board', () => {
     expect(values[0]).toMatchObject({ projectBoardId: 'staging-board', selectedBoardId: 'staging-board' });
   });
 
-  it('creates no staging board for an archive whose board was empty', async () => {
+  it('stages and claims the inbox of an archive whose board was empty, uploading nothing', async () => {
     acceptCreate();
     await projectFile.exportOpenProject(boardProject());
     await projectFile.importProjectFile(capturedArchive());
 
-    expect(transport.createStagingBoard).not.toHaveBeenCalled();
-    expect(api.createProjectSettled.mock.calls[0]![0]).toMatchObject({ minimum_canvas_schema_version: 3 });
-    expect(api.createProjectSettled.mock.calls[0]![0]).not.toHaveProperty('board_id');
+    expect(transport.createStagingBoard).toHaveBeenCalledTimes(1);
+    expect(transport.uploadBoardImage).not.toHaveBeenCalled();
+    expect(api.createProjectSettled.mock.calls[0]![0]).toMatchObject({
+      board_id: 'staging-board',
+      minimum_canvas_schema_version: 3,
+    });
   });
 
   it('refuses an incompatible archive before staging or restoring any media', async () => {
@@ -1088,5 +1094,121 @@ describe('embedded font project imports', () => {
     expect(collectFontDependencies(result.record.data)[0]?.references).toEqual(['source-font']);
     expect(fontTransport.upload).not.toHaveBeenCalled();
     expect(fontTransport.remove).not.toHaveBeenCalled();
+  });
+});
+
+describe('importing every board of a project', () => {
+  const boardProject = () => {
+    const project = createDraftProject([]);
+
+    return {
+      ...project,
+      canvas: {
+        ...project.canvas,
+        document: { ...project.canvas.document, stacks: stacksFrom([rasterImageLayer('l1', 'shared.png')]) },
+      },
+      name: 'Board project',
+    };
+  };
+  const multiBoardSnapshot = (): ProjectBoardSnapshotDTO => ({
+    boards: [
+      {
+        archived: false,
+        board_id: 'source-inbox',
+        is_inbox: true,
+        items: [{ category: 'general', kind: 'image', name: 'shared.png', starred: true }],
+        name: 'Board project',
+      },
+      {
+        archived: true,
+        board_id: 'source-old',
+        is_inbox: false,
+        items: [{ category: 'general', kind: 'image', name: 'old.png', starred: false }],
+        name: 'Old façades',
+      },
+      { archived: false, board_id: 'source-empty', is_inbox: false, items: [], name: 'Site plan refs' },
+    ],
+  });
+  const exportedArchive = async (): Promise<File> => {
+    acceptCreate();
+    api.getProjectBoardSnapshot.mockResolvedValue(multiBoardSnapshot());
+    await projectFile.exportOpenProject(boardProject());
+
+    return capturedArchive();
+  };
+
+  it('stages a board per archive board, claims the inbox on create, then moves the rest in', async () => {
+    const archive = await exportedArchive();
+    transport.createStagingBoard
+      .mockResolvedValueOnce('staging-inbox')
+      .mockResolvedValueOnce('staging-old')
+      .mockResolvedValueOnce('staging-empty');
+
+    const outcome = await projectFile.importProjectFile(archive);
+
+    // Named for the user: the inbox after the project, the others after themselves, in the archive's order.
+    expect((transport.createStagingBoard.mock.calls as unknown[][]).map((call) => call[0])).toEqual([
+      'Board project',
+      'Old façades',
+      'Site plan refs',
+    ]);
+    expect(
+      (transport.uploadBoardImage.mock.calls as unknown[][]).map((call) => [
+        call[1],
+        (call[2] as { boardId?: string } | undefined)?.boardId,
+      ])
+    ).toEqual([
+      ['shared.png', 'staging-inbox'],
+      ['old.png', 'staging-old'],
+    ]);
+    expect(api.createProjectSettled.mock.calls[0]![0]).toMatchObject({ board_id: 'staging-inbox' });
+    // Only once the project exists: the staged members move in, archived as they were.
+    const projectId = outcome.record.project_id;
+    expect(transport.placeBoardInProject.mock.calls).toEqual([
+      ['staging-old', projectId, true, expect.anything()],
+      ['staging-empty', projectId, false, expect.anything()],
+    ]);
+    expect(outcome.boardIssues).toEqual([]);
+    expect(outcome.boardItemIssues).toEqual([]);
+  });
+
+  it('reports a board it could not place and keeps the imported project', async () => {
+    const archive = await exportedArchive();
+    transport.createStagingBoard.mockResolvedValueOnce('staging-inbox').mockResolvedValueOnce('staging-old');
+    transport.placeBoardInProject.mockRejectedValueOnce(new Error('move refused'));
+
+    const outcome = await projectFile.importProjectFile(archive);
+
+    expect(outcome.boardIssues).toEqual([{ name: 'Old façades' }]);
+    expect(transport.deleteStagingBoard).not.toHaveBeenCalled();
+  });
+
+  it('deletes every staging board when the create provably did not happen', async () => {
+    const archive = await exportedArchive();
+    transport.createStagingBoard
+      .mockResolvedValueOnce('staging-inbox')
+      .mockResolvedValueOnce('staging-old')
+      .mockResolvedValueOnce('staging-empty');
+    api.createProjectSettled.mockRejectedValueOnce(new ProjectCreateAbsentError(new Error('refused')));
+
+    await expect(projectFile.importProjectFile(archive)).rejects.toBeInstanceOf(ProjectCreateAbsentError);
+
+    expect((transport.deleteStagingBoard.mock.calls as unknown[][]).map((call) => call[0]).sort()).toEqual([
+      'staging-empty',
+      'staging-inbox',
+      'staging-old',
+    ]);
+    expect(transport.placeBoardInProject).not.toHaveBeenCalled();
+  });
+
+  it('deletes the boards it had staged when staging a later one fails, before any upload', async () => {
+    const archive = await exportedArchive();
+    transport.createStagingBoard.mockResolvedValueOnce('staging-inbox').mockRejectedValueOnce(new Error('refused'));
+
+    await expect(projectFile.importProjectFile(archive)).rejects.toThrow('refused');
+
+    expect(transport.uploadBoardImage).not.toHaveBeenCalled();
+    expect(transport.deleteStagingBoard).toHaveBeenCalledExactlyOnceWith('staging-inbox', expect.anything());
+    expect(api.createProjectSettled).not.toHaveBeenCalled();
   });
 });

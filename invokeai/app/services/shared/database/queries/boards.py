@@ -12,6 +12,7 @@ from sqlalchemy import (
     Select,
     Update,
     bindparam,
+    case,
     delete,
     exists,
     false,
@@ -45,11 +46,12 @@ _BOARD_COLUMNS = (
     boards.c.cover_image_name,
     boards.c.archived,
     boards.c.board_visibility,
+    boards.c.project_id,
 )
 _CLAIMED = exists().where(projects.c.board_id == boards.c.board_id)
 
 _GET = select(*_BOARD_COLUMNS).where(boards.c.board_id == bindparam("board_id"))
-_GET_WITH_PROJECT_ID = (
+_GET_WITH_INBOX_PROJECT = (
     select(*_BOARD_COLUMNS, projects.c.project_id)
     .select_from(boards.outerjoin(projects, projects.c.board_id == boards.c.board_id))
     .where(boards.c.board_id == bindparam("board_id"))
@@ -76,10 +78,33 @@ _RENAME = (
     .values(board_name=bindparam("new_board_name"))
 )
 _RENAME_AND_UNARCHIVE = _RENAME.values(archived=false())
+_SET_PROJECT = (
+    update(boards)
+    .where(boards.c.board_id == bindparam("target_board_id"))
+    .values(project_id=bindparam("new_project_id"))
+)
+_OTHER_MEMBERS = (
+    boards.c.user_id == bindparam("target_user_id"),
+    boards.c.project_id == bindparam("target_project_id"),
+    boards.c.board_id != bindparam("inbox_id"),
+)
+_RELEASE_MEMBERS = update(boards).where(*_OTHER_MEMBERS).values(project_id=None)
+_DELETE_MEMBERS = delete(boards).where(*_OTHER_MEMBERS)
 
 
 def _board(row: Sequence[Any]) -> BoardRecord:
-    board_id, board_name, user_id, created_at, updated_at, deleted_at, cover_image_name, archived, visibility = row
+    (
+        board_id,
+        board_name,
+        user_id,
+        created_at,
+        updated_at,
+        deleted_at,
+        cover_image_name,
+        archived,
+        visibility,
+        project_id,
+    ) = row
     try:
         board_visibility = BoardVisibility(visibility)
     except ValueError:
@@ -94,6 +119,7 @@ def _board(row: Sequence[Any]) -> BoardRecord:
         cover_image_name=cover_image_name,
         archived=archived,
         board_visibility=board_visibility,
+        project_id=project_id,
     )
 
 
@@ -127,6 +153,10 @@ def _update(changes_owned_state: bool) -> Update:
                 bindparam("new_cover_image_name", type_=boards.c.cover_image_name.type), boards.c.cover_image_name
             ),
             archived=func.coalesce(bindparam("new_archived", type_=boards.c.archived.type), boards.c.archived),
+            project_id=case(
+                (bindparam("moves_board"), bindparam("new_project_id", type_=boards.c.project_id.type)),
+                else_=boards.c.project_id,
+            ),
             board_visibility=func.coalesce(
                 bindparam("new_board_visibility", type_=boards.c.board_visibility.type), boards.c.board_visibility
             ),
@@ -179,9 +209,9 @@ class BoardQueries(QueryModule):
 
     @mapped(_board_and_project_id)
     @read
-    def get_with_project_id(self, conn: Connection, board_id: str) -> Optional[Row[Any]]:
+    def get_with_inbox_project(self, conn: Connection, board_id: str) -> Optional[Row[Any]]:
         """The board and the id of the project that claims it, if one does."""
-        return conn.execute(_GET_WITH_PROJECT_ID, {"board_id": board_id}).first()
+        return conn.execute(_GET_WITH_INBOX_PROJECT, {"board_id": board_id}).first()
 
     @read
     def exists(self, conn: Connection, board_id: str) -> bool:
@@ -261,20 +291,29 @@ class BoardQueries(QueryModule):
         return bool(conn.execute(_IS_SHARED, {"board_id": board_id}).scalar_one())
 
     @write
-    def insert(self, conn: Connection, *, board_id: str, board_name: str, user_id: str) -> None:
-        conn.execute(_INSERT, {"board_id": board_id, "board_name": board_name, "user_id": user_id})
+    def insert(
+        self, conn: Connection, *, board_id: str, board_name: str, user_id: str, project_id: str | None = None
+    ) -> None:
+        conn.execute(
+            _INSERT, {"board_id": board_id, "board_name": board_name, "user_id": user_id, "project_id": project_id}
+        )
 
     @write
     def update(self, conn: Connection, board_id: str, changes: BoardChanges) -> bool:
         """Applies the changes; whether a board took them. A board a project claims keeps its name, archived flag
         and visibility, so a change to one of those leaves it as it is."""
         changes_owned_state = (
-            changes.board_name is not None or changes.archived is not None or changes.board_visibility is not None
+            changes.board_name is not None
+            or changes.archived is not None
+            or changes.board_visibility is not None
+            or changes.moves_board
         )
         result = conn.execute(
             _update(changes_owned_state),
             {
                 "target_board_id": board_id,
+                "moves_board": changes.moves_board,
+                "new_project_id": changes.project_id,
                 "new_board_name": changes.board_name,
                 "new_cover_image_name": changes.cover_image_name,
                 "new_archived": changes.archived,
@@ -292,6 +331,21 @@ class BoardQueries(QueryModule):
         claimed board as it is.)"""
         statement = _RENAME_AND_UNARCHIVE if unarchive else _RENAME
         conn.execute(statement, {"target_board_id": board_id, "new_board_name": board_name})
+
+    @write
+    def set_project(self, conn: Connection, board_id: str, project_id: str) -> None:
+        """Sets membership for an inbox claim; the caller holds the board's lock."""
+        conn.execute(_SET_PROJECT, {"target_board_id": board_id, "new_project_id": project_id})
+
+    @write
+    def remove_project_members(
+        self, conn: Connection, user_id: str, project_id: str, inbox_id: str, *, delete_members: bool
+    ) -> None:
+        """Releases or deletes the owner's non-inbox members while the project is locked. Media remain intact."""
+        conn.execute(
+            _DELETE_MEMBERS if delete_members else _RELEASE_MEMBERS,
+            {"target_user_id": user_id, "target_project_id": project_id, "inbox_id": inbox_id},
+        )
 
     @write
     def delete_if_unclaimed(self, conn: Connection, board_id: str) -> bool:

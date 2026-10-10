@@ -4,7 +4,7 @@ import { collectLiveAssetRefs, selectCoverImageName, stripInstallationState } fr
 
 import type { InvkArchiveEntry } from './archive';
 import type { FetchedThumbnail } from './assetTransport';
-import type { InvkBoardItem, InvkBoardSnapshot } from './board';
+import type { InvkBoard, InvkBoardSnapshot } from './board';
 import type { InvkTransferItem, ProjectTransferIssues } from './transfer';
 
 import { binaryEntry, INVK_MAX_ENTRIES, textEntry, writeArchive } from './archive';
@@ -14,7 +14,7 @@ import {
   INVK_TRANSFER_CONCURRENCY,
   isRequestCancellation,
 } from './assetTransport';
-import { buildInvkBoardSnapshot } from './board';
+import { buildInvkBoardSnapshot, flattenInvkBoardItems } from './board';
 import {
   collectFontDependencies,
   INVK_MAX_FONT_BYTES,
@@ -35,7 +35,7 @@ import { createTransferIssueLog, planMediaTransfer, toMediaRefs } from './transf
 /** Skip unavailable assets, but abort on cancellation before packing. */
 
 export interface InvkExportPlan {
-  /** The board's contents exactly as they will be written to `board.json`. */
+  /** The project's boards exactly as they will be written to `board.json`. */
   boardSnapshot: InvkBoardSnapshot;
   /** Cover image name, or `null` for a project that has produced nothing. */
   coverImageName: string | null;
@@ -61,7 +61,8 @@ const FIXED_ENTRY_COUNT = 3;
 
 export const planInvkExport = (input: {
   appVersion: string;
-  boardItems: readonly InvkBoardItem[];
+  /** The project's boards as the server enumerated them, the inbox among them. */
+  boards: readonly InvkBoard[];
   createdAt: string;
   minimumCanvasSchemaVersion: number;
   name: string;
@@ -72,8 +73,11 @@ export const planInvkExport = (input: {
 
   // Strip installation state during planning; excluding its bytes alone leaves dangling references.
   const projectDocument = stripInstallationState(input.projectDocument);
-  const boardSnapshot = buildInvkBoardSnapshot(input.boardItems);
-  const transferItems = planMediaTransfer(boardSnapshot.items, toMediaRefs(collectLiveAssetRefs(projectDocument)));
+  const boardSnapshot = buildInvkBoardSnapshot(input.boards);
+  const transferItems = planMediaTransfer(
+    flattenInvkBoardItems(boardSnapshot),
+    toMediaRefs(collectLiveAssetRefs(projectDocument))
+  );
   const fonts = collectFontDependencies(projectDocument);
 
   // Check the archive budget before downloading assets.

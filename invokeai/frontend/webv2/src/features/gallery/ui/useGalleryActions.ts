@@ -37,7 +37,7 @@ export const useGalleryActions = ({
   loadMore: () => void;
   selectedBoardId: string;
 }): GalleryActions => {
-  const { exportProject, gallery, notifications, widgets } = useGalleryUi();
+  const { ensureProjectOnServer, exportProject, gallery, notifications, widgets } = useGalleryUi();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const uploadFiles = useGalleryUploadAction({ boards, getCurrentGalleryLocation, selectedBoardId });
@@ -90,22 +90,29 @@ export const useGalleryActions = ({
           recordError(error);
         }
       },
-      createBoard: async (boardName) => {
+      createBoard: async (boardName, projectId) => {
         const owner = captureAccountScope();
 
         try {
-          const board = await createGalleryBoard(boardName, owner.signal);
+          if (projectId !== null) {
+            await ensureProjectOnServer?.();
+            assertAccountScopeCurrent(owner);
+          }
+
+          const board = await createGalleryBoard(boardName, projectId, owner.signal);
 
           assertAccountScopeCurrent(owner);
           gallery.selectBoard(board.id);
           recordSuccess(t('widgets.gallery.boardCreated', { name: board.name }));
           refresh();
+
+          return true;
         } catch (error: unknown) {
-          if (!isAccountScopeCurrent(owner)) {
-            return;
+          if (isAccountScopeCurrent(owner)) {
+            recordError(error);
           }
 
-          recordError(error);
+          return false;
         }
       },
       deleteBoard: async (boardId, includeImages) => {
@@ -176,6 +183,32 @@ export const useGalleryActions = ({
       },
       exportProject,
       loadMore,
+      moveBoard: async (boardId, projectId, destinationLabel) => {
+        const owner = captureAccountScope();
+        const rollback = patchGalleryBoardCaches(queryClient, boardId, { projectId });
+
+        try {
+          if (projectId !== null) {
+            await ensureProjectOnServer?.();
+            assertAccountScopeCurrent(owner);
+          }
+
+          await updateGalleryBoard(boardId, { projectId }, owner.signal);
+
+          assertAccountScopeCurrent(owner);
+          recordSuccess(
+            t('widgets.gallery.boardMoved', { destination: destinationLabel, name: getBoardName(boardId) })
+          );
+          refresh();
+        } catch (error: unknown) {
+          if (!isAccountScopeCurrent(owner)) {
+            return;
+          }
+
+          rollback();
+          recordError(error);
+        }
+      },
       refresh,
       renameBoard: async (boardId, boardName) => {
         const owner = captureAccountScope();
@@ -225,6 +258,7 @@ export const useGalleryActions = ({
     };
   }, [
     boards,
+    ensureProjectOnServer,
     exportProject,
     gallery,
     getCurrentGalleryLocation,

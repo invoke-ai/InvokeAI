@@ -9,10 +9,12 @@ from sqlalchemy import (
     Connection,
     Row,
     bindparam,
+    case,
     delete,
     false,
     insert,
     literal,
+    or_,
     select,
     union_all,
     update,
@@ -21,11 +23,14 @@ from sqlalchemy import (
 from invokeai.app.services.image_records.image_records_common import ASSETS_CATEGORIES, IMAGE_CATEGORIES
 from invokeai.app.services.project_records.project_records_common import (
     ProjectBoardItemDTO,
+    ProjectBoardSnapshotBoardDTO,
+    ProjectBoardSnapshotDTO,
     ProjectRecordDTO,
     ProjectSummaryDTO,
 )
+from invokeai.app.services.shared.database.dialect import OrderedJoin
 from invokeai.app.services.shared.database.queries.base import QueryModule, locking, mapped, read, write
-from invokeai.app.services.shared.database.schema.boards import board_images, board_videos
+from invokeai.app.services.shared.database.schema.boards import board_images, board_videos, boards
 from invokeai.app.services.shared.database.schema.images import images
 from invokeai.app.services.shared.database.schema.projects import projects
 from invokeai.app.services.shared.database.schema.videos import videos
@@ -87,28 +92,51 @@ def _shown_by_the_gallery(category: ColumnElement[str]) -> ColumnElement[bool]:
 
 # What the gallery shows on a board, of both kinds. `deleted_at` is not filtered: soft delete is unused, and no
 # other board query consults it, so filtering here would make the snapshot disagree with the board's counts.
+_PROJECT_MEMBERS = (
+    boards.c.user_id == bindparam("user_id"),
+    or_(boards.c.project_id == bindparam("project_id"), boards.c.board_id == bindparam("inbox_id")),
+)
+_PROJECT_BOARDS = (
+    select(boards.c.board_id, boards.c.board_name, boards.c.archived)
+    .where(*_PROJECT_MEMBERS)
+    .order_by(case((boards.c.board_id == bindparam("inbox_id"), 0), else_=1), boards.c.created_at, boards.c.board_id)
+)
 _ITEMS = union_all(
     select(
+        board_images.c.board_id.label("board_id"),
         literal("image").label("kind"),
         images.c.image_name.label("name"),
         images.c.image_category.label("category"),
         images.c.starred.label("starred"),
     )
-    .select_from(board_images.join(images, board_images.c.image_name == images.c.image_name))
+    .select_from(
+        OrderedJoin(
+            OrderedJoin(boards, board_images, boards.c.board_id == board_images.c.board_id),
+            images,
+            board_images.c.image_name == images.c.image_name,
+        )
+    )
     .where(
-        board_images.c.board_id == bindparam("board_id"),
+        *_PROJECT_MEMBERS,
         images.c.is_intermediate == false(),
         _shown_by_the_gallery(images.c.image_category),
     ),
-    select(literal("video"), videos.c.video_name, videos.c.video_category, videos.c.starred)
-    .select_from(board_videos.join(videos, board_videos.c.video_name == videos.c.video_name))
+    select(board_videos.c.board_id, literal("video"), videos.c.video_name, videos.c.video_category, videos.c.starred)
+    .select_from(
+        OrderedJoin(
+            OrderedJoin(boards, board_videos, boards.c.board_id == board_videos.c.board_id),
+            videos,
+            board_videos.c.video_name == videos.c.video_name,
+        )
+    )
     .where(
-        board_videos.c.board_id == bindparam("board_id"),
+        *_PROJECT_MEMBERS,
         videos.c.is_intermediate == false(),
         _shown_by_the_gallery(videos.c.video_category),
     ),
 )
-_BOARD_ITEMS = _ITEMS.order_by(_ITEMS.selected_columns.kind, _ITEMS.selected_columns.name).limit(bindparam("limit"))
+# Limit before ordering: an oversized project must not sort every item before it is refused.
+_BOARD_ITEMS = _ITEMS.limit(bindparam("limit"))
 
 
 def _summary(row: Sequence[Any]) -> ProjectSummaryDTO:
@@ -148,13 +176,21 @@ def _record_or_none(row: Optional[Sequence[Any]]) -> Optional[ProjectRecordDTO]:
     )
 
 
-def _board_items_or_none(rows: Optional[Sequence[Sequence[Any]]]) -> Optional[list[ProjectBoardItemDTO]]:
-    if rows is None:
+def _board_snapshot_or_none(
+    result: Optional[tuple[str, Sequence[Sequence[Any]], Sequence[Sequence[Any]]]],
+) -> Optional[ProjectBoardSnapshotDTO]:
+    if result is None:
         return None
-    return [
-        ProjectBoardItemDTO(kind=kind, name=name, category=category, starred=starred)
-        for kind, name, category, starred in rows
-    ]
+    inbox_id, board_rows, item_rows = result
+    snapshots = {
+        board_id: ProjectBoardSnapshotBoardDTO(
+            board_id=board_id, name=name, is_inbox=board_id == inbox_id, archived=archived, items=[]
+        )
+        for board_id, name, archived in board_rows
+    }
+    for board_id, kind, name, category, starred in sorted(item_rows, key=lambda row: (row[1], row[2])):
+        snapshots[board_id].items.append(ProjectBoardItemDTO(kind=kind, name=name, category=category, starred=starred))
+    return ProjectBoardSnapshotDTO(boards=list(snapshots.values()))
 
 
 class ProjectQueries(QueryModule):
@@ -199,15 +235,20 @@ class ProjectQueries(QueryModule):
         user_id, project_id = row
         return user_id, project_id
 
-    @mapped(_board_items_or_none)
+    @mapped(_board_snapshot_or_none)
     @read
-    def board_items(self, conn: Connection, user_id: str, project_id: str, limit: int) -> Optional[Sequence[Row[Any]]]:
-        """Up to `limit` of what the gallery shows on the project's board, by kind and then name; None when there
-        is no such project."""
-        board_id = conn.execute(_BOARD_ID, {"user_id": user_id, "project_id": project_id}).scalar_one_or_none()
-        if board_id is None:
+    def board_snapshot(
+        self, conn: Connection, user_id: str, project_id: str, limit: int
+    ) -> Optional[tuple[str, Sequence[Row[Any]], Sequence[Row[Any]]]]:
+        """Every project board, inbox first, and at most `limit` gallery items across them all, in one snapshot."""
+        parameters = {"user_id": user_id, "project_id": project_id, "limit": limit}
+        inbox_id = conn.execute(_BOARD_ID, parameters).scalar_one_or_none()
+        if inbox_id is None:
             return None
-        return conn.execute(_BOARD_ITEMS, {"board_id": board_id, "limit": limit}).all()
+        parameters["inbox_id"] = inbox_id
+        board_rows = conn.execute(_PROJECT_BOARDS, parameters).all()
+        item_rows = conn.execute(_BOARD_ITEMS, parameters).all()
+        return inbox_id, board_rows, item_rows
 
     @write
     def insert(

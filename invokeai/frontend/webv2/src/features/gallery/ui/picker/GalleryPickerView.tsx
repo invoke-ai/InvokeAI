@@ -3,7 +3,7 @@ import type { GallerySparseListing } from '@features/gallery/ui/useGalleryData';
 import type { KeyboardEvent, RefObject } from 'react';
 
 import { Box, HStack, Icon, Stack, Text } from '@chakra-ui/react';
-import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
+import { getGalleryProjectGroupLabel, getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { getGalleryUploadAccept, toGalleryItemKey } from '@features/gallery/core/items';
 import { GALLERY_PAGE_SIZE, galleryItemsPageOptions } from '@features/gallery/data/queries';
 import { BoardCover, BoardCoverIcon } from '@features/gallery/ui/GalleryBoardCover';
@@ -76,7 +76,7 @@ export const GalleryPickerView = ({
   onPick: (item: GalleryItem) => void;
 }) => {
   const { t } = useTranslation();
-  const { galleryValues, projectName, revealInGallery } = useGalleryHost();
+  const { galleryValues, projectId = null, projectName, projects, revealInGallery } = useGalleryHost();
   const { data, gallerySelectedItem, scope, selectBoard, setSearchTerm, setView, settings, togglePane } =
     useGalleryPickerScope();
   const idBase = useId();
@@ -249,7 +249,7 @@ export const GalleryPickerView = ({
     const groups = getGalleryBoardGroups({
       boards: data.boards,
       projectBoardId: getGalleryProjectBoardId(galleryValues),
-      projectName,
+      projectId,
       searchTerm: scope.searchTerm,
       showArchived: settings.showArchivedBoards,
       showDates: settings.showDateBoards,
@@ -257,16 +257,25 @@ export const GalleryPickerView = ({
       showOtherProjects: true,
       t,
     });
+    const projectNames = new Map((projects ?? []).map((project) => [project.id, project.name]));
 
     return [
-      { boards: groups.yourBoards, id: 'boards', label: t('widgets.gallery.boardGroups.boards') },
+      { boards: groups.projectBoards, id: 'project', label: projectName },
+      { boards: groups.libraryBoards, id: 'library', label: t('widgets.gallery.boardGroups.library') },
+      ...groups.otherProjects.map((group) => ({
+        boards: group.boards,
+        id: `project:${group.projectId}`,
+        label: getGalleryProjectGroupLabel(group.projectId, group.boards, projectNames, t),
+      })),
       { boards: groups.dateBoards, id: 'dates', label: t('widgets.gallery.boardGroups.byDate') },
       { boards: groups.archivedBoards, id: 'archived', label: t('common.archived') },
     ].filter((group) => group.boards.length > 0);
   }, [
     data.boards,
     galleryValues,
+    projectId,
     projectName,
+    projects,
     scope.searchTerm,
     settings.showArchivedBoards,
     settings.showDateBoards,

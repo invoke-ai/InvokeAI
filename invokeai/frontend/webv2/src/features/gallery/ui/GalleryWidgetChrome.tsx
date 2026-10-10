@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next';
 import type { GalleryWidgetProps } from './GalleryUiContext';
 
 import { BoardCover, BoardCoverIcon } from './GalleryBoardCover';
-import { getGalleryProjectBoardId, getGallerySelectedBoardId } from './galleryStateView';
+import { getGallerySelectedBoardId } from './galleryStateView';
 import { useGalleryUi } from './GalleryUiContext';
 
 type GalleryChromeProps = { region: GalleryWidgetProps['region'] };
@@ -43,16 +43,14 @@ const useGalleryChromeBoards = () => {
 
 export const GalleryWidgetLabel = ({ region }: GalleryChromeProps) => {
   const { t } = useTranslation();
-  const { projectName } = useGalleryUi();
-  const { boards, gallery, galleryValues, selectedBoardId, settings } = useGalleryChromeBoards();
+  const { projectId } = useGalleryUi();
+  const { boards, gallery, selectedBoardId, settings } = useGalleryChromeBoards();
   const selectedBoard = boards.find((board) => board.id === selectedBoardId);
-  // The project board renames with its project server-side, but the fetched
-  // list lags a rename; the live project name is authoritative (as in the
-  // boards panel), so the header follows a rename at once.
+  // Another project's inbox is just "Inbox" in its own list; the header has no section to say whose.
   const boardName = !selectedBoard
     ? t('widgets.gallery.selectedBoardFallback')
-    : selectedBoard.id === getGalleryProjectBoardId(galleryValues)
-      ? projectName
+    : selectedBoard.isInbox && selectedBoard.projectId !== projectId
+      ? t('widgets.gallery.inboxOf', { project: selectedBoard.name })
       : getGalleryBoardLabel(selectedBoard, t);
   const isCollapsed = settings.boardPanelCollapsed;
 

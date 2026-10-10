@@ -1,4 +1,5 @@
 import type { GalleryItem } from '@features/gallery/core/items';
+import type { GalleryProjectRef } from '@features/gallery/core/types';
 import type { GalleryItemsFilter } from '@features/gallery/data/queries';
 import type { TFunction } from 'i18next';
 
@@ -94,6 +95,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     generateValues,
     projectId,
     projectName,
+    projects,
     ItemActionsProvider,
   } = useGalleryUi();
   const galleryView = getGalleryView(galleryValues);
@@ -247,7 +249,9 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
         isWindowTruncated={data.isWindowTruncated}
         listing={data.listing}
         loadedItems={loadedItems}
+        projectId={projectId}
         projectName={projectName}
+        projects={projects}
         region={region}
         runtime={runtime}
         pinRevealIndex={data.pinRevealIndex}
@@ -298,7 +302,9 @@ const GalleryWidgetContent = ({
   listing,
   loadedItems,
   pinRevealIndex,
+  projectId,
   projectName,
+  projects,
   region,
   runtime,
   setVisibleRange,
@@ -313,7 +319,9 @@ const GalleryWidgetContent = ({
   listing: GalleryListingState;
   loadedItems: GalleryItem[];
   pinRevealIndex: GalleryData['pinRevealIndex'];
+  projectId: string;
   projectName: string;
+  projects: readonly GalleryProjectRef[];
   region: GalleryWidgetProps['region'];
   runtime: GalleryWidgetRuntime;
   setVisibleRange: ((range: { endIndexExclusive: number; startIndex: number }) => void) | undefined;
@@ -322,6 +330,7 @@ const GalleryWidgetContent = ({
 }) => {
   const { t } = useTranslation();
   const itemActions = useGalleryItemActions();
+  const projectNames = useMemo(() => new Map(projects.map((project) => [project.id, project.name])), [projects]);
   const contextValue = useMemo<GalleryWidgetContextValue>(
     () => ({
       actions,
@@ -333,7 +342,9 @@ const GalleryWidgetContent = ({
       listing,
       loadedItems,
       pinRevealIndex,
+      projectId,
       projectName,
+      projectNames,
       region,
       runtime,
       setVisibleRange,
@@ -350,7 +361,9 @@ const GalleryWidgetContent = ({
       listing,
       loadedItems,
       pinRevealIndex,
+      projectId,
       projectName,
+      projectNames,
       region,
       runtime,
       setVisibleRange,

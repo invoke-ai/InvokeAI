@@ -134,7 +134,7 @@ export const WorkbenchProvider = ({
           store.commands.projects.close(projectId);
         }
       },
-      deleteProject: (projectId) => persistence.deleteProjectOnServer(projectId),
+      deleteProject: (projectId, boards) => persistence.deleteProjectOnServer(projectId, boards),
       flushPixels: (projectId) => liveCanvasEngines.flushPendingPixels(projectId),
       flushProject: (projectId) => {
         const project = store.getSnapshot().projects.find((candidate) => candidate.id === projectId);

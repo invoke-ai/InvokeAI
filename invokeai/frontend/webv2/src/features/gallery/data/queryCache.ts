@@ -435,7 +435,7 @@ const isGalleryBoardsData = (value: unknown): value is GalleryBoard[] =>
 export const patchGalleryBoardCaches = (
   client: QueryClient,
   boardId: string,
-  changes: Partial<Pick<GalleryBoard, 'archived' | 'name'>>
+  changes: Partial<Pick<GalleryBoard, 'archived' | 'name' | 'projectId'>>
 ): (() => void) => {
   const owner = captureAccountScope();
   const rollbackEntries: BoardCacheRollbackEntry[] = [];

@@ -12,7 +12,9 @@ import type { GalleryActions } from './GalleryWidgetContext';
 import { useGalleryActions } from './useGalleryActions';
 
 const mocks = vi.hoisted(() => ({
+  createGalleryBoard: vi.fn(),
   deleteGalleryBoard: vi.fn(),
+  ensureProjectOnServer: vi.fn(async () => {}),
   downloadBlob: vi.fn(),
   downloadGalleryArchive: vi.fn(),
   invalidateGallery: vi.fn(),
@@ -25,7 +27,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@features/gallery/data/backend', () => ({
-  createGalleryBoard: vi.fn(),
+  createGalleryBoard: (...args: unknown[]) => mocks.createGalleryBoard(...args),
   deleteGalleryBoard: (...args: unknown[]) => mocks.deleteGalleryBoard(...args),
   downloadGalleryArchive: (...args: unknown[]) => mocks.downloadGalleryArchive(...args),
   isDateBoardId: (boardId: string) => boardId.startsWith('by_date:'),
@@ -115,6 +117,7 @@ const Probe = ({
         imageCount: 2,
         kind: 'board',
         name: 'Board 1',
+        isInbox: false,
         projectId: null,
         videoCount: 1,
       },
@@ -126,6 +129,7 @@ const Probe = ({
         imageCount: 0,
         kind: 'uncategorized',
         name: '',
+        isInbox: false,
         projectId: null,
         videoCount: 0,
       },
@@ -183,6 +187,8 @@ const adapter: GalleryUiAdapter = {
   },
   projectId: 'project-1',
   projectName: 'Project',
+  projects: [],
+  ensureProjectOnServer: () => mocks.ensureProjectOnServer(),
   widgets: { openGallery: () => true, patchGalleryValues },
 };
 
@@ -283,6 +289,45 @@ describe('optimistic board updates', () => {
     expect(mocks.patchGalleryBoardCaches.mock.results[0]?.value).toHaveBeenCalledOnce();
     expect(mocks.notificationsReportError).toHaveBeenCalledOnce();
     expect(mocks.invalidateGallery).not.toHaveBeenCalled();
+  });
+
+  it('moves before the request and rolls back when the backend rejects', async () => {
+    mocks.updateGalleryBoard.mockRejectedValue(new Error('move failed'));
+
+    await act(async () => {
+      await actionsRef.current?.moveBoard('board-1', null, 'Library');
+    });
+
+    expect(mocks.patchGalleryBoardCaches).toHaveBeenCalledWith(expect.anything(), 'board-1', { projectId: null });
+    expect(mocks.updateGalleryBoard).toHaveBeenCalledWith('board-1', { projectId: null }, expect.anything());
+    expect(mocks.patchGalleryBoardCaches.mock.results[0]?.value).toHaveBeenCalledOnce();
+    expect(mocks.notificationsReportError).toHaveBeenCalledOnce();
+    expect(mocks.invalidateGallery).not.toHaveBeenCalled();
+  });
+
+  it('makes the project exist on the server before creating or moving a board into it, never for the Library', async () => {
+    mocks.createGalleryBoard.mockResolvedValue({ id: 'new', name: 'New' });
+    mocks.updateGalleryBoard.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await actionsRef.current?.createBoard('New', null);
+      await actionsRef.current?.moveBoard('board-1', null, 'Library');
+    });
+    expect(mocks.ensureProjectOnServer).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await expect(actionsRef.current?.createBoard('New', 'p1')).resolves.toBe(true);
+    });
+    expect(mocks.ensureProjectOnServer).toHaveBeenCalledOnce();
+    expect(mocks.ensureProjectOnServer.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.createGalleryBoard.mock.invocationCallOrder[1] ?? 0
+    );
+    expect(mocks.createGalleryBoard).toHaveBeenLastCalledWith('New', 'p1', expect.anything());
+
+    await act(async () => {
+      await actionsRef.current?.moveBoard('board-1', 'p1', 'Project');
+    });
+    expect(mocks.ensureProjectOnServer).toHaveBeenCalledTimes(2);
   });
 
   it('keeps a successful rename applied without rolling back', async () => {

@@ -2,6 +2,7 @@ import type { Project } from '@workbench/projectContracts';
 import type { ProjectCommandResult } from '@workbench/workbenchStore';
 
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createDraftProject } from '@workbench/workbenchState';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -55,7 +56,7 @@ let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const Harness = () => {
+const HarnessBody = () => {
   const { closeProject, deleteProject } = useProjectActions();
   return (
     <>
@@ -64,6 +65,14 @@ const Harness = () => {
     </>
   );
 };
+
+// Deleting invalidates the gallery's board lists, so the hook reads the query client.
+const queryClient = new QueryClient();
+const Harness = () => (
+  <QueryClientProvider client={queryClient}>
+    <HarnessBody />
+  </QueryClientProvider>
+);
 
 beforeEach(() => {
   accountLifecycle.activate('use-project-actions-browser-test');

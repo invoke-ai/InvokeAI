@@ -1,6 +1,6 @@
 import json
 import uuid
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from invokeai.app.services.board_records.board_records_common import BOARD_NAME_MAX_LENGTH, BoardVisibility
 from invokeai.app.services.project_records.project_records_base import ProjectRecordsStorageBase
@@ -84,20 +84,26 @@ def _claim_board(q: Queries, *, user_id: str, board_id: str, board_name: str, pr
     if owner != user_id:
         raise ProjectBoardNotFoundError(board_id)
     claimant = q.projects.claimant(board_id)
+    record = q.boards.get(board_id)
+    assert record is not None
     if (
-        visibility != BoardVisibility.Private.value
+        record.project_id not in (None, project_id)
+        or visibility != BoardVisibility.Private.value
         or claimant not in (None, (user_id, project_id))
         or q.boards.is_shared(board_id)
     ):
         raise ProjectBoardUnavailableError(board_id)
     # The board's claimant can be the project being created although its lock found nothing: the same create sent
     # twice, both under way at once. Inserting it again would lock its row after the board's.
+    if record.project_id is not None and claimant != (user_id, project_id):
+        raise ProjectBoardUnavailableError(board_id)
     if project_exists or claimant is not None:
         raise ProjectRecordExistsError(project_id)
     # Un-archived as well as renamed. A project's board takes its archived state from the project, and
     # `PATCH /boards/{id}` refuses to set it on a claimed board -- so a board that arrived archived would be
     # invisible in every listing with no API left to fix it.
     q.boards.rename(board_id, board_name, unarchive=True)
+    q.boards.set_project(board_id, project_id)
 
 
 class ProjectRecordsStorage(ProjectRecordsStorageBase):
@@ -135,7 +141,9 @@ class ProjectRecordsStorage(ProjectRecordsStorageBase):
             q.locks.acquire(DatabaseLock.MEDIA_PROTECTION, shared=True)
             if board_id is None:
                 project_board_id = uuid_string()
-                q.boards.insert(board_id=project_board_id, board_name=board_name, user_id=user_id)
+                q.boards.insert(
+                    board_id=project_board_id, board_name=board_name, user_id=user_id, project_id=new_project_id
+                )
             else:
                 _claim_board(q, user_id=user_id, board_id=board_id, board_name=board_name, project_id=new_project_id)
                 project_board_id = board_id
@@ -241,7 +249,7 @@ class ProjectRecordsStorage(ProjectRecordsStorageBase):
 
         return _record(self._queries.run(save), project_id, data)
 
-    def delete(self, user_id: str, project_id: str) -> None:
+    def delete(self, user_id: str, project_id: str, boards: Literal["release", "delete"] = "release") -> None:
         def delete(q: Queries) -> None:
             # The project's row, then its board's, as every write of a project locks them: the board deleted below
             # is the one of the project deleted here.
@@ -249,6 +257,7 @@ class ProjectRecordsStorage(ProjectRecordsStorageBase):
             if project is None:
                 return
             q.boards.lock(project.board_id)
+            q.boards.remove_project_members(user_id, project_id, project.board_id, delete_members=boards == "delete")
             q.projects.delete(user_id, project_id)
             q.media_references.delete(owner_kind="project", user_id=user_id, owner_id=project_id)
             # Only after the project is gone: a claimed board cannot be deleted. Deleting the board deletes its
@@ -261,12 +270,12 @@ class ProjectRecordsStorage(ProjectRecordsStorageBase):
     def get_board_snapshot(self, user_id: str, project_id: str) -> ProjectBoardSnapshotDTO:
         # Bounded, unlike the board's counts: the caller holds the whole answer in memory and so does this, and
         # the route is reachable by anyone with a project id.
-        items = self._queries.projects.board_items(user_id, project_id, PROJECT_BOARD_SNAPSHOT_MAX_ITEMS + 1)
-        if items is None:
+        snapshot = self._queries.projects.board_snapshot(user_id, project_id, PROJECT_BOARD_SNAPSHOT_MAX_ITEMS + 1)
+        if snapshot is None:
             raise ProjectRecordNotFoundError(project_id)
-        if len(items) > PROJECT_BOARD_SNAPSHOT_MAX_ITEMS:
+        if sum(len(board.items) for board in snapshot.boards) > PROJECT_BOARD_SNAPSHOT_MAX_ITEMS:
             raise ProjectBoardTooLargeError(project_id, PROJECT_BOARD_SNAPSHOT_MAX_ITEMS)
-        return ProjectBoardSnapshotDTO(items=items)
+        return snapshot
 
     def get_board_id(self, user_id: str, project_id: str) -> str:
         board_id = self._queries.projects.board_id(user_id, project_id)
