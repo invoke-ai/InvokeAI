@@ -1,7 +1,8 @@
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
 from invokeai.app.invocations.fields import InputField, OutputField, UIType
+from invokeai.app.invocations.primitives import BooleanOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 
 
@@ -39,3 +40,30 @@ class IfInvocation(BaseInvocation):
         if execution is not None:
             execution.emit(selected_field, selected_field, token_kind="activation")
         return IfInvocationOutput(value=self.true_input if self.condition else self.false_input)
+
+
+BOOLEAN_OPERATIONS = Literal["AND", "OR", "XOR", "NOT"]
+
+
+@invocation("boolean_logic", title="Boolean Logic", tags=["logic", "boolean"], category="math", version="1.0.0")
+class BooleanLogicInvocation(BaseInvocation):
+    """Performs Boolean AND, OR, XOR, or NOT operations."""
+
+    operation: BOOLEAN_OPERATIONS = InputField(
+        default="AND",
+        description="The logical operation to perform",
+        ui_choice_labels={"AND": "A AND B", "OR": "A OR B", "XOR": "A XOR B", "NOT": "NOT A"},
+    )
+    a: bool = InputField(default=False, description="First Boolean input")
+    b: bool = InputField(default=False, description="Second Boolean input (ignored for NOT)")
+
+    def invoke(self, context: InvocationContext) -> BooleanOutput:
+        if self.operation == "AND":
+            result = self.a and self.b
+        elif self.operation == "OR":
+            result = self.a or self.b
+        elif self.operation == "XOR":
+            result = self.a != self.b
+        else:  # self.operation == "NOT"
+            result = not self.a
+        return BooleanOutput(value=result)
