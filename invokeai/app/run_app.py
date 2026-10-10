@@ -69,12 +69,25 @@ def run_app() -> None:
 
     logger = InvokeAILogger.get_logger(config=app_config)
 
+    # Before torch is imported anywhere: HIP reads its device list once, when torch initializes it, and an explicit
+    # allocator configuration below imports torch. Runs a short child process on Windows ROCm.
+    from invokeai.app.util.rocm_integrated_gpu import hide_integrated_gpus_on_rocm_windows
+
+    hide_integrated_gpus_on_rocm_windows(logger)
+
     # Configure the torch CUDA memory allocator.
     # NOTE: It is important that this happens before torch is imported.
     if app_config.pytorch_cuda_alloc_conf:
         configure_torch_cuda_allocator(app_config.pytorch_cuda_alloc_conf, logger)
     else:
         apply_rocm_windows_allocator_default(logger)
+
+    # Decide on AOTriton's experimental attention kernels before anything can run attention: torch reads the switch
+    # once, at its first fused-kernel check, and the server already runs attention while starting up. This imports
+    # torch, so it comes after the allocator configuration.
+    from invokeai.app.util.rocm_aotriton import apply_rocm_aotriton_setting
+
+    apply_rocm_aotriton_setting(app_config.rocm_aotriton_experimental, app_config.generation_devices, logger)
 
     # This import must happen after configure_torch_cuda_allocator() is called, because the module imports torch.
     from invokeai.app.invocations.baseinvocation import InvocationRegistry
