@@ -503,7 +503,9 @@
       "tooLargeToWrite": "This project is too large to package into a project file.",
       "unstarredItems_one": "1 item could not be re-starred.",
       "unstarredItems_other": "{{count}} items could not be re-starred.",
-      "unsupportedVersion": "This project file was written by a newer version of Invoke."
+      "unsupportedVersion": "This project file was written by a newer version of Invoke.",
+      "workspaceInseparable": "This version of Invoke can't read this project, so it can't leave your settings out of the file. Export it with your settings for this project included.",
+      "workspaceNotSaved": "Its layout and generation settings could not be saved, so it opens with a new project's."
     },
     "gridView": "Grid view",
     "groups": {
@@ -554,6 +556,10 @@
     },
     "unpin": "Unpin",
     "viewLabel": "Project layout",
+    "exportOptions": {
+      "includeWorkspace": "Include my settings for this project",
+      "workspaceDescription": "Your layout, generation settings, prompt history and staged results for this project. Turn this off to share the project without them."
+    },
     "fonts": {
       "exportTitle": "Export {{name}}",
       "includeFiles": "Include font files",

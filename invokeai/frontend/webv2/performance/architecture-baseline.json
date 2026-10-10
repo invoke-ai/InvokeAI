@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 794977,
+        "brotliBytes": 797507,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 793689,
+        "gzipBytes": 796378,
         "imageRawBytes": 44398,
-        "initialRawBytes": 2042114,
-        "largestAssetRawBytes": 749029,
+        "initialRawBytes": 2052522,
+        "largestAssetRawBytes": 752421,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 98621,
+        "ownedRawBytes": 98851,
         "requestCount": 35,
         "scriptRequestCount": 19,
         "sourceOwners": [
@@ -327,6 +327,7 @@
           "source:src/workbench/projects/projectFileErrors.ts",
           "source:src/workbench/projects/projectFileToasts.ts",
           "source:src/workbench/projects/projectFlush.ts",
+          "source:src/workbench/projects/projectHalves.ts",
           "source:src/workbench/projects/session.ts",
           "source:src/workbench/projects/syncStore.ts",
           "source:src/workbench/projects/useProjectFileActions.ts",
@@ -346,15 +347,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1171873,
+        "brotliBytes": 1177496,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1165072,
+        "gzipBytes": 1170594,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3208701,
-        "largestAssetRawBytes": 749029,
+        "initialRawBytes": 3228313,
+        "largestAssetRawBytes": 752421,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 150716,
+        "ownedRawBytes": 150967,
         "requestCount": 72,
         "scriptRequestCount": 56,
         "sourceOwners": [
@@ -950,6 +951,7 @@
           "source:src/workbench/projects/projectFileErrors.ts",
           "source:src/workbench/projects/projectFileToasts.ts",
           "source:src/workbench/projects/projectFlush.ts",
+          "source:src/workbench/projects/projectHalves.ts",
           "source:src/workbench/projects/projectHydration.ts",
           "source:src/workbench/projects/projectLifecycleLocks.ts",
           "source:src/workbench/projects/projectLoadRefusal.ts",
@@ -1092,7 +1094,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-10-09",
+  "capturedAt": "2026-10-10",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",

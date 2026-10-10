@@ -102,6 +102,8 @@ const ROUTE_SHARED_MODULES = [
   '/workbench/projects/invk/format.ts',
   '/workbench/projects/library.ts',
   '/workbench/projects/projectAssets.ts',
+  // The editor splits documents at boot, and project files reach it lazily; alone it costs a startup request.
+  '/workbench/projects/projectHalves.ts',
   '/workbench/projects/projectFile.ts',
   '/workbench/projects/projectFileErrors.ts',
   '/workbench/projects/projectFileToasts.ts',

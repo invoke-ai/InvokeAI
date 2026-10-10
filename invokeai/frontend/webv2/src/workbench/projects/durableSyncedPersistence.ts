@@ -64,7 +64,7 @@ import {
   updateProject,
 } from './api';
 import { recordProjectCover } from './covers';
-import { PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION } from './documentSchemaVersion';
+import { PROJECT_DOCUMENT_SCHEMA_VERSION, PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION } from './documentSchemaVersion';
 import {
   getUtf8ByteSize,
   getCopySourceProjectName,
@@ -84,7 +84,6 @@ import { selectCoverImageName } from './projectAssets';
 import {
   migrateProjectDocument,
   PROJECT_DOCUMENT_MAX_BYTES,
-  PROJECT_DOCUMENT_SCHEMA_VERSION,
   serializeProjectDocumentV3Json,
   type ProjectDocumentV3,
 } from './projectDocument';

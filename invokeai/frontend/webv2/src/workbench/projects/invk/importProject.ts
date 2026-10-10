@@ -1,4 +1,6 @@
 import { mapWithConcurrency } from '@platform/core/concurrency';
+import { MAX_SUPPORTED_CANVAS_SCHEMA_VERSION } from '@workbench/canvasSchemaVersion';
+import { PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION } from '@workbench/projects/documentSchemaVersion';
 import { collectLiveAssetRefs, selectCoverImageName } from '@workbench/projects/projectAssets';
 
 import type { InvkBoardSnapshot } from './board';
@@ -27,6 +29,7 @@ import {
   INVK_IMAGES_PREFIX,
   INVK_MANIFEST_ENTRY,
   INVK_VIDEOS_PREFIX,
+  INVK_WORKSPACE_ENTRY,
   InvkFormatError,
 } from './format';
 import { type InvkManifest, parseInvkManifest } from './manifest';
@@ -47,22 +50,25 @@ export interface InvkArchiveContents {
   images: Map<string, Uint8Array>;
   fonts?: EmbeddedFont[];
   manifest: InvkManifest;
+  /** `project.json`: the project content, or a whole document (v2, or a v3 written below the split). */
   projectDocument: Record<string, unknown>;
   /** Bundled video bytes, keyed by the video name the exporting server used. */
   videos: Map<string, Uint8Array>;
+  /** `workspace.json`: the exporter's workspace, or `null` when the archive carries none. */
+  workspace: Record<string, unknown> | null;
 }
 
-const parseDocumentEntry = (bytes: Uint8Array): Record<string, unknown> => {
+const parseDocumentEntry = (bytes: Uint8Array, entryName: string): Record<string, unknown> => {
   let parsed: unknown;
 
   try {
     parsed = JSON.parse(readEntryText(bytes));
   } catch {
-    throw new InvkFormatError('damaged', `${INVK_DOCUMENT_ENTRY} is not valid JSON.`);
+    throw new InvkFormatError('damaged', `${entryName} is not valid JSON.`);
   }
 
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    throw new InvkFormatError('damaged', `${INVK_DOCUMENT_ENTRY} is not a project document.`);
+    throw new InvkFormatError('damaged', `${entryName} is not a project document.`);
   }
 
   return parsed as Record<string, unknown>;
@@ -116,6 +122,20 @@ export const readInvkArchive = async (file: File): Promise<InvkArchiveContents> 
   }
 
   const manifest = parseInvkManifest(manifestData);
+
+  // Refused before any entry is read: a newer build may shape what it writes in ways this one would call damage.
+  if ((manifest.minimumCanvasSchemaVersion ?? 1) > MAX_SUPPORTED_CANVAS_SCHEMA_VERSION) {
+    throw new InvkFormatError(
+      'unsupported-version',
+      `Project requires canvas schema ${manifest.minimumCanvasSchemaVersion}.`
+    );
+  }
+  if (manifest.version === 3 && manifest.documentSchemaVersion > PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION) {
+    throw new InvkFormatError(
+      'unsupported-version',
+      `Project requires document schema ${manifest.documentSchemaVersion}.`
+    );
+  }
   const documentEntry = entries.get(INVK_DOCUMENT_ENTRY);
 
   if (!documentEntry) {
@@ -145,8 +165,15 @@ export const readInvkArchive = async (file: File): Promise<InvkArchiveContents> 
   }
 
   const coverBytes = manifest.cover === undefined ? undefined : entries.get(manifest.cover);
-  const projectDocument = parseDocumentEntry(documentEntry);
-  const fonts = await readEmbeddedFonts(manifest.fonts ?? [], projectDocument, entries);
+  const projectDocument = parseDocumentEntry(documentEntry, INVK_DOCUMENT_ENTRY);
+  // Only a v3 archive's content has a workspace beside it; an entry in an older one names nothing.
+  const workspaceEntry = manifest.version === 3 ? entries.get(INVK_WORKSPACE_ENTRY) : undefined;
+  const workspace = workspaceEntry === undefined ? null : parseDocumentEntry(workspaceEntry, INVK_WORKSPACE_ENTRY);
+  const fonts = await readEmbeddedFonts(
+    manifest.fonts ?? [],
+    { canvas: [projectDocument.canvas, workspace?.canvas] },
+    entries
+  );
 
   return {
     boardSnapshot,
@@ -156,6 +183,7 @@ export const readInvkArchive = async (file: File): Promise<InvkArchiveContents> 
     manifest,
     projectDocument,
     videos,
+    workspace,
   };
 };
 

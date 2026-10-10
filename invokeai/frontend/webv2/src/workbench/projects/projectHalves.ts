@@ -1,9 +1,6 @@
-import { PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION } from './documentSchemaVersion';
-import {
-  PROJECT_DOCUMENT_SCHEMA_VERSION,
-  type ProjectDocumentMigration,
-  type ProjectDocumentV3,
-} from './projectDocument';
+import type { ProjectDocumentMigration, ProjectDocumentV3 } from './projectDocument';
+
+import { PROJECT_DOCUMENT_SCHEMA_VERSION, PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION } from './documentSchemaVersion';
 
 /*
  * The project document as the server stores it from schema 4: the project **content** (what the project is, shared
@@ -67,9 +64,10 @@ export const PROJECT_DOCUMENT_HALVES = {
 
 export interface ProjectHalves {
   content: ProjectContentV4;
-  contentJson: string;
+  /** Serialized on first read and kept: a caller that only sends the objects never pays for a large document's. */
+  readonly contentJson: string;
   workspace: ProjectWorkspaceV4;
-  workspaceJson: string;
+  readonly workspaceJson: string;
 }
 
 /** Splits a whole document into the two halves the server saves apart. */
@@ -105,7 +103,18 @@ export const splitProjectDocument = (document: ProjectDocumentV3): ProjectHalves
     workflows: { activeWorkflowId: document.workflows.activeWorkflowId, lastRuns },
   };
 
-  return { content, contentJson: JSON.stringify(content), workspace, workspaceJson: JSON.stringify(workspace) };
+  let contentJson: string | undefined;
+  let workspaceJson: string | undefined;
+  return {
+    content,
+    get contentJson() {
+      return (contentJson ??= JSON.stringify(content));
+    },
+    workspace,
+    get workspaceJson() {
+      return (workspaceJson ??= JSON.stringify(workspace));
+    },
+  };
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -137,7 +146,8 @@ export const findRepeatedWorkflowItem = (entries: unknown[]): string | null => {
 /**
  * Joins the two halves into the whole document the browser works on, which the ordinary migration and load path then
  * reads. A project with no workspace for the caller yet (a 7.1 member, or one never saved) gets `defaults`, the
- * workspace a new project starts with.
+ * workspace a new project starts with. Content that repeats an item id joins too: a server's must be refused
+ * (`joinProjectRecord`), but an archive's is created whole (`toProjectCreation`).
  */
 export const joinProjectDocument = (
   content: Record<string, unknown>,
@@ -153,10 +163,6 @@ export const joinProjectDocument = (
     return { reason: 'The project content is missing its canvas or workflows.', status: 'malformed' };
   }
   const entries = workflows.entries as unknown[];
-  const repeated = findRepeatedWorkflowItem(entries);
-  if (repeated !== null) {
-    return { reason: `Workflow ${repeated} repeats an item id.`, status: 'malformed' };
-  }
 
   const fallback = workspace ? null : defaults();
   const own = (workspace ?? fallback) as Record<string, unknown>;

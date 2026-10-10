@@ -8,16 +8,20 @@ import {
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
-import { getProjectCanvasSchemaRequirement, MAX_SUPPORTED_CANVAS_SCHEMA_VERSION } from '@workbench/canvasSchemaVersion';
+import { getProjectCanvasSchemaRequirement } from '@workbench/canvasSchemaVersion';
 
 import type { ProjectTransferIssues } from './invk/transfer';
+import type { ProjectDocumentV3 } from './projectDocument';
 
 import { createProjectSettled, getProjectBoardSnapshot, type ProjectWithWorkspaceDTO } from './api';
 import { recordProjectCover } from './covers';
+import { PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION } from './documentSchemaVersion';
 import { createProjectId } from './ids';
-import { INVK_EXTENSION, InvkFormatError, toInvkFormatReason } from './invk/format';
+import { INVK_EXTENSION, InvkFormatError, toInvkRefusalError } from './invk/format';
 import { readAcknowledgedProject, upsertProjectSummary } from './library';
 import { remapAssetRefs, stripInstallationState } from './projectAssets';
+import { ProjectWorkspaceInseparableError } from './projectFileErrors';
+import { splitProjectDocument, toProjectCreation } from './projectHalves';
 import { getOpenProject } from './syncStore';
 
 export const LEGACY_PROJECT_FILE_EXTENSION = '.invokeproject.json';
@@ -68,7 +72,16 @@ export interface ProjectFileOptions {
   onProgress?: (progress: ProjectFileProgress) => void;
   owner?: AccountScope;
   includeFonts?: boolean;
+  /** Export only: whether the file carries the exporter's workspace. On unless turned off. */
+  includeWorkspace?: boolean;
   skipEmbeddedFonts?: boolean;
+}
+
+/** What an archive's `project.json` and `workspace.json` carry, and the document schema the first is written in. */
+interface ArchivedProject {
+  content: Record<string, unknown>;
+  documentSchemaVersion: number;
+  workspace: Record<string, unknown> | null;
 }
 
 export interface ProjectExportOutcome extends ProjectTransferIssues {
@@ -102,10 +115,42 @@ const readProjectDocument = async (file: File) => {
   return { contents: await readInvkArchive(file), format: 'invk' as const };
 };
 
+/** A whole document as an archive carries it: its content, and the exporter's workspace unless it stays out. */
+const toArchivedProject = (document: ProjectDocumentV3, includeWorkspace: boolean): ArchivedProject => {
+  const halves = splitProjectDocument(document);
+
+  return {
+    content: halves.content as unknown as Record<string, unknown>,
+    documentSchemaVersion: PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION,
+    workspace: includeWorkspace ? (halves.workspace as unknown as Record<string, unknown>) : null,
+  };
+};
+
+/**
+ * What the server holds of a project this build cannot read, verbatim, so it can still be recovered: content (schema 4
+ * on, as a newer build may write it) beside the caller's workspace, or a whole document, whose workspace no build that
+ * cannot read it can take out.
+ */
+const toRecoveryArchive = (record: ProjectWithWorkspaceDTO, includeWorkspace: boolean): ArchivedProject => {
+  const { documentSchemaVersion } = record.data;
+  const schema = typeof documentSchemaVersion === 'number' ? documentSchemaVersion : 1;
+  const isSplit = schema >= PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION;
+
+  if (!isSplit && !includeWorkspace) {
+    throw new ProjectWorkspaceInseparableError();
+  }
+
+  return {
+    content: record.data,
+    documentSchemaVersion: schema,
+    workspace: isSplit && includeWorkspace ? (record.workspace?.data ?? null) : null,
+  };
+};
+
 const exportProjectDocument = async (
   name: string,
   projectId: string,
-  projectDocument: Record<string, unknown>,
+  archived: ArchivedProject,
   minimumCanvasSchemaVersion: number,
   options: Required<Pick<ProjectFileOptions, 'owner'>> & ProjectFileOptions
 ): Promise<ProjectExportOutcome> => {
@@ -127,10 +172,12 @@ const exportProjectDocument = async (
       items: board.items,
       name: board.name,
     })),
+    content: archived.content,
     createdAt: new Date().toISOString(),
+    documentSchemaVersion: archived.documentSchemaVersion,
     minimumCanvasSchemaVersion,
     name,
-    projectDocument,
+    workspace: archived.workspace,
     includeFonts: options.includeFonts ?? false,
   });
 
@@ -160,14 +207,22 @@ export const exportLibraryProject = async (
 
   assertAccountScopeCurrent(owner);
 
-  const [{ deserializeProjectRecord }, { serializeProjectDocumentV3 }] = await Promise.all([
+  const [{ deserializeProjectRecord, isSplitProjectRecord }, { serializeProjectDocumentV3 }] = await Promise.all([
     import('./projectHydration'),
     import('./projectDocument'),
   ]);
   const loaded = deserializeProjectRecord(record);
-  const document = loaded.status === 'loaded' ? serializeProjectDocumentV3(loaded.project) : record.data;
+  const includeWorkspace = options.includeWorkspace ?? true;
+  const archived =
+    loaded.status === 'loaded'
+      ? // Of a split project the caller has never worked in, the workspace is defaults: nothing of theirs to carry.
+        toArchivedProject(
+          serializeProjectDocumentV3(loaded.project),
+          includeWorkspace && (!isSplitProjectRecord(record) || record.workspace !== null)
+        )
+      : toRecoveryArchive(record, includeWorkspace);
 
-  return exportProjectDocument(record.name, record.project_id, document, record.minimum_canvas_schema_version, {
+  return exportProjectDocument(record.name, record.project_id, archived, record.minimum_canvas_schema_version, {
     ...options,
     owner,
   });
@@ -184,8 +239,8 @@ export const exportOpenProject = async (
   await open?.flushPixels();
   assertAccountScopeCurrent(owner);
   const project = open?.current() ?? requested;
-  const { serializeProjectDocument } = await import('./projectDocument');
-  const document = serializeProjectDocument(project);
+  const { serializeProjectDocumentV3 } = await import('./projectDocument');
+  const document = serializeProjectDocumentV3(project);
 
   assertAccountScopeCurrent(owner);
 
@@ -196,7 +251,13 @@ export const exportOpenProject = async (
     record?.minimum_canvas_schema_version ?? 1
   );
 
-  return exportProjectDocument(project.name, project.id, document, minimumCanvasSchemaVersion, { ...options, owner });
+  return exportProjectDocument(
+    project.name,
+    project.id,
+    toArchivedProject(document, options.includeWorkspace ?? true),
+    minimumCanvasSchemaVersion,
+    { ...options, owner }
+  );
 };
 
 /** Project creation commits remapped/staged media. Archives without board entries receive a new empty server board. */
@@ -206,16 +267,17 @@ export const importProjectFile = async (
 ): Promise<ProjectImportOutcome> => {
   const owner = options.owner ?? captureAccountScope();
   const source = await readProjectDocument(file);
-  const projectDocument = source.format === 'invk' ? source.contents.projectDocument : source.projectDocument;
+  const archivedDocument = source.format === 'invk' ? source.contents.projectDocument : source.projectDocument;
+  let projectDocument = archivedDocument;
+  // Project content (v3) is joined with the exporter's workspace, or without one with a new project's defaults.
+  if (archivedDocument.documentSchemaVersion === PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION) {
+    const { joinProjectHalves } = await import('./projectHydration');
+    const joined = joinProjectHalves(archivedDocument, source.format === 'invk' ? source.contents.workspace : null);
 
-  if (
-    source.format === 'invk' &&
-    (source.contents.manifest.minimumCanvasSchemaVersion ?? 1) > MAX_SUPPORTED_CANVAS_SCHEMA_VERSION
-  ) {
-    throw new InvkFormatError(
-      'unsupported-version',
-      `Project requires canvas schema ${source.contents.manifest.minimumCanvasSchemaVersion}.`
-    );
+    if (joined.status === 'malformed') {
+      throw new InvkFormatError('damaged', joined.reason);
+    }
+    projectDocument = joined.document;
   }
 
   assertAccountScopeCurrent(owner);
@@ -235,7 +297,7 @@ export const importProjectFile = async (
   const loaded = deserializeProjectDocument(candidate);
 
   if (loaded.status === 'refused') {
-    throw new InvkFormatError(toInvkFormatReason(loaded.refused), 'The project document was refused.');
+    throw toInvkRefusalError(loaded.refused);
   }
 
   if (loaded.status !== 'loaded') {
@@ -324,11 +386,15 @@ export const importProjectFile = async (
       getProjectCanvasSchemaRequirement(document),
       archive?.manifest.minimumCanvasSchemaVersion ?? 1
     );
+    // Loaded before the create: once the project exists, a chunk that fails to load would fail an import that landed.
+    const { saveTransferredWorkspace } = await import('./invk/transferredWorkspace');
+    const creation = toProjectCreation(document as unknown as ProjectDocumentV3);
     didAttemptProjectCreate = true;
     const record = await createProjectSettled(
       {
-        data: document,
+        data: creation.data as unknown as Record<string, unknown>,
         minimum_canvas_schema_version: minimumCanvasSchemaVersion,
+        minimum_document_schema_version: creation.documentSchemaVersion,
         name,
         project_id: id,
         ...(inboxStagingBoardId === null ? {} : { board_id: inboxStagingBoardId }),
@@ -343,6 +409,18 @@ export const importProjectFile = async (
       memberBoards === null
         ? []
         : await memberBoards.placeMemberBoards(stagedBoards, record.project_id, { signal: owner.signal });
+    assertAccountScopeCurrent(owner);
+    // The importer's workspace: the archive's, or a new project's. A project created whole carries it inside.
+    const { record: imported, workspaceNotSaved } = creation.workspace
+      ? await saveTransferredWorkspace(record, creation.workspace as unknown as Record<string, unknown>, owner)
+      : {
+          record: {
+            ...record,
+            data: applyAuthoritativeProjectBoard(record.data, record.board_id, { selectBoard: true }),
+            workspace: null,
+          },
+          workspaceNotSaved: false,
+        };
     assertAccountScopeCurrent(owner);
     upsertProjectSummary(
       {
@@ -362,13 +440,9 @@ export const importProjectFile = async (
       boardIssues,
       boardItemIssues: restored?.boardItemIssues ?? [],
       documentReferenceIssues: restored?.documentReferenceIssues ?? [],
-      // Bind the initial selection to the authoritative returned board ID, not the requested ID. Created whole, the
-      // project has no workspace until its first save splits it.
-      record: {
-        ...record,
-        data: applyAuthoritativeProjectBoard(record.data, record.board_id, { selectBoard: true }),
-        workspace: null,
-      },
+      // The initial selection is bound to the board ID the server returned, not the one requested.
+      record: imported,
+      workspaceNotSaved,
     };
   } catch (error) {
     if (fontTransfer && fontTransport && fontLedger && isAccountScopeCurrent(owner)) {

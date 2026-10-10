@@ -306,6 +306,7 @@ describe('duplicateProjectRecord', () => {
     });
 
     expect(result.record).toMatchObject({ project_id: expect.any(String), workspace: null });
+    expect(result.workspaceNotSaved).toBe(true);
     expect(transport.placeBoardInProject).not.toHaveBeenCalled();
   });
 

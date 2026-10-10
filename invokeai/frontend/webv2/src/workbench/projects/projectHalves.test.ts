@@ -4,8 +4,16 @@ import { addProjectWorkflow, createBlankWorkflowDocument, recordProjectWorkflowR
 import { createInitialWorkbenchState } from '@workbench/workbenchState.testing';
 import { describe, expect, it } from 'vitest';
 
+import type { ProjectWithWorkspaceDTO } from './api';
+
 import { serializeProjectDocumentV3, serializeProjectDocumentV3Json } from './projectDocument';
-import { joinProjectDocument, PROJECT_DOCUMENT_HALVES, splitProjectDocument } from './projectHalves';
+import {
+  findRepeatedWorkflowItem,
+  joinProjectDocument,
+  PROJECT_DOCUMENT_HALVES,
+  splitProjectDocument,
+} from './projectHalves';
+import { joinProjectRecord } from './projectHydration';
 import { deserializeProjectDocument } from './syncedPersistence';
 
 const RUN = { completedAt: '2026-10-10T00:00:02.000Z', imageName: 'run.png', submittedAt: '2026-10-10T00:00:01.000Z' };
@@ -135,44 +143,42 @@ describe('joining a project for a member', () => {
     );
   });
 
-  it('refuses content that repeats an item id within a workflow, which a lock could not tell apart', () => {
+  it('refuses a server’s content that repeats an item id within a workflow, which a lock could not tell apart', () => {
     const project = workedOnProject();
     const { content, workspace } = splitProjectDocument(serializeProjectDocumentV3(project));
     const [first, ...rest] = content.workflows.entries;
     const node = { id: 'node-1', type: 'notes' };
     const repeated = { ...first!, document: { ...first!.document, nodes: [node, node] } };
     const elsewhere = rest.map((entry) => ({ ...entry, document: { ...entry.document, nodes: [node] } }));
+    const record = (entries: unknown[]) =>
+      ({
+        data: { ...content, workflows: { entries } },
+        workspace: { data: workspace, revision: 1, updated_at: '' },
+      }) as unknown as ProjectWithWorkspaceDTO;
 
+    expect(joinProjectRecord(record([repeated, ...rest])).status).toBe('malformed');
+    // An archive's joins: importing creates it whole.
     expect(join({ content: { ...content, workflows: { entries: [repeated, ...rest] } }, workspace }).status).toBe(
-      'malformed'
+      'migrated'
     );
     // Workflow duplication keeps node ids, so two workflows may share one.
     expect(
-      join({
-        content: {
-          ...content,
-          workflows: { entries: [{ ...first!, document: { ...first!.document, nodes: [node] } }, ...elsewhere] },
-        },
-        workspace,
-      }).status
+      joinProjectRecord(record([{ ...first!, document: { ...first!.document, nodes: [node] } }, ...elsewhere])).status
     ).toBe('migrated');
   });
 
-  it('refuses repeated edge and form element ids too', () => {
-    const { content, workspace } = splitProjectDocument(serializeProjectDocumentV3(workedOnProject()));
+  it('finds repeated edge and form element ids too', () => {
+    const { content } = splitProjectDocument(serializeProjectDocumentV3(workedOnProject()));
     const [first, ...rest] = content.workflows.entries;
     const edge = { id: 'edge-1', source: 'a', sourceHandle: 'value', target: 'b', targetHandle: 'value' };
     const element = { data: { children: [], layout: 'column' }, id: 'container-1', type: 'container' };
-    const repeating = (document: object) => ({
-      ...content,
-      workflows: { entries: [{ ...first!, document: { ...first!.document, ...document } }, ...rest] },
-    });
+    const repeating = (document: object) => [{ ...first!, document: { ...first!.document, ...document } }, ...rest];
 
-    expect(join({ content: repeating({ edges: [edge, edge] }), workspace }).status).toBe('malformed');
+    expect(findRepeatedWorkflowItem(repeating({ edges: [edge, edge] }))).toBe(first!.document.id);
     expect(
-      join({ content: repeating({ form: { elements: { a: element, b: element }, rootElementId: 'a' } }), workspace })
-        .status
-    ).toBe('malformed');
+      findRepeatedWorkflowItem(repeating({ form: { elements: { a: element, b: element }, rootElementId: 'a' } }))
+    ).toBe(first!.document.id);
+    expect(findRepeatedWorkflowItem(content.workflows.entries)).toBeNull();
   });
 
   it('refuses a workspace of another document schema', () => {

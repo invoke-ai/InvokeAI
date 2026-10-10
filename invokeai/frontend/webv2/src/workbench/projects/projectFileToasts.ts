@@ -25,6 +25,7 @@ export interface ProjectFileReporter {
 const MISSING_REASONS: ReadonlySet<InvkMediaIssueReason> = new Set(['fetch-failed', 'missing-entry', 'upload-failed']);
 
 const countIssues = (issues: ProjectTransferIssues) => ({
+  workspace: issues.workspaceNotSaved === true,
   boards: issues.boardIssues.length,
   boardItems: issues.boardItemIssues.filter((issue) => MISSING_REASONS.has(issue.reason)).length,
   documentReferences: issues.documentReferenceIssues.filter((issue) => MISSING_REASONS.has(issue.reason)).length,
@@ -121,9 +122,9 @@ export const startProjectFileReport = (
       }, PROGRESS_REDRAW_INTERVAL_MS);
     },
     succeed: (successTitle, issues) => {
-      const { boardItems, boards, documentReferences, unstarred } = countIssues(issues);
+      const { boardItems, boards, documentReferences, unstarred, workspace } = countIssues(issues);
 
-      if (boards === 0 && boardItems === 0 && documentReferences === 0 && unstarred === 0) {
+      if (boards === 0 && boardItems === 0 && documentReferences === 0 && unstarred === 0 && !workspace) {
         settle({ title: successTitle, type: 'success' });
 
         return;
@@ -135,6 +136,7 @@ export const startProjectFileReport = (
         ...(boardItems === 0 ? [] : [t('projects.file.missingBoardItems', { count: boardItems })]),
         ...(documentReferences === 0 ? [] : [t('projects.file.missingReferences', { count: documentReferences })]),
         ...(unstarred === 0 ? [] : [t('projects.file.unstarredItems', { count: unstarred })]),
+        ...(workspace ? [t('projects.file.workspaceNotSaved')] : []),
       ];
 
       settle({ description: parts.join(' '), title: successTitle, type: 'warning' });
