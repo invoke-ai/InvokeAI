@@ -2,7 +2,7 @@ import type { ProjectBoardSnapshotBoardDTO, ProjectWithWorkspaceDTO } from '@wor
 import type { ProjectDocumentV3 } from '@workbench/projects/projectDocument';
 
 import { type AccountScope, assertAccountScopeCurrent, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
-import { createProjectSettled } from '@workbench/projects/api';
+import { createProjectSettled, invalidateBoardLists } from '@workbench/projects/api';
 import { createProjectId } from '@workbench/projects/ids';
 import {
   collectLiveAssetRefs,
@@ -43,7 +43,8 @@ export interface DuplicateProjectInput {
 export interface DuplicateProjectDeps {
   copyImages?: typeof copyImagesToBoard;
   copyVideos?: typeof copyVideosToBoard;
-  onProgress?: (progress: { completed: number; total: number }) => void;
+  /** Copying the media, then moving the other boards into the copy. */
+  onProgress?: (progress: { completed: number; phase: 'placing-boards' | 'restoring'; total: number }) => void;
 }
 
 export interface DuplicateProjectResult extends ProjectTransferIssues {
@@ -71,28 +72,34 @@ export const createCopyMediaMaterializer = (
       return { copied: [], failed: names };
     };
 
-  return async (items, boardId, onItemSettled) => {
-    const imageNames = items.filter((item) => item.kind === 'image').map((item) => item.name);
-    const videoNames = items.filter((item) => item.kind === 'video').map((item) => item.name);
-    const [images, videos] = await Promise.all([
-      copyImages(imageNames, boardId, deps.signal).catch(allFailed(imageNames)),
-      copyVideos(videoNames, boardId, deps.signal).catch(allFailed(videoNames)),
-    ]);
+  // Board by board: each board's media is one batched copy the server does in a single request, so overlapping them
+  // would add server load rather than save round trips.
+  return async (boards, onItemSettled) => {
+    const result: Awaited<ReturnType<MediaMaterializer>> = { failed: [], materialized: [] };
 
-    for (let index = 0; index < items.length; index += 1) {
-      onItemSettled();
+    for (const { items, stagingBoardId } of boards) {
+      const imageNames = items.filter((item) => item.kind === 'image').map((item) => item.name);
+      const videoNames = items.filter((item) => item.kind === 'video').map((item) => item.name);
+      const [images, videos] = await Promise.all([
+        copyImages(imageNames, stagingBoardId, deps.signal).catch(allFailed(imageNames)),
+        copyVideos(videoNames, stagingBoardId, deps.signal).catch(allFailed(videoNames)),
+      ]);
+
+      for (let index = 0; index < items.length; index += 1) {
+        onItemSettled();
+      }
+
+      result.failed.push(
+        ...images.failed.map((name) => ({ kind: 'image' as const, name, reason: 'upload-failed' as const })),
+        ...videos.failed.map((name) => ({ kind: 'video' as const, name, reason: 'upload-failed' as const }))
+      );
+      result.materialized.push(
+        ...images.copied.map((entry) => ({ kind: 'image' as const, name: entry.name, sourceName: entry.sourceName })),
+        ...videos.copied.map((entry) => ({ kind: 'video' as const, name: entry.name, sourceName: entry.sourceName }))
+      );
     }
 
-    return {
-      failed: [
-        ...images.failed.map((name) => ({ kind: 'image' as const, name, reason: 'upload-failed' as const })),
-        ...videos.failed.map((name) => ({ kind: 'video' as const, name, reason: 'upload-failed' as const })),
-      ],
-      materialized: [
-        ...images.copied.map((entry) => ({ kind: 'image' as const, name: entry.name, sourceName: entry.sourceName })),
-        ...videos.copied.map((entry) => ({ kind: 'video' as const, name: entry.name, sourceName: entry.sourceName })),
-      ],
-    };
+    return result;
   };
 };
 
@@ -178,7 +185,9 @@ export const duplicateProjectRecord = async (
           ...(deps.copyVideos === undefined ? {} : { copyVideos: deps.copyVideos }),
           signal: owner.signal,
         }),
-        ...(deps.onProgress === undefined ? {} : { onProgress: deps.onProgress }),
+        ...(deps.onProgress === undefined
+          ? {}
+          : { onProgress: (progress) => deps.onProgress?.({ ...progress, phase: 'restoring' }) }),
         signal: owner.signal,
       }
     );
@@ -202,8 +211,12 @@ export const duplicateProjectRecord = async (
 
     didCreateProject = true;
     assertAccountScopeCurrent(owner);
-    // The copy exists; its other boards can now belong to it. Reported, never fatal, from here on.
-    const boardIssues = await placeMemberBoards(stagedBoards, record.project_id, { signal: owner.signal });
+    // The copy exists; its other boards can now belong to it. Reported, never fatal, from here on. Lists fetched
+    // while they were still staged, the create's own refresh among them, would keep showing them in the Library.
+    const boardIssues = await placeMemberBoards(stagedBoards, record.project_id, {
+      onProgress: (completed, total) => deps.onProgress?.({ completed, phase: 'placing-boards', total }),
+      signal: owner.signal,
+    }).finally(() => invalidateBoardLists(owner));
     assertAccountScopeCurrent(owner);
     // The duplicating account's workspace; a copy created whole carries it inside.
     const { record: copy, workspaceNotSaved } = creation.workspace

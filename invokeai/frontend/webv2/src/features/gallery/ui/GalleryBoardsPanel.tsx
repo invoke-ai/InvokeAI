@@ -2,8 +2,9 @@ import type { GalleryItemKey } from '@features/gallery/core/items';
 import type { GalleryBoardSectionId } from '@features/gallery/core/settings';
 import type { GalleryBoard } from '@features/gallery/core/types';
 
-import { HStack, Icon, ScrollArea, Stack, Text } from '@chakra-ui/react';
-import { getGalleryBoardLabel, getGalleryProjectGroupLabel } from '@features/gallery/core/boardLabels';
+import { Box, HStack, Icon, ScrollArea, Stack, Text } from '@chakra-ui/react';
+import { useDndContext, useDroppable } from '@dnd-kit/core';
+import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { toGalleryItemKey } from '@features/gallery/core/items';
 import { isGalleryBoardSectionOpen, toggleGalleryBoardSection } from '@features/gallery/core/settings';
 import { usePreservedScrollOffset } from '@platform/react/usePreservedScrollOffset';
@@ -11,18 +12,22 @@ import { IconButton } from '@platform/ui/Button';
 import { RenameDialog } from '@platform/ui/RenameDialog';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { PlusIcon } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Fragment, use, useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import type { GalleryBoardProjectGroup } from './galleryBoardGroups';
 
 import { BoardCoverIcon } from './GalleryBoardCover';
 import { GalleryBoardFilters } from './GalleryBoardFilters';
-import { getGalleryBoardGroups } from './galleryBoardGroups';
+import { getGalleryBoardGroups, isMovableGalleryBoard } from './galleryBoardGroups';
 import { GalleryBoardMenu, type GalleryBoardMenuTarget } from './GalleryBoardMenu';
 import { GalleryBoardRow } from './GalleryBoardRow';
 import { GalleryBoardRowShell } from './GalleryBoardRowShell';
 import { GalleryBoardSection } from './GalleryBoardSection';
+import {
+  acceptsGalleryBoardMove,
+  GalleryDragScope,
+  getGalleryBoardTierDropData,
+  getGalleryBoardTierDropId,
+} from './galleryDnd';
 import { focusVisibleOperable, GalleryLoadNotice } from './GalleryLoadError';
 import { getGalleryRedirectedDestination } from './galleryStateView';
 import { useGalleryWidget } from './GalleryWidgetContext';
@@ -35,7 +40,9 @@ type CreateTier = 'library' | 'project';
 
 export const GalleryBoardsPanel = () => {
   const { t } = useTranslation();
-  const { actions, boardsState, gallery, projectId, projectName, projectNames } = useGalleryWidget();
+  const { actions, boardsState, gallery, projectId, projectName, projectNames, region } = useGalleryWidget();
+  // Boards move between tiers by dragging only inside the workbench's drag context; elsewhere, by their menu.
+  const canDragBoards = use(GalleryDragScope);
   const [searchTerm, setSearchTerm] = useState('');
   // The tier whose "+" asked for a name; the dialog it opens creates there.
   const [createDialogTier, setCreateDialogTier] = useState<CreateTier | null>(null);
@@ -54,6 +61,7 @@ export const GalleryBoardsPanel = () => {
         boards: gallery.boards,
         projectBoardId: gallery.projectBoardId,
         projectId,
+        projectNames,
         searchTerm,
         showArchived: showArchivedBoards,
         showDates: showDateBoards,
@@ -64,6 +72,7 @@ export const GalleryBoardsPanel = () => {
       gallery.boards,
       gallery.projectBoardId,
       projectId,
+      projectNames,
       searchTerm,
       showArchivedBoards,
       showDateBoards,
@@ -170,6 +179,7 @@ export const GalleryBoardsPanel = () => {
         redirected?.boardId === board.id ? getGalleryBoardLabel(redirected.refusedBoard, t) : undefined
       }
       board={board}
+      dragScope={canDragBoards && isMovableGalleryBoard(board, gallery.projectBoardId) ? region : undefined}
       isAutoAddTarget={redirected ? board.id === redirected.boardId : board.id === gallery.settings.autoAddBoardId}
       isMenuOpen={boardMenuTarget?.board.id === board.id}
       isSelected={board.id === gallery.selectedBoardId}
@@ -188,6 +198,15 @@ export const GalleryBoardsPanel = () => {
         onSelect={tier === 'project' ? createProjectBoardFromSearch : createLibraryBoardFromSearch}
       />
     ) : null;
+  // A dragged board moves to whichever tier it is dropped on.
+  const renderDropTier = (tierProjectId: string | null, label: string, content: ReactNode) =>
+    canDragBoards ? (
+      <GalleryBoardTierDropZone dropScope={region} label={label} projectId={tierProjectId}>
+        {content}
+      </GalleryBoardTierDropZone>
+    ) : (
+      content
+    );
   // One line, shown while a tier holds only its fixed row, so the two tiers explain themselves once.
   const renderHint = (text: string) =>
     trimmedSearchTerm ? null : (
@@ -195,14 +214,11 @@ export const GalleryBoardsPanel = () => {
         {text}
       </Text>
     );
-  const otherProjectLabel = (group: GalleryBoardProjectGroup) =>
-    getGalleryProjectGroupLabel(group.projectId, group.boards, projectNames, t);
-
   const projectBoards = isBoardListUnavailable ? [] : groups.projectBoards;
   const libraryBoards = isBoardListUnavailable ? [] : groups.libraryBoards;
-  // Each tier counts the boards made in it; its fixed row (Inbox, Uncategorized) is not one.
-  const countCreated = (boards: GalleryBoard[]) =>
-    boards.filter((board) => board.kind === 'board' && !board.isInbox).length;
+  // Each tier counts its boards, the project's inbox among them; Uncategorized is where media on no board shows, not
+  // a board.
+  const countBoards = (boards: GalleryBoard[]) => boards.filter((board) => board.kind === 'board').length;
 
   return (
     <Stack flex="1" gap="1" minH="0" minW="0">
@@ -210,47 +226,57 @@ export const GalleryBoardsPanel = () => {
       <ScrollArea.Root flex="1" minH="0" variant="hover" w="full">
         <ScrollArea.Viewport ref={boardsViewportRef} h="full" w="full">
           <ScrollArea.Content {...SCROLL_CONTENT_PROPS}>
-            <GalleryBoardSection
-              action={addProjectBoardAction}
-              count={countCreated(projectBoards)}
-              isOpen={isSectionOpen('project')}
-              label={projectName}
-              sectionId="project"
-              onToggle={handleToggleSection}
-            >
-              {boardsState.status === 'error' || boardsState.status === 'stale-error' ? (
-                <GalleryLoadNotice
-                  message={t(
-                    isBoardListUnavailable ? 'widgets.gallery.boardsLoadFailed' : 'widgets.gallery.boardsRefreshFailed'
-                  )}
-                  pe="1"
-                  ps="2"
-                  read={boardsState}
-                  retryLabel={t('widgets.gallery.retryLoadingBoards')}
-                  onFocusLost={focusBoardList}
-                />
-              ) : null}
-              {projectBoards.map((board) => renderRow(board))}
-              {renderCreateRow('project')}
-              {isBoardListSettled && projectBoards.every((board) => board.isInbox)
-                ? renderHint(t('widgets.gallery.projectBoardsHint'))
-                : null}
-            </GalleryBoardSection>
+            {renderDropTier(
+              projectId,
+              projectName,
+              <GalleryBoardSection
+                action={addProjectBoardAction}
+                count={countBoards(projectBoards)}
+                isOpen={isSectionOpen('project')}
+                label={projectName}
+                sectionId="project"
+                onToggle={handleToggleSection}
+              >
+                {boardsState.status === 'error' || boardsState.status === 'stale-error' ? (
+                  <GalleryLoadNotice
+                    message={t(
+                      isBoardListUnavailable
+                        ? 'widgets.gallery.boardsLoadFailed'
+                        : 'widgets.gallery.boardsRefreshFailed'
+                    )}
+                    pe="1"
+                    ps="2"
+                    read={boardsState}
+                    retryLabel={t('widgets.gallery.retryLoadingBoards')}
+                    onFocusLost={focusBoardList}
+                  />
+                ) : null}
+                {projectBoards.map((board) => renderRow(board))}
+                {renderCreateRow('project')}
+                {isBoardListSettled && projectBoards.every((board) => board.isInbox)
+                  ? renderHint(t('widgets.gallery.projectBoardsHint'))
+                  : null}
+              </GalleryBoardSection>
+            )}
 
-            <GalleryBoardSection
-              action={addLibraryBoardAction}
-              count={countCreated(libraryBoards)}
-              isOpen={isSectionOpen('library')}
-              label={t('widgets.gallery.boardGroups.library')}
-              sectionId="library"
-              onToggle={handleToggleSection}
-            >
-              {libraryBoards.map((board) => renderRow(board))}
-              {renderCreateRow('library')}
-              {isBoardListSettled && libraryBoards.every((board) => board.kind === 'uncategorized')
-                ? renderHint(t('widgets.gallery.libraryBoardsHint'))
-                : null}
-            </GalleryBoardSection>
+            {renderDropTier(
+              null,
+              t('widgets.gallery.boardGroups.library'),
+              <GalleryBoardSection
+                action={addLibraryBoardAction}
+                count={countBoards(libraryBoards)}
+                isOpen={isSectionOpen('library')}
+                label={t('widgets.gallery.boardGroups.library')}
+                sectionId="library"
+                onToggle={handleToggleSection}
+              >
+                {libraryBoards.map((board) => renderRow(board))}
+                {renderCreateRow('library')}
+                {isBoardListSettled && libraryBoards.every((board) => board.kind === 'uncategorized')
+                  ? renderHint(t('widgets.gallery.libraryBoardsHint'))
+                  : null}
+              </GalleryBoardSection>
+            )}
 
             {!isBoardListUnavailable && groups.sharedBoards.length > 0 ? (
               <GalleryBoardSection
@@ -285,28 +311,34 @@ export const GalleryBoardsPanel = () => {
                 onToggle={handleToggleSection}
               >
                 {groups.otherProjects.map((group) => (
-                  <Stack key={group.projectId} gap="0.5">
-                    <Text
-                      color="fg.muted"
-                      fontSize="xs"
-                      fontWeight="600"
-                      pe="2"
-                      ps="2"
-                      pt="1"
-                      role="heading"
-                      aria-level={4}
-                      truncate
-                    >
-                      {otherProjectLabel(group)}
-                    </Text>
-                    {group.boards.map((board) =>
-                      // Every other project's inbox is called "Inbox"; assistive tech needs the project in the name.
-                      renderRow(
-                        board,
-                        board.isInbox ? t('widgets.gallery.inboxOf', { project: otherProjectLabel(group) }) : undefined
-                      )
+                  <Fragment key={group.projectId}>
+                    {renderDropTier(
+                      group.projectId,
+                      group.label,
+                      <Stack gap="0.5">
+                        <Text
+                          color="fg.muted"
+                          fontSize="xs"
+                          fontWeight="600"
+                          pe="2"
+                          ps="2"
+                          pt="1"
+                          role="heading"
+                          aria-level={4}
+                          truncate
+                        >
+                          {group.label}
+                        </Text>
+                        {group.boards.map((board) =>
+                          // Every other project's inbox is called "Inbox"; assistive tech needs the project in the name.
+                          renderRow(
+                            board,
+                            board.isInbox ? t('widgets.gallery.inboxOf', { project: group.label }) : undefined
+                          )
+                        )}
+                      </Stack>
                     )}
-                  </Stack>
+                  </Fragment>
                 ))}
               </GalleryBoardSection>
             ) : null}
@@ -368,6 +400,48 @@ export const GalleryBoardsPanel = () => {
         onSubmit={handleCreateDialogSubmit}
       />
     </Stack>
+  );
+};
+
+/**
+ * A project's boards, or the Library's, as the place a dragged board lands: anywhere on them, heading and rows alike,
+ * so a collapsed section still takes one. It marks itself only while one of this gallery's boards from elsewhere is
+ * being dragged.
+ */
+const GalleryBoardTierDropZone = ({
+  children,
+  dropScope,
+  label,
+  projectId,
+}: {
+  children: ReactNode;
+  /** The gallery it is in; another gallery's dragged boards neither land on it nor see it highlighted. */
+  dropScope: string;
+  /** What the move's notice calls the destination. */
+  label: string;
+  projectId: string | null;
+}) => {
+  const { active } = useDndContext();
+  const canDrop = acceptsGalleryBoardMove(active?.data.current, projectId, dropScope);
+  const { isOver, setNodeRef } = useDroppable({
+    data: getGalleryBoardTierDropData(projectId, label, dropScope),
+    disabled: !canDrop,
+    id: getGalleryBoardTierDropId(projectId, dropScope),
+  });
+
+  return (
+    <Box
+      ref={setNodeRef}
+      // Outlines, as on a row taking items, so the highlight cannot reflow the list under the pointer.
+      bg={canDrop && isOver ? 'accent.muted' : undefined}
+      outline={canDrop ? (isOver ? '2px solid' : '1px dashed') : undefined}
+      outlineColor={canDrop ? 'accent.solid' : undefined}
+      outlineOffset="-2px"
+      rounded="sm"
+      transition="background var(--wb-motion-duration-fast) ease"
+    >
+      {children}
+    </Box>
   );
 };
 

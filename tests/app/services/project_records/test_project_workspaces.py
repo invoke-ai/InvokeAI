@@ -289,10 +289,21 @@ def test_deleting_the_project_drops_the_workspace_and_its_references(
     kept_id = _split_project(project_records)
     _save(project_records, kept_id, None, {"imageName": "kept.png"})
 
+    project_records.delete(OWNER, project_id)
+
+    assert _references(database, "project_workspace") == {"kept.png"}
+
+
+@pytest.mark.sqlite_only
+def test_deleting_the_project_drops_its_workspace_references_by_key(
+    project_records: ProjectRecordsStorage, database: Database
+) -> None:
+    project_id = _split_project(project_records)
+    _save(project_records, project_id, None, {"imageName": "a.png"})
+
     with capture_statements(database) as captured:
         project_records.delete(OWNER, project_id)
 
-    assert _references(database, "project_workspace") == {"kept.png"}
     # By key: not a scan of every workspace reference in the install, under the write lock.
     deletes = [(sql, args) for sql, args in captured if sql.startswith("DELETE FROM media_references")]
     assert deletes

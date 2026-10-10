@@ -13,7 +13,12 @@ import { getProjectCanvasSchemaRequirement } from '@workbench/canvasSchemaVersio
 import type { ProjectTransferIssues } from './invk/transfer';
 import type { ProjectDocumentV3 } from './projectDocument';
 
-import { createProjectSettled, getProjectBoardSnapshot, type ProjectWithWorkspaceDTO } from './api';
+import {
+  createProjectSettled,
+  getProjectBoardSnapshot,
+  invalidateBoardLists,
+  type ProjectWithWorkspaceDTO,
+} from './api';
 import { recordProjectCover } from './covers';
 import { PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION } from './documentSchemaVersion';
 import { createProjectId } from './ids';
@@ -64,7 +69,7 @@ export const parseProjectFile = (text: string): Record<string, unknown> | null =
 /** Asset-count phases exclude ZIP packing. */
 export interface ProjectFileProgress {
   completed: number;
-  phase: 'bundling' | 'packing' | 'restoring' | 'restoring-fonts';
+  phase: 'bundling' | 'packing' | 'placing-boards' | 'restoring' | 'restoring-fonts';
   total: number;
 }
 
@@ -404,11 +409,17 @@ export const importProjectFile = async (
 
     didCreateProject = true;
     assertAccountScopeCurrent(owner);
-    // The project exists; its other boards can now belong to it. Reported, never fatal, from here on.
+    // The project exists; its other boards can now belong to it. Reported, never fatal, from here on. Lists fetched
+    // while they were still staged, the create's own refresh among them, would keep showing them in the Library.
     const boardIssues =
       memberBoards === null
         ? []
-        : await memberBoards.placeMemberBoards(stagedBoards, record.project_id, { signal: owner.signal });
+        : await memberBoards
+            .placeMemberBoards(stagedBoards, record.project_id, {
+              onProgress: (completed, total) => options.onProgress?.({ completed, phase: 'placing-boards', total }),
+              signal: owner.signal,
+            })
+            .finally(() => invalidateBoardLists(owner));
     assertAccountScopeCurrent(owner);
     // The importer's workspace: the archive's, or a new project's. A project created whole carries it inside.
     const { record: imported, workspaceNotSaved } = creation.workspace

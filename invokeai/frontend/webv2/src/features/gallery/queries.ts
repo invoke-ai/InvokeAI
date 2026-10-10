@@ -32,6 +32,7 @@ export type {
 export type { GalleryLocatorRequest } from './core/selection';
 export {
   getGalleryItemBoardIdsFromCaches,
+  getGalleryProjectBoardsFromCaches,
   getGalleryItemStarredFromCaches,
   invalidateGallery,
   invalidateGalleryItems,

@@ -10,6 +10,7 @@ import { createSingleFlight } from '@platform/state/singleFlight';
 import { normalizeServerTimestamp } from '@platform/time/serverTimestamp';
 import { DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION, isCanvasSchemaVersionSupported } from '@workbench/canvasSchemaVersion';
 
+import type { DuplicateProjectDeps } from './invk/duplicateProject';
 import type { ProjectTransferIssues } from './invk/transfer';
 
 import {
@@ -325,7 +326,7 @@ export interface DuplicatedProject extends ProjectTransferIssues {
  */
 export const duplicateLibraryProject = async (
   projectId: string,
-  options: { onProgress?: (progress: { completed: number; total: number }) => void; owner?: AccountScope } = {}
+  options: Pick<DuplicateProjectDeps, 'onProgress'> & { owner?: AccountScope } = {}
 ): Promise<DuplicatedProject> => {
   const owner = options.owner ?? captureAccountScope();
   const record = await readAcknowledgedProject(projectId, owner);

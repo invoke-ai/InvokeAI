@@ -227,8 +227,12 @@ describe('createArchiveMediaMaterializer', () => {
     const settled = vi.fn();
 
     const result = await materialize(
-      [boardItem({ category: 'control' }), boardItem({ category: 'user', kind: 'video', name: 'clip.mp4' })],
-      'staging',
+      [
+        {
+          items: [boardItem({ category: 'control' }), boardItem({ category: 'user', kind: 'video', name: 'clip.mp4' })],
+          stagingBoardId: 'staging',
+        },
+      ],
       settled
     );
 
@@ -255,8 +259,7 @@ describe('createArchiveMediaMaterializer', () => {
       Promise.resolve({ height: 1, imageName: `server-${fileName}`, width: 1 })
     );
     const result = await createArchiveMediaMaterializer(archive(), { uploadBoardImage })(
-      [boardItem()],
-      'staging',
+      [{ items: [boardItem()], stagingBoardId: 'staging' }],
       () => undefined
     );
 
@@ -266,8 +269,7 @@ describe('createArchiveMediaMaterializer', () => {
   it('reports a descriptor the archive carried no bytes for', async () => {
     const uploadBoardImage = vi.fn(() => Promise.reject(new Error('should not be called')));
     const result = await createArchiveMediaMaterializer(archive(), { uploadBoardImage })(
-      [boardItem({ name: 'absent.png' })],
-      'staging',
+      [{ items: [boardItem({ name: 'absent.png' })], stagingBoardId: 'staging' }],
       () => undefined
     );
 
@@ -286,13 +288,41 @@ describe('createArchiveMediaMaterializer', () => {
     withSecond.images.set('b.png', bytes(3));
 
     const result = await createArchiveMediaMaterializer(withSecond, { uploadBoardImage })(
-      [boardItem(), boardItem({ name: 'b.png' })],
-      'staging',
+      [{ items: [boardItem(), boardItem({ name: 'b.png' })], stagingBoardId: 'staging' }],
       () => undefined
     );
 
     expect(result.failed).toEqual([{ kind: 'image', name: 'a.png', reason: 'upload-failed' }]);
     expect(result.materialized).toEqual([{ kind: 'image', name: 'fresh.png', sourceName: 'b.png' }]);
+  });
+
+  it('uploads across boards at once, so many small boards are not restored one at a time', async () => {
+    const images = new Map(['a.png', 'b.png', 'c.png'].map((name, index) => [name, bytes(index)]));
+    const releases: (() => void)[] = [];
+    const uploadBoardImage = vi.fn(
+      (_bytes: Uint8Array, fileName: string, options: { boardId?: string }) =>
+        new Promise<{ height: number; imageName: string; width: number }>((resolve) => {
+          releases.push(() => resolve({ height: 1, imageName: `${String(options.boardId)}/${fileName}`, width: 1 }));
+        })
+    );
+
+    const materializing = createArchiveMediaMaterializer({ images, videos: new Map() }, { uploadBoardImage })(
+      [
+        { items: [boardItem({ name: 'a.png' })], stagingBoardId: 'one' },
+        { items: [boardItem({ name: 'b.png' })], stagingBoardId: 'two' },
+        { items: [boardItem({ name: 'c.png' })], stagingBoardId: 'three' },
+      ],
+      () => undefined
+    );
+
+    await vi.waitFor(() => expect(uploadBoardImage).toHaveBeenCalledTimes(3));
+    releases.forEach((release) => release());
+
+    expect((await materializing).materialized.map((entry) => entry.name).sort()).toEqual([
+      'one/a.png',
+      'three/c.png',
+      'two/b.png',
+    ]);
   });
 });
 

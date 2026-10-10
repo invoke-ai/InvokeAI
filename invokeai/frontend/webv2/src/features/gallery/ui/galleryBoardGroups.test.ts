@@ -37,6 +37,7 @@ const groupsOf = (overrides: Partial<Parameters<typeof getGalleryBoardGroups>[0]
     boards: ALL,
     projectBoardId: 'mine',
     projectId: 'project-1',
+    projectNames: new Map(),
     searchTerm: '',
     showArchived: true,
     showDates: true,
@@ -75,6 +76,18 @@ describe('getGalleryBoardGroups', () => {
       ['project-z', ['zebra', 'zebra-member']],
     ]);
     expect(groupsOf({ showOtherProjects: false }).otherProjects).toEqual([]);
+  });
+
+  it('names and orders other projects by their live names, whatever their inboxes were listed as', () => {
+    // The listing still has Zebra's inbox under its old name; the project was renamed to "Aardvark" since.
+    const projectNames = new Map([['project-z', 'Aardvark study']]);
+
+    expect(groupsOf({ projectNames }).otherProjects.map((group) => [group.projectId, group.label])).toEqual([
+      ['project-z', 'Aardvark study'],
+      ['project-a', 'Apple ads'],
+    ]);
+    // A search that hides the inbox keeps the group's name and place.
+    expect(groupsOf({ searchTerm: 'stripes' }).otherProjects.map((group) => group.label)).toEqual(['Zebra study']);
   });
 
   it('keeps other projects archived boards out of the archived section while they are hidden', () => {

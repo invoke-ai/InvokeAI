@@ -167,7 +167,11 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     [data.filter, queryClient, starredStrip.items]
   );
   const itemActionContextRef = useRef<GalleryItemActionContext | null>(null);
-  const galleryLocationRef = useRef({ galleryView, selectedBoardId });
+  const galleryLocationRef = useRef({
+    autoAddBoardId: gallery.settings.autoAddBoardId,
+    galleryView,
+    selectedBoardId,
+  });
 
   // In-flight deletion must read the latest rendered filter and selection without an effect-sized stale window.
   // eslint-disable-next-line react/refs
@@ -180,7 +184,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
   };
   // Capture upload destination at launch; judge completion visibility against the latest rendered board and view.
   // eslint-disable-next-line react/refs
-  galleryLocationRef.current = { galleryView, selectedBoardId };
+  galleryLocationRef.current = { autoAddBoardId: gallery.settings.autoAddBoardId, galleryView, selectedBoardId };
 
   const getItemActionContext = useCallback(() => itemActionContextRef.current, []);
   const getCurrentGalleryLocation = useCallback(() => galleryLocationRef.current, []);

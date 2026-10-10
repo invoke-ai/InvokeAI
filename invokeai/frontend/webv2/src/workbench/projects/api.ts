@@ -424,8 +424,8 @@ export class ProjectCreateAbsentError extends Error {
 /**
  * Settle ambiguous creates with a second POST: SQLite serializes writers, while GET 404 can race the initial
  * commit. A 201 succeeds; after 409, GET distinguishes an existing project from a board conflict or an id another
- * account holds. Other
- * deterministic rejections prove absence. Transport failure remains unknown and must never authorize deletion.
+ * account holds. Other deterministic rejections prove absence. When the retry settles nothing either, a GET that finds
+ * this create's project still proves it committed. Transport failure remains unknown and must never authorize deletion.
  */
 const settleProjectCreate = async (request: ProjectCreateRequest, owner: AccountScope): Promise<ProjectRecordDTO> => {
   const projectId = request.project_id;
@@ -456,6 +456,24 @@ const settleProjectCreate = async (request: ProjectCreateRequest, owner: Account
     }
   };
 
+  /** No answer settled the create; only finding its project does. A 404 here may predate the commit, so proves nothing. */
+  const settleUnanswered = async (unanswered: unknown, id: string): Promise<ProjectRecordDTO> => {
+    let record: ProjectRecordDTO | null = null;
+
+    try {
+      record = await getProject(id, owner.signal);
+    } catch {
+      // Still unknown.
+    }
+    assertAccountScopeCurrent(owner);
+
+    if (record === null || !projectRecordMatchesCreate(record, body)) {
+      throw unanswered;
+    }
+
+    return record;
+  };
+
   const classify = (error: unknown): Promise<ProjectRecordDTO> => {
     if (isProjectConflictError(error)) {
       return settleConflict(error);
@@ -481,7 +499,7 @@ const settleProjectCreate = async (request: ProjectCreateRequest, owner: Account
 
       // An ambiguous retry must retain uploads; unknown never authorizes cleanup.
       if (isIndeterminate(retryError) || isProjectWriteBusyError(retryError)) {
-        throw error;
+        return settleUnanswered(error, projectId);
       }
 
       return classify(retryError);
@@ -495,13 +513,20 @@ export const createProjectSettled = async (
 ): Promise<ProjectRecordDTO> => {
   const record = await settleProjectCreate(request, owner);
 
-  // The server mints the project's board with it, so board lists fetched before now are missing it. Loaded lazily
-  // to keep the gallery data layer off the launchpad's startup graph.
+  // The server mints the project's board with it, so board lists fetched before now are missing it.
+  invalidateBoardLists(owner);
+
+  return record;
+};
+
+/**
+ * Mark the account's board lists stale after a change the board endpoints do not announce. Loaded lazily to keep the
+ * gallery data layer off the launchpad's startup graph.
+ */
+export const invalidateBoardLists = (owner: AccountScope): void => {
   void import('@features/gallery/queries').then(({ galleryKeys }) =>
     queryClient.invalidateQueries({ queryKey: galleryKeys.boardsForAccount(owner) })
   );
-
-  return record;
 };
 
 /** A response arrived and refused the create outright, so nothing was written. */

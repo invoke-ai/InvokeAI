@@ -1,5 +1,7 @@
+/* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type { GalleryUiAdapter } from '@features/gallery/react';
 
+import { GALLERY_AUTO_ADD_FOLLOW, getGallerySettings } from '@features/gallery/core/settings';
 import { GalleryUiProvider } from '@features/gallery/react';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
@@ -89,6 +91,7 @@ let root: Root | null = null;
 const actionsRef = createRef<GalleryActions>();
 const reconcileDeletedBoardOutcome = vi.fn();
 const selectBoard = vi.fn();
+const updateSettings = vi.fn();
 const selectItem = vi.fn();
 const setItemMultiSelection = vi.fn();
 const patchGalleryValues = vi.fn();
@@ -103,11 +106,12 @@ const Probe = ({
   ref: Ref<GalleryActions>;
   selectedBoardId: string;
 }) => {
-  const currentGalleryLocationRef = useRef({ galleryView, selectedBoardId });
+  const { autoAddBoardId } = getGallerySettings(galleryValues);
+  const currentGalleryLocationRef = useRef({ autoAddBoardId, galleryView, selectedBoardId });
 
   // Match GalleryWidgetView's render-assigned live-read port.
   // eslint-disable-next-line react/refs
-  currentGalleryLocationRef.current = { galleryView, selectedBoardId };
+  currentGalleryLocationRef.current = { autoAddBoardId, galleryView, selectedBoardId };
   const getCurrentGalleryLocation = useCallback(() => currentGalleryLocationRef.current, []);
   const actions = useGalleryActions({
     boards: [
@@ -187,7 +191,7 @@ const adapter: GalleryUiAdapter = {
     clearSearch: noop,
     setView: noop,
     toggleItemSelection: noop,
-    updateSettings: noop,
+    updateSettings,
   },
   galleryValues: {},
   generateValues: {},
@@ -211,11 +215,13 @@ const adapter: GalleryUiAdapter = {
 let selectedBoardId = 'board-1';
 let galleryView: 'images' | 'assets' = 'images';
 
-const renderProbe = async (probeAdapter: GalleryUiAdapter = adapter) => {
+let galleryValues: Record<string, unknown> = {};
+
+const renderProbe = async () => {
   await act(() => {
     root?.render(
       <QueryClientProvider client={new QueryClient()}>
-        <GalleryUiProvider adapter={probeAdapter}>
+        <GalleryUiProvider adapter={{ ...adapter, galleryValues }}>
           <Probe galleryView={galleryView} ref={actionsRef} selectedBoardId={selectedBoardId} />
         </GalleryUiProvider>
       </QueryClientProvider>
@@ -228,6 +234,7 @@ beforeEach(async () => {
   accountLifecycle.activate('user-a');
   selectedBoardId = 'board-1';
   galleryView = 'images';
+  galleryValues = {};
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -324,6 +331,15 @@ describe('optimistic board updates', () => {
   it('makes the project exist on the server before creating or moving a board into it, never for the Library', async () => {
     mocks.createGalleryBoard.mockResolvedValue({ id: 'new', name: 'New' });
     mocks.updateGalleryBoard.mockResolvedValue(undefined);
+    // Each ensure is held until the test lets it finish, so a request sent without waiting for it shows.
+    let finishEnsure: () => void = () => undefined;
+    const holdNextEnsure = () =>
+      mocks.ensureProjectOnServer.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finishEnsure = resolve;
+          })
+      );
 
     await act(async () => {
       await actionsRef.current?.createBoard('New', null);
@@ -331,19 +347,104 @@ describe('optimistic board updates', () => {
     });
     expect(mocks.ensureProjectOnServer).not.toHaveBeenCalled();
 
-    await act(async () => {
-      await expect(actionsRef.current?.createBoard('New', 'p1')).resolves.toBe(true);
+    let create!: Promise<boolean | undefined>;
+    holdNextEnsure();
+    await act(() => {
+      create = actionsRef.current!.createBoard('New', 'p1');
     });
     expect(mocks.ensureProjectOnServer).toHaveBeenCalledOnce();
-    expect(mocks.ensureProjectOnServer.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.createGalleryBoard.mock.invocationCallOrder[1] ?? 0
-    );
+    expect(mocks.createGalleryBoard).toHaveBeenCalledOnce();
+    await act(async () => {
+      finishEnsure();
+      await expect(create).resolves.toBe(true);
+    });
     expect(mocks.createGalleryBoard).toHaveBeenLastCalledWith('New', 'p1', expect.anything());
 
-    await act(async () => {
-      await actionsRef.current?.moveBoard('board-1', 'p1', 'Project');
+    let move!: Promise<void>;
+    holdNextEnsure();
+    await act(() => {
+      move = actionsRef.current!.moveBoard('board-1', 'p1', 'Project');
     });
     expect(mocks.ensureProjectOnServer).toHaveBeenCalledTimes(2);
+    expect(mocks.updateGalleryBoard).toHaveBeenCalledOnce();
+    await act(async () => {
+      finishEnsure();
+      await move;
+    });
+    expect(mocks.updateGalleryBoard).toHaveBeenLastCalledWith('board-1', { projectId: 'p1' }, expect.anything());
+  });
+
+  it('steps the selection and auto-add off a board moved into a project the panel hides, and back on failure', async () => {
+    galleryValues = { autoAddBoardId: 'board-1' };
+    await renderProbe();
+    let rejectUpdate: (error: Error) => void = () => undefined;
+    mocks.updateGalleryBoard.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        rejectUpdate = reject;
+      })
+    );
+
+    let move!: Promise<void>;
+    await act(() => {
+      move = actionsRef.current!.moveBoard('board-1', 'other-project', 'Other');
+    });
+
+    expect(selectBoard).toHaveBeenCalledExactlyOnceWith('none');
+    expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW });
+
+    // Reflect both optimistic steps in the live gallery the failure path reads.
+    selectedBoardId = 'none';
+    galleryValues = { autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW };
+    await renderProbe();
+    rejectUpdate(new Error('move failed'));
+    await act(() => move);
+
+    expect(selectBoard).toHaveBeenLastCalledWith('board-1');
+    expect(updateSettings).toHaveBeenLastCalledWith({ autoAddBoardId: 'board-1' });
+  });
+
+  it('leaves choices the user made while a failing move was in flight', async () => {
+    galleryValues = { autoAddBoardId: 'board-1' };
+    await renderProbe();
+    let rejectUpdate: (error: Error) => void = () => undefined;
+    mocks.updateGalleryBoard.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        rejectUpdate = reject;
+      })
+    );
+
+    let move!: Promise<void>;
+    await act(() => {
+      move = actionsRef.current!.moveBoard('board-1', 'other-project', 'Other');
+    });
+
+    // Another board selected, and another made the auto-add target, before the failure arrived.
+    selectedBoardId = 'board-2';
+    galleryValues = { autoAddBoardId: 'board-3' };
+    await renderProbe();
+    rejectUpdate(new Error('move failed'));
+    await act(() => move);
+
+    expect(selectBoard).toHaveBeenCalledExactlyOnceWith('none');
+    expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW });
+  });
+
+  it('keeps the selection and auto-add on a board that stays in sight', async () => {
+    mocks.updateGalleryBoard.mockResolvedValue(undefined);
+
+    for (const [values, destination] of [
+      [{ autoAddBoardId: 'board-1' }, 'project-1'],
+      [{ autoAddBoardId: 'board-1', showOtherProjectBoards: true }, 'other-project'],
+    ] as const) {
+      galleryValues = values;
+      await renderProbe();
+      await act(async () => {
+        await actionsRef.current?.moveBoard('board-1', destination, 'Somewhere');
+      });
+    }
+
+    expect(selectBoard).not.toHaveBeenCalled();
+    expect(updateSettings).not.toHaveBeenCalled();
   });
 
   it('keeps a successful rename applied without rolling back', async () => {
@@ -499,25 +600,48 @@ describe('board access', () => {
 });
 
 describe('archiving the auto-add board', () => {
+  const archiveFailingLater = async () => {
+    let rejectUpdate: (error: Error) => void = () => undefined;
+    mocks.updateGalleryBoard.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        rejectUpdate = reject;
+      })
+    );
+    let archive!: Promise<void>;
+    await act(() => {
+      archive = actionsRef.current!.archiveBoard('board-1', true);
+    });
+
+    return { archive, reject: () => rejectUpdate(new Error('archive failed')) };
+  };
+
   it('stops auto-adding there, and pins it again if the archive is refused', async () => {
-    const updateSettings = vi.fn();
-    await renderProbe({
-      ...adapter,
-      gallery: { ...adapter.gallery, updateSettings },
-      galleryValues: { autoAddBoardId: 'board-1' },
-    });
-    mocks.updateGalleryBoard.mockResolvedValueOnce({}).mockRejectedValueOnce(new Error('archive failed'));
+    galleryValues = { autoAddBoardId: 'board-1' };
+    await renderProbe();
+    const { archive, reject } = await archiveFailingLater();
 
-    await act(async () => {
-      await actionsRef.current?.archiveBoard('board-1', true);
-    });
-    expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: 'follow' });
+    expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW });
 
-    updateSettings.mockClear();
-    await act(async () => {
-      await actionsRef.current?.archiveBoard('board-1', true);
-    });
-    expect(updateSettings.mock.calls).toEqual([[{ autoAddBoardId: 'follow' }], [{ autoAddBoardId: 'board-1' }]]);
+    // Reflect the optimistic step in the live gallery the failure path reads.
+    galleryValues = { autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW };
+    await renderProbe();
+    reject();
+    await act(() => archive);
+
+    expect(updateSettings).toHaveBeenLastCalledWith({ autoAddBoardId: 'board-1' });
+  });
+
+  it('leaves an auto-add board the user chose while the refused archive was in flight', async () => {
+    galleryValues = { autoAddBoardId: 'board-1' };
+    await renderProbe();
+    const { archive, reject } = await archiveFailingLater();
+
+    galleryValues = { autoAddBoardId: 'board-3' };
+    await renderProbe();
+    reject();
+    await act(() => archive);
+
+    expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW });
   });
 });
 

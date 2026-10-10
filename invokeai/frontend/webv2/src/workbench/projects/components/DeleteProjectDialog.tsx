@@ -30,6 +30,16 @@ export const DeleteProjectDialog = ({
 }) => {
   const { t } = useTranslation();
   const [boards, setBoards] = useState<DeleteProjectBoards>('release');
+  // Each opening starts from the safe choice again, set as it opens rather than once the last one finished closing:
+  // a dialog reopened during that exit, for this project or another, must not inherit a destructive choice.
+  const [choiceOpenFor, setChoiceOpenFor] = useState<string | null>(null);
+  const openFor = isOpen ? projectId : null;
+  if (openFor !== choiceOpenFor) {
+    setChoiceOpenFor(openFor);
+    if (openFor !== null) {
+      setBoards('release');
+    }
+  }
   // Archived members go with the project just the same, so the list must include them.
   const { data, isError, isLoading } = useQuery({
     ...galleryBoardsOptions({ includeArchived: true }),
@@ -45,8 +55,6 @@ export const DeleteProjectDialog = ({
     setBoards(event.value === 'delete' ? 'delete' : 'release');
   }, []);
   const handleConfirm = useCallback(() => onConfirm(boards), [boards, onConfirm]);
-  // Each opening starts from the safe choice again.
-  const handleExitComplete = useCallback(() => setBoards('release'), []);
 
   return (
     <ConfirmDialog
@@ -106,7 +114,6 @@ export const DeleteProjectDialog = ({
       title={t('projects.deleteProjectQuestion')}
       onClose={onClose}
       onConfirm={handleConfirm}
-      onExitComplete={handleExitComplete}
     />
   );
 };

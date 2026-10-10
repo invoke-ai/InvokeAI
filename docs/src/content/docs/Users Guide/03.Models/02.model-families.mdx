@@ -42,7 +42,7 @@ page lists the builds it supports.
 
 ### Quantized formats
 
-InvokeAI recognizes the format from the file's contents, so you install them like any other model:
+InvokeAI recognizes the format from the file's contents, so you install them like any other model. Which format loads for which model is listed in [Model Format Support](/users-guide/models/model-format-support/).
 
 - **GGUF** (`.gguf`, llama.cpp quantization such as Q4_K or Q8_0): weights stay packed in memory and are unpacked layer by layer during generation. Supported for the FLUX.1, FLUX.2, Z-Image, Krea-2, Qwen-Image, Ideogram 4 and Wan transformers, and for the T5, Qwen3, Qwen3-VL, Mistral and Gemma 2 text encoders. ComfyUI-GGUF's `Q8_CR` files, which store int8 (`int8_convrot`) layers inside a `.gguf`, load for the Krea-2 transformer; for other models, and for ComfyUI-GGUF's `Q4_CR`, installation is refused with a message saying so.
 - **NF4** (bitsandbytes): 4-bit, CUDA only.

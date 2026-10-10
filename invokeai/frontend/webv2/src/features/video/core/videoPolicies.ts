@@ -46,6 +46,7 @@ import {
   resolveLtx2Canvas,
   resolveMiniMaxH3Canvas,
   scaleAndSnapWanDimensions,
+  snapLtx2FramesDown,
   snapNumFramesToChoices,
   snapNumFramesToGrid,
   WAN_A14B_PIXEL_MULTIPLE,
@@ -640,8 +641,8 @@ export interface EffectiveVideoTiming {
  * Whether this mode has a length left for the duration head to decide.
  *
  * A conditioning clip drives `num_frames` by its own edge, and a second edge into one input is a
- * malformed graph. An extension has no such edge, but its frame count is the new material the user
- * asked for, measured against the source it joins -- a prompt's natural length is not that number.
+ * malformed graph. An extension has no such edge: its prompt describes the continuation, so the
+ * head sizes the new material and the held context is added in front of it.
  *
  * Separate from `isAutoDurationActive` because the panel needs to say *why* the control is
  * unavailable, which "not active" alone cannot tell it.
@@ -654,7 +655,7 @@ export const isAutoDurationSupportedForMode = (
 ): boolean => {
   const mode = resolveVideoMode(settings);
 
-  return mode !== 'audio-to-video' && mode !== 'video-to-audio' && mode !== 'extend';
+  return mode !== 'audio-to-video' && mode !== 'video-to-audio';
 };
 
 /**
@@ -840,6 +841,19 @@ export interface VideoModelPolicy {
   };
 }
 
+export interface AutoDurationBounds {
+  maxSeconds: number;
+  minSeconds: number;
+  /** Frames held in front of the prediction: an extension's context, else 0. */
+  contextFrames: number;
+  /** The longest total the head can hand the run, context included, at `fps`. */
+  maxFrames: number;
+  /** The most new material that total holds: `maxFrames` less the context. */
+  maxNewFrames: number;
+  /** The rate the seconds are read at; a continuation's is the source's. */
+  fps: number;
+}
+
 /**
  * The range the duration head chooses this run's length from, or null when it does not run.
  *
@@ -848,11 +862,15 @@ export interface VideoModelPolicy {
  * sized the run for. A ceiling at or under that floor leaves nothing to choose: the head is skipped
  * and the run uses the Frames value as set. The graph and the panel both read this, so the panel's
  * description of the run is the run.
+ *
+ * A continuation plays at its source's rate, and its prompt describes only what follows the held
+ * context, so the head chooses the new material: from the family's shortest clip up to whatever of
+ * the Frames ceiling the context leaves.
  */
 export const getAutoDurationBounds = (
   model: MainModelConfig | undefined,
   settings: VideoSettings
-): { maxSeconds: number; minSeconds: number } | null => {
+): AutoDurationBounds | null => {
   if (!isAutoDurationActive(settings)) {
     return null;
   }
@@ -861,8 +879,24 @@ export const getAutoDurationBounds = (
     return null;
   }
   const timing = getEffectiveVideoTiming(model, settings);
+  const source = resolveVideoMode(settings) === 'extend' ? settings.sourceVideo : null;
+  const fps = source ? source.fps : timing.fps;
+  const contextFrames = source ? settings.ltx2ExtendContextFrames : 0;
+  // Both 8k + 1, so their difference plus one is too: the longest prediction that still fits.
+  const bounds = ltx2AutoDurationBounds(fps, frames.min, timing.numFrames - Math.max(0, contextFrames - 1));
+  if (!bounds) {
+    return null;
+  }
+  // The head converts seconds at the run's rate and floors onto the grid, the same as here.
+  const predicted = snapLtx2FramesDown(Math.round(bounds.maxSeconds * fps));
 
-  return ltx2AutoDurationBounds(timing.fps, frames.min, timing.numFrames);
+  return {
+    ...bounds,
+    contextFrames,
+    fps,
+    maxFrames: contextFrames ? contextFrames + predicted - 1 : predicted,
+    maxNewFrames: contextFrames ? predicted - 1 : predicted,
+  };
 };
 
 export const getVideoModelPolicy = (model: MainModelConfig | undefined, settings: VideoSettings): VideoModelPolicy => {

@@ -24,17 +24,23 @@ const imageRef = (name: string): InvkMediaRef => ({ kind: 'image', name });
 /** Materializes everything, under the fresh names the destination server would assign. */
 const freshNameMaterializer =
   (options: { fail?: ReadonlySet<string> } = {}): MediaMaterializer =>
-  (items, boardId, onItemSettled) => {
+  (boards, onItemSettled) => {
     const result: MaterializeResult = { failed: [], materialized: [] };
 
-    for (const item of items) {
-      if (options.fail?.has(item.name)) {
-        result.failed.push({ kind: item.kind, name: item.name, reason: 'upload-failed' });
-      } else {
-        result.materialized.push({ kind: item.kind, name: `${boardId}-${item.name}`, sourceName: item.name });
-      }
+    for (const { items, stagingBoardId } of boards) {
+      for (const item of items) {
+        if (options.fail?.has(item.name)) {
+          result.failed.push({ kind: item.kind, name: item.name, reason: 'upload-failed' });
+        } else {
+          result.materialized.push({
+            kind: item.kind,
+            name: `${stagingBoardId}-${item.name}`,
+            sourceName: item.name,
+          });
+        }
 
-      onItemSettled();
+        onItemSettled();
+      }
     }
 
     return Promise.resolve(result);
@@ -198,7 +204,7 @@ describe('board media', () => {
     const result = await restore(
       { boardItems: [boardItem({ name: 'described.png' })] },
       {
-        materializeBoardMedia: (_items, _boardId, onItemSettled) => {
+        materializeBoardMedia: (_boards, onItemSettled) => {
           onItemSettled();
 
           return Promise.resolve({
@@ -238,10 +244,10 @@ describe('board media', () => {
     const result = await restore(
       { boardItems: [boardItem({ name: 'gone.png' })], documentRefs: [imageRef('gone.png')] },
       {
-        materializeBoardMedia: (items, _boardId, onItemSettled) => {
+        materializeBoardMedia: (boards, onItemSettled) => {
           onItemSettled();
 
-          return Promise.resolve({ failed: failuresFor(items), materialized: [] });
+          return Promise.resolve({ failed: failuresFor(boards.flatMap((board) => board.items)), materialized: [] });
         },
       }
     );
@@ -413,10 +419,12 @@ describe('progress', () => {
   it('counts the items of every staged board, each materialized onto its own board', async () => {
     const onProgress = vi.fn();
     const targets: [string, string][] = [];
-    const materializeBoardMedia: MediaMaterializer = (items, boardId, onItemSettled) => {
-      targets.push(...items.map((item): [string, string] => [item.name, boardId]));
+    const materializeBoardMedia: MediaMaterializer = (boards, onItemSettled) => {
+      for (const { items, stagingBoardId } of boards) {
+        targets.push(...items.map((item): [string, string] => [item.name, stagingBoardId]));
+      }
 
-      return freshNameMaterializer()(items, boardId, onItemSettled);
+      return freshNameMaterializer()(boards, onItemSettled);
     };
 
     await restore(

@@ -2,17 +2,20 @@
 import type { GalleryBoard } from '@features/gallery/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { DndContext } from '@dnd-kit/core';
+import { DndContext, KeyboardSensor, MouseSensor, pointerWithin, useSensor, useSensors } from '@dnd-kit/core';
 import { DEFAULT_GALLERY_SETTINGS, type GallerySettings } from '@features/gallery/core/settings';
 import { system } from '@theme/system';
-import { act } from 'react';
+import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import type { GalleryStateView } from './galleryStateView';
 import type { GalleryWidgetContextValue } from './GalleryWidgetContext';
 
+import { GalleryBoardDragMonitor } from './GalleryBoardDragMonitor';
 import { GalleryBoardsPanel } from './GalleryBoardsPanel';
+import { GalleryDragScope } from './galleryDnd';
 import { GalleryWidgetContext } from './GalleryWidgetContext';
 
 vi.mock('react-i18next', () => ({
@@ -41,6 +44,7 @@ vi.mock('react-i18next', () => ({
 
 const actions = {
   createBoard: vi.fn(() => Promise.resolve(true)),
+  moveBoard: vi.fn(() => Promise.resolve()),
   selectBoard: vi.fn(),
   updateSettings: vi.fn(),
 };
@@ -100,7 +104,24 @@ let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const renderPanel = async (gallery: GalleryStateView = createGallery()) => {
+/** The workbench's drag context: the shell's mouse activation, pointer collisions, and the gallery's drop monitor. */
+const WorkbenchDrag = ({ children }: { children: ReactNode }) => {
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor)
+  );
+
+  return (
+    <DndContext collisionDetection={pointerWithin} sensors={sensors}>
+      <GalleryDragScope value>
+        {children}
+        <GalleryBoardDragMonitor />
+      </GalleryDragScope>
+    </DndContext>
+  );
+};
+
+const renderPanel = async (gallery: GalleryStateView = createGallery(), { withDrag = false } = {}) => {
   const contextValue = {
     actions,
     boardsState: { error: null, isRetrying: false, retry: () => Promise.resolve(), status: 'ready' },
@@ -109,15 +130,22 @@ const renderPanel = async (gallery: GalleryStateView = createGallery()) => {
     projectId: 'p1',
     projectName: 'Mahogany House',
     projectNames: new Map([['p2', 'Harbor Tower']]),
+    region: 'left',
   } as unknown as GalleryWidgetContextValue;
 
   await act(() =>
     root?.render(
       <ChakraProvider value={system}>
         <GalleryWidgetContext value={contextValue}>
-          <DndContext>
-            <GalleryBoardsPanel />
-          </DndContext>
+          {withDrag ? (
+            <WorkbenchDrag>
+              <GalleryBoardsPanel />
+            </WorkbenchDrag>
+          ) : (
+            <DndContext>
+              <GalleryBoardsPanel />
+            </DndContext>
+          )}
         </GalleryWidgetContext>
       </ChakraProvider>
     )
@@ -343,14 +371,134 @@ describe('GalleryBoardsPanel', () => {
     expect((await getCreateDialog()).querySelector('h2')?.textContent).toBe('Create board in Mahogany House');
   });
 
-  it('counts the boards made in each tier, not its fixed row', async () => {
+  it('counts the boards in each tier, the inbox included, but not Uncategorized', async () => {
     await renderPanel();
 
     const counts = Array.from(
       host?.querySelectorAll<HTMLElement>('[data-scope="collapsible"][data-part="trigger"]') ?? []
     ).map((trigger) => trigger.textContent);
 
-    expect(counts.slice(0, 2)).toEqual(['Mahogany House1', 'Library2']);
+    expect(counts.slice(0, 2)).toEqual(['Mahogany House2', 'Library2']);
+  });
+
+  describe('dragging a board', () => {
+    const row = (label: string) =>
+      getBoardRows().find((button) => button.textContent?.startsWith(label))!.parentElement as HTMLElement;
+    const heading = (label: string) =>
+      [...(host?.querySelectorAll<HTMLElement>('[data-part="trigger"], [role="heading"]') ?? [])].find((element) =>
+        element.textContent?.startsWith(label)
+      )!;
+    const settle = () =>
+      new Promise<void>((resolve) => {
+        globalThis.setTimeout(resolve, 30);
+      });
+    /**
+     * A pointer that travels, as a hand does: the tiers start taking boards once the drag has begun, and are measured
+     * on the moves after it. Outside act, as in the shell: dnd-kit settles the drop in effects act would hold back.
+     */
+    const drag = async (source: HTMLElement, target: HTMLElement) => {
+      const center = (element: HTMLElement) => {
+        const rect = element.getBoundingClientRect();
+
+        return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+      };
+      const from = center(source);
+      const to = center(target);
+      const mouse = (type: string, at: { x: number; y: number }, element: EventTarget = document) =>
+        element.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0, clientX: at.x, clientY: at.y }));
+
+      mouse('mousedown', from, source);
+      for (const progress of [0.25, 0.5, 0.75, 1, 1]) {
+        mouse('mousemove', { x: from.x + (to.x - from.x) * progress, y: from.y + (to.y - from.y) * progress });
+        await settle();
+      }
+      mouse('mouseup', to);
+      await settle();
+    };
+
+    it('moves it to the project or Library it is dropped on, anywhere on that tier', async () => {
+      await renderPanel(createGallery({ showOtherProjectBoards: true }), { withDrag: true });
+
+      await drag(row('dogs'), heading('Harbor Tower'));
+      expect(actions.moveBoard).toHaveBeenLastCalledWith('dogs', 'p2', 'Harbor Tower');
+
+      await drag(row('Stripes'), row('Façades'));
+      expect(actions.moveBoard).toHaveBeenLastCalledWith('theirs-member', 'p1', 'Mahogany House');
+
+      await drag(row('Façades'), heading('Library'));
+      expect(actions.moveBoard).toHaveBeenLastCalledWith('mine-member', null, 'Library');
+      expect(actions.moveBoard).toHaveBeenCalledTimes(3);
+    });
+
+    it('moves nothing dropped on its own tier, and never drags an inbox, which moves with its project', async () => {
+      await renderPanel(createGallery({ showOtherProjectBoards: true }), { withDrag: true });
+
+      await drag(row('dogs'), row('Cats'));
+      await drag(row('Inbox'), heading('Library'));
+      // Pressing the row's menu button and moving away is no drag either.
+      await drag(row('Façades').querySelector<HTMLElement>('.board-row-actions')!, heading('Library'));
+
+      expect(actions.moveBoard).not.toHaveBeenCalled();
+    });
+
+    it("never drags someone else's board onto the caller's own tiers", async () => {
+      const shared = createBoard({
+        access: {
+          actions: ['read', 'add_media', 'rename'],
+          adminOverride: false,
+          generalAccess: 'viewer',
+          role: 'editor',
+        },
+        id: 'refs',
+        name: 'Client references',
+        ownerName: 'Cleo',
+      });
+      // An admin's rights allow the move, but its destinations would be the admin's projects, not the owner's.
+      const adminOnly = createBoard({
+        access: {
+          actions: ['read', 'add_media', 'rename', 'move'],
+          adminOverride: true,
+          generalAccess: 'restricted',
+          role: null,
+        },
+        id: 'sketches',
+        name: 'Private sketches',
+        ownerName: 'Dee',
+      });
+      await renderPanel(
+        {
+          ...createGallery({ expandedBoardSections: ['other-users'], showOtherProjectBoards: true }),
+          boards: [...boards, shared, adminOnly],
+        },
+        { withDrag: true }
+      );
+
+      await drag(row('Client references'), heading('Harbor Tower'));
+      await drag(row('Private sketches'), heading('Harbor Tower'));
+
+      expect(actions.moveBoard).not.toHaveBeenCalled();
+    });
+
+    it('takes a drop on a collapsed tier, by its heading', async () => {
+      await renderPanel(createGallery({ collapsedBoardSections: ['library'] }), { withDrag: true });
+
+      await drag(row('Façades'), heading('Library'));
+
+      expect(actions.moveBoard).toHaveBeenCalledExactlyOnceWith('mine-member', null, 'Library');
+    });
+
+    it('selects a draggable board from the keyboard rather than starting a drag', async () => {
+      await renderPanel(createGallery(), { withDrag: true });
+      const button = getBoardRows().find((candidate) => candidate.textContent?.startsWith('Façades'))!;
+
+      button.focus();
+      await userEvent.keyboard('{Enter}');
+      await userEvent.keyboard(' ');
+
+      expect(actions.selectBoard).toHaveBeenCalledTimes(2);
+      expect(actions.selectBoard).toHaveBeenLastCalledWith('mine-member');
+      expect(actions.moveBoard).not.toHaveBeenCalled();
+    });
   });
 
   it('names another project inbox for assistive tech while the visible row says Inbox', async () => {

@@ -201,10 +201,15 @@ export const createArchiveMediaMaterializer = (
   const uploadImage = deps.uploadBoardImage ?? uploadBoardImage;
   const uploadVideo = deps.uploadBoardVideo ?? uploadBoardVideo;
 
-  return async (items, boardId, onItemSettled) => {
+  return async (boards, onItemSettled) => {
     const result: Awaited<ReturnType<MediaMaterializer>> = { failed: [], materialized: [] };
+    // One pool across the boards: uploads are per item, so an archive of many small boards would otherwise run
+    // little more than one at a time.
+    const uploads = boards.flatMap(({ items, stagingBoardId }) =>
+      items.map((item) => ({ boardId: stagingBoardId, item }))
+    );
 
-    await mapWithConcurrency(items, INVK_TRANSFER_CONCURRENCY, async (item) => {
+    await mapWithConcurrency(uploads, INVK_TRANSFER_CONCURRENCY, async ({ boardId, item }) => {
       const entries = item.kind === 'image' ? archive.images : archive.videos;
       const bytes = entries.get(item.name);
 

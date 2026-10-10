@@ -22,6 +22,7 @@ import {
 import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { isManagedGalleryBoard, isMovableGalleryBoard } from './galleryBoardGroups';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 export interface GalleryBoardMenuTarget {
@@ -50,11 +51,8 @@ export const GalleryBoardMenu = ({
   targetRef.current = target;
 
   const board = target?.board ?? null;
-  // An inbox is renamed, archived and deleted through its project; other real boards are managed as far as the
-  // server allows the caller. The active project's own inbox is also checked by id, because a draft project's inbox
-  // can predate the listing.
-  const isManagedBoard =
-    board !== null && board.kind === 'board' && !board.isInbox && board.id !== gallery.projectBoardId;
+  // Other than an inbox, a real board is managed as far as the server allows the caller.
+  const isManagedBoard = board !== null && isManagedGalleryBoard(board, gallery.projectBoardId);
   const can = (action: GalleryBoardAction) => board !== null && isManagedBoard && canOnBoard(board, action);
   // A dialog stays open only while the board is listed and still allows its action: a refetch after a revocation
   // or a deletion elsewhere closes it, for good, rather than leaving a change that would only be refused or reopening
@@ -181,8 +179,7 @@ export const GalleryBoardMenu = ({
                   <BoardRenameMenuItem board={board} onRename={setRenameTarget} onRenameValue={setRenameValue} />
                 )}
                 {boardSharing && can('set_general_access') && <BoardGeneralAccessSubMenu board={board} />}
-                {/* Its destinations are the caller's own projects, which only the board's owner can move it into. */}
-                {can('move') && isOwnGalleryBoard(board) && <BoardMoveSubMenu board={board} />}
+                {isMovableGalleryBoard(board, gallery.projectBoardId) && <BoardMoveSubMenu board={board} />}
                 {can('archive') && <BoardArchiveMenuItem archived={board.archived} boardId={board.id} />}
                 {can('delete') && (
                   <>

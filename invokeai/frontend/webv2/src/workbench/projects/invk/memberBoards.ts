@@ -18,6 +18,8 @@ export interface StagedBoard {
 }
 
 export interface MemberBoardPlacementDeps {
+  /** After each board settles, placed or not. */
+  onProgress?: (completed: number, total: number) => void;
   placeBoardInProject?: typeof placeBoardInProject;
   signal?: AbortSignal;
 }
@@ -61,12 +63,9 @@ export const placeMemberBoards = async (
 ): Promise<InvkBoardIssue[]> => {
   const place = deps.placeBoardInProject ?? placeBoardInProject;
   const issues: InvkBoardIssue[] = [];
+  const members = staged.filter(({ board }) => !board.isInbox);
 
-  for (const { board, stagingBoardId } of staged) {
-    if (board.isInbox) {
-      continue;
-    }
-
+  for (const [index, { board, stagingBoardId }] of members.entries()) {
     try {
       await place(stagingBoardId, projectId, board.archived, deps.signal);
     } catch (error) {
@@ -76,6 +75,8 @@ export const placeMemberBoards = async (
 
       issues.push({ name: board.name });
     }
+
+    deps.onProgress?.(index + 1, members.length);
   }
 
   return issues;

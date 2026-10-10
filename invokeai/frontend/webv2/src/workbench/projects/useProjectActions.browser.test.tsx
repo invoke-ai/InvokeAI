@@ -1,6 +1,8 @@
+import type { GalleryBoard } from '@features/gallery';
 import type { Project } from '@workbench/projectContracts';
 import type { ProjectCommandResult } from '@workbench/workbenchStore';
 
+import { galleryBoardsOptions } from '@features/gallery/queries';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createDraftProject } from '@workbench/workbenchState';
@@ -20,6 +22,7 @@ const harness = vi.hoisted(() => ({
   notifyError: vi.fn(),
   persistEmptySession: vi.fn(),
   project: {} as Project,
+  reconcileDeletedBoardOutcome: vi.fn(),
   releaseProjectSync: vi.fn(),
   reopenSession: vi.fn(),
 }));
@@ -35,7 +38,10 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
 vi.mock('@workbench/useNotify', () => ({ useNotify: () => ({ error: harness.notifyError }) }));
 vi.mock('@workbench/WorkbenchContext', () => ({
   useWorkbenchLiveCanvasEngines: () => ({ flushPendingPixels: harness.flushCanvasPixels }),
-  useWorkbenchCommands: () => ({ projects: { close: harness.close } }),
+  useWorkbenchCommands: () => ({
+    gallery: { reconcileDeletedBoardOutcome: harness.reconcileDeletedBoardOutcome },
+    projects: { close: harness.close },
+  }),
   useWorkbenchPersistenceAdapter: () => ({ getState: () => ({ projects: [harness.project] }) }),
   useWorkbenchPersistenceService: () => ({
     flushProjectToServer: harness.flush,
@@ -62,6 +68,7 @@ const HarnessBody = () => {
     <>
       <button onClick={() => closeProject(harness.project)}>close</button>
       <button onClick={() => void deleteProject(harness.project)}>delete</button>
+      <button onClick={() => void deleteProject(harness.project, 'delete')}>delete with boards</button>
     </>
   );
 };
@@ -85,6 +92,8 @@ beforeEach(() => {
   harness.flushCanvasPixels.mockReset();
   harness.flushCanvasPixels.mockResolvedValue(undefined);
   harness.navigate.mockReset();
+  harness.reconcileDeletedBoardOutcome.mockReset();
+  queryClient.clear();
   harness.notifyError.mockReset();
   harness.persistEmptySession.mockReset();
   harness.persistEmptySession.mockResolvedValue(undefined);
@@ -113,6 +122,50 @@ describe('useProjectActions', () => {
 
     expect(harness.notifyError).toHaveBeenCalledWith('projects.deleteFailed', 'projects.activeRunsMustFinish');
     expect(harness.deleteLibraryProject).not.toHaveBeenCalled();
+  });
+
+  it('clears other open projects of the boards that went with a deleted project, and only once it is gone', async () => {
+    const board = (id: string, projectId: string | null, isInbox = false, archived = false): GalleryBoard => ({
+      archived,
+      assetCount: 0,
+      assetVideoCount: 0,
+      id,
+      imageCount: 0,
+      isInbox,
+      kind: 'board',
+      name: id,
+      projectId,
+      videoCount: 0,
+    });
+    // The delete dialog's list holds archived boards, which go with the project too; the gallery's does not.
+    queryClient.setQueryData(galleryBoardsOptions({}).queryKey, [
+      board('inbox', harness.project.id, true),
+      board('member', harness.project.id),
+      board('elsewhere', 'other-project'),
+      board('library', null),
+    ]);
+    queryClient.setQueryData(galleryBoardsOptions({ includeArchived: true }).queryKey, [
+      board('inbox', harness.project.id, true),
+      board('member', harness.project.id),
+      board('old-member', harness.project.id, false, true),
+    ]);
+    const reconciledBoardIds = () =>
+      harness.reconcileDeletedBoardOutcome.mock.calls.map((call) => (call[0] as { boardId: string }).boardId);
+    await act(() => root?.render(<Harness />));
+
+    harness.deleteLibraryProject.mockRejectedValueOnce(new Error('offline'));
+    await act(() => userEvent.click(document.querySelectorAll('button')[2]!));
+    expect(harness.reconcileDeletedBoardOutcome).not.toHaveBeenCalled();
+
+    await act(() => userEvent.click(document.querySelectorAll('button')[1]!));
+    expect(reconciledBoardIds()).toEqual(['inbox']);
+
+    harness.reconcileDeletedBoardOutcome.mockReset();
+    await act(() => userEvent.click(document.querySelectorAll('button')[2]!));
+    expect(reconciledBoardIds()).toEqual(['inbox', 'member', 'old-member']);
+    expect(harness.reconcileDeletedBoardOutcome).toHaveBeenCalledWith(
+      expect.objectContaining({ deletedImageNames: [], deletedVideoNames: [], failedImageNames: [] })
+    );
   });
 
   it('blocks project close before flushing while a queue run is active', async () => {

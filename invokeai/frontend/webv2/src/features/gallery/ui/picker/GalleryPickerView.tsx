@@ -3,7 +3,7 @@ import type { GallerySparseListing } from '@features/gallery/ui/useGalleryData';
 import type { KeyboardEvent, RefObject } from 'react';
 
 import { Box, HStack, Icon, Stack, Text } from '@chakra-ui/react';
-import { getGalleryProjectGroupLabel, getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
+import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { getGalleryUploadAccept, toGalleryItemKey } from '@features/gallery/core/items';
 import { GALLERY_PAGE_SIZE, galleryItemsPageOptions } from '@features/gallery/data/queries';
 import { BoardCover, BoardCoverIcon } from '@features/gallery/ui/GalleryBoardCover';
@@ -250,6 +250,7 @@ export const GalleryPickerView = ({
       boards: data.boards,
       projectBoardId: getGalleryProjectBoardId(galleryValues),
       projectId,
+      projectNames: new Map((projects ?? []).map((project) => [project.id, project.name])),
       searchTerm: scope.searchTerm,
       showArchived: settings.showArchivedBoards,
       showDates: settings.showDateBoards,
@@ -257,15 +258,13 @@ export const GalleryPickerView = ({
       showOtherProjects: true,
       t,
     });
-    const projectNames = new Map((projects ?? []).map((project) => [project.id, project.name]));
-
     return [
       { boards: groups.projectBoards, id: 'project', label: projectName },
       { boards: groups.libraryBoards, id: 'library', label: t('widgets.gallery.boardGroups.library') },
       ...groups.otherProjects.map((group) => ({
         boards: group.boards,
         id: `project:${group.projectId}`,
-        label: getGalleryProjectGroupLabel(group.projectId, group.boards, projectNames, t),
+        label: group.label,
       })),
       { boards: groups.sharedBoards, id: 'shared', label: t('widgets.gallery.boardGroups.shared') },
       { boards: groups.otherUsersBoards, id: 'other-users', label: t('widgets.gallery.boardGroups.otherUsers') },

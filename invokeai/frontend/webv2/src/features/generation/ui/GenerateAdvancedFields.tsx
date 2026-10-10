@@ -108,7 +108,8 @@ export const GenerateAdvancedFields = ({
     !policy.seamlessVisible &&
     !policy.hiDiffusionVisible &&
     !policy.clipSkipMax &&
-    !policy.cfgRescaleVisible
+    !policy.cfgRescaleVisible &&
+    !policy.pidVisible
   ) {
     return null;
   }

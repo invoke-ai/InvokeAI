@@ -37,12 +37,14 @@ export const useGalleryActions = ({
   selectedBoardId,
 }: {
   boards: GalleryBoard[];
-  getCurrentGalleryLocation: () => { galleryView: GalleryView; selectedBoardId: string };
+  /** The latest rendered gallery, for settling an action the user may have moved on from while it ran. */
+  getCurrentGalleryLocation: () => { autoAddBoardId: string; galleryView: GalleryView; selectedBoardId: string };
   loadMore: () => void;
   selectedBoardId: string;
 }): GalleryActions => {
-  const { ensureProjectOnServer, exportProject, gallery, galleryValues, notifications, widgets } = useGalleryUi();
-  const { autoAddBoardId } = getGallerySettings(galleryValues);
+  const { ensureProjectOnServer, exportProject, gallery, galleryValues, notifications, projectId, widgets } =
+    useGalleryUi();
+  const { autoAddBoardId, showOtherProjectBoards } = getGallerySettings(galleryValues);
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const uploadFiles = useGalleryUploadAction({ boards, getCurrentGalleryLocation, selectedBoardId });
@@ -125,10 +127,12 @@ export const useGalleryActions = ({
 
           rollback();
 
-          if (movedSelectionAway && getCurrentGalleryLocation().selectedBoardId === 'none') {
+          // Each only while the user has not chosen again since.
+          const current = getCurrentGalleryLocation();
+          if (movedSelectionAway && current.selectedBoardId === 'none') {
             gallery.selectBoard(boardId);
           }
-          if (stoppedAutoAdding) {
+          if (stoppedAutoAdding && current.autoAddBoardId === GALLERY_AUTO_ADD_FOLLOW) {
             gallery.updateSettings({ autoAddBoardId: boardId });
           }
 
@@ -229,17 +233,30 @@ export const useGalleryActions = ({
       },
       exportProject,
       loadMore,
-      moveBoard: async (boardId, projectId, destinationLabel) => {
+      moveBoard: async (boardId, destinationProjectId, destinationLabel) => {
         const owner = captureAccountScope();
-        const rollback = patchGalleryBoardCaches(queryClient, boardId, { projectId });
+        const rollback = patchGalleryBoardCaches(queryClient, boardId, { projectId: destinationProjectId });
+        // Into another project while other projects are hidden, the board leaves the panel as an archived one does:
+        // it stops being the selection and the auto-add target rather than take results nothing on screen shows.
+        const leavesView =
+          destinationProjectId !== null && destinationProjectId !== projectId && !showOtherProjectBoards;
+        const movedSelectionAway = leavesView && boardId === selectedBoardId;
+        const stoppedAutoAdding = leavesView && boardId === autoAddBoardId;
+
+        if (movedSelectionAway) {
+          gallery.selectBoard('none');
+        }
+        if (stoppedAutoAdding) {
+          gallery.updateSettings({ autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW });
+        }
 
         try {
-          if (projectId !== null) {
+          if (destinationProjectId !== null) {
             await ensureProjectOnServer?.();
             assertAccountScopeCurrent(owner);
           }
 
-          await updateGalleryBoard(boardId, { projectId }, owner.signal);
+          await updateGalleryBoard(boardId, { projectId: destinationProjectId }, owner.signal);
 
           assertAccountScopeCurrent(owner);
           recordSuccess(
@@ -252,6 +269,16 @@ export const useGalleryActions = ({
           }
 
           rollback();
+
+          // Each only while the user has not chosen again since.
+          const current = getCurrentGalleryLocation();
+          if (movedSelectionAway && current.selectedBoardId === 'none') {
+            gallery.selectBoard(boardId);
+          }
+          if (stoppedAutoAdding && current.autoAddBoardId === GALLERY_AUTO_ADD_FOLLOW) {
+            gallery.updateSettings({ autoAddBoardId: boardId });
+          }
+
           recordBoardError(boardId, error, { missingIsBoard: false });
         }
       },
@@ -335,8 +362,10 @@ export const useGalleryActions = ({
     getCurrentGalleryLocation,
     loadMore,
     notifications,
+    projectId,
     queryClient,
     selectedBoardId,
+    showOtherProjectBoards,
     t,
     uploadFiles,
     widgets,

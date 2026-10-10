@@ -67,8 +67,9 @@ const noop = () => undefined;
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-const renderDialog = async (projectId: string, seed = true) => {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+let queryClient = new QueryClient();
+
+const renderDialog = async (projectId: string, seed = true, isOpen = true) => {
   if (seed) {
     // Archived members are included: they go with the project just the same.
     queryClient.setQueryData(galleryBoardsOptions({ includeArchived: true }).queryKey, boards);
@@ -80,7 +81,7 @@ const renderDialog = async (projectId: string, seed = true) => {
         <QueryClientProvider client={queryClient}>
           <DeleteProjectDialog
             body="Delete this project?"
-            isOpen
+            isOpen={isOpen}
             projectId={projectId}
             onClose={noop}
             onConfirm={onConfirm}
@@ -99,6 +100,7 @@ const confirmButton = () =>
 
 beforeEach(() => {
   onConfirm.mockClear();
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -135,6 +137,33 @@ describe('DeleteProjectDialog', () => {
     await act(() => userEvent.click(confirmButton()));
 
     expect(onConfirm).toHaveBeenCalledExactlyOnceWith('delete');
+  });
+
+  it('starts every opening from keeping the boards, even one that comes before the last finished closing', async () => {
+    const chooseDelete = () =>
+      act(() =>
+        userEvent.click(
+          [...document.querySelectorAll<HTMLElement>('[role="alertdialog"] label')].find((label) =>
+            label.textContent?.includes('Delete its other boards too')
+          )!
+        )
+      );
+    const p3Boards = [createBoard({ id: 'p3-member', name: 'Elevations', projectId: 'p3' })];
+    queryClient.setQueryData(galleryBoardsOptions({ includeArchived: true }).queryKey, [...boards, ...p3Boards]);
+
+    await renderDialog('p1', false);
+    await chooseDelete();
+    // Reopened for another project with no exit in between.
+    await renderDialog('p3', false);
+    await act(() => userEvent.click(confirmButton()));
+    expect(onConfirm).toHaveBeenLastCalledWith('release');
+
+    await chooseDelete();
+    // Closed and reopened for the same project before its exit finished.
+    await renderDialog('p3', false, false);
+    await renderDialog('p3', false);
+    await act(() => userEvent.click(confirmButton()));
+    expect(onConfirm).toHaveBeenLastCalledWith('release');
   });
 
   it('holds confirmation until the boards are known, and says so when they cannot be', async () => {

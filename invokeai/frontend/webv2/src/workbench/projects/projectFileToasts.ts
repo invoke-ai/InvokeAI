@@ -39,6 +39,9 @@ const describeProgress = (t: Translate, progress: ProjectFileProgress): string =
   if (progress.phase === 'restoring-fonts') {
     return t('projects.fonts.installing', { completed: progress.completed, total: progress.total });
   }
+  if (progress.phase === 'placing-boards') {
+    return t('projects.file.placingBoardsProgress', { completed: progress.completed, total: progress.total });
+  }
 
   const key = progress.phase === 'bundling' ? 'projects.file.bundlingProgress' : 'projects.file.restoringProgress';
 

@@ -123,6 +123,16 @@ describe('startProjectFileReport', () => {
     );
   });
 
+  it('counts the boards moved into the project once the media is in', () => {
+    const report = toasts.startProjectFileReport(t, 'projects.importing');
+
+    report.report({ completed: 1, phase: 'placing-boards', total: 3 });
+
+    expect(toaster.update.mock.calls[0]![1].description).toBe(
+      'projects.file.placingBoardsProgress({"completed":1,"total":3})'
+    );
+  });
+
   /** Count missing board media separately from missing document references. */
   it.each([
     ['nothing', [], [], { title: 'projects.exported', type: 'success' }],

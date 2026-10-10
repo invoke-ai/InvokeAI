@@ -429,6 +429,29 @@ interface BoardCacheRollbackEntry {
 const isGalleryBoardsData = (value: unknown): value is GalleryBoard[] =>
   Array.isArray(value) && value.every((board) => typeof board === 'object' && board !== null && 'id' in board);
 
+/** The boards of a project that the account's cached board lists hold, archived ones included where a list has them. */
+export const getGalleryProjectBoardsFromCaches = (client: QueryClient, projectId: string): GalleryBoard[] => {
+  const boards = new Map<string, GalleryBoard>();
+
+  for (const query of client
+    .getQueryCache()
+    .findAll({ queryKey: galleryKeys.boardsForAccount(captureAccountScope()) })) {
+    const data = query.state.data;
+
+    if (!isGalleryBoardsData(data)) {
+      continue;
+    }
+
+    for (const board of data) {
+      if (board.projectId === projectId && !boards.has(board.id)) {
+        boards.set(board.id, board);
+      }
+    }
+  }
+
+  return [...boards.values()];
+};
+
 /**
  * Whether the account may add media to a board, as its board listings say, newest first: a board listed with
  * `add_media`. A board a listing no longer holds was deleted or stopped being readable: not a destination either, so

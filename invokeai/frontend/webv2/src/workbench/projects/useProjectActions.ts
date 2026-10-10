@@ -1,6 +1,7 @@
+import type { GalleryBoardDeletionResult } from '@features/gallery';
 import type { Project } from '@workbench/projectContracts';
 
-import { invalidateGallery } from '@features/gallery/queries';
+import { getGalleryProjectBoardsFromCaches, invalidateGallery } from '@features/gallery/queries';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
@@ -27,6 +28,16 @@ import { serializeProjectDocumentV3Json } from './projectDocument';
 import { describeRefusedProject } from './projectLoadRefusal';
 
 const CLOSE_FLUSH_ATTEMPTS = 3;
+
+/** A project's boards go without their media, which returns to Uncategorized. */
+const NO_MEDIA_DELETED: Omit<GalleryBoardDeletionResult, 'boardId'> = {
+  deletedBoardImageNames: [],
+  deletedBoardVideoNames: [],
+  deletedImageNames: [],
+  deletedVideoNames: [],
+  failedImageNames: [],
+  failedVideoNames: [],
+};
 
 /**
  * Open reuses or hydrates a project. Close flushes while preserving the server record; closing the last tab
@@ -212,6 +223,11 @@ export const useProjectActions = (): {
     }
 
     const owner = captureAccountScope();
+    // The boards that go with it, as the board lists know them: its inbox, and the rest when they go too. Read before
+    // the delete, whose refresh drops them from the lists.
+    const deletedBoardIds = getGalleryProjectBoardsFromCaches(queryClient, project.id)
+      .filter((board) => board.isInbox || boards === 'delete')
+      .map((board) => board.id);
     try {
       // Open projects delete through the sync engine so in-flight saves finish first.
       await deleteLibraryProject(project.id, boards);
@@ -219,6 +235,10 @@ export const useProjectActions = (): {
       notify.error(t('projects.deleteFailed'), error instanceof Error ? error.message : undefined);
 
       return;
+    }
+    // Other open projects may still select, auto-add to or queue results for those boards. Only this account's.
+    for (const boardId of isAccountScopeCurrent(owner) ? deletedBoardIds : []) {
+      commands.gallery.reconcileDeletedBoardOutcome({ ...NO_MEDIA_DELETED, boardId });
     }
     // Its boards were released or deleted with it; every board list on screen is stale either way.
     void invalidateGallery(queryClient);

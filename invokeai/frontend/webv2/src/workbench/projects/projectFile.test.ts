@@ -19,6 +19,7 @@ const api = vi.hoisted(() => ({
   deleteClientStateValue: vi.fn(() => Promise.resolve()),
   getClientStateValue: vi.fn(() => Promise.resolve(null)),
   getProject: vi.fn(),
+  invalidateBoardLists: vi.fn(),
   // Every export enumerates the project's board; most of these cases do not care what is on it.
   getProjectBoardSnapshot: vi.fn((): Promise<ProjectBoardSnapshotDTO> =>
     Promise.resolve({ boards: [{ archived: false, board_id: 'inbox', is_inbox: true, items: [], name: 'Project' }] })
@@ -1335,6 +1336,11 @@ describe('importing every board of a project', () => {
       ['staging-old', projectId, true, expect.anything()],
       ['staging-empty', projectId, false, expect.anything()],
     ]);
+    // Board lists refreshed before the moves finished would still show the members in the Library.
+    expect(api.invalidateBoardLists).toHaveBeenCalledOnce();
+    expect(api.invalidateBoardLists.mock.invocationCallOrder[0]).toBeGreaterThan(
+      transport.placeBoardInProject.mock.invocationCallOrder[1]!
+    );
     expect(outcome.boardIssues).toEqual([]);
     expect(outcome.boardItemIssues).toEqual([]);
   });

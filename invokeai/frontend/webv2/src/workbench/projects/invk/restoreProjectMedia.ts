@@ -62,10 +62,12 @@ export interface MaterializeResult {
   materialized: MaterializedMedia[];
 }
 
-/** onItemSettled fires exactly once per descriptor. */
+/**
+ * Takes every board at once, so it schedules the work across them: many small boards should not run one at a time.
+ * onItemSettled fires exactly once per descriptor.
+ */
 export type MediaMaterializer = (
-  items: readonly InvkBoardItem[],
-  boardId: string,
+  boards: readonly RestoreBoardInput[],
   onItemSettled: () => void
 ) => Promise<MaterializeResult>;
 
@@ -282,15 +284,8 @@ export const restoreProjectMedia = async (
       : checkExistingVideos(documentOnlyVideos, deps.signal).catch(degradeUnlessCancelled(new Set<string>())),
   ]);
 
-  // Board by board, in order: a staging board holds exactly its source board's media.
-  const boardResult: MaterializeResult = { failed: [], materialized: [] };
-
-  for (const board of stagedBoards) {
-    const result = await deps.materializeBoardMedia(board.items, board.stagingBoardId, advance);
-
-    boardResult.failed.push(...result.failed);
-    boardResult.materialized.push(...result.materialized);
-  }
+  // Each staging board receives exactly its source board's media.
+  const boardResult = await deps.materializeBoardMedia(stagedBoards, advance);
 
   const starTargets = { image: [] as string[], video: [] as string[] };
   const sourceNamesByFreshName = new Map<string, string>();
@@ -507,7 +502,7 @@ export const rollbackRestoredMedia = async (
   ]);
 
   await Promise.allSettled(
-    // An unclaimed private board is invisible clutter, not a broken state, so each is best-effort.
+    // A staging board left behind is a Library board its owner can delete, not a broken state, so each is best-effort.
     ledger.boardIds.map((boardId) => deleteBoard(boardId, deps.signal))
   );
 };

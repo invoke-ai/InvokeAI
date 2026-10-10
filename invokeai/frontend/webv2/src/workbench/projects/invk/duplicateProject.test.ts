@@ -19,6 +19,7 @@ import type * as duplicateProjectModule from './duplicateProject';
 const api = vi.hoisted(() => ({
   createProjectSettled: vi.fn(),
   getProject: vi.fn(),
+  invalidateBoardLists: vi.fn(),
   saveFirstProjectWorkspace: vi.fn(),
   isProjectNotFoundError: (error: unknown) =>
     typeof error === 'object' && error !== null && 'status' in error && error.status === 404,
@@ -357,15 +358,19 @@ describe('duplicateProjectRecord', () => {
       .mockResolvedValueOnce('member-staging')
       .mockResolvedValueOnce('empty-staging');
 
-    const result = await duplicateProject.duplicateProjectRecord({
-      boards: [
-        ...inboxOf([boardItem()]),
-        { archived: true, board_id: 'old', is_inbox: false, items: [boardItem({ name: 'old.png' })], name: 'Old' },
-        { archived: false, board_id: 'empty', is_inbox: false, items: [], name: 'Empty' },
-      ],
-      owner,
-      record: sourceRecord(),
-    });
+    const onProgress = vi.fn();
+    const result = await duplicateProject.duplicateProjectRecord(
+      {
+        boards: [
+          ...inboxOf([boardItem()]),
+          { archived: true, board_id: 'old', is_inbox: false, items: [boardItem({ name: 'old.png' })], name: 'Old' },
+          { archived: false, board_id: 'empty', is_inbox: false, items: [], name: 'Empty' },
+        ],
+        owner,
+        record: sourceRecord(),
+      },
+      { onProgress }
+    );
 
     // In source order, so the copy's boards keep their creation order; the empty one has nothing to copy.
     expect((transport.createStagingBoard.mock.calls as unknown[][]).map((call) => call[0])).toEqual([
@@ -381,6 +386,17 @@ describe('duplicateProjectRecord', () => {
       ['member-staging', result.record.project_id, true, owner.signal],
       ['empty-staging', result.record.project_id, false, owner.signal],
     ]);
+    // Copying is counted by item, then the moves by board, so progress does not sit at its end while boards move.
+    expect(onProgress.mock.calls.map(([progress]) => progress).slice(-3)).toEqual([
+      { completed: 2, phase: 'restoring', total: 2 },
+      { completed: 1, phase: 'placing-boards', total: 2 },
+      { completed: 2, phase: 'placing-boards', total: 2 },
+    ]);
+    // Board lists refreshed before the moves finished would still show the members in the Library.
+    expect(api.invalidateBoardLists).toHaveBeenCalledExactlyOnceWith(owner);
+    expect(api.invalidateBoardLists.mock.invocationCallOrder[0]).toBeGreaterThan(
+      transport.placeBoardInProject.mock.invocationCallOrder[1]!
+    );
     expect(result.boardIssues).toEqual([]);
   });
 

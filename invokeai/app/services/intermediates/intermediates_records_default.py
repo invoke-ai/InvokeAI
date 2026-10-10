@@ -306,7 +306,7 @@ class IntermediatesRecords:
         return self._queries.run(summarize, read_only=True)
 
     def get_projects(self, user_id: Optional[str]) -> dict[tuple[str, str], tuple[str, Optional[str]]]:
-        """Maps (owner, project) to (name, cover image): the newest durable image on the project's board."""
+        """Maps (owner, project) to (name, cover image): the newest durable image on any of the project's boards."""
         return {
             (owner, project_id): (name, cover)
             for owner, project_id, name, cover in self._queries.intermediates.projects(user_id)

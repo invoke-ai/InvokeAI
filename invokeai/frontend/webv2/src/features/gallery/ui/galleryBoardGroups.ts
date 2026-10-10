@@ -1,11 +1,23 @@
 import type { GalleryBoard } from '@features/gallery/core/types';
 
-import { isOtherUsersGalleryBoard, isOwnGalleryBoard, isSharedGalleryBoard } from '@features/gallery/core/boardAccess';
-import { getGalleryBoardLabel, inboxFirst, type GalleryBoardTranslate } from '@features/gallery/core/boardLabels';
+import {
+  canOnBoard,
+  isOtherUsersGalleryBoard,
+  isOwnGalleryBoard,
+  isSharedGalleryBoard,
+} from '@features/gallery/core/boardAccess';
+import {
+  getGalleryBoardLabel,
+  getGalleryProjectGroupLabel,
+  inboxFirst,
+  type GalleryBoardTranslate,
+} from '@features/gallery/core/boardLabels';
 
 /** One other project's boards: its inbox first, named after the project, then the rest. */
 export interface GalleryBoardProjectGroup {
   boards: GalleryBoard[];
+  /** The project's name as its heading shows it, which is also the order the groups take. */
+  label: string;
   projectId: string;
 }
 
@@ -19,7 +31,7 @@ export interface GalleryBoardGroups {
   hasAnyMatch: boolean;
   /** Uncategorized first, then the boards in no project. */
   libraryBoards: GalleryBoard[];
-  /** Other projects in name order; empty unless other projects are shown. */
+  /** Other projects in label order; empty unless other projects are shown. */
   otherProjects: GalleryBoardProjectGroup[];
   /** The open project's inbox first, then its other boards. */
   projectBoards: GalleryBoard[];
@@ -28,6 +40,17 @@ export interface GalleryBoardGroups {
   /** Other people's boards an admin sees only through admin rights, by name. */
   otherUsersBoards: GalleryBoard[];
 }
+
+/**
+ * A board renamed, moved, archived and deleted directly, as far as the caller's role allows. An inbox is managed
+ * through its project; the open project's is also known by id, because a draft project's inbox can predate the listing.
+ */
+export const isManagedGalleryBoard = (board: GalleryBoard, projectBoardId: string | null): boolean =>
+  board.kind === 'board' && !board.isInbox && board.id !== projectBoardId;
+
+/** A board the caller can move between the Library and their projects: only its owner has projects to move it into. */
+export const isMovableGalleryBoard = (board: GalleryBoard, projectBoardId: string | null): boolean =>
+  isManagedGalleryBoard(board, projectBoardId) && isOwnGalleryBoard(board) && canOnBoard(board, 'move');
 
 /**
  * Apply visibility filters while grouping; GET /boards/ cannot filter by project and returns the complete list.
@@ -39,6 +62,7 @@ export const getGalleryBoardGroups = ({
   boards,
   projectBoardId,
   projectId,
+  projectNames,
   searchTerm,
   showArchived,
   showDates,
@@ -49,6 +73,8 @@ export const getGalleryBoardGroups = ({
   projectBoardId: string | null;
   /** The open project; null where there is none, in which case every project is "other". */
   projectId: string | null;
+  /** The account's project names by id, which name other projects ahead of the names their inboxes were listed with. */
+  projectNames: ReadonlyMap<string, string>;
   searchTerm: string;
   showArchived: boolean;
   showDates: boolean;
@@ -94,11 +120,20 @@ export const getGalleryBoardGroups = ({
       }
     }
     for (const [otherProjectId, projectGroupBoards] of byProject) {
-      otherProjects.push({ boards: inboxFirst(projectGroupBoards), projectId: otherProjectId });
+      otherProjects.push({
+        boards: inboxFirst(projectGroupBoards),
+        // Labelled from every board, not the ones the search kept: a search that hides the inbox must not cost the
+        // group the name its inbox would give it.
+        label: getGalleryProjectGroupLabel(
+          otherProjectId,
+          boards.filter((board) => board.projectId === otherProjectId),
+          projectNames,
+          t
+        ),
+        projectId: otherProjectId,
+      });
     }
-    // The inbox carries the project's name, so projects sort by it where one is listed.
-    const nameOf = (group: GalleryBoardProjectGroup) => group.boards.find((board) => board.isInbox)?.name ?? '';
-    otherProjects.sort((left, right) => nameOf(left).localeCompare(nameOf(right)));
+    otherProjects.sort((left, right) => left.label.localeCompare(right.label));
   }
 
   const dateBoards = showDates ? boards.filter((board) => board.kind === 'date' && matchesBoardSearch(board)) : [];
