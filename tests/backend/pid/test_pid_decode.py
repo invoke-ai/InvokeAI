@@ -166,25 +166,81 @@ def test_pid_memory_optimization_defaults_to_disabled() -> None:
     assert PiDDecodeConfig().pid_memory_optimization is False
 
 
-def test_working_memory_estimate_shrinks_when_the_optimization_is_enabled() -> None:
-    """The estimates contain only calibrated activation/workspace terms."""
-    latent = torch.zeros(1, 16, 64, 64)  # FLUX: 64 * 4 * 8 = 2048px output
+# Device-level peak of a FLUX decode in GiB — max of a v1 and a v1.5 decoder, PidNet weights excluded — measured on
+# an RTX 4090 under Windows, keyed by (output px, pid_memory_optimization). See the calibration in `pid/decode.py`.
+_MEASURED_PEAKS_GIB = {
+    "cudaMallocAsync": {
+        (1024, True): 0.77,
+        (2048, True): 2.49,
+        (3072, True): 5.89,
+        (4096, True): 10.24,
+        (1024, False): 1.33,
+        (2048, False): 5.17,
+        (3072, False): 12.18,
+    },
+    "native": {
+        (1024, True): 0.81,
+        (2048, True): 3.20,
+        (3072, True): 7.11,
+        (4096, True): 13.19,
+        (1024, False): 1.43,
+        (2048, False): 5.70,
+        (3072, False): 13.36,
+    },
+}
+_CALIBRATIONS = {
+    "cudaMallocAsync": pid_decode_module._PID_WORKING_MEMORY_CUDA_MALLOC_ASYNC,
+    "native": pid_decode_module._PID_WORKING_MEMORY_NATIVE,
+}
 
-    unoptimized = estimate_pid_decode_working_memory(latent, BaseModelType.Flux)
-    optimized = estimate_pid_decode_working_memory(latent, BaseModelType.Flux, True)
 
-    output_bytes = 2048 * 2048 * 4
-    # Exact activation-only formulas reject reintroducing a fixed model/cache term.
-    assert unoptimized == 260 * output_bytes
-    assert optimized == 120 * output_bytes + 224 * 2**20
+@pytest.mark.parametrize(
+    ("allocator", "output_px", "optimized"),
+    [(allocator, px, opt) for allocator, peaks in _MEASURED_PEAKS_GIB.items() for px, opt in peaks],
+)
+def test_working_memory_estimate_covers_the_measured_peak_without_hoarding(
+    monkeypatch: pytest.MonkeyPatch, allocator: str, output_px: int, optimized: bool
+) -> None:
+    """Below the peak the main transformer stays resident into the decode and Windows spills to shared memory; far
+    above it, PidNet partial-loads onto the CPU on small cards. Both bounds come from the measurements."""
+    monkeypatch.setattr(pid_decode_module, "_pid_working_memory_calibration", lambda: _CALIBRATIONS[allocator])
+    side = output_px // 32  # FLUX: 4x super-resolution of an 8x-downsampled latent
+    peak = _MEASURED_PEAKS_GIB[allocator][(output_px, optimized)] * 2**30
+
+    estimate = estimate_pid_decode_working_memory(torch.zeros(1, 16, side, side), BaseModelType.Flux, optimized)
+
+    assert peak <= estimate <= peak + 2**30
 
 
+def test_cuda_malloc_async_gets_its_own_calibration_and_every_other_allocator_the_native_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def run_on(device: str, backend: str, hip: str | None = None) -> object:
+        monkeypatch.setattr(pid_decode_module.TorchDevice, "choose_torch_device", lambda: torch.device(device))
+        monkeypatch.setattr(torch.cuda, "get_allocator_backend", lambda: backend)
+        monkeypatch.setattr(torch.version, "hip", hip)
+        return pid_decode_module._pid_working_memory_calibration()
+
+    assert run_on("cuda", "cudaMallocAsync") is pid_decode_module._PID_WORKING_MEMORY_CUDA_MALLOC_ASYNC
+    assert run_on("cuda", "native") is pid_decode_module._PID_WORKING_MEMORY_NATIVE
+    assert run_on("cpu", "cudaMallocAsync") is pid_decode_module._PID_WORKING_MEMORY_NATIVE
+    # Measured on CUDA only: a ROCm build reporting hipMallocAsync as cudaMallocAsync gets the safe side.
+    assert run_on("cuda", "cudaMallocAsync", hip="7.1") is pid_decode_module._PID_WORKING_MEMORY_NATIVE
+
+
+@pytest.fixture(params=list(_CALIBRATIONS), ids=list(_CALIBRATIONS))
+def each_calibration(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Run a structural estimate test under every allocator's calibration, not only the host's."""
+    monkeypatch.setattr(pid_decode_module, "_pid_working_memory_calibration", lambda: _CALIBRATIONS[request.param])
+
+
+@pytest.mark.usefixtures("each_calibration")
 def test_working_memory_estimate_keeps_a_fixed_term_for_the_chunk_working_set() -> None:
     """The optimized peak is not a pure multiple of the output size.
 
-    Chunking bounds the per-block activations to a fixed working set, so halving the output area does
-    not halve the peak (measured: 509 MiB at 1024px vs 1533 MiB at 2048px — a factor of 3.0, not 4).
-    A pure scaling constant would therefore under-reserve at small sizes or over-reserve at large ones.
+    Chunking bounds the per-block activations to a fixed working set, so quartering the output area does
+    not quarter the peak under cudaMallocAsync (measured: 0.77 GiB at 1024px vs 2.49 GiB at 2048px — 3.2x, not
+    4). Under the native allocator the peak scales almost purely with area, and the fixed term is headroom.
     """
     small = estimate_pid_decode_working_memory(torch.zeros(1, 16, 32, 32), BaseModelType.Flux, True)
     large = estimate_pid_decode_working_memory(torch.zeros(1, 16, 64, 64), BaseModelType.Flux, True)
@@ -193,6 +249,7 @@ def test_working_memory_estimate_keeps_a_fixed_term_for_the_chunk_working_set() 
     assert large > 2 * small, "the per-pixel term has been lost"
 
 
+@pytest.mark.usefixtures("each_calibration")
 def test_working_memory_estimate_accounts_for_every_image_in_the_batch() -> None:
     """The decoder accepts batched latents, so reserving only one image's activations can OOM.
 
@@ -208,6 +265,7 @@ def test_working_memory_estimate_accounts_for_every_image_in_the_batch() -> None
     assert batched_unoptimized == 2 * single_unoptimized
 
 
+@pytest.mark.usefixtures("each_calibration")
 def test_working_memory_estimate_never_exceeds_the_unoptimized_one() -> None:
     """Below the chunk size the pixel blocks run unchunked, so the fixed chunk-working-set term must
     not be charged: a small output would otherwise reserve *more* with the optimization enabled than
