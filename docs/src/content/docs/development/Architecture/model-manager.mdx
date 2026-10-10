@@ -1005,7 +1005,7 @@ def _load_model(
 
 `_load_model()` will be passed the path to the model on disk, an optional repository variant (used by the diffusers loaders to select, e.g.  the `fp16` variant, and an optional submodel_type for main and onnx models.
 
-To install a new loader, place it in `invokeai/backend/model_manager/load/model_loaders`. Inherit from `ModelLoader` and use the `@ModelLoaderRegistry.register()` decorator to indicate what type of models the loader can handle.
+To install a new loader, place it in `invokeai/backend/model_manager/load/model_loaders`. Inherit from `ModelLoader`, which checks a cold load against edits of its record (the registry refuses any other class), and use the `@ModelLoaderRegistry.register()` decorator to indicate what type of models the loader can handle.
 
 Here is a complete example from `generic_diffusers.py`, which is able to load several different diffusers types:
 

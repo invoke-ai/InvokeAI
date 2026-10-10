@@ -16,7 +16,13 @@ from invokeai.app.services.model_load.model_load_default import ModelLoadService
 from invokeai.app.services.model_records import ModelRecordChanges, ModelRecordServiceSQL
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.siglip import SigLIP_Diffusers_Config
-from invokeai.backend.model_manager.load import LoadedModel, ModelCache, ModelLoader, StaleModelConfigError
+from invokeai.backend.model_manager.load import (
+    LoadedModel,
+    ModelCache,
+    ModelLoader,
+    ModelLoaderBase,
+    StaleModelConfigError,
+)
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
 from invokeai.backend.util.logging import InvokeAILogger
@@ -484,3 +490,40 @@ def test_rename_then_load_affecting_edit_while_a_load_waits_rejects_it(harness, 
 
     assert len(outcome) == 1 and outcome[0].config.cpu_only is True
     assert _RecordingLoader.built_from == [True]
+
+
+class _UnfencedLoader(ModelLoaderBase):
+    """Built directly on the base, so nothing checks its config against record edits before it caches."""
+
+    def __init__(self, app_config, logger, ram_cache: ModelCache) -> None:
+        self._ram_cache = ram_cache
+
+    @property
+    def ram_cache(self) -> ModelCache:
+        return self._ram_cache
+
+    def get_size_fs(self, config, model_path, submodel_type=None) -> int:
+        return 0
+
+    def load_model(self, model_config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
+        self._ram_cache.put(model_config.key, torch.nn.Linear(2, 2))
+        return LoadedModel(
+            config=model_config, cache_record=self._ram_cache.get(model_config.key), cache=self._ram_cache
+        )
+
+
+def test_loader_built_directly_on_the_base_is_refused_before_it_can_cache(harness, monkeypatch):
+    """A registry is free to hand the service any class, so the service refuses one that skips the check."""
+    service, store, cache, events = harness
+
+    class _UnfencedRegistry:
+        @classmethod
+        def get_implementation(cls, config: AnyModelConfig, submodel_type: Optional[SubModelType]):
+            return _UnfencedLoader, config, submodel_type
+
+    monkeypatch.setattr(service, "_registry", _UnfencedRegistry)
+
+    with pytest.raises(TypeError, match="not a ModelLoader"):
+        service.load_model(store.get_model(KEY))
+    assert not _is_cached(cache)
+    assert events.log == [("started", "siglip"), ("complete", "siglip")]

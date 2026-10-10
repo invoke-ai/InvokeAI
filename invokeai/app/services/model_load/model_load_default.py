@@ -193,7 +193,10 @@ class ModelLoadService(ModelLoadServiceBase):
             logger=self._logger,
             ram_cache=self.ram_cache,
         )
-        if hasattr(self, "_invoker") and isinstance(loader, ModelLoader):
+        if not isinstance(loader, ModelLoader):
+            # Only `ModelLoader` applies the stale-config check before admitting a model to the cache.
+            raise TypeError(f"{implementation!r} is not a ModelLoader, so it cannot be loaded safely")
+        if hasattr(self, "_invoker"):
             loader.config_check = self._check_config
         return loader.load_model(model_config, submodel_type)
 
