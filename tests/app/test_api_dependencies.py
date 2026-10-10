@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 from invokeai.app.api import dependencies
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.shared.database.database import Database
 
 
 def test_initialize_does_not_vacuum_database(monkeypatch, tmp_path) -> None:
@@ -18,17 +18,17 @@ def test_initialize_does_not_vacuum_database(monkeypatch, tmp_path) -> None:
         MagicMock(return_value=MagicMock()),
     )
 
-    original_init_db = dependencies.init_db
-    initialized_databases: list[SqliteDatabase] = []
+    original_init_database = dependencies.init_database
+    initialized_databases: list[Database] = []
 
-    def initialize_database(*args, **kwargs) -> SqliteDatabase:
-        database = original_init_db(*args, **kwargs)
+    def initialize_database(*args, **kwargs) -> Database:
+        database = original_init_database(*args, **kwargs)
         initialized_databases.append(database)
         return database
 
-    monkeypatch.setattr(dependencies, "init_db", initialize_database)
-    clean_calls: list[SqliteDatabase] = []
-    monkeypatch.setattr(SqliteDatabase, "clean", lambda database: clean_calls.append(database))
+    monkeypatch.setattr(dependencies, "init_database", initialize_database)
+    clean_calls: list[Database] = []
+    monkeypatch.setattr(Database, "clean", lambda database: clean_calls.append(database))
 
     config = InvokeAIAppConfig(
         use_memory_db=True,
@@ -54,4 +54,7 @@ def test_initialize_does_not_vacuum_database(monkeypatch, tmp_path) -> None:
                 delattr(ApiDependencies, "invoker")
             else:
                 ApiDependencies.invoker = original_invoker
+        for database in initialized_databases:
+            database.dispose()
+        ApiDependencies.database = None
         loop.close()

@@ -43,7 +43,7 @@ from invokeai.app.services.model_records import (
     UnknownModelException,
 )
 from invokeai.app.services.orphaned_models import CONVERSION_SCRATCH_DIRNAME, OrphanedModelInfo
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.util.path_safety import is_plain_filename
 from invokeai.app.util.suppress_output import SuppressOutput
 from invokeai.backend.architectures import ArchitectureCapabilities, architecture_capabilities
@@ -1782,12 +1782,9 @@ def get_orphaned_models(_: AdminUserOrDefault) -> list[OrphanedModelInfo]:
     """
     from invokeai.app.services.orphaned_models import OrphanedModelsService
 
-    # Access the database through the model records service
-    model_records_service = ApiDependencies.invoker.services.model_manager.store
-
     service = OrphanedModelsService(
         config=ApiDependencies.invoker.services.configuration,
-        db=model_records_service._db,  # Access the database from model records service
+        store=ApiDependencies.invoker.services.model_manager.store,
     )
     return service.find_orphaned_models()
 
@@ -1808,12 +1805,9 @@ def delete_orphaned_models(request: DeleteOrphanedModelsRequest, _: AdminUserOrD
     """
     from invokeai.app.services.orphaned_models import OrphanedModelsService
 
-    # Access the database through the model records service
-    model_records_service = ApiDependencies.invoker.services.model_manager.store
-
     service = OrphanedModelsService(
         config=ApiDependencies.invoker.services.configuration,
-        db=model_records_service._db,  # Access the database from model records service
+        store=ApiDependencies.invoker.services.model_manager.store,
     )
 
     results = service.delete_orphaned_models(request.paths)

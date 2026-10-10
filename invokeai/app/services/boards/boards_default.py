@@ -4,8 +4,7 @@ from invokeai.app.services.board_records.board_records_common import BoardChange
 from invokeai.app.services.boards.boards_base import BoardServiceABC
 from invokeai.app.services.boards.boards_common import BoardDTO, board_record_to_dto
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults, SQLiteDirection
 
 
 class BoardService(BoardServiceABC):
@@ -41,10 +40,8 @@ class BoardService(BoardServiceABC):
 
     def _get_counts(self, board_id: str) -> tuple[int, int, int, int]:
         """Return ``(image_count, video_count, asset_count, asset_video_count)`` for a board."""
-        image_count = self.__invoker.services.board_image_records.get_image_count_for_board(board_id)
-        asset_count = self.__invoker.services.board_image_records.get_asset_count_for_board(board_id)
-        video_count = self.__invoker.services.board_video_records.get_video_count_for_board(board_id)
-        asset_video_count = self.__invoker.services.board_video_records.get_asset_video_count_for_board(board_id)
+        image_count, asset_count = self.__invoker.services.board_image_records.get_counts_for_board(board_id)
+        video_count, asset_video_count = self.__invoker.services.board_video_records.get_counts_for_board(board_id)
         return image_count, video_count, asset_count, asset_video_count
 
     def create(

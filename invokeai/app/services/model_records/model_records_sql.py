@@ -1,47 +1,35 @@
 """
-SQL Implementation of the ModelRecordServiceBase API
+SQL implementation of the ModelRecordServiceBase API, on the database layer.
 
 Typical usage:
 
-  from invokeai.backend.model_manager import ModelConfigStoreSQL
-  store = ModelConfigStoreSQL(sqlite_db)
-  config = dict(
-        path='/tmp/pokemon.bin',
-        name='old name',
-        base_model='sd-1',
-        type='embedding',
-        format='embedding_file',
-     )
+  from invokeai.app.services.model_records import ModelRecordChanges, ModelRecordServiceSQL
+  store = ModelRecordServiceSQL(database, logger)
 
-   # adding - the key becomes the model's "key" field
-   store.add_model('key1', config)
+  # adding - the config's key becomes the record's key
+  store.add_model(config)
 
-   # updating
-   config.name='new name'
-   store.update_model('key1', config)
+  # updating
+  store.update_model(config.key, ModelRecordChanges(name="new name"))
 
-   # checking for existence
-   if store.exists('key1'):
+  # checking for existence
+  if store.exists(config.key):
       print("yes")
 
-   # fetching config
-   new_config = store.get_model('key1')
-   print(new_config.name, new_config.base)
-   assert new_config.key == 'key1'
+  # fetching a config
+  config = store.get_model(config.key)
 
   # deleting
-  store.del_model('key1')
+  store.del_model(config.key)
 
   # searching
-  configs = store.search_by_path(path='/tmp/pokemon.bin')
-  configs = store.search_by_hash('750a499f35e43b7e1b4d15c207aa2f01')
-  configs = store.search_by_attr(base_model='sd-2', model_type='main')
+  configs = store.search_by_path("/tmp/pokemon.bin")
+  configs = store.search_by_hash("750a499f35e43b7e1b4d15c207aa2f01")
+  configs = store.search_by_attr(base_model=BaseModelType.StableDiffusion2, model_type=ModelType.Main)
 """
 
 import json
 import logging
-import sqlite3
-from math import ceil
 from pathlib import Path
 from typing import List, Optional, Union
 
@@ -53,12 +41,13 @@ from invokeai.app.services.model_records.model_records_base import (
     ModelRecordChanges,
     ModelRecordOrderBy,
     ModelRecordServiceBase,
-    ModelSummary,
     UnknownModelException,
 )
-from invokeai.app.services.shared.pagination import PaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.errors import UniqueViolation
+from invokeai.app.services.shared.database.queries import Queries
+from invokeai.app.services.shared.database.queries.models import MAX_KEY_LENGTH, MAX_PATH_LENGTH
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
@@ -88,58 +77,43 @@ def _construct_config_for_type(fields: dict, target_type: ModelType) -> AnyModel
     )
 
 
+def _check_path_length(path: str) -> None:
+    if len(path) > MAX_PATH_LENGTH:
+        raise ValueError(f"A model's path can be at most {MAX_PATH_LENGTH} characters long")
+
+
+def _parse(config: str) -> AnyModelConfig:
+    return ModelConfigFactory.from_dict(json.loads(config))
+
+
 class ModelRecordServiceSQL(ModelRecordServiceBase):
     """Implementation of the ModelConfigStore ABC using a SQL database."""
 
-    def __init__(self, db: SqliteDatabase, logger: logging.Logger):
-        """
-        Initialize a new object from preexisting sqlite3 connection and threading lock objects.
-
-        :param db: Sqlite connection object
-        """
+    def __init__(self, database: Database, logger: logging.Logger):
         super().__init__()
-        self._db = db
+        self._queries = database.queries
         self._logger = logger
 
     def add_model(self, config: AnyModelConfig) -> AnyModelConfig:
         """
         Add a model to the database.
 
-        :param key: Unique key for the model
-        :param config: Model configuration record, either a dict with the
-         required fields or a ModelConfigBase instance.
+        :param config: Model configuration record; its key becomes the record's key.
 
-        Can raise DuplicateModelException and InvalidModelConfigException exceptions.
+        Raises DuplicateModelException when a model with the same path or key is installed, and ValueError when
+        its key or path is longer than a record holds.
         """
-        with self._db.transaction() as cursor:
-            try:
-                cursor.execute(
-                    """--sql
-                    INSERT INTO models (
-                        id,
-                        config
-                        )
-                    VALUES (?,?);
-                    """,
-                    (
-                        config.key,
-                        config.model_dump_json(),
-                    ),
-                )
-
-            except sqlite3.IntegrityError as e:
-                if "UNIQUE constraint failed" in str(e):
-                    if "models.path" in str(e):
-                        msg = f"A model with path '{config.path}' is already installed"
-                    elif "models.name" in str(e):
-                        msg = f"A model with name='{config.name}', type='{config.type}', base='{config.base}' is already installed"
-                    else:
-                        msg = f"A model with key '{config.key}' is already installed"
-                    raise DuplicateModelException(msg) from e
-                else:
-                    raise e
-
-        return self.get_model(config.key)
+        if len(config.key) > MAX_KEY_LENGTH:
+            raise ValueError(f"A model's key can be at most {MAX_KEY_LENGTH} characters long")
+        _check_path_length(config.path)
+        stored = config.model_dump_json()
+        try:
+            self._queries.models.insert(config.key, stored)
+        except UniqueViolation as error:
+            if self._queries.models.at_path(str(config.path)):
+                raise DuplicateModelException(f"A model with path '{config.path}' is already installed") from error
+            raise DuplicateModelException(f"A model with key '{config.key}' is already installed") from error
+        return _parse(stored)
 
     def del_model(self, key: str) -> None:
         """
@@ -149,20 +123,16 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
         Can raise an UnknownModelException
         """
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                DELETE FROM models
-                WHERE id=?;
-                """,
-                (key,),
-            )
-            if cursor.rowcount == 0:
-                raise UnknownModelException("model not found")
+        if not self._queries.models.delete(key):
+            raise UnknownModelException("model not found")
 
     def update_model(self, key: str, changes: ModelRecordChanges, allow_class_change: bool = False) -> AnyModelConfig:
-        with self._db.transaction() as cursor:
-            record = self.get_model(key)
+        def apply(q: Queries) -> str:
+            # Locked, so that a concurrent update applies its changes to this one's result, not beside it.
+            stored = q.models.lock(key)
+            if stored is None:
+                raise UnknownModelException("model not found")
+            record = _parse(stored)
 
             if allow_class_change:
                 # The changes may cause the model config class to change. To handle this, we need to construct the new
@@ -197,46 +167,28 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                         if stale_field not in changes.model_fields_set:
                             fallback_dict.pop(stale_field, None)
                     record = _construct_config_for_type(fallback_dict, changes.type)
-
-                # If we get this far, the updated model config is valid, so we can save it to the database.
-                json_serialized = record.model_dump_json()
             else:
                 # We are not allowing the model config class to change, so we can just update the existing instance in
                 # place. If the changes are invalid for the existing class, an exception will be raised by pydantic.
                 for field_name in changes.model_fields_set:
                     setattr(record, field_name, getattr(changes, field_name))
-                json_serialized = record.model_dump_json()
 
-            cursor.execute(
-                """--sql
-                UPDATE models
-                SET
-                    config=?
-                WHERE id=?;
-                """,
-                (json_serialized, key),
-            )
-            if cursor.rowcount == 0:
-                raise UnknownModelException("model not found")
+            # If we get this far, the updated model config is valid, so we can save it to the database.
+            if "path" in changes.model_fields_set:
+                _check_path_length(record.path)
+            updated = record.model_dump_json()
+            q.models.save(key, updated)
+            return updated
 
-        return self.get_model(key)
+        return _parse(self._queries.run(apply))
 
     def replace_model(self, key: str, new_config: AnyModelConfig) -> AnyModelConfig:
         if key != new_config.key:
             raise ValueError("key does not match new_config.key")
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                UPDATE models
-                SET
-                    config=?
-                WHERE id=?;
-                """,
-                (new_config.model_dump_json(), key),
-            )
-            if cursor.rowcount == 0:
-                raise UnknownModelException("model not found")
-        return self.get_model(key)
+        stored = new_config.model_dump_json()
+        if not self._queries.models.save(key, stored):
+            raise UnknownModelException("model not found")
+        return _parse(stored)
 
     def get_model(self, key: str) -> AnyModelConfig:
         """
@@ -246,34 +198,10 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
         Exceptions: UnknownModelException
         """
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT config FROM models
-                WHERE id=?;
-                """,
-                (key,),
-            )
-            rows = cursor.fetchone()
-        if not rows:
+        stored = self._queries.models.get(key)
+        if stored is None:
             raise UnknownModelException("model not found")
-        model = ModelConfigFactory.from_dict(json.loads(rows[0]))
-        return model
-
-    def get_model_by_hash(self, hash: str) -> AnyModelConfig:
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT config FROM models
-                WHERE hash=?;
-                """,
-                (hash,),
-            )
-            rows = cursor.fetchone()
-        if not rows:
-            raise UnknownModelException("model not found")
-        model = ModelConfigFactory.from_dict(json.loads(rows[0]))
-        return model
+        return _parse(stored)
 
     def exists(self, key: str) -> bool:
         """
@@ -281,16 +209,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
         :param key: Unique key for the model to be deleted
         """
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                select count(*) FROM models
-                WHERE id=?;
-                """,
-                (key,),
-            )
-            count = cursor.fetchone()[0]
-        return count > 0
+        return self._queries.models.exists(key)
 
     def search_by_attr(
         self,
@@ -314,60 +233,28 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         If none of the optional filters are passed, will return all
         models in the database.
         """
-        with self._db.transaction() as cursor:
-            assert isinstance(order_by, ModelRecordOrderBy)
-            order_dir = "DESC" if direction == SQLiteDirection.Descending else "ASC"
-            ordering = {
-                ModelRecordOrderBy.Default: f"type {order_dir}, base COLLATE NOCASE {order_dir}, name COLLATE NOCASE {order_dir}, format",
-                ModelRecordOrderBy.Type: "type",
-                ModelRecordOrderBy.Base: "base COLLATE NOCASE",
-                ModelRecordOrderBy.Name: "name COLLATE NOCASE",
-                ModelRecordOrderBy.Format: "format",
-                ModelRecordOrderBy.Size: "IFNULL(json_extract(config, '$.file_size'), 0)",
-                ModelRecordOrderBy.DateAdded: "created_at",
-                ModelRecordOrderBy.DateModified: "updated_at",
-                ModelRecordOrderBy.Path: "path",
-            }
-
-            where_clause: list[str] = []
-            bindings: list[str] = []
-            if model_name:
-                where_clause.append("name=?")
-                bindings.append(model_name)
-            if base_model:
-                where_clause.append("base=?")
-                bindings.append(base_model)
-            if model_type:
-                where_clause.append("type=?")
-                bindings.append(model_type)
-            if model_format:
-                where_clause.append("format=?")
-                bindings.append(model_format)
-            where = f"WHERE {' AND '.join(where_clause)}" if where_clause else ""
-
-            cursor.execute(
-                f"""--sql
-                SELECT config
-                FROM models
-                {where}
-                ORDER BY {ordering[order_by]} {order_dir} -- using ? to bind doesn't work here for some reason;
-                """,
-                tuple(bindings),
-            )
-            result = cursor.fetchall()
+        assert isinstance(order_by, ModelRecordOrderBy)
+        configs = self._queries.models.search(
+            name=model_name,
+            base=base_model,
+            model_type=model_type,
+            model_format=model_format,
+            order_by=order_by.value,
+            descending=direction == SQLiteDirection.Descending,
+        )
 
         # Parse the model configs.
         results: list[AnyModelConfig] = []
-        for row in result:
+        for config in configs:
             try:
-                model_config = ModelConfigFactory.from_dict(json.loads(row[0]))
+                model_config = _parse(config)
             except pydantic.ValidationError as e:
                 # We catch this error so that the app can still run if there are invalid model configs in the database.
                 # One reason that an invalid model config might be in the database is if someone had to rollback from a
                 # newer version of the app that added a new model type.
-                row_data = f"{row[0][:64]}..." if len(row[0]) > 64 else row[0]
+                row_data = f"{config[:64]}..." if len(config) > 64 else config
                 try:
-                    name = json.loads(row[0]).get("name", "<unknown>")
+                    name = json.loads(config).get("name", "<unknown>")
                 except Exception:
                     name = "<unknown>"
                 self._logger.warning(
@@ -381,77 +268,11 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
     def search_by_path(self, path: Union[str, Path]) -> List[AnyModelConfig]:
         """Return models with the indicated path."""
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT config FROM models
-                WHERE path=?;
-                """,
-                (str(path),),
-            )
-            results = [ModelConfigFactory.from_dict(json.loads(x[0])) for x in cursor.fetchall()]
-        return results
+        return [_parse(config) for config in self._queries.models.at_path(str(path))]
 
     def search_by_hash(self, hash: str) -> List[AnyModelConfig]:
         """Return models with the indicated hash."""
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT config FROM models
-                WHERE hash=?;
-                """,
-                (hash,),
-            )
-            results = [ModelConfigFactory.from_dict(json.loads(x[0])) for x in cursor.fetchall()]
-        return results
+        return [_parse(config) for config in self._queries.models.with_hash(hash)]
 
-    def list_models(
-        self,
-        page: int = 0,
-        per_page: int = 10,
-        order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default,
-        direction: SQLiteDirection = SQLiteDirection.Ascending,
-    ) -> PaginatedResults[ModelSummary]:
-        """Return a paginated summary listing of each model in the database."""
-        with self._db.transaction() as cursor:
-            assert isinstance(order_by, ModelRecordOrderBy)
-            order_dir = "DESC" if direction == SQLiteDirection.Descending else "ASC"
-            ordering = {
-                ModelRecordOrderBy.Default: f"type {order_dir}, base COLLATE NOCASE {order_dir}, name COLLATE NOCASE {order_dir}, format",
-                ModelRecordOrderBy.Type: "type",
-                ModelRecordOrderBy.Base: "base COLLATE NOCASE",
-                ModelRecordOrderBy.Name: "name COLLATE NOCASE",
-                ModelRecordOrderBy.Format: "format",
-                ModelRecordOrderBy.Size: "IFNULL(json_extract(config, '$.file_size'), 0)",
-                ModelRecordOrderBy.DateAdded: "created_at",
-                ModelRecordOrderBy.DateModified: "updated_at",
-                ModelRecordOrderBy.Path: "path",
-            }
-
-            # Lock so that the database isn't updated while we're doing the two queries.
-            # query1: get the total number of model configs
-            cursor.execute(
-                """--sql
-                select count(*) from models;
-                """,
-                (),
-            )
-            total = int(cursor.fetchone()[0])
-
-            # query2: fetch key fields
-            cursor.execute(
-                f"""--sql
-                SELECT config
-                FROM models
-                ORDER BY {ordering[order_by]} {order_dir} -- using ? to bind doesn't work here for some reason
-                LIMIT ?
-                OFFSET ?;
-                """,
-                (
-                    per_page,
-                    page * per_page,
-                ),
-            )
-            rows = cursor.fetchall()
-        items = [ModelSummary.model_validate(dict(x)) for x in rows]
-        return PaginatedResults(page=page, pages=ceil(total / per_page), per_page=per_page, total=total, items=items)
+    def get_model_paths(self) -> list[str]:
+        return self._queries.models.paths()

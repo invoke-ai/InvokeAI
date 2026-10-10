@@ -16,6 +16,7 @@ model_relationships_router = APIRouter(prefix="/v1/model_relationships", tags=["
 class ModelRelationshipCreateRequest(BaseModel):
     model_key_1: str = Field(
         ...,
+        max_length=255,
         description="The key of the first model in the relationship",
         examples=[
             "aa3b247f-90c9-4416-bfcd-aeaa57a5339e",
@@ -28,6 +29,7 @@ class ModelRelationshipCreateRequest(BaseModel):
     )
     model_key_2: str = Field(
         ...,
+        max_length=255,
         description="The key of the second model in the relationship",
         examples=[
             "3bb7c0eb-b6c8-469c-ad8c-4d69c06075e4",

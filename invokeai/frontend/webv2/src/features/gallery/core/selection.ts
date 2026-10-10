@@ -136,6 +136,8 @@ export const getGalleryDeletionSuccessor = (
  */
 
 export interface GalleryRevealRequest {
+  accountSignal: AbortSignal;
+  absoluteIndex?: number;
   itemKey: GalleryItemKey;
   token: number;
 }
@@ -145,15 +147,24 @@ let nextToken = 0;
 
 const listeners = new Set<() => void>();
 
-export const requestGalleryItemReveal = (itemKey: GalleryItemKey): void => {
+export const requestGalleryItemReveal = (
+  itemKey: GalleryItemKey,
+  accountSignal: AbortSignal,
+  absoluteIndex?: number
+): void => {
   nextToken += 1;
-  currentRequest = { itemKey, token: nextToken };
+  currentRequest = { accountSignal, absoluteIndex, itemKey, token: nextToken };
   for (const listener of listeners) {
     listener();
   }
 };
 
-export const getGalleryRevealRequest = (): GalleryRevealRequest | null => currentRequest;
+/** Ignore a pending intent after its account lifetime changes, including when Gallery mounts later. */
+export const getGalleryRevealRequest = (): GalleryRevealRequest | null => {
+  const request = currentRequest;
+
+  return request && !request.accountSignal.aborted ? request : null;
+};
 
 export const subscribeGalleryRevealRequests = (listener: () => void): (() => void) => {
   listeners.add(listener);
@@ -167,6 +178,33 @@ export const subscribeGalleryRevealRequests = (listener: () => void): (() => voi
  * Order navigation gestures across mounts and surfaces before async hydration; only the latest may update the
  * shared selection.
  */
+
+export interface GalleryLocatorRequest {
+  signal: AbortSignal;
+  release: () => void;
+}
+
+const activeGalleryLocatorRequests = new Set<AbortController>();
+
+/** Create a cancellable locator lifetime shared by Gallery reveal entry points. */
+export const createGalleryLocatorRequest = (): GalleryLocatorRequest => {
+  const controller = new AbortController();
+  activeGalleryLocatorRequests.add(controller);
+
+  return {
+    signal: controller.signal,
+    release: () => activeGalleryLocatorRequests.delete(controller),
+  };
+};
+
+/** A later Gallery navigation supersedes every locator currently in flight. */
+export const abortGalleryLocatorRequests = (): void => {
+  for (const controller of activeGalleryLocatorRequests) {
+    controller.abort();
+  }
+
+  activeGalleryLocatorRequests.clear();
+};
 
 let navigationSequence = 0;
 
@@ -183,6 +221,7 @@ export const isGalleryNavigationCurrent = (sequence: number): boolean => sequenc
 
 export type GalleryNavigationEntry =
   | { kind: 'item'; item: GalleryItem }
+  | { kind: 'slot'; id: string; navigable: boolean }
   | { kind: 'session'; id: string; navigable: boolean };
 
 export type GalleryNavigationDirection = 'down' | 'left' | 'right' | 'up';
@@ -190,7 +229,11 @@ export type GalleryNavigationDirection = 'down' | 'left' | 'right' | 'up';
 export const getGallerySessionNavigationKey = (sessionId: string): string => `session:${sessionId}`;
 
 const getGalleryNavigationEntryKey = (entry: GalleryNavigationEntry): string =>
-  entry.kind === 'item' ? toGalleryItemKey(entry.item) : getGallerySessionNavigationKey(entry.id);
+  entry.kind === 'item'
+    ? toGalleryItemKey(entry.item)
+    : entry.kind === 'slot'
+      ? entry.id
+      : getGallerySessionNavigationKey(entry.id);
 
 /**
  * Where an arrow steps from: the first candidate the sections show. A candidate they do not show (a followed session
@@ -219,7 +262,10 @@ export const getGalleryNavigationStep = (
   { itemsOnly = false }: { itemsOnly?: boolean } = {}
 ): GalleryNavigationEntry | null => {
   const isNavigable = (entry: GalleryNavigationEntry | undefined): entry is GalleryNavigationEntry =>
-    entry !== undefined && (entry.kind === 'item' || (!itemsOnly && entry.navigable));
+    entry !== undefined &&
+    (entry.kind === 'item' ||
+      (entry.kind === 'slot' && entry.navigable) ||
+      (entry.kind === 'session' && !itemsOnly && entry.navigable));
   const entries = sections.flat();
   const cursorKey = getGalleryNavigationCursor(sections, cursorKeys);
 

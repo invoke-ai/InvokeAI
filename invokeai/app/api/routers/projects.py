@@ -37,7 +37,9 @@ class ProjectCreateRequest(BaseModel):
     """Request body for creating a project."""
 
     project_id: str | None = Field(
-        default=None, description="Client-generated project id (e.g. for imports); generated when omitted"
+        default=None,
+        max_length=255,
+        description="Client-generated project id (e.g. for imports); generated when omitted",
     )
     board_id: str | None = Field(
         default=None,

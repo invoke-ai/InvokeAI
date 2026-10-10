@@ -235,16 +235,18 @@ Both actions handle partial failures: if some models succeed and others fail, th
 
 ## Finding orphaned models
 
-If a model file is deleted or moved outside the Model Manager, its
-database entry sticks around. To find these orphaned entries:
+Model files can stay in the models directory after their database entry is gone, for example when the
+database was reset, or files were copied into the directory by hand. To find these orphaned models:
 
 1. Open the Model Manager.
 2. Click the "..." menu at the top right of the installed model list, and pick **"Clean up orphaned models..."**
-3. If there are orphaned models, a dialogue box appears that lists them and offers to remove their database entries.
+3. If there are orphaned models, a dialogue box appears that lists their folders and offers to delete them.
 
-Orphaned models are automatically excluded from selection dropdowns
-(main model, LoRA, VAE, etc.), so you cannot accidentally pick one for
-generation.
+On an install without the web UI at hand, an administrator can do the same through the API:
+`GET /api/v2/models/sync/orphaned` lists the folders and `DELETE /api/v2/models/sync/orphaned` deletes those given.
+
+The opposite case, a database entry whose files are missing from disk, is marked in the Model Manager's
+model list, and its filter can show only those models.
 
 ## Exporting and Importing Model Settings
 

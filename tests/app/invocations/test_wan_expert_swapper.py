@@ -80,7 +80,11 @@ class _FakeInfo:
         self.weight_bytes = 0
         self.resident_weight_bytes = 0
 
-    def model_on_device(self):
+    @property
+    def model(self) -> nn.Module:
+        return self._model
+
+    def model_on_device(self, working_mem_bytes=None):
         return _FakeModelOnDevice(self._label, self._model, self._log)
 
     def unload_from_vram(self, _vram_bytes_to_free, keep_required_weights_in_vram=False):
@@ -628,7 +632,7 @@ def test_slots_cleared_when_device_exit_raises():
             raise RuntimeError("device teardown blew up")
 
     class _ExitRaisingInfo(_FakeInfo):
-        def model_on_device(self):
+        def model_on_device(self, working_mem_bytes=None):
             return _ExitRaisingDeviceCtx(self._label, self._model, self._log)
 
     ctx = _FakeContext({"high": _ExitRaisingInfo("HIGH", high_nn, log)}, log)

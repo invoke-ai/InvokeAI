@@ -284,6 +284,23 @@ describe('architecture policy, read from the backend capability table', () => {
       expect(isGenerateModelSelectable(createModel('wan', { variant: 'a14b' }))).toBe(true);
     });
 
+    it('treats a GGUF branch like a safetensors one', () => {
+      const ggufUnconditional = createModel('ideogram-4', { branch: 'unconditional', format: 'gguf_quantized' });
+      const ggufConditional = createModel('ideogram-4', { branch: 'conditional', format: 'gguf_quantized' });
+      const missing = 'Generate needs the unconditional transformer for single-file Ideogram 4 models.';
+
+      expect(isGenerateModelSelectable(ggufUnconditional)).toBe(false);
+      expect(isGenerateModelSelectable(ggufConditional)).toBe(true);
+      // The slot that hides it from the picker is the slot that has to accept it.
+      expect(getGenerationValidationReasons(ggufConditional, createSettings(ggufConditional))).toContain(missing);
+      expect(
+        getGenerationValidationReasons(
+          ggufConditional,
+          createSettings(ggufConditional, { ideogram4UnconditionalModel: ggufUnconditional })
+        )
+      ).not.toContain(missing);
+    });
+
     it('is what every path that offers or picks a model filters with', () => {
       // Check actual selection calls across entry points, not merely their imports.
       const callSites = {

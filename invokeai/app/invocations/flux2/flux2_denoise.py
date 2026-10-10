@@ -569,16 +569,16 @@ class Flux2DenoiseInvocation(BaseInvocation):
         with ExitStack() as exit_stack:
             transformer_info = context.models.load(self.transformer.transformer)
 
-            # An `int8_tensorwise` build materializes each linear's dequantized weight per forward.
+            # An `int8_tensorwise` or GGUF build materializes each linear's dequantized weight per forward.
             # That transient is not part of the model's resident size, so it is added to the
             # activation estimate -- the two are alive at the same time -- rather than taking its
             # chances against whatever slack the estimate happens to have. Read from the unlocked
             # model, before the VRAM lock the reservation applies to; zero for every other build.
-            int8_dequant_bytes = peak_dequant_transient_bytes(transformer_info.model, inference_dtype)
+            dequant_bytes = peak_dequant_transient_bytes(transformer_info.model, inference_dtype)
 
             # Load the transformer model
             (cached_weights, transformer) = exit_stack.enter_context(
-                transformer_info.model_on_device(working_mem_bytes=estimated_working_memory + int8_dequant_bytes)
+                transformer_info.model_on_device(working_mem_bytes=estimated_working_memory + dequant_bytes)
             )
             config = transformer_config
 
@@ -730,8 +730,9 @@ class Flux2DenoiseInvocation(BaseInvocation):
         references adds 12288 more for ~6.5GB, and a 1328px tile with three 1328px references reaches
         ~10.9GB -- against a default ``device_working_mem_gb`` of 3.
 
-        A fixed base covers resolution-independent overhead (transient fp8/GGUF -> bf16 weight casts
-        during the forward, and allocator slack across many steps). LoRA sidecar patches add an extra
+        A fixed base covers resolution-independent overhead (transient fp8 -> bf16 weight casts during
+        the forward, and allocator slack across many steps); the dequantization copy of an int8 or GGUF
+        build is added by the caller. LoRA sidecar patches add an extra
         activation branch per patched layer, so we add a per-LoRA margin.
 
         Batch multiplies the token count and nothing else. A batch of B is B independent sequences,

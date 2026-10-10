@@ -10,6 +10,7 @@
     "core_metadata metadata wan_l2v metadata",
     "extract_video_range fps float_to_int value",
     "extract_video_range fps ltx2_denoise fps",
+    "extract_video_range fps ltx2_duration fps",
     "extract_video_range fps ltx2_extend_conditioning fps",
     "extract_video_range fps ltx2_latents_to_video fps",
     "extract_video_range video collect item",
@@ -31,6 +32,7 @@
     "ltx2_duration num_frames core_metadata num_frames",
     "ltx2_duration num_frames ltx2_denoise num_frames",
     "ltx2_extend_conditioning audio_conditioning ltx2_denoise audio_prefix_conditioning",
+    "ltx2_extend_conditioning context_frames ltx2_duration context_frames",
     "ltx2_extend_conditioning context_frames video_concat transition_frames",
     "ltx2_extend_conditioning video_conditioning ltx2_denoise video_conditioning",
     "ltx2_image_conditioning video_conditioning ltx2_denoise keyframe_conditioning",
@@ -470,7 +472,9 @@
     },
     "ltx2_duration": {
       "inputs": [
-        "conditioning"
+        "conditioning",
+        "context_frames",
+        "fps"
       ],
       "literalInputs": {
         "duration_head": [],
@@ -480,8 +484,8 @@
         "is_intermediate": [
           true
         ],
-        "max_seconds": [
-          5.041666666666667
+        "max_num_frames": [
+          121
         ],
         "min_seconds": [
           1

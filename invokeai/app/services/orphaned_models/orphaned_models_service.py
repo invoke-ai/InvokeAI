@@ -4,10 +4,9 @@ Orphaned models are files in the models directory that are not referenced
 in the database models table.
 """
 
-import json
 import shutil
 from pathlib import Path
-from typing import Set
+from typing import TYPE_CHECKING, Set
 
 from pydantic import BaseModel, Field
 
@@ -19,7 +18,9 @@ from invokeai.app.services.model_install.model_install_common import (
     delete_active_install_sentinel,
     is_recovery_protected_path,
 )
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+
+if TYPE_CHECKING:
+    from invokeai.app.services.model_records import ModelRecordServiceBase
 
 # Scratch area for operations that must build a model on the models volume before registering it -
 # model conversion writes its diffusers copy here. It lives under the models root so the finished
@@ -63,15 +64,15 @@ class OrphanedModelsService:
         ".git",
     }
 
-    def __init__(self, config: InvokeAIAppConfig, db: SqliteDatabase):
+    def __init__(self, config: InvokeAIAppConfig, store: "ModelRecordServiceBase"):
         """Initialize the service.
 
         Args:
             config: Application configuration containing models path
-            db: Database connection for querying registered models
+            store: The model records, whose files are not orphans
         """
         self._config = config
-        self._db = db
+        self._store = store
 
     def find_orphaned_models(self) -> list[OrphanedModelInfo]:
         """Find all orphaned model directories.
@@ -226,36 +227,27 @@ class OrphanedModelsService:
         """Get the set of all model directories from the database."""
         model_directories = set()
 
-        with self._db.transaction() as cursor:
-            cursor.execute("SELECT config FROM models")
-            rows = cursor.fetchall()
+        # Every record's path, also of a record whose config no longer validates: its files are not orphans.
+        for path_str in self._store.get_model_paths():
+            if not path_str:
+                continue
+            path = Path(path_str)
 
-            for row in rows:
-                try:
-                    config = json.loads(row[0])
-                    if "path" in config and config["path"]:
-                        path_str = config["path"]
-                        path = Path(path_str)
+            # If the path is relative, resolve it relative to models_dir
+            if not path.is_absolute():
+                full_path = (models_dir / path).resolve()
+            else:
+                full_path = path.resolve()
 
-                        # If the path is relative, resolve it relative to models_dir
-                        if not path.is_absolute():
-                            full_path = (models_dir / path).resolve()
-                        else:
-                            full_path = path.resolve()
-
-                        # Extract the top-level directory under models_dir
-                        try:
-                            rel_path = full_path.relative_to(models_dir)
-                            if rel_path.parts:
-                                top_level_dir = models_dir / rel_path.parts[0]
-                                model_directories.add(top_level_dir.resolve())
-                        except ValueError:
-                            # Path is not relative to models_dir
-                            model_directories.add(full_path)
-
-                except (json.JSONDecodeError, KeyError, TypeError):
-                    # Skip invalid model configs
-                    continue
+            # Extract the top-level directory under models_dir
+            try:
+                rel_path = full_path.relative_to(models_dir)
+                if rel_path.parts:
+                    top_level_dir = models_dir / rel_path.parts[0]
+                    model_directories.add(top_level_dir.resolve())
+            except ValueError:
+                # Path is not relative to models_dir
+                model_directories.add(full_path)
 
         return model_directories
 
