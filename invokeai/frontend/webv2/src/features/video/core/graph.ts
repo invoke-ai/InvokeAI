@@ -776,18 +776,19 @@ const buildLtx2VideoGraph = (settings: VideoSettings, model: MainModelConfig): B
   //
   // Only in the modes whose length is still open. A conditioning clip drives `num_frames` by its
   // own edge further down, and a second edge into one input is a malformed graph rather than a
-  // fallback; an extension has no such edge, but its length is the continuation the user asked
-  // for, measured against the source it joins. The head chooses at most the Frames value, which
-  // under auto duration is the ceiling the run's memory was sized for.
+  // fallback. An extension's prompt sizes the continuation; its rate and held context arrive over
+  // edges once the join is laid out. The head chooses at most the Frames value, which under auto
+  // duration is the ceiling the run's memory was sized for. It goes in frames only: the node turns it
+  // into seconds at the rate it actually runs at, which for a continuation only the run knows.
   const durationBounds = getAutoDurationBounds(model, settings);
   const durationHead =
     durationBounds && settings.ltx2DurationHeadModel
       ? addNode(graph, {
           duration_head: settings.ltx2DurationHeadModel,
-          fps: timing.fps,
+          ...(durationBounds.contextFrames ? {} : { fps: durationBounds.fps }),
           id: 'duration',
           type: 'ltx2_duration',
-          max_seconds: durationBounds.maxSeconds,
+          max_num_frames: timing.numFrames,
           min_seconds: durationBounds.minSeconds,
         })
       : null;
@@ -1072,6 +1073,10 @@ const buildLtx2VideoGraph = (settings: VideoSettings, model: MainModelConfig): B
     }
 
     addEdge(graph, extendConditioning, 'context_frames', join.concat, 'transition_frames');
+    if (durationHead) {
+      addEdge(graph, extendConditioning, 'context_frames', durationHead, 'context_frames');
+      addEdge(graph, join.extract, 'fps', durationHead, 'fps');
+    }
     // The continuation inherits the source's own frame rate, read off the trimmed clip at run time
     // rather than from the gallery's record of it -- a video row's fps is nullable, and a guess
     // here would play the two halves at different speeds and mistime the generated soundtrack.

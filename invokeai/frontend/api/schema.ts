@@ -25170,10 +25170,14 @@ export type components = {
          *     The duration head reads the same connector outputs the transformer's prompt cross-attention
          *     consumes, so it judges the prompt the model will actually see rather than its raw text. The
          *     prediction is clamped to `min_seconds`/`max_seconds` and then snapped down onto the VAE's
-         *     causal temporal grid (`8k + 1`), which is the only frame count a generation can run at.
+         *     causal temporal grid (`8k + 1`), which is the only frame count a generation can run at. The
+         *     total is then capped at `max_num_frames` (by default LTX-2's longest clip), which can be
+         *     shorter than `max_seconds` at a high frame rate.
          *
-         *     Conditioning clips and video extension fix the frame count by construction -- the source
-         *     footage decides it -- so this node has nothing to say about those graphs.
+         *     For an extension, the prompt describes the continuation rather than the frames it opens with,
+         *     so the prediction sizes the new material and `context_frames` is added in front of it.
+         *     Conditioning clips fix the frame count by construction -- the clip decides it -- so this node
+         *     has nothing to say about those graphs.
          */
         LTX2DurationInvocation: {
             /**
@@ -25224,6 +25228,18 @@ export type components = {
              */
             max_seconds?: number;
             /**
+             * Context Frames
+             * @description Source frames the run opens with, as an extension's `context_frames`. The prediction covers what follows them, so they are added to it. 0 when nothing is held.
+             * @default 0
+             */
+            context_frames?: number;
+            /**
+             * Max Num Frames
+             * @description Longest total frame count, context included, the run was sized for. The result is capped at it, so it holds at whatever `fps` the run turns out to have.
+             * @default 481
+             */
+            max_num_frames?: number;
+            /**
              * type
              * @default ltx2_duration
              * @constant
@@ -25237,7 +25253,7 @@ export type components = {
         LTX2DurationOutput: {
             /**
              * Num Frames
-             * @description Frame count on LTX-2's 8k+1 grid. Wire into the denoise node's `num_frames`.
+             * @description Frame count on LTX-2's 8k+1 grid, including any context frames. Wire into the denoise node's `num_frames`.
              */
             num_frames: number;
             /**

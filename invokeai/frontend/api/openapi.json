@@ -63303,7 +63303,7 @@
         "category": "video",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Predicts the natural length of the shot a prompt describes, as an LTX-2 frame count.\n\nThe duration head reads the same connector outputs the transformer's prompt cross-attention\nconsumes, so it judges the prompt the model will actually see rather than its raw text. The\nprediction is clamped to `min_seconds`/`max_seconds` and then snapped down onto the VAE's\ncausal temporal grid (`8k + 1`), which is the only frame count a generation can run at.\n\nConditioning clips and video extension fix the frame count by construction -- the source\nfootage decides it -- so this node has nothing to say about those graphs.",
+        "description": "Predicts the natural length of the shot a prompt describes, as an LTX-2 frame count.\n\nThe duration head reads the same connector outputs the transformer's prompt cross-attention\nconsumes, so it judges the prompt the model will actually see rather than its raw text. The\nprediction is clamped to `min_seconds`/`max_seconds` and then snapped down onto the VAE's\ncausal temporal grid (`8k + 1`), which is the only frame count a generation can run at. The\ntotal is then capped at `max_num_frames` (by default LTX-2's longest clip), which can be\nshorter than `max_seconds` at a high frame rate.\n\nFor an extension, the prompt describes the continuation rather than the frames it opens with,\nso the prediction sizes the new material and `context_frames` is added in front of it.\nConditioning clips fix the frame count by construction -- the clip decides it -- so this node\nhas nothing to say about those graphs.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -63400,6 +63400,29 @@
             "title": "Max Seconds",
             "type": "number"
           },
+          "context_frames": {
+            "default": 0,
+            "description": "Source frames the run opens with, as an extension's `context_frames`. The prediction covers what follows them, so they are added to it. 0 when nothing is held.",
+            "field_kind": "input",
+            "input": "any",
+            "minimum": 0,
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Context Frames",
+            "type": "integer"
+          },
+          "max_num_frames": {
+            "default": 481,
+            "description": "Longest total frame count, context included, the run was sized for. The result is capped at it, so it holds at whatever `fps` the run turns out to have.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 481,
+            "minimum": 1,
+            "orig_default": 481,
+            "orig_required": false,
+            "title": "Max Num Frames",
+            "type": "integer"
+          },
           "type": {
             "const": "ltx2_duration",
             "default": "ltx2_duration",
@@ -63412,7 +63435,7 @@
         "tags": ["ltx", "ltx2", "video", "duration", "frames"],
         "title": "Duration - LTX-2",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/LTX2DurationOutput"
         }
@@ -63422,7 +63445,7 @@
         "description": "A predicted shot length, as both a frame count and the seconds it came from.",
         "properties": {
           "num_frames": {
-            "description": "Frame count on LTX-2's 8k+1 grid. Wire into the denoise node's `num_frames`.",
+            "description": "Frame count on LTX-2's 8k+1 grid, including any context frames. Wire into the denoise node's `num_frames`.",
             "field_kind": "output",
             "title": "Num Frames",
             "type": "integer",
