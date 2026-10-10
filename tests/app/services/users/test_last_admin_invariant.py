@@ -18,13 +18,19 @@ so the invariant belongs in the service, inside the transaction that performs th
 """
 
 import threading
-from logging import Logger
+from collections.abc import Callable
+from typing import Any
 
 import pytest
+from sqlalchemy import update
 
 from invokeai.app.services.auth.password_utils import hash_password
-from invokeai.app.services.shared.media_references import create_media_references_table
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.queries import Queries
+from invokeai.app.services.shared.database.queries.locks import DatabaseLock
+from invokeai.app.services.shared.database.queries.users import UserQueries
+from invokeai.app.services.shared.database.schema.users import users as users_table
+from invokeai.app.services.users import users_default
 from invokeai.app.services.users.users_common import (
     SYSTEM_USER_ID,
     LastAdministratorError,
@@ -38,31 +44,8 @@ PASSWORD = "Sup3rSecret!pass"
 
 
 @pytest.fixture
-def db() -> SqliteDatabase:
-    db = SqliteDatabase(db_path=None, logger=Logger("test_last_admin"), verbose=False)
-    db._conn.execute("""
-        CREATE TABLE users (
-            user_id TEXT NOT NULL PRIMARY KEY,
-            email TEXT NOT NULL UNIQUE,
-            display_name TEXT,
-            password_hash TEXT NOT NULL,
-            is_admin BOOLEAN NOT NULL DEFAULT FALSE,
-            is_active BOOLEAN NOT NULL DEFAULT TRUE,
-            created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-            updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-            last_login_at DATETIME,
-            token_epoch INTEGER NOT NULL DEFAULT 0
-        );
-    """)
-    # Deleting an account also drops the media references its documents held.
-    create_media_references_table(db._conn.cursor())
-    db._conn.commit()
-    return db
-
-
-@pytest.fixture
-def users(db: SqliteDatabase) -> UserService:
-    return UserService(db)
+def users(database: Database) -> UserService:
+    return UserService(database)
 
 
 def _make(users: UserService, email: str, *, is_admin: bool) -> str:
@@ -242,23 +225,160 @@ def test_concurrent_delete_and_demotion_cannot_remove_both_admins(users: UserSer
     assert sum(isinstance(e, LastAdministratorError) for e in errors) == 1
 
 
+def _while_another_transaction_holds_the_lock(
+    database: Database, change: Callable[[], None], holders_work: Callable[[Queries], None]
+) -> list[BaseException]:
+    """Runs `change` while another transaction holds `ADMIN_ACCOUNTS`; that transaction then does `holders_work`
+    and commits, and `change` goes on. Returns what `change` raised."""
+    locked = threading.Event()
+    proceed = threading.Event()
+
+    def hold() -> None:
+        with database.queries.transaction() as q:
+            q.locks.acquire(DatabaseLock.ADMIN_ACCOUNTS)
+            locked.set()
+            proceed.wait(timeout=30)
+            holders_work(q)
+
+    errors: list[BaseException] = []
+
+    def run_change() -> None:
+        try:
+            change()
+        except BaseException as e:  # noqa: BLE001 - asserted on by the caller
+            errors.append(e)
+
+    holder = threading.Thread(target=hold)
+    holder.start()
+    try:
+        assert locked.wait(timeout=10), "the lock was not taken"
+        changing = threading.Thread(target=run_change)
+        changing.start()
+        changing.join(timeout=0.5)
+        assert changing.is_alive(), "the change did not wait for the lock"
+    finally:
+        proceed.set()
+        holder.join(timeout=10)
+    changing.join(timeout=10)
+    assert not changing.is_alive()
+    return errors
+
+
+@pytest.fixture
+def quick_hashing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Hashing takes a large part of a second on its own; the tests below time how long a change waits."""
+    monkeypatch.setattr(users_default, "hash_password", lambda password: f"hash of {password}")
+
+
+@pytest.mark.parametrize("change", ["delete", "demote", "deactivate"])
+def test_a_waiting_change_counts_the_admins_the_lock_holder_left(
+    database: Database, users: UserService, change: str
+) -> None:
+    """On a server transactions run side by side: what decides is that each change takes the lock before it
+    counts, so it counts what the transaction holding the lock committed. (On SQLite the held transaction blocks
+    every other one anyway.)"""
+    first = _make(users, "a1@test.com", is_admin=True)
+    second = _make(users, "a2@test.com", is_admin=True)
+
+    def revoke_second() -> None:
+        if change == "delete":
+            users.delete(second)
+        else:
+            revoke = UserUpdateRequest(is_admin=False) if change == "demote" else UserUpdateRequest(is_active=False)
+            users.update(second, revoke, strict_password_checking=False)
+
+    errors = _while_another_transaction_holds_the_lock(
+        database, revoke_second, lambda q: q.users.update(first, is_admin=False)
+    )
+
+    assert [type(e) for e in errors] == [LastAdministratorError]
+    assert users.count_admins() == 1
+
+
+@pytest.mark.usefixtures("quick_hashing")
+def test_a_waiting_first_admin_setup_sees_the_admin_the_lock_holder_created(
+    database: Database, users: UserService
+) -> None:
+    def setup() -> None:
+        users.create_admin(
+            UserCreateRequest(email="second@test.com", password=PASSWORD), strict_password_checking=False
+        )
+
+    errors = _while_another_transaction_holds_the_lock(
+        database,
+        setup,
+        lambda q: q.users.insert(
+            user_id="first", email="first@test.com", display_name=None, password_hash="hash", is_admin=True
+        ),
+    )
+
+    assert [str(e) for e in errors] == ["Admin user already exists"]
+    assert users.count_admins() == 1
+
+
+@pytest.mark.usefixtures("quick_hashing")
+@pytest.mark.parametrize("change", ["create_admin_account", "promote", "reactivate"])
+def test_first_admin_setup_waits_for_an_admin_being_added(
+    database: Database, users: UserService, monkeypatch: pytest.MonkeyPatch, change: str
+) -> None:
+    """`invoke-useradd --admin` or `invoke-usermod` can add an administrator while the unauthenticated setup is
+    open: the setup must not count before that change has committed."""
+    if change == "promote":
+        target = _make(users, "user@test.com", is_admin=False)
+    elif change == "reactivate":
+        target = _make(users, "admin@test.com", is_admin=True)
+        with database.queries.transaction() as q:
+            q.users.update(target, is_active=False)
+    written = threading.Event()
+    proceed = threading.Event()
+    patched = "insert" if change == "create_admin_account" else "update"
+    real = getattr(UserQueries, patched)
+
+    def write_then_wait(self: UserQueries, *args: Any, **kwargs: Any) -> None:
+        real(self, *args, **kwargs)
+        written.set()
+        assert proceed.wait(timeout=30)
+
+    monkeypatch.setattr(UserQueries, patched, write_then_wait)
+
+    def add_admin() -> None:
+        if change == "create_admin_account":
+            users.create(UserCreateRequest(email="added@test.com", password=PASSWORD, is_admin=True), False)
+        else:
+            added = UserUpdateRequest(is_admin=True) if change == "promote" else UserUpdateRequest(is_active=True)
+            users.update(target, added, strict_password_checking=False)
+
+    adding = threading.Thread(target=add_admin)
+    adding.start()
+    errors: list[BaseException] = []
+
+    def setup() -> None:
+        try:
+            users.create_admin(UserCreateRequest(email="setup@test.com", password=PASSWORD), False)
+        except BaseException as e:  # noqa: BLE001 - asserted on below
+            errors.append(e)
+
+    try:
+        assert written.wait(timeout=10), "the admin was not added"
+        setting_up = threading.Thread(target=setup)
+        setting_up.start()
+        setting_up.join(timeout=0.5)
+        assert setting_up.is_alive(), "the setup did not wait for the lock"
+    finally:
+        proceed.set()
+        adding.join(timeout=10)
+    setting_up.join(timeout=10)
+
+    assert [str(e) for e in errors] == ["Admin user already exists"]
+    assert users.count_admins() == 1
+
+
 # endregion
 
 # region the system account
 
 
-def _seed_system_user(db: SqliteDatabase) -> None:
-    """The row migration_27 creates: active, non-admin, and with an empty password hash."""
-    db._conn.execute(
-        """
-        INSERT INTO users (user_id, email, display_name, password_hash, is_admin, is_active)
-        VALUES ('system', 'system@system.invokeai', 'System', '', FALSE, TRUE);
-        """
-    )
-    db._conn.commit()
-
-
-def test_the_system_user_cannot_be_promoted(db: SqliteDatabase, users: UserService) -> None:
+def test_the_system_user_cannot_be_promoted(users: UserService) -> None:
     """`count_admins()` counts admin rows, but the invariant that matters is "an admin who
     can log in". The system row is active and can never authenticate — it has no password —
     so promoting it would inflate the count with an unusable administrator, which is enough
@@ -270,7 +390,6 @@ def test_the_system_user_cannot_be_promoted(db: SqliteDatabase, users: UserServi
 
     leaving the instance with no usable administration and no authenticated way back.
     """
-    _seed_system_user(db)
     admin = _make(users, "admin@test.com", is_admin=True)
 
     with pytest.raises(SystemUserProtectedError):
@@ -283,10 +402,9 @@ def test_the_system_user_cannot_be_promoted(db: SqliteDatabase, users: UserServi
         users.update(admin, UserUpdateRequest(is_admin=False), strict_password_checking=False)
 
 
-def test_the_system_user_cannot_be_given_a_password(db: SqliteDatabase, users: UserService) -> None:
+def test_the_system_user_cannot_be_given_a_password(users: UserService) -> None:
     """The other end of the same hole: a password turns the owner of every pre-multiuser
     board, image, and workflow into a login account."""
-    _seed_system_user(db)
 
     with pytest.raises(SystemUserProtectedError):
         users.update(SYSTEM_USER_ID, UserUpdateRequest(password=PASSWORD), strict_password_checking=False)
@@ -294,11 +412,10 @@ def test_the_system_user_cannot_be_given_a_password(db: SqliteDatabase, users: U
     assert users.authenticate("system@system.invokeai", PASSWORD) is None
 
 
-def test_the_system_user_cannot_be_deleted_or_deactivated(db: SqliteDatabase, users: UserService) -> None:
+def test_the_system_user_cannot_be_deleted_or_deactivated(users: UserService) -> None:
     """The routes already refuse both, but `invoke-userdel` / `invoke-usermod` construct
     this service directly and never reach a route — the same reason the last-admin guard
     lives here."""
-    _seed_system_user(db)
 
     with pytest.raises(SystemUserProtectedError):
         users.delete(SYSTEM_USER_ID)
@@ -309,16 +426,15 @@ def test_the_system_user_cannot_be_deleted_or_deactivated(db: SqliteDatabase, us
     assert system is not None and system.is_active is True
 
 
-def test_renaming_the_system_user_is_allowed(db: SqliteDatabase, users: UserService) -> None:
+def test_renaming_the_system_user_is_allowed(users: UserService) -> None:
     """Not a blanket lock on the row — only the changes that would make it dangerous."""
-    _seed_system_user(db)
 
     updated = users.update(SYSTEM_USER_ID, UserUpdateRequest(display_name="Renamed"), strict_password_checking=False)
 
     assert updated.display_name == "Renamed"
 
 
-def test_a_system_row_carrying_a_password_still_cannot_log_in(db: SqliteDatabase, users: UserService) -> None:
+def test_a_system_row_carrying_a_password_still_cannot_log_in(database: Database, users: UserService) -> None:
     """The guard above only stops a password being set *from now on*.
 
     An instance that set one through the old `PATCH /auth/users/system` hole still carries
@@ -327,27 +443,25 @@ def test_a_system_row_carrying_a_password_still_cannot_log_in(db: SqliteDatabase
     migration clears it, but migrations run once and cannot reach a row damaged afterwards
     by direct SQL, so `authenticate` refuses the account outright whatever the row holds.
     """
-    _seed_system_user(db)
-    db._conn.execute(
-        "UPDATE users SET password_hash = ? WHERE user_id = 'system'",
-        (hash_password(PASSWORD),),
-    )
-    db._conn.commit()
+    with database.begin(write=True) as conn:
+        conn.execute(
+            update(users_table)
+            .where(users_table.c.user_id == SYSTEM_USER_ID)
+            .values(password_hash=hash_password(PASSWORD))
+        )
 
     assert users.authenticate("system@system.invokeai", PASSWORD) is None
 
 
-def test_refusing_the_system_account_does_not_block_other_logins(db: SqliteDatabase, users: UserService) -> None:
+def test_refusing_the_system_account_does_not_block_other_logins(users: UserService) -> None:
     """The refusal is keyed on the user id, not on anything a real account shares."""
-    _seed_system_user(db)
     _make(users, "real@test.com", is_admin=False)
 
     assert users.authenticate("real@test.com", PASSWORD) is not None
 
 
-def test_the_system_error_is_a_value_error(db: SqliteDatabase, users: UserService) -> None:
+def test_the_system_error_is_a_value_error(users: UserService) -> None:
     """Same reason as the last-admin error: existing route and CLI handlers catch ValueError."""
-    _seed_system_user(db)
 
     with pytest.raises(ValueError):
         users.delete(SYSTEM_USER_ID)

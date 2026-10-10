@@ -15,8 +15,7 @@ from invokeai.app.services.gallery.gallery_common import (
     GalleryItemNamesResult,
 )
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
-from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults, SQLiteDirection
 
 gallery_router = APIRouter(prefix="/v1/gallery", tags=["gallery"])
 

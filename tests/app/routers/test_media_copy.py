@@ -22,8 +22,10 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.names.names_default import SimpleNameService
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.urls.urls_default import LocalUrlService
 from tests.app.routers.conftest import _auth, _create_board
+from tests.fixtures.sqlite_database import sqlite_cursor
 
 SOURCE_METADATA = {"positive_prompt": "a cat", "seed": 12345}
 SOURCE_WORKFLOW = '{"name": "a workflow"}'
@@ -34,9 +36,9 @@ def _owner_id(client: TestClient, token: str) -> str:
     return board.json()["user_id"]
 
 
-def _insert_image_record(mock_invoker: Invoker, name: str, user_id: str, category: str = "control") -> None:
+def _insert_image_record(db: Database, name: str, user_id: str, category: str = "control") -> None:
     """A real row, so the route's read-access check runs against real data."""
-    with mock_invoker.services.board_records._db.transaction() as cursor:
+    with sqlite_cursor(db) as cursor:
         cursor.execute(
             "INSERT INTO images (image_name, image_origin, image_category, width, height, user_id)"
             " VALUES (?, 'internal', ?, 64, 64, ?);",
@@ -219,12 +221,17 @@ def test_copying_into_a_board_you_cannot_write_is_refused(
 
 
 def test_copying_someone_elses_image_is_refused_per_name(
-    client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str, real_images: DiskImageFileStorage
+    client: TestClient,
+    mock_invoker: Invoker,
+    mock_sqlite_database: Database,
+    user1_token: str,
+    user2_token: str,
+    real_images: DiskImageFileStorage,
 ):
     mine = _owner_id(client, user1_token)
     theirs = _owner_id(client, user2_token)
     source = _create_source_image(mock_invoker, mine)
-    _insert_image_record(mock_invoker, "theirs.png", theirs)
+    _insert_image_record(mock_sqlite_database, "theirs.png", theirs)
 
     response = _copy_images(client, user1_token, image_names=[source.image_name, "theirs.png"])
 
@@ -245,9 +252,9 @@ def test_a_batch_larger_than_the_cap_is_refused(
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
-def _insert_video_record(mock_invoker: Invoker, name: str, user_id: str) -> None:
+def _insert_video_record(db: Database, name: str, user_id: str) -> None:
     """A real row, so the board service's cover resolution keeps working around it."""
-    with mock_invoker.services.board_records._db.transaction() as cursor:
+    with sqlite_cursor(db) as cursor:
         cursor.execute(
             "INSERT INTO videos (video_name, video_origin, video_category, width, height, duration, fps, user_id)"
             " VALUES (?, 'internal', 'general', 640, 480, 2.5, 24.0, ?);",
@@ -256,11 +263,11 @@ def _insert_video_record(mock_invoker: Invoker, name: str, user_id: str) -> None
 
 
 def test_copying_a_video_delegates_copy_invariants_to_the_video_service(
-    client: TestClient, mock_invoker: Invoker, user1_token: str
+    client: TestClient, mock_invoker: Invoker, mock_sqlite_database: Database, user1_token: str
 ):
     user_id = _owner_id(client, user1_token)
     board_id = _create_board(client, user1_token, "Video+Target")
-    _insert_video_record(mock_invoker, "src.mp4", user_id)
+    _insert_video_record(mock_sqlite_database, "src.mp4", user_id)
 
     videos = MagicMock()
     created = MagicMock()
@@ -281,13 +288,13 @@ def test_copying_a_video_delegates_copy_invariants_to_the_video_service(
 
 
 def test_a_video_copy_that_missed_its_board_is_reported_as_failed(
-    client: TestClient, mock_invoker: Invoker, user1_token: str
+    client: TestClient, mock_invoker: Invoker, mock_sqlite_database: Database, user1_token: str
 ):
     """`create` treats board attachment as best-effort, which is right for a generation and wrong
     here: the caller is about to remap a document onto the name we return."""
     user_id = _owner_id(client, user1_token)
     board_id = _create_board(client, user1_token, "Video+Target")
-    _insert_video_record(mock_invoker, "src.mp4", user_id)
+    _insert_video_record(mock_sqlite_database, "src.mp4", user_id)
 
     videos = MagicMock()
     videos.copy.side_effect = RuntimeError("copy missed board")
@@ -302,9 +309,11 @@ def test_a_video_copy_that_missed_its_board_is_reported_as_failed(
     assert response.json() == {"copied": [], "failed": ["src.mp4"]}
 
 
-def test_copying_someone_elses_video_is_refused_per_name(client: TestClient, mock_invoker: Invoker, user1_token: str):
+def test_copying_someone_elses_video_is_refused_per_name(
+    client: TestClient, mock_invoker: Invoker, mock_sqlite_database: Database, user1_token: str
+):
     _owner_id(client, user1_token)
-    _insert_video_record(mock_invoker, "theirs.mp4", "somebody-else")
+    _insert_video_record(mock_sqlite_database, "theirs.mp4", "somebody-else")
     videos = MagicMock()
     mock_invoker.services.videos = videos
 

@@ -13,7 +13,9 @@ from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers.boards import delete_board
 from invokeai.app.api_app import app
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.users.users_common import UserCreateRequest
+from tests.fixtures.sqlite_database import sqlite_cursor
 
 
 class MockApiDependencies(ApiDependencies):
@@ -82,7 +84,7 @@ def enable_multiuser_for_tests(monkeypatch: Any, mock_invoker: Invoker):
     # so the route doesn't hit AttributeError on the None placeholders in mock_services.
     mock_board_video_records = MagicMock()
     mock_board_video_records.get_all_board_video_names_for_board.return_value = []
-    mock_board_video_records.get_video_count_for_board.return_value = 0
+    mock_board_video_records.get_counts_for_board.return_value = (0, 0)
     mock_invoker.services.board_video_records = mock_board_video_records
     # The board service also consults video_records for cover-image selection (most recent video).
     mock_video_records = MagicMock()
@@ -997,12 +999,12 @@ def test_generic_update_of_a_project_board_is_refused(
 
 
 def test_setting_only_the_cover_of_a_project_board_is_still_allowed(
-    client: TestClient, mock_invoker: Invoker, user1_token: str
+    client: TestClient, mock_invoker: Invoker, mock_sqlite_database: Database, user1_token: str
 ):
     """The cover is a display detail with no bearing on the project relationship."""
     board_id = _claim_board_for_a_project(client, mock_invoker, user1_token, "Cover+Board")
     # `boards.cover_image_name` is a foreign key, so the image has to actually exist.
-    with mock_invoker.services.board_records._db.transaction() as cursor:
+    with sqlite_cursor(mock_sqlite_database) as cursor:
         cursor.execute(
             "INSERT INTO images (image_name, image_origin, image_category, width, height)"
             " VALUES ('cover.png', 'internal', 'general', 64, 64);"

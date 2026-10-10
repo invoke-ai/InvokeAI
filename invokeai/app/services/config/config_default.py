@@ -92,6 +92,7 @@ class InvokeAIAppConfig(BaseSettings):
         download_cache_dir: Path to the directory that contains dynamically downloaded models.
         legacy_conf_dir: Path to directory of legacy checkpoint config files.
         db_dir: Path to InvokeAI databases directory.
+        db_url: URL of a MySQL 8.4+ or MariaDB 10.11+ database to use instead of the SQLite database in `db_dir`, e.g. `mariadb+pymysql://invokeai:password@db.example/invokeai`. Needs the `mysql` extra. One InvokeAI process uses a database at a time. Read at startup only.
         db_synchronous: SQLite durability setting. `full`, the default and what InvokeAI has always used, flushes every commit to disk. `normal` acknowledges commits without waiting for that flush - measured at roughly 12x shorter commits on an SSD - and cannot corrupt the database under WAL, which is why it is refused, with a warning, when WAL is unavailable for the database file. What `normal` gives up is the most recent transactions on a power loss or OS crash: a just-written image record or queue status, not the image file itself.<br>Valid values: `full`, `normal`
         outputs_dir: Path to directory for outputs.
         image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.<br>Valid values: `flat`, `date`, `type`, `hash`
@@ -110,6 +111,7 @@ class InvokeAIAppConfig(BaseSettings):
         profiles_dir: Path to profiles output directory.
         max_cache_ram_gb: The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.
         max_cache_vram_gb: The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.
+        reserve_vram_gb: The amount of VRAM (in GB) to subtract from the model cache's available memory budget. Defaults to 0.
         log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.
         model_cache_keep_alive_min: How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.
         device_working_mem_gb: The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.
@@ -203,6 +205,7 @@ class InvokeAIAppConfig(BaseSettings):
     download_cache_dir:            Path = Field(default=Path("models/.download_cache"), description="Path to the directory that contains dynamically downloaded models.")
     legacy_conf_dir:               Path = Field(default=Path("configs"), description="Path to directory of legacy checkpoint config files.")
     db_dir:                        Path = Field(default=Path("databases"),  description="Path to InvokeAI databases directory.")
+    db_url:                Optional[str] = Field(default=None,              description="URL of a MySQL 8.4+ or MariaDB 10.11+ database to use instead of the SQLite database in `db_dir`, e.g. `mariadb+pymysql://invokeai:password@db.example/invokeai`. Needs the `mysql` extra. One InvokeAI process uses a database at a time. Read at startup only.")
     db_synchronous:      DB_SYNCHRONOUS = Field(default="full", description="SQLite durability setting. `full`, the default and what InvokeAI has always used, flushes every commit to disk. `normal` acknowledges commits without waiting for that flush - measured at roughly 12x shorter commits on an SSD - and cannot corrupt the database under WAL, which is why it is refused, with a warning, when WAL is unavailable for the database file. What `normal` gives up is the most recent transactions on a power loss or OS crash: a just-written image record or queue status, not the image file itself.")
     outputs_dir:                   Path = Field(default=Path("outputs"),    description="Path to directory for outputs.")
     fonts_dir:                     Path = Field(default=Path("fonts"),      description="Path to directory for custom fonts.")
@@ -232,6 +235,7 @@ class InvokeAIAppConfig(BaseSettings):
     # CACHE
     max_cache_ram_gb:   Optional[float] = Field(default=None, gt=0,         description="The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.")
     max_cache_vram_gb:  Optional[float] = Field(default=None, ge=0,         description="The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.")
+    reserve_vram_gb:              float = Field(default=0.0, ge=0,          description="The amount of VRAM (in GB) to subtract from the model cache's available memory budget. Defaults to 0.")
     log_memory_usage:              bool = Field(default=False,              description="If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.")
     model_cache_keep_alive_min:   float = Field(default=0, ge=0,            description="How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.")
     device_working_mem_gb:        float = Field(default=3,                  description="The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.")
@@ -735,6 +739,17 @@ def ensure_fonts_dir(fonts_path: Path) -> None:
                 )
     except OSError:
         logger.warning("Unable to initialize fonts directory at %s", fonts_path, exc_info=True)
+
+
+def load_config_from_root(root: Path) -> InvokeAIAppConfig:
+    """The config of the install at `root`, from the environment and its `invokeai.yaml` as `get_config` reads them,
+    for the maintenance scripts. Unlike `get_config` it writes no example or default config file and copies no
+    legacy model configs; like it, it migrates an `invokeai.yaml` of an older schema."""
+    config = InvokeAIAppConfig()
+    config._root = root
+    if config.config_file_path.exists():
+        config.update_config(load_and_migrate_config(config.config_file_path), clobber=False)
+    return config
 
 
 @lru_cache(maxsize=1)

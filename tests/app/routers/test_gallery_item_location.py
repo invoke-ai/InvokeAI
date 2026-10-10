@@ -9,6 +9,7 @@ import anyio.to_thread
 import httpx
 import pytest
 from fastapi import FastAPI, HTTPException, status
+from sqlalchemy import update
 
 from invokeai.app.api.auth_dependencies import get_current_user_or_default
 from invokeai.app.api.routers import gallery as gallery_router_module
@@ -17,7 +18,9 @@ from invokeai.app.services.auth.token_service import TokenData
 from invokeai.app.services.gallery.gallery_common import GalleryItemKind, GalleryItemLocation
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ImageRecordChanges, ResourceOrigin
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.database.schema.images import images
+from invokeai.app.services.shared.database.schema.videos import videos
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.services.video_records.video_records_common import VideoRecordChanges
 
 
@@ -50,8 +53,9 @@ def _save_video(invoker: Invoker, name: str, user_id: str) -> None:
 
 
 def _set_created_at(invoker: Invoker, table: str, name_column: str, name: str, created_at: str) -> None:
-    with invoker.services.image_records._db.transaction() as cursor:
-        cursor.execute(f"UPDATE {table} SET created_at = ? WHERE {name_column} = ?", (created_at, name))
+    media = {"images": images, "videos": videos}[table]
+    with invoker.services.database.begin(write=True) as conn:
+        conn.execute(update(media).where(media.c[name_column] == name).values(created_at=created_at))
 
 
 def _locate(

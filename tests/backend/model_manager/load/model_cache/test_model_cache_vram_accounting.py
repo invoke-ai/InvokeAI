@@ -216,6 +216,33 @@ def test_the_windows_video_memory_budget_caps_the_measured_free_vram(monkeypatch
     assert cache._get_vram_available(None) == 6 * GB
 
 
+@pytest.mark.parametrize("cache_cap_gb", [None, 12.0])
+@pytest.mark.parametrize("reserve_vram_gb", [0.0, 1.5])
+def test_reserve_vram_reduces_available_memory(
+    monkeypatch: pytest.MonkeyPatch, cache_cap_gb: float | None, reserve_vram_gb: float
+):
+    cache = ModelCache(
+        execution_device_working_mem_gb=1.0,
+        enable_partial_loading=True,
+        keep_ram_copy_of_weights=True,
+        max_vram_cache_size_gb=cache_cap_gb,
+        reserve_vram_gb=reserve_vram_gb,
+        execution_device="cpu",
+        storage_device="cpu",
+        logger=MagicMock(),
+        shared_cpu_weights=None,
+    )
+    cache._execution_device = torch.device("cuda")  # Avoid requiring a physical GPU.
+    monkeypatch.setattr(TorchDevice, "cuda_mem_get_info", classmethod(lambda cls, device: (8 * GB, 16 * GB)))
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device: 2 * GB)
+    monkeypatch.setattr(cache, "_get_reclaimable_allocator_bytes", lambda: 0)
+
+    reserved_bytes = int(reserve_vram_gb * GB)
+    expected_cache = (9 if cache_cap_gb is not None else 7) * GB - reserved_bytes
+    assert cache._get_vram_available(None) == expected_cache
+    assert cache._get_physical_vram_available() == 7 * GB - reserved_bytes
+
+
 @pytest.mark.parametrize("peer_busy", [False, True], ids=["alone", "peer-device-busy"])
 def test_offloading_under_expandable_segments_stops_once_enough_is_free(monkeypatch: pytest.MonkeyPatch, peer_busy):
     """Under expandable segments the driver sees an offloaded model's pages only after empty_cache(), and no

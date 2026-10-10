@@ -17,8 +17,10 @@ from invokeai.app.services.session_processor.session_processor_default import (
     DefaultSessionProcessor,
     DefaultSessionRunner,
 )
-from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
+from invokeai.app.services.session_queue.session_queue_default import SessionQueue
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
+from tests.fixtures.sqlite_database import sqlite_cursor_of
 from tests.test_nodes import create_edge
 
 
@@ -72,9 +74,9 @@ def _build_if_graph(*, condition: bool = True) -> Graph:
     return graph
 
 
-def _insert_session(queue: SqliteSessionQueue, graph: Graph) -> int:
+def _insert_session(queue: SessionQueue, graph: Graph) -> int:
     session = GraphExecutionState(graph=graph)
-    with queue._db.transaction() as cursor:
+    with sqlite_cursor_of(queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -147,6 +149,7 @@ def registered_event_bus() -> Iterator[_RecordingRegisteredEventService]:
 )
 def test_if_cancellation_preserves_activation_and_never_resumes_unselected_branch(
     mock_invoker: Invoker,
+    mock_sqlite_database: Database,
     registered_event_bus: _RecordingRegisteredEventService,
     condition: bool,
     selected_branch: str,
@@ -154,7 +157,7 @@ def test_if_cancellation_preserves_activation_and_never_resumes_unselected_branc
     selected_field: str,
 ) -> None:
     test_timeout = 30
-    queue = SqliteSessionQueue(db=mock_invoker.services.board_records._db)
+    queue = SessionQueue(mock_sqlite_database)
     mock_invoker.services.events = registered_event_bus
     mock_invoker.services.session_queue = queue
     mock_invoker.services.performance_statistics = _Stats()
@@ -214,6 +217,7 @@ def test_if_cancellation_preserves_activation_and_never_resumes_unselected_branc
 )
 def test_if_retry_starts_fresh_and_preserves_selected_output_without_stale_activation(
     mock_invoker: Invoker,
+    mock_sqlite_database: Database,
     registered_event_bus: _RecordingRegisteredEventService,
     condition: bool,
     selected_branch: str,
@@ -222,7 +226,7 @@ def test_if_retry_starts_fresh_and_preserves_selected_output_without_stale_activ
     sink_value: int,
     cancel_after_source: str,
 ) -> None:
-    queue = SqliteSessionQueue(db=mock_invoker.services.board_records._db)
+    queue = SessionQueue(mock_sqlite_database)
     mock_invoker.services.events = registered_event_bus
     mock_invoker.services.session_queue = queue
     mock_invoker.services.performance_statistics = _Stats()
@@ -287,13 +291,14 @@ def test_if_retry_starts_fresh_and_preserves_selected_output_without_stale_activ
 )
 def test_if_early_cancellation_before_resolution_does_not_run_any_branch_continuation(
     mock_invoker: Invoker,
+    mock_sqlite_database: Database,
     registered_event_bus: _RecordingRegisteredEventService,
     condition: bool,
     selected_branch: str,
     unselected_branch: str,
     selected_field: str,
 ) -> None:
-    queue = SqliteSessionQueue(db=mock_invoker.services.board_records._db)
+    queue = SessionQueue(mock_sqlite_database)
     mock_invoker.services.events = registered_event_bus
     mock_invoker.services.session_queue = queue
     mock_invoker.services.performance_statistics = _Stats()

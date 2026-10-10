@@ -5,16 +5,19 @@ import re
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Optional
 
 from fastapi import FastAPI, Request
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.security.utils import get_authorization_scheme_param
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.middleware import EventHandlerASGIMiddleware
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import Headers
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.middleware.gzip import GZipMiddleware, GZipResponder, IdentityResponder
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -52,6 +55,7 @@ from invokeai.app.api.routers import (
 )
 from invokeai.app.api.sockets import SocketIO
 from invokeai.app.services.config.config_default import get_config
+from invokeai.app.services.shared.database.errors import TransientDatabaseError
 from invokeai.app.util.custom_openapi import get_openapi_func
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.frontend.cli.arg_parser import InvokeAIArgs
@@ -108,6 +112,42 @@ app = FastAPI(
     separate_input_output_schemas=False,
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(TransientDatabaseError)
+async def database_busy(request: Request, error: TransientDatabaseError) -> JSONResponse:
+    return _database_busy(request, error)
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_error(request: Request, error: StarletteHTTPException) -> Response:
+    # Many routes answer every exception with an error of their own ("not found", "unexpected error"); one raised
+    # while handling a busy database still means the database is busy.
+    transient = _transient_cause(error)
+    if transient is not None:
+        return _database_busy(request, transient)
+    return await http_exception_handler(request, error)
+
+
+def _database_busy(request: Request, error: TransientDatabaseError) -> JSONResponse:
+    # A lock held too long elsewhere, a race the call lost on every attempt, a server out of reach: the same
+    # request can succeed in a moment, so it is a busy server rather than a failed request.
+    logger.warning(f"{request.method} {request.url.path}: the database is busy: {error}")
+    return JSONResponse(
+        status_code=503, content={"detail": "The database is busy; try again"}, headers={"Retry-After": "1"}
+    )
+
+
+def _transient_cause(error: BaseException) -> Optional[TransientDatabaseError]:
+    """The busy database an exception was raised while handling, if any."""
+    seen: set[int] = set()
+    cause: Optional[BaseException] = error.__cause__ or error.__context__
+    while cause is not None and id(cause) not in seen:
+        if isinstance(cause, TransientDatabaseError):
+            return cause
+        seen.add(id(cause))
+        cause = cause.__cause__ or cause.__context__
+    return None
 
 
 class SlidingWindowTokenMiddleware(BaseHTTPMiddleware):
@@ -277,13 +317,14 @@ GZIP_MINIMUM_SIZE = 1000
 def configure_gzip(app: FastAPI, compresslevel: int) -> None:
     """Install response compression, unless it is turned off.
 
-    Compression runs on the event loop, so its cost is not paid by the requesting client alone —
-    it stalls every other request and every socket.io event for its duration. That makes the
-    level a real trade-off rather than a free win.
+    Body chunks under 128 KiB are compressed on the event loop (Starlette moves larger ones to a
+    worker thread), so the cost is not paid by the requesting client alone — it stalls every other
+    request and every socket.io event for its duration, and offloaded chunks still compete for CPU.
+    That makes the level a real trade-off rather than a free win.
 
     Measured on the flat name list of a 200k-image library (8.48 MB of JSON): level 1 takes
     16.4ms and returns 6.1% of the input, level 9 takes 90.2ms and returns 5.7%. Level 9 costs
-    5.5x the event-loop time for 0.4 percentage points of bandwidth, which is a poor deal for a
+    5.5x the compression time for 0.4 percentage points of bandwidth, which is a poor deal for a
     locally-served app. The default stays at 9 so behavior is unchanged for existing installs;
     users who feel the stall on a large library can lower it.
 
