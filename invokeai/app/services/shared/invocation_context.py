@@ -19,7 +19,7 @@ from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.app.services.shared.execution_effects import ExecutionEffectsRecorder, ExecutionInterface
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.services.videos.videos_common import VideoDTO
 from invokeai.app.services.wildcard_records.wildcard_records_common import build_wildcard_manager
 from invokeai.app.util.step_callback import diffusion_step_callback

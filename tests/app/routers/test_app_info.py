@@ -1,9 +1,11 @@
 import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock
 
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from invokeai.app.api.dependencies import ApiDependencies
@@ -14,6 +16,7 @@ from invokeai.app.services.config.config_default import get_config, load_and_mig
 from invokeai.app.services.external_generation.external_generation_common import ExternalProviderStatus
 from invokeai.app.services.image_files.image_subfolder_strategy import DateStrategy, create_subfolder_strategy
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.shared.database.errors import LockTimeoutError
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig, ExternalModelCapabilities
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 
@@ -604,3 +607,42 @@ def test_reset_external_provider_config_rejects_non_admin_users(
 
 def _get_provider_config(payload: list[dict[str, Any]], provider_id: str) -> dict[str, Any]:
     return next(item for item in payload if item["provider_id"] == provider_id)
+
+
+def _busy() -> None:
+    raise LockTimeoutError("lock wait timeout exceeded")
+
+
+def _busy_behind_a_routes_own_error() -> None:
+    # As many routes do: every exception becomes an answer of their own.
+    try:
+        _busy()
+    except Exception:
+        raise HTTPException(status_code=404, detail="Board not found")
+
+
+@pytest.mark.parametrize("route", [_busy, _busy_behind_a_routes_own_error])
+def test_a_busy_database_answers_503_with_a_retry_hint(client: TestClient, route: Callable[[], None]) -> None:
+    app.add_api_route("/api/v1/test/busy", route)
+    try:
+        response = client.get("/api/v1/test/busy")
+    finally:
+        app.router.routes.pop()
+
+    assert response.status_code == 503
+    assert response.headers["Retry-After"] == "1"
+    assert response.json() == {"detail": "The database is busy; try again"}
+
+
+def test_a_routes_own_error_is_answered_as_it_is(client: TestClient) -> None:
+    def missing() -> None:
+        raise HTTPException(status_code=404, detail="Board not found")
+
+    app.add_api_route("/api/v1/test/missing", missing)
+    try:
+        response = client.get("/api/v1/test/missing")
+    finally:
+        app.router.routes.pop()
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Board not found"}

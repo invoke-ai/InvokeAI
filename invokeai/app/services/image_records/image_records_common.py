@@ -104,38 +104,6 @@ class ImageRecordSaveException(Exception):
         super().__init__(message)
 
 
-class ImageRecordDeleteException(Exception):
-    """Raised when an image record cannot be deleted."""
-
-    def __init__(self, message="Image record not deleted"):
-        super().__init__(message)
-
-
-IMAGE_DTO_COLS = ", ".join(
-    [
-        "images." + c
-        for c in [
-            "image_name",
-            "image_origin",
-            "image_category",
-            "width",
-            "height",
-            "session_id",
-            "node_id",
-            "has_workflow",
-            "is_intermediate",
-            "created_at",
-            "updated_at",
-            "deleted_at",
-            "starred",
-            "image_subfolder",
-            "project_id",
-            "file_size_bytes",
-        ]
-    ]
-)
-
-
 class ImageRecord(BaseModelExcludeNull):
     """Deserialized image record without metadata."""
 

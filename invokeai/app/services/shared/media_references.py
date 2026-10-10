@@ -11,12 +11,12 @@ save and its references are never observed apart, and the extractor here is the 
 Extraction is deliberately over-inclusive: every string under an image- or video-name key counts,
 history included. A false reference retains a file; a missed one deletes something in use.
 
-Applied migrations call the table DDL, the extractors and `replace_media_references`: keep their DDL
-and signatures frozen, since changing them changes what a fresh install's migrations do.
+Applied migrations call the extractors: keep their behaviour frozen, since changing it changes what a fresh
+install's migrations do. The migrations' table DDL and writes are frozen in `sqlite_migrator/migrations/
+_media_references_v1.py`; the application writes through `database.queries.media_references`.
 """
 
 import json
-import sqlite3
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -78,63 +78,3 @@ def extract_media_references_from_json(document_json: str) -> MediaReferences:
         return extract_media_references(json.loads(document_json))
     except ValueError:
         return MediaReferences()
-
-
-def replace_media_references(
-    cursor: sqlite3.Cursor,
-    *,
-    owner_kind: MediaReferenceOwnerKind,
-    user_id: str,
-    owner_id: str,
-    references: MediaReferences,
-) -> None:
-    """Makes the index for one owner equal to `references`, on the caller's transaction."""
-    delete_media_references(cursor, owner_kind=owner_kind, user_id=user_id, owner_id=owner_id)
-    rows: list[tuple[str, str, str, str, str]] = []
-    rows.extend((owner_kind, user_id, owner_id, "image", name) for name in sorted(references.images))
-    rows.extend((owner_kind, user_id, owner_id, "video", name) for name in sorted(references.videos))
-    if rows:
-        cursor.executemany(
-            """--sql
-            INSERT OR IGNORE INTO media_references (owner_kind, user_id, owner_id, media_kind, media_name)
-            VALUES (?, ?, ?, ?, ?);
-            """,
-            rows,
-        )
-
-
-def delete_media_references(
-    cursor: sqlite3.Cursor, *, owner_kind: MediaReferenceOwnerKind, user_id: str, owner_id: str
-) -> None:
-    cursor.execute(
-        """--sql
-        DELETE FROM media_references
-        WHERE owner_kind = ? AND user_id = ? AND owner_id = ?;
-        """,
-        (owner_kind, user_id, owner_id),
-    )
-
-
-def create_media_references_table(cursor: sqlite3.Cursor) -> None:
-    """DDL shared by the migration and tests that need the table without the whole chain."""
-    cursor.execute(
-        """--sql
-        CREATE TABLE IF NOT EXISTS media_references (
-            -- A MediaReferenceOwnerKind
-            owner_kind TEXT NOT NULL,
-            -- The owning account; project ids are unique per user, not globally.
-            user_id TEXT NOT NULL,
-            owner_id TEXT NOT NULL,
-            -- 'image' or 'video'
-            media_kind TEXT NOT NULL,
-            media_name TEXT NOT NULL,
-            PRIMARY KEY (owner_kind, user_id, owner_id, media_kind, media_name)
-        );
-        """
-    )
-    cursor.execute(
-        """--sql
-        CREATE INDEX IF NOT EXISTS idx_media_references_media
-        ON media_references(media_kind, media_name);
-        """
-    )

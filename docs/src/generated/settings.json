@@ -215,6 +215,17 @@
     },
     {
       "category": "PATHS",
+      "default": null,
+      "description": "URL of a MySQL 8.4+ or MariaDB 10.11+ database to use instead of the SQLite database in `db_dir`, e.g. `mariadb+pymysql://invokeai:password@db.example/invokeai`. Needs the `mysql` extra. One InvokeAI process uses a database at a time. Read at startup only.",
+      "env_var": "INVOKEAI_DB_URL",
+      "literal_values": [],
+      "name": "db_url",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "PATHS",
       "default": "full",
       "description": "SQLite durability setting. `full`, the default and what InvokeAI has always used, flushes every commit to disk. `normal` acknowledges commits without waiting for that flush - measured at roughly 12x shorter commits on an SSD - and cannot corrupt the database under WAL, which is why it is refused, with a warning, when WAL is unavailable for the database file. What `normal` gives up is the most recent transactions on a power loss or OS crash: a just-written image record or queue status, not the image file itself.",
       "env_var": "INVOKEAI_DB_SYNCHRONOUS",

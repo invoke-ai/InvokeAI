@@ -92,6 +92,7 @@ class InvokeAIAppConfig(BaseSettings):
         download_cache_dir: Path to the directory that contains dynamically downloaded models.
         legacy_conf_dir: Path to directory of legacy checkpoint config files.
         db_dir: Path to InvokeAI databases directory.
+        db_url: URL of a MySQL 8.4+ or MariaDB 10.11+ database to use instead of the SQLite database in `db_dir`, e.g. `mariadb+pymysql://invokeai:password@db.example/invokeai`. Needs the `mysql` extra. One InvokeAI process uses a database at a time. Read at startup only.
         db_synchronous: SQLite durability setting. `full`, the default and what InvokeAI has always used, flushes every commit to disk. `normal` acknowledges commits without waiting for that flush - measured at roughly 12x shorter commits on an SSD - and cannot corrupt the database under WAL, which is why it is refused, with a warning, when WAL is unavailable for the database file. What `normal` gives up is the most recent transactions on a power loss or OS crash: a just-written image record or queue status, not the image file itself.<br>Valid values: `full`, `normal`
         outputs_dir: Path to directory for outputs.
         image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.<br>Valid values: `flat`, `date`, `type`, `hash`
@@ -204,6 +205,7 @@ class InvokeAIAppConfig(BaseSettings):
     download_cache_dir:            Path = Field(default=Path("models/.download_cache"), description="Path to the directory that contains dynamically downloaded models.")
     legacy_conf_dir:               Path = Field(default=Path("configs"), description="Path to directory of legacy checkpoint config files.")
     db_dir:                        Path = Field(default=Path("databases"),  description="Path to InvokeAI databases directory.")
+    db_url:                Optional[str] = Field(default=None,              description="URL of a MySQL 8.4+ or MariaDB 10.11+ database to use instead of the SQLite database in `db_dir`, e.g. `mariadb+pymysql://invokeai:password@db.example/invokeai`. Needs the `mysql` extra. One InvokeAI process uses a database at a time. Read at startup only.")
     db_synchronous:      DB_SYNCHRONOUS = Field(default="full", description="SQLite durability setting. `full`, the default and what InvokeAI has always used, flushes every commit to disk. `normal` acknowledges commits without waiting for that flush - measured at roughly 12x shorter commits on an SSD - and cannot corrupt the database under WAL, which is why it is refused, with a warning, when WAL is unavailable for the database file. What `normal` gives up is the most recent transactions on a power loss or OS crash: a just-written image record or queue status, not the image file itself.")
     outputs_dir:                   Path = Field(default=Path("outputs"),    description="Path to directory for outputs.")
     fonts_dir:                     Path = Field(default=Path("fonts"),      description="Path to directory for custom fonts.")
@@ -737,6 +739,17 @@ def ensure_fonts_dir(fonts_path: Path) -> None:
                 )
     except OSError:
         logger.warning("Unable to initialize fonts directory at %s", fonts_path, exc_info=True)
+
+
+def load_config_from_root(root: Path) -> InvokeAIAppConfig:
+    """The config of the install at `root`, from the environment and its `invokeai.yaml` as `get_config` reads them,
+    for the maintenance scripts. Unlike `get_config` it writes no example or default config file and copies no
+    legacy model configs; like it, it migrates an `invokeai.yaml` of an older schema."""
+    config = InvokeAIAppConfig()
+    config._root = root
+    if config.config_file_path.exists():
+        config.update_config(load_and_migrate_config(config.config_file_path), clobber=False)
+    return config
 
 
 @lru_cache(maxsize=1)

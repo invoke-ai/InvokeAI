@@ -10,8 +10,7 @@ from PIL import Image
 
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.services.shared.pagination import PaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, PaginatedResults, SQLiteDirection
 from invokeai.app.services.shared.workflow_call_compatibility import get_workflow_call_compatibility
 from invokeai.app.services.workflow_records.workflow_records_common import (
     Workflow,
@@ -57,7 +56,9 @@ def get_workflow(
         if not (is_default or is_owner or workflow.is_public or current_user.is_admin):
             raise HTTPException(status_code=403, detail="Not authorized to access this workflow")
 
-    thumbnail_url = ApiDependencies.invoker.services.workflow_thumbnails.get_url(workflow_id)
+    thumbnail_url = ApiDependencies.invoker.services.workflow_thumbnails.get_url(
+        workflow_id, category=workflow.workflow.meta.category
+    )
     compatibility = get_workflow_call_compatibility(
         workflow=workflow.workflow.model_dump(),
         workflow_id=workflow.workflow_id,
@@ -197,6 +198,7 @@ def create_workflow(
     workflow_id: Optional[str] = Body(
         default=None,
         embed=True,
+        max_length=255,
         description="A client-reserved UUID for the new record. Retrying the same creation with the same id returns "
         "the record already created for it; another owner's record or different content under that id is a 409.",
     ),
@@ -242,8 +244,10 @@ def create_workflow(
 )
 def list_workflows(
     current_user: CurrentUserOrDefault,
-    page: int = Query(default=0, description="The page to get"),
-    per_page: Optional[int] = Query(default=None, description="The number of workflows per page"),
+    page: int = Query(default=0, ge=0, description="The page to get"),
+    per_page: Optional[int] = Query(
+        default=None, ge=0, le=MAX_PAGE_SIZE, description="The number of workflows per page; all of them when omitted"
+    ),
     order_by: WorkflowRecordOrderBy = Query(
         default=WorkflowRecordOrderBy.Name, description="The attribute to order by"
     ),
@@ -302,7 +306,9 @@ def list_workflows(
             continue
         workflows_with_thumbnails.append(
             WorkflowRecordListItemWithThumbnailDTO(
-                thumbnail_url=ApiDependencies.invoker.services.workflow_thumbnails.get_url(workflow.workflow_id),
+                thumbnail_url=ApiDependencies.invoker.services.workflow_thumbnails.get_url(
+                    workflow.workflow_id, category=workflow.category
+                ),
                 call_saved_workflow_compatibility=compatibility,
                 **workflow.model_dump(),
             )
