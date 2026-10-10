@@ -4,7 +4,7 @@ sidebar:
   order: 2
 ---
 
-As of v5.6.0, Invoke has a low-VRAM mode. It works on systems with dedicated GPUs (Nvidia GPUs on Windows/Linux and AMD GPUs on Linux).
+As of v5.6.0, Invoke has a low-VRAM mode. It works on systems with dedicated GPUs (Nvidia and AMD GPUs on Windows/Linux).
 
 This allows you to generate even if your GPU doesn't have enough VRAM to hold full models. Most users should be able to run even the beefiest models - like the ~24GB unquantised FLUX dev model.
 
@@ -255,7 +255,7 @@ It is strongly suggested to disable this feature:
 
 ### AMD GPUs on Windows (ROCm)
 
-Invoke does not officially support ROCm on Windows (see the [System Requirements](/start-here/system-requirements/)). If you run a ROCm build of PyTorch there anyway, Windows behaves as if the Nvidia sysmem fallback were always on: an allocation that does not fit is moved into much slower system memory instead of failing, and it stays there. Task Manager shows it as shared GPU memory. Invoke works around this where it can:
+With a ROCm build of PyTorch (see the [System Requirements](/start-here/system-requirements/)), Windows behaves as if the Nvidia sysmem fallback were always on: an allocation that does not fit is moved into much slower system memory instead of failing, and it stays there. Task Manager shows it as shared GPU memory. Invoke works around this where it can:
 
 - The model cache plans against the video-memory budget Windows grants Invoke, not against the card's total VRAM.
 - The PyTorch allocator defaults to `expandable_segments:True` (see [PyTorch CUDA allocator config](#pytorch-cuda-allocator-config)), so fragmented VRAM does not force allocations out.

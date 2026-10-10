@@ -91,6 +91,21 @@ def test_wan_memory_optimization_defaults_to_false_and_loads_from_yaml(tmp_path:
     assert load_and_migrate_config(temp_config_file).wan_memory_optimization is True
 
 
+@pytest.mark.parametrize(
+    ("yaml_value", "expected"),
+    [("on", "on"), ("off", "off"), ('"on"', "on"), ("auto", "auto")],
+    ids=["unquoted-on", "unquoted-off", "quoted", "auto"],
+)
+def test_rocm_aotriton_experimental_loads_unquoted_on_and_off(
+    tmp_path: Path, patch_rootdir: None, yaml_value: str, expected: str
+) -> None:
+    """YAML 1.1 reads an unquoted `on`/`off` as a boolean; the startup log tells users to write exactly that."""
+    temp_config_file = tmp_path / "temp_invokeai.yaml"
+    temp_config_file.write_text(f'schema_version: "4.0.3"\nrocm_aotriton_experimental: {yaml_value}\n')
+
+    assert load_and_migrate_config(temp_config_file).rocm_aotriton_experimental == expected
+
+
 def test_db_synchronous_defaults_to_full_and_loads_from_yaml(tmp_path: Path, patch_rootdir: None) -> None:
     # The default must stay `full`: anything else would quietly reduce durability for every existing
     # install on upgrade.
