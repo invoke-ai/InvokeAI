@@ -19,6 +19,7 @@ import type * as duplicateProjectModule from './duplicateProject';
 const api = vi.hoisted(() => ({
   createProjectSettled: vi.fn(),
   getProject: vi.fn(),
+  invalidateBoardLists: vi.fn(),
   isProjectNotFoundError: (error: unknown) =>
     typeof error === 'object' && error !== null && 'status' in error && error.status === 404,
 }));
@@ -32,7 +33,9 @@ const transport = vi.hoisted(() => ({
   deleteStagingBoard: vi.fn(() => Promise.resolve()),
   findExistingImageNames: vi.fn((names: readonly string[]) => Promise.resolve(new Set(names))),
   findExistingVideoNames: vi.fn((names: readonly string[]) => Promise.resolve(new Set(names))),
+  getBoardProjectId: vi.fn((): Promise<string | null> => Promise.resolve(null)),
   mimeForEntryName: () => 'image/png',
+  placeBoardInProject: vi.fn(() => Promise.resolve()),
   starImages: vi.fn(() => Promise.resolve({ failed: [] as string[] })),
   starVideos: vi.fn(() => Promise.resolve({ failed: [] as string[] })),
   uploadArchiveImage: vi.fn(() => Promise.reject(new Error('duplication uploads nothing'))),
@@ -145,10 +148,15 @@ beforeEach(async () => {
   duplicateProject = await import('./duplicateProject');
 });
 
+/** The source's boards as the snapshot lists them: the inbox alone unless a test adds members. */
+const inboxOf = (items: ReturnType<typeof boardItem>[]) => [
+  { archived: false, board_id: 'source-board', is_inbox: true, items, name: 'Source' },
+];
+
 describe('duplicateProjectRecord', () => {
   it('copies every board item onto a staging board the create then claims', async () => {
     const result = await duplicateProject.duplicateProjectRecord({
-      boardItems: [boardItem(), boardItem({ category: 'user', name: 'unreferenced.png' })],
+      boards: inboxOf([boardItem(), boardItem({ category: 'user', name: 'unreferenced.png' })]),
       owner,
       record: sourceRecord(),
     });
@@ -170,7 +178,7 @@ describe('duplicateProjectRecord', () => {
 
   it('uses a caller-reserved identity for retry-safe conflict copies', async () => {
     await duplicateProject.duplicateProjectRecord({
-      boardItems: [],
+      boards: inboxOf([]),
       identity: { id: 'reserved-copy', name: 'Source (copy)' },
       owner,
       record: sourceRecord(),
@@ -185,7 +193,7 @@ describe('duplicateProjectRecord', () => {
   /** The whole reason duplication needs its own copies rather than a second reference. */
   it('points the copy at its own media, never the original name', async () => {
     await duplicateProject.duplicateProjectRecord({
-      boardItems: [boardItem()],
+      boards: inboxOf([boardItem()]),
       owner,
       record: sourceRecord(),
     });
@@ -195,7 +203,7 @@ describe('duplicateProjectRecord', () => {
 
   it('stars the copies whose descriptor was starred', async () => {
     await duplicateProject.duplicateProjectRecord({
-      boardItems: [boardItem({ name: 'plain.png' }), boardItem({ name: 'starred.png', starred: true })],
+      boards: inboxOf([boardItem({ name: 'plain.png' }), boardItem({ name: 'starred.png', starred: true })]),
       owner,
       record: sourceRecord(),
     });
@@ -205,7 +213,7 @@ describe('duplicateProjectRecord', () => {
 
   it('copies videos through the video endpoint with their category', async () => {
     await duplicateProject.duplicateProjectRecord({
-      boardItems: [boardItem({ category: 'user', kind: 'video', name: 'clip.mp4' })],
+      boards: inboxOf([boardItem({ category: 'user', kind: 'video', name: 'clip.mp4' })]),
       owner,
       record: sourceRecord(),
     });
@@ -218,7 +226,7 @@ describe('duplicateProjectRecord', () => {
   it('reuses a document reference the board does not own, copying nothing', async () => {
     const record = sourceRecord({ futureImageInput: { image_name: 'external.png' } });
 
-    await duplicateProject.duplicateProjectRecord({ boardItems: [boardItem()], owner, record });
+    await duplicateProject.duplicateProjectRecord({ boards: inboxOf([boardItem()]), owner, record });
 
     expect(transport.copyImagesToBoard).toHaveBeenCalledWith(['shared.png'], 'staging-board', owner.signal);
     expect((createdData().futureImageInput as { image_name: string }).image_name).toBe('external.png');
@@ -229,7 +237,7 @@ describe('duplicateProjectRecord', () => {
     transport.copyImagesToBoard.mockResolvedValue({ copied: [], failed: ['shared.png'] });
 
     const result = await duplicateProject.duplicateProjectRecord({
-      boardItems: [boardItem()],
+      boards: inboxOf([boardItem()]),
       owner,
       record: sourceRecord(),
     });
@@ -245,7 +253,7 @@ describe('duplicateProjectRecord', () => {
       widgetStates: { gallery: { values: { projectBoardId: 'source-board', selectedBoardId: 'source-board' } } },
     });
 
-    const result = await duplicateProject.duplicateProjectRecord({ boardItems: [boardItem()], owner, record });
+    const result = await duplicateProject.duplicateProjectRecord({ boards: inboxOf([boardItem()]), owner, record });
     const gallery = (createdData().widgetStates as { gallery: { values: Record<string, unknown> } }).gallery.values;
 
     // The document that goes to the server carries neither the original's board nor its selection.
@@ -272,7 +280,7 @@ describe('duplicateProjectRecord', () => {
       },
     });
 
-    await duplicateProject.duplicateProjectRecord({ boardItems: [], owner, record });
+    await duplicateProject.duplicateProjectRecord({ boards: inboxOf([]), owner, record });
 
     const workflows = createdData().workflows as { entries: { source?: unknown }[] };
 
@@ -280,11 +288,129 @@ describe('duplicateProjectRecord', () => {
     expect(createdData().documentSchemaVersion).toBe(3);
   });
 
-  it('creates no staging board for a project whose board is empty', async () => {
-    await duplicateProject.duplicateProjectRecord({ boardItems: [], owner, record: sourceRecord() });
+  it('stages, copies and places every other board of the source, empty ones included', async () => {
+    transport.createStagingBoard
+      .mockResolvedValueOnce('staging-board')
+      .mockResolvedValueOnce('member-staging')
+      .mockResolvedValueOnce('empty-staging');
+
+    const onProgress = vi.fn();
+    const result = await duplicateProject.duplicateProjectRecord(
+      {
+        boards: [
+          ...inboxOf([boardItem()]),
+          { archived: true, board_id: 'old', is_inbox: false, items: [boardItem({ name: 'old.png' })], name: 'Old' },
+          { archived: false, board_id: 'empty', is_inbox: false, items: [], name: 'Empty' },
+        ],
+        owner,
+        record: sourceRecord(),
+      },
+      { onProgress }
+    );
+
+    // In source order, so the copy's boards keep their creation order; the empty one has nothing to copy.
+    expect((transport.createStagingBoard.mock.calls as unknown[][]).map((call) => call[0])).toEqual([
+      'Source copy',
+      'Old',
+      'Empty',
+    ]);
+    expect(transport.copyImagesToBoard).toHaveBeenCalledWith(['old.png'], 'member-staging', owner.signal);
+    expect(transport.copyImagesToBoard).toHaveBeenCalledTimes(2);
+    expect(api.createProjectSettled.mock.calls[0]![0]).toMatchObject({ board_id: 'staging-board' });
+    // Only once the copy exists: the staged members move in, archived as they were.
+    expect(transport.placeBoardInProject.mock.calls).toEqual([
+      ['member-staging', result.record.project_id, true, owner.signal],
+      ['empty-staging', result.record.project_id, false, owner.signal],
+    ]);
+    // Copying is counted by item, then the moves by board, so progress does not sit at its end while boards move.
+    expect(onProgress.mock.calls.map(([progress]) => progress).slice(-3)).toEqual([
+      { completed: 2, phase: 'restoring', total: 2 },
+      { completed: 1, phase: 'placing-boards', total: 2 },
+      { completed: 2, phase: 'placing-boards', total: 2 },
+    ]);
+    // Board lists refreshed before the moves finished would still show the members in the Library.
+    expect(api.invalidateBoardLists).toHaveBeenCalledExactlyOnceWith(owner);
+    expect(api.invalidateBoardLists.mock.invocationCallOrder[0]).toBeGreaterThan(
+      transport.placeBoardInProject.mock.invocationCallOrder[1]!
+    );
+    expect(result.boardIssues).toEqual([]);
+  });
+
+  it('reports a board that could not be placed and keeps the copy', async () => {
+    transport.placeBoardInProject.mockRejectedValueOnce(new Error('move refused'));
+    transport.createStagingBoard.mockResolvedValueOnce('staging-board').mockResolvedValueOnce('member-staging');
+
+    const result = await duplicateProject.duplicateProjectRecord({
+      boards: [
+        ...inboxOf([]),
+        { archived: false, board_id: 'old', is_inbox: false, items: [boardItem({ name: 'old.png' })], name: 'Old' },
+      ],
+      owner,
+      record: sourceRecord(),
+    });
+
+    expect(result.record.project_id).not.toBe('source');
+    expect(result.boardIssues).toEqual([{ name: 'Old' }]);
+    expect(transport.deleteStagingBoard).not.toHaveBeenCalled();
+  });
+
+  it('refreshes board lists even when placing the boards is cancelled part way', async () => {
+    transport.placeBoardInProject.mockRejectedValueOnce(new DOMException('cancelled', 'AbortError'));
+    transport.createStagingBoard.mockResolvedValueOnce('staging-board').mockResolvedValueOnce('member-staging');
+
+    await expect(
+      duplicateProject.duplicateProjectRecord({
+        boards: [...inboxOf([]), { archived: false, board_id: 'old', is_inbox: false, items: [], name: 'Old' }],
+        owner,
+        record: sourceRecord(),
+      })
+    ).rejects.toThrow('cancelled');
+
+    expect(api.invalidateBoardLists).toHaveBeenCalledExactlyOnceWith(owner);
+  });
+
+  it('stages and claims the inbox even when it is empty, copying nothing', async () => {
+    await duplicateProject.duplicateProjectRecord({ boards: inboxOf([]), owner, record: sourceRecord() });
+
+    expect(transport.createStagingBoard).toHaveBeenCalledTimes(1);
+    expect(transport.copyImagesToBoard).not.toHaveBeenCalled();
+    expect(api.createProjectSettled.mock.calls[0]![0]).toMatchObject({ board_id: 'staging-board' });
+  });
+
+  it('refuses a source with more boards than a copy may carry, before staging anything', async () => {
+    const members = Array.from({ length: 1000 }, (_unused, index) => ({
+      archived: false,
+      board_id: `b${String(index)}`,
+      is_inbox: false,
+      items: [],
+      name: `Board ${String(index)}`,
+    }));
+
+    await expect(
+      duplicateProject.duplicateProjectRecord({ boards: [...inboxOf([]), ...members], owner, record: sourceRecord() })
+    ).rejects.toMatchObject({ reason: 'too-large' });
 
     expect(transport.createStagingBoard).not.toHaveBeenCalled();
-    expect(api.createProjectSettled.mock.calls[0]![0]).not.toHaveProperty('board_id');
+    expect(api.createProjectSettled).not.toHaveBeenCalled();
+  });
+
+  it('deletes the boards it had staged when staging a later one fails', async () => {
+    transport.createStagingBoard.mockResolvedValueOnce('staging-board').mockRejectedValueOnce(new Error('refused'));
+
+    await expect(
+      duplicateProject.duplicateProjectRecord({
+        boards: [
+          ...inboxOf([boardItem()]),
+          { archived: false, board_id: 'old', is_inbox: false, items: [boardItem({ name: 'old.png' })], name: 'Old' },
+        ],
+        owner,
+        record: sourceRecord(),
+      })
+    ).rejects.toThrow('refused');
+
+    expect(transport.copyImagesToBoard).not.toHaveBeenCalled();
+    expect(transport.deleteStagingBoard).toHaveBeenCalledExactlyOnceWith('staging-board', owner.signal);
+    expect(api.createProjectSettled).not.toHaveBeenCalled();
   });
 
   it('deletes the copies it made and the staging board when the create provably did not happen', async () => {
@@ -294,7 +420,7 @@ describe('duplicateProjectRecord', () => {
 
     await expect(
       duplicateProject.duplicateProjectRecord({
-        boardItems: [boardItem(), boardItem({ kind: 'video', name: 'clip.mp4' })],
+        boards: inboxOf([boardItem(), boardItem({ kind: 'video', name: 'clip.mp4' })]),
         owner,
         record: sourceRecord(),
       })
@@ -303,6 +429,11 @@ describe('duplicateProjectRecord', () => {
     expect(transport.deleteArchiveImages).toHaveBeenCalledWith(['copy-shared.png'], owner.signal);
     expect(transport.deleteArchiveVideos).toHaveBeenCalledWith(['copy-clip.mp4'], owner.signal);
     expect(transport.deleteStagingBoard).toHaveBeenCalledWith('staging-board', owner.signal);
+    // Uploads announce their board, so lists can already show the staging board it deleted.
+    expect(api.invalidateBoardLists).toHaveBeenCalledExactlyOnceWith(owner);
+    expect(api.invalidateBoardLists.mock.invocationCallOrder[0]).toBeGreaterThan(
+      transport.deleteStagingBoard.mock.invocationCallOrder[0]!
+    );
   });
 
   /** Retain media for unproven create outcomes; GET 404 can race commit. */
@@ -312,7 +443,7 @@ describe('duplicateProjectRecord', () => {
     api.createProjectSettled.mockRejectedValue(failure);
 
     await expect(
-      duplicateProject.duplicateProjectRecord({ boardItems: [boardItem()], owner, record: sourceRecord() })
+      duplicateProject.duplicateProjectRecord({ boards: inboxOf([boardItem()]), owner, record: sourceRecord() })
     ).rejects.toBe(failure);
 
     expect(transport.deleteArchiveImages).not.toHaveBeenCalled();
@@ -329,7 +460,7 @@ describe('duplicateProjectRecord', () => {
     });
 
     await expect(
-      duplicateProject.duplicateProjectRecord({ boardItems: [boardItem()], owner, record: sourceRecord() })
+      duplicateProject.duplicateProjectRecord({ boards: inboxOf([boardItem()]), owner, record: sourceRecord() })
     ).rejects.toThrow();
 
     expect(transport.deleteArchiveImages).not.toHaveBeenCalled();

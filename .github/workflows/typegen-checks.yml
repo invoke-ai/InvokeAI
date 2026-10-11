@@ -45,11 +45,11 @@ jobs:
     env:
       # uv requires a venv by default - but for this, we can simply use the system python
       UV_SYSTEM_PYTHON: 1
-    runs-on: ubuntu-22.04
+    runs-on: blacksmith-4vcpu-ubuntu-2204
     timeout-minutes: 15 # expected run time: <5 min
     steps:
       - name: checkout
-        uses: actions/checkout@v6
+        uses: useblacksmith/checkout@v1
 
       - name: Free up more disk space on the runner
         # https://github.com/actions/runner-images/issues/2840#issuecomment-1284059930

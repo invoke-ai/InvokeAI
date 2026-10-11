@@ -1497,6 +1497,9 @@
                       "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
                     },
                     {
@@ -1970,6 +1973,9 @@
                       "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
                     },
                     {
@@ -2441,6 +2447,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
@@ -2959,6 +2968,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
@@ -3504,6 +3516,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
@@ -4921,6 +4936,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
@@ -10531,7 +10549,7 @@
       "post": {
         "tags": ["boards"],
         "summary": "Create Board",
-        "description": "Creates a board for the current user",
+        "description": "Creates a board for the current user, in one of their projects or in the Library",
         "operationId": "create_board",
         "security": [
           {
@@ -10550,6 +10568,24 @@
               "title": "Board Name"
             },
             "description": "The name of the board to create"
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "One of the current user's projects to create the board in; omit for the Library",
+              "title": "Project Id"
+            },
+            "description": "One of the current user's projects to create the board in; omit for the Library"
           }
         ],
         "responses": {
@@ -10763,7 +10799,7 @@
       "patch": {
         "tags": ["boards"],
         "summary": "Update Board",
-        "description": "Updates a board (user must have access to it)",
+        "description": "Updates a board (user must have access to it).\n\nA project's inbox takes its name, archived state and visibility from the project and cannot be\nmoved, so those changes are refused for it \u2014 for admins too; its cover is still fair game. A\nboard in a project is private and unshared, so a move into a project, or a visibility change on\na member, is refused when the result would be otherwise. The storage decides all of this in one\ntransaction; the DTO read here is only for the ownership check.",
         "operationId": "update_board",
         "security": [
           {
@@ -15864,7 +15900,7 @@
       "post": {
         "tags": ["projects"],
         "summary": "Create Project",
-        "description": "Creates a project, and the private board it owns, for the current user.",
+        "description": "Creates a project, and the private inbox board it owns, for the current user.",
         "operationId": "create_project",
         "requestBody": {
           "content": {
@@ -16026,7 +16062,7 @@
       "delete": {
         "tags": ["projects"],
         "summary": "Delete Project",
-        "description": "Deletes one of the current user's projects, and the board it owns, in one transaction.\n\nIdempotent. The media survives: deleting the board drops its memberships, so the images and\nvideos on it return to Uncategorized, exactly as they would if the board were deleted without\n`include_images`. There is deliberately no option to take them with it \u2014 a project is a\nworkspace, and emptying someone's gallery is not what deleting one should be able to mean.\nNothing is reported back for the same reason: nothing was destroyed to report.",
+        "description": "Deletes one of the current user's projects and its inbox, in one transaction.\n\nIdempotent. The media survives either way: deleting a board drops its memberships, so the images\nand videos on it return to Uncategorized, exactly as they would if the board were deleted without\n`include_images`. There is deliberately no option to take them with it \u2014 a project is a\nworkspace, and emptying someone's gallery is not what deleting one should be able to mean.\nNothing is reported back for the same reason: nothing was destroyed to report.",
         "operationId": "delete_project",
         "security": [
           {
@@ -16044,6 +16080,19 @@
               "title": "Project Id"
             },
             "description": "The id of the project to delete"
+          },
+          {
+            "name": "boards",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": ["release", "delete"],
+              "type": "string",
+              "description": "What becomes of the project's boards other than its inbox: released to the Library with their media, or deleted so their media returns to Uncategorized",
+              "default": "release",
+              "title": "Boards"
+            },
+            "description": "What becomes of the project's boards other than its inbox: released to the Library with their media, or deleted so their media returns to Uncategorized"
           }
         ],
         "responses": {
@@ -16067,7 +16116,7 @@
       "get": {
         "tags": ["projects"],
         "summary": "Get Project Board Snapshot",
-        "description": "Lists everything on the project's board that the gallery would show.\n\nIntermediates and the canvas's private `other` category are excluded. Unpaginated: the caller\nthat needs this \u2014 exporting a project \u2014 has to hold the whole list anyway. It is still bounded,\nbecause the answer is built entirely in memory and any client with a project id can ask for it;\na board past the ceiling is one an export could not have packed either, so it is refused as a\n413 rather than paged.",
+        "description": "Lists everything on the project's boards that the gallery would show, inbox first.\n\nIntermediates and the canvas's private `other` category are excluded. Unpaginated: the caller\nthat needs this \u2014 exporting a project \u2014 has to hold the whole list anyway. It is still bounded\nover all the boards together, because the answer is built entirely in memory and any client\nwith a project id can ask for it; a project past the ceiling is one an export could not have\npacked either, so it is refused as a 413 rather than paged.",
         "operationId": "get_project_board_snapshot",
         "security": [
           {
@@ -16081,10 +16130,10 @@
             "required": true,
             "schema": {
               "type": "string",
-              "description": "The id of the project whose board to enumerate",
+              "description": "The id of the project whose boards to enumerate",
               "title": "Project Id"
             },
-            "description": "The id of the project whose board to enumerate"
+            "description": "The id of the project whose boards to enumerate"
           }
         ],
         "responses": {
@@ -19483,6 +19532,9 @@
             "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
           },
           {
+            "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
+          },
+          {
             "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
           },
           {
@@ -21121,6 +21173,18 @@
               }
             ],
             "description": "The visibility of the board."
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id",
+            "description": "Move the board into one of the owner's projects, or to the Library with an explicit null. Omit the field to leave the board where it is."
           }
         },
         "additionalProperties": false,
@@ -21208,6 +21272,18 @@
             "description": "The visibility of the board.",
             "default": "private"
           },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id",
+            "description": "The id of the owner's project this board belongs to; absent for a Library board."
+          },
           "cover_video_name": {
             "anyOf": [
               {
@@ -21254,17 +21330,11 @@
             "title": "Owner Username",
             "description": "The username of the board owner (for admin view)."
           },
-          "project_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Project Id",
-            "description": "The id of the project that owns this board, if any."
+          "is_inbox": {
+            "type": "boolean",
+            "title": "Is Inbox",
+            "description": "Whether this board is its project's inbox, which only the project APIs may change.",
+            "default": false
           }
         },
         "type": "object",
@@ -22085,6 +22155,94 @@
         "title": "Boolean Primitive",
         "type": "object",
         "version": "1.0.1",
+        "output": {
+          "$ref": "#/components/schemas/BooleanOutput"
+        }
+      },
+      "BooleanLogicInvocation": {
+        "category": "math",
+        "class": "invocation",
+        "classification": "stable",
+        "description": "Performs Boolean AND, OR, XOR, NOT, NAND, NOR, or XNOR operations. NOT uses only A.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "operation": {
+            "default": "AND",
+            "description": "The logical operation to perform",
+            "enum": ["AND", "OR", "XOR", "NAND", "NOR", "XNOR", "NOT"],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "AND",
+            "orig_required": false,
+            "title": "Operation",
+            "type": "string",
+            "ui_choice_labels": {
+              "AND": "A AND B",
+              "NAND": "A NAND B",
+              "NOR": "A NOR B",
+              "NOT": "NOT A",
+              "OR": "A OR B",
+              "XNOR": "A XNOR B",
+              "XOR": "A XOR B"
+            }
+          },
+          "a": {
+            "default": false,
+            "description": "First Boolean input",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "A",
+            "type": "boolean"
+          },
+          "b": {
+            "default": false,
+            "description": "Second Boolean input (ignored for NOT)",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "B",
+            "type": "boolean"
+          },
+          "type": {
+            "const": "boolean_logic",
+            "default": "boolean_logic",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["logic", "boolean"],
+        "title": "Boolean Logic",
+        "type": "object",
+        "version": "1.0.0",
         "output": {
           "$ref": "#/components/schemas/BooleanOutput"
         }
@@ -42224,6 +42382,9 @@
                   "$ref": "#/components/schemas/BooleanInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/BooleanLogicInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/BoundingBoxInvocation"
                 },
                 {
@@ -52500,6 +52661,9 @@
                 "$ref": "#/components/schemas/BooleanInvocation"
               },
               {
+                "$ref": "#/components/schemas/BooleanLogicInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/BoundingBoxInvocation"
               },
               {
@@ -54091,6 +54255,9 @@
                 "$ref": "#/components/schemas/BooleanInvocation"
               },
               {
+                "$ref": "#/components/schemas/BooleanLogicInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/BoundingBoxInvocation"
               },
               {
@@ -55209,6 +55376,9 @@
           "boolean_collection": {
             "$ref": "#/components/schemas/BooleanCollectionOutput"
           },
+          "boolean_logic": {
+            "$ref": "#/components/schemas/BooleanOutput"
+          },
           "bounding_box": {
             "$ref": "#/components/schemas/BoundingBoxOutput"
           },
@@ -56210,6 +56380,7 @@
           "blank_image",
           "boolean",
           "boolean_collection",
+          "boolean_logic",
           "bounding_box",
           "calculate_image_tiles",
           "calculate_image_tiles_even_split",
@@ -56658,6 +56829,9 @@
               },
               {
                 "$ref": "#/components/schemas/BooleanInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/BooleanLogicInvocation"
               },
               {
                 "$ref": "#/components/schemas/BoundingBoxInvocation"
@@ -57885,6 +58059,9 @@
               },
               {
                 "$ref": "#/components/schemas/BooleanInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/BooleanLogicInvocation"
               },
               {
                 "$ref": "#/components/schemas/BoundingBoxInvocation"
@@ -75832,6 +76009,171 @@
         "title": "Main_Diffusers_ZImage_Config",
         "description": "Model config for Z-Image diffusers models (Z-Image-Turbo, Z-Image-Base)."
       },
+      "Main_GGUF_ErnieImage_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "ernie-image",
+            "title": "Base",
+            "default": "ernie-image"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format"
+        ],
+        "title": "Main_GGUF_ErnieImage_Config",
+        "description": "Model config for GGUF-quantized ERNIE-Image transformers (single-file).\n\nThe community GGUFs carry the diffusers key layout unchanged, so the same fingerprint identifies\nthem. Their `general.architecture` says nothing about ERNIE -- unsloth's builds declare `wan`,\nothers `flux` -- so identification rests on the keys alone. As with the safetensors file, Turbo\nand base are told apart by the model name."
+      },
       "Main_GGUF_FLUX_Config": {
         "properties": {
           "key": {
@@ -84777,6 +85119,9 @@
                 "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
               },
               {
@@ -85496,6 +85841,9 @@
                     "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
                   },
                   {
@@ -86100,6 +86448,9 @@
                 "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
               },
               {
@@ -86558,6 +86909,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
@@ -87508,6 +87862,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
@@ -90672,8 +91029,28 @@
         "title": "ProjectBoardItemDTO",
         "description": "One visible item on a project's board."
       },
-      "ProjectBoardSnapshotDTO": {
+      "ProjectBoardSnapshotBoardDTO": {
         "properties": {
+          "board_id": {
+            "type": "string",
+            "title": "Board Id",
+            "description": "The board's id on this install"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The board's name; the inbox carries the project's"
+          },
+          "is_inbox": {
+            "type": "boolean",
+            "title": "Is Inbox",
+            "description": "Whether this is the project's inbox, which every project has exactly one of"
+          },
+          "archived": {
+            "type": "boolean",
+            "title": "Archived",
+            "description": "Whether the board is archived"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/ProjectBoardItemDTO"
@@ -90684,9 +91061,25 @@
           }
         },
         "type": "object",
-        "required": ["items"],
+        "required": ["board_id", "name", "is_inbox", "archived", "items"],
+        "title": "ProjectBoardSnapshotBoardDTO",
+        "description": "One of the project's boards and the visible items on it."
+      },
+      "ProjectBoardSnapshotDTO": {
+        "properties": {
+          "boards": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectBoardSnapshotBoardDTO"
+            },
+            "type": "array",
+            "title": "Boards",
+            "description": "The project's boards, inbox first, then the rest in creation order"
+          }
+        },
+        "type": "object",
+        "required": ["boards"],
         "title": "ProjectBoardSnapshotDTO",
-        "description": "Everything a project's board holds that the gallery would show.\n\nThis is the enumeration an export needs in order to carry a project's whole workspace rather\nthan only the media its document happens to reference. Intermediates and the canvas's private\n`other` category are excluded, because neither is something the gallery shows on the board.\n\nDeliberately unversioned: `.invk`'s `board.json` carries its own version, so the archive format\nis free to change without the wire format following it, and vice versa."
+        "description": "Everything a project's boards hold that the gallery would show.\n\nThis is the enumeration an export needs in order to carry a project's whole workspace rather\nthan only the media its document happens to reference. Intermediates and the canvas's private\n`other` category are excluded, because neither is something the gallery shows on a board.\n\nDeliberately unversioned: `.invk`'s `board.json` carries its own version, so the archive format\nis free to change without the wire format following it, and vice versa."
       },
       "ProjectCreateRequest": {
         "properties": {
@@ -90713,7 +91106,7 @@
               }
             ],
             "title": "Board Id",
-            "description": "An existing unclaimed private board for the project to adopt, renamed to match. Omit to create one. Restoring a project uploads its media into such a board first, so that creating the project is the single commit point for an import."
+            "description": "An existing unclaimed private Library board for the project to adopt as its inbox, renamed to match. Omit to create one. Restoring a project uploads its media into such a board first, so that creating the project is the single commit point for an import."
           },
           "name": {
             "type": "string",

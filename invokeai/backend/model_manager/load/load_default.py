@@ -3,9 +3,10 @@
 import copy
 import itertools
 import re
+from contextlib import nullcontext
 from logging import Logger
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, ContextManager, Optional
 
 import torch
 
@@ -13,7 +14,7 @@ from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.model_manager.configs.base import Diffusers_Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load.fp8_capability import fp8_storage_verdict
-from invokeai.backend.model_manager.load.load_base import LoadedModel, ModelLoaderBase
+from invokeai.backend.model_manager.load.load_base import LoadedModel, ModelLoaderBase, StaleModelConfigError
 from invokeai.backend.model_manager.load.memory_snapshot import GB, MemorySnapshot
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
 from invokeai.backend.model_manager.load.model_cache.model_cache import (
@@ -248,6 +249,13 @@ def _model_declared_skip_patterns(model: torch.nn.Module) -> tuple[str, ...]:
 class ModelLoader(ModelLoaderBase):
     """Default implementation of ModelLoaderBase."""
 
+    # Optionally set on an instance before `load_model()`: on a cache miss, entered with the caller's config
+    # before MODEL_LOAD_LOCK is taken (entering may block) and exited after it is released; the callable it
+    # yields is called once construction is serialized against cache invalidation, must not block, and False
+    # rejects the load with StaleModelConfigError. An attribute
+    # rather than a constructor argument so that registered loaders overriding `__init__` keep working.
+    config_check: Optional[Callable[[AnyModelConfig], ContextManager[Callable[[], bool]]]] = None
+
     def __init__(
         self,
         app_config: InvokeAIAppConfig,
@@ -361,7 +369,12 @@ class ModelLoader(ModelLoaderBase):
         #
         # Lock-ordering: the write lock is acquired before any ModelCache._lock taken below
         # (get/make_room/put), matching the readers' order, so there is no AB-BA deadlock.
-        with MODEL_LOAD_LOCK.write_lock():
+        #
+        # The caller read `config` before this point. A record edit commits first and then invalidates the
+        # cache under this lock; building from a record superseded by an edit that has already invalidated
+        # would re-admit what that edit evicted, so the config check is finished under the lock.
+        config_check = self.config_check(config) if self.config_check is not None else nullcontext(None)
+        with config_check as still_current, MODEL_LOAD_LOCK.write_lock():
             # Double-checked locking: another worker sharing this cache may have loaded the same
             # entry while we waited for the mutex. (Workers on other devices use a different cache,
             # so they will still miss here and construct their own copy — which is intended.)
@@ -369,6 +382,11 @@ class ModelLoader(ModelLoaderBase):
                 return self._ram_cache.get_with_first_use_claim(key=cache_key, stats_name=stats_name)
             except IndexError:
                 pass
+
+            if still_current is not None and not still_current():
+                raise StaleModelConfigError(
+                    f"Model '{config.name}' was modified while it was being loaded; retry with the updated model."
+                )
 
             config.path = str(self._get_model_path(config))
             self._report_inert_fp8_request(config, submodel_type)

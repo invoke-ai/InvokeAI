@@ -2,6 +2,7 @@ import { mapWithConcurrency } from '@platform/core/concurrency';
 import { collectLiveAssetRefs, selectCoverImageName } from '@workbench/projects/projectAssets';
 
 import type { InvkBoardSnapshot } from './board';
+import type { StagedBoard } from './memberBoards';
 import type {
   MediaMaterializer,
   RestoredMediaLedger,
@@ -36,8 +37,8 @@ import { toMediaRefs } from './transfer';
 
 export interface InvkArchiveContents {
   /**
-   * What the project's board held, or `null` for an archive that names no board. `null` and
-   * `{items: []}` are different answers: only the first may have a board invented for it.
+   * What the project's boards held, or `null` for an archive that names no board — which is not an empty inbox:
+   * nothing is staged for it, and the server makes the project's inbox itself.
    */
   boardSnapshot: InvkBoardSnapshot | null;
   /** Bundled preview bytes and the entry they came from, when the archive has one. */
@@ -172,10 +173,15 @@ export const createArchiveMediaMaterializer = (
   const uploadImage = deps.uploadBoardImage ?? uploadBoardImage;
   const uploadVideo = deps.uploadBoardVideo ?? uploadBoardVideo;
 
-  return async (items, boardId, onItemSettled) => {
+  return async (boards, onItemSettled) => {
     const result: Awaited<ReturnType<MediaMaterializer>> = { failed: [], materialized: [] };
+    // One pool across the boards: uploads are per item, so an archive of many small boards would otherwise run
+    // little more than one at a time.
+    const uploads = boards.flatMap(({ items, stagingBoardId }) =>
+      items.map((item) => ({ boardId: stagingBoardId, item }))
+    );
 
-    await mapWithConcurrency(items, INVK_TRANSFER_CONCURRENCY, async (item) => {
+    await mapWithConcurrency(uploads, INVK_TRANSFER_CONCURRENCY, async ({ boardId, item }) => {
       const entries = item.kind === 'image' ? archive.images : archive.videos;
       const bytes = entries.get(item.name);
 
@@ -217,8 +223,8 @@ export const createArchiveMediaMaterializer = (
 };
 
 export interface RestoreArchiveMediaInput {
-  /** The staging board for this archive's board media, or `null` when it carries none. */
-  boardId: string | null;
+  /** The archive's boards with the Library boards staged for them. */
+  stagedBoards: readonly StagedBoard[];
   /** The canonical document, already rehydrated and re-serialized. */
   projectDocument: Record<string, unknown>;
   /** The id the project will be created under. */
@@ -245,8 +251,7 @@ export const restoreArchiveMedia = (
 
   return restoreProjectMedia(
     {
-      boardId: input.boardId,
-      boardItems: archive.boardSnapshot?.items ?? [],
+      boards: input.stagedBoards.map(({ board, stagingBoardId }) => ({ items: board.items, stagingBoardId })),
       coverBytes: archive.cover,
       coverSourceImageName: selectCoverImageName(input.projectDocument),
       documentRefs: toMediaRefs(collectLiveAssetRefs(input.projectDocument)),
