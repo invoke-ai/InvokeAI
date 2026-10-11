@@ -93,6 +93,11 @@ def test_model_identification(model_path: Path):
         print(mod.path)
         pytest.fail(f"{id}: Exception during model probing: {e}")
 
+    if expected_refusal := test_metadata.get("expected_refusal"):
+        if result.config is not None or not any(expected_refusal in str(e) for e in result.invalid_matches):
+            pytest.fail(f"{id}: expected a refusal naming {expected_refusal!r}, got:\n{pformat(result.details)}")
+        return
+
     if result.config is None:
         pytest.fail(f"{id}: no match, detailed results:\n{pformat(result.details)}")
 
