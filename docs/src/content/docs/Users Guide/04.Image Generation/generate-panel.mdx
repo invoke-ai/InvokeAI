@@ -49,7 +49,7 @@ The **Seed** sets the starting noise for the image. The same model, prompt, seed
 
 Some families add their own controls to the Render section:
 
-* **DyPE** (FLUX.1) — position extrapolation for sizes above the 1024px training resolution. **Auto** turns it on above 1536px, **Area** by image area and **4K** is a fixed tuning; **Manual** exposes the **scale (λs)** and **exponent (λt)**.
+* **DyPE** (FLUX.1) — position extrapolation for sizes above the 1024px training resolution. **Auto** turns it on above 1536px, **Area** by image area and **4K optimized** is a fixed tuning; **Manual** exposes the **scale (λs)** and **exponent (λt)**.
 * **Shift** (Z-Image, Qwen Image) — an override for the sampling schedule's timestep shift. Left on auto, the model derives it from the image size; Lightning LoRAs are trained for `3`.
 * **Seed variance** (Krea-2, Z-Image) — perturbs the prompt conditioning so nearby seeds give more varied images; **Variance strength** and **Randomized channels** set how much.
 * **Conditioning rebalance** (Krea-2) and **CFG (Low)** (Wan) — see the model's page under Local Models.

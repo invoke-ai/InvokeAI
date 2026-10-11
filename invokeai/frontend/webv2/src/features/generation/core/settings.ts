@@ -237,7 +237,11 @@ export const isFluxDypePreset = (value: unknown): value is FluxDypePreset =>
 export const isQwenImageEncoderQuantization = (value: unknown): value is QwenImageEncoderQuantization =>
   QWEN_IMAGE_ENCODER_QUANTIZATIONS.includes(value as QwenImageEncoderQuantization);
 
-/** A shift override, kept only inside the node's bounds; anything else means auto. */
+/**
+ * A shift override, kept only inside the node's bounds. Anything else means auto rather than a clamped value: null is
+ * the legacy sentinel for "let the node derive it", and silently clamping a stray value would turn auto recipes into
+ * fixed ones.
+ */
 const getTimestepShift = (value: unknown): number | null =>
   typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= MAX_TIMESTEP_SHIFT ? value : null;
 

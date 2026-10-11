@@ -1303,6 +1303,35 @@ describe('model-family tuning recall', () => {
   });
 });
 
+describe('Krea-2 style reference without an image', () => {
+  it('recalls the rest of the record and leaves reference images alone', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: {
+        krea2_style_strength: 1.4,
+        model: { key: krea2Model.key },
+        ref_images: [
+          {
+            config: { image: null, styleStrength: 1.4, type: 'krea2_style_reference_image' },
+            id: 'style',
+            isEnabled: true,
+          },
+        ],
+        steps: 8,
+      },
+      models: [],
+      supportedModels: [krea2Model],
+      vaeModels: [],
+    });
+
+    expect(result?.fields).toEqual(expect.arrayContaining(['model', 'steps']));
+    expect(result?.fields).not.toContain('referenceImages');
+    expect(result?.values.referenceImages).toEqual([]);
+  });
+});
+
 /** Remix from the metadata a fully filled graph records, starting from SDXL defaults. */
 const remixRoundTrip = ({ base, shape }: (typeof generateGraphCases)[number]) => {
   const { filled, model, settings } = fullyFilledSettingsFor(base, shape);

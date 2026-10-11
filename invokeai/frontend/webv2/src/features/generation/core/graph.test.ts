@@ -1447,8 +1447,12 @@ describe('output filters', () => {
   /** The graph without its minted ids, so two compilations of one recipe compare equal. */
   const structure = (graph: ReturnType<typeof compile>) => stabilizeBackendGraphIds(graph);
 
+  // The committed node-type contract (`__snapshots__/generateGraphNodeTypes.json`, checked against the backend
+  // registry) is the guard on what a default recipe emits; this only pins that the filter switches themselves are
+  // inert at their defaults. Metadata does record the new tuning keys at defaults (`z_image_shift: 'auto'` etc.),
+  // as legacy did.
   it.each(generateGraphCases)(
-    '$label compiles the same graph when the filters are left at their defaults',
+    '$label emits no filter nodes and the same structure whether the filter settings are omitted or off',
     ({ base, shape }) => {
       const { model, settings } = satisfiedSettingsFor(base, shape);
       const plain = compileGenerateGraph(settings, model, 'gallery', { useCpuNoise: true }).backendGraph;

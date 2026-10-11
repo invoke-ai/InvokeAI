@@ -497,8 +497,11 @@ describe('GenerateRenderSection model-family tuning', () => {
     expect(onCommit).toHaveBeenCalledWith({ zImageShift: 3 });
 
     await settle(() => root?.unmount());
-    await render(zImageModel, { zImageShift: 2.5 });
+    const onOverriddenCommit = await render(zImageModel, { zImageShift: 2.5 });
     expect(slidersNamed('Shift')[0]?.getAttribute('aria-valuenow')).toBe('2.5');
+    // Turning the override off hands the shift back to the node, rather than leaving the last value in place.
+    await settle(() => switchNamed('Override')?.querySelector<HTMLElement>('[data-part="control"]')?.click());
+    expect(onOverriddenCommit).toHaveBeenCalledWith({ zImageShift: null });
 
     await settle(() => root?.unmount());
     const onQwenCommit = await render(qwenImageModel);

@@ -450,6 +450,13 @@ const primeGenerate = (
 const submitGenerate = (state: WorkbenchState) =>
   workbenchReducer(state, { backendSupportsCancellation: true, type: 'submitInvocationSnapshot' });
 
+const getQueuedOutputNode = (state: WorkbenchState) => {
+  const submission = getActiveProject(state).queue.items[0]?.snapshot.backendSubmission;
+  const nodes = submission?.kind === 'invalid' ? {} : (submission?.graph.nodes ?? {});
+
+  return nodes.canvas_output;
+};
+
 const getQueuedRandDevice = (state: WorkbenchState): unknown => {
   const submission = getActiveProject(state).queue.items[0]?.snapshot.backendSubmission;
   const nodes = submission?.kind === 'invalid' ? {} : (submission?.graph.nodes ?? {});
@@ -469,6 +476,35 @@ const createUpscaleModel = (key: string, type: string, base: string, name = key)
   source: key,
   source_type: 'path',
   type,
+});
+
+describe('project output filters', () => {
+  it('queues the NSFW checker as the generate output when the project turns it on', () => {
+    const initial = workbenchReducer(createInitialWorkbenchState(), {
+      settings: { useNsfwChecker: true },
+      type: 'setActiveProjectSettings',
+    });
+    const state = workbenchReducer(primeGenerate(initial), {
+      backendSupportsCancellation: true,
+      route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
+      projectId: initial.activeProjectId,
+      type: 'submitResolvedInvocationSnapshot',
+    });
+
+    expect(getQueuedOutputNode(state)).toMatchObject({ is_intermediate: false, type: 'img_nsfw' });
+  });
+
+  it('queues the plain decode while the filters are off', () => {
+    const initial = createInitialWorkbenchState();
+    const state = workbenchReducer(primeGenerate(initial), {
+      backendSupportsCancellation: true,
+      route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
+      projectId: initial.activeProjectId,
+      type: 'submitResolvedInvocationSnapshot',
+    });
+
+    expect(getQueuedOutputNode(state)?.type).toBe('l2i');
+  });
 });
 
 describe('generation-device orchestration metadata', () => {

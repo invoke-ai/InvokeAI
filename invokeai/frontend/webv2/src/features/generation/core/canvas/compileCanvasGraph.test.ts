@@ -1146,6 +1146,23 @@ describe('compileCanvasGraph — output filters', () => {
     expect(metadataTarget(backendGraph)).toBe('canvas_output');
   });
 
+  it('runs a lone watermark as the staged outpaint result', () => {
+    const { backendGraph } = compile(sd1Model, 'outpaint', {
+      destination: 'canvas',
+      projectSettings: { useWatermark: true },
+    });
+
+    expect(backendGraph.nodes.canvas_decode?.type).toBe('invokeai_img_blend');
+    expect(backendGraph.nodes.canvas_img_nsfw).toBeUndefined();
+    expect(backendGraph.nodes.canvas_output).toMatchObject({ is_intermediate: true, type: 'img_watermark' });
+    expect(
+      backendGraph.edges.find(
+        (edge) => edge.destination.node_id === 'canvas_output' && edge.destination.field === 'image'
+      )?.source.node_id
+    ).toBe('canvas_decode');
+    expect(metadataTarget(backendGraph)).toBe('canvas_output');
+  });
+
   it('leaves every mode untouched while both filters are off', () => {
     for (const mode of ['txt2img', 'img2img', 'inpaint', 'outpaint'] as const) {
       const { backendGraph } = compile(sd1Model, mode, {

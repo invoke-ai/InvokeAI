@@ -65,6 +65,7 @@ const STEPS_SLIDER_MAX = 100;
 /** The useful shift range; the input accepts the node's full `ge=0` span up to 10. */
 const TIMESTEP_SHIFT_SLIDER_MIN = 1;
 const TIMESTEP_SHIFT_SLIDER_MAX = 7;
+const TIMESTEP_SHIFT_MARKS = [{ label: String(DEFAULT_TIMESTEP_SHIFT), value: DEFAULT_TIMESTEP_SHIFT }];
 /** The exponent's `le=1000` bound is far beyond any documented recipe (0.5–2), so the track stops at 10. */
 const DYPE_EXPONENT_SLIDER_MAX = 10;
 const formatPercent = (value: number): string => `${value}%`;
@@ -440,14 +441,13 @@ const TimestepShiftField = ({
         onCheckedChange={(checked) => onChange(checked ? DEFAULT_TIMESTEP_SHIFT : null)}
       />
       {shift !== null ? (
-        <ScrubberField
-          defaultValue={DEFAULT_TIMESTEP_SHIFT}
-          inputMax={MAX_TIMESTEP_SHIFT}
-          inputMin={0}
-          label={t('widgets.generate.timestepShift')}
-          marks={[DEFAULT_TIMESTEP_SHIFT]}
+        <SliderNumberField
+          ariaLabel={t('widgets.generate.timestepShift')}
+          marks={TIMESTEP_SHIFT_MARKS}
           max={TIMESTEP_SHIFT_SLIDER_MAX}
           min={TIMESTEP_SHIFT_SLIDER_MIN}
+          numberInputMax={MAX_TIMESTEP_SHIFT}
+          numberInputMin={0}
           step={0.1}
           value={shift}
           onChange={onChange}
