@@ -704,6 +704,16 @@ describe('compileGenerateGraph', () => {
 
       expect(unlisted.nodes.canvas_output?.image_size).toBeNull();
       expect(getNodeByType(unlisted, 'core_metadata')).not.toHaveProperty('image_size');
+
+      // Dimensions typed after the pick are custom: the named size would otherwise override them at the provider.
+      const typed = compile(providerModel('gemini', { modes: ['txt2img'], resolution_presets: presets }), {
+        ...providerSettings,
+        height: 2048,
+        width: 1536,
+      });
+
+      expect(typed.nodes.canvas_output).toMatchObject({ height: 2048, image_size: null, width: 1536 });
+      expect(getNodeByType(typed, 'core_metadata')).not.toHaveProperty('image_size');
     });
 
     it('accepts provider sizes that are not multiples of a local model grid', () => {

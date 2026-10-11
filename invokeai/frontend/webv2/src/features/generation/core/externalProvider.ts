@@ -97,16 +97,6 @@ export const getExternalAspectRatioSizes = (
   return sizes ? Object.entries(sizes) : [];
 };
 
-/** The named size to send: only one the model lists, so a stale pick from another model never reaches the provider. */
-export const resolveExternalImageSize = (
-  settings: Pick<GenerateSettings, 'externalImageSize'>,
-  model: GenerateModelConfig | undefined
-): string | null =>
-  settings.externalImageSize !== null &&
-  getExternalResolutionPresets(model).some((preset) => preset.image_size === settings.externalImageSize)
-    ? settings.externalImageSize
-    : null;
-
 /** The preset matching the current size and named size exactly, for the preset select's value. */
 export const findExternalResolutionPreset = (
   settings: Pick<GenerateSettings, 'externalImageSize' | 'height' | 'width'>,
@@ -118,6 +108,15 @@ export const findExternalResolutionPreset = (
       preset.width === settings.width &&
       preset.height === settings.height
   ) ?? null;
+
+/**
+ * The named size to send: the selected model's preset the current size matches exactly, so a hand-typed size or a
+ * pick left over from another model never overrides the dimensions at the provider.
+ */
+export const resolveExternalImageSize = (
+  settings: Pick<GenerateSettings, 'externalImageSize' | 'height' | 'width'>,
+  model: GenerateModelConfig | undefined
+): string | null => findExternalResolutionPreset(settings, model)?.image_size ?? null;
 
 /**
  * Provider-specific invocation fields for the selected model, keyed as the node declares them. Optional fields are

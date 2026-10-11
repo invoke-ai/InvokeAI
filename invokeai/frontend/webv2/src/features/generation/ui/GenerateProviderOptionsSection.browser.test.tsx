@@ -84,17 +84,15 @@ const render = async (model: GenerateModelConfig, settings: Partial<GenerateSett
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
-  const onCommit = vi.fn();
+  const draft = createExternalStoreCore({ ...getDefaultGenerateSettings(model), ...settings });
+  // Commits land in the draft as the form's would, so the section re-renders from what it committed.
+  const onCommit = vi.fn((patch: Partial<GenerateSettings>) => draft.setSnapshot({ ...draft.getSnapshot(), ...patch }));
 
   await settle(() => {
     root?.render(
       <ChakraProvider value={system}>
         <I18nextProvider i18n={i18n}>
-          <GenerateProviderOptionsSection
-            draft={createExternalStoreCore({ ...getDefaultGenerateSettings(model), ...settings })}
-            selectedModel={model}
-            onCommit={onCommit}
-          />
+          <GenerateProviderOptionsSection draft={draft} selectedModel={model} onCommit={onCommit} />
         </I18nextProvider>
       </ChakraProvider>
     );
@@ -157,10 +155,11 @@ describe('GenerateProviderOptionsSection', () => {
 
     expect(selectNames()).toEqual(['Thinking level']);
     // Temperature starts at the provider default: no slider until overridden.
-    expect(host?.querySelector('input[aria-label="Temperature"]')).toBeNull();
+    expect(host?.querySelector('[role="slider"]')).toBeNull();
 
     await settle(() => switches()[0]?.click());
     expect(onCommit).toHaveBeenCalledWith({ geminiTemperature: 1 });
+    expect(host?.querySelector('[role="slider"]')?.getAttribute('aria-valuenow')).toBe('1');
 
     await settle(() => selectTriggers()[0]?.click());
     await settle(() => option('Provider default')?.click());

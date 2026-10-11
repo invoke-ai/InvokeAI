@@ -1,8 +1,8 @@
 import type { ModelEditFormValues } from '@features/models/core/schemas';
 import type { ModelConfig } from '@features/models/core/types';
 
+import { toExternalModelValues } from '@features/models/core/externalModelFields';
 import { getModelsSnapshot, subscribeModels } from '@features/models/data/modelsStore';
-import { toExternalModelValues } from '@features/models/ui/detail/externalModelFields';
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createKeyedTransientStore } from '@platform/state/externalStore';
 import { useExternalStoreSelector, type EqualityFn } from '@platform/state/selectors';

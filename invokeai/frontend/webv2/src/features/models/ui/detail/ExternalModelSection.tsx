@@ -1,8 +1,28 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
+import type { ExternalModelSettingsModel } from '@features/models/core/externalModelFields';
 import type { ExternalModelFormValues } from '@features/models/core/schemas';
 
-import { Checkbox, Grid, HStack, Input, NumberInput, Stack, Switch, Text } from '@chakra-ui/react';
+import {
+  Checkbox,
+  createListCollection,
+  Grid,
+  HStack,
+  Input,
+  NumberInput,
+  Stack,
+  Switch,
+  Text,
+} from '@chakra-ui/react';
+import {
+  toExternalModelChanges,
+  toExternalModelValues,
+  validateExternalModel,
+} from '@features/models/core/externalModelFields';
 import { updateModel } from '@features/models/data/api';
+import {
+  ensureExternalProvidersLoaded,
+  useExternalProvidersSelector,
+} from '@features/models/data/externalProvidersStore';
 import { replaceModelInStore } from '@features/models/data/modelsStore';
 import {
   applyModelDraftFields,
@@ -16,17 +36,16 @@ import {
   useModelDraft,
   type ModelDraft,
 } from '@features/models/ui/modelDraftsStore';
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Button } from '@platform/ui/Button';
 import { Field, FieldLabel } from '@platform/ui/Field';
 import { Panel } from '@platform/ui/Panel';
+import { Select } from '@platform/ui/Select';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { ExternalModelSettingsModel } from './externalModelFields';
-
-import { toExternalModelChanges, toExternalModelValues, validateExternalModel } from './externalModelFields';
 import { DraftConflictNotice, UnsavedChangesLabel } from './ModelDraftNotices';
 
 /**
@@ -120,9 +139,28 @@ export const ExternalModelSection = ({
   const values = useMemo(() => applyModelDraftFields(saved, draft), [draft, saved]);
   const [error, setError] = useState<string | null>(null);
   const { run } = useScopedAction();
+  const providerConfigs = useExternalProvidersSelector((snapshot) => snapshot.configs);
+  // The registered providers are what requests can route to; a record's own id stays offered even when it is not
+  // among them, so an unknown provider reads as what it is rather than as nothing.
+  const providerCollection = useMemo(
+    () =>
+      providerConfigs === null
+        ? null
+        : createListCollection({
+            items: [...new Set([...providerConfigs.map((config) => config.provider_id), values.providerId])]
+              .filter((id) => id !== '')
+              .map((id) => ({ label: id, value: id })),
+          }),
+    [providerConfigs, values.providerId]
+  );
   // From the draft, not this instance: a save started before the user navigated away may still be in flight.
   const isSaving = draft?.submitted !== undefined;
   const isDirty = hasDraftFields(draft);
+
+  useMountEffect(() => {
+    // The list is a convenience: while it is unavailable the provider stays a text field.
+    ensureExternalProvidersLoaded().catch(() => {});
+  });
 
   const setField = <Key extends keyof ExternalModelFormValues>(key: Key, value: ExternalModelFormValues[Key]) => {
     recordModelDraftFields(model.key, 'external', { ...values, [key]: value }, saved);
@@ -135,7 +173,7 @@ export const ExternalModelSection = ({
   };
 
   const handleSave = async () => {
-    const validationError = validateExternalModel(values, t);
+    const validationError = validateExternalModel(values);
 
     if (validationError) {
       setError(validationError);
@@ -206,12 +244,28 @@ export const ExternalModelSection = ({
       {hasModelDraftConflict(saved, draft) ? <DraftConflictNotice /> : null}
       <Grid gap="2.5" templateColumns="repeat(auto-fill, minmax(13rem, 1fr))">
         <Field helpText={t('models.providerIdHelp')} label={t('models.providerId')}>
-          <Input
-            disabled={isSaving}
-            size="lg"
-            value={values.providerId}
-            onChange={(event) => setField('providerId', event.currentTarget.value)}
-          />
+          {providerCollection ? (
+            <Select
+              aria-label={t('models.providerId')}
+              collection={providerCollection}
+              disabled={isSaving}
+              size="lg"
+              value={values.providerId === '' ? [] : [values.providerId]}
+              onValueChange={({ value }) => {
+                if (value[0] !== undefined) {
+                  setField('providerId', value[0]);
+                }
+              }}
+            />
+          ) : (
+            <Input
+              aria-label={t('models.providerId')}
+              disabled={isSaving}
+              size="lg"
+              value={values.providerId}
+              onChange={(event) => setField('providerId', event.currentTarget.value)}
+            />
+          )}
         </Field>
         <Field helpText={t('models.providerModelIdHelp')} label={t('models.providerModelId')}>
           <Input

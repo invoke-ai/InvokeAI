@@ -63,10 +63,19 @@ const getCanvasValidationReasons = (input: CompileCanvasGraphInput): string[] =>
   const { bbox, compositeImageName, maskImageName, mode, model, strength } = input;
   const reasons: string[] = [];
 
-  // Providers take a whole image to edit; a partially covered bbox has nothing to send for the empty area. The
-  // shared validator reports the other modes the model does not advertise.
-  if (model.type === 'external_image_generator' && mode === 'outpaint') {
-    reasons.push(`${model.name} does not support outpainting on the canvas.`);
+  if (model.type === 'external_image_generator') {
+    // A provider takes a whole image to edit and nothing else: a partially covered bbox has nothing to send for the
+    // empty area, and the request carries no conditioning beyond the prompt, the init image and the mask. The
+    // shared validator reports the other modes the model does not advertise.
+    if (mode === 'outpaint') {
+      reasons.push(`${model.name} does not support outpainting on the canvas.`);
+    }
+    if (input.controlLayers && input.controlLayers.length > 0) {
+      reasons.push(`${model.name} does not support control layers.`);
+    }
+    if (input.regionalGuidance && input.regionalGuidance.length > 0) {
+      reasons.push(`${model.name} does not support regional guidance.`);
+    }
   }
 
   // Reject canvas PiD because its graph lacks the expected VAE/decode seam.
@@ -85,7 +94,8 @@ const getCanvasValidationReasons = (input: CompileCanvasGraphInput): string[] =>
       reasons.push('Canvas generation requires a composited source image.');
     }
 
-    if (!Number.isFinite(strength) || strength <= 0 || strength > 1) {
+    // A provider edits at its own strength; only the local denoise reads this one.
+    if (model.type !== 'external_image_generator' && (!Number.isFinite(strength) || strength <= 0 || strength > 1)) {
       reasons.push('Canvas denoising strength must be greater than 0 and at most 1.');
     }
   }
@@ -610,11 +620,7 @@ const graftOutpaint = (
 /** Throw the first validation reason. */
 export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanvasGraph => {
   const { bbox, compositeImageName, destination, mode, model, projectSettings, strength } = input;
-  // A provider buckets the request to its own size table and returns one image, so it is asked for the bbox itself.
-  const processingSize =
-    model.type === 'external_image_generator'
-      ? { height: bbox.height, width: bbox.width }
-      : resolveCanvasProcessingSize(model, input.settings.pidMode, bbox, input.scaling);
+  const processingSize = resolveCanvasProcessingSize(model, input.settings.pidMode, bbox, input.scaling);
   const settings = withProcessingDimensions(input.settings, processingSize);
 
   const validationReasons = [
@@ -639,7 +645,8 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
     }
 
     // Validation above guarantees the composite for the edit modes and the mask for inpaint. The provider returns
-    // the edited image whole, so no encode, mask tail, control, or regional grafts apply.
+    // the edited image whole, so no encode, mask tail, control, or regional grafts apply, and no denoising strength
+    // is sent or recorded. Metadata carries no `generation_mode`: the backend's mode list has no provider variants.
     const initImageName = compositeImageName as string;
     const backendGraph = buildExternalGraph(
       settings,

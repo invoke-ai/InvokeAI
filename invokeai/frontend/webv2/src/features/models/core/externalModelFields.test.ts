@@ -1,12 +1,8 @@
-import type { TFunction } from 'i18next';
-
 import { describe, expect, it } from 'vitest';
 
 import type { ExternalModelSettingsModel } from './externalModelFields';
 
 import { toExternalModelChanges, toExternalModelValues, validateExternalModel } from './externalModelFields';
-
-const t = ((key: string) => key) as unknown as TFunction;
 
 const geminiModel: ExternalModelSettingsModel = {
   capabilities: {
@@ -106,15 +102,15 @@ describe('external model record mapping', () => {
   it('rejects an empty route, no modes, half a max size, and non-positive limits', () => {
     const values = toExternalModelValues(geminiModel);
 
-    expect(validateExternalModel(values, t)).toBeNull();
-    expect(validateExternalModel({ ...values, providerModelId: '  ' }, t)).toBe('Provider model ID is required.');
-    expect(validateExternalModel({ ...values, modeTxt2img: false }, t)).toBe('Choose at least one supported mode.');
-    expect(validateExternalModel({ ...values, maxImageHeight: null }, t)).toBe(
+    expect(validateExternalModel(values)).toBeNull();
+    expect(validateExternalModel({ ...values, providerModelId: '  ' })).toBe('Provider model ID is required.');
+    expect(validateExternalModel({ ...values, modeTxt2img: false })).toBe('Choose at least one supported mode.');
+    expect(validateExternalModel({ ...values, maxImageHeight: null })).toBe(
       'Set both a max width and a max height, or neither.'
     );
-    expect(validateExternalModel({ ...values, maxImagesPerRequest: 0 }, t)).toBe(
+    expect(validateExternalModel({ ...values, maxImagesPerRequest: 0 })).toBe(
       'Images per request must be greater than 0.'
     );
-    expect(validateExternalModel({ ...values, defaultWidth: 1024.5 }, t)).toBe('Default width must be a whole number.');
+    expect(validateExternalModel({ ...values, defaultWidth: 1024.5 })).toBe('Default width must be a whole number.');
   });
 });

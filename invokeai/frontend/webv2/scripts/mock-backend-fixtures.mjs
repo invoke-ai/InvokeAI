@@ -399,6 +399,7 @@ const MODEL_TYPES = ['main', 'lora', 'controlnet', 'vae', 'embedding'];
 /**
  * Hosted-provider records with the capability shapes the Generate panel, Canvas, and Model Manager read: a named
  * resolution table (Gemini), fixed sizes per ratio with an edit mode (OpenAI), and provider toggles (Seedream).
+ * No shipped provider accepts a mask, so none advertises inpaint.
  */
 const EXTERNAL_MODEL_FIXTURES = [
   {
@@ -457,12 +458,12 @@ const EXTERNAL_MODEL_FIXTURES = [
         '2:3': { height: 1536, width: 1024 },
       },
       max_images_per_request: 10,
-      modes: ['txt2img', 'img2img', 'inpaint'],
+      modes: ['txt2img', 'img2img'],
       supports_reference_images: true,
     },
     cover_image: null,
     default_settings: { height: 1024, num_images: 1, width: 1024 },
-    description: 'Fixture hosted model with fixed ratio sizes and canvas edit modes.',
+    description: 'Fixture hosted model with fixed ratio sizes and canvas image-to-image.',
     file_size: 0,
     format: 'external_api',
     hash: 'external:openai:fixture-gpt-image',

@@ -493,6 +493,58 @@ describe('compileCanvasGraph', () => {
         'OpenAI Image does not support outpainting on the canvas.'
       );
     });
+
+    it('rejects control layers and regional guidance by name instead of failing inside a graft', () => {
+      const layer: ControlLayerGraphInput = {
+        beginEndStepPct: [0, 1],
+        controlMode: 'balanced',
+        id: 'control',
+        imageName: 'control.png',
+        kind: 'controlnet',
+        model: { base: 'sd-1', key: 'canny', name: 'Canny', type: 'controlnet' },
+        weight: 1,
+      };
+
+      expect(() => compile(editModel, 'txt2img', { compositeImageName: null, controlLayers: [layer] })).toThrow(
+        'OpenAI Image does not support control layers.'
+      );
+      expect(() =>
+        compile(editModel, 'txt2img', {
+          compositeImageName: null,
+          regionalGuidance: [
+            {
+              autoNegative: false,
+              id: 'r1',
+              maskImageName: 'r1-mask.png',
+              negativePrompt: null,
+              positivePrompt: 'a cat',
+              referenceImages: [],
+            },
+          ],
+        })
+      ).toThrow('OpenAI Image does not support regional guidance.');
+    });
+
+    it('ignores the denoising strength: the provider edits at its own, so none is validated, sent or recorded', () => {
+      const { backendGraph } = compile(editModel, 'img2img', { compositeImageName: 'bbox.png', strength: 0 });
+      const metadata = getNodeByType(backendGraph, 'core_metadata');
+
+      expect(backendGraph.nodes.canvas_output).not.toHaveProperty('strength');
+      expect(backendGraph.nodes.canvas_output).not.toHaveProperty('denoising_start');
+      expect(metadata).not.toHaveProperty('strength');
+      expect(metadata).not.toHaveProperty('generation_mode');
+    });
+
+    it('asks for the bbox itself even when the render size is set to auto or a custom size', () => {
+      const custom = compile(editModel, 'img2img', {
+        bbox: smallBbox,
+        compositeImageName: 'bbox.png',
+        scaling: { height: 2048, method: 'manual', width: 2048 },
+      });
+
+      expect(custom.backendGraph.nodes.canvas_output).toMatchObject({ height: 512, width: 640 });
+      expect(Object.values(custom.backendGraph.nodes).map((node) => node.type)).not.toContain('img_resize');
+    });
   });
 
   describe('unsupported models', () => {

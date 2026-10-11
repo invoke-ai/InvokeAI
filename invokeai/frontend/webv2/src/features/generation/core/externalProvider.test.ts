@@ -56,13 +56,18 @@ describe('external provider options', () => {
     ).toContain('openaiInputFidelity');
   });
 
-  it('resolves a named size only from the selected model’s own presets', () => {
+  it('resolves a named size only from the selected model’s own presets, at the preset’s exact size', () => {
     const gemini = external('gemini', { modes: ['txt2img'], resolution_presets: presets });
 
-    expect(resolveExternalImageSize({ externalImageSize: '2K' }, gemini)).toBe('2K');
-    expect(resolveExternalImageSize({ externalImageSize: '4K' }, gemini)).toBeNull();
+    expect(resolveExternalImageSize({ externalImageSize: '2K', height: 1152, width: 2048 }, gemini)).toBe('2K');
+    expect(resolveExternalImageSize({ externalImageSize: '4K', height: 1152, width: 2048 }, gemini)).toBeNull();
+    // A size typed by hand after picking a preset is custom: the provider buckets the dimensions instead.
+    expect(resolveExternalImageSize({ externalImageSize: '2K', height: 1152, width: 2000 }, gemini)).toBeNull();
     expect(
-      resolveExternalImageSize({ externalImageSize: '2K' }, external('openai', { modes: ['txt2img'] }))
+      resolveExternalImageSize(
+        { externalImageSize: '2K', height: 1152, width: 2048 },
+        external('openai', { modes: ['txt2img'] })
+      )
     ).toBeNull();
   });
 

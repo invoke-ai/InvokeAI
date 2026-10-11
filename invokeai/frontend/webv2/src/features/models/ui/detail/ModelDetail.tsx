@@ -4,6 +4,10 @@ import type { ReactNode } from 'react';
 
 import { chakra, DataList, HStack, Icon, Menu, Portal, Separator, Stack, Text } from '@chakra-ui/react';
 import { isConvertibleToDiffusers } from '@features/models/core/baseIdentity';
+import {
+  supportsExternalModelSettings,
+  type ExternalModelSettingsModel,
+} from '@features/models/core/externalModelFields';
 import { isLinkableType } from '@features/models/core/relationships';
 import { isAbsoluteModelPath, resolveModelAbsolutePath } from '@features/models/core/schemas';
 import { getModelSourceHref } from '@features/models/core/taxonomy';
@@ -28,7 +32,6 @@ import { useTranslation } from 'react-i18next';
 import { CpuOnlySetting, supportsCpuOnlySetting } from './CpuOnlySetting';
 import { supportsDefaultSettings, type DefaultSettingsModel } from './defaultSettingsFields';
 import { DefaultSettingsSection } from './DefaultSettingsSection';
-import { supportsExternalModelSettings, type ExternalModelSettingsModel } from './externalModelFields';
 import { ExternalModelSection } from './ExternalModelSection';
 import { MissingFileBadge, ModelBaseBadge, ModelFormatBadge } from './ModelBadges';
 import { ModelEditForm } from './ModelEditForm';

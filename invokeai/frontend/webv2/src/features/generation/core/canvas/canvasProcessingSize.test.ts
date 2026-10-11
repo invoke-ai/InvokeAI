@@ -9,8 +9,21 @@ seedArchitectureCapabilities();
 
 const sd1 = { base: 'sd-1', type: 'main' } as GenerateModelConfig;
 const sdxl = { base: 'sdxl', type: 'main' } as GenerateModelConfig;
+const external = { base: 'external', type: 'external_image_generator' } as GenerateModelConfig;
 
 describe('resolveCanvasProcessingSize', () => {
+  it('asks a hosted provider for the bbox itself, whatever the scaling method', () => {
+    const bbox = { height: 300, width: 500 };
+
+    expect(resolveCanvasProcessingSize(external, 'off', bbox, undefined)).toEqual(bbox);
+    expect(resolveCanvasProcessingSize(external, 'off', bbox, { height: null, method: 'auto', width: null })).toEqual(
+      bbox
+    );
+    expect(resolveCanvasProcessingSize(external, 'off', bbox, { height: 2048, method: 'manual', width: 2048 })).toEqual(
+      bbox
+    );
+  });
+
   it('keeps the bbox on the model grid when scaling is off or unset', () => {
     expect(resolveCanvasProcessingSize(sd1, 'off', { height: 300, width: 500 }, undefined)).toEqual({
       height: 304,

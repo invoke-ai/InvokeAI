@@ -56,7 +56,7 @@ The **Size** section lists the provider's fixed sizes per aspect ratio (**Provid
 
 ## Canvas
 
-GPT Image models that advertise `img2img` can generate from the Canvas: an empty bounding box runs text-to-image, and a filled one sends the composited bounding box as the init image. Inpainting and outpainting are not available for OpenAI models.
+GPT Image models that advertise `img2img` can generate from the Canvas: an empty bounding box runs text-to-image, and a filled one sends the composited bounding box as the init image. The provider edits the composite whole at the bounding box's own size, so the render size, denoising strength, control layers and regional guidance do not apply and are not offered. Inpainting and outpainting are not available for OpenAI models.
 
 ## How Requests Are Routed
 

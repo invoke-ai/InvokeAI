@@ -39,18 +39,22 @@ const sizePatch = (ratio: string, width: number, height: number): Partial<Genera
  */
 export const ExternalSizeSelect = ({ model, onCommit, settings }: ExternalSizeSelectProps) => {
   const { t } = useTranslation();
-  const presets = getExternalResolutionPresets(model);
-  const ratioSizes = getExternalAspectRatioSizes(model);
-  const collection = useMemo(
-    () =>
-      createListCollection({
+  // One table per model: the policy reads fresh arrays off the record, so the record is the memo key.
+  const { collection, presets, ratioSizes } = useMemo(() => {
+    const presets = getExternalResolutionPresets(model);
+    const ratioSizes = getExternalAspectRatioSizes(model);
+
+    return {
+      collection: createListCollection({
         items:
           presets.length > 0
             ? presets.map((preset) => ({ label: preset.label, value: presetKey(preset) }))
             : ratioSizes.map(([ratio, size]) => ({ label: `${ratio} (${size.width}×${size.height})`, value: ratio })),
       }),
-    [presets, ratioSizes]
-  );
+      presets,
+      ratioSizes,
+    };
+  }, [model]);
 
   if (presets.length === 0 && ratioSizes.length === 0) {
     return null;

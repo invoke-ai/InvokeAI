@@ -1,6 +1,7 @@
 /**
  * None snaps the bbox to the model grid; auto grows undersized content toward optimal area at its aspect ratio;
- * manual uses the selected size. Restore final output to the exact bbox.
+ * manual uses the selected size. Restore final output to the exact bbox. Hosted providers are asked for the bbox
+ * itself: they bucket the request to their own size table and return one image, so there is nothing to scale.
  */
 
 import type { GenerateModelConfig, PidMode } from '@features/generation/core/types';
@@ -80,6 +81,9 @@ export const resolveCanvasProcessingSize = (
   bbox: CanvasSize,
   scaling: CanvasScalingSettings | undefined
 ): CanvasSize => {
+  if (model.type === 'external_image_generator') {
+    return { height: bbox.height, width: bbox.width };
+  }
   const { grid, optimal } = getGenerationDimensions(model, pidMode);
   switch (scaling?.method) {
     case 'auto': {

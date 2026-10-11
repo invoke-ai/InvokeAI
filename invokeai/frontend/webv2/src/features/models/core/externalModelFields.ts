@@ -1,8 +1,7 @@
-import type { ExternalModelFormValues } from '@features/models/core/schemas';
-import type { ExternalModelCapabilities, ModelConfig, ModelRecordChanges } from '@features/models/core/types';
-import type { TFunction } from 'i18next';
+import type { ExternalModelFormValues } from './schemas';
+import type { ExternalModelCapabilities, ModelConfig, ModelRecordChanges } from './types';
 
-import { externalModelSchema } from '@features/models/core/schemas';
+import { externalModelSchema } from './schemas';
 
 export type ExternalModelSettingsModel = Pick<
   ModelConfig,
@@ -76,8 +75,9 @@ export const toExternalModelChanges = (
   };
 };
 
-export const validateExternalModel = (values: ExternalModelFormValues, t: TFunction): string | null => {
+/** The first schema message, like the other record editors' messages, so the UI shows it as is. */
+export const validateExternalModel = (values: ExternalModelFormValues): string | null => {
   const result = externalModelSchema.safeParse(values);
 
-  return result.success ? null : (result.error.issues[0]?.message ?? t('models.invalidExternalSettings'));
+  return result.success ? null : (result.error.issues[0]?.message ?? 'Invalid provider settings.');
 };

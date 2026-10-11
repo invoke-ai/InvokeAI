@@ -583,7 +583,8 @@ export const GenerateDimensionFields = ({
   };
 
   // Switching source remounts the section's subtree; that is deliberate, as its state lives in this component.
-  return project.invocationSourceId === 'canvas' ? (
+  // A hosted provider is asked for the frame itself (it buckets to its own size table), so there is no render size.
+  return project.invocationSourceId === 'canvas' && selectedModel?.type !== 'external_image_generator' ? (
     <CanvasRenderSizeSlot frame={displayDimensions}>{renderSection}</CanvasRenderSizeSlot>
   ) : (
     renderSection(null)

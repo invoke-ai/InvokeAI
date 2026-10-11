@@ -1343,7 +1343,6 @@
     "saveExternalSettings": "Save Provider Settings",
     "externalSettingsSaved": "Provider settings saved",
     "failedToSaveExternalSettings": "Failed to save provider settings.",
-    "invalidExternalSettings": "Invalid provider settings.",
     "externalModes": {
       "txt2img": "Text to image",
       "img2img": "Image to image",

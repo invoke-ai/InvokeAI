@@ -1,3 +1,4 @@
+import type { ExternalModelSettingsModel } from '@features/models/core/externalModelFields';
 import type * as ModelsApi from '@features/models/data/api';
 
 import { ChakraProvider } from '@chakra-ui/react';
@@ -8,11 +9,15 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ExternalModelSettingsModel } from './externalModelFields';
-
 import { ExternalModelSection } from './ExternalModelSection';
 
 const api = vi.hoisted(() => ({
+  getExternalProviderConfigs: vi.fn(() =>
+    Promise.resolve([
+      { api_key_configured: true, base_url: null, provider_id: 'openai' },
+      { api_key_configured: false, base_url: null, provider_id: 'gemini' },
+    ])
+  ),
   getModelsDir: vi.fn(() => Promise.resolve('')),
   listMissingModels: vi.fn(() => Promise.resolve([])),
   listModels: vi.fn(() => Promise.resolve([])),
@@ -87,8 +92,19 @@ describe('ExternalModelSection', () => {
       await Promise.resolve();
     });
   };
+  // The select's menu renders after a frame; the provider list after its fetch settles.
+  const settle = () =>
+    act(
+      () =>
+        new Promise<void>((resolve) => {
+          globalThis.setTimeout(resolve, 50);
+        })
+    );
+  // The provider is the section's only select; inside its Field it takes the field's label.
+  const providerTrigger = () => host.querySelector<HTMLButtonElement>('[data-scope="select"][data-part="trigger"]');
 
   beforeEach(() => {
+    api.getExternalProviderConfigs.mockClear();
     api.updateModel.mockReset();
     onError.mockReset();
     onSaved.mockReset();
@@ -171,6 +187,35 @@ describe('ExternalModelSection', () => {
     await click(button('common.reset'));
     expect(host.querySelector('[role="alert"]')).toBeNull();
     expect(checkbox('models.externalModes.txt2img').checked).toBe(true);
+  });
+
+  it('offers the registered providers, keeping an unregistered id of the record selectable', async () => {
+    await render({ ...gptImage, provider_id: 'custom' });
+    await settle();
+
+    expect(host.querySelector('input[aria-label="models.providerId"]')).toBeNull();
+    expect(providerTrigger()?.textContent).toContain('custom');
+    await click(providerTrigger()!);
+    await settle();
+
+    const options = [...document.querySelectorAll<HTMLElement>('[role="option"]')];
+    expect(options.map((option) => option.textContent)).toEqual(['openai', 'gemini', 'custom']);
+    await click(options[1]!);
+    await settle();
+
+    expect(providerTrigger()?.textContent).toContain('gemini');
+    expect(getModelDraft('gpt-image-1')?.external?.fields).toEqual({ providerId: 'gemini' });
+  });
+
+  it('keeps the provider a text field while the provider list is unavailable', async () => {
+    api.getExternalProviderConfigs.mockRejectedValueOnce(new Error('offline'));
+    await render(gptImage);
+    await settle();
+
+    const providerInput = host.querySelector<HTMLInputElement>('input[aria-label="models.providerId"]')!;
+    expect(providerInput.value).toBe('openai');
+    await type(providerInput, 'seedream');
+    expect(getModelDraft('gpt-image-1')?.external?.fields).toEqual({ providerId: 'seedream' });
   });
 
   it('surfaces a failed save and keeps the edits for another attempt', async () => {
