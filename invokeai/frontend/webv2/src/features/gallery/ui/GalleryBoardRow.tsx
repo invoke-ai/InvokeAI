@@ -36,6 +36,7 @@ export const GalleryBoardRow = ({
   isMenuOpen,
   isSelected,
   loadedItemBoardIds,
+  onFocusLost,
   onOpenMenu,
   onSelectBoard,
 }: {
@@ -55,6 +56,8 @@ export const GalleryBoardRow = ({
   isMenuOpen?: boolean;
   isSelected: boolean;
   loadedItemBoardIds: ReadonlyMap<GalleryItemKey, string>;
+  /** The row left the list holding focus — moved to another tier, archived or deleted — so focus needs a new home. */
+  onFocusLost?: (boardId: string) => void;
   /** Omitted for date rows, which have no board actions. */
   onOpenMenu?: (board: GalleryBoard, x: number, y: number) => void;
   onSelectBoard: (boardId: string) => void;
@@ -189,6 +192,23 @@ export const GalleryBoardRow = ({
     [handleActionsClick, isMenuOpen, onOpenMenu, spokenLabel, stopPropagation, t]
   );
 
+  // The container, which outlives neither a move to another tier (the row remounts there) nor an archive or delete.
+  const setRowRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (!node || !onFocusLost) {
+        return;
+      }
+
+      return () => {
+        if (node.contains(document.activeElement)) {
+          // After the commit, when the row's replacement (if any) is in the document.
+          queueMicrotask(() => onFocusLost(board.id));
+        }
+      };
+    },
+    [board.id, onFocusLost]
+  );
+
   const dragPreviewStyle = useMemo(
     () =>
       dragOrigin
@@ -206,6 +226,8 @@ export const GalleryBoardRow = ({
 
   return (
     <Box
+      ref={setRowRef}
+      data-board-row={board.id}
       // Use outlines to avoid reflow during drag highlighting; the active row gets an inset ring.
       bg={isOver ? 'accent.muted' : undefined}
       opacity={isDragging ? 0.4 : undefined}

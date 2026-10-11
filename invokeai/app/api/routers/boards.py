@@ -16,6 +16,7 @@ from invokeai.app.services.board_access.board_access_common import (
 from invokeai.app.services.board_records.board_records_common import (
     BoardChanges,
     BoardRecordInboxException,
+    BoardRecordNotFoundException,
     BoardRecordOrderBy,
     BoardRecordProjectNotFoundException,
 )
@@ -87,9 +88,11 @@ def get_board(
 
     _assert_board_read_access(board_id, current_user)
 
+    # Only a board that is not there, or that the caller cannot open, is a 404: clients take it as the board being gone
+    # for them, and clear what names it.
     try:
         return ApiDependencies.invoker.services.boards.get_dto(board_id=board_id, viewer=_viewer(current_user))
-    except Exception:
+    except BoardRecordNotFoundException:
         raise HTTPException(status_code=404, detail="Board not found")
 
 

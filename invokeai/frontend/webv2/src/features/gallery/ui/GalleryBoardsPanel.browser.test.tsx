@@ -43,6 +43,7 @@ vi.mock('react-i18next', () => ({
 }));
 
 const actions = {
+  archiveBoard: vi.fn(() => Promise.resolve()),
   createBoard: vi.fn(() => Promise.resolve(true)),
   moveBoard: vi.fn(() => Promise.resolve()),
   selectBoard: vi.fn(),
@@ -498,6 +499,86 @@ describe('GalleryBoardsPanel', () => {
       expect(actions.selectBoard).toHaveBeenCalledTimes(2);
       expect(actions.selectBoard).toHaveBeenLastCalledWith('mine-member');
       expect(actions.moveBoard).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('focus after a board moves', () => {
+    it('follows a board archived from its menu into the Archived group', async () => {
+      await renderPanel(galleryWithFacadesIn('p1'));
+      const archive = await openMenuItem('widgets.gallery.archiveBoard');
+      actions.archiveBoard.mockImplementationOnce(() => {
+        void renderPanel(galleryWithFacadesIn('p1', true) as GalleryStateView);
+
+        return Promise.resolve();
+      });
+
+      await act(() => userEvent.click(archive));
+
+      await vi.waitFor(() => expect(document.activeElement).toBe(facadesButton()));
+      expect(sectionOf(facadesButton())).toMatch(/^Archived/);
+    });
+
+    const galleryWithFacadesIn = (projectId: string | null, archived = false) => ({
+      ...createGallery(),
+      boards: boards.map((board) => (board.id === 'mine-member' ? { ...board, archived, projectId } : board)),
+    });
+    const menuItem = (label: string) =>
+      [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((element) => element.textContent === label);
+    const openMenuItem = async (label: string) => {
+      await act(() => userEvent.click(facadesButton(), { button: 'right' }));
+
+      return vi.waitFor(() => {
+        expect(menuItem(label)).toBeDefined();
+        return menuItem(label)!;
+      });
+    };
+    const facadesButton = () => getBoardRows().find((button) => button.textContent?.startsWith('Façades'))!;
+    const sectionOf = (element: Element) =>
+      element.closest('[data-scope="collapsible"][data-part="root"]')?.querySelector('[data-part="trigger"]')
+        ?.textContent;
+
+    it('follows the board to its new tier', async () => {
+      await renderPanel(galleryWithFacadesIn('p1'));
+      facadesButton().focus();
+
+      await renderPanel(galleryWithFacadesIn(null) as GalleryStateView);
+      await act(() => Promise.resolve());
+
+      expect(document.activeElement).toBe(facadesButton());
+      expect(sectionOf(facadesButton())).toMatch(/^Library/);
+    });
+
+    it('follows a board moved from its menu once the menu has closed', async () => {
+      await renderPanel(galleryWithFacadesIn('p1'));
+      const menuItem = (label: string) =>
+        [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
+          (element) => element.textContent === label
+        );
+      await act(() => userEvent.click(facadesButton(), { button: 'right' }));
+      const moveTo = await vi.waitFor(() => {
+        expect(menuItem('widgets.gallery.moveBoard')).toBeDefined();
+        return menuItem('widgets.gallery.moveBoard')!;
+      });
+      await act(() => userEvent.click(moveTo));
+      const library = await vi.waitFor(() => {
+        const item = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
+          (element) => element.textContent === 'Library'
+        );
+        expect(item).toBeDefined();
+        return item!;
+      });
+
+      // As in the app, the move patches the board lists at once: the row leaves while the menu is still open.
+      actions.moveBoard.mockImplementationOnce(() => {
+        void renderPanel(galleryWithFacadesIn(null) as GalleryStateView);
+
+        return Promise.resolve();
+      });
+      await act(() => userEvent.click(library));
+      expect(actions.moveBoard).toHaveBeenCalledExactlyOnceWith('mine-member', null, 'Library');
+
+      await vi.waitFor(() => expect(document.activeElement).toBe(facadesButton()));
+      expect(sectionOf(facadesButton())).toMatch(/^Library/);
     });
   });
 

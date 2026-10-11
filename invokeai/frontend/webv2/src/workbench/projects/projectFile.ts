@@ -466,7 +466,9 @@ export const importProjectFile = async (
     }
     // Media-free legacy JSON imports do not load restore rollback.
     if (ledger !== null && restoreMedia !== null) {
-      const rollback = () => restoreMedia.rollbackRestoredMedia(ledger, { signal: owner.signal });
+      // The staging boards it deletes may already be listed: uploads to them announce themselves.
+      const rollback = () =>
+        restoreMedia.rollbackRestoredMedia(ledger, { signal: owner.signal }).finally(() => invalidateBoardLists(owner));
       if (!didAttemptProjectCreate && isAccountScopeCurrent(owner)) {
         await rollback();
       } else {

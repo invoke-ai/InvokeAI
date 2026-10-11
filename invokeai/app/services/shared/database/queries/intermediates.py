@@ -498,7 +498,12 @@ def _newest_durable_on_project_board(column: ColumnElement[Any]) -> Any:
 # newest comes from its own index range, so the cost follows the number of boards rather than the images on them.
 _COVER = (
     select(_newest_durable_on_project_board(board_images.c.image_name))
-    .where(_PROJECT_BOARD.c.user_id == _P.user_id, _PROJECT_BOARD.c.project_id == _P.project_id)
+    .where(
+        _PROJECT_BOARD.c.user_id == _P.user_id,
+        _PROJECT_BOARD.c.project_id == _P.project_id,
+        # A board with no durable image has nothing to offer, wherever a dialect would sort its NULL.
+        _newest_durable_on_project_board(board_images.c.created_at).is_not(None),
+    )
     .order_by(
         _newest_durable_on_project_board(board_images.c.created_at).desc(),
         _newest_durable_on_project_board(board_images.c.image_name).desc(),

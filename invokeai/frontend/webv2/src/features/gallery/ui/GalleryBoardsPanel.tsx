@@ -154,8 +154,6 @@ export const GalleryBoardsPanel = () => {
     setBoardMenuTarget({ board, x, y });
   }, []);
 
-  const handleBoardMenuClose = useCallback(() => setBoardMenuTarget(null), []);
-
   const handleToggleSection = useCallback(
     (sectionId: GalleryBoardSectionId, isOpen: boolean) =>
       actions.updateSettings(toggleGalleryBoardSection(gallery.settings, sectionId, isOpen)),
@@ -168,6 +166,36 @@ export const GalleryBoardsPanel = () => {
   const isBoardListUnavailable = boardsState.status === 'error';
   const isBoardListSettled = boardsState.status !== 'loading' && !isBoardListUnavailable;
   const focusBoardList = useCallback(() => focusVisibleOperable(boardsViewportRef.current), []);
+  // A board's row wherever it is now: a move remounts it under its new tier. Without one, the list keeps focus.
+  const focusBoardRow = useCallback(
+    (boardId: string) => {
+      const row = boardsViewportRef.current?.querySelector<HTMLElement>(
+        `[data-board-row="${CSS.escape(boardId)}"] button[type="button"]:not(.board-row-actions)`
+      );
+
+      if (row) {
+        row.focus();
+      } else {
+        focusBoardList();
+      }
+    },
+    [focusBoardList]
+  );
+  // A move or archive from the menu takes the row away while the menu still holds focus, and with it the button the
+  // menu would hand focus back to; once it closes, focus goes to the board's row wherever it now is.
+  const relocatingBoardIdRef = useRef<string | null>(null);
+  const handleBoardRelocated = useCallback((boardId: string) => {
+    relocatingBoardIdRef.current = boardId;
+  }, []);
+  const handleBoardMenuClose = useCallback(() => {
+    setBoardMenuTarget(null);
+    const relocatedBoardId = relocatingBoardIdRef.current;
+    relocatingBoardIdRef.current = null;
+
+    if (relocatedBoardId !== null && document.activeElement?.closest('[data-scope="menu"]')) {
+      focusBoardRow(relocatedBoardId);
+    }
+  }, [focusBoardRow]);
 
   // Results the selected or auto-add board refuses (someone else's, view-only) go to the inbox, and its row says so.
   const redirected = getGalleryRedirectedDestination(gallery);
@@ -184,6 +212,7 @@ export const GalleryBoardsPanel = () => {
       isMenuOpen={boardMenuTarget?.board.id === board.id}
       isSelected={board.id === gallery.selectedBoardId}
       loadedItemBoardIds={loadedItemBoardIds}
+      onFocusLost={focusBoardRow}
       onOpenMenu={openBoardMenu}
       onSelectBoard={handleSelectBoard}
     />
@@ -387,7 +416,11 @@ export const GalleryBoardsPanel = () => {
           <ScrollArea.Thumb />
         </ScrollArea.Scrollbar>
       </ScrollArea.Root>
-      <GalleryBoardMenu target={boardMenuTarget} onClose={handleBoardMenuClose} />
+      <GalleryBoardMenu
+        target={boardMenuTarget}
+        onBoardRelocated={handleBoardRelocated}
+        onClose={handleBoardMenuClose}
+      />
       <RenameDialog
         cancelLabel={t('common.cancel')}
         initialName={trimmedSearchTerm}

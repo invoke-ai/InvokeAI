@@ -45,7 +45,10 @@ describe('placeMemberBoards', () => {
     { board: old, stagingBoardId: 'staged-old' },
     { board: empty, stagingBoardId: 'staged-empty' },
   ];
-  const deps = () => ({ placeBoardInProject: vi.fn(() => Promise.resolve()) });
+  const deps = () => ({
+    getBoardProjectId: vi.fn((): Promise<string | null> => Promise.resolve(null)),
+    placeBoardInProject: vi.fn(() => Promise.resolve()),
+  });
 
   it('moves every board but the inbox into the project as it was', async () => {
     const d = deps();
@@ -63,6 +66,15 @@ describe('placeMemberBoards', () => {
 
     await expect(placeMemberBoards(staged, 'p1', d)).resolves.toEqual([{ name: 'Old' }]);
     expect(d.placeBoardInProject).toHaveBeenCalledTimes(2);
+  });
+
+  it('counts a move whose answer was lost when the board is in the project after all', async () => {
+    const d = deps();
+    d.placeBoardInProject.mockRejectedValueOnce(new TypeError('response lost'));
+    d.getBoardProjectId.mockResolvedValueOnce('p1');
+
+    await expect(placeMemberBoards(staged, 'p1', d)).resolves.toEqual([]);
+    expect(d.getBoardProjectId).toHaveBeenCalledExactlyOnceWith('staged-old', undefined);
   });
 
   it('ends the placement when the operation was cancelled', async () => {

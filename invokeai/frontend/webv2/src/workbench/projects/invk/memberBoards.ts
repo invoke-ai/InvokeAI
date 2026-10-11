@@ -2,7 +2,7 @@ import type { InvkBoard } from './board';
 import type { RestoredMediaLedger } from './restoreProjectMedia';
 import type { InvkBoardIssue } from './transfer';
 
-import { createStagingBoard, isRequestCancellation, placeBoardInProject } from './assetTransport';
+import { createStagingBoard, getBoardProjectId, isRequestCancellation, placeBoardInProject } from './assetTransport';
 
 /**
  * A project's boards travel as a set, but only the inbox rides the project create: the server claims it in the same
@@ -18,6 +18,7 @@ export interface StagedBoard {
 }
 
 export interface MemberBoardPlacementDeps {
+  getBoardProjectId?: typeof getBoardProjectId;
   /** After each board settles, placed or not. */
   onProgress?: (completed: number, total: number) => void;
   placeBoardInProject?: typeof placeBoardInProject;
@@ -62,7 +63,20 @@ export const placeMemberBoards = async (
   deps: MemberBoardPlacementDeps = {}
 ): Promise<InvkBoardIssue[]> => {
   const place = deps.placeBoardInProject ?? placeBoardInProject;
+  const readProjectId = deps.getBoardProjectId ?? getBoardProjectId;
   const issues: InvkBoardIssue[] = [];
+  /** A move with no usable answer may still have been made; the board says where it is. */
+  const wasPlaced = async (stagingBoardId: string): Promise<boolean> => {
+    try {
+      return (await readProjectId(stagingBoardId, deps.signal)) === projectId;
+    } catch (error) {
+      if (isRequestCancellation(error)) {
+        throw error;
+      }
+
+      return false;
+    }
+  };
   const members = staged.filter(({ board }) => !board.isInbox);
 
   for (const [index, { board, stagingBoardId }] of members.entries()) {
@@ -73,7 +87,9 @@ export const placeMemberBoards = async (
         throw error;
       }
 
-      issues.push({ name: board.name });
+      if (!(await wasPlaced(stagingBoardId))) {
+        issues.push({ name: board.name });
+      }
     }
 
     deps.onProgress?.(index + 1, members.length);

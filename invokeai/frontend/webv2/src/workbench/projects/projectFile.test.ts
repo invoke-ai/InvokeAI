@@ -62,6 +62,7 @@ const transport = vi.hoisted(() => ({
   findExistingImageNames: vi.fn((_names: readonly string[]) => Promise.resolve(new Set<string>())),
   findExistingVideoNames: vi.fn((_names: readonly string[]) => Promise.resolve(new Set<string>())),
   mimeForEntryName: () => 'image/png',
+  getBoardProjectId: vi.fn((): Promise<string | null> => Promise.resolve(null)),
   placeBoardInProject: vi.fn(() => Promise.resolve()),
   starImages: vi.fn((_names: readonly string[]) => Promise.resolve({ failed: [] as string[] })),
   starVideos: vi.fn((_names: readonly string[]) => Promise.resolve({ failed: [] as string[] })),

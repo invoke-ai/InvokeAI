@@ -34,9 +34,12 @@ export interface GalleryBoardMenuTarget {
 /** Keep the board dropdown open beneath its cursor-anchored actions menu; actions need not select the board. */
 export const GalleryBoardMenu = ({
   target,
+  onBoardRelocated,
   onClose,
 }: {
   target: GalleryBoardMenuTarget | null;
+  /** A move or an archive was started from the menu: the board's row is leaving its place in the list. */
+  onBoardRelocated?: (boardId: string) => void;
   onClose: () => void;
 }) => {
   const { t } = useTranslation();
@@ -179,8 +182,12 @@ export const GalleryBoardMenu = ({
                   <BoardRenameMenuItem board={board} onRename={setRenameTarget} onRenameValue={setRenameValue} />
                 )}
                 {boardSharing && can('set_general_access') && <BoardGeneralAccessSubMenu board={board} />}
-                {isMovableGalleryBoard(board, gallery.projectBoardId) && <BoardMoveSubMenu board={board} />}
-                {can('archive') && <BoardArchiveMenuItem archived={board.archived} boardId={board.id} />}
+                {isMovableGalleryBoard(board, gallery.projectBoardId) && (
+                  <BoardMoveSubMenu board={board} onBoardMoved={onBoardRelocated} />
+                )}
+                {can('archive') && (
+                  <BoardArchiveMenuItem archived={board.archived} boardId={board.id} onArchive={onBoardRelocated} />
+                )}
                 {can('delete') && (
                   <>
                     <Menu.Separator />
@@ -297,9 +304,23 @@ const SUBMENU_POSITIONING = { gutter: 2, placement: 'right-start' } as const;
  * Where a board can go: the Library, the open project, then the account's other projects by name — every tier
  * but the one it is in. Nested so the board menu keeps its one-level shape for the common actions.
  */
-const BoardMoveSubMenu = ({ board }: { board: GalleryBoard }) => {
+const BoardMoveSubMenu = ({
+  board,
+  onBoardMoved,
+}: {
+  board: GalleryBoard;
+  onBoardMoved?: (boardId: string) => void;
+}) => {
   const { t } = useTranslation();
   const { actions, projectId, projectName, projectNames } = useGalleryWidget();
+  const handleMove = useCallback(
+    (boardId: string, destinationId: string | null, label: string) => {
+      onBoardMoved?.(boardId);
+
+      return actions.moveBoard(boardId, destinationId, label);
+    },
+    [actions, onBoardMoved]
+  );
   const destinations = useMemo(() => {
     const others = [...projectNames]
       .filter(([id]) => id !== projectId && id !== board.projectId)
@@ -337,7 +358,7 @@ const BoardMoveSubMenu = ({ board }: { board: GalleryBoard }) => {
                 boardId={board.id}
                 destinationId={destination.id}
                 label={destination.label}
-                onMove={actions.moveBoard}
+                onMove={handleMove}
               />
             ))}
           </MenuContent>
@@ -418,10 +439,21 @@ const BoardRenameMenuItem = ({
   );
 };
 
-const BoardArchiveMenuItem = ({ archived, boardId }: { archived: boolean; boardId: string }) => {
+const BoardArchiveMenuItem = ({
+  archived,
+  boardId,
+  onArchive,
+}: {
+  archived: boolean;
+  boardId: string;
+  onArchive?: (boardId: string) => void;
+}) => {
   const { t } = useTranslation();
   const { actions } = useGalleryWidget();
-  const handleClick = useCallback(() => void actions.archiveBoard(boardId, !archived), [actions, archived, boardId]);
+  const handleClick = useCallback(() => {
+    onArchive?.(boardId);
+    void actions.archiveBoard(boardId, !archived);
+  }, [actions, archived, boardId, onArchive]);
 
   return (
     <BoardMenuItem

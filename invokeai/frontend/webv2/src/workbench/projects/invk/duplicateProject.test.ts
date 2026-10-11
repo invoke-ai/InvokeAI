@@ -34,6 +34,7 @@ const transport = vi.hoisted(() => ({
   deleteStagingBoard: vi.fn(() => Promise.resolve()),
   findExistingImageNames: vi.fn((names: readonly string[]) => Promise.resolve(new Set(names))),
   findExistingVideoNames: vi.fn((names: readonly string[]) => Promise.resolve(new Set(names))),
+  getBoardProjectId: vi.fn((): Promise<string | null> => Promise.resolve(null)),
   mimeForEntryName: () => 'image/png',
   placeBoardInProject: vi.fn(() => Promise.resolve()),
   starImages: vi.fn(() => Promise.resolve({ failed: [] as string[] })),
@@ -418,6 +419,21 @@ describe('duplicateProjectRecord', () => {
     expect(transport.deleteStagingBoard).not.toHaveBeenCalled();
   });
 
+  it('refreshes board lists even when placing the boards is cancelled part way', async () => {
+    transport.placeBoardInProject.mockRejectedValueOnce(new DOMException('cancelled', 'AbortError'));
+    transport.createStagingBoard.mockResolvedValueOnce('staging-board').mockResolvedValueOnce('member-staging');
+
+    await expect(
+      duplicateProject.duplicateProjectRecord({
+        boards: [...inboxOf([]), { archived: false, board_id: 'old', is_inbox: false, items: [], name: 'Old' }],
+        owner,
+        record: sourceRecord(),
+      })
+    ).rejects.toThrow('cancelled');
+
+    expect(api.invalidateBoardLists).toHaveBeenCalledExactlyOnceWith(owner);
+  });
+
   it('stages and claims the inbox even when it is empty, copying nothing', async () => {
     await duplicateProject.duplicateProjectRecord({ boards: inboxOf([]), owner, record: sourceRecord() });
 
@@ -478,6 +494,11 @@ describe('duplicateProjectRecord', () => {
     expect(transport.deleteArchiveImages).toHaveBeenCalledWith(['copy-shared.png'], owner.signal);
     expect(transport.deleteArchiveVideos).toHaveBeenCalledWith(['copy-clip.mp4'], owner.signal);
     expect(transport.deleteStagingBoard).toHaveBeenCalledWith('staging-board', owner.signal);
+    // Uploads announce their board, so lists can already show the staging board it deleted.
+    expect(api.invalidateBoardLists).toHaveBeenCalledExactlyOnceWith(owner);
+    expect(api.invalidateBoardLists.mock.invocationCallOrder[0]).toBeGreaterThan(
+      transport.deleteStagingBoard.mock.invocationCallOrder[0]!
+    );
   });
 
   /** Retain media for unproven create outcomes; GET 404 can race commit. */

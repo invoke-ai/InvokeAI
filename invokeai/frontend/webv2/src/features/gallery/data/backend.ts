@@ -1064,6 +1064,28 @@ export const getGalleryImageMetadata = async (
   return body && typeof body === 'object' && !Array.isArray(body) ? (body as GalleryImageMetadata) : null;
 };
 
+/**
+ * Whether a board a project names still exists for this account: false only when the server answers that it does
+ * not. A virtual board (Uncategorized, a date, every board) always exists; any other failure is thrown, unanswered.
+ */
+export const galleryBoardExists = async (boardId: string, signal?: AbortSignal): Promise<boolean> => {
+  if (getUploadBoardId(boardId) === undefined) {
+    return true;
+  }
+
+  try {
+    await apiFetchJson<BackendBoardDTO>(`/api/v1/boards/${encodeURIComponent(boardId)}`, { signal });
+
+    return true;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return false;
+    }
+
+    throw error;
+  }
+};
+
 /** `projectId` null creates in the Library; a project must be the caller's own, else the backend answers 404. */
 export const createGalleryBoard = async (
   boardName: string,

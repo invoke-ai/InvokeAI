@@ -14,6 +14,7 @@ from fastapi import status
 from fastapi.testclient import TestClient
 from sqlalchemy import insert
 
+from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.schema.boards import board_members
 from tests.app.routers.conftest import _auth, _create_board
@@ -39,6 +40,26 @@ def _get_board(client: TestClient, token: str, board_id: str) -> dict[str, Any]:
 
 def _move(client: TestClient, token: str, board_id: str, project_id: str | None):
     return client.patch(f"/api/v1/boards/{board_id}", json={"project_id": project_id}, headers=_auth(token))
+
+
+def test_reading_a_board_is_a_404_only_when_the_board_is_gone(
+    client: TestClient, user1_token: str, mock_invoker: Invoker, monkeypatch: pytest.MonkeyPatch
+):
+    """Clients take a 404 here as the board being deleted and clear what names it, so a failure is never one."""
+    board_id = _create_board(client, user1_token, "Kept")
+    assert client.delete(f"/api/v1/boards/{board_id}", headers=_auth(user1_token)).status_code == status.HTTP_200_OK
+    assert client.get(f"/api/v1/boards/{board_id}", headers=_auth(user1_token)).status_code == 404
+
+    kept = _create_board(client, user1_token, "Kept")
+
+    def fail(board_id: str) -> None:
+        raise RuntimeError("database is locked")
+
+    monkeypatch.setattr(mock_invoker.services.boards, "get_dto", fail)
+    unraised = TestClient(client.app, raise_server_exceptions=False)
+    response = unraised.get(f"/api/v1/boards/{kept}", headers=_auth(user1_token))
+
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
 # --- creating ---------------------------------------------------------------------------------

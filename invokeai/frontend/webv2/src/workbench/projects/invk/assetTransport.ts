@@ -660,6 +660,11 @@ export const placeBoardInProject = async (
   });
 };
 
+/** The project a board is in; null is the Library. */
+export const getBoardProjectId = async (boardId: string, signal?: AbortSignal): Promise<string | null> =>
+  (await apiFetchJson<{ project_id?: string | null }>(`${BOARDS_BASE}/${encodeURIComponent(boardId)}`, { signal }))
+    .project_id ?? null;
+
 /**
  * Drop a staging board whose project was never created. `include_images=false` deliberately: the
  * restore deletes its own identities one by one, and a generation that landed on the board

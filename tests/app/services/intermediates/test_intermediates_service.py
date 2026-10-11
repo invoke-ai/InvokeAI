@@ -311,6 +311,9 @@ def test_a_project_row_takes_its_cover_from_whichever_of_its_boards_has_the_newe
             cursor.execute(
                 "UPDATE board_images SET created_at = ? WHERE image_name = ?;", (f"2020-01-0{index + 1} 00:00:00", name)
             )
+    # The newest board of all, with nothing durable on it: a database that sorts its empty newest first must not
+    # hand the project no cover.
+    invoker.services.board_records.save("Empty", "alice", project_id=project)
     _seed_image(invoker, "intermediate.png", project_id=project, size=1)
 
     summary = service.get_summary(
