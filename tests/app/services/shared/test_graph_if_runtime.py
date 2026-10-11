@@ -2,9 +2,11 @@ import pytest
 
 from invokeai.app.invocations.logic import IfInvocation
 from invokeai.app.invocations.math import AddInvocation
+from invokeai.app.services.shared import graph_if_runtime
 from invokeai.app.services.shared.execution_engine.scheduler import ActivationDependency
 from invokeai.app.services.shared.graph import Edge, EdgeConnection, Graph, GraphExecutionState
 from invokeai.app.services.shared.graph_runtime_records import _ApplyTransaction
+from invokeai.app.services.shared.graph_validation import IterateInvocation
 from tests.app.services.shared.import_test_utils import assert_module_imports_without_graph
 
 
@@ -103,3 +105,54 @@ def test_apply_rollback_reconstructs_pending_if_nodes(state: GraphExecutionState
     state._reset_apply_derived_caches()
 
     assert state._pending_if_exec_nodes == {"if-exec"}
+
+
+def test_prepare_uses_supplied_source_graph_for_if_iteration_paths() -> None:
+    state = GraphExecutionState(graph=Graph(nodes={"if": IfInvocation(id="if", condition=True)}))
+    state.graph.add_node(IterateInvocation(id="iterator"))
+    state.graph.add_node(IfInvocation(id="inner"))
+    state.graph.edges.extend(
+        [
+            Edge(
+                source=EdgeConnection(node_id="iterator", field="item"),
+                destination=EdgeConnection(node_id="inner", field="condition"),
+            ),
+            Edge(
+                source=EdgeConnection(node_id="inner", field="value"),
+                destination=EdgeConnection(node_id="if", field="true_input"),
+            ),
+            Edge(
+                source=EdgeConnection(node_id="iterator", field="item"),
+                destination=EdgeConnection(node_id="if", field="false_input"),
+            ),
+        ]
+    )
+    state.graph._invalidate_edge_indexes()
+    source_graph = state._get_source_graph_flat()
+    constrained_graph = source_graph.copy()
+    constrained_graph.remove_node("iterator")
+
+    constrained_graph.remove_edge("inner", "if")
+
+    assert (
+        graph_if_runtime._get_if_iteration_paths(
+            state,
+            "if",
+            set(),
+            lambda _source_id: set(),
+            lambda _edge, _prepared_id: (),
+            source_graph,
+        )
+        == []
+    )
+    assert graph_if_runtime._get_if_iteration_paths(
+        state,
+        "if",
+        set(),
+        lambda _source_id: set(),
+        lambda _edge, _prepared_id: (),
+        constrained_graph,
+    ) == [()]
+    prepared_id = state._materializer().prepare(constrained_graph)
+    assert prepared_id is not None and prepared_id != "if"
+    assert state.prepared_source_mapping[prepared_id] == "if"
