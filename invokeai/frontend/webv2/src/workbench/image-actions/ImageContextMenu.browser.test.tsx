@@ -67,6 +67,8 @@ const createActions = (deleteItems: ImageActions['deleteItems']): ImageActions =
   openImageInPreview: vi.fn(),
   recallImageData: vi.fn(() => Promise.resolve()),
   getVideoRecallCapabilities: vi.fn(() => Promise.resolve({ all: false, prompts: false, remix: false, seed: false })),
+  hasVideoWorkflow: vi.fn(() => Promise.resolve(false)),
+  loadVideoWorkflow: vi.fn(() => Promise.resolve()),
   recallVideoData: vi.fn(() => Promise.resolve()),
   selectForCompare: vi.fn(),
   sendToCanvas: vi.fn(() => Promise.resolve()),
@@ -444,6 +446,27 @@ describe('ImageContextMenu video placement', () => {
 
     expect(getMenuItem('Use as Reference Video').getAttribute('aria-disabled')).toBe('true');
     expect(getMenuItem('Extend in Video').getAttribute('aria-disabled')).not.toBe('true');
+  });
+
+  it('enables Load Workflow once the video is known to embed one and hands the video to the action', async () => {
+    const video = item('video', 'made-by-workflow.mp4');
+    const actions = createActions(vi.fn());
+    actions.hasVideoWorkflow = vi.fn(() => Promise.resolve(true));
+    await renderVideoMenu(actions, video);
+
+    await vi.waitFor(() => expect(getMenuItem('Load Workflow').getAttribute('aria-disabled')).not.toBe('true'));
+    await interact(() => getMenuItem('Load Workflow').click());
+
+    expect(actions.loadVideoWorkflow).toHaveBeenCalledExactlyOnceWith(video);
+  });
+
+  it('keeps Load Workflow disabled for a video without one', async () => {
+    const actions = createActions(vi.fn());
+    await renderVideoMenu(actions, item('video', 'plain.mp4'));
+
+    await vi.waitFor(() => expect(actions.hasVideoWorkflow).toHaveBeenCalled());
+    expect(getMenuItem('Load Workflow').getAttribute('aria-disabled')).toBe('true');
+    expect(actions.loadVideoWorkflow).not.toHaveBeenCalled();
   });
 
   const openConditioningSubmenu = async (): Promise<void> => {

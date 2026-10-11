@@ -89,6 +89,7 @@ const implemented = new Set([
   'viewer.recallSeed',
   'viewer.remix',
   'viewer.swapImages',
+  'viewer.toggleMetadata',
   'viewer.useSize',
   'workflows.addNode',
   'workflows.copySelection',
