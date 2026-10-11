@@ -7,7 +7,7 @@ import {
   resolveReferenceCropDrag,
   type ReferenceCropConstraints,
   type ReferenceCropDragMode,
-} from './referenceImageCropGeometry';
+} from './referenceImage';
 
 const IMAGE = { height: 600, width: 800 };
 const constraints = (ratio: number | null, image = IMAGE): ReferenceCropConstraints => ({

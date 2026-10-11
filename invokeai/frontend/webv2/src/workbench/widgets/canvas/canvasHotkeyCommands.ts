@@ -47,13 +47,24 @@ const REORDER_KINDS: Record<string, LayerStackMoveKind> = {
   'canvas.layerToFront': 'front',
 };
 
-/** The layer `steps` away from the selection in layer order, wrapping; none selected starts from either end. */
+/**
+ * The layer `steps` away from the selection in layer order, wrapping. A selected group stands at its first
+ * descendant leaf: next enters the group there, previous leaves it upward. None selected starts from either end.
+ */
 const cycleLayerId = (document: CanvasDocumentContractV3, steps: 1 | -1): string | null => {
-  const { leaves } = getDocumentIndex(document);
+  const { byId, leaves } = getDocumentIndex(document);
   if (leaves.length === 0) {
     return null;
   }
-  const current = leaves.findIndex((leaf) => leaf.id === document.selectedLayerId);
+  const { selectedLayerId } = document;
+  const selected = selectedLayerId ? byId.get(selectedLayerId) : undefined;
+  if (selected && isGroupNode(selected.node)) {
+    const first = leaves.findIndex((leaf) => byId.get(leaf.id)?.path.includes(selected.node.id));
+    if (first >= 0) {
+      return leaves[steps === 1 ? first : (first - 1 + leaves.length) % leaves.length]!.id;
+    }
+  }
+  const current = leaves.findIndex((leaf) => leaf.id === selectedLayerId);
   if (current < 0) {
     return leaves[steps === 1 ? 0 : leaves.length - 1]!.id;
   }

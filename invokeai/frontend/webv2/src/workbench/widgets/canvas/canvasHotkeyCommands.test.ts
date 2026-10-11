@@ -184,6 +184,30 @@ describe('layer navigation without staging', () => {
     expect(dispatch).not.toHaveBeenCalled();
   });
 
+  it('enters a selected group at its first leaf and leaves it upward, skipping an empty group to the ends', () => {
+    const grouped = {
+      ...documentOf([], 'g'),
+      stacks: stacksFrom([
+        rasterLayer('a'),
+        groupContract('g', [rasterLayer('b'), rasterLayer('c')]),
+        rasterLayer('d'),
+      ]),
+    };
+    run('canvas.nextEntity', { document: grouped, selectedLayerIds: ['g'] });
+    expect(dispatch).toHaveBeenLastCalledWith(select('b'));
+    run('canvas.prevEntity', { document: grouped, selectedLayerIds: ['g'] });
+    expect(dispatch).toHaveBeenLastCalledWith(select('a'));
+
+    const empty = {
+      ...documentOf([], 'g'),
+      stacks: stacksFrom([rasterLayer('a'), groupContract('g'), rasterLayer('d')]),
+    };
+    run('canvas.nextEntity', { document: empty, selectedLayerIds: ['g'] });
+    expect(dispatch).toHaveBeenLastCalledWith(select('a'));
+    run('canvas.prevEntity', { document: empty, selectedLayerIds: ['g'] });
+    expect(dispatch).toHaveBeenLastCalledWith(select('d'));
+  });
+
   it('stays put on the only layer and while interaction is locked', () => {
     run('canvas.nextEntity', { document: documentOf([rasterLayer('a')], 'a') });
     run('canvas.prevEntity', { document: documentOf(layers, 'a'), isInteractionLocked: true });

@@ -5,23 +5,21 @@ import type { CSSProperties, PointerEvent, RefCallback } from 'react';
 import { Box, createListCollection, HStack, Portal, Spacer, Stack, Text } from '@chakra-ui/react';
 import { galleryTransfers } from '@features/gallery';
 import {
+  constrainReferenceCropBox,
   FULL_REFERENCE_IMAGE_CROP_BOX,
   generatedImageToReferenceImage,
   getReferenceImageCropBoxPct,
   isFullReferenceImageCropBox,
-  resolveReferenceImageCrop,
-  type ReferenceImageCropBoxPct,
-} from '@features/generation/core/referenceImage';
-import {
-  constrainReferenceCropBox,
   matchReferenceCropAspectRatio,
   REFERENCE_CROP_ASPECT_RATIOS,
   resolveReferenceCropDrag,
+  resolveReferenceImageCrop,
   type ReferenceCropAspectRatioId,
   type ReferenceCropDrag,
   type ReferenceCropDragMode,
   type ReferenceCropHandle,
-} from '@features/generation/core/referenceImageCropGeometry';
+  type ReferenceImageCropBoxPct,
+} from '@features/generation/core/referenceImage';
 import { getReferenceImageUrls } from '@features/generation/data/referenceImageUrls';
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import {
@@ -81,10 +79,18 @@ const isDragMode = (value: unknown): value is ReferenceCropDragMode =>
 const isAspectRatioId = (value: unknown): value is ReferenceCropAspectRatioId =>
   REFERENCE_CROP_ASPECT_RATIOS.some((preset) => preset.id === value);
 
-/** Space pans only when nothing that consumes Space has focus; those keep their own behaviour. */
+/** Space pans only when nothing that activates on Space has focus; buttons and fields keep their own behaviour. */
 const consumesSpace = (target: EventTarget | null): boolean =>
   target instanceof Element &&
-  target.closest('input, textarea, select, [contenteditable], [role="combobox"], [role="listbox"]') !== null;
+  target.closest(
+    'button, [role="button"], input, textarea, select, [contenteditable], [role="combobox"], [role="listbox"]'
+  ) !== null;
+
+/** A saved partial crop reopens on its preset; the full image opens free, so the first drag is unconstrained. */
+const initialAspectRatioId = (image: GenerateReferenceImageAsset): ReferenceCropAspectRatioId => {
+  const box = getReferenceImageCropBoxPct(image);
+  return isFullReferenceImageCropBox(box) ? 'free' : matchReferenceCropAspectRatio(box, image.original.image);
+};
 
 /** Pointer position as a percentage of the (transformed) stage, which holds the image at its on-screen size. */
 const getPointerPct = (event: PointerEvent, stage: HTMLElement): { x: number; y: number } => {
@@ -205,9 +211,7 @@ export const ReferenceImageCropDialog = ({
   const { gallery, notifications } = useGenerationUi();
   const original = image.original.image;
   const [cropBox, setCropBox] = useState<ReferenceImageCropBoxPct>(() => getReferenceImageCropBoxPct(image));
-  const [aspectRatioId, setAspectRatioId] = useState<ReferenceCropAspectRatioId>(() =>
-    matchReferenceCropAspectRatio(getReferenceImageCropBoxPct(image), original)
-  );
+  const [aspectRatioId, setAspectRatioId] = useState<ReferenceCropAspectRatioId>(() => initialAspectRatioId(image));
   const [view, setView] = useState<CropView>(FIT_VIEW);
   const [panState, setPanState] = useState<PanState>('idle');
   const [isApplying, setIsApplying] = useState(false);
@@ -462,8 +466,8 @@ export const ReferenceImageCropDialog = ({
     }
   }, [close, cropBox, gallery, image, notifications, onApply, onClose]);
 
-  // A durable copy of the crop in Uploads, unrelated to applying it: the dialog stays open and the reference
-  // unchanged.
+  // A durable copy of the crop in Uploads on the Gallery's auto-add board, unrelated to applying it: the dialog
+  // stays open and the reference unchanged.
   const saveToAssets = useCallback(async () => {
     const owner = captureAccountScope();
     setIsSaving(true);
@@ -471,7 +475,7 @@ export const ReferenceImageCropDialog = ({
     try {
       const file = await exportCroppedReferenceImage(image, cropBox, owner);
       assertAccountScopeCurrent(owner);
-      await galleryTransfers.upload(file, 'none', { isIntermediate: false, signal: owner.signal });
+      await galleryTransfers.upload(file, gallery.uploadBoardId, { isIntermediate: false, signal: owner.signal });
       assertAccountScopeCurrent(owner);
       gallery.touchImages();
       notifications.info(t('widgets.generate.cropSavedToAssets'));
@@ -516,11 +520,11 @@ export const ReferenceImageCropDialog = ({
             <Dialog.Body>
               <Stack gap="3">
                 <HStack gap="2">
-                  <Text as="label" color="fg.muted" fontSize="sm" id="reference-crop-aspect-ratio-label">
+                  <Text color="fg.muted" fontSize="sm">
                     {t('widgets.generate.aspectRatio')}
                   </Text>
                   <Select
-                    aria-labelledby="reference-crop-aspect-ratio-label"
+                    aria-label={t('widgets.generate.aspectRatio')}
                     collection={aspectRatioCollection}
                     disabled={isBusy}
                     size="sm"
