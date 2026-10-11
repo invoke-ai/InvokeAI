@@ -200,7 +200,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     variant_type_adapter,
 )
-from invokeai.backend.quantization.gguf.loaders import parse_q8_cr_markers
+from invokeai.backend.quantization.gguf.loaders import parse_gguf_convrot_markers
 
 logger = logging.getLogger(__name__)
 
@@ -674,12 +674,15 @@ class ModelConfigFactory:
         if getattr(config, "format", None) is not ModelFormat.GGUFQuantized:
             return
         try:
-            markers = parse_q8_cr_markers(mod.metadata(), mod.path.name)
+            markers = parse_gguf_convrot_markers(mod.metadata(), mod.path.name)
         except ValueError as e:
             raise InvalidMatchError(str(e)) from None
-        if markers and not type(config).DECODES_GGUF_Q8_CR:
+        undecodable = sorted({m["format"] for m in markers.values()} - type(config).DECODES_GGUF_CONVROT)
+        if undecodable:
+            names = {"int8_tensorwise": "Q8_CR", "int4_tensorwise": "Q4_CR"}
+            kinds = " and ".join(names.get(fmt, fmt) for fmt in undecodable)
             raise InvalidMatchError(
-                f"{mod.path.name} is a ComfyUI-GGUF Q8_CR (int8 convrot) file, which this model type cannot load "
+                f"{mod.path.name} is a ComfyUI-GGUF convrot ({kinds}) file, which this model type cannot load "
                 "yet. Use a GGML-quantized (Q8_0, Q4_K, ...) or safetensors build instead."
             )
 
