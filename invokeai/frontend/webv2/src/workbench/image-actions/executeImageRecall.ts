@@ -287,7 +287,8 @@ export const executeImageRecall = async ({
       return false;
     }
 
-    if (result.fields.includes('referenceImages')) {
+    // An empty recalled list clears the current references; there is nothing to check for it.
+    if (result.fields.includes('referenceImages') && result.values.referenceImages.length > 0) {
       result.values.referenceImages = await filterAvailableReferenceImages(result.values.referenceImages, owner.signal);
       assertAccountScopeCurrent(owner);
 
