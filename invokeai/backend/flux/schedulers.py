@@ -50,24 +50,22 @@ def set_heun_timesteps_from_sigmas(
     terminal_sigma: float,
     device: str | torch.device | None,
 ) -> None:
-    """Set the pinned Diffusers Heun layout from InvokeAI's shifted model sigmas."""
+    """Set Diffusers 0.41.0's Heun layout from InvokeAI's shifted model sigmas."""
     if not sigmas:
         raise ValueError("At least one model-evaluation sigma is required")
 
-    # Diffusers 0.40.0 evaluates the first sigma once, later sigmas twice, then
-    # uses one terminal interval without a second-order evaluation.
+    # In Diffusers 0.41.0, set_timesteps() creates a schedule with the first
+    # sigma evaluated once and every later sigma twice. The final interval ends
+    # at the terminal sigma and has no second-order evaluation.
+    scheduler.set_timesteps(num_inference_steps=len(sigmas), device=device)
     model_sigmas = torch.tensor(sigmas, dtype=torch.float32, device=device)
     expanded_sigmas = torch.cat((model_sigmas[:1], model_sigmas[1:].repeat_interleave(2)))
-    scheduler.num_inference_steps = len(sigmas)
     scheduler.timesteps = expanded_sigmas * scheduler.config.num_train_timesteps
     scheduler.sigmas = torch.cat((expanded_sigmas, model_sigmas.new_tensor([terminal_sigma])))
 
-    # Reset the state used by Diffusers step() and state_in_first_order.
-    scheduler.prev_derivative = None
-    scheduler.dt = None
+    # set_timesteps() resets derivative, timestep-index and begin-index state.
+    # It does not clear the stored sample when reusing an interrupted scheduler.
     scheduler.sample = None
-    scheduler._step_index = None
-    scheduler._begin_index = None
 
 
 def is_flow_match_lcm_scheduler(scheduler: SchedulerMixin) -> bool:

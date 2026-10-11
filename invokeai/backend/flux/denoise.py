@@ -1,4 +1,3 @@
-import inspect
 import math
 from typing import Callable
 
@@ -53,30 +52,26 @@ def denoise(
 
     # Initialize scheduler with timesteps
     # The timesteps list contains values in [0, 1] range (sigmas)
-    # LCM should use num_inference_steps (it has its own sigma schedule),
-    # while other schedulers can use custom sigmas if supported
-    is_lcm = is_flow_match_lcm_scheduler(scheduler)
-    set_timesteps_sig = inspect.signature(scheduler.set_timesteps)
+    # Euler and Heun use InvokeAI's custom sigmas; LCM owns its schedule.
     if isinstance(scheduler, FlowMatchHeunDiscreteScheduler):
         set_heun_timesteps_from_sigmas(scheduler, timesteps[:-1], timesteps[-1], img.device)
-    elif not is_lcm and "sigmas" in set_timesteps_sig.parameters:
+    elif isinstance(scheduler, FlowMatchEulerDiscreteScheduler):
         # InvokeAI supplies model-evaluation sigmas plus its requested terminal endpoint.
         scheduler.set_timesteps(sigmas=timesteps[:-1], device=img.device)
-        if hasattr(scheduler, "sigmas"):
-            scheduler.sigmas[-1] = torch.as_tensor(
-                timesteps[-1], dtype=scheduler.sigmas.dtype, device=scheduler.sigmas.device
-            )
-    else:
-        # LCM or scheduler doesn't support custom sigmas - use num_inference_steps
-        # The schedule will be computed by the scheduler itself. For LCM,
-        # clipping controls the requested step count but not exact start/end
-        # sigmas; keep that scheduler-defined behavior intact.
+        scheduler.sigmas[-1] = torch.as_tensor(
+            timesteps[-1], dtype=scheduler.sigmas.dtype, device=scheduler.sigmas.device
+        )
+    elif is_flow_match_lcm_scheduler(scheduler):
+        # LCM owns its schedule; clipping controls the requested evaluation count,
+        # while its exact start/end sigmas remain scheduler-defined.
         #
         # Important for img2img callers: if the initial latent/noise blend was
         # computed from a separate pre-scheduler schedule, that preblend may not
         # match this scheduler's true first step exactly.
         num_inference_steps = len(timesteps) - 1
         scheduler.set_timesteps(num_inference_steps=num_inference_steps, device=img.device)
+    else:
+        raise TypeError(f"Unsupported FLUX scheduler: {type(scheduler).__name__}")
 
     # For schedulers like Heun, the number of actual steps may differ
     # (Heun doubles timesteps internally)
@@ -123,7 +118,7 @@ def denoise(
                 )
 
             # For Heun scheduler, track if we're in first or second order step
-            is_heun = hasattr(scheduler, "state_in_first_order")
+            is_heun = isinstance(scheduler, FlowMatchHeunDiscreteScheduler)
             in_first_order = scheduler.state_in_first_order if is_heun else True
 
             # Run ControlNet models
@@ -190,6 +185,8 @@ def denoise(
                     neg_img_input = torch.cat((neg_img_input, img_cond), dim=-1)
 
                 if img_cond_seq is not None:
+                    # Keep positive and negative spatial contexts aligned for Kontext; omitting
+                    # reference tokens from the negative pass creates visible artifacts.
                     neg_img_input = torch.cat((neg_img_input, img_cond_seq), dim=1)
                     neg_img_input_ids = torch.cat((neg_img_input_ids, img_cond_seq_ids), dim=1)
 
@@ -249,7 +246,9 @@ def denoise(
                         step_callback(
                             PipelineIntermediateState(
                                 step=user_step,
-                                order=2 if not in_first_order else 1,
+                                # This callback aggregates a completed user-facing interval; its
+                                # order is progress semantics, not the solver's internal order.
+                                order=1,
                                 total_steps=total_steps,
                                 timestep=int(t_curr * 1000),
                                 latents=preview_img,
