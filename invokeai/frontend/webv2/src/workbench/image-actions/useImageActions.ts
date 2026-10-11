@@ -63,8 +63,7 @@ import type { RequestDeletionConfirmation } from './useDeletionConfirmation';
 
 import { appendReferenceImage } from './appendReferenceImage';
 import { recordCanvasImportError } from './canvasImportError';
-import { executeImageRecall, getCurrentGenerateValues } from './executeImageRecall';
-import { executeLoadMediaWorkflow } from './executeLoadMediaWorkflow';
+import { executeImageRecall, executeLoadMediaWorkflow, getCurrentGenerateValues } from './executeImageRecall';
 import {
   appendReferenceVideo,
   executeVideoRecall,

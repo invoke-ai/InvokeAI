@@ -138,7 +138,7 @@ export const useRegisterFirstPartyCommands = () => {
   const loadSelectedItemWorkflow = async () => {
     const owner = captureAccountScope();
     const [{ executeLoadMediaWorkflow }, { getSelectedGalleryItem }] = await Promise.all([
-      import('@workbench/image-actions/executeLoadMediaWorkflow'),
+      import('@workbench/image-actions/executeImageRecall'),
       import('@workbench/image-actions/selectedImage'),
     ]);
 
