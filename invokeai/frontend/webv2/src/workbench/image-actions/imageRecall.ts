@@ -3,8 +3,8 @@ import type {
   ComponentModelConfig,
   GenerateLora,
   GenerateModelConfig,
+  GenerateReferenceImage,
   GenerateWidgetValues,
-  LoraModelConfig,
   MainModelConfig,
   VaeModelConfig,
 } from '@features/generation/contracts';
@@ -30,6 +30,7 @@ import {
   isVaeCompatibleWithGenerateModel,
   isValidKrea2RebalanceWeights,
   MAX_HIDIFFUSION_RATIO,
+  MAX_KREA2_SEED_VARIANCE_STRENGTH,
   MIN_HIDIFFUSION_T1_RATIO,
   normalizeReferenceImages,
 } from '@features/generation/settings';
@@ -73,7 +74,8 @@ type RecalledField =
   | 'components'
   | 'loras'
   | 'referenceImages'
-  | 'krea2Rebalance';
+  | 'krea2Rebalance'
+  | 'krea2SeedVariance';
 
 export type ImageRecallSkipReason =
   | 'ambiguous'
@@ -182,10 +184,18 @@ export const getSteps = (metadata: unknown): number | null => {
   return steps !== null && steps >= 1 ? steps : null;
 };
 
-export const getCfgScale = (metadata: unknown): number | null => {
-  const cfgScale = getNumber(metadata, 'cfg_scale');
+/**
+ * The value the model's single guidance slider holds. Distilled-guidance families record it as `guidance` and
+ * their older records carry no `cfg_scale` at all, so for them the dedicated key wins.
+ */
+export const getCfgScale = (metadata: unknown, model?: GenerateModelConfig): number | null => {
+  const { guidanceLabel, guidanceMin } = getGenerationUiPolicy(model);
+  const cfgScale =
+    guidanceLabel === 'Guidance'
+      ? (getNumber(metadata, 'guidance') ?? getNumber(metadata, 'cfg_scale'))
+      : getNumber(metadata, 'cfg_scale');
 
-  return cfgScale !== null && cfgScale >= 1 ? cfgScale : null;
+  return cfgScale !== null && cfgScale >= guidanceMin ? cfgScale : null;
 };
 
 export const getCfgRescaleMultiplier = (metadata: unknown): number | null => {
@@ -282,20 +292,18 @@ export const getMetadataSize = (
   };
 };
 
-const getMetadataModelKey = (metadata: unknown, key: 'model' | 'vae'): string | null => {
-  const model = getRecord(metadata, key);
+/** The installed model a recorded reference names, or null when none (or more than one) does. */
+const resolveMetadataModel = <T extends ComponentModelConfig>(value: unknown, models: readonly T[]): T | null => {
+  const ref = toRecordedModelRef(value);
+  const resolved = ref ? resolveRecordedModel(ref, models) : null;
 
-  return typeof model?.key === 'string' ? model.key : null;
+  return resolved === 'ambiguous' ? null : resolved;
 };
 
 const getSupportedMetadataModel = (
   metadata: unknown,
   supportedModels: GenerateModelConfig[]
-): GenerateModelConfig | null => {
-  const modelKey = getMetadataModelKey(metadata, 'model');
-
-  return modelKey ? (supportedModels.find((model) => model.key === modelKey) ?? null) : null;
-};
+): GenerateModelConfig | null => resolveMetadataModel(getRecord(metadata, 'model'), supportedModels);
 
 const getModelFromMetadata = <T extends ComponentModelConfig>(
   metadata: unknown,
@@ -311,13 +319,7 @@ const getModelFromMetadata = <T extends ComponentModelConfig>(
     return null;
   }
 
-  const modelKey = getMetadataModelKey(metadata, key as 'model' | 'vae');
-
-  if (!modelKey) {
-    return undefined;
-  }
-
-  const model = models.find((candidate) => candidate.key === modelKey);
+  const model = resolveMetadataModel(metadata[key], models);
 
   return guard(model) ? model : undefined;
 };
@@ -347,13 +349,7 @@ const getMetadataVae = (
     return null;
   }
 
-  const vaeKey = getMetadataModelKey(metadata, 'vae');
-
-  if (!vaeKey) {
-    return undefined;
-  }
-
-  const vae = vaeModels.find((vae) => vae.key === vaeKey);
+  const vae = resolveMetadataModel(metadata.vae, vaeModels);
 
   return vae && isVaeCompatibleWithGenerateModel(model, vae) ? vae : undefined;
 };
@@ -388,9 +384,9 @@ export const getMetadataPrompts = (metadata: unknown): { negativePrompt: string;
 const hasMetadataSize = (metadata: unknown, model: GenerateModelConfig): boolean =>
   Object.keys(getMetadataSize(metadata, model)).length > 0;
 
-const hasGenerationSettings = (metadata: unknown): boolean =>
+const hasGenerationSettings = (metadata: unknown, model: GenerateModelConfig): boolean =>
   getSteps(metadata) !== null ||
-  getCfgScale(metadata) !== null ||
+  getCfgScale(metadata, model) !== null ||
   getCfgRescaleMultiplier(metadata) !== null ||
   getScheduler(metadata) !== null ||
   getBoolean(metadata, 'seamless_x') !== null ||
@@ -418,6 +414,33 @@ const getMetadataKrea2Rebalance = (
 
 const hasKrea2Rebalance = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
   Object.keys(getMetadataKrea2Rebalance(metadata, model)).length > 0;
+
+/** Bounds match the enhancer's own controls; a value outside them keeps the current setting. */
+const getMetadataKrea2SeedVariance = (
+  metadata: unknown,
+  model: GenerateModelConfig | undefined
+): Partial<GenerateWidgetValues> => {
+  if (model?.base !== 'krea-2') {
+    return {};
+  }
+
+  const enabled = getBoolean(metadata, 'krea2_seed_variance_enabled');
+  const strength = getNumber(metadata, 'krea2_seed_variance_strength');
+  const randomizePercent = getNumber(metadata, 'krea2_seed_variance_randomize_percent');
+
+  return {
+    ...(enabled === null ? {} : { krea2SeedVarianceEnabled: enabled }),
+    ...(strength !== null && strength >= 0 && strength <= MAX_KREA2_SEED_VARIANCE_STRENGTH
+      ? { krea2SeedVarianceStrength: strength }
+      : {}),
+    ...(randomizePercent !== null && randomizePercent >= 0 && randomizePercent <= 100
+      ? { krea2SeedVarianceRandomizePercent: randomizePercent }
+      : {}),
+  };
+};
+
+const hasKrea2SeedVariance = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
+  Object.keys(getMetadataKrea2SeedVariance(metadata, model)).length > 0;
 
 type RecalledComponentSetting = keyof Pick<
   GenerateWidgetValues,
@@ -495,12 +518,16 @@ const getComponentPatch = (
 const hasComponentModels = (metadata: unknown, models: readonly ComponentModelConfig[]): boolean =>
   Object.keys(getComponentPatch(metadata, models)).length > 0;
 
-/** A recorded `ModelIdentifierField` — `{ key, hash, name, base }` — with every field optional on read. */
+/**
+ * A recorded `ModelIdentifierField` — `{ key, hash, name, base, type }` — with every field optional on read. Records
+ * from before identifier fields named the model as `{ model_name, base_model, model_type }`.
+ */
 interface RecordedModelRef {
   base: string | null;
   hash: string | null;
   key: string | null;
   name: string | null;
+  type: string | null;
 }
 
 const toRecordedModelRef = (value: unknown): RecordedModelRef | null => {
@@ -509,10 +536,11 @@ const toRecordedModelRef = (value: unknown): RecordedModelRef | null => {
   }
 
   const ref = {
-    base: getString(value, 'base'),
+    base: getString(value, 'base') ?? getString(value, 'base_model'),
     hash: getString(value, 'hash'),
     key: getString(value, 'key'),
-    name: getString(value, 'name'),
+    name: getString(value, 'name') ?? getString(value, 'model_name'),
+    type: getString(value, 'type') ?? getString(value, 'model_type'),
   };
 
   return ref.key || ref.hash || (ref.name && ref.base) ? ref : null;
@@ -520,23 +548,25 @@ const toRecordedModelRef = (value: unknown): RecordedModelRef | null => {
 
 /**
  * Resolve the install-local key first, then a portable identifier: the content hash when one was recorded, otherwise
- * name and base. A recorded hash never falls back to a same-named file, and a portable identifier counts only when
- * exactly one installed LoRA matches it.
+ * name and base (and type, when recorded). A recorded hash never falls back to a same-named file, and a portable
+ * identifier counts only when exactly one installed model matches it.
  */
-const resolveRecordedLora = (
+const resolveRecordedModel = <T extends ComponentModelConfig>(
   ref: RecordedModelRef,
-  loraModels: readonly LoraModelConfig[]
-): LoraModelConfig | 'ambiguous' | null => {
-  const byKey = ref.key ? loraModels.find((model) => model.key === ref.key) : undefined;
+  models: readonly T[]
+): T | 'ambiguous' | null => {
+  const byKey = ref.key ? models.find((model) => model.key === ref.key) : undefined;
 
   if (byKey) {
     return byKey;
   }
 
   const matches = ref.hash
-    ? loraModels.filter((model) => model.hash === ref.hash)
+    ? models.filter((model) => model.hash === ref.hash)
     : ref.name && ref.base
-      ? loraModels.filter((model) => model.name === ref.name && model.base === ref.base)
+      ? models.filter(
+          (model) => model.name === ref.name && model.base === ref.base && (!ref.type || model.type === ref.type)
+        )
       : [];
 
   return matches.length > 1 ? 'ambiguous' : (matches[0] ?? null);
@@ -605,7 +635,7 @@ const getMetadataConcepts = (
       continue;
     }
 
-    const installed = resolveRecordedLora(ref, loraModels);
+    const installed = resolveRecordedModel(ref, loraModels);
 
     if (installed === null || installed === 'ambiguous') {
       skipped.push({ name: recordedName, reason: installed === 'ambiguous' ? 'ambiguous' : 'unresolved' });
@@ -622,8 +652,16 @@ const getMetadataConcepts = (
   return { loras, skipped };
 };
 
-export const getMetadataReferenceImages = (metadata: unknown) => {
+/**
+ * The references the image was generated with, or null when the record says nothing about them. An explicitly
+ * empty modern list means it used none; only a list with no usable entry falls back to the pre-v6 canvas slot.
+ */
+export const getMetadataReferenceImages = (metadata: unknown): GenerateReferenceImage[] | null => {
   if (!isRecord(metadata)) {
+    return null;
+  }
+
+  if (Array.isArray(metadata.ref_images) && metadata.ref_images.length === 0) {
     return [];
   }
 
@@ -638,16 +676,18 @@ export const getMetadataReferenceImages = (metadata: unknown) => {
   const referenceImages = getRecord(canvasMetadata, 'referenceImages');
   const legacyEntities = referenceImages?.entities;
   if (!Array.isArray(legacyEntities)) {
-    return [];
+    return null;
   }
 
-  return normalizeReferenceImages(
+  const legacy = normalizeReferenceImages(
     legacyEntities.map((entry) =>
       isRecord(entry) && isRecord(entry.ipAdapter)
         ? { config: entry.ipAdapter, id: entry.id, isEnabled: entry.isEnabled }
         : entry
     )
   ).filter((referenceImage) => referenceImage.config.image !== null);
+
+  return legacy.length > 0 ? legacy : null;
 };
 
 export const withDimensions = (
@@ -702,11 +742,14 @@ export const getImageRecallCapabilities = ({
   const hasSeed = getSeed(metadata) !== null;
   const hasPrompts = hasPrompt(metadata);
   const hasSize = hasMetadataSize(metadata, currentValues.model);
-  const hasSettings = hasGenerationSettings(metadata);
+  const hasSettings = hasGenerationSettings(metadata, clipSkipModel);
   const hasComponents = hasComponentModels(metadata, models);
-  const hasReferenceImages = getMetadataReferenceImages(metadata).length > 0;
+  const recordedReferenceImages = getMetadataReferenceImages(metadata);
+  const hasReferenceImages =
+    recordedReferenceImages !== null &&
+    (recordedReferenceImages.length > 0 || currentValues.referenceImages.length > 0);
   const hasModel = supportedMetadataModel !== null;
-  const hasRebalance = hasKrea2Rebalance(metadata, clipSkipModel);
+  const hasRebalance = hasKrea2Rebalance(metadata, clipSkipModel) || hasKrea2SeedVariance(metadata, clipSkipModel);
   const hasConcepts =
     (getMetadataConcepts(metadata, models, clipSkipModel, supportedMetadataModel).loras?.length ?? 0) > 0;
   const hasAnyMetadata =
@@ -803,6 +846,13 @@ export const buildImageRecallSettings = ({
       fields.push('krea2Rebalance');
     }
 
+    const seedVariancePatch = getMetadataKrea2SeedVariance(metadata, values.model);
+
+    if (Object.keys(seedVariancePatch).length > 0) {
+      values = { ...values, ...seedVariancePatch };
+      fields.push('krea2SeedVariance');
+    }
+
     const vae = getMetadataVae(metadata, values.model, vaeModels);
 
     if (vae !== undefined) {
@@ -835,9 +885,11 @@ export const buildImageRecallSettings = ({
     // Recalled reference images must fit the effective model — when the
     // metadata model was not recalled (e.g. uninstalled), `values.model` is
     // still the current one and incompatible configs are re-targeted or dropped.
-    const referenceImages = getCompatibleReferenceImages(getMetadataReferenceImages(metadata), values.model, models);
+    const recordedReferenceImages = getMetadataReferenceImages(metadata);
+    const referenceImages = getCompatibleReferenceImages(recordedReferenceImages ?? [], values.model, models);
 
-    if (referenceImages.length > 0) {
+    // A record of no references clears the current ones; a record whose references do not fit leaves them.
+    if (referenceImages.length > 0 || (recordedReferenceImages?.length === 0 && values.referenceImages.length > 0)) {
       values = { ...values, referenceImages };
       fields.push('referenceImages');
     }
@@ -879,7 +931,7 @@ export const buildImageRecallSettings = ({
 
   if (kind === 'all' || kind === 'remix') {
     const steps = getSteps(metadata);
-    const cfgScale = getCfgScale(metadata);
+    const cfgScale = getCfgScale(metadata, values.model);
     const cfgRescaleMultiplier = getCfgRescaleMultiplier(metadata);
     const scheduler = getScheduler(metadata);
     const seamlessXAxis = getBoolean(metadata, 'seamless_x');
