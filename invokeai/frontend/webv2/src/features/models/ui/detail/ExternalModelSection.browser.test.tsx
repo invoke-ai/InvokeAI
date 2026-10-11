@@ -19,6 +19,12 @@ const api = vi.hoisted(() => ({
     ])
   ),
   getModelsDir: vi.fn(() => Promise.resolve('')),
+  getStarterModels: vi.fn(() =>
+    Promise.resolve({
+      starter_bundles: {},
+      starter_models: [{ source: 'external://gemini/gemini-2.5-flash-image' }],
+    })
+  ),
   listMissingModels: vi.fn(() => Promise.resolve([])),
   listModels: vi.fn(() => Promise.resolve([])),
   updateModel: vi.fn(),
@@ -44,6 +50,7 @@ const gptImage: ExternalModelSettingsModel = {
   name: 'GPT Image 1',
   provider_id: 'openai',
   provider_model_id: 'gpt-image-1',
+  source: 'external://openai/gpt-image-1',
   type: 'external_image_generator',
 };
 
@@ -60,6 +67,7 @@ describe('ExternalModelSection', () => {
   const onError = vi.fn();
   const onSaved = vi.fn();
 
+  // The editor is read-only until the starter catalog has answered, so every render waits for it.
   const render = async (model: ExternalModelSettingsModel) => {
     await act(() => {
       root.render(
@@ -68,6 +76,7 @@ describe('ExternalModelSection', () => {
         </ChakraProvider>
       );
     });
+    await settle();
   };
 
   const input = (label: string) => host.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!;
@@ -216,6 +225,37 @@ describe('ExternalModelSection', () => {
     expect(providerInput.value).toBe('openai');
     await type(providerInput, 'seedream');
     expect(getModelDraft('gpt-image-1')?.external?.fields).toEqual({ providerId: 'seedream' });
+  });
+
+  it('shows a starter-managed record read-only and saves only its routing ids', async () => {
+    const geminiFlash: ExternalModelSettingsModel = {
+      ...gptImage,
+      capabilities: { max_images_per_request: 1, modes: ['txt2img'], supports_reference_images: true },
+      key: 'gemini-flash',
+      provider_id: 'gemini',
+      provider_model_id: 'gemini-2.5-flash-image',
+      source: 'external://gemini/gemini-2.5-flash-image',
+    };
+    api.updateModel.mockImplementation((_key: string, changes: Record<string, unknown>) =>
+      Promise.resolve({ ...geminiFlash, ...changes })
+    );
+    await render(geminiFlash);
+
+    expect(host.querySelector('[role="note"]')?.textContent).toBe('models.externalFields.starterManaged');
+    expect(host.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
+    expect(host.querySelector('input[aria-label="models.externalFields.maxImagesPerRequest"]')).toBeNull();
+    expect(host.textContent).toContain('models.externalModes.txt2img');
+    expect(host.textContent).toContain('1024');
+
+    await type(host.querySelector<HTMLInputElement>('input[value="gemini-2.5-flash-image"]')!, 'gemini-3-pro');
+    await click(button('models.saveExternalSettings'));
+
+    expect(api.updateModel).toHaveBeenCalledWith(
+      'gemini-flash',
+      { provider_id: 'gemini', provider_model_id: 'gemini-3-pro' },
+      expect.anything()
+    );
+    expect(onSaved).toHaveBeenCalledOnce();
   });
 
   it('surfaces a failed save and keeps the edits for another attempt', async () => {

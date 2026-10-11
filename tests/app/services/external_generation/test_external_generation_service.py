@@ -228,55 +228,6 @@ def test_generate_happy_path() -> None:
     assert provider.last_request == request
 
 
-class _RecordStore:
-    def __init__(self, record: ExternalApiModelConfig) -> None:
-        self._record = record
-
-    def get_model(self, key: str) -> ExternalApiModelConfig:
-        assert key == self._record.key
-        return self._record
-
-
-def _gemini_record(capabilities: ExternalModelCapabilities) -> ExternalApiModelConfig:
-    return ExternalApiModelConfig(
-        key="gemini_flash",
-        name="Gemini Flash",
-        provider_id="gemini",
-        provider_model_id="gemini-2.5-flash-image",
-        capabilities=capabilities,
-    )
-
-
-def test_generate_fills_an_unset_starter_record_from_its_definition() -> None:
-    starter = next(model for model in STARTER_MODELS if model.source == "external://gemini/gemini-2.5-flash-image")
-    record = _gemini_record(ExternalModelCapabilities())
-    provider = DummyProvider("gemini", configured=True, result=ExternalGenerationResult(images=[]))
-    service = ExternalGenerationService(
-        {"gemini": provider}, logging.getLogger("test"), record_store=_RecordStore(record)
-    )
-
-    service.generate(_build_request(model=record))
-
-    assert provider.last_request is not None
-    assert provider.last_request.model.capabilities == starter.capabilities
-    assert provider.last_request.model.default_settings == starter.default_settings
-
-
-def test_generate_honours_a_starter_record_edited_past_its_definition() -> None:
-    # The shipped definition is txt2img only; the record was edited to allow img2img.
-    record = _gemini_record(ExternalModelCapabilities(modes=["txt2img", "img2img"], supports_seed=True))
-    provider = DummyProvider("gemini", configured=True, result=ExternalGenerationResult(images=[]))
-    service = ExternalGenerationService(
-        {"gemini": provider}, logging.getLogger("test"), record_store=_RecordStore(record)
-    )
-
-    service.generate(_build_request(model=record, mode="img2img", init_image=_make_image()))
-
-    assert provider.last_request is not None
-    assert provider.last_request.model.capabilities.modes == ["txt2img", "img2img"]
-    assert provider.last_request.model.capabilities.allowed_aspect_ratios is None
-
-
 def test_generate_resizes_inpaint_result_to_original_init_size() -> None:
     model = _build_model(ExternalModelCapabilities(modes=["inpaint"]))
     request = _build_request(

@@ -26,8 +26,8 @@ from invokeai.app.services.external_generation.external_generation_common import
     ExternalGenerationResult,
     ExternalProviderStatus,
 )
-from invokeai.app.services.external_generation.starter_overrides import apply_external_starter_overrides
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig, ExternalImageSize
+from invokeai.backend.model_manager.starter_models import STARTER_MODELS
 
 if TYPE_CHECKING:
     from invokeai.app.services.model_records import ModelRecordServiceBase
@@ -188,7 +188,7 @@ class ExternalGenerationService(ExternalGenerationServiceBase):
         if record.provider_model_id != request.model.provider_model_id:
             return request
 
-        record = apply_external_starter_overrides(record)
+        record = _apply_starter_overrides(record)
 
         if record == request.model:
             return request
@@ -402,3 +402,18 @@ def _resize_result_images(result: ExternalGenerationResult, width: int, height: 
         provider_metadata=result.provider_metadata,
         content_filters=result.content_filters,
     )
+
+
+def _apply_starter_overrides(model: ExternalApiModelConfig) -> ExternalApiModelConfig:
+    source = model.source or f"external://{model.provider_id}/{model.provider_model_id}"
+    starter_match = next((starter for starter in STARTER_MODELS if starter.source == source), None)
+    if starter_match is None:
+        return model
+    updates: dict[str, object] = {}
+    if starter_match.capabilities is not None:
+        updates["capabilities"] = starter_match.capabilities
+    if starter_match.default_settings is not None:
+        updates["default_settings"] = starter_match.default_settings
+    if not updates:
+        return model
+    return model.model_copy(update=updates)

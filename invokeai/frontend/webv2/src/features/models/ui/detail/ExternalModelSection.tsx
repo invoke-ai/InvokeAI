@@ -14,8 +14,10 @@ import {
   Text,
 } from '@chakra-ui/react';
 import {
+  isStarterManagedExternalModel,
   toExternalModelChanges,
   toExternalModelValues,
+  toExternalProviderChanges,
   validateExternalModel,
 } from '@features/models/core/externalModelFields';
 import { updateModel } from '@features/models/data/api';
@@ -24,6 +26,7 @@ import {
   useExternalProvidersSelector,
 } from '@features/models/data/externalProvidersStore';
 import { replaceModelInStore } from '@features/models/data/modelsStore';
+import { ensureStartersLoaded, useStartersSelector } from '@features/models/data/startersStore';
 import {
   applyModelDraftFields,
   beginModelDraftSave,
@@ -50,8 +53,10 @@ import { DraftConflictNotice, UnsavedChangesLabel } from './ModelDraftNotices';
 
 /**
  * Edits the hosted-provider record: which provider and model ID requests route to, the modes and inputs the model
- * advertises, its limits, and the size/count the provider is asked for by default. Unsaved values live in the
- * model's retained draft; `externalModelFields` owns the record mapping and validation.
+ * advertises, its limits, and the size/count the provider is asked for by default. A record the starter catalog
+ * manages shows its capabilities and defaults read-only, since the backend reapplies the catalog's on every
+ * response; its routing ids still persist. Unsaved values live in the model's retained draft; `externalModelFields`
+ * owns the record mapping and validation.
  */
 
 const selectExternalDraft = (draft: ModelDraft | undefined) => draft?.external;
@@ -87,6 +92,15 @@ const DEFAULT_FIELDS: readonly { key: OptionalNumberKey; labelKey: string }[] = 
   { key: 'defaultHeight', labelKey: 'models.externalFields.defaultHeight' },
   { key: 'defaultNumImages', labelKey: 'models.externalFields.defaultNumImages' },
 ];
+
+const ReadOnlyValue = ({ label, value }: { label: string; value: string }) => (
+  <Stack gap="0.5">
+    <Text color="fg.subtle" fontSize="xs" fontWeight="600" textTransform="uppercase">
+      {label}
+    </Text>
+    <Text fontSize="sm">{value}</Text>
+  </Stack>
+);
 
 const OptionalNumberField = ({
   disabled,
@@ -140,6 +154,12 @@ export const ExternalModelSection = ({
   const [error, setError] = useState<string | null>(null);
   const { run } = useScopedAction();
   const providerConfigs = useExternalProvidersSelector((snapshot) => snapshot.configs);
+  const starters = useStartersSelector((snapshot) => snapshot.response?.starter_models ?? null);
+  const startersStatus = useStartersSelector((snapshot) => snapshot.status);
+  // Read-only until the catalog says otherwise, so an edit never flips under the user; a catalog that cannot be
+  // loaded lets the editor through rather than locking custom records.
+  const isStarterManaged =
+    starters === null ? startersStatus !== 'error' : isStarterManagedExternalModel(model, starters);
   // The registered providers are what requests can route to; a record's own id stays offered even when it is not
   // among them, so an unknown provider reads as what it is rather than as nothing.
   const providerCollection = useMemo(
@@ -158,6 +178,7 @@ export const ExternalModelSection = ({
   const isDirty = hasDraftFields(draft);
 
   useMountEffect(() => {
+    ensureStartersLoaded();
     // The list is a convenience: while it is unavailable the provider stays a text field.
     ensureExternalProvidersLoaded().catch(() => {});
   });
@@ -188,7 +209,11 @@ export const ExternalModelSection = ({
           return;
         }
 
-        const updated = await updateModel(model.key, toExternalModelChanges(submitted, model), owner.signal);
+        const updated = await updateModel(
+          model.key,
+          isStarterManaged ? toExternalProviderChanges(submitted) : toExternalModelChanges(submitted, model),
+          owner.signal
+        );
 
         assertAccountScopeCurrent(owner);
         replaceModelInStore(updated);
@@ -276,59 +301,100 @@ export const ExternalModelSection = ({
           />
         </Field>
       </Grid>
-      <Panel gap="2" p="2.5" tone="surface">
-        <Text fontSize="xs" fontWeight="600" textTransform="uppercase">
-          {t('models.externalFields.supportedModes')}
-        </Text>
-        <HStack gap="4" wrap="wrap">
-          {MODE_FLAGS.map(({ key, labelKey }) => (
-            <Checkbox.Root
-              key={key}
-              checked={values[key]}
-              disabled={isSaving}
-              size="sm"
-              onCheckedChange={(event) => setField(key, event.checked === true)}
-            >
-              <Checkbox.HiddenInput />
-              <Checkbox.Control />
-              <Checkbox.Label fontSize="xs">{t(labelKey)}</Checkbox.Label>
-            </Checkbox.Root>
-          ))}
-        </HStack>
-        <Text color="fg.subtle" fontSize="xs">
-          {t('models.externalFields.supportedModesHelp')}
-        </Text>
-      </Panel>
-      <Grid gap="2.5" templateColumns="repeat(auto-fill, minmax(13rem, 1fr))">
-        {SUPPORT_FLAGS.map(({ key, labelKey }) => (
-          <Panel key={key} gap="2" p="2.5" tone="surface">
-            <HStack justify="space-between">
-              <Text fontSize="xs" fontWeight="600" textTransform="uppercase">
-                {t(labelKey)}
-              </Text>
-              <Switch.Root
-                checked={values[key]}
-                colorPalette="accent"
-                disabled={isSaving}
-                size="sm"
-                onCheckedChange={(event) => setField(key, event.checked)}
-              >
-                <Switch.HiddenInput />
-                <Switch.Control>
-                  <Switch.Thumb />
-                </Switch.Control>
-                <Switch.Label srOnly>{t(labelKey)}</Switch.Label>
-              </Switch.Root>
+      {isStarterManaged ? (
+        <Panel gap="2.5" p="2.5" tone="surface">
+          {starters === null ? null : (
+            <Text color="fg.muted" fontSize="xs" role="note">
+              {t('models.externalFields.starterManaged')}
+            </Text>
+          )}
+          <Grid gap="2.5" templateColumns="repeat(auto-fill, minmax(13rem, 1fr))">
+            <ReadOnlyValue
+              label={t('models.externalFields.supportedModes')}
+              value={MODE_FLAGS.filter(({ key }) => saved[key])
+                .map(({ labelKey }) => t(labelKey))
+                .join(', ')}
+            />
+            {SUPPORT_FLAGS.map(({ key, labelKey }) => (
+              <ReadOnlyValue
+                key={key}
+                label={t(labelKey)}
+                value={t(saved[key] ? 'models.externalFields.supported' : 'models.externalFields.notSupported')}
+              />
+            ))}
+            {LIMIT_FIELDS.map(({ key, labelKey }) => (
+              <ReadOnlyValue
+                key={key}
+                label={t(labelKey)}
+                value={saved[key] === null ? t('models.externalFields.unlimited') : String(saved[key])}
+              />
+            ))}
+            {DEFAULT_FIELDS.map(({ key, labelKey }) => (
+              <ReadOnlyValue
+                key={key}
+                label={t(labelKey)}
+                value={saved[key] === null ? t('models.externalFields.providerDefault') : String(saved[key])}
+              />
+            ))}
+          </Grid>
+        </Panel>
+      ) : (
+        <>
+          <Panel gap="2" p="2.5" tone="surface">
+            <Text fontSize="xs" fontWeight="600" textTransform="uppercase">
+              {t('models.externalFields.supportedModes')}
+            </Text>
+            <HStack gap="4" wrap="wrap">
+              {MODE_FLAGS.map(({ key, labelKey }) => (
+                <Checkbox.Root
+                  key={key}
+                  checked={values[key]}
+                  disabled={isSaving}
+                  size="sm"
+                  onCheckedChange={(event) => setField(key, event.checked === true)}
+                >
+                  <Checkbox.HiddenInput />
+                  <Checkbox.Control />
+                  <Checkbox.Label fontSize="xs">{t(labelKey)}</Checkbox.Label>
+                </Checkbox.Root>
+              ))}
             </HStack>
+            <Text color="fg.subtle" fontSize="xs">
+              {t('models.externalFields.supportedModesHelp')}
+            </Text>
           </Panel>
-        ))}
-      </Grid>
-      <Grid gap="2.5" templateColumns="repeat(auto-fill, minmax(13rem, 1fr))">
-        {LIMIT_FIELDS.map((field) => numberField(field, 'models.externalFields.unlimited'))}
-      </Grid>
-      <Grid gap="2.5" templateColumns="repeat(auto-fill, minmax(13rem, 1fr))">
-        {DEFAULT_FIELDS.map((field) => numberField(field, 'models.externalFields.providerDefault'))}
-      </Grid>
+          <Grid gap="2.5" templateColumns="repeat(auto-fill, minmax(13rem, 1fr))">
+            {SUPPORT_FLAGS.map(({ key, labelKey }) => (
+              <Panel key={key} gap="2" p="2.5" tone="surface">
+                <HStack justify="space-between">
+                  <Text fontSize="xs" fontWeight="600" textTransform="uppercase">
+                    {t(labelKey)}
+                  </Text>
+                  <Switch.Root
+                    checked={values[key]}
+                    colorPalette="accent"
+                    disabled={isSaving}
+                    size="sm"
+                    onCheckedChange={(event) => setField(key, event.checked)}
+                  >
+                    <Switch.HiddenInput />
+                    <Switch.Control>
+                      <Switch.Thumb />
+                    </Switch.Control>
+                    <Switch.Label srOnly>{t(labelKey)}</Switch.Label>
+                  </Switch.Root>
+                </HStack>
+              </Panel>
+            ))}
+          </Grid>
+          <Grid gap="2.5" templateColumns="repeat(auto-fill, minmax(13rem, 1fr))">
+            {LIMIT_FIELDS.map((field) => numberField(field, 'models.externalFields.unlimited'))}
+          </Grid>
+          <Grid gap="2.5" templateColumns="repeat(auto-fill, minmax(13rem, 1fr))">
+            {DEFAULT_FIELDS.map((field) => numberField(field, 'models.externalFields.providerDefault'))}
+          </Grid>
+        </>
+      )}
     </Stack>
   );
 };

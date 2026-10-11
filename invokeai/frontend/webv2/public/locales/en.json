@@ -1362,7 +1362,10 @@
       "defaultHeight": "Default height",
       "defaultNumImages": "Default image count",
       "unlimited": "No limit",
-      "providerDefault": "Provider default"
+      "providerDefault": "Provider default",
+      "supported": "Supported",
+      "notSupported": "Not supported",
+      "starterManaged": "Managed by the starter catalog; the provider IDs can still be edited."
     },
     "queueAttentionCount_one": "{{count}} needs attention",
     "queueAttentionCount_other": "{{count}} need attention",

@@ -1,15 +1,32 @@
 import type { ExternalModelFormValues } from './schemas';
-import type { ExternalModelCapabilities, ModelConfig, ModelRecordChanges } from './types';
+import type { ExternalModelCapabilities, ModelConfig, ModelRecordChanges, StarterModel } from './types';
 
 import { externalModelSchema } from './schemas';
 
 export type ExternalModelSettingsModel = Pick<
   ModelConfig,
-  'capabilities' | 'default_settings' | 'key' | 'name' | 'provider_id' | 'provider_model_id' | 'type'
+  'capabilities' | 'default_settings' | 'key' | 'name' | 'provider_id' | 'provider_model_id' | 'source' | 'type'
 >;
 
 export const supportsExternalModelSettings = (model: Pick<ModelConfig, 'type'>): boolean =>
   model.type === 'external_image_generator';
+
+/**
+ * Whether the starter catalog manages the record's capabilities and defaults: the backend overlays the catalog's
+ * values on every response for a record whose source names a starter, so editing them would not persist. Records
+ * without a source are matched by the source an external install would record.
+ */
+export const isStarterManagedExternalModel = (
+  model: Pick<ExternalModelSettingsModel, 'provider_id' | 'provider_model_id'> & { source?: string | null },
+  starters: readonly Pick<StarterModel, 'source'>[]
+): boolean => {
+  const source =
+    typeof model.source === 'string' && model.source !== ''
+      ? model.source
+      : `external://${model.provider_id ?? ''}/${model.provider_model_id ?? ''}`;
+
+  return starters.some((starter) => starter.source === source);
+};
 
 const toOptionalInteger = (value: number | null | undefined): number | null =>
   typeof value === 'number' && Number.isFinite(value) ? value : null;
@@ -74,6 +91,14 @@ export const toExternalModelChanges = (
     provider_model_id: values.providerModelId.trim(),
   };
 };
+
+/** The PATCH body for a starter-managed record: only the routing ids persist, so only they are sent. */
+export const toExternalProviderChanges = (
+  values: ExternalModelFormValues
+): Pick<ModelRecordChanges, 'provider_id' | 'provider_model_id'> => ({
+  provider_id: values.providerId.trim(),
+  provider_model_id: values.providerModelId.trim(),
+});
 
 /** The first schema message, like the other record editors' messages, so the UI shows it as is. */
 export const validateExternalModel = (values: ExternalModelFormValues): string | null => {

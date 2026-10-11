@@ -138,6 +138,7 @@ const selectExternalModel = (snapshot: ModelsSnapshot, modelKey: string): Extern
         name: model.name,
         provider_id: model.provider_id,
         provider_model_id: model.provider_model_id,
+        source: model.source,
         type: model.type,
       }
     : null;

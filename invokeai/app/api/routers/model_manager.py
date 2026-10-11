@@ -25,7 +25,6 @@ from typing_extensions import Annotated
 
 from invokeai.app.api.auth_dependencies import AdminUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.services.external_generation.starter_overrides import apply_external_starter_overrides
 from invokeai.app.services.model_images.model_images_common import (
     ModelImageFileDeleteException,
     ModelImageFileNotFoundException,
@@ -189,11 +188,26 @@ def add_cover_image_to_model_config(config: AnyModelConfig, dependencies: Type[A
 
 
 def apply_external_starter_model_overrides(config: AnyModelConfig) -> AnyModelConfig:
-    """Fill an installed external model config's unset fields from its starter definition."""
+    """Overlay starter-model metadata onto installed external model configs."""
     if not isinstance(config, ExternalApiModelConfig):
         return config
 
-    return apply_external_starter_overrides(config)
+    starter_match = next((starter for starter in STARTER_MODELS if starter.source == config.source), None)
+    if starter_match is None:
+        return config
+
+    model_updates: dict[str, object] = {}
+    if starter_match.capabilities is not None:
+        model_updates["capabilities"] = starter_match.capabilities
+    if starter_match.default_settings is not None:
+        model_updates["default_settings"] = starter_match.default_settings
+    if starter_match.panel_schema is not None:
+        model_updates["panel_schema"] = starter_match.panel_schema
+
+    if not model_updates:
+        return config
+
+    return config.model_copy(update=model_updates)
 
 
 def prepare_model_config_for_response(config: AnyModelConfig, dependencies: Type[ApiDependencies]) -> AnyModelConfig:

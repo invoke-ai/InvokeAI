@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import type { ExternalModelSettingsModel } from './externalModelFields';
 
-import { toExternalModelChanges, toExternalModelValues, validateExternalModel } from './externalModelFields';
+import {
+  isStarterManagedExternalModel,
+  toExternalModelChanges,
+  toExternalModelValues,
+  toExternalProviderChanges,
+  validateExternalModel,
+} from './externalModelFields';
 
 const geminiModel: ExternalModelSettingsModel = {
   capabilities: {
@@ -22,6 +28,7 @@ const geminiModel: ExternalModelSettingsModel = {
   name: 'Gemini 3 Pro',
   provider_id: 'gemini',
   provider_model_id: 'gemini-3-pro-image-preview',
+  source: 'external://gemini/gemini-3-pro-image-preview',
   type: 'external_image_generator',
 };
 
@@ -112,5 +119,38 @@ describe('external model record mapping', () => {
       'Images per request must be greater than 0.'
     );
     expect(validateExternalModel({ ...values, defaultWidth: 1024.5 })).toBe('Default width must be a whole number.');
+  });
+
+  it('recognises a record the starter catalog manages by its source, or by the source an install would record', () => {
+    const starters = [
+      { source: 'external://openai/gpt-image-1' },
+      { source: 'external://gemini/gemini-2.5-flash-image' },
+    ];
+
+    expect(
+      isStarterManagedExternalModel(
+        { provider_id: 'openai', provider_model_id: 'renamed', source: 'external://openai/gpt-image-1' },
+        starters
+      )
+    ).toBe(true);
+    expect(isStarterManagedExternalModel({ provider_id: 'openai', provider_model_id: 'gpt-image-1' }, starters)).toBe(
+      true
+    );
+    expect(
+      isStarterManagedExternalModel(
+        { provider_id: 'openai', provider_model_id: 'gpt-image-1', source: 'external://custom/gpt-image-1' },
+        starters
+      )
+    ).toBe(false);
+    expect(isStarterManagedExternalModel({ provider_id: 'custom', provider_model_id: 'mine' }, [])).toBe(false);
+  });
+
+  it('sends only the routing ids for a starter-managed record', () => {
+    const values = toExternalModelValues(geminiModel);
+
+    expect(toExternalProviderChanges({ ...values, providerId: ' gemini ', providerModelId: 'flash ' })).toEqual({
+      provider_id: 'gemini',
+      provider_model_id: 'flash',
+    });
   });
 });

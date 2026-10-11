@@ -194,54 +194,6 @@ def test_model_manager_gemini_starter_model_applies_reference_and_resolution_ove
     ]
 
 
-def test_model_manager_external_record_edits_win_over_starter_overrides(
-    monkeypatch: Any, client: TestClient, mm2_model_manager: Any, mm2_app_config: Any
-) -> None:
-    """A capability table or default settings the record sets are returned as stored, not the starter's."""
-    config = ExternalApiModelConfig(
-        key="external_gemini_edited",
-        name="Gemini Edited",
-        provider_id="gemini",
-        provider_model_id="gemini-3.1-flash-image-preview",
-        capabilities=ExternalModelCapabilities(modes=["txt2img"]),
-        source="external://gemini/gemini-3.1-flash-image-preview",
-    )
-    mm2_model_manager.store.add_model(config)
-
-    services = type("Services", (), {})()
-    services.model_manager = mm2_model_manager
-    services.model_images = DummyModelImages()
-    services.configuration = mm2_app_config
-    services.logger = logging.getLogger("test")
-
-    invoker = DummyInvoker(services)
-    monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))
-    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(invoker))
-
-    edited_capabilities = {"modes": ["txt2img", "img2img"], "max_reference_images": 3, "supports_seed": True}
-    edited_defaults = {"width": 2048, "height": 2048, "num_images": 1}
-    patch_response = client.patch(
-        "/api/v2/models/i/external_gemini_edited",
-        json={"capabilities": edited_capabilities, "default_settings": edited_defaults},
-    )
-
-    assert patch_response.status_code == 200
-    patched = patch_response.json()
-    assert patched["capabilities"]["modes"] == ["txt2img", "img2img"]
-    assert patched["capabilities"]["max_reference_images"] == 3
-    assert patched["capabilities"]["allowed_aspect_ratios"] is None
-    assert patched["default_settings"] == edited_defaults
-
-    get_response = client.get("/api/v2/models/i/external_gemini_edited")
-
-    assert get_response.status_code == 200
-    fetched = get_response.json()
-    assert fetched["capabilities"] == patched["capabilities"]
-    assert fetched["default_settings"] == edited_defaults
-    # Fields the record never set still follow the starter definition.
-    assert [control["name"] for control in fetched["panel_schema"]["prompts"]] == ["reference_images"]
-
-
 def _make_stats_services(ram_caches: dict) -> Any:
     class _Load:
         pass
