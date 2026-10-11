@@ -623,9 +623,14 @@ describe('generate PBR maps', () => {
 
   it('queues one pbr_maps graph into the project auto-add board, then refreshes the gallery when it completes', async () => {
     const settlement = createSettlement();
-    mocks.getProject.mockImplementation((id: string) =>
-      makeMockProject(id, { autoAddBoardId: 'board-materials', selectedBoardId: 'board-other' })
-    );
+    mocks.getSnapshot.mockImplementation(() => {
+      const project = makeMockProject('project-1', {
+        autoAddBoardId: 'board-materials',
+        selectedBoardId: 'board-other',
+      });
+
+      return { activeProject: project, projects: [project] };
+    });
     mocks.submitUtilityGraph.mockResolvedValueOnce({ itemIds: [41], origin: 'utility:1', settled: settlement.settled });
 
     await act(async () => {
@@ -634,6 +639,8 @@ describe('generate PBR maps', () => {
 
     expect(mocks.submitUtilityGraph).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
+        prepend: true,
+        signal: expect.any(AbortSignal),
         graph: expect.objectContaining({
           nodes: {
             pbr_maps: expect.objectContaining({
@@ -663,7 +670,11 @@ describe('generate PBR maps', () => {
   });
 
   it('leaves the maps Uncategorized while the gallery follows no board', async () => {
-    mocks.getProject.mockImplementation((id: string) => makeMockProject(id, { autoAddBoardId: 'none' }));
+    mocks.getSnapshot.mockImplementation(() => {
+      const project = makeMockProject('project-1', { autoAddBoardId: 'none' });
+
+      return { activeProject: project, projects: [project] };
+    });
     mocks.submitUtilityGraph.mockResolvedValueOnce({
       itemIds: [42],
       origin: 'utility:2',
@@ -704,6 +715,57 @@ describe('generate PBR maps', () => {
     expect(mocks.reportError).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({ area: 'image-actions', message: 'No PBR model', namespace: 'gallery' })
     );
+    expect(mocks.invalidateGallery).not.toHaveBeenCalled();
+  });
+
+  it('turns a canceled item into an info notice, and says nothing once the watch is aborted', async () => {
+    const { UtilityQueueError } = await import('@features/queue/utility');
+    const canceled = createSettlement();
+    mocks.submitUtilityGraph.mockResolvedValueOnce({ itemIds: [44], origin: 'utility:4', settled: canceled.settled });
+    await act(async () => {
+      await actionsRef.current?.generatePbrMaps(image);
+    });
+    await act(async () => {
+      canceled.reject(new UtilityQueueError('canceled', 'The utility graph was canceled.'));
+      await canceled.settled.catch(() => {});
+    });
+
+    expect(mocks.notificationsAdd).toHaveBeenLastCalledWith(
+      expect.objectContaining({ kind: 'info', title: 'widgets.gallery.itemActions.pbrMaps.canceled' })
+    );
+    expect(mocks.reportError).not.toHaveBeenCalled();
+
+    const aborted = createSettlement();
+    mocks.notificationsAdd.mockClear();
+    mocks.submitUtilityGraph.mockResolvedValueOnce({ itemIds: [45], origin: 'utility:5', settled: aborted.settled });
+    await act(async () => {
+      await actionsRef.current?.generatePbrMaps(image);
+    });
+    await act(async () => {
+      aborted.reject(new UtilityQueueError('aborted', 'The utility graph watch was aborted.'));
+      await aborted.settled.catch(() => {});
+    });
+
+    expect(mocks.notificationsAdd).toHaveBeenCalledTimes(1);
+    expect(mocks.reportError).not.toHaveBeenCalled();
+  });
+
+  it('suppresses every notice when the account changes while the graph is being accepted', async () => {
+    const settlement = createSettlement();
+    mocks.submitUtilityGraph.mockImplementationOnce(() => {
+      accountLifecycle.activate('user-b');
+      return Promise.resolve({ itemIds: [46], origin: 'utility:6', settled: settlement.settled });
+    });
+
+    await act(async () => {
+      await actionsRef.current?.generatePbrMaps(image);
+    });
+    await act(async () => {
+      settlement.resolve();
+      await settlement.settled;
+    });
+
+    expect(mocks.notificationsAdd).not.toHaveBeenCalled();
     expect(mocks.invalidateGallery).not.toHaveBeenCalled();
   });
 });

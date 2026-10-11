@@ -44,23 +44,3 @@ export {
 export type { GalleryItemCachePatch } from './data/queryCache';
 export { createGalleryRealtimeRuntime } from './data/realtimeRuntime';
 export { galleryBoardExists } from './data/backend';
-export {
-  getImageMoveStatus,
-  getImageStorageLayout,
-  IMAGE_STORAGE_LAYOUTS,
-  imageMoveStatusQueryOptions,
-  imageStorageKeys,
-  imageStorageLayoutQueryOptions,
-  isImageStorageLayout,
-  isTerminalImageMoveJobState,
-  startImageMove,
-  startImageMoveRecovery,
-  updateImageStorageLayout,
-} from './data/imageStorage';
-export type {
-  ImageMoveJob,
-  ImageMoveJobState,
-  ImageMoveOperation,
-  ImageMoveStatus,
-  ImageStorageLayout,
-} from './data/imageStorage';

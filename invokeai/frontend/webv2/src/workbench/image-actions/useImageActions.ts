@@ -37,7 +37,7 @@ import { setPendingPromptTemplateDraft } from '@features/generation/react';
 import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import { getMaxReferenceImages, isVaeModelConfig, isSupportedGenerateModel } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
-import { submitUtilityGraph, UtilityQueueError } from '@features/queue/utility';
+import { submitUtilityGraph, type UtilityGraphSubmission, UtilityQueueError } from '@features/queue/utility';
 import { downloadBlob } from '@platform/browser/downloadBlob';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {
@@ -889,51 +889,69 @@ export const useImageActions = ({
       downloadImages: (imageNames) => downloadItems(imageNames.map((name) => ({ kind: 'image', name }))),
       generatePbrMaps: async (image) => {
         const owner = captureAccountScope();
-        const project = queries.getProject(projectId ?? queries.getSnapshot().activeProject.id);
-        const boardId = project ? getGalleryAutoAddBoardId(getProjectWidgetValues(project, 'gallery')) : null;
+        const boardId = getGalleryAutoAddBoardId(getLatestWidgetValues('gallery'));
+        let submission: UtilityGraphSubmission;
 
         try {
-          const submission = await submitUtilityGraph({
+          // Ahead of queued generations, as the legacy action was; the account signal ends the watch, not the item.
+          submission = await submitUtilityGraph({
             graph: buildPbrMapsGraph({ boardId, imageName: image.imageName }),
             hub: socketHub,
+            prepend: true,
+            signal: owner.signal,
           });
-
-          assertAccountScopeCurrent(owner);
-          recordSuccess(
-            t('widgets.gallery.itemActions.pbrMaps.queued'),
-            t('widgets.gallery.itemActions.pbrMaps.queuedMessage', { name: image.imageName })
-          );
-          // The utility item is not project work, so the queue runtime does not refresh the gallery for it.
-          void submission.settled.then(
-            () => {
-              if (!isAccountScopeCurrent(owner)) {
-                return;
-              }
-
-              void invalidateGallery(queryClient, owner);
-              recordSuccess(
-                t('widgets.gallery.itemActions.pbrMaps.completed'),
-                t('widgets.gallery.itemActions.pbrMaps.completedMessage', { name: image.imageName })
-              );
-            },
-            (error: unknown) => {
-              // A timeout only ends the watch; the backend item keeps running.
-              if (isAccountScopeCurrent(owner) && !(error instanceof UtilityQueueError && error.reason === 'timeout')) {
-                recordError(error);
-              }
-            }
-          );
         } catch (error: unknown) {
-          if (!isAccountScopeCurrent(owner)) {
-            return;
+          if (isAccountScopeCurrent(owner)) {
+            notifications.add({
+              kind: 'error',
+              message: toErrorMessage(error),
+              title: t('widgets.gallery.itemActions.pbrMaps.failed'),
+            });
           }
-
-          notifications.add({
-            kind: 'error',
-            message: toErrorMessage(error),
-            title: t('widgets.gallery.itemActions.pbrMaps.failed'),
-          });
+          return;
         }
+
+        // Handle settlement before anything else can throw, so an aborted watch never rejects unobserved. The
+        // utility item is not project work, so the queue runtime does not refresh the gallery for it.
+        void submission.settled.then(
+          () => {
+            if (!isAccountScopeCurrent(owner)) {
+              return;
+            }
+
+            void invalidateGallery(queryClient, owner);
+            recordSuccess(
+              t('widgets.gallery.itemActions.pbrMaps.completed'),
+              t('widgets.gallery.itemActions.pbrMaps.completedMessage', { name: image.imageName })
+            );
+          },
+          (error: unknown) => {
+            if (!isAccountScopeCurrent(owner)) {
+              return;
+            }
+            if (error instanceof UtilityQueueError && error.reason === 'canceled') {
+              notifications.add({
+                kind: 'info',
+                message: t('widgets.gallery.itemActions.pbrMaps.canceledMessage', { name: image.imageName }),
+                title: t('widgets.gallery.itemActions.pbrMaps.canceled'),
+              });
+              return;
+            }
+            // A timeout or abort only ends the watch; the backend item keeps running.
+            if (!(error instanceof UtilityQueueError && (error.reason === 'timeout' || error.reason === 'aborted'))) {
+              recordError(error);
+            }
+          }
+        );
+
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
+
+        recordSuccess(
+          t('widgets.gallery.itemActions.pbrMaps.queued'),
+          t('widgets.gallery.itemActions.pbrMaps.queuedMessage', { name: image.imageName })
+        );
       },
       getImageRecallCapabilities: async (image, signal) => {
         const owner = captureAccountScope();

@@ -166,6 +166,41 @@ describe('image storage settings', () => {
     await expect.poll(() => text()).toContain('settings.imageStorage.statusIdle 12');
   });
 
+  it('keeps the server layout and shows the refusal when the layout change is rejected', async () => {
+    installRoutes({
+      [`GET ${CONFIG_ROUTE}`]: () => ({ config: { image_subfolder_strategy: 'flat' } }),
+      [`PATCH ${CONFIG_ROUTE}`]: () => new ApiError(JSON.stringify({ detail: 'Admin privileges required' }), 403),
+      [`GET ${STATUS_ROUTE}`]: () => idleStatus(0),
+    });
+    await render();
+    await expect.poll(() => trigger()?.textContent).toContain('settings.imageStorage.layouts.flat');
+
+    await act(() => userEvent.click(trigger()!));
+    await expect.poll(() => document.querySelectorAll('[role="option"]').length).toBe(4);
+    const hashOption = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((option) =>
+      option.textContent?.includes('settings.imageStorage.layouts.hash')
+    );
+    await act(() => userEvent.click(hashOption!));
+
+    await expect.poll(() => host.querySelector('[role="alert"]')?.textContent).toBe('Admin privileges required');
+    expect(trigger()?.textContent).toContain('settings.imageStorage.layouts.flat');
+    expect(trigger()?.disabled).toBe(false);
+    expect(calls('GET', STATUS_ROUTE)).toHaveLength(1);
+  });
+
+  it('shows a layout this build does not know as itself instead of reading as flat', async () => {
+    installRoutes({
+      [`GET ${CONFIG_ROUTE}`]: () => ({ config: { image_subfolder_strategy: 'by_user' } }),
+      [`GET ${STATUS_ROUTE}`]: () => idleStatus(0),
+    });
+    await render();
+
+    await expect.poll(() => trigger()?.textContent).toContain('settings.imageStorage.layouts.unknown by_user');
+    await act(() => userEvent.click(trigger()!));
+    await expect.poll(() => document.querySelectorAll('[role="option"]').length).toBe(5);
+    expect(calls('PATCH', CONFIG_ROUTE)).toHaveLength(0);
+  });
+
   it('starts a move after confirmation, polls it, and refreshes the gallery once it stops', async () => {
     let status: unknown = idleStatus(12);
     installRoutes({
@@ -241,6 +276,9 @@ describe('image storage settings', () => {
 
     await expect.poll(() => host.querySelector('[role="alert"]')?.textContent).toBe('Queue work is active');
     expect(button('settings.imageStorage.startMove')?.disabled).toBe(false);
+    expect(button('settings.imageStorage.startMove')?.getAttribute('aria-describedby')).toBe(
+      host.querySelector('[role="alert"]')?.id
+    );
     expect(mocks.invalidateGallery).not.toHaveBeenCalled();
   });
 

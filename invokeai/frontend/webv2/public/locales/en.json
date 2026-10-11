@@ -4149,6 +4149,8 @@
           "missing": "This image has no workflow embedded."
         },
         "pbrMaps": {
+          "canceled": "PBR maps canceled",
+          "canceledMessage": "The queue item generating maps for {{name}} was canceled.",
           "completed": "PBR maps are ready",
           "completedMessage": "Normal, roughness and displacement maps for {{name}} were added to the gallery.",
           "failed": "Could not generate PBR maps",

@@ -1,4 +1,4 @@
-import type { ImageMoveStatus, ImageStorageLayout } from '@features/gallery/queries';
+import type { ImageMoveStatus, ImageStorageLayout } from '@features/gallery/storage';
 
 import { createListCollection, HStack, Spinner, Stack, Text } from '@chakra-ui/react';
 import {
@@ -9,7 +9,7 @@ import {
   startImageMove,
   startImageMoveRecovery,
   updateImageStorageLayout,
-} from '@features/gallery/queries';
+} from '@features/gallery/storage';
 import { useCapabilities } from '@features/identity';
 import { useScopedAction } from '@platform/react/useScopedAction';
 import { getApiErrorMessage } from '@platform/transport/http';
@@ -18,7 +18,7 @@ import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { Field } from '@platform/ui/Field';
 import { Select } from '@platform/ui/Select';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const tKey = (key: string): string => `settings.imageStorage.${key}`;
@@ -48,7 +48,9 @@ const ImageStorageEditor = () => {
   const queryClient = useQueryClient();
   // Both routes are admin-only; the editor only mounts for accounts that can read them.
   const layoutQuery = useQuery(imageStorageLayoutQueryOptions());
+  // Polling lives with this editor: the gallery refresh at the end of a move needs it open until the job stops.
   const statusQuery = useQuery(imageMoveStatusQueryOptions());
+  const actionErrorId = useId();
   const { isBusy: isSavingLayout, run: runLayoutSave } = useScopedAction();
   const { isBusy: isActing, run: runAction } = useScopedAction();
   const [layoutError, setLayoutError] = useState<string | null>(null);
@@ -123,7 +125,7 @@ const ImageStorageEditor = () => {
       >
         {layoutQuery.isError ? (
           <HStack gap="2">
-            <Text color="fg.error" fontSize="md" role="alert">
+            <Text color="fg.error" fontSize="md" minW="0" role="alert" wordBreak="break-word">
               {getApiErrorMessage(layoutQuery.error, t(tKey('layoutLoadFailed')))}
             </Text>
             <Button size="sm" variant="outline" onClick={retryLayout}>
@@ -158,6 +160,7 @@ const ImageStorageEditor = () => {
         />
         <HStack gap="2" wrap="wrap">
           <Button
+            aria-describedby={actionError ? actionErrorId : undefined}
             disabled={isBusy || hasActiveJob}
             loading={isActing && pendingAction === 'start'}
             size="lg"
@@ -167,6 +170,7 @@ const ImageStorageEditor = () => {
             {t(tKey('startMove'))}
           </Button>
           <Button
+            aria-describedby={actionError ? actionErrorId : undefined}
             disabled={isBusy}
             loading={isActing && pendingAction === 'recover'}
             size="lg"
@@ -177,7 +181,7 @@ const ImageStorageEditor = () => {
           </Button>
         </HStack>
         {actionError ? (
-          <Text color="fg.error" fontSize="md" role="alert">
+          <Text color="fg.error" fontSize="md" id={actionErrorId} minW="0" role="alert" wordBreak="break-word">
             {actionError}
           </Text>
         ) : null}
@@ -211,7 +215,7 @@ const ImageMoveStatusLine = ({
   if (loadError) {
     return (
       <HStack gap="2">
-        <Text color="fg.error" fontSize="md" role="alert">
+        <Text color="fg.error" fontSize="md" minW="0" role="alert" wordBreak="break-word">
           {loadError}
         </Text>
         <Button size="sm" variant="outline" onClick={onRetry}>
@@ -231,9 +235,7 @@ const ImageMoveStatusLine = ({
   if (status.activeJobId !== null && !status.isRunning) {
     summary = t(tKey('statusNeedsRecovery'), { jobId: status.activeJobId });
   } else if (status.isRunning) {
-    summary = t(tKey(status.operation === 'recovery' ? 'statusRecovering' : 'statusMoving'), {
-      count: status.needsMoveCount,
-    });
+    summary = t(tKey(status.operation === 'recovery' ? 'statusRecovering' : 'statusMoving'));
   } else {
     summary = t(tKey('statusIdle'), { count: status.needsMoveCount });
   }
@@ -255,7 +257,7 @@ const ImageMoveStatusLine = ({
         </Text>
       ) : null}
       {errorMessage ? (
-        <Text color="fg.error" fontSize="xs" whiteSpace="pre-wrap">
+        <Text color="fg.error" fontSize="xs" minW="0" whiteSpace="pre-wrap" wordBreak="break-word">
           {errorMessage}
         </Text>
       ) : null}

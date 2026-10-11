@@ -1,5 +1,6 @@
 import type { InvocationCompleteEvent, QueueItemStatusChangedEvent } from '@features/queue/contracts';
 import type { SocketHub } from '@platform/transport/socketHub';
+import type { BackendConnectionStatus } from '@platform/transport/types';
 
 import {
   buildQueueItemOrigin,
@@ -10,7 +11,7 @@ import {
 import { ApiError } from '@platform/transport/http';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { UtilityEnqueue } from './utilityGraph';
+import type { UtilityEnqueue, UtilityItemStatusReader } from './utilityGraph';
 
 import {
   DEFAULT_UTILITY_QUEUE_TIMEOUT_MS,
@@ -25,7 +26,9 @@ const createFakeHub = () => {
   const handlers = new Map<string, Set<(payload: unknown) => void>>();
   let detachCount = 0;
 
-  const hub: Pick<SocketHub, 'on'> = {
+  const connectionHandlers = new Set<(status: BackendConnectionStatus) => void>();
+
+  const hub: Pick<SocketHub, 'on' | 'onConnectionChange'> = {
     on: (event, handler) => {
       const set = handlers.get(event) ?? new Set();
       set.add(handler as (payload: unknown) => void);
@@ -34,6 +37,11 @@ const createFakeHub = () => {
         detachCount += 1;
         set.delete(handler as (payload: unknown) => void);
       };
+    },
+    onConnectionChange: (handler) => {
+      connectionHandlers.add(handler);
+      handler('connected');
+      return () => connectionHandlers.delete(handler);
     },
   };
 
@@ -44,6 +52,12 @@ const createFakeHub = () => {
   };
 
   return {
+    connection: (status: BackendConnectionStatus): void => {
+      for (const handler of connectionHandlers) {
+        handler(status);
+      }
+    },
+    connectionHandlerCount: (): number => connectionHandlers.size,
     emit,
     get detachCount() {
       return detachCount;
@@ -1240,20 +1254,108 @@ describe('submitUtilityGraph — fire, then watch settlement', () => {
     expect(inconsistent.handlerCount('queue_item_status_changed')).toBe(0);
   });
 
-  it('stops watching after the settle timeout without canceling the backend item', async () => {
+  it('passes prepend through to the enqueue so the item runs ahead of queued generations', async () => {
+    const fake = createFakeHub();
+    const enqueue = vi.fn<UtilityEnqueue>(() => Promise.resolve({ enqueued: 1, itemIds: [1] }));
+
+    await submitUtilityGraph({ createId: () => UTIL_ID, enqueue, graph, hub: fake.hub, prepend: true });
+
+    expect(enqueue).toHaveBeenCalledExactlyOnceWith({ graph, origin: ORIGIN, prepend: true });
+  });
+
+  it('aborting ends the watch: the listener detaches, the timer clears, and the item is not canceled', async () => {
     vi.useFakeTimers();
     const fake = createFakeHub();
-    const submission = await submitUtilityGraph({ createId: () => UTIL_ID, enqueue: okEnqueue, graph, hub: fake.hub });
+    const controller = new AbortController();
+    const readItemStatus = vi.fn();
+    const submission = await submitUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: okEnqueue,
+      graph,
+      hub: fake.hub,
+      readItemStatus,
+      signal: controller.signal,
+    });
     const outcome = submission.settled.then(
       () => 'resolved',
       (error: UtilityQueueError) => error.reason
     );
 
-    vi.advanceTimersByTime(DEFAULT_UTILITY_SETTLE_TIMEOUT_MS - 1);
     expect(fake.handlerCount('queue_item_status_changed')).toBe(1);
-    vi.advanceTimersByTime(1);
+    controller.abort();
 
-    await expect(outcome).resolves.toBe('timeout');
+    await expect(outcome).resolves.toBe('aborted');
     expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(readItemStatus).not.toHaveBeenCalled();
+
+    // An already-aborted signal refuses the submission before anything is enqueued.
+    const enqueue = vi.fn<UtilityEnqueue>(okEnqueue);
+    await expect(
+      submitUtilityGraph({ createId: () => UTIL_ID, enqueue, graph, hub: fake.hub, signal: AbortSignal.abort() })
+    ).rejects.toMatchObject({ reason: 'aborted' });
+    expect(enqueue).not.toHaveBeenCalled();
+  });
+
+  it('re-reads the item after a reconnect so a missed completion still settles', async () => {
+    const fake = createFakeHub();
+    const readItemStatus = vi.fn<UtilityItemStatusReader>(() => Promise.resolve({ status: 'in_progress' }));
+    const submission = await submitUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: () => Promise.resolve({ enqueued: 1, itemIds: [9] }),
+      graph,
+      hub: fake.hub,
+      readItemStatus,
+    });
+    const outcome = submission.settled.then(
+      () => 'resolved',
+      (error: UtilityQueueError) => error.reason
+    );
+
+    // The initial status replay is not a reconnect.
+    fake.connection('connected');
+    expect(readItemStatus).not.toHaveBeenCalled();
+
+    fake.connection('disconnected');
+    fake.connection('connected');
+    await vi.waitFor(() => expect(readItemStatus).toHaveBeenCalledExactlyOnceWith(9, undefined));
+    expect(fake.handlerCount('queue_item_status_changed')).toBe(1);
+
+    readItemStatus.mockResolvedValueOnce({ status: 'completed' });
+    fake.connection('disconnected');
+    fake.connection('connected');
+
+    await expect(outcome).resolves.toBe('resolved');
+    expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
+    expect(fake.connectionHandlerCount()).toBe(0);
+  });
+
+  it('reads the item at the settle timeout: a finished item settles, an open one times out', async () => {
+    vi.useFakeTimers();
+    for (const [status, expected] of [
+      ['completed', 'resolved'],
+      ['failed', 'failed'],
+      ['in_progress', 'timeout'],
+    ] as const) {
+      const fake = createFakeHub();
+      const submission = await submitUtilityGraph({
+        createId: () => UTIL_ID,
+        enqueue: okEnqueue,
+        graph,
+        hub: fake.hub,
+        readItemStatus: () => Promise.resolve({ error_message: 'boom', status }),
+      });
+      const outcome = submission.settled.then(
+        () => 'resolved',
+        (error: UtilityQueueError) => error.reason
+      );
+
+      vi.advanceTimersByTime(DEFAULT_UTILITY_SETTLE_TIMEOUT_MS - 1);
+      expect(fake.handlerCount('queue_item_status_changed')).toBe(1);
+      vi.advanceTimersByTime(1);
+
+      await expect(outcome).resolves.toBe(expected);
+      expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
+    }
   });
 });

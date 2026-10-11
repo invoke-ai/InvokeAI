@@ -7,4 +7,5 @@ export {
   type SubmitUtilityGraphOptions,
   type UtilityGraphResult,
   type UtilityGraphSubmission,
+  type UtilityItemStatusReader,
 } from './runtime/utilityGraph';
