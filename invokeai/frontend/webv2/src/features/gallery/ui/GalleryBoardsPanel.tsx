@@ -227,7 +227,8 @@ export const GalleryBoardsPanel = () => {
         onSelect={tier === 'project' ? createProjectBoardFromSearch : createLibraryBoardFromSearch}
       />
     ) : null;
-  // A dragged board moves to whichever tier it is dropped on.
+  // A dragged board moves to whichever tier it is dropped on. Every tier is the caller's own: other people's boards are
+  // listed apart, never under a project of theirs.
   const renderDropTier = (tierProjectId: string | null, label: string, content: ReactNode) =>
     canDragBoards ? (
       <GalleryBoardTierDropZone dropScope={region} label={label} projectId={tierProjectId}>

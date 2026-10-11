@@ -38,7 +38,10 @@ export const WorkbenchRuntime = () => {
  * Clears what each project loaded into the workbench says about boards that are gone. A board can go while the project
  * is not open — deleted from another tab, or with a project deleted from the Launchpad — and the project's saved
  * selection, auto-add board and unfinished queue items would keep naming it, sending results to a board that no longer
- * exists. Each project is checked once, as it is loaded, and each board it names is asked about once.
+ * exists. Each project is checked as it is loaded, against what the server says then: an earlier answer for the same
+ * board may be stale, since it can go with a project or board deleted in between. Only a question still in flight is
+ * shared, and a project closed and opened again is checked again. The Launchpad is a route of its own, so returning
+ * from it mounts a new workbench, which checks every project it loads.
  */
 export const createGalleryBoardReferenceCheck = (
   store: Pick<WorkbenchInternalStore, 'commands' | 'getSnapshot' | 'subscribe'>,
@@ -48,11 +51,11 @@ export const createGalleryBoardReferenceCheck = (
   const lifetime = new AbortController();
   const signal = AbortSignal.any([owner.signal, lifetime.signal]);
   const checkedProjectIds = new Set<string>();
-  const askedBoardIds = new Set<string>();
+  const unansweredBoardIds = new Set<string>();
   let checkedProjects: unknown = null;
 
   const ask = (boardId: string) => {
-    askedBoardIds.add(boardId);
+    unansweredBoardIds.add(boardId);
     boardExists(boardId, signal)
       .then((exists) => {
         if (!exists && !signal.aborted && isAccountScopeCurrent(owner)) {
@@ -68,7 +71,8 @@ export const createGalleryBoardReferenceCheck = (
         }
       })
       // Unanswered says nothing about the board; it stays named.
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => unansweredBoardIds.delete(boardId));
   };
 
   // Every edit notifies; only a change to the set of loaded projects can bring one in to check.
@@ -80,6 +84,13 @@ export const createGalleryBoardReferenceCheck = (
     }
 
     checkedProjects = projects;
+    const loadedProjectIds = new Set(projects.map((project) => project.id));
+
+    for (const projectId of checkedProjectIds) {
+      if (!loadedProjectIds.has(projectId)) {
+        checkedProjectIds.delete(projectId);
+      }
+    }
 
     for (const project of projects) {
       if (checkedProjectIds.has(project.id)) {
@@ -88,7 +99,7 @@ export const createGalleryBoardReferenceCheck = (
 
       checkedProjectIds.add(project.id);
       getProjectGalleryBoardReferences(project)
-        .filter((boardId) => !askedBoardIds.has(boardId))
+        .filter((boardId) => !unansweredBoardIds.has(boardId))
         .forEach(ask);
     }
   };

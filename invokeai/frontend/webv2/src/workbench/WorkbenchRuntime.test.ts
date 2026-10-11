@@ -102,6 +102,30 @@ describe('createGalleryBoardReferenceCheck', () => {
     expect(reconciled(store)).toEqual(['gone', 'also-gone']);
   });
 
+  it('asks again for a project loaded later, or reopened, rather than trusting an earlier answer', async () => {
+    const first = withGallery(createDraftProject([]), { autoAddBoardId: 'shared-board' });
+    const later = withGallery(createDraftProject([first]), { selectedBoardId: 'shared-board' });
+    const store = createStore([first]);
+    let exists = true;
+    const boardExists = vi.fn(() => Promise.resolve(exists));
+
+    createGalleryBoardReferenceCheck(store as never, boardExists);
+    await settle();
+    expect(reconciled(store)).toEqual([]);
+
+    // The board goes, with a project deleted in this session; a project opened afterwards names it.
+    exists = false;
+    store.set({ projects: [first, later] });
+    await settle();
+    expect(reconciled(store)).toEqual(['shared-board']);
+
+    // Closed and opened again, the first project is asked about afresh.
+    store.set({ projects: [later] });
+    store.set({ projects: [later, first] });
+    await settle();
+    expect(boardExists).toHaveBeenCalledTimes(3);
+  });
+
   it('acts on no answer that arrives after the workbench is gone', async () => {
     const project = withGallery(createDraftProject([]), { selectedBoardId: 'gone' });
     const store = createStore([project]);
