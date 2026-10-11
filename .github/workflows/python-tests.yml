@@ -161,7 +161,7 @@ jobs:
   # included, would pull both server images and wait for them to become healthy.
   external-database-changes:
     name: 'external database: change detection'
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 10
     outputs:
       run: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
@@ -206,7 +206,7 @@ jobs:
             health-cmd: 'mariadb-admin ping -h 127.0.0.1 --silent'
             url: 'mariadb+pymysql://root:invokeai@127.0.0.1:3306'
     name: 'py3.12: linux-${{ matrix.server }}'
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
     services:
       database:
