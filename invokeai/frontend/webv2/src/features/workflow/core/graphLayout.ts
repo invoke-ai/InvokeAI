@@ -78,3 +78,78 @@ export const getTopologicalOrder = (nodes: LayoutGraphNode[], edges: LayoutGraph
     .sort((a, b) => a.depth - b.depth || a.index - b.index)
     .map((entry) => entry.id);
 };
+
+export interface LayoutSizedNode extends LayoutGraphNode {
+  height: number;
+  width: number;
+}
+
+export interface SizedLayoutOptions {
+  /** Horizontal gap between layers; defaults to 80. */
+  layerGap?: number;
+  /** Top-left corner of the arrangement; defaults to the origin. */
+  origin?: { x: number; y: number };
+  /** Vertical gap between the nodes of one layer; defaults to 40. */
+  rowGap?: number;
+}
+
+const DEFAULT_LAYER_GAP = 80;
+const DEFAULT_ROW_GAP = 40;
+
+/**
+ * Layered layout that respects each node's size: layers are columns as wide as their widest node, nodes stack top
+ * to bottom within a layer, and a layer's rows follow the mean row of their parents in the layer before (ties keep
+ * node-array order) so edges tend not to cross.
+ */
+export const getSizedLayeredPositions = (
+  nodes: LayoutSizedNode[],
+  edges: LayoutGraphEdge[],
+  { layerGap = DEFAULT_LAYER_GAP, origin = { x: 0, y: 0 }, rowGap = DEFAULT_ROW_GAP }: SizedLayoutOptions = {}
+): Record<string, { x: number; y: number }> => {
+  const depths = getNodeDepths(nodes, edges);
+  const layers = new Map<number, LayoutSizedNode[]>();
+
+  for (const node of nodes) {
+    const depth = depths.get(node.id) ?? 0;
+
+    layers.set(depth, [...(layers.get(depth) ?? []), node]);
+  }
+
+  const parents = new Map<string, string[]>();
+
+  for (const edge of edges) {
+    parents.set(edge.targetNodeId, [...(parents.get(edge.targetNodeId) ?? []), edge.sourceNodeId]);
+  }
+
+  const positions: Record<string, { x: number; y: number }> = {};
+  const rowOf = new Map<string, number>();
+  let x = origin.x;
+
+  for (const depth of [...layers.keys()].sort((a, b) => a - b)) {
+    const members = layers.get(depth)!;
+    const ordered = members
+      .map((node, index) => {
+        const parentRows = (parents.get(node.id) ?? [])
+          .map((parent) => rowOf.get(parent))
+          .filter((row): row is number => row !== undefined);
+        const barycenter =
+          parentRows.length === 0 ? index : parentRows.reduce((sum, row) => sum + row, 0) / parentRows.length;
+
+        return { barycenter, index, node };
+      })
+      .sort((a, b) => a.barycenter - b.barycenter || a.index - b.index);
+    let y = origin.y;
+    let width = 0;
+
+    ordered.forEach(({ node }, row) => {
+      positions[node.id] = { x, y };
+      rowOf.set(node.id, row);
+      y += node.height + rowGap;
+      width = Math.max(width, node.width);
+    });
+
+    x += width + layerGap;
+  }
+
+  return positions;
+};
