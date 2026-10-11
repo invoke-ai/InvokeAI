@@ -1243,6 +1243,23 @@ describe('anima inpaint adapter', () => {
     }
   );
 
+  it('leaves the slot alone but still recalls the weight when the recorded adapter is not installed', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ animaInpaintAdapterModel: inpaintAdapter, animaInpaintAdapterWeight: 1 }),
+      image,
+      kind: 'all',
+      metadata: { ...canvasInpaintMetadata, anima_inpaint_adapter: { key: 'gone' } },
+      models: [animaModel, animaQwen3, qwenImageVae],
+      supportedModels: [animaModel],
+      vaeModels: [qwenImageVae],
+    });
+
+    // Recall clones the current values, so the untouched slot keeps the same pick by value.
+    expect(result?.values.animaInpaintAdapterModel).toEqual(inpaintAdapter);
+    expect(result?.values.animaInpaintAdapterWeight).toBe(0.7);
+    expect(result?.fields).toContain('animaInpaintAdapterWeight');
+  });
+
   it('skips the adapter and weight when the image is not an Anima image or the adapter is a control adapter', () => {
     const notAnima = buildImageRecallSettings({
       currentValues: createValues({ animaInpaintAdapterWeight: 1 }),

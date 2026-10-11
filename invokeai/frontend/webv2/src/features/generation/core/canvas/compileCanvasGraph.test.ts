@@ -1057,19 +1057,55 @@ describe('compileCanvasGraph — Anima ControlNet-LLLite (integration)', () => {
     );
   });
 
-  it.each(['inpaint', 'outpaint'] as const)('leaves the %s graph unchanged without an adapter', (mode) => {
-    // Only the metadata node id is minted per compile; pin it so the graphs compare structurally.
-    const pinned = (graph: BackendGraphContract) => {
-      const metadataId = getNodeByType(graph, 'core_metadata')!.id;
-      return JSON.parse(JSON.stringify({ edges: graph.edges, nodes: graph.nodes }).replaceAll(metadataId, 'metadata'));
-    };
-    const unset = compile(animaModel, mode, { settings: { animaInpaintAdapterModel: null } }).backendGraph;
-    const defaults = compile(animaModel, mode).backendGraph;
+  it.each(['inpaint', 'outpaint'] as const)(
+    'adds no adapter nodes, edges or metadata to the %s graph without one',
+    (mode) => {
+      const { backendGraph } = compile(animaModel, mode, { settings: { animaInpaintAdapterModel: null } });
 
-    expect(pinned(unset)).toEqual(pinned(defaults));
-    expect(unset.nodes.anima_inpaint_adapter).toBeUndefined();
-    expect(getEdge(unset, 'denoise_latents', 'control_lllite')).toBeUndefined();
-    expect(getNodeByType(unset, 'core_metadata')?.anima_inpaint_adapter).toBeUndefined();
+      expect(backendGraph.nodes.anima_inpaint_adapter).toBeUndefined();
+      expect(backendGraph.nodes.invert_anima_inpaint_adapter_mask).toBeUndefined();
+      expect(backendGraph.nodes.control_lllite_collector).toBeUndefined();
+      expect(getEdge(backendGraph, 'denoise_latents', 'control_lllite')).toBeUndefined();
+      expect(getNodeByType(backendGraph, 'core_metadata')).not.toHaveProperty('anima_inpaint_adapter');
+      expect(getNodeByType(backendGraph, 'core_metadata')).not.toHaveProperty('anima_inpaint_adapter_weight');
+    }
+  );
+
+  it('outpaint with Scale Before Processing: the adapter reads the resized combined mask (legacy addOutpaint.ts:182)', () => {
+    const { backendGraph } = compile(animaModel, 'outpaint', {
+      maskImageName: 'canvas-mask.png',
+      scaling: { height: 1024, method: 'manual', width: 1024 },
+      settings: withAdapter(),
+    });
+
+    expect(getEdge(backendGraph, 'canvas_resize_outpaint_mask_to_processing', 'image')?.source.node_id).toBe(
+      'mask_combine'
+    );
+    expect(getEdge(backendGraph, 'invert_anima_inpaint_adapter_mask', 'image')?.source.node_id).toBe(
+      'canvas_resize_outpaint_mask_to_processing'
+    );
+    expect(getEdge(backendGraph, 'anima_inpaint_adapter', 'image')?.source.node_id).toBe('infill');
+    expect(backendGraph.nodes.invert_anima_inpaint_adapter_mask?.image).toBeUndefined();
+  });
+
+  it('inpaint with a noise mask: the adapter reads the image before noise is added (legacy addInpaint.ts:223/316)', () => {
+    const unscaled = compile(animaModel, 'inpaint', {
+      noiseMaskImageName: 'noise-mask.png',
+      settings: withAdapter(),
+    }).backendGraph;
+    expect(getEdge(unscaled, 'canvas_i2l', 'image')?.source.node_id).toBe('add_inpaint_noise');
+    expect(unscaled.nodes.anima_inpaint_adapter?.image).toEqual({ image_name: 'canvas-composite.png' });
+    expect(getEdge(unscaled, 'anima_inpaint_adapter', 'image')).toBeUndefined();
+
+    const scaled = compile(animaModel, 'inpaint', {
+      noiseMaskImageName: 'noise-mask.png',
+      scaling: { height: 1024, method: 'manual', width: 1024 },
+      settings: withAdapter(),
+    }).backendGraph;
+    expect(getEdge(scaled, 'add_inpaint_noise', 'image')?.source.node_id).toBe('canvas_resize_initial_to_processing');
+    expect(getEdge(scaled, 'anima_inpaint_adapter', 'image')?.source.node_id).toBe(
+      'canvas_resize_initial_to_processing'
+    );
   });
 
   it('ignores a picked adapter outside inpaint/outpaint and outside Anima', () => {

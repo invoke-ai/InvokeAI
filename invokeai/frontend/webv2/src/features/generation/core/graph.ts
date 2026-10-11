@@ -548,6 +548,7 @@ export const findVaeSource = (
     const node = graph.nodes[edge.source.node_id];
     return node ? { field: edge.source.field, node } : null;
   }
+  // The fallback holds because each builder wires exactly one `vae` edge into its decode node, from `model_loader`.
   const modelLoader = graph.nodes.model_loader;
   const decodesWithPid = Object.values(graph.nodes).some((node) => isPidDecodeNodeType(node.type));
   return modelLoader && decodesWithPid ? { field: 'vae', node: modelLoader } : null;
