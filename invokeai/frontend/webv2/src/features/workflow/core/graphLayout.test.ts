@@ -83,14 +83,17 @@ describe('getSizedLayeredPositions', () => {
   });
 
   it('orders a layer by the mean row of its parents so edges do not cross', () => {
-    // p -> y and q -> x, listed in the "wrong" order: x and y swap rows to follow their parents.
+    // r -> p, r -> q, p -> y, q -> x: x and y are listed in the "wrong" order and swap rows to follow their parents.
     const nodes = [
+      { height: 10, id: 'r', width: 10 },
       { height: 10, id: 'p', width: 10 },
       { height: 10, id: 'q', width: 10 },
       { height: 10, id: 'x', width: 10 },
       { height: 10, id: 'y', width: 10 },
     ];
     const edges = [
+      { sourceNodeId: 'r', targetNodeId: 'p' },
+      { sourceNodeId: 'r', targetNodeId: 'q' },
       { sourceNodeId: 'p', targetNodeId: 'y' },
       { sourceNodeId: 'q', targetNodeId: 'x' },
     ];
@@ -99,5 +102,63 @@ describe('getSizedLayeredPositions', () => {
 
     expect(positions.y!.y).toBeLessThan(positions.x!.y);
     expect(positions.x!.x).toBe(positions.y!.x);
+  });
+
+  it('packs unconnected nodes into a near-square grid instead of one column', () => {
+    const nodes = Array.from({ length: 9 }, (_, index) => ({ height: 50, id: `n${index}`, width: 100 }));
+
+    const positions = getSizedLayeredPositions(nodes, [], { layerGap: 10, rowGap: 10 });
+    const xs = new Set(Object.values(positions).map((position) => position.x));
+    const ys = new Set(Object.values(positions).map((position) => position.y));
+
+    expect(xs).toEqual(new Set([0, 110, 220]));
+    expect(ys).toEqual(new Set([0, 60, 120]));
+    expect(positions.n0).toEqual({ x: 0, y: 0 });
+    expect(positions.n3).toEqual({ x: 0, y: 60 });
+  });
+
+  it('lays out each connected component separately and shares a row while components fit', () => {
+    const nodes = [
+      { height: 50, id: 'a', width: 100 },
+      { height: 50, id: 'b', width: 100 },
+      { height: 50, id: 'lone', width: 100 },
+    ];
+    const edges = [{ sourceNodeId: 'a', targetNodeId: 'b' }];
+
+    expect(getSizedLayeredPositions(nodes, edges, { layerGap: 10, rowGap: 10 })).toEqual({
+      a: { x: 0, y: 0 },
+      b: { x: 110, y: 0 },
+      lone: { x: 220, y: 0 },
+    });
+  });
+
+  it('gives a component wider than the row budget its own row', () => {
+    const nodes = [
+      { height: 50, id: 'wide', width: 500 },
+      { height: 50, id: 'p', width: 100 },
+      { height: 50, id: 'q', width: 100 },
+    ];
+
+    expect(getSizedLayeredPositions(nodes, [], { layerGap: 10, rowGap: 10 })).toEqual({
+      wide: { x: 0, y: 0 },
+      p: { x: 0, y: 60 },
+      q: { x: 110, y: 60 },
+    });
+  });
+
+  it('ignores edges that reference nodes outside the arranged set', () => {
+    const nodes = [
+      { height: 50, id: 'a', width: 100 },
+      { height: 50, id: 'b', width: 100 },
+    ];
+    const edges = [
+      { sourceNodeId: 'outside', targetNodeId: 'b' },
+      { sourceNodeId: 'a', targetNodeId: 'b' },
+    ];
+
+    expect(getSizedLayeredPositions(nodes, edges, { layerGap: 10, rowGap: 10 })).toEqual({
+      a: { x: 0, y: 0 },
+      b: { x: 110, y: 0 },
+    });
   });
 });

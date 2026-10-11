@@ -96,16 +96,64 @@ export interface SizedLayoutOptions {
 const DEFAULT_LAYER_GAP = 80;
 const DEFAULT_ROW_GAP = 40;
 
+/** Nodes grouped by undirected connectivity, each group in node-array order; groups ordered by first member. */
+const getConnectedComponents = (nodes: LayoutSizedNode[], edges: LayoutGraphEdge[]): LayoutSizedNode[][] => {
+  const neighbours = new Map<string, string[]>();
+
+  for (const edge of edges) {
+    neighbours.set(edge.sourceNodeId, [...(neighbours.get(edge.sourceNodeId) ?? []), edge.targetNodeId]);
+    neighbours.set(edge.targetNodeId, [...(neighbours.get(edge.targetNodeId) ?? []), edge.sourceNodeId]);
+  }
+
+  const componentOf = new Map<string, number>();
+  const components: LayoutSizedNode[][] = [];
+
+  for (const node of nodes) {
+    if (componentOf.has(node.id)) {
+      continue;
+    }
+
+    const index = components.length;
+    const stack = [node.id];
+
+    componentOf.set(node.id, index);
+
+    while (stack.length > 0) {
+      for (const next of neighbours.get(stack.pop()!) ?? []) {
+        if (!componentOf.has(next)) {
+          componentOf.set(next, index);
+          stack.push(next);
+        }
+      }
+    }
+
+    components.push([]);
+  }
+
+  for (const node of nodes) {
+    components[componentOf.get(node.id)!]!.push(node);
+  }
+
+  return components;
+};
+
+interface ComponentLayout {
+  height: number;
+  positions: Record<string, { x: number; y: number }>;
+  width: number;
+}
+
 /**
- * Layered layout that respects each node's size: layers are columns as wide as their widest node, nodes stack top
- * to bottom within a layer, and a layer's rows follow the mean row of their parents in the layer before (ties keep
- * node-array order) so edges tend not to cross.
+ * Layered layout of one connected graph at the origin: layers are columns as wide as their widest node, nodes stack
+ * top to bottom within a layer, and a layer's rows follow the mean row of their parents in the layer before (ties
+ * keep node-array order) so edges tend not to cross.
  */
-export const getSizedLayeredPositions = (
+const layoutComponent = (
   nodes: LayoutSizedNode[],
   edges: LayoutGraphEdge[],
-  { layerGap = DEFAULT_LAYER_GAP, origin = { x: 0, y: 0 }, rowGap = DEFAULT_ROW_GAP }: SizedLayoutOptions = {}
-): Record<string, { x: number; y: number }> => {
+  layerGap: number,
+  rowGap: number
+): ComponentLayout => {
   const depths = getNodeDepths(nodes, edges);
   const layers = new Map<number, LayoutSizedNode[]>();
 
@@ -123,7 +171,8 @@ export const getSizedLayeredPositions = (
 
   const positions: Record<string, { x: number; y: number }> = {};
   const rowOf = new Map<string, number>();
-  let x = origin.x;
+  let x = 0;
+  let height = 0;
 
   for (const depth of [...layers.keys()].sort((a, b) => a - b)) {
     const members = layers.get(depth)!;
@@ -138,17 +187,68 @@ export const getSizedLayeredPositions = (
         return { barycenter, index, node };
       })
       .sort((a, b) => a.barycenter - b.barycenter || a.index - b.index);
-    let y = origin.y;
+    let y = 0;
     let width = 0;
 
     ordered.forEach(({ node }, row) => {
       positions[node.id] = { x, y };
       rowOf.set(node.id, row);
+      height = Math.max(height, y + node.height);
       y += node.height + rowGap;
       width = Math.max(width, node.width);
     });
 
     x += width + layerGap;
+  }
+
+  return { height, positions, width: Math.max(0, x - layerGap) };
+};
+
+/**
+ * Layered layout that respects each node's size. Each connected component is laid out on its own (see
+ * `layoutComponent`); components then fill rows left to right in node-array order, wrapping at a width that keeps
+ * the arrangement roughly square, so unconnected nodes form a grid rather than one tall column. A single connected
+ * graph is simply its layered layout at the origin.
+ */
+export const getSizedLayeredPositions = (
+  nodes: LayoutSizedNode[],
+  edges: LayoutGraphEdge[],
+  { layerGap = DEFAULT_LAYER_GAP, origin = { x: 0, y: 0 }, rowGap = DEFAULT_ROW_GAP }: SizedLayoutOptions = {}
+): Record<string, { x: number; y: number }> => {
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const knownEdges = edges.filter((edge) => nodeIds.has(edge.sourceNodeId) && nodeIds.has(edge.targetNodeId));
+  const components = getConnectedComponents(nodes, knownEdges).map((members) => {
+    const memberIds = new Set(members.map((node) => node.id));
+
+    return layoutComponent(
+      members,
+      knownEdges.filter((edge) => memberIds.has(edge.sourceNodeId)),
+      layerGap,
+      rowGap
+    );
+  });
+  const gap = Math.max(layerGap, rowGap);
+  const perRow = Math.ceil(Math.sqrt(components.length));
+  const meanWidth = components.reduce((sum, component) => sum + component.width, 0) / components.length;
+  const rowBudget = Math.max(...components.map((component) => component.width), perRow * (meanWidth + gap) - gap);
+  const positions: Record<string, { x: number; y: number }> = {};
+  let x = 0;
+  let y = 0;
+  let rowHeight = 0;
+
+  for (const component of components) {
+    if (x > 0 && x + component.width > rowBudget) {
+      x = 0;
+      y += rowHeight + gap;
+      rowHeight = 0;
+    }
+
+    for (const [id, position] of Object.entries(component.positions)) {
+      positions[id] = { x: origin.x + x + position.x, y: origin.y + y + position.y };
+    }
+
+    x += component.width + gap;
+    rowHeight = Math.max(rowHeight, component.height);
   }
 
   return positions;
