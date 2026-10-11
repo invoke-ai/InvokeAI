@@ -6,7 +6,7 @@ from invokeai.app.invocations.logic import IfInvocation
 from invokeai.app.services.shared.execution_engine.primitives import ActivationGate
 from invokeai.app.services.shared.execution_engine.scheduler import ActivationDependency
 from invokeai.app.services.shared.graph_models import Edge, ExecutionToken
-from invokeai.app.services.shared.graph_validation import IterateInvocation, nx
+from invokeai.app.services.shared.graph_validation import ForInvocation, IterateInvocation, nx
 
 if TYPE_CHECKING:
     from invokeai.app.services.shared.graph import GraphExecutionState
@@ -135,7 +135,10 @@ def _get_if_iteration_paths(
             iterator_graph = state._iterator_graph(
                 source_graph if source_graph is not None else state._get_source_graph_flat()
             )
-            has_iterator_ancestor = bool(state._materializer().get_node_iterators(node_id, iterator_graph))
+            has_iterator_ancestor = any(
+                isinstance(state.graph.get_node(ancestor_id), (ForInvocation, IterateInvocation))
+                for ancestor_id in nx.ancestors(iterator_graph, node_id)
+            )
             if not has_iterator_ancestor:
                 return [()]
         return []
