@@ -431,6 +431,7 @@ export const GalleryImageGrid = () => {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const {
     imageDensityPercent,
+    middleClickOpensInNewTab,
     paginationMode,
     progressSectionCollapsed,
     showImageDimensions,
@@ -1654,6 +1655,7 @@ export const GalleryImageGrid = () => {
     [itemActions]
   );
   const handleOpenItem = useCallback((item: GalleryItem) => itemActions.openItemInPreview(item), [itemActions]);
+  const handleOpenItemInNewTab = useCallback((item: GalleryItem) => itemActions.openItemInNewTab(item), [itemActions]);
 
   // Releasing the anchor puts the window back over the top of the listing.
   const handleReturnToBoardTop = useCallback(() => galleryCommands.setPage(0), [galleryCommands]);
@@ -1690,6 +1692,7 @@ export const GalleryImageGrid = () => {
           onContextMenu={handleThumbnailContextMenu}
           onFocusLost={restoreTileFocus}
           onOpen={handleOpenItem}
+          onOpenInNewTab={middleClickOpensInNewTab ? handleOpenItemInNewTab : null}
           onToggleStarred={handleToggleStarred}
           selectionPage={selectionPage}
         />
@@ -1701,11 +1704,13 @@ export const GalleryImageGrid = () => {
       getDragItems,
       getReadyItemLabel,
       handleOpenItem,
+      handleOpenItemInNewTab,
       handleThumbnailClick,
       handleThumbnailContextMenu,
       handleToggleStarred,
       isComparisonActive,
       isFollowingLive,
+      middleClickOpensInNewTab,
       region,
       restoreTileFocus,
       selectedItemKeys,

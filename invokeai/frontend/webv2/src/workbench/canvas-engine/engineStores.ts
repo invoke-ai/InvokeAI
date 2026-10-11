@@ -48,6 +48,19 @@ export interface EraserOptions {
   opacity: number;
   /** Edge hardness in [0, 1]: 1 is a crisp edge, lower feathers the silhouette. */
   hardness: number;
+  /** Whether pen pressure modulates the eraser width; pressure never modulates erase strength. */
+  pressureAffectsWidth: boolean;
+}
+
+/**
+ * Quick-switch memory (Q): the layer a user bookmarked from its menu, and the layer selected before the current
+ * one. Transient like tool options: it lives with the engine, never in the project.
+ */
+export interface LayerQuickSwitchState {
+  /** Set from the layer menu; a stale id (the layer was removed) is ignored by readers. */
+  bookmarkedLayerId: string | null;
+  /** Engine-maintained: the previous non-null selection, once the selection has changed. */
+  previousLayerId: string | null;
 }
 
 /** Lasso (selection) tool options: how the path is drawn, and the op it applies. */
@@ -249,6 +262,7 @@ export const DEFAULT_BRUSH_OPTIONS: Readonly<BrushOptions> = {
 export const DEFAULT_ERASER_OPTIONS: Readonly<EraserOptions> = {
   hardness: 1,
   opacity: 1,
+  pressureAffectsWidth: true,
   size: 50,
 };
 
@@ -439,8 +453,10 @@ export interface EngineStores {
   brushOptions: ScalarStore<BrushOptions>;
   /** One-way foreground/background mirror for gesture-start reads; the engine never writes it. */
   colorPair: ScalarStore<ActiveColorPairState>;
-  /** Eraser tool options (size / opacity). */
+  /** Eraser tool options (size / opacity / pressure width). */
   eraserOptions: ScalarStore<EraserOptions>;
+  /** The Q quick-switch memory: the bookmarked layer and the previously selected one. */
+  layerQuickSwitch: ScalarStore<LayerQuickSwitchState>;
   /** Whether the engine-owned canvas history has an entry to undo. */
   canUndo: ScalarStore<boolean>;
   /** Whether the engine-owned canvas history has an entry to redo. */
@@ -523,7 +539,13 @@ const brushOptionsEqual = (a: BrushOptions, b: BrushOptions): boolean =>
   a.pressureAffectsOpacity === b.pressureAffectsOpacity;
 
 const eraserOptionsEqual = (a: EraserOptions, b: EraserOptions): boolean =>
-  a.size === b.size && a.opacity === b.opacity && a.hardness === b.hardness;
+  a.size === b.size &&
+  a.opacity === b.opacity &&
+  a.hardness === b.hardness &&
+  a.pressureAffectsWidth === b.pressureAffectsWidth;
+
+const layerQuickSwitchEqual = (a: LayerQuickSwitchState, b: LayerQuickSwitchState): boolean =>
+  a.bookmarkedLayerId === b.bookmarkedLayerId && a.previousLayerId === b.previousLayerId;
 
 const checkerColorsEqual = (a: CheckerColors, b: CheckerColors): boolean => a.a === b.a && a.b === b.b;
 
@@ -678,6 +700,10 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   hasFloatingSelection: createScalarStore<boolean>(false),
   hasSelection: createScalarStore<boolean>(false),
   invertBrushSizeScroll: createScalarStore<boolean>(false),
+  layerQuickSwitch: createScalarStore<LayerQuickSwitchState>(
+    { bookmarkedLayerId: null, previousLayerId: null },
+    layerQuickSwitchEqual
+  ),
   gradientOptions: createScalarStore<GradientToolOptions>(
     { ...DEFAULT_GRADIENT_OPTIONS, stops: DEFAULT_GRADIENT_OPTIONS.stops.map((s) => ({ ...s })) },
     gradientOptionsEqual

@@ -47,6 +47,33 @@ const REORDER_KINDS: Record<string, LayerStackMoveKind> = {
   'canvas.layerToFront': 'front',
 };
 
+/** The layer `steps` away from the selection in layer order, wrapping; none selected starts from either end. */
+const cycleLayerId = (document: CanvasDocumentContractV3, steps: 1 | -1): string | null => {
+  const { leaves } = getDocumentIndex(document);
+  if (leaves.length === 0) {
+    return null;
+  }
+  const current = leaves.findIndex((leaf) => leaf.id === document.selectedLayerId);
+  if (current < 0) {
+    return leaves[steps === 1 ? 0 : leaves.length - 1]!.id;
+  }
+  return leaves[(current + steps + leaves.length) % leaves.length]!.id;
+};
+
+/**
+ * Q: the bookmarked layer when one is set and not already selected, else the previously selected layer. Ids whose
+ * layer no longer exists are skipped rather than cleared, so a removed bookmark never selects nothing.
+ */
+const quickSwitchLayerId = (document: CanvasDocumentContractV3, engine: CanvasEngine): string | null => {
+  const { byId } = getDocumentIndex(document);
+  const { bookmarkedLayerId, previousLayerId } = engine.interaction.get('layerQuickSwitch');
+  const exists = (id: string | null): id is string => id !== null && byId.has(id);
+  if (exists(bookmarkedLayerId) && bookmarkedLayerId !== document.selectedLayerId) {
+    return bookmarkedLayerId;
+  }
+  return exists(previousLayerId) && previousLayerId !== document.selectedLayerId ? previousLayerId : null;
+};
+
 /** Pass hotkey dependencies explicitly so dispatch can be tested without mounting React. */
 export interface CanvasHotkeyContext {
   readonly document: CanvasDocumentContractV3;
@@ -117,6 +144,18 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
   if (ctx.isInteractionLocked) {
     if (commandId === 'canvas.tool.view') {
       engine?.tools.setTool('view');
+    }
+    return;
+  }
+
+  // Without staged results, alt+[ / alt+] walk the layers themselves; Q jumps to the bookmark or back.
+  if (commandId === 'canvas.prevEntity' || commandId === 'canvas.nextEntity' || commandId === 'canvas.quickSwitch') {
+    const target =
+      commandId === 'canvas.quickSwitch'
+        ? engine && quickSwitchLayerId(document, engine)
+        : cycleLayerId(document, commandId === 'canvas.nextEntity' ? 1 : -1);
+    if (target !== null && target !== selectedLayerId) {
+      dispatch({ id: target, type: 'setCanvasSelectedLayer' });
     }
     return;
   }

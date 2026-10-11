@@ -375,6 +375,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     historyEpoch: stores.historyEpoch,
     invertBrushSizeScroll: stores.invertBrushSizeScroll,
     lassoOptions: stores.lassoOptions,
+    layerQuickSwitch: stores.layerQuickSwitch,
     marqueeOptions: stores.marqueeOptions,
     layerPixelEpoch: stores.layerPixelEpoch,
     documentEpoch: stores.documentEpoch,
@@ -1446,6 +1447,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   // ---- Document mirror ----------------------------------------------------
 
+  /** The selection the mirror last reported; it feeds the Q quick-switch memory on the next change. */
+  let lastSelectedLayerId: string | null = null;
   const mirror: DocumentMirror = createDocumentMirror(mutationPort, {
     onDocumentChanged: () => stores.documentEpoch.set(stores.documentEpoch.get() + 1),
     // Bbox changes need only overlay redraw unless a bbox-relative staged preview must move in the composite.
@@ -1589,6 +1592,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
      */
     onSelectionChanged: (selectedLayerId) => {
       const cleanup = createCleanupAccumulator();
+      // Q returns to the layer selected before this one; deselecting keeps the last real selection as previous.
+      if (lastSelectedLayerId !== null) {
+        stores.layerQuickSwitch.set({ ...stores.layerQuickSwitch.get(), previousLayerId: lastSelectedLayerId });
+      }
+      lastSelectedLayerId = selectedLayerId;
       // A float belongs to exactly one layer; selecting another banks it rather
       // than leaving pixels in flight over a layer the user is no longer on.
       cleanup.run(() => floatingSelection.commit());
@@ -1604,6 +1612,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     },
     onStagingChanged: () => scheduler.invalidate({ overlay: true }),
   });
+  // The mirror seeds silently from the current state, so the memory starts from that selection too.
+  lastSelectedLayerId = mirror.getDocument()?.selectedLayerId ?? null;
 
   let fontSourceStacks: CanvasDocumentContractV3['stacks'] | null = null;
   let documentFontSources: CanvasTextSource[] = [];

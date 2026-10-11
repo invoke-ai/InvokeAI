@@ -18929,6 +18929,37 @@ describe('floating selection lifecycle', () => {
   });
 });
 
+describe('layer quick-switch memory', () => {
+  it('remembers the previously selected layer across selection changes, keeping it through a deselect', () => {
+    const document = { ...makeDoc(), stacks: stacksFrom([rasterLayer('a'), rasterLayer('b')]), selectedLayerId: 'a' };
+    const { setDocument, store } = createReactiveStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    expect(engine.interaction.get('layerQuickSwitch')).toEqual({ bookmarkedLayerId: null, previousLayerId: null });
+
+    setDocument({ ...document, selectedLayerId: 'b' });
+    expect(engine.interaction.get('layerQuickSwitch').previousLayerId).toBe('a');
+    setDocument({ ...document, selectedLayerId: null });
+    expect(engine.interaction.get('layerQuickSwitch').previousLayerId).toBe('b');
+    // Reselecting after a deselect records nothing new: there was no layer to return to.
+    setDocument({ ...document, selectedLayerId: 'a' });
+    expect(engine.interaction.get('layerQuickSwitch').previousLayerId).toBe('b');
+
+    // The bookmark is caller-owned and survives selection changes.
+    engine.interaction.set('layerQuickSwitch', {
+      ...engine.interaction.get('layerQuickSwitch'),
+      bookmarkedLayerId: 'b',
+    });
+    setDocument({ ...document, selectedLayerId: 'b' });
+    expect(engine.interaction.get('layerQuickSwitch')).toEqual({ bookmarkedLayerId: 'b', previousLayerId: 'a' });
+    engine.lifecycle.dispose();
+  });
+});
+
 describe('document epoch', () => {
   it('advances on each document change, once the engine model already reflects it', () => {
     const { setDocument, store } = createReactiveStore(paintDoc());

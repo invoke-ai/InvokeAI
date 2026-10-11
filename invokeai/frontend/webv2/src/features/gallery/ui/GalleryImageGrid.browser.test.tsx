@@ -1227,6 +1227,28 @@ describe('GalleryImageGrid mixed item cells', () => {
     expect(imageActionMocks.openItemInPreview).not.toHaveBeenCalled();
   });
 
+  it('opens a middle-clicked tile in a new tab only when the Gallery setting opts in', async () => {
+    const auxclick = (button: HTMLButtonElement) =>
+      interact(() => {
+        button.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 1, cancelable: true }));
+        button.dispatchEvent(new MouseEvent('auxclick', { bubbles: true, button: 1, cancelable: true }));
+      });
+
+    await renderGallery();
+    await auxclick(getButton('Select last.png for preview'));
+    expect(imageActionMocks.openItemInNewTab).not.toHaveBeenCalled();
+
+    const gallery = createGallery();
+    await renderGallery({ ...gallery, settings: { ...gallery.settings, middleClickOpensInNewTab: true } });
+    await auxclick(getButton('Select last.png for preview'));
+    expect(imageActionMocks.openItemInNewTab).toHaveBeenCalledExactlyOnceWith(createItem('image', 'last.png'));
+    await auxclick(getButton('Select video shared, duration 1:06, for preview'));
+    expect(imageActionMocks.openItemInNewTab).toHaveBeenLastCalledWith(createItem('video', 'shared'));
+    // The middle button never selects or opens in Preview.
+    expect(actionMocks.selectItem).not.toHaveBeenCalled();
+    expect(imageActionMocks.openItemInPreview).not.toHaveBeenCalled();
+  });
+
   it('toggles the star on each click of a double-click without selecting or opening the item', async () => {
     await renderGallery();
     await act(() => userEvent.dblClick(getButton('Star first.png')));
