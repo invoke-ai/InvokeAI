@@ -114,6 +114,16 @@ def _get_if_iteration_paths(
             )
         else:
             branch_paths = {condition_path or ()}
+        if (
+            not branch_paths
+            and condition_path is not None
+            and any(
+                edge.source.node_id not in state.source_prepared_mapping and edge.source.node_id not in state.executed
+                for edge in selected_edges
+            )
+        ):
+            # The selected branch is not materialized yet; the If still runs in the condition's frame.
+            branch_paths = {condition_path}
 
         for branch_path in branch_paths:
             if condition_path is None:
@@ -237,8 +247,20 @@ def _record_compatibility_activation_token(
     )
 
 
+def _get_condition_verdict(
+    state: "GraphExecutionState", dependency: ActivationDependency
+) -> Optional[tuple[bool, bool]]:
+    # Fresh shapes never place an If where none of its executions can gate a branch source.
+    if state._can_use_fresh_flat_if_activation():
+        return None
+    return state._if_activation_controller().get_condition_verdict(dependency)
+
+
 def _is_activation_dependency_satisfied(state: "GraphExecutionState", dependency: ActivationDependency) -> bool:
     """Check one opaque plan requirement against durable gate and token state."""
+    verdict = _get_condition_verdict(state, dependency)
+    if verdict is not None:
+        return verdict[0]
     matching_gate_ids = state._prepared_if_exec_ids(dependency.owner_id, dependency.frame)
     if not matching_gate_ids:
         return False
@@ -276,6 +298,9 @@ def _is_activation_dependency_satisfied(state: "GraphExecutionState", dependency
 def _is_activation_dependency_rejected(state: "GraphExecutionState", dependency: ActivationDependency) -> bool:
     """Return whether a resolved gate explicitly selected another branch."""
 
+    verdict = _get_condition_verdict(state, dependency)
+    if verdict is not None:
+        return verdict[1]
     matching_gate_ids = state._prepared_if_exec_ids(dependency.owner_id, dependency.frame)
     for gate_id in matching_gate_ids:
         gate = state._activation_gate(gate_id)
