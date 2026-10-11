@@ -619,28 +619,6 @@ class RemoteInvokeClient:
             raise RemoteInvokeError(f"Remote enqueue succeeded but no item_ids were returned: {result}")
         return int(item_ids[0])
 
-    def wait_for_item(
-        self,
-        item_id: int,
-        queue_id: str = "default",
-        poll_interval_seconds: float = 0.75,
-        timeout_seconds: float = 1800.0,
-    ) -> dict[str, Any]:
-        started = time.monotonic()
-        while True:
-            item = self.get_item(item_id=item_id, queue_id=queue_id)
-            status = str(item.get("status", "")).lower()
-            if status == "completed":
-                return item
-            if status in {"failed", "canceled", "cancelled"}:
-                errors = item.get("session", {}).get("errors", {})
-                raise RemoteInvokeError(
-                    f"Remote queue item {item_id} ended with status '{status}'. Errors: {json.dumps(errors)[:3000]}"
-                )
-            if time.monotonic() - started > timeout_seconds:
-                raise RemoteInvokeError(f"Remote queue item {item_id} timed out after {timeout_seconds:g} seconds")
-            time.sleep(poll_interval_seconds)
-
     @staticmethod
     def extract_image_names(
         item: dict[str, Any],

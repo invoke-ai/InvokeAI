@@ -1,5 +1,3 @@
-import type { toaster as appToaster } from '@platform/ui/toaster';
-
 import { FontsRuntimeProvider } from '@features/fonts/react';
 import {
   AuthSessionUnavailableError,
@@ -15,7 +13,7 @@ import { ModelInstallRuntime } from '@features/models';
 import { createLogger } from '@platform/logging/logger';
 import {
   createHashHistory,
-  createRootRouteWithContext,
+  createRootRoute,
   createRoute,
   createRouter,
   ErrorComponent,
@@ -57,7 +55,7 @@ const RouterError = ({ error }: ErrorComponentProps) => {
   );
 };
 
-const rootRoute = createRootRouteWithContext<{ remoteModelTransferToaster?: typeof appToaster }>()({
+const rootRoute = createRootRoute({
   component: Outlet,
   errorComponent: RouterError,
 });

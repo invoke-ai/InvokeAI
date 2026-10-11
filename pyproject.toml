@@ -40,8 +40,8 @@ dependencies = [
   "gguf",
   "mediapipe==0.10.14",                   # needed for "mediapipeface" controlnet model
   "mistral-common>=1.5.4,<2",             # canonical Tekken tokenizer for FLUX.2 [dev] Mistral encoder; the
-  # loader depends on private surface (Tekkenizer internals) that
-  # moves across majors, so cap below 2.x (validated against 1.11.6)
+                                          # loader depends on private surface (Tekkenizer internals) that
+                                          # moves across majors, so cap below 2.x (validated against 1.11.6)
   "numpy<2.0.0",
   "onnx==1.21.0",
   "onnxruntime==1.19.2",
@@ -66,6 +66,7 @@ dependencies = [
   "torchsde",                             # diffusers needs this for SDE solvers, but it is not an explicit dep of diffusers
   "torchvision",
   "transformers>=5.10.4,<5.11",
+
   # Core application dependencies, pinned for reproducible builds.
   "fastapi-events",
   # The old pin sat at 0.118.3 because 0.119.0 crashed generating our OpenAPI schema. That was a FastAPI bug, not
@@ -90,9 +91,11 @@ dependencies = [
   # compilation and the pysqlite transaction handling it relies on are exactly what changes between minors.
   "sqlalchemy>=2.1,<2.2",
   "uvicorn[standard]",
+
   # Auxiliary dependencies, pinned only if necessary.
   "blake3",
   "bcrypt<4.0.0",
+  "cryptography>=50.0.2",
   "Deprecated",
   "dnspython",
   "dynamicprompts",
@@ -109,6 +112,7 @@ dependencies = [
   "requests",
   "semver~=3.0.1",
   "PyWavelets",
+
   # Semantic image index (image map / semantic search).
   # numba is a umap-learn transitive, pinned to the range this stack has been
   # exercised against rather than for numpy compatibility: every release from
@@ -118,7 +122,6 @@ dependencies = [
   "umap-learn~=0.5.7",
   "scikit-learn~=1.5",
   "numba>=0.59,<0.62",
-  "cryptography>=50.0.2",
 ]
 
 [project.optional-dependencies]

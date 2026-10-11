@@ -69,9 +69,7 @@ export type { QueueRunLockPort } from './runtime';
 export { hasPendingWorkflowQueueItem } from './ui/queueViewModel';
 
 export {
-  getRemoteWorkerName,
   getRemoteWorkerUrls,
-  isRemoteWorkerEnabled,
   remoteWorkersStore,
   setRemoteWorkerEnabled,
   setRemoteWorkerName,

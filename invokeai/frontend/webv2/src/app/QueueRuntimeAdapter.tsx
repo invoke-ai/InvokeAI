@@ -9,8 +9,8 @@ import {
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
+import { toaster } from '@platform/ui/toaster';
 import { useQueryClient } from '@tanstack/react-query';
-import { useRouteContext } from '@tanstack/react-router';
 import { getOpenProject, getProjectSyncSnapshot } from '@workbench/projects/syncStore';
 import {
   createAccountOwnedQueueRecallCache,
@@ -26,7 +26,6 @@ export const QueueRuntimeAdapter = () => {
   const { notifications, queue } = useWorkbenchCommands();
   const queries = useWorkbenchQueries();
   const queryClient = useQueryClient();
-  const { remoteModelTransferToaster } = useRouteContext({ from: '__root__' });
   const subscribe = useWorkbenchSubscription();
 
   useMountEffect(() => {
@@ -151,7 +150,7 @@ export const QueueRuntimeAdapter = () => {
         locks: createQueueRunLockPort(owner.storageSuffix),
         modelLoads: modelLoadActivitySink,
         nodeExecution: nodeExecutionStore,
-        remoteModelTransferToaster,
+        remoteModelTransferToaster: toaster,
       });
       runtime.start();
     };
