@@ -59,12 +59,17 @@ import {
   clampDimension,
   DEFAULT_HIDIFFUSION_T1_RATIO,
   DEFAULT_HIDIFFUSION_T2_RATIO,
+  DEFAULT_FLUX_DYPE_EXPONENT,
+  DEFAULT_FLUX_DYPE_SCALE,
   DEFAULT_IDEOGRAM4_SAMPLER_PRESET,
   DEFAULT_KREA2_REBALANCE_MULTIPLIER,
   DEFAULT_KREA2_REBALANCE_WEIGHTS,
   DEFAULT_KREA2_SEED_VARIANCE_RANDOMIZE_PERCENT,
   DEFAULT_KREA2_SEED_VARIANCE_STRENGTH,
+  DEFAULT_KREA2_STYLE_STRENGTH,
   DEFAULT_REFERENCE_IMAGE_LIMIT,
+  DEFAULT_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
+  DEFAULT_ZIMAGE_SEED_VARIANCE_STRENGTH,
   deriveAspectRatioId,
   IDEOGRAM4_GUIDANCE_MAX,
   IDEOGRAM4_GUIDANCE_MIN,
@@ -356,6 +361,8 @@ export const getGenerationUiPolicy = (model: GenerateModelConfig | undefined) =>
     seedVisible,
     // Show PiD controls on supported bases even while PiD is disabled.
     pidVisible: getIsPidSupportedBase(model?.base),
+    // Both Qwen-Image text encoders take the quantization choice; no other family's encoder does.
+    encoderQuantizationVisible: model?.type === 'main' && model.base === 'qwen-image',
   };
 };
 
@@ -473,6 +480,15 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     krea2SeedVarianceEnabled: false,
     krea2SeedVarianceStrength: DEFAULT_KREA2_SEED_VARIANCE_STRENGTH,
     krea2SeedVarianceRandomizePercent: DEFAULT_KREA2_SEED_VARIANCE_RANDOMIZE_PERCENT,
+    fluxDypePreset: 'off',
+    fluxDypeScale: DEFAULT_FLUX_DYPE_SCALE,
+    fluxDypeExponent: DEFAULT_FLUX_DYPE_EXPONENT,
+    zImageShift: null,
+    zImageSeedVarianceEnabled: false,
+    zImageSeedVarianceStrength: DEFAULT_ZIMAGE_SEED_VARIANCE_STRENGTH,
+    zImageSeedVarianceRandomizePercent: DEFAULT_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
+    qwenImageShift: null,
+    qwenImageEncoderQuantization: 'none',
     pidMode: 'off',
     pidDecoderModel: null,
     gemma2EncoderModel: null,
@@ -1270,6 +1286,10 @@ export const getDefaultReferenceImageConfig = (
     return { image, type: 'qwen_image_reference_image' };
   }
 
+  if (modelBase === 'krea-2') {
+    return { image, styleStrength: DEFAULT_KREA2_STYLE_STRENGTH, type: 'krea2_style_reference_image' };
+  }
+
   if (isFluxKontextModel(model)) {
     return { image, model, type: 'flux_kontext_reference_image' };
   }
@@ -1299,6 +1319,8 @@ const getReferenceImageConfigSupported = (
       return model.type !== 'external_image_generator' && model.base === 'flux2';
     case 'qwen_image_reference_image':
       return model.type !== 'external_image_generator' && model.base === 'qwen-image' && model.variant === 'edit';
+    case 'krea2_style_reference_image':
+      return model.type !== 'external_image_generator' && model.base === 'krea-2';
     case 'flux_kontext_reference_image':
       return isFluxKontextModel(model);
     case 'flux_redux':

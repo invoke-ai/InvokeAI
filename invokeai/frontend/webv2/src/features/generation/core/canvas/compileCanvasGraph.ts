@@ -9,7 +9,13 @@ import type { GenerateModelConfig, GenerateSettings } from '@features/generation
 
 import { getGenerationValidationReasons } from '@features/generation/core/baseGenerationPolicies';
 import { GRAPH_BUILDERS } from '@features/generation/core/graph';
-import { addEdge, addNode, toGraphContract } from '@features/generation/core/graphBuilder';
+import {
+  addEdge,
+  addNode,
+  addOutputPostprocessors,
+  renameNode,
+  toGraphContract,
+} from '@features/generation/core/graphBuilder';
 import { addKrea2ConditioningEnhancers } from '@features/generation/core/krea2Conditioning';
 import { getIsPidSupportedBase } from '@features/generation/core/pid';
 
@@ -124,26 +130,6 @@ const requireVaeSource = (graph: BackendGraphContract): { node: BackendInvocatio
     throw new Error('Canvas generation could not resolve a VAE source in the base graph.');
   }
   return source;
-};
-
-/** Rename every matching node ID and edge reference. */
-const renameNode = (graph: BackendGraphContract, oldId: string, newId: string): BackendInvocationContract => {
-  const node = graph.nodes[oldId];
-  if (!node) {
-    throw new Error(`Canvas generation could not find the "${oldId}" node to rename.`);
-  }
-  delete graph.nodes[oldId];
-  node.id = newId;
-  graph.nodes[newId] = node;
-  for (const edge of graph.edges) {
-    if (edge.source.node_id === oldId) {
-      edge.source.node_id = newId;
-    }
-    if (edge.destination.node_id === oldId) {
-      edge.destination.node_id = newId;
-    }
-  }
-  return node;
 };
 
 /** Resizes a model-grid processing output back to the bbox's exact final footprint. */
@@ -682,6 +668,8 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
   if (mode === 'txt2img' || mode === 'img2img') {
     resizeCanvasOutputToBbox(backendGraph, bbox, processingSize, destination);
   }
+  // After every mode has settled its final image node, so the filters see the composited/resized result.
+  addOutputPostprocessors(backendGraph, runtimeProjectSettings, outputIsIntermediate);
   setCanvasMetadataDimensions(backendGraph, bbox);
 
   return {

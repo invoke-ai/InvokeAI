@@ -22,6 +22,7 @@ import {
   getComponentSectionPolicy,
   getAutoFlux2ComponentSourceModel,
   getDefaultGenerateSettings,
+  getDefaultReferenceImageConfig,
   getGenerateModelSelectionResult,
   getGenerationDimensions,
   getGenerationModelAvailabilityReasons,
@@ -959,6 +960,64 @@ describe('component policies', () => {
 
     expect(result.settings.referenceImages).toBe(referenceImages);
     expect(result.clearedLabels).not.toContain('Reference Images');
+  });
+
+  it('routes Krea-2 to its single style reference and re-targets other kinds to it', () => {
+    // A Diffusers bundle needs no standalone components, which keeps the reasons to the reference check.
+    const krea2 = createModel('krea-2', { format: 'diffusers' });
+
+    expect(isReferenceImageSupported(krea2)).toBe(true);
+    expect(getMaxReferenceImages(krea2)).toBe(1);
+    expect(getDefaultReferenceImageConfig(krea2, [sdxlIpAdapter], referenceImage)).toEqual({
+      image: referenceImage,
+      styleStrength: 1,
+      type: 'krea2_style_reference_image',
+    });
+
+    const fromSdxl = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sdxl'), {
+        referenceImages: [
+          {
+            id: 'ref-1',
+            isEnabled: true,
+            config: {
+              beginEndStepPct: [0, 1],
+              clipVisionModel: 'ViT-H',
+              image: referenceImage,
+              method: 'style',
+              model: sdxlIpAdapter,
+              type: 'ip_adapter',
+              weight: 1,
+            },
+          },
+        ],
+      }),
+      model: krea2,
+      models: [sdxlIpAdapter],
+    });
+
+    expect(fromSdxl.settings.referenceImages).toEqual([
+      {
+        id: 'ref-1',
+        isEnabled: true,
+        config: { image: referenceImage, styleStrength: 1, type: 'krea2_style_reference_image' },
+      },
+    ]);
+
+    const styleSettings = createSettings(krea2, {
+      referenceImages: [
+        {
+          id: 'style',
+          isEnabled: true,
+          config: { image: referenceImage, styleStrength: 1, type: 'krea2_style_reference_image' },
+        },
+      ],
+    });
+
+    expect(getGenerationValidationReasons(krea2, styleSettings)).toEqual([]);
+    expect(getGenerationValidationReasons(createModel('sd-3'), styleSettings)).toEqual([
+      'Reference Image #1 is not supported by sd-3 model.',
+    ]);
   });
 
   it('reports reference image support per model', () => {

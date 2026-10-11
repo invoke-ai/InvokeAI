@@ -1,5 +1,10 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
-import type { GenerateModelConfig, GenerateSettings, Ideogram4SamplerPreset } from '@features/generation/core/types';
+import type {
+  FluxDypePreset,
+  GenerateModelConfig,
+  GenerateSettings,
+  Ideogram4SamplerPreset,
+} from '@features/generation/core/types';
 import type { ReactNode } from 'react';
 
 import { Badge, Box, createListCollection, HStack, Image, Input, Separator, Stack, Text } from '@chakra-ui/react';
@@ -11,6 +16,10 @@ import {
 } from '@features/generation/core/baseGenerationPolicies';
 import { getEffectivePrompts } from '@features/generation/core/promptTemplates';
 import {
+  DEFAULT_FLUX_DYPE_EXPONENT,
+  DEFAULT_FLUX_DYPE_SCALE,
+  DEFAULT_TIMESTEP_SHIFT,
+  FLUX_DYPE_PRESETS,
   getDynamicPromptsConfig,
   IDEOGRAM4_GUIDANCE_MAX,
   IDEOGRAM4_GUIDANCE_MIN,
@@ -19,7 +28,13 @@ import {
   IDEOGRAM4_SAMPLER_PRESETS,
   IDEOGRAM4_STEPS_MAX,
   IDEOGRAM4_STEPS_MIN,
+  isFluxDypePreset,
+  MAX_FLUX_DYPE_EXPONENT,
+  MAX_FLUX_DYPE_SCALE,
   MAX_KREA2_SEED_VARIANCE_STRENGTH,
+  MAX_TIMESTEP_SHIFT,
+  MAX_ZIMAGE_SEED_VARIANCE_STRENGTH,
+  MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
 } from '@features/generation/core/settings';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Combobox } from '@platform/ui/Combobox';
@@ -29,6 +44,7 @@ import { ScrubberField } from '@platform/ui/ScrubberField';
 import { Select } from '@platform/ui/Select';
 import { SliderNumberField } from '@platform/ui/SliderNumberField';
 import { Tooltip } from '@platform/ui/Tooltip';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { GenerateConditioningRebalanceField } from './GenerateConditioningRebalanceField';
@@ -46,6 +62,11 @@ import { SeedField as SharedSeedField } from './shared/SeedField';
 import { useDynamicPrompts } from './useDynamicPrompts';
 
 const STEPS_SLIDER_MAX = 100;
+/** The useful shift range; the input accepts the node's full `ge=0` span up to 10. */
+const TIMESTEP_SHIFT_SLIDER_MIN = 1;
+const TIMESTEP_SHIFT_SLIDER_MAX = 7;
+/** The exponent's `le=1000` bound is far beyond any documented recipe (0.5–2), so the track stops at 10. */
+const DYPE_EXPONENT_SLIDER_MAX = 10;
 const formatPercent = (value: number): string => `${value}%`;
 
 /**
@@ -70,6 +91,9 @@ const selectRenderSettings = pickGenerateSettings([
   'dynamicPromptsResample',
   'dynamicPromptsSampleSeed',
   'dynamicPromptsSeedBehaviour',
+  'fluxDypeExponent',
+  'fluxDypePreset',
+  'fluxDypeScale',
   'ideogram4ColorPalette',
   'ideogram4GuidanceScale',
   'ideogram4Mu',
@@ -85,11 +109,16 @@ const selectRenderSettings = pickGenerateSettings([
   'negativePrompt',
   'positivePrompt',
   'promptTemplate',
+  'qwenImageShift',
   'scheduler',
   'seed',
   'seedMode',
   'steps',
   'wanGuidanceScaleLowNoise',
+  'zImageSeedVarianceEnabled',
+  'zImageSeedVarianceRandomizePercent',
+  'zImageSeedVarianceStrength',
+  'zImageShift',
 ]);
 
 interface RenderFieldsProps {
@@ -228,8 +257,25 @@ const WanLowNoiseGuidanceField = ({ onCommit, settings }: RenderFieldsProps) => 
   );
 };
 
-/** Perturbs Krea-2 conditioning between seeds — a variation concern, so it sits by the seed. */
-const Krea2SeedVarianceFields = ({ onCommit, settings }: RenderFieldsProps) => {
+/**
+ * Perturbs conditioning between seeds — a variation concern, so it sits by the seed. Krea-2 and Z-Image each have
+ * their own enhancer node with the same three settings.
+ */
+const SeedVarianceFields = ({
+  enabled,
+  maxStrength,
+  minRandomizePercent,
+  onChange,
+  randomizePercent,
+  strength,
+}: {
+  enabled: boolean;
+  maxStrength: number;
+  minRandomizePercent: number;
+  randomizePercent: number;
+  strength: number;
+  onChange: (patch: { enabled?: boolean; randomizePercent?: number; strength?: number }) => void;
+}) => {
   const { t } = useTranslation();
 
   return (
@@ -239,36 +285,175 @@ const Krea2SeedVarianceFields = ({ onCommit, settings }: RenderFieldsProps) => {
         label={t('widgets.generate.krea2SeedVariance')}
         labelEnd={
           <GenerateToggleSwitch
-            checked={settings.krea2SeedVarianceEnabled}
+            checked={enabled}
             label={t('widgets.generate.krea2SeedVariance')}
-            onCheckedChange={(checked) => onCommit({ krea2SeedVarianceEnabled: checked })}
+            onCheckedChange={(checked) => onChange({ enabled: checked })}
           />
         }
       >
         {null}
       </Field>
-      {settings.krea2SeedVarianceEnabled ? (
+      {enabled ? (
         <>
           <ScrubberField
             label={t('widgets.generate.krea2SeedVarianceStrength')}
-            max={MAX_KREA2_SEED_VARIANCE_STRENGTH}
+            max={maxStrength}
             min={0}
             step={0.05}
-            value={settings.krea2SeedVarianceStrength}
-            onChange={(value) => onCommit({ krea2SeedVarianceStrength: value })}
+            value={strength}
+            onChange={(value) => onChange({ strength: value })}
           />
           <ScrubberField
             formatValue={formatPercent}
             label={t('widgets.generate.krea2SeedVarianceRandomize')}
             max={100}
-            min={0}
+            min={minRandomizePercent}
             step={1}
-            value={settings.krea2SeedVarianceRandomizePercent}
-            onChange={(value) => onCommit({ krea2SeedVarianceRandomizePercent: value })}
+            value={randomizePercent}
+            onChange={(value) => onChange({ randomizePercent: value })}
           />
         </>
       ) : null}
     </>
+  );
+};
+
+const Krea2SeedVarianceFields = ({ onCommit, settings }: RenderFieldsProps) => (
+  <SeedVarianceFields
+    enabled={settings.krea2SeedVarianceEnabled}
+    maxStrength={MAX_KREA2_SEED_VARIANCE_STRENGTH}
+    minRandomizePercent={0}
+    randomizePercent={settings.krea2SeedVarianceRandomizePercent}
+    strength={settings.krea2SeedVarianceStrength}
+    onChange={({ enabled, randomizePercent, strength }) =>
+      onCommit({
+        ...(enabled === undefined ? {} : { krea2SeedVarianceEnabled: enabled }),
+        ...(randomizePercent === undefined ? {} : { krea2SeedVarianceRandomizePercent: randomizePercent }),
+        ...(strength === undefined ? {} : { krea2SeedVarianceStrength: strength }),
+      })
+    }
+  />
+);
+
+const ZImageSeedVarianceFields = ({ onCommit, settings }: RenderFieldsProps) => (
+  <SeedVarianceFields
+    enabled={settings.zImageSeedVarianceEnabled}
+    maxStrength={MAX_ZIMAGE_SEED_VARIANCE_STRENGTH}
+    minRandomizePercent={MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT}
+    randomizePercent={settings.zImageSeedVarianceRandomizePercent}
+    strength={settings.zImageSeedVarianceStrength}
+    onChange={({ enabled, randomizePercent, strength }) =>
+      onCommit({
+        ...(enabled === undefined ? {} : { zImageSeedVarianceEnabled: enabled }),
+        ...(randomizePercent === undefined ? {} : { zImageSeedVarianceRandomizePercent: randomizePercent }),
+        ...(strength === undefined ? {} : { zImageSeedVarianceStrength: strength }),
+      })
+    }
+  />
+);
+
+/** Preset labels name the trigger condition, which the backend IDs leave implicit. */
+const FLUX_DYPE_PRESET_LABEL_KEYS: Record<FluxDypePreset, string> = {
+  '4k': 'widgets.generate.dypePreset4k',
+  area: 'widgets.generate.dypePresetArea',
+  auto: 'widgets.generate.dypePresetAuto',
+  manual: 'widgets.generate.dypePresetManual',
+  off: 'widgets.generate.dypePresetOff',
+};
+
+/** The scale and exponent only reach the node under the manual preset, so they only show then. */
+const FluxDypeFields = ({ onCommit, settings }: RenderFieldsProps) => {
+  const { t } = useTranslation();
+  const presetCollection = useMemo(
+    () =>
+      createListCollection({
+        items: FLUX_DYPE_PRESETS.map((value) => ({ label: t(FLUX_DYPE_PRESET_LABEL_KEYS[value]), value })),
+      }),
+    [t]
+  );
+
+  return (
+    <>
+      <Field hint="dypePreset" label={t('widgets.generate.dypePreset')}>
+        <Select
+          aria-label={t('widgets.generate.dypePreset')}
+          collection={presetCollection}
+          value={[settings.fluxDypePreset]}
+          onValueChange={({ value }) => {
+            const preset = value[0];
+
+            if (isFluxDypePreset(preset)) {
+              onCommit({ fluxDypePreset: preset });
+            }
+          }}
+        />
+      </Field>
+      {settings.fluxDypePreset === 'manual' ? (
+        <>
+          <ScrubberField
+            defaultValue={DEFAULT_FLUX_DYPE_SCALE}
+            label={t('widgets.generate.dypeScale')}
+            marks={[DEFAULT_FLUX_DYPE_SCALE]}
+            max={MAX_FLUX_DYPE_SCALE}
+            min={0}
+            step={0.1}
+            value={settings.fluxDypeScale}
+            onChange={(value) => onCommit({ fluxDypeScale: value })}
+          />
+          <ScrubberField
+            defaultValue={DEFAULT_FLUX_DYPE_EXPONENT}
+            inputMax={MAX_FLUX_DYPE_EXPONENT}
+            label={t('widgets.generate.dypeExponent')}
+            marks={[DEFAULT_FLUX_DYPE_EXPONENT]}
+            max={DYPE_EXPONENT_SLIDER_MAX}
+            min={0}
+            step={0.1}
+            value={settings.fluxDypeExponent}
+            onChange={(value) => onCommit({ fluxDypeExponent: value })}
+          />
+        </>
+      ) : null}
+    </>
+  );
+};
+
+/** Null lets the denoise node derive the shift from the image size; the override starts at the Lightning value. */
+const TimestepShiftField = ({
+  onChange,
+  shift,
+}: {
+  shift: number | null;
+  onChange: (shift: number | null) => void;
+}) => {
+  const { t } = useTranslation();
+
+  return (
+    <Field
+      helpText={t('widgets.generate.timestepShiftHelp')}
+      hint="timestepShift"
+      label={t('widgets.generate.timestepShift')}
+    >
+      <GenerateToggleSwitch
+        checked={shift !== null}
+        label={t('widgets.generate.override')}
+        labelVisible
+        onCheckedChange={(checked) => onChange(checked ? DEFAULT_TIMESTEP_SHIFT : null)}
+      />
+      {shift !== null ? (
+        <ScrubberField
+          defaultValue={DEFAULT_TIMESTEP_SHIFT}
+          inputMax={MAX_TIMESTEP_SHIFT}
+          inputMin={0}
+          label={t('widgets.generate.timestepShift')}
+          marks={[DEFAULT_TIMESTEP_SHIFT]}
+          max={TIMESTEP_SHIFT_SLIDER_MAX}
+          min={TIMESTEP_SHIFT_SLIDER_MIN}
+          step={0.1}
+          value={shift}
+          onChange={onChange}
+        />
+      ) : null}
+    </Field>
   );
 };
 
@@ -414,6 +599,16 @@ export const GenerateRenderSection = ({
         </>
       ) : null}
       {familyBase === 'wan' ? <WanLowNoiseGuidanceField settings={settings} onCommit={onCommit} /> : null}
+      {familyBase === 'z-image' ? (
+        <TimestepShiftField shift={settings.zImageShift} onChange={(zImageShift) => onCommit({ zImageShift })} />
+      ) : null}
+      {familyBase === 'qwen-image' ? (
+        <TimestepShiftField
+          shift={settings.qwenImageShift}
+          onChange={(qwenImageShift) => onCommit({ qwenImageShift })}
+        />
+      ) : null}
+      {familyBase === 'flux' ? <FluxDypeFields settings={settings} onCommit={onCommit} /> : null}
       {uiPolicy.schedulerVisible ? (
         <GenerateFieldContextMenu
           copyValue={() => settings.scheduler}
@@ -446,6 +641,12 @@ export const GenerateRenderSection = ({
         <>
           <Separator borderColor="border.subtle" />
           <Krea2SeedVarianceFields settings={settings} onCommit={onCommit} />
+        </>
+      ) : null}
+      {familyBase === 'z-image' ? (
+        <>
+          <Separator borderColor="border.subtle" />
+          <ZImageSeedVarianceFields settings={settings} onCommit={onCommit} />
         </>
       ) : null}
     </>

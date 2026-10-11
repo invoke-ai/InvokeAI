@@ -254,6 +254,15 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   krea2SeedVarianceEnabled: false,
   krea2SeedVarianceStrength: 0.1,
   krea2SeedVarianceRandomizePercent: 50,
+  fluxDypePreset: 'off',
+  fluxDypeScale: 2,
+  fluxDypeExponent: 2,
+  zImageShift: null,
+  zImageSeedVarianceEnabled: false,
+  zImageSeedVarianceStrength: 0.1,
+  zImageSeedVarianceRandomizePercent: 50,
+  qwenImageShift: null,
+  qwenImageEncoderQuantization: 'none',
   referenceImages: [],
   scheduler: 'euler_a',
   seamlessXAxis: false,
@@ -6096,6 +6105,8 @@ describe('workbench account and project settings', () => {
       antialiasProgressImages: true,
       showProgressImagesInViewer: true,
       useCpuNoise: false,
+      useNsfwChecker: false,
+      useWatermark: false,
     });
   });
 });

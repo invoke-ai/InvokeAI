@@ -85,7 +85,7 @@ def test_reference_images_and_the_one_variant_condition() -> None:
     supported = {
         b.value for b in generative_bases() if (f := get(b, FeaturesFacet)) is not None and f.supports_reference_images
     }
-    assert supported == {"flux", "flux2", "sd-1", "sdxl", "qwen-image"}
+    assert supported == {"flux", "flux2", "sd-1", "sdxl", "qwen-image", "krea-2"}
 
     conditional = {
         b.value

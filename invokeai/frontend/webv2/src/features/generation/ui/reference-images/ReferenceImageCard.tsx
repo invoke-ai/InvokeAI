@@ -19,7 +19,13 @@ import { memo, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatWeight, getModeLabelKey } from './referenceImageConfig';
-import { ClipVisionSelect, FieldHeader, FluxReduxControls, IPAdapterControls } from './ReferenceImageControls';
+import {
+  ClipVisionSelect,
+  FieldHeader,
+  FluxReduxControls,
+  IPAdapterControls,
+  Krea2StyleReferenceControls,
+} from './ReferenceImageControls';
 import { ReferenceImageCropDialog } from './ReferenceImageCropDialog';
 
 /** Reference image config variants that carry a selectable model. */
@@ -148,6 +154,14 @@ const ReferenceImageCardBase = ({
                     {formatWeight(config.weight)}
                   </Text>
                 </>
+              ) : config.type === 'krea2_style_reference_image' ? (
+                <>
+                  {' · '}
+                  {t('widgets.generate.styleStrength')}{' '}
+                  <Text as="span" color="fg.subtle" fontFamily="mono">
+                    {formatWeight(config.styleStrength)}
+                  </Text>
+                </>
               ) : null}
             </Text>
           </HStack>
@@ -258,6 +272,8 @@ const ReferenceImageCardBase = ({
                 selectedBase={selectedBase}
                 onConfigChange={changeConfig}
               />
+            ) : config.type === 'krea2_style_reference_image' ? (
+              <Krea2StyleReferenceControls config={config} disabled={!isEnabled} onChange={changeConfig} />
             ) : null}
           </Stack>
         </HStack>

@@ -11,10 +11,12 @@ import type {
   GenerateReferenceImageAsset,
   GenerateReferenceImageConfig,
   GenerateSettings,
+  FluxDypePreset,
   GenerateWidgetValues,
   Ideogram4SamplerPreset,
   LoraModelConfig,
   MainModelConfig,
+  QwenImageEncoderQuantization,
   VaeModelConfig,
   VaePrecision,
 } from './types';
@@ -207,9 +209,37 @@ export const IDEOGRAM4_MU_MAX = 4;
 export const DEFAULT_KREA2_SEED_VARIANCE_STRENGTH = 0.1;
 export const MAX_KREA2_SEED_VARIANCE_STRENGTH = 2;
 export const DEFAULT_KREA2_SEED_VARIANCE_RANDOMIZE_PERCENT = 50;
+/** `krea2_style_reference.style_strength` is `ge=0, le=2`; 1 is the recommended setting. */
+export const DEFAULT_KREA2_STYLE_STRENGTH = 1;
+export const MAX_KREA2_STYLE_STRENGTH = 2;
+/** `flux_denoise.dype_scale` is `le=8` and `dype_exponent` `le=1000`; both default to 2 under the manual preset. */
+export const FLUX_DYPE_PRESETS: FluxDypePreset[] = ['off', 'manual', 'auto', 'area', '4k'];
+export const DEFAULT_FLUX_DYPE_SCALE = 2;
+export const MAX_FLUX_DYPE_SCALE = 8;
+export const DEFAULT_FLUX_DYPE_EXPONENT = 2;
+export const MAX_FLUX_DYPE_EXPONENT = 1000;
+/** Z-Image and Qwen-Image `shift` are `ge=0`; 3 is the Lightning value and the auto-derived one at one megapixel. */
+export const DEFAULT_TIMESTEP_SHIFT = 3;
+export const MAX_TIMESTEP_SHIFT = 10;
+/** `z_image_seed_variance_enhancer`: strength `le=2`, randomize percent `ge=1, le=100`. */
+export const DEFAULT_ZIMAGE_SEED_VARIANCE_STRENGTH = 0.1;
+export const MAX_ZIMAGE_SEED_VARIANCE_STRENGTH = 2;
+export const MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT = 1;
+export const DEFAULT_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT = 50;
+export const QWEN_IMAGE_ENCODER_QUANTIZATIONS: QwenImageEncoderQuantization[] = ['none', 'int8', 'nf4'];
 
 const isIdeogram4SamplerPreset = (value: unknown): value is Ideogram4SamplerPreset =>
   IDEOGRAM4_SAMPLER_PRESETS.includes(value as Ideogram4SamplerPreset);
+
+export const isFluxDypePreset = (value: unknown): value is FluxDypePreset =>
+  FLUX_DYPE_PRESETS.includes(value as FluxDypePreset);
+
+export const isQwenImageEncoderQuantization = (value: unknown): value is QwenImageEncoderQuantization =>
+  QWEN_IMAGE_ENCODER_QUANTIZATIONS.includes(value as QwenImageEncoderQuantization);
+
+/** A shift override, kept only inside the node's bounds; anything else means auto. */
+const getTimestepShift = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= MAX_TIMESTEP_SHIFT ? value : null;
 
 const getOptionalNumber = (value: unknown): number | null =>
   typeof value === 'number' && Number.isFinite(value) ? value : null;
@@ -238,6 +268,7 @@ const REFERENCE_IMAGE_CONFIG_TYPES = new Set([
   'flux_kontext_reference_image',
   'flux_redux',
   'ip_adapter',
+  'krea2_style_reference_image',
   'qwen_image_reference_image',
 ]);
 
@@ -277,6 +308,18 @@ const normalizeReferenceImageConfig = (value: unknown): GenerateReferenceImageCo
       return { image, type: value.type };
     case 'flux_kontext_reference_image':
       return { image, model: getMainModelOrNull(value.model), type: value.type };
+    case 'krea2_style_reference_image':
+      return {
+        image,
+        styleStrength: getClampedNumber(
+          value,
+          'styleStrength',
+          0,
+          MAX_KREA2_STYLE_STRENGTH,
+          DEFAULT_KREA2_STYLE_STRENGTH
+        ),
+        type: value.type,
+      };
     case 'flux_redux':
       return {
         image,
@@ -332,6 +375,7 @@ const cloneReferenceImageConfig = (config: GenerateReferenceImageConfig): Genera
   switch (config.type) {
     case 'external_reference_image':
     case 'flux2_reference_image':
+    case 'krea2_style_reference_image':
     case 'qwen_image_reference_image':
       return { ...config, image: config.image ? cloneCroppableImage(config.image) : null };
     case 'flux_kontext_reference_image':
@@ -499,6 +543,7 @@ const syncReferenceImageConfigWithModels = (
     }
     case 'external_reference_image':
     case 'flux2_reference_image':
+    case 'krea2_style_reference_image':
     case 'qwen_image_reference_image':
       return config;
   }
@@ -790,6 +835,35 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
       100,
       DEFAULT_KREA2_SEED_VARIANCE_RANDOMIZE_PERCENT
     ),
+    fluxDypePreset: isFluxDypePreset(values.fluxDypePreset) ? values.fluxDypePreset : 'off',
+    fluxDypeScale: getClampedNumber(values, 'fluxDypeScale', 0, MAX_FLUX_DYPE_SCALE, DEFAULT_FLUX_DYPE_SCALE),
+    fluxDypeExponent: getClampedNumber(
+      values,
+      'fluxDypeExponent',
+      0,
+      MAX_FLUX_DYPE_EXPONENT,
+      DEFAULT_FLUX_DYPE_EXPONENT
+    ),
+    zImageShift: getTimestepShift(values.zImageShift),
+    zImageSeedVarianceEnabled: values.zImageSeedVarianceEnabled === true,
+    zImageSeedVarianceStrength: getClampedNumber(
+      values,
+      'zImageSeedVarianceStrength',
+      0,
+      MAX_ZIMAGE_SEED_VARIANCE_STRENGTH,
+      DEFAULT_ZIMAGE_SEED_VARIANCE_STRENGTH
+    ),
+    zImageSeedVarianceRandomizePercent: getClampedNumber(
+      values,
+      'zImageSeedVarianceRandomizePercent',
+      MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
+      100,
+      DEFAULT_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT
+    ),
+    qwenImageShift: getTimestepShift(values.qwenImageShift),
+    qwenImageEncoderQuantization: isQwenImageEncoderQuantization(values.qwenImageEncoderQuantization)
+      ? values.qwenImageEncoderQuantization
+      : 'none',
     pidMode: isPidMode(values.pidMode) ? values.pidMode : 'off',
     pidDecoderModel: getModelIdentifierOrNull(values.pidDecoderModel),
     gemma2EncoderModel: getModelIdentifierOrNull(values.gemma2EncoderModel),

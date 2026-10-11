@@ -41,6 +41,70 @@ export const addEdge = (
   return edge;
 };
 
+/** Rename every matching node ID and edge reference. */
+export const renameNode = (graph: BackendGraphContract, oldId: string, newId: string): BackendInvocationContract => {
+  const node = graph.nodes[oldId];
+  if (!node) {
+    throw new Error(`Could not find the "${oldId}" node to rename.`);
+  }
+  delete graph.nodes[oldId];
+  node.id = newId;
+  graph.nodes[newId] = node;
+  for (const edge of graph.edges) {
+    if (edge.source.node_id === oldId) {
+      edge.source.node_id = newId;
+    }
+    if (edge.destination.node_id === oldId) {
+      edge.destination.node_id = newId;
+    }
+  }
+  return node;
+};
+
+/**
+ * Chains the project's optional output filters after the image the graph ends on. The last filter takes over
+ * `canvas_output` with its durability flag and metadata edge, so result hydration and the saved record stay on the
+ * node that actually emits the final image; the decode behind it becomes intermediate.
+ */
+export const addOutputPostprocessors = (
+  graph: BackendGraphContract,
+  projectSettings: Pick<GenerationProjectSettings, 'useNsfwChecker' | 'useWatermark'>,
+  outputIsIntermediate: boolean
+): void => {
+  const filters = [
+    ...(projectSettings.useNsfwChecker ? ['img_nsfw'] : []),
+    ...(projectSettings.useWatermark ? ['img_watermark'] : []),
+  ];
+
+  if (filters.length === 0) {
+    return;
+  }
+
+  const decode = renameNode(graph, 'canvas_output', 'canvas_decode');
+  decode.is_intermediate = true;
+  let source = decode;
+
+  filters.forEach((type, index) => {
+    const isLast = index === filters.length - 1;
+    const filter = addNode(graph, {
+      id: isLast ? 'canvas_output' : `canvas_${type}`,
+      is_intermediate: isLast ? outputIsIntermediate : true,
+      type,
+      use_cache: false,
+    });
+
+    addEdge(graph, source, 'image', filter, 'image');
+    source = filter;
+  });
+
+  const metadataEdge = graph.edges.find(
+    (edge) => edge.destination.node_id === decode.id && edge.destination.field === 'metadata'
+  );
+  if (metadataEdge) {
+    metadataEdge.destination.node_id = source.id;
+  }
+};
+
 export const getActiveCompatibleLoras = (
   settings: Pick<GenerateSettings, 'loras'>,
   model: GenerateModelConfig

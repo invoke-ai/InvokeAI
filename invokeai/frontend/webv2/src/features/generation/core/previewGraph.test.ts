@@ -49,7 +49,7 @@ afterEach(resetArchitectureCapabilities);
 
 describe('compileGeneratePreviewGraph', () => {
   it('compiles a ready graph with deterministic node ids across repeated compiles', () => {
-    const input = { destination: 'gallery' as const, models, storedValues, useCpuNoise: false };
+    const input = { destination: 'gallery' as const, models, storedValues, projectSettings: { useCpuNoise: false } };
     const first = compileGeneratePreviewGraph(input);
     const second = compileGeneratePreviewGraph(input);
 
@@ -71,7 +71,12 @@ describe('compileGeneratePreviewGraph', () => {
   });
 
   it('keeps the literal seed value instead of resolving a random one', () => {
-    const result = compileGeneratePreviewGraph({ destination: 'gallery', models, storedValues, useCpuNoise: false });
+    const result = compileGeneratePreviewGraph({
+      destination: 'gallery',
+      models,
+      storedValues,
+      projectSettings: { useCpuNoise: false },
+    });
 
     if (result.status !== 'ready') {
       throw new Error('expected ready');
@@ -83,7 +88,12 @@ describe('compileGeneratePreviewGraph', () => {
   });
 
   it('rewrites edges consistently with rewritten node ids', () => {
-    const result = compileGeneratePreviewGraph({ destination: 'gallery', models, storedValues, useCpuNoise: false });
+    const result = compileGeneratePreviewGraph({
+      destination: 'gallery',
+      models,
+      storedValues,
+      projectSettings: { useCpuNoise: false },
+    });
 
     if (result.status !== 'ready') {
       throw new Error('expected ready');
@@ -104,7 +114,7 @@ describe('compileGeneratePreviewGraph', () => {
       destination: 'gallery',
       models,
       storedValues: badValues,
-      useCpuNoise: false,
+      projectSettings: { useCpuNoise: false },
     });
 
     expect(result.status).toBe('invalid');
@@ -119,14 +129,19 @@ describe('compileGeneratePreviewGraph', () => {
       destination: 'gallery',
       models: [],
       storedValues,
-      useCpuNoise: false,
+      projectSettings: { useCpuNoise: false },
     });
 
     expect(result.status).toBe('invalid');
   });
 
   it('pins a deterministic seed across repeated compiles when generate settings are uninitialized', () => {
-    const input = { destination: 'gallery' as const, models, storedValues: undefined, useCpuNoise: false };
+    const input = {
+      destination: 'gallery' as const,
+      models,
+      storedValues: undefined,
+      projectSettings: { useCpuNoise: false },
+    };
     const first = compileGeneratePreviewGraph(input);
     const second = compileGeneratePreviewGraph(input);
 

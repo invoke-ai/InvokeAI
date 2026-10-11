@@ -9,6 +9,7 @@ import type { FeatureHintId } from '@platform/ui/hints';
 import type { ReactNode } from 'react';
 
 import { Collapsible, createListCollection, HStack, SegmentGroup, Stack, Text } from '@chakra-ui/react';
+import { DEFAULT_KREA2_STYLE_STRENGTH, MAX_KREA2_STYLE_STRENGTH } from '@features/generation/core/settings';
 import { Field, Select, Slider } from '@platform/ui';
 import { FeatureHint } from '@platform/ui/hints';
 import { ScrubberField } from '@platform/ui/ScrubberField';
@@ -376,5 +377,40 @@ export const FluxReduxControls = <T extends { imageInfluence: FluxReduxImageInfl
         onValueChange={handleValueChange}
       />
     </Field>
+  );
+};
+
+const STYLE_STRENGTH_MARKS = [DEFAULT_KREA2_STYLE_STRENGTH];
+
+/** Krea-2 style transfer has one knob; 0 bypasses the reference entirely. */
+export const Krea2StyleReferenceControls = <T extends { styleStrength: number; type: 'krea2_style_reference_image' }>({
+  config,
+  disabled,
+  onChange,
+}: {
+  config: T;
+  disabled: boolean;
+  onChange: (config: T) => void;
+}) => {
+  const { t } = useTranslation();
+  const handleStrengthChange = useCallback(
+    (styleStrength: number) => onChange({ ...config, styleStrength }),
+    [config, onChange]
+  );
+
+  return (
+    <ScrubberField
+      defaultValue={DEFAULT_KREA2_STYLE_STRENGTH}
+      disabled={disabled}
+      formatValue={formatWeight}
+      hint="styleStrength"
+      label={t('widgets.generate.styleStrength')}
+      marks={STYLE_STRENGTH_MARKS}
+      max={MAX_KREA2_STYLE_STRENGTH}
+      min={0}
+      step={0.05}
+      value={config.styleStrength}
+      onChange={handleStrengthChange}
+    />
   );
 };

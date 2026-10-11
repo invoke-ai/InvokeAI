@@ -28,9 +28,16 @@ import {
   isMainModelConfig,
   isModelIdentifierConfig,
   isVaeCompatibleWithGenerateModel,
+  isFluxDypePreset,
+  isQwenImageEncoderQuantization,
   isValidKrea2RebalanceWeights,
+  MAX_FLUX_DYPE_EXPONENT,
+  MAX_FLUX_DYPE_SCALE,
   MAX_HIDIFFUSION_RATIO,
+  MAX_TIMESTEP_SHIFT,
+  MAX_ZIMAGE_SEED_VARIANCE_STRENGTH,
   MIN_HIDIFFUSION_T1_RATIO,
+  MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
   normalizeReferenceImages,
 } from '@features/generation/settings';
 import { SEED_MAX } from '@platform/core/seed';
@@ -73,7 +80,8 @@ type RecalledField =
   | 'components'
   | 'loras'
   | 'referenceImages'
-  | 'krea2Rebalance';
+  | 'krea2Rebalance'
+  | 'modelTuning';
 
 export type ImageRecallSkipReason =
   | 'ambiguous'
@@ -419,6 +427,82 @@ const getMetadataKrea2Rebalance = (
 const hasKrea2Rebalance = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
   Object.keys(getMetadataKrea2Rebalance(metadata, model)).length > 0;
 
+const getBoundedNumber = (metadata: unknown, key: string, min: number, max: number): number | null => {
+  const value = getNumber(metadata, key);
+
+  return value !== null && value >= min && value <= max ? value : null;
+};
+
+/** The graphs record `'auto'` for a shift they let the node derive; a number is an explicit override. */
+const getTimestepShiftPatch = (metadata: unknown, key: string): number | null | undefined => {
+  if (getString(metadata, key) === 'auto') {
+    return null;
+  }
+
+  const shift = getBoundedNumber(metadata, key, 0, MAX_TIMESTEP_SHIFT);
+
+  return shift === null ? undefined : shift;
+};
+
+/**
+ * Per-family tuning the graphs record under their own keys. Gated on the model recall settles on, since each
+ * setting only reaches that family's denoise or encoder nodes.
+ */
+const getMetadataModelTuning = (
+  metadata: unknown,
+  model: GenerateModelConfig | undefined
+): Partial<GenerateWidgetValues> => {
+  if (!model || model.type !== 'main') {
+    return {};
+  }
+
+  if (model.base === 'flux') {
+    const preset = isRecord(metadata) ? metadata.dype_preset : undefined;
+    const scale = getBoundedNumber(metadata, 'dype_scale', 0, MAX_FLUX_DYPE_SCALE);
+    const exponent = getBoundedNumber(metadata, 'dype_exponent', 0, MAX_FLUX_DYPE_EXPONENT);
+
+    return {
+      ...(isFluxDypePreset(preset) ? { fluxDypePreset: preset } : {}),
+      ...(scale === null ? {} : { fluxDypeScale: scale }),
+      ...(exponent === null ? {} : { fluxDypeExponent: exponent }),
+    };
+  }
+
+  if (model.base === 'z-image') {
+    const shift = getTimestepShiftPatch(metadata, 'z_image_shift');
+    const enabled = getBoolean(metadata, 'z_image_seed_variance_enabled');
+    const strength = getBoundedNumber(metadata, 'z_image_seed_variance_strength', 0, MAX_ZIMAGE_SEED_VARIANCE_STRENGTH);
+    const randomizePercent = getBoundedNumber(
+      metadata,
+      'z_image_seed_variance_randomize_percent',
+      MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
+      100
+    );
+
+    return {
+      ...(shift === undefined ? {} : { zImageShift: shift }),
+      ...(enabled === null ? {} : { zImageSeedVarianceEnabled: enabled }),
+      ...(strength === null ? {} : { zImageSeedVarianceStrength: strength }),
+      ...(randomizePercent === null ? {} : { zImageSeedVarianceRandomizePercent: randomizePercent }),
+    };
+  }
+
+  if (model.base === 'qwen-image') {
+    const shift = getTimestepShiftPatch(metadata, 'qwen_image_shift');
+    const quantization = isRecord(metadata) ? metadata.qwen_image_quantization : undefined;
+
+    return {
+      ...(shift === undefined ? {} : { qwenImageShift: shift }),
+      ...(isQwenImageEncoderQuantization(quantization) ? { qwenImageEncoderQuantization: quantization } : {}),
+    };
+  }
+
+  return {};
+};
+
+const hasModelTuning = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
+  Object.keys(getMetadataModelTuning(metadata, model)).length > 0;
+
 type RecalledComponentSetting = keyof Pick<
   GenerateWidgetValues,
   | 'clipEmbedModel'
@@ -707,6 +791,7 @@ export const getImageRecallCapabilities = ({
   const hasReferenceImages = getMetadataReferenceImages(metadata).length > 0;
   const hasModel = supportedMetadataModel !== null;
   const hasRebalance = hasKrea2Rebalance(metadata, clipSkipModel);
+  const hasTuning = hasModelTuning(metadata, clipSkipModel);
   const hasConcepts =
     (getMetadataConcepts(metadata, models, clipSkipModel, supportedMetadataModel).loras?.length ?? 0) > 0;
   const hasAnyMetadata =
@@ -721,7 +806,8 @@ export const getImageRecallCapabilities = ({
     hasComponents ||
     hasReferenceImages ||
     hasConcepts ||
-    hasRebalance;
+    hasRebalance ||
+    hasTuning;
   const hasNonSeedMetadata =
     hasModel ||
     hasVae ||
@@ -733,7 +819,8 @@ export const getImageRecallCapabilities = ({
     hasComponents ||
     hasReferenceImages ||
     hasConcepts ||
-    hasRebalance;
+    hasRebalance ||
+    hasTuning;
 
   return {
     all: hasAnyMetadata && isImageRecallKindAvailable('all'),
@@ -801,6 +888,13 @@ export const buildImageRecallSettings = ({
     if (Object.keys(rebalancePatch).length > 0) {
       values = { ...values, ...rebalancePatch };
       fields.push('krea2Rebalance');
+    }
+
+    const tuningPatch = getMetadataModelTuning(metadata, values.model);
+
+    if (Object.keys(tuningPatch).length > 0) {
+      values = { ...values, ...tuningPatch };
+      fields.push('modelTuning');
     }
 
     const vae = getMetadataVae(metadata, values.model, vaeModels);

@@ -12,6 +12,8 @@ import type {
 
 import { getDefaultGenerateSettings, isSupportedGenerateModel } from './baseGenerationPolicies';
 import { compileGenerateGraph, resolveGenerateSeed } from './graph';
+import { generateGraphCases, satisfiedSettingsFor } from './graphCoverage.testing';
+import { stabilizeBackendGraphIds } from './previewGraph';
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
 const sd2Model: MainModelConfig = { base: 'sd-2', key: 'sd2-model', name: 'SD 2', type: 'main' };
@@ -1280,5 +1282,245 @@ describe('PiD decode', () => {
         width: 2032,
       })
     ).toThrow(/multiple of 64/);
+  });
+});
+
+describe('model-family tuning', () => {
+  const fluxComponents: Partial<GenerateSettings> = {
+    clipEmbedModel: clipEmbed,
+    t5EncoderModel: t5Encoder,
+    vae: fluxVae,
+  };
+  const krea2Model: MainModelConfig = {
+    base: 'krea-2',
+    format: 'diffusers',
+    key: 'krea2-tuning',
+    name: 'Krea-2 Turbo',
+    type: 'main',
+    variant: 'krea2_turbo',
+  };
+  const styleReference = (styleStrength: number, isEnabled = true, id = 'style-ref') => ({
+    config: { image: refImage, styleStrength, type: 'krea2_style_reference_image' as const },
+    id,
+    isEnabled,
+  });
+
+  it('sends no DyPE fields while the preset is off, so the FLUX denoise node stays as it was', () => {
+    const graph = compile(fluxModel, fluxComponents);
+
+    expect(graph.nodes.denoise_latents).not.toHaveProperty('dype_preset');
+    expect(graph.nodes.denoise_latents).not.toHaveProperty('dype_scale');
+    expect(getNodeByType(graph, 'core_metadata')).not.toHaveProperty('dype_preset');
+  });
+
+  it('sends only the DyPE preset for the derived presets, and scale and exponent under manual', () => {
+    const auto = compile(fluxModel, { ...fluxComponents, fluxDypePreset: 'auto', fluxDypeScale: 3 });
+    const manual = compile(fluxModel, {
+      ...fluxComponents,
+      fluxDypeExponent: 0.5,
+      fluxDypePreset: 'manual',
+      fluxDypeScale: 3,
+    });
+
+    expect(auto.nodes.denoise_latents).toMatchObject({ dype_preset: 'auto' });
+    expect(auto.nodes.denoise_latents).not.toHaveProperty('dype_scale');
+    expect(manual.nodes.denoise_latents).toMatchObject({ dype_exponent: 0.5, dype_preset: 'manual', dype_scale: 3 });
+    expect(getNodeByType(manual, 'core_metadata')).toMatchObject({
+      dype_exponent: 0.5,
+      dype_preset: 'manual',
+      dype_scale: 3,
+    });
+  });
+
+  it('leaves the Z-Image shift to the node unless overridden, and records which', () => {
+    const auto = compile(zImageModel);
+    const fixed = compile(zImageModel, { zImageShift: 3 });
+
+    expect(auto.nodes.denoise_latents).not.toHaveProperty('shift');
+    expect(getNodeByType(auto, 'core_metadata')?.z_image_shift).toBe('auto');
+    expect(fixed.nodes.denoise_latents?.shift).toBe(3);
+    expect(getNodeByType(fixed, 'core_metadata')?.z_image_shift).toBe(3);
+  });
+
+  it('inserts the Z-Image seed variance enhancer between the encoder and the collector, fed by the seed', () => {
+    const graph = compile(zImageModel, {
+      zImageSeedVarianceEnabled: true,
+      zImageSeedVarianceRandomizePercent: 25,
+      zImageSeedVarianceStrength: 0.3,
+    });
+    const enhancer = getNodeByType(graph, 'z_image_seed_variance_enhancer');
+
+    expect(enhancer).toMatchObject({ randomize_percent: 25, strength: 0.3 });
+    expect(getEdge(graph, enhancer!.id, 'conditioning')?.source.node_id).toBe('pos_cond');
+    expect(getEdge(graph, enhancer!.id, 'seed')?.source.node_id).toBe('seed');
+    expect(getEdge(graph, 'pos_cond_collect', 'item')?.source.node_id).toBe(enhancer!.id);
+    expect(getNodeByType(graph, 'core_metadata')).toMatchObject({
+      z_image_seed_variance_enabled: true,
+      z_image_seed_variance_randomize_percent: 25,
+      z_image_seed_variance_strength: 0.3,
+    });
+  });
+
+  it('skips the Z-Image enhancer while it is off or at zero strength, keeping the direct conditioning edge', () => {
+    for (const graph of [
+      compile(zImageModel),
+      compile(zImageModel, { zImageSeedVarianceEnabled: true, zImageSeedVarianceStrength: 0 }),
+    ]) {
+      expect(getNodeByType(graph, 'z_image_seed_variance_enhancer')).toBeUndefined();
+      expect(getEdge(graph, 'pos_cond_collect', 'item')?.source.node_id).toBe('pos_cond');
+    }
+  });
+
+  it('sends the Qwen-Image shift only when overridden', () => {
+    expect(compile(qwenImageModel).nodes.denoise_latents).not.toHaveProperty('shift');
+    expect(getNodeByType(compile(qwenImageModel), 'core_metadata')?.qwen_image_shift).toBe('auto');
+
+    const fixed = compile(qwenImageModel, { qwenImageShift: 3 });
+
+    expect(fixed.nodes.denoise_latents?.shift).toBe(3);
+    expect(getNodeByType(fixed, 'core_metadata')?.qwen_image_shift).toBe(3);
+  });
+
+  it('passes the Qwen-Image encoder quantization to both text encoders, and nothing for none', () => {
+    const plain = compile(qwenImageModel, { cfgScale: 4 });
+    const quantized = compile(qwenImageModel, { cfgScale: 4, qwenImageEncoderQuantization: 'nf4' });
+
+    expect(plain.nodes.pos_cond).not.toHaveProperty('quantization');
+    expect(plain.nodes.neg_cond).not.toHaveProperty('quantization');
+    expect(quantized.nodes.pos_cond?.quantization).toBe('nf4');
+    expect(quantized.nodes.neg_cond?.quantization).toBe('nf4');
+    expect(getNodeByType(quantized, 'core_metadata')?.qwen_image_quantization).toBe('nf4');
+  });
+
+  it('encodes the enabled Krea-2 style reference at the denoise size and feeds it to the denoise node', () => {
+    // The served limit is one enabled reference; a disabled card stays out of the graph.
+    const graph = compile(krea2Model, {
+      height: 768,
+      referenceImages: [styleReference(1.5, false, 'disabled'), styleReference(0.8, true, 'used')],
+      width: 1280,
+    });
+    const styleNodes = Object.values(graph.nodes).filter((node) => node.type === 'krea2_style_reference');
+
+    expect(styleNodes).toHaveLength(1);
+    expect(styleNodes[0]).toMatchObject({
+      height: 768,
+      image: { image_name: 'reference.png' },
+      style_strength: 0.8,
+      width: 1280,
+    });
+    expect(getEdge(graph, styleNodes[0]!.id, 'vae')?.source.node_id).toBe('model_loader');
+    expect(getEdge(graph, 'denoise_latents', 'style_reference')?.source.node_id).toBe(styleNodes[0]!.id);
+    expect(getNodeByType(graph, 'core_metadata')?.krea2_style_strength).toBe(0.8);
+    expect((getNodeByType(graph, 'core_metadata')!.ref_images as { id: string }[]).map((entry) => entry.id)).toEqual([
+      'used',
+    ]);
+  });
+
+  it('encodes a cropped Krea-2 reference from its crop', () => {
+    const cropped = {
+      crop: {
+        box: { height: 256, width: 256, x: 0, y: 0 },
+        image: { height: 256, image_name: 'crop.png', width: 256 },
+        ratio: 1,
+      },
+      original: refImage.original,
+    };
+    const graph = compile(krea2Model, {
+      referenceImages: [
+        { config: { image: cropped, styleStrength: 1, type: 'krea2_style_reference_image' }, id: 'r', isEnabled: true },
+      ],
+    });
+
+    expect(getNodeByType(graph, 'krea2_style_reference')?.image).toEqual({ image_name: 'crop.png' });
+  });
+
+  it('leaves the Krea-2 graph without a style node when every reference is bypassed', () => {
+    const graph = compile(krea2Model, { referenceImages: [styleReference(0)] });
+
+    expect(getNodeByType(graph, 'krea2_style_reference')).toBeUndefined();
+    expect(getEdge(graph, 'denoise_latents', 'style_reference')).toBeUndefined();
+    expect(getNodeByType(graph, 'core_metadata')).not.toHaveProperty('krea2_style_strength');
+  });
+});
+
+describe('output filters', () => {
+  /** The graph without its minted ids, so two compilations of one recipe compare equal. */
+  const structure = (graph: ReturnType<typeof compile>) => stabilizeBackendGraphIds(graph);
+
+  it.each(generateGraphCases)(
+    '$label compiles the same graph when the filters are left at their defaults',
+    ({ base, shape }) => {
+      const { model, settings } = satisfiedSettingsFor(base, shape);
+      const plain = compileGenerateGraph(settings, model, 'gallery', { useCpuNoise: true }).backendGraph;
+      const explicit = compileGenerateGraph(settings, model, 'gallery', {
+        useCpuNoise: true,
+        useNsfwChecker: false,
+        useWatermark: false,
+      }).backendGraph;
+
+      expect(structure(explicit)).toEqual(structure(plain));
+      expect(Object.values(plain.nodes).some((node) => node.type === 'img_nsfw' || node.type === 'img_watermark')).toBe(
+        false
+      );
+    }
+  );
+
+  it.each(generateGraphCases)('$label chains the checker and watermark after its decode', ({ base, shape }) => {
+    const { model, settings } = satisfiedSettingsFor(base, shape);
+    const plain = compileGenerateGraph(settings, model, 'gallery', { useCpuNoise: true }).backendGraph;
+    const graph = compileGenerateGraph(settings, model, 'canvas', {
+      useCpuNoise: true,
+      useNsfwChecker: true,
+      useWatermark: true,
+    }).backendGraph;
+
+    // The decode that used to be the output now feeds the checker, and only the watermark is the result.
+    expect(graph.nodes.canvas_decode?.type).toBe(plain.nodes.canvas_output?.type);
+    expect(graph.nodes.canvas_decode?.is_intermediate).toBe(true);
+    expect(graph.nodes.canvas_img_nsfw).toMatchObject({ is_intermediate: true, type: 'img_nsfw', use_cache: false });
+    expect(graph.nodes.canvas_output).toMatchObject({ is_intermediate: true, type: 'img_watermark', use_cache: false });
+    expect(getEdge(graph, 'canvas_img_nsfw', 'image')?.source).toEqual({ field: 'image', node_id: 'canvas_decode' });
+    expect(getEdge(graph, 'canvas_output', 'image')?.source).toEqual({ field: 'image', node_id: 'canvas_img_nsfw' });
+    expect(getEdge(graph, 'canvas_output', 'metadata')?.source.node_id).toBe(getNodeByType(graph, 'core_metadata')?.id);
+    expect(getEdge(graph, 'canvas_decode', 'metadata')).toBeUndefined();
+  });
+
+  it('runs a single filter as the durable output itself', () => {
+    const graph = compileGenerateGraph(createSettings(sd1Model), sd1Model, 'gallery', {
+      useCpuNoise: true,
+      useWatermark: true,
+    }).backendGraph;
+
+    expect(graph.nodes.canvas_img_nsfw).toBeUndefined();
+    expect(graph.nodes.canvas_output).toMatchObject({ is_intermediate: false, type: 'img_watermark' });
+    expect(getEdge(graph, 'canvas_output', 'image')?.source.node_id).toBe('canvas_decode');
+  });
+
+  it('keeps the filters after a PiD decode, which already ends on the output node', () => {
+    const gemma2: ComponentModelConfig = { base: 'any', key: 'gemma2', name: 'Gemma 2 2B', type: 'gemma2_encoder' };
+    const graph = compileGenerateGraph(
+      createSettings(sdxlModel, {
+        gemma2EncoderModel: gemma2,
+        pidDecoderModel: { base: 'sdxl', key: 'pid-sdxl', name: 'PiD SDXL', type: 'pid_decoder' },
+        pidMode: 'native',
+      }),
+      sdxlModel,
+      'gallery',
+      { useCpuNoise: true, useNsfwChecker: true }
+    ).backendGraph;
+
+    expect(graph.nodes.canvas_decode?.type).toBe('sdxl_pid_decode');
+    expect(graph.nodes.canvas_output?.type).toBe('img_nsfw');
+  });
+
+  it('does not filter an external provider, which returns finished images', () => {
+    const graph = compileGenerateGraph(createSettings(externalModel), externalModel, 'gallery', {
+      useCpuNoise: true,
+      useNsfwChecker: true,
+      useWatermark: true,
+    }).backendGraph;
+
+    expect(getNodeByType(graph, 'img_nsfw')).toBeUndefined();
+    expect(getNodeByType(graph, 'img_watermark')).toBeUndefined();
   });
 });

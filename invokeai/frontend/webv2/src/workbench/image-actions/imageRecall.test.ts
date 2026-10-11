@@ -149,6 +149,15 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   krea2SeedVarianceEnabled: false,
   krea2SeedVarianceStrength: 0.1,
   krea2SeedVarianceRandomizePercent: 50,
+  fluxDypePreset: 'off',
+  fluxDypeScale: 2,
+  fluxDypeExponent: 2,
+  zImageShift: null,
+  zImageSeedVarianceEnabled: false,
+  zImageSeedVarianceStrength: 0.1,
+  zImageSeedVarianceRandomizePercent: 50,
+  qwenImageShift: null,
+  qwenImageEncoderQuantization: 'none',
   referenceImages: [],
   scheduler: 'euler_a',
   seamlessXAxis: false,
@@ -1177,6 +1186,120 @@ describe('image recall', () => {
       expect(capabilities.all).toBe(true);
       expect(capabilities.remix).toBe(true);
     });
+  });
+});
+
+describe('model-family tuning recall', () => {
+  const fluxModel: MainModelConfig = { base: 'flux', key: 'flux-model', name: 'FLUX', type: 'main' };
+  const zImageModel: MainModelConfig = { base: 'z-image', key: 'z-model', name: 'Z-Image', type: 'main' };
+  const qwenModel: MainModelConfig = { base: 'qwen-image', key: 'qwen-model', name: 'Qwen', type: 'main' };
+  const recall = (metadata: Record<string, unknown>, model: MainModelConfig, kind: ImageRecallKind = 'all') =>
+    buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind,
+      metadata: { model: { key: model.key }, ...metadata },
+      models: [],
+      supportedModels: [model],
+      vaeModels: [],
+    });
+
+  it('restores the DyPE recipe a FLUX image was generated with', () => {
+    const result = recall({ dype_exponent: 0.5, dype_preset: 'manual', dype_scale: 3 }, fluxModel, 'remix');
+
+    expect(result?.values).toMatchObject({ fluxDypeExponent: 0.5, fluxDypePreset: 'manual', fluxDypeScale: 3 });
+    expect(result?.fields).toContain('modelTuning');
+  });
+
+  it('restores the Z-Image shift and seed variance, reading auto back as no override', () => {
+    const fixed = recall(
+      {
+        z_image_seed_variance_enabled: true,
+        z_image_seed_variance_randomize_percent: 25,
+        z_image_seed_variance_strength: 0.3,
+        z_image_shift: 2.5,
+      },
+      zImageModel
+    );
+    const auto = recall({ z_image_shift: 'auto' }, zImageModel);
+
+    expect(fixed?.values).toMatchObject({
+      zImageSeedVarianceEnabled: true,
+      zImageSeedVarianceRandomizePercent: 25,
+      zImageSeedVarianceStrength: 0.3,
+      zImageShift: 2.5,
+    });
+    expect(auto?.values.zImageShift).toBeNull();
+    expect(auto?.fields).toContain('modelTuning');
+  });
+
+  it('restores the Qwen-Image shift and encoder quantization', () => {
+    const result = recall({ qwen_image_quantization: 'nf4', qwen_image_shift: 3 }, qwenModel);
+
+    expect(result?.values).toMatchObject({ qwenImageEncoderQuantization: 'nf4', qwenImageShift: 3 });
+  });
+
+  it('ignores tuning recorded for another family and values outside the node bounds', () => {
+    const wrongFamily = recall({ dype_preset: 'manual', z_image_shift: 2 }, qwenModel);
+    const outOfRange = recall({ dype_preset: 'turbo', dype_scale: 9 }, fluxModel);
+
+    expect(wrongFamily?.values.fluxDypePreset).toBe('off');
+    expect(wrongFamily?.values.zImageShift).toBeNull();
+    expect(wrongFamily?.fields ?? []).not.toContain('modelTuning');
+    expect(outOfRange?.values).toMatchObject({ fluxDypePreset: 'off', fluxDypeScale: 2 });
+  });
+
+  it('offers recall for an image whose only recallable delta is its tuning', () => {
+    const capabilities = getImageRecallCapabilities({
+      currentValues: createValues({ model: fluxModel }),
+      image,
+      metadata: { dype_preset: 'auto' },
+      models: [],
+      supportedModels: [],
+      vaeModels: [],
+    });
+
+    expect(capabilities.all).toBe(true);
+    expect(capabilities.remix).toBe(true);
+  });
+
+  it('restores a Krea-2 style reference with its strength through the recorded reference images', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: {
+        krea2_style_strength: 1.4,
+        model: { key: krea2Model.key },
+        ref_images: [
+          {
+            config: {
+              image: { original: { image: { height: 512, image_name: 'style.png', width: 512 } } },
+              styleStrength: 1.4,
+              type: 'krea2_style_reference_image',
+            },
+            id: 'style',
+            isEnabled: true,
+          },
+        ],
+      },
+      models: [],
+      supportedModels: [krea2Model],
+      vaeModels: [],
+    });
+
+    expect(result?.values.referenceImages).toEqual([
+      {
+        config: {
+          image: { original: { image: { height: 512, image_name: 'style.png', width: 512 } } },
+          styleStrength: 1.4,
+          type: 'krea2_style_reference_image',
+        },
+        id: 'style',
+        isEnabled: true,
+      },
+    ]);
+    expect(result?.fields).toContain('referenceImages');
   });
 });
 
