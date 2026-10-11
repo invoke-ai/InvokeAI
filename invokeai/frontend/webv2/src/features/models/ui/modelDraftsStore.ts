@@ -2,6 +2,7 @@ import type { ModelEditFormValues } from '@features/models/core/schemas';
 import type { ModelConfig } from '@features/models/core/types';
 
 import { getModelsSnapshot, subscribeModels } from '@features/models/data/modelsStore';
+import { toExternalModelValues } from '@features/models/ui/detail/externalModelFields';
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createKeyedTransientStore } from '@platform/state/externalStore';
 import { useExternalStoreSelector, type EqualityFn } from '@platform/state/selectors';
@@ -36,6 +37,8 @@ export interface ModelIdentityDraft extends ModelFieldsDraft {
 export interface ModelDraft {
   /** Default-settings edits; absent when nothing differs from the server and no save is in flight. */
   readonly defaults?: ModelFieldsDraft;
+  /** Hosted-provider record edits, kept like `defaults`. */
+  readonly external?: ModelFieldsDraft;
   /** Present exactly while the identity editor is open, even before anything is edited. */
   readonly identity?: ModelIdentityDraft;
 }
@@ -68,8 +71,11 @@ export const toModelIdentityValues = (model: ModelIdentitySource): ModelEditForm
 
 const SERVER_VALUES: Record<ModelDraftSurface, (model: ModelConfig) => object> = {
   defaults: (model) => model.default_settings ?? {},
+  external: toExternalModelValues,
   identity: toModelIdentityValues,
 };
+
+const FIELD_SURFACES = ['identity', 'defaults', 'external'] as const satisfies readonly ModelDraftSurface[];
 
 // Unset and null are the same "no value" to the backend and to every form here.
 const isSameValue = (left: unknown, right: unknown): boolean => Object.is(left ?? null, right ?? null);
@@ -93,7 +99,7 @@ export const hasModelDraftConflict = (server: object, draft: ModelFieldsDraft | 
   );
 
 export const hasUnsavedModelChanges = (draft: ModelDraft | undefined): boolean =>
-  hasDraftFields(draft?.identity) || hasDraftFields(draft?.defaults);
+  FIELD_SURFACES.some((surface) => hasDraftFields(draft?.[surface]));
 
 /**
  * Whether a user value is still an edit: it differs from the server, or from a save in flight (a field typed back
@@ -123,7 +129,7 @@ const evictBeyondBound = (): void => {
 };
 
 const writeDraft = (modelKey: string, draft: ModelDraft, edited = false): void => {
-  if (draft.identity === undefined && draft.defaults === undefined) {
+  if (FIELD_SURFACES.every((surface) => draft[surface] === undefined)) {
     deleteDraft(modelKey);
     return;
   }
@@ -224,7 +230,7 @@ const syncWithLibrary = (): void => {
 
     let draft = store.get(key);
 
-    for (const surface of ['identity', 'defaults'] as const) {
+    for (const surface of FIELD_SURFACES) {
       const surfaceDraft = draft?.[surface];
 
       if (surfaceDraft !== undefined) {

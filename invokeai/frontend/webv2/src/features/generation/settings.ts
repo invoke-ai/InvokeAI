@@ -55,6 +55,16 @@ export {
 } from './core/baseGenerationPolicies';
 export { hasArchitectureCapabilities } from './core/architectureCapabilities';
 export {
+  GEMINI_TEMPERATURE_MAX,
+  GEMINI_TEMPERATURE_MIN,
+  getExternalProviderOptionKeys,
+  getExternalResolutionPresets,
+  isGeminiThinkingLevel,
+  isOpenAIImageBackground,
+  isOpenAIImageQuality,
+  isOpenAIInputFidelity,
+} from './core/externalProvider';
+export {
   resolveGenerateWidgetValues,
   type ResolvedGenerateWidgetValues,
   type ResolveGenerateWidgetValuesInput,

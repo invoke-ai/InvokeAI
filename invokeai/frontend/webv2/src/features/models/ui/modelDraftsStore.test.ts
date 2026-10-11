@@ -47,6 +47,21 @@ describe('model drafts store', () => {
     expect(getModelDraft('m')?.identity?.fields).toEqual({ name: 'Draft 2' });
   });
 
+  it('counts hosted-provider record edits as unsaved changes and discards them like defaults', () => {
+    recordModelDraftFields(
+      'm',
+      'external',
+      { modeInpaint: true, providerId: 'openai' },
+      { modeInpaint: false, providerId: 'openai' }
+    );
+
+    expect(getModelDraft('m')?.external?.fields).toEqual({ modeInpaint: true });
+    expect(hasUnsavedModelChanges(getModelDraft('m'))).toBe(true);
+
+    discardModelDraft('m', 'external');
+    expect(getModelDraft('m')).toBeUndefined();
+  });
+
   it('treats unset and null default settings as the same value', () => {
     recordModelDraftFields('m', 'defaults', { cfgScale: null, steps: 30 }, { steps: 30 });
 

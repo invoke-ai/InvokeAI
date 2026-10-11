@@ -28,6 +28,14 @@ import {
   KREA2_REBALANCE_WEIGHT_COUNT,
 } from './conditioningRebalance';
 import { isDynamicPromptsSeedBehaviour, sanitizeMaxPrompts, sanitizeSampleSeed } from './dynamicPrompts';
+import {
+  GEMINI_TEMPERATURE_MAX,
+  GEMINI_TEMPERATURE_MIN,
+  isGeminiThinkingLevel,
+  isOpenAIImageBackground,
+  isOpenAIImageQuality,
+  isOpenAIInputFidelity,
+} from './externalProvider';
 import { clampPidSteps, DEFAULT_PID_STEPS, isPidMode } from './pid';
 import { isCanonicalPromptTemplateSnapshot, sanitizePromptTemplateSnapshot } from './promptTemplates';
 import { cloneCroppableImage, normalizeCroppableImage } from './referenceImage';
@@ -794,6 +802,20 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     pidDecoderModel: getModelIdentifierOrNull(values.pidDecoderModel),
     gemma2EncoderModel: getModelIdentifierOrNull(values.gemma2EncoderModel),
     pidSteps: clampPidSteps(hasFiniteNumber(values, 'pidSteps') ? (values.pidSteps as number) : DEFAULT_PID_STEPS),
+    externalImageSize:
+      typeof values.externalImageSize === 'string' && values.externalImageSize !== '' ? values.externalImageSize : null,
+    openaiQuality: isOpenAIImageQuality(values.openaiQuality) ? values.openaiQuality : 'auto',
+    openaiBackground: isOpenAIImageBackground(values.openaiBackground) ? values.openaiBackground : 'auto',
+    openaiInputFidelity: isOpenAIInputFidelity(values.openaiInputFidelity) ? values.openaiInputFidelity : null,
+    geminiTemperature:
+      hasFiniteNumber(values, 'geminiTemperature') &&
+      (values.geminiTemperature as number) >= GEMINI_TEMPERATURE_MIN &&
+      (values.geminiTemperature as number) <= GEMINI_TEMPERATURE_MAX
+        ? (values.geminiTemperature as number)
+        : null,
+    geminiThinkingLevel: isGeminiThinkingLevel(values.geminiThinkingLevel) ? values.geminiThinkingLevel : null,
+    seedreamWatermark: values.seedreamWatermark === true,
+    seedreamOptimizePrompt: values.seedreamOptimizePrompt === true,
     width,
   };
 };

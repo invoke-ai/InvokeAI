@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type {
   ComponentModelConfig,
+  ExternalImageGeneratorModelConfig,
   GenerateModelConfig,
   GenerateSettings,
   LoraModelConfig,
@@ -598,6 +599,119 @@ describe('compileGenerateGraph', () => {
     );
 
     expect(graph.nodes.canvas_output?.reference_images).toEqual([{ image_name: 'reference.png' }]);
+  });
+
+  describe('external provider options', () => {
+    const providerSettings: Partial<GenerateSettings> = {
+      externalImageSize: '2K',
+      geminiTemperature: 0.4,
+      geminiThinkingLevel: 'high',
+      openaiBackground: 'transparent',
+      openaiInputFidelity: 'high',
+      openaiQuality: 'low',
+      seedreamOptimizePrompt: true,
+      seedreamWatermark: true,
+    };
+    const providerModel = (
+      providerId: string,
+      capabilities: ExternalImageGeneratorModelConfig['capabilities']
+    ): GenerateModelConfig => ({ ...externalModel, capabilities, provider_id: providerId }) as GenerateModelConfig;
+
+    it('compiles OpenAI quality, background and input fidelity, recording them in metadata', () => {
+      const model = providerModel('openai', { modes: ['txt2img', 'img2img'] });
+      const graph = compile(model, providerSettings);
+
+      expect(graph.nodes.canvas_output).toMatchObject({
+        background: 'transparent',
+        input_fidelity: 'high',
+        quality: 'low',
+      });
+      // Fields of other providers' nodes never reach this one.
+      expect(graph.nodes.canvas_output).not.toHaveProperty('temperature');
+      expect(graph.nodes.canvas_output).not.toHaveProperty('watermark');
+      expect(getNodeByType(graph, 'core_metadata')).toMatchObject({
+        openai_background: 'transparent',
+        openai_input_fidelity: 'high',
+        openai_quality: 'low',
+      });
+    });
+
+    it('omits OpenAI input fidelity for a model with no image inputs, and when unset', () => {
+      const noInputs = compile(providerModel('openai', { modes: ['txt2img'] }), providerSettings);
+
+      expect(noInputs.nodes.canvas_output).toMatchObject({ background: 'transparent', quality: 'low' });
+      expect(noInputs.nodes.canvas_output).not.toHaveProperty('input_fidelity');
+
+      const unset = compile(providerModel('openai', { modes: ['txt2img', 'img2img'] }), {
+        ...providerSettings,
+        openaiInputFidelity: null,
+      });
+
+      expect(unset.nodes.canvas_output).not.toHaveProperty('input_fidelity');
+      expect(getNodeByType(unset, 'core_metadata')).not.toHaveProperty('openai_input_fidelity');
+    });
+
+    it('compiles Gemini temperature and thinking level only when set', () => {
+      const model = providerModel('gemini', { modes: ['txt2img'] });
+      const graph = compile(model, providerSettings);
+
+      expect(graph.nodes.canvas_output).toMatchObject({ temperature: 0.4, thinking_level: 'high' });
+      expect(graph.nodes.canvas_output).not.toHaveProperty('quality');
+      expect(getNodeByType(graph, 'core_metadata')).toMatchObject({
+        gemini_temperature: 0.4,
+        gemini_thinking_level: 'high',
+      });
+
+      const defaults = compile(model, { ...providerSettings, geminiTemperature: null, geminiThinkingLevel: null });
+
+      expect(defaults.nodes.canvas_output).not.toHaveProperty('temperature');
+      expect(defaults.nodes.canvas_output).not.toHaveProperty('thinking_level');
+    });
+
+    it('compiles Seedream watermark and prompt optimization as explicit booleans', () => {
+      const model = providerModel('seedream', { modes: ['txt2img'] });
+
+      expect(compile(model, providerSettings).nodes.canvas_output).toMatchObject({
+        optimize_prompt: true,
+        watermark: true,
+      });
+      expect(
+        compile(model, { ...providerSettings, seedreamOptimizePrompt: false, seedreamWatermark: false }).nodes
+          .canvas_output
+      ).toMatchObject({ optimize_prompt: false, watermark: false });
+      expect(getNodeByType(compile(model, providerSettings), 'core_metadata')).toMatchObject({
+        seedream_optimize_prompt: true,
+        seedream_watermark: true,
+      });
+    });
+
+    it('sends the named size only when the model lists it in a resolution preset', () => {
+      const presets = [
+        { aspect_ratio: '1:1', height: 2048, image_size: '2K', label: '1:1 (2K)', width: 2048 },
+        { aspect_ratio: '1:1', height: 1024, image_size: '1K', label: '1:1 (1K)', width: 1024 },
+      ];
+      const listed = compile(providerModel('gemini', { modes: ['txt2img'], resolution_presets: presets }), {
+        ...providerSettings,
+        height: 2048,
+        width: 2048,
+      });
+
+      expect(listed.nodes.canvas_output).toMatchObject({ height: 2048, image_size: '2K', width: 2048 });
+      expect(getNodeByType(listed, 'core_metadata')).toMatchObject({ image_size: '2K' });
+
+      // A size picked for another model, or a provider without named sizes, falls back to the provider default.
+      const unlisted = compile(providerModel('gemini', { modes: ['txt2img'] }), providerSettings);
+
+      expect(unlisted.nodes.canvas_output?.image_size).toBeNull();
+      expect(getNodeByType(unlisted, 'core_metadata')).not.toHaveProperty('image_size');
+    });
+
+    it('accepts provider sizes that are not multiples of a local model grid', () => {
+      const model = providerModel('gemini', { modes: ['txt2img'] });
+      const graph = compile(model, { height: 2048, width: 1365 });
+
+      expect(graph.nodes.canvas_output).toMatchObject({ height: 2048, width: 1365 });
+    });
   });
 
   it('wires SD IP Adapter reference images into denoise', () => {

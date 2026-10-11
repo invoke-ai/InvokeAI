@@ -98,6 +98,14 @@ information on how to generate these keys. Once a valid API key has
 been provided, the list of models hosted by that service will appear
 as selections in the Image Generation panel.
 
+Opening an external model in the Model Manager shows an **External
+Provider** section where you can change the provider and provider model
+ID it routes to, the modes (text to image, image to image, inpaint) and
+inputs (seed, reference images, negative prompt) it advertises, its
+request limits, and the size and image count the provider is asked for
+by default. The Generate panel and the Canvas only offer what the
+record advertises, so keep it in step with the provider's documentation.
+
 :::note[Gated Downloads]
    The API Keys section is also used to provide keys for services that
    require authentication to download certain models, such as those

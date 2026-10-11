@@ -406,15 +406,96 @@ describe('compileCanvasGraph', () => {
     );
   });
 
+  describe('external image generators', () => {
+    const editModel: GenerateModelConfig = {
+      ...externalModel,
+      capabilities: { modes: ['txt2img', 'img2img', 'inpaint'], supports_seed: true },
+    };
+    const smallBbox: Rect = { height: 512, width: 640, x: 10, y: 20 };
+
+    it('generates txt2img from an empty bbox on one provider node sized to the bbox, with no encode or resize', () => {
+      const { backendGraph, mode } = compile(externalModel, 'txt2img', {
+        bbox: smallBbox,
+        compositeImageName: null,
+        scaling: { height: null, method: 'auto', width: null },
+      });
+      const output = backendGraph.nodes.canvas_output;
+
+      expect(mode).toBe('txt2img');
+      expect(output).toMatchObject({
+        height: 512,
+        is_intermediate: true,
+        mode: 'txt2img',
+        type: 'openai_image_generation',
+        width: 640,
+      });
+      expect(output).not.toHaveProperty('init_image');
+      expect(output).not.toHaveProperty('mask_image');
+      expect(getEdge(backendGraph, 'canvas_output', 'prompt')?.source.node_id).toBe('positive_prompt');
+      expect(getEdge(backendGraph, 'canvas_output', 'seed')?.source.node_id).toBe('seed');
+      expect(backendGraph.nodes.canvas_i2l).toBeUndefined();
+      expect(backendGraph.nodes.canvas_processing_output).toBeUndefined();
+      expect(Object.values(backendGraph.nodes).map((node) => node.type)).not.toContain('img_resize');
+      // The provider returns one image at the bbox size, so metadata records the bbox too.
+      expect(getNodeByType(backendGraph, 'core_metadata')).toMatchObject({ height: 512, width: 640 });
+    });
+
+    it('sends the composited bbox as the init image for img2img when the model advertises it', () => {
+      const { backendGraph } = compile(editModel, 'img2img', { compositeImageName: 'bbox.png' });
+
+      expect(backendGraph.nodes.canvas_output).toMatchObject({
+        init_image: { image_name: 'bbox.png' },
+        mode: 'img2img',
+      });
+      expect(backendGraph.nodes.canvas_output).not.toHaveProperty('mask_image');
+      // No local denoise path is grafted: the provider edits the whole image.
+      expect(backendGraph.nodes.denoise_latents).toBeUndefined();
+      expect(backendGraph.nodes.create_gradient_mask).toBeUndefined();
+    });
+
+    it('sends the composite and the grayscale mask for inpaint', () => {
+      const { backendGraph } = compile(editModel, 'inpaint', {
+        compositeImageName: 'bbox.png',
+        maskImageName: 'mask.png',
+      });
+
+      expect(backendGraph.nodes.canvas_output).toMatchObject({
+        init_image: { image_name: 'bbox.png' },
+        mask_image: { image_name: 'mask.png' },
+        mode: 'inpaint',
+      });
+      // The provider composites its own edit, so no blend/apply-mask tail follows it.
+      expect(backendGraph.nodes.invokeai_img_blend).toBeUndefined();
+      expect(backendGraph.nodes.expand_mask).toBeUndefined();
+    });
+
+    it('still requires the composite and the mask the mode needs', () => {
+      expect(() => compile(editModel, 'img2img', { compositeImageName: null })).toThrow(
+        'Canvas generation requires a composited source image.'
+      );
+      expect(() => compile(editModel, 'inpaint', { maskImageName: null })).toThrow(
+        'Canvas inpainting requires an inpaint mask.'
+      );
+    });
+
+    it('rejects the edit modes a model does not advertise, naming the mode', () => {
+      expect(() => compile(externalModel, 'img2img')).toThrow(
+        'OpenAI Image does not support image-to-image generation.'
+      );
+      expect(() => compile(externalModel, 'inpaint')).toThrow('OpenAI Image does not support inpainting.');
+      expect(() =>
+        compile({ ...externalModel, capabilities: { modes: ['img2img'] } }, 'txt2img', { compositeImageName: null })
+      ).toThrow('OpenAI Image does not support text-to-image generation.');
+    });
+
+    it('rejects outpaint even for a model that advertises every provider mode', () => {
+      expect(() => compile(editModel, 'outpaint', { maskImageName: null })).toThrow(
+        'OpenAI Image does not support outpainting on the canvas.'
+      );
+    });
+  });
+
   describe('unsupported models', () => {
-    it('rejects external image generators for txt2img', () => {
-      expect(() => compile(externalModel, 'txt2img')).toThrow('does not support canvas generation');
-    });
-
-    it('rejects external image generators for img2img', () => {
-      expect(() => compile(externalModel, 'img2img')).toThrow('does not support canvas generation');
-    });
-
     it('rejects PiD with an actionable message rather than an internal VAE error', () => {
       // PiD lacks the VAE seam expected by canvas compilation, so reject it explicitly.
       for (const mode of ['txt2img', 'img2img'] as const) {
@@ -843,12 +924,6 @@ describe('compileCanvasGraph — outpaint per base', () => {
     expect(backendGraph.nodes.create_gradient_mask?.edge_radius).toBe(8);
     expect(backendGraph.nodes.create_gradient_mask?.minimum_denoise).toBe(0.3);
     expect(backendGraph.nodes.expand_mask?.fade_size_px).toBe(24);
-  });
-
-  it('rejects an external model for every image mode', () => {
-    expect(() => compile(externalModel, 'outpaint', { maskImageName: null })).toThrow(
-      'does not support canvas generation'
-    );
   });
 });
 

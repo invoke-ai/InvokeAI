@@ -396,7 +396,123 @@ const createQueueItems = (count) =>
 const MODEL_BASES = ['sd-1', 'sdxl', 'flux', 'flux2', 'qwen-image'];
 const MODEL_TYPES = ['main', 'lora', 'controlnet', 'vae', 'embedding'];
 
-const createModels = (count) =>
+/**
+ * Hosted-provider records with the capability shapes the Generate panel, Canvas, and Model Manager read: a named
+ * resolution table (Gemini), fixed sizes per ratio with an edit mode (OpenAI), and provider toggles (Seedream).
+ */
+const EXTERNAL_MODEL_FIXTURES = [
+  {
+    base: 'external',
+    capabilities: {
+      allowed_aspect_ratios: ['1:1', '16:9', '9:16'],
+      max_image_size: { height: 4096, width: 4096 },
+      max_images_per_request: 1,
+      max_reference_images: 14,
+      modes: ['txt2img'],
+      resolution_presets: ['1K', '2K'].flatMap((imageSize) =>
+        [
+          ['1:1', 1, 1],
+          ['16:9', 16, 9],
+          ['9:16', 9, 16],
+        ].map(([ratio, w, h]) => {
+          const base = imageSize === '1K' ? 1024 : 2048;
+          const width = w >= h ? base : Math.round((base * w) / h);
+          const height = w >= h ? Math.round((base * h) / w) : base;
+          return {
+            aspect_ratio: ratio,
+            height,
+            image_size: imageSize,
+            label: `${ratio} (${imageSize}) — ${width}×${height}`,
+            width,
+          };
+        })
+      ),
+      supports_reference_images: true,
+      supports_seed: true,
+    },
+    cover_image: null,
+    default_settings: { height: 1024, num_images: 1, width: 1024 },
+    description: 'Fixture hosted model with named resolution presets and sampling options.',
+    file_size: 0,
+    format: 'external_api',
+    hash: 'external:gemini:fixture-gemini-image',
+    key: 'fixture-external-gemini',
+    name: 'Fixture Gemini Image',
+    path: 'external://gemini/fixture-gemini-image',
+    provider_id: 'gemini',
+    provider_model_id: 'fixture-gemini-image',
+    source: 'external://gemini/fixture-gemini-image',
+    source_type: 'external',
+    source_url: null,
+    trigger_phrases: null,
+    type: 'external_image_generator',
+  },
+  {
+    base: 'external',
+    capabilities: {
+      allowed_aspect_ratios: ['1:1', '3:2', '2:3'],
+      aspect_ratio_sizes: {
+        '1:1': { height: 1024, width: 1024 },
+        '3:2': { height: 1024, width: 1536 },
+        '2:3': { height: 1536, width: 1024 },
+      },
+      max_images_per_request: 10,
+      modes: ['txt2img', 'img2img', 'inpaint'],
+      supports_reference_images: true,
+    },
+    cover_image: null,
+    default_settings: { height: 1024, num_images: 1, width: 1024 },
+    description: 'Fixture hosted model with fixed ratio sizes and canvas edit modes.',
+    file_size: 0,
+    format: 'external_api',
+    hash: 'external:openai:fixture-gpt-image',
+    key: 'fixture-external-openai',
+    name: 'Fixture GPT Image',
+    path: 'external://openai/fixture-gpt-image',
+    provider_id: 'openai',
+    provider_model_id: 'fixture-gpt-image',
+    source: 'external://openai/fixture-gpt-image',
+    source_type: 'external',
+    source_url: null,
+    trigger_phrases: null,
+    type: 'external_image_generator',
+  },
+  {
+    base: 'external',
+    capabilities: {
+      allowed_aspect_ratios: ['1:1', '16:9'],
+      aspect_ratio_sizes: { '1:1': { height: 2048, width: 2048 }, '16:9': { height: 1600, width: 2848 } },
+      max_images_per_request: 15,
+      max_reference_images: 14,
+      modes: ['txt2img', 'img2img'],
+      supports_reference_images: true,
+    },
+    cover_image: null,
+    default_settings: { height: 2048, num_images: 1, width: 2048 },
+    description: 'Fixture hosted model with provider toggles.',
+    file_size: 0,
+    format: 'external_api',
+    hash: 'external:seedream:fixture-seedream',
+    key: 'fixture-external-seedream',
+    name: 'Fixture Seedream',
+    path: 'external://seedream/fixture-seedream',
+    provider_id: 'seedream',
+    provider_model_id: 'fixture-seedream',
+    source: 'external://seedream/fixture-seedream',
+    source_type: 'external',
+    source_url: null,
+    trigger_phrases: null,
+    type: 'external_image_generator',
+  },
+];
+
+/** The last slots of the model library hold the hosted-provider records so the profile counts stay as declared. */
+const createModels = (count) => [
+  ...createLocalModels(Math.max(0, count - EXTERNAL_MODEL_FIXTURES.length)),
+  ...EXTERNAL_MODEL_FIXTURES.slice(0, count).map((model) => structuredClone(model)),
+];
+
+const createLocalModels = (count) =>
   range(count, (index) => {
     const id = ordinal(index);
     const type = MODEL_TYPES[index % MODEL_TYPES.length];

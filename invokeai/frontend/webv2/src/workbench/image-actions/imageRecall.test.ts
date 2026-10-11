@@ -143,6 +143,14 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   ideogram4GuidanceScale: null,
   ideogram4Mu: null,
   ideogram4ColorPalette: [],
+  externalImageSize: null,
+  openaiQuality: 'auto',
+  openaiBackground: 'auto',
+  openaiInputFidelity: null,
+  geminiTemperature: null,
+  geminiThinkingLevel: null,
+  seedreamWatermark: false,
+  seedreamOptimizePrompt: false,
   krea2RebalanceEnabled: false,
   krea2RebalanceMultiplier: 4,
   krea2RebalanceWeights: '1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0',
@@ -567,8 +575,9 @@ describe('image recall', () => {
     expect(result?.values.aspectRatioId).toBe('2:3');
   });
 
-  it('recalls the size for an external generator, which has no architecture row to wait for', () => {
-    // External providers have no capability row and must remain eligible for dimension recall.
+  it('recalls the exact size for an external generator, which has no architecture row or grid', () => {
+    // External providers have no capability row and must remain eligible for dimension recall; their providers
+    // bucket sizes themselves, so the image's pixel size is kept rather than snapped to a local model grid.
     const externalModel = {
       base: 'external',
       capabilities: { modes: ['txt2img'], supports_seed: true },
@@ -589,11 +598,11 @@ describe('image recall', () => {
         vaeModels: [],
       });
 
-    expect(recall()?.values).toMatchObject({ height: 768, width: 512 });
+    expect(recall()?.values).toMatchObject({ height: 770, width: 513 });
 
     resetArchitectureCapabilities();
     try {
-      expect(recall()?.values).toMatchObject({ height: 768, width: 512 });
+      expect(recall()?.values).toMatchObject({ height: 770, width: 513 });
     } finally {
       setArchitectureCapabilities(architectureCapabilitiesFixture);
     }
@@ -1169,6 +1178,137 @@ describe('image recall', () => {
         currentValues: createValues({ model: krea2Model }),
         image,
         metadata: { krea2_rebalance_enabled: true },
+        models: [],
+        supportedModels: [],
+        vaeModels: [],
+      });
+
+      expect(capabilities.all).toBe(true);
+      expect(capabilities.remix).toBe(true);
+    });
+  });
+
+  describe('external provider options', () => {
+    const openaiModel = {
+      base: 'external',
+      capabilities: { modes: ['txt2img', 'img2img'], supports_reference_images: true },
+      format: 'external_api',
+      key: 'gpt-image',
+      name: 'GPT Image',
+      provider_id: 'openai',
+      type: 'external_image_generator',
+    } as GenerateWidgetValues['model'];
+    const geminiModel = {
+      ...openaiModel,
+      capabilities: {
+        modes: ['txt2img'],
+        resolution_presets: [
+          { aspect_ratio: '1:1', height: 1024, image_size: '1K', label: '1:1 (1K)', width: 1024 },
+          { aspect_ratio: '1:1', height: 2048, image_size: '2K', label: '1:1 (2K)', width: 2048 },
+        ],
+      },
+      key: 'gemini-3',
+      name: 'Gemini 3',
+      provider_id: 'gemini',
+    } as GenerateWidgetValues['model'];
+    const seedreamModel = {
+      ...openaiModel,
+      capabilities: { modes: ['txt2img'] },
+      key: 'seedream',
+      name: 'Seedream',
+      provider_id: 'seedream',
+    } as GenerateWidgetValues['model'];
+    // What the provider nodes record (`_build_output_provider_metadata`) plus the named size the base node records.
+    const providerMetadata = {
+      gemini_temperature: 0.4,
+      gemini_thinking_level: 'high',
+      image_size: '2K',
+      openai_background: 'transparent',
+      openai_input_fidelity: 'high',
+      openai_quality: 'low',
+      seedream_optimize_prompt: true,
+      seedream_watermark: true,
+    };
+    const recall = (model: GenerateWidgetValues['model'], metadata: Record<string, unknown>, kind: 'all' | 'remix') =>
+      buildImageRecallSettings({
+        currentValues: createValues(),
+        image,
+        kind,
+        metadata: { ...metadata, model: { key: model.key } },
+        models: [],
+        supportedModels: [model],
+        vaeModels: [],
+      });
+
+    it('restores only the options the recalled OpenAI model accepts', () => {
+      const result = recall(openaiModel, providerMetadata, 'all');
+
+      expect(result?.values).toMatchObject({
+        openaiBackground: 'transparent',
+        openaiInputFidelity: 'high',
+        openaiQuality: 'low',
+      });
+      // Another provider's keys and a named size the model does not list stay at the current values.
+      expect(result?.values).toMatchObject({
+        externalImageSize: null,
+        geminiTemperature: null,
+        geminiThinkingLevel: null,
+        seedreamOptimizePrompt: false,
+        seedreamWatermark: false,
+      });
+      expect(result?.fields).toContain('externalProvider');
+    });
+
+    it('restores Gemini sampling and the named size the model lists, on a remix too', () => {
+      const result = recall(geminiModel, providerMetadata, 'remix');
+
+      expect(result?.values).toMatchObject({
+        externalImageSize: '2K',
+        geminiTemperature: 0.4,
+        geminiThinkingLevel: 'high',
+        openaiQuality: 'auto',
+      });
+      expect(result?.fields).toContain('externalProvider');
+    });
+
+    it('restores Seedream toggles and drops values the node would reject', () => {
+      const result = recall(
+        seedreamModel,
+        { ...providerMetadata, seedream_optimize_prompt: 'yes', seedream_watermark: false },
+        'all'
+      );
+
+      expect(result?.values.seedreamWatermark).toBe(false);
+      expect(result?.values.seedreamOptimizePrompt).toBe(false);
+      expect(result?.fields).toContain('externalProvider');
+
+      const invalid = recall(geminiModel, { gemini_temperature: 9, gemini_thinking_level: 'max' }, 'all');
+
+      expect(invalid?.values.geminiTemperature).toBeNull();
+      expect(invalid?.values.geminiThinkingLevel).toBeNull();
+      expect(invalid?.fields).not.toContain('externalProvider');
+    });
+
+    it('skips provider metadata when the image was made with a local model', () => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues(),
+        image,
+        kind: 'all',
+        metadata: { ...providerMetadata, model: { key: sdxlModel.key } },
+        models: [],
+        supportedModels: [sdxlModel],
+        vaeModels: [],
+      });
+
+      expect(result?.values.openaiQuality).toBe('auto');
+      expect(result?.fields).not.toContain('externalProvider');
+    });
+
+    it('offers recall for an image whose only recallable delta is a provider option', () => {
+      const capabilities = getImageRecallCapabilities({
+        currentValues: createValues({ model: seedreamModel, modelKey: seedreamModel.key }),
+        image,
+        metadata: { seedream_watermark: true },
         models: [],
         supportedModels: [],
         vaeModels: [],

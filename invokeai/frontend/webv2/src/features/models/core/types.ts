@@ -115,9 +115,45 @@ export interface ControlAdapterDefaultSettings {
   fp8_storage?: boolean | null;
 }
 
+/** Hosted-provider defaults (`ExternalApiModelDefaultSettings`): the size and image count the provider is asked for. */
+export interface ExternalModelDefaultSettings {
+  width?: number | null;
+  height?: number | null;
+  num_images?: number | null;
+}
+
 export type AnyModelDefaultSettings = MainModelDefaultSettings &
   LoraModelDefaultSettings &
-  ControlAdapterDefaultSettings;
+  ControlAdapterDefaultSettings &
+  ExternalModelDefaultSettings;
+
+export type ExternalGenerationMode = 'txt2img' | 'img2img' | 'inpaint';
+
+export interface ExternalImageSize {
+  width: number;
+  height: number;
+}
+
+/**
+ * The capability matrix of an external model (`ExternalModelCapabilities`). Fields the editor does not expose are
+ * typed loosely and carried through unchanged, because a PATCH replaces the whole object.
+ */
+export interface ExternalModelCapabilities {
+  modes?: ExternalGenerationMode[];
+  supports_reference_images?: boolean;
+  supports_negative_prompt?: boolean;
+  supports_seed?: boolean;
+  supports_guidance?: boolean;
+  supports_steps?: boolean;
+  max_images_per_request?: number | null;
+  max_image_size?: ExternalImageSize | null;
+  max_reference_images?: number | null;
+  allowed_aspect_ratios?: string[] | null;
+  aspect_ratio_sizes?: Record<string, ExternalImageSize> | null;
+  resolution_presets?: unknown[] | null;
+  mask_format?: string;
+  input_image_required_for?: ExternalGenerationMode[] | null;
+}
 
 /**
  * A model config record. This is the union of fields across all backend config
@@ -154,6 +190,7 @@ export interface ModelConfig {
   /** External API models. */
   provider_id?: string;
   provider_model_id?: string;
+  capabilities?: ExternalModelCapabilities | null;
   [key: string]: unknown;
 }
 
@@ -173,6 +210,10 @@ export interface ModelRecordChanges {
   cpu_only?: boolean | null;
   trigger_phrases?: string[] | null;
   default_settings?: AnyModelDefaultSettings | null;
+  /** External API models; `capabilities` replaces the stored matrix wholesale. */
+  provider_id?: string;
+  provider_model_id?: string;
+  capabilities?: ExternalModelCapabilities | null;
 }
 
 export type ModelInstallStatus =

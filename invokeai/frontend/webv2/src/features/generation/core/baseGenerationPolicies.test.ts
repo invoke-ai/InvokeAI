@@ -575,6 +575,27 @@ describe('component policies', () => {
     );
   });
 
+  it('validates the external mode being compiled against the modes the model advertises', () => {
+    const model: GenerateModelConfig = {
+      ...externalModel,
+      capabilities: { modes: ['txt2img', 'inpaint'] },
+    };
+
+    expect(getGenerationValidationReasons(model, createSettings(model))).toEqual([]);
+    expect(getGenerationValidationReasons(model, createSettings(model), 'inpaint')).toEqual([]);
+    expect(getGenerationValidationReasons(model, createSettings(model), 'img2img')).toContain(
+      'External Model does not support image-to-image generation.'
+    );
+    // Modes default to txt2img only when the record omits them.
+    expect(
+      getGenerationValidationReasons({ ...externalModel, capabilities: null }, createSettings(externalModel), 'inpaint')
+    ).toContain('External Model does not support inpainting.');
+  });
+
+  it('accepts provider sizes off the local model grids for external generators', () => {
+    expect(getGenerationValidationReasons(externalModel, createSettings(externalModel, { width: 1365 }))).toEqual([]);
+  });
+
   it('renders no component slots for bases without extra requirements', () => {
     expect(getComponentSectionPolicy(createModel('cogview4'), createSettings(createModel('cogview4'))).slots).toEqual(
       []

@@ -18,6 +18,7 @@ import {
 import { SEED_MAX } from '@platform/core/seed';
 
 import type {
+  ExternalGenerationMode,
   GenerateModelConfig,
   GenerateReferenceImage,
   GenerateReferenceImageAsset,
@@ -192,11 +193,12 @@ const getBaseGenerationConfig = (
   return getArchitectureGenerationConfig(model.base, model.variant) ?? FALLBACK_GENERATION_CONFIG;
 };
 
-/** Use variant-aware grids; return null for undescribed local architectures. External providers use a generic grid. */
+/** Pixel-exact: hosted providers bucket requests to their own size tables, which are not grid-aligned. */
+const EXTERNAL_DIMENSION_GRID = 1;
+
+/** Use variant-aware grids; return null for undescribed local architectures. External providers have no grid. */
 export const getDimensionGrid = (base: string, variant?: unknown): number | null =>
-  base === 'external'
-    ? FALLBACK_GENERATION_CONFIG.dimensions.grid
-    : (getArchitectureFeatures(base, variant)?.dimension_grid ?? null);
+  base === 'external' ? EXTERNAL_DIMENSION_GRID : (getArchitectureFeatures(base, variant)?.dimension_grid ?? null);
 
 /** A served architecture row does not imply frontend graph support. */
 export const isArchitectureDescribed = (model: Pick<GenerateModelConfig, 'base' | 'type'>): boolean =>
@@ -219,7 +221,7 @@ export const getGenerationDimensions = (
   const { grid, optimalSide } = getPidDimensionOverrides(
     pidMode,
     model?.base,
-    config.dimensions.grid,
+    model?.type === 'external_image_generator' ? EXTERNAL_DIMENSION_GRID : config.dimensions.grid,
     config.dimensions.optimalSide
   );
 
@@ -477,6 +479,14 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     pidDecoderModel: null,
     gemma2EncoderModel: null,
     pidSteps: DEFAULT_PID_STEPS,
+    externalImageSize: null,
+    openaiQuality: 'auto',
+    openaiBackground: 'auto',
+    openaiInputFidelity: null,
+    geminiTemperature: null,
+    geminiThinkingLevel: null,
+    seedreamWatermark: false,
+    seedreamOptimizePrompt: false,
     referenceImages: [],
     scheduler: defaults.scheduler,
     seamlessXAxis: false,
@@ -1669,7 +1679,24 @@ const getModelFamilyValidationReasons = (model: MainModelConfig, settings: Gener
   return reasons;
 };
 
-export const getGenerationValidationReasons = (model: GenerateModelConfig, settings: GenerateSettings): string[] => {
+const EXTERNAL_MODE_LABELS: Record<ExternalGenerationMode, string> = {
+  img2img: 'image-to-image generation',
+  inpaint: 'inpainting',
+  txt2img: 'text-to-image generation',
+};
+
+/** Why an external model cannot run `mode`, or null when it advertises it. */
+export const getExternalModeReason = (model: GenerateModelConfig, mode: ExternalGenerationMode): string | null =>
+  model.type === 'external_image_generator' && !(model.capabilities?.modes ?? ['txt2img']).includes(mode)
+    ? `${model.name} does not support ${EXTERNAL_MODE_LABELS[mode]}.`
+    : null;
+
+/** `mode` is the external generation mode being compiled; local models are validated the same way for every mode. */
+export const getGenerationValidationReasons = (
+  model: GenerateModelConfig,
+  settings: GenerateSettings,
+  mode: ExternalGenerationMode = 'txt2img'
+): string[] => {
   // All compilers share this validator; check capabilities before model-specific policy.
   if (!hasArchitectureCapabilities()) {
     // Keep core independent of the load-state store; failures direct callers to retry.
@@ -1694,8 +1721,10 @@ export const getGenerationValidationReasons = (model: GenerateModelConfig, setti
   ];
 
   if (model.type === 'external_image_generator') {
-    if (model.capabilities?.modes && !model.capabilities.modes.includes('txt2img')) {
-      reasons.push(`${model.name} does not support text-to-image generation.`);
+    const modeReason = getExternalModeReason(model, mode);
+
+    if (modeReason) {
+      reasons.push(modeReason);
     }
 
     if (!getExternalProviderNodeType(model.provider_id)) {

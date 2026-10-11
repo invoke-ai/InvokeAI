@@ -26,6 +26,7 @@ import {
   useGenerationUi,
 } from './GenerationUiContext';
 import { AspectRatioLockButton, AspectRatioSelect } from './shared/AspectRatioSelect';
+import { ExternalSizeSelect } from './shared/ExternalSizeSelect';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 import { GenerateFieldContextMenu } from './shared/GenerateFieldContextMenu';
 
@@ -247,6 +248,7 @@ const selectDimensionSettings = pickGenerateSettings([
   'aspectRatioId',
   'aspectRatioIsLocked',
   'aspectRatioValue',
+  'externalImageSize',
   'height',
   'width',
 ]);
@@ -519,6 +521,17 @@ export const GenerateDimensionFields = ({
                 </HStack>
               </GenerateFieldContextMenu>
 
+              {selectedModel?.type === 'external_image_generator' ? (
+                <ExternalSizeSelect
+                  model={selectedModel}
+                  settings={{
+                    externalImageSize: settings.externalImageSize,
+                    height: displayDimensions.height,
+                    width: displayDimensions.width,
+                  }}
+                  onCommit={commitSettings}
+                />
+              ) : null}
               <HStack alignItems="center" gap="1">
                 <AspectRatioSelect
                   fallbackRatio={dimensionRatio}
