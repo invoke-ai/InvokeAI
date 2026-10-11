@@ -55,6 +55,17 @@ import type { ImageActions } from './useImageActions';
 import { EMPTY_IMAGE_RECALL_CAPABILITIES, type ImageRecallCapabilities } from './imageRecall';
 import { EMPTY_VIDEO_RECALL_CAPABILITIES, type VideoRecallCapabilities, type VideoRecallKind } from './videoRecall';
 
+/** What the menu learns about a video after it opens: metadata recall and whether a workflow is embedded. */
+interface VideoItemCapabilities {
+  recall: VideoRecallCapabilities;
+  workflow: boolean;
+}
+
+const EMPTY_VIDEO_ITEM_CAPABILITIES: VideoItemCapabilities = {
+  recall: EMPTY_VIDEO_RECALL_CAPABILITIES,
+  workflow: false,
+};
+
 export interface LegacyImageContextMenuTarget {
   /** Right-clicked image first; more entries switch the menu into bulk mode. */
   images: GalleryImage[];
@@ -321,12 +332,12 @@ const SingleItemMenuItems = ({
     [actions, itemRef]
   );
   const handleDelete = useCallback(() => onRequestDeletion([itemRef]), [itemRef, onRequestDeletion]);
-  const [videoRecallCapabilities, setVideoRecallCapabilities] = useState<VideoRecallCapabilities>(
-    EMPTY_VIDEO_RECALL_CAPABILITIES
-  );
+  const [videoCapabilities, setVideoCapabilities] = useState<VideoItemCapabilities>(EMPTY_VIDEO_ITEM_CAPABILITIES);
+  const { recall: videoRecallCapabilities, workflow: hasVideoWorkflow } = videoCapabilities;
   const [isLoadingVideoRecall, setIsLoadingVideoRecall] = useState(false);
   const videoItemName = item.kind === 'video' ? item.name : null;
   const getVideoRecallCapabilities = actions.getVideoRecallCapabilities;
+  const getHasVideoWorkflow = actions.hasVideoWorkflow;
 
   useEffect(() => {
     if (!videoItemName || item.kind !== 'video') {
@@ -336,17 +347,17 @@ const SingleItemMenuItems = ({
     let isCancelled = false;
     const videoItem = item;
 
-    setVideoRecallCapabilities(EMPTY_VIDEO_RECALL_CAPABILITIES);
+    setVideoCapabilities(EMPTY_VIDEO_ITEM_CAPABILITIES);
     setIsLoadingVideoRecall(true);
-    getVideoRecallCapabilities(videoItem)
-      .then((capabilities) => {
+    Promise.all([getVideoRecallCapabilities(videoItem), getHasVideoWorkflow(videoItem)])
+      .then(([recall, workflow]) => {
         if (!isCancelled) {
-          setVideoRecallCapabilities(capabilities);
+          setVideoCapabilities({ recall, workflow });
         }
       })
       .catch(() => {
         if (!isCancelled) {
-          setVideoRecallCapabilities(EMPTY_VIDEO_RECALL_CAPABILITIES);
+          setVideoCapabilities(EMPTY_VIDEO_ITEM_CAPABILITIES);
         }
       })
       .finally(() => {
@@ -359,7 +370,12 @@ const SingleItemMenuItems = ({
       isCancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by name; the item identity churns per render
-  }, [getVideoRecallCapabilities, videoItemName]);
+  }, [getHasVideoWorkflow, getVideoRecallCapabilities, videoItemName]);
+  const handleLoadVideoWorkflow = useCallback(() => {
+    if (item.kind === 'video') {
+      void actions.loadVideoWorkflow(item);
+    }
+  }, [actions, item]);
 
   const makeVideoRecallHandler = useCallback(
     (kind: VideoRecallKind) => () => {
@@ -421,6 +437,13 @@ const SingleItemMenuItems = ({
       <Menu.Separator borderColor="border.subtle" />
       {item.kind === 'video' ? (
         <>
+          <ContextMenuItem
+            disabled={isLoadingVideoRecall || !hasVideoWorkflow}
+            icon={WorkflowIcon}
+            label="Load Workflow"
+            value="load-video-workflow"
+            onClick={handleLoadVideoWorkflow}
+          />
           <ContextSubMenu icon={AsteriskIcon} label="Recall Metadata">
             <ContextMenuItem
               disabled={isLoadingVideoRecall || !videoRecallCapabilities.all}
