@@ -1,5 +1,6 @@
 import type {
   QueueBackendPort,
+  QueueItemDetailReadModel,
   QueueQueryScope,
   QueueReadModel,
   QueueStatusReadModel,
@@ -12,6 +13,7 @@ export const QUEUE_RECENT_WINDOW = 50;
 
 export const queueKeys = {
   all: ['queue'] as const,
+  itemDetail: (itemId: number) => [...queueKeys.all, 'item-detail', itemId] as const,
   readModel: (scope: QueueQueryScope) => [...queueKeys.all, 'read-model', scope.originPrefix ?? 'all'] as const,
   status: (scope: QueueQueryScope) => [...queueKeys.all, 'status', scope.originPrefix ?? 'all'] as const,
 };
@@ -66,6 +68,24 @@ export const queueReadModelOptions = (
         return model;
       },
       queryKey: queueKeys.readModel(scope),
+      staleTime: 5_000,
+    });
+  })();
+
+/** One item's saved execution data, read when a details view opens; an item's session changes only while it runs. */
+export const queueItemDetailOptions = (backend: QueueBackendPort, itemId: number) =>
+  (() => {
+    const owner = captureAccountScope();
+
+    return queryOptions({
+      queryFn: async ({ signal }): Promise<QueueItemDetailReadModel> => {
+        const detail = await backend.readItemDetail(itemId, AbortSignal.any([signal, owner.signal]));
+
+        assertAccountScopeCurrent(owner);
+
+        return detail;
+      },
+      queryKey: queueKeys.itemDetail(itemId),
       staleTime: 5_000,
     });
   })();

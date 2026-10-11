@@ -1,6 +1,11 @@
-import type { QueueCounts, QueueItemReadModel, QueueQueryScope } from '@features/queue/core/types';
+import type {
+  QueueCounts,
+  QueueItemDetailReadModel,
+  QueueItemReadModel,
+  QueueQueryScope,
+} from '@features/queue/core/types';
 
-import { getQueueReadModelOptions } from '@features/queue/publicApi';
+import { getQueueItemDetailOptions, getQueueReadModelOptions } from '@features/queue/publicApi';
 import { queryClient } from '@platform/query/client';
 import { useQuery } from '@tanstack/react-query';
 
@@ -74,4 +79,32 @@ export const useQueueLoadState = (): { loadState: 'loading' | 'loaded' | 'error'
   }
 
   return { error: null, loadState: query.isPending ? 'loading' : 'loaded' };
+};
+
+export interface QueueItemDetailState {
+  detail: QueueItemDetailReadModel | null;
+  error: string | null;
+  loadState: 'idle' | 'loading' | 'loaded' | 'error';
+  retry: () => void;
+}
+
+/** One item's saved execution data, fetched only while `enabled` (a details dialog is open). */
+export const useQueueItemDetail = (itemId: number, enabled: boolean): QueueItemDetailState => {
+  const query = useQuery({ ...getQueueItemDetailOptions(itemId), enabled });
+  const retry = query.refetch;
+
+  if (!enabled) {
+    return { detail: null, error: null, loadState: 'idle', retry };
+  }
+
+  if (query.isError) {
+    return {
+      detail: null,
+      error: query.error instanceof Error ? query.error.message : 'Failed to load queue item',
+      loadState: 'error',
+      retry,
+    };
+  }
+
+  return { detail: query.data ?? null, error: null, loadState: query.isPending ? 'loading' : 'loaded', retry };
 };

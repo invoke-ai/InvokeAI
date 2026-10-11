@@ -13,10 +13,12 @@ import { CancelQueueItemButton } from './CancelQueueItemButton';
 import { formatCompactAge, formatDuration } from './formatDuration';
 import { QueueItemDetails } from './QueueItemDetails';
 import { QueueItemThumbnail } from './QueueItemThumbnail';
+import { isCancellableQueueItem, isRetryableQueueItem } from './queueOwnership';
 import { QueueStatusDot } from './QueueStatusDot';
 import { QueueStepProgress } from './QueueStepProgress';
 import { useQueueUi } from './QueueUiContext';
 import { clearPendingQueueItemReveal, type QueueItemRevealRequest } from './queueUiStore';
+import { RetryQueueItemButton } from './RetryQueueItemButton';
 import { getStatusMeta } from './statusMeta';
 import { useDeviceLabel } from './useDeviceLabel';
 
@@ -36,7 +38,9 @@ export const QueueItemRow = memo(
     const age = formatCompactAge(item.completedAt ?? item.createdAt);
     const ageLabel = [duration, age].filter(Boolean).join(' · ');
     const isFailed = item.status === 'failed';
-    const isCancellable = (item.status === 'pending' || item.status === 'in_progress') && canManageItem(item);
+    const canManage = canManageItem(item);
+    const isCancellable = isCancellableQueueItem(item) && canManage;
+    const isRetryable = isRetryableQueueItem(item) && canManage;
     const canExpand = canViewItemDetails(item);
 
     const consumeReveal = useCallback(
@@ -70,7 +74,13 @@ export const QueueItemRow = memo(
     return (
       <Box ref={consumeReveal} borderColor={borderColor} borderWidth={1} overflow="hidden" role="listitem" rounded="md">
         <ListItem
-          actions={isCancellable ? <CancelQueueItemButton itemId={item.id} /> : undefined}
+          actions={
+            isCancellable ? (
+              <CancelQueueItemButton itemId={item.id} />
+            ) : isRetryable ? (
+              <RetryQueueItemButton itemId={item.id} />
+            ) : undefined
+          }
           description={
             <HStack gap="1.5" minW="0">
               <QueueStatusDot status={item.status} />

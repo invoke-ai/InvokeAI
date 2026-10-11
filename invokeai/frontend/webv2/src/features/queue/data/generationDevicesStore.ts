@@ -10,18 +10,25 @@ import { createExternalStore } from '@platform/state/externalStore';
 import { apiFetchJson, getApiErrorMessage } from '@platform/transport/http';
 
 /**
- * Read available accelerators and server-wide generation_devices without polling; configuration takes effect only
- * after restart and has no socket updates.
+ * Read available accelerators and the server's writable runtime settings (generation_devices, max_queue_history)
+ * without polling; configuration takes effect only after restart and has no socket updates.
  */
 
 /** `auto` uses every available accelerator; an explicit list pins generation to those devices. */
 export type GenerationDevicesSetting = 'auto' | string[];
+
+/**
+ * How many finished (completed, failed, canceled) items the server keeps at startup: a count, `null` when the
+ * server prunes nothing, or `undefined` while unknown (not loaded, or the reader is not an administrator).
+ */
+export type MaxQueueHistorySetting = number | null;
 
 export interface GenerationDevicesSnapshot {
   /** Every installed generation device, in backend order. Empty until loaded. */
   options: GenerationDeviceOption[];
   /** The configured setting, or null while unknown. */
   setting: GenerationDevicesSetting | null;
+  maxQueueHistory: MaxQueueHistorySetting | undefined;
   loadState: 'idle' | 'loading' | 'loaded' | 'error';
   error: string | null;
 }
@@ -29,6 +36,7 @@ export interface GenerationDevicesSnapshot {
 const EMPTY_SNAPSHOT: GenerationDevicesSnapshot = {
   error: null,
   loadState: 'idle',
+  maxQueueHistory: undefined,
   options: [],
   setting: null,
 };
@@ -52,12 +60,24 @@ registerAccountOwnedResource({
 interface RuntimeConfigResponse {
   config?: {
     generation_devices?: GenerationDevicesSetting | null;
+    max_queue_history?: number | null;
   } | null;
   set_fields?: string[];
 }
 
 const readGenerationDevices = (response: RuntimeConfigResponse | null): GenerationDevicesSetting | null =>
   response?.config?.generation_devices ?? null;
+
+/** Distinguishes "the server keeps everything" (`null`) from "the config was not readable" (`undefined`). */
+const readMaxQueueHistory = (response: RuntimeConfigResponse | null): MaxQueueHistorySetting | undefined => {
+  if (!response?.config) {
+    return undefined;
+  }
+
+  const value = response.config.max_queue_history;
+
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
+};
 
 /**
  * Non-admins can read device options but not runtime config; return a null setting without failing the read-only
@@ -86,6 +106,7 @@ export const refreshGenerationDevices = (): Promise<void> => {
       store.patchSnapshot({
         error: null,
         loadState: 'loaded',
+        maxQueueHistory: readMaxQueueHistory(runtimeConfig),
         options,
         setting: readGenerationDevices(runtimeConfig),
       });
@@ -124,6 +145,24 @@ export const updateGenerationDevices = async (setting: GenerationDevicesSetting)
   assertAccountScopeCurrent(owner);
 
   store.patchSnapshot({ error: null, setting: readGenerationDevices(runtimeConfig) ?? setting });
+};
+
+/**
+ * Sends only `max_queue_history`, so the PATCH leaves generation devices alone; `null` clears the limit. Takes
+ * effect at the next startup, when the server prunes its history.
+ */
+export const updateMaxQueueHistory = async (value: MaxQueueHistorySetting): Promise<void> => {
+  const owner = captureAccountScope();
+
+  const runtimeConfig = await apiFetchJson<RuntimeConfigResponse>('/api/v1/app/runtime_config', {
+    body: JSON.stringify({ max_queue_history: value }),
+    method: 'PATCH',
+    signal: owner.signal,
+  });
+
+  assertAccountScopeCurrent(owner);
+
+  store.patchSnapshot({ error: null, maxQueueHistory: readMaxQueueHistory(runtimeConfig) ?? value });
 };
 
 export const getGenerationDevicesSnapshot = (): GenerationDevicesSnapshot => store.getSnapshot();

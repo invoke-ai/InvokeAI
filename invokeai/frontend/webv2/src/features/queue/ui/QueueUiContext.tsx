@@ -12,6 +12,8 @@ export interface QueueUiNotificationPort {
 export interface QueueUiAdapter {
   ItemActions: ComponentType<{ item: QueueItemReadModel }>;
   activeProjectId: string | null;
+  /** The invocation cache endpoints are admin-only; the footer hides for everyone else. */
+  canManageInvocationCache: boolean;
   canManageProcessor: boolean;
   canManageItem(item: QueueItemReadModel): boolean;
   canViewItemDetails(item: QueueItemReadModel): boolean;

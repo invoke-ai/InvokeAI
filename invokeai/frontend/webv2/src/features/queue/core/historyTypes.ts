@@ -20,6 +20,8 @@ export interface QueueSubmissionSnapshot {
   filterIntermediateResults: boolean;
   resultNodeIds?: readonly string[];
   presentation: QueueSubmissionPresentation;
+  /** Set by Invoke Front: the backend runs the batch ahead of the user's other pending work. */
+  prepend?: boolean;
   submittedAt: string;
 }
 
