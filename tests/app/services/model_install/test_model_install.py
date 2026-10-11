@@ -202,7 +202,7 @@ def test_destination_is_hidden_from_orphan_cleanup_during_install(
     )
     from invokeai.app.services.orphaned_models import OrphanedModelsService
 
-    orphan_service = OrphanedModelsService(config=mm2_app_config, db=mm2_installer.record_store._db)
+    orphan_service = OrphanedModelsService(config=mm2_app_config, store=mm2_installer.record_store)
     observations: list[tuple[str, bool, set[str]]] = []
     real_move = shutil.move
 
@@ -239,7 +239,7 @@ def test_managed_local_source_is_hidden_from_orphan_cleanup_during_install(
 
     source_root = mm2_app_config.models_path / f"local-source-{uuid.uuid4().hex}"
     shutil.copytree(diffusers_dir, source_root)
-    orphan_service = OrphanedModelsService(config=mm2_app_config, db=mm2_installer.record_store._db)
+    orphan_service = OrphanedModelsService(config=mm2_app_config, store=mm2_installer.record_store)
     observations: list[tuple[bool, set[str], str]] = []
     real_probe = mm2_installer._probe
     real_move_with_retries = mm2_installer._move_with_retries
@@ -285,7 +285,7 @@ def test_orphan_delete_claim_prevents_a_local_install_from_starting(
 
     source_root = mm2_app_config.models_path / f"local-source-{uuid.uuid4().hex}"
     shutil.copytree(diffusers_dir, source_root)
-    orphan_service = OrphanedModelsService(config=mm2_app_config, db=mm2_installer.record_store._db)
+    orphan_service = OrphanedModelsService(config=mm2_app_config, store=mm2_installer.record_store)
     real_rmtree = orphaned_models_service.shutil.rmtree
     deletion_claimed = threading.Event()
     release_deletion = threading.Event()
@@ -410,7 +410,7 @@ def test_unregistered_destination_remains_protected_after_registration_failure(
     from invokeai.app.services.model_install.model_install_common import has_recovery_sentinel
     from invokeai.app.services.orphaned_models import OrphanedModelsService
 
-    orphan_service = OrphanedModelsService(config=mm2_app_config, db=mm2_installer.record_store._db)
+    orphan_service = OrphanedModelsService(config=mm2_app_config, store=mm2_installer.record_store)
 
     def fail_recording(_config: Any) -> None:
         raise RuntimeError("simulated model record failure")
@@ -1399,15 +1399,17 @@ def test_install_registration_failure_preserves_complete_recoverable_files(
 
     store = mm2_installer.record_store
     assert isinstance(store, ModelRecordServiceSQL)
-    # Exercise a genuine SQLite write rejection without changing permissions on any real user database.
-    with store._db.transaction() as cursor:
-        cursor.execute("PRAGMA query_only = ON")
+    database = store._queries._database
+    # Exercise a genuine SQLite write rejection without changing permissions on any real user database. The
+    # pragma is set in read transactions: a write transaction could not even begin while it is on.
+    with database.begin(write=False) as conn:
+        conn.exec_driver_sql("PRAGMA query_only = ON")
     try:
         with pytest.raises(sqlite3.OperationalError, match="readonly database"):
             mm2_installer.install_path(diffusers_dir)
     finally:
-        with store._db.transaction() as cursor:
-            cursor.execute("PRAGMA query_only = OFF")
+        with database.begin(write=False) as conn:
+            conn.exec_driver_sql("PRAGMA query_only = OFF")
 
     assert mm2_installer.record_store.all_models() == []
     new_paths = set(mm2_app_config.models_path.iterdir()) - existing_paths
@@ -2585,7 +2587,7 @@ def test_paused_remote_install_stays_hidden_from_orphan_cleanup(
     job._multifile_job = download_job
     installer._download_cache[download_job.id] = job
     create_active_install_sentinel(tmpdir)
-    orphan_service = OrphanedModelsService(config=mm2_app_config, db=installer.record_store._db)
+    orphan_service = OrphanedModelsService(config=mm2_app_config, store=installer.record_store)
 
     try:
         installer._download_cancelled_callback(download_job)

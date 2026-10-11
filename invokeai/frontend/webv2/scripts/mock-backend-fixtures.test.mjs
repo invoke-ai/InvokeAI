@@ -270,8 +270,14 @@ test('merged gallery list and names share qualified ordering, filters, ownership
       backend,
       '/api/v1/gallery/items/?categories=general&is_intermediate=false&order_dir=DESC&limit=100&offset=0'
     );
+    const countOnlyPage = await getJson(
+      backend,
+      '/api/v1/gallery/items/?categories=general&is_intermediate=false&order_dir=DESC&limit=0&offset=0'
+    );
 
     assert.equal(defaultPage.items[0]?.kind, 'image');
+    assert.deepEqual(countOnlyPage.items, []);
+    assert.equal(countOnlyPage.total, backendDefaultPage.total);
     assert.deepEqual(
       backendDefaultPage.items.map((item) => item.starred),
       backendDefaultPage.items.map((item) => item.starred).toSorted((left, right) => Number(right) - Number(left))
@@ -330,6 +336,37 @@ test('merged gallery list and names share qualified ordering, filters, ownership
     const ascendingKeys = ascending.items.map((item) => `${item.created_at}|${item.kind}|${item.name}`);
 
     assert.deepEqual(ascendingKeys, [...ascendingKeys].sort());
+  });
+});
+
+test('gallery item location shares listing filters and order, and reports missing items as not found', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const query =
+      'categories=general&is_intermediate=false&origin=internal&starred=false&order_dir=ASC&starred_first=false&created_from=2026-01-15&created_to=2026-01-15';
+    const listing = await getJson(backend, `/api/v1/gallery/items/?${query}&limit=1000&offset=0`);
+    const target = listing.items.find((item) => item.kind === 'video');
+
+    assert.ok(target, 'the filtered fixture listing should contain a video');
+
+    const location = await getJson(
+      backend,
+      `/api/v1/gallery/items/location?${query}&kind=${target.kind}&name=${encodeURIComponent(target.name)}`
+    );
+
+    assert.deepEqual(location, {
+      index: listing.items.findIndex((item) => item.kind === target.kind && item.name === target.name),
+      kind: target.kind,
+      name: target.name,
+      total: listing.total,
+    });
+
+    const excludedQuery = query.replace('starred=false', 'starred=true');
+    const notFound = await fetch(
+      `${backend.origin}/api/v1/gallery/items/location?${excludedQuery}&kind=${target.kind}&name=${encodeURIComponent(target.name)}`
+    );
+
+    assert.equal(notFound.status, 404);
+    assert.deepEqual(await notFound.json(), { detail: 'Gallery item not found' });
   });
 });
 

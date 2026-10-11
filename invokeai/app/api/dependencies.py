@@ -1,17 +1,18 @@
 import asyncio
 from logging import Logger
+from typing import Optional
 
 import torch
 
 from invokeai.app.services.app_settings import AppSettingsService
 from invokeai.app.services.auth.token_service import set_jwt_secret
-from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
+from invokeai.app.services.board_image_records.board_image_records_default import BoardImageRecordStorage
 from invokeai.app.services.board_images.board_images_default import BoardImagesService
-from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
-from invokeai.app.services.board_video_records.board_video_records_sqlite import SqliteBoardVideoRecordStorage
+from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
+from invokeai.app.services.board_video_records.board_video_records_default import BoardVideoRecordStorage
 from invokeai.app.services.boards.boards_default import BoardService
 from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
-from invokeai.app.services.client_state_persistence.client_state_persistence_sqlite import ClientStatePersistenceSqlite
+from invokeai.app.services.client_state_persistence.client_state_persistence_default import ClientStatePersistence
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.download.download_default import DownloadQueueService
 from invokeai.app.services.events.events_fastapievents import FastAPIEventService
@@ -25,16 +26,16 @@ from invokeai.app.services.external_generation.providers import (
 )
 from invokeai.app.services.external_generation.startup import sync_configured_external_starter_models
 from invokeai.app.services.fonts.fonts_default import FontService
-from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
+from invokeai.app.services.gallery.gallery_default import GalleryService
 from invokeai.app.services.gallery_maintenance.gallery_maintenance_default import GalleryMaintenanceService
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.image_index.image_index_default import ImageIndexService, warm_up_attention
-from invokeai.app.services.image_index.image_index_records_sqlite import ImageIndexRecordsSqlite
+from invokeai.app.services.image_index.image_index_records_default import ImageIndexRecords
 from invokeai.app.services.image_moves.image_moves_default import ImageMoveService
-from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
 from invokeai.app.services.intermediates.intermediates_default import IntermediatesService
-from invokeai.app.services.intermediates.intermediates_records_sqlite import IntermediatesRecordsSqlite
+from invokeai.app.services.intermediates.intermediates_records_default import IntermediatesRecords
 from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
@@ -42,31 +43,32 @@ from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_images.model_images_default import ModelImageFileStorageDisk
 from invokeai.app.services.model_manager.model_manager_default import ModelManagerService
 from invokeai.app.services.model_records.model_records_sql import ModelRecordServiceSQL
-from invokeai.app.services.model_relationship_records.model_relationship_records_sqlite import (
-    SqliteModelRelationshipRecordStorage,
+from invokeai.app.services.model_relationship_records.model_relationship_records_default import (
+    ModelRelationshipRecordStorage,
 )
 from invokeai.app.services.model_relationships.model_relationships_default import ModelRelationshipsService
 from invokeai.app.services.names.names_default import SimpleNameService
 from invokeai.app.services.object_serializer.object_serializer_disk import ObjectSerializerDisk
 from invokeai.app.services.object_serializer.object_serializer_forward_cache import ObjectSerializerForwardCache
 from invokeai.app.services.progress_previews.progress_previews_default import MemoryProgressPreviews
-from invokeai.app.services.project_records.project_records_sqlite import ProjectRecordsSqlite
+from invokeai.app.services.project_records.project_records_default import ProjectRecordsStorage
 from invokeai.app.services.session_processor.session_processor_default import (
     DefaultSessionProcessor,
     DefaultSessionRunner,
 )
-from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
-from invokeai.app.services.shared.sqlite.sqlite_util import init_db
+from invokeai.app.services.session_queue.session_queue_default import SessionQueue
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.startup import init_database
 from invokeai.app.services.style_preset_images.style_preset_images_disk import StylePresetImageFileStorageDisk
-from invokeai.app.services.style_preset_records.style_preset_records_sqlite import SqliteStylePresetRecordsStorage
-from invokeai.app.services.system_prompt_records.system_prompt_records_sqlite import SqliteSystemPromptRecordsStorage
+from invokeai.app.services.style_preset_records.style_preset_records_default import StylePresetRecordsStorage
+from invokeai.app.services.system_prompt_records.system_prompt_records_default import SystemPromptRecordsStorage
 from invokeai.app.services.urls.urls_default import LocalUrlService
 from invokeai.app.services.users.users_default import UserService
 from invokeai.app.services.video_files.video_files_disk import DiskVideoFileStorage
-from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
+from invokeai.app.services.video_records.video_records_default import VideoRecordStorage
 from invokeai.app.services.videos.videos_default import VideoService
-from invokeai.app.services.wildcard_records.wildcard_records_sqlite import SqliteWildcardRecordsStorage
-from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
+from invokeai.app.services.wildcard_records.wildcard_records_default import WildcardRecordsStorage
+from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
 from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_disk import WorkflowThumbnailFileStorageDisk
 from invokeai.backend.architectures import conditioning_safe_globals
 from invokeai.backend.architectures import validate as validate_architectures
@@ -98,6 +100,7 @@ class ApiDependencies:
     """Contains and initializes all dependencies for the API"""
 
     invoker: Invoker
+    database: Optional[Database] = None
 
     @staticmethod
     def initialize(
@@ -129,10 +132,10 @@ class ApiDependencies:
         style_presets_folder = config.style_presets_path
         workflow_thumbnails_folder = config.workflow_thumbnails_path
 
-        db = init_db(config=config, logger=logger, image_files=image_files)
+        database = init_database(config=config, logger=logger, image_files=image_files)
 
         # Initialize JWT secret from database
-        app_settings = AppSettingsService(db=db)
+        app_settings = AppSettingsService(database)
         jwt_secret = app_settings.get_jwt_secret()
         set_jwt_secret(jwt_secret)
         logger.info("JWT secret loaded from database")
@@ -140,19 +143,19 @@ class ApiDependencies:
         configuration = config
         logger = logger
 
-        board_image_records = SqliteBoardImageRecordStorage(db=db)
+        board_image_records = BoardImageRecordStorage(database)
         board_images = BoardImagesService()
-        board_records = SqliteBoardRecordStorage(db=db)
+        board_records = BoardRecordStorage(database)
         boards = BoardService()
         events = FastAPIEventService(event_handler_id, loop=loop)
         bulk_download = BulkDownloadService()
-        image_records = SqliteImageRecordStorage(db=db)
-        image_moves = ImageMoveService(db=db, image_files=image_files, config=configuration, logger=logger)
+        image_records = ImageRecordStorage(database)
+        image_moves = ImageMoveService(database, image_files=image_files, config=configuration, logger=logger)
         images = ImageService()
-        video_records = SqliteVideoRecordStorage(db=db)
+        video_records = VideoRecordStorage(database)
         videos = VideoService()
-        board_video_records = SqliteBoardVideoRecordStorage(db=db)
-        gallery = SqliteGalleryService(db=db)
+        board_video_records = BoardVideoRecordStorage(database)
+        gallery = GalleryService(database)
         gallery_maintenance = GalleryMaintenanceService()
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
         tensors = ObjectSerializerForwardCache(
@@ -175,7 +178,7 @@ class ApiDependencies:
             ),
         )
         download_queue_service = DownloadQueueService(app_config=configuration, event_bus=events)
-        model_record_service = ModelRecordServiceSQL(db=db, logger=logger)
+        model_record_service = ModelRecordServiceSQL(database, logger=logger)
         model_manager = ModelManagerService.build_model_manager(
             app_config=configuration,
             model_record_service=model_record_service,
@@ -195,26 +198,26 @@ class ApiDependencies:
         )
         model_images_service = ModelImageFileStorageDisk(model_images_folder / "model_images")
         model_relationships = ModelRelationshipsService()
-        model_relationship_records = SqliteModelRelationshipRecordStorage(db=db)
+        model_relationship_records = ModelRelationshipRecordStorage(database)
         names = SimpleNameService()
         performance_statistics = InvocationStatsService()
         session_processor = DefaultSessionProcessor(session_runner=DefaultSessionRunner())
-        session_queue = SqliteSessionQueue(db=db)
+        session_queue = SessionQueue(database)
         urls = LocalUrlService()
-        workflow_records = SqliteWorkflowRecordsStorage(db=db)
-        style_preset_records = SqliteStylePresetRecordsStorage(db=db)
-        wildcard_records = SqliteWildcardRecordsStorage(db=db)
+        workflow_records = WorkflowRecordsStorage(database)
+        style_preset_records = StylePresetRecordsStorage(database)
+        wildcard_records = WildcardRecordsStorage(database)
         style_preset_image_files = StylePresetImageFileStorageDisk(style_presets_folder / "images")
-        system_prompt_records = SqliteSystemPromptRecordsStorage(db=db)
+        system_prompt_records = SystemPromptRecordsStorage(database)
         workflow_thumbnails = WorkflowThumbnailFileStorageDisk(workflow_thumbnails_folder)
-        client_state_persistence = ClientStatePersistenceSqlite(db=db)
-        project_records = ProjectRecordsSqlite(db=db)
-        users = UserService(db=db)
-        image_index_records = ImageIndexRecordsSqlite(db=db)
+        client_state_persistence = ClientStatePersistence(database)
+        project_records = ProjectRecordsStorage(database)
+        users = UserService(database)
+        image_index_records = ImageIndexRecords(database)
         image_index = ImageIndexService()
-        intermediates = IntermediatesService(records=IntermediatesRecordsSqlite(db=db), logger=logger)
+        intermediates = IntermediatesService(records=IntermediatesRecords(database), logger=logger)
         fonts = FontService(
-            db=db,
+            database,
             fonts_dir=configuration.fonts_path,
             storage_dir=configuration.fonts_storage_path,
             logger=logger,
@@ -229,7 +232,7 @@ class ApiDependencies:
             boards=boards,
             bulk_download=bulk_download,
             configuration=configuration,
-            database=db,
+            database=database,
             events=events,
             image_files=image_files,
             image_moves=image_moves,
@@ -289,8 +292,13 @@ class ApiDependencies:
             model_manager=model_manager,
             logger=logger,
         )
+        ApiDependencies.database = database
 
     @staticmethod
     def shutdown() -> None:
         if ApiDependencies.invoker:
             ApiDependencies.invoker.stop()
+        if ApiDependencies.database is not None:
+            # Releases a server database's instance lock, and checkpoints a SQLite database's write-ahead log.
+            ApiDependencies.database.dispose()
+            ApiDependencies.database = None

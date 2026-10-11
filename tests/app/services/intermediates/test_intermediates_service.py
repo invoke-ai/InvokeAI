@@ -12,6 +12,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
+from sqlalchemy import update
 
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.image_records.image_records_common import (
@@ -36,12 +37,16 @@ from invokeai.app.services.intermediates.intermediates_common import (
     IntermediatesUnavailableError,
 )
 from invokeai.app.services.intermediates.intermediates_default import IntermediatesService
-from invokeai.app.services.intermediates.intermediates_records_sqlite import IntermediatesRecordsSqlite
+from invokeai.app.services.intermediates.intermediates_records_default import IntermediatesRecords
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
+from invokeai.app.services.session_queue.session_queue_default import SessionQueue
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.schema.intermediates import intermediates_session_holds
 from invokeai.app.services.video_files.video_files_disk import DiskVideoFileStorage
 from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
 from invokeai.app.services.videos.videos_default import VideoService
+from tests.fixtures.database import capture_statements, explain_query_plan
+from tests.fixtures.sqlite_database import sqlite_cursor, sqlite_cursor_of
 
 ADMIN = IntermediatesCaller(user_id="admin", is_admin=True)
 ALICE = IntermediatesCaller(user_id="alice", is_admin=False)
@@ -49,7 +54,7 @@ BOB = IntermediatesCaller(user_id="bob", is_admin=False)
 
 
 @pytest.fixture
-def invoker(mock_invoker: Invoker, tmp_path: Path) -> Invoker:
+def invoker(mock_invoker: Invoker, mock_sqlite_database: Database, tmp_path: Path) -> Invoker:
     """The shared mock invoker with real image/video file storage and a real queue table."""
     services = mock_invoker.services
     services.image_files = DiskImageFileStorage(tmp_path / "outputs")
@@ -57,11 +62,11 @@ def invoker(mock_invoker: Invoker, tmp_path: Path) -> Invoker:
     services.video_files = DiskVideoFileStorage(str(tmp_path / "outputs" / "videos"))
     services.videos = VideoService()
     services.videos.start(mock_invoker)
-    services.session_queue = SqliteSessionQueue(db=services.image_records._db)
+    services.session_queue = SessionQueue(mock_sqlite_database)
     services.image_moves = None
     # These are multi-account scenarios; the single-user case is covered explicitly below.
     services.configuration.multiuser = True
-    with services.image_records._db.transaction() as cursor:
+    with sqlite_cursor(mock_sqlite_database) as cursor:
         cursor.executemany(
             "INSERT INTO users (user_id, email, display_name, password_hash, is_admin, is_active)"
             " VALUES (?, ?, ?, 'x', ?, 1);",
@@ -76,7 +81,7 @@ def invoker(mock_invoker: Invoker, tmp_path: Path) -> Invoker:
 
 @pytest.fixture
 def service(invoker: Invoker) -> IntermediatesService:
-    svc = IntermediatesService(records=IntermediatesRecordsSqlite(db=invoker.services.image_records._db))
+    svc = IntermediatesService(records=IntermediatesRecords(invoker.services.session_queue._queries._database))
     invoker.services.intermediates = svc
     svc.start(invoker)
     yield svc
@@ -109,7 +114,7 @@ def _seed_image(
         project_id=project_id,
     )
     if created_at is not None:
-        with records._db.transaction() as cursor:
+        with sqlite_cursor_of(invoker.services.session_queue) as cursor:
             cursor.execute("UPDATE images SET created_at = ? WHERE image_name = ?;", (created_at, name))
     if with_file:
         invoker.services.image_files.save(image=Image.new("RGB", (8, 8)), image_name=name)
@@ -131,7 +136,7 @@ def _seed_video(invoker: Invoker, name: str, *, user_id: str = "alice", is_inter
         is_intermediate=is_intermediate,
         user_id=user_id,
     )
-    with records._db.transaction() as cursor:
+    with sqlite_cursor_of(invoker.services.session_queue) as cursor:
         cursor.execute("UPDATE videos SET created_at = '2020-01-01 00:00:00.000' WHERE video_name = ?;", (name,))
     files = invoker.services.video_files
     path = files.get_path(name)
@@ -150,7 +155,7 @@ def _enqueue_row(
     root_item_id: Optional[int] = None,
     parent_item_id: Optional[int] = None,
 ) -> int:
-    with invoker.services.image_records._db.transaction() as cursor:
+    with sqlite_cursor_of(invoker.services.session_queue) as cursor:
         cursor.execute(
             "INSERT INTO session_queue "
             "(queue_id, session, session_id, batch_id, priority, user_id, status, root_item_id, parent_item_id)"
@@ -167,10 +172,11 @@ def _project(invoker: Invoker, user_id: str, name: str, data: dict) -> str:
 def _end_cached_media_grace(service: IntermediatesService, invoker: Invoker) -> None:
     """Lets the recency grace of cached media whose consuming sessions have ended run out."""
     service._records.summarize(None)
-    with invoker.services.image_records._db.transaction() as cursor:
-        cursor.execute(
-            "UPDATE temp.intermediates_session_media SET released_at = '2000-01-01 00:00:00.000' "
-            "WHERE released_at IS NOT NULL;"
+    with invoker.services.session_queue._queries._database.begin(write=True) as conn:
+        conn.execute(
+            update(intermediates_session_holds)
+            .where(intermediates_session_holds.c.released_at.is_not(None))
+            .values(released_at="2000-01-01 00:00:00.000")
         )
 
 
@@ -513,12 +519,12 @@ def test_a_row_that_was_recent_at_preview_time_stays_recent_for_the_operation(
 ) -> None:
     from datetime import datetime, timedelta, timezone
 
-    from invokeai.app.services.intermediates import intermediates_records_sqlite
+    from invokeai.app.services.intermediates import intermediates_records_default
     from invokeai.app.services.intermediates.intermediates_common import RECENT_GRACE_SECONDS
 
     start = datetime(2030, 1, 1, tzinfo=timezone.utc)
     readings = iter([start] + [start + timedelta(hours=1)] * 100)
-    monkeypatch.setattr(intermediates_records_sqlite, "_utc_now", lambda: next(readings))
+    monkeypatch.setattr(intermediates_records_default, "_utc_now", lambda: next(readings))
     crossing = start - timedelta(seconds=RECENT_GRACE_SECONDS - 1)
     _seed_image(invoker, "crossing.png", created_at=crossing.strftime("%Y-%m-%d %H:%M:%S.000"))
     _seed_image(invoker, "old.png")
@@ -819,7 +825,7 @@ def test_a_restart_forgets_operations_and_a_fresh_run_finishes_the_work(
     assert failed.progress.failed_images == 1
     service.stop()
 
-    restored = IntermediatesService(IntermediatesRecordsSqlite(invoker.services.image_records._db))
+    restored = IntermediatesService(IntermediatesRecords(invoker.services.session_queue._queries._database))
     invoker.services.intermediates = restored
     restored.start(invoker)
     monkeypatch.setattr(invoker.services.images, "delete_intermediates_by_names", real_delete)
@@ -883,9 +889,11 @@ def test_inputs_added_to_an_active_session_after_it_was_scanned_are_protected(
     first = service.create_preview(IntermediatesPreviewRequest(mode="safe", scope=_owner("alice")), ALICE)
     assert first.impact.delete_images == 1
 
-    with invoker.services.image_records._db.transaction() as cursor:
+    with sqlite_cursor_of(invoker.services.session_queue) as cursor:
+        # Every write of a session counts its revision, which tells the scan to read it again.
         cursor.execute(
-            "UPDATE session_queue SET session = ?, status = 'pending' WHERE item_id = ?;",
+            "UPDATE session_queue SET session = ?, session_revision = session_revision + 1, status = 'pending' "
+            "WHERE item_id = ?;",
             ('{"results": {"n": {"image": {"image_name": "child-output.png"}}}}', item_id),
         )
 
@@ -912,10 +920,10 @@ def test_a_save_cannot_slip_between_the_final_check_and_the_delete(
     def slow_guard_factory(kind, **kwargs):
         guard = real_guard_factory(kind, **kwargs)
 
-        def paused(cursor, names):
+        def paused(q, names):
             guard_entered.set()
             assert guard_may_finish.wait(timeout=10)
-            return guard(cursor, names)
+            return guard(q, names)
 
         return paused
 
@@ -957,10 +965,11 @@ def test_a_save_cannot_slip_between_the_final_check_and_the_delete(
 def test_active_inputs_survive_a_rolled_back_batch(
     invoker: Invoker, service: IntermediatesService, monkeypatch
 ) -> None:
-    """A failed batch rolls the temp table back; the next check must still see everything active."""
+    """A failed batch rolls back what its guard wrote; the next check must still see everything active."""
     monkeypatch.setattr(intermediates_default, "DELETE_BATCH_SIZE", 1)
-    _seed_image(invoker, "first.png")
-    _seed_image(invoker, "consumed.png")
+    # Windows page in creation order: "first.png" is the first batch.
+    _seed_image(invoker, "first.png", created_at="2020-01-01 00:00:00.000")
+    _seed_image(invoker, "consumed.png", created_at="2020-01-02 00:00:00.000")
     preview = service.create_preview(IntermediatesPreviewRequest(mode="safe", scope=_owner("alice")), ALICE)
     assert preview.impact.delete_images == 2
     real_delete = invoker.services.image_records.delete_intermediates_by_names
@@ -969,10 +978,10 @@ def test_active_inputs_survive_a_rolled_back_batch(
     def fail_first_batch_after_the_guard(names, guard=None):
         calls["n"] += 1
         if calls["n"] == 1:
-            with invoker.services.image_records._db.transaction() as cursor:
+            with invoker.services.session_queue._queries._database.queries.transaction() as q:
                 if guard is not None:
-                    guard(cursor, names)
-                raise RuntimeError("simulated I/O failure after the guard rebuilt the temp table")
+                    guard(q, names)
+                raise RuntimeError("simulated I/O failure after the guard ran")
         # Enqueued after the second batch was paged: only its final check can protect it.
         _enqueue_row(
             invoker, session_id="s-late", status="pending", session_json='{"a": {"image_name": "consumed.png"}}'
@@ -1032,7 +1041,7 @@ def test_an_account_holds_media_for_a_bounded_number_of_leases(invoker: Invoker,
         _seed_image(invoker, f"held-{tab}.png")
         service.replace_browser_hold(ALICE, f"tab-{tab}", IntermediatesBrowserHoldRequest(images=[f"held-{tab}.png"]))
         # Refresh order decides which lease lapses; stagger it so the first tab is the stalest.
-        with invoker.services.image_records._db.transaction() as cursor:
+        with sqlite_cursor_of(invoker.services.session_queue) as cursor:
             cursor.execute(
                 "UPDATE intermediates_browser_holds SET expires_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW', ?)"
                 " WHERE user_id = 'alice' AND lease_id = ?;",
@@ -1117,19 +1126,19 @@ def test_the_final_check_judges_cached_media_recency_as_of_the_preview(
     counted recent, and the next page would then collect the row the preview promised to keep."""
     from datetime import datetime, timedelta, timezone
 
-    from invokeai.app.services.intermediates import intermediates_records_sqlite
+    from invokeai.app.services.intermediates import intermediates_records_default
     from invokeai.app.services.shared.media_references import MediaReferences
 
     monkeypatch.setattr(intermediates_default, "DELETE_BATCH_SIZE", 1)
     start = datetime(2030, 1, 1, tzinfo=timezone.utc)
     release_time = start - timedelta(minutes=29)
     readings = iter([release_time, release_time, start] + [start + timedelta(hours=1)] * 100)
-    monkeypatch.setattr(intermediates_records_sqlite, "_utc_now", lambda: next(readings))
+    monkeypatch.setattr(intermediates_records_default, "_utc_now", lambda: next(readings))
     _seed_image(invoker, "old.png")
     _seed_image(invoker, "cached.png")
     consumer = _enqueue_row(invoker, session_id="consumer", status="in_progress")
     assert service.hold_cached_media("consumer", MediaReferences(images={"cached.png"}))
-    with invoker.services.image_records._db.transaction() as cursor:
+    with sqlite_cursor_of(invoker.services.session_queue) as cursor:
         cursor.execute("UPDATE session_queue SET status = 'completed' WHERE item_id = ?;", (consumer,))
     service._records.summarize(None)
 
@@ -1176,49 +1185,42 @@ def test_matching_scope_resolves_filtered_rows_minus_exclusions(
 
 
 def test_selection_paging_seeks_each_row_without_sorting_the_scope(
-    invoker: Invoker, service: IntermediatesService, monkeypatch: pytest.MonkeyPatch
+    invoker: Invoker, service: IntermediatesService
 ) -> None:
-    """A window of an explicit-row scope is an index seek in rowid order. One OR over many rows would make
-    SQLite sort the whole remaining scope on every window, holding the database lock for the run."""
+    """A window's page of an explicit-row scope is an index seek that starts at the keyset, in creation order. One
+    OR over many rows would make SQLite sort the whole remaining scope on every window, holding the database for
+    the run; only the page itself is classified and put in order."""
     records = service._records
+    database = invoker.services.session_queue._queries._database
     targets = [("alice", _project(invoker, "alice", f"P{index}", {})) for index in range(3)] + [("alice", None)]
     for index in range(len(targets)):
         _seed_image(invoker, f"row-{index}.png", project_id=targets[index][1])
-    real_scope_clauses = records._scope_clauses
-    paging_clauses: list[list[tuple[str, list[object]]]] = []
 
-    def recording_scope_clauses(**kwargs):
-        clauses = real_scope_clauses(**kwargs)
-        if kwargs.get("per_statement") == 1:
-            paging_clauses.append(clauses)
-        return clauses
-
-    monkeypatch.setattr(records, "_scope_clauses", recording_scope_clauses)
-    batches = list(
-        records.iter_deletable_batches(
-            "image",
-            user_id=None,
-            targets=targets,
-            mode="safe",
-            is_admin=False,
-            caller_user_id="alice",
-            recent_cutoff=None,
-            limit=10,
-        )
-    )
-    assert sorted(name for batch in batches for name, _ in batch) == [f"row-{index}.png" for index in range(4)]
-    assert len(paging_clauses) == 1 and len(paging_clauses[0]) == len(targets)
-
-    deletable_sql, deletable_params = records._deletable_sql("image", "safe", is_admin=False, caller_user_id="alice")
-    with invoker.services.image_records._db.transaction() as cursor:
-        clock = records._prepare(cursor)
-        for clause, params in paging_clauses[0]:
-            cursor.execute(
-                "EXPLAIN QUERY PLAN " + records._window_sql("image", clause, deletable_sql),
-                [*deletable_params, *clock, *params, 0, 10],
+    with capture_statements(database) as statements:
+        batches = list(
+            records.iter_deletable_batches(
+                "image",
+                user_id=None,
+                targets=targets,
+                mode="safe",
+                is_admin=False,
+                caller_user_id="alice",
+                recent_cutoff=None,
+                limit=10,
             )
-            plan = " ".join(str(row[-1]) for row in cursor.fetchall())
-            assert "B-TREE FOR ORDER BY" not in plan, plan
+        )
+
+    assert sorted(name for batch in batches for name, _ in batch) == [f"row-{index}.png" for index in range(4)]
+    windows = [
+        (statement, parameters) for statement, parameters in statements if "ORDER BY classified.created_at" in statement
+    ]
+    # A first window of each row finds it, a second finds nothing more.
+    assert len(windows) == 2 * len(targets)
+    for statement, parameters in windows:
+        plan = explain_query_plan(database, statement, parameters)
+        page = plan[: plan.index("SCAN page")]
+        assert any("(created_at,image_name)>(?,?)" in step for step in page), plan
+        assert not any("B-TREE" in step for step in page), plan
 
 
 @pytest.mark.parametrize("cleanup_wins_race", [False, True])
@@ -1270,7 +1272,7 @@ def test_running_graph_keeps_cached_media_or_recomputes_if_cleanup_won(
     runner.run_node(first.session.next(), first)
     assert first.session.is_complete() and not first.session.has_error()
     services.session_queue.save_queue_item_session(first.item_id, first.session)
-    with services.image_records._db.transaction() as cursor:
+    with sqlite_cursor_of(services.session_queue) as cursor:
         cursor.execute("UPDATE session_queue SET status = 'completed' WHERE item_id = ?", (first.item_id,))
         cursor.execute("UPDATE images SET created_at = '2020-01-01 00:00:00.000' WHERE image_name = ?", (image_name,))
 
@@ -1309,7 +1311,7 @@ def test_running_graph_keeps_cached_media_or_recomputes_if_cleanup_won(
     runner.run_node(second.session.next(), second)
     assert second.session.is_complete() and not second.session.has_error()
     services.session_queue.save_queue_item_session(second.item_id, second.session)
-    with services.image_records._db.transaction() as cursor:
+    with sqlite_cursor_of(services.session_queue) as cursor:
         cursor.execute("UPDATE session_queue SET status = 'completed' WHERE item_id = ?", (second.item_id,))
     if not cleanup_wins_race:
         _end_cached_media_grace(service, invoker)
@@ -1335,11 +1337,11 @@ def test_cached_media_holds_keep_rows_out_of_a_running_cleanup_until_all_consumi
     assert protected.progress.deleted_images == protected.progress.deleted_videos == 0
     assert _exists(invoker, "cached.png")
 
-    with invoker.services.image_records._db.transaction() as cursor:
+    with sqlite_cursor_of(invoker.services.session_queue) as cursor:
         cursor.execute("UPDATE session_queue SET status = 'completed' WHERE item_id = ?", (first,))
     preview, _ = _run(service, ALICE, _owner("alice"), mode=mode)
     assert preview.impact.keep_active_images == preview.impact.keep_active_videos == 1
-    with invoker.services.image_records._db.transaction() as cursor:
+    with sqlite_cursor_of(invoker.services.session_queue) as cursor:
         cursor.execute("UPDATE session_queue SET status = 'canceled' WHERE item_id = ?", (second,))
     preview, _ = _run(service, ALICE, _owner("alice"), mode=mode)
     # A cache hit reused old rows; the grace a fresh output gets now runs from the session's end.
@@ -1407,10 +1409,9 @@ def test_completed_child_media_survives_until_its_root_finishes(
     assert queue.prune("default").deleted == 0
 
     if reload_records:
+        # A new process starts without the holds of the last one.
         service.stop()
-        with invoker.services.image_records._db.transaction() as cursor:
-            cursor.execute("DROP TABLE IF EXISTS temp.intermediates_session_media;")
-        service = IntermediatesService(IntermediatesRecordsSqlite(invoker.services.image_records._db))
+        service = IntermediatesService(IntermediatesRecords(invoker.services.session_queue._queries._database))
         service.start(invoker)
     try:
         if not reload_records:
@@ -1444,7 +1445,7 @@ def test_completed_nested_child_keeps_media_while_its_root_is_active(
     _seed_image(invoker, "produced.png", session_id="leaf")
     _seed_video(invoker, "cached.mp4")
     assert service.hold_cached_media("leaf", MediaReferences(videos={"cached.mp4"}))
-    with invoker.services.image_records._db.transaction() as cursor:
+    with sqlite_cursor_of(invoker.services.session_queue) as cursor:
         cursor.execute("UPDATE session_queue SET status = 'completed' WHERE item_id = ?", (child,))
 
     for mode in ("safe", "force"):
@@ -1452,7 +1453,7 @@ def test_completed_nested_child_keeps_media_while_its_root_is_active(
         assert preview.impact.keep_active_images == preview.impact.keep_active_videos == 1
         assert completed.progress.deleted_images == completed.progress.deleted_videos == 0
 
-    with invoker.services.image_records._db.transaction() as cursor:
+    with sqlite_cursor_of(invoker.services.session_queue) as cursor:
         cursor.execute("UPDATE session_queue SET status = 'completed' WHERE item_id = ?", (root,))
     _end_cached_media_grace(service, invoker)
     _, completed = _run(service, ALICE, _owner("alice"))
@@ -1542,22 +1543,21 @@ def test_legacy_client_state_protects_its_canvas_media_until_it_changes(
 def test_quarantined_projects_are_named_when_a_force_clear_would_break_them(
     invoker: Invoker, service: IntermediatesService
 ) -> None:
-    from invokeai.app.services.shared.media_references import MediaReferences, replace_media_references
+    from invokeai.app.services.shared.media_references import MediaReferences
 
     _seed_image(invoker, "recovered.png")
-    with invoker.services.image_records._db.transaction() as cursor:
+    with sqlite_cursor_of(invoker.services.session_queue) as cursor:
         cursor.execute(
             "CREATE TABLE IF NOT EXISTS orphaned_projects_2026_08_06 (project_id TEXT, user_id TEXT, name TEXT,"
             " data TEXT, PRIMARY KEY (user_id, project_id));"
         )
         cursor.execute("INSERT INTO orphaned_projects_2026_08_06 VALUES ('p1', 'alice', 'Before boards', '{}');")
-        replace_media_references(
-            cursor,
-            owner_kind="quarantined_project",
-            user_id="alice",
-            owner_id="p1",
-            references=MediaReferences(images={"recovered.png"}),
-        )
+    invoker.services.session_queue._queries._database.queries.media_references.replace(
+        owner_kind="quarantined_project",
+        user_id="alice",
+        owner_id="p1",
+        references=MediaReferences(images={"recovered.png"}),
+    )
 
     safe, _ = _run(service, ALICE, _owner("alice"))
     assert safe.impact.keep_referenced_images == 1

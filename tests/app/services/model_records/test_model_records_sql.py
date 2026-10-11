@@ -2,13 +2,14 @@
 Test the refactored model config classes.
 """
 
+import json
 from hashlib import sha256
 from typing import Any, Optional
 
 import pytest
 from pydantic import ValidationError
+from sqlalchemy import insert
 
-from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.model_records import (
     DuplicateModelException,
     ModelRecordOrderBy,
@@ -17,7 +18,10 @@ from invokeai.app.services.model_records import (
     UnknownModelException,
 )
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.queries.models import MAX_KEY_LENGTH, MAX_PATH_LENGTH, ModelQueries
+from invokeai.app.services.shared.database.schema.models import models
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefaultSettings
 from invokeai.backend.model_manager.configs.lora import LoRA_LyCORIS_SDXL_Config
 from invokeai.backend.model_manager.configs.main import (
@@ -41,18 +45,12 @@ from invokeai.backend.model_manager.taxonomy import (
     SchedulerPredictionType,
 )
 from invokeai.backend.util.logging import InvokeAILogger
-from tests.fixtures.sqlite_database import create_mock_sqlite_database
+from tests.fixtures.races import when_called
 
 
 @pytest.fixture
-def store(
-    datadir: Any,
-) -> ModelRecordServiceSQL:
-    config = InvokeAIAppConfig()
-    config._root = datadir
-    logger = InvokeAILogger.get_logger(config=config)
-    db = create_mock_sqlite_database(config, logger)
-    return ModelRecordServiceSQL(db, logger)
+def store(database: Database) -> ModelRecordServiceSQL:
+    return ModelRecordServiceSQL(database, InvokeAILogger.get_logger())
 
 
 def example_ti_config(key: Optional[str] = None) -> TI_File_SD1_Config:
@@ -80,7 +78,7 @@ def test_type(store: ModelRecordServiceBase):
 
 
 def test_raises_on_violating_uniqueness(store: ModelRecordServiceBase):
-    # Models have a uniqueness constraint by their name, base and type
+    # The key and the path are unique: config1 again repeats both, config2 its path.
     config1 = example_ti_config("key1")
     config2 = config1.model_copy(deep=True)
     config2.key = "key2"
@@ -313,8 +311,7 @@ def test_unique_by_path(store: ModelRecordServiceBase):
         prediction_type=SchedulerPredictionType.Epsilon,
         repo_variant=ModelRepoVariant.Default,
     )
-    # config1, config2 and config3 are compatible because they have unique paths
-    # of name, type and base
+    # config1, config2 and config3 can be installed together: their paths differ, though not their names
     for c in config1, config2, config3:
         c.key = sha256(c.path.encode("utf-8")).hexdigest()
         store.add_model(c)
@@ -486,3 +483,202 @@ def test_model_record_changes():
 
     changes = ModelRecordChanges.model_validate({"default_settings": {"vae": "value"}})
     assert isinstance(changes.default_settings, MainModelDefaultSettings)
+
+
+def _embedding(key: str, *, name: str = "embedding") -> TI_File_SD1_Config:
+    return TI_File_SD1_Config(
+        key=key,
+        source="test/source/",
+        source_type=ModelSourceType.Path,
+        path=f"/tmp/{key}.bin",
+        file_size=1024,
+        name=name,
+        base=BaseModelType.StableDiffusion1,
+        type=ModelType.TextualInversion,
+        format=ModelFormat.EmbeddingFile,
+        hash="ABC123",
+    )
+
+
+def test_a_duplicate_is_reported_by_what_it_repeats(store: ModelRecordServiceBase) -> None:
+    store.add_model(_embedding("key1"))
+
+    with pytest.raises(DuplicateModelException, match="with path"):
+        store.add_model(_embedding("key2").model_copy(update={"path": "/tmp/key1.bin"}))
+    with pytest.raises(DuplicateModelException, match="with key"):
+        store.add_model(_embedding("key1").model_copy(update={"path": "/tmp/elsewhere.bin"}))
+
+
+def test_models_that_tie_are_listed_by_key_and_names_ignore_case(store: ModelRecordServiceBase) -> None:
+    # Added against key order, so that only the tie-break lists equal names by key. By bytes "Beta" sorts before
+    # "alpha", so only a case-insensitive order lists it last.
+    for key, name in (("k4", "Beta"), ("k3", "alpha"), ("k2", "ALPHA"), ("k1", "Alpha")):
+        store.add_model(_embedding(key, name=name))
+
+    def keys(order_by: ModelRecordOrderBy, direction: SQLiteDirection) -> list[str]:
+        return [model.key for model in store.search_by_attr(order_by=order_by, direction=direction)]
+
+    # The embeddings share their type, base and format, so the default order goes by their names too.
+    for order_by in (ModelRecordOrderBy.Name, ModelRecordOrderBy.Default):
+        assert keys(order_by, SQLiteDirection.Ascending) == ["k1", "k2", "k3", "k4"]
+        assert keys(order_by, SQLiteDirection.Descending) == ["k4", "k3", "k2", "k1"]
+
+
+_MAIN = {
+    "variant": ModelVariantType.Normal,
+    "prediction_type": SchedulerPredictionType.Epsilon,
+    "repo_variant": ModelRepoVariant.Default,
+}
+# Models that differ on every ordered attribute: key -> (class, fields of the class, name, path, size, added, modified).
+# Timestamps are written as stored, so that no test waits for the clock.
+_ORDERED_MODELS: dict[str, tuple[type, dict[str, Any], str, str, int, str, str]] = {
+    "a": (
+        Main_Diffusers_SDXL_Config,
+        _MAIN,
+        "delta",
+        "/m/2",
+        3000,
+        "2000-01-03 00:00:00.000",
+        "2000-02-02 00:00:00.000",
+    ),
+    "b": (
+        VAE_Diffusers_SD1_Config,
+        {"repo_variant": ModelRepoVariant.Default},
+        "Charlie",
+        "/m/4",
+        1000,
+        "2000-01-01 00:00:00.000",
+        "2000-02-04 00:00:00.000",
+    ),
+    "c": (TI_File_SD1_Config, {}, "bravo", "/m/1", 4000, "2000-01-02 00:00:00.000", "2000-02-03 00:00:00.000"),
+    "d": (LoRA_LyCORIS_SDXL_Config, {}, "Alpha", "/m/3", 2000, "2000-01-04 00:00:00.000", "2000-02-01 00:00:00.000"),
+    "e": (Main_Diffusers_SD1_Config, _MAIN, "echo", "/m/5", 5000, "2000-01-05 00:00:00.000", "2000-02-05 00:00:00.000"),
+}
+# Each order's listing, ascending; descending is its reverse, ties included.
+_ASCENDING = {
+    ModelRecordOrderBy.Default: "cdeab",  # by type, then base: the two main models
+    ModelRecordOrderBy.Type: "cdaeb",  # the two main models tie, by key
+    ModelRecordOrderBy.Base: "bcead",
+    ModelRecordOrderBy.Name: "dcbae",  # ignoring case; by bytes it would be "dbcae"
+    ModelRecordOrderBy.Format: "abecd",
+    ModelRecordOrderBy.Size: "bdace",
+    ModelRecordOrderBy.DateAdded: "bcade",
+    ModelRecordOrderBy.DateModified: "dacbe",
+    ModelRecordOrderBy.Path: "cadbe",
+}
+
+
+@pytest.fixture
+def ordered_store(database: Database, store: ModelRecordServiceSQL) -> ModelRecordServiceSQL:
+    with database.begin(write=True) as conn:
+        for key, (cls, fields, name, path, size, added, modified) in _ORDERED_MODELS.items():
+            config = cls(
+                key=key,
+                name=name,
+                path=path,
+                file_size=size,
+                hash=f"hash-{key}",
+                source="test/source/",
+                source_type=ModelSourceType.Path,
+                **fields,
+            )
+            conn.execute(
+                insert(models).values(id=key, config=config.model_dump_json(), created_at=added, updated_at=modified)
+            )
+    return store
+
+
+def _listed(store: ModelRecordServiceBase, order_by: ModelRecordOrderBy, direction: SQLiteDirection) -> str:
+    return "".join(model.key for model in store.search_by_attr(order_by=order_by, direction=direction))
+
+
+def test_each_order_has_its_own_listing() -> None:
+    # Else a test below could not tell one order's column from another's.
+    assert len(set(_ASCENDING.values())) == len(_ASCENDING) == len(ModelRecordOrderBy)
+
+
+@pytest.mark.parametrize("order_by", list(ModelRecordOrderBy))
+def test_each_order_sorts_by_its_own_column(ordered_store: ModelRecordServiceSQL, order_by: ModelRecordOrderBy) -> None:
+    assert _listed(ordered_store, order_by, SQLiteDirection.Ascending) == _ASCENDING[order_by]
+    assert _listed(ordered_store, order_by, SQLiteDirection.Descending) == _ASCENDING[order_by][::-1]
+
+
+def test_an_update_makes_a_model_the_last_modified(ordered_store: ModelRecordServiceSQL) -> None:
+    ordered_store.update_model("c", ModelRecordChanges(description="edited"))
+
+    assert _listed(ordered_store, ModelRecordOrderBy.DateModified, SQLiteDirection.Ascending) == "dabec"
+    assert _listed(ordered_store, ModelRecordOrderBy.DateAdded, SQLiteDirection.Ascending) == "bcade"
+
+
+def test_the_format_filter_applies(ordered_store: ModelRecordServiceSQL) -> None:
+    diffusers = ordered_store.search_by_attr(model_format=ModelFormat.Diffusers)
+
+    assert [model.key for model in diffusers] == ["e", "a", "b"]
+
+
+def test_a_replaced_model_is_stored_and_an_unknown_one_is_not_found(ordered_store: ModelRecordServiceSQL) -> None:
+    replaced = ordered_store.get_model("c").model_copy(update={"name": "renamed"})
+
+    ordered_store.replace_model("c", replaced)
+
+    assert ordered_store.get_model("c").name == "renamed"
+    with pytest.raises(ValueError):
+        ordered_store.replace_model("c", ordered_store.get_model("a"))
+    with pytest.raises(UnknownModelException):
+        ordered_store.replace_model("ghost", replaced.model_copy(update={"key": "ghost", "path": "/m/ghost"}))
+    with pytest.raises(UnknownModelException):
+        ordered_store.del_model("ghost")
+
+
+def test_concurrent_updates_of_a_model_both_apply(
+    store: ModelRecordServiceBase, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store.add_model(example_ti_config("key1"))
+
+    def second() -> object:
+        return store.update_model("key1", ModelRecordChanges(description="second"))
+
+    # The second update starts while the first holds the model's row: it must wait, then build on the first.
+    ended = when_called(monkeypatch, ModelQueries, "lock", second)
+    store.update_model("key1", ModelRecordChanges(name="first"))
+
+    assert ended() == []
+    updated = store.get_model("key1")
+    assert (updated.name, updated.description) == ("first", "second")
+
+
+def test_model_paths_include_records_that_no_longer_validate(store: ModelRecordServiceBase, database: Database) -> None:
+    store.add_model(_embedding("key1"))
+    # A record of a model type this version does not know, as after going back to an older version.
+    unknown = _embedding("key2").model_dump(mode="json") | {"type": "from_the_future"}
+    database.queries.models.insert("key2", json.dumps(unknown))
+
+    assert sorted(store.get_model_paths()) == ["/tmp/key1.bin", "/tmp/key2.bin"]
+    assert [model.key for model in store.search_by_attr()] == ["key1"]
+
+
+def test_the_oldest_model_of_a_file_comes_first(store: ModelRecordServiceBase, database: Database) -> None:
+    # The same file under two paths, the older record with the larger key: the route that recalls a model by its hash
+    # takes the first.
+    with database.begin(write=True) as conn:
+        for key, added in (("k1", "2000-01-02 00:00:00.000"), ("k2", "2000-01-01 00:00:00.000")):
+            config = _embedding(key).model_dump_json()
+            conn.execute(insert(models).values(id=key, config=config, created_at=added, updated_at=added))
+
+    assert [model.key for model in store.search_by_hash("ABC123")] == ["k2", "k1"]
+
+
+def test_a_key_or_path_longer_than_a_record_holds_is_refused(store: ModelRecordServiceBase) -> None:
+    # SQLite would hold them, a server would not: every backend refuses them alike.
+    with pytest.raises(ValueError, match="key"):
+        store.add_model(_embedding("k" * (MAX_KEY_LENGTH + 1)))
+    too_long_path = "/" + "p" * MAX_PATH_LENGTH
+    with pytest.raises(ValueError, match="path"):
+        store.add_model(_embedding("key1").model_copy(update={"path": too_long_path}))
+
+    longest_path = "/" + "p" * (MAX_PATH_LENGTH - 1)
+    store.add_model(_embedding("k" * MAX_KEY_LENGTH).model_copy(update={"path": longest_path}))
+    store.add_model(_embedding("key1"))
+    with pytest.raises(ValueError, match="path"):
+        store.update_model("key1", ModelRecordChanges(path=too_long_path))
+    assert store.get_model("key1").path == "/tmp/key1.bin"

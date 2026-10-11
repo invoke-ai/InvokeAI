@@ -266,6 +266,7 @@ const GalleryItemContextMenuContent = ({
             {isBulk ? (
               <BulkItemMenuItems
                 actions={actions}
+                allStarred={target.allStarred}
                 boards={boards}
                 itemRefs={target.itemRefs}
                 loadedItems={target.items}
@@ -514,6 +515,7 @@ const SingleItemMenuItems = ({
 
 const BulkItemMenuItems = ({
   actions,
+  allStarred: knownAllStarred,
   boards,
   itemRefs,
   loadedItems,
@@ -521,13 +523,15 @@ const BulkItemMenuItems = ({
   onRequestDeletion,
 }: {
   actions: ImageActions;
+  allStarred: boolean | undefined;
   boards: GalleryBoard[];
   itemRefs: GalleryItemRef[];
   loadedItems: GalleryItem[];
   primaryItem: GalleryItem;
   onRequestDeletion: (itemRefs: GalleryItemRef[]) => void;
 }) => {
-  const allStarred = loadedItems.length === itemRefs.length && loadedItems.every((item) => item.starred);
+  const allStarred =
+    knownAllStarred ?? (loadedItems.length === itemRefs.length && loadedItems.every((item) => item.starred));
   const handleOpenInNewTab = useCallback(() => actions.openItemInNewTab(primaryItem), [actions, primaryItem]);
   const handleOpenPreview = useCallback(() => actions.openItemInPreview(primaryItem), [actions, primaryItem]);
   const handleToggleStarred = useCallback(

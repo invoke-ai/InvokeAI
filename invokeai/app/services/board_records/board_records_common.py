@@ -91,7 +91,9 @@ class BoardChanges(BaseModel, extra="forbid"):
     board_name: Optional[str] = Field(
         default=None, description="The board's new name.", max_length=BOARD_NAME_MAX_LENGTH
     )
-    cover_image_name: Optional[str] = Field(default=None, description="The name of the board's new cover image.")
+    cover_image_name: Optional[str] = Field(
+        default=None, max_length=255, description="The name of the board's new cover image."
+    )
     archived: Optional[bool] = Field(default=None, description="Whether or not the board is archived")
     board_visibility: Optional[BoardVisibility] = Field(default=None, description="The visibility of the board.")
 
@@ -121,11 +123,4 @@ class BoardRecordProjectOwnedException(BoardRecordSaveException):
     """Raised when a generic board update would change project-owned state."""
 
     def __init__(self, message="Board belongs to a project"):
-        super().__init__(message)
-
-
-class BoardRecordDeleteException(Exception):
-    """Raised when an board record cannot be deleted."""
-
-    def __init__(self, message="Board record not deleted"):
         super().__init__(message)

@@ -20,9 +20,10 @@ import {
   fetchGalleryItemsRange,
   GALLERY_PAGE_SIZE,
   galleryKeys,
+  getGalleryItemListingKey,
   getGalleryItemListQueries,
   getGalleryItemsFilterFromKey,
-  isGalleryStarredStripQueryKey,
+  isGallerySinglePageQueryKey,
   type CanonicalGalleryItemsFilter,
 } from './queries';
 
@@ -61,7 +62,7 @@ export const getRefreshedGalleryThumbnailUrl = (url: string, currentRevision: nu
   return refreshedUrl.toString();
 };
 
-/** A list window's pages, or the starred strip's single page. */
+/** A list window's pages, or one sparse/strip page. */
 type GalleryItemsCacheData = InfiniteData<GalleryItemsPage, number> | GalleryItemsPage;
 
 interface ItemCacheRollbackEntry {
@@ -94,7 +95,7 @@ const getCachedPages = (query: Query): GalleryItemsPage[] => {
     return data.pages;
   }
 
-  return isGalleryStarredStripQueryKey(query.queryKey) && isGalleryItemsPage(data) ? [data] : [];
+  return isGallerySinglePageQueryKey(query.queryKey) && isGalleryItemsPage(data) ? [data] : [];
 };
 
 const mapPageItems = (
@@ -104,8 +105,9 @@ const mapPageItems = (
 ): GalleryItemsPage => {
   let changed = false;
   const items: GalleryItem[] = [];
+  const itemIndices: number[] | undefined = page.itemIndices ? [] : undefined;
 
-  for (const item of page.items) {
+  for (const [index, item] of page.items.entries()) {
     const nextItem = mapItem(item);
 
     if (nextItem !== item) {
@@ -113,6 +115,7 @@ const mapPageItems = (
     }
     if (nextItem) {
       items.push(nextItem);
+      itemIndices?.push(page.itemIndices?.[index] ?? (page.offset ?? 0) + index);
     }
   }
 
@@ -123,6 +126,7 @@ const mapPageItems = (
   return {
     ...page,
     items: changed ? items : page.items,
+    ...(changed && itemIndices ? { itemIndices } : {}),
     total: Math.max(0, page.total - totalDelta),
   };
 };
@@ -173,32 +177,16 @@ const patchItemPage = (
   });
 };
 
-const countRemovedItems = (page: GalleryItemsPage, itemKeys: ReadonlySet<GalleryItemKey>): number =>
-  page.items.filter((item) => itemKeys.has(toGalleryItemKey(item))).length;
-
 const patchItemsInfiniteData = (
   data: InfiniteData<GalleryItemsPage, number>,
   filter: CanonicalGalleryItemsFilter,
   patch: GalleryItemCachePatch,
-  itemKeys: ReadonlySet<GalleryItemKey>
+  itemKeys: ReadonlySet<GalleryItemKey>,
+  removedItemCount: number
 ): InfiniteData<GalleryItemsPage, number> => {
-  const removedItemKeys = new Set<GalleryItemKey>();
-
-  if (patchRemovesItems(filter, patch)) {
-    for (const page of data.pages) {
-      for (const item of page.items) {
-        const key = toGalleryItemKey(item);
-
-        if (itemKeys.has(key)) {
-          removedItemKeys.add(key);
-        }
-      }
-    }
-  }
-
   let changed = false;
   const pages = data.pages.map((page) => {
-    const nextPage = patchItemPage(page, filter, patch, itemKeys, removedItemKeys.size);
+    const nextPage = patchItemPage(page, filter, patch, itemKeys, removedItemCount);
     changed ||= nextPage !== page;
 
     return nextPage;
@@ -211,28 +199,115 @@ const patchItemsCacheData = (
   query: Query,
   filter: CanonicalGalleryItemsFilter,
   patch: GalleryItemCachePatch,
-  itemKeys: ReadonlySet<GalleryItemKey>
+  itemKeys: ReadonlySet<GalleryItemKey>,
+  removedItemCount: number
 ): { after: GalleryItemsCacheData; before: GalleryItemsCacheData } | null => {
   const before = query.state.data;
 
   if (isGalleryItemsData(before)) {
-    return { after: patchItemsInfiniteData(before, filter, patch, itemKeys), before };
+    return { after: patchItemsInfiniteData(before, filter, patch, itemKeys, removedItemCount), before };
   }
 
-  // A newly starred item is left to the trailing refetch, which knows where
-  // it belongs chronologically in the strip.
-  if (isGalleryStarredStripQueryKey(query.queryKey) && isGalleryItemsPage(before)) {
-    return { after: patchItemPage(before, filter, patch, itemKeys, countRemovedItems(before, itemKeys)), before };
+  // New items are left to the trailing refetch so their server ordering is preserved.
+  if (isGallerySinglePageQueryKey(query.queryKey) && isGalleryItemsPage(before)) {
+    return { after: patchItemPage(before, filter, patch, itemKeys, removedItemCount), before };
   }
 
   return null;
 };
 
+const getListingHash = (queryKey: QueryKey): string => hashKey(getGalleryItemListingKey(queryKey));
+
+/**
+ * Count the removed items each listing, or each cache entry, holds in its cached pages. Every cached page of a listing
+ * reports the same server total, so each must lose the same count: pages left disagreeing would make the sparse views
+ * clamp and reconcile against each other.
+ */
+const countRemovedItems = (
+  queries: readonly Query[],
+  patch: GalleryItemCachePatch,
+  itemKeys: ReadonlySet<GalleryItemKey>,
+  getCountKey: (query: Query) => string
+): Map<string, number> => {
+  const removedKeysByCountKey = new Map<string, Set<GalleryItemKey>>();
+
+  for (const query of queries) {
+    const filter = getGalleryItemsFilterFromKey(query.queryKey);
+
+    if (!filter || !patchRemovesItems(filter, patch)) {
+      continue;
+    }
+
+    const countKey = getCountKey(query);
+    const removedKeys = removedKeysByCountKey.get(countKey) ?? new Set<GalleryItemKey>();
+
+    removedKeysByCountKey.set(countKey, removedKeys);
+    for (const page of getCachedPages(query)) {
+      for (const item of page.items) {
+        const key = toGalleryItemKey(item);
+
+        if (itemKeys.has(key)) {
+          removedKeys.add(key);
+        }
+      }
+    }
+  }
+
+  return new Map([...removedKeysByCountKey].map(([countKey, keys]) => [countKey, keys.size]));
+};
+
+/** An optimistic star patch, or the rollback of one, for state that retains star flags outside the item caches. */
+export type GalleryItemStarPatchEvent =
+  | { itemKeys: ReadonlySet<GalleryItemKey>; kind: 'apply'; patchId: number; starred: boolean }
+  | { kind: 'revert'; patchId: number };
+
+type GalleryItemStarPatchListener = (event: GalleryItemStarPatchEvent) => void;
+
+const galleryItemStarPatchListeners = new WeakMap<QueryClient, Set<GalleryItemStarPatchListener>>();
+let nextGalleryItemStarPatchId = 0;
+
+/**
+ * Observe star patches on `client`'s item caches. An unstarred item leaves starred-only listings, and an item on an
+ * evicted page is in no cache at all, so its flag can only be reconciled from the patch itself.
+ */
+export const subscribeGalleryItemStarPatches = (
+  client: QueryClient,
+  listener: GalleryItemStarPatchListener
+): (() => void) => {
+  let listeners = galleryItemStarPatchListeners.get(client);
+
+  if (!listeners) {
+    listeners = new Set();
+    galleryItemStarPatchListeners.set(client, listeners);
+  }
+
+  listeners.add(listener);
+
+  return () => listeners.delete(listener);
+};
+
+const emitGalleryItemStarPatch = (client: QueryClient, event: GalleryItemStarPatchEvent): void =>
+  galleryItemStarPatchListeners.get(client)?.forEach((listener) => listener(event));
+
+export interface GalleryItemCachePatchOptions {
+  /**
+   * Which cached pages a removal lowers the total of. `listing` (the default) lowers every cached page of a listing
+   * that holds a removed item anywhere, as a first patch must. `holder` lowers only the cache entries that still hold a
+   * removed item, for re-applying a patch that already lowered the rest: a page refetched since then is the only one
+   * still counting the item.
+   */
+  totals?: 'holder' | 'listing';
+}
+
 /**
  * Applies only backend-confirmed successes. Failed refs are intentionally
  * ignored, and kind-qualified keys prevent same-name images/videos colliding.
  */
-export const patchGalleryItemCaches = (client: QueryClient, patch: GalleryItemCachePatch): (() => void) => {
+export const patchGalleryItemCaches = (
+  client: QueryClient,
+  patch: GalleryItemCachePatch,
+  { totals = 'listing' }: GalleryItemCachePatchOptions = {}
+): (() => void) => {
   const itemKeys = new Set(patch.result.succeeded.map(toGalleryItemKey));
 
   if (itemKeys.size === 0) {
@@ -245,10 +320,17 @@ export const patchGalleryItemCaches = (client: QueryClient, patch: GalleryItemCa
   const rollbackClusterMembers =
     patch.kind === 'delete' ? pruneImageClusterMembers(patch.result.succeeded.map(toGalleryItemKey)) : null;
   const rollbackEntries: ItemCacheRollbackEntry[] = [];
+  const starPatchId = patch.kind === 'star' ? ++nextGalleryItemStarPatchId : null;
 
-  for (const query of getGalleryItemListQueries(client)) {
+  const queries = getGalleryItemListQueries(client);
+  const getCountKey =
+    totals === 'listing' ? (query: Query) => getListingHash(query.queryKey) : (query: Query) => query.queryHash;
+  const removedCounts = countRemovedItems(queries, patch, itemKeys, getCountKey);
+
+  for (const query of queries) {
     const filter = getGalleryItemsFilterFromKey(query.queryKey);
-    const patched = filter ? patchItemsCacheData(query, filter, patch, itemKeys) : null;
+    const removedItemCount = removedCounts.get(getCountKey(query)) ?? 0;
+    const patched = filter ? patchItemsCacheData(query, filter, patch, itemKeys, removedItemCount) : null;
 
     if (!patched || patched.after === patched.before) {
       continue;
@@ -261,6 +343,10 @@ export const patchGalleryItemCaches = (client: QueryClient, patch: GalleryItemCa
     }
   }
 
+  if (patch.kind === 'star' && starPatchId !== null) {
+    emitGalleryItemStarPatch(client, { itemKeys, kind: 'apply', patchId: starPatchId, starred: patch.starred });
+  }
+
   return () => {
     rollbackClusterMembers?.();
     rollBackUnclaimedEntries(
@@ -268,6 +354,10 @@ export const patchGalleryItemCaches = (client: QueryClient, patch: GalleryItemCa
       (entry) => client.getQueryData<GalleryItemsCacheData>(entry.queryKey),
       (entry) => client.setQueryData(entry.queryKey, entry.before)
     );
+
+    if (starPatchId !== null) {
+      emitGalleryItemStarPatch(client, { kind: 'revert', patchId: starPatchId });
+    }
   };
 };
 
@@ -438,6 +528,7 @@ const rebuildGalleryItemWindow = async (client: QueryClient, owner: AccountScope
       limit: span.rowCount,
       offset: span.offset,
       signal: owner.signal,
+      includeAbsolutePositions: true,
     });
   } catch {
     return false;
@@ -451,11 +542,25 @@ const rebuildGalleryItemWindow = async (client: QueryClient, owner: AccountScope
     return false;
   }
 
-  const pages: GalleryItemsPage[] = [];
+  const loadedRangeCount = Math.min(span.rowCount, Math.max(0, result.total - span.offset));
+  const pageCount = Math.max(1, Math.ceil(loadedRangeCount / GALLERY_PAGE_SIZE));
+  const pages: GalleryItemsPage[] = Array.from({ length: pageCount }, (_, pageIndex) => {
+    const pageOffset = span.offset + pageIndex * GALLERY_PAGE_SIZE;
+    const pageEnd = pageOffset + GALLERY_PAGE_SIZE;
+    const items: GalleryItem[] = [];
+    const itemIndices: number[] | undefined = result.itemIndices ? [] : undefined;
 
-  for (let index = 0; index < result.items.length; index += GALLERY_PAGE_SIZE) {
-    pages.push({ items: result.items.slice(index, index + GALLERY_PAGE_SIZE), total: result.total });
-  }
+    result.items.forEach((item, index) => {
+      const itemIndex = result.itemIndices?.[index] ?? (result.offset ?? span.offset) + index;
+
+      if (itemIndex >= pageOffset && itemIndex < pageEnd) {
+        items.push(item);
+        itemIndices?.push(itemIndex);
+      }
+    });
+
+    return { items, ...(itemIndices ? { itemIndices } : {}), offset: pageOffset, total: result.total };
+  });
 
   // TanStack never stores zero pages; an emptied span keeps one empty page.
   if (pages.length === 0) {

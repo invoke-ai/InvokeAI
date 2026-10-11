@@ -1,14 +1,18 @@
 import type { SystemStyleObject } from '@chakra-ui/react';
 import type { GalleryItem, GalleryItemKey } from '@features/gallery/core/items';
+import type { GallerySparsePageState } from '@features/gallery/ui/useGalleryData';
 import type { CSSProperties, MouseEvent } from 'react';
 
-import { Box, Icon, Skeleton } from '@chakra-ui/react';
+import { Box, Icon, Skeleton, Stack, Text } from '@chakra-ui/react';
 import { toGalleryItemKey } from '@features/gallery/core/items';
+import { GALLERY_PAGE_SIZE } from '@features/gallery/data/queries';
 import { getGalleryColumnCountForCell } from '@features/gallery/ui/galleryGridLayout';
 import { GalleryTileFrame } from '@features/gallery/ui/GalleryTileFrame';
+import { Button } from '@platform/ui/Button';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { CheckIcon } from 'lucide-react';
-import { memo, useCallback, useMemo, useRef } from 'react';
+import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useVirtualizer } from 'react-hook-tanstack-virtual';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -19,6 +23,7 @@ import {
 } from './galleryPicker';
 
 const GRID_GAP_PX = 4;
+const GRID_PADDING_PX = 8;
 const SKELETON_TILE_COUNT = 8;
 
 const IMG_STYLE: CSSProperties = {
@@ -46,55 +51,47 @@ const getTileCss = (state: GalleryPickerTileState, isActive: boolean): SystemSty
   return isActive ? { ...base, ...ACTIVE_TILE_CSS } : base;
 };
 
-export const galleryPickerOptionId = (idBase: string, key: GalleryItemKey): string => `${idBase}-${key}`;
+export const galleryPickerOptionId = (idBase: string, index: number): string => `${idBase}-slot-${index}`;
 
 const GalleryPickerTile = memo(function GalleryPickerTile({
+  activeIndex,
+  currentKey,
   idBase,
-  isActive,
-  isCurrent,
+  index,
   isMultiple,
   item,
   state,
+  total,
 }: {
+  activeIndex: number;
+  currentKey: GalleryItemKey | null;
   idBase: string;
-  isActive: boolean;
-  /** The Gallery widget's own selection, ringed so it reads as the default. */
-  isCurrent: boolean;
+  index: number;
   isMultiple: boolean;
   item: GalleryItem;
   state: GalleryPickerTileState;
+  total: number;
 }) {
   const { t } = useTranslation();
   const key = toGalleryItemKey(item);
-  const css = useMemo(() => getTileCss(state, isActive), [isActive, state]);
+  const css = useMemo(() => getTileCss(state, index === activeIndex), [activeIndex, index, state]);
   const unsupportedLabel =
     state === 'unsupported'
       ? t(item.kind === 'video' ? 'widgets.gallery.picker.unsupportedVideo' : 'widgets.gallery.picker.unsupportedImage')
       : undefined;
 
-  // Active-state ref callbacks reveal keyboard highlights; pointer hover must not scroll.
-  const scrollIntoView = useCallback(
-    (node: HTMLDivElement | null) => {
-      if (node && isActive) {
-        node.scrollIntoView({ block: 'nearest' });
-      }
-    },
-    [isActive]
-  );
-
   return (
     <GalleryTileFrame
-      ref={scrollIntoView}
       aria-disabled={state === 'pickable' ? undefined : true}
       aria-label={state === 'added' ? t('widgets.gallery.picker.addedItem', { name: item.name }) : item.name}
-      // Single mode: selection follows the highlight (what Enter picks).
-      // Multiple mode: selection is what has been added; the highlight is
-      // carried by `aria-activedescendant` alone.
-      aria-selected={isMultiple ? state === 'added' : isActive}
+      aria-posinset={index + 1}
+      aria-selected={isMultiple ? state === 'added' : index === activeIndex}
+      aria-setsize={total}
       css={css}
+      data-item-index={index}
       data-item-key={key}
-      id={galleryPickerOptionId(idBase, key)}
-      isSelected={isCurrent || state === 'added'}
+      id={galleryPickerOptionId(idBase, index)}
+      isSelected={key === currentKey || state === 'added'}
       item={item}
       role="option"
       title={unsupportedLabel}
@@ -129,42 +126,122 @@ const GalleryPickerTile = memo(function GalleryPickerTile({
   );
 });
 
-/**
- * The bounded infinite window limits nonvirtualized rows; lazy images defer requests and the sentinel loads
- * further pages.
- */
+const GalleryPickerPlaceholder = ({
+  error,
+  idBase,
+  index,
+  isActive,
+  isLoading,
+  retry,
+  total,
+}: {
+  error: Error | null;
+  idBase: string;
+  index: number;
+  isActive: boolean;
+  isLoading: boolean;
+  retry?: () => Promise<unknown>;
+  total: number;
+}) => {
+  const { t } = useTranslation();
+  const handleRetry = useCallback(() => {
+    if (retry) {
+      void retry();
+    }
+  }, [retry]);
+
+  return (
+    <Box
+      aria-busy={isLoading || undefined}
+      aria-disabled="true"
+      aria-label={error ? t('common.error') : isLoading ? t('common.loading') : undefined}
+      aria-posinset={index + 1}
+      aria-selected={false}
+      aria-setsize={total}
+      bg={isLoading ? 'bg.subtle' : undefined}
+      borderColor="border.subtle"
+      borderWidth="2px"
+      css={isActive ? ACTIVE_TILE_CSS : undefined}
+      data-item-index={index}
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      id={galleryPickerOptionId(idBase, index)}
+      minW="0"
+      overflow="hidden"
+      role="option"
+      rounded="md"
+    >
+      {error && retry ? (
+        <Stack align="center" gap="1" maxW="full" px="1">
+          <Text color="fg.muted" fontSize="xs" lineClamp={2} textAlign="center">
+            {error.message}
+          </Text>
+          <Button size="sm" variant="ghost" onClick={handleRetry}>
+            {t('common.retry')}
+          </Button>
+        </Stack>
+      ) : isLoading ? (
+        <Skeleton aspectRatio={1} h="full" rounded="md" w="full" />
+      ) : null}
+    </Box>
+  );
+};
+
+/** A virtualized absolute-slot picker backed by the same 60-item Query pages as Gallery. */
 export const GalleryPickerGrid = ({
-  activeKey,
+  activeIndex,
+  activePlacement,
   columnCount,
   currentKey,
   getTileState,
   idBase,
   isMultiple,
   isStale,
-  items,
+  itemSlots,
   label,
   onActivate,
   onColumnCountChange,
-  onLoadMore,
+  onVisibleRangeChange,
+  pageStates,
+  suppressInlineRetry,
+  total,
 }: {
-  activeKey: GalleryItemKey | null;
+  activeIndex: number;
+  /**
+   * The highlight's last deliberate placement, in its listing. A new placement reveals the highlight even at the same
+   * index; an insert that only shifts the highlighted item's index does not.
+   */
+  activePlacement: string;
   columnCount: number;
   currentKey: GalleryItemKey | null;
   getTileState: (item: GalleryItem) => GalleryPickerTileState;
   idBase: string;
   isMultiple: boolean;
-  /** `items` belong to the previous scope while the current one loads. */
+  /** Slots belong to the previous scope while the current listing loads. */
   isStale: boolean;
-  /** Null while nothing has loaded yet. */
-  items: GalleryItem[] | null;
+  itemSlots: ReadonlyMap<number, GalleryItem>;
   label: string;
   onActivate: (item: GalleryItem) => void;
   onColumnCountChange: (columnCount: number) => void;
-  onLoadMore: () => void;
+  onVisibleRangeChange: (range: { endIndexExclusive: number; startIndex: number }) => void;
+  pageStates: ReadonlyMap<number, GallerySparsePageState>;
+  suppressInlineRetry: boolean;
+  total: number | null;
 }) => {
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
-  const loadMoreObserverRef = useRef<IntersectionObserver | null>(null);
-  const itemsByKey = useMemo(() => new Map(items?.map((item) => [toGalleryItemKey(item), item])), [items]);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const [viewportWidth, setViewportWidth] = useState(0);
+  const totalSlots = total ?? SKELETON_TILE_COUNT;
+  const rowCount = Math.ceil(totalSlots / columnCount);
+  const rowPitch =
+    viewportWidth > 0
+      ? Math.max(1, (viewportWidth - GRID_PADDING_PX * 2 - GRID_GAP_PX * (columnCount - 1)) / columnCount) + GRID_GAP_PX
+      : GALLERY_PICKER_CELL_PX + GRID_GAP_PX;
+  const itemsByKey = useMemo(
+    () => new Map([...itemSlots.values()].map((item) => [toGalleryItemKey(item), item])),
+    [itemSlots]
+  );
 
   const measureRef = useCallback(
     (node: HTMLDivElement | null) => {
@@ -179,6 +256,7 @@ export const GalleryPickerGrid = ({
         const widthPx = entry?.contentRect.width ?? 0;
 
         if (widthPx > 0) {
+          setViewportWidth(widthPx);
           onColumnCountChange(
             getGalleryColumnCountForCell({
               max: GALLERY_PICKER_MAX_COLUMNS,
@@ -196,31 +274,59 @@ export const GalleryPickerGrid = ({
     [onColumnCountChange]
   );
 
-  // The scroll viewport is found from the DOM rather than a ref: the sentinel
-  // can mount in the same commit as the viewport, before any parent ref is set.
-  const sentinelRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      loadMoreObserverRef.current?.disconnect();
-      loadMoreObserverRef.current = null;
-
-      if (!node) {
+  const getScrollElement = useCallback(() => viewportRef.current, []);
+  const getItemKey = useCallback((index: number) => index, []);
+  const estimateSize = useCallback(() => rowPitch, [rowPitch]);
+  const handleVirtualizerChange = useCallback(
+    (instance: { getVirtualItems: () => readonly { index: number }[] }) => {
+      if (total === 0) {
         return;
       }
 
-      const observer = new IntersectionObserver(
-        ([entry]) => {
-          if (entry?.isIntersecting) {
-            onLoadMore();
-          }
-        },
-        { root: node.closest('[data-scope="scroll-area"][data-part="viewport"]'), rootMargin: '160px' }
-      );
+      const visibleRows = instance.getVirtualItems();
+      const firstRow = visibleRows[0]?.index;
+      const lastRow = visibleRows[visibleRows.length - 1]?.index;
 
-      observer.observe(node);
-      loadMoreObserverRef.current = observer;
+      if (firstRow === undefined || lastRow === undefined) {
+        return;
+      }
+
+      const startIndex = Math.min(total ?? GALLERY_PAGE_SIZE, firstRow * columnCount);
+      const endIndexExclusive = Math.min(total ?? GALLERY_PAGE_SIZE, (lastRow + 1) * columnCount);
+
+      onVisibleRangeChange({ endIndexExclusive, startIndex });
     },
-    [onLoadMore]
+    [columnCount, onVisibleRangeChange, total]
   );
+  const virtualizer = useVirtualizer({
+    count: rowCount,
+    estimateSize,
+    getItemKey,
+    getScrollElement,
+    onChange: handleVirtualizerChange,
+    overscan: 2,
+    useFlushSync: false,
+  });
+  const { measure, scrollToIndex, totalSize, virtualItems } = virtualizer;
+  const isInitialPageFailed = pageStates.get(0)?.error !== null && pageStates.get(0)?.error !== undefined;
+  const isAnyPageLoading = [...pageStates.values()].some((pageState) => pageState.isLoading);
+
+  useLayoutEffect(() => {
+    measure();
+  }, [columnCount, measure, rowPitch]);
+
+  // Reveal the highlight when it is placed, its listing changes, or a reflow moves its row. A later count update or
+  // insert must not pull a pointer-scrolled view back to it; a highlight past the known count is revealed once the
+  // count reaches it.
+  const revealedActiveRef = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    const active = `${activePlacement}\n${columnCount}`;
+
+    if (activeIndex >= 0 && activeIndex < totalSlots && revealedActiveRef.current !== active) {
+      revealedActiveRef.current = active;
+      scrollToIndex(Math.floor(activeIndex / columnCount), { align: 'auto' });
+    }
+  }, [activeIndex, activePlacement, columnCount, scrollToIndex, totalSlots]);
 
   const handleClick = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
@@ -240,43 +346,84 @@ export const GalleryPickerGrid = ({
   );
 
   return (
-    <Scrollable flex="1" minH="0">
+    <Scrollable flex="1" minH="0" viewportRef={viewportRef}>
       <Box
         ref={measureRef}
-        aria-busy={items === null || isStale || undefined}
+        aria-busy={isStale || (total === null && !isInitialPageFailed) || isAnyPageLoading || undefined}
         aria-label={label}
         aria-multiselectable={isMultiple || undefined}
-        display="grid"
-        gap={`${GRID_GAP_PX}px`}
-        gridTemplateColumns={`repeat(${columnCount}, minmax(0, 1fr))`}
         id={idBase}
+        minW="0"
         opacity={isStale ? 0.6 : undefined}
-        p="2"
+        position="relative"
         role="listbox"
         transition="opacity var(--wb-motion-duration-fast) ease"
+        w="full"
         onClick={handleClick}
+        h={`${totalSize + GRID_PADDING_PX * 2}px`}
       >
-        {items === null
-          ? Array.from({ length: SKELETON_TILE_COUNT }, (_, index) => (
-              <Skeleton key={index} aspectRatio={1} rounded="md" />
-            ))
-          : items.map((item) => {
-              const key = toGalleryItemKey(item);
+        {virtualItems.map((virtualRow) => {
+          const startIndex = virtualRow.index * columnCount;
+          const endIndex = Math.min(totalSlots, startIndex + columnCount);
+          const cells = Array.from({ length: endIndex - startIndex }, (_, offset) => startIndex + offset);
 
-              return (
-                <GalleryPickerTile
-                  key={key}
-                  idBase={idBase}
-                  isActive={key === activeKey}
-                  isCurrent={key === currentKey}
-                  isMultiple={isMultiple}
-                  item={item}
-                  state={getTileState(item)}
-                />
-              );
-            })}
+          return (
+            <Box
+              key={virtualRow.key}
+              display="grid"
+              gap={`${GRID_GAP_PX}px`}
+              gridTemplateColumns={`repeat(${columnCount}, minmax(0, 1fr))`}
+              h={`${rowPitch}px`}
+              left="0"
+              position="absolute"
+              px={`${GRID_PADDING_PX}px`}
+              pb={`${GRID_GAP_PX}px`}
+              boxSizing="border-box"
+              top="0"
+              transform={`translateY(${virtualRow.start + GRID_PADDING_PX}px)`}
+              w="full"
+            >
+              {cells.map((index) => {
+                const item = itemSlots.get(index);
+
+                if (item) {
+                  return (
+                    <GalleryPickerTile
+                      key={index}
+                      activeIndex={activeIndex}
+                      currentKey={currentKey}
+                      idBase={idBase}
+                      index={index}
+                      isMultiple={isMultiple}
+                      item={item}
+                      state={getTileState(item)}
+                      total={total ?? totalSlots}
+                    />
+                  );
+                }
+
+                const pageOffset = Math.floor(index / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE;
+                const pageState = pageStates.get(pageOffset);
+                const hasError = pageState?.error !== null && pageState?.error !== undefined;
+                const isRetrySlot = index === pageOffset && hasError;
+
+                return (
+                  <GalleryPickerPlaceholder
+                    key={index}
+                    error={isRetrySlot && !suppressInlineRetry ? pageState.error : null}
+                    idBase={idBase}
+                    index={index}
+                    isActive={index === activeIndex}
+                    isLoading={pageState ? pageState.isLoading : true}
+                    retry={isRetrySlot && !suppressInlineRetry ? pageState.retry : undefined}
+                    total={total ?? -1}
+                  />
+                );
+              })}
+            </Box>
+          );
+        })}
       </Box>
-      {items && items.length > 0 && !isStale ? <Box ref={sentinelRef} aria-hidden="true" h="1px" /> : null}
     </Scrollable>
   );
 };

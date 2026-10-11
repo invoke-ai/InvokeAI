@@ -5,22 +5,14 @@ dedicated "touch" method/endpoint, never as a side effect of `get`/`create`/`upd
 the frontend show "Your last run · 2 days ago" on library cards.
 """
 
-import pytest
-
-from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.services.workflow_records.workflow_records_common import (
     WorkflowCategory,
     WorkflowMeta,
     WorkflowRecordOrderBy,
     WorkflowWithoutID,
 )
-from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
-
-
-@pytest.fixture
-def workflow_records_service(mock_invoker: Invoker) -> SqliteWorkflowRecordsStorage:
-    return mock_invoker.services.workflow_records
+from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
 
 
 def create_minimal_user_workflow() -> WorkflowWithoutID:
@@ -40,20 +32,22 @@ def create_minimal_user_workflow() -> WorkflowWithoutID:
     )
 
 
-def test_update_last_run_at_sets_timestamp(workflow_records_service: SqliteWorkflowRecordsStorage) -> None:
+def test_update_last_run_at_sets_timestamp(workflow_records: WorkflowRecordsStorage) -> None:
     workflow = create_minimal_user_workflow()
-    created = workflow_records_service.create(workflow=workflow)
+    created = workflow_records.create(workflow=workflow)
     assert created.last_run_at is None
 
-    workflow_records_service.update_last_run_at(created.workflow_id)
+    workflow_records.update_last_run_at(created.workflow_id)
 
-    fetched = workflow_records_service.get(created.workflow_id)
+    fetched = workflow_records.get(created.workflow_id)
     assert fetched.last_run_at is not None
 
-    listed = workflow_records_service.get_many(
+    # Only user workflows: the bundled ones share its millisecond `created_at` on a coarse clock (Windows), and the
+    # `workflow_id` tie-break then pushes it off the page at random.
+    listed = workflow_records.get_many(
         order_by=WorkflowRecordOrderBy.CreatedAt,
         direction=SQLiteDirection.Descending,
-        categories=None,
+        categories=[WorkflowCategory.User],
         page=0,
         per_page=10,
     )
@@ -61,24 +55,24 @@ def test_update_last_run_at_sets_timestamp(workflow_records_service: SqliteWorkf
     assert row.last_run_at is not None
 
 
-def test_update_last_run_at_scoped_to_owning_user(workflow_records_service: SqliteWorkflowRecordsStorage) -> None:
+def test_update_last_run_at_scoped_to_owning_user(workflow_records: WorkflowRecordsStorage) -> None:
     """Mirrors update_opened_at's ownership scoping: passing a mismatched user_id is a no-op,
     and the row updates only once the correct owner's user_id is supplied."""
     workflow = create_minimal_user_workflow()
-    created = workflow_records_service.create(workflow=workflow, user_id="user-a")
+    created = workflow_records.create(workflow=workflow, user_id="user-a")
 
-    workflow_records_service.update_last_run_at(created.workflow_id, user_id="user-b")
-    assert workflow_records_service.get(created.workflow_id).last_run_at is None
+    workflow_records.update_last_run_at(created.workflow_id, user_id="user-b")
+    assert workflow_records.get(created.workflow_id).last_run_at is None
 
-    workflow_records_service.update_last_run_at(created.workflow_id, user_id="user-a")
-    assert workflow_records_service.get(created.workflow_id).last_run_at is not None
+    workflow_records.update_last_run_at(created.workflow_id, user_id="user-a")
+    assert workflow_records.get(created.workflow_id).last_run_at is not None
 
 
 def test_update_last_run_at_missing_workflow_is_a_no_op(
-    workflow_records_service: SqliteWorkflowRecordsStorage,
+    workflow_records: WorkflowRecordsStorage,
 ) -> None:
     """The service method mirrors update_opened_at: it has no existence check and silently does
     nothing for an unknown workflow_id. The router turns a missing workflow into a 404 by calling
     `get()` first (see tests/app/routers/test_multiuser_authorization.py::TestWorkflowMutationAuth
     ::test_update_last_run_at_missing_workflow_404s)."""
-    workflow_records_service.update_last_run_at("does-not-exist")
+    workflow_records.update_last_run_at("does-not-exist")

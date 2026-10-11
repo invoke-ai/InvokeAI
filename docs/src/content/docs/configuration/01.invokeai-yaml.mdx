@@ -249,6 +249,8 @@ If you serve InvokeAI through nginx, Caddy, or similar, set `http_compression_le
 
 #### Database Durability
 
+This section concerns the default SQLite database. A [MySQL or MariaDB database](/configuration/external-database/), set with `db_url`, has its durability set on the server.
+
 Every write to InvokeAI's SQLite database is committed to disk before the request returns. How hard that commit is pushed to the physical disk is controlled by `db_synchronous`:
 
 ```yaml
@@ -268,7 +270,7 @@ Running the database on a network share is not a supported configuration -- SQLi
 
 The safeguard exists anyway, because WAL needs shared memory and a few setups cannot provide it: a database on a network share, some container volume drivers, and SQLite builds compiled without WAL all leave a rollback journal in place instead — and on a rollback journal, `normal` _can_ corrupt the database on power loss. InvokeAI reads back the journal mode it actually got, so in that case it ignores `normal`, uses `full`, and logs a warning naming the mode. An in-memory database (`use_memory_db`) has no durability to trade and is unaffected.
 
-`db_synchronous` applies to the application's own database connection. Gallery maintenance is an administrator action in Settings and uses that same application database connection, so its database work follows this setting. The image import script, `invokeai/frontend/install/import_images.py`, still opens the database independently and leaves SQLite's own default in place; the measurements below describe the running app, not that script.
+`db_synchronous` applies to the application's own database connection, which gallery maintenance (an administrator action in Settings) uses too, and to the image import script, `invokeai/frontend/install/import_images.py`, which reads the same `invokeai.yaml`. The measurements below describe the running app.
 
 Measured on a copy of a real library, 300 single-row inserts each committed on its own:
 

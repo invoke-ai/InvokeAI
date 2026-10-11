@@ -1,4 +1,4 @@
-"""SQLite-backed custom font library.
+"""The custom font library.
 
 The service keeps the configured ``fonts_dir`` as a read-only, shared source and stores
 uploads in an application-owned directory. Font files are addressed by opaque IDs and
@@ -36,7 +36,8 @@ from invokeai.app.services.fonts.fonts_common import (
     FontUploadResult,
     FontValidationResult,
 )
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.queries.fonts import MAX_SOURCE_PATH_LENGTH, DirectoryFont, UploadedFont
 
 SUPPORTED_FONT_EXTENSIONS = frozenset({".ttf", ".otf", ".woff", ".woff2"})
 FONT_MEDIA_TYPES = {
@@ -53,11 +54,6 @@ MAX_INSTANCE_JOBS = 2
 MAX_INSTANCE_QUEUE = 4
 MAX_INSTANCE_CACHE_BYTES = 64 * 1024 * 1024
 INSTANCE_JOB_TIMEOUT_SECONDS = 30.0
-
-_FONT_COLUMNS = """
-    id, owner_id, family, label, style, weight, content_hash, scope, source, filename,
-    byte_size, axes_json, instances_json, storage_path, source_path
-"""
 
 
 class FontServiceError(RuntimeError):
@@ -246,36 +242,6 @@ def _parse_font_worker(filename: str, data: bytes, max_bytes: int) -> FontValida
     return _parse_font_bytes(filename, data, max_bytes=max_bytes)
 
 
-def _json_axes(axes: tuple[FontAxis, ...]) -> str:
-    return json.dumps([axis.__dict__ for axis in axes], separators=(",", ":"), sort_keys=True)
-
-
-def _json_instances(instances: tuple[FontInstance, ...]) -> str:
-    return json.dumps([instance.__dict__ for instance in instances], separators=(",", ":"), sort_keys=True)
-
-
-def _record_from_row(row: Any) -> FontRecord:
-    axes = tuple(FontAxis(**axis) for axis in json.loads(row[11]))
-    instances = tuple(FontInstance(**instance) for instance in json.loads(row[12]))
-    return FontRecord(
-        id=row[0],
-        family=row[2],
-        label=row[3],
-        style=row[4],
-        weight=int(row[5]),
-        content_hash=row[6],
-        scope=FontScope(row[7]),
-        source=FontSource(row[8]),
-        filename=row[9],
-        byte_size=int(row[10]),
-        axes=axes,
-        instances=instances,
-        owner_id=row[1],
-        storage_path=row[13],
-        source_path=row[14],
-    )
-
-
 def _validation_from_record(record: FontRecord, filename: str) -> FontValidationResult:
     """Reuse indexed metadata when a directory file's content hash is unchanged."""
     return FontValidationResult(
@@ -288,6 +254,23 @@ def _validation_from_record(record: FontRecord, filename: str) -> FontValidation
         byte_size=record.byte_size,
         axes=record.axes,
         instances=record.instances,
+    )
+
+
+def _indexed_as(record: FontRecord | None, font: DirectoryFont) -> bool:
+    """Whether the catalog already holds the directory font as found."""
+    return (
+        record is not None
+        and record.filename == font.filename
+        and record.source_path == font.source_path
+        and record.family == font.family
+        and record.label == font.label
+        and record.style == font.style
+        and record.weight == font.weight
+        and record.content_hash == font.content_hash
+        and record.byte_size == font.byte_size
+        and record.axes == font.axes
+        and record.instances == font.instances
     )
 
 
@@ -338,7 +321,7 @@ class FontService:
 
     def __init__(
         self,
-        db: SqliteDatabase,
+        database: Database,
         fonts_dir: Path,
         storage_dir: Path,
         logger: logging.Logger | None = None,
@@ -356,7 +339,7 @@ class FontService:
             or storage_absolute.is_relative_to(fonts_absolute)
         ):
             raise ValueError("Font source and managed storage directories must not overlap")
-        self._db = db
+        self._queries = database.queries
         self._fonts_dir = fonts_dir
         self._storage_dir = storage_dir
         self._logger = logger or logging.getLogger(__name__)
@@ -376,6 +359,8 @@ class FontService:
         # cleanup sweep must not observe an upload between writing its file and committing
         # its row, or it could remove a live upload.
         self._managed_storage_lock = threading.RLock()
+        # One scan at a time: two would race to insert the same new directory font.
+        self._rescan_lock = threading.Lock()
         self._instance_cache: OrderedDict[tuple[str, tuple[tuple[str, float], ...]], bytes] = OrderedDict()
         self._instance_cache_bytes = 0
         self._cache_lock = threading.RLock()
@@ -432,66 +417,46 @@ class FontService:
         duplicate: FontRecord | None = None
         storage_path: str | None = None
         font_id = f"font_{uuid4().hex}"
+        # The duplicate and quota checks, the file and the row are published together: every upload, and the
+        # orphaned-file sweep, run under the managed-storage lock (one process serves the database). The file is
+        # written outside any transaction, so that no database transaction waits on its fsync.
         with self._managed_storage_lock:
-            try:
-                with self._db.transaction() as cursor:
-                    cursor.execute("BEGIN IMMEDIATE;")
-                    if scope == FontScope.PRIVATE:
-                        cursor.execute(
-                            f"SELECT {_FONT_COLUMNS} FROM fonts WHERE source = 'uploaded' AND scope = ? "
-                            "AND owner_id = ? AND content_hash = ? LIMIT 1;",
-                            (scope.value, owner_id, validation.content_hash),
+            duplicate, used_bytes = self._queries.fonts.upload_state(
+                owner_id=owner_id, content_hash=validation.content_hash
+            )
+            if duplicate is None:
+                if used_bytes + validation.byte_size > self._max_library_bytes:
+                    raise FontQuotaExceededError("Font library storage quota exceeded")
+                storage_path = f"{font_id}{Path(filename).suffix.lower()}"
+                try:
+                    self._write_atomic(_safe_relative_path(Path(storage_path), self._storage_dir), data)
+                    self._queries.fonts.insert_upload(
+                        UploadedFont(
+                            id=font_id,
+                            owner_id=owner_id,
+                            scope=scope,
+                            filename=validation.filename,
+                            storage_path=storage_path,
+                            family=validation.family,
+                            label=validation.label,
+                            style=validation.style,
+                            weight=validation.weight,
+                            content_hash=validation.content_hash,
+                            byte_size=validation.byte_size,
+                            axes=validation.axes,
+                            instances=validation.instances,
                         )
-                    else:
-                        cursor.execute(
-                            f"SELECT {_FONT_COLUMNS} FROM fonts WHERE source = 'uploaded' AND scope = ? "
-                            "AND owner_id IS NULL AND content_hash = ? LIMIT 1;",
-                            (scope.value, validation.content_hash),
-                        )
-                    row = cursor.fetchone()
-                    if row is not None:
-                        duplicate = _record_from_row(row)
-                    else:
-                        cursor.execute(
-                            "SELECT COALESCE(SUM(byte_size), 0) FROM fonts WHERE source = 'uploaded' "
-                            "AND scope = ? AND (owner_id IS ? OR (? = 'shared' AND owner_id IS NULL));",
-                            (scope.value, owner_id, scope.value),
-                        )
-                        current_bytes = int(cursor.fetchone()[0])
-                        if current_bytes + validation.byte_size > self._max_library_bytes:
-                            raise FontQuotaExceededError("Font library storage quota exceeded")
-
-                        extension = Path(filename).suffix.lower()
-                        storage_path = f"{font_id}{extension}"
-                        target = _safe_relative_path(Path(storage_path), self._storage_dir)
-                        self._write_atomic(target, data)
-                        cursor.execute(
-                            """--sql
-                            INSERT INTO fonts (
-                                id, owner_id, scope, source, filename, storage_path, source_path,
-                                family, label, style, weight, content_hash, byte_size, axes_json, instances_json
-                            ) VALUES (?, ?, ?, 'uploaded', ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?);
-                            """,
-                            (
-                                font_id,
-                                owner_id,
-                                scope.value,
-                                validation.filename,
-                                storage_path,
-                                validation.family,
-                                validation.label,
-                                validation.style,
-                                validation.weight,
-                                validation.content_hash,
-                                validation.byte_size,
-                                _json_axes(validation.axes),
-                                _json_instances(validation.instances),
-                            ),
-                        )
-            except Exception:
-                if storage_path is not None:
-                    self._unlink_managed_file(storage_path)
-                raise
+                    )
+                except Exception:
+                    # A lost connection can fail a commit that took effect: keep the file of a row that exists, or
+                    # that cannot be checked; the startup sweep removes it if no row names it.
+                    try:
+                        indexed = self._queries.fonts.get(font_id) is not None
+                    except Exception:
+                        indexed = True
+                    if not indexed:
+                        self._unlink_managed_file(storage_path)
+                    raise
 
         if duplicate is not None:
             return FontUploadResult(font=duplicate, created=False)
@@ -504,35 +469,37 @@ class FontService:
 
     def rescan_directory(self) -> int:
         """Index valid files in the configured directory and remove stale directory rows."""
+        with self._rescan_lock:
+            return self._rescan_directory()
+
+    def _rescan_directory(self) -> int:
         root = self._fonts_dir
         if not root.exists() or not root.is_dir() or root.is_symlink():
             if root.is_symlink():
                 self._logger.warning("Skipping custom fonts directory %s: symlinks are not supported", root)
-            with self._db.transaction() as cursor:
-                cursor.execute("DELETE FROM fonts WHERE source = 'directory';")
-                removed = cursor.rowcount
-            if removed:
+            if self._queries.fonts.delete_directory_fonts():
                 self._bump_revision()
             return 0
 
-        with self._db.transaction() as cursor:
-            cursor.execute(f"SELECT {_FONT_COLUMNS} FROM fonts WHERE source = 'directory';")
-            existing_records = {
-                record.source_path: record
-                for record in (_record_from_row(row) for row in cursor.fetchall())
-                if record.source_path is not None
-            }
+        existing_records = {
+            record.source_path: record
+            for record in self._queries.fonts.directory_fonts()
+            if record.source_path is not None
+        }
 
-        discovered: list[tuple[str, FontValidationResult, str]] = []
+        discovered: list[DirectoryFont] = []
         for path in sorted(root.rglob("*")):
             if self._path_has_symlink_component(path, root):
                 self._logger.warning("Skipping font path %s: symlinks are not supported", path)
                 continue
             if not path.is_file() or path.suffix.lower() not in SUPPORTED_FONT_EXTENSIONS:
                 continue
+            relative = path.relative_to(root).as_posix()
+            if len(relative) > MAX_SOURCE_PATH_LENGTH:
+                self._logger.warning("Skipping font file %s: its path is longer than the catalog holds", path)
+                continue
             try:
                 data = _read_bounded_file(path, MAX_INDEXED_FONT_BYTES)
-                relative = path.relative_to(root).as_posix()
                 content_hash = hashlib.sha256(data).hexdigest()
                 existing = existing_records.get(relative)
                 if existing is not None and existing.byte_size == len(data) and existing.content_hash == content_hash:
@@ -548,74 +515,27 @@ class FontService:
                 continue
             # The path-derived ID lets a project distinguish two same-named files and remains
             # stable when a directory file is replaced. Its content hash detects that replacement.
-            font_id = f"directory_{hashlib.sha256(relative.encode('utf-8')).hexdigest()[:32]}"
-            discovered.append((font_id, metadata, relative))
+            discovered.append(
+                DirectoryFont(
+                    id=f"directory_{hashlib.sha256(relative.encode('utf-8')).hexdigest()[:32]}",
+                    filename=metadata.filename,
+                    source_path=relative,
+                    family=metadata.family,
+                    label=metadata.label,
+                    style=metadata.style,
+                    weight=metadata.weight,
+                    content_hash=metadata.content_hash,
+                    byte_size=metadata.byte_size,
+                    axes=metadata.axes,
+                    instances=metadata.instances,
+                )
+            )
 
-        discovered_ids = {font_id for font_id, _metadata, _relative in discovered}
         existing_by_id = {record.id: record for record in existing_records.values()}
-        changed = set(existing_by_id) != discovered_ids
-        if not changed:
-            for font_id, metadata, relative in discovered:
-                existing = existing_by_id[font_id]
-                if (
-                    existing.filename != metadata.filename
-                    or existing.source_path != relative
-                    or existing.family != metadata.family
-                    or existing.label != metadata.label
-                    or existing.style != metadata.style
-                    or existing.weight != metadata.weight
-                    or existing.content_hash != metadata.content_hash
-                    or existing.byte_size != metadata.byte_size
-                    or existing.axes != metadata.axes
-                    or existing.instances != metadata.instances
-                ):
-                    changed = True
-                    break
-        with self._db.transaction() as cursor:
-            for font_id, metadata, relative in discovered:
-                cursor.execute(
-                    """--sql
-                    INSERT INTO fonts (
-                        id, owner_id, scope, source, filename, storage_path, source_path,
-                        family, label, style, weight, content_hash, byte_size, axes_json, instances_json
-                    ) VALUES (?, NULL, 'shared', 'directory', ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(id) DO UPDATE SET
-                        filename = excluded.filename,
-                        source_path = excluded.source_path,
-                        family = excluded.family,
-                        label = excluded.label,
-                        style = excluded.style,
-                        weight = excluded.weight,
-                        content_hash = excluded.content_hash,
-                        byte_size = excluded.byte_size,
-                        axes_json = excluded.axes_json,
-                        instances_json = excluded.instances_json;
-                    """,
-                    (
-                        font_id,
-                        metadata.filename,
-                        relative,
-                        metadata.family,
-                        metadata.label,
-                        metadata.style,
-                        metadata.weight,
-                        metadata.content_hash,
-                        metadata.byte_size,
-                        _json_axes(metadata.axes),
-                        _json_instances(metadata.instances),
-                    ),
-                )
-
-            if discovered_ids:
-                placeholders = ",".join("?" for _ in discovered_ids)
-                cursor.execute(
-                    f"DELETE FROM fonts WHERE source = 'directory' AND id NOT IN ({placeholders});",
-                    tuple(discovered_ids),
-                )
-            else:
-                cursor.execute("DELETE FROM fonts WHERE source = 'directory';")
-
-        if changed:
+        changed_fonts = [font for font in discovered if not _indexed_as(existing_by_id.get(font.id), font)]
+        discovered_ids = frozenset(font.id for font in discovered)
+        if changed_fonts or set(existing_by_id) != discovered_ids:
+            self._queries.fonts.replace_directory_fonts(changed_fonts, discovered_ids)
             self._invalidate_instance_cache()
             self._bump_revision()
         return len(discovered)
@@ -636,43 +556,15 @@ class FontService:
         if scope not in (FontScope.ALL, FontScope.PRIVATE, FontScope.SHARED):
             raise ValueError("Invalid font scope")
 
-        conditions = [
-            "(source = 'directory' OR scope = 'shared' OR (scope = 'private' AND owner_id = ?))",
-        ]
-        params: list[object] = [user_id]
-        if scope == FontScope.PRIVATE:
-            conditions.append("source = 'uploaded' AND scope = 'private' AND owner_id = ?")
-            params.append(user_id)
-        elif scope == FontScope.SHARED:
-            conditions.append("(source = 'directory' OR (source = 'uploaded' AND scope = 'shared'))")
-        if content_hash is not None:
-            if re.fullmatch(r"[a-f0-9]{64}", content_hash) is None:
-                raise ValueError("content_hash must be a lowercase SHA-256 hash")
-            conditions.append("content_hash = ?")
-            params.append(content_hash)
-        if search:
-            conditions.append(
-                "(family LIKE ? COLLATE NOCASE OR label LIKE ? COLLATE NOCASE OR filename LIKE ? COLLATE NOCASE)"
-            )
-            term = f"%{search}%"
-            params.extend((term, term, term))
-        where = " AND ".join(conditions)
-        with self._db.transaction() as cursor:
-            cursor.execute(f"SELECT COUNT(*) FROM fonts WHERE {where};", tuple(params))
-            total = int(cursor.fetchone()[0])
-            cursor.execute(
-                f"SELECT {_FONT_COLUMNS} FROM fonts WHERE {where} ORDER BY family COLLATE NOCASE, label COLLATE NOCASE, id LIMIT ? OFFSET ?;",
-                (*params, limit, offset),
-            )
-            rows = cursor.fetchall()
-        return [_record_from_row(row) for row in rows], total
+        if content_hash is not None and re.fullmatch(r"[a-f0-9]{64}", content_hash) is None:
+            raise ValueError("content_hash must be a lowercase SHA-256 hash")
+        return self._queries.fonts.page(
+            user_id=user_id, scope=scope, content_hash=content_hash, search=search, offset=offset, limit=limit
+        )
 
     def get(self, font_id: str) -> FontRecord | None:
         """Get an indexed font without applying account visibility."""
-        with self._db.transaction() as cursor:
-            cursor.execute(f"SELECT {_FONT_COLUMNS} FROM fonts WHERE id = ?;", (font_id,))
-            row = cursor.fetchone()
-        return _record_from_row(row) if row is not None else None
+        return self._queries.fonts.get(font_id)
 
     def get_accessible(self, *, user_id: str, font_id: str) -> FontRecord:
         """Get a font visible to the account, hiding private-resource existence."""
@@ -717,10 +609,8 @@ class FontService:
         if record.scope == FontScope.SHARED and not is_admin:
             raise FontForbiddenError("Only administrators may delete a shared font")
 
-        with self._db.transaction() as cursor:
-            cursor.execute("DELETE FROM fonts WHERE id = ? AND source = 'uploaded';", (font_id,))
-            if cursor.rowcount != 1:
-                raise FontNotFoundError("Font not found")
+        if not self._queries.fonts.delete_upload(font_id):
+            raise FontNotFoundError("Font not found")
         # A variable-font instance is derived from the source bytes. Drop every derived
         # value before unlinking the source so a later request cannot serve a deleted font
         # from memory while the filesystem cleanup is in progress.
@@ -738,9 +628,7 @@ class FontService:
             self._invalidate_instance_cache()
             if not self._storage_dir.exists() or not self._storage_dir.is_dir() or self._storage_dir.is_symlink():
                 return
-            with self._db.transaction() as cursor:
-                cursor.execute("SELECT storage_path FROM fonts WHERE source = 'uploaded' AND storage_path IS NOT NULL;")
-                referenced = {row[0] for row in cursor.fetchall()}
+            referenced = self._queries.fonts.storage_paths()
             for path in self._storage_dir.iterdir():
                 if not path.is_file() or path.is_symlink():
                     continue
@@ -761,13 +649,7 @@ class FontService:
     def prepare_user_cleanup(self, user_id: str) -> tuple[str, ...]:
         """Capture a user's private managed paths before its account row is deleted."""
         with self._managed_storage_lock:
-            with self._db.transaction() as cursor:
-                cursor.execute(
-                    "SELECT storage_path FROM fonts "
-                    "WHERE source = 'uploaded' AND scope = 'private' AND owner_id = ? AND storage_path IS NOT NULL;",
-                    (user_id,),
-                )
-                storage_paths = tuple(row[0] for row in cursor.fetchall())
+            storage_paths = self._queries.fonts.private_storage_paths(user_id)
             # A caller may delete the account through a separate service, which cascades
             # rows without notifying this process. Purge derived values before that race.
             self._invalidate_instance_cache()

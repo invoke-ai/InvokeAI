@@ -22,12 +22,12 @@ from invokeai.app.api_app import app
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.project_records.project_records_sqlite import ProjectRecordsSqlite
+from invokeai.app.services.project_records.project_records_default import ProjectRecordsStorage
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem, SessionQueueItemSummary
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.users.users_common import UserCreateRequest
-from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
-from invokeai.backend.util.logging import InvokeAILogger
-from tests.fixtures.sqlite_database import create_mock_sqlite_database
+from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
+from tests.fixtures.sqlite_database import sqlite_cursor, sqlite_cursor_of
 
 
 class MockApiDependencies(ApiDependencies):
@@ -74,42 +74,41 @@ def _mock_urls() -> MagicMock:
 
 
 @pytest.fixture
-def mock_services() -> InvocationServices:
-    from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
-    from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
-    from invokeai.app.services.board_video_records.board_video_records_sqlite import SqliteBoardVideoRecordStorage
+def mock_services(mock_sqlite_database: Database) -> InvocationServices:
+    from invokeai.app.services.board_image_records.board_image_records_default import BoardImageRecordStorage
+    from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
+    from invokeai.app.services.board_video_records.board_video_records_default import BoardVideoRecordStorage
     from invokeai.app.services.boards.boards_default import BoardService
     from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
-    from invokeai.app.services.client_state_persistence.client_state_persistence_sqlite import (
-        ClientStatePersistenceSqlite,
+    from invokeai.app.services.client_state_persistence.client_state_persistence_default import (
+        ClientStatePersistence,
     )
-    from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+    from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
     from invokeai.app.services.images.images_default import ImageService
     from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
     from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
-    from invokeai.app.services.system_prompt_records.system_prompt_records_sqlite import (
-        SqliteSystemPromptRecordsStorage,
+    from invokeai.app.services.system_prompt_records.system_prompt_records_default import (
+        SystemPromptRecordsStorage,
     )
     from invokeai.app.services.users.users_default import UserService
-    from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
-    from invokeai.app.services.wildcard_records.wildcard_records_sqlite import SqliteWildcardRecordsStorage
+    from invokeai.app.services.video_records.video_records_default import VideoRecordStorage
+    from invokeai.app.services.wildcard_records.wildcard_records_default import WildcardRecordsStorage
     from tests.test_nodes import TestEventService
 
     configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
-    logger = InvokeAILogger.get_logger()
-    db = create_mock_sqlite_database(configuration, logger)
+    db = mock_sqlite_database
 
     return InvocationServices(
-        board_image_records=SqliteBoardImageRecordStorage(db=db),
+        board_image_records=BoardImageRecordStorage(db),
         board_images=None,  # type: ignore
-        board_records=SqliteBoardRecordStorage(db=db),
+        board_records=BoardRecordStorage(db),
         boards=BoardService(),
         bulk_download=BulkDownloadService(),
         configuration=configuration,
         database=db,
         events=TestEventService(),
         image_files=None,  # type: ignore
-        image_records=SqliteImageRecordStorage(db=db),
+        image_records=ImageRecordStorage(db),
         images=ImageService(),
         invocation_cache=MemoryInvocationCache(max_cache_size=0),
         logger=logging,  # type: ignore
@@ -126,24 +125,24 @@ def mock_services() -> InvocationServices:
         # every name was skipped before the ownership check ran, and the test passed no
         # matter what the route did. The returns must be strings; ImageDTO validates them.
         urls=_mock_urls(),
-        workflow_records=SqliteWorkflowRecordsStorage(db=db),
+        workflow_records=WorkflowRecordsStorage(db),
         tensors=None,  # type: ignore
         conditioning=None,  # type: ignore
         style_preset_records=None,  # type: ignore
         style_preset_image_files=None,  # type: ignore
-        system_prompt_records=SqliteSystemPromptRecordsStorage(db=db),
+        system_prompt_records=SystemPromptRecordsStorage(db),
         workflow_thumbnails=None,  # type: ignore
         model_relationship_records=None,  # type: ignore
         model_relationships=None,  # type: ignore
-        client_state_persistence=ClientStatePersistenceSqlite(db=db),
-        project_records=ProjectRecordsSqlite(db=db),
+        client_state_persistence=ClientStatePersistence(db),
+        project_records=ProjectRecordsStorage(db),
         users=UserService(db),
-        wildcard_records=SqliteWildcardRecordsStorage(db=db),
+        wildcard_records=WildcardRecordsStorage(db),
         external_generation=None,  # type: ignore
         videos=None,  # type: ignore
         video_files=None,  # type: ignore
-        video_records=SqliteVideoRecordStorage(db=db),
-        board_video_records=SqliteBoardVideoRecordStorage(db=db),
+        video_records=VideoRecordStorage(db),
+        board_video_records=BoardVideoRecordStorage(db),
         gallery=None,  # type: ignore
         image_index_records=None,  # type: ignore
         image_index=None,  # type: ignore
@@ -249,10 +248,9 @@ def _share_board(client: TestClient, token: str, board_id: str) -> None:
     assert r.status_code == status.HTTP_201_CREATED
 
 
-def _share_board_with_user(mock_invoker: Invoker, board_id: str, user_id: str) -> None:
+def _share_board_with_user(db: Database, board_id: str, user_id: str) -> None:
     """Insert an explicit per-user share row directly into the shared_boards table."""
-    board_records: Any = mock_invoker.services.board_records
-    with board_records._db.transaction() as cursor:
+    with sqlite_cursor(db) as cursor:
         cursor.execute(
             "INSERT OR IGNORE INTO shared_boards (board_id, user_id) VALUES (?, ?)",
             (board_id, user_id),
@@ -281,7 +279,7 @@ def _insert_pending_queue_item(session_queue: Any, user_id: str, queue_id: str =
     graph.add_node(PromptTestInvocation(id="prompt", prompt="test"))
     session = GraphExecutionState(graph=graph)
     session_json = session.model_dump_json(warnings=False, exclude_none=True)
-    with session_queue._db.transaction() as cursor:
+    with sqlite_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -1132,7 +1130,12 @@ class TestImageReadAuth:
         assert r.status_code != status.HTTP_403_FORBIDDEN
 
     def test_explicit_share_grants_image_read_to_member(
-        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+        self,
+        client: TestClient,
+        mock_invoker: Invoker,
+        mock_sqlite_database: Database,
+        user1_token: str,
+        user2_token: str,
     ):
         """An image on a private board explicitly shared with user2 should be readable
         by user2 — matching the visibility the board_id="all" listing already grants."""
@@ -1146,7 +1149,7 @@ class TestImageReadAuth:
         r = client.get("/api/v1/images/i/explicit-share-img", headers=_auth(user2_token))
         assert r.status_code == status.HTTP_403_FORBIDDEN
 
-        _share_board_with_user(mock_invoker, board_id, user2.user_id)
+        _share_board_with_user(mock_sqlite_database, board_id, user2.user_id)
 
         r = client.get("/api/v1/images/i/explicit-share-img", headers=_auth(user2_token))
         assert r.status_code != status.HTTP_403_FORBIDDEN
@@ -1209,14 +1212,19 @@ class TestImageReadAuth:
         assert r.status_code == status.HTTP_200_OK
 
     def test_list_images_explicitly_shared_private_board_allowed_for_member(
-        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+        self,
+        client: TestClient,
+        mock_invoker: Invoker,
+        mock_sqlite_database: Database,
+        user1_token: str,
+        user2_token: str,
     ):
         """User2 should be able to list a private board explicitly shared with them,
         on both the DTO and names endpoints."""
         user2 = mock_invoker.services.users.get_by_email("user2@test.com")
         assert user2 is not None
         board_id = _create_board(client, user1_token, "Explicit Share Enum Board")
-        _share_board_with_user(mock_invoker, board_id, user2.user_id)
+        _share_board_with_user(mock_sqlite_database, board_id, user2.user_id)
 
         r = client.get(f"/api/v1/images/?board_id={board_id}", headers=_auth(user2_token))
         assert r.status_code == status.HTTP_200_OK
@@ -1225,7 +1233,12 @@ class TestImageReadAuth:
         assert r.status_code == status.HTTP_200_OK
 
     def test_explicitly_shared_private_board_dto_and_image_names_allowed_for_member(
-        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+        self,
+        client: TestClient,
+        mock_invoker: Invoker,
+        mock_sqlite_database: Database,
+        user1_token: str,
+        user2_token: str,
     ):
         """User2 should be able to fetch the board DTO and board image_names of a private
         board explicitly shared with them; a non-member (user1's other boards aside) stays 403."""
@@ -1238,7 +1251,7 @@ class TestImageReadAuth:
         r = client.get(f"/api/v1/boards/{board_id}/image_names", headers=_auth(user2_token))
         assert r.status_code == status.HTTP_403_FORBIDDEN
 
-        _share_board_with_user(mock_invoker, board_id, user2.user_id)
+        _share_board_with_user(mock_sqlite_database, board_id, user2.user_id)
 
         r = client.get(f"/api/v1/boards/{board_id}", headers=_auth(user2_token))
         assert r.status_code == status.HTTP_200_OK
@@ -1704,7 +1717,7 @@ class TestWorkflowListScoping:
     """Tests that listing workflows in multiuser mode does not filter out default workflows."""
 
     def test_default_workflows_visible_when_listing_user_and_default(
-        self, client: TestClient, mock_invoker: Invoker, user1_token: str
+        self, client: TestClient, mock_invoker: Invoker, mock_sqlite_database: Database, user1_token: str
     ):
         """When categories=['user','default'], default workflows must still appear even
         though user_id_filter is set to the current user (default workflows belong to 'system')."""
@@ -1732,7 +1745,7 @@ class TestWorkflowListScoping:
         )
         wf_with_id = Workflow(**default_wf.model_dump(), id=uuid_string())
         # Insert directly via DB since the create API rejects default workflows
-        with mock_invoker.services.workflow_records._db.transaction() as cursor:
+        with sqlite_cursor(mock_sqlite_database) as cursor:
             cursor.execute(
                 "INSERT INTO workflow_library (workflow_id, workflow, user_id) VALUES (?, ?, ?)",
                 (wf_with_id.id, wf_with_id.model_dump_json(), "system"),
@@ -1755,7 +1768,7 @@ class TestWorkflowListScoping:
         assert "user" in categories_found
 
     def test_default_workflows_visible_when_no_category_filter(
-        self, client: TestClient, mock_invoker: Invoker, user1_token: str
+        self, client: TestClient, mock_invoker: Invoker, mock_sqlite_database: Database, user1_token: str
     ):
         """When no categories filter is given, default workflows should still appear."""
         from invokeai.app.services.workflow_records.workflow_records_common import (
@@ -1781,7 +1794,7 @@ class TestWorkflowListScoping:
             form_fields=[],
         )
         wf_with_id = Workflow(**default_wf.model_dump(), id=uuid_string())
-        with mock_invoker.services.workflow_records._db.transaction() as cursor:
+        with sqlite_cursor(mock_sqlite_database) as cursor:
             cursor.execute(
                 "INSERT INTO workflow_library (workflow_id, workflow, user_id) VALUES (?, ?, ?)",
                 (wf_with_id.id, wf_with_id.model_dump_json(), "system"),
@@ -2158,7 +2171,12 @@ class TestRecallImageAccess:
         assert r.status_code != status.HTTP_403_FORBIDDEN
 
     def test_recall_explicitly_shared_board_image_allowed_for_member(
-        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+        self,
+        client: TestClient,
+        mock_invoker: Invoker,
+        mock_sqlite_database: Database,
+        user1_token: str,
+        user2_token: str,
     ):
         """User2 should be able to reference an image on a private board explicitly shared with them."""
         user1 = mock_invoker.services.users.get_by_email("user1@test.com")
@@ -2177,7 +2195,7 @@ class TestRecallImageAccess:
         )
         assert r.status_code == status.HTTP_403_FORBIDDEN
 
-        _share_board_with_user(mock_invoker, board_id, user2.user_id)
+        _share_board_with_user(mock_sqlite_database, board_id, user2.user_id)
 
         r = client.post(
             "/api/v1/recall/default",
@@ -2370,16 +2388,15 @@ class TestQueueStatusScoping:
         assert scoped.pending == 5  # global, unchanged
         assert scoped.user_pending == 2  # this user's share
 
-    def _setup_queue_router(self, mock_invoker: Invoker):
+    def _setup_queue_router(self, mock_invoker: Invoker, db: Database):
         """Wire a real session queue and a stub processor into the invoker the router uses,
         so GET /queue/{queue_id}/status exercises the real service contract."""
         from unittest.mock import MagicMock
 
         from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
-        from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
+        from invokeai.app.services.session_queue.session_queue_default import SessionQueue
 
-        db = mock_invoker.services.board_records._db
-        queue = SqliteSessionQueue(db=db)
+        queue = SessionQueue(db)
         queue.start(mock_invoker)
         mock_invoker.services.session_queue = queue
 
@@ -2389,13 +2406,18 @@ class TestQueueStatusScoping:
         return queue
 
     def test_get_queue_status_route_returns_global_and_user_counts(
-        self, setup_jwt_secret: None, enable_multiuser: Any, mock_invoker: Invoker, client: TestClient
+        self,
+        setup_jwt_secret: None,
+        enable_multiuser: Any,
+        mock_invoker: Invoker,
+        mock_sqlite_database: Database,
+        client: TestClient,
     ):
         """Regression test: GET /api/v1/queue/{queue_id}/status must return 200 (not 500) and the
         expected global and per-user counts for both non-admin and admin callers. Previously the
         router called get_queue_status() with a keyword the service did not accept, raising a
         TypeError that the broad except turned into a 500 for every status request."""
-        queue = self._setup_queue_router(mock_invoker)
+        queue = self._setup_queue_router(mock_invoker, mock_sqlite_database)
 
         user1_id = _create_user(mock_invoker, "user1@test.com", "User One")
         user2_id = _create_user(mock_invoker, "user2@test.com", "User Two")

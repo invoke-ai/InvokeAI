@@ -5,7 +5,7 @@ import pytest
 from invokeai.app.services.board_records.board_records_common import BoardRecordOrderBy
 from invokeai.app.services.boards.boards_base import BoardServiceABC
 from invokeai.app.services.shared.invocation_context import BoardsInterface
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 
 
 def _make_interface(multiuser: bool, user: MagicMock | None) -> tuple[BoardsInterface, MagicMock]:

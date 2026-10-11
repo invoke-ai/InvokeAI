@@ -155,3 +155,96 @@ jobs:
         # one worker per vCPU is the right level where the runner has the headroom for it. The
         # matrix carries the count, because windows needs a lower one.
         run: uv run --no-sync pytest -n ${{ matrix.pytest-workers }} --max-worker-restart=0
+
+  # Decides whether the external-database job runs. That job's service containers start before any of its
+  # steps, so the decision has to come from a job of its own: otherwise every pull request, frontend-only ones
+  # included, would pull both server images and wait for them to become healthy.
+  external-database-changes:
+    name: 'external database: change detection'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      run: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
+    steps:
+      - name: checkout
+        if: ${{ inputs.always_run != true }}
+        uses: nschloe/action-cached-lfs-checkout@385a8ecc719e50b8c71af6ab01a624b486b7c3bc
+
+      - name: check for changed python files
+        if: ${{ inputs.always_run != true }}
+        id: changed-files
+        # Pinned to the _hash_ for v45.0.9, see the matrix job above.
+        uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96
+        with:
+          files_yaml: |
+            python:
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - '.github/workflows/python-tests.yml'
+              - 'invokeai/**/*.py'
+              # The library's tests store the bundled workflows and style presets.
+              - 'invokeai/app/services/workflow_records/default_workflows/**'
+              - 'invokeai/app/services/style_preset_records/default_style_presets.json'
+              - 'tests/**'
+
+  # The database layer against MySQL and MariaDB, at the oldest release of each that InvokeAI supports.
+  # Only the tests on the database fixtures (marked `uses_database`) target the server; the matrix above
+  # runs the whole suite, those tests included, on SQLite.
+  external-database:
+    needs: external-database-changes
+    if: ${{ needs.external-database-changes.outputs.run == 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - server: mysql
+            image: 'mysql:8.4.11'
+            health-cmd: 'mysqladmin ping -h 127.0.0.1 --silent'
+            url: 'mysql+pymysql://root:invokeai@127.0.0.1:3306'
+          - server: mariadb
+            image: 'mariadb:10.11.19'
+            health-cmd: 'mariadb-admin ping -h 127.0.0.1 --silent'
+            url: 'mariadb+pymysql://root:invokeai@127.0.0.1:3306'
+    name: 'py3.12: linux-${{ matrix.server }}'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      database:
+        image: ${{ matrix.image }}
+        env:
+          MYSQL_ROOT_PASSWORD: invokeai
+          MARIADB_ROOT_PASSWORD: invokeai
+        ports:
+          - '3306:3306'
+        options: >-
+          --health-cmd="${{ matrix.health-cmd }}"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    env:
+      OMP_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+      INVOKEAI_TEST_DB_URL: ${{ matrix.url }}
+
+    steps:
+      - name: checkout
+        uses: nschloe/action-cached-lfs-checkout@385a8ecc719e50b8c71af6ab01a624b486b7c3bc
+
+      - name: setup uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: '0.11.28'  # When updating this, make sure the version in launcher's package.json gets updated too.
+          enable-cache: true
+          python-version: '3.12'
+
+      - name: install dependencies
+        env:
+          UV_INDEX: 'https://download.pytorch.org/whl/cpu'
+        run: uv sync --no-progress --locked --extra test --extra mysql
+
+      - name: run pytest
+        run: uv run --no-sync pytest -n logical --max-worker-restart=0 -m "uses_database and not sqlite_only and not slow"
+
+      - name: server log
+        if: ${{ failure() }}
+        run: docker logs "${{ job.services.database.id }}"

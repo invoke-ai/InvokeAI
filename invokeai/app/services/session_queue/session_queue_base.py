@@ -27,8 +27,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueStatus,
 )
 from invokeai.app.services.shared.graph import GraphExecutionState
-from invokeai.app.services.shared.pagination import CursorPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import CursorPaginatedResults, SQLiteDirection
 
 
 @dataclass(frozen=True)
@@ -277,6 +276,25 @@ class SessionQueueBase(ABC):
         If user_id is provided, only returns items for that user. If limit is provided, returns only the first
         `limit` ids of that order. total_count is the number of ids in item_ids, which equals the number of
         matching items only when no limit is given."""
+        pass
+
+    @abstractmethod
+    def get_root_queue_item_ids(
+        self, queue_id: str, user_id: str, statuses: tuple[QUEUE_ITEM_STATUS, ...]
+    ) -> list[int]:
+        """List user-owned root items eligible for additional queue execution lanes."""
+        pass
+
+    @abstractmethod
+    def transition_queue_item_if_status(
+        self,
+        item_id: int,
+        status: QUEUE_ITEM_STATUS,
+        expected_statuses: tuple[QUEUE_ITEM_STATUS, ...],
+        device: Optional[str] = None,
+        queue_item: Optional[SessionQueueItem] = None,
+    ) -> Optional[SessionQueueItem]:
+        """Atomically transition from an allowed source status; None if another lane won."""
         pass
 
     @abstractmethod

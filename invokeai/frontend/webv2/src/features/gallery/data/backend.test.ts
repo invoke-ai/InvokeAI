@@ -24,6 +24,7 @@ import {
   fetchImageIndexAvailability,
   getGalleryImageByName,
   getGalleryImagesByNames,
+  getGalleryItemLocation,
   getGalleryVideoMetadata,
   getGalleryImageWorkflow,
   getGalleryVideoWorkflow,
@@ -157,6 +158,38 @@ describe('downloadGalleryArchive', () => {
     expect(pollSignal?.aborted).toBe(true);
     expect(sleepSignal.aborted).toBe(true);
     expect(mocks.apiFetchRaw).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('getGalleryItemLocation', () => {
+  beforeEach(() => {
+    accountLifecycle.activate('user-a');
+    mocks.apiFetchJson.mockReset();
+  });
+
+  it('sends the exact ordinary-page filters and maps the zero-based rank', async () => {
+    mocks.apiFetchJson.mockResolvedValue({ index: 123, kind: 'video', name: 'clip.mp4', total: 250 });
+    const signal = new AbortController().signal;
+
+    await expect(
+      getGalleryItemLocation({
+        boardId: 'board-1',
+        createdFrom: '2026-07-01',
+        createdTo: '2026-07-31',
+        galleryView: 'assets',
+        kind: 'video',
+        name: 'clip.mp4',
+        orderDir: 'ASC',
+        searchTerm: ' portrait ',
+        signal,
+        starred: false,
+      })
+    ).resolves.toEqual({ index: 123, kind: 'video', name: 'clip.mp4', total: 250 });
+
+    expect(mocks.apiFetchJson).toHaveBeenCalledWith(
+      '/api/v1/gallery/items/location?board_id=board-1&categories=control&categories=mask&categories=user&created_from=2026-07-01&created_to=2026-07-31&is_intermediate=false&kind=video&order_dir=ASC&name=clip.mp4&search_term=portrait&starred=false&starred_first=false',
+      { signal }
+    );
   });
 });
 

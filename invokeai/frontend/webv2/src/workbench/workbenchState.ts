@@ -441,6 +441,11 @@ type WorkbenchReducerAction =
   | {
       type: 'selectGalleryItem';
       item: GalleryItem;
+      /**
+       * Navigate within the item's own board, unfiltered, instead of the listing the Gallery shows: for selections
+       * made outside the Gallery, such as a search result from any board.
+       */
+      navigateItemBoard?: boolean;
       preserveNavigationQuery?: boolean;
       projectId?: string;
       selectionPage?: number;
@@ -450,13 +455,17 @@ type WorkbenchReducerAction =
       item: GalleryItem;
       nextPrimaryItem: GalleryItem | null;
       projectId?: string;
+      /** The grid page of whichever item becomes primary: the added item, or `nextPrimaryItem`. */
+      selectionPage?: number;
     }
   | {
       type: 'setGalleryMultiSelection';
       itemKeys: GalleryItemKey[];
       primaryItem: GalleryItem;
+      /** Keep the navigation query already on the selection, as `selectGalleryItem` does for a host's own window. */
+      preserveNavigationQuery?: boolean;
       projectId?: string;
-      /** Stamps this page, in the navigation query already on the selection, instead of the grid's. */
+      /** Stamps this page instead of the grid's. */
       selectionPage?: number;
     }
   | { type: 'setGalleryCompareImage'; image: GalleryImageItem | null; projectId?: string }
@@ -3681,6 +3690,49 @@ export const createInitialWorkbenchState = (): WorkbenchState => {
   };
 };
 
+const hasGallerySelectionPage = (selectionPage: number | undefined): selectionPage is number =>
+  typeof selectionPage === 'number' && Number.isFinite(selectionPage);
+
+/** An explicit page for the item being selected, else the page the grid is on. */
+const getGallerySelectionPage = (values: Record<string, unknown>, selectionPage: number | undefined): number =>
+  hasGallerySelectionPage(selectionPage)
+    ? Math.max(0, Math.floor(selectionPage))
+    : typeof values.galleryPage === 'number' && Number.isFinite(values.galleryPage)
+      ? Math.max(0, Math.floor(values.galleryPage))
+      : 0;
+
+/**
+ * A host step keeps the selection's query but follows the Gallery's active ranking, except for a selection that
+ * navigates its item's own board.
+ */
+const getRankingStampFields = (
+  values: Record<string, unknown>,
+  existingNavigationQuery: Record<string, unknown>,
+  semanticKey: string
+): Record<string, unknown> =>
+  existingNavigationQuery.itemBoard === true
+    ? {}
+    : semanticKey
+      ? { boardId: getGallerySelectionBoardId(values), semanticKey }
+      : { semanticKey: null };
+
+/** The listing the Gallery shows now, which a selection made in it navigates within. */
+const getCurrentGallerySelectionQuery = (values: Record<string, unknown>, page: number): Record<string, unknown> => {
+  const settings = getGallerySettings(values);
+  const semanticKey = gallerySemanticReferenceKey(parseGallerySemanticReference(values.semanticImageQuery));
+
+  return {
+    boardId: getGallerySelectionBoardId(values),
+    galleryView: values.galleryView === 'assets' ? 'assets' : 'images',
+    imageOrderDir: settings.imageOrderDir,
+    page,
+    paginationMode: settings.paginationMode,
+    searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
+    ...(semanticKey ? { semanticKey } : {}),
+    starredOnly: values.starredOnly === true,
+  };
+};
+
 export const __workbenchReducerInternal = (
   state: WorkbenchState,
   action: WorkbenchReducerAction,
@@ -4913,29 +4965,35 @@ export const __workbenchReducerInternal = (
       return updateGalleryValuesAndPauseLiveFollow(
         state,
         (values) => {
+          // A selection navigated within its own board has no known page there; Preview locates it.
           const selectedImagePage =
-            typeof action.selectionPage === 'number' && Number.isFinite(action.selectionPage)
-              ? Math.max(0, Math.floor(action.selectionPage))
-              : typeof values.galleryPage === 'number' && Number.isFinite(values.galleryPage)
-                ? Math.max(0, Math.floor(values.galleryPage))
-                : 0;
-          const settings = getGallerySettings(values);
+            action.navigateItemBoard && !hasGallerySelectionPage(action.selectionPage)
+              ? 0
+              : getGallerySelectionPage(values, action.selectionPage);
+          const semanticKey = gallerySemanticReferenceKey(parseGallerySemanticReference(values.semanticImageQuery));
           const existingNavigationQuery =
             values.selectedImageQuery && typeof values.selectedImageQuery === 'object'
               ? (values.selectedImageQuery as Record<string, unknown>)
               : null;
-          const selectedImageQuery =
-            action.preserveNavigationQuery && existingNavigationQuery
-              ? { ...existingNavigationQuery, page: selectedImagePage }
-              : {
-                  boardId: getGallerySelectionBoardId(values),
-                  galleryView: values.galleryView === 'assets' ? 'assets' : 'images',
-                  imageOrderDir: settings.imageOrderDir,
+          const settings = getGallerySettings(values);
+          const selectedImageQuery = action.navigateItemBoard
+            ? {
+                boardId: action.item.boardId,
+                galleryView: action.item.category === 'general' ? 'images' : 'assets',
+                imageOrderDir: settings.imageOrderDir,
+                itemBoard: true,
+                page: selectedImagePage,
+                paginationMode: settings.paginationMode,
+                searchTerm: '',
+                starredOnly: false,
+              }
+            : action.preserveNavigationQuery && existingNavigationQuery
+              ? {
+                  ...existingNavigationQuery,
+                  ...getRankingStampFields(values, existingNavigationQuery, semanticKey),
                   page: selectedImagePage,
-                  paginationMode: settings.paginationMode,
-                  searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
-                  starredOnly: values.starredOnly === true,
-                };
+                }
+              : getCurrentGallerySelectionQuery(values, selectedImagePage);
           const itemKey = toGalleryItemKey(action.item);
 
           return {
@@ -4959,11 +5017,7 @@ export const __workbenchReducerInternal = (
           const selectedItemKeys = getPersistedSelectedGalleryItemKeys(values);
 
           if (!selectedItemKeys.includes(itemKey)) {
-            const settings = getGallerySettings(values);
-            const selectedImagePage =
-              typeof values.galleryPage === 'number' && Number.isFinite(values.galleryPage)
-                ? Math.max(0, Math.floor(values.galleryPage))
-                : 0;
+            const selectedImagePage = getGallerySelectionPage(values, action.selectionPage);
 
             return {
               ...values,
@@ -4972,15 +5026,7 @@ export const __workbenchReducerInternal = (
               selectedImageName: itemKey,
               selectedImageNames: [...selectedItemKeys, itemKey],
               selectedImagePage,
-              selectedImageQuery: {
-                boardId: getGallerySelectionBoardId(values),
-                galleryView: values.galleryView === 'assets' ? 'assets' : 'images',
-                imageOrderDir: settings.imageOrderDir,
-                page: selectedImagePage,
-                paginationMode: settings.paginationMode,
-                searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
-                starredOnly: values.starredOnly === true,
-              },
+              selectedImageQuery: getCurrentGallerySelectionQuery(values, selectedImagePage),
             };
           }
 
@@ -5009,6 +5055,11 @@ export const __workbenchReducerInternal = (
               ? action.nextPrimaryItem
               : null;
           const nextPrimaryKey = nextPrimaryItem ? toGalleryItemKey(nextPrimaryItem) : null;
+          // The next primary keeps the old primary's stamp unless the grid knows where the next one sits.
+          const nextPrimaryPage =
+            nextPrimaryItem && hasGallerySelectionPage(action.selectionPage)
+              ? getGallerySelectionPage(values, action.selectionPage)
+              : null;
 
           return {
             ...values,
@@ -5016,6 +5067,12 @@ export const __workbenchReducerInternal = (
             selectedImage: nextPrimaryItem,
             selectedImageName: nextPrimaryKey,
             selectedImageNames: expectedNextPrimaryKey && !nextPrimaryItem ? [] : remainingItemKeys,
+            ...(nextPrimaryPage === null
+              ? {}
+              : {
+                  selectedImagePage: nextPrimaryPage,
+                  selectedImageQuery: getCurrentGallerySelectionQuery(values, nextPrimaryPage),
+                }),
           };
         },
         action.projectId
@@ -5025,13 +5082,8 @@ export const __workbenchReducerInternal = (
       return updateGalleryValuesAndPauseLiveFollow(
         state,
         (values) => {
-          const settings = getGallerySettings(values);
-          const hasSelectionPage = typeof action.selectionPage === 'number' && Number.isFinite(action.selectionPage);
-          const selectedImagePage = hasSelectionPage
-            ? Math.max(0, Math.floor(action.selectionPage as number))
-            : typeof values.galleryPage === 'number' && Number.isFinite(values.galleryPage)
-              ? Math.max(0, Math.floor(values.galleryPage))
-              : 0;
+          const semanticKey = gallerySemanticReferenceKey(parseGallerySemanticReference(values.semanticImageQuery));
+          const selectedImagePage = getGallerySelectionPage(values, action.selectionPage);
           const existingNavigationQuery =
             values.selectedImageQuery && typeof values.selectedImageQuery === 'object'
               ? (values.selectedImageQuery as Record<string, unknown>)
@@ -5044,19 +5096,15 @@ export const __workbenchReducerInternal = (
             selectedImageName: toGalleryItemKey(action.primaryItem),
             selectedImageNames: action.itemKeys,
             selectedImagePage,
-            // An explicit host page belongs to the selection's query, matching preserveNavigationQuery.
+            // A Gallery range captures the current listing; only a host stepping within its own window keeps the old one.
             selectedImageQuery:
-              hasSelectionPage && existingNavigationQuery
-                ? { ...existingNavigationQuery, page: selectedImagePage }
-                : {
-                    boardId: getGallerySelectionBoardId(values),
-                    galleryView: values.galleryView === 'assets' ? 'assets' : 'images',
-                    imageOrderDir: settings.imageOrderDir,
+              action.preserveNavigationQuery && existingNavigationQuery
+                ? {
+                    ...existingNavigationQuery,
+                    ...getRankingStampFields(values, existingNavigationQuery, semanticKey),
                     page: selectedImagePage,
-                    paginationMode: settings.paginationMode,
-                    searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
-                    starredOnly: values.starredOnly === true,
-                  },
+                  }
+                : getCurrentGallerySelectionQuery(values, selectedImagePage),
           };
         },
         action.projectId

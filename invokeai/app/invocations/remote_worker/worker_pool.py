@@ -188,26 +188,7 @@ def _queue_item_ids(
 ) -> list[int]:
     if not statuses:
         return []
-
-    db = getattr(services.session_queue, "_db", None)
-    if db is None:
-        raise RuntimeError("Remote worker pool requires InvokeAI's SQLite session queue")
-
-    placeholders = ", ".join("?" for _ in statuses)
-    with db.transaction() as cursor:
-        cursor.execute(
-            f"""--sql
-            SELECT item_id
-            FROM session_queue
-            WHERE queue_id = ?
-              AND user_id = ?
-              AND status IN ({placeholders})
-              AND parent_item_id IS NULL
-            ORDER BY priority DESC, item_id ASC
-            """,
-            (queue_id, user_id, *statuses),
-        )
-        return [int(row[0]) for row in cursor.fetchall()]
+    return services.session_queue.get_root_queue_item_ids(queue_id, user_id, statuses)
 
 
 def _status(services: Any, item_id: int) -> str:
@@ -219,35 +200,17 @@ def _status(services: Any, item_id: int) -> str:
 
 def _park_remote_only_items(services: Any, queue_id: str, user_id: str) -> None:
     queue = services.session_queue
-    dequeue_lock = getattr(queue, "_dequeue_lock", None)
-    set_status = getattr(queue, "_set_queue_item_status", None)
-    if dequeue_lock is None or set_status is None:
-        raise RuntimeError("Remote worker pool requires queue claim primitives")
-
-    for item_id in _queue_item_ids(
-        services,
-        queue_id=queue_id,
-        user_id=user_id,
-        statuses=("pending",),
-    ):
+    for item_id in _queue_item_ids(services, queue_id=queue_id, user_id=user_id, statuses=("pending",)):
         try:
             item = queue.get_queue_item(item_id)
         except Exception:
             continue
-
         settings = _settings_for_queue_item(item)
         if settings is None or settings.mode != "Remote Only":
             continue
-
-        with dequeue_lock:
-            try:
-                fresh = queue.get_queue_item(item_id)
-            except Exception:
-                continue
-            fresh_settings = _settings_for_queue_item(fresh)
-            if fresh.status != "pending" or fresh_settings is None or fresh_settings.mode != "Remote Only":
-                continue
-            set_status(item_id=item_id, status="waiting", queue_item=fresh)
+        # This loses cleanly to local dequeue or cancellation instead of racing
+        # under a removed process-local lock.
+        queue.transition_queue_item_if_status(item_id, "waiting", ("pending",), queue_item=item)
 
 
 def _claim_for_worker(
@@ -259,22 +222,9 @@ def _claim_for_worker(
     excluded: set[int],
 ) -> tuple[Any, PoolSettings] | None:
     queue = services.session_queue
-    dequeue_lock = getattr(queue, "_dequeue_lock", None)
-    set_status = getattr(queue, "_set_queue_item_status", None)
-    if dequeue_lock is None or set_status is None:
-        raise RuntimeError("Remote worker pool requires queue claim primitives")
-
-    for item_id in _queue_item_ids(
-        services,
-        queue_id=queue_id,
-        user_id=user_id,
-        statuses=("pending", "waiting"),
-    ):
-        if _is_local_handoff(item_id):
+    for item_id in _queue_item_ids(services, queue_id=queue_id, user_id=user_id, statuses=("pending", "waiting")):
+        if item_id in excluded or _is_local_handoff(item_id):
             continue
-        if item_id in excluded:
-            continue
-
         try:
             candidate = queue.get_queue_item(item_id)
         except Exception:
@@ -287,28 +237,17 @@ def _claim_for_worker(
         if settings.mode == "Remote Only" and candidate.status not in {"pending", "waiting"}:
             continue
 
-        with dequeue_lock:
-            try:
-                fresh = queue.get_queue_item(item_id)
-            except Exception:
-                continue
-            fresh_settings = _settings_for_queue_item(fresh)
-            if fresh_settings is None or not _worker_allowed(fresh_settings, worker):
-                continue
-            if fresh_settings.mode == "Distributed" and fresh.status != "pending":
-                continue
-            if fresh_settings.mode == "Remote Only" and fresh.status not in {"pending", "waiting"}:
-                continue
-
-            claimed = set_status(
-                item_id=item_id,
-                status="in_progress",
-                device=f"remote:{worker.name}",
-                queue_item=fresh,
-            )
-            if claimed.status == "in_progress":
-                return claimed, fresh_settings
-
+        # The conditional UPDATE is atomic across threads/processes/database
+        # backends; at most one local or remote execution lane wins.
+        claimed = queue.transition_queue_item_if_status(
+            item_id,
+            "in_progress",
+            (candidate.status,),
+            device=f"remote:{worker.name}",
+            queue_item=candidate,
+        )
+        if claimed is not None:
+            return claimed, settings
     return None
 
 
@@ -336,15 +275,10 @@ def _has_eligible_item(
 
 
 def _requeue(services: Any, item_id: int, settings: PoolSettings, reason: str) -> None:
-    if _status(services, item_id) != "in_progress":
-        return
-
     target = "waiting" if settings.mode == "Remote Only" else "pending"
-    set_status = getattr(services.session_queue, "_set_queue_item_status", None)
-    if set_status is None:
-        raise RuntimeError("Remote worker pool requires queue status transitions")
-    set_status(item_id=item_id, status=target)
-    services.logger.warning(f"Remote Workers: returned local item {item_id} to {target}: {reason}")
+    transitioned = services.session_queue.transition_queue_item_if_status(item_id, target, ("in_progress",))
+    if transitioned is not None:
+        services.logger.warning(f"Remote Workers: returned local item {item_id} to {target}: {reason}")
 
 
 def _is_remote_oom_error(errors: Any) -> bool:
@@ -1217,18 +1151,13 @@ def run_current_remote_only(context: Any, invocation: Any) -> None:
     if settings is None or settings.mode != "Remote Only":
         raise RemoteInvokeError("Remote Only worker settings are invalid")
 
-    set_status = getattr(context._services.session_queue, "_set_queue_item_status", None)
-    if set_status is None:
-        raise RemoteInvokeError("Remote Only requires queue status transitions")
-
+    queue = context._services.session_queue
     _register_local_handoff(item_id)
     try:
-        if _status(context._services, item_id) == "in_progress":
-            set_status(
-                item_id=item_id,
-                status="waiting",
-                queue_item=queue_item,
-            )
+        if (
+            queue.transition_queue_item_if_status(item_id, "waiting", ("in_progress",), queue_item=queue_item)
+            is not None
+        ):
             context.logger.info(f"Remote Workers: Remote Only local item {item_id} is waiting for a free remote worker")
 
         ensure_remote_worker_pool(context._services, item_id)
@@ -1251,13 +1180,12 @@ def run_current_remote_only(context: Any, invocation: Any) -> None:
                 made_attempt = True
                 attempted.add(key)
                 try:
-                    if _status(context._services, item_id) == "waiting":
-                        set_status(
-                            item_id=item_id,
-                            status="in_progress",
-                            device=f"remote:{worker.name}",
-                            queue_item=queue_item,
-                        )
+                    claimed = queue.transition_queue_item_if_status(
+                        item_id, "in_progress", ("waiting",), device=f"remote:{worker.name}", queue_item=queue_item
+                    )
+                    if claimed is None:
+                        # Canceled, deleted or otherwise taken while we waited.
+                        continue
 
                     try:
                         outcome = _run_remote_job(
@@ -1269,11 +1197,9 @@ def run_current_remote_only(context: Any, invocation: Any) -> None:
                         )
                     except Exception as exc:
                         last_error = exc
-                        if not context.util.is_canceled() and _status(context._services, item_id) == "in_progress":
-                            set_status(
-                                item_id=item_id,
-                                status="waiting",
-                                queue_item=queue_item,
+                        if not context.util.is_canceled():
+                            queue.transition_queue_item_if_status(
+                                item_id, "waiting", ("in_progress",), queue_item=queue_item
                             )
                         context.logger.warning(
                             f"Remote Workers [{worker.name}]: could not accept Local-held Remote Only item: {exc}"

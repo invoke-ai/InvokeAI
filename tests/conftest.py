@@ -11,37 +11,61 @@ from pathlib import Path
 
 import pytest
 
-from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
-from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
-from invokeai.app.services.board_video_records.board_video_records_sqlite import SqliteBoardVideoRecordStorage
+from invokeai.app.services.board_image_records.board_image_records_default import BoardImageRecordStorage
+from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
+from invokeai.app.services.board_video_records.board_video_records_default import BoardVideoRecordStorage
 from invokeai.app.services.boards.boards_default import BoardService
 from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
-from invokeai.app.services.client_state_persistence.client_state_persistence_sqlite import ClientStatePersistenceSqlite
+from invokeai.app.services.client_state_persistence.client_state_persistence_default import ClientStatePersistence
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.external_generation.external_generation_default import ExternalGenerationService
-from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
+from invokeai.app.services.gallery.gallery_default import GalleryService
 from invokeai.app.services.image_index.image_index_default import ImageIndexService
-from invokeai.app.services.image_index.image_index_records_sqlite import ImageIndexRecordsSqlite
-from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+from invokeai.app.services.image_index.image_index_records_default import ImageIndexRecords
+from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
 from invokeai.app.services.intermediates.intermediates_default import IntermediatesService
-from invokeai.app.services.intermediates.intermediates_records_sqlite import IntermediatesRecordsSqlite
+from invokeai.app.services.intermediates.intermediates_records_default import IntermediatesRecords
 from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.project_records.project_records_sqlite import ProjectRecordsSqlite
-from invokeai.app.services.system_prompt_records.system_prompt_records_sqlite import (
-    SqliteSystemPromptRecordsStorage,
+from invokeai.app.services.project_records.project_records_default import ProjectRecordsStorage
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.system_prompt_records.system_prompt_records_default import (
+    SystemPromptRecordsStorage,
 )
 from invokeai.app.services.users.users_default import UserService
-from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
-from invokeai.app.services.wildcard_records.wildcard_records_sqlite import SqliteWildcardRecordsStorage
-from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
+from invokeai.app.services.video_records.video_records_default import VideoRecordStorage
+from invokeai.app.services.wildcard_records.wildcard_records_default import WildcardRecordsStorage
+from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa: F403
+from tests.fixtures.database import (  # noqa: F401
+    _external_application_schema,
+    _external_test_schema,
+    _migrated_sqlite,
+    database,
+    empty_database,
+    external_test_db_url,
+)
+from tests.fixtures.races import lost_races  # noqa: F401
 from tests.fixtures.sqlite_database import create_mock_sqlite_database  # noqa: F401
 from tests.test_nodes import TestEventService
+
+# Fixtures that put a test on the backend under test, which `-m uses_database` selects.
+_DATABASE_FIXTURES = {"empty_database", "database"}
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    # tryfirst: the marks must exist before `-m` deselects by them.
+    external = external_test_db_url() is not None
+    for item in items:
+        if _DATABASE_FIXTURES & set(getattr(item, "fixturenames", ())):
+            item.add_marker(pytest.mark.uses_database)
+        if external and item.get_closest_marker("sqlite_only") is not None:
+            item.add_marker(pytest.mark.skip(reason="needs SQLite, but INVOKEAI_TEST_DB_URL names another backend"))
 
 
 @pytest.fixture(autouse=True)
@@ -56,26 +80,33 @@ def _clear_deferred_empty_cache():
 
 
 @pytest.fixture
-def mock_services() -> InvocationServices:
+def mock_sqlite_database() -> Database:
+    """The in-memory database behind `mock_services`, for tests that need SQL of their own or a service that
+    `mock_services` leaves out (the session queue)."""
+    return create_mock_sqlite_database(InvokeAIAppConfig(use_memory_db=True), InvokeAILogger.get_logger())
+
+
+@pytest.fixture
+def mock_services(mock_sqlite_database: Database) -> InvocationServices:
     # Image indexing is on by default, but `model_manager` below is None: starting
     # the indexer against these stub services would fail while resolving the
     # embedding model. Tests that exercise the index enable it themselves.
     configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0, image_index_enabled=False)
     logger = InvokeAILogger.get_logger()
-    db = create_mock_sqlite_database(configuration, logger)
+    db = mock_sqlite_database
 
     # NOTE: none of these are actually called by the test invocations
     return InvocationServices(
-        board_image_records=SqliteBoardImageRecordStorage(db=db),
+        board_image_records=BoardImageRecordStorage(db),
         board_images=None,  # type: ignore
-        board_records=SqliteBoardRecordStorage(db=db),
+        board_records=BoardRecordStorage(db),
         boards=BoardService(),
         bulk_download=BulkDownloadService(),
         configuration=configuration,
         database=db,
         events=TestEventService(),
         image_files=None,  # type: ignore
-        image_records=SqliteImageRecordStorage(db=db),
+        image_records=ImageRecordStorage(db),
         images=ImageService(),
         invocation_cache=MemoryInvocationCache(max_cache_size=0),
         logger=logging,  # type: ignore
@@ -88,29 +119,29 @@ def mock_services() -> InvocationServices:
         session_processor=None,  # type: ignore
         session_queue=None,  # type: ignore
         urls=None,  # type: ignore
-        workflow_records=SqliteWorkflowRecordsStorage(db=db),
+        workflow_records=WorkflowRecordsStorage(db),
         tensors=None,  # type: ignore
         conditioning=None,  # type: ignore
         style_preset_records=None,  # type: ignore
         style_preset_image_files=None,  # type: ignore
-        system_prompt_records=SqliteSystemPromptRecordsStorage(db=db),
+        system_prompt_records=SystemPromptRecordsStorage(db),
         workflow_thumbnails=None,  # type: ignore
         model_relationship_records=None,  # type: ignore
         model_relationships=None,  # type: ignore
-        client_state_persistence=ClientStatePersistenceSqlite(db=db),
-        project_records=ProjectRecordsSqlite(db=db),
+        client_state_persistence=ClientStatePersistence(db),
+        project_records=ProjectRecordsStorage(db),
         users=UserService(db),
-        wildcard_records=SqliteWildcardRecordsStorage(db=db),
+        wildcard_records=WildcardRecordsStorage(db),
         videos=None,  # type: ignore
         video_files=None,  # type: ignore
-        video_records=SqliteVideoRecordStorage(db=db),
-        board_video_records=SqliteBoardVideoRecordStorage(db=db),
+        video_records=VideoRecordStorage(db),
+        board_video_records=BoardVideoRecordStorage(db),
         # Real SQLite-backed gallery service: the virtual-boards router reads dates and
         # per-date item names through it, and MagicMock cannot exercise the filter SQL.
-        gallery=SqliteGalleryService(db=db),
-        image_index_records=ImageIndexRecordsSqlite(db=db),
+        gallery=GalleryService(db),
+        image_index_records=ImageIndexRecords(db),
         image_index=ImageIndexService(),
-        intermediates=IntermediatesService(records=IntermediatesRecordsSqlite(db=db), logger=logger),
+        intermediates=IntermediatesService(records=IntermediatesRecords(db), logger=logger),
     )
 
 

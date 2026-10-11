@@ -101,7 +101,7 @@ BatchDataCollection: TypeAlias = list[list[BatchDatum]]
 
 
 class Batch(BaseModel):
-    batch_id: str = Field(default_factory=uuid_string, description="The ID of the batch")
+    batch_id: str = Field(default_factory=uuid_string, max_length=255, description="The ID of the batch")
     idempotency_key: str | None = Field(
         default=None,
         min_length=1,

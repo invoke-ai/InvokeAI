@@ -39,10 +39,14 @@ def test_the_released_shift_is_what_we_carry() -> None:
     assert ERNIE_IMAGE_SHIFT == RELEASED_SHIFT
 
 
-def test_a_single_file_denoises_on_the_released_schedule(tmp_path: Path) -> None:
-    """No `scheduler/` exists for a checkpoint, so this is every single-file generation."""
-    (tmp_path / "ernie-image.safetensors").touch()
-    context = _context(ModelFormat.Checkpoint, tmp_path, "ernie-image.safetensors")
+@pytest.mark.parametrize(
+    ("format", "filename"),
+    [(ModelFormat.Checkpoint, "ernie-image.safetensors"), (ModelFormat.GGUFQuantized, "ernie-image-Q4_K_M.gguf")],
+)
+def test_a_single_file_denoises_on_the_released_schedule(tmp_path: Path, format: ModelFormat, filename: str) -> None:
+    """No `scheduler/` exists for a single file, so this is every safetensors and GGUF generation."""
+    (tmp_path / filename).touch()
+    context = _context(format, tmp_path, filename)
 
     scheduler = _node()._build_scheduler(context)  # type: ignore[arg-type]
 

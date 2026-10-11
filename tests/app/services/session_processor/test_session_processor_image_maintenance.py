@@ -8,7 +8,7 @@ from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.image_moves.image_moves_default import ImageMoveQueueActive, ImageMoveService
 from invokeai.app.services.session_processor.session_processor_default import DefaultSessionProcessor, _SessionWorker
-from invokeai.app.services.shared.sqlite.sqlite_util import init_db
+from invokeai.app.services.shared.database.database import Database
 from invokeai.backend.util.logging import InvokeAILogger
 
 
@@ -32,13 +32,12 @@ class _Queue:
         return self.item
 
 
-def _services(tmp_path: Path, queue: _Queue) -> tuple[DefaultSessionProcessor, ImageMoveService]:
+def _services(tmp_path: Path, database: Database, queue: _Queue) -> tuple[DefaultSessionProcessor, ImageMoveService]:
     config = InvokeAIAppConfig(use_memory_db=True)
     config._root = tmp_path
     logger = InvokeAILogger.get_logger(config=config)
     image_files = DiskImageFileStorage(tmp_path / "images")
-    db = init_db(config=config, logger=logger, image_files=image_files)
-    moves = ImageMoveService(db=db, image_files=image_files, config=config, logger=logger)
+    moves = ImageMoveService(database, image_files=image_files, config=config, logger=logger)
     invoker = SimpleNamespace(services=SimpleNamespace(session_queue=queue))
     moves.start(invoker)
 
@@ -49,10 +48,12 @@ def _services(tmp_path: Path, queue: _Queue) -> tuple[DefaultSessionProcessor, I
     return processor, moves
 
 
-def test_in_flight_queue_claim_is_visible_before_gallery_maintenance_can_start(tmp_path: Path) -> None:
+def test_in_flight_queue_claim_is_visible_before_gallery_maintenance_can_start(
+    tmp_path: Path, database: Database
+) -> None:
     queue = _Queue(pending=1)
     queue.allow_dequeue.clear()
-    processor, moves = _services(tmp_path, queue)
+    processor, moves = _services(tmp_path, database, queue)
     claimed: list[tuple[bool, object | None]] = []
     claim_errors: list[Exception] = []
 
@@ -107,9 +108,9 @@ def test_in_flight_queue_claim_is_visible_before_gallery_maintenance_can_start(t
     assert moves.is_maintenance_active() is False
 
 
-def test_queue_work_admitted_after_reservation_waits_without_being_claimed(tmp_path: Path) -> None:
+def test_queue_work_admitted_after_reservation_waits_without_being_claimed(tmp_path: Path, database: Database) -> None:
     queue = _Queue(pending=0)
-    processor, moves = _services(tmp_path, queue)
+    processor, moves = _services(tmp_path, database, queue)
 
     try:
         with moves.reserve_gallery_maintenance():
@@ -126,10 +127,10 @@ def test_queue_work_admitted_after_reservation_waits_without_being_claimed(tmp_p
         moves.stop()
 
 
-def test_worker_stops_while_gallery_maintenance_holds_the_mutation_lock(tmp_path: Path) -> None:
+def test_worker_stops_while_gallery_maintenance_holds_the_mutation_lock(tmp_path: Path, database: Database) -> None:
     queue = _Queue(pending=0)
     queue.allow_dequeue.set()
-    processor, moves = _services(tmp_path, queue)
+    processor, moves = _services(tmp_path, database, queue)
     maintenance_entered = threading.Event()
     release_maintenance = threading.Event()
     maintenance_errors: list[Exception] = []

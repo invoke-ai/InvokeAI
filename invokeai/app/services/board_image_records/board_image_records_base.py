@@ -55,17 +55,6 @@ class BoardImageRecordStorageBase(ABC):
         pass
 
     @abstractmethod
-    def get_image_count_for_board(
-        self,
-        board_id: str,
-    ) -> int:
-        """Gets the number of images for a board."""
-        pass
-
-    @abstractmethod
-    def get_asset_count_for_board(
-        self,
-        board_id: str,
-    ) -> int:
-        """Gets the number of assets for a board."""
+    def get_counts_for_board(self, board_id: str) -> tuple[int, int]:
+        """Gets the numbers of images and of assets on a board, intermediates not counted."""
         pass

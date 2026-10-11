@@ -1,4 +1,4 @@
-import type { GalleryImageItem, GalleryItem, GalleryItemKey, GalleryView } from '@features/gallery';
+import type { GalleryImageItem, GalleryItem, GalleryItemKey, GalleryItemRef, GalleryView } from '@features/gallery';
 import type {
   GalleryItemsPage,
   GalleryNavigationEntry,
@@ -7,7 +7,6 @@ import type {
 } from '@features/gallery/contracts';
 import type { GalleryItemsFilter } from '@features/gallery/queries';
 import type { QueueItem, QueueProgressSession } from '@features/queue/contracts';
-import type { InfiniteData } from '@tanstack/react-query';
 
 import {
   compareGalleryItems,
@@ -15,28 +14,49 @@ import {
   getGalleryNavigationStep,
   getGallerySessionNavigationKey,
   toGalleryItemKey,
+  toGalleryItemRef,
 } from '@features/gallery/contracts';
 import {
-  flattenGalleryItemsData,
   GALLERY_MAX_ROWS,
   GALLERY_PAGE_SIZE,
-  galleryItemsInfiniteOptions,
+  fetchGalleryItemsPage,
+  fetchVerifiedGalleryItemPage,
+  isDateBoardId,
+  galleryItemNamesOptions,
+  galleryItemsPageOptions,
   galleryStarredStripOptions,
 } from '@features/gallery/queries';
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { parseDateTokens } from '@platform/search/dateTokens';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 
 /**
- * Own Preview query merging, cursor derivation, boundary fetches, and neighbor prefetch. Follow Gallery's
- * session/starred/list order, but traverse the full bounded starred query beyond the grid's folded rows;
- * selection/follow remain authoritative.
+ * Own Preview query merging, cursor derivation, boundary fetches, and neighbor prefetch. Shared absolute pages let
+ * Preview reach deep selections without replaying every earlier page.
  */
 
 const EMPTY_PREVIEW_ITEMS: GalleryItem[] = [];
 
-const flattenPreviewItems = (data: InfiniteData<GalleryItemsPage, number> | undefined): GalleryItem[] =>
-  flattenGalleryItemsData(data);
+export const getPreviewSelectedPage = ({
+  galleryPage,
+  navigationBoardId,
+  navigationSemanticKey,
+  selectedImageQuery,
+}: {
+  galleryPage: number;
+  navigationBoardId: string;
+  navigationSemanticKey: string;
+  selectedImageQuery: ReturnType<typeof getGallerySelectedImageQuery>;
+}): number =>
+  navigationSemanticKey === ''
+    ? selectedImageQuery.semanticKey === null
+      ? selectedImageQuery.page
+      : 0
+    : selectedImageQuery.boardId === navigationBoardId && selectedImageQuery.semanticKey === navigationSemanticKey
+      ? selectedImageQuery.page
+      : galleryPage;
 
 const getOrderedPreviewItems = (
   items: GalleryItem[],
@@ -132,7 +152,9 @@ const toNeighbor = (entry: GalleryNavigationEntry | null): PreviewNeighbor =>
     ? null
     : entry.kind === 'item'
       ? { item: entry.item, kind: 'item' }
-      : { id: entry.id, kind: 'session' };
+      : entry.kind === 'session'
+        ? { id: entry.id, kind: 'session' }
+        : null;
 
 export interface PreviewNavigationState {
   /** Every saved item the arrows can reach, in order: the starred strip, then the listing. */
@@ -142,12 +164,15 @@ export interface PreviewNavigationState {
   navigate: (offset: -1 | 1) => Promise<boolean>;
   /** What each step would land on, so a swipe can show it before committing. */
   neighbors: PreviewNeighbors;
-  /** The selection's index in `boardItems`; -1 while following live or off the list. */
-  navigationCursor: number;
+  /** The selection's place in the whole strip-then-listing order (-1 while following live or off the list), and that
+   * order's length. */
+  position: { index: number; total: number };
   /** Identity of the backing query — the action context's filter identity. */
   navigationQueryKey: string;
   /** The page a selection of `item` is stamped with — see the action context's `getItemSelectionPage`. */
   getSelectionPage: (item: GalleryItem) => number;
+  /** Lazily fetch the full ordered listing when an action needs an item beyond the sparse loaded pages. */
+  loadOrderedRefs: (signal: AbortSignal) => Promise<GalleryItemRef[]>;
   selectPreviewItem: (item: GalleryItem) => void;
   /** How many of `boardItems` lead as the starred strip, ahead of the in-progress sessions. */
   stripItemCount: number;
@@ -184,79 +209,70 @@ export const usePreviewNavigation = ({
   /** The gallery's in-progress tiles, in its order; only running ones can be stepped onto. */
   progressSessions: readonly QueueProgressSession[];
   queueItems: QueueItem[];
-  selectGalleryItem: (item: GalleryItem, selectionPage: number) => void;
+  selectGalleryItem: (item: GalleryItem, selectionPage: number, absoluteIndex?: number) => void;
   selectedImageQuery: ReturnType<typeof getGallerySelectedImageQuery>;
   selectedItem: GalleryItem | null;
   selectedItemKey: GalleryItemKey | null;
   /** The gallery's active similarity search, or null for the board listing. */
   semanticQuery: GallerySemanticReference | null;
 }): PreviewNavigationState => {
+  const accountScope = captureAccountScope();
   const selectedImageSearch = useMemo(
     () => parseDateTokens(selectedImageQuery.searchTerm),
     [selectedImageQuery.searchTerm]
   );
-  // A ranked filmstrip follows the gallery's current search, board and paging; a listing follows the selection's.
-  const navigationBoardId = semanticQuery ? galleryBoardId : selectedImageQuery.boardId;
+  // A ranked filmstrip follows the gallery's current search, board and paging; a listing follows the selection's. A
+  // selection made outside the Gallery navigates its own board even while the Gallery ranks.
+  const navigationSemanticQuery = selectedImageQuery.itemBoard ? null : semanticQuery;
+  const navigationBoardId = navigationSemanticQuery ? galleryBoardId : selectedImageQuery.boardId;
   const navigationGalleryView = selectedImageQuery.galleryView;
   const navigationOrderDir = selectedImageQuery.imageOrderDir;
   // The grid partitions: its listing is unstarred-only, with the starred
   // items in the strip above it, unless the starred filter is on.
   const navigationStarredOnly = selectedImageQuery.starredOnly;
-  const navigationSemanticQuery = semanticQuery;
   const navigationSemanticKey = gallerySemanticReferenceKey(navigationSemanticQuery);
+  const navigationPaginationMode =
+    navigationSemanticQuery === null ? selectedImageQuery.paginationMode : galleryPaginationMode;
+  const selectedPage = getPreviewSelectedPage({
+    galleryPage,
+    navigationBoardId,
+    navigationSemanticKey,
+    selectedImageQuery,
+  });
   // Following live has a cursor too, so the listing loads for the step off it.
   const hasNavigationContext = selectedItem !== null || followedSessionId !== null;
-  const navigationContextKey = `${followedSessionId ?? ''}:${selectedItemKey ?? ''}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${selectedImageQuery.paginationMode}:${selectedImageQuery.page}:${selectedImageQuery.searchTerm}:${navigationStarredOnly}:${navigationSemanticKey}`;
-  const navigationQueryKey = `${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${selectedImageQuery.paginationMode}:${selectedImageQuery.searchTerm}:${navigationStarredOnly}:${navigationSemanticKey}`;
+  const navigationContextKey = `${accountScope.epoch}:${followedSessionId ?? ''}:${selectedItemKey ?? ''}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationPaginationMode}:${selectedPage}:${selectedImageQuery.searchTerm}:${navigationStarredOnly}:${navigationSemanticKey}`;
+  const navigationQueryKey = `${accountScope.epoch}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationPaginationMode}:${selectedImageQuery.searchTerm}:${navigationStarredOnly}:${navigationSemanticKey}`;
+  const queryClient = useQueryClient();
 
   // Publish navigation context in layout effect so boundary-fetch continuations cannot observe new UI with a stale
   // fence.
   const navigationContextKeyRef = useRef(navigationContextKey);
+  const navigationQueryKeyRef = useRef(navigationQueryKey);
+  const pendingNavigationContextRef = useRef<string | null>(null);
+  const pageFetchRequestRef = useRef<{ contextKey: string; controller: AbortController } | null>(null);
 
   useLayoutEffect(() => {
     navigationContextKeyRef.current = navigationContextKey;
-  }, [navigationContextKey]);
+    navigationQueryKeyRef.current = navigationQueryKey;
+    const pageFetchRequest = pageFetchRequestRef.current;
 
-  // Keep paginated navigation anchored until query identity changes; expose the dependency as derived state.
-  const [navigationAnchor, setNavigationAnchor] = useState({
-    page: selectedImageQuery.page,
-    queryKey: navigationQueryKey,
-  });
-  const hasStaleNavigationAnchor = navigationAnchor.queryKey !== navigationQueryKey;
+    if (pageFetchRequest && pageFetchRequest.contextKey !== navigationContextKey) {
+      pageFetchRequest.controller.abort();
+      pageFetchRequestRef.current = null;
+    }
 
-  if (hasStaleNavigationAnchor) {
-    setNavigationAnchor({ page: selectedImageQuery.page, queryKey: navigationQueryKey });
-  }
+    if (pendingNavigationContextRef.current !== navigationContextKey) {
+      pendingNavigationContextRef.current = null;
+    }
+  }, [navigationContextKey, navigationQueryKey]);
 
-  // Only paginated anchors are sticky. Infinite steps preserve their anchor, while external selections must
-  // immediately reanchor the window.
-  const navigationAnchorPage =
-    selectedImageQuery.paginationMode === 'paginated'
-      ? hasStaleNavigationAnchor
-        ? selectedImageQuery.page
-        : navigationAnchor.page
-      : selectedImageQuery.page;
-  const isPaginatedWindow = selectedImageQuery.paginationMode === 'paginated';
-  // Anchor deep navigation at the selection page. Shared infinite windows cannot grow upward without shifting grid
-  // content, so retain that anchor and derive mid-board exclusions from it.
-  const deepAnchorOffset =
-    !isPaginatedWindow &&
-    navigationSemanticQuery === null &&
-    navigationAnchorPage * GALLERY_PAGE_SIZE >= GALLERY_MAX_ROWS
-      ? navigationAnchorPage * GALLERY_PAGE_SIZE
-      : 0;
+  useMountEffect(() => () => pageFetchRequestRef.current?.controller.abort());
 
-  // Rankings follow grid paging, not stamped board pages, which can address unrelated or empty ranking slices.
-  const navigationWindow =
-    navigationSemanticQuery !== null
-      ? galleryPaginationMode === 'paginated'
-        ? ({ kind: 'anchor', offset: galleryPage * GALLERY_PAGE_SIZE } as const)
-        : // In infinite mode the grid's page IS its window offset, so mirroring
-          // it covers the deep-reveal case below without a separate test.
-          ({ kind: 'infinite', offset: galleryPage * GALLERY_PAGE_SIZE } as const)
-      : selectedImageQuery.paginationMode === 'paginated'
-        ? ({ kind: 'anchor', offset: navigationAnchorPage * GALLERY_PAGE_SIZE } as const)
-        : ({ kind: 'infinite', offset: deepAnchorOffset } as const);
+  const isPaginatedWindow = navigationPaginationMode === 'paginated';
+  const selectedPageOffset = Math.max(0, selectedPage) * GALLERY_PAGE_SIZE;
+  const isDeepPageWindow =
+    !isPaginatedWindow && navigationSemanticQuery === null && selectedPageOffset >= GALLERY_MAX_ROWS;
 
   const listingFilter = useMemo(
     (): GalleryItemsFilter => ({
@@ -271,23 +287,53 @@ export const usePreviewNavigation = ({
     [navigationBoardId, navigationGalleryView, navigationOrderDir, navigationSemanticQuery, selectedImageSearch]
   );
 
-  const {
-    data: boardItemsData,
-    fetchNextPage: fetchNextBoardItemsPage,
-    fetchPreviousPage: fetchPreviousBoardItemsPage,
-    hasNextPage: hasNextBoardItemsPage,
-    hasPreviousPage: hasPreviousBoardItemsPage,
-    isFetching: isFetchingBoardItems,
-    isFetchingNextPage: isFetchingNextBoardItemsPage,
-    isFetchingPreviousPage: isFetchingPreviousBoardItemsPage,
-  } = useInfiniteQuery({
-    ...galleryItemsInfiniteOptions({ ...listingFilter, starred: navigationStarredOnly }, navigationWindow),
+  const listingFilterWithStarred = useMemo(
+    () => ({ ...listingFilter, starred: navigationStarredOnly }),
+    [listingFilter, navigationStarredOnly]
+  );
+  const selectedPageQuery = useQuery({
+    ...galleryItemsPageOptions(listingFilterWithStarred, selectedPageOffset),
     enabled: hasNavigationContext,
   });
+  const adjacentPageOffsets = useMemo(() => {
+    const offsets: number[] = [];
 
-  // Share Gallery's bounded starred strip except for ranked, starred-only, or mid-board windows.
+    if (selectedPageOffset >= GALLERY_PAGE_SIZE) {
+      offsets.push(selectedPageOffset - GALLERY_PAGE_SIZE);
+    }
+
+    if (selectedPageQuery.data === undefined || selectedPageOffset + GALLERY_PAGE_SIZE < selectedPageQuery.data.total) {
+      offsets.push(selectedPageOffset + GALLERY_PAGE_SIZE);
+    }
+
+    return offsets;
+  }, [selectedPageOffset, selectedPageQuery.data]);
+  const adjacentPageQueries = useQueries({
+    queries: adjacentPageOffsets.map((offset) => ({
+      ...galleryItemsPageOptions(listingFilterWithStarred, offset),
+      enabled: hasNavigationContext,
+    })),
+  });
+  const boardPageResults = useMemo(
+    () =>
+      [
+        { offset: selectedPageOffset, data: selectedPageQuery.data },
+        ...adjacentPageOffsets.map((offset, index) => ({
+          offset,
+          data: adjacentPageQueries[index]?.data,
+        })),
+      ]
+        .filter((page): page is { offset: number; data: GalleryItemsPage } => page.data !== undefined)
+        .sort((a, b) => a.offset - b.offset),
+    [adjacentPageOffsets, adjacentPageQueries, selectedPageOffset, selectedPageQuery.data]
+  );
+  const backendBoardItems = useMemo(() => boardPageResults.flatMap(({ data }) => data.items), [boardPageResults]);
+  const listingTotal = selectedPageQuery.data?.total ?? boardPageResults[0]?.data.total;
+  const isFetchingBoardItems = selectedPageQuery.isFetching || adjacentPageQueries.some((query) => query.isFetching);
+
+  // Share Gallery's bounded starred strip except for ranked, starred-only, or deep windows.
   const hasStrip =
-    hasNavigationContext && !navigationStarredOnly && navigationSemanticQuery === null && deepAnchorOffset === 0;
+    hasNavigationContext && !navigationStarredOnly && navigationSemanticQuery === null && !isDeepPageWindow;
   const { data: stripData } = useQuery({ ...galleryStarredStripOptions(listingFilter), enabled: hasStrip });
   const stripItems = useMemo(() => {
     if (!hasStrip) {
@@ -305,37 +351,57 @@ export const usePreviewNavigation = ({
   }, [hasStrip, selectedItem, selectedItemKey, stripData]);
 
   const getSelectionPageIn = useCallback(
-    (item: GalleryItem, data: typeof boardItemsData): number => {
+    (item: GalleryItem, pages: typeof boardPageResults): number => {
       const itemKey = toGalleryItemKey(item);
-      const pageIndex = data?.pages.findIndex((page) =>
-        page.items.some((candidate) => toGalleryItemKey(candidate) === itemKey)
-      );
-      const pageParam = pageIndex === undefined || pageIndex < 0 ? undefined : data?.pageParams[pageIndex];
-      // Stamp ranked picks with board page zero, never ranking offsets. Infinite picks retain their window anchor
-      // to preserve prior pages; items outside the window use the top-of-board context.
-      return navigationSemanticQuery !== null
-        ? 0
-        : selectedImageQuery.paginationMode === 'paginated'
-          ? typeof pageParam === 'number'
-            ? Math.floor(pageParam / GALLERY_PAGE_SIZE)
-            : selectedImageQuery.page
-          : typeof pageParam === 'number'
-            ? deepAnchorOffset / GALLERY_PAGE_SIZE
-            : 0;
+      const page = pages.find(({ data }) => data.items.some((candidate) => toGalleryItemKey(candidate) === itemKey));
+
+      // Ranked picks retain their exact result page. Ordinary picks use their exact shared page; local anchors fall
+      // back to the selected page in paginated mode or the board top for recent items outside this page set.
+      if (navigationSemanticQuery !== null) {
+        return page === undefined ? selectedPage : page.offset / GALLERY_PAGE_SIZE;
+      }
+
+      return page === undefined
+        ? isPaginatedWindow && !isDeepPageWindow
+          ? selectedPage
+          : 0
+        : page.offset / GALLERY_PAGE_SIZE;
     },
-    [deepAnchorOffset, navigationSemanticQuery, selectedImageQuery.page, selectedImageQuery.paginationMode]
+    [isDeepPageWindow, isPaginatedWindow, navigationSemanticQuery, selectedPage]
   );
   const stampSelection = useCallback(
-    (item: GalleryItem, data: typeof boardItemsData) => selectGalleryItem(item, getSelectionPageIn(item, data)),
-    [getSelectionPageIn, selectGalleryItem]
+    (item: GalleryItem, pages: typeof boardPageResults) => {
+      if (isAccountScopeCurrent(accountScope)) {
+        const page = pages.find(({ data }) =>
+          data.items.some((candidate) => toGalleryItemKey(candidate) === toGalleryItemKey(item))
+        );
+        const itemIndex = page?.data.items.findIndex(
+          (candidate) => toGalleryItemKey(candidate) === toGalleryItemKey(item)
+        );
+        const pageItemIndex = itemIndex !== undefined && itemIndex >= 0 ? itemIndex : undefined;
+        const candidateAbsoluteIndex =
+          page && pageItemIndex !== undefined
+            ? (page.data.itemIndices?.[pageItemIndex] ?? page.offset + pageItemIndex)
+            : undefined;
+        const absoluteIndex =
+          candidateAbsoluteIndex !== undefined &&
+          Number.isInteger(candidateAbsoluteIndex) &&
+          candidateAbsoluteIndex >= 0
+            ? candidateAbsoluteIndex
+            : undefined;
+
+        selectGalleryItem(item, getSelectionPageIn(item, pages), absoluteIndex);
+      }
+    },
+    [accountScope, getSelectionPageIn, selectGalleryItem]
   );
   const getSelectionPage = useCallback(
-    (item: GalleryItem) => getSelectionPageIn(item, boardItemsData),
-    [boardItemsData, getSelectionPageIn]
+    (item: GalleryItem) => getSelectionPageIn(item, boardPageResults),
+    [boardPageResults, getSelectionPageIn]
   );
   const selectPreviewItem = useCallback(
-    (item: GalleryItem) => stampSelection(item, boardItemsData),
-    [boardItemsData, stampSelection]
+    (item: GalleryItem) => stampSelection(item, boardPageResults),
+    [boardPageResults, stampSelection]
   );
 
   const optimisticQueueItemIds = useMemo(
@@ -346,12 +412,12 @@ export const usePreviewNavigation = ({
     [queueItems]
   );
   const navigationLocalItems = useMemo(() => {
-    // Keep recent results until listings catch up, except in filtered or mid-board windows where they do not
+    // Keep recent results until listings catch up, except in filtered or deep windows where they do not
     // belong. Those windows merge only in-flight work and selection.
     const hasActiveSearch =
       navigationStarredOnly || selectedImageSearch.text.trim() !== '' || selectedImageSearch.range !== undefined;
 
-    if (!hasActiveSearch && !isPaginatedWindow && deepAnchorOffset === 0) {
+    if (!hasActiveSearch && !isPaginatedWindow && !isDeepPageWindow) {
       return localItems;
     }
 
@@ -364,7 +430,7 @@ export const usePreviewNavigation = ({
         item.sourceQueueItemId === refreshingSelectedSourceId
     );
   }, [
-    deepAnchorOffset,
+    isDeepPageWindow,
     isFetchingBoardItems,
     isPaginatedWindow,
     localItems,
@@ -397,7 +463,6 @@ export const usePreviewNavigation = ({
 
     return [selectedItem, ...listingLocalItems];
   }, [hasStrip, localBoardItems, selectedItem, selectedItemKey]);
-  const backendBoardItems = useMemo(() => flattenPreviewItems(boardItemsData), [boardItemsData]);
   // Rankings accept only selection as cursor anchor, never board recents.
   const previewMergeItems = useMemo(
     () =>
@@ -422,6 +487,41 @@ export const usePreviewNavigation = ({
     () => (stripItems.length === 0 ? listingItems : [...stripItems, ...listingItems]),
     [listingItems, stripItems]
   );
+  const loadOrderedRefs = useCallback(
+    async (signal: AbortSignal): Promise<GalleryItemRef[]> => {
+      const requestSignal = AbortSignal.any([signal, accountScope.signal]);
+      requestSignal.throwIfAborted();
+      const namesPromise = queryClient.fetchQuery(galleryItemNamesOptions(listingFilterWithStarred));
+      let abortListener: (() => void) | undefined;
+
+      try {
+        const names = await Promise.race([
+          namesPromise,
+          new Promise<never>((_resolve, reject) => {
+            abortListener = () =>
+              reject(requestSignal.reason ?? new DOMException('The operation was aborted.', 'AbortError'));
+            requestSignal.addEventListener('abort', abortListener, { once: true });
+            if (requestSignal.aborted) {
+              abortListener();
+            }
+          }),
+        ]);
+
+        requestSignal.throwIfAborted();
+        // Fenced on the listing, not the selection: a deletion clears the selection before it asks for this order.
+        if (!isAccountScopeCurrent(accountScope) || navigationQueryKeyRef.current !== navigationQueryKey) {
+          throw new DOMException('The Preview listing changed.', 'AbortError');
+        }
+
+        return [...stripItems.map(toGalleryItemRef), ...names.items];
+      } finally {
+        if (abortListener) {
+          requestSignal.removeEventListener('abort', abortListener);
+        }
+      }
+    },
+    [accountScope, listingFilterWithStarred, navigationQueryKey, queryClient, stripItems]
+  );
   const isLoadingBoard = hasNavigationContext && isFetchingBoardItems;
   const sessionEntries = useMemo(
     (): GalleryNavigationEntry[] =>
@@ -443,84 +543,377 @@ export const usePreviewNavigation = ({
     followedSessionId !== null || selectedItemKey === null
       ? -1
       : boardItems.findIndex((item) => toGalleryItemKey(item) === selectedItemKey);
+  const selectedItemPageOffset = useMemo(() => {
+    if (selectedItemKey === null) {
+      return selectedPageOffset;
+    }
 
-  // Preview is the only surface that walks a paginated listing across its pages, so at a loaded edge the next page
-  // wins over the strip seam; the strip is reached from the listing's first page.
-  const isAtLoadedBackendBoundary = useCallback(
-    (offset: -1 | 1): boolean =>
-      followedSessionId === null &&
-      selectedItemKey !== null &&
-      (offset === 1
-        ? backendBoardItems.at(-1) !== undefined &&
-          toGalleryItemKey(backendBoardItems.at(-1)!) === selectedItemKey &&
-          hasNextBoardItemsPage
-        : backendBoardItems[0] !== undefined &&
-          toGalleryItemKey(backendBoardItems[0]) === selectedItemKey &&
-          hasPreviousBoardItemsPage),
-    [backendBoardItems, followedSessionId, hasNextBoardItemsPage, hasPreviousBoardItemsPage, selectedItemKey]
+    return (
+      boardPageResults.find(({ data }) => data.items.some((item) => toGalleryItemKey(item) === selectedItemKey))
+        ?.offset ?? selectedPageOffset
+    );
+  }, [boardPageResults, selectedItemKey, selectedPageOffset]);
+  const selectedListingPage = boardPageResults.find(({ data }) =>
+    data.items.some((item) => toGalleryItemKey(item) === selectedItemKey)
+  );
+  const selectedListingPageItems = selectedListingPage?.data.items ?? EMPTY_PREVIEW_ITEMS;
+  const isSelectedListingItem = (item: GalleryItem | undefined): boolean =>
+    item !== undefined && toGalleryItemKey(item) === selectedItemKey;
+  const selectedItemStartsPage = isSelectedListingItem(selectedListingPageItems[0]);
+  const selectedItemEndsPage = isSelectedListingItem(selectedListingPageItems.at(-1));
+  // A recent local item or another section can sit just past a page edge; while the neighboring page is missing,
+  // loading, or failed, a loaded step would skip that page's items.
+  const isListingPageUnresolved = (pageOffset: number): boolean => {
+    if (pageOffset < 0 || (listingTotal !== undefined && pageOffset >= listingTotal)) {
+      return false;
+    }
+
+    const pageQuery =
+      pageOffset === selectedPageOffset
+        ? selectedPageQuery
+        : adjacentPageQueries[adjacentPageOffsets.indexOf(pageOffset)];
+
+    return (
+      !boardPageResults.some(({ offset }) => offset === pageOffset) ||
+      pageQuery?.isFetching === true ||
+      pageQuery?.isError === true
+    );
+  };
+  const hasUnresolvedPreviousListingPage =
+    selectedItemStartsPage && isListingPageUnresolved(selectedItemPageOffset - GALLERY_PAGE_SIZE);
+  const hasUnresolvedNextListingPage =
+    selectedItemEndsPage && isListingPageUnresolved(selectedItemPageOffset + GALLERY_PAGE_SIZE);
+  const selectedItemIsMissingFromStampedPage =
+    selectedItem !== null &&
+    selectedItemKey !== null &&
+    navigationSemanticQuery === null &&
+    !isDateBoardId(navigationBoardId) &&
+    selectedPageQuery.data !== undefined &&
+    !selectedPageQuery.isFetching &&
+    !stripItems.some((item) => toGalleryItemKey(item) === selectedItemKey) &&
+    !navigationLocalItems.some((item) => toGalleryItemKey(item) === selectedItemKey) &&
+    !boardPageResults
+      .find(({ offset }) => offset === selectedPageOffset)
+      ?.data.items.some((item) => toGalleryItemKey(item) === selectedItemKey);
+  const selectedItemNeedsLocation = selectedItemIsMissingFromStampedPage;
+  // `boardItems` holds only the pages around the selection; the listing part of the cursor is offset by where that
+  // window starts, and the total adds the listing items outside it. A selection not yet located in its listing sits
+  // in the window only as an anchor, so it has no position until a step locates it.
+  const windowStartIndex = boardPageResults[0]?.offset ?? 0;
+  const isSelectionInLoadedPage = boardPageResults.some(({ data }) =>
+    data.items.some((item) => toGalleryItemKey(item) === selectedItemKey)
+  );
+  const positionIndex =
+    selectedItemNeedsLocation && !isSelectionInLoadedPage
+      ? -1
+      : navigationCursor < stripItems.length
+        ? navigationCursor
+        : navigationCursor + windowStartIndex;
+  const positionTotal =
+    selectedItemNeedsLocation && !isSelectionInLoadedPage
+      ? stripItems.length + (listingTotal ?? backendBoardItems.length)
+      : Math.max(positionIndex + 1, boardItems.length + Math.max(0, (listingTotal ?? 0) - backendBoardItems.length));
+  const position = useMemo(() => ({ index: positionIndex, total: positionTotal }), [positionIndex, positionTotal]);
+  const getSectionsFor = useCallback(
+    (pages: typeof boardPageResults) => [
+      stripEntries,
+      sessionEntries,
+      toItemEntries(mergeListingItems(pages.flatMap(({ data }) => data.items))),
+    ],
+    [mergeListingItems, sessionEntries, stripEntries]
+  );
+  // A step right onto the listing comes from the strip or the sessions, and enters it where the grid's listing starts:
+  // the board's top, or the page's in paginated mode. A window anchored lower would otherwise land mid-board. Returns
+  // the pages to step within, 'unloaded' while the start page is not loaded, or null for an ordinary step.
+  const listingStartOffset = isPaginatedWindow ? selectedPageOffset : 0;
+  const firstListingItem = listingItems[0];
+  const getListingStartPages = useCallback(
+    (entry: GalleryNavigationEntry | null): typeof boardPageResults | 'unloaded' | null => {
+      if (entry?.kind !== 'item' || entry.item !== firstListingItem) {
+        return null;
+      }
+
+      const entryKey = toGalleryItemKey(entry.item);
+      const entryPage = boardPageResults.find(({ data }) =>
+        data.items.some((item) => toGalleryItemKey(item) === entryKey)
+      );
+
+      if (entryPage === undefined || entryPage.offset === listingStartOffset) {
+        return null;
+      }
+
+      const startPages = boardPageResults.filter(({ offset }) => offset >= listingStartOffset);
+
+      return startPages[0]?.offset === listingStartOffset ? startPages : 'unloaded';
+    },
+    [boardPageResults, firstListingItem, listingStartOffset]
   );
 
   // Share navigation between keyboard, footer, and swipe; comparison does not step saved images.
   const navigate = useCallback(
     (offset: -1 | 1): Promise<boolean> => {
-      if (isComparing) {
+      if (isComparing || !isAccountScopeCurrent(accountScope)) {
         return Promise.resolve(false);
       }
 
       const direction = offset === 1 ? 'right' : 'left';
-      const stepTo = (entry: GalleryNavigationEntry | null, data: typeof boardItemsData): boolean => {
+      const isCurrentNavigation = (): boolean =>
+        isAccountScopeCurrent(accountScope) && navigationContextKeyRef.current === navigationContextKey;
+      const stepTo = (entry: GalleryNavigationEntry | null, pages: typeof boardPageResults): boolean => {
         if (entry?.kind === 'session') {
           followSession(entry.id);
-        } else if (entry) {
-          stampSelection(entry.item, data);
-        }
-
-        return entry !== null;
-      };
-
-      if (!isAtLoadedBackendBoundary(offset)) {
-        return Promise.resolve(
-          stepTo(getGalleryNavigationStep(navigationSections, cursorKeys, direction), boardItemsData)
-        );
-      }
-
-      if (offset === 1 ? isFetchingNextBoardItemsPage : isFetchingPreviousBoardItemsPage) {
-        return Promise.resolve(false);
-      }
-
-      const fetchBoundaryPage = offset === 1 ? fetchNextBoardItemsPage : fetchPreviousBoardItemsPage;
-
-      return fetchBoundaryPage().then((result) => {
-        if (result.isError || navigationContextKeyRef.current !== navigationContextKey) {
+        } else if (entry?.kind === 'item') {
+          stampSelection(entry.item, pages);
+        } else {
           return false;
         }
 
-        // Against the data just fetched: the item is not in the pages this
-        // render closed over, and a lookup there would read it as an item
-        // the window does not hold.
-        const nextSections = [
-          stripEntries,
-          sessionEntries,
-          toItemEntries(mergeListingItems(flattenPreviewItems(result.data))),
-        ];
+        return true;
+      };
 
-        return stepTo(getGalleryNavigationStep(nextSections, cursorKeys, direction), result.data);
-      });
+      const loadedEntry = getGalleryNavigationStep(navigationSections, cursorKeys, direction);
+      const listingStartPages = offset === 1 ? getListingStartPages(loadedEntry) : null;
+
+      if (Array.isArray(listingStartPages)) {
+        pageFetchRequestRef.current?.controller.abort();
+        pageFetchRequestRef.current = null;
+        pendingNavigationContextRef.current = null;
+        return Promise.resolve(
+          stepTo(getGalleryNavigationStep(getSectionsFor(listingStartPages), cursorKeys, direction), listingStartPages)
+        );
+      }
+
+      if (
+        listingStartPages === null &&
+        loadedEntry !== null &&
+        !selectedItemNeedsLocation &&
+        !(offset === 1 ? hasUnresolvedNextListingPage : hasUnresolvedPreviousListingPage)
+      ) {
+        pageFetchRequestRef.current?.controller.abort();
+        pageFetchRequestRef.current = null;
+        pendingNavigationContextRef.current = null;
+        return Promise.resolve(stepTo(loadedEntry, boardPageResults));
+      }
+
+      if (pendingNavigationContextRef.current === navigationContextKey) {
+        return Promise.resolve(false);
+      }
+
+      pendingNavigationContextRef.current = navigationContextKey;
+      const controller = new AbortController();
+      const requestSignal = AbortSignal.any([controller.signal, accountScope.signal]);
+      pageFetchRequestRef.current = { contextKey: navigationContextKey, controller };
+
+      const pages = [...boardPageResults];
+      let pageOffset = selectedItemPageOffset;
+      let total = listingTotal ?? pages[0]?.data.total;
+      const updatePage = (offset: number, data: GalleryItemsPage) => {
+        const index = pages.findIndex((page) => page.offset === offset);
+        const page = { offset, data };
+
+        if (index === -1) {
+          pages.push(page);
+        } else {
+          pages[index] = page;
+        }
+
+        pages.sort((a, b) => a.offset - b.offset);
+      };
+
+      return (async () => {
+        try {
+          if (listingStartPages === 'unloaded') {
+            const startPage = await fetchGalleryItemsPage(queryClient, listingFilterWithStarred, listingStartOffset, {
+              signal: requestSignal,
+            });
+
+            if (!isCurrentNavigation()) {
+              return false;
+            }
+
+            const startPages = [{ offset: listingStartOffset, data: startPage }];
+
+            return stepTo(getGalleryNavigationStep(getSectionsFor(startPages), cursorKeys, direction), startPages);
+          }
+
+          if (selectedItemNeedsLocation && selectedItem) {
+            const located = await fetchVerifiedGalleryItemPage(
+              queryClient,
+              listingFilterWithStarred,
+              toGalleryItemRef(selectedItem),
+              accountScope,
+              requestSignal
+            );
+
+            if (!isCurrentNavigation()) {
+              return false;
+            }
+
+            if (located !== null) {
+              pages.splice(0, pages.length, { offset: located.offset, data: located.page });
+              pageOffset = located.offset;
+              total = located.total;
+
+              // At the located page's edge, its neighbor page comes first: a recent or another section could
+              // otherwise sit just past the edge and take the step.
+              const adjacentOffset =
+                direction === 'left'
+                  ? located.index === located.offset && located.offset > 0
+                    ? located.offset - GALLERY_PAGE_SIZE
+                    : null
+                  : located.page.items.at(-1) !== undefined &&
+                      toGalleryItemKey(located.page.items.at(-1)!) === toGalleryItemKey(selectedItem) &&
+                      located.offset + GALLERY_PAGE_SIZE < located.total
+                    ? located.offset + GALLERY_PAGE_SIZE
+                    : null;
+
+              if (adjacentOffset !== null) {
+                const adjacentPage = await fetchGalleryItemsPage(
+                  queryClient,
+                  listingFilterWithStarred,
+                  adjacentOffset,
+                  { signal: requestSignal, staleTime: 0 }
+                );
+
+                if (!isCurrentNavigation()) {
+                  return false;
+                }
+
+                updatePage(adjacentOffset, adjacentPage);
+              }
+
+              const sections = [
+                stripEntries,
+                sessionEntries,
+                toItemEntries(
+                  mergePreviewBoardItems(
+                    pages.flatMap(({ data }) => data.items),
+                    previewMergeItems,
+                    navigationOrderDir,
+                    { isRanked: navigationSemanticQuery !== null }
+                  ).filter((item) => !stripKeys.has(toGalleryItemKey(item)))
+                ),
+              ];
+              const entry = getGalleryNavigationStep(sections, cursorKeys, direction);
+
+              if (entry !== null) {
+                return stepTo(entry, pages);
+              }
+            } else if (selectedPageOffset >= (listingTotal ?? total ?? 0)) {
+              return false;
+            } else if (loadedEntry !== null) {
+              return stepTo(loadedEntry, boardPageResults);
+            }
+          }
+
+          if (total === undefined) {
+            const currentPage = await fetchGalleryItemsPage(queryClient, listingFilterWithStarred, selectedPageOffset, {
+              signal: requestSignal,
+            });
+
+            if (!isCurrentNavigation()) {
+              return false;
+            }
+
+            updatePage(selectedPageOffset, currentPage);
+            total = currentPage.total;
+
+            const currentSections = [
+              stripEntries,
+              sessionEntries,
+              toItemEntries(
+                mergePreviewBoardItems(
+                  pages.flatMap(({ data }) => data.items),
+                  previewMergeItems,
+                  navigationOrderDir,
+                  { isRanked: navigationSemanticQuery !== null }
+                ).filter((item) => !stripKeys.has(toGalleryItemKey(item)))
+              ),
+            ];
+            const currentEntry = getGalleryNavigationStep(currentSections, cursorKeys, direction);
+
+            if (currentEntry !== null) {
+              return stepTo(currentEntry, pages);
+            }
+          }
+
+          while (true) {
+            pageOffset += offset * GALLERY_PAGE_SIZE;
+
+            if (pageOffset < 0 || pageOffset >= (total ?? 0) || !isCurrentNavigation()) {
+              return false;
+            }
+
+            try {
+              // Query deduplicates with the adjacent observer if it is already loading this page.
+              const page = await fetchGalleryItemsPage(queryClient, listingFilterWithStarred, pageOffset, {
+                signal: requestSignal,
+              });
+
+              if (!isCurrentNavigation()) {
+                return false;
+              }
+
+              updatePage(pageOffset, page);
+              total = page.total;
+              const pageItems = pages.flatMap(({ data }) => data.items);
+              const sections = [
+                stripEntries,
+                sessionEntries,
+                toItemEntries(
+                  mergePreviewBoardItems(pageItems, previewMergeItems, navigationOrderDir, {
+                    isRanked: navigationSemanticQuery !== null,
+                  }).filter((item) => !stripKeys.has(toGalleryItemKey(item)))
+                ),
+              ];
+              const entry = getGalleryNavigationStep(sections, cursorKeys, direction);
+
+              if (entry !== null) {
+                return stepTo(entry, pages);
+              }
+            } catch {
+              return false;
+            }
+          }
+        } catch {
+          return false;
+        } finally {
+          if (pageFetchRequestRef.current?.controller === controller) {
+            pageFetchRequestRef.current = null;
+            if (pendingNavigationContextRef.current === navigationContextKey) {
+              pendingNavigationContextRef.current = null;
+            }
+          }
+        }
+      })();
     },
     [
-      boardItemsData,
+      boardPageResults,
       cursorKeys,
-      fetchNextBoardItemsPage,
-      fetchPreviousBoardItemsPage,
       followSession,
-      isAtLoadedBackendBoundary,
+      getListingStartPages,
+      getSectionsFor,
       isComparing,
-      isFetchingNextBoardItemsPage,
-      isFetchingPreviousBoardItemsPage,
-      mergeListingItems,
+      listingStartOffset,
+      accountScope,
+      listingFilterWithStarred,
+      listingTotal,
       navigationContextKey,
       navigationSections,
+      navigationOrderDir,
+      selectedPageOffset,
+      selectedItem,
+      selectedItemNeedsLocation,
+      hasUnresolvedNextListingPage,
+      hasUnresolvedPreviousListingPage,
+      navigationSemanticQuery,
+      pendingNavigationContextRef,
+      pageFetchRequestRef,
+      previewMergeItems,
+      queryClient,
+      selectedItemPageOffset,
       sessionEntries,
+      stripKeys,
       stampSelection,
       stripEntries,
     ]
@@ -532,13 +925,46 @@ export const usePreviewNavigation = ({
       return NO_NEIGHBORS;
     }
 
-    const resolve = (offset: -1 | 1): PreviewNeighbor =>
-      isAtLoadedBackendBoundary(offset)
-        ? { kind: 'more' }
-        : toNeighbor(getGalleryNavigationStep(navigationSections, cursorKeys, offset === 1 ? 'right' : 'left'));
+    const resolve = (offset: -1 | 1): PreviewNeighbor => {
+      const neighbor = getGalleryNavigationStep(navigationSections, cursorKeys, offset === 1 ? 'right' : 'left');
+      const listingStartPages = offset === 1 ? getListingStartPages(neighbor) : null;
+
+      if (listingStartPages !== null) {
+        return listingStartPages === 'unloaded'
+          ? { kind: 'more' }
+          : toNeighbor(getGalleryNavigationStep(getSectionsFor(listingStartPages), cursorKeys, 'right'));
+      }
+
+      // A selection that must be relocated first steps from wherever it is found, not from the loaded guess.
+      if (
+        selectedItemNeedsLocation ||
+        (offset === 1 ? hasUnresolvedNextListingPage : hasUnresolvedPreviousListingPage)
+      ) {
+        return { kind: 'more' };
+      }
+
+      if (neighbor !== null) {
+        return toNeighbor(neighbor);
+      }
+
+      const targetOffset = selectedItemPageOffset + offset * GALLERY_PAGE_SIZE;
+
+      return targetOffset >= 0 && (listingTotal === undefined || targetOffset < listingTotal) ? { kind: 'more' } : null;
+    };
 
     return { next: resolve(1), previous: resolve(-1) };
-  }, [cursorKeys, isAtLoadedBackendBoundary, isComparing, navigationSections]);
+  }, [
+    cursorKeys,
+    getListingStartPages,
+    getSectionsFor,
+    hasUnresolvedNextListingPage,
+    hasUnresolvedPreviousListingPage,
+    isComparing,
+    listingTotal,
+    navigationSections,
+    selectedItemNeedsLocation,
+    selectedItemPageOffset,
+  ]);
 
   // Prefetch the images a step would land on to avoid decode flashes during navigation.
   const previousNeighborUrl =
@@ -561,9 +987,10 @@ export const usePreviewNavigation = ({
     isLoadingBoard,
     navigate,
     neighbors,
-    navigationCursor,
     navigationQueryKey,
     getSelectionPage,
+    position,
+    loadOrderedRefs,
     selectPreviewItem,
     stripItemCount: stripItems.length,
   };
