@@ -63,8 +63,8 @@ import type { RequestDeletionConfirmation } from './useDeletionConfirmation';
 
 import { appendReferenceImage } from './appendReferenceImage';
 import { recordCanvasImportError } from './canvasImportError';
-import { executeImageRecall, executeLoadImageWorkflow, getCurrentGenerateValues } from './executeImageRecall';
-import { executeLoadVideoWorkflow } from './executeLoadVideoWorkflow';
+import { executeImageRecall, getCurrentGenerateValues } from './executeImageRecall';
+import { executeLoadMediaWorkflow } from './executeLoadMediaWorkflow';
 import {
   appendReferenceVideo,
   executeVideoRecall,
@@ -932,9 +932,9 @@ export const useImageActions = ({
         }
       },
       loadImageWorkflow: (image) =>
-        executeLoadImageWorkflow({
-          image,
+        executeLoadMediaWorkflow({
           isProjectActive: () => !projectId || queries.isActiveProject(projectId),
+          media: { kind: 'image', name: image.imageName },
           notifications,
           openWorkflowEditor: () =>
             openWorkbenchWidget('workflow', { preferredRegions: ['center'], requireCenterView: true }).ok,
@@ -970,9 +970,9 @@ export const useImageActions = ({
         }
       },
       loadVideoWorkflow: (item) =>
-        executeLoadVideoWorkflow({
+        executeLoadMediaWorkflow({
           isProjectActive: () => !projectId || queries.isActiveProject(projectId),
-          item,
+          media: { kind: 'video', name: item.name },
           notifications,
           openWorkflowEditor: () =>
             openWorkbenchWidget('workflow', { preferredRegions: ['center'], requireCenterView: true }).ok,

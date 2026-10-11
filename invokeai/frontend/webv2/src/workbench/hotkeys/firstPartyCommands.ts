@@ -133,10 +133,10 @@ export const useRegisterFirstPartyCommands = () => {
       title: 'No image selected',
     });
 
-  const loadSelectedImageWorkflow = async () => {
+  const loadSelectedItemWorkflow = async () => {
     const owner = captureAccountScope();
-    const [{ executeLoadImageWorkflow }, { getSelectedGalleryImage }] = await Promise.all([
-      import('@workbench/image-actions/executeImageRecall'),
+    const [{ executeLoadMediaWorkflow }, { getSelectedGalleryItem }] = await Promise.all([
+      import('@workbench/image-actions/executeLoadMediaWorkflow'),
       import('@workbench/image-actions/selectedImage'),
     ]);
 
@@ -145,16 +145,16 @@ export const useRegisterFirstPartyCommands = () => {
     }
 
     const activeProject = queries.getSnapshot().activeProject;
-    const image = getSelectedGalleryImage(activeProject);
+    const item = getSelectedGalleryItem(activeProject);
 
-    if (!image) {
+    if (!item) {
       notifyNoImageSelected();
       return;
     }
 
-    await executeLoadImageWorkflow({
-      image,
+    await executeLoadMediaWorkflow({
       isProjectActive: () => queries.isActiveProject(activeProject.id),
+      media: { kind: item.kind, name: item.name },
       notifications,
       openWorkflowEditor: () =>
         openWidgetPlacement({
@@ -474,7 +474,7 @@ export const useRegisterFirstPartyCommands = () => {
         commandApi.register({ handler: () => recallSelectedImage(kind), id, title: id })
       ),
       commandApi.register({
-        handler: () => loadSelectedImageWorkflow(),
+        handler: () => loadSelectedItemWorkflow(),
         id: LOAD_WORKFLOW_COMMAND_ID,
         title: 'Load workflow from image',
       }),

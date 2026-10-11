@@ -1,8 +1,7 @@
-import type { GalleryVideoItem } from '@features/gallery';
 import type { WorkbenchCommands } from '@workbench/workbenchStore';
 import type { TFunction } from 'i18next';
 
-import { galleryVideos } from '@features/gallery';
+import { galleryImages, galleryVideos } from '@features/gallery';
 import { requestWorkflowDocumentLoad } from '@features/workflow/react';
 import {
   assertAccountScopeCurrent,
@@ -10,35 +9,45 @@ import {
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 
+export interface WorkflowMediaRef {
+  kind: 'image' | 'video';
+  /** The image or video name the backend stores the embedded workflow under. */
+  name: string;
+}
+
 const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
+const fetchEmbeddedWorkflow = (media: WorkflowMediaRef, signal: AbortSignal) =>
+  media.kind === 'image' ? galleryImages.workflow(media.name, signal) : galleryVideos.workflow(media.name, signal);
+
 /**
- * The video counterpart of `executeLoadImageWorkflow`: open the workflow editor before requesting replacement with
- * the workflow embedded in the video; false from `openWorkflowEditor` means no editor can consume it.
+ * Open the workflow editor before requesting replacement with the workflow embedded in an image or video; false
+ * from `openWorkflowEditor` means no editor can consume it.
  */
-export const executeLoadVideoWorkflow = async ({
+export const executeLoadMediaWorkflow = async ({
   isProjectActive,
-  item,
+  media,
   notifications,
   openWorkflowEditor,
   t,
 }: {
   /** Re-checked after the fetch: a store-resident request must not land on another project's editor. */
   isProjectActive: () => boolean;
-  item: GalleryVideoItem;
+  media: WorkflowMediaRef;
   notifications: Pick<WorkbenchCommands['notifications'], 'add'>;
   openWorkflowEditor: () => boolean;
   t: TFunction;
 }): Promise<void> => {
   const owner = captureAccountScope();
+  const suffix = media.kind === 'video' ? 'Video' : '';
 
   try {
-    const { workflow } = await galleryVideos.workflow(item.name, owner.signal);
+    const { workflow } = await fetchEmbeddedWorkflow(media, owner.signal);
 
     assertAccountScopeCurrent(owner);
 
     if (!workflow) {
-      notifications.add({ kind: 'info', title: t('widgets.gallery.itemActions.loadWorkflow.missingVideo') });
+      notifications.add({ kind: 'info', title: t(`widgets.gallery.itemActions.loadWorkflow.missing${suffix}`) });
       return;
     }
 
@@ -58,7 +67,7 @@ export const executeLoadVideoWorkflow = async ({
 
     requestWorkflowDocumentLoad(
       raw,
-      t('widgets.gallery.itemActions.loadWorkflow.loadedLabelVideo', { name: name || item.name })
+      t(`widgets.gallery.itemActions.loadWorkflow.loadedLabel${suffix}`, { name: name || media.name })
     );
   } catch (error) {
     if (!isAccountScopeCurrent(owner)) {
@@ -68,7 +77,7 @@ export const executeLoadVideoWorkflow = async ({
     notifications.add({
       kind: 'error',
       message: toErrorMessage(error),
-      title: t('widgets.gallery.itemActions.loadWorkflow.failedVideo'),
+      title: t(`widgets.gallery.itemActions.loadWorkflow.failed${suffix}`),
     });
   }
 };
