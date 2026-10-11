@@ -25,6 +25,19 @@ GPU0 = torch.device("cuda:0")
 GPU1 = torch.device("cuda:1")
 
 
+class _ObservedPollEvent(Event):
+    def __init__(self) -> None:
+        super().__init__()
+        self.waiting = Event()
+        self.wakeups: list[bool] = []
+
+    def wait(self, timeout: float | None = None) -> bool:
+        self.waiting.set()
+        signaled = super().wait(timeout)
+        self.wakeups.append(signaled)
+        return signaled
+
+
 @pytest.fixture(autouse=True)
 def pool() -> Iterator[None]:
     GENERATION_DEVICE_POOL.reset()
@@ -38,7 +51,9 @@ def pool() -> Iterator[None]:
             GENERATION_DEVICE_POOL.reset()
 
 
-def _start_worker(device: torch.device) -> tuple[threading.Thread, Event, list[str], DefaultSessionProcessor]:
+def _start_worker(
+    device: torch.device, poll_now_event: Event | None = None
+) -> tuple[threading.Thread, Event, list[str], DefaultSessionProcessor]:
     """Run one worker on ``device`` in a thread; it records each claim and stops after running one item."""
     stop_event = Event()
     resume_event = Event()
@@ -65,9 +80,9 @@ def _start_worker(device: torch.device) -> tuple[threading.Thread, Event, list[s
             configuration=SimpleNamespace(multiuser=False, clear_vram_after_session=False),
         )
     )
-    processor._polling_interval = 5  # long enough that only the release listener can wake it in time
+    processor._polling_interval = 60  # longer than the test hang ceiling; polling cannot satisfy the wake-up check
     processor._thread_semaphore = BoundedSemaphore(1)
-    processor._poll_now_event = Event()
+    processor._poll_now_event = poll_now_event if poll_now_event is not None else Event()
     GENERATION_DEVICE_POOL.set_release_listener(processor._poll_now_event.set)
     thread = threading.Thread(
         target=processor._process,
@@ -87,20 +102,23 @@ def test_worker_leaves_items_alone_while_its_gpu_is_lent_and_resumes_on_release(
     lent = GENERATION_DEVICE_POOL.try_borrow_off_queue("cuda")
     assert lent == GPU0
 
-    thread, stop_event, claims, processor = _start_worker(GPU0)
+    poll_now_event = _ObservedPollEvent()
+    thread, stop_event, claims, processor = _start_worker(GPU0, poll_now_event)
     try:
-        thread.join(timeout=0.3)
+        assert poll_now_event.waiting.wait(timeout=30)
         assert claims == []  # nothing claimed onto the lent GPU
 
         GENERATION_DEVICE_POOL.release_borrow(GPU0)
-        # The release wakes the worker at once; its 5 s poll interval would fail this join.
-        thread.join(timeout=2)
+        # Allow session GC to finish even on a busy runner, but require a signaled wake-up.
+        thread.join(timeout=30)
+        assert poll_now_event.wakeups == [True]
         assert not thread.is_alive()
         assert claims == ["cuda:0"]
     finally:
         stop_event.set()
         processor._poll_now_event.set()
-        thread.join(timeout=2)
+        thread.join(timeout=30)
+        assert not thread.is_alive()
 
 
 def test_worker_on_a_free_gpu_claims_while_another_is_lent() -> None:
@@ -108,11 +126,12 @@ def test_worker_on_a_free_gpu_claims_while_another_is_lent() -> None:
 
     thread, stop_event, claims, processor = _start_worker(GPU1)
     try:
-        thread.join(timeout=2)
+        thread.join(timeout=30)
         assert not thread.is_alive()
         assert claims == ["cuda:1"]
     finally:
         stop_event.set()
         processor._poll_now_event.set()
-        thread.join(timeout=2)
+        thread.join(timeout=30)
         GENERATION_DEVICE_POOL.release_borrow(GPU0)
+        assert not thread.is_alive()
