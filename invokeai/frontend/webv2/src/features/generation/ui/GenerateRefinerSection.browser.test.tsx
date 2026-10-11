@@ -23,8 +23,8 @@ const CATALOG: readonly GenerationModelCatalogItem[] = [sdxlModel, refinerModel]
 
 vi.mock('./GenerationUiContext', () => ({
   /** The picker reduced to one button per catalog model that passes the section's filter. */
-  GenerationModelSelect: ({ filter, onChange, value }: GenerationModelSelectProps) => (
-    <div data-testid="refiner-picker" data-value={value ?? ''}>
+  GenerationModelSelect: ({ filter, onChange, scopeLabel, value }: GenerationModelSelectProps) => (
+    <div data-testid="refiner-picker" data-scope-label={scopeLabel ?? ''} data-value={value ?? ''}>
       {CATALOG.filter((model) => filter?.(model) ?? true).map((model) => (
         <button key={model.key} type="button" onClick={() => onChange(model)}>
           {model.name}
@@ -47,10 +47,10 @@ void i18n.use(initReactI18next).init({
       translation: {
         widgets: {
           generate: {
-            noRefinerModels: 'No SDXL Refiner models are installed.',
             refiner: 'Refiner',
             refinerCfgScale: 'Refiner CFG',
             refinerModel: 'Refiner model',
+            refinerModelsScope: 'SDXL Refiner models',
             refinerNegativeAestheticScore: 'Negative aesthetic score',
             refinerNone: 'None',
             refinerPositiveAestheticScore: 'Positive aesthetic score',
@@ -76,10 +76,7 @@ const settle = (action: () => void): Promise<void> =>
     });
   });
 
-const render = async (
-  model: MainModelConfig,
-  options: { models?: readonly GenerationModelCatalogItem[]; refinerModel?: MainModelConfig | null } = {}
-) => {
+const render = async (model: MainModelConfig, options: { refinerModel?: MainModelConfig | null } = {}) => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -93,7 +90,6 @@ const render = async (
         <I18nextProvider i18n={i18n}>
           <GenerateRefinerSection
             draft={createExternalStoreCore(settings)}
-            models={options.models ?? CATALOG}
             selectedModel={model}
             onCommit={onCommit}
             onCommitImmediate={onCommitImmediate}
@@ -113,6 +109,9 @@ const sliderByLabel = (label: string): HTMLElement | null =>
 
     return labelId !== null && host?.querySelector(`#${CSS.escape(labelId)}`)?.textContent === label;
   }) ?? null;
+
+const schedulerInput = (): HTMLInputElement | null =>
+  host?.querySelector<HTMLInputElement>('input[aria-label="Refiner scheduler"]') ?? null;
 
 const pickerButton = (name: string): HTMLButtonElement | null =>
   [...(host?.querySelectorAll<HTMLButtonElement>('[data-testid="refiner-picker"] button') ?? [])].find(
@@ -148,6 +147,8 @@ describe('GenerateRefinerSection', () => {
     expect(pickerButton('SDXL Refiner')).not.toBeNull();
     expect(sliderByLabel('Refiner start')?.getAttribute('aria-disabled')).toBe('true');
     expect(sliderByLabel('Refiner steps')?.getAttribute('aria-disabled')).toBe('true');
+    expect(sliderByLabel('Refiner CFG')?.getAttribute('aria-disabled')).toBe('true');
+    expect(schedulerInput()?.disabled).toBe(true);
 
     await settle(() => pickerButton('SDXL Refiner')?.click());
 
@@ -160,13 +161,19 @@ describe('GenerateRefinerSection', () => {
     expect(host?.textContent).toContain('SDXL Refiner');
     expect(host?.querySelector('[data-testid="refiner-picker"]')?.getAttribute('data-value')).toBe('refiner');
     expect(sliderByLabel('Refiner start')?.getAttribute('aria-disabled')).not.toBe('true');
+    expect(sliderByLabel('Refiner CFG')?.getAttribute('aria-disabled')).not.toBe('true');
+    expect(schedulerInput()?.disabled).toBe(false);
     expect(sliderByLabel('Positive aesthetic score')?.getAttribute('aria-valuenow')).toBe('6');
     expect(sliderByLabel('Negative aesthetic score')?.getAttribute('aria-valuenow')).toBe('2.5');
   });
 
-  it('explains an empty picker when no refiner is installed', async () => {
-    await render(sdxlModel, { models: [sdxlModel] });
+  it('leaves the empty and loading states to the picker, scoped to refiner models', async () => {
+    await render(sdxlModel);
 
-    expect(host?.textContent).toContain('No SDXL Refiner models are installed.');
+    expect(host?.querySelector('[data-testid="refiner-picker"]')?.getAttribute('data-scope-label')).toBe(
+      'SDXL Refiner models'
+    );
+    // No section-level help text duplicates the picker's own empty message or flashes before the catalog loads.
+    expect(host?.textContent).not.toContain('installed');
   });
 });

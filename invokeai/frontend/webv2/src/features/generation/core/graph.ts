@@ -54,7 +54,7 @@ import {
 import { addKrea2ConditioningEnhancers } from './krea2Conditioning';
 import { addPidDecode, getPidDenoiseSize, getPidMetadata, shouldUsePidDecode } from './pidGraph';
 import { getEffectiveReferenceImage } from './referenceImage';
-import { getActiveRefiner } from './sdxlRefiner';
+import { getActiveRefiner, getBaseDenoisingRange } from './sdxlRefiner';
 import { addSDXLRefinerStage, getRefinerMetadata } from './sdxlRefinerGraph';
 
 const getCompatibleComponentSource = (
@@ -342,8 +342,7 @@ const buildSDGraph = (
   const denoise = addNode(graph, {
     cfg_rescale_multiplier: settings.cfgRescaleMultiplier,
     cfg_scale: settings.cfgScale,
-    denoising_end: 1,
-    denoising_start: 0,
+    ...getBaseDenoisingRange(settings, model, 0),
     id: 'denoise_latents',
     ...(supportsHiDiffusion
       ? {

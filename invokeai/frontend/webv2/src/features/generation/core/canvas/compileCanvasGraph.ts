@@ -12,7 +12,8 @@ import { GRAPH_BUILDERS } from '@features/generation/core/graph';
 import { addEdge, addNode, toGraphContract } from '@features/generation/core/graphBuilder';
 import { addKrea2ConditioningEnhancers } from '@features/generation/core/krea2Conditioning';
 import { getIsPidSupportedBase } from '@features/generation/core/pid';
-import { getActiveRefiner, getRefinerDenoisingSplit } from '@features/generation/core/sdxlRefiner';
+import { getBaseDenoisingRange } from '@features/generation/core/sdxlRefiner';
+import { REFINER_DENOISE_NODE_ID } from '@features/generation/core/sdxlRefinerGraph';
 
 import type {
   CanvasCompositingSettings,
@@ -52,20 +53,14 @@ const canvasDenoisingStart = (model: GenerateModelConfig, strength: number): num
   return 1 - strength ** (usesOptimizedCurve ? 0.2 : 1);
 };
 
-/** Applies the strength-derived range to the base denoise; with a refiner, the base pass stops at the hand-over. */
+/** Re-derives the base denoise range from the strength; the refiner hand-over rule stays with its owner. */
 const setCanvasDenoisingRange = (
   denoise: BackendInvocationContract,
   model: GenerateModelConfig,
   settings: GenerateSettings,
   strength: number
 ): void => {
-  const denoisingStart = canvasDenoisingStart(model, strength);
-  const range = getActiveRefiner(settings, model)
-    ? getRefinerDenoisingSplit(settings.refinerStart, denoisingStart)
-    : { denoising_end: 1, denoising_start: denoisingStart };
-
-  denoise.denoising_start = range.denoising_start;
-  denoise.denoising_end = range.denoising_end;
+  Object.assign(denoise, getBaseDenoisingRange(settings, model, canvasDenoisingStart(model, strength)));
 };
 
 /** True for the image-referencing modes (everything but pure txt2img). */
@@ -377,6 +372,11 @@ const graftMaskTail = (
     addEdge(graph, unetSource.node, unetSource.field, gradientMask, 'unet');
   }
   addEdge(graph, gradientMask, 'denoise_mask', denoise, 'denoise_mask');
+  // The refiner pass must respect the same region, or its unmasked latents would bleed past the coherence edge.
+  const refinerDenoise = graph.nodes[REFINER_DENOISE_NODE_ID];
+  if (refinerDenoise) {
+    addEdge(graph, gradientMask, 'denoise_mask', refinerDenoise, 'denoise_mask');
+  }
 
   const expandMask = addNode(graph, {
     fade_size_px: compositing.maskBlur,

@@ -1156,18 +1156,62 @@ describe('compileCanvasGraph — SDXL Refiner', () => {
   });
 
   it.each(['inpaint', 'outpaint'] as const)(
-    'keeps the mask on the base pass and decodes the refiner for %s',
+    'feeds the same gradient mask to both passes and decodes the refiner for %s',
     (mode) => {
       const { backendGraph } = compile(sdxlModel, mode, { settings: refinerSettings, strength: 0.5 });
 
       expect(backendGraph.nodes.denoise_latents).toMatchObject({ denoising_end: 0.8, denoising_start: 0.5 });
       expect(getEdge(backendGraph, 'denoise_latents', 'denoise_mask')?.source.node_id).toBe('create_gradient_mask');
-      expect(getEdge(backendGraph, 'refiner_denoise_latents', 'denoise_mask')).toBeUndefined();
+      // The refiner respects the same region, or its unmasked latents would bleed past the coherence edge.
+      expect(getEdge(backendGraph, 'refiner_denoise_latents', 'denoise_mask')?.source.node_id).toBe(
+        'create_gradient_mask'
+      );
       expect(getEdge(backendGraph, 'refiner_denoise_latents', 'latents')?.source.node_id).toBe('denoise_latents');
       expect(getEdge(backendGraph, 'canvas_l2i', 'latents')?.source.node_id).toBe('refiner_denoise_latents');
       expect(getNodeByType(backendGraph, 'core_metadata')?.generation_mode).toBe(`sdxl_${mode}`);
     }
   );
+
+  it.each(['txt2img', 'img2img', 'inpaint', 'outpaint'] as const)(
+    'never lets the %s graft restore the full base schedule while a refiner is active',
+    (mode) => {
+      const { backendGraph } = compile(sdxlModel, mode, { settings: refinerSettings, strength: 0.9 });
+
+      // The canvas re-derives the base range from the strength after the refiner stage is grafted.
+      expect(backendGraph.nodes.denoise_latents?.denoising_end).toBe(0.8);
+      expect(backendGraph.nodes.refiner_denoise_latents?.denoising_start).toBe(0.8);
+    }
+  );
+
+  it('keeps regional guidance on the base pass', () => {
+    const { backendGraph } = compile(sdxlModel, 'txt2img', {
+      regionalGuidance: [
+        {
+          autoNegative: false,
+          id: 'r1',
+          maskImageName: 'r1-mask.png',
+          negativePrompt: null,
+          positivePrompt: 'a cat',
+          referenceImages: [],
+        },
+      ],
+      settings: refinerSettings,
+    });
+
+    const collected = backendGraph.edges
+      .filter((edge) => edge.destination.node_id === 'pos_cond_collect')
+      .map((edge) => edge.source.node_id);
+    expect(collected).toEqual(['pos_cond', 'rg_pos_cond_r1']);
+    expect(getEdge(backendGraph, 'denoise_latents', 'positive_conditioning')?.source.node_id).toBe('pos_cond_collect');
+    expect(getEdge(backendGraph, 'refiner_denoise_latents', 'positive_conditioning')?.source.node_id).toBe(
+      'refiner_pos_cond'
+    );
+    expect(
+      backendGraph.edges
+        .filter((edge) => edge.destination.node_id === 'refiner_denoise_latents')
+        .map((edge) => edge.destination.field)
+    ).toEqual(['unet', 'positive_conditioning', 'negative_conditioning', 'latents']);
+  });
 
   it('attaches control layers to the base pass, not the refiner', () => {
     const { backendGraph } = compile(sdxlModel, 'txt2img', {

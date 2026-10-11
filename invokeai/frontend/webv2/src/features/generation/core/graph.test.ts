@@ -1410,4 +1410,65 @@ describe('SDXL Refiner', () => {
       'SDXL is not an SDXL Refiner model.'
     );
   });
+
+  it('hands the whole schedule to the refiner at a start of 0', () => {
+    const graph = compile(sdxlModel, { ...refinerSettings, refinerStart: 0 });
+
+    // The base pass only seeds the latents from noise; the refiner denoises every step.
+    expect(graph.nodes.denoise_latents).toMatchObject({ denoising_end: 0, denoising_start: 0 });
+    expect(graph.nodes.refiner_denoise_latents).toMatchObject({ denoising_end: 1, denoising_start: 0 });
+    expect(getEdge(graph, 'canvas_output', 'latents')?.source.node_id).toBe('refiner_denoise_latents');
+    expect(getNodeByType(graph, 'core_metadata')?.refiner_start).toBe(0);
+  });
+
+  it('runs without the refiner at a start of 1, where its pass would be empty', () => {
+    const graph = compile(sdxlModel, {
+      ...refinerSettings,
+      gemma2EncoderModel: { base: 'any', key: 'gemma2', name: 'Gemma 2 2B', type: 'gemma2_encoder' },
+      pidDecoderModel: { base: 'sdxl', key: 'pid-sdxl', name: 'PiD SDXL', type: 'pid_decoder' },
+      pidMode: 'fit',
+      refinerStart: 1,
+    });
+
+    // Neither the refiner model nor its PiD conflict applies: the graph is the plain SDXL graph.
+    expect(graph.nodes.refiner_model_loader).toBeUndefined();
+    expect(graph.nodes.refiner_denoise_latents).toBeUndefined();
+    expect(graph.nodes.denoise_latents).toMatchObject({ denoising_end: 1, denoising_start: 0 });
+    expect(getNodeByType(graph, 'core_metadata')).not.toHaveProperty('refiner_model');
+  });
+
+  it('keeps IP Adapter reference images on the base pass', () => {
+    const sdxlIpAdapter: ComponentModelConfig = {
+      base: 'sdxl',
+      key: 'sdxl-ip-adapter',
+      name: 'SDXL IP Adapter',
+      type: 'ip_adapter',
+    };
+    const graph = compile(sdxlModel, {
+      ...refinerSettings,
+      referenceImages: [
+        {
+          id: 'ref-1',
+          isEnabled: true,
+          config: {
+            beginEndStepPct: [0, 1],
+            clipVisionModel: 'ViT-H',
+            image: refImage,
+            method: 'full',
+            model: sdxlIpAdapter,
+            type: 'ip_adapter',
+            weight: 1,
+          },
+        },
+      ],
+    });
+
+    expect(getEdge(graph, 'denoise_latents', 'ip_adapter')?.source.node_id).toContain('ip_adapter_collector');
+    expect(getEdge(graph, 'refiner_denoise_latents', 'ip_adapter')).toBeUndefined();
+    expect(
+      graph.edges
+        .filter((edge) => edge.destination.node_id === 'refiner_denoise_latents')
+        .map((e) => e.destination.field)
+    ).toEqual(['unet', 'positive_conditioning', 'negative_conditioning', 'latents']);
+  });
 });

@@ -35,12 +35,17 @@ export const isRefinerModel = (model: { base: string; type: string } | null | un
 export const isRefinerSupported = (model: GenerateModelConfig | undefined): boolean =>
   model?.type === 'main' && model.base === 'sdxl';
 
-/** The refiner that will run: a refiner model selected on an SDXL main model. */
+/**
+ * The refiner that will run: a refiner model selected on an SDXL main model. A start of 1 leaves the refiner no
+ * schedule, so it is treated as off rather than loading a model for an empty pass.
+ */
 export const getActiveRefiner = (
-  settings: Pick<GenerateSettings, 'refinerModel'>,
+  settings: Pick<GenerateSettings, 'refinerModel' | 'refinerStart'>,
   model: GenerateModelConfig | undefined
 ): MainModelConfig | null =>
-  isRefinerSupported(model) && isRefinerModel(settings.refinerModel) ? settings.refinerModel : null;
+  isRefinerSupported(model) && isRefinerModel(settings.refinerModel) && settings.refinerStart < MAX_REFINER_START
+    ? settings.refinerModel
+    : null;
 
 /**
  * The base model's denoise range when a refiner finishes the schedule. An image-to-image start past the hand-over
@@ -53,6 +58,19 @@ export const getRefinerDenoisingSplit = (
   denoising_start: Math.min(refinerStart, denoisingStart),
   denoising_end: refinerStart,
 });
+
+/**
+ * The single owner of the base denoise range. `denoisingStart` is the strength-derived start (0 for text-to-image);
+ * with an active refiner the base pass ends at the hand-over, otherwise it runs to the end of the schedule.
+ */
+export const getBaseDenoisingRange = (
+  settings: Pick<GenerateSettings, 'refinerModel' | 'refinerStart'>,
+  model: GenerateModelConfig,
+  denoisingStart: number
+): { denoising_start: number; denoising_end: number } =>
+  getActiveRefiner(settings, model)
+    ? getRefinerDenoisingSplit(settings.refinerStart, denoisingStart)
+    : { denoising_end: 1, denoising_start: denoisingStart };
 
 export const getRefinerValidationReasons = (
   model: GenerateModelConfig,
@@ -69,7 +87,7 @@ export const getRefinerValidationReasons = (
   const reasons: string[] = [];
 
   // PiD replaces the VAE decode the refiner's second denoise stage feeds; the two cannot share a graph.
-  if (settings.pidMode !== 'off') {
+  if (settings.pidMode !== 'off' && settings.refinerStart < MAX_REFINER_START) {
     reasons.push('PiD decode is not compatible with the SDXL Refiner. Turn PiD off or clear the refiner model.');
   }
 

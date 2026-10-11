@@ -4,7 +4,6 @@ import type {
   GenerateLora,
   GenerateModelConfig,
   GenerateWidgetValues,
-  LoraModelConfig,
   MainModelConfig,
   VaeModelConfig,
 } from '@features/generation/contracts';
@@ -91,10 +90,11 @@ export type ImageRecallSkipReason =
   | 'modelUnavailable'
   | 'unresolved';
 
-/** A recorded concept recall could not restore; `name` is the best label the record or catalog offers. */
+/** A recorded model recall could not restore; `name` is the best label the record or catalog offers. */
 export interface ImageRecallSkip {
   name: string | null;
   reason: ImageRecallSkipReason;
+  subject: 'concept' | 'refiner';
 }
 
 export interface ImageRecallResult {
@@ -529,46 +529,25 @@ const toRecordedModelRef = (value: unknown): RecordedModelRef | null => {
 /**
  * Resolve the install-local key first, then a portable identifier: the content hash when one was recorded, otherwise
  * name and base. A recorded hash never falls back to a same-named file, and a portable identifier counts only when
- * exactly one installed LoRA matches it.
+ * exactly one candidate matches it.
  */
-const resolveRecordedLora = (
+const resolveRecordedModel = <T extends { base: string; hash?: string; key: string; name: string }>(
   ref: RecordedModelRef,
-  loraModels: readonly LoraModelConfig[]
-): LoraModelConfig | 'ambiguous' | null => {
-  const byKey = ref.key ? loraModels.find((model) => model.key === ref.key) : undefined;
+  candidates: readonly T[]
+): T | 'ambiguous' | null => {
+  const byKey = ref.key ? candidates.find((model) => model.key === ref.key) : undefined;
 
   if (byKey) {
     return byKey;
   }
 
   const matches = ref.hash
-    ? loraModels.filter((model) => model.hash === ref.hash)
+    ? candidates.filter((model) => model.hash === ref.hash)
     : ref.name && ref.base
-      ? loraModels.filter((model) => model.name === ref.name && model.base === ref.base)
+      ? candidates.filter((model) => model.name === ref.name && model.base === ref.base)
       : [];
 
   return matches.length > 1 ? 'ambiguous' : (matches[0] ?? null);
-};
-
-/** Resolve a recorded main model by install-local key, then content hash, then name and base, like a LoRA. */
-const resolveRecordedMainModel = (
-  ref: RecordedModelRef,
-  models: readonly ComponentModelConfig[]
-): MainModelConfig | null => {
-  const mains = models.filter(isMainModelConfig);
-  const byKey = ref.key ? mains.find((model) => model.key === ref.key) : undefined;
-
-  if (byKey) {
-    return byKey;
-  }
-
-  const matches = ref.hash
-    ? mains.filter((model) => model.hash === ref.hash)
-    : ref.name && ref.base
-      ? mains.filter((model) => model.name === ref.name && model.base === ref.base)
-      : [];
-
-  return matches.length === 1 ? matches[0]! : null;
 };
 
 type RefinerPatch = Partial<
@@ -590,29 +569,45 @@ const getNumberInRange = (metadata: unknown, key: string, min: number, max: numb
   return value !== null && value >= min && value <= max ? value : null;
 };
 
+interface RefinerRecall {
+  patch: RefinerPatch;
+  /** The recorded refiner could not be restored; the slot keeps its current pick, like an uninstalled VAE. */
+  skipped: ImageRecallSkip | null;
+}
+
+const isInstalledRefiner = (model: ComponentModelConfig): model is MainModelConfig =>
+  isMainModelConfig(model) && isRefinerModel(model);
+
 /**
- * The refiner an SDXL image ran with, resolved against installed refiner models, plus its tuning. A refiner that is
- * not installed leaves the slot as it is, like an uninstalled VAE. Generation records only name a refiner when one
- * ran, so a stamped record without one clears the slot, as a missing `loras` list means no concepts.
+ * The refiner an SDXL image ran with, resolved against installed refiner models, plus its tuning. Generation records
+ * only name a refiner when one ran, so a stamped record without one clears the slot, as a missing `loras` list means
+ * no concepts.
  */
-const getRefinerPatch = (
+const getRefinerRecall = (
   metadata: unknown,
   model: GenerateModelConfig,
   models: readonly ComponentModelConfig[]
-): RefinerPatch => {
+): RefinerRecall => {
   if (!getGenerationUiPolicy(model).refinerVisible || !isRecord(metadata)) {
-    return {};
+    return { patch: {}, skipped: null };
   }
 
   const patch: RefinerPatch = {};
+  let skipped: ImageRecallSkip | null = null;
 
   if ('refiner_model' in metadata) {
     const ref = toRecordedModelRef(metadata.refiner_model);
-    const refiner = ref ? resolveRecordedMainModel(ref, models) : null;
+    const refiner = ref ? resolveRecordedModel(ref, models.filter(isInstalledRefiner)) : null;
 
     if (metadata.refiner_model === null) {
       patch.refinerModel = null;
-    } else if (refiner && isRefinerModel(refiner)) {
+    } else if (refiner === null || refiner === 'ambiguous') {
+      skipped = {
+        name: ref?.name ?? ref?.key ?? null,
+        reason: refiner === 'ambiguous' ? 'ambiguous' : 'unresolved',
+        subject: 'refiner',
+      };
+    } else {
       patch.refinerModel = refiner;
     }
   } else if (isGenerationRecord(metadata)) {
@@ -637,13 +632,16 @@ const getRefinerPatch = (
   );
 
   return {
-    ...patch,
-    ...(steps !== null && steps >= MIN_REFINER_STEPS ? { refinerSteps: steps } : {}),
-    ...(cfgScale !== null && cfgScale >= MIN_REFINER_CFG_SCALE ? { refinerCfgScale: cfgScale } : {}),
-    ...(scheduler !== null && isKnownScheduler(scheduler) ? { refinerScheduler: scheduler } : {}),
-    ...(start !== null ? { refinerStart: start } : {}),
-    ...(positiveScore !== null ? { refinerPositiveAestheticScore: positiveScore } : {}),
-    ...(negativeScore !== null ? { refinerNegativeAestheticScore: negativeScore } : {}),
+    patch: {
+      ...patch,
+      ...(steps !== null && steps >= MIN_REFINER_STEPS ? { refinerSteps: steps } : {}),
+      ...(cfgScale !== null && cfgScale >= MIN_REFINER_CFG_SCALE ? { refinerCfgScale: cfgScale } : {}),
+      ...(scheduler !== null && isKnownScheduler(scheduler) ? { refinerScheduler: scheduler } : {}),
+      ...(start !== null ? { refinerStart: start } : {}),
+      ...(positiveScore !== null ? { refinerPositiveAestheticScore: positiveScore } : {}),
+      ...(negativeScore !== null ? { refinerNegativeAestheticScore: negativeScore } : {}),
+    },
+    skipped,
   };
 };
 
@@ -683,6 +681,7 @@ const getMetadataConcepts = (
       skipped: entries.map((entry) => ({
         name: toRecordedModelRef(getRecord(entry, 'model') ?? getRecord(entry, 'lora'))?.name ?? null,
         reason: 'modelUnavailable',
+        subject: 'concept',
       })),
     };
   }
@@ -692,7 +691,7 @@ const getMetadataConcepts = (
   }
 
   if (!Array.isArray(recorded)) {
-    return { loras: null, skipped: [{ name: null, reason: 'invalid' }] };
+    return { loras: null, skipped: [{ name: null, reason: 'invalid', subject: 'concept' }] };
   }
 
   const loraModels = models.filter(isLoraModelConfig);
@@ -706,18 +705,22 @@ const getMetadataConcepts = (
     const recordedName = ref?.name ?? null;
 
     if (!ref || weight === null) {
-      skipped.push({ name: recordedName, reason: 'invalid' });
+      skipped.push({ name: recordedName, reason: 'invalid', subject: 'concept' });
       continue;
     }
 
-    const installed = resolveRecordedLora(ref, loraModels);
+    const installed = resolveRecordedModel(ref, loraModels);
 
     if (installed === null || installed === 'ambiguous') {
-      skipped.push({ name: recordedName, reason: installed === 'ambiguous' ? 'ambiguous' : 'unresolved' });
+      skipped.push({
+        name: recordedName,
+        reason: installed === 'ambiguous' ? 'ambiguous' : 'unresolved',
+        subject: 'concept',
+      });
     } else if (!isLoraCompatibleWithModel(installed, model)) {
-      skipped.push({ name: installed.name, reason: 'incompatible' });
+      skipped.push({ name: installed.name, reason: 'incompatible', subject: 'concept' });
     } else if (loras.some((lora) => lora.model.key === installed.key)) {
-      skipped.push({ name: installed.name, reason: 'duplicate' });
+      skipped.push({ name: installed.name, reason: 'duplicate', subject: 'concept' });
     } else {
       // Kept exactly: graphs and model defaults accept weights beyond the panel's typed range, which bounds only edits.
       loras.push({ isEnabled: true, model: installed, weight });
@@ -812,7 +815,7 @@ export const getImageRecallCapabilities = ({
   const hasReferenceImages = getMetadataReferenceImages(metadata).length > 0;
   const hasModel = supportedMetadataModel !== null;
   const hasRebalance = hasKrea2Rebalance(metadata, clipSkipModel);
-  const hasRefiner = Object.keys(getRefinerPatch(metadata, clipSkipModel, models)).length > 0;
+  const hasRefiner = Object.keys(getRefinerRecall(metadata, clipSkipModel, models).patch).length > 0;
   const hasConcepts =
     (getMetadataConcepts(metadata, models, clipSkipModel, supportedMetadataModel).loras?.length ?? 0) > 0;
   const hasAnyMetadata =
@@ -1029,7 +1032,8 @@ export const buildImageRecallSettings = ({
     }
 
     // Judged against the model the recall settled on: a non-SDXL main has no refiner to restore.
-    const refinerPatch = getRefinerPatch(metadata, values.model, models);
+    const refinerRecall = getRefinerRecall(metadata, values.model, models);
+    const refinerPatch = refinerRecall.patch;
     const refinerChanged = (Object.keys(refinerPatch) as (keyof RefinerPatch)[]).some((key) =>
       key === 'refinerModel'
         ? refinerPatch.refinerModel?.key !== values.refinerModel?.key
@@ -1039,6 +1043,9 @@ export const buildImageRecallSettings = ({
     if (refinerChanged) {
       values = { ...values, ...refinerPatch };
       fields.push('refiner');
+    }
+    if (refinerRecall.skipped) {
+      skipped.push(refinerRecall.skipped);
     }
   }
 

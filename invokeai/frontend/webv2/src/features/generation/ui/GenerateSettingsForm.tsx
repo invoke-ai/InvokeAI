@@ -283,7 +283,6 @@ export const GenerateSettingsForm = ({
 
       <GenerateRefinerSection
         draft={draft}
-        models={models}
         selectedModel={selectedModel}
         onCommit={commit}
         onCommitImmediate={commitPatchImmediately}

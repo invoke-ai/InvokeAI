@@ -32,14 +32,14 @@ import { GenerationModelSelect as ModelSelect } from './GenerationUiContext';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 import { GenerateFieldContextMenu } from './shared/GenerateFieldContextMenu';
 
-/** Practical track ranges; typed values may exceed them within validation bounds. */
+/** Practical track ranges; typed values may exceed them up to the legacy input limits. */
 const STEPS_SLIDER_MAX = 100;
+const STEPS_INPUT_MAX = 500;
 const CFG_SLIDER_MAX = 20;
-const CFG_INPUT_MAX = 100;
+const CFG_INPUT_MAX = 200;
 
 interface GenerateRefinerSectionProps {
   draft: GenerateDraft;
-  models: readonly ModelConfig[];
   selectedModel: GenerateModelConfig | undefined;
   onCommit: (patch: Partial<GenerateSettings>) => void;
   onCommitImmediate: (patch: Partial<GenerateSettings>) => void;
@@ -67,7 +67,6 @@ const MAIN_MODEL_TYPES = ['main'];
 
 export const GenerateRefinerSection = ({
   draft,
-  models,
   onCommit,
   onCommitImmediate,
   selectedModel,
@@ -85,7 +84,6 @@ export const GenerateRefinerSection = ({
     return null;
   }
 
-  const hasInstalledRefiner = models.some(refinerFilter);
   const refiner = settings.refinerModel;
   const isActive = refiner !== null;
 
@@ -144,16 +142,14 @@ export const GenerateRefinerSection = ({
       sectionId="refiner"
     >
       <Stack gap="2" p="2">
-        <Field
-          hint="refinerModel"
-          label={t('widgets.generate.refinerModel')}
-          helpText={hasInstalledRefiner ? undefined : t('widgets.generate.noRefinerModels')}
-        >
+        <Field hint="refinerModel" label={t('widgets.generate.refinerModel')}>
+          {/* The picker owns the loading and empty states, so no refiner installed reads as one message. */}
           <ModelSelect
             filter={refinerFilter}
             isClearable
             modelTypes={MAIN_MODEL_TYPES}
             placeholder={t('widgets.generate.refinerNone')}
+            scopeLabel={t('widgets.generate.refinerModelsScope')}
             value={refiner?.key ?? null}
             onChange={commitRefinerModel}
           />
@@ -161,7 +157,7 @@ export const GenerateRefinerSection = ({
         {numberField({
           defaultValue: DEFAULT_REFINER_STEPS,
           hint: 'refinerSteps',
-          inputMax: Number.MAX_SAFE_INTEGER,
+          inputMax: STEPS_INPUT_MAX,
           key: 'refinerSteps',
           label: t('widgets.generate.refinerSteps'),
           max: STEPS_SLIDER_MAX,

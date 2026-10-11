@@ -887,8 +887,8 @@ describe('image recall', () => {
       expect(result?.values.loras).toEqual([{ isEnabled: true, model: staleLora, weight: 0.9 }]);
       expect(result?.fields).not.toContain('loras');
       expect(result?.skipped).toEqual([
-        { name: 'Grain', reason: 'modelUnavailable' },
-        { name: 'Ink', reason: 'modelUnavailable' },
+        { name: 'Grain', reason: 'modelUnavailable', subject: 'concept' },
+        { name: 'Ink', reason: 'modelUnavailable', subject: 'concept' },
       ]);
     });
 
@@ -965,11 +965,11 @@ describe('image recall', () => {
 
       expect(result?.values.loras).toEqual([{ isEnabled: true, model: inkLora, weight: 0.5 }]);
       expect(result?.skipped).toEqual([
-        { name: 'Deleted', reason: 'unresolved' },
-        { name: 'Pixel', reason: 'incompatible' },
-        { name: null, reason: 'invalid' },
-        { name: null, reason: 'invalid' },
-        { name: 'Ink', reason: 'duplicate' },
+        { name: 'Deleted', reason: 'unresolved', subject: 'concept' },
+        { name: 'Pixel', reason: 'incompatible', subject: 'concept' },
+        { name: null, reason: 'invalid', subject: 'concept' },
+        { name: null, reason: 'invalid', subject: 'concept' },
+        { name: 'Ink', reason: 'duplicate', subject: 'concept' },
       ]);
     });
 
@@ -977,7 +977,7 @@ describe('image recall', () => {
       const result = recallConcepts('all', { loras: 'ink', model: { key: sdxlModel.key }, steps: 20 });
 
       expect(result?.values.loras).toEqual([{ isEnabled: true, model: staleLora, weight: 0.9 }]);
-      expect(result?.skipped).toEqual([{ name: null, reason: 'invalid' }]);
+      expect(result?.skipped).toEqual([{ name: null, reason: 'invalid', subject: 'concept' }]);
       expect(result?.fields).toContain('steps');
     });
 
@@ -994,7 +994,7 @@ describe('image recall', () => {
 
       expect(result?.values.model).toEqual(sd1Model);
       expect(result?.values.loras).toEqual([{ isEnabled: true, model: sd1Lora, weight: 0.6 }]);
-      expect(result?.skipped).toEqual([{ name: 'Ink', reason: 'incompatible' }]);
+      expect(result?.skipped).toEqual([{ name: 'Ink', reason: 'incompatible', subject: 'concept' }]);
     });
 
     it('resolves a reinstalled LoRA by its content hash, or by name and base when no hash was recorded', () => {
@@ -1030,7 +1030,7 @@ describe('image recall', () => {
       );
 
       expect(result?.values.loras).toEqual([]);
-      expect(result?.skipped).toEqual([{ name: 'Ink', reason: 'ambiguous' }]);
+      expect(result?.skipped).toEqual([{ name: 'Ink', reason: 'ambiguous', subject: 'concept' }]);
     });
 
     it('does not substitute a same-named LoRA whose content differs from the recorded hash', () => {
@@ -1044,7 +1044,7 @@ describe('image recall', () => {
         [sdxlModel, { ...inkLora, hash: 'blake3:retrained', key: 'retrained-ink' }]
       );
 
-      expect(result?.skipped).toEqual([{ name: 'Ink', reason: 'unresolved' }]);
+      expect(result?.skipped).toEqual([{ name: 'Ink', reason: 'unresolved', subject: 'concept' }]);
     });
 
     it('offers Recall All and Remix for metadata that records only concepts it can restore', () => {
@@ -1290,13 +1290,12 @@ describe('SDXL Refiner recall', () => {
     expect(recall(recordedRefiner, [byKey, refiner])?.values.refinerModel).toEqual(byKey);
 
     const unhashed = { ...recordedRefiner, refiner_model: { base: 'sdxl-refiner', name: 'SDXL Refiner' } };
-    const twin = { ...refiner, key: 'refiner-twin' };
 
     expect(recall(unhashed, [refiner])?.values.refinerModel).toEqual(refiner);
-    expect(recall(unhashed, [refiner, twin])?.values.refinerModel).toBeNull();
+    expect(recall(unhashed, [refiner])?.skipped).toEqual([]);
   });
 
-  it('keeps the current refiner when the recorded one is not installed, but still restores the tuning', () => {
+  it('reports an uninstalled refiner, keeps the current one and still restores the tuning', () => {
     const current = createValues({ refinerModel: refiner });
     const result = buildImageRecallSettings({
       currentValues: current,
@@ -1310,6 +1309,23 @@ describe('SDXL Refiner recall', () => {
 
     expect(result?.values.refinerModel).toEqual(refiner);
     expect(result?.values.refinerStart).toBe(0.7);
+    expect(result?.skipped).toEqual([{ name: 'SDXL Refiner', reason: 'unresolved', subject: 'refiner' }]);
+  });
+
+  it('reports an ambiguous refiner instead of guessing between same-named installs', () => {
+    const unhashed = { ...recordedRefiner, refiner_model: { base: 'sdxl-refiner', name: 'SDXL Refiner' } };
+    const twin = { ...refiner, key: 'refiner-twin' };
+    const result = recall(unhashed, [refiner, twin]);
+
+    expect(result?.values.refinerModel).toBeNull();
+    expect(result?.skipped).toEqual([{ name: 'SDXL Refiner', reason: 'ambiguous', subject: 'refiner' }]);
+  });
+
+  it('does not treat a non-refiner model named by the record as the refiner', () => {
+    const result = recall({ ...recordedRefiner, refiner_model: { key: sdxlModel.key } }, [sdxlModel, refiner]);
+
+    expect(result?.values.refinerModel).toBeNull();
+    expect(result?.skipped).toEqual([{ name: sdxlModel.key, reason: 'unresolved', subject: 'refiner' }]);
   });
 
   it('clears the refiner for a generation record that ran without one and ignores refiner data on other families', () => {

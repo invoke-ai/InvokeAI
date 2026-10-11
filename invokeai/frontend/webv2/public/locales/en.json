@@ -1086,7 +1086,8 @@
       "heading": "Refiner start",
       "paragraphs": [
         "Where in the schedule the base model hands over to the refiner.",
-        "0.8 means the base model denoises the first 80% and the refiner finishes the last 20%; 0 hands the whole schedule to the refiner."
+        "0.8 means the base model denoises the first 80% and the refiner finishes the last 20%; 0 hands the whole schedule to the refiner, and 1 leaves it nothing to do, so the refiner is not run.",
+        "On the Canvas the base pass cannot start after the hand-over, so an image-to-image strength above 1 − Refiner start is capped there."
       ]
     },
     "refinerAestheticScore": {
@@ -2691,7 +2692,7 @@
       "refiner": "Refiner",
       "refinerModel": "Refiner model",
       "refinerNone": "None",
-      "noRefinerModels": "No SDXL Refiner models are installed.",
+      "refinerModelsScope": "SDXL Refiner models",
       "refinerSteps": "Refiner steps",
       "refinerCfgScale": "Refiner CFG",
       "refinerScheduler": "Refiner scheduler",
@@ -4170,6 +4171,7 @@
           "nothingRecalled": "No recallable image data",
           "partiallyRecalled": "Some image data was not recalled",
           "unnamedConcept": "unnamed concept",
+          "unnamedRefiner": "unnamed refiner",
           "skippedConcept": {
             "ambiguous": "{{name}} (matches more than one installed model)",
             "duplicate": "{{name}} (listed more than once)",
@@ -4177,6 +4179,10 @@
             "invalid": "{{name}} (unreadable metadata)",
             "modelUnavailable": "{{name}} (the image's model is not available)",
             "unresolved": "{{name}} (not installed)"
+          },
+          "skippedRefiner": {
+            "ambiguous": "Refiner not restored: {{name}} matches more than one installed model; the current refiner was kept.",
+            "unresolved": "Refiner not restored: {{name}} is not installed; the current refiner was kept."
           }
         },
         "star": {

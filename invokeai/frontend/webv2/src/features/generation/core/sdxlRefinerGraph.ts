@@ -6,7 +6,6 @@ import type { GenerateSettings, MainModelConfig } from './types';
 
 import { coerceSchedulerForGraph } from './baseGenerationPolicies';
 import { addEdge, addNode, toModelIdentifier } from './graphBuilder';
-import { getRefinerDenoisingSplit } from './sdxlRefiner';
 
 export const REFINER_DENOISE_NODE_ID = 'refiner_denoise_latents';
 
@@ -16,7 +15,7 @@ interface RefinerStageInput {
   /** The SDXL main model; the refiner shares its scheduler set. */
   model: MainModelConfig;
   refiner: MainModelConfig;
-  /** The base denoise, whose latents the refiner finishes. Its `denoising_end` becomes the hand-over point. */
+  /** The base denoise, whose latents the refiner finishes; `getBaseDenoisingRange` already ends it at the hand-over. */
   denoise: BackendInvocationContract;
   positivePrompt: BackendInvocationContract;
   negativePrompt: BackendInvocationContract;
@@ -36,11 +35,6 @@ export const addSDXLRefinerStage = ({
   settings,
 }: RefinerStageInput): BackendInvocationContract => {
   const scheduler = coerceSchedulerForGraph(model, settings.refinerScheduler);
-  const split = getRefinerDenoisingSplit(settings.refinerStart, denoise.denoising_start as number);
-
-  denoise.denoising_start = split.denoising_start;
-  denoise.denoising_end = split.denoising_end;
-
   const modelLoader = addNode(graph, {
     id: 'refiner_model_loader',
     model: toModelIdentifier(refiner),

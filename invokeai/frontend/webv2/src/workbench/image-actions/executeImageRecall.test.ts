@@ -182,6 +182,36 @@ describe('executeImageRecall', () => {
     }
   });
 
+  it('reports a recorded refiner that is not installed while applying the rest', async () => {
+    const { add, commands, setSettings } = createCommands();
+    const t = await createRecallTranslator('en');
+
+    galleryApi.galleryImages.metadata.mockResolvedValue({
+      model: { key: model.key },
+      refiner_model: { base: 'sdxl-refiner', key: 'gone-refiner', name: 'Gone Refiner' },
+      refiner_start: 0.6,
+    });
+
+    await expect(
+      executeImageRecall({
+        t,
+        commands,
+        generateValues: { modelKey: model.key },
+        image: { ...image, imageName: 'missing-refiner.png' },
+        kind: 'all',
+        models: [model],
+        projectId: 'project-1',
+      })
+    ).resolves.toBe(true);
+
+    expect(setSettings).toHaveBeenCalledWith(expect.objectContaining({ refinerStart: 0.6 }), 'project-1');
+    expect(add).toHaveBeenCalledWith({
+      kind: 'info',
+      message: 'Refiner not restored: Gone Refiner is not installed; the current refiner was kept.',
+      title: 'Some image data was not recalled',
+    });
+  });
+
   it('explains why nothing was recalled when no recorded concept can be restored', async () => {
     const { add, commands, setSettings } = createCommands();
     const t = await createRecallTranslator('en');

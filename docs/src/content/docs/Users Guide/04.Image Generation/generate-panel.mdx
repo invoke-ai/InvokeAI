@@ -51,6 +51,10 @@ A negative prompt lists what you do *not* want in the image, such as *blurry, wa
 
 Not every model uses a negative prompt. SD 1.5, SDXL, SD 3.5 and CogView4 always use it. Several newer models, including Z-Image, Qwen Image and Krea-2, use it only when CFG is above 1, and the box says so. FLUX.1, FLUX.2 and Ideogram 4 do not use a negative prompt, and the box is not shown for them.
 
+### Refiner
+
+The **Refiner** section appears for SDXL models. Pick an **SDXL Refiner** model to have it finish the last part of the denoising schedule; the base model stops at **Refiner start** (0.8 by default, so the refiner handles the final 20%) and the refiner continues from there with its own **Refiner steps**, **Refiner CFG** and **Refiner scheduler**. The **Positive** and **Negative aesthetic score** condition the refiner on the aesthetic rating it was trained with. A **Refiner start** of 1 leaves the refiner nothing to do, so it is not run. The controls are disabled until a refiner is selected, and refiner models are only offered here, never as the main model. The refiner also runs for SDXL generations from the Canvas. It cannot be combined with **PiD Decode**. See [SDXL](/users-guide/models/local-models/sdxl/#sdxl-refiner).
+
 ### Advanced settings
 
 The **Advanced** section appears for models with extra options, and its header counts the settings you have changed. Depending on the model it can include:
@@ -61,10 +65,6 @@ The **Advanced** section appears for models with extra options, and its header c
 * **Color compensation** — SDXL only.
 * **PiD Decode** — decodes the image at up to four times its size; see [PiD Super-Resolution Decode](/users-guide/image-generation/advanced-topics/pid-decode/).
 * **Seamless tiling** — makes the image tile along the X axis, the Y axis, or both.
-
-### Refiner
-
-The **Refiner** section appears for SDXL models. Pick an **SDXL Refiner** model to have it finish the last part of the denoising schedule; the base model stops at **Refiner start** (0.8 by default, so the refiner handles the final 20%) and the refiner continues from there with its own **Refiner steps**, **Refiner CFG** and **Refiner scheduler**. The **Positive** and **Negative aesthetic score** condition the refiner on the aesthetic rating it was trained with. The controls are disabled until a refiner is selected, and refiner models are only offered here, never as the main model. The refiner also runs for SDXL generations from the Canvas. It cannot be combined with **PiD Decode**. See [SDXL](/users-guide/models/local-models/sdxl/#sdxl-refiner).
 
 ### Resetting to defaults
 
