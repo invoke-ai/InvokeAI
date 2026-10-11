@@ -1,4 +1,4 @@
-import type { FieldInputTemplate } from './types';
+import type { FieldInputTemplate, WorkflowForm } from './types';
 
 /**
  * Per-element control settings an author gives a form field: which control renders it and, for numbers, the
@@ -119,16 +119,24 @@ export const getNodeFieldFormSettings = (
   const min = finiteOrUndefined(settings.min);
   const max = finiteOrUndefined(settings.max);
   const step = finiteOrUndefined(settings.step);
-  const boundsUsable = min === undefined || max === undefined || min <= max;
 
+  // Bounds are kept as authored, even inverted, so the builder edits what is stored; `applyNodeFieldFormSettings`
+  // decides what the form honours.
   return {
     component,
     kind: 'number',
-    ...(boundsUsable && min !== undefined ? { min } : {}),
-    ...(boundsUsable && max !== undefined ? { max } : {}),
+    ...(min !== undefined ? { min } : {}),
+    ...(max !== undefined ? { max } : {}),
     ...(step !== undefined && step > 0 ? { step } : {}),
   };
 };
+
+/** Authored bounds that cannot form a range; the form ignores both until the author fixes one. */
+export const hasInvertedNodeFieldBounds = (settings: NodeFieldFormSettings | null): boolean =>
+  settings?.kind === 'number' &&
+  settings.min !== undefined &&
+  settings.max !== undefined &&
+  settings.min > settings.max;
 
 /**
  * The settings bag to store for `settings` on a field of `template`, in the legacy shape: tagged with the field
@@ -166,9 +174,10 @@ const isMultipleOf = (step: number, base: number): boolean => {
 };
 
 /**
- * The template narrowed by the authored number settings: a bound applies only inside the template's own range, and
- * a step only when the template has none or the step keeps every value a multiple of the template's. Validation,
- * shuffle and the control all read this template, so the form can never offer a value the node would reject.
+ * The template narrowed by the authored number settings: a bound applies only inside the template's own range (and
+ * an inverted pair not at all), and a step only when the template has none or the step keeps every value a multiple
+ * of the template's. Validation, shuffle and the control all read this template, so the form can never offer a
+ * value the node would reject.
  */
 export const applyNodeFieldFormSettings = (
   template: FieldInputTemplate,
@@ -178,12 +187,13 @@ export const applyNodeFieldFormSettings = (
     return template;
   }
 
+  const inverted = hasInvertedNodeFieldBounds(settings);
   let next = template;
   const patch = (fields: Partial<FieldInputTemplate>) => {
     next = next === template ? { ...template, ...fields } : { ...next, ...fields };
   };
 
-  if (settings.min !== undefined) {
+  if (settings.min !== undefined && !inverted) {
     if (template.minimum !== null) {
       if (settings.min > template.minimum) {
         patch({ minimum: settings.min });
@@ -193,7 +203,7 @@ export const applyNodeFieldFormSettings = (
     }
   }
 
-  if (settings.max !== undefined) {
+  if (settings.max !== undefined && !inverted) {
     if (template.maximum !== null) {
       if (settings.max < template.maximum) {
         patch({ maximum: settings.max });
@@ -205,6 +215,7 @@ export const applyNodeFieldFormSettings = (
 
   if (
     settings.step !== undefined &&
+    (template.type.name !== 'IntegerField' || Number.isInteger(settings.step)) &&
     (template.multipleOf === null || template.multipleOf <= 0 || isMultipleOf(settings.step, template.multipleOf))
   ) {
     patch({ multipleOf: settings.step });
@@ -234,4 +245,28 @@ export const getNodeFieldSliderRange = (template: FieldInputTemplate): NodeField
   }
 
   return { max, min, step };
+};
+
+/**
+ * The template a node field is validated against: the invocation template narrowed by the settings of the form
+ * element exposing it, or the template itself when the field is not on the form. Invoke readiness and the builder's
+ * invalid markers read this so they agree with the control.
+ */
+export const getFormFieldTemplate = (
+  form: WorkflowForm,
+  nodeId: string,
+  fieldName: string,
+  template: FieldInputTemplate
+): FieldInputTemplate => {
+  for (const element of Object.values(form.elements)) {
+    if (
+      element.type === 'node-field' &&
+      element.data.fieldIdentifier.nodeId === nodeId &&
+      element.data.fieldIdentifier.fieldName === fieldName
+    ) {
+      return applyNodeFieldFormSettings(template, getNodeFieldFormSettings(element.data.settings, template));
+    }
+  }
+
+  return template;
 };

@@ -6,7 +6,7 @@ import type { ProjectGraphAction } from '@features/workflow/utility';
 import { ChakraProvider } from '@chakra-ui/react';
 import { useDroppable } from '@dnd-kit/core';
 import { WorkflowUiProvider } from '@features/workflow/react';
-import { createProjectGraph, projectGraphReducer } from '@features/workflow/utility';
+import { buildInvocationNode, createProjectGraph, projectGraphReducer } from '@features/workflow/utility';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
 import { act, useCallback, useMemo, useState } from 'react';
@@ -728,5 +728,103 @@ describe('Workflow form empty states', () => {
     );
     expect([...host.querySelectorAll('button')].map((button) => button.textContent)).toEqual(['Add form element']);
     expect(overflowingElements()).toEqual([]);
+  });
+});
+
+describe('Form builder field settings', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    host.style.width = '480px';
+    document.body.append(host);
+    root = createRoot(host);
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+  });
+
+  const renderBuilder = async () => {
+    const node = buildInvocationNode(entryTemplate, { x: 0, y: 0 });
+    let latest = projectGraphReducer(createProjectGraph('form-settings-test'), { node, type: 'addNode' });
+
+    latest = projectGraphReducer(latest, {
+      fieldIdentifier: { fieldName: 'steps', nodeId: node.id },
+      type: 'exposeField',
+    });
+
+    const Harness = () => {
+      const [projectGraph, setProjectGraph] = useState(latest);
+      const editGraph = useCallback((action: ProjectGraphAction) => {
+        setProjectGraph((current) => {
+          latest = projectGraphReducer(current, action);
+
+          return latest;
+        });
+      }, []);
+      const adapter = useMemo(
+        () =>
+          ({
+            commands: { editGraph, redo: () => undefined, undo: () => undefined },
+            project: TEST_PROJECT_PORT,
+            widgets: { open: () => undefined, patchValues: () => undefined },
+          }) as unknown as WorkflowUiAdapter,
+        [editGraph]
+      );
+
+      return (
+        <I18nextProvider i18n={i18n}>
+          <WorkflowUiProvider adapter={adapter}>
+            <FormBuilderTab projectGraph={projectGraph} />
+          </WorkflowUiProvider>
+        </I18nextProvider>
+      );
+    };
+
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <Harness />
+        </ChakraProvider>
+      );
+    });
+
+    const storedSettings = () => {
+      const element = Object.values(latest.form.elements).find((candidate) => candidate.type === 'node-field');
+
+      return element?.type === 'node-field' ? element.data.settings : undefined;
+    };
+
+    return { storedSettings };
+  };
+
+  it('keeps both authored bounds while they are inverted and warns instead of dropping one', async () => {
+    const { storedSettings } = await renderBuilder();
+
+    await userEvent.click(
+      host.querySelector(`[aria-label="${i18n.t('widgets.workflow.formBuilder.fieldSettings')}"]`)!
+    );
+
+    const maxInput = document.querySelector<HTMLInputElement>(
+      `input[aria-label="${i18n.t('widgets.workflow.formBuilder.maximum')}"]`
+    )!;
+    const minInput = document.querySelector<HTMLInputElement>(
+      `input[aria-label="${i18n.t('widgets.workflow.formBuilder.minimum')}"]`
+    )!;
+
+    await userEvent.fill(maxInput, '5');
+    expect(storedSettings()).toMatchObject({ max: 5, type: 'integer-field-config' });
+
+    await userEvent.fill(minInput, '10');
+    expect(storedSettings()).toMatchObject({ max: 5, min: 10 });
+    expect(document.body.textContent).toContain(i18n.t('widgets.workflow.formBuilder.invertedBounds'));
+    expect(maxInput.value).toBe('5');
+
+    await userEvent.fill(minInput, '1');
+    expect(storedSettings()).toMatchObject({ max: 5, min: 1 });
+    expect(document.body.textContent).not.toContain(i18n.t('widgets.workflow.formBuilder.invertedBounds'));
   });
 });

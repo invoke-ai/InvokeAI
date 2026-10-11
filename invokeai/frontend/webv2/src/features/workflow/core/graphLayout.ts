@@ -9,6 +9,17 @@ export interface LayoutGraphEdge {
   targetNodeId: string;
 }
 
+/** Append to a map of lists, creating the list on first use. */
+const pushTo = <K, V>(lists: Map<K, V[]>, key: K, value: V): void => {
+  const list = lists.get(key);
+
+  if (list) {
+    list.push(value);
+  } else {
+    lists.set(key, [value]);
+  }
+};
+
 const LAYER_WIDTH = 300;
 const ROW_HEIGHT = 100;
 
@@ -18,7 +29,7 @@ export const getNodeDepths = (nodes: LayoutGraphNode[], edges: LayoutGraphEdge[]
   const incoming = new Map<string, string[]>();
 
   for (const edge of edges) {
-    incoming.set(edge.targetNodeId, [...(incoming.get(edge.targetNodeId) ?? []), edge.sourceNodeId]);
+    pushTo(incoming, edge.targetNodeId, edge.sourceNodeId);
   }
 
   const resolve = (nodeId: string, seen: Set<string>): number => {
@@ -101,8 +112,8 @@ const getConnectedComponents = (nodes: LayoutSizedNode[], edges: LayoutGraphEdge
   const neighbours = new Map<string, string[]>();
 
   for (const edge of edges) {
-    neighbours.set(edge.sourceNodeId, [...(neighbours.get(edge.sourceNodeId) ?? []), edge.targetNodeId]);
-    neighbours.set(edge.targetNodeId, [...(neighbours.get(edge.targetNodeId) ?? []), edge.sourceNodeId]);
+    pushTo(neighbours, edge.sourceNodeId, edge.targetNodeId);
+    pushTo(neighbours, edge.targetNodeId, edge.sourceNodeId);
   }
 
   const componentOf = new Map<string, number>();
@@ -160,13 +171,13 @@ const layoutComponent = (
   for (const node of nodes) {
     const depth = depths.get(node.id) ?? 0;
 
-    layers.set(depth, [...(layers.get(depth) ?? []), node]);
+    pushTo(layers, depth, node);
   }
 
   const parents = new Map<string, string[]>();
 
   for (const edge of edges) {
-    parents.set(edge.targetNodeId, [...(parents.get(edge.targetNodeId) ?? []), edge.sourceNodeId]);
+    pushTo(parents, edge.targetNodeId, edge.sourceNodeId);
   }
 
   const positions: Record<string, { x: number; y: number }> = {};

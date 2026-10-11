@@ -81,10 +81,10 @@ describe('getNodeFieldFormSettings', () => {
     expect(getNodeFieldFormSettings(undefined, template('IntegerField'))).toBeNull();
   });
 
-  it('keeps the control but drops bounds that cannot form a range', () => {
+  it('keeps inverted bounds as authored and drops a non-positive step', () => {
     expect(
       getNodeFieldFormSettings({ component: 'slider', max: 1, min: 10, step: -2 }, template('FloatField'))
-    ).toEqual({ component: 'slider', kind: 'number' });
+    ).toEqual({ component: 'slider', kind: 'number', max: 1, min: 10 });
   });
 
   it('falls back to the plain control for an unknown component name', () => {
@@ -189,6 +189,18 @@ describe('applyNodeFieldFormSettings', () => {
     expect(applyNodeFieldFormSettings(free, { component: 'slider', kind: 'number', step: 0.25 }).multipleOf).toBe(0.25);
     expect(applyNodeFieldFormSettings(eights, { component: 'slider', kind: 'number', step: 64 }).multipleOf).toBe(64);
     expect(applyNodeFieldFormSettings(eights, { component: 'slider', kind: 'number', step: 12 })).toBe(eights);
+    // An integer field cannot take a fractional step: the slider would commit values the node rejects.
+    const whole = template('IntegerField');
+    expect(applyNodeFieldFormSettings(whole, { component: 'slider', kind: 'number', step: 0.5 })).toBe(whole);
+  });
+
+  it('ignores an inverted pair of bounds but still applies the step', () => {
+    const base = template('IntegerField', { maximum: 100, minimum: 0 });
+
+    expect(applyNodeFieldFormSettings(base, { component: 'slider', kind: 'number', max: 5, min: 10 })).toBe(base);
+    expect(
+      applyNodeFieldFormSettings(base, { component: 'slider', kind: 'number', max: 5, min: 10, step: 5 })
+    ).toMatchObject({ maximum: 100, minimum: 0, multipleOf: 5 });
   });
 
   it('returns the template itself for string settings and unchanged bounds', () => {

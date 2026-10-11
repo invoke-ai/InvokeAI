@@ -25,7 +25,10 @@ const mapInvocationCacheStatus = (dto: InvocationCacheStatusDTO): InvocationCach
 
 export const invocationCacheKey = [...queueKeys.all, 'invocation-cache'] as const;
 
-/** Statistics have no socket stream; they refresh on mount and after each cache command. */
+/**
+ * Statistics have no socket stream. The key sits under the queue's so every queue refresh (status changes, enqueue,
+ * cancel) also refetches them, which is when hit and miss counts move; cache commands invalidate them directly.
+ */
 export const invocationCacheStatusOptions = () =>
   (() => {
     const owner = captureAccountScope();

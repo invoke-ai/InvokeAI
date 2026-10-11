@@ -152,7 +152,9 @@ const isTerminalStatus = (status: QueueServerItemDTO['status']): boolean =>
 
 /**
  * Removes finished history and keeps pending, waiting and running items. Without a scope the server prunes in one
- * sweep; a scoped prune deletes the scope's terminal items individually, as the clear commands do.
+ * sweep; a scoped prune deletes the scope's terminal root items individually, as the clear commands do. Deleting a
+ * root removes its whole workflow-call chain, so children are never addressed on their own: a second delete would
+ * miss, and a finished child must not take a still-waiting parent with it.
  */
 export const clearFinishedQueueItems = async (scope: QueueQueryScope = {}): Promise<void> => {
   const owner = captureAccountScope();
@@ -170,7 +172,9 @@ export const clearFinishedQueueItems = async (scope: QueueQueryScope = {}): Prom
 
   assertAccountScopeCurrent(owner);
   await deleteQueueItems(
-    items.filter((item) => isTerminalStatus(item.status)).map((item) => item.item_id),
+    items
+      .filter((item) => isTerminalStatus(item.status) && (item.parent_item_id ?? null) === null)
+      .map((item) => item.item_id),
     owner.signal
   );
   assertAccountScopeCurrent(owner);
@@ -229,17 +233,31 @@ export const cancelScopedQueueItems = async (
   assertAccountScopeCurrent(owner);
 };
 
-export const cancelByBatchIds = (batchIds: string[]): Promise<CancelByBatchIdsResultDTO> =>
-  apiFetchJson<CancelByBatchIdsResultDTO>(buildQueueUrl('cancel_by_batch_ids'), {
+export const cancelByBatchIds = async (batchIds: string[]): Promise<CancelByBatchIdsResultDTO> => {
+  const owner = captureAccountScope();
+  const result = await apiFetchJson<CancelByBatchIdsResultDTO>(buildQueueUrl('cancel_by_batch_ids'), {
     body: JSON.stringify({ batch_ids: batchIds }),
     method: 'PUT',
+    signal: owner.signal,
   });
 
-export const retryItemsById = (itemIds: number[]): Promise<RetryItemsResultDTO> =>
-  apiFetchJson<RetryItemsResultDTO>(buildQueueUrl('retry_items_by_id'), {
+  assertAccountScopeCurrent(owner);
+
+  return result;
+};
+
+export const retryItemsById = async (itemIds: number[]): Promise<RetryItemsResultDTO> => {
+  const owner = captureAccountScope();
+  const result = await apiFetchJson<RetryItemsResultDTO>(buildQueueUrl('retry_items_by_id'), {
     body: JSON.stringify(itemIds),
     method: 'PUT',
+    signal: owner.signal,
   });
+
+  assertAccountScopeCurrent(owner);
+
+  return result;
+};
 
 const INVOCATION_CACHE_URL = '/api/v1/app/invocation_cache';
 

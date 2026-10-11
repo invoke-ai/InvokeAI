@@ -35,13 +35,15 @@ export const QueueHeaderMenu = () => {
   const clearFinished = useCallback(async () => {
     try {
       await queueCommands.clearFinishedItems(scope);
-      await refreshQueue();
       notify.success(t('widgets.queue.finishedItemsCleared'));
     } catch (error) {
       notify.error(
         t('widgets.queue.failedToClearItems'),
         getApiErrorMessage(error, t('widgets.queue.couldNotClearFinishedItems'))
       );
+    } finally {
+      // A scoped clear deletes item by item, so a failure part-way has still changed the list.
+      await refreshQueue();
     }
   }, [notify, scope, t]);
 

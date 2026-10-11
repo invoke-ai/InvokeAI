@@ -39,9 +39,16 @@ export const useNodeFieldBinding = (element: NodeFieldFormElement, projectGraph:
     ? (invocationNode.data.dynamicInputTemplates?.[fieldName] ?? templates[invocationNode.data.type]?.inputs[fieldName])
     : undefined;
   const instance = invocationNode?.data.inputs[fieldName];
-  const formSettings = template ? getNodeFieldFormSettings(element.data.settings, template) : null;
-  // The authored bounds narrow the template once here; validation, shuffle and the control all read the result.
-  const effectiveTemplate = template ? applyNodeFieldFormSettings(template, formSettings) : undefined;
+  // The authored bounds narrow the template once here; validation, shuffle and the control all read the result,
+  // and the memo keeps its identity stable for the input's own memos while the bag is unchanged.
+  const { effectiveTemplate, formSettings } = useMemo(() => {
+    const settings = template ? getNodeFieldFormSettings(element.data.settings, template) : null;
+
+    return {
+      effectiveTemplate: template ? applyNodeFieldFormSettings(template, settings) : undefined,
+      formSettings: settings,
+    };
+  }, [element.data.settings, template]);
   const groupId =
     invocationNode && isWorkflowBatchNodeType(invocationNode.data.type)
       ? getWorkflowBatchGroupId(invocationNode)

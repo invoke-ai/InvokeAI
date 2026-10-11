@@ -34,7 +34,9 @@ import { getWorkflowNodeChromeProps } from '@features/workflow/ui/nodeChrome';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import { useWorkflowHostCommands } from '@features/workflow/ui/WorkflowUiContext';
 import {
+  applyNodeFieldFormSettings,
   getFormChildren,
+  getNodeFieldFormSettings,
   getResolvedWorkflowEdges,
   getWorkflowFieldInvalidReason,
   isShuffleableField,
@@ -596,7 +598,18 @@ export const getInvalidNodeFieldElementIds = (
 
     const isConnected = connectedInputKeys.has(`${nodeId}:${fieldName}`);
 
-    if (getWorkflowFieldInvalidReason({ isConnected, template, value: node.data.inputs[fieldName]?.value }) !== null) {
+    const effectiveTemplate = applyNodeFieldFormSettings(
+      template,
+      getNodeFieldFormSettings(element.data.settings, template)
+    );
+
+    if (
+      getWorkflowFieldInvalidReason({
+        isConnected,
+        template: effectiveTemplate,
+        value: node.data.inputs[fieldName]?.value,
+      }) !== null
+    ) {
       invalidElementIds.add(element.id);
     }
   }

@@ -191,7 +191,9 @@ describe('clearFinishedQueueItems', () => {
       }
       if (url.endsWith('items_by_ids')) {
         return Promise.resolve([
-          { item_id: 5, status: 'in_progress' },
+          { item_id: 7, parent_item_id: 5, root_item_id: 5, status: 'completed' },
+          { item_id: 6, parent_item_id: 3, root_item_id: 3, status: 'completed' },
+          { item_id: 5, status: 'waiting' },
           { item_id: 4, status: 'pending' },
           { item_id: 3, status: 'completed' },
           { item_id: 2, status: 'canceled' },

@@ -12,6 +12,7 @@ import { useFocusedDraft } from '@features/workflow/ui/fields/NumericInput';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import {
   getDefaultNodeFieldFormSettings,
+  hasInvertedNodeFieldBounds,
   hasNodeFieldFormSettings,
   serializeNodeFieldFormSettings,
 } from '@features/workflow/utility';
@@ -102,6 +103,7 @@ const NumberSettingsBody = ({
     (step: number | undefined) => onChange({ ...settings, step: step !== undefined && step > 0 ? step : undefined }),
     [onChange, settings]
   );
+  const inverted = hasInvertedNodeFieldBounds(settings);
   const needsBounds =
     settings.component !== 'number-input' &&
     ((settings.min === undefined && templateBounds.min === '') ||
@@ -136,10 +138,12 @@ const NumberSettingsBody = ({
           onChange={onStepChange}
         />
       </HStack>
-      <Text color={needsBounds ? 'fg.warning' : 'fg.subtle'} fontSize="xs" lineHeight={1.3}>
-        {needsBounds
-          ? t('widgets.workflow.formBuilder.sliderNeedsBounds')
-          : t('widgets.workflow.formBuilder.boundsHint')}
+      <Text color={inverted || needsBounds ? 'fg.warning' : 'fg.subtle'} fontSize="xs" lineHeight={1.3}>
+        {inverted
+          ? t('widgets.workflow.formBuilder.invertedBounds')
+          : needsBounds
+            ? t('widgets.workflow.formBuilder.sliderNeedsBounds')
+            : t('widgets.workflow.formBuilder.boundsHint')}
       </Text>
     </Stack>
   );

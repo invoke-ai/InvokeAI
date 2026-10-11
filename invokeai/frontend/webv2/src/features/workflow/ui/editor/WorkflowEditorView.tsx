@@ -70,9 +70,6 @@ import { buildDuplicateElements, buildPasteElements, copyNodesToClipboard, useHa
 import { ConnectorFlowNode } from './ConnectorFlowNode';
 import { CurrentImageFlowNode } from './CurrentImageFlowNode';
 import { EditorToolbar, type EditorTool } from './EditorToolbar';
-
-// A node xyflow has not measured yet (a large graph renders only what is visible) counts at a typical node size.
-const UNMEASURED_ARRANGE_SIZE = { height: 160, width: 288 };
 import {
   toFlowEdges,
   toFlowNodes,
@@ -103,6 +100,9 @@ import { WorkflowEdge } from './WorkflowEdge';
 import { WORKFLOW_HOTKEYS } from './workflowHotkeys';
 import { WorkflowSelectionRequestRuntime } from './WorkflowSelectionRequestRuntime';
 import { getWorkflowViewport, getWorkflowViewportKey, setWorkflowViewport } from './workflowViewportStore';
+
+// A node xyflow has not measured yet (a large graph renders only what is visible) counts at a typical node size.
+const UNMEASURED_ARRANGE_SIZE = { height: 160, width: 288 };
 
 const nodeTypes: NodeTypes = {
   connector: ConnectorFlowNode,
