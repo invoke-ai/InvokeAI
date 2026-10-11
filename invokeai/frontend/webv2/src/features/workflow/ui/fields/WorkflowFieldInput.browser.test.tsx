@@ -347,6 +347,72 @@ describe('WorkflowFieldInput textarea', () => {
   });
 });
 
+describe('WorkflowFieldInput authored form controls', () => {
+  const renderWithSettings = async (
+    template: FieldInputTemplate,
+    value: unknown,
+    onChange: (value: unknown) => void,
+    formSettings: WorkflowFieldInputProps['formSettings']
+  ) => {
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <QueryClientProvider client={queryClient}>
+            <DndContext>
+              <WorkflowFieldInput formSettings={formSettings} template={template} value={value} onChange={onChange} />
+            </DndContext>
+          </QueryClientProvider>
+        </ChakraProvider>
+      );
+    });
+  };
+
+  it('restricts a dropdown string field to the authored options and commits the option value', async () => {
+    const onChange = vi.fn();
+    await renderWithSettings(fullTemplate('StringField'), 'slow', onChange, {
+      component: 'dropdown',
+      kind: 'string',
+      options: [
+        { label: 'Fast', value: 'fast' },
+        { label: '', value: 'slow' },
+      ],
+    });
+
+    expect(host.querySelector('input:not([type="hidden"]), textarea')).toBeNull();
+    const trigger = host.querySelector<HTMLElement>('[data-scope="select"][data-part="trigger"]')!;
+    expect(trigger.textContent).toContain('slow');
+
+    await act(() => userEvent.click(trigger));
+    const items = Array.from(document.querySelectorAll<HTMLElement>('[data-scope="select"][data-part="item"]'));
+    expect(items.map((item) => item.textContent)).toEqual(['Fast', 'slow']);
+
+    await act(() => userEvent.click(items[0]!));
+    expect(onChange).toHaveBeenCalledWith('fast');
+  });
+
+  it('shows a slider for a bounded number field and keeps the input when an end is open', async () => {
+    const bounded = fullTemplate('IntegerField', { maximum: 20, minimum: 4, multipleOf: 4 });
+    await renderWithSettings(bounded, 8, vi.fn(), { component: 'slider', kind: 'number' });
+
+    const slider = host.querySelector<HTMLElement>('[role="slider"]')!;
+    expect(slider.getAttribute('aria-valuemin')).toBe('4');
+    expect(slider.getAttribute('aria-valuemax')).toBe('20');
+    expect(slider.getAttribute('aria-valuenow')).toBe('8');
+    expect(host.querySelector('input[type="number"]')).toBeNull();
+
+    await renderWithSettings(bounded, 8, vi.fn(), { component: 'number-input-and-slider', kind: 'number' });
+    expect(host.querySelector('[role="slider"]')).not.toBeNull();
+    expect(host.querySelector<HTMLInputElement>('[data-scope="number-input"] input')?.value).toBe('8');
+
+    await renderWithSettings(fullTemplate('IntegerField', { minimum: 0 }), 8, vi.fn(), {
+      component: 'slider',
+      kind: 'number',
+    });
+    expect(host.querySelector('[role="slider"]')).toBeNull();
+    expect(host.querySelector<HTMLInputElement>('input[type="number"]')?.value).toBe('8');
+  });
+});
+
 describe('WorkflowFieldInput typed enums', () => {
   it.each([
     { label: 'numeric', options: [256, 512], selected: 512, next: 256 },

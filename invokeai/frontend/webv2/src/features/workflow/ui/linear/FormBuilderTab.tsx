@@ -81,6 +81,7 @@ import {
   type AddableFormElementKey,
 } from './formElementMeta';
 import { NodeFieldControl, useNodeFieldBinding } from './NodeFieldControl';
+import { NodeFieldSettingsPopover } from './NodeFieldSettingsPopover';
 
 /**
  * Commit form moves only at DndContext onDragEnd so reparenting remounts cannot lose completion; all edits use the
@@ -433,6 +434,7 @@ const BuilderElementBase = ({
                 </IconButton>
               </Tooltip>
               <FieldDescriptionAction element={element} projectGraph={projectGraph} />
+              <NodeFieldSettingsPopover element={element} projectGraph={projectGraph} />
               <ShuffleToggleAction element={element} projectGraph={projectGraph} />
               <Tooltip
                 content={

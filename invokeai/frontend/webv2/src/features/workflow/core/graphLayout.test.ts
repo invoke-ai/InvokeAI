@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { LayoutGraphEdge, LayoutGraphNode } from './graphLayout';
 
-import { getLayeredPositions, getNodeDepths, getTopologicalOrder } from './graphLayout';
+import { getLayeredPositions, getNodeDepths, getSizedLayeredPositions, getTopologicalOrder } from './graphLayout';
 
 // Diamond: a -> b, a -> c, b -> d, c -> d
 const DIAMOND_NODES: LayoutGraphNode[] = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }];
@@ -60,5 +60,44 @@ describe('getLayeredPositions', () => {
     expect(positions.b).toEqual({ x: 300, y: 0 });
     expect(positions.c).toEqual({ x: 300, y: 100 });
     expect(positions.d).toEqual({ x: 600, y: 0 });
+  });
+});
+
+describe('getSizedLayeredPositions', () => {
+  it('stacks each layer by node height and places the next layer past the widest node', () => {
+    const nodes = [
+      { height: 100, id: 'a', width: 200 },
+      { height: 300, id: 'b', width: 250 },
+      { height: 120, id: 'c', width: 180 },
+      { height: 80, id: 'd', width: 200 },
+    ];
+
+    expect(
+      getSizedLayeredPositions(nodes, DIAMOND_EDGES, { layerGap: 50, origin: { x: 10, y: 20 }, rowGap: 10 })
+    ).toEqual({
+      a: { x: 10, y: 20 },
+      b: { x: 260, y: 20 },
+      c: { x: 260, y: 330 },
+      d: { x: 560, y: 20 },
+    });
+  });
+
+  it('orders a layer by the mean row of its parents so edges do not cross', () => {
+    // p -> y and q -> x, listed in the "wrong" order: x and y swap rows to follow their parents.
+    const nodes = [
+      { height: 10, id: 'p', width: 10 },
+      { height: 10, id: 'q', width: 10 },
+      { height: 10, id: 'x', width: 10 },
+      { height: 10, id: 'y', width: 10 },
+    ];
+    const edges = [
+      { sourceNodeId: 'p', targetNodeId: 'y' },
+      { sourceNodeId: 'q', targetNodeId: 'x' },
+    ];
+
+    const positions = getSizedLayeredPositions(nodes, edges, { rowGap: 0 });
+
+    expect(positions.y!.y).toBeLessThan(positions.x!.y);
+    expect(positions.x!.x).toBe(positions.y!.x);
   });
 });

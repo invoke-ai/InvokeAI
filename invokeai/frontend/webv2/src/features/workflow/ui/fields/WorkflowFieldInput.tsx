@@ -1,7 +1,7 @@
 import type { ModelConfig, ModelTaxonomyType } from '@features/models/react';
 import type { FieldInputTemplate } from '@features/workflow/contracts';
 import type { WorkflowLibraryPage, WorkflowRecordDTO } from '@features/workflow/data/api';
-import type { LoraFieldCollectionEntry } from '@features/workflow/utility';
+import type { LoraFieldCollectionEntry, NodeFieldFormSettings } from '@features/workflow/utility';
 import type { SeedInputPatch } from '@platform/ui/SeedInput';
 
 import {
@@ -66,10 +66,12 @@ import {
   finiteNumberOrUndefined,
   invalidProps,
   NumericInput,
+  NumericSliderInput,
   useFocusedDraft,
 } from '@features/workflow/ui/fields/NumericInput';
 import { useWorkflowProjectSelector, useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
 import {
+  getNodeFieldSliderRange,
   getResolvedWorkflowEdges,
   isLoraFieldCollectionEntry,
   isLoraFieldWeightValid,
@@ -159,6 +161,11 @@ export interface WorkflowFieldInputProps {
   /** The instance's seed mode; read only for seed inputs (`isSeedInputField`), which render the mode menu. */
   seedMode?: SeedMode;
   onSeedModeChange?: (seedMode: SeedMode) => void;
+  /**
+   * The form element's authored control (dropdown, slider, text area) for a scalar string or number field; the
+   * template's bounds are expected to be narrowed by `applyNodeFieldFormSettings` already.
+   */
+  formSettings?: NodeFieldFormSettings | null;
 }
 
 // The media well's hover matches DropZone's accent preview; an invalid well keeps its error border and tints instead.
@@ -171,7 +178,7 @@ const MEDIA_WELL_INVALID_PROPS = {
 /** A row of a list names itself by position; a scalar field is named by its title. */
 type ScalarInputProps = WorkflowFieldInputProps & { ariaLabel?: string };
 
-const StringInput = ({ ariaLabel, id, invalid, onChange, template, value }: ScalarInputProps) => {
+const StringInput = ({ ariaLabel, formSettings, id, invalid, onChange, template, value }: ScalarInputProps) => {
   const [draft, setDraft, clearDraft] = useFocusedDraft();
   const text = draft ?? (typeof value === 'string' ? value : '');
   const onTextChange = useCallback(
@@ -181,8 +188,33 @@ const StringInput = ({ ariaLabel, id, invalid, onChange, template, value }: Scal
     },
     [onChange, setDraft]
   );
+  const stringSettings = formSettings?.kind === 'string' ? formSettings : null;
+  const component = stringSettings?.component ?? (template.uiComponent === 'textarea' ? 'textarea' : 'input');
+  const dropdownOptions = useMemo(
+    () =>
+      stringSettings?.component === 'dropdown'
+        ? stringSettings.options.map((option, index) => ({
+            label: option.label || option.value || `Option ${index + 1}`,
+            value: option.value,
+          }))
+        : [],
+    [stringSettings]
+  );
 
-  if (template.uiComponent === 'textarea') {
+  if (component === 'dropdown') {
+    return (
+      <SelectInput
+        id={id}
+        invalid={invalid}
+        options={dropdownOptions}
+        title={ariaLabel ?? template.title}
+        value={value}
+        onChange={onChange}
+      />
+    );
+  }
+
+  if (component === 'textarea') {
     return (
       <ResizableTextarea
         aria-label={ariaLabel ?? template.title}
@@ -211,6 +243,28 @@ const StringInput = ({ ariaLabel, id, invalid, onChange, template, value }: Scal
       {...invalidProps(invalid)}
       onBlur={clearDraft}
       onChange={onTextChange}
+    />
+  );
+};
+
+/** A number field renders the authored slider when its (narrowed) template bounds both ends; otherwise the input. */
+const NumberFieldInput = (props: ScalarInputProps) => {
+  const { formSettings, template } = props;
+  const component = formSettings?.kind === 'number' ? formSettings.component : 'number-input';
+  const range = component === 'number-input' ? null : getNodeFieldSliderRange(template);
+
+  if (!range) {
+    return <NumericInput {...props} />;
+  }
+
+  return (
+    <NumericSliderInput
+      ariaLabel={props.ariaLabel}
+      range={range}
+      template={template}
+      value={props.value}
+      withNumberInput={component === 'number-input-and-slider'}
+      onChange={props.onChange}
     />
   );
 };
@@ -1817,9 +1871,9 @@ export const WorkflowFieldInput = (props: WorkflowFieldInputProps) => {
         );
       }
 
-      return <NumericInput {...props} />;
+      return <NumberFieldInput {...props} />;
     case 'FloatField':
-      return <NumericInput {...props} />;
+      return <NumberFieldInput {...props} />;
     case 'BooleanField':
       return <BooleanInput {...props} />;
     case 'EnumField':
