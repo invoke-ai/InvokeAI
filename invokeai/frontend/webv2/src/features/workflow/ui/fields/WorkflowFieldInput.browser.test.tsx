@@ -411,6 +411,23 @@ describe('WorkflowFieldInput authored form controls', () => {
     expect(host.querySelector('[role="slider"]')).toBeNull();
     expect(host.querySelector<HTMLInputElement>('input[type="number"]')?.value).toBe('8');
   });
+
+  it('ends the slider track on the step multiples the node accepts', async () => {
+    // Bounds 1–100 with a step of 8 admit 8…96; a track from 1 would offer stops such as 49 that validation rejects.
+    const misaligned = fullTemplate('IntegerField', { maximum: 100, minimum: 1, multipleOf: 8 });
+    await renderWithSettings(misaligned, 16, vi.fn(), { component: 'slider', kind: 'number' });
+
+    const slider = host.querySelector<HTMLElement>('[role="slider"]')!;
+    expect(slider.getAttribute('aria-valuemin')).toBe('8');
+    expect(slider.getAttribute('aria-valuemax')).toBe('96');
+
+    await renderWithSettings(fullTemplate('IntegerField', { maximum: 7, minimum: 1, multipleOf: 8 }), 0, vi.fn(), {
+      component: 'slider',
+      kind: 'number',
+    });
+    expect(host.querySelector('[role="slider"]')).toBeNull();
+    expect(host.querySelector('input[type="number"]')).not.toBeNull();
+  });
 });
 
 describe('WorkflowFieldInput typed enums', () => {

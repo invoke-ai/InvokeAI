@@ -221,9 +221,47 @@ describe('getNodeFieldSliderRange', () => {
     expect(
       getNodeFieldSliderRange(template('FloatField', { exclusiveMaximum: 1, exclusiveMinimum: 0, multipleOf: 0.1 }))
     ).toEqual({ max: 0.9, min: 0.1, step: 0.1 });
+    expect(getNodeFieldSliderRange(template('FloatField', { exclusiveMaximum: 1, exclusiveMinimum: 0 }))).toEqual({
+      max: 0.99,
+      min: 0.01,
+      step: 0.01,
+    });
   });
 
-  it('has no range while an end is open', () => {
+  it('ends the track on the step multiples validation accepts, not on the bounds', () => {
+    // Every stop must pass `isWorkflowFieldValueValid`, which counts multiples from zero.
+    expect(getNodeFieldSliderRange(template('IntegerField', { maximum: 100, minimum: 1, multipleOf: 8 }))).toEqual({
+      max: 96,
+      min: 8,
+      step: 8,
+    });
+    expect(getNodeFieldSliderRange(template('IntegerField', { maximum: 9.5, minimum: 1.5 }))).toEqual({
+      max: 9,
+      min: 2,
+      step: 1,
+    });
+    expect(getNodeFieldSliderRange(template('FloatField', { maximum: 0.95, minimum: 0.05, multipleOf: 0.1 }))).toEqual({
+      max: 0.9,
+      min: 0.1,
+      step: 0.1,
+    });
+  });
+
+  it('keeps a bound that is itself a multiple despite float noise, and steps past an exclusive one', () => {
+    // 1.1 / 0.1 and 0.3 / 0.1 are not integers in floating point; validation tolerates that and so must the track.
+    expect(getNodeFieldSliderRange(template('FloatField', { maximum: 1.1, minimum: 0.3, multipleOf: 0.1 }))).toEqual({
+      max: 1.1,
+      min: 0.3,
+      step: 0.1,
+    });
+    expect(
+      getNodeFieldSliderRange(template('FloatField', { exclusiveMaximum: 1.1, exclusiveMinimum: 0.3, multipleOf: 0.1 }))
+    ).toEqual({ max: 1, min: 0.4, step: 0.1 });
+  });
+
+  it('has no range while an end is open or no stop would be valid', () => {
     expect(getNodeFieldSliderRange(template('IntegerField', { minimum: 0 }))).toBeNull();
+    expect(getNodeFieldSliderRange(template('IntegerField', { maximum: 7, minimum: 1, multipleOf: 8 }))).toBeNull();
+    expect(getNodeFieldSliderRange(template('IntegerField', { maximum: 2.9, minimum: 2.1 }))).toBeNull();
   });
 });

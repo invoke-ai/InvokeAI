@@ -827,4 +827,39 @@ describe('Form builder field settings', () => {
     expect(storedSettings()).toMatchObject({ max: 5, min: 1 });
     expect(document.body.textContent).not.toContain(i18n.t('widgets.workflow.formBuilder.invertedBounds'));
   });
+
+  it('warns that a slider has no track until its bounds admit a step multiple', async () => {
+    const { storedSettings } = await renderBuilder();
+
+    await userEvent.click(
+      host.querySelector(`[aria-label="${i18n.t('widgets.workflow.formBuilder.fieldSettings')}"]`)!
+    );
+
+    const sliderOption = Array.from(document.querySelectorAll<HTMLElement>('[data-part="item"]')).find(
+      (item) => item.textContent === i18n.t('widgets.workflow.formBuilder.controlSlider')
+    )!;
+    const boundInput = (key: 'maximum' | 'minimum' | 'step') =>
+      document.querySelector<HTMLInputElement>(`input[aria-label="${i18n.t(`widgets.workflow.formBuilder.${key}`)}"]`)!;
+    // Typed into the focused element: a locator for "Step" also matches the exposed "Steps" field by label.
+    const fillBound = async (key: 'maximum' | 'minimum' | 'step', value: string) => {
+      boundInput(key).focus();
+      await userEvent.keyboard(`{Control>}a{/Control}${value}`);
+    };
+    const hint = i18n.t('widgets.workflow.formBuilder.sliderNeedsBounds');
+
+    await userEvent.click(sliderOption);
+    expect(storedSettings()).toMatchObject({ component: 'slider' });
+    // The integer template has no bounds of its own.
+    expect(document.body.textContent).toContain(hint);
+
+    await fillBound('minimum', '1');
+    await fillBound('maximum', '7');
+    await fillBound('step', '8');
+    // 1…7 holds no multiple of 8, so the form would still show an input.
+    expect(document.body.textContent).toContain(hint);
+
+    await fillBound('maximum', '8');
+    expect(storedSettings()).toMatchObject({ max: 8, min: 1, step: 8 });
+    expect(document.body.textContent).not.toContain(hint);
+  });
 });

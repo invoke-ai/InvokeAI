@@ -1,5 +1,7 @@
 import type { FieldInputTemplate, WorkflowForm } from './types';
 
+import { finiteNumberOrNull, getWorkflowFieldStepIndexBounds, toWorkflowFieldStepMultiple } from './fields';
+
 /**
  * Per-element control settings an author gives a form field: which control renders it and, for numbers, the
  * bounds the form offers. They are stored in the element's legacy settings bag (`NodeFieldFormElement.data.settings`)
@@ -230,21 +232,43 @@ export interface NodeFieldSliderRange {
   step: number;
 }
 
+// The track step of a float field that accepts any value in range, as in v6.
+const FLOAT_SLIDER_STEP = 0.01;
+
 /**
- * The range a slider can show for `template` (already narrowed by `applyNodeFieldFormSettings`), or null when an
- * end is unbounded: a slider over an open range has no meaningful track, so the host keeps the number input.
+ * The range a slider can show for `template` (already narrowed by `applyNodeFieldFormSettings`), or null when it
+ * has no track: an end is unbounded, or no stop would pass validation. The host then keeps the number input.
+ *
+ * Validation accepts only multiples of the step counted from zero (every integer, for an integer field without
+ * one), so the track runs between the first and last multiples inside the bounds rather than the bounds
+ * themselves; a slider stepping by 8 between 1 and 100 offers 8…96, not 1…97.
  */
 export const getNodeFieldSliderRange = (template: FieldInputTemplate): NodeFieldSliderRange | null => {
-  const isInteger = template.type.name === 'IntegerField';
-  const step = template.multipleOf !== null && template.multipleOf > 0 ? template.multipleOf : isInteger ? 1 : 0.01;
-  const min = template.minimum ?? (template.exclusiveMinimum !== null ? template.exclusiveMinimum + step : null);
-  const max = template.maximum ?? (template.exclusiveMaximum !== null ? template.exclusiveMaximum - step : null);
+  const multipleOf = finiteNumberOrNull(template.multipleOf);
+  const step = multipleOf !== null && multipleOf > 0 ? multipleOf : template.type.name === 'IntegerField' ? 1 : null;
 
-  if (min === null || max === null || !Number.isFinite(min) || !Number.isFinite(max) || min > max) {
+  if (step !== null) {
+    const { first, last } = getWorkflowFieldStepIndexBounds(template, step);
+
+    if (first === null || last === null || first > last) {
+      return null;
+    }
+
+    return { max: toWorkflowFieldStepMultiple(last, step), min: toWorkflowFieldStepMultiple(first, step), step };
+  }
+
+  const exclusiveMinimum = finiteNumberOrNull(template.exclusiveMinimum);
+  const exclusiveMaximum = finiteNumberOrNull(template.exclusiveMaximum);
+  const min =
+    finiteNumberOrNull(template.minimum) ?? (exclusiveMinimum !== null ? exclusiveMinimum + FLOAT_SLIDER_STEP : null);
+  const max =
+    finiteNumberOrNull(template.maximum) ?? (exclusiveMaximum !== null ? exclusiveMaximum - FLOAT_SLIDER_STEP : null);
+
+  if (min === null || max === null || min > max) {
     return null;
   }
 
-  return { max, min, step };
+  return { max, min, step: FLOAT_SLIDER_STEP };
 };
 
 /**

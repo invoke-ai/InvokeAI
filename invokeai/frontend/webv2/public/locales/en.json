@@ -3352,7 +3352,7 @@
         "optionValuePlaceholder": "Value",
         "removeOption": "Remove option {{index}}",
         "invertedBounds": "The minimum is above the maximum; the form ignores both until one is corrected.",
-        "sliderNeedsBounds": "A slider needs a minimum and a maximum; until both are known the form shows an input.",
+        "sliderNeedsBounds": "A slider needs a minimum and a maximum with at least one step between them; until then the form shows an input.",
         "step": "Step",
         "containerEmpty": "Empty container — drag cards here",
         "dropHere": "Drop here",

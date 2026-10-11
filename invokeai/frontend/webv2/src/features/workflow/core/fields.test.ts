@@ -138,6 +138,15 @@ describe('workflow field validation', () => {
     expect(isWorkflowFieldValueValid(input({ multipleOf: 2, type: single('IntegerField') }), -3)).toBe(false);
   });
 
+  it('accepts multiples of a fine step far from zero despite float noise', () => {
+    // 1.001 / 0.001 is 1000.9999999999999; an absolute tolerance on the quotient would reject it.
+    const fine = input({ maximum: 2, minimum: 1, multipleOf: 0.001, type: single('FloatField') });
+
+    expect(isWorkflowFieldValueValid(fine, 1.001)).toBe(true);
+    expect(isWorkflowFieldValueValid(fine, 1.999)).toBe(true);
+    expect(isWorkflowFieldValueValid(fine, 1.0015)).toBe(false);
+  });
+
   it('tells a cleared required number apart from a present but invalid one', () => {
     const required = input({ minimum: 0, type: single('IntegerField') });
     const optional = input({ required: false, type: single('FloatField') });
@@ -457,6 +466,25 @@ describe('getRandomWorkflowFieldValue', () => {
 
     expect(getRandomWorkflowFieldValue(steppedExclusive, () => 0)).toBe(0.5);
     expect(getRandomWorkflowFieldValue(steppedExclusive, () => 0.999)).toBe(0.5);
+  });
+
+  it('treats a bound that is a multiple up to float noise the way validation does', () => {
+    // 1.1 / 0.1 is 11.000000000000002 and 0.3 / 0.1 is 2.9999999999999996; validation accepts both as multiples.
+    const closed = input({ maximum: 1.1, minimum: 0.3, multipleOf: 0.1, type: single('FloatField') });
+
+    expect(getRandomWorkflowFieldValue(closed, () => 0)).toBe(0.3);
+    expect(getRandomWorkflowFieldValue(closed, () => 0.999)).toBe(1.1);
+
+    const open = input({ exclusiveMaximum: 1.1, exclusiveMinimum: 0.3, multipleOf: 0.1, type: single('FloatField') });
+
+    expect(getRandomWorkflowFieldValue(open, () => 0)).toBe(0.4);
+    expect(getRandomWorkflowFieldValue(open, () => 0.999)).toBe(1);
+    expect(
+      isWorkflowFieldValueValid(
+        open,
+        getRandomWorkflowFieldValue(open, () => 0)
+      )
+    ).toBe(true);
   });
 
   it('keeps legacy numeric templates finite when optional constraints are absent', () => {

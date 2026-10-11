@@ -1,4 +1,4 @@
-import type { NodeFieldFormElement, ProjectGraphState } from '@features/workflow/contracts';
+import type { FieldInputTemplate, NodeFieldFormElement, ProjectGraphState } from '@features/workflow/contracts';
 import type {
   NodeFieldFormSettings,
   NodeFieldNumberSettings,
@@ -11,7 +11,9 @@ import { isSeedInputField } from '@features/workflow/graph';
 import { useFocusedDraft } from '@features/workflow/ui/fields/NumericInput';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import {
+  applyNodeFieldFormSettings,
   getDefaultNodeFieldFormSettings,
+  getNodeFieldSliderRange,
   hasInvertedNodeFieldBounds,
   hasNodeFieldFormSettings,
   serializeNodeFieldFormSettings,
@@ -78,10 +80,12 @@ const BoundInput = ({
 const NumberSettingsBody = ({
   onChange,
   settings,
+  template,
   templateBounds,
 }: {
   onChange: (settings: NodeFieldFormSettings) => void;
   settings: NodeFieldNumberSettings;
+  template: FieldInputTemplate;
   templateBounds: { max: string; min: string; step: string };
 }) => {
   const { t } = useTranslation();
@@ -104,10 +108,11 @@ const NumberSettingsBody = ({
     [onChange, settings]
   );
   const inverted = hasInvertedNodeFieldBounds(settings);
+  // The form falls back to an input whenever the narrowed template yields no track, so say so here.
   const needsBounds =
     settings.component !== 'number-input' &&
-    ((settings.min === undefined && templateBounds.min === '') ||
-      (settings.max === undefined && templateBounds.max === ''));
+    !inverted &&
+    getNodeFieldSliderRange(applyNodeFieldFormSettings(template, settings)) === null;
 
   return (
     <Stack gap="2">
@@ -347,7 +352,12 @@ export const NodeFieldSettingsPopover = ({
                   {t('widgets.workflow.formBuilder.fieldSettingsHint')}
                 </Text>
                 {settings.kind === 'number' ? (
-                  <NumberSettingsBody settings={settings} templateBounds={templateBounds} onChange={onSettingsChange} />
+                  <NumberSettingsBody
+                    settings={settings}
+                    template={template}
+                    templateBounds={templateBounds}
+                    onChange={onSettingsChange}
+                  />
                 ) : (
                   <StringSettingsBody settings={settings} onChange={onSettingsChange} />
                 )}
