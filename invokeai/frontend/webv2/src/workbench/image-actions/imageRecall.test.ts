@@ -98,6 +98,13 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   pidDecoderModel: null,
   gemma2EncoderModel: null,
   pidSteps: 4,
+  refinerModel: null,
+  refinerSteps: 20,
+  refinerCfgScale: 7.5,
+  refinerScheduler: 'euler',
+  refinerPositiveAestheticScore: 6,
+  refinerNegativeAestheticScore: 2.5,
+  refinerStart: 0.8,
   cfgRescaleMultiplier: 0,
   cfgScale: 7,
   clipEmbedModel: null,
@@ -1231,5 +1238,166 @@ describe('remix round trip', () => {
       'wanLowNoiseModel',
       'wanT5EncoderModel',
     ]);
+  });
+});
+
+describe('SDXL Refiner recall', () => {
+  const refiner: MainModelConfig = {
+    base: 'sdxl-refiner',
+    hash: 'blake3:refiner',
+    key: 'refiner-installed',
+    name: 'SDXL Refiner',
+    type: 'main',
+  };
+  const recordedRefiner = {
+    refiner_cfg_scale: 5,
+    refiner_model: { base: 'sdxl-refiner', hash: 'blake3:refiner', key: 'refiner-recorded', name: 'SDXL Refiner' },
+    refiner_negative_aesthetic_score: 2,
+    refiner_positive_aesthetic_score: 7,
+    refiner_scheduler: 'dpmpp_2m',
+    refiner_start: 0.7,
+    refiner_steps: 12,
+  };
+  const recall = (metadata: Record<string, unknown>, models: ComponentModelConfig[], kind: ImageRecallKind = 'all') =>
+    buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind,
+      metadata: { model: { key: sdxlModel.key }, ...metadata },
+      models,
+      supportedModels: [sdxlModel],
+      vaeModels: [],
+    });
+
+  it.each(['all', 'remix'] as const)('restores the refiner and its tuning with %s, resolving by hash', (kind) => {
+    const result = recall(recordedRefiner, [refiner], kind);
+
+    expect(result?.values).toMatchObject({
+      refinerCfgScale: 5,
+      refinerModel: refiner,
+      refinerNegativeAestheticScore: 2,
+      refinerPositiveAestheticScore: 7,
+      refinerScheduler: 'dpmpp_2m',
+      refinerStart: 0.7,
+      refinerSteps: 12,
+    });
+    expect(result?.fields).toContain('refiner');
+  });
+
+  it('resolves the refiner by key, then by name and base, and only when that is unambiguous', () => {
+    const byKey = { ...refiner, hash: 'blake3:other', key: 'refiner-recorded' };
+
+    expect(recall(recordedRefiner, [byKey, refiner])?.values.refinerModel).toEqual(byKey);
+
+    const unhashed = { ...recordedRefiner, refiner_model: { base: 'sdxl-refiner', name: 'SDXL Refiner' } };
+    const twin = { ...refiner, key: 'refiner-twin' };
+
+    expect(recall(unhashed, [refiner])?.values.refinerModel).toEqual(refiner);
+    expect(recall(unhashed, [refiner, twin])?.values.refinerModel).toBeNull();
+  });
+
+  it('keeps the current refiner when the recorded one is not installed, but still restores the tuning', () => {
+    const current = createValues({ refinerModel: refiner });
+    const result = buildImageRecallSettings({
+      currentValues: current,
+      image,
+      kind: 'all',
+      metadata: { model: { key: sdxlModel.key }, ...recordedRefiner },
+      models: [{ ...refiner, key: 'another-refiner', hash: 'blake3:another', name: 'Other Refiner' }],
+      supportedModels: [sdxlModel],
+      vaeModels: [],
+    });
+
+    expect(result?.values.refinerModel).toEqual(refiner);
+    expect(result?.values.refinerStart).toBe(0.7);
+  });
+
+  it('clears the refiner for a generation record that ran without one and ignores refiner data on other families', () => {
+    const cleared = buildImageRecallSettings({
+      currentValues: createValues({ refinerModel: refiner }),
+      image,
+      kind: 'all',
+      metadata: { generation_mode: 'sdxl_txt2img', model: { key: sdxlModel.key } },
+      models: [refiner],
+      supportedModels: [sdxlModel],
+      vaeModels: [],
+    });
+
+    expect(cleared?.values.refinerModel).toBeNull();
+    expect(cleared?.fields).toContain('refiner');
+
+    // A canvas save names a model but is not a generation record, so it says nothing about the refiner.
+    const canvasSave = buildImageRecallSettings({
+      currentValues: createValues({ refinerModel: refiner }),
+      image,
+      kind: 'all',
+      metadata: { model: { key: sdxlModel.key }, positive_prompt: 'kept' },
+      models: [refiner],
+      supportedModels: [sdxlModel],
+      vaeModels: [],
+    });
+
+    expect(canvasSave?.values.refinerModel).toEqual(refiner);
+    expect(canvasSave?.fields).not.toContain('refiner');
+
+    const sd1 = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: { model: { key: sd1Model.key }, ...recordedRefiner },
+      models: [sd1Model, refiner],
+      supportedModels: [sd1Model],
+      vaeModels: [],
+    });
+
+    expect(sd1?.values.refinerModel).toBeNull();
+    expect(sd1?.fields).not.toContain('refiner');
+  });
+
+  it('drops out-of-range refiner tuning and unknown schedulers', () => {
+    const result = recall({ ...recordedRefiner, refiner_scheduler: 'bogus', refiner_start: 3, refiner_steps: 0 }, [
+      refiner,
+    ]);
+
+    expect(result?.values).toMatchObject({
+      refinerModel: refiner,
+      refinerScheduler: 'euler',
+      refinerStart: 0.8,
+      refinerSteps: 20,
+    });
+  });
+
+  it('round-trips the refiner a compiled SDXL graph records', () => {
+    const { model, settings } = satisfiedSettingsFor('sdxl', {
+      label: 'diffusers',
+      overrides: { format: 'diffusers' },
+    });
+    const graph = compileGenerateGraph({ ...settings, refinerModel: refiner, refinerStart: 0.65 }, model, 'gallery', {
+      useCpuNoise: true,
+    }).backendGraph;
+    const metadata = Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ model: sd1Model, modelKey: sd1Model.key }),
+      image,
+      kind: 'remix',
+      metadata,
+      models: [refiner],
+      supportedModels: [model],
+      vaeModels: [],
+    });
+
+    expect(result?.values.model).toEqual(model);
+    expect(result?.values.refinerModel).toEqual(refiner);
+    expect(result?.values.refinerStart).toBe(0.65);
+    expect(
+      getImageRecallCapabilities({
+        currentValues: createValues(),
+        image,
+        metadata: { refiner_model: metadata?.refiner_model },
+        models: [refiner],
+        supportedModels: [model],
+        vaeModels: [],
+      })
+    ).toMatchObject({ all: true, remix: true });
   });
 });

@@ -6,7 +6,7 @@ import { seedArchitectureCapabilities } from '@features/generation/core/architec
 import { describe, expect, it } from 'vitest';
 
 import type { GenerateComponentValueKey, SupportedGenerateBase } from './baseGenerationPolicies';
-import type { ModelIdentifierConfig, VaeModelConfig } from './types';
+import type { MainModelConfig, ModelIdentifierConfig, VaeModelConfig } from './types';
 
 import {
   getComponentSectionPolicy,
@@ -34,6 +34,14 @@ const compileForShape = (
   expect(getGenerationValidationReasons(model, settings), `${base}/${shape.label} is not satisfiable`).toEqual([]);
 
   return { filled, graph: compileGenerateGraph(settings, model, 'gallery', { useCpuNoise: true }).backendGraph };
+};
+
+const SDXL_REFINER_SHAPE: ModelShape = { label: 'diffusers-with-refiner', overrides: { format: 'diffusers' } };
+const SDXL_REFINER_MODEL: MainModelConfig = {
+  base: 'sdxl-refiner',
+  key: 'sdxl-refiner',
+  name: 'SDXL Refiner',
+  type: 'main',
 };
 
 seedArchitectureCapabilities();
@@ -162,8 +170,27 @@ describe('generate graph coverage', () => {
     const fieldsFor = (nodeType: string) =>
       (fields[nodeType] ??= { inputs: new Set(), literals: new Map(), outputs: new Set() });
 
-    for (const { base, shape } of generateGraphCases) {
-      const { filled, graph } = compileForShape(base, shape);
+    // The refiner is a per-image choice, not a component slot, so it needs its own SDXL case.
+    const refinerCase = () => {
+      const { filled, model, settings } = satisfiedSettingsFor('sdxl', SDXL_REFINER_SHAPE);
+      const withRefiner = { ...settings, refinerModel: SDXL_REFINER_MODEL };
+
+      expect(getGenerationValidationReasons(model, withRefiner)).toEqual([]);
+
+      return {
+        base: 'sdxl' as const,
+        filled,
+        graph: compileGenerateGraph(withRefiner, model, 'gallery', { useCpuNoise: true }).backendGraph,
+        shape: SDXL_REFINER_SHAPE,
+      };
+    };
+    const contractCases = [
+      ...generateGraphCases.map(({ base, shape }) => () => ({ base, shape, ...compileForShape(base, shape) })),
+      refinerCase,
+    ];
+
+    for (const compileCase of contractCases) {
+      const { base, filled, graph, shape } = compileCase();
       const entry = (byBase[base] ??= { componentsFilled: {}, nodeTypes: [] });
 
       entry.componentsFilled[shape.label] = filled;

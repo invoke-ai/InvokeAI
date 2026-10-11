@@ -62,11 +62,15 @@ The **Advanced** section appears for models with extra options, and its header c
 * **PiD Decode** — decodes the image at up to four times its size; see [PiD Super-Resolution Decode](/users-guide/image-generation/advanced-topics/pid-decode/).
 * **Seamless tiling** — makes the image tile along the X axis, the Y axis, or both.
 
+### Refiner
+
+The **Refiner** section appears for SDXL models. Pick an **SDXL Refiner** model to have it finish the last part of the denoising schedule; the base model stops at **Refiner start** (0.8 by default, so the refiner handles the final 20%) and the refiner continues from there with its own **Refiner steps**, **Refiner CFG** and **Refiner scheduler**. The **Positive** and **Negative aesthetic score** condition the refiner on the aesthetic rating it was trained with. The controls are disabled until a refiner is selected, and refiner models are only offered here, never as the main model. The refiner also runs for SDXL generations from the Canvas. It cannot be combined with **PiD Decode**. See [SDXL](/users-guide/models/local-models/sdxl/#sdxl-refiner).
+
 ### Resetting to defaults
 
 Each model has recommended settings, which you can change in the Model Manager. **Reset all to model defaults**, the ↺ button in the Generate panel's title bar, applies them: size, steps, CFG or guidance, scheduler and VAE settings. Your prompts are left alone. The button is disabled when your settings already match the defaults.
 
-To return to the settings of an earlier image instead, right-click it in the Gallery or Preview and open **Recall Metadata**. **Recall All** restores its model, concepts, prompts, seed, size and render settings; **Remix Image** does the same but keeps a new seed; and **Use Prompt**, **Use Seed** and **Use Size** recall one thing at a time. Recalled concepts replace the ones in the panel at the weights the image used; any that are not installed or do not fit the model are listed in a notice. If the image's model is not installed, or the image was saved from the canvas, your current concepts are kept.
+To return to the settings of an earlier image instead, right-click it in the Gallery or Preview and open **Recall Metadata**. **Recall All** restores its model, concepts, prompts, seed, size, render and refiner settings; **Remix Image** does the same but keeps a new seed; and **Use Prompt**, **Use Seed** and **Use Size** recall one thing at a time. Recalled concepts replace the ones in the panel at the weights the image used; any that are not installed or do not fit the model are listed in a notice. If the image's model is not installed, or the image was saved from the canvas, your current concepts are kept.
 
 To keep a combination of settings for later, use **Presets** in the panel's title bar to save the current settings under a name and apply them again.
 

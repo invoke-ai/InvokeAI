@@ -56,6 +56,16 @@ import {
   getPidDimensionOverrides,
 } from './pid';
 import {
+  DEFAULT_REFINER_CFG_SCALE,
+  DEFAULT_REFINER_NEGATIVE_AESTHETIC_SCORE,
+  DEFAULT_REFINER_POSITIVE_AESTHETIC_SCORE,
+  DEFAULT_REFINER_SCHEDULER,
+  DEFAULT_REFINER_START,
+  DEFAULT_REFINER_STEPS,
+  getRefinerValidationReasons,
+  isRefinerSupported,
+} from './sdxlRefiner';
+import {
   clampDimension,
   DEFAULT_HIDIFFUSION_T1_RATIO,
   DEFAULT_HIDIFFUSION_T2_RATIO,
@@ -356,6 +366,7 @@ export const getGenerationUiPolicy = (model: GenerateModelConfig | undefined) =>
     seedVisible,
     // Show PiD controls on supported bases even while PiD is disabled.
     pidVisible: getIsPidSupportedBase(model?.base),
+    refinerVisible: isRefinerSupported(model),
   };
 };
 
@@ -478,6 +489,13 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     gemma2EncoderModel: null,
     pidSteps: DEFAULT_PID_STEPS,
     referenceImages: [],
+    refinerModel: null,
+    refinerSteps: DEFAULT_REFINER_STEPS,
+    refinerCfgScale: DEFAULT_REFINER_CFG_SCALE,
+    refinerScheduler: DEFAULT_REFINER_SCHEDULER,
+    refinerPositiveAestheticScore: DEFAULT_REFINER_POSITIVE_AESTHETIC_SCORE,
+    refinerNegativeAestheticScore: DEFAULT_REFINER_NEGATIVE_AESTHETIC_SCORE,
+    refinerStart: DEFAULT_REFINER_START,
     scheduler: defaults.scheduler,
     seamlessXAxis: false,
     seamlessYAxis: false,
@@ -1441,6 +1459,12 @@ const getSettingsWithCompatibleModelSelections = (
     addClearedLabel(clearedLabels, 'HiDiffusion');
   }
 
+  // The refiner only ever follows an SDXL base; its tuning values stay for the next SDXL pick.
+  if (!uiPolicy.refinerVisible && nextSettings.refinerModel) {
+    nextSettings.refinerModel = null;
+    addClearedLabel(clearedLabels, 'Refiner');
+  }
+
   if (!uiPolicy.seamlessVisible && (nextSettings.seamlessXAxis || nextSettings.seamlessYAxis)) {
     nextSettings.seamlessXAxis = false;
     nextSettings.seamlessYAxis = false;
@@ -1505,6 +1529,10 @@ export const getGenerationModelAvailabilityReasons = (
     if (value && !hasModelKey(models, value.key, value.type)) {
       reasons.push(`${COMPONENT_SETTING_LABELS[key]} "${value.name}" is no longer installed.`);
     }
+  }
+
+  if (settings.refinerModel && isRefinerSupported(model) && !hasModelKey(models, settings.refinerModel.key, 'main')) {
+    reasons.push(`Refiner "${settings.refinerModel.name}" is no longer installed.`);
   }
 
   for (const lora of settings.loras) {
@@ -1714,6 +1742,7 @@ export const getGenerationValidationReasons = (model: GenerateModelConfig, setti
   }
 
   reasons.push(...getModelFamilyValidationReasons(model, settings));
+  reasons.push(...getRefinerValidationReasons(model, settings));
 
   return reasons;
 };

@@ -1282,3 +1282,132 @@ describe('PiD decode', () => {
     ).toThrow(/multiple of 64/);
   });
 });
+
+describe('SDXL Refiner', () => {
+  const refinerModel: MainModelConfig = {
+    base: 'sdxl-refiner',
+    hash: 'blake3:refiner',
+    key: 'sdxl-refiner-model',
+    name: 'SDXL Refiner',
+    type: 'main',
+  };
+  const refinerSettings: Partial<GenerateSettings> = {
+    refinerCfgScale: 5,
+    refinerModel,
+    refinerNegativeAestheticScore: 2,
+    refinerPositiveAestheticScore: 7,
+    refinerScheduler: 'dpmpp_2m',
+    refinerStart: 0.7,
+    refinerSteps: 12,
+  };
+
+  it('leaves the SDXL graph unchanged without a refiner', () => {
+    const graph = compile(sdxlModel);
+
+    expect(graph.nodes.refiner_denoise_latents).toBeUndefined();
+    expect(graph.nodes.refiner_model_loader).toBeUndefined();
+    expect(graph.nodes.denoise_latents).toMatchObject({ denoising_end: 1, denoising_start: 0 });
+    expect(getEdge(graph, 'canvas_output', 'latents')?.source.node_id).toBe('denoise_latents');
+    expect(getNodeByType(graph, 'core_metadata')).not.toHaveProperty('refiner_model');
+  });
+
+  it('hands the base latents to a refiner stage that feeds the decode', () => {
+    const graph = compile(sdxlModel, refinerSettings);
+    const refinerDenoise = graph.nodes.refiner_denoise_latents;
+
+    expect(graph.nodes.denoise_latents).toMatchObject({ denoising_end: 0.7, denoising_start: 0 });
+    expect(graph.nodes.refiner_model_loader).toMatchObject({
+      model: { base: 'sdxl-refiner', hash: 'blake3:refiner', key: 'sdxl-refiner-model', type: 'main' },
+      type: 'sdxl_refiner_model_loader',
+    });
+    expect(refinerDenoise).toMatchObject({
+      cfg_scale: 5,
+      denoising_end: 1,
+      denoising_start: 0.7,
+      scheduler: 'dpmpp_2m',
+      steps: 12,
+      type: 'denoise_latents',
+    });
+    expect(graph.nodes.refiner_pos_cond).toMatchObject({ aesthetic_score: 7, type: 'sdxl_refiner_compel_prompt' });
+    expect(graph.nodes.refiner_neg_cond).toMatchObject({ aesthetic_score: 2, type: 'sdxl_refiner_compel_prompt' });
+
+    expect(getEdge(graph, 'refiner_denoise_latents', 'unet')?.source).toEqual({
+      field: 'unet',
+      node_id: 'refiner_model_loader',
+    });
+    expect(getEdge(graph, 'refiner_pos_cond', 'clip2')?.source.node_id).toBe('refiner_model_loader');
+    expect(getEdge(graph, 'refiner_neg_cond', 'clip2')?.source.node_id).toBe('refiner_model_loader');
+    expect(getEdge(graph, 'refiner_pos_cond', 'style')?.source.node_id).toBe('positive_prompt');
+    expect(getEdge(graph, 'refiner_neg_cond', 'style')?.source.node_id).toBe('negative_prompt');
+    expect(getEdge(graph, 'refiner_denoise_latents', 'positive_conditioning')?.source.node_id).toBe('refiner_pos_cond');
+    expect(getEdge(graph, 'refiner_denoise_latents', 'negative_conditioning')?.source.node_id).toBe('refiner_neg_cond');
+    expect(getEdge(graph, 'refiner_denoise_latents', 'latents')?.source.node_id).toBe('denoise_latents');
+    expect(getEdge(graph, 'canvas_output', 'latents')?.source.node_id).toBe('refiner_denoise_latents');
+    // The base VAE still decodes; the refiner has none of its own.
+    expect(getEdge(graph, 'canvas_output', 'vae')?.source.node_id).toBe('model_loader');
+  });
+
+  it('records the refiner and its tuning in metadata', () => {
+    const graph = compile(sdxlModel, refinerSettings);
+
+    expect(getNodeByType(graph, 'core_metadata')).toMatchObject({
+      refiner_cfg_scale: 5,
+      refiner_model: { base: 'sdxl-refiner', hash: 'blake3:refiner', key: 'sdxl-refiner-model', type: 'main' },
+      refiner_negative_aesthetic_score: 2,
+      refiner_positive_aesthetic_score: 7,
+      refiner_scheduler: 'dpmpp_2m',
+      refiner_start: 0.7,
+      refiner_steps: 12,
+    });
+  });
+
+  it('wraps the refiner UNet in its own seamless node when tiling is on', () => {
+    const graph = compile(sdxlModel, { ...refinerSettings, seamlessXAxis: true });
+
+    expect(graph.nodes.refiner_seamless).toMatchObject({ seamless_x: true, seamless_y: false, type: 'seamless' });
+    expect(getEdge(graph, 'refiner_seamless', 'unet')?.source.node_id).toBe('refiner_model_loader');
+    expect(getEdge(graph, 'refiner_denoise_latents', 'unet')?.source.node_id).toBe('refiner_seamless');
+  });
+
+  it('runs the refiner pass with the base HiDiffusion settings and coerces its scheduler', () => {
+    const graph = compile(sdxlModel, {
+      ...refinerSettings,
+      hiDiffusionEnabled: true,
+      hiDiffusionT1Ratio: 0.3,
+      refinerScheduler: 'not-a-scheduler',
+    });
+
+    expect(graph.nodes.refiner_denoise_latents).toMatchObject({
+      hidiffusion: true,
+      hidiffusion_t1_ratio: 0.3,
+      scheduler: 'euler_a',
+    });
+    expect(getNodeByType(graph, 'core_metadata')?.refiner_scheduler).toBe('euler_a');
+  });
+
+  it('ignores a stored refiner on a non-SDXL main model', () => {
+    const graph = compile(sd1Model, refinerSettings);
+
+    expect(graph.nodes.refiner_denoise_latents).toBeUndefined();
+    expect(getNodeByType(graph, 'core_metadata')).not.toHaveProperty('refiner_model');
+  });
+
+  it('rejects a refiner together with PiD decoding', () => {
+    const gemma2: ComponentModelConfig = { base: 'any', key: 'gemma2', name: 'Gemma 2 2B', type: 'gemma2_encoder' };
+
+    expect(() =>
+      compile(sdxlModel, {
+        ...refinerSettings,
+        gemma2EncoderModel: gemma2,
+        pidDecoderModel: { base: 'sdxl', key: 'pid-sdxl', name: 'PiD SDXL', type: 'pid_decoder' },
+        pidMode: 'fit',
+      })
+    ).toThrow('PiD decode is not compatible with the SDXL Refiner.');
+  });
+
+  it('refuses a non-refiner model stored in the refiner slot', () => {
+    expect(() => compile(sdxlModel, { ...refinerSettings, refinerModel: sdxlModel })).toThrow(
+      'SDXL is not an SDXL Refiner model.'
+    );
+  });
+});

@@ -181,8 +181,13 @@ image on its own.
 - **Installing** — install **SDXL Refiner** from the starter models, or any refiner checkpoint or
   Diffusers folder; InvokeAI recognizes refiners automatically and lists them under their own
   **SDXL Refiner** family.
-- **Using it** — the refiner is not selectable in the Generate panel or on the Canvas. Use it in the
-  workflow editor.
+- **Using it** — with an SDXL main model selected, the Generate panel shows a **Refiner** section.
+  Pick the refiner there and set **Refiner start** (the point where the base model hands over, 0.8
+  by default), its steps, CFG, scheduler and the positive and negative **aesthetic scores**. The
+  same settings apply to SDXL generations from the Canvas, including inpainting and outpainting. The
+  refiner is never offered as a main model, and it cannot be combined with PiD decoding. An image
+  made with a refiner records it in its metadata, so **Recall All** and **Remix Image** restore it.
+  The workflow editor offers the same nodes for custom graphs.
 
 A refiner workflow runs two denoise passes over the same latents:
 

@@ -72,6 +72,17 @@ export {
 } from './core/conditioningRebalance';
 export { MIN_BATCH_COUNT, sanitizeBatchCount } from './core/batch';
 export {
+  getActiveRefiner,
+  isRefinerModel,
+  isRefinerSupported,
+  MAX_REFINER_AESTHETIC_SCORE,
+  MAX_REFINER_START,
+  MIN_REFINER_AESTHETIC_SCORE,
+  MIN_REFINER_CFG_SCALE,
+  MIN_REFINER_START,
+  MIN_REFINER_STEPS,
+} from './core/sdxlRefiner';
+export {
   createDynamicPromptsSampleSeed,
   DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS,
   DYNAMIC_PROMPTS_MAX_PROMPTS,

@@ -28,9 +28,16 @@ import {
   isMainModelConfig,
   isModelIdentifierConfig,
   isVaeCompatibleWithGenerateModel,
+  isRefinerModel,
   isValidKrea2RebalanceWeights,
   MAX_HIDIFFUSION_RATIO,
+  MAX_REFINER_AESTHETIC_SCORE,
+  MAX_REFINER_START,
   MIN_HIDIFFUSION_T1_RATIO,
+  MIN_REFINER_AESTHETIC_SCORE,
+  MIN_REFINER_CFG_SCALE,
+  MIN_REFINER_START,
+  MIN_REFINER_STEPS,
   normalizeReferenceImages,
 } from '@features/generation/settings';
 import { SEED_MAX } from '@platform/core/seed';
@@ -73,7 +80,8 @@ type RecalledField =
   | 'components'
   | 'loras'
   | 'referenceImages'
-  | 'krea2Rebalance';
+  | 'krea2Rebalance'
+  | 'refiner';
 
 export type ImageRecallSkipReason =
   | 'ambiguous'
@@ -542,6 +550,103 @@ const resolveRecordedLora = (
   return matches.length > 1 ? 'ambiguous' : (matches[0] ?? null);
 };
 
+/** Resolve a recorded main model by install-local key, then content hash, then name and base, like a LoRA. */
+const resolveRecordedMainModel = (
+  ref: RecordedModelRef,
+  models: readonly ComponentModelConfig[]
+): MainModelConfig | null => {
+  const mains = models.filter(isMainModelConfig);
+  const byKey = ref.key ? mains.find((model) => model.key === ref.key) : undefined;
+
+  if (byKey) {
+    return byKey;
+  }
+
+  const matches = ref.hash
+    ? mains.filter((model) => model.hash === ref.hash)
+    : ref.name && ref.base
+      ? mains.filter((model) => model.name === ref.name && model.base === ref.base)
+      : [];
+
+  return matches.length === 1 ? matches[0]! : null;
+};
+
+type RefinerPatch = Partial<
+  Pick<
+    GenerateWidgetValues,
+    | 'refinerModel'
+    | 'refinerSteps'
+    | 'refinerCfgScale'
+    | 'refinerScheduler'
+    | 'refinerPositiveAestheticScore'
+    | 'refinerNegativeAestheticScore'
+    | 'refinerStart'
+  >
+>;
+
+const getNumberInRange = (metadata: unknown, key: string, min: number, max: number): number | null => {
+  const value = getNumber(metadata, key);
+
+  return value !== null && value >= min && value <= max ? value : null;
+};
+
+/**
+ * The refiner an SDXL image ran with, resolved against installed refiner models, plus its tuning. A refiner that is
+ * not installed leaves the slot as it is, like an uninstalled VAE. Generation records only name a refiner when one
+ * ran, so a stamped record without one clears the slot, as a missing `loras` list means no concepts.
+ */
+const getRefinerPatch = (
+  metadata: unknown,
+  model: GenerateModelConfig,
+  models: readonly ComponentModelConfig[]
+): RefinerPatch => {
+  if (!getGenerationUiPolicy(model).refinerVisible || !isRecord(metadata)) {
+    return {};
+  }
+
+  const patch: RefinerPatch = {};
+
+  if ('refiner_model' in metadata) {
+    const ref = toRecordedModelRef(metadata.refiner_model);
+    const refiner = ref ? resolveRecordedMainModel(ref, models) : null;
+
+    if (metadata.refiner_model === null) {
+      patch.refinerModel = null;
+    } else if (refiner && isRefinerModel(refiner)) {
+      patch.refinerModel = refiner;
+    }
+  } else if (isGenerationRecord(metadata)) {
+    patch.refinerModel = null;
+  }
+
+  const steps = getInteger(metadata, 'refiner_steps');
+  const cfgScale = getNumber(metadata, 'refiner_cfg_scale');
+  const scheduler = getString(metadata, 'refiner_scheduler');
+  const start = getNumberInRange(metadata, 'refiner_start', MIN_REFINER_START, MAX_REFINER_START);
+  const positiveScore = getNumberInRange(
+    metadata,
+    'refiner_positive_aesthetic_score',
+    MIN_REFINER_AESTHETIC_SCORE,
+    MAX_REFINER_AESTHETIC_SCORE
+  );
+  const negativeScore = getNumberInRange(
+    metadata,
+    'refiner_negative_aesthetic_score',
+    MIN_REFINER_AESTHETIC_SCORE,
+    MAX_REFINER_AESTHETIC_SCORE
+  );
+
+  return {
+    ...patch,
+    ...(steps !== null && steps >= MIN_REFINER_STEPS ? { refinerSteps: steps } : {}),
+    ...(cfgScale !== null && cfgScale >= MIN_REFINER_CFG_SCALE ? { refinerCfgScale: cfgScale } : {}),
+    ...(scheduler !== null && isKnownScheduler(scheduler) ? { refinerScheduler: scheduler } : {}),
+    ...(start !== null ? { refinerStart: start } : {}),
+    ...(positiveScore !== null ? { refinerPositiveAestheticScore: positiveScore } : {}),
+    ...(negativeScore !== null ? { refinerNegativeAestheticScore: negativeScore } : {}),
+  };
+};
+
 /**
  * Generation graphs stamp `generation_mode` and omit `loras` when no concept was active, so on such a record a
  * missing list means "none". Other records that name a model, such as canvas saves, never record concepts.
@@ -707,6 +812,7 @@ export const getImageRecallCapabilities = ({
   const hasReferenceImages = getMetadataReferenceImages(metadata).length > 0;
   const hasModel = supportedMetadataModel !== null;
   const hasRebalance = hasKrea2Rebalance(metadata, clipSkipModel);
+  const hasRefiner = Object.keys(getRefinerPatch(metadata, clipSkipModel, models)).length > 0;
   const hasConcepts =
     (getMetadataConcepts(metadata, models, clipSkipModel, supportedMetadataModel).loras?.length ?? 0) > 0;
   const hasAnyMetadata =
@@ -721,7 +827,8 @@ export const getImageRecallCapabilities = ({
     hasComponents ||
     hasReferenceImages ||
     hasConcepts ||
-    hasRebalance;
+    hasRebalance ||
+    hasRefiner;
   const hasNonSeedMetadata =
     hasModel ||
     hasVae ||
@@ -733,7 +840,8 @@ export const getImageRecallCapabilities = ({
     hasComponents ||
     hasReferenceImages ||
     hasConcepts ||
-    hasRebalance;
+    hasRebalance ||
+    hasRefiner;
 
   return {
     all: hasAnyMetadata && isImageRecallKindAvailable('all'),
@@ -918,6 +1026,19 @@ export const buildImageRecallSettings = ({
     if (Object.keys(hiDiffusionPatch).length > 0) {
       values = { ...values, ...hiDiffusionPatch };
       fields.push('hiDiffusion');
+    }
+
+    // Judged against the model the recall settled on: a non-SDXL main has no refiner to restore.
+    const refinerPatch = getRefinerPatch(metadata, values.model, models);
+    const refinerChanged = (Object.keys(refinerPatch) as (keyof RefinerPatch)[]).some((key) =>
+      key === 'refinerModel'
+        ? refinerPatch.refinerModel?.key !== values.refinerModel?.key
+        : refinerPatch[key] !== values[key]
+    );
+
+    if (refinerChanged) {
+      values = { ...values, ...refinerPatch };
+      fields.push('refiner');
     }
   }
 

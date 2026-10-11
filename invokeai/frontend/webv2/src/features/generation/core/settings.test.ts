@@ -611,3 +611,66 @@ describe('planSeedSubmission', () => {
     ).toMatchObject({ lastSeed: 45, nextSeed: 46, sequenceLength: 4 });
   });
 });
+
+describe('normalizeGenerateSettings refiner fields', () => {
+  const refiner: MainModelConfig = { base: 'sdxl-refiner', key: 'refiner', name: 'SDXL Refiner', type: 'main' };
+
+  it('defaults values saved before the refiner existed', () => {
+    expect(normalizeGenerateSettings(legacyStoredValues)).toMatchObject({
+      refinerCfgScale: 7.5,
+      refinerModel: null,
+      refinerNegativeAestheticScore: 2.5,
+      refinerPositiveAestheticScore: 6,
+      refinerScheduler: 'euler',
+      refinerStart: 0.8,
+      refinerSteps: 20,
+    });
+  });
+
+  it('keeps a refiner-family model and drops any other model stored in the slot', () => {
+    const stored = { ...legacyStoredValues, refinerModel: refiner };
+
+    expect(normalizeGenerateSettings(stored)?.refinerModel).toEqual(refiner);
+    expect(
+      normalizeGenerateSettings({
+        ...legacyStoredValues,
+        refinerModel: { base: 'sdxl', key: 'sdxl', name: 'SDXL', type: 'main' },
+      })?.refinerModel
+    ).toBeNull();
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, refinerModel: { key: 'refiner' } })?.refinerModel
+    ).toBeNull();
+  });
+
+  it('clamps the refiner tuning to its ranges and rounds steps', () => {
+    const normalized = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      refinerCfgScale: 0,
+      refinerNegativeAestheticScore: -3,
+      refinerPositiveAestheticScore: 42,
+      refinerScheduler: 7,
+      refinerStart: 1.5,
+      refinerSteps: 2.6,
+    });
+
+    expect(normalized).toMatchObject({
+      refinerCfgScale: 1,
+      refinerNegativeAestheticScore: 1,
+      refinerPositiveAestheticScore: 10,
+      refinerScheduler: 'euler',
+      refinerStart: 1,
+      refinerSteps: 3,
+    });
+    expect(normalized && isGenerateSettings(normalized)).toBe(true);
+    expect(isGenerateSettings({ ...normalized, refinerStart: 2 })).toBe(false);
+  });
+
+  it('refreshes a stale refiner snapshot from the installed catalog', () => {
+    const sdxl: MainModelConfig = { base: 'sdxl', key: 'legacy-model', name: 'SDXL', type: 'main' };
+    const values = { ...normalizeGenerateSettings(legacyStoredValues)!, model: sdxl, refinerModel: refiner };
+    const renamed = { ...refiner, name: 'SDXL Refiner 1.0' };
+
+    expect(syncGenerateWidgetValuesWithModels(values, [sdxl, renamed]).refinerModel).toEqual(renamed);
+    expect(syncGenerateWidgetValuesWithModels(values, [sdxl, refiner])).toBe(values);
+  });
+});

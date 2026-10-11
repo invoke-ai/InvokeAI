@@ -12,6 +12,7 @@ import { GRAPH_BUILDERS } from '@features/generation/core/graph';
 import { addEdge, addNode, toGraphContract } from '@features/generation/core/graphBuilder';
 import { addKrea2ConditioningEnhancers } from '@features/generation/core/krea2Conditioning';
 import { getIsPidSupportedBase } from '@features/generation/core/pid';
+import { getActiveRefiner, getRefinerDenoisingSplit } from '@features/generation/core/sdxlRefiner';
 
 import type {
   CanvasCompositingSettings,
@@ -49,6 +50,22 @@ const canvasDenoisingStart = (model: GenerateModelConfig, strength: number): num
   }
   const usesOptimizedCurve = model.base === 'sd-3' || model.base === 'flux' || model.base === 'flux2';
   return 1 - strength ** (usesOptimizedCurve ? 0.2 : 1);
+};
+
+/** Applies the strength-derived range to the base denoise; with a refiner, the base pass stops at the hand-over. */
+const setCanvasDenoisingRange = (
+  denoise: BackendInvocationContract,
+  model: GenerateModelConfig,
+  settings: GenerateSettings,
+  strength: number
+): void => {
+  const denoisingStart = canvasDenoisingStart(model, strength);
+  const range = getActiveRefiner(settings, model)
+    ? getRefinerDenoisingSplit(settings.refinerStart, denoisingStart)
+    : { denoising_end: 1, denoising_start: denoisingStart };
+
+  denoise.denoising_start = range.denoising_start;
+  denoise.denoising_end = range.denoising_end;
 };
 
 /** True for the image-referencing modes (everything but pure txt2img). */
@@ -274,8 +291,7 @@ const graftImageToImage = (
 
   addEdge(graph, vaeSource.node, vaeSource.field, encode, 'vae');
   addEdge(graph, encode, 'latents', denoise, 'latents');
-  denoise.denoising_start = canvasDenoisingStart(model, strength);
-  denoise.denoising_end = 1;
+  setCanvasDenoisingRange(denoise, model, settings, strength);
 
   setMetadataMode(graph, 'img2img', strength);
 };
@@ -465,8 +481,7 @@ const graftInpaint = (
   const strength = input.strength;
   const needsResize = !sizesMatch(input.bbox, processingSize);
 
-  denoise.denoising_start = canvasDenoisingStart(model, strength);
-  denoise.denoising_end = 1;
+  setCanvasDenoisingRange(denoise, model, input.settings, strength);
 
   const initialResize = needsResize
     ? addInputResizeNode(graph, 'canvas_resize_initial_to_processing', initialImageName, processingSize)
@@ -530,8 +545,7 @@ const graftOutpaint = (
   const strength = input.strength;
   const needsResize = !sizesMatch(input.bbox, processingSize);
 
-  denoise.denoising_start = canvasDenoisingStart(model, strength);
-  denoise.denoising_end = 1;
+  setCanvasDenoisingRange(denoise, model, input.settings, strength);
 
   // Infill the transparent region before encode (legacy `getInfill`).
   const infill = addInfillNode(graph, compositing.infillMethod, compositing);
