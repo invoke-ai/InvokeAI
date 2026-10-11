@@ -13,8 +13,8 @@ or header, which the nvfp4 reader requires to know the block-scale layout, so it
 time; the official file lists its layers in ``_quantization_metadata``. Both are optional, so the
 cost of the exception falls only on users who choose them.
 
-The two GGUF transformers come from a community conversion, ``vantagewithai/LTX-2.5-GGUF``,
-ungated as well.
+The two GGUF transformers come from a community conversion, ``vantagewithai/LTX-2.5-GGUF``, and
+the GGUF text encoder from ``Rootport/Nz-Gemma4-12B-LTX25``; both are ungated as well.
 """
 
 from invokeai.backend.model_manager.starter_models.types import StarterModel
@@ -84,6 +84,19 @@ ltx2_5_text_encoder_bf16 = StarterModel(
     f"The text encoder every LTX-2.5 generation uses. {_LICENSE_NOTE}",
     type=ModelType.Gemma4Encoder,
     format=ModelFormat.Gemma4Encoder,
+)
+
+# A community conversion of the release's encoder (ungated, like the mirror), with the tokenizer and config packed in.
+# Its text projection and vision stubs are left unread.
+ltx2_5_text_encoder_gguf_q4_k_m = StarterModel(
+    name="LTX-2.5 Text Encoder (Gemma-4 12B, GGUF Q4_K_M)",
+    base=BaseModelType.LTX2,
+    source="Rootport/Nz-Gemma4-12B-LTX25::TextEncoder/LTX-2.5-gemma4-12b-text-encoder-Q4_K_M.gguf",
+    description="Lightricks' LTX-tuned Gemma-4-12B text encoder as a community GGUF Q4_K_M build with its tokenizer "
+    "(~9.2 GB; ~7.6 GiB on the card against ~12 GiB for int8). It drifts further from the unquantized encoder than "
+    f"int8 does: the same scene, framed a little differently at the same seed. {_LICENSE_NOTE}",
+    type=ModelType.Gemma4Encoder,
+    format=ModelFormat.GGUFQuantized,
 )
 
 ltx2_5_dev_transformer_int8 = StarterModel(

@@ -64,13 +64,15 @@ Ministral 3B encoder. Others are recognized by their layer names and fail, or mi
 | Mistral Small 3 | FLUX.2 dev | ✓ | ✓ | ✓ | L | ✓ | ✓ | ✗ |
 | Ministral 3B | ERNIE-Image | ✓ | ✓ | ✓ | L | L | ✗ | ✗ |
 | Gemma-2 2B | PiD decoders | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ |
-| Gemma-4 12B | LTX-2 | ✓ (bf16 or int8) | ✗ | L | in the folder | L | ✗ | ✗ |
+| Gemma-4 12B | LTX-2 | ✓ (bf16 or int8) | ✗ | L | in the folder | L | ✓ (LTX-2.5 conversions) | ✗ |
 | UMT5 | Wan 2.2 | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 
 The Qwen3-VL GGUF encoder is the language model only; a separate `mmproj` vision file is refused, and split
-multi-part GGUFs have to be joined before installing. The Gemma-4 encoder installs only as a folder: its
-`config.json` and tokenizer files next to exactly one weight file, bf16 or int8. A standalone `.safetensors` file is
-not recognized.
+multi-part GGUFs have to be joined before installing. The Gemma-4 encoder installs as a folder (its `config.json`
+and tokenizer files next to exactly one weight file, bf16 or int8) or as a GGUF conversion of the LTX-2.5 encoder
+that packs its tokenizer and config in, such as elix3r's or Rootport's. Google's stock Gemma-4-12B GGUF fails to
+install with a message, since LTX-2 needs the Lightricks-tuned weights; its `mmproj` file is not recognized. A
+standalone `.safetensors` file is not recognized.
 
 ## VAEs
 
