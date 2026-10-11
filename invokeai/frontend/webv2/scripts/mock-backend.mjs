@@ -48,12 +48,84 @@ const ARCHITECTURE_CAPABILITIES = JSON.parse(
 /**
  * POST /__faults sets capabilities to error, empty, or ok, and `intermediatesCaller` to admin or user, until POST
  * /__reset; independent of workload profile. `user` also turns on multi-user auth with a non-admin session: sign in
- * with any email and password (or reload a page that already holds the token) to reach the non-admin UI.
+ * with any email and password (or reload a page that already holds the token) to reach the non-admin UI. It also
+ * makes the admin-only image storage routes answer 403. `imageMoves` seeds the image move journal: `idle` (the
+ * default), `needs-recovery` (an interrupted job that only Recover can finish) or `queue-active` (Start Move is
+ * refused with 409 while recovery still works).
  */
 const CAPABILITY_FAULTS = new Set(['ok', 'error', 'empty']);
 const INTERMEDIATES_CALLERS = new Set(['admin', 'user']);
+const IMAGE_MOVE_FAULTS = new Set(['idle', 'needs-recovery', 'queue-active']);
+const IMAGE_STORAGE_LAYOUTS = new Set(['flat', 'date', 'type', 'hash']);
+/** Status reads a running move or recovery takes to finish, so polling clients observe it in progress. */
+const IMAGE_MOVE_TICKS = 2;
 
-const createFaults = () => ({ capabilities: 'ok', intermediatesCaller: 'admin' });
+const createFaults = () => ({ capabilities: 'ok', imageMoves: 'idle', intermediatesCaller: 'admin' });
+
+/**
+ * Every fixture image is stored flat, so the move count is the whole library whenever the configured layout
+ * differs from the one the last committed move left the files in.
+ */
+const createImageStorage = () => ({
+  layout: 'flat',
+  storedLayout: 'flat',
+  job: null,
+  lastError: null,
+  nextJobId: 1,
+  running: null,
+});
+
+const imageMoveStatus = (state) => {
+  const storage = state.imageStorage;
+
+  return {
+    active_job_id: storage.job !== null && storage.job.state !== 'committed' ? storage.job.id : null,
+    is_running: storage.running !== null,
+    last_error: storage.lastError,
+    latest_job: storage.job === null ? null : { ...storage.job },
+    needs_move_count: storage.layout === storage.storedLayout ? 0 : state.images.size,
+    operation: storage.running?.operation ?? null,
+  };
+};
+
+const seedInterruptedImageMove = (state) => {
+  const storage = state.imageStorage;
+
+  storage.job = { error_message: null, id: storage.nextJobId, state: 'moving' };
+  storage.nextJobId += 1;
+  storage.lastError = 'Server stopped during an image move';
+};
+
+const startImageMoveOperation = (state, operation) => {
+  const storage = state.imageStorage;
+
+  if (operation === 'move_all') {
+    storage.job = { error_message: null, id: storage.nextJobId, state: 'moving' };
+    storage.nextJobId += 1;
+  }
+  storage.lastError = null;
+  storage.running = { operation, ticks: IMAGE_MOVE_TICKS };
+};
+
+/** Each status read advances a running operation; it commits on the last tick. */
+const tickImageMove = (state) => {
+  const storage = state.imageStorage;
+
+  if (storage.running === null) {
+    return;
+  }
+  storage.running.ticks -= 1;
+  if (storage.running.ticks > 0) {
+    return;
+  }
+  if (storage.running.operation === 'move_all') {
+    storage.storedLayout = storage.layout;
+  }
+  if (storage.job !== null) {
+    storage.job = { ...storage.job, state: 'committed' };
+  }
+  storage.running = null;
+};
 
 const MOCK_USER_ID = 'fixture-user';
 
@@ -123,6 +195,7 @@ const createState = (profile) => {
       ],
     ]),
     images: new Map(fixture.images.map((image) => [image.image_name, clone(image)])),
+    imageStorage: createImageStorage(),
     models: new Map(fixture.models.map((model) => [model.key, clone(model)])),
     mutationClock: 0,
     nextBoardNumber: fixture.boards.length + 1,
@@ -796,6 +869,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           const body = await readJsonBody(request);
           const requested = url.searchParams.get('capabilities') ?? body.capabilities;
           const caller = url.searchParams.get('intermediatesCaller') ?? body.intermediatesCaller;
+          const imageMoves = url.searchParams.get('imageMoves') ?? body.imageMoves;
 
           if (requested !== undefined && requested !== null) {
             if (!CAPABILITY_FAULTS.has(requested)) {
@@ -811,6 +885,18 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             }
 
             faults.intermediatesCaller = caller;
+          }
+
+          if (imageMoves !== undefined && imageMoves !== null) {
+            if (!IMAGE_MOVE_FAULTS.has(imageMoves)) {
+              return json(400, { detail: `Unknown image moves fault: ${String(imageMoves)}` });
+            }
+
+            faults.imageMoves = imageMoves;
+            state.imageStorage = createImageStorage();
+            if (imageMoves === 'needs-recovery') {
+              seedInterruptedImageMove(state);
+            }
           }
         }
 
@@ -907,8 +993,67 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         return json(200, [{ device: 'cpu', name: 'CPU' }]);
       }
 
-      if (method === 'GET' && path === '/api/v1/app/runtime_config') {
-        return json(200, { config: { generation_devices: 'auto' }, set_fields: [] });
+      if (path === '/api/v1/app/runtime_config') {
+        const runtimeConfig = () => ({
+          config: { generation_devices: 'auto', image_subfolder_strategy: state.imageStorage.layout },
+          set_fields: state.imageStorage.layout === 'flat' ? [] : ['image_subfolder_strategy'],
+        });
+
+        if (method === 'GET') {
+          return json(200, runtimeConfig());
+        }
+        if (method === 'PATCH') {
+          if (faults.intermediatesCaller === 'user') {
+            return json(403, { detail: 'Admin privileges required' });
+          }
+
+          const body = await readJsonBody(request);
+
+          if ('image_subfolder_strategy' in body) {
+            if (!IMAGE_STORAGE_LAYOUTS.has(body.image_subfolder_strategy)) {
+              return json(422, { detail: 'image_subfolder_strategy must be one of flat, date, type, hash' });
+            }
+
+            state.imageStorage.layout = body.image_subfolder_strategy;
+          }
+
+          return json(200, runtimeConfig());
+        }
+      }
+
+      if (path.startsWith('/api/v1/image_moves/')) {
+        if (faults.intermediatesCaller === 'user') {
+          return json(403, { detail: 'Admin privileges required' });
+        }
+
+        const storage = state.imageStorage;
+
+        if (method === 'GET' && path === '/api/v1/image_moves/status') {
+          tickImageMove(state);
+          return json(200, imageMoveStatus(state));
+        }
+        if (method === 'POST' && path === '/api/v1/image_moves/start') {
+          if (storage.running !== null) {
+            return json(409, { detail: 'An image move job is already running' });
+          }
+          if (imageMoveStatus(state).active_job_id !== null) {
+            return json(409, { detail: 'An image move job is already active' });
+          }
+          if (faults.imageMoves === 'queue-active') {
+            return json(409, { detail: 'Cannot move images while the queue has active work' });
+          }
+
+          startImageMoveOperation(state, 'move_all');
+          return json(202, imageMoveStatus(state));
+        }
+        if (method === 'POST' && path === '/api/v1/image_moves/recover') {
+          if (storage.running !== null) {
+            return json(409, { detail: 'An image move job is already running' });
+          }
+
+          startImageMoveOperation(state, 'recovery');
+          return json(202, imageMoveStatus(state));
+        }
       }
 
       if (path.startsWith('/api/v1/app/external_providers')) {
@@ -1148,6 +1293,51 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
       const queueMatch = /^\/api\/v1\/queue\/[^/]+\/(.+)$/.exec(path);
       if (queueMatch) {
         const action = queueMatch[1];
+
+        if (action === 'enqueue_batch' && method === 'POST') {
+          const { batch = {} } = await readJsonBody(request);
+          const runs = Number.isInteger(batch.runs) && batch.runs > 0 ? batch.runs : 1;
+          const now = timestamp(state);
+          const batchId = `mock-batch-${String(state.mutationClock)}`;
+          const itemIds = [];
+
+          // Items stay pending: the mock has no processor and no socket, so nothing ever completes them.
+          for (let run = 0; run < runs; run += 1) {
+            const itemId = Math.max(0, ...state.queueItems.keys()) + 1;
+
+            itemIds.push(itemId);
+            state.queueItems.set(itemId, {
+              batch_id: batchId,
+              completed_at: null,
+              created_at: now,
+              destination: batch.destination ?? null,
+              error_message: null,
+              error_traceback: null,
+              error_type: null,
+              field_values: null,
+              item_id: itemId,
+              origin: batch.origin ?? null,
+              retried_from_item_id: null,
+              session: { prepared_source_mapping: {}, results: {} },
+              session_id: `mock-session-${String(itemId)}`,
+              started_at: null,
+              status: 'pending',
+              updated_at: now,
+              user_display_name: 'Fixture User',
+              user_email: 'fixture@example.test',
+              user_id: MOCK_USER_ID,
+            });
+          }
+
+          return json(201, {
+            batch: { ...batch, batch_id: batchId },
+            enqueued: itemIds.length,
+            item_ids: itemIds,
+            priority: 0,
+            queue_id: 'default',
+          });
+        }
+
         const scopedItems = queueItemsForScope(state, url);
 
         if (action === 'status') {

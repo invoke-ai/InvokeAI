@@ -12,7 +12,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { UtilityEnqueue } from './utilityGraph';
 
-import { DEFAULT_UTILITY_QUEUE_TIMEOUT_MS, runUtilityGraph, UtilityQueueError } from './utilityGraph';
+import {
+  DEFAULT_UTILITY_QUEUE_TIMEOUT_MS,
+  DEFAULT_UTILITY_SETTLE_TIMEOUT_MS,
+  runUtilityGraph,
+  submitUtilityGraph,
+  UtilityQueueError,
+} from './utilityGraph';
 
 /** A fake socket hub that records handlers per event and can emit to them, mirroring `hub.on`. */
 const createFakeHub = () => {
@@ -1145,5 +1151,109 @@ describe('UtilityQueueError', () => {
     expect(error).toBeInstanceOf(Error);
     expect(error.name).toBe('UtilityQueueError');
     expect(error.reason).toBe('timeout');
+  });
+});
+
+describe('submitUtilityGraph — fire, then watch settlement', () => {
+  const graph = { edges: [], id: 'pbr', nodes: {} };
+
+  it('resolves once the backend accepts the graph and settles when the item completes', async () => {
+    const fake = createFakeHub();
+    const enqueue = vi.fn<UtilityEnqueue>(() => Promise.resolve({ enqueued: 1, itemIds: [7] }));
+
+    const submission = await submitUtilityGraph({ createId: () => UTIL_ID, enqueue, graph, hub: fake.hub });
+
+    expect(enqueue).toHaveBeenCalledExactlyOnceWith({ graph, origin: ORIGIN });
+    expect(submission).toMatchObject({ itemIds: [7], origin: ORIGIN });
+    // Only status changes are watched; no output image is expected.
+    expect(fake.handlerCount('invocation_complete')).toBe(0);
+    expect(fake.handlerCount('queue_item_status_changed')).toBe(1);
+
+    fake.emit('queue_item_status_changed', statusEvent('completed', { origin: 'other-origin' }));
+    fake.emit('queue_item_status_changed', statusEvent('completed', { item_id: 7 }));
+
+    await expect(submission.settled).resolves.toBeUndefined();
+    expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
+  });
+
+  it('settles a completion that arrives before the enqueue response', async () => {
+    const fake = createFakeHub();
+    const deferred = createDeferred<{ enqueued: number; itemIds: number[] }>();
+    const pending = submitUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: () => deferred.promise,
+      graph,
+      hub: fake.hub,
+    });
+
+    fake.emit('queue_item_status_changed', statusEvent('completed'));
+    deferred.resolve({ enqueued: 1, itemIds: [1] });
+
+    await expect((await pending).settled).resolves.toBeUndefined();
+    expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
+  });
+
+  it('rejects settlement with the backend failure message, or as canceled', async () => {
+    const failed = createFakeHub();
+    const failedSubmission = await submitUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: okEnqueue,
+      graph,
+      hub: failed.hub,
+    });
+    failed.emit('queue_item_status_changed', statusEvent('failed', { error_message: 'No model' }));
+    await expect(failedSubmission.settled).rejects.toMatchObject({ message: 'No model', reason: 'failed' });
+
+    const canceled = createFakeHub();
+    const canceledSubmission = await submitUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: okEnqueue,
+      graph,
+      hub: canceled.hub,
+    });
+    canceled.emit('queue_item_status_changed', statusEvent('canceled'));
+    await expect(canceledSubmission.settled).rejects.toMatchObject({ reason: 'canceled' });
+    expect(canceled.handlerCount('queue_item_status_changed')).toBe(0);
+  });
+
+  it('rejects the submission, and detaches, when the enqueue fails or answers inconsistently', async () => {
+    const failing = createFakeHub();
+    await expect(
+      submitUtilityGraph({
+        createId: () => UTIL_ID,
+        enqueue: () => Promise.reject(new ApiError('{"detail":"queue paused"}', 409)),
+        graph,
+        hub: failing.hub,
+      })
+    ).rejects.toMatchObject({ message: '{"detail":"queue paused"}', reason: 'enqueue' });
+    expect(failing.handlerCount('queue_item_status_changed')).toBe(0);
+
+    const inconsistent = createFakeHub();
+    await expect(
+      submitUtilityGraph({
+        createId: () => UTIL_ID,
+        enqueue: () => Promise.resolve({ enqueued: 0, itemIds: [] }),
+        graph,
+        hub: inconsistent.hub,
+      })
+    ).rejects.toMatchObject({ reason: 'enqueue' });
+    expect(inconsistent.handlerCount('queue_item_status_changed')).toBe(0);
+  });
+
+  it('stops watching after the settle timeout without canceling the backend item', async () => {
+    vi.useFakeTimers();
+    const fake = createFakeHub();
+    const submission = await submitUtilityGraph({ createId: () => UTIL_ID, enqueue: okEnqueue, graph, hub: fake.hub });
+    const outcome = submission.settled.then(
+      () => 'resolved',
+      (error: UtilityQueueError) => error.reason
+    );
+
+    vi.advanceTimersByTime(DEFAULT_UTILITY_SETTLE_TIMEOUT_MS - 1);
+    expect(fake.handlerCount('queue_item_status_changed')).toBe(1);
+    vi.advanceTimersByTime(1);
+
+    await expect(outcome).resolves.toBe('timeout');
+    expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
   });
 });

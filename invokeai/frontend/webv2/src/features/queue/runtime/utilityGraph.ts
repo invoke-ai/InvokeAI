@@ -189,6 +189,144 @@ export const reconcileUtilityCompletedOutput: UtilityCompletedOutputReconciler =
   return null;
 };
 
+/** The default time a submitted utility graph is watched for settlement; the first run may download models. */
+export const DEFAULT_UTILITY_SETTLE_TIMEOUT_MS = 30 * 60_000;
+
+/** Dependencies for {@link submitUtilityGraph}. */
+export interface SubmitUtilityGraphOptions {
+  /** The graph to enqueue; its outputs stay wherever the graph sends them (a board, intermediates). */
+  graph: QueueBackendGraph;
+  /** The socket hub (only `on` is used). */
+  hub: Pick<SocketHub, 'on'>;
+  /** Enqueue seam (defaults to the real utility enqueue API). */
+  enqueue?: UtilityEnqueue;
+  /** Injectable id source (defaults to `createUuid`). */
+  createId?: () => string;
+  /**
+   * Stop watching for settlement after this many ms (default {@link DEFAULT_UTILITY_SETTLE_TIMEOUT_MS}); `0`
+   * disables. The backend item is left running: the caller never asked for it to be canceled.
+   */
+  settleTimeoutMs?: number;
+}
+
+/** An accepted utility submission whose results are not returned, only awaited. */
+export interface UtilityGraphSubmission {
+  /** The accepted backend item ids. */
+  itemIds: number[];
+  /** The origin used, for diagnostics/tests. */
+  origin: string;
+  /**
+   * Resolves once the backend completes the item; rejects with {@link UtilityQueueError} when it fails, is
+   * canceled, or stops reporting before the settle timeout.
+   */
+  settled: Promise<void>;
+}
+
+/**
+ * Enqueue a utility graph whose results land where the graph sends them (such as a gallery board) rather than
+ * being returned. Resolves when the backend accepts it; `settled` tracks the item afterwards. Rejects as
+ * {@link UtilityQueueError} when the enqueue fails or its response is inconsistent.
+ */
+export const submitUtilityGraph = async (options: SubmitUtilityGraphOptions): Promise<UtilityGraphSubmission> => {
+  const { graph, hub } = options;
+  const enqueue = options.enqueue ?? enqueueUtility;
+  const settleTimeoutMs = options.settleTimeoutMs ?? DEFAULT_UTILITY_SETTLE_TIMEOUT_MS;
+  let origin: string;
+  try {
+    origin = buildUtilityQueueItemOrigin((options.createId ?? createUuid)());
+  } catch (cause) {
+    const detail = cause instanceof Error ? cause.message : String(cause);
+    throw new UtilityQueueError('setup', `Failed to initialize utility graph submission: ${detail}`, cause);
+  }
+
+  let settleResolve!: () => void;
+  let settleReject!: (error: UtilityQueueError) => void;
+  const settled = new Promise<void>((resolve, reject) => {
+    settleResolve = resolve;
+    settleReject = reject;
+  });
+  let isSettled = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let detach: (() => void) | null = null;
+
+  const finish = (error: UtilityQueueError | null): void => {
+    if (isSettled) {
+      return;
+    }
+    isSettled = true;
+    if (timer !== null) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    try {
+      detach?.();
+    } catch {
+      // Settlement must not depend on the listener detaching cleanly.
+    }
+    detach = null;
+    if (error) {
+      settleReject(error);
+    } else {
+      settleResolve();
+    }
+  };
+
+  // Attach before enqueue so a very fast completion is not missed.
+  try {
+    detach = hub.on('queue_item_status_changed', (event: QueueItemStatusChangedEvent) => {
+      if (event.origin !== origin) {
+        return;
+      }
+      if (event.status === 'completed') {
+        finish(null);
+      } else if (event.status === 'failed') {
+        const errorMessage = typeof event.error_message === 'string' ? event.error_message.trim() : '';
+        const errorType = typeof event.error_type === 'string' ? event.error_type.trim() : '';
+        finish(new UtilityQueueError('failed', errorMessage || errorType || 'The utility graph failed.'));
+      } else if (event.status === 'canceled') {
+        finish(new UtilityQueueError('canceled', 'The utility graph was canceled.'));
+      }
+    });
+  } catch (cause) {
+    const detail = cause instanceof Error ? cause.message : String(cause);
+    const error = new UtilityQueueError('setup', `Failed to attach utility graph listeners: ${detail}`, cause);
+    finish(error);
+    settled.catch(() => {});
+    throw error;
+  }
+
+  let result: Awaited<ReturnType<UtilityEnqueue>>;
+  try {
+    result = await enqueue({ graph, origin });
+  } catch (cause) {
+    const error = new UtilityQueueError(
+      'enqueue',
+      cause instanceof Error ? cause.message : 'Failed to enqueue utility graph.',
+      cause
+    );
+    finish(error);
+    // The caller never receives `settled`, so its rejection has no other handler.
+    settled.catch(() => {});
+    throw error;
+  }
+
+  const inspected = inspectUtilityEnqueueResult(result);
+  if (!inspected.result) {
+    const error = new UtilityQueueError('enqueue', 'The backend returned an inconsistent utility enqueue response.');
+    finish(error);
+    settled.catch(() => {});
+    throw error;
+  }
+
+  if (!isSettled && settleTimeoutMs > 0) {
+    timer = setTimeout(() => {
+      finish(new UtilityQueueError('timeout', `The utility graph did not settle within ${String(settleTimeoutMs)}ms.`));
+    }, settleTimeoutMs);
+  }
+
+  return { itemIds: inspected.result.itemIds, origin, settled };
+};
+
 /**
  * Return utility output metadata without project routing; reject failures, cancellation, timeout, abort, and
  * enqueue errors as {@link UtilityQueueError}.

@@ -145,6 +145,7 @@ export const developerSettings = section('developer', 'Developer', [
 ]);
 export const serverSettings = section('server', 'Server', [
   custom('generationDevices', 'Generation devices', 'server'),
+  { ...custom('imageStorage', 'Image storage', 'server'), keywords: 'images folder subfolder layout move recover' },
 ]);
 export const workspaceSettings = section('workspace', 'Data & workspace', [
   custom('workspaceActions', 'Data & workspace', 'none'),

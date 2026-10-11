@@ -1,4 +1,5 @@
 import type { GalleryImage, GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery';
+import type * as QueueUtilityModule from '@features/queue/utility';
 import type { CreateCanvasFromImagesResult } from '@workbench/canvas-operations/api';
 
 import {
@@ -47,6 +48,7 @@ const mocks = vi.hoisted(() => ({
     Promise.resolve({ graph: null, workflow: null })
   ),
   requestWorkflowDocumentLoad: vi.fn(),
+  submitUtilityGraph: vi.fn((..._args: unknown[]): Promise<unknown> => Promise.reject(new Error('not submitted'))),
   videoMetadata: vi.fn((..._args: unknown[]) => Promise.resolve(null)),
   invalidateGallery: vi.fn(),
   invalidateGalleryItems: vi.fn(),
@@ -98,6 +100,12 @@ vi.mock('@features/gallery', () => ({
   toGalleryItemKey: ({ kind, name }: { kind: string; name: string }) => `${kind}:${name}`,
   toGalleryItemRef: ({ kind, name }: { kind: 'image' | 'video'; name: string }) => ({ kind, name }),
 }));
+
+vi.mock('@features/queue/utility', async (importOriginal) => ({
+  ...(await importOriginal<typeof QueueUtilityModule>()),
+  submitUtilityGraph: (...args: unknown[]) => mocks.submitUtilityGraph(...args),
+}));
+vi.mock('@platform/transport/socketHub', () => ({ socketHub: { on: () => () => {} } }));
 
 vi.mock('@features/workflow/react', () => ({
   requestWorkflowDocumentLoad: (...args: unknown[]) => mocks.requestWorkflowDocumentLoad(...args),
@@ -587,6 +595,116 @@ describe('load workflow from image', () => {
     expect(mocks.notificationsAdd).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'info', title: 'widgets.gallery.itemActions.loadWorkflow.missing' })
     );
+  });
+});
+
+describe('generate PBR maps', () => {
+  const image: GalleryImage = {
+    boardId: 'none',
+    height: 512,
+    imageCategory: 'general',
+    imageName: 'texture.png',
+    imageUrl: '/full/texture.png',
+    queuedAt: '2026-07-30T00:00:00.000Z',
+    sourceQueueItemId: 'backend-gallery',
+    starred: false,
+    thumbnailUrl: '/thumb/texture.png',
+    width: 512,
+  };
+  const createSettlement = () => {
+    let resolve!: () => void;
+    let reject!: (error: unknown) => void;
+    const settled = new Promise<void>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { reject, resolve, settled };
+  };
+
+  it('queues one pbr_maps graph into the project auto-add board, then refreshes the gallery when it completes', async () => {
+    const settlement = createSettlement();
+    mocks.getProject.mockImplementation((id: string) =>
+      makeMockProject(id, { autoAddBoardId: 'board-materials', selectedBoardId: 'board-other' })
+    );
+    mocks.submitUtilityGraph.mockResolvedValueOnce({ itemIds: [41], origin: 'utility:1', settled: settlement.settled });
+
+    await act(async () => {
+      await actionsRef.current?.generatePbrMaps(image);
+    });
+
+    expect(mocks.submitUtilityGraph).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        graph: expect.objectContaining({
+          nodes: {
+            pbr_maps: expect.objectContaining({
+              board: { board_id: 'board-materials' },
+              image: { image_name: 'texture.png' },
+              is_intermediate: false,
+              type: 'pbr_maps',
+            }),
+          },
+        }),
+      })
+    );
+    expect(mocks.notificationsAdd).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ kind: 'success', title: 'widgets.gallery.itemActions.pbrMaps.queued' })
+    );
+    expect(mocks.invalidateGallery).not.toHaveBeenCalled();
+
+    await act(async () => {
+      settlement.resolve();
+      await settlement.settled;
+    });
+
+    expect(mocks.invalidateGallery).toHaveBeenCalledTimes(1);
+    expect(mocks.notificationsAdd).toHaveBeenLastCalledWith(
+      expect.objectContaining({ kind: 'success', title: 'widgets.gallery.itemActions.pbrMaps.completed' })
+    );
+  });
+
+  it('leaves the maps Uncategorized while the gallery follows no board', async () => {
+    mocks.getProject.mockImplementation((id: string) => makeMockProject(id, { autoAddBoardId: 'none' }));
+    mocks.submitUtilityGraph.mockResolvedValueOnce({
+      itemIds: [42],
+      origin: 'utility:2',
+      settled: new Promise(() => {}),
+    });
+
+    await act(async () => {
+      await actionsRef.current?.generatePbrMaps(image);
+    });
+
+    const [request] = mocks.submitUtilityGraph.mock.calls[0] as [{ graph: { nodes: Record<string, unknown> } }];
+    expect(request.graph.nodes.pbr_maps).not.toHaveProperty('board');
+  });
+
+  it('reports an enqueue failure as an error notice and a failed run through the error channel', async () => {
+    mocks.submitUtilityGraph.mockRejectedValueOnce(new Error('queue paused'));
+
+    await act(async () => {
+      await actionsRef.current?.generatePbrMaps(image);
+    });
+
+    expect(mocks.notificationsAdd).toHaveBeenCalledExactlyOnceWith({
+      kind: 'error',
+      message: 'queue paused',
+      title: 'widgets.gallery.itemActions.pbrMaps.failed',
+    });
+
+    const settlement = createSettlement();
+    mocks.submitUtilityGraph.mockResolvedValueOnce({ itemIds: [43], origin: 'utility:3', settled: settlement.settled });
+    await act(async () => {
+      await actionsRef.current?.generatePbrMaps(image);
+    });
+    await act(async () => {
+      settlement.reject(new Error('No PBR model'));
+      await settlement.settled.catch(() => {});
+    });
+
+    expect(mocks.reportError).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ area: 'image-actions', message: 'No PBR model', namespace: 'gallery' })
+    );
+    expect(mocks.invalidateGallery).not.toHaveBeenCalled();
   });
 });
 
