@@ -1,5 +1,5 @@
 import type { GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery/core/items';
-import type { GalleryBoardKind } from '@features/gallery/core/types';
+import type { GalleryBoard, GalleryBoardKind } from '@features/gallery/core/types';
 
 import { useDndContext, useDroppable, type UseDroppableArguments } from '@dnd-kit/core';
 import { toGalleryItemKey } from '@features/gallery/core/items';
@@ -49,6 +49,81 @@ export const getGalleryItemDragId = (
 export const GalleryDragScope = createContext(false);
 
 export const getGalleryBoardDropId = (boardId: string): string => `gallery-board:${boardId}`;
+
+/**
+ * A board row on its way to another project or the Library. Each gallery resolves only its own boards' drags onto its
+ * own tiers: the shell's one drag context reports every drop to every mounted gallery.
+ */
+export interface GalleryBoardDragData {
+  boardId: string;
+  kind: 'gallery-board-drag';
+  /** Where it is now; null is the Library. */
+  projectId: string | null;
+  /** The gallery it was picked up in. */
+  scope: string;
+}
+
+/** A project's boards, or the Library's (null): dropping a board anywhere on them moves it there. */
+export interface GalleryBoardTierDropData {
+  kind: 'gallery-board-tier';
+  label: string;
+  projectId: string | null;
+  scope: string;
+}
+
+export interface GalleryBoardMove {
+  boardId: string;
+  label: string;
+  projectId: string | null;
+}
+
+export const getGalleryBoardDragId = (boardId: string, scope: string): string =>
+  `gallery-board-drag#${scope}:${boardId}`;
+
+export const getGalleryBoardDragData = (
+  board: Pick<GalleryBoard, 'id' | 'projectId'>,
+  scope: string
+): GalleryBoardDragData => ({ boardId: board.id, kind: 'gallery-board-drag', projectId: board.projectId, scope });
+
+export const getGalleryBoardTierDropId = (projectId: string | null, scope: string): string =>
+  `gallery-board-tier#${scope}:${projectId ?? 'library'}`;
+
+export const getGalleryBoardTierDropData = (
+  projectId: string | null,
+  label: string,
+  scope: string
+): GalleryBoardTierDropData => ({ kind: 'gallery-board-tier', label, projectId, scope });
+
+export const isGalleryBoardDragData = (value: unknown): value is GalleryBoardDragData =>
+  isRecord(value) &&
+  value.kind === 'gallery-board-drag' &&
+  typeof value.boardId === 'string' &&
+  typeof value.scope === 'string' &&
+  (value.projectId === null || typeof value.projectId === 'string');
+
+const isGalleryBoardTierDropData = (value: unknown): value is GalleryBoardTierDropData =>
+  isRecord(value) &&
+  value.kind === 'gallery-board-tier' &&
+  typeof value.label === 'string' &&
+  typeof value.scope === 'string' &&
+  (value.projectId === null || typeof value.projectId === 'string');
+
+/** Whether a dragged board would move by landing on the tier: it came from this gallery and is not there already. */
+export const acceptsGalleryBoardMove = (activeData: unknown, projectId: string | null, scope: string): boolean =>
+  isGalleryBoardDragData(activeData) && activeData.scope === scope && activeData.projectId !== projectId;
+
+/** The move a board drop in this gallery asks for, or null when it was no board of its own or stayed in its tier. */
+export const resolveGalleryBoardMove = (
+  activeData: unknown,
+  overData: unknown,
+  scope: string
+): GalleryBoardMove | null =>
+  isGalleryBoardTierDropData(overData) &&
+  overData.scope === scope &&
+  acceptsGalleryBoardMove(activeData, overData.projectId, scope) &&
+  isGalleryBoardDragData(activeData)
+    ? { boardId: activeData.boardId, label: overData.label, projectId: overData.projectId }
+    : null;
 
 /** Real boards and Uncategorized hold items; date boards are views and accept no moves. */
 export const acceptsGalleryItemMoves = (boardKind: GalleryBoardKind): boolean =>

@@ -4,10 +4,13 @@ from invokeai.app.services.board_records.board_records_base import BoardRecordSt
 from invokeai.app.services.board_records.board_records_common import (
     BoardChanges,
     BoardRecord,
+    BoardRecordInboxException,
     BoardRecordNotFoundException,
     BoardRecordOrderBy,
-    BoardRecordProjectOwnedException,
+    BoardRecordProjectNotFoundException,
+    BoardRecordProjectUnavailableException,
     BoardRecordSaveException,
+    BoardVisibility,
 )
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries import Queries
@@ -23,16 +26,16 @@ class BoardRecordStorage(BoardRecordStorageBase):
     def delete_if_unclaimed(self, board_id: str) -> bool:
         return self._queries.boards.delete_if_unclaimed(board_id)
 
-    def get_project_ids_for_boards(self, board_ids: list[str]) -> dict[str, str]:
+    def get_inbox_board_ids(self, board_ids: list[str]) -> set[str]:
         if not board_ids:
-            return {}
+            return set()
         # The caller is a board *listing*: an admin's `GET /boards/?all=true` passes every board on the install.
-        return self._queries.boards.project_ids(board_ids)
+        return set(self._queries.boards.project_ids(board_ids))
 
-    def get_with_project_id(self, board_id: str) -> tuple[BoardRecord, Optional[str]]:
+    def get_with_inbox_project(self, board_id: str) -> tuple[BoardRecord, Optional[str]]:
         """The board and the project that claims it, in one query: `get_dto` needs both, for every board the
         API returns."""
-        found = self._queries.boards.get_with_project_id(board_id)
+        found = self._queries.boards.get_with_inbox_project(board_id)
         if found is None:
             raise BoardRecordNotFoundException
         return found
@@ -41,11 +44,14 @@ class BoardRecordStorage(BoardRecordStorageBase):
         self,
         board_name: str,
         user_id: str,
+        project_id: Optional[str] = None,
     ) -> BoardRecord:
         board_id = uuid_string()
 
         def insert(q: Queries) -> Optional[BoardRecord]:
-            q.boards.insert(board_id=board_id, board_name=board_name, user_id=user_id)
+            if project_id is not None and q.projects.lock(user_id, project_id) is None:
+                raise BoardRecordProjectNotFoundException
+            q.boards.insert(board_id=board_id, board_name=board_name, user_id=user_id, project_id=project_id)
             return q.boards.get(board_id)
 
         board = self._queries.run(insert)
@@ -80,13 +86,36 @@ class BoardRecordStorage(BoardRecordStorageBase):
         changes: BoardChanges,
     ) -> BoardRecord:
         def apply(q: Queries) -> Optional[BoardRecord]:
-            # One conditional write, not a read followed by a write. A project claim racing this statement
-            # either commits first and makes it change nothing, or waits until this update has committed; there
-            # is no stale DTO window in which project-owned state can be renamed, archived or published.
-            if not q.boards.update(board_id, changes):
-                if not q.boards.exists(board_id):
+            # A destination project is locked before its board, as in project deletion. A move or
+            # creation cannot land in a project whose deletion has already committed.
+            destination_exists = True
+            if changes.moves_board and changes.project_id is not None:
+                current = q.boards.get(board_id)
+                if current is None:
                     raise BoardRecordNotFoundException
-                raise BoardRecordProjectOwnedException
+                destination_exists = q.projects.lock(current.user_id, changes.project_id) is not None
+            if q.boards.lock(board_id) is None:
+                raise BoardRecordNotFoundException
+            found = q.boards.get_with_inbox_project(board_id)
+            assert found is not None
+            current, inbox_project = found
+            if inbox_project is not None and (
+                changes.board_name is not None
+                or changes.archived is not None
+                or changes.board_visibility is not None
+                or changes.moves_board
+            ):
+                raise BoardRecordInboxException
+            next_project = changes.project_id if changes.moves_board else current.project_id
+            next_visibility = changes.board_visibility or current.board_visibility
+            if next_project is not None and (
+                next_visibility != BoardVisibility.Private or q.boards.is_shared(board_id)
+            ):
+                raise BoardRecordProjectUnavailableException
+            if not destination_exists:
+                raise BoardRecordProjectNotFoundException
+            if not q.boards.update(board_id, changes):
+                raise BoardRecordInboxException
             return q.boards.get(board_id)
 
         board = self._queries.run(apply)

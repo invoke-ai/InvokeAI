@@ -50,6 +50,7 @@ const uncategorized: GalleryBoard = {
   assetVideoCount: 0,
   id: 'none',
   imageCount: 1,
+  isInbox: false,
   kind: 'uncategorized',
   name: '',
   projectId: null,
