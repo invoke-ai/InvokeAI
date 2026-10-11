@@ -73,7 +73,8 @@ type RecalledField =
   | 'components'
   | 'loras'
   | 'referenceImages'
-  | 'krea2Rebalance';
+  | 'krea2Rebalance'
+  | 'animaInpaintAdapterWeight';
 
 export type ImageRecallSkipReason =
   | 'ambiguous'
@@ -419,8 +420,26 @@ const getMetadataKrea2Rebalance = (
 const hasKrea2Rebalance = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
   Object.keys(getMetadataKrea2Rebalance(metadata, model)).length > 0;
 
+/** The canvas records the adapter's weight beside the adapter; only an Anima image can carry it. */
+const getMetadataAnimaInpaintAdapterWeight = (
+  metadata: unknown,
+  model: GenerateModelConfig | undefined
+): Partial<GenerateWidgetValues> => {
+  if (model?.base !== 'anima') {
+    return {};
+  }
+
+  const weight = getNumber(metadata, 'anima_inpaint_adapter_weight');
+
+  return weight === null ? {} : { animaInpaintAdapterWeight: weight };
+};
+
+const hasAnimaInpaintAdapterWeight = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
+  Object.keys(getMetadataAnimaInpaintAdapterWeight(metadata, model)).length > 0;
+
 type RecalledComponentSetting = keyof Pick<
   GenerateWidgetValues,
+  | 'animaInpaintAdapterModel'
   | 'clipEmbedModel'
   | 'componentSourceModel'
   | 'gemma2EncoderModel'
@@ -453,6 +472,7 @@ const RECALLED_COMPONENTS: readonly RecalledComponent[] = [
   { isMainModel: true, metadataKey: 'wan_component_source', setting: 'componentSourceModel' },
   { isMainModel: true, metadataKey: 'ideogram4_unconditional_model', setting: 'ideogram4UnconditionalModel' },
   { isMainModel: true, metadataKey: 'wan_transformer_low_noise', setting: 'wanLowNoiseModel' },
+  { metadataKey: 'anima_inpaint_adapter', setting: 'animaInpaintAdapterModel' },
   { metadataKey: 'clip_embed_model', setting: 'clipEmbedModel' },
   { metadataKey: 'gemma2_encoder', setting: 'gemma2EncoderModel' },
   { metadataKey: 'mistral_encoder', setting: 'mistralEncoderModel' },
@@ -707,6 +727,7 @@ export const getImageRecallCapabilities = ({
   const hasReferenceImages = getMetadataReferenceImages(metadata).length > 0;
   const hasModel = supportedMetadataModel !== null;
   const hasRebalance = hasKrea2Rebalance(metadata, clipSkipModel);
+  const hasAdapterWeight = hasAnimaInpaintAdapterWeight(metadata, clipSkipModel);
   const hasConcepts =
     (getMetadataConcepts(metadata, models, clipSkipModel, supportedMetadataModel).loras?.length ?? 0) > 0;
   const hasAnyMetadata =
@@ -721,7 +742,8 @@ export const getImageRecallCapabilities = ({
     hasComponents ||
     hasReferenceImages ||
     hasConcepts ||
-    hasRebalance;
+    hasRebalance ||
+    hasAdapterWeight;
   const hasNonSeedMetadata =
     hasModel ||
     hasVae ||
@@ -733,7 +755,8 @@ export const getImageRecallCapabilities = ({
     hasComponents ||
     hasReferenceImages ||
     hasConcepts ||
-    hasRebalance;
+    hasRebalance ||
+    hasAdapterWeight;
 
   return {
     all: hasAnyMetadata && isImageRecallKindAvailable('all'),
@@ -801,6 +824,13 @@ export const buildImageRecallSettings = ({
     if (Object.keys(rebalancePatch).length > 0) {
       values = { ...values, ...rebalancePatch };
       fields.push('krea2Rebalance');
+    }
+
+    const adapterWeightPatch = getMetadataAnimaInpaintAdapterWeight(metadata, values.model);
+
+    if (Object.keys(adapterWeightPatch).length > 0) {
+      values = { ...values, ...adapterWeightPatch };
+      fields.push('animaInpaintAdapterWeight');
     }
 
     const vae = getMetadataVae(metadata, values.model, vaeModels);

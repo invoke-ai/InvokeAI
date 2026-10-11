@@ -52,7 +52,7 @@ import {
   toGraphContract,
 } from './graphBuilder';
 import { addKrea2ConditioningEnhancers } from './krea2Conditioning';
-import { addPidDecode, getPidDenoiseSize, getPidMetadata, shouldUsePidDecode } from './pidGraph';
+import { addPidDecode, getPidDenoiseSize, getPidMetadata, isPidDecodeNodeType, shouldUsePidDecode } from './pidGraph';
 import { getEffectiveReferenceImage } from './referenceImage';
 
 const getCompatibleComponentSource = (
@@ -527,6 +527,30 @@ const addDecodeOutput = ({
   addEdge(graph, denoise, 'latents', output, 'latents');
 
   return output;
+};
+
+/**
+ * The node and field a built graph decodes with, for grafting an encode onto it. An ordinary decode reads it on
+ * `canvas_output.vae`; a PiD decode reads it only when its node type takes a `vae` input. The FLUX and SD-3 PiD
+ * decodes take none, and those builders decode with the model loader, which the fallback names. Null when no builder
+ * convention applies.
+ */
+export const findVaeSource = (
+  graph: BackendGraphContract
+): { node: BackendInvocationContract; field: string } | null => {
+  const edge = graph.edges.find(
+    (candidate) =>
+      candidate.destination.field === 'vae' &&
+      (candidate.destination.node_id === 'canvas_output' ||
+        isPidDecodeNodeType(graph.nodes[candidate.destination.node_id]?.type))
+  );
+  if (edge) {
+    const node = graph.nodes[edge.source.node_id];
+    return node ? { field: edge.source.field, node } : null;
+  }
+  const modelLoader = graph.nodes.model_loader;
+  const decodesWithPid = Object.values(graph.nodes).some((node) => isPidDecodeNodeType(node.type));
+  return modelLoader && decodesWithPid ? { field: 'vae', node: modelLoader } : null;
 };
 
 /** Native PiD denoises at one quarter of the requested target dimensions. */

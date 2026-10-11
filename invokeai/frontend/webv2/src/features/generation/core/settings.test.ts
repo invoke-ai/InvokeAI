@@ -314,6 +314,30 @@ describe('normalizeGenerateSettings', () => {
   });
 });
 
+describe('the Anima inpaint adapter settings', () => {
+  it('defaults the weight, clamps it to the node bounds, and drops a malformed adapter', () => {
+    expect(normalizeGenerateSettings(legacyStoredValues)).toMatchObject({
+      animaInpaintAdapterModel: null,
+      animaInpaintAdapterWeight: 1,
+    });
+    const adapter = { base: 'anima', cond_in_channels: 4, key: 'inpaint', name: 'Inpainting', type: 'controlnet' };
+    expect(
+      normalizeGenerateSettings({
+        ...legacyStoredValues,
+        animaInpaintAdapterModel: adapter,
+        animaInpaintAdapterWeight: 12,
+      })
+    ).toMatchObject({ animaInpaintAdapterModel: adapter, animaInpaintAdapterWeight: 10 });
+    expect(
+      normalizeGenerateSettings({
+        ...legacyStoredValues,
+        animaInpaintAdapterModel: { key: 'no-name' },
+        animaInpaintAdapterWeight: 'heavy',
+      })
+    ).toMatchObject({ animaInpaintAdapterModel: null, animaInpaintAdapterWeight: 1 });
+  });
+});
+
 describe('Generate widget value snapshots', () => {
   const model: MainModelConfig = { base: 'flux2', key: 'model', name: 'Old Model', type: 'main' };
   const component: ComponentModelConfig = { base: 'any', key: 'qwen3', name: 'Old Qwen3', type: 'qwen3_encoder' };

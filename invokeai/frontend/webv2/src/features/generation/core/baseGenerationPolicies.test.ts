@@ -1098,6 +1098,53 @@ describe('component policies', () => {
   });
 });
 
+describe('Anima inpaint adapter slot', () => {
+  const anima = createModel('anima');
+  const inpaintAdapter: ComponentModelConfig = {
+    base: 'anima',
+    cond_in_channels: 4,
+    key: 'anima-inpaint',
+    name: 'Anima LLLite Inpainting',
+    type: 'controlnet',
+  };
+
+  it('is offered to Anima only, optional, and takes 4-channel or pre-field Anima LLLite models', () => {
+    const settings = createSettings(anima);
+    const slot = getComponentSectionPolicy(anima, settings).slots.find((s) => s.key === 'animaInpaintAdapterModel');
+    const ctx = { model: anima, selectedComponents: settings, settings };
+
+    expect(slot?.modelTypes).toEqual(['controlnet']);
+    expect(slot?.required).toBeUndefined();
+    expect(slot?.filter?.(inpaintAdapter, ctx)).toBe(true);
+    expect(slot?.filter?.({ ...inpaintAdapter, cond_in_channels: null }, ctx)).toBe(true);
+    expect(slot?.filter?.({ ...inpaintAdapter, cond_in_channels: 3 }, ctx)).toBe(false);
+    expect(slot?.filter?.({ ...inpaintAdapter, base: 'sdxl' }, ctx)).toBe(false);
+    expect(getGenerationValidationReasons(anima, settings)).not.toContain(expect.stringContaining('Inpaint Adapter'));
+    expect(
+      getComponentSectionPolicy(createModel('sdxl'), settings).slots.some((s) => s.key === 'animaInpaintAdapterModel')
+    ).toBe(false);
+  });
+
+  it('is cleared, and named, when the model leaves Anima', () => {
+    const settings = createSettings(anima, {
+      animaInpaintAdapterModel: inpaintAdapter,
+      animaInpaintAdapterWeight: 0.6,
+      qwen3EncoderModel: animaQwen3Encoder,
+      vae: qwenImageVae,
+    });
+
+    const result = getGenerateModelSelectionResult({ currentValues: settings, model: createModel('sdxl'), models: [] });
+
+    expect(result.settings.animaInpaintAdapterModel).toBeNull();
+    expect(result.clearedLabels).toContain('Inpaint Adapter');
+    expect(result.settings.animaInpaintAdapterWeight).toBe(0.6);
+    expect(
+      getGenerateModelSelectionResult({ currentValues: settings, model: anima, models: [] }).settings
+        .animaInpaintAdapterModel
+    ).toBe(inpaintAdapter);
+  });
+});
+
 describe('Krea-2, Ideogram 4 and Wan policies', () => {
   const krea2Vae: VaeModelConfig = { base: 'qwen-image', key: 'krea2-vae', name: 'Qwen VAE', type: 'vae' };
   const qwen3VlEncoder: ComponentModelConfig = {
