@@ -12,7 +12,7 @@ const QueueItemActions = lazy(() => importQueueItemActions().then((module) => ({
 export const QueueUiAdapterProvider = ({ children }: { children: ReactNode }) => {
   const notify = useNotify();
   const activeProjectId = useActiveProjectSelector((project) => project.id);
-  const { canManageModels } = useCapabilities();
+  const { canManageAppConfig, canManageModels } = useCapabilities();
   const session = useAuthSession();
   const { queueJobsScope } = useWorkbenchPreferences();
   const openWorkbenchWidget = useOpenWorkbenchWidget();
@@ -27,6 +27,7 @@ export const QueueUiAdapterProvider = ({ children }: { children: ReactNode }) =>
     return {
       activeProjectId,
       ItemActions: QueueItemActions,
+      canManageInvocationCache: canManageAppConfig,
       canManageProcessor: canManageModels,
       canManageItem: (item) => getQueueItemAccess(item, viewer).canManage,
       canViewItemDetails: (item) => getQueueItemAccess(item, viewer).canViewDetails,
@@ -36,7 +37,16 @@ export const QueueUiAdapterProvider = ({ children }: { children: ReactNode }) =>
       preloadItemActions: () => void importQueueItemActions(),
       queueJobsScope,
     };
-  }, [activeProjectId, canManageModels, isConnected, notify, openWorkbenchWidget, queueJobsScope, session]);
+  }, [
+    activeProjectId,
+    canManageAppConfig,
+    canManageModels,
+    isConnected,
+    notify,
+    openWorkbenchWidget,
+    queueJobsScope,
+    session,
+  ]);
 
   return <QueueUiProvider adapter={adapter}>{children}</QueueUiProvider>;
 };

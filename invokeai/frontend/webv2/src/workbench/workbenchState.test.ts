@@ -438,8 +438,22 @@ const primeGenerate = (
   overrides: Partial<GenerateWidgetValues> = {}
 ) => workbenchReducer(state, { type: 'setGenerateSettings', values: createGenerateValues(overrides) });
 
-const submitGenerate = (state: WorkbenchState) =>
-  workbenchReducer(state, { backendSupportsCancellation: true, type: 'submitInvocationSnapshot' });
+const submitGenerate = (state: WorkbenchState, prepend?: boolean) =>
+  workbenchReducer(state, {
+    backendSupportsCancellation: true,
+    ...(prepend === undefined ? {} : { prepend }),
+    type: 'submitInvocationSnapshot',
+  });
+
+describe('Invoke Front', () => {
+  it('records front priority on the queued snapshot only when the command asks for it', () => {
+    const appended = submitGenerate(primeGenerate());
+    const prepended = submitGenerate(primeGenerate(), true);
+
+    expect(getActiveProject(appended).queue.items[0]?.snapshot).not.toHaveProperty('prepend');
+    expect(getActiveProject(prepended).queue.items[0]?.snapshot.prepend).toBe(true);
+  });
+});
 
 const getQueuedRandDevice = (state: WorkbenchState): unknown => {
   const submission = getActiveProject(state).queue.items[0]?.snapshot.backendSubmission;

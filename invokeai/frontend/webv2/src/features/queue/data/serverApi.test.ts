@@ -12,6 +12,7 @@ import {
   cancelQueueItems,
   cancelScopedQueueItems,
   clearFailedQueueItems,
+  clearFinishedQueueItems,
   clearScopedQueue,
   getQueueItemsByIds,
 } from './serverApi';
@@ -165,5 +166,52 @@ describe('getQueueItemsByIds', () => {
   it('issues no request for an empty id list', async () => {
     await expect(getQueueItemsByIds([])).resolves.toEqual([]);
     expect(transport.apiFetchJson).not.toHaveBeenCalled();
+  });
+});
+
+describe('clearFinishedQueueItems', () => {
+  beforeEach(() => {
+    accountLifecycle.activate('user-a');
+    transport.apiFetchJson.mockReset();
+  });
+
+  it('prunes the whole queue in one server sweep when no scope is given', async () => {
+    transport.apiFetchJson.mockResolvedValue({ deleted: 3 });
+
+    await clearFinishedQueueItems();
+
+    expect(requestedUrls()).toEqual(['/api/v1/queue/default/prune']);
+    expect(transport.apiFetchJson.mock.calls[0]?.[1]).toMatchObject({ method: 'PUT' });
+  });
+
+  it('deletes only the terminal items of a scope and leaves active work alone', async () => {
+    transport.apiFetchJson.mockImplementation((url: string) => {
+      if (url.includes('item_ids')) {
+        return Promise.resolve({ item_ids: [5, 4, 3, 2, 1] });
+      }
+      if (url.endsWith('items_by_ids')) {
+        return Promise.resolve([
+          { item_id: 5, status: 'in_progress' },
+          { item_id: 4, status: 'pending' },
+          { item_id: 3, status: 'completed' },
+          { item_id: 2, status: 'canceled' },
+          { item_id: 1, status: 'failed' },
+        ]);
+      }
+      return Promise.resolve({});
+    });
+
+    await clearFinishedQueueItems({ originPrefix: 'webv2:p:a:' });
+
+    const deletions = transport.apiFetchJson.mock.calls
+      .filter((call) => (call[1] as RequestInit | undefined)?.method === 'DELETE')
+      .map((call) => String(call[0]));
+
+    expect(deletions.sort()).toEqual([
+      '/api/v1/queue/default/i/1',
+      '/api/v1/queue/default/i/2',
+      '/api/v1/queue/default/i/3',
+    ]);
+    expect(requestedUrls()).not.toContain('/api/v1/queue/default/prune');
   });
 });

@@ -1,8 +1,11 @@
 import type { QueueProgressPreviewPayload, QueueQueryScope } from '@features/queue/core/types';
 import type {
+  CancelByBatchIdsResultDTO,
+  InvocationCacheStatusDTO,
   QueueAndProcessorStatusDTO,
   QueueItemIdsResultDTO,
   QueueServerItemDTO,
+  RetryItemsResultDTO,
 } from '@features/queue/data/serverTypes';
 
 import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
@@ -144,6 +147,35 @@ export const clearFailedQueueItems = async (scope: QueueQueryScope = {}): Promis
   assertAccountScopeCurrent(owner);
 };
 
+const isTerminalStatus = (status: QueueServerItemDTO['status']): boolean =>
+  status === 'completed' || status === 'canceled' || status === 'failed';
+
+/**
+ * Removes finished history and keeps pending, waiting and running items. Without a scope the server prunes in one
+ * sweep; a scoped prune deletes the scope's terminal items individually, as the clear commands do.
+ */
+export const clearFinishedQueueItems = async (scope: QueueQueryScope = {}): Promise<void> => {
+  const owner = captureAccountScope();
+
+  if (!scope.originPrefix) {
+    await pruneQueue(owner.signal);
+    assertAccountScopeCurrent(owner);
+    return;
+  }
+
+  const idsResult = await getQueueItemIds('desc', scope, owner.signal);
+
+  assertAccountScopeCurrent(owner);
+  const items = await getQueueItemsByIds(idsResult.item_ids, owner.signal);
+
+  assertAccountScopeCurrent(owner);
+  await deleteQueueItems(
+    items.filter((item) => isTerminalStatus(item.status)).map((item) => item.item_id),
+    owner.signal
+  );
+  assertAccountScopeCurrent(owner);
+};
+
 export const clearScopedQueue = async (scope: QueueQueryScope = {}): Promise<void> => {
   const owner = captureAccountScope();
 
@@ -197,17 +229,28 @@ export const cancelScopedQueueItems = async (
   assertAccountScopeCurrent(owner);
 };
 
-export const cancelByBatchIds = (batchIds: string[]): Promise<unknown> =>
-  apiFetchJson(buildQueueUrl('cancel_by_batch_ids'), {
+export const cancelByBatchIds = (batchIds: string[]): Promise<CancelByBatchIdsResultDTO> =>
+  apiFetchJson<CancelByBatchIdsResultDTO>(buildQueueUrl('cancel_by_batch_ids'), {
     body: JSON.stringify({ batch_ids: batchIds }),
     method: 'PUT',
   });
 
-export const retryItemsById = (itemIds: number[]): Promise<unknown> =>
-  apiFetchJson(buildQueueUrl('retry_items_by_id'), {
+export const retryItemsById = (itemIds: number[]): Promise<RetryItemsResultDTO> =>
+  apiFetchJson<RetryItemsResultDTO>(buildQueueUrl('retry_items_by_id'), {
     body: JSON.stringify(itemIds),
     method: 'PUT',
   });
+
+const INVOCATION_CACHE_URL = '/api/v1/app/invocation_cache';
+
+/** Admin-only: the invocation (node output) cache, distinct from the model cache. */
+export const getInvocationCacheStatus = (signal?: AbortSignal): Promise<InvocationCacheStatusDTO> =>
+  apiFetchJson<InvocationCacheStatusDTO>(`${INVOCATION_CACHE_URL}/status`, { signal });
+
+export const clearInvocationCache = (): Promise<unknown> => apiFetchJson(INVOCATION_CACHE_URL, { method: 'DELETE' });
+
+export const setInvocationCacheEnabled = (enabled: boolean): Promise<unknown> =>
+  apiFetchJson(`${INVOCATION_CACHE_URL}/${enabled ? 'enable' : 'disable'}`, { method: 'PUT' });
 
 export const pauseQueueProcessor = (): Promise<unknown> =>
   apiFetchJson(buildQueueUrl('processor/pause'), { method: 'PUT' });

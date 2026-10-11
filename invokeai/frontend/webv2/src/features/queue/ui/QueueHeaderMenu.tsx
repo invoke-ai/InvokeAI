@@ -1,7 +1,7 @@
 import { Icon, Menu } from '@chakra-ui/react';
 import { queueCommands } from '@features/queue/publicApi';
 import { getApiErrorMessage } from '@platform/transport/http';
-import { Trash2Icon, TrashIcon } from 'lucide-react';
+import { BrushCleaningIcon, Trash2Icon, TrashIcon } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -32,6 +32,19 @@ export const QueueHeaderMenu = () => {
     }
   }, [notify, scope, t]);
 
+  const clearFinished = useCallback(async () => {
+    try {
+      await queueCommands.clearFinishedItems(scope);
+      await refreshQueue();
+      notify.success(t('widgets.queue.finishedItemsCleared'));
+    } catch (error) {
+      notify.error(
+        t('widgets.queue.failedToClearItems'),
+        getApiErrorMessage(error, t('widgets.queue.couldNotClearFinishedItems'))
+      );
+    }
+  }, [notify, scope, t]);
+
   const clearAll = useCallback(async () => {
     try {
       await queueCommands.clearItems(scope);
@@ -52,6 +65,14 @@ export const QueueHeaderMenu = () => {
       title: t('widgets.queue.clearFailedTitle'),
     });
   }, [clearFailed, t]);
+  const onClearFinished = useCallback(() => {
+    requestQueueConfirmation({
+      body: t('widgets.queue.clearFinishedConfirmationBody'),
+      confirmLabel: t('widgets.queue.clearFinishedItems'),
+      onConfirm: clearFinished,
+      title: t('widgets.queue.clearFinishedTitle'),
+    });
+  }, [clearFinished, t]);
   const onClearAll = useCallback(() => {
     requestQueueConfirmation({
       body: t('widgets.queue.clearQueueConfirmationBody'),
@@ -72,6 +93,15 @@ export const QueueHeaderMenu = () => {
         <Menu.Item data-danger="" disabled={counts.failed === 0} value="clear-failed-items" onClick={onClearFailed}>
           <Icon as={Trash2Icon} boxSize="3" />
           <Menu.ItemText>{t('widgets.queue.clearFailedItems')}</Menu.ItemText>
+        </Menu.Item>
+        <Menu.Item
+          data-danger=""
+          disabled={counts.completed + counts.canceled + counts.failed === 0}
+          value="clear-finished-items"
+          onClick={onClearFinished}
+        >
+          <Icon as={BrushCleaningIcon} boxSize="3" />
+          <Menu.ItemText>{t('widgets.queue.clearFinishedItems')}</Menu.ItemText>
         </Menu.Item>
         <Menu.Item data-danger="" disabled={counts.total === 0} value="clear-all-items" onClick={onClearAll}>
           <Icon as={TrashIcon} boxSize="3" />

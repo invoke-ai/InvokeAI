@@ -200,7 +200,10 @@ test('the HTTP reset contract selects profiles explicitly and restores the start
       100
     );
     assert.equal(projects.length, 40);
-    assert.deepEqual(runtimeConfig, { config: { generation_devices: 'auto' }, set_fields: [] });
+    assert.deepEqual(runtimeConfig, {
+      config: { generation_devices: 'auto', max_queue_history: null },
+      set_fields: [],
+    });
 
     assert.deepEqual(await readJson('/__reset', { method: 'POST' }), {
       counts: MOCK_BACKEND_PROFILE_COUNTS.empty,
@@ -936,5 +939,70 @@ test('workflow thumbnails round-trip their bytes and refresh the listed URL on e
 
     await getJson(backend, path, { method: 'DELETE' });
     assert.equal(await listedUrl(), null);
+  });
+});
+
+test('queue retry clones failed or canceled roots once, cancel-by-batch spares other batches, prune keeps active work', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const items = await getJson(backend, '/api/v1/queue/default/list_all');
+    const failed = items.find((item) => item.status === 'failed');
+    const pending = items.find((item) => item.status === 'pending');
+    const completed = items.find((item) => item.status === 'completed');
+
+    assert.ok(failed && pending && completed, 'the representative queue has failed, pending and completed items');
+
+    const retried = await getJson(backend, '/api/v1/queue/default/retry_items_by_id', {
+      body: JSON.stringify([failed.item_id, failed.item_id, completed.item_id]),
+      method: 'PUT',
+    });
+
+    assert.equal(retried.retried_item_ids.length, 1);
+    const clone = await getJson(backend, `/api/v1/queue/default/i/${retried.retried_item_ids[0]}`);
+    assert.equal(clone.status, 'pending');
+    assert.equal(clone.retried_from_item_id, failed.item_id);
+
+    const canceled = await getJson(backend, '/api/v1/queue/default/cancel_by_batch_ids', {
+      body: JSON.stringify({ batch_ids: [pending.batch_id] }),
+      method: 'PUT',
+    });
+
+    assert.ok(canceled.canceled >= 1);
+    assert.equal((await getJson(backend, `/api/v1/queue/default/i/${pending.item_id}`)).status, 'canceled');
+    if (clone.batch_id !== pending.batch_id) {
+      assert.equal((await getJson(backend, `/api/v1/queue/default/i/${clone.item_id}`)).status, 'pending');
+    }
+
+    const pruned = await getJson(backend, '/api/v1/queue/default/prune', { method: 'PUT' });
+    const remaining = await getJson(backend, '/api/v1/queue/default/list_all');
+
+    assert.ok(pruned.deleted >= 1);
+    assert.ok(remaining.every((item) => ['pending', 'waiting', 'in_progress'].includes(item.status)));
+  });
+});
+
+test('runtime config PATCH keeps the other writable field and validates the queue history limit', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    await getJson(backend, '/api/v1/app/runtime_config', {
+      body: JSON.stringify({ generation_devices: ['cpu'] }),
+      method: 'PATCH',
+    });
+    const withHistory = await getJson(backend, '/api/v1/app/runtime_config', {
+      body: JSON.stringify({ max_queue_history: 0 }),
+      method: 'PATCH',
+    });
+
+    assert.deepEqual(withHistory.config, { generation_devices: ['cpu'], max_queue_history: 0 });
+
+    const invalid = await fetch(`${backend.origin}/api/v1/app/runtime_config`, {
+      body: JSON.stringify({ max_queue_history: -1 }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'PATCH',
+    });
+
+    assert.equal(invalid.status, 422);
+
+    const cache = await getJson(backend, '/api/v1/app/invocation_cache/disable', { method: 'PUT' });
+    assert.equal(cache, null);
+    assert.equal((await getJson(backend, '/api/v1/app/invocation_cache/status')).enabled, false);
   });
 });

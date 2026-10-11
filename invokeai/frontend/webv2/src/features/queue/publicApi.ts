@@ -10,7 +10,7 @@ import type {
 import type { QueueModelLoadPort, QueueNodeExecutionPort } from './runtime/coordinator';
 
 import { queueBackend } from './data/httpRealtimeQueueBackend';
-import { queueReadModelOptions } from './data/queries';
+import { queueItemDetailOptions, queueReadModelOptions } from './data/queries';
 import { createQueueRealtimeRuntime } from './data/realtimeRuntime';
 import { createQueueRuntime } from './runtime';
 import { createQueueReceiptAcknowledgements, type QueueReceiptStorePort } from './runtime/receiptAcknowledgements';
@@ -23,12 +23,14 @@ export const createProductionQueueReceiptAcknowledgements = (store: QueueReceipt
   });
 
 export const queueCommands: QueueFeatureCommands = {
+  cancelBatch: queueBackend.cancelBatch,
   cancelCurrentItem: queueBackend.cancelCurrentItem,
   cancelItem: async (itemId) => {
     await queueBackend.cancelItem(itemId);
   },
   cancelScopedItems: queueBackend.cancelScopedItems,
   clearFailedItems: queueBackend.clearFailedItems,
+  clearFinishedItems: queueBackend.clearFinishedItems,
   clearItems: queueBackend.clearItems,
   pauseProcessor: async () => {
     await queueBackend.pauseProcessor();
@@ -36,7 +38,10 @@ export const queueCommands: QueueFeatureCommands = {
   resumeProcessor: async () => {
     await queueBackend.resumeProcessor();
   },
+  retryItems: queueBackend.retryItems,
 };
+
+export const getQueueItemDetailOptions = (itemId: number) => queueItemDetailOptions(queueBackend, itemId);
 
 export const getQueueReadModelOptions = (scope: QueueQueryScope, onRead?: (model: QueueReadModel) => void) =>
   queueReadModelOptions(queueBackend, scope, onRead);

@@ -54,6 +54,9 @@ const createTestBackend = (overrides: Partial<QueueBackendPort> = {}): QueueBack
   cancelItem: vi.fn(),
   cancelQueueItems: vi.fn(),
   cancelQueueItemsByBatchIds: vi.fn(),
+  cancelBatch: vi.fn(),
+  clearFinishedItems: vi.fn(),
+  readItemDetail: vi.fn(),
   cancelScopedItems: vi.fn(),
   clearFailedItems: vi.fn(),
   clearItems: vi.fn(),
@@ -126,6 +129,22 @@ describe('queue runtime', () => {
     expect(createQueueItemBackendSubmission({ id: 'project-1' }, queueItem)).toEqual({
       error: 'Queue item is missing a compiled backend submission.',
       kind: 'invalid',
+    });
+  });
+
+  it('carries an Invoke Front snapshot to the backend request and leaves ordinary runs appending', () => {
+    const ordinary = createQueueItemBackendSubmission({ id: 'project-1' }, createPendingQueueItem()) as {
+      request: object;
+    };
+
+    expect(ordinary.request).not.toHaveProperty('prepend');
+
+    const front = createPendingQueueItem();
+    front.snapshot.prepend = true;
+
+    expect(createQueueItemBackendSubmission({ id: 'project-1' }, front)).toMatchObject({
+      kind: 'generate',
+      request: { prepend: true },
     });
   });
 
@@ -301,6 +320,9 @@ describe('queue runtime', () => {
       cancelItem: vi.fn(),
       cancelQueueItems: vi.fn(),
       cancelQueueItemsByBatchIds: vi.fn(),
+      cancelBatch: vi.fn(),
+      clearFinishedItems: vi.fn(),
+      readItemDetail: vi.fn(),
       cancelScopedItems: vi.fn(),
       clearFailedItems: vi.fn(),
       clearItems: vi.fn(),
@@ -2228,6 +2250,9 @@ describe('queue runtime video board routing', () => {
       cancelItem: vi.fn(),
       cancelQueueItems: vi.fn(),
       cancelQueueItemsByBatchIds: vi.fn(),
+      cancelBatch: vi.fn(),
+      clearFinishedItems: vi.fn(),
+      readItemDetail: vi.fn(),
       cancelScopedItems: vi.fn(),
       clearFailedItems: vi.fn(),
       clearItems: vi.fn(),

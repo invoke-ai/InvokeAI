@@ -137,6 +137,8 @@ const createState = (profile) => {
     intermediatesOperations: new Map(),
     intermediatesPreviews: new Map(),
     queueItems: new Map(fixture.queueItems.map((item) => [item.item_id, clone(item)])),
+    runtimeConfig: { generation_devices: 'auto', max_queue_history: null },
+    invocationCache: { enabled: true, hits: 0, max_size: 1000, misses: 0, size: 0 },
     videos: new Map(fixture.videos.map((video) => [video.video_name, clone(video)])),
     workflows: new Map(fixture.workflows.map((workflow) => [workflow.workflow_id, clone(workflow)])),
     nextWorkflowNumber: fixture.workflows.length + 1,
@@ -907,8 +909,45 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         return json(200, [{ device: 'cpu', name: 'CPU' }]);
       }
 
-      if (method === 'GET' && path === '/api/v1/app/runtime_config') {
-        return json(200, { config: { generation_devices: 'auto' }, set_fields: [] });
+      if (path === '/api/v1/app/runtime_config') {
+        if (method === 'PATCH') {
+          const changes = await readJsonBody(request);
+
+          if ('generation_devices' in changes) {
+            state.runtimeConfig.generation_devices = changes.generation_devices;
+          }
+          if ('max_queue_history' in changes) {
+            const value = changes.max_queue_history;
+
+            if (value !== null && !(Number.isInteger(value) && value >= 0)) {
+              return json(422, { detail: 'max_queue_history must be a non-negative integer or null' });
+            }
+            state.runtimeConfig.max_queue_history = value;
+          }
+        }
+        if (method === 'GET' || method === 'PATCH') {
+          return json(200, { config: { ...state.runtimeConfig }, set_fields: [] });
+        }
+      }
+
+      if (path.startsWith('/api/v1/app/invocation_cache')) {
+        const cache = state.invocationCache;
+
+        if (path === '/api/v1/app/invocation_cache/status' && method === 'GET') {
+          return json(200, { ...cache });
+        }
+        if (path === '/api/v1/app/invocation_cache' && method === 'DELETE') {
+          cache.size = 0;
+          return json(200, null);
+        }
+        if (path === '/api/v1/app/invocation_cache/enable' && method === 'PUT') {
+          cache.enabled = true;
+          return json(200, null);
+        }
+        if (path === '/api/v1/app/invocation_cache/disable' && method === 'PUT') {
+          cache.enabled = false;
+          return json(200, null);
+        }
       }
 
       if (path.startsWith('/api/v1/app/external_providers')) {
@@ -1197,12 +1236,66 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           return json(200, { deleted: true });
         }
         if (action === 'prune' && method === 'PUT') {
+          let deleted = 0;
+
           for (const item of state.queueItems.values()) {
             if (item.status === 'completed' || item.status === 'failed' || item.status === 'canceled') {
               state.queueItems.delete(item.item_id);
+              deleted += 1;
             }
           }
-          return json(200, { deleted: true });
+          return json(200, { deleted });
+        }
+        if (action === 'cancel_by_batch_ids' && method === 'PUT') {
+          const body = await readJsonBody(request);
+          const batchIds = new Set(Array.isArray(body.batch_ids) ? body.batch_ids : []);
+          let canceled = 0;
+
+          for (const item of state.queueItems.values()) {
+            if (batchIds.has(item.batch_id) && ['pending', 'waiting', 'in_progress'].includes(item.status)) {
+              item.status = 'canceled';
+              item.completed_at = timestamp(state);
+              item.updated_at = item.completed_at;
+              canceled += 1;
+            }
+          }
+          return json(200, { canceled });
+        }
+        if (action === 'retry_items_by_id' && method === 'PUT') {
+          // Like the backend: only failed or canceled roots are cloned, once each, as new pending items.
+          const itemIds = await readJsonBody(request, []);
+          const retriedItemIds = [];
+          const seenRoots = new Set();
+
+          for (const itemId of Array.isArray(itemIds) ? itemIds : []) {
+            const item = state.queueItems.get(itemId);
+            const rootId = item?.root_item_id ?? item?.item_id;
+            const root = rootId === undefined ? undefined : state.queueItems.get(rootId);
+
+            if (!root || seenRoots.has(root.item_id) || !['failed', 'canceled'].includes(root.status)) {
+              continue;
+            }
+            seenRoots.add(root.item_id);
+
+            const nextId = Math.max(0, ...state.queueItems.keys()) + 1;
+            const now = timestamp(state);
+
+            state.queueItems.set(nextId, {
+              ...clone(root),
+              completed_at: null,
+              created_at: now,
+              error_message: null,
+              error_traceback: null,
+              error_type: null,
+              item_id: nextId,
+              retried_from_item_id: root.item_id,
+              started_at: null,
+              status: 'pending',
+              updated_at: now,
+            });
+            retriedItemIds.push(nextId);
+          }
+          return json(200, { queue_id: 'default', retried_item_ids: retriedItemIds });
         }
 
         return json(200, null);

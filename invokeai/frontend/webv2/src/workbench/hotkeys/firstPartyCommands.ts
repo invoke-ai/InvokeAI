@@ -114,14 +114,16 @@ export const useRegisterFirstPartyCommands = () => {
   /**
    * Submits the active route. `destinationOverride` applies to this run only and
    * is never written back to the project — "just this once, send it to the
-   * gallery" must not silently retarget every subsequent invoke.
+   * gallery" must not silently retarget every subsequent invoke. `prepend` is
+   * likewise per run: Invoke Front puts this batch ahead of the user's pending work.
    */
-  const submitInvocation = async (destinationOverride?: ResultDestination) => {
+  const submitInvocation = async (destinationOverride?: ResultDestination, prepend = false) => {
     await submitActiveInvocation({
       commands,
       destinationOverride,
       formatControlLayerError: (rejection) => describeControlLayerIssue(t, rejection),
       getModels: getAvailableModels,
+      ...(prepend ? { prepend } : {}),
       queries,
     });
   };
@@ -263,7 +265,11 @@ export const useRegisterFirstPartyCommands = () => {
         })
       ),
       commandApi.register({ handler: () => submitInvocation(), id: 'app.invoke', title: 'Invoke' }),
-      commandApi.register({ handler: () => submitInvocation(), id: 'app.invokeFront', title: 'Invoke front' }),
+      commandApi.register({
+        handler: () => submitInvocation(undefined, true),
+        id: 'app.invokeFront',
+        title: 'Invoke front',
+      }),
       commandApi.register({
         handler: () => {
           const { destination } = queries.getSnapshot().activeProject.invocation;

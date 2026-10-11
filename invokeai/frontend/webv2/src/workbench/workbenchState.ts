@@ -385,10 +385,18 @@ type WorkbenchReducerAction =
     }
   | { type: 'undoWorkflowChange'; projectId?: string; workflowId?: string }
   | { type: 'redoWorkflowChange'; projectId?: string; workflowId?: string }
-  | { type: 'submitInvocationSnapshot'; backendSupportsCancellation: boolean; models?: readonly ModelConfig[] }
+  | {
+      type: 'submitInvocationSnapshot';
+      backendSupportsCancellation: boolean;
+      models?: readonly ModelConfig[];
+      /** Invoke Front: the backend runs the batch ahead of the user's other pending work. */
+      prepend?: boolean;
+    }
   | ({
       type: 'submitResolvedInvocationSnapshot';
       backendSupportsCancellation: boolean;
+      /** Invoke Front: the backend runs the batch ahead of the user's other pending work. */
+      prepend?: boolean;
       /** Async workflow generator outputs, resolved by the caller before dispatch. */
       workflowGenerators?: WorkflowGeneratorResolutions;
       route: InvocationRoute;
@@ -510,6 +518,8 @@ type WorkbenchReducerAction =
       destination: ResultDestination;
       generate: QueueGenerateSnapshot;
       graph: GraphContract;
+      /** Invoke Front: the backend runs the batch ahead of the user's other pending work. */
+      prepend?: boolean;
       projectId: string;
     } & Partial<ExpandedPositivePrompts>)
   | {
@@ -3439,7 +3449,8 @@ const enqueueCompiledSnapshot = (
     projectWorkflowId?: string;
   },
   backendSupportsCancellation: boolean,
-  canvasSnapshot?: CanvasStateContractV3
+  canvasSnapshot?: CanvasStateContractV3,
+  prepend = false
 ): Project => {
   const submittedAt = now();
   const queueItemId = createId('queue-item');
@@ -3606,6 +3617,7 @@ const enqueueCompiledSnapshot = (
             : {}),
       submittedAt,
       ...(recall ? { recall } : {}),
+      ...(prepend ? { prepend: true } : {}),
     },
     status: 'pending',
   };
@@ -3686,7 +3698,8 @@ const submitInvocationSnapshot = (
   models?: readonly ModelConfig[],
   expansion: Partial<ExpandedPositivePrompts> = {},
   workflowGenerators?: WorkflowGeneratorResolutions,
-  workflowDocument?: ProjectGraphState
+  workflowDocument?: ProjectGraphState,
+  prepend = false
 ): Project => {
   if (!isInvocationRouteValid(route)) {
     return project;
@@ -3698,7 +3711,14 @@ const submitInvocationSnapshot = (
     return project;
   }
 
-  return enqueueCompiledSnapshot(project, route, { ...compiledSnapshot, ...expansion }, backendSupportsCancellation);
+  return enqueueCompiledSnapshot(
+    project,
+    route,
+    { ...compiledSnapshot, ...expansion },
+    backendSupportsCancellation,
+    undefined,
+    prepend
+  );
 };
 
 export const createInitialWorkbenchState = (): WorkbenchState => {
@@ -4773,7 +4793,16 @@ export const __workbenchReducerInternal = (
       return withEnqueueNotification(
         state,
         updateActiveProject(state, (project) =>
-          submitInvocationSnapshot(project, action.backendSupportsCancellation, undefined, action.models)
+          submitInvocationSnapshot(
+            project,
+            action.backendSupportsCancellation,
+            undefined,
+            action.models,
+            undefined,
+            undefined,
+            undefined,
+            action.prepend === true
+          )
         ),
         state.activeProjectId
       );
@@ -4814,7 +4843,8 @@ export const __workbenchReducerInternal = (
             action.models,
             { positivePrompts: action.positivePrompts, positivePromptsSampleSeed: action.positivePromptsSampleSeed },
             action.workflowGenerators,
-            workflow?.document
+            workflow?.document,
+            action.prepend === true
           )
         ),
         action.projectId
@@ -5373,7 +5403,8 @@ export const __workbenchReducerInternal = (
               widgetStates: getWidgetStatesSnapshot(project.widgetInstances),
             },
             action.backendSupportsCancellation,
-            action.canvas
+            action.canvas,
+            action.prepend === true
           )
         ),
         action.projectId

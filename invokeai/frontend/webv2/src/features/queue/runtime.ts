@@ -291,6 +291,7 @@ export const createQueueItemBackendSubmission = (
         ...compiled,
         destination: queueItem.snapshot.destination,
         ...(isQueueSeedStep(submission.seedStep) ? {} : { legacySeedPlan: true as const }),
+        ...(queueItem.snapshot.prepend === true ? { prepend: true } : {}),
         projectId: project.id,
         seedStep,
         sourceQueueItemId: queueItem.id,
@@ -324,6 +325,7 @@ export const createQueueItemBackendSubmission = (
     request: {
       ...compiled,
       destination: queueItem.snapshot.destination,
+      ...(queueItem.snapshot.prepend === true ? { prepend: true } : {}),
       projectId: project.id,
       sourceQueueItemId: queueItem.id,
     },

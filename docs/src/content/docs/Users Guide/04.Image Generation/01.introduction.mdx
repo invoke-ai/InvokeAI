@@ -49,7 +49,9 @@ If a required component is missing, **Invoke** is disabled and its tooltip names
 
 </Steps>
 
-Hover over **Invoke** to see what will be queued, for example *1 prompt × 4 iterations → 4 generations*. When Invoke is disabled, the same tooltip lists what is stopping it.
+Hover over **Invoke** to see what will be queued, for example *1 prompt × 4 iterations → 4 generations*. When Invoke is disabled, the same tooltip lists what is stopping it. To run a batch ahead of the work you already have queued, press **Ctrl+Shift+Enter** (**Cmd+Shift+Enter** on macOS) or choose **Invoke (Front of Queue)** from the command palette; the batch still waits its turn behind other users' jobs.
+
+The **Queue** panel lists recent jobs. Cancel a pending, waiting or running job from its row, and retry a failed or canceled job from the session the server saved for it, independently of your current settings. Expand a row to cancel its whole batch while other batches keep running, or to open **View JSON**, which shows the graph the server actually ran, its results and the embedded workflow. The panel menu clears failed items, clears every finished item while keeping queued and running work, or clears the whole queue. Administrators also see the **Invocation Cache** beneath the queue, next to the model cache, where cached node outputs can be cleared, disabled or re-enabled.
 
 ## Routing images to the Gallery or the Canvas
 

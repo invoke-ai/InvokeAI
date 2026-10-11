@@ -2,7 +2,13 @@ import type { QueueBackendPort } from '@features/queue/core/types';
 
 import { socketHub } from '@platform/transport/socketHub';
 
-import { mapQueueBackendItemDTO, mapQueueItemDTO, mapQueueItemIdsDTO, mapQueueStatusDTO } from './mappers';
+import {
+  mapQueueBackendItemDTO,
+  mapQueueItemDetailDTO,
+  mapQueueItemDTO,
+  mapQueueItemIdsDTO,
+  mapQueueStatusDTO,
+} from './mappers';
 import {
   cancelByBatchIds,
   cancelCurrentQueueItem,
@@ -10,6 +16,7 @@ import {
   cancelQueueItems,
   cancelScopedQueueItems,
   clearFailedQueueItems,
+  clearFinishedQueueItems,
   clearScopedQueue,
   getCurrentQueueItem,
   getNextQueueItem,
@@ -36,6 +43,7 @@ import {
 /** Production adapter for the queue backend port. */
 export const queueBackend: QueueBackendPort = {
   acknowledgeEnqueue: acknowledgeQueueEnqueue,
+  cancelBatch: async (batchId) => (await cancelByBatchIds([batchId])).canceled,
   cancelCurrentItem: cancelCurrentQueueItem,
   cancelQueueItems,
   cancelQueueItemsByBatchIds: async (batchIds) => {
@@ -46,6 +54,7 @@ export const queueBackend: QueueBackendPort = {
   },
   cancelScopedItems: cancelScopedQueueItems,
   clearFailedItems: clearFailedQueueItems,
+  clearFinishedItems: clearFinishedQueueItems,
   clearItems: clearScopedQueue,
   emit: socketHub.emit,
   enqueueGenerate,
@@ -61,6 +70,7 @@ export const queueBackend: QueueBackendPort = {
   pauseProcessor: async () => {
     await pauseQueueProcessor();
   },
+  readItemDetail: async (itemId, signal) => mapQueueItemDetailDTO(await getQueueItem(itemId, signal)),
   readCurrent: async (scope, signal) => {
     const item = await getCurrentQueueItem(scope, signal);
 
@@ -76,7 +86,7 @@ export const queueBackend: QueueBackendPort = {
     return item ? mapQueueItemDTO(item) : null;
   },
   readStatus: async (scope, signal) => mapQueueStatusDTO(await getQueueStatus(scope, signal)),
-  retryItems: retryItemsById,
+  retryItems: async (itemIds) => (await retryItemsById(itemIds)).retried_item_ids,
   resumeProcessor: async () => {
     await resumeQueueProcessor();
   },
