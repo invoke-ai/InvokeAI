@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 794977,
+        "brotliBytes": 795879,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 793689,
+        "gzipBytes": 794696,
         "imageRawBytes": 44398,
-        "initialRawBytes": 2042114,
-        "largestAssetRawBytes": 749029,
+        "initialRawBytes": 2046651,
+        "largestAssetRawBytes": 752421,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 98621,
+        "ownedRawBytes": 98845,
         "requestCount": 35,
         "scriptRequestCount": 19,
         "sourceOwners": [
@@ -346,15 +346,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1171873,
+        "brotliBytes": 1175838,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1165072,
+        "gzipBytes": 1169044,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3208701,
-        "largestAssetRawBytes": 749029,
+        "initialRawBytes": 3222761,
+        "largestAssetRawBytes": 752421,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 150716,
+        "ownedRawBytes": 151795,
         "requestCount": 72,
         "scriptRequestCount": 56,
         "sourceOwners": [
@@ -562,6 +562,8 @@
           "source:src/features/generation/core/promptTemplates.ts",
           "source:src/features/generation/core/referenceImage.ts",
           "source:src/features/generation/core/resolveGenerateWidgetValues.ts",
+          "source:src/features/generation/core/sdxlRefiner.ts",
+          "source:src/features/generation/core/sdxlRefinerGraph.ts",
           "source:src/features/generation/core/settings.ts",
           "source:src/features/generation/core/supportedBases.ts",
           "source:src/features/generation/data/architectureCapabilitiesApi.ts",
@@ -1092,7 +1094,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-10-09",
+  "capturedAt": "2026-10-11",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",
