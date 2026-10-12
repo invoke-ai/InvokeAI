@@ -11,6 +11,7 @@ import {
   toGalleryItemKey,
 } from '@features/gallery';
 import { getGalleryBoardDestinationGroups, getGalleryBoardLabel } from '@features/gallery/contracts';
+import { galleryKeys } from '@features/gallery/queries';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { MenuContent, MenuIconItem } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
@@ -339,7 +340,7 @@ const SingleItemMenuItems = ({
   // The record answers whether a workflow is embedded only when the listing did not say.
   const videoCapabilitiesQuery = useQuery({
     enabled: videoItem !== null,
-    queryKey: ['gallery', 'item-menu', 'video-capabilities', owner.epoch, videoItem?.name ?? null],
+    queryKey: galleryKeys.videoMenuCapabilities(owner, videoItem?.name ?? null),
     queryFn: async ({ signal }): Promise<VideoItemCapabilities> => {
       if (!videoItem) {
         return EMPTY_VIDEO_ITEM_CAPABILITIES;
