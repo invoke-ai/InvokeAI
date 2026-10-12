@@ -18,6 +18,7 @@ vi.mock('@platform/transport/http', () => ({
 
 import {
   addImagesToGalleryBoard,
+  createGalleryBoard,
   deleteGalleryBoard,
   deleteGalleryImages,
   downloadGalleryArchive,
@@ -37,6 +38,7 @@ import {
   removeImagesFromGalleryBoard,
   starGalleryImages,
   unstarGalleryImages,
+  updateGalleryBoard,
   uploadGalleryImage,
   uploadGalleryVideo,
 } from './backend';
@@ -973,5 +975,44 @@ describe('fetchImageIndexAvailability', () => {
     mocks.apiFetchJson.mockResolvedValue(body);
 
     await expect(fetchImageIndexAvailability(new AbortController().signal)).resolves.toEqual(availability);
+  });
+});
+
+describe('board membership transport', () => {
+  const dto = { archived: false, asset_count: 0, board_id: 'b1', board_name: 'B', image_count: 0, is_inbox: false };
+
+  beforeEach(() => {
+    accountLifecycle.activate('user-a');
+    mocks.apiFetchJson.mockReset();
+    mocks.apiFetchJson.mockResolvedValue(dto);
+  });
+
+  it('creates in a project only when one is named', async () => {
+    await createGalleryBoard('B');
+    await createGalleryBoard('B', 'p1');
+
+    expect(mocks.apiFetchJson.mock.calls.map(([url]) => url)).toEqual([
+      '/api/v1/boards/?board_name=B',
+      '/api/v1/boards/?board_name=B&project_id=p1',
+    ]);
+  });
+
+  it('sends an explicit null to move a board to the Library, and no key to leave it alone', async () => {
+    await updateGalleryBoard('b1', { projectId: null });
+    await updateGalleryBoard('b1', { projectId: 'p2' });
+    await updateGalleryBoard('b1', { name: 'Renamed' });
+
+    const bodies = mocks.apiFetchJson.mock.calls.map(([, init]) => JSON.parse((init as { body: string }).body));
+    expect(bodies[0]).toEqual({ project_id: null });
+    expect(bodies[1]).toEqual({ project_id: 'p2' });
+    expect(bodies[2]).toEqual({ board_name: 'Renamed' });
+  });
+
+  it('reads membership and the inbox flag off the wire', async () => {
+    mocks.apiFetchJson.mockResolvedValueOnce({ ...dto, is_inbox: true, project_id: 'p1' });
+
+    const board = await createGalleryBoard('B', 'p1');
+
+    expect(board).toMatchObject({ id: 'b1', isInbox: true, projectId: 'p1' });
   });
 });

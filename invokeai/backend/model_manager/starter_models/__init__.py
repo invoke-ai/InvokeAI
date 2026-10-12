@@ -65,9 +65,13 @@ from invokeai.backend.model_manager.starter_models.common import (
 )
 from invokeai.backend.model_manager.starter_models.ernie_image import (
     ernie_image,
+    ernie_image_gguf_q4_k_m,
+    ernie_image_gguf_q8_0,
     ernie_image_mistral_encoder,
     ernie_image_single_file,
     ernie_image_turbo,
+    ernie_image_turbo_gguf_q4_k_m,
+    ernie_image_turbo_gguf_q8_0,
     ernie_image_turbo_single_file,
 )
 from invokeai.backend.model_manager.starter_models.external import (
@@ -468,6 +472,10 @@ STARTER_MODELS: list[StarterModel] = [
     ernie_image_turbo,
     ernie_image_single_file,
     ernie_image_turbo_single_file,
+    ernie_image_turbo_gguf_q4_k_m,
+    ernie_image_turbo_gguf_q8_0,
+    ernie_image_gguf_q4_k_m,
+    ernie_image_gguf_q8_0,
     ernie_image_mistral_encoder,
     krea2_turbo,
     krea2_raw,
