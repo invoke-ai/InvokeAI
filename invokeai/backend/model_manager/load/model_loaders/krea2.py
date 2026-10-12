@@ -119,9 +119,10 @@ def _put_unique_key(
     source_of[key] = source
 
 
-def _count_int4(markers: dict[str, dict[str, Any]]) -> int:
-    """How many of the kept quantized layers are packed int4, for the load log."""
-    return sum(marker_layout(marker).packed_int4 for marker in markers.values())
+def _int4_int8_split(markers: dict[str, dict[str, Any]]) -> str:
+    """How the kept quantized layers divide into packed int4 and int8, for the load log."""
+    int4 = sum(marker_layout(marker).packed_int4 for marker in markers.values())
+    return f"{int4} int4, {len(markers) - int4} int8"
 
 
 def _is_native_krea2_format(sd: dict[str, Any]) -> bool:
@@ -534,7 +535,7 @@ class Krea2CheckpointModel(ModelLoader):
             )
             self._logger.info(
                 f"Krea-2: kept {len(quantized)} of {len(int8_markers)} layer(s) quantized "
-                f"({_count_int4(quantized)} int4, the rest int8; dequantized per forward)"
+                f"({_int4_int8_split(quantized)}; dequantized per forward)"
             )
             # The fp8 reporting below is keyed on these; an int8 checkpoint keeps neither.
             fp8_layers = {}
@@ -714,7 +715,7 @@ class Krea2GGUFCheckpointModel(ModelLoader):
             swap_in_int8_linears(model, sd, quantized)
             self._logger.info(
                 f"Krea-2: kept {len(quantized)} of {len(int8_markers)} layer(s) quantized "
-                f"(ComfyUI-GGUF Q8_CR/Q4_CR, {_count_int4(quantized)} int4; dequantized per forward)"
+                f"(ComfyUI-GGUF Q8_CR/Q4_CR, {_int4_int8_split(quantized)}; dequantized per forward)"
             )
 
         load_state_dict_ignoring_extras(model, sd, source="Krea-2 GGUF checkpoint", assign=True, allow_missing=True)
