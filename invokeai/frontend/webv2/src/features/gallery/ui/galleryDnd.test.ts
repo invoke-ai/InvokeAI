@@ -5,13 +5,16 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   forwardGalleryBoardDrop,
   GALLERY_SEMANTIC_SEARCH_DROP_ID,
+  getGalleryBoardDragData,
   getGalleryBoardDropData,
+  getGalleryBoardTierDropData,
   getGalleryItemDragData,
   getGalleryItemDragId,
   isGalleryBoardDropData,
   isGalleryImageDragData,
   isGalleryItemDragData,
   resolveGalleryBoardDrop,
+  resolveGalleryBoardMove,
   resolveGallerySemanticSearchDrop,
 } from './galleryDnd';
 
@@ -235,5 +238,28 @@ describe('resolveGallerySemanticSearchDrop', () => {
     expect(resolveGallerySemanticSearchDrop(imageDrag, 'gallery-board:board-a')).toBe(null);
     expect(resolveGallerySemanticSearchDrop(imageDrag, undefined)).toBe(null);
     expect(resolveGallerySemanticSearchDrop({ kind: 'other' }, GALLERY_SEMANTIC_SEARCH_DROP_ID)).toBe(null);
+  });
+});
+
+describe('resolveGalleryBoardMove', () => {
+  const dogs = getGalleryBoardDragData({ id: 'dogs', projectId: null }, 'left');
+
+  it('moves a board dropped on another tier of the gallery it was picked up in', () => {
+    expect(resolveGalleryBoardMove(dogs, getGalleryBoardTierDropData('p2', 'Harbor Tower', 'left'), 'left')).toEqual({
+      boardId: 'dogs',
+      label: 'Harbor Tower',
+      projectId: 'p2',
+    });
+    expect(resolveGalleryBoardMove(dogs, getGalleryBoardTierDropData(null, 'Library', 'left'), 'left')).toBeNull();
+  });
+
+  // Every mounted gallery hears every drop; only the one the drag began and ended in acts on it.
+  it('leaves a drop to the gallery it belongs to', () => {
+    const tier = getGalleryBoardTierDropData('p2', 'Harbor Tower', 'left');
+
+    expect(resolveGalleryBoardMove(dogs, tier, 'right')).toBeNull();
+    expect(
+      resolveGalleryBoardMove(dogs, getGalleryBoardTierDropData('p2', 'Harbor Tower', 'right'), 'right')
+    ).toBeNull();
   });
 });
