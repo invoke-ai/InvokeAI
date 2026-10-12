@@ -960,6 +960,7 @@ def test_restore_metadata_timeout_preserves_partial_download_for_retry(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
     tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}restore-timeout-{uuid.uuid4().hex}"
     tmpdir.mkdir(parents=True)
     partial_path = tmpdir / "weights.safetensors.downloading"
