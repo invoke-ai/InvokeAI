@@ -6,6 +6,7 @@ import type {
   QueueStatusReadModel,
 } from '@features/queue/core/types';
 
+import { isTerminalBackendStatus } from '@features/queue/data/events';
 import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
 import { queryOptions, type QueryClient } from '@tanstack/react-query';
 
@@ -90,7 +91,16 @@ export const queueItemDetailOptions = (backend: QueueBackendPort, itemId: number
     });
   })();
 
-/** Coalesced by QueryClient; only active queue observers refetch. */
-export const invalidateQueueReadModels = async (queryClient: QueryClient): Promise<void> => {
-  await queryClient.invalidateQueries({ queryKey: queueKeys.all });
+/**
+ * Refresh queue reads after queue activity; coalesced by QueryClient, and only active observers refetch. A finished
+ * item's execution data no longer changes, so its open details are not read again on every queue event; a details
+ * view opened again reads them afresh.
+ */
+export const invalidateQueueQueries = async (queryClient: QueryClient): Promise<void> => {
+  await queryClient.invalidateQueries({
+    predicate: ({ queryKey, state }) =>
+      queryKey[0] === queueKeys.all[0] &&
+      (queryKey[1] !== 'item-detail' ||
+        !isTerminalBackendStatus((state.data as QueueItemDetailReadModel | undefined)?.status ?? 'pending')),
+  });
 };

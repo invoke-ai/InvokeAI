@@ -8,7 +8,7 @@ import type {
   RetryItemsResultDTO,
 } from '@features/queue/data/serverTypes';
 
-import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
+import { assertAccountScopeCurrent, captureAccountScope, type AccountScope } from '@platform/state/accountLifecycle';
 import { apiFetchJson } from '@platform/transport/http';
 
 const QUEUE_ID = 'default';
@@ -100,20 +100,52 @@ export const getQueueItemIds = (
     { signal }
   );
 
-/** Hydrates items in id order, one bounded request per page of ids. */
-export const getQueueItemsByIds = async (itemIds: number[], signal?: AbortSignal): Promise<QueueServerItemDTO[]> => {
-  const items: QueueServerItemDTO[] = [];
+/** Reads `action`'s answer for `itemIds` in id order, one bounded request per page of ids. */
+const readQueueItemIdPages = async <T>(
+  action: 'item_summaries_by_ids' | 'items_by_ids',
+  itemIds: number[],
+  signal?: AbortSignal
+): Promise<T[]> => {
+  const results: T[] = [];
 
   for (let start = 0; start < itemIds.length; start += QUEUE_ITEM_IDS_PER_REQUEST) {
-    const page = await apiFetchJson<QueueServerItemDTO[]>(buildQueueUrl('items_by_ids'), {
+    const page = await apiFetchJson<T[]>(buildQueueUrl(action), {
       body: JSON.stringify({ item_ids: itemIds.slice(start, start + QUEUE_ITEM_IDS_PER_REQUEST) }),
       method: 'POST',
       signal,
     });
-    items.push(...page);
+    results.push(...page);
   }
 
-  return items;
+  return results;
+};
+
+/** Hydrates items in id order. */
+export const getQueueItemsByIds = (itemIds: number[], signal?: AbortSignal): Promise<QueueServerItemDTO[]> =>
+  readQueueItemIdPages<QueueServerItemDTO>('items_by_ids', itemIds, signal);
+
+type QueueItemSummaryDTO = Pick<QueueServerItemDTO, 'item_id' | 'parent_item_id' | 'status'>;
+
+/** The roots in `scope` whose status `include` accepts; deleting a root removes its whole workflow-call chain. */
+const readScopedRootIds = async (
+  scope: QueueQueryScope,
+  include: (status: QueueServerItemDTO['status']) => boolean,
+  owner: AccountScope
+): Promise<number[]> => {
+  const idsResult = await getQueueItemIds('desc', scope, owner.signal);
+
+  assertAccountScopeCurrent(owner);
+  // Just status and lineage: choosing roots needs no sessions.
+  const summaries = await readQueueItemIdPages<QueueItemSummaryDTO>(
+    'item_summaries_by_ids',
+    idsResult.item_ids,
+    owner.signal
+  );
+
+  assertAccountScopeCurrent(owner);
+  return summaries
+    .filter((item) => include(item.status) && (item.parent_item_id ?? null) === null)
+    .map((item) => item.item_id);
 };
 
 export const clearQueue = (signal?: AbortSignal): Promise<unknown> =>
@@ -133,17 +165,14 @@ export const cancelQueueItems = async (itemIds: number[], signal?: AbortSignal):
   await runConcurrent(itemIds, (itemId) => cancelQueueItem(itemId, signal));
 };
 
+/**
+ * Deletes failed roots with their workflow-call chains. A child that failed under a root that is still active, or was
+ * then canceled, stays with its root, so Clear Failed never deletes a running tree.
+ */
 export const clearFailedQueueItems = async (scope: QueueQueryScope = {}): Promise<void> => {
   const owner = captureAccountScope();
-  const idsResult = await getQueueItemIds('desc', scope, owner.signal);
 
-  assertAccountScopeCurrent(owner);
-  const items = await getQueueItemsByIds(idsResult.item_ids, owner.signal);
-
-  assertAccountScopeCurrent(owner);
-  const failedItemIds = items.filter((item) => item.status === 'failed').map((item) => item.item_id);
-
-  await deleteQueueItems(failedItemIds, owner.signal);
+  await deleteQueueItems(await readScopedRootIds(scope, (status) => status === 'failed', owner), owner.signal);
   assertAccountScopeCurrent(owner);
 };
 
@@ -165,18 +194,7 @@ export const clearFinishedQueueItems = async (scope: QueueQueryScope = {}): Prom
     return;
   }
 
-  const idsResult = await getQueueItemIds('desc', scope, owner.signal);
-
-  assertAccountScopeCurrent(owner);
-  const items = await getQueueItemsByIds(idsResult.item_ids, owner.signal);
-
-  assertAccountScopeCurrent(owner);
-  await deleteQueueItems(
-    items
-      .filter((item) => isTerminalStatus(item.status) && (item.parent_item_id ?? null) === null)
-      .map((item) => item.item_id),
-    owner.signal
-  );
+  await deleteQueueItems(await readScopedRootIds(scope, isTerminalStatus, owner), owner.signal);
   assertAccountScopeCurrent(owner);
 };
 

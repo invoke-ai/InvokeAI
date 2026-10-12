@@ -1213,6 +1213,39 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             scopedItems.filter((item) => ids.has(item.item_id))
           );
         }
+        if (action === 'item_summaries_by_ids') {
+          const body = await readJsonBody(request);
+          const ids = Array.isArray(body.item_ids) ? body.item_ids : [];
+          const itemsById = new Map(scopedItems.map((item) => [item.item_id, item]));
+
+          return json(
+            200,
+            ids
+              .map((itemId) => itemsById.get(itemId))
+              .filter((item) => item !== undefined)
+              // SessionQueueItemSummary: an item without its session, workflow or lineage beyond the parent.
+              .map((item) =>
+                Object.fromEntries(
+                  [
+                    'item_id',
+                    'created_at',
+                    'status',
+                    'device',
+                    'started_at',
+                    'completed_at',
+                    'origin',
+                    'destination',
+                    'batch_id',
+                    'user_id',
+                    'user_display_name',
+                    'user_email',
+                    'field_values',
+                    'parent_item_id',
+                  ].map((key) => [key, item[key] ?? null])
+                )
+              )
+          );
+        }
         if (action === 'item_ids' || action === 'list') {
           const descending = url.searchParams.get('order_dir')?.toUpperCase() !== 'ASC';
           const itemIds = scopedItems.map((item) => item.item_id).sort((left, right) => left - right);
@@ -1236,15 +1269,21 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           return json(200, { deleted: true });
         }
         if (action === 'prune' && method === 'PUT') {
-          let deleted = 0;
+          // Like the backend: a finished child stays while its root is still active.
+          const isTerminal = (item) => ['completed', 'failed', 'canceled'].includes(item?.status);
+          const prunable = [...state.queueItems.values()].filter(
+            (item) =>
+              isTerminal(item) &&
+              (item.root_item_id === null ||
+                item.root_item_id === undefined ||
+                !state.queueItems.has(item.root_item_id) ||
+                isTerminal(state.queueItems.get(item.root_item_id)))
+          );
 
-          for (const item of state.queueItems.values()) {
-            if (item.status === 'completed' || item.status === 'failed' || item.status === 'canceled') {
-              state.queueItems.delete(item.item_id);
-              deleted += 1;
-            }
+          for (const item of prunable) {
+            state.queueItems.delete(item.item_id);
           }
-          return json(200, { deleted });
+          return json(200, { deleted: prunable.length });
         }
         if (action === 'cancel_by_batch_ids' && method === 'PUT') {
           const body = await readJsonBody(request);

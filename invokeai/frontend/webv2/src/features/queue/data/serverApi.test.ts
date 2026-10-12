@@ -118,7 +118,7 @@ describe('scoped clears', () => {
       if (url.includes('/item_ids')) {
         return Promise.resolve({ item_ids: scopeIds, total_count: scopeIds.length });
       }
-      if (url.endsWith('/items_by_ids')) {
+      if (url.endsWith('/item_summaries_by_ids')) {
         const { item_ids: itemIds } = JSON.parse(String(init?.body)) as { item_ids: number[] };
         return Promise.resolve(itemIds.map((itemId) => ({ item_id: itemId, status: 'failed' })));
       }
@@ -189,7 +189,7 @@ describe('clearFinishedQueueItems', () => {
       if (url.includes('item_ids')) {
         return Promise.resolve({ item_ids: [5, 4, 3, 2, 1] });
       }
-      if (url.endsWith('items_by_ids')) {
+      if (url.endsWith('item_summaries_by_ids')) {
         return Promise.resolve([
           { item_id: 7, parent_item_id: 5, root_item_id: 5, status: 'completed' },
           { item_id: 6, parent_item_id: 3, root_item_id: 3, status: 'completed' },
@@ -215,5 +215,31 @@ describe('clearFinishedQueueItems', () => {
       '/api/v1/queue/default/i/3',
     ]);
     expect(requestedUrls()).not.toContain('/api/v1/queue/default/prune');
+    // Choosing what to delete needs status and lineage alone, never the items' sessions.
+    expect(requestedUrls()).not.toContain('/api/v1/queue/default/items_by_ids');
+  });
+
+  it('clears a failed workflow-call chain through its root alone', async () => {
+    transport.apiFetchJson.mockImplementation((url: string) => {
+      if (url.includes('item_ids')) {
+        return Promise.resolve({ item_ids: [3, 2, 1] });
+      }
+      if (url.endsWith('item_summaries_by_ids')) {
+        return Promise.resolve([
+          { item_id: 3, parent_item_id: 1, status: 'failed' },
+          { item_id: 2, status: 'completed' },
+          { item_id: 1, status: 'failed' },
+        ]);
+      }
+      return Promise.resolve({});
+    });
+
+    await clearFailedQueueItems({ originPrefix: 'webv2:p:a:' });
+
+    expect(
+      transport.apiFetchJson.mock.calls
+        .filter((call) => (call[1] as RequestInit | undefined)?.method === 'DELETE')
+        .map((call) => String(call[0]))
+    ).toEqual(['/api/v1/queue/default/i/1']);
   });
 });

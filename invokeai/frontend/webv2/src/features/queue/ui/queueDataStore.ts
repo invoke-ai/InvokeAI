@@ -5,6 +5,7 @@ import type {
   QueueQueryScope,
 } from '@features/queue/core/types';
 
+import { invalidateQueueQueries } from '@features/queue/data/queries';
 import { getQueueItemDetailOptions, getQueueReadModelOptions } from '@features/queue/publicApi';
 import { queryClient } from '@platform/query/client';
 import { useQuery } from '@tanstack/react-query';
@@ -43,9 +44,7 @@ const useQueueReadModel = () => {
 };
 
 /** Invalidate queue data; TanStack Query deduplicates concurrent callers. */
-export const refreshQueue = async (): Promise<void> => {
-  await queryClient.invalidateQueries({ queryKey: ['queue'] });
-};
+export const refreshQueue = (): Promise<void> => invalidateQueueQueries(queryClient);
 
 /** Imperative prefetch for non-React composition roots. */
 export const ensureQueueLoaded = (scope: QueueQueryScope = {}): void => {

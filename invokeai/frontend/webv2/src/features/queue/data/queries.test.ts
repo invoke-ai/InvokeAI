@@ -1,4 +1,4 @@
-import type { QueueBackendPort } from '@features/queue/core/types';
+import type { QueueBackendPort, QueueItemDetailReadModel } from '@features/queue/core/types';
 
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient } from '@tanstack/react-query';
@@ -6,7 +6,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { queueBackend } from './httpRealtimeQueueBackend';
 import {
-  invalidateQueueReadModels,
+  invalidateQueueQueries,
+  queueItemDetailOptions,
   QUEUE_RECENT_WINDOW,
   queueKeys,
   queueReadModelOptions,
@@ -93,10 +94,25 @@ describe('queue queries', () => {
 
     await client.fetchQuery(queueReadModelOptions(backend, scope));
     await client.fetchQuery(queueStatusOptions(backend, {}));
-    await invalidateQueueReadModels(client);
+    await invalidateQueueQueries(client);
 
     expect(client.getQueryState(queueKeys.readModel(scope))?.isInvalidated).toBe(true);
     expect(client.getQueryState(queueKeys.status({}))?.isInvalidated).toBe(true);
+  });
+
+  it("re-reads an open item's details only while the item can still change", async () => {
+    const backend = createBackend();
+    const client = new QueryClient();
+    vi.mocked(backend.readItemDetail).mockImplementation((itemId) =>
+      Promise.resolve({ status: itemId === 1 ? 'completed' : 'in_progress' } as QueueItemDetailReadModel)
+    );
+
+    await client.fetchQuery(queueItemDetailOptions(backend, 1));
+    await client.fetchQuery(queueItemDetailOptions(backend, 2));
+    await invalidateQueueQueries(client);
+
+    expect(client.getQueryState(queueKeys.itemDetail(1))?.isInvalidated).toBe(false);
+    expect(client.getQueryState(queueKeys.itemDetail(2))?.isInvalidated).toBe(true);
   });
 
   it('does not continue or publish a read after its account epoch expires', async () => {
