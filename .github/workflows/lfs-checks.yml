@@ -17,14 +17,14 @@ on:
 
 jobs:
   lfs-check:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5
     permissions:
       # Required to label and comment on the PRs
       pull-requests: write
     steps:
       - name: checkout
-        uses: actions/checkout@v6
+        uses: useblacksmith/checkout@v1
 
       - name: check lfs files
         uses: ppremk/lfs-warning@v3.3
