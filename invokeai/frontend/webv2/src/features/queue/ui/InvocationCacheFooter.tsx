@@ -5,7 +5,7 @@ import { getApiErrorMessage } from '@platform/transport/http';
 import { Button } from '@platform/ui/Button';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronUpIcon, LayersIcon, PauseIcon, PlayIcon, Trash2Icon } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useQueueUi } from './QueueUiContext';
@@ -40,8 +40,9 @@ export const InvocationCacheFooter = () => {
       setBusy(command);
 
       try {
-        await runInvocationCacheCommand(queryClient, command);
-        notify.success(t(`widgets.queue.invocationCache.${command}Done`));
+        if (await runInvocationCacheCommand(queryClient, command)) {
+          notify.success(t(`widgets.queue.invocationCache.${command}Done`));
+        }
       } catch (error) {
         notify.error(
           t(`widgets.queue.invocationCache.${command}Failed`),
@@ -55,13 +56,20 @@ export const InvocationCacheFooter = () => {
   );
   const onClear = useCallback(() => run('clear'), [run]);
   const onToggleEnabled = useCallback(() => run(status?.enabled ? 'disable' : 'enable'), [run, status?.enabled]);
+  // With no capacity the server ignores every command, so none is offered; only its configuration can turn it on.
+  const hasNoCapacity = status?.maxSize === 0;
+  const noCapacityId = useId();
+  const commandDescription = hasNoCapacity ? noCapacityId : undefined;
+  const canCommand = status !== null && !hasNoCapacity && busy === null;
 
   const summary = query.isError
     ? t('widgets.queue.invocationCache.unavailable')
     : status
-      ? status.enabled
-        ? t('widgets.queue.invocationCache.sizeOfMax', { max: status.maxSize, size: status.size })
-        : t('widgets.queue.invocationCache.disabled')
+      ? hasNoCapacity
+        ? t('widgets.queue.invocationCache.off')
+        : status.enabled
+          ? t('widgets.queue.invocationCache.sizeOfMax', { max: status.maxSize, size: status.size })
+          : t('widgets.queue.invocationCache.disabled')
       : t('widgets.queue.invocationCache.loading');
 
   return (
@@ -85,9 +93,15 @@ export const InvocationCacheFooter = () => {
               <CacheStat label={t('widgets.queue.invocationCache.cached')} value={status?.size ?? 0} />
             </HStack>
           )}
+          {hasNoCapacity ? (
+            <Text color="fg.muted" fontSize="xs" id={noCapacityId}>
+              {t('widgets.queue.invocationCache.noCapacity')}
+            </Text>
+          ) : null}
           <HStack>
             <Button
-              disabled={!status || busy !== null}
+              aria-describedby={commandDescription}
+              disabled={!canCommand}
               loading={busy === 'clear'}
               size="sm"
               variant="surface"
@@ -97,7 +111,8 @@ export const InvocationCacheFooter = () => {
               {t('widgets.queue.invocationCache.clear')}
             </Button>
             <Button
-              disabled={!status || busy !== null}
+              aria-describedby={commandDescription}
+              disabled={!canCommand}
               loading={busy === 'enable' || busy === 'disable'}
               size="sm"
               variant="surface"

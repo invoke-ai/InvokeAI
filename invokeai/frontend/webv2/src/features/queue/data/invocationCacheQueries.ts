@@ -1,4 +1,8 @@
-import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { queryOptions, type QueryClient } from '@tanstack/react-query';
 
 import type { InvocationCacheStatusDTO } from './serverTypes';
@@ -46,13 +50,26 @@ export const invocationCacheStatusOptions = () =>
     });
   })();
 
+/** Resolves false when the account changed meanwhile: the outcome no longer belongs to anyone who could see it. */
 export const runInvocationCacheCommand = async (
   queryClient: QueryClient,
   command: 'clear' | 'disable' | 'enable'
-): Promise<void> => {
+): Promise<boolean> => {
   const owner = captureAccountScope();
 
-  await (command === 'clear' ? clearInvocationCache() : setInvocationCacheEnabled(command === 'enable'));
-  assertAccountScopeCurrent(owner);
+  try {
+    await (command === 'clear'
+      ? clearInvocationCache(owner.signal)
+      : setInvocationCacheEnabled(command === 'enable', owner.signal));
+  } catch (error) {
+    if (!isAccountScopeCurrent(owner)) {
+      return false;
+    }
+    throw error;
+  }
+  if (!isAccountScopeCurrent(owner)) {
+    return false;
+  }
   await queryClient.invalidateQueries({ queryKey: invocationCacheKey });
+  return true;
 };

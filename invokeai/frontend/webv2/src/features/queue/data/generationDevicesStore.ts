@@ -68,15 +68,14 @@ interface RuntimeConfigResponse {
 const readGenerationDevices = (response: RuntimeConfigResponse | null): GenerationDevicesSetting | null =>
   response?.config?.generation_devices ?? null;
 
-/** Distinguishes "the server keeps everything" (`null`) from "the config was not readable" (`undefined`). */
+/**
+ * Distinguishes "the server keeps everything" (`null`) from "the config was not readable" (`undefined`). A value the
+ * server should never send is unreadable too: shown as "keep all" it would invite saving over the real limit.
+ */
 const readMaxQueueHistory = (response: RuntimeConfigResponse | null): MaxQueueHistorySetting | undefined => {
-  if (!response?.config) {
-    return undefined;
-  }
+  const value = response?.config?.max_queue_history;
 
-  const value = response.config.max_queue_history;
-
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
+  return value === null || (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) ? value : undefined;
 };
 
 /**
@@ -94,9 +93,13 @@ export const refreshGenerationDevices = (): Promise<void> => {
     store.patchSnapshot({ loadState: 'loading' });
   }
 
+  // The runtime config is read on its own: a failed device listing must not hide the queue history setting.
+  const runtimeConfigRead = apiFetchJson<RuntimeConfigResponse>('/api/v1/app/runtime_config', {
+    signal: owner.signal,
+  }).catch(() => null);
   const refresh = Promise.all([
     apiFetchJson<GenerationDeviceOption[]>('/api/v1/app/generation_device_options', { signal: owner.signal }),
-    apiFetchJson<RuntimeConfigResponse>('/api/v1/app/runtime_config', { signal: owner.signal }).catch(() => null),
+    runtimeConfigRead,
   ])
     .then(([options, runtimeConfig]) => {
       if (!isAccountScopeCurrent(owner)) {
@@ -111,7 +114,8 @@ export const refreshGenerationDevices = (): Promise<void> => {
         setting: readGenerationDevices(runtimeConfig),
       });
     })
-    .catch((error: unknown) => {
+    .catch(async (error: unknown) => {
+      const runtimeConfig = await runtimeConfigRead;
       if (!isAccountScopeCurrent(owner)) {
         return;
       }
@@ -119,6 +123,7 @@ export const refreshGenerationDevices = (): Promise<void> => {
       store.patchSnapshot({
         error: getApiErrorMessage(error, 'Failed to load generation devices'),
         loadState: 'error',
+        maxQueueHistory: readMaxQueueHistory(runtimeConfig),
       });
     })
     .finally(() => {
@@ -149,7 +154,8 @@ export const updateGenerationDevices = async (setting: GenerationDevicesSetting)
 
 /**
  * Sends only `max_queue_history`, so the PATCH leaves generation devices alone; `null` clears the limit. Takes
- * effect at the next startup, when the server prunes its history.
+ * effect at the next startup, when the server prunes its history. The stored value is what the server answers, not
+ * what was asked; an unreadable answer leaves the setting unknown.
  */
 export const updateMaxQueueHistory = async (value: MaxQueueHistorySetting): Promise<void> => {
   const owner = captureAccountScope();
@@ -162,7 +168,7 @@ export const updateMaxQueueHistory = async (value: MaxQueueHistorySetting): Prom
 
   assertAccountScopeCurrent(owner);
 
-  store.patchSnapshot({ error: null, maxQueueHistory: readMaxQueueHistory(runtimeConfig) ?? value });
+  store.patchSnapshot({ maxQueueHistory: readMaxQueueHistory(runtimeConfig) });
 };
 
 export const getGenerationDevicesSnapshot = (): GenerationDevicesSnapshot => store.getSnapshot();

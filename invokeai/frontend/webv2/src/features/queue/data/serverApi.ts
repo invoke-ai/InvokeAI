@@ -265,10 +265,11 @@ const INVOCATION_CACHE_URL = '/api/v1/app/invocation_cache';
 export const getInvocationCacheStatus = (signal?: AbortSignal): Promise<InvocationCacheStatusDTO> =>
   apiFetchJson<InvocationCacheStatusDTO>(`${INVOCATION_CACHE_URL}/status`, { signal });
 
-export const clearInvocationCache = (): Promise<unknown> => apiFetchJson(INVOCATION_CACHE_URL, { method: 'DELETE' });
+export const clearInvocationCache = (signal?: AbortSignal): Promise<unknown> =>
+  apiFetchJson(INVOCATION_CACHE_URL, { method: 'DELETE', signal });
 
-export const setInvocationCacheEnabled = (enabled: boolean): Promise<unknown> =>
-  apiFetchJson(`${INVOCATION_CACHE_URL}/${enabled ? 'enable' : 'disable'}`, { method: 'PUT' });
+export const setInvocationCacheEnabled = (enabled: boolean, signal?: AbortSignal): Promise<unknown> =>
+  apiFetchJson(`${INVOCATION_CACHE_URL}/${enabled ? 'enable' : 'disable'}`, { method: 'PUT', signal });
 
 export const pauseQueueProcessor = (): Promise<unknown> =>
   apiFetchJson(buildQueueUrl('processor/pause'), { method: 'PUT' });

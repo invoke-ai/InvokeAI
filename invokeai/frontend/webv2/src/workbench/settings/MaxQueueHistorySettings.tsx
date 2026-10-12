@@ -7,6 +7,7 @@ import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button } from '@platform/ui/Button';
 import { ModifiedSettingIndicator } from '@platform/ui/settings/ModifiedSettingIndicator';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const LIMIT_PATTERN = /^\d+$/;
 
@@ -25,8 +26,9 @@ const formatLimit = (value: number | null | undefined): string => (typeof value 
 
 /** `max_queue_history` is admin-only server configuration applied at the next startup. */
 export const MaxQueueHistorySettings = () => {
+  const { t } = useTranslation();
   const { canManageAppConfig } = useCapabilities();
-  const { error, loadState, maxQueueHistory } = useGenerationDevices();
+  const { loadState, maxQueueHistory } = useGenerationDevices();
   const [draft, setDraft] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -35,6 +37,13 @@ export const MaxQueueHistorySettings = () => {
   useMountEffect(() => {
     void refreshGenerationDevices();
   });
+
+  const [retrying, setRetrying] = useState(false);
+  const onRetry = useCallback(async () => {
+    setRetrying(true);
+    await refreshGenerationDevices();
+    setRetrying(false);
+  }, []);
 
   const savedText = formatLimit(maxQueueHistory);
   const text = draft ?? savedText;
@@ -60,71 +69,84 @@ export const MaxQueueHistorySettings = () => {
         setDraft(null);
         setDidChange(true);
       } catch (failure) {
-        setSaveError(failure instanceof Error ? failure.message : 'Could not save the queue history limit.');
+        setSaveError(failure instanceof Error ? failure.message : t('settings.maxQueueHistory.saveFailed'));
       } finally {
         setSaving(false);
       }
     },
-    [isDirty, parsed]
+    [isDirty, parsed, t]
   );
 
   if (loadState === 'loading' || loadState === 'idle') {
     return <Spinner size="lg" />;
   }
 
-  if (error) {
+  if (!canManageAppConfig) {
     return (
-      <Text color="fg.error" fontSize="md">
-        {error}
+      <Text color="fg.muted" fontSize="md">
+        {t('settings.maxQueueHistory.adminOnly')}
       </Text>
     );
   }
 
-  if (!canManageAppConfig) {
+  // A save stays acknowledged even when the server's answer to it cannot be read back.
+  const restartNotice = didChange ? (
+    <Text color="fg.muted" fontSize="md">
+      {t('settings.maxQueueHistory.restartRequired')}
+    </Text>
+  ) : null;
+
+  // An unknown limit is never shown as the blank "keep all" field: saving from it would overwrite the real limit.
+  if (maxQueueHistory === undefined) {
     return (
-      <Text color="fg.muted" fontSize="md">
-        Only an administrator can change how much queue history the server keeps.
-      </Text>
+      <Stack gap="2">
+        <HStack gap="2">
+          <Text color="fg.error" fontSize="md" role="alert">
+            {t('settings.maxQueueHistory.readFailed')}
+          </Text>
+          <Button loading={retrying} size="sm" variant="surface" onClick={onRetry}>
+            {t('common.retry')}
+          </Button>
+        </HStack>
+        {restartNotice}
+      </Stack>
     );
   }
 
   return (
     <Stack as="form" gap="2" onSubmit={onSubmit}>
       <Text color="fg.muted" fontSize="md">
-        Finished, failed and canceled items kept when InvokeAI starts. Leave blank to keep everything, or enter 0 to
-        clear finished history on every start.
+        {t('settings.maxQueueHistory.description')}
       </Text>
       <HStack gap="2">
         <Input
           aria-invalid={parsed === 'invalid' ? true : undefined}
-          aria-label="Queue history limit"
+          aria-label={t('settings.maxQueueHistory.inputLabel')}
           inputMode="numeric"
           maxW="10rem"
-          placeholder="Keep all"
+          placeholder={t('settings.maxQueueHistory.keepAll')}
           size="sm"
           value={text}
           onChange={onChange}
         />
         <Button disabled={!isDirty || parsed === 'invalid'} loading={saving} size="sm" type="submit" variant="surface">
-          Save
+          {t('common.save')}
         </Button>
-        {typeof maxQueueHistory === 'number' ? <ModifiedSettingIndicator label="Queue history" /> : null}
+        {typeof maxQueueHistory === 'number' ? (
+          <ModifiedSettingIndicator label={t('settings.maxQueueHistory.modified')} />
+        ) : null}
       </HStack>
       {parsed === 'invalid' ? (
         <Text color="fg.error" fontSize="md">
-          Enter a whole number of items, or leave the field blank.
+          {t('settings.maxQueueHistory.invalid')}
         </Text>
       ) : null}
       {saveError ? (
-        <Text color="fg.error" fontSize="md">
+        <Text color="fg.error" fontSize="md" role="alert">
           {saveError}
         </Text>
       ) : null}
-      {didChange ? (
-        <Text color="fg.muted" fontSize="md">
-          Restart InvokeAI for changes to take effect.
-        </Text>
-      ) : null}
+      {restartNotice}
     </Stack>
   );
 };

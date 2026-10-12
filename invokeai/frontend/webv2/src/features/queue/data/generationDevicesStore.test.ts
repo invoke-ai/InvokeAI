@@ -106,6 +106,26 @@ describe('generationDevicesStore', () => {
     );
     await refreshGenerationDevices();
     expect(getGenerationDevicesSnapshot().maxQueueHistory).toBeUndefined();
+
+    mocks.apiFetchJson.mockImplementation((url: string) =>
+      url.includes('generation_device_options')
+        ? Promise.resolve(options)
+        : Promise.resolve({ config: { generation_devices: 'auto', max_queue_history: -3 }, set_fields: [] })
+    );
+    await refreshGenerationDevices();
+    expect(getGenerationDevicesSnapshot().maxQueueHistory).toBeUndefined();
+  });
+
+  it('still reads the queue history limit when the device listing fails', async () => {
+    mocks.apiFetchJson.mockImplementation((url: string) =>
+      url.includes('generation_device_options')
+        ? Promise.reject(new Error('500'))
+        : Promise.resolve({ config: { generation_devices: 'auto', max_queue_history: 12 }, set_fields: [] })
+    );
+
+    await refreshGenerationDevices();
+
+    expect(getGenerationDevicesSnapshot()).toMatchObject({ loadState: 'error', maxQueueHistory: 12 });
   });
 
   it('PATCHes only the queue history limit so the device selection is left untouched', async () => {
@@ -128,5 +148,14 @@ describe('generationDevicesStore', () => {
     const lastInit = mocks.apiFetchJson.mock.lastCall?.[1] as RequestInit | undefined;
     expect(JSON.parse(String(lastInit?.body))).toEqual({ max_queue_history: null });
     expect(getGenerationDevicesSnapshot().maxQueueHistory).toBeNull();
+
+    // The server's answer is what is stored, even when it differs from the request.
+    mocks.apiFetchJson.mockResolvedValue({ config: { generation_devices: ['cuda:1'], max_queue_history: null } });
+    await updateMaxQueueHistory(40);
+    expect(getGenerationDevicesSnapshot().maxQueueHistory).toBeNull();
+
+    mocks.apiFetchJson.mockResolvedValue({ detail: 'unexpected' });
+    await updateMaxQueueHistory(40);
+    expect(getGenerationDevicesSnapshot().maxQueueHistory).toBeUndefined();
   });
 });
