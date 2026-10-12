@@ -893,6 +893,33 @@ describe('Form builder field settings', () => {
     expect(document.body.textContent).not.toContain(warning);
   });
 
+  it('offers Shuffle only while the authored bounds and step leave a value to shuffle to', async () => {
+    await renderBuilder();
+    const shuffleButton = () =>
+      host.querySelector(`button[aria-label="${i18n.t('nodes.shuffleField', { label: 'Steps' })}"]`);
+    const fillBound = async (key: 'maximum' | 'minimum' | 'step', value: string) => {
+      document
+        .querySelector<HTMLInputElement>(`input[aria-label="${i18n.t(`widgets.workflow.formBuilder.${key}`)}"]`)!
+        .focus();
+      await userEvent.keyboard(`{Control>}a{/Control}${value}`);
+    };
+
+    await userEvent.click(host.querySelector(`[aria-label="${i18n.t('widgets.workflow.formBuilder.showShuffle')}"]`)!);
+    expect(shuffleButton()).not.toBeNull();
+
+    await userEvent.click(
+      host.querySelector(`[aria-label="${i18n.t('widgets.workflow.formBuilder.fieldSettings')}"]`)!
+    );
+    await fillBound('minimum', '1');
+    await fillBound('maximum', '7');
+    await fillBound('step', '8');
+    // 1…7 holds no multiple of 8: a shuffle could only write a value the node rejects.
+    expect(shuffleButton()).toBeNull();
+
+    await fillBound('maximum', '8');
+    expect(shuffleButton()).not.toBeNull();
+  });
+
   it('authors dropdown options and offers exactly those on the form', async () => {
     const { storedSettings } = await renderBuilder('prompt');
     const formBuilder = (key: string, index?: number) => i18n.t(`widgets.workflow.formBuilder.${key}`, { index });

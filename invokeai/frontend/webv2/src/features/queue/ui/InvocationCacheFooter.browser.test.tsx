@@ -79,7 +79,10 @@ const render = async () => {
       </ChakraProvider>
     )
   );
-  await vi.waitFor(() => expect(host.textContent).not.toContain('widgets.queue.invocationCache.loading'));
+  // The status read retries once before it reports a failure.
+  await vi.waitFor(() => expect(host.textContent).not.toContain('widgets.queue.invocationCache.loading'), {
+    timeout: 5_000,
+  });
   await act(() => host.querySelector<HTMLButtonElement>('button[aria-expanded]')!.click());
 };
 
@@ -100,6 +103,18 @@ describe('InvocationCacheFooter', () => {
       const description = document.getElementById(button(label).getAttribute('aria-describedby') ?? '');
       expect(description?.textContent).toBe('widgets.queue.invocationCache.noCapacity');
     }
+  });
+
+  it('says the cache is unavailable, with the reason, and offers no command when its status cannot be read', async () => {
+    server.getInvocationCacheStatus.mockRejectedValue(new Error('Server offline'));
+
+    await render();
+
+    expect(host.textContent).toContain('widgets.queue.invocationCache.unavailable');
+    expect(host.textContent).toContain('Server offline');
+    expect(button('widgets.queue.invocationCache.clear').disabled).toBe(true);
+    expect(button('widgets.queue.invocationCache.enable').disabled).toBe(true);
+    expect(server.clearInvocationCache).not.toHaveBeenCalled();
   });
 
   it('disables a running cache, refreshes its status and reports a failed clear', async () => {

@@ -1011,6 +1011,49 @@ test('queue retry clones failed or canceled roots once, cancel-by-batch spares o
   });
 });
 
+test('queue chain rules: prune keeps finished children of an active root, and canceling a child cancels its chain', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const items = await getJson(backend, '/api/v1/queue/default/list_all');
+    const pending = items.find((item) => item.status === 'pending');
+    const completed = items.find((item) => item.status === 'completed');
+    assert.ok(pending && completed, 'the representative queue has pending and completed items');
+
+    const nextId = Math.max(...items.map((item) => item.item_id)) + 1;
+    const chained = (item_id, root, status) => ({
+      ...root,
+      item_id,
+      parent_item_id: root.item_id,
+      root_item_id: root.item_id,
+      status,
+    });
+    const activeRoot = { ...pending, item_id: nextId, parent_item_id: null, root_item_id: null };
+    const finishedChildOfActive = chained(nextId + 1, activeRoot, 'completed');
+    const waitingChildOfActive = chained(nextId + 2, activeRoot, 'pending');
+    const finishedChildOfFinished = chained(nextId + 3, completed, 'completed');
+    await getJson(backend, '/__queue_items', {
+      body: JSON.stringify({
+        items: [activeRoot, finishedChildOfActive, waitingChildOfActive, finishedChildOfFinished],
+      }),
+      method: 'POST',
+    });
+
+    await getJson(backend, '/api/v1/queue/default/prune', { method: 'PUT' });
+    const afterPrune = new Set((await getJson(backend, '/api/v1/queue/default/list_all')).map((item) => item.item_id));
+
+    // Like the backend, a finished child stays while its root is still active; one under a finished root goes.
+    assert.ok(afterPrune.has(finishedChildOfActive.item_id));
+    assert.ok(!afterPrune.has(finishedChildOfFinished.item_id));
+
+    await getJson(backend, `/api/v1/queue/default/i/${waitingChildOfActive.item_id}/cancel`, { method: 'PUT' });
+    const status = async (itemId) => (await getJson(backend, `/api/v1/queue/default/i/${itemId}`)).status;
+
+    assert.equal(await status(activeRoot.item_id), 'canceled');
+    assert.equal(await status(waitingChildOfActive.item_id), 'canceled');
+    assert.equal(await status(finishedChildOfActive.item_id), 'completed');
+    assert.equal(await status(pending.item_id), 'pending');
+  });
+});
+
 test('runtime config PATCH keeps the other writable field and validates the queue history limit', async () => {
   await withRepresentativeBackend(async (backend) => {
     await getJson(backend, '/api/v1/app/runtime_config', {

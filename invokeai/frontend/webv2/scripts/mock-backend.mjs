@@ -793,6 +793,15 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         return json(200, { ok: true, ...getProfileInfo(state) });
       }
 
+      if (method === 'POST' && path === '/__queue_items') {
+        // Test seam: workflow-call chains only arise from execution, which the mock does not run.
+        const body = await readJsonBody(request);
+        for (const item of Array.isArray(body.items) ? body.items : []) {
+          state.queueItems.set(item.item_id, clone(item));
+        }
+        return json(200, { ok: true });
+      }
+
       if (path === '/__faults') {
         if (method === 'POST') {
           const body = await readJsonBody(request);
