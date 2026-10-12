@@ -37,6 +37,7 @@ compared with PyTorch's default attention there:
 | --- | --- | --- | --- |
 | LTX-2.5 distilled (int8) | 1248×704, 121 frames | 72.0 s → 63.4 s (−12 %) | Video self-attention only; text cross-attention and the audio streams stay on PyTorch. The audio reads the video through cross-attention, so it changes too, but measured no more than with an exact kernel swap: no shift against the picture, same loudness. |
 | Wan 2.2 TI2V-5B (GGUF Q8) | 1280×704, 121 frames | 380.9 s → 247.9 s (−35 %) | |
+| Wan 2.2 T2V A14B (GGUF Q4_K_M, 4-step Lightning LoRA) | 832×480, 81 frames | Denoising 121.5 s → 60.9 s (−50 %) | Measured with `device_working_mem_gb: 10`. At 1280×720 a 24 GB GPU is already full with PyTorch's attention, and SageAttention made denoising slower: 293 s → 662 s. |
 
 At 1024×1024 most of a step is spent outside attention, so the gain is small; at high resolutions and for video,
 attention dominates. GGUF models spend much of each step dequantizing weights, which SageAttention does not touch.
