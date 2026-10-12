@@ -116,6 +116,7 @@ def test_nested_if_iteration_paths_use_supplied_source_graph_recursively() -> No
                 "inner": IfInvocation(id="inner", condition=True),
                 "guarded": IfInvocation(id="guarded"),
                 "condition": BooleanLogicInvocation(id="condition", a=True, b=True),
+                "bridge": AddInvocation(id="bridge"),
             }
         )
     )
@@ -135,6 +136,10 @@ def test_nested_if_iteration_paths_use_supplied_source_graph_recursively() -> No
             ),
             Edge(
                 source=EdgeConnection(node_id="inner", field="value"),
+                destination=EdgeConnection(node_id="bridge", field="a"),
+            ),
+            Edge(
+                source=EdgeConnection(node_id="bridge", field="value"),
                 destination=EdgeConnection(node_id="if", field="true_input"),
             ),
             Edge(
