@@ -99,7 +99,8 @@ export const useQueueItemDetail = (itemId: number, enabled: boolean): QueueItemD
   if (query.isError) {
     return {
       detail: null,
-      error: query.error instanceof Error ? query.error.message : 'Failed to load queue item',
+      // The view words the failure; only a reason the server gave is worth adding to it.
+      error: query.error instanceof Error ? query.error.message : null,
       loadState: 'error',
       retry,
     };

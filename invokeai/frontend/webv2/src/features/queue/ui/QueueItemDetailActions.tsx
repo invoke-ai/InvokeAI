@@ -2,6 +2,7 @@ import type { QueueItemReadModel } from '@features/queue/core/types';
 
 import { Icon } from '@chakra-ui/react';
 import { queueCommands } from '@features/queue/publicApi';
+import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button } from '@platform/ui/Button';
 import { LayersIcon } from 'lucide-react';
@@ -22,20 +23,30 @@ export const QueueItemDetailActions = ({ item }: { item: QueueItemReadModel }) =
   const [busy, setBusy] = useState(false);
 
   const cancelBatch = useCallback(async () => {
+    const owner = captureAccountScope();
     setBusy(true);
 
     try {
       const canceled = await queueCommands.cancelBatch(item.batchId);
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
       await refreshQueue();
-      notify.success(
-        t('widgets.queue.batchCancellationRequested'),
-        t('widgets.queue.batchCanceledCount', { count: canceled })
-      );
+      if (canceled === 0) {
+        notify.info(t('widgets.queue.batchNothingToCancel'), t('widgets.queue.batchNothingToCancelDescription'));
+      } else {
+        notify.success(
+          t('widgets.queue.batchCancellationRequested'),
+          t('widgets.queue.batchCanceledCount', { count: canceled })
+        );
+      }
     } catch (error) {
-      notify.error(
-        t('widgets.queue.failedToCancelBatch'),
-        getApiErrorMessage(error, t('widgets.queue.couldNotCancelBatch'))
-      );
+      if (isAccountScopeCurrent(owner)) {
+        notify.error(
+          t('widgets.queue.failedToCancelBatch'),
+          getApiErrorMessage(error, t('widgets.queue.couldNotCancelBatch'))
+        );
+      }
     } finally {
       setBusy(false);
     }

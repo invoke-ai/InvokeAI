@@ -44,14 +44,16 @@ const QueueItemDetailBody = ({ item, open }: { item: QueueItemReadModel; open: b
   if (loadState === 'error') {
     return (
       <Stack align="start" gap="2">
-        <Text color="fg.error" fontSize="sm">
-          {t('widgets.queue.detailLoadFailed')}
-        </Text>
-        {error ? (
-          <Text color="fg.muted" fontSize="sm">
-            {error}
+        <Stack gap="2" role="alert">
+          <Text color="fg.error" fontSize="sm">
+            {t('widgets.queue.detailLoadFailed')}
           </Text>
-        ) : null}
+          {error ? (
+            <Text color="fg.muted" fontSize="sm">
+              {error}
+            </Text>
+          ) : null}
+        </Stack>
         <Button size="sm" variant="surface" onClick={retry}>
           {t('common.retry')}
         </Button>

@@ -2852,6 +2852,8 @@
       "batchCancellationRequested": "Batch cancellation requested",
       "batchCanceledCount_one": "{{count}} queue item was canceled.",
       "batchCanceledCount_other": "{{count}} queue items were canceled.",
+      "batchNothingToCancel": "Nothing left to cancel",
+      "batchNothingToCancelDescription": "Every item in this batch had already finished.",
       "cancelAllExceptCurrent": "Cancel all except current item",
       "cancelBatch": "Cancel batch",
       "cancelBatchConfirmationBody": "This cancels every unfinished item in this batch. Other batches keep running.",
