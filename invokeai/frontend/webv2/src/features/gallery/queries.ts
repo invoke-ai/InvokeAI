@@ -31,6 +31,7 @@ export type {
 export type { GalleryLocatorRequest } from './core/selection';
 export {
   getGalleryItemBoardIdsFromCaches,
+  getGalleryProjectBoardsFromCaches,
   getGalleryItemStarredFromCaches,
   invalidateGallery,
   invalidateGalleryItems,
@@ -42,3 +43,4 @@ export {
 } from './data/queryCache';
 export type { GalleryItemCachePatch } from './data/queryCache';
 export { createGalleryRealtimeRuntime } from './data/realtimeRuntime';
+export { galleryBoardExists } from './data/backend';

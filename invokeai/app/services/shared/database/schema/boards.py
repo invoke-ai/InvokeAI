@@ -24,12 +24,14 @@ boards = table(
     Column("user_id", Key(USER_ID_LENGTH), server_default=default("system")),
     Column("is_public", Boolean(), nullable=False, server_default=default(False)),
     Column("board_visibility", Key(ENUM_LENGTH), nullable=False, server_default=default("private")),
+    Column("project_id", Key()),
 )
 
 Index("idx_boards_board_visibility", boards.c.board_visibility)
 Index("idx_boards_created_at", boards.c.created_at)
 Index("idx_boards_is_public", boards.c.is_public)
 Index("idx_boards_user_id", boards.c.user_id)
+Index("idx_boards_project_id", boards.c.project_id)
 
 shared_boards = table(
     "shared_boards",
