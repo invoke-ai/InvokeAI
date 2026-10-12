@@ -5083,9 +5083,14 @@ export const __workbenchReducerInternal = (
       });
     }
     case 'reopenQueueItemForRetry': {
-      return updateProjectById(state, action.projectId, (project) =>
-        reopenQueueItemForRetry(project, action.queueItemId, action.retriedItems)
-      );
+      return updateProjectById(state, action.projectId, (project) => {
+        const reopened = reopenQueueItemForRetry(project, action.queueItemId, action.retriedItems);
+
+        // The reopened run's slots regroup under its rerun, so keep the selection on the candidate it showed.
+        return reopened === project
+          ? project
+          : clampCanvasStagingSelection(reopened, getSelectedCanvasStagingSlot(project));
+      });
     }
     case 'stageRetriedCanvasResults': {
       return updateProjectById(state, action.projectId, (project) =>

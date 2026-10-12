@@ -2342,6 +2342,73 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     );
   });
 
+  it('keeps the staged candidate selected when a retry reopens an earlier run', () => {
+    let state = submitGenerate(primeGenerate());
+    const projectId = state.activeProjectId;
+    const runA = getProject(state, projectId).queue.items[0]!;
+    state = workbenchReducer(state, { mode: 'off', type: 'setCanvasStagingAutoSwitch' });
+    state = workbenchReducer(state, {
+      backendItemIds: [41, 42],
+      projectId,
+      queueItemId: runA.id,
+      type: 'markQueueItemBackendSubmitted',
+    });
+    state = workbenchReducer(state, {
+      backendItemId: 41,
+      images: [createImage('a1.png', runA.id)],
+      projectId,
+      queueItemId: runA.id,
+      type: 'routeQueueItemPartialResults',
+    });
+    state = workbenchReducer(state, {
+      notify: false,
+      projectId,
+      queueItemId: runA.id,
+      status: 'failed',
+      type: 'setQueueItemStatus',
+    });
+    state = submitGenerate(state);
+    const runB = getProject(state, projectId).queue.items.find((item) => item.id !== runA.id)!;
+    state = workbenchReducer(state, {
+      backendItemIds: [51],
+      projectId,
+      queueItemId: runB.id,
+      type: 'markQueueItemBackendSubmitted',
+    });
+    state = workbenchReducer(state, {
+      images: [createImage('b1.png', runB.id), createImage('b2.png', runB.id)],
+      projectId,
+      queueItemId: runB.id,
+      type: 'routeQueueItemResults',
+    });
+    const selectedImageName = () => {
+      const project = getProject(state, projectId);
+      const slot = getCanvasStagingSlots(project.canvas, project.queue.items)[
+        project.canvas.stagingArea.selectedImageIndex
+      ];
+      return slot?.kind === 'candidate' ? slot.candidate.imageName : slot?.kind;
+    };
+    const slotsBefore = getCanvasStagingSlots(
+      getProject(state, projectId).canvas,
+      getProject(state, projectId).queue.items
+    );
+    state = workbenchReducer(state, {
+      imageIndex: slotsBefore.findIndex((slot) => slot.kind === 'candidate' && slot.candidate.imageName === 'b2.png'),
+      type: 'setStagedImageIndex',
+    });
+    expect(selectedImageName()).toBe('b2.png');
+
+    state = workbenchReducer(state, {
+      projectId,
+      queueItemId: runA.id,
+      retriedItems: [{ itemId: 99, sourceItemId: 42 }],
+      type: 'reopenQueueItemForRetry',
+    });
+
+    expect(getProject(state, projectId).queue.items.find((item) => item.id === runA.id)?.status).toBe('running');
+    expect(selectedImageName()).toBe('b2.png');
+  });
+
   it('leaves a run finished when it is still active or its Canvas document was replaced', () => {
     let state = submitGenerate(primeGenerate());
     const project = getActiveProject(state);
