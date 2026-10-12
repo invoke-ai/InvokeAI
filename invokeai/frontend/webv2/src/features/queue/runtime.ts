@@ -1409,12 +1409,15 @@ export const createQueueRuntime = ({
     };
 
     if (event.destination === 'gallery') {
-      if (!run || !queueItemId) {
+      if (!run || !target || !queueItemId) {
         commands.refreshBackendData();
         return;
       }
-      void readUnadoptedRerunImages(event, queueItemId, run)
-        .then((images) => addImagesToDestination(run, images))
+      // Video graphs leave their output unboarded, so videos need the same board routing as an adopted rerun's.
+      void Promise.all([
+        readUnadoptedRerunImages(event, queueItemId, run).then((images) => addImagesToDestination(run, images)),
+        deliverResultVideos(target.project.id, run, [event.item_id]),
+      ])
         .catch(recordError)
         .finally(() => {
           if (isActive()) {

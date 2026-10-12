@@ -3078,6 +3078,39 @@ describe('queue runtime retries', () => {
     await runtime.dispose();
   });
 
+  it("adds a video rerun its active run could not adopt to that run's board", async () => {
+    // A second failed item of a video batch, retried while the first item's rerun still runs.
+    const queueItem: QueueItem = {
+      ...createPendingQueueItem(),
+      backendItemIds: [99],
+      retriedBackendItemIds: [41, 42],
+      snapshot: {
+        ...createPendingQueueItem().snapshot,
+        destination: 'gallery',
+        galleryBoardId: 'board-1',
+        resultNodeIds: ['video_output'],
+        sourceId: 'video',
+      },
+      status: 'running',
+    };
+    const getResultVideoNames = vi.fn().mockResolvedValue(['rerun.mp4']);
+    const getResultVideos = vi.fn().mockResolvedValue([{ videoName: 'rerun.mp4' } as QueueResultVideo]);
+    const { commands, emit, project, runtime } = createRetryHarness(queueItem, {
+      getResultVideoNames,
+      getResultVideos,
+    });
+
+    runtime.start();
+    emit('queue_items_retried', retriedEvent([{ item_id: 100, source_item_id: 42 }]));
+    emit('queue_item_status_changed', completedEvent(100, buildQueueItemOrigin(queueItem.id, project.id), 'gallery'));
+
+    await vi.waitFor(() => expect(commands.refreshBackendData).toHaveBeenCalled());
+    expect(getResultVideoNames).toHaveBeenCalledWith(100, { resultNodeIds: ['video_output'] });
+    expect(runtimeServices.destinations.addVideosToGalleryBoard).toHaveBeenCalledWith('board-1', ['rerun.mp4']);
+
+    await runtime.dispose();
+  });
+
   it('delivers reruns no run adopted to the Gallery or the current Canvas, and nothing else', async () => {
     // The owning run refuses to reopen (its Canvas document was replaced); the other rerun belongs to another tab.
     const queueItem: QueueItem = { ...createPendingQueueItem(), backendItemIds: [41], status: 'failed' };
