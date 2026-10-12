@@ -1,18 +1,34 @@
 import type { GalleryItemRef } from '@features/gallery/contracts';
-import type { GalleryUiAdapter } from '@features/gallery/react';
+import type { GalleryProjectRef, GalleryUiAdapter } from '@features/gallery/react';
+import type { ProjectLibrarySnapshot } from '@workbench/projects/library';
 import type { ReactNode } from 'react';
 
 import { GalleryUiProvider } from '@features/gallery/react';
+import { useAuthSession } from '@features/identity';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
+import { useProjectLibrarySelector } from '@workbench/projects/library';
 import { useExportLibraryProject } from '@workbench/projects/useProjectFileActions';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useLivePreviewFollow } from '@workbench/widgets/preview/livePreviewFollow';
 import { getProjectWidgetInstance } from '@workbench/widgetState';
-import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
+import {
+  useActiveProjectSelector,
+  useWorkbenchCommands,
+  useWorkbenchInternalStore,
+  useWorkbenchPersistenceService,
+  useWorkbenchQueries,
+} from '@workbench/WorkbenchContext';
 import { lazy, useMemo } from 'react';
 
 const EMPTY_WIDGET_VALUES: Record<string, unknown> = Object.freeze({});
+
+const selectGalleryProjects = (snapshot: ProjectLibrarySnapshot): GalleryProjectRef[] =>
+  snapshot.summaries.map((summary) => ({ id: summary.id, name: summary.name }));
+
+const areGalleryProjectsEqual = (left: GalleryProjectRef[], right: GalleryProjectRef[]): boolean =>
+  left.length === right.length &&
+  left.every((project, index) => project.id === right[index]?.id && project.name === right[index]?.name);
 
 // Loaded on first reveal; the label cache is not part of the editor's initial graph.
 const getItemLabel = (item: GalleryItemRef): Promise<string | null> =>
@@ -45,6 +61,13 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
   const accountScope = captureAccountScope();
   const exportProject = useExportLibraryProject();
   const openWorkbenchWidget = useOpenWorkbenchWidget();
+  const session = useAuthSession();
+  const currentUserId = session.multiuserEnabled ? (session.user?.user_id ?? null) : null;
+  // Only what the gallery needs to label other projects' boards, compared structurally: every autosave ack and
+  // library refresh rebuilds the summaries, and the gallery must not re-render for cover or timestamp churn.
+  const projects = useProjectLibrarySelector(selectGalleryProjects, areGalleryProjectsEqual);
+  const store = useWorkbenchInternalStore();
+  const persistence = useWorkbenchPersistenceService();
   // Preload row dependencies here to avoid a second fetch wave after the gallery mounts.
   useMountEffect(() => {
     void import('./GalleryImageActionsBridge');
@@ -52,6 +75,7 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
   const adapter = useMemo<GalleryUiAdapter>(
     () => ({
       antialiasProgressImages,
+      currentUserId,
       exportProject,
       gallery: {
         ...gallery,
@@ -92,6 +116,16 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
       notifications,
       projectId,
       projectName,
+      projects,
+      // A board created in or moved into a project needs the project to exist on the server, which a new project
+      // does only after its first save; the canvas path makes the same request before its first write.
+      ensureProjectOnServer: async () => {
+        const project = store.getState().projects.find((candidate) => candidate.id === projectId);
+
+        if (project) {
+          await persistence.ensureProjectOnServer(project);
+        }
+      },
       widgets: {
         openGallery: () => openWorkbenchWidget('gallery').ok,
         patchGalleryValues: (values) => widgets.patchValues('gallery', values),
@@ -100,6 +134,7 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
     [
       accountScope,
       antialiasProgressImages,
+      currentUserId,
       exportProject,
       gallery,
       galleryValues,
@@ -108,9 +143,12 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
       livePreview,
       notifications,
       openWorkbenchWidget,
+      persistence,
       projectId,
       projectName,
+      projects,
       queries,
+      store,
       widgets,
     ]
   );

@@ -56,6 +56,7 @@ vi.mock('@platform/ui/ConfirmDialog', () => ({ ConfirmDialog: () => null }));
 vi.mock('@workbench/components/QueueProgressIndicator', () => ({ QueueCircularProgress: () => null }));
 vi.mock('@workbench/launchpad/formatRelativeTime', () => ({ formatRelativeTime: () => '' }));
 vi.mock('@workbench/projects/components', () => ({ OpenProjectDialog: () => null }));
+vi.mock('@workbench/projects/components/DeleteProjectDialog', () => ({ DeleteProjectDialog: () => null }));
 vi.mock('@workbench/projects/library', () => ({
   refreshProjectLibrary: vi.fn(() => Promise.resolve()),
   renameLibraryProject: vi.fn(() => Promise.resolve()),

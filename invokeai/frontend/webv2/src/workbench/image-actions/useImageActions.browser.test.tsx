@@ -254,6 +254,7 @@ const Probe = ({ modelKey = 'sd-1-model', ref }: { modelKey?: string; ref: Ref<I
         assetVideoCount: 0,
         id: 'none',
         imageCount: 0,
+        isInbox: false,
         kind: 'uncategorized',
         name: '',
         projectId: null,

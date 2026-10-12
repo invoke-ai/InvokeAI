@@ -1,7 +1,7 @@
 ---
 title: ERNIE-Image
-description: Generate images with Baidu's ERNIE-Image and ERNIE-Image Turbo, from the Diffusers pipelines or the single-file transformers.
-lastUpdated: 2026-09-30
+description: Generate images with Baidu's ERNIE-Image and ERNIE-Image Turbo, from the Diffusers pipelines, the single-file transformers or GGUF.
+lastUpdated: 2026-10-09
 sidebar:
   order: 3
 ---
@@ -27,7 +27,8 @@ This is a summary, not legal advice. Read the full license on the model's Huggin
 ## Hardware
 
 See the [System Requirements](/start-here/system-requirements/) table. For scale: the single-file
-transformer alone is about 16 GB and the standalone Ministral 3B encoder about 7.7 GB. On smaller
+transformer alone is about 16 GB (5.0 GB as GGUF Q4_K_M, 8.7 GB as Q8_0) and the standalone Ministral 3B
+encoder about 7.7 GB. On smaller
 cards, [Low-VRAM mode](/configuration/optimization/low-vram-mode/) lets InvokeAI stream models that
 don't fit entirely in VRAM.
 
@@ -41,7 +42,7 @@ ERNIE-Image needs three components:
 
 | Component                   | Diffusers install | Single-file install  |
 | --------------------------- | ----------------- | -------------------- |
-| Transformer                 | bundled           | the `.safetensors` file |
+| Transformer                 | bundled           | the `.safetensors` or `.gguf` file |
 | Text encoder (Ministral 3B) | bundled           | installed separately |
 | VAE (FLUX.2)                | bundled           | installed separately |
 
@@ -53,9 +54,20 @@ The starter models:
 | ERNIE-Image Turbo               | `baidu/ERNIE-Image-Turbo` (Diffusers)     | nothing, everything is bundled         |
 | ERNIE-Image (single file)       | Comfy-Org single file (~16 GB)            | Ministral 3B encoder + FLUX.2 VAE      |
 | ERNIE-Image Turbo (single file) | Comfy-Org single file (~16 GB)            | Ministral 3B encoder + FLUX.2 VAE      |
+| ERNIE-Image (GGUF, Q4_K_M / Q8_0)       | unsloth GGUF (5.0 / 8.7 GB)       | Ministral 3B encoder + FLUX.2 VAE      |
+| ERNIE-Image Turbo (GGUF, Q4_K_M / Q8_0) | unsloth GGUF (5.0 / 8.7 GB)       | Ministral 3B encoder + FLUX.2 VAE      |
 
 The Diffusers pipelines also carry a prompt-enhancer model (see [Prompt enhancer](#prompt-enhancer)); the
-single files do not. GGUF and quantized single files are not supported.
+single files do not.
+
+GGUF transformers load like the safetensors single file: the weights stay packed in memory and are
+unpacked layer by layer during generation, on every device. Measured on an RTX 4090 at 1024px with
+ERNIE-Image Turbo (8 steps): the Q4_K_M transformer holds 4.8 GB instead of 15.3 GB, the GPU peak drops
+from 23.6 GB to 17.8 GB, and an image takes 11.0 s against 11.6 s for the Diffusers pipeline.
+Other GGUF conversions with the same layout
+(for example vantagewithai's) install as well. Quantized safetensors single files (fp8, int8) are not
+supported, and neither is a GGUF build of the Ministral 3B encoder, so the encoder stays the 7.7 GB
+safetensors file.
 
 When a single-file ERNIE-Image model is selected, the **Components** section next to the model asks for:
 

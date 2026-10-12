@@ -2,6 +2,7 @@ import type { GalleryBoard, GalleryView } from '@features/gallery/core/types';
 
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { toGalleryItemKey } from '@features/gallery/core/items';
+import { GALLERY_AUTO_ADD_FOLLOW, getGallerySettings } from '@features/gallery/core/settings';
 import {
   createGalleryBoard,
   deleteGalleryBoard,
@@ -33,11 +34,14 @@ export const useGalleryActions = ({
   selectedBoardId,
 }: {
   boards: GalleryBoard[];
-  getCurrentGalleryLocation: () => { galleryView: GalleryView; selectedBoardId: string };
+  /** The latest rendered gallery, for settling an action the user may have moved on from while it ran. */
+  getCurrentGalleryLocation: () => { autoAddBoardId: string; galleryView: GalleryView; selectedBoardId: string };
   loadMore: () => void;
   selectedBoardId: string;
 }): GalleryActions => {
-  const { exportProject, gallery, notifications, widgets } = useGalleryUi();
+  const { ensureProjectOnServer, exportProject, gallery, galleryValues, notifications, projectId, widgets } =
+    useGalleryUi();
+  const { autoAddBoardId, showOtherProjectBoards } = getGallerySettings(galleryValues);
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const uploadFiles = useGalleryUploadAction({ boards, getCurrentGalleryLocation, selectedBoardId });
@@ -90,22 +94,29 @@ export const useGalleryActions = ({
           recordError(error);
         }
       },
-      createBoard: async (boardName) => {
+      createBoard: async (boardName, projectId) => {
         const owner = captureAccountScope();
 
         try {
-          const board = await createGalleryBoard(boardName, owner.signal);
+          if (projectId !== null) {
+            await ensureProjectOnServer?.();
+            assertAccountScopeCurrent(owner);
+          }
+
+          const board = await createGalleryBoard(boardName, projectId, owner.signal);
 
           assertAccountScopeCurrent(owner);
           gallery.selectBoard(board.id);
           recordSuccess(t('widgets.gallery.boardCreated', { name: board.name }));
           refresh();
+
+          return true;
         } catch (error: unknown) {
-          if (!isAccountScopeCurrent(owner)) {
-            return;
+          if (isAccountScopeCurrent(owner)) {
+            recordError(error);
           }
 
-          recordError(error);
+          return false;
         }
       },
       deleteBoard: async (boardId, includeImages) => {
@@ -176,6 +187,55 @@ export const useGalleryActions = ({
       },
       exportProject,
       loadMore,
+      moveBoard: async (boardId, destinationProjectId, destinationLabel) => {
+        const owner = captureAccountScope();
+        const rollback = patchGalleryBoardCaches(queryClient, boardId, { projectId: destinationProjectId });
+        // Into another project while other projects are hidden, the board leaves the panel as an archived one does:
+        // it stops being the selection and the auto-add target rather than take results nothing on screen shows.
+        const leavesView =
+          destinationProjectId !== null && destinationProjectId !== projectId && !showOtherProjectBoards;
+        const movedSelectionAway = leavesView && boardId === selectedBoardId;
+        const stoppedAutoAdding = leavesView && boardId === autoAddBoardId;
+
+        if (movedSelectionAway) {
+          gallery.selectBoard('none');
+        }
+        if (stoppedAutoAdding) {
+          gallery.updateSettings({ autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW });
+        }
+
+        try {
+          if (destinationProjectId !== null) {
+            await ensureProjectOnServer?.();
+            assertAccountScopeCurrent(owner);
+          }
+
+          await updateGalleryBoard(boardId, { projectId: destinationProjectId }, owner.signal);
+
+          assertAccountScopeCurrent(owner);
+          recordSuccess(
+            t('widgets.gallery.boardMoved', { destination: destinationLabel, name: getBoardName(boardId) })
+          );
+          refresh();
+        } catch (error: unknown) {
+          if (!isAccountScopeCurrent(owner)) {
+            return;
+          }
+
+          rollback();
+
+          // Each only while the user has not chosen again since.
+          const current = getCurrentGalleryLocation();
+          if (movedSelectionAway && current.selectedBoardId === 'none') {
+            gallery.selectBoard(boardId);
+          }
+          if (stoppedAutoAdding && current.autoAddBoardId === GALLERY_AUTO_ADD_FOLLOW) {
+            gallery.updateSettings({ autoAddBoardId: boardId });
+          }
+
+          recordError(error);
+        }
+      },
       refresh,
       renameBoard: async (boardId, boardName) => {
         const owner = captureAccountScope();
@@ -224,14 +284,18 @@ export const useGalleryActions = ({
       uploadFiles,
     };
   }, [
+    autoAddBoardId,
     boards,
+    ensureProjectOnServer,
     exportProject,
     gallery,
     getCurrentGalleryLocation,
     loadMore,
     notifications,
+    projectId,
     queryClient,
     selectedBoardId,
+    showOtherProjectBoards,
     t,
     uploadFiles,
     widgets,

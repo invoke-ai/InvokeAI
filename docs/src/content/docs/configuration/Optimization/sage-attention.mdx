@@ -134,11 +134,15 @@ kernels.
   until restart. Some GPU faults (an illegal memory access, for example) leave the GPU unusable for the rest of the
   process: then PyTorch's attention fails the same way, and only a restart helps. A fault the GPU raises later, while
   running a kernel, cannot be caught at all and ends the generation.
-- **Memory.** Peak VRAM was unchanged for every measured model. Each call holds quantized copies of its inputs, about
-  1.7 bytes per element of the query, key and value together — around 70 MB for FLUX.1 at 1024×1024, and around 2 GB
-  per call for Wan 2.2 14B at 1280×720 with 81 frames (not measured). When a call does not fit, the rest of that
-  generation runs on PyTorch's attention, which needs less, and the log says so; the next generation tries
-  SageAttention again.
+- **Memory.** SageAttention needs more memory per call than PyTorch's attention: quantized copies of the query, key
+  and value, about 1.7 bytes per element of the three together — around 70 MB for FLUX.1 at 1024×1024, about 1.9 GB
+  for Wan 2.2 A14B at 1280×720 with 81 frames. They only live for the call, and at the sizes in the tables other
+  buffers set the peak, so peak VRAM stayed the same. When a call runs out of memory, the rest of that generation runs
+  on PyTorch's attention, which needs less, and the log says so; the next generation tries SageAttention again.
+- **A generation that only just fits your GPU gets slower, not faster.** On Windows the graphics driver usually moves
+  memory to shared system memory instead of reporting the GPU as full, so nothing falls back and every step slows
+  down. If a generation is close to your GPU's VRAM, compare it with `attention_backend: auto`.
+  [Issue #9831](https://github.com/invoke-ai/InvokeAI/issues/9831) tracks a fix.
 - **Recall.** `attention_backend` is not stored in an image's metadata, so an image recalled after switching it is
   generated slightly differently.
 - **Black or noisy images** have been reported with SageAttention for some models in other applications. None appeared

@@ -62,10 +62,12 @@ export interface MaterializeResult {
   materialized: MaterializedMedia[];
 }
 
-/** onItemSettled fires exactly once per descriptor. */
+/**
+ * Takes every board at once, so it schedules the work across them: many small boards should not run one at a time.
+ * onItemSettled fires exactly once per descriptor.
+ */
 export type MediaMaterializer = (
-  items: readonly InvkBoardItem[],
-  boardId: string,
+  boards: readonly RestoreBoardInput[],
   onItemSettled: () => void
 ) => Promise<MaterializeResult>;
 
@@ -74,8 +76,8 @@ export type MediaMaterializer = (
  * runs, not returned at the end: a restore that throws part way has still created things.
  */
 export interface RestoredMediaLedger {
-  /** The staging board these were created on, when this restore created one. */
-  boardId: string | null;
+  /** The staging boards these were created on: one per archive board that carried media. */
+  boardIds: string[];
   boardImageNames: string[];
   boardVideoNames: string[];
   /** A cover thumbnail uploaded as a fallback, unboarded. */
@@ -85,8 +87,8 @@ export interface RestoredMediaLedger {
   videoNames: string[];
 }
 
-export const createRestoredMediaLedger = (boardId: string | null): RestoredMediaLedger => ({
-  boardId,
+export const createRestoredMediaLedger = (boardIds: readonly string[]): RestoredMediaLedger => ({
+  boardIds: [...boardIds],
   boardImageNames: [],
   boardVideoNames: [],
   coverImageName: null,
@@ -94,11 +96,17 @@ export const createRestoredMediaLedger = (boardId: string | null): RestoredMedia
   videoNames: [],
 });
 
-export interface RestoreProjectMediaInput {
-  /** The staging board to materialize onto, or `null` when this project has no board media. */
-  boardId: string | null;
+/** One of the source's boards and where its media lands here. */
+export interface RestoreBoardInput {
   /** The board's contents as the source enumerated them, canonically ordered. */
-  boardItems: readonly InvkBoardItem[];
+  items: readonly InvkBoardItem[];
+  /** The staging board to materialize onto. */
+  stagingBoardId: string;
+}
+
+export interface RestoreProjectMediaInput {
+  /** The source's boards, inbox first; an item is on exactly one of them. */
+  boards: readonly RestoreBoardInput[];
   /** Bundled cover bytes, for the case where the cover's source image cannot be restored. */
   coverBytes: { bytes: Uint8Array; entryName: string } | null;
   /** The image the document nominates as its cover, under its pre-restore name. */
@@ -207,11 +215,13 @@ export const restoreProjectMedia = async (
   const issues = createTransferIssueLog();
   const mappings = { images: new Map<string, string>(), videos: new Map<string, string>() };
   const documentKeys = new Set(input.documentRefs.map(toMediaKey));
-  const boardKeys = new Set(input.boardItems.map(toMediaKey));
+  /** Every board item in board order; an item is on one board, so this is a set. */
+  const boardItems = input.boards.flatMap((board) => board.items);
+  const boardKeys = new Set(boardItems.map(toMediaKey));
   /** Descriptor position, so a placeholder name does not depend on the order failures happened in. */
-  const descriptorIndexes = new Map(input.boardItems.map((item, index) => [toMediaKey(item), index]));
+  const descriptorIndexes = new Map(boardItems.map((item, index) => [toMediaKey(item), index]));
   /** Allocate unique placeholders even without descriptor positions. */
-  let nextUnknownIndex = input.boardItems.length;
+  let nextUnknownIndex = boardItems.length;
   const missingNameIndex = (key: string): number => {
     const index = descriptorIndexes.get(key);
 
@@ -223,19 +233,18 @@ export const restoreProjectMedia = async (
 
     return nextUnknownIndex - 1;
   };
-  const starredKeys = new Set(input.boardItems.filter((item) => item.starred).map(toMediaKey));
+  const starredKeys = new Set(boardItems.filter((item) => item.starred).map(toMediaKey));
 
   const documentOnlyRefs = input.documentRefs.filter((ref) => !boardKeys.has(toMediaKey(ref)));
   const documentOnlyImages = documentOnlyRefs.filter((ref) => ref.kind === 'image').map((ref) => ref.name);
   const documentOnlyVideos = documentOnlyRefs.filter((ref) => ref.kind === 'video').map((ref) => ref.name);
 
-  // Descriptors without a staging board still require explicit failure reporting.
-  const stagingBoardId = input.boardItems.length === 0 ? null : input.boardId;
+  const stagedBoards = input.boards.filter((board) => board.items.length > 0);
 
   let completed = 0;
   // Use the worst-case progress total until existence probes resolve.
   let total =
-    (stagingBoardId === null ? 0 : input.boardItems.length) +
+    stagedBoards.reduce((count, board) => count + board.items.length, 0) +
     documentOnlyRefs.length +
     (input.coverBytes === null ? 0 : 1);
   const advance = (): void => {
@@ -275,10 +284,8 @@ export const restoreProjectMedia = async (
       : checkExistingVideos(documentOnlyVideos, deps.signal).catch(degradeUnlessCancelled(new Set<string>())),
   ]);
 
-  const boardResult =
-    stagingBoardId === null
-      ? ({ failed: [], materialized: [] } satisfies MaterializeResult)
-      : await deps.materializeBoardMedia(input.boardItems, stagingBoardId, advance);
+  // Each staging board receives exactly its source board's media.
+  const boardResult = await deps.materializeBoardMedia(stagedBoards, advance);
 
   const starTargets = { image: [] as string[], video: [] as string[] };
   const sourceNamesByFreshName = new Map<string, string>();
@@ -331,7 +338,7 @@ export const restoreProjectMedia = async (
   }
 
   // Treat unreported descriptors as failures with missing placeholders.
-  for (const item of input.boardItems) {
+  for (const item of boardItems) {
     if (!settledBoardKeys.has(toMediaKey(item))) {
       failBoardItem({ kind: item.kind, name: item.name, reason: 'upload-failed' });
     }
@@ -494,13 +501,8 @@ export const rollbackRestoredMedia = async (
     videoNames.length === 0 ? Promise.resolve() : deleteVideos(videoNames, deps.signal),
   ]);
 
-  if (ledger.boardId === null) {
-    return;
-  }
-
-  try {
-    await deleteBoard(ledger.boardId, deps.signal);
-  } catch {
-    // An unclaimed private board is invisible clutter, not a broken state.
-  }
+  await Promise.allSettled(
+    // A staging board left behind is a Library board its owner can delete, not a broken state, so each is best-effort.
+    ledger.boardIds.map((boardId) => deleteBoard(boardId, deps.signal))
+  );
 };
