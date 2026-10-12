@@ -27865,9 +27865,10 @@ export type components = {
          * LoRA_LyCORIS_ErnieImage_Config
          * @description Model config for ERNIE-Image LoRA models (single file; PEFT, kohya-style or LyCORIS tensors).
          *
-         *     ERNIE-Image LoRAs name the transformer's own modules behind a container prefix. Its block submodules
-         *     (`layers.N.self_attention.*`, `layers.N.mlp.{gate_proj,up_proj,linear_fc2}`) exist in no other supported
-         *     transformer, which is what makes the match exclusive; see `ernie_image_lora_constants`.
+         *     ERNIE-Image LoRAs name the transformer's own modules behind a container prefix. `layers.N.self_attention.*` and
+         *     `layers.N.mlp.linear_fc2` exist in no other supported transformer, which is what makes the match exclusive;
+         *     `mlp.gate_proj` / `up_proj` are shared with LLM layers and only count once those identified the file. See
+         *     `ernie_image_lora_constants`.
          */
         LoRA_LyCORIS_ErnieImage_Config: {
             /**
