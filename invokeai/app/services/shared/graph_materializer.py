@@ -1065,7 +1065,7 @@ class _ExecutionNodeBuilder:
         return path
 
     def _get_collect_source_iterator_ids(self, source_node_id: str) -> list[str]:
-        iterator_node_ids = self.get_node_iterators(source_node_id)
+        iterator_node_ids = self._get_active_node_iterators(source_node_id)
         if isinstance(self._state.graph.get_node(source_node_id), IterateInvocation):
             iterator_node_ids.append(source_node_id)
         return iterator_node_ids
@@ -1319,8 +1319,8 @@ class _ExecutionNodeBuilder:
         input_edges = input_edges or self._state.graph._get_input_edges(next_node_id)
         parent_node_ids = list(dict.fromkeys(edge.source.node_id for edge in input_edges))
         iterator_graph = self.iterator_graph(graph)
-        iterator_nodes = self.get_node_iterators(next_node_id, iterator_graph)
-        if not iterator_nodes:
+        iterator_nodes = self._get_active_node_iterators(next_node_id, iterator_graph)
+        if not iterator_nodes or self._has_mixed_depth_if_input(input_edges):
             return iter(self._get_parent_iteration_mappings_without_iterators(next_node_id, input_edges))
 
         iterator_nodes_prepared = [
@@ -1417,15 +1417,19 @@ class _ExecutionNodeBuilder:
         if isinstance(self._state.graph.get_node(node_id), IfInvocation):
             condition_edges = self._state.graph._get_input_edges(node_id, "condition")
             if not condition_edges:
+                iteration_paths = graph_if_runtime._get_if_iteration_paths(
+                    self._state,
+                    node_id,
+                    set(),
+                    self._get_prepared_nodes_for_source,
+                    self._get_prepared_edge_iteration_path,
+                )
+                if not iteration_paths:
+                    # A selected branch that has run without producing a frame leaves the If with no executions.
+                    return self._is_selected_branch_resolved_empty(node_id)
                 return any(
                     self._state._is_source_activation_admitted(node_id, iteration_path)
-                    for iteration_path in graph_if_runtime._get_if_iteration_paths(
-                        self._state,
-                        node_id,
-                        set(),
-                        self._get_prepared_nodes_for_source,
-                        self._get_prepared_edge_iteration_path,
-                    )
+                    for iteration_path in iteration_paths
                 )
             mappings = self._get_if_condition_iteration_mappings(node_id, graph)
             input_edges = condition_edges
@@ -1452,6 +1456,35 @@ class _ExecutionNodeBuilder:
                 node_id, self._get_known_iteration_path(-1, iteration_mapping, input_edges) or ()
             )
             for iteration_mapping in mappings
+        )
+
+    def _is_selected_branch_resolved_empty(self, node_id: str) -> bool:
+        """Return whether every branch the condition selects has run without producing a frame."""
+
+        node = self._state.graph.get_node(node_id)
+        assert isinstance(node, IfInvocation)
+        condition_edges = self._state.graph._get_input_edges(node_id, "condition")
+        if not condition_edges:
+            selected_fields = {"true_input" if node.condition else "false_input"}
+        else:
+            condition_edge = condition_edges[0]
+            condition_source_id = condition_edge.source.node_id
+            if condition_source_id not in self._state.executed:
+                return False
+            selected_fields = {
+                "true_input"
+                if getattr(self._state.results[prepared_id], condition_edge.source.field)
+                else "false_input"
+                for prepared_id in self._get_prepared_nodes_for_source(condition_source_id)
+            }
+        selected_edges = [
+            edge
+            for selected_field in selected_fields
+            for edge in self._state.graph._get_input_edges(node_id, selected_field)
+        ]
+        return bool(selected_edges) and all(
+            edge.source.node_id in self._state.executed and not self._get_prepared_nodes_for_source(edge.source.node_id)
+            for edge in selected_edges
         )
 
     def _get_if_condition_iteration_mappings(
@@ -1482,6 +1515,9 @@ class _ExecutionNodeBuilder:
             )
             for branch_field in ("true_input", "false_input")
         ):
+            if condition_edges:
+                # The condition is outside the If's iterator frames, so each If frame reads it from a parent frame.
+                return iter(self._get_parent_iteration_mappings_without_iterators(node_id, condition_edges))
             return iter([[]])
 
         if any(iterator_node_id not in self._state.source_prepared_mapping for iterator_node_id in iterator_nodes):
@@ -1547,11 +1583,16 @@ class _ExecutionNodeBuilder:
             for source_edge in selected_edges:
                 if source_edge.source.node_id not in self._state.source_prepared_mapping:
                     continue
-                candidates = [
-                    prepared_id
-                    for prepared_id in self._get_ordered_prepared_nodes_for_edge(source_edge)
-                    if self._get_prepared_edge_iteration_path(source_edge, prepared_id) == target_path
-                ]
+                # A value prepared in a parent frame is shared by every item frame below it.
+                candidates = sorted(
+                    (
+                        prepared_id
+                        for prepared_id in self._get_ordered_prepared_nodes_for_edge(source_edge)
+                        if target_path[: len(self._get_prepared_edge_iteration_path(source_edge, prepared_id))]
+                        == self._get_prepared_edge_iteration_path(source_edge, prepared_id)
+                    ),
+                    key=lambda prepared_id: -len(self._get_prepared_edge_iteration_path(source_edge, prepared_id)),
+                )
                 if not candidates:
                     continue
                 selected_exec_ids.append(candidates[0])
@@ -1583,6 +1624,94 @@ class _ExecutionNodeBuilder:
             if enqueue:
                 self._state._enqueue_if_ready(exec_node_id)
 
+    def _is_closed_branch_iterator(self, iterator_id: str, node_id: str) -> bool:
+        """Return whether an If may be materialized before ``iterator_id`` executes.
+
+        An If needs only its condition to be prepared, but otherwise waits for upstream iterators so it inherits their
+        frames. An iterator inside one of the If's branches waits for the If to select that branch, so waiting for it
+        deadlocks. An iterator cannot change the If's frames when its own frame closes before the If, and every
+        enclosing frame that stays open at the If also reaches it through the condition, which the If already has.
+        """
+
+        if not isinstance(self._state.graph.get_node(node_id), IfInvocation):
+            return False
+        if self._is_iterator_frame_open_at(iterator_id, node_id):
+            return False
+        condition_source_ids = [
+            edge.source.node_id for edge in self._state.graph._get_input_edges(node_id, "condition")
+        ]
+        return all(
+            not self._is_iterator_frame_open_at(enclosing_id, node_id)
+            or any(
+                enclosing_id == condition_source_id
+                or self._is_iterator_frame_open_at(enclosing_id, condition_source_id)
+                for condition_source_id in condition_source_ids
+            )
+            for enclosing_id in nx.ancestors(self._state._get_source_graph_flat(), iterator_id)
+            if isinstance(self._state.graph.get_node(enclosing_id), (ForInvocation, IterateInvocation))
+        )
+
+    def _is_iterator_frame_open_at(self, iterator_id: str, node_id: str, via_fields: Optional[set[str]] = None) -> bool:
+        """Return whether some path carries ``iterator_id``'s iteration frame into ``node_id``.
+
+        ``via_fields`` limits the paths to those entering ``node_id`` through one of those input fields.
+
+        Depth counts frames opened since ``iterator_id``. Per-item outputs of an Iterate or For open one. An item input
+        of a Collect closes one, except a For's final output, which is already in the For's parent frame and which the
+        Collect groups there. A Collect's collection input keeps its source's frame. A Collect that would close
+        ``iterator_id``'s frame leaves it open unless ``iterator_id`` is the item's innermost iterator.
+        """
+
+        pending = [(iterator_id, 0)]
+        seen: set[tuple[str, int]] = set()
+        while pending:
+            current_id, depth = pending.pop()
+            current_node = self._state.graph.get_node(current_id)
+            for edge in self._state.graph._get_output_edges(current_id):
+                if edge.type != "default":
+                    continue
+                is_for_final = (
+                    isinstance(current_node, ForInvocation)
+                    and get_output_field_scope(current_node, edge.source.field) == OutputScope.Final
+                )
+                next_depth = depth
+                if isinstance(current_node, (ForInvocation, IterateInvocation)) and not is_for_final:
+                    next_depth += 1
+                if (
+                    isinstance(self._state.graph.get_node(edge.destination.node_id), CollectInvocation)
+                    and edge.destination.field == ITEM_FIELD
+                    and not is_for_final
+                ):
+                    next_depth -= 1
+                if next_depth <= 0:
+                    if self._is_innermost_iterator(iterator_id, current_id):
+                        continue
+                    next_depth = depth
+                if edge.destination.node_id == node_id:
+                    if via_fields is None or edge.destination.field in via_fields:
+                        return True
+                    continue
+                state = (edge.destination.node_id, next_depth)
+                if state not in seen:
+                    seen.add(state)
+                    pending.append(state)
+        return False
+
+    def _is_innermost_iterator(self, iterator_id: str, collected_source_id: str) -> bool:
+        """Return whether ``iterator_id`` owns the innermost frame of a value entering a Collect.
+
+        A Collect closes only the innermost frame of its item. A sibling iterator combined into the same value adds a
+        frame the depth count cannot order, so the Collect may close the sibling's frame instead.
+        """
+
+        source_iterators = self.get_node_iterators(collected_source_id)
+        if isinstance(self._state.graph.get_node(collected_source_id), (ForInvocation, IterateInvocation)):
+            source_iterators.append(collected_source_id)
+        source_graph = self._state._get_source_graph_flat()
+        return all(
+            other_id == iterator_id or nx.has_path(source_graph, other_id, iterator_id) for other_id in source_iterators
+        )
+
     def iterator_graph(self, base: Optional["nx.DiGraph"] = None) -> "nx.DiGraph":
         """Gets a DiGraph with edges to collectors removed so an ancestor search produces all active iterators for any node"""
         g = base.copy() if base is not None else self._state._get_source_graph_flat().copy()
@@ -1607,6 +1736,33 @@ class _ExecutionNodeBuilder:
             n
             for n in nx.ancestors(g, node_id)
             if isinstance(self._state.graph.get_node(n), (ForInvocation, IterateInvocation))
+        ]
+
+    def _has_mixed_depth_if_input(self, input_edges: list[Edge]) -> bool:
+        """Return whether an input If runs at different depths, as when only one branch keeps an item frame open.
+
+        Its frames then match no single product of iterator executions, so they are matched by path instead.
+        """
+
+        for edge in input_edges:
+            if not isinstance(self._state.graph.get_node(edge.source.node_id), IfInvocation):
+                continue
+            depths = {len(frame) for frame in self._state._prepared_if_exec_frames(edge.source.node_id)}
+            if len(depths) > 1:
+                return True
+        return False
+
+    def _get_active_node_iterators(self, node_id: str, it_graph: Optional["nx.DiGraph"] = None) -> list[str]:
+        """Return the iterators that give ``node_id`` frames.
+
+        An iterator on a rejected If branch never runs, so it adds no frame to values selected past that If.
+        """
+
+        return [
+            iterator_node_id
+            for iterator_node_id in self.get_node_iterators(node_id, it_graph)
+            if iterator_node_id in self._state.source_prepared_mapping
+            or not self._state._is_source_inactive(iterator_node_id)
         ]
 
     def _get_prepared_nodes_for_source(self, source_node_id: str) -> set[str]:
@@ -1733,16 +1889,19 @@ class _ExecutionNodeBuilder:
                     and self._is_if_condition_ready(node_id)
                     or not isinstance(self._state.graph.get_node(node_id), IfInvocation)
                 )
-                and self._has_admitted_source_mapping(node_id, g)
                 and (
                     not isinstance(self._state.graph.get_node(node_id), (ForInvocation, IterateInvocation))
                     or all(source_id in self._state.executed for source_id, _ in g.in_edges(node_id))
                 )
+                # Admission reads the prepared frames of every unblocked upstream iterator.
                 and not any(
                     isinstance(self._state.graph.get_node(ancestor_id), (ForInvocation, IterateInvocation))
                     and ancestor_id not in self._state.executed
+                    and not self._state._is_source_inactive(ancestor_id)
+                    and not self._is_closed_branch_iterator(ancestor_id, node_id)
                     for ancestor_id in nx.ancestors(g, node_id)
                 )
+                and self._has_admitted_source_mapping(node_id, g)
             ),
             None,
         )
@@ -1787,7 +1946,15 @@ class _ExecutionNodeBuilder:
                                 or iteration_path[: len(condition_path or ())] == (condition_path or ())
                             )
                         ]
-                        for iteration_mapping in matching_mappings:
+                        # Only the condition is attached, so mappings that differ in other iterators create one If.
+                        condition_source_ids = {edge.source.node_id for edge in condition_edges}
+                        unique_mappings = {
+                            tuple(
+                                entry for entry in iteration_mapping if entry[0] in condition_source_ids
+                            ): iteration_mapping
+                            for iteration_mapping in matching_mappings
+                        }
+                        for iteration_mapping in unique_mappings.values():
                             create_results = self.create_execution_node(
                                 next_node_id,
                                 iteration_mapping,
@@ -1795,7 +1962,7 @@ class _ExecutionNodeBuilder:
                                 input_fields={"condition"},
                             )
                             new_node_ids.extend(create_results)
-                else:
+                elif not self._is_selected_branch_resolved_empty(next_node_id):
                     for iteration_mapping in iteration_mappings:
                         iteration_path = self._get_known_iteration_path(-1, iteration_mapping, condition_edges)
                         create_results = self.create_execution_node(
