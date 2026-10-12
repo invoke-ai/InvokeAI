@@ -2785,7 +2785,7 @@ describe('queue runtime retries', () => {
   const createRetryHarness = (
     queueItem: QueueItem,
     backendOverrides: Partial<QueueBackendPort> = {},
-    services: { locks?: QueueRunLockPort } = {}
+    services: { locks?: QueueRunLockPort; viewerUserId?: string | null } = {}
   ) => {
     const project = { id: 'project-1', queue: { items: [queueItem] } };
     const listeners = new Set<() => void>();
@@ -3071,6 +3071,8 @@ describe('queue runtime retries', () => {
     };
     const getResultImages = vi.fn().mockResolvedValue([{ imageName: 'rerun.png' } as QueueResultImage]);
     const { commands, emit, project, runtime } = createRetryHarness(queueItem, { getResultImages });
+    // The destination port is shared by every test in this file.
+    vi.mocked(runtimeServices.destinations.addImagesToGalleryBoard).mockClear();
 
     runtime.start();
     emit('queue_items_retried', retriedEvent([{ item_id: 100, source_item_id: 42 }]));
@@ -3104,6 +3106,8 @@ describe('queue runtime retries', () => {
       getResultVideoNames,
       getResultVideos,
     });
+    // The destination port is shared by every test in this file.
+    vi.mocked(runtimeServices.destinations.addVideosToGalleryBoard).mockClear();
 
     runtime.start();
     emit('queue_items_retried', retriedEvent([{ item_id: 100, source_item_id: 42 }]));
@@ -3158,6 +3162,40 @@ describe('queue runtime retries', () => {
     expect(release.mock.invocationCallOrder[0]).toBeGreaterThan(
       vi.mocked(commands.stageRetriedCanvasResults).mock.invocationCallOrder[0]!
     );
+
+    await runtime.dispose();
+  });
+
+  it("handles a retry once when both the tab's own answer and the socket deliver it, and ignores others' retries", async () => {
+    const queueItem: QueueItem = { ...createPendingQueueItem(), backendItemIds: [41], status: 'failed' };
+    const { commands, emit, notify, project, runtime } = createRetryHarness(queueItem, {}, { viewerUserId: 'me' });
+    vi.mocked(commands.reopenForRetry).mockImplementation(({ retriedItems }) => {
+      queueItem.retriedBackendItemIds = [...(queueItem.backendItemIds ?? [])];
+      queueItem.backendItemIds = retriedItems.map(({ itemId }) => itemId);
+      queueItem.status = 'running';
+      notify();
+    });
+    const ownAnswer = retriedEvent([{ item_id: 99, source_item_id: 41 }]);
+
+    runtime.start();
+    emit('queue_items_retried', ownAnswer);
+    // The socket copy an admin receives: the viewer's pair again, plus another user's.
+    emit('queue_items_retried', {
+      ...retriedEvent([
+        { item_id: 99, source_item_id: 41 },
+        { item_id: 200, source_item_id: 70 },
+      ]),
+      retried_item_ids_by_user: { me: [41], other: [70] },
+      user_ids: ['me', 'other'],
+    });
+    emit(
+      'queue_item_status_changed',
+      completedEvent(200, buildQueueItemOrigin('their-run', 'their-project'), 'gallery')
+    );
+
+    expect(commands.reopenForRetry).toHaveBeenCalledTimes(1);
+    expect(commands.refreshBackendData).not.toHaveBeenCalled();
+    expect(project.queue.items[0]?.backendItemIds).toEqual([99]);
 
     await runtime.dispose();
   });

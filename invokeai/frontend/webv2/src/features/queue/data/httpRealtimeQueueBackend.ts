@@ -1,4 +1,5 @@
 import type { QueueBackendPort } from '@features/queue/core/types';
+import type { QueueItemsRetriedEvent } from '@features/queue/data/events';
 
 import { socketHub } from '@platform/transport/socketHub';
 
@@ -40,6 +41,12 @@ import {
   getResultVideos,
 } from './submissionApi';
 
+/**
+ * This tab's own retry answers, delivered like the socket's `queue_items_retried` so a rerun is adopted even when
+ * the socket misses that event; handlers ignore the pairs they have already seen.
+ */
+const ownRetryHandlers = new Set<(payload: never) => void>();
+
 /** Production adapter for the queue backend port. */
 export const queueBackend: QueueBackendPort = {
   acknowledgeEnqueue: acknowledgeQueueEnqueue,
@@ -65,7 +72,17 @@ export const queueBackend: QueueBackendPort = {
   getResultVideoNames,
   getResultVideos,
   listItems: async () => (await listAllQueueItems()).map(mapQueueBackendItemDTO),
-  on: socketHub.on,
+  on: (event, handler) => {
+    const detachSocket = socketHub.on(event, handler);
+    if (event !== 'queue_items_retried') {
+      return detachSocket;
+    }
+    ownRetryHandlers.add(handler);
+    return () => {
+      detachSocket();
+      ownRetryHandlers.delete(handler);
+    };
+  },
   onConnectionChange: socketHub.onConnectionChange,
   pauseProcessor: async () => {
     await pauseQueueProcessor();
@@ -86,7 +103,23 @@ export const queueBackend: QueueBackendPort = {
     return item ? mapQueueItemDTO(item) : null;
   },
   readStatus: async (scope, signal) => mapQueueStatusDTO(await getQueueStatus(scope, signal)),
-  retryItems: async (itemIds) => (await retryItemsById(itemIds)).retried_item_ids,
+  retryItems: async (itemIds) => {
+    const result = await retryItemsById(itemIds);
+    if (result.retried_items?.length) {
+      const event: QueueItemsRetriedEvent = {
+        queue_id: result.queue_id,
+        retried_item_ids: result.retried_item_ids,
+        retried_item_ids_by_user: {},
+        retried_items: result.retried_items,
+        timestamp: Date.now(),
+        user_ids: [],
+      };
+      for (const handler of ownRetryHandlers) {
+        handler(event as never);
+      }
+    }
+    return result.retried_item_ids;
+  },
   resumeProcessor: async () => {
     await resumeQueueProcessor();
   },

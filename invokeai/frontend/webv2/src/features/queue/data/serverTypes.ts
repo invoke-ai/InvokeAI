@@ -42,6 +42,8 @@ export interface QueueServerItemDTO {
 export interface RetryItemsResultDTO {
   queue_id: string;
   retried_item_ids: number[];
+  /** Each retried root paired with the item that re-runs it; absent from servers that predate the pairing. */
+  retried_items?: { item_id: number; source_item_id: number }[];
 }
 
 export interface CancelByBatchIdsResultDTO {

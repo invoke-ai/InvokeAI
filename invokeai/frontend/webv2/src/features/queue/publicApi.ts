@@ -68,6 +68,7 @@ export const createProductionQueueRuntime = ({
   locks,
   modelLoads,
   nodeExecution,
+  viewerUserId,
 }: {
   destinations: QueueResultDestinationPort;
   ensureProjectPersisted?(projectId: string): Promise<'ready' | 'refused' | 'retry'>;
@@ -77,6 +78,7 @@ export const createProductionQueueRuntime = ({
   locks?: QueueRunLockPort;
   modelLoads: QueueModelLoadPort;
   nodeExecution: QueueNodeExecutionPort;
+  viewerUserId: string | null;
 }): QueueRuntime =>
   createQueueRuntime({
     backend: queueBackend,
@@ -88,4 +90,5 @@ export const createProductionQueueRuntime = ({
     locks,
     modelLoads,
     nodeExecution,
+    viewerUserId,
   });

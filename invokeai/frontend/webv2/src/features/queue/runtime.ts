@@ -409,6 +409,7 @@ export const createQueueRuntime = ({
   locks,
   modelLoads,
   nodeExecution,
+  viewerUserId = null,
 }: {
   backend: QueueBackendPort;
   destinations: QueueResultDestinationPort;
@@ -419,6 +420,8 @@ export const createQueueRuntime = ({
   locks?: QueueRunLockPort;
   modelLoads: QueueModelLoadPort;
   nodeExecution: QueueNodeExecutionPort;
+  /** The signed-in user on a multiuser server; null in single-user mode, where every item is the viewer's. */
+  viewerUserId?: string | null;
 }): QueueRuntime => {
   const owner = captureAccountScope();
   const commands = history.commands;
@@ -1302,19 +1305,34 @@ export const createQueueRuntime = ({
     }
 
     const runsByBackendItemId = new Map<number, { projectId: string; queueItemId: string }>();
+    const trackedItemIds = new Set<number>();
     for (const project of history.getSnapshot().projects) {
       for (const queueItem of project.queue.items) {
         for (const backendItemId of [...(queueItem.backendItemIds ?? []), ...(queueItem.retriedBackendItemIds ?? [])]) {
           runsByBackendItemId.set(backendItemId, { projectId: project.id, queueItemId: queueItem.id });
         }
+        for (const backendItemId of queueItem.backendItemIds ?? []) {
+          trackedItemIds.add(backendItemId);
+        }
       }
     }
+    // An admin's socket carries every user's retries; only the viewer's own can belong to runs or projects here.
+    const viewerSourceIds =
+      viewerUserId && event.user_ids.length > 0 ? new Set(event.retried_item_ids_by_user[viewerUserId] ?? []) : null;
 
     const retriedItemsByRun = new Map<
       string,
       { projectId: string; queueItemId: string; retriedItems: { itemId: number; sourceItemId: number }[] }
     >();
     for (const { item_id: itemId, source_item_id: sourceItemId } of event.retried_items) {
+      // The retrying tab sees its pairs twice, from its own response and from the socket; the first one handles them.
+      if (
+        (viewerSourceIds && !viewerSourceIds.has(sourceItemId)) ||
+        trackedItemIds.has(itemId) ||
+        unadoptedReruns.has(itemId)
+      ) {
+        continue;
+      }
       const owner = runsByBackendItemId.get(sourceItemId);
 
       if (!owner) {
