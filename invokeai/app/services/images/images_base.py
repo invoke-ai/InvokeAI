@@ -13,8 +13,7 @@ from invokeai.app.services.image_records.image_records_common import (
 )
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.shared.intermediate_delete import IntermediateDeleteGuard, IntermediateDeleteResult
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults, SQLiteDirection
 
 
 class ImageServiceABC(ABC):
@@ -39,9 +38,10 @@ class ImageServiceABC(ABC):
         for callback in self._on_changed_callbacks:
             callback(item)
 
-    def _on_deleted(self, item_id: str) -> None:
+    def notify_deleted(self, image_name: str) -> None:
+        """Notify registered listeners after an image record has been deleted."""
         for callback in self._on_deleted_callbacks:
-            callback(item_id)
+            callback(image_name)
 
     @abstractmethod
     def create(

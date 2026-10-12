@@ -12,7 +12,7 @@ from invokeai.app.invocations.vae.wan_latents_to_image import WanLatentsToImageI
 from invokeai.app.invocations.vae.wan_latents_to_video import WanLatentsToVideoInvocation
 from invokeai.app.invocations.wan.wan_ref_image_encoder import WanRefImageEncoderInvocation
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_wan
+from invokeai.backend.util.vae_working_memory import VAE_PRETILE_VRAM_FRACTION, estimate_vae_working_memory_wan
 
 
 def _mock_wan_vae(
@@ -111,12 +111,67 @@ class TestEstimateVaeWorkingMemoryWan:
         tiled = estimate_vae_working_memory_wan(
             operation="decode", vae=vae, pixel_height=1920, pixel_width=1080, pixel_frames=17, tile_size=256
         )
-        expected = int(256 * 256 * 2 * 6500 * 1.25 + 2 * 3 * 17 * 1920 * 1080 * 2)
+        # The tile's working set, plus the six clip copies the tiled assembly holds at once.
+        expected = int(256 * 256 * 2 * 10000 * 1.25 + 6 * 3 * 17 * 1920 * 1080 * 2)
         assert tiled == expected
         full = estimate_vae_working_memory_wan(
             operation="decode", vae=vae, pixel_height=1920, pixel_width=1080, pixel_frames=17
         )
         assert tiled < full
+
+    @pytest.mark.parametrize(
+        ("z_dim", "spatial_scale", "width", "height", "frames", "mode", "reserved_mib"),
+        [
+            (16, 8, 832, 480, 49, "full", 6666),
+            (16, 8, 1280, 704, 121, "full", 15124),
+            (16, 8, 1280, 704, 81, "streaming", 14804),
+            (16, 8, 1280, 704, 121, "tiled", 3530),
+            (48, 16, 640, 352, 49, "full", 3952),
+            (48, 16, 832, 480, 49, "full", 7464),  # in a server: the highest relative to its size
+            (48, 16, 1280, 704, 49, "full", 15878),  # in a server
+            (48, 16, 832, 480, 49, "streaming", 6926),  # in a server
+            (48, 16, 1280, 704, 49, "streaming", 15894),  # in a server
+            (48, 16, 1280, 704, 121, "tiled", 3620),
+        ],
+        ids=[
+            "a14b-480p",
+            "a14b-720p-121f",
+            "a14b-720p-streaming",
+            "a14b-720p-121f-tiled",
+            "ti2v-352p",
+            "ti2v-480p-server",
+            "ti2v-720p-server",
+            "ti2v-480p-streaming-server",
+            "ti2v-720p-streaming-server",
+            "ti2v-720p-121f-tiled",
+        ],
+    )
+    def test_video_decode_estimate_covers_the_measured_reserved_peak(
+        self, z_dim, spatial_scale, width, height, frames, mode, reserved_mib
+    ):
+        """Peak reserved growth of bf16 decodes on an RTX 4090. The cache keeps only the estimate free, so an
+        estimate below what the allocator reserves leaves a full card short (sysmem fallback: a stalled decode)."""
+        vae = _mock_wan_vae(z_dim=z_dim, spatial_scale=spatial_scale, dtype=torch.bfloat16)
+        estimate = estimate_vae_working_memory_wan(
+            operation="decode",
+            vae=vae,
+            pixel_height=height,
+            pixel_width=width,
+            pixel_frames=frames,
+            tile_size=256 if mode == "tiled" else None,
+            streaming=mode == "streaming",
+        )
+        assert estimate >= reserved_mib * 2**20
+
+    @pytest.mark.parametrize(("z_dim", "spatial_scale", "width", "height"), [(16, 8, 1280, 720), (48, 16, 1280, 704)])
+    def test_720p_video_decodes_stay_untiled_on_24gb_cards(self, z_dim, spatial_scale, width, height):
+        """Tiled output is not pixel-identical. A 24 GB card's untiled 720p decode fits (15.9 GiB reserved), so its
+        estimate must stay below the auto-tiling line, which on Windows is 0.9 of a ~22.4 GiB budget."""
+        vae = _mock_wan_vae(z_dim=z_dim, spatial_scale=spatial_scale, dtype=torch.bfloat16)
+        estimate = estimate_vae_working_memory_wan(
+            operation="decode", vae=vae, pixel_height=height, pixel_width=width, pixel_frames=121
+        )
+        assert estimate < VAE_PRETILE_VRAM_FRACTION * 22.4 * 2**30
 
     def test_multi_frame_decode_estimate_triggers_tiling_on_12gb_cards(self):
         """Conservative video estimates must engage the tiling fallback for both Wan VAEs."""

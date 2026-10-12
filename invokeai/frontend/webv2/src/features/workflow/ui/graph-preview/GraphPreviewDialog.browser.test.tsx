@@ -337,7 +337,6 @@ const createWorkflowUiAdapter = (): WorkflowUiAdapter => {
       getSnapshot: () => projectSnapshot,
       subscribe: () => () => {},
     },
-    registerModalHotkeyLayer: vi.fn(() => vi.fn()),
     widgets: { open: vi.fn(), patchValues: vi.fn() },
   } as unknown as WorkflowUiAdapter;
 };
@@ -750,6 +749,25 @@ describe('GraphPreviewDialog', () => {
 
     const buttonText = [...document.querySelectorAll('button')].map((button) => button.textContent ?? '');
     expect(buttonText.some((text) => text.includes('Invoke Generate → Gallery'))).toBe(true);
+  });
+
+  it('keeps the footer Invoke button inert while the route cannot be invoked', async () => {
+    graphPreviewPort = {
+      ...createGraphPreviewPort(),
+      getRoute: () => ({ canInvoke: false, label: 'Generate → Gallery', validationMessage: 'Preparing generation…' }),
+    };
+    await renderDialog(FIXTURE_SOURCE);
+
+    const button = [...document.querySelectorAll('button')].find((candidate) =>
+      (candidate.textContent ?? '').includes('Invoke Generate → Gallery')
+    );
+    expect(button?.getAttribute('aria-disabled')).toBe('true');
+    expect(button?.getAttribute('title')).toBe('Preparing generation…');
+
+    await clickButtonWithText('Invoke Generate → Gallery');
+
+    expect(graphPreviewPort.invoke).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalled();
   });
 
   it('hideInvoke hides only the footer Invoke button — Copy JSON and Open as stay', async () => {

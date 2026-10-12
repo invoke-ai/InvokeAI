@@ -33,6 +33,9 @@ import { submitResolvedInvocation } from './invocationSubmit';
 import { createInitialWorkbenchState, workbenchReducer } from './workbenchState.testing';
 import { createWorkbenchStore } from './workbenchStore';
 
+// Production words rejections from the locale; tests only need the structured rejection to reach the notice.
+const formatControlLayerError = ({ code, layerName }: { code: string; layerName: string }) => `${layerName}: ${code}`;
+
 const animaModel: MainModelConfig = { base: 'anima', key: 'anima-model', name: 'Anima', type: 'main' };
 const animaVae: VaeModelConfig = { base: 'qwen-image', key: 'anima-vae', name: 'Anima VAE', type: 'vae' };
 const flux2Model: MainModelConfig = {
@@ -279,7 +282,8 @@ describe('resolveInvocationRoute — canvas source', () => {
   const loadedModels = [animaModel, qwen3Encoder, animaVae] as unknown as ModelConfig[];
 
   const modellessControlLayer = (source?: CanvasControlLayerContract['source']): CanvasControlLayerContract => ({
-    adapter: { beginEndStepPct: [0, 1], controlMode: null, kind: 'controlnet', model: null, weight: 1 },
+    // The fixture's main model is Anima, so the layer carries the kind Anima runs.
+    adapter: { beginEndStepPct: [0, 1], controlMode: null, kind: 'anima_lllite', model: null, weight: 1 },
     blendMode: 'normal',
     id: 'control-1',
     isEnabled: true,
@@ -341,7 +345,15 @@ describe('resolveInvocationRoute — canvas source', () => {
     );
 
     expect(route.sourceValid).toBe(false);
-    expect(route.validationReasons).toContain('Control layer "Control Layer 1" has no control model selected.');
+    // Kept structured so the shell words it from the locale.
+    expect(route.validationReasons).toContainEqual({
+      controlLayerIssue: {
+        code: 'missing_model',
+        layerId: expect.any(String),
+        layerName: 'Control Layer 1',
+        suggestedKind: null,
+      },
+    });
   });
 
   it('does not block content-less control layers or check layers before models load', () => {
@@ -390,7 +402,15 @@ describe('submitResolvedInvocation', () => {
     const route = routeFor(project, { ...project.invocation, destination: 'gallery', sourceId: 'canvas' });
     const owner = captureAccountScope();
 
-    submitResolvedInvocation({ commands, models: undefined, owner, prepareCanvasInvocation, project, route });
+    submitResolvedInvocation({
+      commands,
+      formatControlLayerError,
+      models: undefined,
+      owner,
+      prepareCanvasInvocation,
+      project,
+      route,
+    });
 
     expect(submitResolved).not.toHaveBeenCalled();
     expect(prepareCanvasInvocation).toHaveBeenCalledTimes(1);
@@ -418,6 +438,7 @@ describe('submitResolvedInvocation', () => {
 
     const submission = submitResolvedInvocation({
       commands,
+      formatControlLayerError,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,
@@ -447,6 +468,7 @@ describe('submitResolvedInvocation', () => {
 
     submitResolvedInvocation({
       commands,
+      formatControlLayerError,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,
@@ -475,6 +497,7 @@ describe('submitResolvedInvocation', () => {
 
     submitResolvedInvocation({
       commands,
+      formatControlLayerError,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -499,6 +522,7 @@ describe('submitResolvedInvocation', () => {
 
     submitResolvedInvocation({
       commands,
+      formatControlLayerError,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -507,7 +531,7 @@ describe('submitResolvedInvocation', () => {
     });
 
     expect(submitResolved).toHaveBeenCalledTimes(1);
-    expect(submitResolved.mock.calls[0]?.[0]).toMatchObject({ positivePrompts: undefined });
+    expect(submitResolved.mock.calls[0]?.[0]).not.toHaveProperty('positivePrompts');
   });
 
   // Expansion failures must not submit literal dynamic syntax.
@@ -520,6 +544,7 @@ describe('submitResolvedInvocation', () => {
 
       submitResolvedInvocation({
         commands: store.commands,
+        formatControlLayerError,
         models: undefined,
         owner: captureAccountScope(),
         prepareCanvasInvocation: vi.fn(),
@@ -568,7 +593,15 @@ describe('submitResolvedInvocation', () => {
     const owner = captureAccountScope();
 
     accountLifecycle.invalidate();
-    submitResolvedInvocation({ commands, models: undefined, owner, prepareCanvasInvocation, project, route });
+    submitResolvedInvocation({
+      commands,
+      formatControlLayerError,
+      models: undefined,
+      owner,
+      prepareCanvasInvocation,
+      project,
+      route,
+    });
 
     expect(prepareCanvasInvocation).not.toHaveBeenCalled();
     expect(submitResolved).not.toHaveBeenCalled();

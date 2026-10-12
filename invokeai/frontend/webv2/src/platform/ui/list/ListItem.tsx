@@ -1,12 +1,12 @@
-import type { MouseEvent, ReactNode } from 'react';
+import type { MouseEvent, PointerEvent, ReactNode } from 'react';
 
 import { Checkbox, chakra, useSlotRecipe } from '@chakra-ui/react';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { listItemSlotRecipe } from '@theme/recipes';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export type ListDensity = 'compact' | 'regular' | 'comfortable';
+export type ListDensity = 'compact' | 'regular' | 'comfortable' | 'snug';
 
 export interface ListContextMenuAnchor {
   x: number;
@@ -24,7 +24,7 @@ export interface ListItemProps {
   title: string;
   /** Identifiers keep their tail visible; prose keeps its start. */
   titleTruncate?: 'middle' | 'end';
-  /** Media or icon before the text; size it for the density (36px at comfortable). */
+  /** Media or icon before the text; size it for the density (36px at comfortable and snug). */
   leading?: ReactNode;
   /** Inline after the title, e.g. a status badge; keep it short so the title keeps its room. */
   badges?: ReactNode;
@@ -34,6 +34,11 @@ export interface ListItemProps {
   trailing?: ReactNode;
   /** Controls that act on the row, rendered beside the primary button so they never nest inside it. */
   actions?: ReactNode;
+  /**
+   * Content under the row that belongs to it, such as a control tuning the item; it shares the row's surface but sits
+   * outside the primary button, so it may hold controls. A context menu it handles itself takes precedence.
+   */
+  detail?: ReactNode;
   density?: ListDensity;
   /** The one row whose detail is open; announced with aria-current and filled with the accent tone. */
   isActive?: boolean;
@@ -43,6 +48,8 @@ export interface ListItemProps {
   isBusy?: boolean;
   /** The row discloses content below itself; announced with aria-expanded. */
   isExpanded?: boolean;
+  /** This row's context menu is open; the row keeps its hover surface so it is clear what the menu acts on. */
+  isMenuOpen?: boolean;
   /** Accessible name of the checkbox when the title alone is ambiguous; defaults to "Select {title}". */
   checkLabel?: string;
   /** Identifies the row to its owning List for focus management. */
@@ -59,6 +66,10 @@ export interface ListItemProps {
   onIntent?: () => void;
   /** Renders the leading checkbox. */
   onCheckedChange?: (checked: boolean) => void;
+  /**
+   * Without onPress, activating the primary button also opens this menu, except from a mouse click, where
+   * right-click is the path; keyboard, assistive-technology, touch, and pen activation all open it.
+   */
   onContextMenu?: (anchor: ListContextMenuAnchor) => void;
 }
 
@@ -75,10 +86,12 @@ export const ListItem = ({
   checkLabel,
   density = 'regular',
   description,
+  detail,
   isActive = false,
   isBusy = false,
   isChecked = false,
   isExpanded,
+  isMenuOpen = false,
   itemKey,
   leading,
   positionInSet,
@@ -99,20 +112,18 @@ export const ListItem = ({
   const styles = useMemo(() => recipe({ active: tone, density }), [density, recipe, tone]);
   // Inside a List every row is a keyboard stop; a standalone row is a button only when pressing it does something.
   const isInteractive = onPress !== undefined || onContextMenu !== undefined || itemKey !== undefined;
+  // A row with actions is pointed like an interactive one, so its buttons read as belonging to it; only a row with
+  // nothing to act on stays static.
+  const isStatic = !isInteractive && (actions === undefined || actions === null);
 
-  const handleContextMenu = useCallback(
-    (event: MouseEvent<HTMLDivElement>) => {
+  const openContextMenu = useCallback(
+    (row: HTMLElement, point?: { x: number; y: number }) => {
       if (!onContextMenu) {
         return;
       }
 
-      event.preventDefault();
-      const row = event.currentTarget;
       const viewport = row.closest<HTMLElement>('[data-list-viewport]');
       const key = row.getAttribute('data-list-row');
-      // Firefox reports keyboard-invoked menus at (0,0); Chromium reports a point on the element, which the pointer
-      // branch anchors just as well.
-      const fromKeyboard = event.clientX === 0 && event.clientY === 0;
       const rect = row.getBoundingClientRect();
       const focusTarget = (): HTMLElement | null => {
         if (row.isConnected) {
@@ -134,23 +145,52 @@ export const ListItem = ({
       onContextMenu({
         focusTarget,
         restoreFocus: () => focusTarget()?.focus(),
-        x: fromKeyboard ? rect.left + 8 : event.clientX,
-        y: fromKeyboard ? rect.bottom : event.clientY,
+        x: point?.x ?? rect.left + 8,
+        y: point?.y ?? rect.bottom,
       });
     },
     [onContextMenu]
+  );
+  const handleContextMenu = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      // A nested field's menu takes precedence. Keyboard-invoked menus can report (0,0).
+      if (event.defaultPrevented) {
+        return;
+      }
+      event.preventDefault();
+      openContextMenu(
+        event.currentTarget,
+        event.clientX === 0 && event.clientY === 0 ? undefined : { x: event.clientX, y: event.clientY }
+      );
+    },
+    [openContextMenu]
   );
   const handleCheckedChange = useCallback(
     (details: { checked: boolean | 'indeterminate' }) => onCheckedChange?.(details.checked === true),
     [onCheckedChange]
   );
+  // Detect a mouse press positively: screen readers synthesize clicks that look like pointer clicks (detail 1), and
+  // touch has no right-click, so only a click that a mouse pressed skips the menu.
+  const pressPointerType = useRef<string | null>(null);
+  const handlePointerDown = useCallback((event: PointerEvent<HTMLButtonElement>) => {
+    pressPointerType.current = event.pointerType;
+  }, []);
   const handlePress = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
-      if (!isBusy) {
-        onPress?.(event);
+      // Firefox marks screen-reader activation as a virtual input source even when it fires pointer events for it.
+      const isVirtualClick = (event.nativeEvent as { mozInputSource?: number }).mozInputSource === 0;
+      const isMouseClick = pressPointerType.current === 'mouse' && event.detail > 0 && !isVirtualClick;
+      pressPointerType.current = null;
+      if (isBusy) {
+        return;
+      }
+      if (onPress) {
+        onPress(event);
+      } else if (!isMouseClick && event.currentTarget.parentElement) {
+        openContextMenu(event.currentTarget.parentElement);
       }
     },
-    [isBusy, onPress]
+    [isBusy, onPress, openContextMenu]
   );
   // Plain text keeps to its line; a node (badge row, figures) lays itself out.
   const descriptionCss = useMemo(
@@ -190,7 +230,9 @@ export const ListItem = ({
       css={styles.root}
       data-busy={isBusy || undefined}
       data-list-row={itemKey}
-      data-static={isInteractive || tone !== 'none' ? undefined : ''}
+      data-list-surface=""
+      data-menu-open={isMenuOpen || undefined}
+      data-static={isStatic || undefined}
       role={role}
       onContextMenu={onContextMenu ? handleContextMenu : undefined}
     >
@@ -201,7 +243,7 @@ export const ListItem = ({
             checked={isChecked}
             colorPalette="accent"
             disabled={isBusy}
-            size="xs"
+            size="sm"
             onCheckedChange={handleCheckedChange}
           >
             <Checkbox.HiddenInput />
@@ -213,13 +255,15 @@ export const ListItem = ({
         <chakra.button
           aria-current={isActive || undefined}
           aria-disabled={isBusy || undefined}
-          aria-expanded={isExpanded}
+          aria-expanded={onContextMenu && !onPress ? isMenuOpen : isExpanded}
+          aria-haspopup={onContextMenu && !onPress ? 'menu' : undefined}
           css={styles.primary}
           data-list-primary=""
           tabIndex={tabIndex}
           type="button"
           onClick={handlePress}
           onFocus={onIntent}
+          onPointerDown={onPress ? undefined : handlePointerDown}
           onPointerEnter={onIntent}
         >
           {content}
@@ -231,6 +275,7 @@ export const ListItem = ({
         </chakra.div>
       )}
       {actions !== undefined && actions !== null ? <chakra.div css={styles.actions}>{actions}</chakra.div> : null}
+      {detail !== undefined && detail !== null ? <chakra.div css={styles.detail}>{detail}</chakra.div> : null}
     </chakra.div>
   );
 };

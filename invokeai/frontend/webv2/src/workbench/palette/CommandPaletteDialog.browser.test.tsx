@@ -1,4 +1,7 @@
 import { ChakraProvider } from '@chakra-ui/react';
+import { useExitPresence } from '@platform/react/useExitRetainedValue';
+import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
+import { isModalPresent } from '@platform/ui/modalPresence';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import i18n from 'i18next';
@@ -79,19 +82,53 @@ const entry = (id: string, title: string, run = vi.fn()): PaletteEntry => ({
 
 const storeHostEntries = [entry('first', 'First command')];
 
+/** Mirrors the Workbench and Launchpad hosts: mounted while open, then until the close animation finishes. */
 const StorePaletteHost = () => {
   const isOpen = useIsCommandPaletteOpen();
+  const dialog = useExitPresence(isOpen);
 
   return (
     <>
       <button type="button" onClick={openCommandPalette}>
         Open palette
       </button>
-      {isOpen ? (
-        <CommandPaletteDialog entries={storeHostEntries} isOpen modifierKeyLabel="ctrl" onClose={closeCommandPalette} />
+      {dialog.isMounted ? (
+        <CommandPaletteDialog
+          key={dialog.generation}
+          entries={storeHostEntries}
+          isOpen={isOpen}
+          modifierKeyLabel="ctrl"
+          onClose={closeCommandPalette}
+          onExitComplete={dialog.release}
+        />
       ) : null}
     </>
   );
+};
+
+const renderStorePaletteHost = async () => {
+  await i18nReady;
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+  await act(async () => {
+    root?.render(
+      <I18nextProvider i18n={i18n}>
+        <ChakraProvider value={system}>
+          <QueryClientProvider client={new QueryClient()}>
+            <StorePaletteHost />
+          </QueryClientProvider>
+        </ChakraProvider>
+      </I18nextProvider>
+    );
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve());
+    });
+  });
+  const button = document.querySelector<HTMLButtonElement>('button');
+  expect(button).not.toBeNull();
+
+  return button!;
 };
 
 const renderPalette = async ({
@@ -162,28 +199,9 @@ afterEach(async () => {
 
 describe('CommandPaletteDialog interaction', () => {
   it('restores focus through the store-driven host lifecycle and preserves the first return target', async () => {
-    await i18nReady;
-    host = document.createElement('div');
-    document.body.append(host);
-    root = createRoot(host);
-    await act(async () => {
-      root?.render(
-        <I18nextProvider i18n={i18n}>
-          <ChakraProvider value={system}>
-            <QueryClientProvider client={new QueryClient()}>
-              <StorePaletteHost />
-            </QueryClientProvider>
-          </ChakraProvider>
-        </I18nextProvider>
-      );
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => resolve());
-      });
-    });
-    const button = document.querySelector<HTMLButtonElement>('button');
-    expect(button).not.toBeNull();
+    const button = await renderStorePaletteHost();
 
-    await act(() => userEvent.click(button!));
+    await act(() => userEvent.click(button));
     const input = await waitFor(() => {
       const node = document.querySelector<HTMLInputElement>('[name="command-palette-query"]');
       expect(node).not.toBeNull();
@@ -194,6 +212,23 @@ describe('CommandPaletteDialog interaction', () => {
     await act(() => openCommandPalette());
     await act(() => userEvent.keyboard('{Escape}'));
     await waitFor(() => expect(document.activeElement).toBe(button));
+  });
+
+  it('animates the palette out instead of unmounting it on close, suspending shortcuts only while open', async () => {
+    const button = await renderStorePaletteHost();
+    await act(() => userEvent.click(button));
+    await waitFor(() => expect(document.querySelector('[role="dialog"]')?.getAttribute('data-state')).toBe('open'));
+    const dialog = document.querySelector('[role="dialog"]')!;
+    expect(isModalPresent()).toBe(true);
+
+    const frames = await recordDialogExit(dialog, async () => {
+      await act(() => userEvent.keyboard('{Escape}'));
+      expect(isModalPresent()).toBe(false);
+    });
+
+    // An unmounted palette never reaches its closed state, so it cannot animate out; a retained one does, then leaves.
+    expect(closingFrames(frames)).not.toHaveLength(0);
+    await waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull());
   });
 
   it('exposes an accessible focused search field and runs the stable highlighted command in bare > mode', async () => {

@@ -4,6 +4,8 @@ import type { WidgetRegion } from '@workbench/layoutContracts';
 import type { Project } from '@workbench/projectContracts';
 
 import { claimGalleryNavigationSequence, isGalleryNavigationCurrent } from '@features/gallery/contracts';
+import { abortGalleryLocatorRequests, createGalleryLocatorRequest } from '@features/gallery/utility';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { useQueryClient } from '@tanstack/react-query';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
@@ -22,37 +24,63 @@ const getGalleryRegions = (project: Project): WidgetRegion[] =>
     )
   );
 
+/** Where a reveal that leaves the center alone may raise the Gallery. */
+const PANEL_REGIONS: readonly WidgetRegion[] = ['right', 'left', 'bottom'];
+
+export interface FindGalleryItemOptions {
+  /**
+   * Also bring Preview to the front of the center (the default). Off, the center keeps what it shows, so an editor
+   * there stays in front, and the Gallery is raised only in a panel.
+   */
+  revealPreview?: boolean;
+}
+
 /**
  * Raise Preview then Gallery immediately so Gallery wins shared regions, then lazy-load reveal. Claim the gesture
  * ticket before import to preserve press order and project fencing.
  */
-export const useFindGalleryItem = (): ((ref: GalleryItemRef) => void) => {
+export const useFindGalleryItem = (): ((ref: GalleryItemRef, options?: FindGalleryItemOptions) => void) => {
   const commands = useWorkbenchCommands();
   const queries = useWorkbenchQueries();
   const queryClient = useQueryClient();
   const openWorkbenchWidget = useOpenWorkbenchWidget();
 
   return useCallback(
-    (ref: GalleryItemRef) => {
+    (ref: GalleryItemRef, { revealPreview = true }: FindGalleryItemOptions = {}) => {
       const activeProject = queries.getSnapshot().activeProject;
       // Minted here, not inside the import below: both the ordering and the
       // project fence describe the PRESS, and reading either after the chunk
       // lands would pin whatever the workspace had become by then.
+      const sequence = claimGalleryNavigationSequence();
+      abortGalleryLocatorRequests();
+      const locatorRequest = createGalleryLocatorRequest();
       const ticket: GalleryRevealTicket = {
+        accountScope: captureAccountScope(),
+        locatorSignal: locatorRequest.signal,
         projectId: activeProject.id,
-        sequence: claimGalleryNavigationSequence(),
+        sequence,
       };
       const galleryRegions = getGalleryRegions(activeProject);
 
-      openWorkbenchWidget('preview', { preferredRegions: ['center'], requireCenterView: true });
-      openWorkbenchWidget('gallery', galleryRegions.length > 0 ? { preferredRegions: galleryRegions } : undefined);
+      if (revealPreview) {
+        openWorkbenchWidget('preview', { preferredRegions: ['center'], requireCenterView: true });
+        openWorkbenchWidget('gallery', galleryRegions.length > 0 ? { preferredRegions: galleryRegions } : undefined);
+      } else {
+        const panelRegions = galleryRegions.filter((region) => region !== 'center');
+
+        openWorkbenchWidget('gallery', { preferredRegions: panelRegions.length > 0 ? panelRegions : PANEL_REGIONS });
+      }
 
       void import('@workbench/image-actions/revealGalleryItem')
         .then(({ revealGalleryItem }) => revealGalleryItem({ commands, queries, queryClient }, ref, ticket))
         .catch((error: unknown) => {
           // Report chunk or media failures only for the still-current gesture, since widgets already moved. Keep
           // the failed gesture's claim so older intents cannot reclaim selection.
-          if (!isGalleryNavigationCurrent(ticket.sequence) || !queries.isActiveProject(ticket.projectId)) {
+          if (
+            ticket.accountScope.signal.aborted ||
+            !isGalleryNavigationCurrent(ticket.sequence) ||
+            !queries.isActiveProject(ticket.projectId)
+          ) {
             return;
           }
 
@@ -61,7 +89,8 @@ export const useFindGalleryItem = (): ((ref: GalleryItemRef) => void) => {
             message: error instanceof Error ? error.message : String(error),
             namespace: 'gallery',
           });
-        });
+        })
+        .finally(locatorRequest.release);
     },
     [commands, openWorkbenchWidget, queries, queryClient]
   );

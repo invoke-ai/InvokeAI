@@ -13,7 +13,7 @@ export const SettingsScopeLabel = ({ scope }: { scope: SettingDefinition['scope'
   }
   const label = scope === 'preference' && preferenceScope === 'global' ? 'install' : scope;
   return (
-    <Text fontSize="2xs" color="fg.muted">
+    <Text fontSize="xs" color="fg.muted">
       {t(`settingsDialog.scope.${label}`)}
     </Text>
   );

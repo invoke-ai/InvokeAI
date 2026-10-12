@@ -270,6 +270,7 @@ describe('nextInpaintMaskName', () => {
 describe('createControlLayer', () => {
   it('centralizes legacy defaults for every adapter kind', () => {
     expect(CONTROL_ADAPTER_DEFAULTS).toEqual({
+      anima_lllite: { beginEndStepPct: [0, 1], controlMode: null, kind: 'anima_lllite', model: null, weight: 1 },
       control_lora: { beginEndStepPct: [0, 1], controlMode: null, kind: 'control_lora', model: null, weight: 0.75 },
       controlnet: {
         beginEndStepPct: [0, 0.75],
@@ -313,6 +314,13 @@ describe('createControlLayer', () => {
 
   it('uses Z-Image control defaults when created for a Z-Image main model', () => {
     expect(createControlLayer('Z Control', 'z1', 'z-image').adapter).toEqual(CONTROL_ADAPTER_DEFAULTS.z_image_control);
+  });
+
+  it('uses Anima ControlNet-LLLite defaults when created for an Anima main model', () => {
+    expect(createControlLayer('Anima Control', 'a1', 'anima', 'sketch').adapter).toEqual({
+      ...CONTROL_ADAPTER_DEFAULTS.anima_lllite,
+      model: 'sketch',
+    });
   });
 
   it('seeds the provided default control model and stays null without one', () => {

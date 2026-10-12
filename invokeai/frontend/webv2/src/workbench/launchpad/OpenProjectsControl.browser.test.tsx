@@ -29,7 +29,8 @@ vi.mock('@workbench/projects/library', () => ({
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 
-vi.mock('@tanstack/react-router', () => ({
+vi.mock('@tanstack/react-router', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   Link: ({ children, search, to, ...props }: { children?: unknown; search?: { project?: string }; to: string }) => (
     <a data-project={search?.project} href={to} {...props}>
       {children as never}
@@ -51,7 +52,7 @@ const renderedOrder = async () => {
   await act(() =>
     root.render(
       <ChakraProvider value={system}>
-        <OpenProjectsNavSection headingCss={{}} itemProps={{ justifyContent: 'start', size: 'sm', w: 'full' }} />
+        <OpenProjectsNavSection headingCss={{}} itemProps={{ justifyContent: 'start', size: 'lg', w: 'full' }} />
       </ChakraProvider>
     )
   );

@@ -1,7 +1,11 @@
 import type { ModelConfig } from '@features/models';
 import type { VideoReferenceItem } from '@features/video';
 
-import { createDefaultVideoWidgetValues, createVideoReferenceEntry } from '@features/video';
+import {
+  createDefaultVideoWidgetValues,
+  createVideoConditioningClip,
+  createVideoReferenceEntry,
+} from '@features/video';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -9,6 +13,7 @@ import {
   getVideoPlacementRoom,
   placeConditioningClip,
   placeInitialVideo,
+  placeVideoImage,
 } from './executeVideoRecall';
 
 const model = (fields: Record<string, unknown>) =>
@@ -32,6 +37,7 @@ const REF2VA = model({
   name: 'H3 Ref2VA',
   variant: 'ref2va',
 });
+const WAN_TI2V = model({ base: 'wan', format: 'diffusers', key: 'wan-ti2v', name: 'Wan TI2V', variant: 'ti2v_5b' });
 const LTX2 = model({ base: 'ltx-2', format: 'checkpoint', key: 'ltx2', name: 'LTX-2.5 dev', variant: 'ltx2_dev' });
 
 const clip = { durationSeconds: 5, fps: 16, height: 480, name: 'clip.mp4', width: 832 };
@@ -161,23 +167,19 @@ describe('appendReferenceVideo', () => {
 });
 
 describe('placeConditioningClip', () => {
-  it('sets the clip in the requested role and clears every other conditioning slot', () => {
-    const placement = placeConditioningClip({
-      models: [LTX2],
-      role: 'audio',
-      video: clip,
-      videoValues: panel(LTX2, {
-        firstFrameImage: { height: 480, image_name: 'first.png', width: 832 },
-        sourceVideo: { ...videoReference('source.mp4').clip },
-      }),
+  it('sets the clip in the requested role and clears the conditioning slots that role conflicts with', () => {
+    const framed = panel(LTX2, {
+      firstFrameImage: { height: 480, image_name: 'first.png', width: 832 },
+      lastFrameImage: { height: 480, image_name: 'last.png', width: 832 },
     });
 
-    expect(placement).toEqual({
+    // The picture role holds every frame, so the start and end images go.
+    expect(placeConditioningClip({ models: [LTX2], role: 'video', video: clip, videoValues: framed })).toEqual({
       displaced: true,
       patch: {
         conditioningClip: expect.objectContaining({
           clip: expect.objectContaining({ video_name: 'clip.mp4' }),
-          role: 'audio',
+          role: 'video',
         }),
         firstFrameImage: null,
         lastFrameImage: null,
@@ -186,6 +188,25 @@ describe('placeConditioningClip', () => {
       },
       status: 'placed',
     });
+    // A soundtrack leaves them to anchor the picture generated for it.
+    expect(placeConditioningClip({ models: [LTX2], role: 'audio', video: clip, videoValues: framed })).toEqual({
+      displaced: false,
+      patch: {
+        conditioningClip: expect.objectContaining({ role: 'audio' }),
+        references: [],
+        sourceVideo: null,
+      },
+      status: 'placed',
+    });
+    // An initial video conflicts with either role.
+    expect(
+      placeConditioningClip({
+        models: [LTX2],
+        role: 'audio',
+        video: clip,
+        videoValues: panel(LTX2, { sourceVideo: { ...videoReference('source.mp4').clip } }),
+      })
+    ).toMatchObject({ displaced: true, patch: { sourceVideo: null }, status: 'placed' });
   });
 
   it('replacing a clip on an otherwise empty panel displaces nothing', () => {
@@ -236,5 +257,233 @@ describe('placeConditioningClip', () => {
       conditioningVideo: true,
       referenceVideo: false,
     });
+  });
+});
+
+describe('placeVideoImage', () => {
+  const still = (name: string) => ({ height: 512, image_name: name, width: 512 });
+  const imageReference = (name: string): VideoReferenceItem => ({ detail: 'match', image: still(name), kind: 'image' });
+  const referenceNames = (placement: ReturnType<typeof placeVideoImage>) =>
+    (placement.status === 'placed' ? (placement.patch.references ?? []) : []).map((entry) =>
+      entry.kind === 'image' ? entry.image.image_name : entry.clip.video_name
+    );
+
+  describe('on a model that takes reference images', () => {
+    const held = [imageReference('a.png'), videoReference('dance.mp4'), imageReference('b.png')];
+
+    it('replaces the reference images, keeping the reference videos', () => {
+      const placement = placeVideoImage({
+        append: false,
+        image: still('new.png'),
+        models: [REF2VA],
+        videoValues: panel(REF2VA, { references: held }),
+      });
+
+      expect(placement).toMatchObject({ slot: 'reference', status: 'placed' });
+      expect(referenceNames(placement)).toEqual(['dance.mp4', 'new.png']);
+    });
+
+    it('appends after the held references, with the detail a later image defaults to', () => {
+      const placement = placeVideoImage({
+        append: true,
+        image: still('new.png'),
+        models: [REF2VA],
+        videoValues: panel(REF2VA, { references: held }),
+      });
+
+      expect(referenceNames(placement)).toEqual(['a.png', 'dance.mp4', 'b.png', 'new.png']);
+      expect(placement.status === 'placed' && placement.patch.references?.at(-1)).toMatchObject({ detail: 'match' });
+    });
+
+    it('gives the first reference image max detail', () => {
+      const placement = placeVideoImage({
+        append: false,
+        image: still('new.png'),
+        models: [REF2VA],
+        videoValues: panel(REF2VA, { references: held }),
+      });
+
+      expect(placement.status === 'placed' && placement.patch.references?.at(-1)).toMatchObject({ detail: 'max' });
+    });
+
+    it('keeps a reference-extend continuity anchor last', () => {
+      const anchor: VideoReferenceItem = { ...videoReference('source.mp4'), fromSourceVideo: true };
+      const placement = placeVideoImage({
+        append: true,
+        image: still('new.png'),
+        models: [REF2VA],
+        videoValues: panel(REF2VA, { references: [anchor] }),
+      });
+
+      expect(referenceNames(placement)).toEqual(['new.png', 'source.mp4']);
+    });
+
+    it('declines an append when every image slot is taken, but a send still replaces them', () => {
+      const videoValues = panel(REF2VA, {
+        references: Array.from({ length: 9 }, (_, index) => imageReference(`${index}.png`)),
+      });
+
+      expect(placeVideoImage({ append: true, image: still('new.png'), models: [REF2VA], videoValues })).toEqual({
+        status: 'full',
+      });
+      expect(
+        referenceNames(placeVideoImage({ append: false, image: still('new.png'), models: [REF2VA], videoValues }))
+      ).toEqual(['new.png']);
+    });
+  });
+
+  describe('on a model that takes frames', () => {
+    const first = { height: 480, image_name: 'first.png', width: 832 };
+    const last = { height: 480, image_name: 'last.png', width: 832 };
+
+    it('sends the image as the first frame, clearing the last frame and the initial video', () => {
+      const placement = placeVideoImage({
+        append: false,
+        image: still('new.png'),
+        models: [WAN_I2V],
+        videoValues: panel(WAN_I2V, { lastFrameImage: last, sourceVideo: { ...videoReference('source.mp4').clip } }),
+      });
+
+      expect(placement).toEqual({
+        displaced: true,
+        patch: {
+          firstFrameImage: still('new.png'),
+          lastFrameImage: null,
+          references: [],
+          sourceVideo: null,
+        },
+        slot: 'firstFrame',
+        status: 'placed',
+      });
+    });
+
+    it('appends into the first frame, then the last, then declines', () => {
+      let videoValues = panel(WAN_I2V);
+      const slots: string[] = [];
+
+      for (const name of ['one.png', 'two.png', 'three.png']) {
+        const placement = placeVideoImage({ append: true, image: still(name), models: [WAN_I2V], videoValues });
+
+        slots.push(placement.status === 'placed' ? placement.slot : placement.status);
+        videoValues = placement.status === 'placed' ? { ...videoValues, ...placement.patch } : videoValues;
+      }
+
+      expect(slots).toEqual(['firstFrame', 'lastFrame', 'full']);
+      expect(videoValues).toMatchObject({ firstFrameImage: still('one.png'), lastFrameImage: still('two.png') });
+    });
+
+    it('appends into the last frame beside an initial video, which holds the first', () => {
+      const placement = placeVideoImage({
+        append: true,
+        image: still('new.png'),
+        models: [WAN_I2V],
+        videoValues: panel(WAN_I2V, { sourceVideo: { ...videoReference('source.mp4').clip } }),
+      });
+
+      expect(placement).toEqual({
+        displaced: false,
+        patch: { lastFrameImage: still('new.png'), references: [] },
+        slot: 'lastFrame',
+        status: 'placed',
+      });
+    });
+
+    it('clears stale references that would hide an appended frame, and the last frame they hid', () => {
+      const staleReferences = [{ detail: 'max' as const, image: still('ref.png'), kind: 'image' as const }];
+      const afterFirst = placeVideoImage({
+        append: true,
+        image: still('new.png'),
+        models: [LTX2],
+        videoValues: panel(LTX2, { lastFrameImage: last, references: staleReferences }),
+      });
+
+      expect(afterFirst).toMatchObject({
+        patch: { firstFrameImage: still('new.png'), lastFrameImage: null, references: [] },
+        slot: 'firstFrame',
+      });
+
+      const afterLast = placeVideoImage({
+        append: true,
+        image: still('new.png'),
+        models: [LTX2],
+        videoValues: panel(LTX2, {
+          references: staleReferences,
+          sourceVideo: { ...videoReference('source.mp4').clip },
+        }),
+      });
+
+      expect(afterLast).toMatchObject({
+        patch: { lastFrameImage: still('new.png'), references: [] },
+        slot: 'lastFrame',
+      });
+    });
+
+    it('declines an appended second frame on a model without a last frame', () => {
+      expect(
+        placeVideoImage({
+          append: true,
+          image: still('new.png'),
+          models: [WAN_TI2V],
+          videoValues: panel(WAN_TI2V, { firstFrameImage: first }),
+        })
+      ).toEqual({ status: 'full' });
+    });
+
+    it('clears a clip that holds the picture, as the frame fields do, but keeps a soundtrack', () => {
+      const pictureClip = { ...createVideoConditioningClip(clip), role: 'video' as const };
+      const soundtrack = { ...createVideoConditioningClip(clip), role: 'audio' as const };
+
+      for (const append of [false, true]) {
+        expect(
+          placeVideoImage({
+            append,
+            image: still('new.png'),
+            models: [LTX2],
+            videoValues: panel(LTX2, { conditioningClip: pictureClip }),
+          })
+        ).toMatchObject({ displaced: true, patch: { conditioningClip: null, firstFrameImage: still('new.png') } });
+
+        const kept = placeVideoImage({
+          append,
+          image: still('new.png'),
+          models: [LTX2],
+          videoValues: panel(LTX2, { conditioningClip: soundtrack }),
+        });
+
+        expect(kept).toMatchObject({ displaced: false, patch: { firstFrameImage: still('new.png') } });
+        expect(kept.status === 'placed' && 'conditioningClip' in kept.patch).toBe(false);
+      }
+    });
+
+    it('clears a picture clip hidden behind the first frame when appending the last', () => {
+      const pictureClip = { ...createVideoConditioningClip(clip), role: 'video' as const };
+
+      // Normalization hides the stored clip behind the first frame; left stored, it would resurface beside the last
+      // frame once the first is cleared. It was never on screen, so it isn't reported as displaced.
+      expect(
+        placeVideoImage({
+          append: true,
+          image: still('new.png'),
+          models: [LTX2],
+          videoValues: panel(LTX2, { conditioningClip: pictureClip, firstFrameImage: first }),
+        })
+      ).toEqual({
+        displaced: false,
+        patch: { conditioningClip: null, lastFrameImage: still('new.png'), references: [] },
+        slot: 'lastFrame',
+        status: 'placed',
+      });
+    });
+  });
+
+  it('declines, rather than switching models, when the panel model takes no images', () => {
+    expect(
+      placeVideoImage({
+        append: false,
+        image: still('new.png'),
+        models: [WAN_T2V, WAN_I2V],
+        videoValues: panel(WAN_T2V),
+      })
+    ).toEqual({ status: 'unsupported' });
   });
 });

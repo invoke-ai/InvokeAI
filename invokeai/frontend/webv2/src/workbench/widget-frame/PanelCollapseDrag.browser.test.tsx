@@ -5,6 +5,7 @@ import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
 import { FocusRegionProvider } from '@workbench/focusRegions';
+import { createTestFocusController } from '@workbench/focusRegions.testing';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import i18next from 'i18next';
 import { act, useSyncExternalStore } from 'react';
@@ -36,6 +37,8 @@ await i18n.use(initReactI18next).init({
   lng: 'en',
   resources: { en: { translation: { widgets: { panelLabel: '{{region}} panel' } } } },
 });
+
+const focusController = createTestFocusController();
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -71,7 +74,7 @@ const renderShell = async (region: 'bottom' | 'left' | 'right') => {
     root?.render(
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
-          <FocusRegionProvider>
+          <FocusRegionProvider controller={focusController}>
             <Shell region={region} />
           </FocusRegionProvider>
         </ChakraProvider>
@@ -125,6 +128,8 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  // Focus is per test: the next one starts with no region outlined and no move pending.
+  focusController.clear();
   await interact(() => root?.unmount());
   host?.remove();
   host = null;

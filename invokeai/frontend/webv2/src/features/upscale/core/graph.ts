@@ -12,6 +12,7 @@ import {
   addNode,
   addTransformerLoraCollectionLoader,
   getActiveCompatibleLoras,
+  getLoadedLoras,
   toGraphContract,
   toModelIdentifier,
 } from '@features/generation/graph';
@@ -52,8 +53,6 @@ const addUpscaleMetadata = (
     return;
   }
 
-  // Pass only loras; fabricating unrelated GenerateSettings fields would obscure the helper's actual dependency.
-  const activeLoras = getActiveCompatibleLoras({ loras: settings.loras }, settings.model);
   const architecture = upscaleArchitectureFor(settings.model);
   // FLUX calls this guidance, not CFG, and its encoders have to be recalled with the rest.
   const guidanceField = architecture?.usesNegativePrompt
@@ -65,7 +64,8 @@ const addUpscaleMetadata = (
     ...(settings.clipEmbedModel ? { clip_embed_model: toModelIdentifier(settings.clipEmbedModel) } : {}),
     creativity: settings.creativity,
     id: 'core_metadata',
-    loras: activeLoras.map((lora) => ({ model: toModelIdentifier(lora.model), weight: lora.weight })),
+    // Runs after the path builder, so the graph already holds the LoRAs this architecture loads.
+    loras: getLoadedLoras(graph),
     model: toModelIdentifier(settings.model),
     rand_device: randDevice,
     scheduler: coerceSchedulerForGraph(settings.model, settings.scheduler),

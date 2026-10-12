@@ -16,7 +16,7 @@ const DetailRow = ({ label, children }: { label: string; children: ReactNode }) 
     <DataList.ItemLabel>{label}</DataList.ItemLabel>
     {/* minW=0 lets unbreakable values (batch UUIDs) truncate instead of
         pushing the row's min-content past the panel. */}
-    <DataList.ItemValue fontFamily="mono" fontSize="2xs" minW="0">
+    <DataList.ItemValue fontFamily="mono" fontSize="xs" minW="0">
       {children}
     </DataList.ItemValue>
   </DataList.Item>
@@ -40,7 +40,7 @@ export const QueueItemDetails = ({ item }: { item: QueueItemReadModel }) => {
   const deviceLabel = useDeviceLabel(item.device);
 
   return (
-    <DataList.Root gap="1.5" orientation="horizontal" size="sm">
+    <DataList.Root gap="1.5" orientation="horizontal">
       <DetailRow label={t('common.prompt')}>{meta.positivePrompt ?? '—'}</DetailRow>
       <DetailRow label={t('common.negative')}>{meta.negativePrompt ?? '—'}</DetailRow>
       <DetailRow label={t('common.seed')}>

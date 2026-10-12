@@ -1,52 +1,29 @@
 """Tests for user service."""
 
 import threading
-from logging import Logger
 
 import pytest
+from pydantic import ValidationError
+from sqlalchemy import insert, select, update
 
-from invokeai.app.services.shared.media_references import create_media_references_table
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.queries.base import IN_CHUNK
+from invokeai.app.services.shared.database.schema.media_references import media_references
+from invokeai.app.services.shared.database.schema.users import users as users_table
 from invokeai.app.services.users import users_default
-from invokeai.app.services.users.users_common import UserCreateRequest, UserUpdateRequest
-from invokeai.app.services.users.users_default import USER_LOOKUP_CHUNK_SIZE, UserService
+from invokeai.app.services.users.users_common import (
+    MAX_EMAIL_LENGTH,
+    SYSTEM_USER_ID,
+    UserCreateRequest,
+    UserUpdateRequest,
+)
+from invokeai.app.services.users.users_default import UserService
 
 
 @pytest.fixture
-def logger() -> Logger:
-    """Create a logger for testing."""
-    return Logger("test_user_service")
-
-
-@pytest.fixture
-def db(logger: Logger) -> SqliteDatabase:
-    """Create an in-memory database for testing."""
-    db = SqliteDatabase(db_path=None, logger=logger, verbose=False)
-    # Create users table manually for testing
-    db._conn.execute("""
-        CREATE TABLE users (
-            user_id TEXT NOT NULL PRIMARY KEY,
-            email TEXT NOT NULL UNIQUE,
-            display_name TEXT,
-            password_hash TEXT NOT NULL,
-            is_admin BOOLEAN NOT NULL DEFAULT FALSE,
-            is_active BOOLEAN NOT NULL DEFAULT TRUE,
-            created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-            updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-            last_login_at DATETIME,
-            token_epoch INTEGER NOT NULL DEFAULT 0
-        );
-    """)
-    # Deleting an account also drops the media references its documents held.
-    create_media_references_table(db._conn.cursor())
-    db._conn.commit()
-    return db
-
-
-@pytest.fixture
-def user_service(db: SqliteDatabase) -> UserService:
+def user_service(database: Database) -> UserService:
     """Create a user service for testing."""
-    return UserService(db)
+    return UserService(database)
 
 
 def test_create_user(user_service: UserService):
@@ -182,19 +159,47 @@ def test_delete_user(user_service: UserService):
     assert retrieved_user is None
 
 
-def test_delete_user_drops_references_only_of_documents_that_cascade(user_service: UserService, db: SqliteDatabase):
-    user = user_service.create(
-        UserCreateRequest(email="test@example.com", display_name="T", password="TestPassword123")
-    )
-    db._conn.executemany(
-        "INSERT INTO media_references VALUES (?, ?, 'owner', 'image', 'a.png');",
-        [(kind, user.user_id) for kind in ("project", "client_state", "workflow", "quarantined_project")],
-    )
+def test_delete_user_drops_references_only_of_documents_that_cascade(user_service: UserService, database: Database):
+    leaving = user_service.create(UserCreateRequest(email="leaving@example.com", password="TestPassword123")).user_id
+    staying = user_service.create(UserCreateRequest(email="staying@example.com", password="TestPassword123")).user_id
+    kinds = ("project", "client_state", "workflow", "quarantined_project")
+    with database.begin(write=True) as conn:
+        conn.execute(
+            insert(media_references),
+            [
+                {"owner_kind": kind, "user_id": user, "owner_id": "owner", "media_kind": "image", "media_name": "a.png"}
+                for kind in kinds
+                for user in (leaving, staying)
+            ],
+        )
 
-    user_service.delete(user.user_id)
+    user_service.delete(leaving)
 
-    rows = db._conn.execute("SELECT owner_kind FROM media_references ORDER BY owner_kind;").fetchall()
-    assert [row[0] for row in rows] == ["quarantined_project", "workflow"]
+    with database.begin(write=False) as conn:
+        remaining = {
+            (user_id, kind)
+            for user_id, kind in conn.execute(select(media_references.c.user_id, media_references.c.owner_kind))
+        }
+    assert remaining == {(leaving, "quarantined_project"), (leaving, "workflow")} | {(staying, kind) for kind in kinds}
+
+
+def test_an_account_created_meanwhile_with_the_same_email_is_refused(
+    user_service: UserService, database: Database, monkeypatch: pytest.MonkeyPatch
+):
+    """The email is checked before the password is hashed, which takes a while; the unique key decides."""
+    real_hash_password = users_default.hash_password
+
+    def hash_while_someone_else_signs_up(password: str) -> str:
+        with database.begin(write=True) as conn:
+            conn.execute(insert(users_table).values(user_id="first", email="taken@example.com", password_hash="hash"))
+        return real_hash_password(password)
+
+    monkeypatch.setattr(users_default, "hash_password", hash_while_someone_else_signs_up)
+
+    with pytest.raises(ValueError, match="Failed to create user"):
+        user_service.create(UserCreateRequest(email="taken@example.com", password="TestPassword123"))
+
+    assert [user.user_id for user in user_service.list_users() if user.email == "taken@example.com"] == ["first"]
 
 
 def test_authenticate_valid_credentials(user_service: UserService):
@@ -211,6 +216,19 @@ def test_authenticate_valid_credentials(user_service: UserService):
     assert authenticated_user is not None
     assert authenticated_user.email == "test@example.com"
     assert authenticated_user.last_login_at is not None
+
+
+def test_a_login_is_recorded_on_that_account_only(user_service: UserService):
+    user_service.create(UserCreateRequest(email="first@example.com", password="TestPassword123"))
+    second = user_service.create(UserCreateRequest(email="second@example.com", password="TestPassword123"))
+
+    logged_in = user_service.authenticate("first@example.com", "TestPassword123")
+
+    assert logged_in is not None
+    first = user_service.get(logged_in.user_id)
+    assert first is not None and first.last_login_at == logged_in.last_login_at
+    unchanged = user_service.get(second.user_id)
+    assert unchanged is not None and unchanged.last_login_at is None
 
 
 def test_authenticate_invalid_password(user_service: UserService):
@@ -343,11 +361,31 @@ def test_list_users(user_service: UserService):
         )
         user_service.create(user_data)
 
+    # Every database starts with the system account.
     users = user_service.list_users()
-    assert len(users) == 5
+    assert SYSTEM_USER_ID in {user.user_id for user in users}
+    assert len(users) == 6
 
     limited_users = user_service.list_users(limit=2)
     assert len(limited_users) == 2
+
+
+def test_list_users_lists_newest_first(user_service: UserService, database: Database):
+    created = {
+        user_service.create(UserCreateRequest(email=f"user{day}@example.com", password="TestPassword123")).user_id: day
+        for day in (2, 3, 1)
+    }
+    with database.begin(write=True) as conn:
+        for user_id, day in created.items():
+            conn.execute(
+                update(users_table)
+                .where(users_table.c.user_id == user_id)
+                .values(created_at=f"2099-01-0{day} 00:00:00.000")
+            )
+
+    listed = [user.email for user in user_service.list_users(limit=3)]
+
+    assert listed == ["user3@example.com", "user2@example.com", "user1@example.com"]
 
 
 def test_get_many_returns_users_keyed_by_id(user_service: UserService):
@@ -398,8 +436,17 @@ def test_get_many_chunks_beyond_sqlite_parameter_limit(user_service: UserService
     user = user_service.create(
         UserCreateRequest(email="chunked@example.com", display_name="Chunked", password="TestPassword123")
     )
-    ids = [f"missing-{index}" for index in range(USER_LOOKUP_CHUNK_SIZE * 2 + 5)] + [user.user_id]
+    ids = [f"missing-{index}" for index in range(IN_CHUNK * 2 + 5)] + [user.user_id]
 
     users = user_service.get_many(ids)
 
     assert set(users) == {user.user_id}
+
+
+def test_an_address_at_a_special_use_domain_is_accepted_up_to_the_longest_address() -> None:
+    domain = "@studio.local"
+    longest = "a" * (MAX_EMAIL_LENGTH - len(domain)) + domain
+
+    assert UserCreateRequest(email=longest, password="TestPassword123").email == longest
+    with pytest.raises(ValidationError, match=f"at most {MAX_EMAIL_LENGTH} characters"):
+        UserCreateRequest(email="a" + longest, password="TestPassword123")

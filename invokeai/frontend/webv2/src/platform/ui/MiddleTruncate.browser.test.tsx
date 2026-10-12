@@ -3,6 +3,7 @@ import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
+import { page } from 'vitest/browser';
 
 import { MiddleTruncate, splitTextForMiddleTruncation } from './MiddleTruncate';
 
@@ -99,5 +100,25 @@ describe('MiddleTruncate', () => {
     expect(tail.textContent).toBe('he Flask');
     // white-space: pre preserves the leading space at the flex split.
     expect(getComputedStyle(tail).whiteSpace).toBe('pre');
+  });
+
+  it('gives a named control the whole text once, while the split keeps its text for copy', async () => {
+    host = document.createElement('div');
+    host.style.cssText = 'width:12rem;';
+    document.body.append(host);
+    root = createRoot(host);
+    await act(() => {
+      root?.render(
+        <ChakraProvider value={system}>
+          <button type="button">
+            <MiddleTruncate text={LONG_NAME} />
+          </button>
+        </ChakraProvider>
+      );
+    });
+
+    // Without this, the split's flex items read as two words.
+    await expect.element(page.getByRole('button', { exact: true, name: LONG_NAME })).toBeInTheDocument();
+    expect(host.querySelector('button')!.textContent).toBe(LONG_NAME);
   });
 });

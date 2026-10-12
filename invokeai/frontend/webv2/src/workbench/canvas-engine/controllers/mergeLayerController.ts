@@ -441,7 +441,25 @@ export class MergeLayerController {
           return 'not-ready';
         }
       }
-      if (ctx.getDocument() !== document) {
+      // The merge is built from `document`: its structure and selection, the contributors' identities and their
+      // eligibility must still hold. A preview-tolerant recheck; see `CanvasMutationContext.getReducerDocument`.
+      const liveDocument = ctx.getReducerDocument();
+      const liveContributors = liveDocument
+        ? getDocumentLeaves(liveDocument).filter((layer) => selectedIds.has(layer.id))
+        : [];
+      if (
+        !liveDocument ||
+        liveDocument.selectedLayerId !== document.selectedLayerId ||
+        !haveSameStructure(liveDocument.stacks, document.stacks) ||
+        liveContributors.length !== contributors.length ||
+        liveContributors.some((layer, index) => layer !== contributors[index]) ||
+        !canMergeSelectedRasters(
+          liveDocument,
+          compileDocumentLeaves(liveDocument),
+          selectedIds,
+          this.deps.hasExportableContent
+        )
+      ) {
         return 'not-ready';
       }
 

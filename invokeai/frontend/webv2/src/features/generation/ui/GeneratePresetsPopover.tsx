@@ -8,6 +8,7 @@ import {
 } from '@features/generation/core/baseGenerationPolicies';
 import { GENERATE_TOOL_MODEL_PICK_KEYS, normalizeGenerateSettings } from '@features/generation/core/settings';
 import { resolveGenerateWidgetValues } from '@features/generation/settings';
+import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
 import {
   Button,
   ConfirmDialog,
@@ -33,12 +34,12 @@ import { PANEL_HEADER_CONTROL_HEIGHT, PromptPanelHeader } from './promptFields/P
 const POPOVER_POSITIONING = { placement: 'bottom-end' } as const;
 const SEARCH_START_ELEMENT = <Icon as={SearchIcon} boxSize="3" color="fg.subtle" />;
 // The rows sit on the popover's `bg.muted` surface; hover one surface step up.
-const PRESET_ROW_HOVER_PROPS = { bg: 'bg.emphasized/60' };
+const PRESET_ROW_HOVER_PROPS = { bg: 'bg.hover' };
 const PRESET_ROW_SEPARATOR = <Separator borderColor="border.subtle" />;
 /** Below this many presets, a search box is more furniture than help. */
 const SEARCH_VISIBLE_MIN_PRESETS = 6;
 
-type PresetDialogState = { mode: 'save' } | { mode: 'rename'; preset: GeneratePresetRecord };
+type PresetDialogSubject = { mode: 'save' } | { mode: 'rename'; preset: GeneratePresetRecord };
 
 /** Ignore presentation and non-applied keys, including seed unless its mode is fixed. */
 const getPresetComparisonKey = (settings: GenerateSettings): string => {
@@ -95,7 +96,7 @@ const PresetRow = ({
       >
         <button type="button" onClick={handleApply}>
           <Icon as={BookmarkIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-          <Text flex="1" fontSize="xs" fontWeight={isActive ? '600' : undefined} minW="0" textAlign="start" truncate>
+          <Text flex="1" fontSize="md" fontWeight={isActive ? '600' : undefined} minW="0" textAlign="start" truncate>
             {preset.label}
           </Text>
 
@@ -105,7 +106,6 @@ const PresetRow = ({
       <Tooltip content={t('common.rename')}>
         <IconButton
           aria-label={t('widgets.generate.renamePresetNamed', { name: preset.label })}
-          size="xs"
           variant="ghost"
           onClick={handleRename}
         >
@@ -116,7 +116,6 @@ const PresetRow = ({
         <IconButton
           aria-label={t('widgets.generate.deletePresetNamed', { name: preset.label })}
           colorPalette="red"
-          size="xs"
           variant="ghost"
           onClick={handleDelete}
         >
@@ -133,7 +132,8 @@ export const GeneratePresetsPopover = () => {
   const ui = useGenerationUi();
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [dialog, setDialog] = useState<PresetDialogState | null>(null);
+  const [dialogSubject, setDialogSubject] = useState<PresetDialogSubject | null>(null);
+  const dialog = useExitRetainedValue(dialogSubject);
   const [pendingDelete, setPendingDelete] = useState<GeneratePresetRecord | null>(null);
   // Tooltip and Popover must share the trigger ID to preserve anchoring.
   const triggerId = useId();
@@ -223,13 +223,16 @@ export const GeneratePresetsPopover = () => {
     [i18n.resolvedLanguage, models, projectId, supportedModels, t, ui.notifications, ui.settings]
   );
 
-  const openSaveDialog = useCallback(() => setDialog({ mode: 'save' }), []);
-  const openRenameDialog = useCallback((preset: GeneratePresetRecord) => setDialog({ mode: 'rename', preset }), []);
-  const closeDialog = useCallback(() => setDialog(null), []);
+  const openSaveDialog = useCallback(() => setDialogSubject({ mode: 'save' }), []);
+  const openRenameDialog = useCallback(
+    (preset: GeneratePresetRecord) => setDialogSubject({ mode: 'rename', preset }),
+    []
+  );
+  const closeDialog = useCallback(() => setDialogSubject(null), []);
   const handleDialogSubmit = useCallback(
     (label: string) => {
-      if (dialog?.mode === 'rename') {
-        ui.presets.rename(dialog.preset.id, label);
+      if (dialogSubject?.mode === 'rename') {
+        ui.presets.rename(dialogSubject.preset.id, label);
         return;
       }
 
@@ -241,7 +244,7 @@ export const GeneratePresetsPopover = () => {
         ui.presets.save(label, { ...snapshot });
       }
     },
-    [dialog, ui.generateValues, ui.presets]
+    [dialogSubject, ui.generateValues, ui.presets]
   );
 
   const cancelDelete = useCallback(() => setPendingDelete(null), []);
@@ -273,13 +276,13 @@ export const GeneratePresetsPopover = () => {
               aria-label={triggerLabel}
               color="fg.muted"
               px={activePreset ? '1' : '0'}
-              size="2xs"
+              size="sm"
               variant="ghost"
               w={activePreset ? 'auto' : '6'}
             >
               <Icon as={BookmarkIcon} boxSize="3.5" />
               {activePreset ? (
-                <Text as="span" fontSize="2xs" maxW="8rem" truncate>
+                <Text as="span" fontSize="xs" maxW="8rem" truncate>
                   {activePreset.label}
                 </Text>
               ) : null}
@@ -295,7 +298,7 @@ export const GeneratePresetsPopover = () => {
                     <Button
                       disabled={!canSave}
                       h={PANEL_HEADER_CONTROL_HEIGHT}
-                      size="2xs"
+                      size="sm"
                       variant="ghost"
                       onClick={openSaveDialog}
                     >
@@ -308,18 +311,17 @@ export const GeneratePresetsPopover = () => {
                       <Input
                         aria-label={t('widgets.generate.searchPresets')}
                         placeholder={t('widgets.generate.searchPresets')}
-                        size="xs"
                         value={searchTerm}
                         onChange={handleSearchChange}
                       />
                     </InputGroup>
                   ) : null}
                   {presets.length === 0 ? (
-                    <Text color="fg.subtle" fontSize="xs">
+                    <Text color="fg.subtle" fontSize="md">
                       {t('widgets.generate.presetsEmpty')}
                     </Text>
                   ) : filteredPresets.length === 0 ? (
-                    <Text color="fg.subtle" fontSize="xs">
+                    <Text color="fg.subtle" fontSize="md">
                       {t('widgets.generate.presetsNoMatches')}
                     </Text>
                   ) : (
@@ -344,16 +346,20 @@ export const GeneratePresetsPopover = () => {
           </Popover.Positioner>
         </Portal>
       </Popover.Root>
-      {dialog ? (
+      {dialog.value ? (
         <RenameDialog
-          initialName={dialog.mode === 'rename' ? dialog.preset.label : ''}
-          isOpen
+          key={dialog.generation}
+          initialName={dialog.value.mode === 'rename' ? dialog.value.preset.label : ''}
+          isOpen={dialog.isOpen}
           label={t('widgets.generate.presetName')}
-          submitLabel={dialog.mode === 'rename' ? t('common.rename') : t('widgets.generate.savePresetAction')}
+          submitLabel={dialog.value.mode === 'rename' ? t('common.rename') : t('widgets.generate.savePresetAction')}
           title={
-            dialog.mode === 'rename' ? t('widgets.generate.renamePresetTitle') : t('widgets.generate.savePresetTitle')
+            dialog.value.mode === 'rename'
+              ? t('widgets.generate.renamePresetTitle')
+              : t('widgets.generate.savePresetTitle')
           }
           onClose={closeDialog}
+          onExitComplete={dialog.release}
           onSubmit={handleDialogSubmit}
         />
       ) : null}

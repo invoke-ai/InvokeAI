@@ -88,5 +88,4 @@ export interface QueueAndProcessorStatusDTO {
 
 export interface QueueItemIdsResultDTO {
   item_ids: number[];
-  total_count: number;
 }

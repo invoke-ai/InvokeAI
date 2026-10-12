@@ -52,11 +52,11 @@ export const ModelsNotice = () => {
     <Stack {...PANEL_STYLE}>
       <Flex align="center" gap="2">
         <Icon as={BoxIcon} boxSize="4" color="fg.muted" />
-        <Text fontSize="sm" fontWeight="700">
+        <Text fontSize="lg" fontWeight="700">
           {t('models.launchpad.noModelsTitle')}
         </Text>
       </Flex>
-      <Text color="fg.muted" fontSize="xs">
+      <Text color="fg.muted" fontSize="md">
         {t('models.launchpad.noModelsDescription')}
       </Text>
       {activeInstallCount > 0 ? <InstallProgress count={activeInstallCount} /> : <StarterBundles bundles={bundles} />}
@@ -69,8 +69,8 @@ const InstallProgress = ({ count }: { count: number }) => {
 
   return (
     <Flex align="center" gap="2">
-      <Spinner color="fg.muted" size="xs" />
-      <Text color="fg.muted" fontSize="xs">
+      <Spinner color="fg.muted" />
+      <Text color="fg.muted" fontSize="md">
         {t('models.launchpad.installing', { count })}
       </Text>
     </Flex>
@@ -87,7 +87,7 @@ const StarterBundles = ({ bundles }: { bundles: Record<string, StarterModelBundl
 
   return (
     <Stack gap="2">
-      <Text color="fg.muted" fontSize="2xs" fontWeight="600" textTransform="uppercase">
+      <Text color="fg.muted" fontSize="xs" fontWeight="600" textTransform="uppercase">
         {t('models.launchpad.starterBundles')}
       </Text>
       <Wrap gap="2">
@@ -108,7 +108,7 @@ const StarterBundleButton = ({ bundle, bundleKey }: { bundle: StarterModelBundle
   }, [bundle.name, bundleKey, navigate]);
 
   return (
-    <Button size="xs" variant="outline" onClick={handleOpen}>
+    <Button variant="outline" onClick={handleOpen}>
       {bundle.name || bundleKey}
       <Icon as={ArrowRightIcon} boxSize="3" color="fg.muted" />
     </Button>

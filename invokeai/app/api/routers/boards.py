@@ -10,13 +10,15 @@ from invokeai.app.api.routers._access import assert_board_read_access as _assert
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.services.board_records.board_records_common import (
     BoardChanges,
+    BoardRecordInboxException,
+    BoardRecordNotFoundException,
     BoardRecordOrderBy,
-    BoardRecordProjectOwnedException,
+    BoardRecordProjectNotFoundException,
+    BoardRecordProjectUnavailableException,
 )
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.image_records.image_records_common import ImageCategory
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults, SQLiteDirection
 
 boards_router = APIRouter(prefix="/v1/boards", tags=["boards"])
 
@@ -57,11 +59,18 @@ class DeleteBoardResult(BaseModel):
 def create_board(
     current_user: CurrentUserOrDefault,
     board_name: str = Query(description="The name of the board to create", max_length=300),
+    project_id: Optional[str] = Query(
+        default=None,
+        description="One of the current user's projects to create the board in; omit for the Library",
+    ),
 ) -> BoardDTO:
-    """Creates a board for the current user"""
+    """Creates a board for the current user, in one of their projects or in the Library"""
     try:
-        result = ApiDependencies.invoker.services.boards.create(board_name=board_name, user_id=current_user.user_id)
-        return result
+        return ApiDependencies.invoker.services.boards.create(
+            board_name=board_name, user_id=current_user.user_id, project_id=project_id
+        )
+    except BoardRecordProjectNotFoundException:
+        raise HTTPException(status_code=404, detail="Project not found")
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to create board")
 
@@ -75,9 +84,10 @@ def get_board(
 
     _assert_board_read_access(board_id, current_user)
 
+    # Only a board that is not there is a 404: clients take it as the board being gone, and clear what names it.
     try:
         return ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
-    except Exception:
+    except BoardRecordNotFoundException:
         raise HTTPException(status_code=404, detail="Board not found")
 
 
@@ -97,7 +107,14 @@ def update_board(
     board_id: str = Path(description="The id of board to update"),
     changes: BoardChanges = Body(description="The changes to apply to the board"),
 ) -> BoardDTO:
-    """Updates a board (user must have access to it)"""
+    """Updates a board (user must have access to it).
+
+    A project's inbox takes its name, archived state and visibility from the project and cannot be
+    moved, so those changes are refused for it — for admins too; its cover is still fair game. A
+    board in a project is private and unshared, so a move into a project, or a visibility change on
+    a member, is refused when the result would be otherwise. The storage decides all of this in one
+    transaction; the DTO read here is only for the ownership check.
+    """
     try:
         board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
     except Exception:
@@ -106,25 +123,17 @@ def update_board(
     if not current_user.is_admin and board.user_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="Not authorized to update this board")
 
-    # A project's board takes its name, archived state and visibility from the project, so the
-    # generic route must not set them — for admins either. The cover is still fair game: it is a
-    # display detail with no bearing on the project relationship.
-    if board.project_id is not None and (
-        changes.board_name is not None or changes.archived is not None or changes.board_visibility is not None
-    ):
-        raise HTTPException(
-            status_code=409,
-            detail="This board belongs to a project; rename or archive the project instead",
-        )
-
     try:
-        result = ApiDependencies.invoker.services.boards.update(board_id=board_id, changes=changes)
-        return result
-    except BoardRecordProjectOwnedException:
+        return ApiDependencies.invoker.services.boards.update(board_id=board_id, changes=changes)
+    except BoardRecordInboxException:
         raise HTTPException(
             status_code=409,
-            detail="This board belongs to a project; rename or archive the project instead",
+            detail="This board is the project's inbox; rename or archive the project instead",
         )
+    except BoardRecordProjectNotFoundException:
+        raise HTTPException(status_code=404, detail="Project not found")
+    except BoardRecordProjectUnavailableException:
+        raise HTTPException(status_code=409, detail="Boards in a project must be private and unshared")
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to update board")
 
@@ -159,7 +168,7 @@ def delete_board(
             assert_image_move_maintenance_inactive()
 
         # Enumerate first, delete the board second, delete its media third. The order matters:
-        # a project's board must be refused *before* anything is destroyed, and the conditional
+        # a project's inbox must be refused *before* anything is destroyed, and the conditional
         # delete is the only check that cannot lose a race against a project claiming the board.
         # Membership rows are gone by the time the media is deleted (the board FK cascades), which
         # is why the names have to be captured up front.
@@ -181,13 +190,12 @@ def delete_board(
         )
 
         if not ApiDependencies.invoker.services.boards.delete_if_unclaimed(board_id=board_id):
-            # `get_dto` above proved the board existed, so it is either claimed now or it vanished
+            # `get_dto` above proved the board existed, so it is either an inbox now or it vanished
             # in between. Ask again rather than trusting the DTO, which predates any concurrent claim.
-            claimed = ApiDependencies.invoker.services.board_records.get_project_ids_for_boards([board_id])
-            if board_id in claimed:
+            if board_id in ApiDependencies.invoker.services.board_records.get_inbox_board_ids([board_id]):
                 raise HTTPException(
                     status_code=409,
-                    detail="This board belongs to a project; delete the project instead",
+                    detail="This board is the project's inbox; delete the project instead",
                 )
             raise HTTPException(status_code=404, detail="Board not found")
         board_deleted = True
@@ -247,8 +255,8 @@ def list_boards(
     order_by: BoardRecordOrderBy = Query(default=BoardRecordOrderBy.CreatedAt, description="The attribute to order by"),
     direction: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The direction to order by"),
     all: Optional[bool] = Query(default=None, description="Whether to list all boards"),
-    offset: Optional[int] = Query(default=None, description="The page offset"),
-    limit: Optional[int] = Query(default=None, description="The number of boards per page"),
+    offset: Optional[int] = Query(default=None, ge=0, description="The page offset"),
+    limit: Optional[int] = Query(default=None, ge=0, le=MAX_PAGE_SIZE, description="The number of boards per page"),
     include_archived: bool = Query(default=False, description="Whether or not to include archived boards in list"),
 ) -> Union[OffsetPaginatedResults[BoardDTO], list[BoardDTO]]:
     """Gets a list of boards for the current user, including shared boards. Admin users see all boards."""

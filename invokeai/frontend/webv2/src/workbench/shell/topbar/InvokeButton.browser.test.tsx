@@ -13,7 +13,7 @@ import type * as UseTopbarShortcutModule from './useTopbarShortcut';
 // Verify progress returns after hover ends unless focus-visible remains; mouse click-focus must not pin the play
 // icon. Mock queue plumbing to isolate that gate.
 const harness = vi.hoisted(() => ({
-  progress: { activeItemIndex: 1, completedItemCount: 0, message: '', percentage: 0.42 },
+  progress: { activeItemIndex: 1, completedItemCount: 0, message: '', percentage: 0.42 as number | null },
   summary: { current: 1, remaining: 1, runningQueueItemId: 'item-1', total: 1 },
 }));
 
@@ -73,6 +73,7 @@ const renderInvokeButton = async (overrides: Partial<InvocationState> = {}) => {
 };
 
 const hasProgressRing = (button: HTMLButtonElement): boolean => button.querySelector('[role="progressbar"]') !== null;
+const hasSpinner = (button: HTMLButtonElement): boolean => button.querySelector('.chakra-spinner') !== null;
 
 beforeEach(() => {
   harness.progress.percentage = 0.42;
@@ -119,6 +120,14 @@ describe('InvokeButton icon slot', () => {
     expect(hasProgressRing(button)).toBe(false);
   });
 
+  it('uses the app spinner, not an indeterminate ring, while progress is unknown', async () => {
+    harness.progress.percentage = null;
+    const { button } = await renderInvokeButton();
+
+    expect(hasSpinner(button)).toBe(true);
+    expect(hasProgressRing(button)).toBe(false);
+  });
+
   it('acknowledges canvas preparation immediately and ignores a second click', async () => {
     harness.summary.total = 0;
     const invoke = vi.fn(() => Promise.resolve());
@@ -126,7 +135,7 @@ describe('InvokeButton icon slot', () => {
 
     expect(button.getAttribute('aria-disabled')).toBe('true');
     expect(button.getAttribute('aria-label')).toBe('topbar.invoke.preparing');
-    expect(hasProgressRing(button)).toBe(true);
+    expect(hasSpinner(button)).toBe(true);
 
     await act(() => button.click());
 

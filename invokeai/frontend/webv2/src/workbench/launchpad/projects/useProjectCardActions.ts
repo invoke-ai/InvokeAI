@@ -1,4 +1,7 @@
+import type { DeleteProjectBoards } from '@workbench/projects/api';
+
 import { toaster } from '@platform/ui';
+import { useQueryClient } from '@tanstack/react-query';
 import { deleteLibraryProject, renameLibraryProject, type ProjectSummary } from '@workbench/projects/library';
 import { useDuplicateProject, useExportLibraryProject } from '@workbench/projects/useProjectFileActions';
 import { useCallback, useMemo } from 'react';
@@ -13,13 +16,14 @@ export interface ProjectCardActions {
   duplicate: () => void;
   /** Reports its own progress and result, so there is nothing to await here. */
   export: () => void;
-  delete: () => Promise<void>;
+  delete: (boards?: DeleteProjectBoards) => Promise<void>;
 }
 
 export const useProjectCardActions = (summary: ProjectSummary): ProjectCardActions => {
   const { t } = useTranslation();
   const startExport = useExportLibraryProject();
   const startDuplicate = useDuplicateProject();
+  const queryClient = useQueryClient();
 
   const rename = useCallback(
     async (name: string) => {
@@ -47,20 +51,29 @@ export const useProjectCardActions = (summary: ProjectSummary): ProjectCardActio
     startExport(summary.id, summary.name);
   }, [startExport, summary.id, summary.name]);
 
-  const deleteProject = useCallback(async () => {
-    try {
-      await deleteLibraryProject(summary.id);
-      // Pins are persisted per account, so a deleted project would otherwise
-      // leave a dead id in preferences forever.
-      dropProjectPin(summary.id);
-    } catch (error) {
-      toaster.create({
-        description: error instanceof Error ? error.message : undefined,
-        title: t('projects.deleteFailed'),
-        type: 'error',
-      });
-    }
-  }, [summary.id, t]);
+  const deleteProject = useCallback(
+    async (boards?: DeleteProjectBoards) => {
+      try {
+        await deleteLibraryProject(summary.id, boards);
+        // Pins are persisted per account, so a deleted project would otherwise
+        // leave a dead id in preferences forever.
+        dropProjectPin(summary.id);
+        // Its boards were released or deleted with it; any board list on screen is stale either way. Loaded here
+        // rather than at the top (the gallery data layer is not part of the Launchpad's initial graph), and never
+        // awaited: the project is gone, so a chunk that fails to load must not be reported as a failed delete.
+        void import('@features/gallery/queries')
+          .then((module) => module.invalidateGallery(queryClient))
+          .catch(() => undefined);
+      } catch (error) {
+        toaster.create({
+          description: error instanceof Error ? error.message : undefined,
+          title: t('projects.deleteFailed'),
+          type: 'error',
+        });
+      }
+    },
+    [queryClient, summary.id, t]
+  );
 
   // Stabilize the actions object so virtualized row renders do not invalidate derived menu callbacks.
   return useMemo(

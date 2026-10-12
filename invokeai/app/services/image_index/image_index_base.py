@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import AbstractSet, Literal, Optional
+from contextlib import contextmanager
+from typing import AbstractSet, Iterator, Literal, Optional
 
 import numpy as np
 from PIL import Image
@@ -37,17 +38,32 @@ class ImageIndexServiceBase(ABC):
         """Content hash of the active embedding model, or None if the indexer is not running."""
         pass
 
+    @property
+    def replacing_model(self) -> bool:
+        """True while a retired model waits to drain before its installed replacement starts."""
+        return False
+
     def try_activate(self) -> bool:
-        """Start indexing if the configured embedding model has since been installed.
+        """Reconcile whether the configured embedding model is still installed.
 
         Concrete when the base's other methods are abstract because the answer
         for an inert implementation is simply "whatever it already was": only
         the real service can pick a model up mid-run. Callers use this on
-        request paths that would otherwise report `model_missing` for the rest
-        of the process. Returns True if the indexer is running on return; may
-        touch the model store, so call it off the event loop.
+        request paths to detect deletion and installation during a server
+        session. Returns True if the indexer is running on return; may touch
+        the model store, so call it off the event loop.
         """
         return self.model_id is not None
+
+    @contextmanager
+    def use_model(self) -> Iterator[None]:
+        """Keep one model's resources stable for a synchronous operation.
+
+        Call off the event loop. Live implementations defer replacement until
+        callers leave; retirement may still make model_id unavailable. A
+        multi-step caller checks its captured model_id inside each use.
+        """
+        yield
 
     @abstractmethod
     def get_status(self) -> ImageIndexStatus | None:

@@ -10,17 +10,24 @@ export {
   addNode,
   createId,
   getActiveCompatibleLoras,
+  getLoadedLoras,
   toGraphContract,
   toModelIdentifier,
 } from './core/graphBuilder';
 export { detectCanvasMode } from './core/canvas/canvasMode';
 export {
+  areControlAdapterValuesValid,
+  CONTROL_ADAPTER_KINDS,
+  CONTROL_VALIDATION_REASONS,
   type ControlAdapterKind,
   type ControlValidationReason,
+  createControlValidationSequence,
+  getControlModelUnusableReason,
   getControlValidationReason,
+  getSuggestedControlKind,
   isControlKindSupportedForBase,
+  isControlModelUsableForKind,
 } from './core/canvas/controlValidation';
-export { getControlLayerRejectionReason, getControlValidationReasonMessage } from './core/canvas/addControlLayers';
 export {
   getRegionalGuidanceRejectionReason,
   getRegionalGuidanceSupport,

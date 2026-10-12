@@ -11,6 +11,7 @@ import type { ListRow } from './listRows';
 
 import { List, type ListRowProps } from './List';
 import { ListItem } from './ListItem';
+import { LIST_ROW_GAP_PX } from './listLayout';
 import { listRowsFromSections } from './listRows';
 
 vi.mock('react-i18next', () => ({
@@ -27,7 +28,8 @@ interface Item {
 }
 
 const HEADER_PX = 32;
-const ROW_PX = 56;
+/** A comfortable row's slot: its 52px item plus the row gap. */
+const ROW_PX = 52 + LIST_ROW_GAP_PX;
 
 const section = (key: string, label: string, count: number): { items: Item[]; key: string; label: string } => ({
   items: Array.from({ length: count }, (_, index) => ({ id: `${key}-${index}`, name: `${label} ${index}` })),
@@ -459,9 +461,9 @@ describe('List measured rows', () => {
     await settleFrame();
 
     const top = (id: string) => host.querySelector<HTMLElement>(`[data-testid="${id}"]`)!.getBoundingClientRect().top;
-    // Each slot is its content plus the 4px gap: the tall row's successor sits 124px below it, a short one 34px.
-    expect(top('main-2') - top('main-1')).toBeCloseTo(124, 0);
-    expect(top('main-3') - top('main-2')).toBeCloseTo(34, 0);
+    // Each slot is its content plus the row gap.
+    expect(top('main-2') - top('main-1')).toBeCloseTo(120 + LIST_ROW_GAP_PX, 0);
+    expect(top('main-3') - top('main-2')).toBeCloseTo(30 + LIST_ROW_GAP_PX, 0);
 
     // A row that grows after mount (an editor adding a line) pushes the rows after it down.
     const before = top('main-3') - top('main-2');
@@ -514,9 +516,9 @@ describe('List measured rows', () => {
     );
     await settleFrame();
     await settleFrame();
-    expect(top('main-3') - top('main-2')).toBeCloseTo(34, 0);
+    expect(top('main-3') - top('main-2')).toBeCloseTo(30 + LIST_ROW_GAP_PX, 0);
 
-    const loraHeaderTop = HEADER_PX + 120 + 4 + 11 * 34;
+    const loraHeaderTop = HEADER_PX + 120 + LIST_ROW_GAP_PX + 11 * (30 + LIST_ROW_GAP_PX);
 
     await scrollTo(loraHeaderTop - HEADER_PX / 2);
     expect(pinnedHeader()?.textContent).toContain('Main');

@@ -101,7 +101,7 @@ BatchDataCollection: TypeAlias = list[list[BatchDatum]]
 
 
 class Batch(BaseModel):
-    batch_id: str = Field(default_factory=uuid_string, description="The ID of the batch")
+    batch_id: str = Field(default_factory=uuid_string, max_length=255, description="The ID of the batch")
     idempotency_key: str | None = Field(
         default=None,
         min_length=1,
@@ -220,7 +220,10 @@ class ItemIdsResult(BaseModel):
     """Response containing ordered item ids with metadata for optimistic updates."""
 
     item_ids: list[int] = Field(description="Ordered list of item ids")
-    total_count: int = Field(description="Total number of queue items matching the query")
+    total_count: int = Field(
+        description="Number of ids in item_ids. Equals the number of matching items only when no limit is given; "
+        "use the queue status for totals"
+    )
 
 
 NodeFieldValueValidator = TypeAdapter(list[NodeFieldValue])

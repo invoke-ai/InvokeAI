@@ -17,6 +17,7 @@ vi.mock('@dnd-kit/core', () => ({ useDndMonitor: () => undefined }));
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectId: () => harness.project!.id,
   useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(harness.project!),
+  useWorkbenchSubscription: () => () => () => {},
   useOptionalWorkbenchCommands: () => null,
   useWorkbenchCommands: () => ({
     canvas: { apply: vi.fn() },
@@ -38,6 +39,9 @@ vi.mock('@workbench/canvas-operations/react', () => ({ useCanvasEngine: () => ha
 vi.mock('./useCanvasGallerySave', () => ({
   useCanvasGallerySave: () => ({ isSaving: false, save: () => undefined }),
 }));
+vi.mock('./useStagedResultGallerySave', () => ({
+  useStagedResultGallerySave: () => ({ isSaving: false, save: () => Promise.resolve() }),
+}));
 vi.mock('./useCreateFromBbox', () => ({
   useCreateFromBbox: () => ({ createFromBbox: () => undefined, isCreating: false }),
 }));
@@ -48,6 +52,7 @@ vi.mock('./CanvasSaveToGallerySubmenu', () => ({ CanvasSaveToGallerySubmenu: () 
 vi.mock('./CanvasSurface', () => ({ CanvasSurface: () => null }));
 vi.mock('./MissingFontsDialog', () => ({ MissingFontsDialog: () => null }));
 vi.mock('./ToolStrip', () => ({ ToolStrip: () => null }));
+vi.mock('./shortcutHints', () => ({ createCanvasShortcutHintSource: () => null }));
 vi.mock('@workbench/widgets/layers/LayerContextMenu', () => ({ CanvasLayerContextMenu: () => null }));
 
 import { CanvasWidgetView } from './CanvasWidgetView';
@@ -79,7 +84,12 @@ const renderView = (): string =>
   renderToStaticMarkup(
     <ChakraProvider value={system}>
       <I18nextProvider i18n={testI18n}>
-        <CanvasWidgetView {...({ runtime: { commands: {}, hotkeys: {} } } as unknown as WidgetViewProps)} />
+        <CanvasWidgetView
+          {...({
+            instance: harness.project!.widgetInstances.canvas,
+            runtime: { commands: {}, hotkeys: {} },
+          } as unknown as WidgetViewProps)}
+        />
       </I18nextProvider>
     </ChakraProvider>
   );

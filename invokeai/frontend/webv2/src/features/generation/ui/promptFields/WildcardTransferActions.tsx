@@ -17,6 +17,7 @@ import {
   WILDCARD_IMPORT_ACCEPT,
   WildcardFileError,
 } from '@features/generation/ui/wildcardFiles';
+import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
@@ -45,6 +46,7 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
     entries: WildcardImportEntry[];
     owner: AccountScope;
   } | null>(null);
+  const importDialog = useExitRetainedValue(pendingImport);
 
   const reportError = useCallback(
     (area: string, caught: unknown, fallback: string) =>
@@ -203,7 +205,7 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
     <HStack gap="0.5">
       <Menu.Root onSelect={handleImportSelect}>
         <Menu.Trigger asChild>
-          <Button disabled={isBusy} size="2xs" variant="ghost">
+          <Button disabled={isBusy} size="sm" variant="ghost">
             <UploadIcon />
             {t('widgets.generate.dynamicPrompts.import')}
           </Button>
@@ -213,7 +215,7 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
             <MenuContent minW="10rem">
               {IMPORT_SOURCES.map((source) => (
                 <Menu.Item key={source} value={source}>
-                  <Menu.ItemText fontSize="xs">
+                  <Menu.ItemText fontSize="md">
                     {t(`widgets.generate.dynamicPrompts.import${source === 'folder' ? 'Folder' : 'Files'}`)}
                   </Menu.ItemText>
                 </Menu.Item>
@@ -224,7 +226,7 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
       </Menu.Root>
       <Menu.Root onSelect={handleExportSelect}>
         <Menu.Trigger asChild>
-          <Button disabled={isBusy || catalog.wildcards.length === 0} size="2xs" variant="ghost">
+          <Button disabled={isBusy || catalog.wildcards.length === 0} size="sm" variant="ghost">
             <DownloadIcon />
             {t('widgets.generate.dynamicPrompts.export')}
           </Button>
@@ -234,7 +236,7 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
             <MenuContent minW="10rem">
               {WILDCARD_COLLECTION_FORMATS.map((format) => (
                 <Menu.Item key={format.id} value={format.id}>
-                  <Menu.ItemText fontSize="xs">{t(format.labelKey)}</Menu.ItemText>
+                  <Menu.ItemText fontSize="md">{t(format.labelKey)}</Menu.ItemText>
                 </Menu.Item>
               ))}
             </MenuContent>
@@ -252,8 +254,15 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
       />
       {/* Use a separate directory input to preserve relative wildcard paths. */}
       <input {...DIRECTORY_INPUT_PROPS} hidden ref={directoryInputRef} type="file" onChange={handleDirectoryChange} />
-      {pendingImport ? (
-        <WildcardImportDialog entries={pendingImport.entries} onCancel={cancelImport} onConfirm={confirmImport} />
+      {importDialog.value ? (
+        <WildcardImportDialog
+          key={importDialog.generation}
+          entries={importDialog.value.entries}
+          isOpen={importDialog.isOpen}
+          onCancel={cancelImport}
+          onConfirm={confirmImport}
+          onExitComplete={importDialog.release}
+        />
       ) : null}
     </HStack>
   );

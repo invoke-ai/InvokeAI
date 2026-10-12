@@ -19,6 +19,7 @@ import {
   getCurrentVideoValues,
   placeConditioningClip,
   placeInitialVideo,
+  placeVideoImage,
 } from './index';
 import { bringRecallWidgetToFront, createRecallEventRuntime } from './recallEventRuntime';
 
@@ -29,6 +30,13 @@ interface VideoRecallEventVideo {
   height: number;
   media_origin: string | null;
   video_name: string;
+  width: number;
+}
+
+/** The `image` of a `video_recall_requested` event: a gallery image, as the backend describes it. */
+interface VideoRecallEventImage {
+  height: number;
+  image_name: string;
   width: number;
 }
 
@@ -43,6 +51,7 @@ export type VideoRecallRequestedEvent = { user_id: string } & (
     }
   | { action: 'initial_video' | 'reference_video'; video: VideoRecallEventVideo }
   | { action: 'conditioning_video'; conditioning_role: VideoConditioningRole; video: VideoRecallEventVideo }
+  | { action: 'image'; append: boolean; image: VideoRecallEventImage }
 );
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -62,6 +71,12 @@ const isEventVideo = (value: unknown): value is VideoRecallEventVideo =>
   (value.fps === null || isPositiveNumber(value.fps)) &&
   (value.media_origin === null || typeof value.media_origin === 'string');
 
+const isEventImage = (value: unknown): value is VideoRecallEventImage =>
+  isRecord(value) &&
+  typeof value.image_name === 'string' &&
+  isPositiveNumber(value.width) &&
+  isPositiveNumber(value.height);
+
 export const isVideoRecallRequestedEvent = (payload: unknown): payload is VideoRecallRequestedEvent => {
   if (!isRecord(payload) || typeof payload.user_id !== 'string') {
     return false;
@@ -72,6 +87,10 @@ export const isVideoRecallRequestedEvent = (payload: unknown): payload is VideoR
       typeof payload.strict === 'boolean' &&
       isRecord(payload.parameters)
     );
+  }
+
+  if (payload.action === 'image') {
+    return typeof payload.append === 'boolean' && isEventImage(payload.image);
   }
 
   if (payload.action === 'conditioning_video') {
@@ -92,9 +111,16 @@ const toPlaceableVideo = (video: VideoRecallEventVideo): PlaceableVideo => ({
   width: video.width,
 });
 
+const IMAGE_PLACED_TITLES = {
+  firstFrame: 'widgets.video.placement.firstFrameSet',
+  lastFrame: 'widgets.video.placement.lastFrameSet',
+  reference: 'widgets.video.placement.referenceImageAdded',
+} as const;
+
 /**
  * Apply `video_recall_requested` events to their arrival-time project's Video panel: recall or remix parameters,
- * set the Initial Video, append a reference video, or set the conditioning clip. The panel's model is never switched to make a video fit; a
+ * set the Initial Video, append a reference video, set the conditioning clip, or place an image as a reference or
+ * frame. The panel's model is never switched to make a video fit; a
  * placement it cannot take is declined with a notice. The Video widget is revealed when the project is still the
  * one on screen.
  */
@@ -176,6 +202,37 @@ export const createVideoRecallRuntime = ({
               }
         );
         applied = true;
+      }
+    } else if (event.action === 'image') {
+      const placement = placeVideoImage({
+        append: event.append,
+        image: { height: event.image.height, image_name: event.image.image_name, width: event.image.width },
+        models,
+        videoValues,
+      });
+
+      if (placement.status === 'placed') {
+        commands.widgets.patchValues('video', placement.patch, projectId);
+        commands.notifications.add(
+          placement.displaced
+            ? {
+                kind: 'info',
+                message: t('widgets.video.placement.imageDisplaced'),
+                title: t(IMAGE_PLACED_TITLES[placement.slot]),
+              }
+            : { kind: 'success', title: t(IMAGE_PLACED_TITLES[placement.slot]) }
+        );
+        applied = true;
+      } else {
+        commands.notifications.add({
+          kind: 'info',
+          message: t(
+            placement.status === 'full'
+              ? 'widgets.video.placement.imageFull'
+              : 'widgets.video.placement.imageUnsupported'
+          ),
+          title: t('widgets.video.placement.imageNotPlaced'),
+        });
       }
     } else if (event.action === 'conditioning_video') {
       const placement = placeConditioningClip({

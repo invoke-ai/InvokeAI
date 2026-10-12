@@ -41,7 +41,7 @@ export const CancelQueueItemButton = ({ itemId }: { itemId: number }) => {
         aria-label={t('widgets.queue.cancelItem', { id: itemId })}
         color="fg.muted"
         loading={busy}
-        size="2xs"
+        size="sm"
         variant="ghost"
         onClick={onCancel}
       >

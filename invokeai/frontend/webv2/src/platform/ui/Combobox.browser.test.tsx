@@ -24,9 +24,9 @@ void i18n.use(initReactI18next).init({
     en: {
       translation: {
         common: {
-          noSchedulersFound: 'No schedulers found',
+          noOptionsFound: 'No matches',
           openSelector: 'Open selector',
-          searchSchedulers: 'Search schedulers…',
+          searchOptions: 'Search…',
         },
       },
     },
@@ -137,7 +137,7 @@ describe('Combobox', () => {
     expect(document.querySelector('[role="option"]')?.textContent).toContain('DPM++ 2M');
 
     await setInputValue(input, 'not-a-scheduler');
-    expect(document.body.textContent).toContain('No schedulers found');
+    expect(document.body.textContent).toContain('No matches');
   });
 
   it('keeps an option that matches secondary server-search text', async () => {

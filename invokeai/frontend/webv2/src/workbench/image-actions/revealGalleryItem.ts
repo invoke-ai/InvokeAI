@@ -1,18 +1,13 @@
 import type { GalleryView } from '@features/gallery';
 import type { GalleryItemRef } from '@features/gallery/contracts';
-import type { GalleryItemsFilter } from '@features/gallery/queries';
+import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { QueryClient } from '@tanstack/react-query';
 import type { WorkbenchCommands, WorkbenchQueries } from '@workbench/workbenchStore';
 
 import { galleryItems, toGalleryItemKey } from '@features/gallery';
 import { getGallerySettings, isGalleryNavigationCurrent, requestGalleryItemReveal } from '@features/gallery/contracts';
-import {
-  GALLERY_MAX_ROWS,
-  GALLERY_PAGE_SIZE,
-  galleryBoardsOptions,
-  galleryItemNamesOptions,
-  galleryItemsInfiniteOptions,
-} from '@features/gallery/queries';
+import { fetchVerifiedGalleryItemPage, GALLERY_PAGE_SIZE, galleryBoardsOptions } from '@features/gallery/queries';
+import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 
 /** Inject workbench dependencies so reveal loads on demand without adding gallery transfer code to editor boot. */
@@ -23,12 +18,15 @@ export interface GalleryRevealContext {
 }
 
 /**
- * What the gesture was, at the moment it was made. Both fields are claimed by
- * the CALLER and neither may be re-read here: a caller that loads this module
- * on demand would otherwise take its ordering, and its project, from whenever
- * the chunk happened to land.
+ * What the gesture was, at the moment it was made. The caller captures the
+ * account, project, and sequence before lazy loading; the reveal must not take
+ * any of them from whatever state exists when the chunk lands.
  */
 export interface GalleryRevealTicket {
+  /** Account identity lifetime at the original gesture, before any lazy import or media fetch. */
+  accountScope: AccountScope;
+  /** Canceled when a later Gallery navigation supersedes this locator. */
+  locatorSignal?: AbortSignal;
   /** The project the press belongs to; its writes may not land in another. */
   projectId: string;
   /** This navigation's place in the global ordering; see `claimGalleryNavigationSequence`. */
@@ -36,46 +34,26 @@ export interface GalleryRevealTicket {
 }
 
 /**
- * Extends the infinite window until it covers `pagesNeeded` pages. This must
- * NOT be a plain prefetch: the mounted gallery keeps the query fresh, and
- * `fetchQuery` returns fresh cache without honoring the `pages` option — the
- * reveal has to force the fetch (staleTime 0) or the window never grows. Two
- * passes because a concurrent fetch already in flight (a second rapid click)
- * absorbs the call without extending; the retry runs after it settles.
- */
-const ensureGalleryPagesLoaded = async (
-  queryClient: QueryClient,
-  listingFilter: GalleryItemsFilter,
-  pagesNeeded: number
-): Promise<void> => {
-  const options = galleryItemsInfiniteOptions(listingFilter, { kind: 'infinite' });
-
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const data = queryClient.getQueryData<{ pages: unknown[] }>(options.queryKey);
-
-    if ((data?.pages.length ?? 0) >= pagesNeeded) {
-      return;
-    }
-
-    await queryClient.fetchInfiniteQuery({ ...options, pages: pagesNeeded, staleTime: 0 });
-  }
-};
-
-/**
- * Reveal a freshly resolved item in its board/view with filters cleared and its page loaded; selection drives grid
- * scrolling and Preview. Do not raise widgets. Caller-minted gesture tickets fence project changes and later
- * selections even across lazy loading. Hydration failures reject without changing selection; position failures
- * only lose scrolling.
+ * Reveal a freshly resolved item in its board/view after its exact filtered-list position and page agree. Do not
+ * change Gallery state until the page verifies the locator result. Caller-minted gesture tickets fence project
+ * changes and later selections even across lazy loading.
  */
 export const revealGalleryItem = (
   { commands, queries, queryClient }: GalleryRevealContext,
   ref: GalleryItemRef,
-  { projectId, sequence }: GalleryRevealTicket
+  { accountScope, locatorSignal, projectId, sequence }: GalleryRevealTicket
 ): Promise<void> => {
   // Fence the network result to the gesture's project before clearing filters or selecting.
-  const isCurrent = () => isGalleryNavigationCurrent(sequence) && queries.isActiveProject(projectId);
+  const isCurrent = () =>
+    !accountScope.signal.aborted && isGalleryNavigationCurrent(sequence) && queries.isActiveProject(projectId);
+
+  if (!isCurrent()) {
+    return Promise.resolve();
+  }
 
   return galleryItems.resolve(ref).then(async (image) => {
+    assertAccountScopeCurrent(accountScope);
+
     if (!isCurrent()) {
       return;
     }
@@ -92,38 +70,27 @@ export const revealGalleryItem = (
       searchTerm: '',
       starred: wantsStarredOnly,
     };
-    // Resolve position for paging, but preserve selection on failure. Check board visibility to avoid using a
-    // hidden board's page in Uncategorized.
-    let boardIndex: number | null = null;
+    // The board list determines whether the destination can present an archived board. The locator itself uses
+    // the same filters as the destination's 60-item page and avoids downloading every item name.
+    const boardsPromise = queryClient
+      .fetchQuery(
+        galleryBoardsOptions({
+          includeArchived: settings.showArchivedBoards,
+          includeDateBoards: settings.showDateBoards,
+          orderBy: settings.boardOrderBy,
+          orderDir: settings.boardOrderDir,
+        })
+      )
+      // Unknown beats blocked: without the boards list the reveal proceeds as if the board were listable.
+      .catch(() => null);
+    const [verified, boards] = await Promise.all([
+      fetchVerifiedGalleryItemPage(queryClient, listingFilter, ref, accountScope, locatorSignal),
+      boardsPromise,
+    ]);
 
-    try {
-      const boardsPromise = queryClient
-        .fetchQuery(
-          galleryBoardsOptions({
-            includeArchived: settings.showArchivedBoards,
-            includeDateBoards: settings.showDateBoards,
-            orderBy: settings.boardOrderBy,
-            orderDir: settings.boardOrderDir,
-          })
-        )
-        // Unknown beats blocked: without the boards list the reveal
-        // proceeds as if the board were listable.
-        .catch(() => null);
-      const names = await queryClient.fetchQuery(galleryItemNamesOptions(listingFilter));
-      const boards = await boardsPromise;
-      const index = names.items.findIndex((item) => item.kind === ref.kind && item.name === ref.name);
-      const isBoardListable =
-        image.boardId === 'none' ||
-        boards === null ||
-        boards.length === 0 ||
-        boards.some((board) => board.id === image.boardId);
+    assertAccountScopeCurrent(accountScope);
 
-      boardIndex = index >= 0 && isBoardListable ? index : null;
-    } catch {
-      boardIndex = null;
-    }
-
-    if (!isCurrent()) {
+    if (!isCurrent() || !verified) {
       return;
     }
 
@@ -134,8 +101,16 @@ export const revealGalleryItem = (
     // in flight (sort direction); the computed index describes the old
     // ordering, so the page landing is dropped.
     if (settingsNow.imageOrderDir !== settings.imageOrderDir) {
-      boardIndex = null;
+      return;
     }
+
+    // Do not use a hidden board's offset when board resolution will present Uncategorized instead.
+    const isBoardListable =
+      image.boardId === 'none' ||
+      boards === null ||
+      boards.length === 0 ||
+      boards.some((board) => board.id === image.boardId);
+    const boardIndex = isBoardListable ? verified.index : null;
 
     const currentView: GalleryView = values.galleryView === 'assets' ? 'assets' : 'images';
     const hasSearch =
@@ -167,24 +142,15 @@ export const revealGalleryItem = (
     const page = boardIndex !== null ? Math.floor(boardIndex / GALLERY_PAGE_SIZE) : null;
 
     if (page !== null && settingsNow.paginationMode === 'paginated') {
+      // The verified page is cached, and its own total lets the listing open it past a stale retained total.
       commands.gallery.setPage(page);
     }
 
-    if (boardIndex !== null && page !== null && settingsNow.paginationMode === 'infinite') {
-      if (boardIndex < GALLERY_MAX_ROWS) {
-        // Load pages through the item without delaying selection; the grid completes its reveal when the item
-        // arrives.
-        void ensureGalleryPagesLoaded(queryClient, listingFilter, page + 1).catch(() => {});
-      } else {
-        // Deeper than the base window can ever load: anchor the
-        // infinite window at the image's page instead (the mounted
-        // gallery query fetches it on its own). Any board, search, or
-        // view change resets the anchor back to the top.
-        commands.gallery.setPage(page);
-      }
-    }
-
     commands.gallery.selectItem(image, projectId, page ?? undefined);
-    requestGalleryItemReveal(toGalleryItemKey(ref));
+    if (boardIndex === null) {
+      requestGalleryItemReveal(toGalleryItemKey(ref), accountScope.signal);
+    } else {
+      requestGalleryItemReveal(toGalleryItemKey(ref), accountScope.signal, boardIndex);
+    }
   });
 };

@@ -1,4 +1,5 @@
 import type { Project } from '@workbench/projectContracts';
+import type { DeleteProjectBoards } from '@workbench/projects/api';
 import type { ProjectSummary } from '@workbench/projects/library';
 import type { MouseEvent } from 'react';
 
@@ -8,7 +9,7 @@ import { useModelLoads } from '@features/models';
 import { getProjectQueueIndicatorState } from '@features/queue/contracts';
 import { useQueueItemProgress } from '@features/queue/react';
 import { Button } from '@platform/ui/Button';
-import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
+import { Dialog } from '@platform/ui/Dialog';
 import { MenuContent } from '@platform/ui/Menu';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { RenameDialog } from '@platform/ui/RenameDialog';
@@ -28,7 +29,7 @@ import {
 } from '@workbench/WorkbenchContext';
 import {
   CheckIcon,
-  ChevronsUpDownIcon,
+  ChevronDownIcon,
   FileDownIcon,
   FolderCogIcon,
   FolderOpenIcon,
@@ -37,11 +38,21 @@ import {
   Trash2Icon,
   XIcon,
 } from 'lucide-react';
-import { useCallback, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { projectSwitcherStore, setProjectSwitcherOpen } from './projectSwitcherStore';
 import { HIDE_BELOW_PROJECT_NAME_WIDTH } from './topbarBreakpoints';
+
+// The dialog reads the gallery's board query, and this host sits in a boot graph the performance gates pin by source
+// file, so even a shared three-line wrapper module would register as growth. Loaded the first time a delete is asked for.
+const LazyDeleteProjectDialog = lazy(() =>
+  import('@workbench/projects/components/DeleteProjectDialog').then((module) => ({
+    default: module.DeleteProjectDialog,
+  }))
+);
+// Modal from the request onward: while the dialog's module is still on its way, shortcuts must already be off.
+const PENDING_DIALOG = <Dialog.Pending />;
 
 const MENU_POSITIONING = { placement: 'bottom-start' } as const;
 const RECENT_PROJECT_LIMIT = 5;
@@ -63,6 +74,8 @@ export const ProjectSwitcher = () => {
   const returnFocus = useCallback(() => triggerRef.current, []);
   const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  // Once mounted the dialog stays, so its close animation and the lazy chunk are paid for once.
+  const [hasRequestedDelete, setHasRequestedDelete] = useState(false);
   const [isOpenDialogVisible, setIsOpenDialogVisible] = useState(false);
 
   const isMenuOpen = projectSwitcherStore.useSelector((snapshot) => snapshot.isOpen);
@@ -86,7 +99,6 @@ export const ProjectSwitcher = () => {
   const getProject = useCallback((projectId: string): Project | null => queries.getProject(projectId), [queries]);
 
   const createProject = useCallback(() => {
-    flushGenerateDrafts();
     projects.create();
   }, [projects]);
   const showOpenDialog = useCallback(() => setIsOpenDialogVisible(true), []);
@@ -115,21 +127,24 @@ export const ProjectSwitcher = () => {
     },
     [renameTarget, t]
   );
-  const confirmDeleteProject = useCallback(async () => {
-    const project = deleteTarget ? getProject(deleteTarget.id) : null;
+  const confirmDeleteProject = useCallback(
+    async (boards: DeleteProjectBoards) => {
+      const project = deleteTarget ? getProject(deleteTarget.id) : null;
 
-    if (project) {
-      await deleteProject(project);
-    }
-  }, [deleteProject, deleteTarget, getProject]);
+      if (project) {
+        await deleteProject(project, boards);
+      }
+    },
+    [deleteProject, deleteTarget, getProject]
+  );
   const renameActiveProject = useCallback(
     () => setRenameTarget({ id: activeProjectId, name: activeProjectName }),
     [activeProjectId, activeProjectName]
   );
-  const deleteActiveProject = useCallback(
-    () => setDeleteTarget({ id: activeProjectId, name: activeProjectName }),
-    [activeProjectId, activeProjectName]
-  );
+  const deleteActiveProject = useCallback(() => {
+    setHasRequestedDelete(true);
+    setDeleteTarget({ id: activeProjectId, name: activeProjectName });
+  }, [activeProjectId, activeProjectName]);
   const showActiveProjectDetails = useCallback(() => openWorkbenchWidget('project'), [openWorkbenchWidget]);
   const exportActiveProject = useCallback(() => {
     flushGenerateDrafts();
@@ -175,22 +190,22 @@ export const ProjectSwitcher = () => {
           <Button
             ref={triggerRef}
             aria-label={t('topbar.projectSwitcher.trigger', { name: activeProjectName })}
-            size="sm"
+            size="lg"
             variant="ghost"
             onContextMenu={handleTriggerContextMenu}
           >
             <MiddleTruncate css={HIDE_BELOW_PROJECT_NAME_WIDTH} fontWeight="500" minW="0" text={activeProjectName} />
-            <Icon as={ChevronsUpDownIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
+            <Icon as={ChevronDownIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
           </Button>
         </Menu.Trigger>
         <Portal>
           <Menu.Positioner>
             <MenuContent maxW="22rem" minW="18rem">
               <Stack gap="0" px="3" py="2">
-                <Text color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                <Text color="fg.subtle" fontSize="xs" textTransform="uppercase">
                   {t('projects.projectDetails')}
                 </Text>
-                <MiddleTruncate fontSize="xs" fontWeight="700" text={activeProjectName} />
+                <MiddleTruncate fontWeight="700" text={activeProjectName} />
               </Stack>
               <Menu.Separator />
               <Menu.Item value="rename-project" onClick={renameActiveProject}>
@@ -216,7 +231,7 @@ export const ProjectSwitcher = () => {
 
               <Menu.Separator />
               <Menu.RadioItemGroup value={activeProjectId} onValueChange={selectOpenProject}>
-                <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
                   {t('projects.openProjects')}
                 </Menu.ItemGroupLabel>
                 {openProjectSummaries.map((project) => (
@@ -233,7 +248,7 @@ export const ProjectSwitcher = () => {
                 <>
                   <Menu.Separator />
                   <Menu.ItemGroup>
-                    <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                    <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
                       {t('common.recent')}
                     </Menu.ItemGroupLabel>
                     {recentSummaries.map((summary) => (
@@ -267,14 +282,17 @@ export const ProjectSwitcher = () => {
         onClose={closeRenameDialog}
         onSubmit={renameProject}
       />
-      <ConfirmDialog
-        body={`${t('projects.deleteProjectTabBody', { name: deleteTarget?.name ?? '' })} ${t('projects.deleteProjectBoardNote')}`}
-        confirmLabel={t('projects.deleteProject')}
-        isOpen={deleteTarget !== null}
-        title={t('projects.deleteProjectQuestion')}
-        onClose={closeDeleteDialog}
-        onConfirm={confirmDeleteProject}
-      />
+      {hasRequestedDelete ? (
+        <Suspense fallback={deleteTarget !== null ? PENDING_DIALOG : null}>
+          <LazyDeleteProjectDialog
+            body={t('projects.deleteProjectTabBody', { name: deleteTarget?.name ?? '' })}
+            isOpen={deleteTarget !== null}
+            projectId={deleteTarget?.id ?? null}
+            onClose={closeDeleteDialog}
+            onConfirm={confirmDeleteProject}
+          />
+        </Suspense>
+      ) : null}
       {/*
        * Keep the dialog mounted by open state; its lazyMount/unmountOnExit handle closed cost and preserve exit
        * animation.
@@ -334,7 +352,7 @@ const RecentProjectRow = ({
       <Menu.ItemText flex="1" minW="0">
         <MiddleTruncate as="span" text={summary.name} />
       </Menu.ItemText>
-      <Text color="fg.subtle" flexShrink={0} fontSize="2xs">
+      <Text color="fg.subtle" flexShrink={0} fontSize="xs">
         {t('projects.editedRelative', { time: formatRelativeTime(summary.updatedAt) })}
       </Text>
     </Menu.Item>

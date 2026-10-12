@@ -37,10 +37,10 @@ const getInspectorTab = (values: Record<string, unknown>): InspectorTab =>
 
 const DetailRow = ({ label, value }: { label: string; value: string }) => (
   <HStack align="start" gap="2">
-    <Text color="fg.subtle" flexShrink={0} fontSize="2xs" minW="16">
+    <Text color="fg.subtle" flexShrink={0} fontSize="xs" minW="16">
       {label}
     </Text>
-    <Text fontSize="2xs" minW="0" wordBreak="break-word">
+    <Text fontSize="xs" minW="0" wordBreak="break-word">
       {value}
     </Text>
   </HStack>
@@ -87,11 +87,11 @@ const NodeUpdateRow = ({ node, template }: { node: WorkflowInvocationNode; templ
       {/* Aligned with the detail values: an empty label cell the width of the label column. */}
       <Box flexShrink={0} minW="16" />
       {status === 'updatable' ? (
-        <Button size="2xs" variant="outline" onClick={onUpdate}>
+        <Button size="sm" variant="outline" onClick={onUpdate}>
           {t('nodes.updateNodeTo', { version: template.version })}
         </Button>
       ) : (
-        <Text color="fg.warning" fontSize="2xs">
+        <Text color="fg.warning" fontSize="xs">
           {status === 'newer'
             ? t('nodes.nodeNewerThanBackend', versions)
             : t('nodes.nodeVersionIncompatible', versions)}
@@ -123,16 +123,15 @@ const DetailsTab = ({ node, template }: { node: WorkflowInvocationNode; template
       {template ? <DetailRow label={t('widgets.workflow.pack')} value={template.nodePack} /> : null}
       {template?.description ? <DetailRow label={t('widgets.workflow.about')} value={template.description} /> : null}
       <Stack gap="1">
-        <Text color="fg.subtle" fontSize="2xs">
+        <Text color="fg.subtle" fontSize="xs">
           {t('widgets.workflow.notes')}
         </Text>
         <Textarea
           aria-label={t('widgets.workflow.nodeNotes')}
-          fontSize="2xs"
+          fontSize="xs"
           minH="3rem"
           placeholder={t('widgets.workflow.nodeNotesPlaceholder')}
           resize="vertical"
-          size="xs"
           value={node.data.notes}
           onChange={onNotesChange}
         />
@@ -170,12 +169,12 @@ const OutputsTab = ({ nodeId, template }: { nodeId: string; template: Invocation
   if (!execution) {
     return (
       <Stack gap="2">
-        <Text color="fg.subtle" fontSize="2xs">
+        <Text color="fg.subtle" fontSize="xs">
           {t('widgets.workflow.noRunRecorded')}
         </Text>
         {outputs.length > 0 ? (
           <Stack gap="1">
-            <Text color="fg.subtle" fontSize="2xs">
+            <Text color="fg.subtle" fontSize="xs">
               {t('widgets.workflow.declaredOutputs')}
             </Text>
             {outputs.map((output) => (
@@ -253,7 +252,7 @@ const InspectorBody = ({ node, tab }: { node: WorkflowNode; tab: InspectorTab })
       return template ? (
         <JsonBlock label={t('widgets.workflow.nodeTemplate')} value={template} />
       ) : (
-        <Text color="fg.subtle" fontSize="2xs">
+        <Text color="fg.subtle" fontSize="xs">
           {t('widgets.workflow.noTemplateKnown', { type: node.data.type })}
         </Text>
       );
@@ -275,13 +274,13 @@ export const NodeInspector = ({ projectGraph }: { projectGraph: ProjectGraphStat
   return (
     <Flex data-node-inspector="" direction="column" h="full" minH="0">
       <HStack flexShrink={0} justify="space-between" px="2" h={10} borderBottomWidth={1}>
-        <Text color="fg.muted" fontSize="2xs" fontWeight="600" textTransform="uppercase">
+        <Text color="fg.muted" fontSize="xs" fontWeight="600" textTransform="uppercase">
           {t('widgets.workflow.nodeInspector')}
         </Text>
-        <Tabs.Root size="sm" value={tab} variant="outline" mb="-1" onValueChange={onTabValueChange}>
+        <Tabs.Root size="xl" value={tab} variant="outline" mb="-1" onValueChange={onTabValueChange}>
           <Tabs.List>
             {(['details', 'outputs', 'data', 'template'] as const).map((value) => (
-              <Tabs.Trigger key={value} fontSize="2xs" textTransform="capitalize" value={value}>
+              <Tabs.Trigger key={value} fontSize="xs" textTransform="capitalize" value={value}>
                 {t(`widgets.workflow.inspectorTabs.${value}`)}
               </Tabs.Trigger>
             ))}
@@ -293,7 +292,7 @@ export const NodeInspector = ({ projectGraph }: { projectGraph: ProjectGraphStat
           {selectedNode ? (
             <InspectorBody node={selectedNode} tab={tab} />
           ) : (
-            <Text color="fg.subtle" fontSize="2xs">
+            <Text color="fg.subtle" fontSize="xs">
               {t('widgets.workflow.selectNodeToInspect')}
             </Text>
           )}

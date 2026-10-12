@@ -102,7 +102,7 @@ export interface ShapeToolOptions {
 }
 
 /** Sensible starting shape options: a filled rect, no stroke, drawn onto the selected paint layer. */
-export const DEFAULT_SHAPE_OPTIONS: ShapeToolOptions = {
+export const DEFAULT_SHAPE_OPTIONS: Readonly<ShapeToolOptions> = {
   fillEnabled: true,
   kind: 'rect',
   strokeEnabled: false,
@@ -145,7 +145,9 @@ export interface GradientPreview {
 }
 
 /** Sensible starting gradient options: the FG→BG preset, horizontal linear. */
-export const DEFAULT_GRADIENT_OPTIONS: GradientToolOptions = {
+export const DEFAULT_GRADIENT_OPTIONS: Readonly<Omit<GradientToolOptions, 'stops'>> & {
+  readonly stops: readonly Readonly<GradientStop>[];
+} = {
   angle: 0,
   kind: 'linear',
   preset: 'pair',
@@ -193,7 +195,7 @@ export const MAX_TEXT_FONT_SIZE = 2000;
 export type TextStylePatch = Partial<TextToolOptions> & { color?: string };
 
 /** Sensible starting text options: left-aligned Inter at 48px. */
-export const DEFAULT_TEXT_OPTIONS: TextToolOptions = {
+export const DEFAULT_TEXT_OPTIONS: Readonly<TextToolOptions> = {
   align: 'left',
   fontFamily: TEXT_FONT_FAMILIES[0]!.value,
   fontSize: 48,
@@ -234,7 +236,7 @@ export interface ActiveColorPairState {
 export const DEFAULT_COLOR_PAIR_STATE: ActiveColorPairState = { background: '#ffffff', foreground: '#000000' };
 
 /** Sensible starting brush options. */
-export const DEFAULT_BRUSH_OPTIONS: BrushOptions = {
+export const DEFAULT_BRUSH_OPTIONS: Readonly<BrushOptions> = {
   color: '#000000',
   hardness: 1,
   opacity: 1,
@@ -244,7 +246,7 @@ export const DEFAULT_BRUSH_OPTIONS: BrushOptions = {
 };
 
 /** Sensible starting eraser options. */
-export const DEFAULT_ERASER_OPTIONS: EraserOptions = {
+export const DEFAULT_ERASER_OPTIONS: Readonly<EraserOptions> = {
   hardness: 1,
   opacity: 1,
   size: 50,

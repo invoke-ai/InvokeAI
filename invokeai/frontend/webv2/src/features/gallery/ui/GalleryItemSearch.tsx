@@ -3,6 +3,7 @@ import type { GallerySemanticReference } from '@features/gallery/core/semanticIm
 import { Box, HStack, Icon, Text } from '@chakra-ui/react';
 import { semanticReferenceFromDataTransfer } from '@features/gallery/core/semanticImageQuery';
 import { imageIndexAvailabilityOptions } from '@features/gallery/data/queries';
+import { isImeComposing } from '@platform/browser/imeComposition';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { describeDateRange, findInvalidDateToken, formatIsoDate, parseDateTokens } from '@platform/search/dateTokens';
 import { CloseButton, ToggleIconButton } from '@platform/ui/Button';
@@ -110,7 +111,7 @@ export const GalleryItemSearch = () => {
   // Enter is the explicit form of the same commit: no reason to keep waiting.
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLInputElement>) => {
-      if (!isSemanticMode || event.key !== 'Enter' || event.nativeEvent.isComposing) {
+      if (!isSemanticMode || event.key !== 'Enter' || isImeComposing(event.nativeEvent)) {
         return;
       }
 
@@ -281,7 +282,7 @@ export const GalleryItemSearch = () => {
         {isSemanticMode || gallery.searchTerm ? (
           <CloseButton
             aria-label={isSemanticMode ? t('widgets.gallery.clearSemanticSearch') : t('common.clearSearch')}
-            size="2xs"
+            size="sm"
             onClick={handleClearSearch}
           />
         ) : null}
@@ -338,7 +339,7 @@ export const GalleryItemSearch = () => {
       {hint ? (
         <Text
           color={invalidHint ? 'fg.error' : 'fg.warning'}
-          fontSize="2xs"
+          fontSize="xs"
           id={SEARCH_HINT_ID}
           insetInlineStart="0"
           // Out of flow and inert: it must never shift the header row, nor
@@ -386,7 +387,7 @@ const GallerySemanticChip = ({
                 ? t('widgets.gallery.clearClusterSearch')
                 : t('widgets.gallery.clearImageSearch')
           }
-          size="2xs"
+          size="sm"
           onClick={onClear}
         />
       </HStack>
@@ -407,7 +408,7 @@ const GallerySemanticChip = ({
 
   return (
     <InputShell endElement={endElement} startElement={kindIcon} title={getSemanticReferenceTitle(reference)}>
-      <Text color="fg.muted" flex="1" fontSize="xs" minW="0" truncate>
+      <Text color="fg.muted" flex="1" fontSize="md" minW="0" truncate>
         {isText
           ? t('widgets.gallery.semanticTextSearch', { name })
           : isCluster

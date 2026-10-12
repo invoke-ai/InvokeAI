@@ -108,7 +108,7 @@ export const QueueCluster = () => {
             fontVariantNumeric="tabular-nums"
             overflow="hidden"
             position="relative"
-            size="sm"
+            size="lg"
             px={2}
             variant={tone === 'idle' ? 'outline' : 'subtle'}
             onClick={handleOpenQueue}
@@ -132,7 +132,7 @@ export const QueueCluster = () => {
             <IconButton
               aria-label={isCancelAllArmed && cancelAll ? cancelAll.label : cancelCurrent.label}
               color="fg.error"
-              size="sm"
+              size="lg"
               variant="outline"
               onClick={handleCancelClick}
               onPointerEnter={handleCancelPointerEnter}
@@ -151,7 +151,7 @@ export const QueueCluster = () => {
           <IconButton
             aria-label={t('topbar.queue.actions')}
             color="fg.subtle"
-            size="sm"
+            size="lg"
             minW="0"
             w="6"
             variant="outline"
@@ -266,10 +266,10 @@ const QueueTooltip = ({
   if (total === 0) {
     return (
       <Stack gap="1" p="3">
-        <Text fontSize="xs" fontWeight="800" fontVariantNumeric="tabular-nums">
+        <Text fontSize="md" fontWeight="800" fontVariantNumeric="tabular-nums">
           {t('topbar.queue.idle')}
         </Text>
-        <Text color="fg.subtle" fontSize="2xs">
+        <Text color="fg.subtle" fontSize="xs">
           {t('topbar.queue.noActiveBatches')}
         </Text>
       </Stack>
@@ -279,10 +279,10 @@ const QueueTooltip = ({
   if (!item) {
     return (
       <Stack gap="2" p="3">
-        <Text fontSize="xs" fontWeight="800" fontVariantNumeric="tabular-nums">
+        <Text fontSize="md" fontWeight="800" fontVariantNumeric="tabular-nums">
           {modelLoads.length ? t('topbar.queue.loadingModels') : t('topbar.queue.waitingToStart')}
         </Text>
-        <Text color="fg.subtle" fontSize="2xs">
+        <Text color="fg.subtle" fontSize="xs">
           {t('topbar.queue.queuedImages', { count: total })}
         </Text>
         {modelLoads.length ? <ModelLoadList modelLoads={modelLoads} /> : null}
@@ -304,22 +304,21 @@ const QueueTooltip = ({
   return (
     <Stack gap="2" p="3" minW="18rem">
       <HStack justify="space-between" gap="3">
-        <Text fontSize="xs" fontWeight="800">
+        <Text fontSize="md" fontWeight="800">
           {t('topbar.queue.loadingImage', { current, total })}
         </Text>
-        <Badge colorPalette="blue" fontSize="2xs">
+        <Badge colorPalette="blue" fontSize="xs">
           {item.status}
         </Badge>
       </HStack>
       <Stack gap="1">
-        <Text color="fg.subtle" fontSize="2xs">
+        <Text color="fg.subtle" fontSize="xs">
           {progressLabel}
         </Text>
         {modelLoads.length ? <ModelLoadList modelLoads={modelLoads} /> : null}
         <Progress.Root
           aria-label={t('topbar.queue.currentImageProgress')}
           max={1}
-          size="xs"
           value={getDeterminateProgressFraction(progress?.percentage)}
         >
           <Progress.Track>
@@ -327,7 +326,7 @@ const QueueTooltip = ({
           </Progress.Track>
         </Progress.Root>
       </Stack>
-      <Stack gap="1" color="fg.subtle" fontSize="2xs">
+      <Stack gap="1" color="fg.subtle" fontSize="xs">
         <Text fontVariantNumeric="tabular-nums">
           {t('topbar.queue.batchImage', { current: activeItemIndex, total: expectedCount })}
           {activeBackendItemId !== undefined ? ` · ${t('topbar.queue.backendItem', { id: activeBackendItemId })}` : ''}
@@ -345,7 +344,7 @@ const QueueTooltip = ({
         </Text>
       </Stack>
       {prompt ? (
-        <Text color="fg.muted" fontSize="2xs" lineClamp={2}>
+        <Text color="fg.muted" fontSize="xs" lineClamp={2}>
           {prompt}
         </Text>
       ) : null}
@@ -358,7 +357,7 @@ const ModelLoadsTooltipContent = ({ modelLoads }: { modelLoads: ModelLoadInfo[] 
 
   return (
     <Stack gap="2" p="3" minW="18rem">
-      <Text fontSize="xs" fontWeight="800">
+      <Text fontSize="md" fontWeight="800">
         {t('topbar.queue.loadingModelsCount', { count: modelLoads.length })}
       </Text>
       <ModelLoadList modelLoads={modelLoads} />
@@ -370,7 +369,7 @@ const ModelLoadList = ({ modelLoads }: { modelLoads: ModelLoadInfo[] }) => {
   const { t } = useTranslation();
 
   return (
-    <Stack gap="0.5" color="fg.muted" fontSize="2xs">
+    <Stack gap="0.5" color="fg.muted" fontSize="xs">
       {modelLoads.slice(0, 3).map((modelLoad, index) => (
         <MiddleTruncate key={`${modelLoad.label}:${index}`} text={modelLoad.label} />
       ))}

@@ -47,6 +47,20 @@ export const appearanceSettings = section('appearance', 'Appearance', [
   preference('reduceMotion', 'Reduce motion', 'animation'),
   preference('highContrast', 'High contrast', 'accessibility a11y readability'),
   preference('showFocusRegionHighlight', 'Highlight focused regions', 'panel outline'),
+  {
+    id: 'promptFontSize',
+    label: text('promptFontSize.label', 'Prompt text size'),
+    description: text('promptFontSize.description'),
+    keywords: 'font generate prompt editor',
+    kind: 'select',
+    scope: 'preference',
+    options: [
+      { value: 'small', label: text('options.small', 'Small') },
+      { value: 'default', label: text('options.default', 'Default') },
+      { value: 'large', label: text('options.large', 'Large') },
+      { value: 'larger', label: text('options.larger', 'Larger') },
+    ],
+  },
 ]);
 export const behaviorSettings = section('behavior', 'Behavior', [
   preference('autoSwitchInvocationRoute', 'Auto-switch Invoke route'),

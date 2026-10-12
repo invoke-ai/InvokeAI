@@ -26,6 +26,15 @@ class GalleryItemRef(BaseModel):
     name: str = Field(description="The unique name of the image or video.")
 
 
+class GalleryItemLocation(BaseModel):
+    """A gallery item's position in a filtered, ordered listing."""
+
+    kind: GalleryItemKind = Field(description="Whether the item is an image or video.")
+    name: str = Field(description="The unique name of the image or video.")
+    index: int = Field(description="The item's zero-based index in the listing.")
+    total: int = Field(description="Number of items matching the listing filters.")
+
+
 class GalleryItem(BaseModelExcludeNull):
     """A gallery item — either an image or a video, with shared fields and a discriminator.
 

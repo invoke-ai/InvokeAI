@@ -17,7 +17,7 @@ export const ModelDefaultButton = ({ label, onClick }: { label: string; onClick:
 
   return (
     <Tooltip content={label}>
-      <IconButton aria-label={label} color="fg.muted" size="2xs" variant="ghost" onClick={handleClick}>
+      <IconButton aria-label={label} color="fg.muted" size="sm" variant="ghost" onClick={handleClick}>
         <Icon as={RotateCcwIcon} boxSize="2.5" />
       </IconButton>
     </Tooltip>

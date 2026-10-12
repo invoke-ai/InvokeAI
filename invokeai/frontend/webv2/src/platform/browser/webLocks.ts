@@ -70,3 +70,27 @@ export const acquireExclusiveLock = (name: string, lockManager?: LockManager): P
 
 export const acquireSharedLock = (name: string, lockManager?: LockManager): Promise<BrowserLockResult> =>
   acquireLock(name, 'shared', lockManager);
+
+/**
+ * Whether any context of this origin currently holds the lock, read without requesting it, so a holder about to claim
+ * the name is never turned away. `null` when the Web Locks API or its query is unavailable.
+ */
+export const isLockHeld = async (name: string, lockManager?: LockManager): Promise<boolean | null> => {
+  let manager = lockManager;
+  if (!manager) {
+    try {
+      manager = typeof navigator === 'undefined' ? undefined : navigator.locks;
+    } catch {
+      manager = undefined;
+    }
+  }
+  if (!manager || typeof manager.query !== 'function') {
+    return null;
+  }
+  try {
+    const { held = [] } = await manager.query();
+    return held.some((lock) => lock.name === name);
+  } catch {
+    return null;
+  }
+};

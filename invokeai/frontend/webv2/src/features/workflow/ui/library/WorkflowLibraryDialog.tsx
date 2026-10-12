@@ -3,7 +3,7 @@ import type { WorkflowLibraryBrowseSnapshot, WorkflowLibraryEntry } from '@featu
 import type { WorkflowLibraryListItem } from '@features/workflow/queries';
 import type { ChangeEvent } from 'react';
 
-import { Dialog, HStack, Input, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
+import { HStack, Input, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import {
   ensureWorkflowLibraryBrowseLoaded,
   getWorkflowLibraryBrowseSnapshot,
@@ -21,6 +21,7 @@ import {
 } from '@features/workflow/ui/workflowUiStore';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { CloseButton, SegmentTabs, segmentTabsPanelId, segmentTabsTabId } from '@platform/ui';
+import { Dialog } from '@platform/ui/Dialog';
 import { Suspense, useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -322,8 +323,8 @@ export const WorkflowLibraryDialog = ({
                   role="status"
                   zIndex="modal"
                 >
-                  <Spinner color="accent.solid" size="lg" />
-                  <Text fontSize="xs" fontWeight="600">
+                  <Spinner color="accent.solid" size="2xl" />
+                  <Text fontSize="md" fontWeight="600">
                     {loadPhase === 'fetching' ? t('workflowLibrary.fetching') : t('workflowLibrary.applying')}
                   </Text>
                 </Stack>
@@ -333,7 +334,7 @@ export const WorkflowLibraryDialog = ({
                   <HStack gap="3" minW="0">
                     <Dialog.Title flexShrink={0}>{t('workflowLibrary.title')}</Dialog.Title>
                     {isProjectTab ? (
-                      <Text color="fg.subtle" flex="1" fontSize="xs" minW="0" truncate>
+                      <Text color="fg.subtle" flex="1" fontSize="md" minW="0" truncate>
                         {t('workflowLibrary.thisProjectHint')}
                       </Text>
                     ) : (
@@ -342,7 +343,6 @@ export const WorkflowLibraryDialog = ({
                         flex="1"
                         minW="0"
                         placeholder={t('workflowLibrary.searchPlaceholder')}
-                        size="xs"
                         type="search"
                         value={searchInput}
                         onChange={handleSearchChange}

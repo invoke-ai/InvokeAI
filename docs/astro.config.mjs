@@ -19,14 +19,14 @@ import {
   socialConfig,
 } from './src/config';
 
-// Deployment target: 'custom' (default, custom domain at invoke.ai) or 'ghpages'
+// Deployment target: 'custom' (default, custom domain at v7.invoke.ai) or 'ghpages'
 // (GitHub Pages project URL at invoke-ai.github.io/InvokeAI). Drive site/base from this
 // so the same source can be deployed to either target.
 const deployTarget = process.env.DEPLOY_TARGET ?? 'custom';
 const isGhPages = deployTarget === 'ghpages';
 const enableAnalytics = process.env.ENABLE_ANALYTICS === 'true';
 const base = isGhPages ? '/InvokeAI' : '';
-const site = isGhPages ? 'https://invoke-ai.github.io' : 'https://invoke.ai';
+const site = isGhPages ? 'https://invoke-ai.github.io' : 'https://v7.invoke.ai';
 
 const redirects = createRedirects(base);
 const head = createHeadConfig({ base, enableAnalytics, isGhPages, site });

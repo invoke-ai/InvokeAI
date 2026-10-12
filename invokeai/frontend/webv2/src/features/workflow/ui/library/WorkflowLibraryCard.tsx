@@ -165,7 +165,7 @@ export const WorkflowLibraryCard = ({
           ) : (
             <Flex align="center" direction="column" gap="1" h="full" justify="center" w="full">
               <Icon aria-hidden as={ImageOffIcon} boxSize="5" color="fg.subtle" opacity={0.6} />
-              <Text color="fg.subtle" fontSize="2xs">
+              <Text color="fg.subtle" fontSize="xs">
                 {t('workflowLibrary.notRunYet')}
               </Text>
             </Flex>
@@ -173,9 +173,9 @@ export const WorkflowLibraryCard = ({
         </Box>
         <Stack gap="1" minW="0" p="2.5" w="full">
           <HStack gap="1.5" h={TITLE_ROW_HEIGHT} minW="0" pe="7">
-            <MiddleTruncate fontSize="xs" fontWeight="600" minW="0" text={item.name || t('workflowLibrary.untitled')} />
+            <MiddleTruncate fontSize="md" fontWeight="600" minW="0" text={item.name || t('workflowLibrary.untitled')} />
             {isActive ? (
-              <Badge data-active-workflow flexShrink={0} size="xs" variant="solid">
+              <Badge data-active-workflow flexShrink={0} variant="solid">
                 {t('workflowLibrary.activeWorkflow')}
               </Badge>
             ) : null}
@@ -186,17 +186,17 @@ export const WorkflowLibraryCard = ({
               <Skeleton data-enrichment-placeholder h="3" rounded="sm" w="14" />
             ) : null}
             {primaryBase ? (
-              <Badge flexShrink={0} size="xs" variant="subtle">
+              <Badge flexShrink={0} variant="subtle">
                 {getModelBaseLabel(primaryBase)}
               </Badge>
             ) : null}
             {enrichment.status === 'ready' ? (
-              <Text color="fg.muted" fontSize="2xs" truncate>
+              <Text color="fg.muted" fontSize="xs" truncate>
                 {t('workflowLibrary.nodeCount', { count: enrichment.nodeCount })}
               </Text>
             ) : null}
             {missingCount > 0 ? (
-              <Badge bg="bg.warning" color="fg.warning" flexShrink={0} size="xs" variant="subtle">
+              <Badge bg="bg.warning" color="fg.warning" flexShrink={0} variant="subtle">
                 {t('workflowLibrary.installModels', { count: missingCount })}
               </Badge>
             ) : null}
@@ -215,7 +215,7 @@ export const WorkflowLibraryCard = ({
           id={getWorkflowLibraryCardMenuId(workflowId)}
           insetEnd="2.5"
           position="absolute"
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={handleMenuButton}
         >

@@ -101,7 +101,7 @@ const NumberSetting = ({
   return (
     <HStack flex="1" gap="1" minW="0">
       {label ? (
-        <chakra.label color="fg.subtle" flexShrink={0} fontSize="2xs" htmlFor={`${id}-number-input`} minW="10">
+        <chakra.label color="fg.subtle" flexShrink={0} fontSize="xs" htmlFor={`${id}-number-input`} minW="10">
           {label}
         </chakra.label>
       ) : null}
@@ -112,7 +112,6 @@ const NumberSetting = ({
           disabled={disabled}
           id={id}
           invalid={invalid}
-          size="2xs"
           template={template}
           value={value ?? undefined}
           onChange={onChange}
@@ -153,10 +152,10 @@ const SeedSetting = ({
     <HStack gap="2" minW="0">
       {/* Ark controls take the enclosing field's control id; a field of their own keeps ids unique in the widget. */}
       <Field.Root flexShrink={0} gap="0" w="auto">
-        <Checkbox.Root checked={seed !== null} colorPalette="accent" size="xs" onCheckedChange={onCheckedChange}>
+        <Checkbox.Root checked={seed !== null} colorPalette="accent" size="sm" onCheckedChange={onCheckedChange}>
           <Checkbox.HiddenInput />
           <Checkbox.Control />
-          <Checkbox.Label fontSize="2xs">{t('nodes.generatorSeed')}</Checkbox.Label>
+          <Checkbox.Label fontSize="xs">{t('nodes.generatorSeed')}</Checkbox.Label>
         </Checkbox.Root>
       </Field.Root>
       <NumberSetting
@@ -206,10 +205,10 @@ const InputSetting = ({ id, value, onCommit }: { id: string; value: string; onCo
   return (
     <Stack gap="1">
       <HStack justify="space-between">
-        <chakra.label color="fg.subtle" fontSize="2xs" htmlFor={id}>
+        <chakra.label color="fg.subtle" fontSize="xs" htmlFor={id}>
           {t('nodes.generatorInput')}
         </chakra.label>
-        <Button className="nodrag" size="2xs" variant="ghost" onClick={onLoadClick}>
+        <Button className="nodrag" size="sm" variant="ghost" onClick={onLoadClick}>
           <UploadIcon />
           {t('nodes.generatorLoadFromFile')}
         </Button>
@@ -228,7 +227,6 @@ const InputSetting = ({ id, value, onCommit }: { id: string; value: string; onCo
         id={id}
         resize="none"
         rows={4}
-        size="xs"
         value={value}
         onChange={onTextChange}
       />
@@ -284,7 +282,7 @@ const PreviewBox = ({ children, tone = 'fg.muted' }: { children: string; tone?: 
     className="nowheel"
     color={tone}
     fontFamily="mono"
-    fontSize="2xs"
+    fontSize="xs"
     maxH="32"
     overflowY="auto"
     px="1.5"
@@ -505,7 +503,6 @@ export const GeneratorFieldInput = ({ id, invalid, onChange, template, value }: 
         className="nodrag"
         collection={variantCollection}
         invalid={invalid}
-        size="xs"
         value={variantValue}
         valueTextProps={SELECT_VALUE_TEXT_PROPS}
         w="full"
@@ -609,16 +606,10 @@ export const GeneratorFieldInput = ({ id, invalid, onChange, template, value }: 
       generator.type === 'string_generator_parse_string' ? (
         <Stack gap="1.5">
           <HStack gap="1">
-            <chakra.label color="fg.subtle" flexShrink={0} fontSize="2xs" htmlFor={`${prefix}-split-on`}>
+            <chakra.label color="fg.subtle" flexShrink={0} fontSize="xs" htmlFor={`${prefix}-split-on`}>
               {t('nodes.splitOn')}
             </chakra.label>
-            <Input
-              className="nodrag"
-              id={`${prefix}-split-on`}
-              size="2xs"
-              value={generator.splitOn}
-              onChange={onSplitOnChange}
-            />
+            <Input className="nodrag" id={`${prefix}-split-on`} value={generator.splitOn} onChange={onSplitOnChange} />
           </HStack>
           <InputSetting id={`${prefix}-input`} value={generator.input} onCommit={onInputChange} />
         </Stack>
@@ -664,7 +655,6 @@ export const GeneratorFieldInput = ({ id, invalid, onChange, template, value }: 
               aria-label={t('nodes.generatorImagesCategory')}
               className="nodrag"
               collection={categoryCollection}
-              size="xs"
               value={categoryValue}
               valueTextProps={SELECT_VALUE_TEXT_PROPS}
               w="full"

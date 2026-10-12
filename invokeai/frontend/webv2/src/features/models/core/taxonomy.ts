@@ -25,6 +25,7 @@ export const MODEL_CATEGORIES: CategoryDefinition[] = [
   { label: 'Qwen3 Encoder', pluralLabel: 'Qwen3 Encoders', type: 'qwen3_encoder' },
   { label: 'Qwen VL Encoder', pluralLabel: 'Qwen VL Encoders', type: 'qwen_vl_encoder' },
   { label: 'Qwen3 VL Encoder', pluralLabel: 'Qwen3 VL Encoders', type: 'qwen3_vl_encoder' },
+  { label: 'Qwen3.5 Encoder', pluralLabel: 'Qwen3.5 Encoders', type: 'qwen3_5_encoder' },
   { label: 'Mistral Encoder', pluralLabel: 'Mistral Encoders', type: 'mistral_encoder' },
   { label: 'Gemma 2 Encoder', pluralLabel: 'Gemma 2 Encoders', type: 'gemma2_encoder' },
   { label: 'Gemma 4 Encoder', pluralLabel: 'Gemma 4 Encoders', type: 'gemma4_encoder' },
@@ -108,6 +109,8 @@ export const getModelSourceHref = (source: string, sourceType: string): string |
 export const MODEL_VARIANT_LABELS: Record<string, string> = {
   '5b': 'Wan 2.2 5B LoRA',
   a14b: 'Wan 2.2 A14B LoRA',
+  anima_qwen3: 'Anima',
+  anima_qwen35: 'Anima + Qwen3.5 (Anima-3.8B)',
   cow_mistral3_small: 'cow-mistral3-small (FLUX.2)',
   depth: 'Depth',
   dev: 'FLUX Dev',
@@ -131,6 +134,7 @@ export const MODEL_VARIANT_LABELS: Record<string, string> = {
   qwen3_06b: 'Qwen3 0.6B',
   qwen3_4b: 'Qwen3 4B',
   qwen3_8b: 'Qwen3 8B',
+  qwen3_5_4b: 'Qwen3.5 4B (Anima-3.8B)',
   qwen3_vl_4b: 'Qwen3-VL 4B (Krea-2)',
   qwen3_vl_8b: 'Qwen3-VL 8B (Ideogram 4)',
   ref2va: 'MiniMax H3 Ref2VA',
@@ -150,6 +154,7 @@ export const getModelVariantLabel = (variant: string): string => MODEL_VARIANT_L
 // Mirrors the backend's per-class variant enums (taxonomy.py): main models
 // key their variants off the base, and a few non-main types carry their own.
 const MAIN_VARIANTS_BY_BASE: Record<string, readonly string[]> = {
+  anima: ['anima_qwen3', 'anima_qwen35'],
   flux: ['schnell', 'dev', 'dev_fill'],
   flux2: ['klein_4b', 'klein_4b_base', 'klein_9b', 'klein_9b_base', 'dev'],
   'krea-2': ['krea2_turbo', 'krea2_base'],
@@ -169,6 +174,7 @@ const VARIANTS_BY_TYPE: Record<string, readonly string[]> = {
   mistral_encoder: ['cow_mistral3_small', 'mistral3_24b', 'ministral3_3b'],
   pid_decoder: ['res2k_sr4x', 'res2kto4k_sr4x'],
   qwen3_encoder: ['qwen3_4b', 'qwen3_8b', 'qwen3_06b'],
+  qwen3_5_encoder: ['qwen3_5_4b'],
   // Required variant configs need explicit choices; a fallback None would fail database validation.
   qwen3_vl_encoder: ['qwen3_vl_4b', 'qwen3_vl_8b'],
 };

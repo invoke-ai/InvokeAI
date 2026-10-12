@@ -43,7 +43,7 @@ Only nodes whose **Save to Gallery** box is checked, at the bottom of nodes that
 
 An image node's **Board** field chooses where its saved images go. **Auto**, the default, uses the Gallery's destination: the selected board, or the auto-add board if one is set (see [Choosing where new media goes](/users-guide/gallery/introduction/#choosing-where-new-media-goes)). **None** saves to Uncategorized, and you can also pick a specific board. Images from nodes that have no Board field go to Uncategorized.
 
-Beside it, **Use Cache** lets InvokeAI reuse a node's previous result when its inputs have not changed, which speeds up repeated runs. On a multi-user installation, only administrators see this option.
+Beside it, **Use cache** lets InvokeAI reuse a node's previous result when its inputs have not changed, which speeds up repeated runs. On a multi-user installation, only administrators see this option.
 
 ### Your workflows
 
@@ -63,7 +63,7 @@ Add comma-separated tags, such as `portrait, SDXL, upscaling`, in the workflow's
 In InvokeAI 6, editing a workflow opened from the library saved every change straight back to the library. Workflows now belong to their project and autosave there; the library changes only when you choose **Save to library…** or **Update library template**.
 :::
 
-To share a workflow, use **Export workflow JSON** from the **⋯** menu; others can load it with **Import workflow JSON…**. An image made by a workflow also carries the workflow in its metadata: right-click the image and choose **Load Workflow**. **Download workflow as PNG** in the editor toolbar saves a picture of the whole graph, at up to twice screen resolution, for documentation or sharing. Closing the workflow editor while the picture is being prepared cancels the export.
+To share a workflow, use **Export workflow JSON** from the **⋯** menu; others can load it with **Import workflow JSON…**. An image made by a workflow also carries the workflow in its metadata: right-click the image and choose **Load Workflow**. **Download workflow as PNG** in the editor toolbar saves a picture of the whole graph, at up to twice screen resolution, for documentation or sharing. A large graph is saved at a lower resolution, with a notice when that falls below screen resolution; one too large to stay legible as a picture is not exported, so share its JSON instead. Closing the workflow editor while the picture is being prepared cancels the export.
 
 ## Common node patterns
 

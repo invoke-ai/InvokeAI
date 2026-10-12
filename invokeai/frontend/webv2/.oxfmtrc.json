@@ -9,6 +9,7 @@
     "node_modules/**",
     "stats.html",
     "src/features/generation/core/__snapshots__/generateGraphNodeTypes.json",
+    "src/features/generation/core/__snapshots__/animaLLLiteCanvasGraphs.json",
     "src/features/video/core/__snapshots__/videoGraphNodeTypes.json",
     "src/features/generation/core/__fixtures__/architectureCapabilities.json"
   ],

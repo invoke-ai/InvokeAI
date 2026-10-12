@@ -5,6 +5,7 @@ import { getWorkflowNodeChromeProps, useIsWorkflowImageExport } from '@features/
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { memo, useCallback, type ChangeEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { NotesFlowNode as NotesFlowNodeType } from './flowAdapters';
 
@@ -23,13 +24,13 @@ const NotesSnapshotNode = ({ data }: NodeProps<NotesFlowNodeType>) => {
     >
       <MiddleTruncate
         data-workflow-export-node-title="true"
-        fontSize="2xs"
+        fontSize="xs"
         fontWeight="700"
         mb="1.5"
         text={node.data.label}
       />
       {node.data.notes ? (
-        <Text fontSize="2xs" overflowWrap="anywhere" whiteSpace="pre-wrap">
+        <Text fontSize="xs" overflowWrap="anywhere" whiteSpace="pre-wrap">
           {node.data.notes}
         </Text>
       ) : null}
@@ -38,6 +39,7 @@ const NotesSnapshotNode = ({ data }: NodeProps<NotesFlowNodeType>) => {
 };
 
 const NotesEditorNode = ({ data, selected }: NodeProps<NotesFlowNodeType>) => {
+  const { t } = useTranslation();
   const { editGraph } = useProjectGraphCommands();
   const node = data.documentNode;
   const onLabelChange = useCallback(
@@ -62,23 +64,21 @@ const NotesEditorNode = ({ data, selected }: NodeProps<NotesFlowNodeType>) => {
       {...getWorkflowNodeChromeProps({ selected })}
     >
       <Input
-        aria-label="Note title"
+        aria-label={t('widgets.workflow.noteTitle')}
         className="nodrag"
         fontWeight="700"
         mb="1.5"
-        size="2xs"
         value={node.data.label}
         variant="flushed"
         onChange={onLabelChange}
       />
       <Textarea
-        aria-label="Note text"
+        aria-label={t('widgets.workflow.noteText')}
         className="nodrag nowheel"
-        fontSize="2xs"
+        fontSize="xs"
         minH="5rem"
-        placeholder="Write a note…"
+        placeholder={t('widgets.workflow.noteTextPlaceholder')}
         resize="vertical"
-        size="xs"
         value={node.data.notes}
         onChange={onNotesChange}
       />

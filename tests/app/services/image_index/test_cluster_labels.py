@@ -27,6 +27,16 @@ def test_normalize_custom_vocab_terms_lowercases_collapses_and_dedupes() -> None
     assert normalized == ["golden retriever", "zebra"]
 
 
+def test_normalize_custom_vocab_terms_folds_the_spellings_server_collations_equate() -> None:
+    # MySQL and MariaDB store the vocabulary under a case-insensitive collation that equates these spellings, so
+    # without the fold a server would silently keep only the first of each pair where SQLite keeps both.
+    decomposed = "café"
+    assert normalize_custom_vocab_terms(["café", decomposed, "ﬁsh", "ｆｉｓｈ"]) == [
+        "café",
+        "fish",
+    ]
+
+
 def test_normalize_custom_vocab_terms_strips_control_characters() -> None:
     # A NUL inside a term would make the fingerprint's NUL-joined phrase
     # stream ambiguous: vocab_fingerprint(["cat", "dog"]) equals

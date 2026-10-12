@@ -23,6 +23,7 @@ import type {
 
 import { isWorkflowGeneratorVariant } from './batch';
 import {
+  beginCallSavedWorkflowSwitch,
   CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX,
   clearSavedWorkflowDynamicFields,
   setCallSavedWorkflowStatus,
@@ -715,7 +716,9 @@ export type ProjectGraphAction =
   | { type: 'setNodeFieldShowDescription'; elementId: string; showDescription: boolean }
   | { type: 'setNodeFieldShowShuffle'; elementId: string; showShuffle: boolean }
   | { type: 'setContainerLayout'; elementId: string; layout: 'row' | 'column' }
-  | { type: 'setMetadata'; patch: Partial<WorkflowMetadata> };
+  | { type: 'setMetadata'; patch: Partial<WorkflowMetadata> }
+  /** A committed rename (a dialog, an adopted template name): one undo step of its own, unlike typing a name. */
+  | { type: 'renameWorkflow'; name: string };
 
 const undoLabels: Partial<Record<ProjectGraphAction['type'], string>> = {
   addEdge: 'Connect workflow fields',
@@ -724,12 +727,13 @@ const undoLabels: Partial<Record<ProjectGraphAction['type'], string>> = {
   addGraphElements: 'Paste workflow nodes',
   addNode: 'Add workflow node',
   addNodeAndEdge: 'Add workflow node',
-  exposeField: 'Expose workflow field',
+  exposeField: 'Add workflow field to form',
   moveFormElement: 'Edit workflow form',
   moveFormElementTo: 'Edit workflow form',
   removeEdges: 'Disconnect workflow fields',
   removeFormElement: 'Edit workflow form',
   removeNodes: 'Delete workflow nodes',
+  renameWorkflow: 'Rename workflow',
   setContainerLayout: 'Edit workflow form',
   setFieldDescription: 'Edit workflow field description',
   setFieldLabel: 'Rename workflow field',
@@ -1002,23 +1006,19 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
     }
     case 'setFieldValue': {
       const node = document.nodes.find((candidate) => candidate.id === action.nodeId);
-      const shouldClearDynamicFields =
+      const isCallRetarget =
         action.fieldName === 'workflow_id' &&
-        node &&
+        node !== undefined &&
         isInvocationNode(node) &&
         node.data.type === 'call_saved_workflow' &&
         node.data.inputs.workflow_id?.value !== action.value;
-      const clearedDocument = shouldClearDynamicFields
-        ? clearSavedWorkflowDynamicFields(document, action.nodeId)
-        : document;
-      const nextDocument =
-        shouldClearDynamicFields && node && isInvocationNode(node) && node.data.type === 'call_saved_workflow'
-          ? setCallSavedWorkflowStatus(
-              clearedDocument,
-              action.nodeId,
-              typeof action.value === 'string' && action.value.trim() ? 'loading' : 'ready'
-            )
-          : clearedDocument;
+      // A cleared call exposes nothing, so its dynamic inputs and their connections go now. A newly selected workflow
+      // keeps them until its signature arrives; the sync then keeps only the connections that signature accepts.
+      const nextDocument = !isCallRetarget
+        ? document
+        : typeof action.value === 'string' && action.value.trim()
+          ? beginCallSavedWorkflowSwitch(document, action.nodeId, action.value)
+          : clearSavedWorkflowDynamicFields(document, action.nodeId);
 
       return setFieldInstance(nextDocument, action.nodeId, action.fieldName, (instance) => ({
         ...instance,
@@ -1197,6 +1197,9 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
     }
     case 'setMetadata': {
       return { ...document, ...action.patch };
+    }
+    case 'renameWorkflow': {
+      return document.name === action.name ? document : { ...document, name: action.name };
     }
   }
 };

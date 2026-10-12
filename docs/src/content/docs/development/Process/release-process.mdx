@@ -21,7 +21,8 @@ The launcher uses GitHub as the source of truth for available releases.
 
 Make a developer call-out for PRs to merge. Merge and test things
 out. Create a branch with a name like user/chore/vX.X.X-prep and bump the version by editing
-`invokeai/version/invokeai_version.py` and commit locally.
+`invokeai/version/invokeai_version.py` and commit locally. The web UI reads its version from the same file when it is
+built, so there is no separate frontend version to update.
 
 ## Release Workflow
 

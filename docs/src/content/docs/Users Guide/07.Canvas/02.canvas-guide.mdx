@@ -1,7 +1,7 @@
 ---
 title: Canvas guide
 description: A detailed guide to the Canvas — its tools and their options, navigation, the header buttons, the generation frame, selections, transform, filters, the staging area, menus, settings and keyboard shortcuts.
-lastUpdated: 2026-09-30
+lastUpdated: 2026-10-05
 ---
 
 import { Image } from 'astro:assets';
@@ -33,7 +33,7 @@ The tool strip on the left edge of the canvas holds the drawing and editing tool
 | **Text** | **T** | Add editable text. |
 | **Marquee select** / **Lasso select** | **U** / **L** | Select an area of pixels. Press **U** again to switch between rectangle and ellipse, or **L** again for freehand and polygon. |
 
-The Shape and Select buttons hold several tools. Click to use the current one, or press and hold (or right-click) the button to choose another. To pick a color from the canvas, hold **Alt** with any painting tool and click. While you pick, a round **loupe** follows the pointer: it magnifies the pixels around it, boxes the pixel that will be picked in the center, and shows that pixel's RGB values. The pointer itself is hidden, so aim with the boxed pixel. You can drag to sample as you go; the color is set when you release.
+The Shape and Select buttons hold several tools. Click to use the current one, or press and hold (or right-click, or press **→** on) the button to choose another from a menu that lists each tool with its shortcut. To pick a color from the canvas, hold **Alt** with any painting tool and click. While you pick, a round **loupe** follows the pointer: it magnifies the pixels around it, boxes the pixel that will be picked in the center, and shows that pixel's RGB values. The pointer itself is hidden, so aim with the boxed pixel. You can drag to sample as you go; the color is set when you release.
 
 ### Tool options
 
@@ -94,7 +94,9 @@ The frame is not a mask: everything inside it can change in image-to-image. To r
 
 ### Frame size and processing size
 
-The frame is the final footprint of the generation on the canvas. With **Scale before processing** (in the Generate panel's canvas sections) set to **Auto** or **Manual**, InvokeAI generates at a different resolution, such as the model's optimal size, and then resizes the result to fit the frame. Choose a frame large enough to include the context the model needs, while keeping it within a size the model and your GPU memory handle well.
+The frame is the final footprint of the generation on the canvas. With **Render at** (at the bottom of the Generate panel's **Size** section; legacy versions called it *Scale before processing*) set to **Optimal for model** or **Custom**, InvokeAI generates at a different resolution, such as the model's optimal size, and then resizes the result to fit the frame. When the two differ, the Size section's badge shows both, frame first, and its preview outlines the render size with a dashed line. **Optimal for model** only enlarges a frame smaller than the model's optimal size; it never shrinks a larger one. Choose a frame large enough to include the context the model needs, while keeping it within a size the model and your GPU memory handle well.
+
+**Optimal for model** is the default, including for older projects that never saved a choice. Those projects previously generated at the frame's size. Processing at a different resolution can change the result for the same seed, generation time, and GPU memory use. To generate at the frame's exact size, choose **Frame size**; saved choices are preserved.
 
 ## Transforming layers
 
@@ -138,7 +140,10 @@ Then click **Run**. If the workflow has no image input and output it can connect
 When the Canvas is the destination, results appear in the staging area at the bottom of the canvas, not directly on it. The staging bar lets you:
 
 * Step through the results with the arrows, or with **←** and **→**, and show or hide the result thumbnails.
-* **Accept to Layer** — add the current result as a new raster layer and close the staging area. The arrow next to it offers **Keep as Hidden Layer**, which adds the result as a disabled layer and keeps staging open.
+* **Accept to Layer** — add the current result as a new raster layer at the top of the raster layers and close the staging area.
+  * A selected inpaint mask, regional guidance or control layer that you can still edit stays selected, so you can carry on painting it. Otherwise the new layer is selected.
+  * While the rest of the result's batch is still queued or generating, accepting also cancels those remaining images. The batch then shows as cancelled in the queue, and undoing the accepted layer does not restart it.
+  * The arrow next to it offers **Keep as Hidden Layer**, which adds the result as a disabled layer and keeps staging open and the batch running.
 * **Save to gallery** the current result, **Discard** it (**Delete**), or **Discard All**.
 * Hide the preview of the current result to compare it with the canvas underneath.
 * **Auto-switch** — show each new result as it arrives (**Newest**), follow the one in progress (**In progress**), or stay on the current one (**Off**).

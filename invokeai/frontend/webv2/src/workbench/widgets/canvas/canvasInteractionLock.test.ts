@@ -3,10 +3,11 @@ import type { CanvasStagingCandidateContract } from '@workbench/canvas-engine/co
 import type { WorkbenchQueueItem as QueueItem } from '@workbench/queueHistoryContracts';
 
 import { createEmptyCanvasState } from '@workbench/canvasMigration';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   getCanvasInteractionCapabilities,
+  createCanvasInteractionLockReader,
   isCanvasInteractionLocked,
   isCanvasStagingActive,
   isCanvasToolEnabled,
@@ -53,6 +54,51 @@ const createQueueItem = ({ revision = 1, status }: { revision?: number; status: 
   }) as QueueItem;
 
 describe('canvas interaction lock', () => {
+  it('reuses lock reads across unrelated aggregate changes and invalidates every relevant immutable input', () => {
+    const item = createQueueItem({ revision: 1, status: 'running' });
+    const readStatus = vi.fn(() => 'running');
+    Object.defineProperty(item, 'status', { get: readStatus });
+    let project: { canvas: ReturnType<typeof createCanvas>; queue: { items: QueueItem[] } } | undefined = {
+      canvas: createCanvas(),
+      queue: { items: [item] },
+    };
+    const read = createCanvasInteractionLockReader(() => project);
+    expect(read()).toBe(true);
+    const initialReads = readStatus.mock.calls.length;
+    expect(initialReads).toBeGreaterThan(0);
+    for (let index = 0; index < 20; index++) {
+      project = {
+        ...project!,
+        canvas: {
+          ...project!.canvas,
+          document: { ...project!.canvas.document },
+          stagingArea: { ...project!.canvas.stagingArea, selectedImageIndex: index },
+        },
+        queue: { ...project!.queue },
+      };
+      expect(read()).toBe(true);
+    }
+    expect(readStatus).toHaveBeenCalledTimes(initialReads);
+    project.canvas = { ...project.canvas, documentRevision: 2 };
+    expect(read()).toBe(false);
+    project.queue = { items: [createQueueItem({ revision: 2, status: 'pending' })] };
+    expect(read()).toBe(true);
+    project.queue = { items: [] };
+    expect(read()).toBe(false);
+    project.canvas = {
+      ...project.canvas,
+      stagingArea: { ...project.canvas.stagingArea, pendingImages: [createStagedCandidate()] },
+    };
+    expect(read()).toBe(true);
+    project.canvas = { ...project.canvas, stagingArea: { ...project.canvas.stagingArea, pendingImages: [] } };
+    expect(read()).toBe(false);
+    const restored = project;
+    project = undefined;
+    expect(read()).toBe(true);
+    project = restored;
+    expect(read()).toBe(false);
+  });
+
   it.each([
     {
       expected: {
@@ -152,6 +198,12 @@ describe('canvas interaction lock', () => {
 
   it('locks while a staged candidate exists', () => {
     expect(isCanvasInteractionLocked(createCanvas({ staged: true }), [])).toBe(true);
+  });
+
+  it.each(['completed', 'cancelled'] as const)('retains the lock for a candidate from a %s queue item', (status) => {
+    const canvas = createCanvas({ staged: true });
+    const item = { ...createQueueItem({ status }), id: 'queue-staged' };
+    expect(isCanvasInteractionLocked(canvas, [item])).toBe(true);
   });
 
   it('locks for a pending queue item on the current document revision without staging slots', () => {

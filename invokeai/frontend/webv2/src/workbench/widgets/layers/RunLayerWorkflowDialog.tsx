@@ -3,7 +3,7 @@ import type { ProjectGraphState } from '@features/workflow/contracts';
 import type { CanvasExportCapability, CanvasLayerCapability } from '@workbench/canvas-engine/api';
 import type { FormEvent } from 'react';
 
-import { chakra, createListCollection, Dialog, Portal, Stack, Text } from '@chakra-ui/react';
+import { chakra, createListCollection, Portal, Stack, Text } from '@chakra-ui/react';
 import { galleryDurability, galleryImages } from '@features/gallery';
 import { invalidateGalleryItems } from '@features/gallery/queries';
 import { runUtilityGraph } from '@features/queue/utility';
@@ -23,6 +23,7 @@ import { createUuid } from '@platform/browser/randomUuid';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { socketHub } from '@platform/transport/socketHub';
 import { Button, CloseButton, Field, Select } from '@platform/ui';
+import { Dialog } from '@platform/ui/Dialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { getCanvasOperations } from '@workbench/canvas-operations/api';
 import { getActiveProjectGraph } from '@workbench/projectWorkflows';
@@ -124,6 +125,8 @@ interface RunLayerWorkflowDialogProps {
   isOpen: boolean;
   layerId: string;
   onClose(): void;
+  /** After the close animation; a host may remount the dialog here so its next open starts fresh. */
+  onExitComplete?(): void;
 }
 
 interface SelectionState {
@@ -193,6 +196,7 @@ export const RunLayerWorkflowDialog = ({
   isOpen,
   layerId,
   onClose,
+  onExitComplete,
 }: RunLayerWorkflowDialogProps) => {
   const { t } = useTranslation();
   const notify = useNotify();
@@ -458,7 +462,14 @@ export const RunLayerWorkflowDialog = ({
   const canRun = engine !== null && !isRunning && readinessMessage === null;
 
   return (
-    <Dialog.Root lazyMount open={isOpen} size="sm" unmountOnExit onOpenChange={handleOpenChange}>
+    <Dialog.Root
+      lazyMount
+      open={isOpen}
+      size="sm"
+      unmountOnExit
+      onExitComplete={onExitComplete}
+      onOpenChange={handleOpenChange}
+    >
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
@@ -475,7 +486,7 @@ export const RunLayerWorkflowDialog = ({
                       collection={outputCollection}
                       disabled={isRunning || availability.outputs.length === 0}
                       positioning={SELECT_POSITIONING}
-                      size="sm"
+                      size="lg"
                       value={outputValue}
                       onValueChange={handleOutputChange}
                     />
@@ -486,7 +497,7 @@ export const RunLayerWorkflowDialog = ({
                       collection={inputCollection}
                       disabled={isRunning || runnableInputs.length === 0}
                       positioning={SELECT_POSITIONING}
-                      size="sm"
+                      size="lg"
                       value={inputValue}
                       onValueChange={handleInputChange}
                     />
@@ -497,33 +508,33 @@ export const RunLayerWorkflowDialog = ({
                       collection={destinationCollection}
                       disabled={isRunning}
                       positioning={SELECT_POSITIONING}
-                      size="sm"
+                      size="lg"
                       value={destinationValue}
                       onValueChange={handleDestinationChange}
                     />
                   </Field>
                   {readinessMessage ? (
-                    <Text color="fg.error" fontSize="xs" role="alert">
+                    <Text color="fg.error" fontSize="md" role="alert">
                       {readinessMessage}
                     </Text>
                   ) : null}
                   {error ? (
-                    <Text color="fg.error" fontSize="xs" role="alert">
+                    <Text color="fg.error" fontSize="md" role="alert">
                       {error}
                     </Text>
                   ) : null}
                   {isRunning ? (
-                    <Text color="fg.muted" fontSize="xs" role="status">
+                    <Text color="fg.muted" fontSize="md" role="status">
                       {t('widgets.layers.runWorkflow.running')}
                     </Text>
                   ) : null}
                 </Stack>
               </Dialog.Body>
               <Dialog.Footer>
-                <Button size="xs" type="button" variant="ghost" onClick={close}>
+                <Button type="button" variant="ghost" onClick={close}>
                   {t('widgets.layers.runWorkflow.cancel')}
                 </Button>
-                <Button disabled={!canRun} loading={isRunning} size="xs" type="submit" variant="solid">
+                <Button disabled={!canRun} loading={isRunning} type="submit" variant="solid">
                   {t('widgets.layers.runWorkflow.run')}
                 </Button>
               </Dialog.Footer>

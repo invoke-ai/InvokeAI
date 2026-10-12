@@ -25,12 +25,12 @@ import type {
   GenerateSettings,
   MainModelConfig,
   PidMode,
-  VaePrecision,
 } from './types';
 
 import {
   getCompatibleDiffusersComponentSource,
   isBundledMainForBase,
+  isAnimaQwen35Encoder,
   isAnimaQwen3Encoder,
   isClipVariant,
   isDiffusersMainForBase,
@@ -168,49 +168,6 @@ const ANIMA_SCHEDULERS = new Set(ANIMA_SCHEDULER_OPTIONS.map((option) => option.
 export const isKnownScheduler = (value: string): boolean => KNOWN_SCHEDULERS.has(value);
 
 export { isSupportedGenerateBase, SUPPORTED_GENERATE_BASES, type SupportedGenerateBase };
-
-export interface GenerationModelPolicy {
-  isSupported: boolean;
-  dimensions: {
-    grid: number;
-    min: number;
-    max: number;
-    optimal: number;
-  };
-  defaults: {
-    steps: number;
-    cfgScale: number;
-    cfgRescaleMultiplier: number;
-    scheduler: string;
-    vaePrecision: VaePrecision;
-  };
-  scheduler: {
-    options: readonly SchedulerOption[];
-    defaultValue: string;
-    appliesToGraph: boolean;
-    coerceForGraph: (value: string) => string;
-  };
-  prompt: {
-    negativeVisible: boolean;
-    negativeUsedInGraph: boolean;
-    negativeHelpText?: string;
-  };
-  ui: {
-    guidanceLabel: GuidanceLabel;
-    /** The node-enforced floor for the guidance control; `null` max means the node enforces none. */
-    guidanceMin: number;
-    guidanceMax: number | null;
-    schedulerVisible: boolean;
-    clipSkipMax: number | null;
-    cfgRescaleVisible: boolean;
-    colorCompensationVisible: boolean;
-    hiDiffusionVisible: boolean;
-    seamlessVisible: boolean;
-    sdVaeVisible: boolean;
-    vaePrecisionVisible: boolean;
-    seedVisible: boolean;
-  };
-}
 
 const FALLBACK_GENERATION_CONFIG: BaseGenerationConfig = {
   dimensions: { grid: 8, optimalSide: 1024 },
@@ -380,10 +337,7 @@ export const getPromptPolicy = (
   };
 };
 
-export const getGenerationUiPolicy = (
-  model: GenerateModelConfig | undefined,
-  _settings: Pick<GenerateSettings, 'cfgScale'>
-) => {
+export const getGenerationUiPolicy = (model: GenerateModelConfig | undefined) => {
   const config = getBaseGenerationConfig(model);
   const seedVisible = model?.type === 'external_image_generator' ? model.capabilities?.supports_seed === true : true;
 
@@ -448,6 +402,7 @@ export const getPromptHistoryRecallPatch = ({
 
 export const EXTERNAL_PROVIDER_NODE_TYPES: Record<string, string> = {
   alibabacloud: 'alibabacloud_image_generation',
+  atlascloud: 'atlascloud_image_generation',
   gemini: 'gemini_image_generation',
   openai: 'openai_image_generation',
   seedream: 'seedream_image_generation',
@@ -455,29 +410,6 @@ export const EXTERNAL_PROVIDER_NODE_TYPES: Record<string, string> = {
 
 export const getExternalProviderNodeType = (providerId: unknown): string | null =>
   typeof providerId === 'string' ? (EXTERNAL_PROVIDER_NODE_TYPES[providerId] ?? null) : null;
-
-export const getGenerationModelPolicy = (
-  model: GenerateModelConfig | undefined,
-  settings: GenerateSettings
-): GenerationModelPolicy => {
-  const config = getBaseGenerationConfig(model);
-  const dimensions = getGenerationDimensions(model);
-  const defaults = getGenerationDefaults(model);
-
-  return {
-    isSupported: model ? isSupportedGenerateModel(model) : false,
-    dimensions,
-    defaults,
-    scheduler: {
-      options: getSchedulerOptions(model, settings.scheduler),
-      defaultValue: defaults.scheduler,
-      appliesToGraph: config.schedulerAppliesToGraph,
-      coerceForGraph: (value: string) => coerceSchedulerForGraph(model, value),
-    },
-    prompt: getPromptPolicy(model, settings),
-    ui: getGenerationUiPolicy(model, settings),
-  };
-};
 
 export const getDefaultGenerateSettings = (model?: GenerateModelConfig): GenerateSettings => {
   const defaults = getGenerationDefaults(model);
@@ -503,6 +435,7 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     dynamicPromptsCombinatorial: true,
     dynamicPromptsMaxPrompts: DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS,
     dynamicPromptsSampleSeed: 0,
+    dynamicPromptsResample: true,
     dynamicPromptsSeedBehaviour: 'per-iteration',
     clipEmbedModel: null,
     clipGEmbedModel: null,
@@ -524,6 +457,7 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     qwen3EncoderModel: null,
     qwenVLEncoderModel: null,
     qwen3VLEncoderModel: null,
+    qwen35EncoderModel: null,
     wanT5EncoderModel: null,
     ideogram4UnconditionalModel: null,
     wanLowNoiseModel: null,
@@ -592,6 +526,7 @@ export type GenerateComponentValueKey =
   | 'qwen3EncoderModel'
   | 'qwenVLEncoderModel'
   | 'qwen3VLEncoderModel'
+  | 'qwen35EncoderModel'
   | 'wanT5EncoderModel'
   | 'wanLowNoiseModel'
   | 'ideogram4UnconditionalModel'
@@ -600,9 +535,12 @@ export type GenerateComponentValueKey =
   | 'gemma2EncoderModel'
   | 'vae';
 
+/** The settings component slot rules read beyond the selected components themselves. */
+export type ComponentPolicySettings = Pick<GenerateSettings, 'componentSourceModel' | 'pidMode'>;
+
 export interface ComponentPolicyContext {
   model: GenerateModelConfig;
-  settings: GenerateSettings;
+  settings: ComponentPolicySettings;
   selectedComponents: Pick<GenerateSettings, GenerateComponentValueKey>;
 }
 
@@ -636,6 +574,7 @@ const TYPE_MISTRAL: ModelTaxonomyType[] = ['mistral_encoder'];
 const TYPE_QWEN3: ModelTaxonomyType[] = ['qwen3_encoder'];
 const TYPE_QWEN_VL: ModelTaxonomyType[] = ['qwen_vl_encoder'];
 const TYPE_QWEN3_VL: ModelTaxonomyType[] = ['qwen3_vl_encoder'];
+const TYPE_QWEN35: ModelTaxonomyType[] = ['qwen3_5_encoder'];
 const TYPE_WAN_T5: ModelTaxonomyType[] = ['wan_t5_encoder'];
 const TYPE_PID_DECODER: ModelTaxonomyType[] = ['pid_decoder'];
 const TYPE_GEMMA2: ModelTaxonomyType[] = ['gemma2_encoder'];
@@ -697,6 +636,16 @@ const qwen3VlEncoderSlot = (helpText: string, filter: GenerateComponentFilter): 
     valueKind: 'component',
     helpText,
     filter,
+  });
+
+const qwen35EncoderSlot = (helpText: string): ComponentSlotPolicy =>
+  slot({
+    key: 'qwen35EncoderModel',
+    label: 'Qwen3.5 Encoder',
+    modelTypes: TYPE_QWEN35,
+    valueKind: 'component',
+    helpText,
+    filter: wrapFilter(isAnimaQwen35Encoder),
   });
 
 /** Expose PiD slots before enabling it; Z-Image uses FLUX's decoder. */
@@ -902,7 +851,7 @@ const EMPTY_COMPONENT_POLICY: ComponentSectionPolicy = createPolicy(false, []);
 
 const getBaseComponentSectionPolicy = (
   model: GenerateModelConfig | undefined,
-  _settings: GenerateSettings
+  _settings: ComponentPolicySettings
 ): ComponentSectionPolicy => {
   if (!model || model.type === 'external_image_generator') {
     return EMPTY_COMPONENT_POLICY;
@@ -1107,6 +1056,16 @@ const getBaseComponentSectionPolicy = (
           required: () => true,
           missingMessage: 'Generate needs a Qwen3 Encoder for Anima models.',
         },
+        // Anima-3.8B reads a second encoder through its bundled semantic connector; no other Anima does.
+        ...(model.variant === 'anima_qwen35'
+          ? [
+              {
+                ...qwen35EncoderSlot('Anima-3.8B reads Qwen3.5 4B beside Qwen3 0.6B. Required for this model.'),
+                required: () => true,
+                missingMessage: 'Generate needs a Qwen3.5 Encoder for Anima-3.8B.',
+              },
+            ]
+          : []),
         {
           ...vaeSlot(
             'Anima decodes with the 16-channel Wan 2.1 VAE, which may be installed under the Anima, Qwen-Image, or Wan base, so all three are listed. Required for Anima models.',
@@ -1124,7 +1083,7 @@ const getBaseComponentSectionPolicy = (
 /** Add and validate PiD slots; each base policy retains ownership of its other component validation. */
 export const getComponentSectionPolicy = (
   model: GenerateModelConfig | undefined,
-  settings: GenerateSettings
+  settings: ComponentPolicySettings
 ): ComponentSectionPolicy => {
   const policy = getBaseComponentSectionPolicy(model, settings);
 
@@ -1153,6 +1112,7 @@ const getComponentPolicyContext = (model: GenerateModelConfig, settings: Generat
     qwen3EncoderModel: settings.qwen3EncoderModel,
     qwenVLEncoderModel: settings.qwenVLEncoderModel,
     qwen3VLEncoderModel: settings.qwen3VLEncoderModel,
+    qwen35EncoderModel: settings.qwen35EncoderModel,
     wanT5EncoderModel: settings.wanT5EncoderModel,
     wanLowNoiseModel: settings.wanLowNoiseModel,
     ideogram4UnconditionalModel: settings.ideogram4UnconditionalModel,
@@ -1171,6 +1131,7 @@ const COMPONENT_SETTING_LABELS: Record<GenerateComponentValueKey, string> = {
   qwen3EncoderModel: 'Qwen3 Encoder',
   qwenVLEncoderModel: 'Qwen VL Encoder',
   qwen3VLEncoderModel: 'Qwen3-VL Encoder',
+  qwen35EncoderModel: 'Qwen3.5 Encoder',
   wanT5EncoderModel: 'Wan T5 Encoder',
   wanLowNoiseModel: 'Low-noise expert',
   ideogram4UnconditionalModel: 'Transformer (Unconditional)',
@@ -1232,6 +1193,26 @@ const isFluxKontextModel = (model: GenerateModelConfig | undefined): model is Ma
     model.base === 'flux' &&
     model.name.toLowerCase().includes('kontext')
   );
+
+/**
+ * Families whose Generate graph loads LoRAs. The backend installs no LoRAs for the others, so their concept picker
+ * could only ever be empty; graph coverage holds the builders to this list.
+ */
+const LORA_SUPPORTED_BASES: ReadonlySet<string> = new Set<SupportedGenerateBase>([
+  'anima',
+  'flux',
+  'flux2',
+  'krea-2',
+  'qwen-image',
+  'sd-1',
+  'sd-2',
+  'sdxl',
+  'wan',
+  'z-image',
+]);
+
+export const isLoraSupported = (model: GenerateModelConfig | undefined): boolean =>
+  Boolean(model && model.type !== 'external_image_generator' && LORA_SUPPORTED_BASES.has(model.base));
 
 /** Picker and validation must agree on compatibility, including required variants. */
 export const isReferenceImageSupported = (model: GenerateModelConfig | undefined): boolean => {
@@ -1412,7 +1393,7 @@ const getSettingsWithCompatibleModelSelections = (
 
   const policy = getComponentSectionPolicy(model, nextSettings);
   const slotsByKey = new Map(policy.slots.map((slotPolicy) => [slotPolicy.key, slotPolicy]));
-  const uiPolicy = getGenerationUiPolicy(model, nextSettings);
+  const uiPolicy = getGenerationUiPolicy(model);
 
   for (const key of Object.keys(COMPONENT_SETTING_LABELS) as GenerateComponentValueKey[]) {
     if (!nextSettings[key]) {

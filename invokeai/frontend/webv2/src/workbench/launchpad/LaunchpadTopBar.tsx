@@ -1,6 +1,6 @@
 import type { BackendConnectionStatus } from '@platform/transport/types';
 
-import { Box, Flex, HStack, Text } from '@chakra-ui/react';
+import { Badge, Box, Flex, HStack, Text } from '@chakra-ui/react';
 import { AccountMenu } from '@features/identity';
 import { useConnectionStatusSelector } from '@platform/transport/connectionStore';
 import { InvokeMark } from '@platform/ui/InvokeMark';
@@ -21,24 +21,11 @@ const ConnectionChip = () => {
     return null;
   }
 
-  const isDown = status === 'disconnected';
-
   return (
-    <HStack
-      aria-live="polite"
-      bg="bg.muted"
-      borderColor={isDown ? 'border.error' : 'border.subtle'}
-      borderWidth="1px"
-      gap="1.5"
-      px="2.5"
-      py="1"
-      rounded="full"
-    >
-      <Box aria-hidden bg={isDown ? 'fg.error' : 'fg.muted'} boxSize="1.5" rounded="full" />
-      <Text color={isDown ? 'fg.error' : 'fg.muted'} fontSize="2xs" fontWeight="600">
-        {t(CONNECTION_LABEL_KEY[status])}
-      </Text>
-    </HStack>
+    <Badge aria-live="polite" colorPalette={status === 'disconnected' ? 'red' : 'gray'} size="xl" variant="subtle">
+      <Box aria-hidden bg="currentColor" boxSize="1.5" rounded="full" />
+      {t(CONNECTION_LABEL_KEY[status])}
+    </Badge>
   );
 };
 
@@ -55,7 +42,7 @@ export const LaunchpadTopBar = () => (
   >
     <HStack gap="3">
       <InvokeMark size={20} />
-      <Text fontSize="sm" fontWeight="700">
+      <Text fontSize="lg" fontWeight="700">
         Invoke
       </Text>
     </HStack>

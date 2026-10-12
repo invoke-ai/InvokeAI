@@ -1,5 +1,10 @@
-import type { CanvasAdjustmentEntry, RegionalGuidanceReferenceImage } from '@workbench/canvas-engine/api';
+import type {
+  CanvasAdjustmentEntry,
+  DocumentCommand,
+  RegionalGuidanceReferenceImage,
+} from '@workbench/canvas-engine/api';
 
+import { createDocumentModel } from '@workbench/canvas-engine/api';
 import {
   documentFrom,
   groupContract,
@@ -10,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 import {
   getLayerChildItem,
   layerChildDropCommand,
+  layerChildMoveTargets,
   layerChildRowCommand,
   layerChildRowKey,
   projectLayerChildRows,
@@ -398,6 +404,76 @@ describe('layerChildDropCommand', () => {
     expect(layerChildDropCommand(document, adjustment, { beforeItemId: null, layerId: 'r1' })).toBeNull();
     expect(layerChildDropCommand(document, adjustment, { beforeItemId: 'a3', layerId: 'r1' })).toBeNull();
     expect(layerChildDropCommand(document, adjustment, { beforeItemId: null, layerId: 'rg1' })).toBeNull();
+  });
+
+  describe('moving an adjustment to another owner', () => {
+    const owners = (target: object = {}) => [
+      layerContract('r1', 'raster', { adjustments: entries(), name: 'Source' }),
+      layerContract('r2', 'raster', {
+        adjustments: [{ id: 'b1', isEnabled: true, type: 'invert' as const }],
+        name: 'Target',
+        ...target,
+      }),
+      groupContract('g1', [layerContract('r3', 'raster', { name: 'Member' })], { name: 'Group' }),
+      layerContract('c1', 'control', { name: 'Control' }),
+    ];
+    type AdjustmentPatch = { id: string; config: { layerType: string; adjustments: CanvasAdjustmentEntry[] } };
+    const patchesOf = (command: DocumentCommand | null) =>
+      command?.type === 'patch-config-batch'
+        ? (command.patches as unknown as AdjustmentPatch[]).map((patch) => [
+            patch.id,
+            patch.config.layerType,
+            patch.config.adjustments.map((entry) => entry.id),
+          ])
+        : null;
+
+    it('removes the entry from its owner and inserts it among the destination entries as one batch', () => {
+      const document = documentFrom(owners());
+      const command = layerChildDropCommand(document, adjustment, { beforeItemId: 'b1', layerId: 'r2' });
+      expect(patchesOf(command)).toEqual([
+        ['r1', 'raster', ['a1', 'a2']],
+        ['r2', 'raster', ['a3', 'b1']],
+      ]);
+      // The entry travels whole: same id, same settings.
+      const landed = (command as unknown as { patches: AdjustmentPatch[] }).patches[1]!.config.adjustments[0];
+      expect(landed).toEqual(entries()[2]);
+      expect(createDocumentModel(document, { editRevision: 0, projectId: 'p' }).refusalFor(command!)).toBeNull();
+    });
+
+    it('appends to a raster group through the group arm', () => {
+      const document = documentFrom(owners());
+      expect(patchesOf(layerChildDropCommand(document, adjustment, { beforeItemId: null, layerId: 'g1' }))).toEqual([
+        ['r1', 'raster', ['a1', 'a2']],
+        ['g1', 'group', ['a3']],
+      ]);
+    });
+
+    it('refuses owners that cannot hold adjustments, colliding ids, and landings above a region', () => {
+      const document = documentFrom(owners());
+      expect(layerChildDropCommand(document, adjustment, { beforeItemId: null, layerId: 'c1' })).toBeNull();
+      expect(layerChildDropCommand(document, adjustment, { beforeItemId: null, layerId: 'gone' })).toBeNull();
+      const colliding = documentFrom(owners({ adjustments: [{ ...entries()[2]!, isEnabled: false }] }));
+      expect(layerChildDropCommand(colliding, adjustment, { beforeItemId: null, layerId: 'r2' })).toBeNull();
+      const withRegion = documentFrom(
+        owners({ inpaint: { fill: { color: '#e07575', style: 'diagonal' }, isEnabled: true } })
+      );
+      expect(layerChildDropCommand(withRegion, adjustment, { beforeItemId: 'inpaint', layerId: 'r2' })).toBeNull();
+      expect(patchesOf(layerChildDropCommand(withRegion, adjustment, { beforeItemId: 'b1', layerId: 'r2' }))).toEqual([
+        ['r1', 'raster', ['a1', 'a2']],
+        ['r2', 'raster', ['a3', 'b1']],
+      ]);
+    });
+
+    it('lists every other raster layer and group as a move target, in panel order', () => {
+      const document = documentFrom(owners());
+      expect(
+        layerChildMoveTargets(document, { ...adjustment, stack: 'raster' }).map((target) => [target.id, target.name])
+      ).toEqual([
+        ['r2', 'Target'],
+        ['g1', 'Group'],
+        ['r3', 'Member'],
+      ]);
+    });
   });
 
   it('reorders a reference image within its layer', () => {

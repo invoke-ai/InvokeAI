@@ -2,40 +2,44 @@ import type { InvocationTemplate, InvocationTemplates } from '@features/workflow
 import type { WorkflowEdge, WorkflowNode } from '@features/workflow/core/types';
 import type { AddNodeConnectionFilter } from '@features/workflow/ui/workflowUiStore';
 
-import { Badge, Box, Dialog, HStack, Icon, Input, Portal, ScrollArea, Stack, Text } from '@chakra-ui/react';
-import { useInvocationTemplatesSelector } from '@features/workflow/react';
+import { Badge, Box, HStack, Icon, Input, Portal, ScrollArea, Spinner, Stack, Text } from '@chakra-ui/react';
+import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSelector } from '@features/workflow/react';
 import { useWorkflowPreferencesSelector, useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
 import {
   getCompatibleInputTemplate,
   getCompatibleOutputTemplate,
+  getFieldTypeLabel,
   LOOP_LINKAGE_FIELD,
   resolveConnectorSource,
 } from '@features/workflow/utility';
-import { useMountEffect } from '@platform/react/useMountEffect';
-import { IconButton, Tooltip } from '@platform/ui';
+import { isImeComposing } from '@platform/browser/imeComposition';
+import { useExitPresence } from '@platform/react/useExitRetainedValue';
+import { Button, IconButton, Tooltip } from '@platform/ui';
+import { Dialog } from '@platform/ui/Dialog';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { ChevronDownIcon, ChevronsDownUpIcon, ChevronsUpDownIcon, HammerIcon } from 'lucide-react';
 import {
   startTransition,
   useCallback,
   useMemo,
+  useRef,
   useState,
   type ChangeEvent,
   type KeyboardEvent,
   type ReactNode,
 } from 'react';
 import { useVirtualizer } from 'react-hook-tanstack-virtual';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Searching expands all node groups without capping results and ranks the closest names first; idle groups collapse
  * and UI-only nodes lead in Utility. With grouping off, results are one ranked list.
  */
 
-const UTILITY_CATEGORY = 'Utility';
 const CATEGORY_ROW_HEIGHT_PX = 28;
 const NODE_ROW_HEIGHT_PX = 44;
 const RESULT_LIST_ID = 'add-node-dialog-results';
-const ROW_HOVER_PROPS = { bg: 'bg.emphasized' };
+const ROW_HOVER_PROPS = { bg: 'bg.hover' };
 const VIRTUALIZER_INITIAL_RECT = { height: 384, width: 0 };
 
 const toCategoryLabel = (value: string): string =>
@@ -144,12 +148,11 @@ const isForIterationOutputConnection = (
   );
 };
 
-const getConnectionFilterName = (connectionFilter: AddNodeConnectionFilter): string => {
-  if (connectionFilter.kind === 'source') {
-    return connectionFilter.sourceType?.name ?? 'connector';
-  }
+/** The field type a pending connection needs; null when it starts at a connector whose type is still unresolved. */
+const getConnectionFilterTypeLabel = (connectionFilter: AddNodeConnectionFilter): string | null => {
+  const type = connectionFilter.kind === 'source' ? connectionFilter.sourceType : connectionFilter.targetType;
 
-  return connectionFilter.targetType?.name ?? 'connector';
+  return type ? getFieldTypeLabel(type) : null;
 };
 
 interface NodeRow {
@@ -183,6 +186,7 @@ const compareRows = (a: NodeRow, b: NodeRow, shouldPromoteForReturn: boolean): n
 };
 
 interface CategoryGroup {
+  isUtility: boolean;
   label: string;
   rows: NodeRow[];
 }
@@ -205,47 +209,51 @@ const NodeResultRow = ({
   level: 1 | 2;
   onActive: () => void;
   row: NodeRow;
-}) => (
-  <Box
-    id={id}
-    as="button"
-    aria-level={level}
-    aria-selected={isActive}
-    bg={isActive ? 'bg.emphasized' : undefined}
-    role="treeitem"
-    tabIndex={-1}
-    _hover={ROW_HOVER_PROPS}
-    ps={level === 1 ? '1.5' : '5'}
-    pe="1.5"
-    py="1.5"
-    rounded="md"
-    textAlign="start"
-    w="full"
-    onClick={row.onAdd}
-    onMouseEnter={onActive}
-  >
-    <HStack gap="2" justify="space-between" alignItems="start">
-      <Stack gap="0" minW="0">
-        <HStack gap="1.5" minW="0">
-          {row.isBeta ? (
-            <Tooltip content="Beta node — may change in the future">
-              <Icon as={HammerIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
-            </Tooltip>
+}) => {
+  const { t } = useTranslation();
+
+  return (
+    <Box
+      id={id}
+      as="button"
+      aria-level={level}
+      aria-selected={isActive}
+      bg={isActive ? 'bg.hover' : undefined}
+      role="treeitem"
+      tabIndex={-1}
+      _hover={ROW_HOVER_PROPS}
+      ps={level === 1 ? '1.5' : '5'}
+      pe="1.5"
+      py="1.5"
+      rounded="md"
+      textAlign="start"
+      w="full"
+      onClick={row.onAdd}
+      onMouseEnter={onActive}
+    >
+      <HStack gap="2" justify="space-between" alignItems="start">
+        <Stack gap="0" minW="0">
+          <HStack gap="1.5" minW="0">
+            {row.isBeta ? (
+              <Tooltip content={t('widgets.workflow.addNodeDialog.betaNode')}>
+                <Icon as={HammerIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
+              </Tooltip>
+            ) : null}
+            <MiddleTruncate fontSize="md" fontWeight="600" text={row.title} />
+          </HStack>
+          {row.description ? (
+            <Text color="fg.subtle" fontSize="xs" lineClamp={2} lineHeight="1.4">
+              {row.description}
+            </Text>
           ) : null}
-          <MiddleTruncate fontSize="xs" fontWeight="600" text={row.title} />
-        </HStack>
-        {row.description ? (
-          <Text color="fg.subtle" fontSize="2xs" lineClamp={2} lineHeight="1.4">
-            {row.description}
-          </Text>
-        ) : null}
-      </Stack>
-      <Badge size="xs" variant="outline" fontFamily="mono">
-        {row.nodePack}
-      </Badge>
-    </HStack>
-  </Box>
-);
+        </Stack>
+        <Badge variant="outline" fontFamily="mono">
+          {row.nodePack}
+        </Badge>
+      </HStack>
+    </Box>
+  );
+};
 
 const CategoryHeaderRow = ({
   group,
@@ -271,7 +279,7 @@ const CategoryHeaderRow = ({
       aria-expanded={isExpanded}
       aria-level={1}
       aria-selected={isActive}
-      bg={isActive ? 'bg.emphasized' : undefined}
+      bg={isActive ? 'bg.hover' : undefined}
       role="treeitem"
       tabIndex={-1}
       _hover={ROW_HOVER_PROPS}
@@ -293,10 +301,10 @@ const CategoryHeaderRow = ({
           transform={isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)'}
           transition="transform var(--wb-motion-duration-fast) ease-out"
         />
-        <Text flex="1" fontSize="xs" fontWeight="700">
+        <Text flex="1" fontSize="md" fontWeight="700">
           {group.label}
         </Text>
-        <Badge size="sm" variant="surface" fontFamily="mono">
+        <Badge size="lg" variant="surface" fontFamily="mono">
           {group.rows.length}
         </Badge>
       </HStack>
@@ -321,6 +329,15 @@ export const AddNodeDialog = ({
   onAddNote: () => void;
   onOpenChange: (isOpen: boolean) => void;
 }) => {
+  // The content stays mounted through the exit animation; a fresh mount per open resets search and expansion.
+  const content = useExitPresence(isOpen);
+  // The store clears the connection on close; keep filtering by it while the dialog animates out.
+  const [shownConnectionFilter, setShownConnectionFilter] = useState(connectionFilter);
+
+  if (isOpen && shownConnectionFilter !== connectionFilter) {
+    setShownConnectionFilter(connectionFilter);
+  }
+
   const onDialogOpenChange = useCallback(
     (event: { open: boolean }) => {
       if (!event.open) {
@@ -337,11 +354,13 @@ export const AddNodeDialog = ({
       scrollBehavior="inside"
       size="md"
       unmountOnExit
+      onExitComplete={content.release}
       onOpenChange={onDialogOpenChange}
     >
-      {isOpen ? (
+      {content.isMounted ? (
         <AddNodeDialogContent
-          connectionFilter={connectionFilter}
+          key={content.generation}
+          connectionFilter={shownConnectionFilter}
           onAddCurrentImage={onAddCurrentImage}
           onAddConnector={onAddConnector}
           onAddNode={onAddNode}
@@ -368,7 +387,8 @@ const AddNodeDialogContent = ({
   onAddNote: () => void;
   onOpenChange: (isOpen: boolean) => void;
 }) => {
-  const { getProjectGraph, registerModalHotkeyLayer } = useWorkflowUi();
+  const { t } = useTranslation();
+  const { getProjectGraph } = useWorkflowUi();
   const error = useInvocationTemplatesSelector((snapshot) => snapshot.error);
   const status = useInvocationTemplatesSelector((snapshot) => snapshot.status);
   const templates = useInvocationTemplatesSelector((snapshot) => snapshot.templates);
@@ -376,21 +396,14 @@ const AddNodeDialogContent = ({
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(() => new Set());
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
+  const [isRetryRequested, setIsRetryRequested] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const retryButtonRef = useRef<HTMLButtonElement | null>(null);
   const groupByCategory = useWorkflowPreferencesSelector((preferences) => preferences.workflowGroupNodesByCategory);
-
-  useMountEffect(() => registerModalHotkeyLayer('workflow-add-node'));
   const isSearching = searchTerm.trim().length > 0;
 
-  const close = useCallback(
-    (added: boolean) => {
-      onOpenChange(false);
-
-      if (added) {
-        setSearchTerm('');
-      }
-    },
-    [onOpenChange]
-  );
+  // Each open mounts fresh content, so the search needs no reset here; clearing it would reflow the closing list.
+  const close = useCallback(() => onOpenChange(false), [onOpenChange]);
 
   const groups = useMemo<CategoryGroup[]>(() => {
     const query = parseSearchQuery(searchTerm);
@@ -403,40 +416,40 @@ const AddNodeDialogContent = ({
     );
     const utilityRows: NodeRow[] = [
       {
-        description: 'Route a connection through a compact pass-through handle.',
+        description: t('widgets.workflow.addNodeDialog.connectorDescription'),
         isBeta: false,
         key: 'utility:connector',
         nodePack: 'invokeai',
         onAdd: () => {
           onAddConnector();
-          close(true);
+          close();
         },
-        title: 'Connector',
+        title: t('widgets.workflow.addNodeDialog.connectorTitle'),
       },
       ...(connectionFilter
         ? []
         : [
             {
-              description: 'Annotate the workflow with a free-text note.',
+              description: t('widgets.workflow.addNodeDialog.notesDescription'),
               isBeta: false,
               key: 'utility:notes',
               nodePack: 'invokeai',
               onAdd: () => {
                 onAddNote();
-                close(true);
+                close();
               },
-              title: 'Notes',
+              title: t('widgets.workflow.addNodeDialog.notesTitle'),
             },
             {
-              description: 'Show the latest generated image (and live progress) inside the graph.',
+              description: t('widgets.workflow.addNodeDialog.currentImageDescription'),
               isBeta: false,
               key: 'utility:current_image',
               nodePack: 'invokeai',
               onAdd: () => {
                 onAddCurrentImage();
-                close(true);
+                close();
               },
-              title: 'Current Image',
+              title: t('widgets.workflow.addNodeDialog.currentImageTitle'),
             },
           ]),
     ].flatMap((row) => {
@@ -467,7 +480,7 @@ const AddNodeDialogContent = ({
         nodePack: template.nodePack,
         onAdd: () => {
           onAddNode(template);
-          close(true);
+          close();
         },
         rank,
         title: template.title,
@@ -477,16 +490,22 @@ const AddNodeDialogContent = ({
     }
 
     const groupsByLabel = [...byCategory.entries()].map(([label, rows]) => ({
+      isUtility: false,
       label,
       rows: rows.sort((a, b) => compareRows(a, b, shouldPromoteForReturn)),
     }));
     const allGroups =
-      utilityRows.length > 0 ? [{ label: UTILITY_CATEGORY, rows: utilityRows }, ...groupsByLabel] : groupsByLabel;
+      utilityRows.length > 0
+        ? [
+            { isUtility: true, label: t('widgets.workflow.addNodeDialog.utilityCategory'), rows: utilityRows },
+            ...groupsByLabel,
+          ]
+        : groupsByLabel;
 
     if (!groupByCategory) {
       const rows = allGroups.flatMap((group) => group.rows).sort((a, b) => compareRows(a, b, shouldPromoteForReturn));
 
-      return rows.length > 0 ? [{ label: '', rows }] : [];
+      return rows.length > 0 ? [{ isUtility: false, label: '', rows }] : [];
     }
 
     // Rows are sorted, so each group lists by its best row; Utility leads among equals.
@@ -502,8 +521,8 @@ const AddNodeDialogContent = ({
         return bestA.rank - bestB.rank;
       }
 
-      if ((a.label === UTILITY_CATEGORY) !== (b.label === UTILITY_CATEGORY)) {
-        return a.label === UTILITY_CATEGORY ? -1 : 1;
+      if (a.isUtility !== b.isUtility) {
+        return a.isUtility ? -1 : 1;
       }
 
       return a.label.localeCompare(b.label);
@@ -518,6 +537,7 @@ const AddNodeDialogContent = ({
     onAddNode,
     onAddNote,
     searchTerm,
+    t,
     templates,
   ]);
 
@@ -635,6 +655,10 @@ const AddNodeDialogContent = ({
 
   const onSearchKeyDown = useCallback(
     (event: KeyboardEvent<HTMLInputElement>) => {
+      if (isImeComposing(event.nativeEvent)) {
+        return;
+      }
+
       if (event.key === 'ArrowDown') {
         event.preventDefault();
         moveActiveIndex(1);
@@ -659,20 +683,82 @@ const AddNodeDialogContent = ({
     setActiveIndex(null);
   }, []);
 
-  let body: ReactNode;
+  // The failure stays on screen, with its Retry busy, until the retried load settles; a later reload started
+  // elsewhere shows as plain loading.
+  if (isRetryRequested && status !== 'loading') {
+    setIsRetryRequested(false);
+  }
 
-  if (status !== 'loaded') {
-    body = (
-      <Text color={status === 'error' ? 'fg.error' : 'fg.subtle'} fontSize="xs" px="1" py="4">
-        {status === 'error' ? (error ?? 'Failed to load node definitions.') : 'Loading node definitions…'}
+  const isRetrying = isRetryRequested && status === 'loading';
+  const onRetryClick = useCallback(() => {
+    if (isRetrying) {
+      return;
+    }
+
+    setIsRetryRequested(true);
+    ensureInvocationTemplatesLoaded();
+  }, [isRetrying]);
+  // A successful retry unmounts the focused Retry; the search, where adding a node starts, takes focus instead.
+  const attachRetryButton = useCallback((node: HTMLButtonElement | null) => {
+    const previous = retryButtonRef.current;
+
+    retryButtonRef.current = node;
+
+    if (node || !previous?.contains(document.activeElement)) {
+      return;
+    }
+
+    queueMicrotask(() => {
+      if (document.activeElement === null || document.activeElement === document.body) {
+        searchRef.current?.focus();
+      }
+    });
+  }, []);
+
+  const connectionTypeLabel = connectionFilter ? getConnectionFilterTypeLabel(connectionFilter) : null;
+  // Status messages sit beside the result tree rather than inside it: a tree may only own tree items.
+  let statusMessage: ReactNode = null;
+  let body: ReactNode = null;
+
+  if (status === 'error' || isRetrying) {
+    statusMessage = (
+      <Stack alignItems="start" aria-busy={isRetrying || undefined} gap="2" px="1" py="4" role="alert">
+        <Text color="fg.error" fontSize="md">
+          {t('widgets.workflow.addNodeDialog.loadFailed')}
+        </Text>
+        {error ? (
+          <Text color="fg.subtle" fontSize="xs">
+            {error}
+          </Text>
+        ) : null}
+        {/* aria-disabled rather than disabled while busy, so the Retry keeps focus. */}
+        <Button
+          ref={attachRetryButton}
+          aria-busy={isRetrying || undefined}
+          aria-disabled={isRetrying || undefined}
+          size="sm"
+          variant="outline"
+          onClick={onRetryClick}
+        >
+          {isRetrying ? <Spinner boxSize="3" /> : null}
+          {t('common.retry')}
+        </Button>
+      </Stack>
+    );
+  } else if (status !== 'loaded') {
+    statusMessage = (
+      <Text color="fg.subtle" fontSize="md" px="1" py="4">
+        {t('widgets.workflow.addNodeDialog.loading')}
       </Text>
     );
   } else if (totalCount === 0) {
-    body = (
-      <Text color="fg.subtle" fontSize="xs" px="1" py="4" textAlign="center">
-        {connectionFilter
-          ? `No compatible ${getConnectionFilterName(connectionFilter)} nodes.`
-          : 'No nodes match your search.'}
+    statusMessage = (
+      <Text color="fg.subtle" fontSize="md" px="1" py="4" textAlign="center">
+        {!connectionFilter
+          ? t('widgets.workflow.addNodeDialog.noMatches')
+          : connectionTypeLabel === null
+            ? t('widgets.workflow.addNodeDialog.noCompatibleMatchesAnyType')
+            : t('widgets.workflow.addNodeDialog.noCompatibleMatches', { type: connectionTypeLabel })}
       </Text>
     );
   } else {
@@ -703,30 +789,43 @@ const AddNodeDialogContent = ({
             <Stack gap="2" flex="1" minH="0">
               <HStack gap="2" flexShrink={0}>
                 <Input
+                  ref={searchRef}
                   autoFocus
                   aria-activedescendant={
                     effectiveActiveIndex === null ? undefined : getResultRowId(effectiveActiveIndex)
                   }
                   aria-controls={RESULT_LIST_ID}
                   aria-expanded="true"
-                  aria-label="Search for nodes"
+                  aria-label={t('widgets.workflow.addNodeDialog.search')}
                   flex="1"
                   placeholder={
-                    connectionFilter
-                      ? `Search compatible ${getConnectionFilterName(connectionFilter)} nodes…`
-                      : 'Search for nodes…'
+                    !connectionFilter
+                      ? t('widgets.workflow.addNodeDialog.searchPlaceholder')
+                      : connectionTypeLabel === null
+                        ? t('widgets.workflow.addNodeDialog.searchCompatiblePlaceholderAnyType')
+                        : t('widgets.workflow.addNodeDialog.searchCompatiblePlaceholder', { type: connectionTypeLabel })
                   }
                   role="combobox"
-                  size="sm"
+                  size="lg"
                   value={searchTerm}
                   onChange={onSearchChange}
                   onKeyDown={onSearchKeyDown}
                 />
                 {groupByCategory ? (
-                  <Tooltip content={isAllExpanded ? 'Collapse All' : 'Expand All'}>
+                  <Tooltip
+                    content={
+                      isAllExpanded
+                        ? t('widgets.workflow.addNodeDialog.collapseAll')
+                        : t('widgets.workflow.addNodeDialog.expandAll')
+                    }
+                  >
                     <IconButton
-                      aria-label={isAllExpanded ? 'Collapse all categories' : 'Expand all categories'}
-                      size="sm"
+                      aria-label={
+                        isAllExpanded
+                          ? t('widgets.workflow.addNodeDialog.collapseAllCategories')
+                          : t('widgets.workflow.addNodeDialog.expandAllCategories')
+                      }
+                      size="lg"
                       variant="ghost"
                       onClick={toggleAllCategories}
                     >
@@ -735,10 +834,18 @@ const AddNodeDialogContent = ({
                   </Tooltip>
                 ) : null}
               </HStack>
-              <ScrollArea.Root flex="1" minH="0" size="xs" variant="hover" w="full">
+              <ScrollArea.Root flex="1" minH="0" variant="hover" w="full">
                 <ScrollArea.Viewport ref={setScrollElement} h="full" w="full">
-                  <ScrollArea.Content id={RESULT_LIST_ID} aria-label="Node search results" role="tree" w="full">
-                    {body}
+                  <ScrollArea.Content w="full">
+                    {statusMessage}
+                    <Box
+                      id={RESULT_LIST_ID}
+                      aria-label={t('widgets.workflow.addNodeDialog.results')}
+                      role="tree"
+                      w="full"
+                    >
+                      {body}
+                    </Box>
                   </ScrollArea.Content>
                 </ScrollArea.Viewport>
                 <ScrollArea.Scrollbar>

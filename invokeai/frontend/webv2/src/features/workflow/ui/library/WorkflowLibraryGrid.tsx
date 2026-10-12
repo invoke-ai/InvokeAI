@@ -125,24 +125,24 @@ export const WorkflowLibraryGrid = ({
           </Box>
         ) : null}
         {!hasEntries && isPending ? (
-          <Text color="fg.subtle" fontSize="xs" py="6" textAlign="center">
+          <Text color="fg.subtle" fontSize="md" py="6" textAlign="center">
             {t('workflowLibrary.loading')}
           </Text>
         ) : null}
         {!hasEntries && !isPending ? (
-          <Text color="fg.subtle" fontSize="xs" py="6" textAlign="center">
+          <Text color="fg.subtle" fontSize="md" py="6" textAlign="center">
             {error ?? t('workflowLibrary.empty')}
           </Text>
         ) : null}
         {hasEntries && status === 'loadingMore' ? (
           <HStack color="fg.subtle" gap="2" justify="center" py="2">
-            <Spinner size="xs" />
-            <Text fontSize="2xs">{t('workflowLibrary.loadingMore')}</Text>
+            <Spinner />
+            <Text fontSize="xs">{t('workflowLibrary.loadingMore')}</Text>
           </HStack>
         ) : null}
         {hasEntries && error ? (
           // A failed page append never blanks the pages already loaded.
-          <Text color="fg.subtle" fontSize="2xs" py="2" textAlign="center">
+          <Text color="fg.subtle" fontSize="xs" py="2" textAlign="center">
             {error}
           </Text>
         ) : null}

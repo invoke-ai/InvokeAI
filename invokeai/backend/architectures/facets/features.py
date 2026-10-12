@@ -20,7 +20,7 @@ from invokeai.backend.model_manager.taxonomy import AnyVariant
 NegativePromptUsage = Literal["always", "cfg-gated", "never"]
 """`cfg-gated` means the field exists but only does anything above CFG 1 — the distilled models."""
 
-ControlKind = Literal["controlnet", "t2i_adapter", "control_lora", "z_image_control"]
+ControlKind = Literal["controlnet", "t2i_adapter", "control_lora", "z_image_control", "anima_lllite"]
 
 SchedulerSet = Literal["standard", "flow", "flow-no-lcm", "anima"]
 """Which family of schedulers to offer. `None` means the architecture drives its own and offers no

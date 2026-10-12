@@ -18,15 +18,22 @@ from typing import List, Literal, Optional, Union
 from huggingface_hub import hf_hub_url
 from pydantic import BaseModel, Field, TypeAdapter
 from pydantic.networks import AnyHttpUrl
+from requests import RequestException
 from requests.sessions import Session
 from typing_extensions import Annotated
 
 from invokeai.backend.model_manager.taxonomy import ModelRepoVariant
 from invokeai.backend.model_manager.util.select_hf_files import filter_files
 
+HF_METADATA_REQUEST_TIMEOUT_SECONDS = 15
+
 
 class UnknownMetadataException(Exception):
     """Raised when no metadata is available for a model."""
+
+
+class ModelMetadataUnavailableError(Exception):
+    """Raised when a remote metadata request fails at the network layer."""
 
 
 class RemoteModelFile(BaseModel):
@@ -121,7 +128,10 @@ class HuggingFaceMetadata(ModelMetadataWithFiles):
         # to the model (only for single subfolder case)
         if Path(f"{prefix}model_index.json") in paths:
             url = hf_hub_url(self.id, filename="model_index.json", subfolder=str(subfolder) if subfolder else None)
-            resp = session.get(url)
+            try:
+                resp = session.get(url, timeout=HF_METADATA_REQUEST_TIMEOUT_SECONDS)
+            except RequestException as e:
+                raise ModelMetadataUnavailableError(f"Could not fetch model index for '{self.id}'") from e
             resp.raise_for_status()
             submodels = resp.json()
             paths = [Path(subfolder or "", x) for x in paths if Path(x).parent.as_posix() in submodels]

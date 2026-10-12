@@ -8,7 +8,7 @@
     },
     "linux": {
       "cpu": "https://download.pytorch.org/whl/cpu",
-      "rocm": "https://download.pytorch.org/whl/rocm7.2",
+      "rocm": "https://stable.repo.amd.com/rocm/whl-next/",
       "cuda": "https://download.pytorch.org/whl/cu130",
       "xpu": "https://download.pytorch.org/whl/xpu"
     },

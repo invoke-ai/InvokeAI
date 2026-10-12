@@ -106,7 +106,7 @@ export const PromptTemplatesButton = ({
             // Quiet states only: dimmed while nothing is applied. No accent, no motion.
             opacity={activeTemplate ? undefined : 0.5}
             px="1"
-            size="2xs"
+            size="sm"
             variant="ghost"
             w="auto"
           >
@@ -114,13 +114,13 @@ export const PromptTemplatesButton = ({
             {activeTemplate ? (
               <MiddleTruncate
                 as="span"
-                fontSize="2xs"
+                fontSize="xs"
                 maxW="6rem"
                 opacity={isMissing ? 0.5 : undefined}
                 text={activeTemplate.name}
               />
             ) : (
-              <Text as="span" fontSize="2xs">
+              <Text as="span" fontSize="xs">
                 {t('widgets.generate.templatesButton')}
               </Text>
             )}

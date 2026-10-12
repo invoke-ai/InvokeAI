@@ -1,14 +1,13 @@
-"""The media reference extractor and index writer shared by project, workflow and migration code."""
+"""The media reference extractor, and the index writer frozen with the migrations that backfill the index."""
 
 import sqlite3
 
 import pytest
 
-from invokeai.app.services.shared.media_references import (
-    MediaReferences,
+from invokeai.app.services.shared.media_references import MediaReferences, extract_media_references
+from invokeai.app.services.shared.sqlite_migrator.migrations._media_references_v1 import (
     create_media_references_table,
     delete_media_references,
-    extract_media_references,
     replace_media_references,
 )
 

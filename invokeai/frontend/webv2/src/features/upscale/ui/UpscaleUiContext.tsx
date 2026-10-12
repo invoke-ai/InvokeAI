@@ -7,7 +7,11 @@ import { createContext, use, useMemo } from 'react';
 /** This UI port preserves dependency direction: Upscale cannot import Workbench. */
 export interface UpscaleUiAdapter {
   patchPromptDraft(values: ProjectPromptDraftPatch): void;
-  patchValues(values: Partial<UpscaleWidgetValues>, origin?: 'user' | 'system'): void;
+  /** Functional patches run synchronously against the originating project's latest normalized values. */
+  patchValues(
+    values: Partial<UpscaleWidgetValues> | ((current: UpscaleWidgetValues) => Partial<UpscaleWidgetValues>),
+    origin?: 'user' | 'system'
+  ): void;
   projectId: string;
   promptDraft: ProjectPromptDraft;
   rawValues: Record<string, unknown>;

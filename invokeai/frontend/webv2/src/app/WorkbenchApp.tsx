@@ -10,7 +10,7 @@ import { WorkbenchShell } from '@workbench/shell';
 import { WidgetHosts } from '@workbench/widget-frame/WidgetHosts';
 import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { WorkbenchProvider } from '@workbench/WorkbenchContext';
-import { WorkbenchRuntime } from '@workbench/WorkbenchRuntime';
+import { WorkbenchFocusProvider, WorkbenchRuntime } from '@workbench/WorkbenchRuntime';
 import { WorkbenchSessionController } from '@workbench/WorkbenchSessionController';
 import { WorkbenchWidgetRegistryProvider } from '@workbench/WorkbenchWidgetRegistryContext';
 import { useMemo } from 'react';
@@ -43,16 +43,19 @@ export const WorkbenchApp = () => {
         <GenerateWidgetSyncRuntime />
         <LLMTaskProgressRuntime />
         <RecallParametersRuntime />
-        <WorkbenchUiPorts>
-          <WorkbenchHotkeyRuntime />
-          <WorkbenchCommandPalette />
-          <QueueRuntimeAdapter />
-          <GalleryRealtimeRuntime />
-          <WorkbenchRuntime />
-          <WorkbenchSessionController search={search} />
-          <WidgetHosts />
-          <WorkbenchShell />
-        </WorkbenchUiPorts>
+        {/* Above the UI ports, the hotkey runtime, and the shell: they all read and move the same focus. */}
+        <WorkbenchFocusProvider>
+          <WorkbenchUiPorts>
+            <WorkbenchHotkeyRuntime />
+            <WorkbenchCommandPalette />
+            <QueueRuntimeAdapter />
+            <GalleryRealtimeRuntime />
+            <WorkbenchRuntime />
+            <WorkbenchSessionController search={search} />
+            <WidgetHosts />
+            <WorkbenchShell />
+          </WorkbenchUiPorts>
+        </WorkbenchFocusProvider>
       </WorkbenchWidgetRegistryProvider>
     </WorkbenchProvider>
   );

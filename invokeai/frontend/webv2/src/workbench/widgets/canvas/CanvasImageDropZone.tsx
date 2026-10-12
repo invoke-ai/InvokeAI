@@ -34,7 +34,7 @@ export const CanvasImageDropZone = ({ colSpan, data, id, labelKey, row }: Canvas
         position="absolute"
         variant="overlay"
       >
-        <Text color="fg" fontSize="sm" fontWeight="700" textAlign="center">
+        <Text color="fg" fontSize="lg" fontWeight="700" textAlign="center">
           {t(labelKey)}
         </Text>
       </DropZone>

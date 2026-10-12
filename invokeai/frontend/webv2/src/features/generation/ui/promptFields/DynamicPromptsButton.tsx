@@ -83,16 +83,16 @@ export const DynamicPromptsButton = ({
             color={expansion.isError ? 'fg.error' : undefined}
             opacity={expansion.isDynamic ? undefined : 0.5}
             px="1"
-            size="2xs"
+            size="sm"
             variant="ghost"
             w="auto"
           >
             <BracesIcon />
-            <Text as="span" fontSize="2xs">
+            <Text as="span" fontSize="xs">
               {t('widgets.generate.dynamicButton')}
             </Text>
             {countLabel ? (
-              <Text as="span" css={TABULAR_NUMS} fontSize="2xs">
+              <Text as="span" css={TABULAR_NUMS} fontSize="xs">
                 {countLabel}
               </Text>
             ) : null}

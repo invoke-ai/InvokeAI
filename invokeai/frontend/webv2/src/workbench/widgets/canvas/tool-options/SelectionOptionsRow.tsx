@@ -44,13 +44,7 @@ const OpModeButton = ({
   const Icon = OP_MODE_ICONS[mode];
   return (
     <Tooltip content={label}>
-      <IconButton
-        aria-label={label}
-        aria-pressed={active}
-        size="xs"
-        variant={active ? 'solid' : 'ghost'}
-        onClick={onClick}
-      >
+      <IconButton aria-label={label} aria-pressed={active} variant={active ? 'solid' : 'ghost'} onClick={onClick}>
         <Icon />
       </IconButton>
     </Tooltip>
@@ -101,7 +95,7 @@ const SelectionAction = ({
   }, [disabledReason, onClick]);
   return (
     <Tooltip content={disabledReason ?? ''} disabled={disabledReason === null}>
-      <Button aria-disabled={disabledReason !== null} size="xs" variant="ghost" onClick={guarded}>
+      <Button aria-disabled={disabledReason !== null} variant="ghost" onClick={guarded}>
         {label}
       </Button>
     </Tooltip>

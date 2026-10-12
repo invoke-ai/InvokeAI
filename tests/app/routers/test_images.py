@@ -1,6 +1,4 @@
 import os
-import sqlite3
-from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -18,6 +16,8 @@ from invokeai.app.services.board_records.board_records_common import BoardRecord
 from invokeai.app.services.image_records.image_records_common import ImageNamesResult, ImageRecordNotFoundException
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.errors import LockTimeoutError
 from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults
 
 
@@ -471,7 +471,7 @@ def test_delete_image_lookup_failure_returns_500_not_404(
 
 
 def test_delete_image_db_fault_during_lookup_returns_500_not_404(
-    monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
+    monkeypatch: Any, mock_invoker: Invoker, mock_sqlite_database: Database, tmp_path: Path, client: TestClient
 ) -> None:
     """A database fault while reading the record is a 500, driven through the real record store.
 
@@ -483,13 +483,13 @@ def test_delete_image_db_fault_during_lookup_returns_500_not_404(
     storage = prepare_delete_image_test(monkeypatch, mock_invoker, tmp_path)
     _save_deletable_image(mock_invoker, storage, "del.png")
 
-    # Break the table out from under the query. Any sqlite3.Error would do; this one is deterministic.
+    # Break the table out from under the query. Any database error would do; this one is deterministic.
     records = mock_invoker.services.image_records
-    records._db._conn.execute("ALTER TABLE images RENAME TO images_moved;")
+    mock_sqlite_database.sqlite.conn.execute("ALTER TABLE images RENAME TO images_moved;")
     try:
         response = client.delete("/api/v1/images/i/del.png")
     finally:
-        records._db._conn.execute("ALTER TABLE images_moved RENAME TO images;")
+        mock_sqlite_database.sqlite.conn.execute("ALTER TABLE images_moved RENAME TO images;")
 
     assert response.status_code == 500
     assert response.json()["detail"] == "Failed to delete image"
@@ -498,24 +498,35 @@ def test_delete_image_db_fault_during_lookup_returns_500_not_404(
     assert storage.get_path("del.png").exists()
 
 
-def test_delete_image_db_failure_returns_500_and_restores_files(
-    monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
+@pytest.mark.parametrize(
+    ("failure", "status", "detail"),
+    [
+        (LockTimeoutError("database is locked"), 503, "The database is busy; try again"),
+        (RuntimeError("disk I/O error"), 500, "Failed to delete image"),
+    ],
+)
+def test_delete_image_db_failure_is_reported_and_restores_files(
+    monkeypatch: Any,
+    mock_invoker: Invoker,
+    tmp_path: Path,
+    client: TestClient,
+    failure: Exception,
+    status: int,
+    detail: str,
 ) -> None:
-    from invokeai.app.services.image_records.image_records_common import ImageRecordDeleteException
-
     storage = prepare_delete_image_test(monkeypatch, mock_invoker, tmp_path)
     _save_deletable_image(mock_invoker, storage, "del.png")
 
     def failing_delete(image_name: str) -> None:
-        raise ImageRecordDeleteException()
+        raise failure
 
     monkeypatch.setattr(mock_invoker.services.image_records, "delete", failing_delete)
 
     response = client.delete("/api/v1/images/i/del.png")
 
-    # The route must report the failure, not a success-shaped empty payload.
-    assert response.status_code == 500
-    assert response.json()["detail"] == "Failed to delete image"
+    # The route must report the failure, not a success-shaped empty payload; a busy database as such.
+    assert response.status_code == status
+    assert response.json()["detail"] == detail
     # The staged files must be rolled back: image and thumbnail restored, record intact.
     assert storage.get_path("del.png").exists()
     assert storage.get_path("del.png", thumbnail=True).exists()
@@ -708,27 +719,6 @@ def test_delete_does_not_report_a_name_that_never_existed(
     body = response.json()
     assert body["deleted_images"] == []
     assert body["failed_images"] == []
-
-
-def test_image_records_get_does_not_disguise_a_storage_error_as_not_found(monkeypatch: Any) -> None:
-    """The narrowing itself: a sqlite3.Error out of the SELECT must stay a sqlite3.Error."""
-    from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
-
-    storage = SqliteImageRecordStorage.__new__(SqliteImageRecordStorage)
-
-    class _Cursor:
-        def execute(self, *args: Any, **kwargs: Any) -> None:
-            raise sqlite3.OperationalError("database disk image is malformed")
-
-    class _Db:
-        @contextmanager
-        def transaction(self):
-            yield _Cursor()
-
-    storage._db = _Db()  # pyright: ignore[reportAttributeAccessIssue]
-
-    with pytest.raises(sqlite3.OperationalError):
-        storage.get("a.png")
 
 
 def test_delete_still_reports_a_genuine_storage_failure(

@@ -170,7 +170,6 @@ const FilterChooseSettings = ({ engine, isSurfaceInteractionLocked }: ToolFormPr
         groupBy={groupBy}
         itemsMaxH="18rem"
         renderGroupLabel={renderGroupLabel}
-        size="xs"
         value={filterValue}
         valueText={t(`widgets.layers.control.filters.${session.draft.type}`, session.draft.type)}
         w="full"
@@ -236,7 +235,7 @@ const FilterFooter = ({ engine, isExternalInteractionLocked }: ToolFooterProps) 
           title={t('widgets.layers.rasterFilter.title')}
         />
       </Box>
-      <Button disabled={!eligibility.canReset} flexShrink={0} size="xs" variant="ghost" onClick={reset}>
+      <Button disabled={!eligibility.canReset} flexShrink={0} variant="ghost" onClick={reset}>
         {t('widgets.layers.selectObject.reset')}
       </Button>
       {session.autoProcess ? null : (
@@ -244,7 +243,6 @@ const FilterFooter = ({ engine, isExternalInteractionLocked }: ToolFooterProps) 
           disabled={!eligibility.canProcess}
           flexShrink={0}
           loading={session.status === 'processing'}
-          size="xs"
           onClick={() => void operations.processFilterOperation()}
         >
           {t('widgets.layers.selectObject.process')}
@@ -256,7 +254,6 @@ const FilterFooter = ({ engine, isExternalInteractionLocked }: ToolFooterProps) 
           disabled={!eligibility.canApply}
           loading={session.status === 'committing'}
           roundedRight="none"
-          size="xs"
           variant="solid"
           onClick={onApply}
         >
@@ -269,7 +266,6 @@ const FilterFooter = ({ engine, isExternalInteractionLocked }: ToolFooterProps) 
               disabled={!eligibility.canSave}
               px="1"
               roundedLeft="none"
-              size="xs"
               variant="solid"
             >
               <Icon as={ChevronDownIcon} boxSize="3.5" />
@@ -299,7 +295,6 @@ const FilterFooter = ({ engine, isExternalInteractionLocked }: ToolFooterProps) 
         data-pane-action="cancel"
         disabled={!eligibility.canCancel}
         flexShrink={0}
-        size="xs"
         variant="ghost"
         onClick={onCancel}
       >

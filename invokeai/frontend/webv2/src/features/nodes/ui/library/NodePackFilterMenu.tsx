@@ -41,7 +41,6 @@ export const NodePackFilterMenu = ({
         <IconButton
           aria-label={t('nodes.filterAndSort')}
           color={isActive ? 'accent.solid' : 'fg.muted'}
-          size="xs"
           variant="outline"
         >
           <Icon as={SlidersHorizontalIcon} boxSize="4" />
@@ -60,7 +59,7 @@ export const NodePackFilterMenu = ({
             </Menu.ItemGroup>
             <Menu.Separator />
             <Menu.ItemGroup>
-              <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+              <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
                 {t('nodes.sortBy')}
               </Menu.ItemGroupLabel>
               {SORT_FIELDS.map(({ field, labelKey }) => (
@@ -96,9 +95,9 @@ const FilterItem = ({
 }) => (
   <Menu.Item aria-checked={isChecked} closeOnSelect={false} role="menuitemcheckbox" value={value} onClick={onSelect}>
     <Icon as={CheckIcon} boxSize="3" opacity={isChecked ? 1 : 0} />
-    <Menu.ItemText fontSize="xs">{label}</Menu.ItemText>
+    <Menu.ItemText>{label}</Menu.ItemText>
     {trailing ? (
-      <Text color="fg.subtle" fontSize="2xs" ms="auto">
+      <Text color="fg.subtle" fontSize="xs" ms="auto">
         {trailing}
       </Text>
     ) : null}

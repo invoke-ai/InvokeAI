@@ -2,14 +2,21 @@ import { DEFAULT_LOGGING_CONFIG } from '@platform/logging/contracts';
 import { configureLogging, getLogSnapshot, resetLogging } from '@platform/logging/logger';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { BackendSocket } from './socketHub';
+import type { BackendSocket, SocketAuthenticator, SocketCredentialSource } from './socketHub';
 
 import { getConnectionStatus } from './connectionStore';
 import { createSocketHub } from './socketHub';
 
+/** Mirrors Socket.IO: every connect attempt asks the authenticator, and a server-ended session stays inactive. */
 class FakeSocket implements BackendSocket {
+  active = false;
+  /** False leaves each handshake pending until the test accepts or refuses it. */
+  acceptsHandshakes = true;
   readonly emitted: { event: string; payload: unknown }[] = [];
+  readonly handshakes: { token?: string }[] = [];
   private readonly handlers = new Map<string, Set<(payload: never) => void>>();
+
+  constructor(private readonly authenticate?: SocketAuthenticator) {}
 
   on(event: string, handler: (payload: never) => void): void {
     let handlers = this.handlers.get(event);
@@ -31,11 +38,30 @@ class FakeSocket implements BackendSocket {
   }
 
   connect(): void {
-    this.fire('connect', undefined);
+    this.active = true;
+    this.authenticate?.((payload) => {
+      this.handshakes.push(payload);
+    });
+    if (this.acceptsHandshakes) {
+      this.fire('connect', undefined);
+    }
+  }
+
+  /** The server refused the pending handshake; like a server disconnect, Socket.IO does not retry it. */
+  refuseHandshake(): void {
+    this.active = false;
+    this.fire('connect_error', { message: 'Connection rejected by server' });
   }
 
   disconnect(): void {
+    this.active = false;
     this.fire('disconnect', 'io client disconnect');
+  }
+
+  /** The server closed the session, e.g. after a password change revoked the token it authenticated with. */
+  serverDisconnect(): void {
+    this.active = false;
+    this.fire('disconnect', 'io server disconnect');
   }
 
   fire(event: string, payload: unknown): void {
@@ -44,6 +70,30 @@ class FakeSocket implements BackendSocket {
     }
   }
 }
+
+const createCredential = (initialToken: string | null) => {
+  let token = initialToken;
+  const listeners = new Set<() => void>();
+  const source: SocketCredentialSource = {
+    getToken: () => token,
+    subscribe: (listener) => {
+      listeners.add(listener);
+
+      return () => listeners.delete(listener);
+    },
+  };
+
+  return {
+    listenerCount: () => listeners.size,
+    replace: (nextToken: string) => {
+      token = nextToken;
+      for (const listener of listeners) {
+        listener();
+      }
+    },
+    source,
+  };
+};
 
 describe('socketHub', () => {
   beforeEach(() => {
@@ -177,5 +227,108 @@ describe('socketHub', () => {
       { level: 'info', name: 'socket.connected' },
       { level: 'debug', name: 'socket.connecting' },
     ]);
+  });
+
+  it('authenticates every connect attempt with the then-current token', () => {
+    const credential = createCredential('token-a');
+    let socket: FakeSocket | undefined;
+    const hub = createSocketHub({
+      createSocket: (authenticate) => (socket = new FakeSocket(authenticate)),
+      credential: credential.source,
+    });
+
+    hub.connect();
+    credential.replace('token-a-renewed');
+    // A transport drop keeps the session active; Socket.IO's own retry asks for the payload again.
+    socket!.fire('disconnect', 'transport close');
+    socket!.connect();
+
+    expect(socket!.handshakes).toEqual([{ token: 'token-a' }, { token: 'token-a-renewed' }]);
+  });
+
+  it('reconnects with the replacement token after the server ends the revoked session, in either order', () => {
+    const credential = createCredential('token-a');
+    const sockets: FakeSocket[] = [];
+    const hub = createSocketHub({
+      createSocket: (authenticate) => {
+        const socket = new FakeSocket(authenticate);
+
+        sockets.push(socket);
+
+        return socket;
+      },
+      credential: credential.source,
+    });
+
+    hub.connect();
+    const socket = sockets[0]!;
+
+    // The server's disconnect can arrive before the password-change response delivers the replacement...
+    socket.serverDisconnect();
+    expect(getConnectionStatus().status).toBe('disconnected');
+    credential.replace('token-b');
+    expect(getConnectionStatus().status).toBe('connected');
+
+    // ...or after it: the replacement alone does not drop a live socket, the server's disconnect does.
+    credential.replace('token-c');
+    expect(socket.handshakes).toEqual([{ token: 'token-a' }, { token: 'token-b' }]);
+    socket.serverDisconnect();
+
+    expect(sockets).toHaveLength(1);
+    expect(socket.handshakes).toEqual([{ token: 'token-a' }, { token: 'token-b' }, { token: 'token-c' }]);
+    expect(getConnectionStatus().status).toBe('connected');
+  });
+
+  it('stays down when the server ends a session whose credential has not changed', () => {
+    const credential = createCredential('token-a');
+    let socket: FakeSocket | undefined;
+    const hub = createSocketHub({
+      createSocket: (authenticate) => (socket = new FakeSocket(authenticate)),
+      credential: credential.source,
+    });
+
+    hub.connect();
+    socket!.serverDisconnect();
+
+    expect(socket!.active).toBe(false);
+    expect(getConnectionStatus().status).toBe('disconnected');
+
+    hub.disconnect();
+    // A hub torn down for an account transition ignores later replacements; the next account rebuilds it.
+    expect(credential.listenerCount()).toBe(0);
+    credential.replace('token-b');
+
+    expect(socket!.handshakes).toEqual([{ token: 'token-a' }]);
+  });
+
+  it('retries a handshake the server refused for a token replaced while it was pending', () => {
+    const credential = createCredential('token-a');
+    const sockets: FakeSocket[] = [];
+    const hub = createSocketHub({
+      createSocket: (authenticate) => {
+        const socket = new FakeSocket(authenticate);
+
+        socket.acceptsHandshakes = false;
+        sockets.push(socket);
+
+        return socket;
+      },
+      credential: credential.source,
+    });
+
+    hub.connect();
+    const socket = sockets[0]!;
+    // The replacement lands while the old token's handshake is still in flight, so there is nothing to resume yet.
+    credential.replace('token-b');
+    expect(socket.handshakes).toEqual([{ token: 'token-a' }]);
+
+    socket.refuseHandshake();
+    expect(socket.handshakes).toEqual([{ token: 'token-a' }, { token: 'token-b' }]);
+
+    // A refusal of the current token is final until the credential changes again.
+    socket.refuseHandshake();
+    expect(socket.handshakes).toHaveLength(2);
+    expect(sockets).toHaveLength(1);
+    hub.disconnect();
   });
 });

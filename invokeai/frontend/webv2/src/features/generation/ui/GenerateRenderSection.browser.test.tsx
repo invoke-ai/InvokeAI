@@ -4,6 +4,7 @@ import type { GenerateSettings, MainModelConfig } from '@features/generation/cor
 import { ChakraProvider } from '@chakra-ui/react';
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
+import { createExternalStoreCore } from '@platform/state/externalStoreCore';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
@@ -12,6 +13,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import type { CanvasDenoisingStrengthProps } from './GenerationUiContext';
+
 import { GenerateRenderSection } from './GenerateRenderSection';
 
 const seedHistory = [
@@ -19,9 +22,18 @@ const seedHistory = [
   { seed: 888, thumbnailUrl: null },
 ];
 
+const harness = vi.hoisted(() => ({ invocationSourceId: 'generate' }));
+
 vi.mock('./GenerationUiContext', () => ({
+  useGenerationQueueInsights: (select: (insights: unknown) => unknown) => select({ secondsPerRun: null, seedHistory }),
   useGenerationUi: () => ({
-    queueInsights: { secondsPerRun: null, seedHistory },
+    // Stands in for the canvas's strength slot, which lays out the section around its badge and field.
+    CanvasDenoisingStrength: ({ children }: CanvasDenoisingStrengthProps) =>
+      children({
+        badges: <span data-testid="strength-badge">75%</span>,
+        field: <div data-testid="strength-field" />,
+      }),
+    project: { invocationSourceId: harness.invocationSourceId },
     sectionPreferences: { sectionsOpen: { render: true }, setSectionOpen: vi.fn() },
   }),
 }));
@@ -142,8 +154,8 @@ const render = async (model: MainModelConfig, settings: Partial<GenerateSettings
         <ChakraProvider value={system}>
           <I18nextProvider i18n={i18n}>
             <GenerateRenderSection
+              draft={createExternalStoreCore({ ...getDefaultGenerateSettings(model), ...settings })}
               selectedModel={model}
-              settings={{ ...getDefaultGenerateSettings(model), ...settings }}
               onCommit={onCommit}
               onCommitImmediate={vi.fn()}
             />
@@ -166,6 +178,7 @@ const menuItem = (label: string) =>
 const preview = () => host?.querySelector('[data-testid="seed-sequence-preview"]')?.textContent ?? null;
 
 afterEach(async () => {
+  harness.invocationSourceId = 'generate';
   await settle(() => root?.unmount());
   host?.remove();
   host = null;
@@ -250,6 +263,28 @@ describe('GenerateRenderSection seed field', () => {
     await renderSeed({ seedMode: 'decrement' });
 
     expect(host?.textContent).toContain('Decrement · 42');
+  });
+});
+
+describe('GenerateRenderSection denoising strength', () => {
+  it('adds the canvas strength to the header badges and under guidance only when the canvas is the destination', async () => {
+    await render(sd1Model);
+
+    expect(host?.querySelector('[data-testid="strength-field"]')).toBeNull();
+    expect(host?.querySelector('[data-testid="strength-badge"]')).toBeNull();
+
+    await settle(() => root?.unmount());
+    host?.remove();
+    harness.invocationSourceId = 'canvas';
+    await render(sd1Model);
+
+    const header = host?.querySelector('[data-part="trigger"]');
+    expect(header?.querySelector('[data-testid="strength-badge"]')).not.toBeNull();
+    // In document order, the strength field is the control right after guidance.
+    const controls = [...(host?.querySelectorAll('[data-scope="scrubber"], [data-testid="strength-field"]') ?? [])];
+    const guidanceIndex = controls.indexOf(guidanceFrame('CFG')!);
+    expect(guidanceIndex).toBeGreaterThan(-1);
+    expect(controls[guidanceIndex + 1]?.getAttribute('data-testid')).toBe('strength-field');
   });
 });
 

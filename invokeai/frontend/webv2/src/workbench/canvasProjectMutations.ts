@@ -41,7 +41,7 @@ import {
 } from '@workbench/canvas-engine/document/documentTree';
 import { insertNodesAtAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
 import { isOverlayStack, layerStackOf, reorderSiblings } from '@workbench/canvas-engine/document/layerStacks';
-import { repairSelectedLayerId } from '@workbench/canvas-engine/document/selectionRepair';
+import { repairSelectedLayerId, selectionAfterAcceptedResult } from '@workbench/canvas-engine/document/selectionRepair';
 import { prependProjectEvent } from '@workbench/projectEvents';
 
 import { canvasDocumentRequiresFontSchemaV4, normalizeCanvasDocumentContract } from './canvasMigration';
@@ -686,7 +686,9 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
       if (!withinLimits(stacks)) {
         return project;
       }
-      const selectedLayerId = mutation.continueStaging ? document.selectedLayerId : layer.id;
+      const selectedLayerId = mutation.continueStaging
+        ? document.selectedLayerId
+        : selectionAfterAcceptedResult(document.stacks, document.selectedLayerId, layer.id);
       return {
         ...project,
         canvas: {
@@ -700,11 +702,13 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
       };
     }
     case 'rollbackStagedImageCommit': {
-      const expectedSelectedLayerId = mutation.continueStaging ? mutation.selectedLayerId : mutation.layer.id;
+      const { document } = project.canvas;
+      const expectedSelectedLayerId = mutation.continueStaging
+        ? mutation.selectedLayerId
+        : selectionAfterAcceptedResult(document.stacks, mutation.selectedLayerId, mutation.layer.id);
       const stagingMatchesCommit = mutation.continueStaging
         ? project.canvas.stagingArea === mutation.stagingArea
         : project.canvas.stagingArea.pendingImages.length === 0;
-      const { document } = project.canvas;
       if (
         document.selectedLayerId !== expectedSelectedLayerId ||
         getDocumentLayer(document, mutation.layer.id) !== mutation.layer ||

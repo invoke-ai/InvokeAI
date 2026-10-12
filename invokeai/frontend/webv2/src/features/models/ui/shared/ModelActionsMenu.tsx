@@ -52,19 +52,19 @@ export const ModelActionMenuItems = ({
     <>
       <Menu.Item value="reidentify" onClick={() => void handleReidentify()}>
         <Icon as={RefreshCcwIcon} boxSize="3.5" />
-        <Menu.ItemText fontSize="xs">{t('models.reidentify')}</Menu.ItemText>
+        <Menu.ItemText fontSize="md">{t('models.reidentify')}</Menu.ItemText>
       </Menu.Item>
       {showConvertItem && isConvertibleToDiffusers(model) ? (
         <Menu.Item value="convert" onClick={() => onRequestConfirm({ kind: 'convert', model })}>
           <Icon as={HuggingFaceIcon} boxSize="3.5" />
-          <Menu.ItemText fontSize="xs">{t('models.convertToDiffusers')}</Menu.ItemText>
+          <Menu.ItemText fontSize="md">{t('models.convertToDiffusers')}</Menu.ItemText>
         </Menu.Item>
       ) : null}
       {extraItems}
       <Menu.Separator />
       <Menu.Item data-danger="" value="delete" onClick={() => onRequestConfirm({ kind: 'delete', model })}>
         <Icon as={Trash2Icon} boxSize="3.5" />
-        <Menu.ItemText fontSize="xs">{t('models.deleteModel')}</Menu.ItemText>
+        <Menu.ItemText fontSize="md">{t('models.deleteModel')}</Menu.ItemText>
       </Menu.Item>
     </>
   );

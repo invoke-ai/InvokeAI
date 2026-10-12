@@ -52,7 +52,7 @@ export const QueueHeaderActions = () => {
   };
 
   return (
-    <Button disabled={disabled} loading={busy} size="2xs" variant="outline" onClick={onCancel}>
+    <Button disabled={disabled} loading={busy} size="sm" variant="outline" onClick={onCancel}>
       <Icon as={XIcon} boxSize="3.5" />
       {t(itemLabel)}
     </Button>

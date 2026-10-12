@@ -215,8 +215,6 @@ class _TinyQwenVL(torch.nn.Module):
     """transformers' `Qwen2_5_VLForConditionalGeneration` layout at toy width: the language model and the vision tower
     under `model.`, the LM head at the top."""
 
-    _checkpoint_conversion_mapping: dict = {}
-
     def __init__(self, _config) -> None:
         super().__init__()
         layer = torch.nn.Module()

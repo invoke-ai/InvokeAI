@@ -68,7 +68,7 @@ export const PanelModeToggle = ({ mode, onChange }: { mode: PanelMode; onChange:
   );
 
   return (
-    <Tabs.Root mb="-1" size="sm" value={mode} variant="line" onValueChange={onValueChange}>
+    <Tabs.Root mb="-1" size="xl" value={mode} variant="line" onValueChange={onValueChange}>
       <Tabs.List aria-label={t('widgets.workflow.panelMode')}>
         {PANEL_MODES.map(({ labelKey, icon, mode: itemMode }) => (
           <Tabs.Trigger key={itemMode} value={itemMode}>
@@ -112,15 +112,15 @@ export const WorkflowLinearPanel = () => {
       <HStack flexShrink={0} justify="space-between" px="2" h={10} borderBottomWidth={1}>
         <PanelModeToggle mode={mode} onChange={onPanelModeChange} />
         {mode === 'edit' ? (
-          <Tabs.Root size="sm" value={editTab} variant="outline" mb="-1" onValueChange={onEditTabChange}>
+          <Tabs.Root size="xl" value={editTab} variant="outline" mb="-1" onValueChange={onEditTabChange}>
             <Tabs.List>
-              <Tabs.Trigger value="form" fontSize="2xs">
+              <Tabs.Trigger value="form" fontSize="xs">
                 {t('widgets.workflow.form')}
               </Tabs.Trigger>
-              <Tabs.Trigger value="details" fontSize="2xs">
+              <Tabs.Trigger value="details" fontSize="xs">
                 {t('widgets.workflow.details')}
               </Tabs.Trigger>
-              <Tabs.Trigger value="json" fontSize="2xs">
+              <Tabs.Trigger value="json" fontSize="xs">
                 {t('common.json')}
               </Tabs.Trigger>
             </Tabs.List>

@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { GalleryProgressLayout } from './galleryGridLayout';
 
+import { GALLERY_TAB_STOP_SELECTOR } from './GalleryThumbnail';
 import { SELECTED_TILE_CSS } from './GalleryTileFrame';
 import { useGalleryUi } from './GalleryUiContext';
 import { useGalleryWidget } from './GalleryWidgetContext';
@@ -36,10 +37,12 @@ export const GalleryProgressSection = ({
   const restoreFocus = useCallback(() => {
     const root = rootRef.current;
     const viewport = getScrollElement();
+    // The section's own disclosure while it stays, else the selection, else the grid's thumbnail Tab stop — never
+    // simply the first thumbnail, which is the first starred one.
     const target =
       root?.querySelector<HTMLButtonElement>('[data-progress-disclosure]') ??
       viewport?.querySelector<HTMLElement>('button[aria-current="true"]') ??
-      viewport?.querySelector<HTMLElement>('[role="listitem"] button') ??
+      viewport?.querySelector<HTMLElement>(GALLERY_TAB_STOP_SELECTOR) ??
       viewport?.querySelector<HTMLElement>('[role="button"]') ??
       viewport;
     target?.focus({ preventScroll: true });
@@ -89,10 +92,10 @@ export const GalleryProgressSection = ({
       >
         <Icon as={ChevronRightIcon} boxSize="3" transform={progressSectionCollapsed ? undefined : 'rotate(90deg)'} />
         <Icon as={HourglassIcon} boxSize="3" />
-        <Text fontSize="2xs" fontWeight="600" letterSpacing="wide" lineHeight="1" textTransform="uppercase">
+        <Text fontSize="xs" fontWeight="600" letterSpacing="wide" lineHeight="1" textTransform="uppercase">
           {t('widgets.gallery.inProgress')}
         </Text>
-        <Text color="fg.muted" fontSize="xs" fontVariantNumeric="tabular-nums">
+        <Text color="fg.muted" fontSize="md" fontVariantNumeric="tabular-nums">
           · {progressSessions.length}
         </Text>
       </chakra.button>
@@ -242,6 +245,7 @@ const GalleryProgressTile = ({
       aria-label={`${label} · ${status}`}
       aria-pressed={isShownSelected}
       aria-disabled={session.state !== 'running'}
+      data-gallery-session-id={session.id}
       tabIndex={session.state === 'running' ? 0 : -1}
       borderColor={isShownSelected ? 'accent.solid' : 'border.subtle'}
       borderWidth="2px"
@@ -276,7 +280,7 @@ const GalleryProgressTile = ({
         display="flex"
       >
         {session.state === 'running' ? (
-          <ProgressCircle.Root aria-label={status} size="xs" value={percentage}>
+          <ProgressCircle.Root aria-label={status} value={percentage}>
             <ProgressCircle.Circle>
               <ProgressCircle.Track />
               <ProgressCircle.Range />

@@ -21,6 +21,7 @@ from invokeai.backend.model_manager import taxonomy
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig  # noqa: F401  (registers every config class)
 from invokeai.backend.model_manager.taxonomy import (
+    AnimaVariantType,
     AnyVariant,
     BaseModelType,
     ClipVariantType,
@@ -28,14 +29,17 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     Qwen3VariantType,
     Qwen3VLVariantType,
+    Qwen35VariantType,
     variant_type_adapter,
 )
 
-BASE_AGNOSTIC_VARIANT_ENUMS = frozenset({ClipVariantType, Qwen3VariantType, Qwen3VLVariantType, MistralVariantType})
+BASE_AGNOSTIC_VARIANT_ENUMS = frozenset(
+    {ClipVariantType, Qwen3VariantType, Qwen3VLVariantType, Qwen35VariantType, MistralVariantType}
+)
 """Variant enums that cannot be declared by any architecture.
 
-All four sit on `base=Any` configs -- CLIP embedders and the Qwen3, Qwen3-VL and Mistral text
-encoders are components shared across architectures, not architectures. `Any` is a sentinel the
+All of them sit on `base=Any` configs -- CLIP embedders and the Qwen3, Qwen3-VL, Qwen3.5 and Mistral
+text encoders are components shared across architectures, not architectures. `Any` is a sentinel the
 registry refuses to register, so these are named here to keep the completeness check against
 `AnyVariant` total rather than quietly partial.
 """
@@ -223,7 +227,14 @@ def test_the_cases_that_motivate_the_model_type_dimension(
 
 
 def test_an_architecture_without_variants_declares_nothing() -> None:
-    # CogView4, ERNIE-Image, Ideogram 4 and Anima model no variants at all. An empty facet would be
+    # CogView4, ERNIE-Image and Ideogram 4 model no variants at all. An empty facet would be
     # indistinguishable from an absent one, so they omit it.
-    for base in (BaseModelType.CogView4, BaseModelType.ErnieImage, BaseModelType.Ideogram4, BaseModelType.Anima):
+    for base in (BaseModelType.CogView4, BaseModelType.ErnieImage, BaseModelType.Ideogram4):
         assert get_variant_enum(base, ModelType.Main) is None
+
+
+def test_anima_variants_label_mains_only() -> None:
+    # The variant says which encoders a main model needs. Anima's LLLite control adapters share the
+    # base and carry no variant.
+    assert get_variant_enum(BaseModelType.Anima, ModelType.Main) is AnimaVariantType
+    assert get_variant_enum(BaseModelType.Anima, ModelType.ControlNet) is None

@@ -203,3 +203,33 @@ describe('compileUpscaleGraph for FLUX.1', () => {
     ).toThrow(/T5 encoder/);
   });
 });
+
+describe('upscale metadata', () => {
+  it.each([
+    ['sd-1', () => createValues('sd-1')],
+    ['sdxl', () => createValues('sdxl')],
+    ['flux', () => createFluxValues()],
+  ] as const)('records exactly the concepts the %s pass loads', (_base, createBaseValues) => {
+    const values = createBaseValues();
+    const { nodes } = compileUpscaleGraph(
+      {
+        ...values,
+        loras: [
+          ...values.loras,
+          { isEnabled: false, model: { ...values.loras[0]!.model, key: 'disabled' }, weight: 1 },
+          { isEnabled: true, model: { ...model('other', 'lora', 'sd-3'), type: 'lora' }, weight: 1 },
+        ],
+      },
+      'gallery',
+      { useCpuNoise: true }
+    ).backendGraph;
+    const loaded = Object.values(nodes)
+      .filter((node) => node.type === 'lora_selector')
+      .map((node) => [(node.lora as { key: string }).key, node.weight]);
+    const recordedLoras = (nodes.core_metadata?.loras ?? []) as { model: { key: string }; weight: number }[];
+    const recorded = recordedLoras.map((entry) => [entry.model.key, entry.weight]);
+
+    expect(loaded).toEqual([[values.loras[0]!.model.key, 0.7]]);
+    expect(recorded).toEqual(loaded);
+  });
+});

@@ -1,5 +1,6 @@
 import babel from '@rolldown/plugin-babel';
 import react, { reactCompilerPreset } from '@vitejs/plugin-react';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 
@@ -17,6 +18,19 @@ const ALLOWED_HOSTS = process.env.INVOKEAI_DEV_HOSTS?.split(',')
   .filter(Boolean);
 const PROJECT_ROOT = fileURLToPath(new URL('.', import.meta.url));
 
+// The Python package owns the release version, and the release workflow checks it against the tag. Fail the build
+// rather than ship a guessed version if the file moves or its format changes.
+const VERSION_FILE = fileURLToPath(new URL('../../version/invokeai_version.py', import.meta.url));
+const readAppVersion = (): string => {
+  const version = /^__version__\s*=\s*["']([^"']+)["']/m.exec(readFileSync(VERSION_FILE, 'utf8'))?.[1];
+
+  if (!version) {
+    throw new Error(`No __version__ assignment found in ${VERSION_FILE}.`);
+  }
+
+  return version;
+};
+
 // Group eager dependencies shared by both routes to avoid extra chunk requests.
 const ROUTE_SHARED_MODULES = [
   '/features/fonts/data/keys.ts',
@@ -32,6 +46,11 @@ const ROUTE_SHARED_MODULES = [
   '/features/nodes/index.ts',
   '/features/nodes/ui/NodesPage.tsx',
   '/platform/browser/downloadBlob.ts',
+  // Editor search fields and the lazy pickers share the IME guard; alone it costs a startup request.
+  '/platform/browser/imeComposition.ts',
+  // The route's recovery peek and the lazy editor share the editor-session lock probe; alone they cost a startup request.
+  '/platform/browser/webLocks.ts',
+  '/workbench/projects/editorSession.ts',
   '/platform/ui/BrandIcon.tsx',
   '/platform/ui/Button.tsx',
   '/platform/ui/Tooltip.tsx',
@@ -40,10 +59,19 @@ const ROUTE_SHARED_MODULES = [
   '/platform/ui/settings/contracts.ts',
   '/platform/core/concurrency.ts',
   '/platform/query/client.ts',
+  // The What's New gate mounts at boot; the app menu and the lazy dialog share these with it.
+  '/platform/runtime/appMetadata.ts',
+  '/workbench/shell/useWhatsNew.ts',
+  '/workbench/shell/whatsNewStore.ts',
   '/platform/time/serverTimestamp.ts',
   '/platform/transport/connectionStore.ts',
   '/platform/transport/socketHub.ts',
   '/platform/ui/ConfirmDialog.tsx',
+  // Every dialog, eager or lazy, is built on these and the hotkey runtime reads the presence; alone they cost a startup request.
+  '/platform/ui/Dialog.tsx',
+  '/platform/ui/modalPresence.ts',
+  // Confirm/Rename dialogs and the boot gates keep closing overlays mounted with it; alone it costs a startup request.
+  '/platform/react/useExitRetainedValue.ts',
   '/platform/ui/MiddleTruncate.tsx',
   // The queue widget and the Launchpad managers share the list row; a separate chunk would cost a request.
   '/platform/ui/list/ListDivider.tsx',
@@ -51,6 +79,8 @@ const ROUTE_SHARED_MODULES = [
   '/platform/ui/list/ListSectionHeader.tsx',
   '/platform/ui/list/ListStack.tsx',
   '/platform/ui/list/listLayout.ts',
+  // The eager List and the lazy Picker share the pinned-header range helpers.
+  '/platform/ui/list/virtualSections.ts',
   // Lazy lists (graph preview) share these with startup; left ungrouped they split into an extra startup chunk.
   '/platform/react/usePreservedScrollOffset.ts',
   '/platform/ui/Scrollable.tsx',
@@ -85,6 +115,11 @@ const ROUTE_SHARED_MODULES = [
 const EDITOR_BOOT_SHARED_MODULES = [
   // Shell regions, their hotkeys and every control that opens a widget read it; alone it cost a boot request.
   '/workbench/focusRegions.tsx',
+  // The shell and lazy guide share hint resources and target resolution without extra boot requests.
+  '/workbench/hotkeys/hintSources.tsx',
+  '/workbench/hotkeys/shortcutHints.ts',
+  '/workbench/hotkeys/targetWidget.ts',
+  '/workbench/widget-frame/compactWidgetCapacity.tsx',
   '/features/gallery/ui/GalleryItemSearch.tsx',
   '/app/GalleryUiAdapter.tsx',
   '/features/generation/core/prompt/ast.ts',
@@ -163,6 +198,7 @@ const GALLERY_PICKER_MODULES = [
   '/features/gallery/picker.ts',
   '/features/gallery/ui/GalleryBoardCover.tsx',
   '/features/gallery/ui/GalleryBoardRowShell.tsx',
+  '/features/gallery/ui/GalleryLoadError.tsx',
   '/features/gallery/ui/GallerySearchField.tsx',
   '/features/gallery/ui/GalleryTileFrame.tsx',
   '/features/gallery/ui/GalleryUploadButton.tsx',
@@ -249,6 +285,8 @@ const getLegacyChunkName = (id: string): string | null => {
   if (
     matchesAnySuffix(id, [
       '/platform/state/selectors.ts',
+      // Eager query stores and lazy runtimes share single-flight scheduling; avoid its standalone boot request.
+      '/platform/state/singleFlight.ts',
       '/workbench/palette/paletteStore.ts',
       '/platform/search/dateTokens.ts',
       '/platform/performance/semanticReady.ts',
@@ -265,6 +303,8 @@ const getLegacyChunkName = (id: string): string | null => {
       '/platform/i18n/languages.ts',
       '/platform/react/useMountEffect.ts',
       '/platform/ui/theme/system.ts',
+      // Editor hints and the lazy Launchpad palette/settings share keycaps without loading editor runtime.
+      '/workbench/hotkeys/keyGlyphs.tsx',
       '/workbench/hotkeys/resolve.ts',
       '/workbench/settings/settingsDialogStore.ts',
     ])
@@ -314,6 +354,8 @@ const getLegacyChunkName = (id: string): string | null => {
 
 export default defineConfig({
   define: {
+    // An env define, not a global: Vitest browser mode re-encodes string globals, wrapping them in quotes.
+    'import.meta.env.APP_VERSION': JSON.stringify(readAppVersion()),
     // Use a boolean: Vitest browser mode treats string defines as truthy string literals.
     __CANVAS_GOLDEN_UPDATE__: false,
   },
@@ -406,6 +448,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@api': fileURLToPath(new URL('../api', import.meta.url)),
       '@app': fileURLToPath(new URL('./src/app', import.meta.url)),
       '@assets': fileURLToPath(new URL('./src/assets', import.meta.url)),
       '@features': fileURLToPath(new URL('./src/features', import.meta.url)),

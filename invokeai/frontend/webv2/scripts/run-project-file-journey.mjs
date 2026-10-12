@@ -14,6 +14,7 @@ import {
   MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME,
   PROJECT_FILE_BOARD,
   PROJECT_FILE_BOARD_ID,
+  PROJECT_FILE_MEMBER_BOARD,
 } from './mock-backend-fixtures.mjs';
 import { startMockBackend } from './mock-backend.mjs';
 import { killPreview, spawnPreview } from './preview-server.mjs';
@@ -159,7 +160,10 @@ const EXPECTED_BOARD_SHAPE = [
   'video:general:false',
 ].sort();
 
-/** The archived names of everything on the source board, for proving none of them is reused. */
+/** The source's other board, as it must travel: two plain generated images. */
+const EXPECTED_MEMBER_BOARD_SHAPE = ['image:general:false', 'image:general:false'];
+
+/** The archived names of everything on the source's boards, for proving none of them is reused. */
 const ARCHIVED_BOARD_NAMES = [
   PROJECT_FILE_BOARD.referencedImage,
   PROJECT_FILE_BOARD.unreferencedImage,
@@ -167,7 +171,11 @@ const ARCHIVED_BOARD_NAMES = [
   PROJECT_FILE_BOARD.userAsset,
   PROJECT_FILE_BOARD.maskAsset,
   PROJECT_FILE_BOARD.video,
+  ...PROJECT_FILE_BOARD.memberImages,
 ];
+
+/** Every item of every board of a snapshot, with the board each came from. */
+const snapshotItems = (snapshot) => snapshot.boards.flatMap((board) => board.items);
 
 const readArchiveEntries = async (archivePath) => unzipSync(new Uint8Array(await readFile(archivePath)));
 
@@ -267,7 +275,8 @@ const importArchive = async ({ archivePath, browser, contexts, errors, phase }) 
 const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory }) => {
   const sourceBoard = await getBoardSnapshot(sourceProjectId);
 
-  assert.deepEqual(boardShape(sourceBoard.items), EXPECTED_BOARD_SHAPE);
+  assert.deepEqual(boardShape(sourceBoard.boards[0].items), EXPECTED_BOARD_SHAPE);
+  assert.deepEqual(boardShape(sourceBoard.boards[1].items), EXPECTED_MEMBER_BOARD_SHAPE);
 
   const exportContext = await browser.newContext({ acceptDownloads: true });
 
@@ -278,11 +287,12 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
   await exportPage.goto(`${origin}${sourceProjectPath}`, { waitUntil: 'domcontentloaded' });
   await exportPage.getByRole('main', { exact: true, name: sourceProjectName }).waitFor();
 
-  const selectedBoardRow = exportPage.locator('button[aria-current="true"]').filter({ hasText: sourceProjectName });
+  // The project's inbox is selected and shown as "Inbox" under the project's own heading.
+  const selectedBoardRow = exportPage.locator('button[aria-current="true"]').filter({ hasText: 'Inbox' });
 
   await selectedBoardRow.first().waitFor();
 
-  await exportPage.getByRole('button', { exact: true, name: `Board actions for ${sourceProjectName}` }).click();
+  await exportPage.getByRole('button', { exact: true, name: 'Board actions for Inbox' }).click();
   await exportPage.getByRole('menuitem', { exact: true, name: 'Export project (.invk)' }).waitFor();
   await exportPage.getByRole('menuitem', { name: /^Download Board/ }).waitFor();
   await exportPage.keyboard.press('Escape');
@@ -314,10 +324,22 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
 
   assert.equal(manifest.version, 2);
   assert.equal(manifest.contents, 'workbench-project');
-  assert.equal(archivedBoard.version, 1);
-  assert.deepEqual(boardShape(archivedBoard.items), EXPECTED_BOARD_SHAPE);
-  assert.deepEqual(archivedBoard.items.map((item) => item.name).sort(), [...ARCHIVED_BOARD_NAMES].sort());
-  // Expect five board items plus three external images and one external video, deduplicated across references.
+  assert.equal(archivedBoard.version, 2);
+  // The inbox leads, then the project's other board, each with its own media.
+  assert.deepEqual(
+    archivedBoard.boards.map((board) => [board.name, board.isInbox, board.archived]),
+    [
+      [sourceProjectName, true, false],
+      [PROJECT_FILE_MEMBER_BOARD.name, false, false],
+    ]
+  );
+  assert.deepEqual(boardShape(archivedBoard.boards[0].items), EXPECTED_BOARD_SHAPE);
+  assert.deepEqual(boardShape(archivedBoard.boards[1].items), EXPECTED_MEMBER_BOARD_SHAPE);
+  assert.deepEqual(
+    archivedBoard.boards.flatMap((board) => board.items.map((item) => item.name)).sort(),
+    [...ARCHIVED_BOARD_NAMES].sort()
+  );
+  // Expect the board items plus three external images and one external video, deduplicated across references.
   assert.deepEqual(
     bundledImages.sort(),
     [...ARCHIVED_BOARD_NAMES.filter((name) => name.endsWith('.png')), ...PROJECT_FILE_BOARD.externalImages]
@@ -365,10 +387,20 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
 
   const imported = await fetchJson(`/api/v1/projects/${encodeURIComponent(summary.project_id)}`);
   const importedBoard = await getBoardSnapshot(summary.project_id);
-  const importedBoardNames = importedBoard.items.map((item) => item.name);
+  const importedBoardNames = snapshotItems(importedBoard).map((item) => item.name);
 
   assert.equal(imported.data.id, summary.project_id);
-  assert.deepEqual(boardShape(importedBoard.items), EXPECTED_BOARD_SHAPE);
+  // The project's other board came across as a board of its own, under its name, with its media.
+  assert.deepEqual(
+    importedBoard.boards.map((board) => [board.is_inbox, board.name]),
+    [
+      [true, summary.name],
+      [false, PROJECT_FILE_MEMBER_BOARD.name],
+    ]
+  );
+  assert.notEqual(importedBoard.boards[1].board_id, PROJECT_FILE_MEMBER_BOARD.id);
+  assert.deepEqual(boardShape(importedBoard.boards[0].items), EXPECTED_BOARD_SHAPE);
+  assert.deepEqual(boardShape(importedBoard.boards[1].items), EXPECTED_MEMBER_BOARD_SHAPE);
 
   for (const name of importedBoardNames) {
     assert.equal(ARCHIVED_BOARD_NAMES.includes(name), false, `${name} was adopted from the archive instead of copied.`);
@@ -407,7 +439,7 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
     assert.equal(response.status, 404, `${hidden} must not exist on the destination.`);
   }
 
-  for (const item of importedBoard.items) {
+  for (const item of snapshotItems(importedBoard)) {
     const base = item.kind === 'image' ? '/api/v1/images' : '/api/v1/videos';
 
     await assertAssetRoute(base, item.name, ['full', 'thumbnail']);
@@ -431,10 +463,11 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
 
   await runDuplication({ browser, contexts, errors, imported, importedBoardNames });
   await runWorkflowCollection({ browser, contexts, errors, imported });
+  await runUnloadRecovery({ browser, contexts, errors, imported });
   await runMissingBinaryImport({ browser, contexts, entries, errors, tempDirectory });
 
   return {
-    boardItemCount: importedBoard.items.length,
+    boardItemCount: snapshotItems(importedBoard).length,
     coverImageName,
     imageNames: [...importedBoardNames].sort(),
     projectId: summary.project_id,
@@ -474,9 +507,18 @@ const runDuplication = async ({ browser, contexts, errors, imported, importedBoa
   assert.notEqual(copy.board_id, imported.board_id);
 
   const copiedBoard = await getBoardSnapshot(copy.project_id);
-  const copiedBoardNames = copiedBoard.items.map((item) => item.name);
+  const copiedBoardNames = snapshotItems(copiedBoard).map((item) => item.name);
 
-  assert.deepEqual(boardShape(copiedBoard.items), EXPECTED_BOARD_SHAPE);
+  // The copy has the same boards, each copied with its own media.
+  assert.deepEqual(
+    copiedBoard.boards.map((board) => [board.is_inbox, board.name]),
+    [
+      [true, `${sourceProjectName} copy`],
+      [false, PROJECT_FILE_MEMBER_BOARD.name],
+    ]
+  );
+  assert.deepEqual(boardShape(copiedBoard.boards[0].items), EXPECTED_BOARD_SHAPE);
+  assert.deepEqual(boardShape(copiedBoard.boards[1].items), EXPECTED_MEMBER_BOARD_SHAPE);
 
   for (const name of copiedBoardNames) {
     assert.equal(importedBoardNames.includes(name), false, `${name} is shared with the project it was copied from.`);
@@ -615,6 +657,7 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
   await saveDialog.getByRole('textbox').fill('Journey Saved');
   await saveDialog.getByRole('button', { exact: true, name: 'Save' }).click();
   await page.getByText('Workflow saved', { exact: true }).waitFor();
+  assert.equal(await currentWorkflowName(), 'Journey Saved');
 
   const libraryWrites = (await workflowRequests())
     .slice(requestsBefore)
@@ -629,7 +672,7 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
   assert.equal(saved.revision, 1);
   assert.equal(library.items.find((item) => item.workflow_id === template.workflow_id)?.name, 'Journey Template');
 
-  // The project keeps both workflows; the saved copy now targets the new template, and the name stayed the copy's.
+  // The project keeps both workflows; the saved copy now targets the new template and takes its name.
   const record = await waitForSavedWorkflows(
     projectId,
     (candidate) =>
@@ -641,7 +684,7 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
   assert.equal(record.data.documentSchemaVersion, 3);
   assert.deepEqual(
     record.data.workflows.entries.map((entry) => entry.document.name),
-    ['Empty Workflow', 'Journey Template edited']
+    ['Empty Workflow', 'Journey Saved']
   );
   assert.deepEqual(record.data.workflows.entries[1].source, { libraryWorkflowId: saved.workflow_id, revision: 1 });
   assert.equal(record.data.workflows.activeWorkflowId, record.data.workflows.entries[1].document.id);
@@ -650,11 +693,120 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('main', { exact: true, name: imported.name }).waitFor();
   await selectLayoutPreset(page, 'Automate', 'Workflow');
-  assert.equal(await currentWorkflowName(), 'Journey Template edited');
+  assert.equal(await currentWorkflowName(), 'Journey Saved');
   await openProjectWorkflows();
   assert.equal(await cards.count(), 2);
   await page.keyboard.press('Escape');
   await dialog.waitFor({ state: 'hidden' });
+
+  await context.close();
+  contexts.delete(context);
+  assertNoBrowserErrors(errors);
+};
+
+/**
+ * Whether browser recovery holds `marker`, in the unload journal or in a staged draft, read from a same-origin page no
+ * editor has reconciled it from. A draft staged by an autosave that beat the navigation retires the journal entry.
+ */
+const isRecoverable = (page, marker) =>
+  page.evaluate(async (needle) => {
+    const read = async (name, storeName) => {
+      const database = await new Promise((resolve, reject) => {
+        const request = indexedDB.open(name);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      try {
+        if (!database.objectStoreNames.contains(storeName)) {
+          return [];
+        }
+        return await new Promise((resolve, reject) => {
+          const request = database.transaction(storeName).objectStore(storeName).getAll();
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+      } finally {
+        database.close();
+      }
+    };
+    for (const { name } of await indexedDB.databases()) {
+      const storeName = name?.startsWith('invokeai:v7:webv2:unload-journal')
+        ? 'entries'
+        : name?.startsWith('invokeai:v7:webv2:workbench')
+          ? 'draftBodies'
+          : null;
+      if (storeName && (await read(name, storeName)).some((record) => record.documentJson.includes(needle))) {
+        return true;
+      }
+    }
+    return false;
+  }, marker);
+
+/**
+ * Edits made just before the page goes away survive a real unload. A rename commits at once and each navigation
+ * follows its click immediately, normally well inside the autosave debounce, so the edit crosses in the unload journal.
+ */
+const runUnloadRecovery = async ({ browser, contexts, errors, imported }) => {
+  const context = await browser.newContext();
+  contexts.add(context);
+  const page = await context.newPage();
+  observeBrowserErrors(page, 'unload recovery', errors);
+  const main = page.getByRole('main', { exact: true, name: imported.name });
+  const workflowName = page.getByRole('button', { name: /^Open this project's workflows\. Current workflow: / });
+  const dialog = page.getByRole('dialog', { exact: true, name: 'Workflows' });
+  const renameDialog = page.getByRole('dialog', { exact: true, name: 'Rename workflow' });
+  const currentWorkflowName = async () =>
+    (await workflowName.getAttribute('aria-label')).replace("Open this project's workflows. Current workflow: ", '');
+  const openEditor = async () => {
+    await page.goto(`${origin}/#/app?project=${encodeURIComponent(imported.project_id)}`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await main.waitFor();
+    await selectLayoutPreset(page, 'Automate', 'Workflow');
+  };
+  const rename = async (name) => {
+    await workflowName.click();
+    await dialog.locator('[data-library-tab="project"]').waitFor();
+    await dialog
+      .locator('[data-project-workflow-detail]')
+      .getByRole('button', { exact: true, name: 'More actions' })
+      .click();
+    await page.getByRole('menuitem', { name: /^Rename…/ }).click();
+    await renameDialog.getByRole('textbox').fill(name);
+    await renameDialog.getByRole('button', { exact: true, name: 'Rename' }).click();
+  };
+
+  // Navigating away: browser recovery holds the edit before any editor loads again. Saves to the server are held,
+  // so it is there only through the journal written while the page unloaded, or through an autosave's local stage.
+  await openEditor();
+  // Never answered: the page goes away with the request still open, so nothing is logged.
+  const holdProjectSaves = (route) => (route.request().method() === 'PUT' ? new Promise(() => {}) : route.fallback());
+  await page.route('**/api/v1/projects/**', holdProjectSaves);
+  await rename('Unload navigate');
+  await page.goto(`${origin}/manifest.webmanifest`, { waitUntil: 'domcontentloaded' });
+  assert.equal(await isRecoverable(page, 'Unload navigate'), true, 'browser recovery holds the rename after unload');
+  await page.unroute('**/api/v1/projects/**', holdProjectSaves);
+  await openEditor();
+  assert.equal(await currentWorkflowName(), 'Unload navigate');
+
+  // Reloading the editor.
+  await rename('Unload reload');
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await main.waitFor();
+  assert.equal(await currentWorkflowName(), 'Unload reload');
+
+  // Leaving the editor and reloading at once, while its exit checkpoint may still be saving.
+  await rename('Unload home');
+  await renameDialog.waitFor({ state: 'hidden' });
+  await page.keyboard.press('Escape');
+  await dialog.waitFor({ state: 'hidden' });
+  await page.getByRole('button', { exact: true, name: 'Open menu' }).click();
+  await page.getByRole('menuitem', { exact: true, name: 'Launchpad' }).click();
+  await page.waitForURL(/#\/$/);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.getByRole('heading', { exact: true, name: 'Welcome to Invoke' }).waitFor();
+  await openEditor();
+  assert.equal(await currentWorkflowName(), 'Unload home');
 
   await context.close();
   contexts.delete(context);

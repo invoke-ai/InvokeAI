@@ -67,7 +67,7 @@ export const GenerateCollapsibleSection = ({ badges, children, defaultOpen, isOp
         </Collapsible.Indicator>
         <Text
           as="span"
-          fontSize="2xs"
+          fontSize="xs"
           truncate
           letterSpacing="widest"
           fontWeight="bold"

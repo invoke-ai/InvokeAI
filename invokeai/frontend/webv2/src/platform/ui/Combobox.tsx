@@ -185,7 +185,7 @@ export const Combobox = ({
         <ChakraCombobox.Input
           {...inputProps}
           aria-label={inputProps?.['aria-label'] ?? ariaLabel}
-          placeholder={searchPlaceholder ?? t('common.searchSchedulers')}
+          placeholder={searchPlaceholder ?? t('common.searchOptions')}
         />
         <ChakraCombobox.IndicatorGroup>
           <ChakraCombobox.Trigger aria-label={t('common.openSelector')}>
@@ -206,8 +206,8 @@ export const Combobox = ({
                     </ChakraCombobox.ItemIndicator>
                   </ChakraCombobox.Item>
                 ))}
-                <ChakraCombobox.Empty color="fg.muted" fontSize="xs" px="3" py="2">
-                  {noResultsText ?? t('common.noSchedulersFound')}
+                <ChakraCombobox.Empty color="fg.muted" fontSize="md" px="3" py="2">
+                  {noResultsText ?? t('common.noOptionsFound')}
                 </ChakraCombobox.Empty>
               </ChakraCombobox.List>
             </Scrollable>

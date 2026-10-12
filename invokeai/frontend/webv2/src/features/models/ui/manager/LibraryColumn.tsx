@@ -19,7 +19,7 @@ import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Button, IconButton, ConfirmDialog } from '@platform/ui';
 import { ListSelectionBar } from '@platform/ui/list/ListSelectionBar';
-import { ManagerColumn } from '@platform/ui/ManagerLayout';
+import { ManagerColumn, type ManagerAddAction } from '@platform/ui/ManagerLayout';
 import { RefreshCcwIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -27,7 +27,7 @@ import { useTranslation } from 'react-i18next';
 const EMPTY_KEYS: string[] = [];
 
 /** The persistent master list: header, search/filter bar, and bulk actions. */
-export const LibraryColumn = () => {
+export const LibraryColumn = ({ addAction }: { addAction: ManagerAddAction }) => {
   const { t } = useTranslation();
   const notify = useNotify();
   const models = useModelsSelector((snapshot) => snapshot.models);
@@ -158,7 +158,7 @@ export const LibraryColumn = () => {
   };
 
   return (
-    <ManagerColumn actions={<MaintenanceMenu />} count={models.length} title={t('models.title')}>
+    <ManagerColumn actions={<MaintenanceMenu />} addAction={addAction} count={models.length} title={t('models.title')}>
       <ModelFilterBar
         availableBases={availableBases}
         availableTypes={availableTypes}
@@ -177,17 +177,17 @@ export const LibraryColumn = () => {
       >
         {hasSelection ? (
           <>
-            <Button size="2xs" variant="ghost" onClick={() => setIsBulkReidentifyOpen(true)}>
+            <Button size="sm" variant="ghost" onClick={() => setIsBulkReidentifyOpen(true)}>
               <Icon as={RefreshCcwIcon} boxSize="3" />
               {t('models.reidentifySelected')}
             </Button>
-            <Button colorPalette="red" size="2xs" variant="ghost" onClick={() => setIsBulkDeleteOpen(true)}>
+            <Button colorPalette="red" size="sm" variant="ghost" onClick={() => setIsBulkDeleteOpen(true)}>
               <Icon as={Trash2Icon} boxSize="3" />
               {t('common.delete')}
             </Button>
             <IconButton
               aria-label={t('models.clearSelection')}
-              size="2xs"
+              size="sm"
               variant="ghost"
               onClick={() => updateModelsUi({ selectedKeys: new Set() })}
             >

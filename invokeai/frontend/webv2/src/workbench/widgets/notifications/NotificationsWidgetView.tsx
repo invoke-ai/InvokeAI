@@ -45,7 +45,7 @@ export const NotificationsWidgetView = ({ presentation, region }: WidgetViewProp
     return (
       <Stack flex="1" gap="0" minH="0">
         <HStack borderBottomWidth="1px" borderColor="border.subtle" justify="space-between" px="2" py="1.5">
-          <Text color="fg.subtle" fontSize="2xs" fontWeight="700" textTransform="uppercase">
+          <Text color="fg.subtle" fontSize="xs" fontWeight="700" textTransform="uppercase">
             {t('widgets.labels.notifications')}
           </Text>
           <NotificationsHeaderActions />
@@ -67,7 +67,7 @@ const NotificationsPanel = () => {
   return (
     <Stack flex="1" gap="3" minH="0" p="2">
       {notifications.length === 0 ? (
-        <Text color="fg.subtle" fontSize="2xs">
+        <Text color="fg.subtle" fontSize="xs">
           {t('notifications.empty')}
         </Text>
       ) : (
@@ -88,20 +88,20 @@ const NotificationsPanel = () => {
                 <HStack align="start" justify="space-between">
                   <HStack gap="2" minW="0">
                     <Icon as={IconComponent} color={`${kindColorPalette[notification.kind]}.300`} boxSize="3.5" />
-                    <Text fontSize="2xs" fontWeight="700">
+                    <Text fontSize="xs" fontWeight="700">
                       {notification.titleKey ? t(notification.titleKey) : notification.title}
                     </Text>
                   </HStack>
-                  <Badge colorPalette={kindColorPalette[notification.kind]} size="xs">
+                  <Badge colorPalette={kindColorPalette[notification.kind]}>
                     {t(`notifications.kind.${notification.kind}`)}
                   </Badge>
                 </HStack>
                 {notification.message || notification.messageKey ? (
-                  <Text color="fg.subtle" fontSize="2xs">
+                  <Text color="fg.subtle" fontSize="xs">
                     {notification.messageKey ? t(notification.messageKey) : notification.message}
                   </Text>
                 ) : null}
-                <Text color="fg.subtle" fontSize="2xs">
+                <Text color="fg.subtle" fontSize="xs">
                   {notification.createdAt}
                 </Text>
               </Stack>

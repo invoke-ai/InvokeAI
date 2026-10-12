@@ -30,15 +30,7 @@ export const GalleryItemSortMenu = () => {
     <Menu.Root ids={triggerIds} positioning={SORT_POSITIONING}>
       <Tooltip content={t('widgets.gallery.sortBy')} ids={triggerIds}>
         <Menu.Trigger asChild>
-          <Button
-            aria-label={t('widgets.gallery.imageSort')}
-            color="fg.muted"
-            flexShrink={0}
-            fontSize="xs"
-            gap="1"
-            size="xs"
-            variant="ghost"
-          >
+          <Button aria-label={t('widgets.gallery.imageSort')} color="fg.muted" flexShrink={0} gap="1" variant="ghost">
             {imageOrderDir === 'DESC' ? t('widgets.gallery.newest') : t('widgets.gallery.oldest')}
             <Icon as={ChevronDownIcon} boxSize="3" />
           </Button>

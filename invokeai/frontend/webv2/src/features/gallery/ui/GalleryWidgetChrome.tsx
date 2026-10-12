@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next';
 import type { GalleryWidgetProps } from './GalleryUiContext';
 
 import { BoardCover, BoardCoverIcon } from './GalleryBoardCover';
-import { getGalleryProjectBoardId, getGallerySelectedBoardId } from './galleryStateView';
+import { getGallerySelectedBoardId } from './galleryStateView';
 import { useGalleryUi } from './GalleryUiContext';
 
 type GalleryChromeProps = { region: GalleryWidgetProps['region'] };
@@ -43,16 +43,14 @@ const useGalleryChromeBoards = () => {
 
 export const GalleryWidgetLabel = ({ region }: GalleryChromeProps) => {
   const { t } = useTranslation();
-  const { projectName } = useGalleryUi();
-  const { boards, gallery, galleryValues, selectedBoardId, settings } = useGalleryChromeBoards();
+  const { projectId } = useGalleryUi();
+  const { boards, gallery, selectedBoardId, settings } = useGalleryChromeBoards();
   const selectedBoard = boards.find((board) => board.id === selectedBoardId);
-  // The project board renames with its project server-side, but the fetched
-  // list lags a rename; the live project name is authoritative (as in the
-  // boards panel), so the header follows a rename at once.
+  // Another project's inbox is just "Inbox" in its own list; the header has no section to say whose.
   const boardName = !selectedBoard
     ? t('widgets.gallery.selectedBoardFallback')
-    : selectedBoard.id === getGalleryProjectBoardId(galleryValues)
-      ? projectName
+    : selectedBoard.isInbox && selectedBoard.projectId !== projectId
+      ? t('widgets.gallery.inboxOf', { project: selectedBoard.name })
       : getGalleryBoardLabel(selectedBoard, t);
   const isCollapsed = settings.boardPanelCollapsed;
 
@@ -64,11 +62,11 @@ export const GalleryWidgetLabel = ({ region }: GalleryChromeProps) => {
   return (
     <HStack flex="1" gap="1" minW="0" pe={region === 'center' ? undefined : '2'}>
       {region === 'center' ? null : (
-        <Text flexShrink={0} fontSize="xs" fontWeight="700" pe="2">
+        <Text flexShrink={0} fontWeight="700" pe="2">
           {t('widgets.labels.gallery')}
         </Text>
       )}
-      <Text color="fg.subtle" flexShrink={0} fontSize="xs">
+      <Text color="fg.subtle" flexShrink={0}>
         /
       </Text>
       {/* No tooltip: it renders over the button and steals its hover. */}
@@ -80,7 +78,7 @@ export const GalleryWidgetLabel = ({ region }: GalleryChromeProps) => {
         minW="0"
         // The cover keeps the same 2px inset on every side of the 24px button.
         ps="0.5"
-        size="2xs"
+        size="sm"
         variant="ghost"
         onClick={toggleBoards}
       >

@@ -20,12 +20,12 @@ export const SelectedBundleBar = ({
 
   return (
     <HStack gap="2" justify="space-between" px="3">
-      <Text color="fg.subtle" fontSize="2xs" truncate>
+      <Text color="fg.subtle" fontSize="xs" truncate>
         {bundle.name} · {t('models.modelCount', { count: bundle.models.length })} ·{' '}
         {missingCount === 0 ? t('models.allInstalled') : t('models.countToInstall', { count: missingCount })}
       </Text>
       {missingCount > 0 ? (
-        <Button flexShrink={0} loading={isInstalling} size="2xs" variant="outline" onClick={onInstall}>
+        <Button flexShrink={0} loading={isInstalling} size="sm" variant="outline" onClick={onInstall}>
           <Icon as={DownloadIcon} boxSize="3" />
           {t('models.installBundle')}
         </Button>

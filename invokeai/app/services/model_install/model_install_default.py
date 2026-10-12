@@ -1,5 +1,8 @@
 """Model installation class."""
 
+import ctypes
+import errno
+import filecmp
 import gc
 import json
 import locale
@@ -11,10 +14,11 @@ import time
 from copy import deepcopy
 from pathlib import Path
 from queue import Empty, Queue
-from shutil import move, rmtree
+from shutil import copy2, copytree, move, rmtree
 from tempfile import mkdtemp
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
+import psutil
 import torch
 import yaml
 from huggingface_hub import get_token as hf_get_token
@@ -27,9 +31,13 @@ from invokeai.app.services.download import DownloadQueueServiceBase, MultiFileDo
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_install.model_install_base import ModelInstallServiceBase
 from invokeai.app.services.model_install.model_install_common import (
+    INSTALL_ACTIVE_SENTINEL,
     MODEL_SOURCE_TO_TYPE_MAP,
     ExternalModelSource,
     HFModelSource,
+    InstallCancellationConflictError,
+    InstallDownloadConflictError,
+    InstallRecoveryRequiredError,
     InstallStatus,
     InvalidModelConfigException,
     LocalModelSource,
@@ -37,6 +45,12 @@ from invokeai.app.services.model_install.model_install_common import (
     ModelSource,
     StringLikeSource,
     URLModelSource,
+    create_active_install_sentinel,
+    delete_active_install_sentinel,
+    has_active_install_sentinel,
+    has_recovery_sentinel,
+    is_recovery_protected_path,
+    recovery_sentinel_path,
 )
 from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase, UnknownModelException
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
@@ -57,6 +71,7 @@ from invokeai.backend.model_manager.metadata import (
     AnyModelRepoMetadata,
     HuggingFaceMetadataFetch,
     ModelMetadataFetchBase,
+    ModelMetadataUnavailableError,
     ModelMetadataWithFiles,
     RemoteModelFile,
 )
@@ -83,6 +98,10 @@ TMPDIR_PREFIX = "tmpinstall_"
 # Marker file used to resume or pause remote model installs across restarts.
 INSTALL_MARKER_FILENAME = ".invokeai_install.json"
 INSTALL_MARKER_VERSION = 1
+
+
+class _InstallCancelledBeforeTransfer(Exception):
+    """Raised when a cancellation request wins before file transfer becomes protected."""
 
 
 # Filesystems cap a single path component at 255 bytes. A source that lists many explicit files
@@ -130,6 +149,7 @@ class ModelInstallService(ModelInstallServiceBase):
         self._install_jobs: List[ModelInstallJob] = []
         self._install_queue: Queue[ModelInstallJob] = Queue()
         self._lock = threading.Lock()
+        self._active_install_job: Optional[ModelInstallJob] = None
         self._stop_event = threading.Event()
         self._downloads_changed_event = threading.Event()
         self._install_completed_event = threading.Event()
@@ -137,8 +157,11 @@ class ModelInstallService(ModelInstallServiceBase):
         # _restore_incomplete_installs_async() finishes so an import racing start() cannot pass the barrier early.
         self._restore_completed_event = threading.Event()
         self._startup_error: Optional[BaseException] = None
+        self._restore_thread: Optional[threading.Thread] = None
         self._download_queue = download_queue
         self._download_cache: Dict[int, ModelInstallJob] = {}
+        self._remote_download_operations: set[int] = set()
+        self._remote_download_condition = threading.Condition(self._lock)
         # Per-source locks serializing download_and_cache_model() so parallel (multi-GPU) sessions
         # that need the same remote model (e.g. the LaMa infill model) don't race to download into
         # the same cache directory. _download_cache_locks_guard protects the dict itself.
@@ -155,6 +178,150 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _marker_path(self, tmpdir: Path) -> Path:
         return tmpdir / INSTALL_MARKER_FILENAME
+
+    def _recovery_sentinel_path(self, tmpdir: Path) -> Path:
+        return recovery_sentinel_path(tmpdir)
+
+    def _has_recovery_sentinel(self, tmpdir: Path) -> bool:
+        return has_recovery_sentinel(tmpdir)
+
+    def _write_recovery_sentinel(self, tmpdir: Path) -> None:
+        # Keep recovery state outside the tree being transferred into the managed model directory.
+        path = self._recovery_sentinel_path(tmpdir)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "xb") as f:
+            f.write(b"Install transfer recovery required. Preserve this directory.\n")
+            f.flush()
+            os.fsync(f.fileno())
+        # Persist the directory entry before moving any source data where directory fsync is supported.
+        if os.name != "nt":
+            fd = os.open(path.parent, os.O_RDONLY)
+            try:
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+
+    def _delete_recovery_sentinel(self, tmpdir: Path) -> None:
+        try:
+            self._recovery_sentinel_path(tmpdir).unlink()
+            if os.name != "nt":
+                fd = os.open(tmpdir.parent, os.O_RDONLY)
+                try:
+                    os.fsync(fd)
+                finally:
+                    os.close(fd)
+        except FileNotFoundError:
+            pass
+        except OSError as e:
+            self._logger.warning(f"Failed to remove install recovery sentinel in {tmpdir}: {e}")
+
+    def _protect_managed_source_path(
+        self, model_path: Path, *, allow_recovery: bool = False
+    ) -> tuple[Optional[Path], bool, bool]:
+        """Claim the top-level orphan-scan root containing a local source."""
+        source_root = model_path if model_path.is_dir() else model_path.parent
+        models_root = self.app_config.models_path.resolve()
+        source_root = source_root.resolve()
+        if source_root == models_root or not source_root.is_relative_to(models_root):
+            return None, False, False
+        source_relative = source_root.relative_to(models_root)
+        source_root = models_root / source_relative.parts[0]
+        has_recovery = False
+        current = model_path.resolve() if model_path.is_dir() else model_path.resolve().parent
+        while current != models_root and current.is_relative_to(models_root):
+            if has_active_install_sentinel(current):
+                raise InstallCancellationConflictError(
+                    f"Cannot use local model source {current}: another install or orphan cleanup is using it."
+                )
+            has_recovery = has_recovery or self._has_recovery_sentinel(current)
+            current = current.parent
+        if has_recovery and not allow_recovery:
+            raise InstallRecoveryRequiredError(
+                f"Cannot use local model source {source_root}: it contains install recovery data."
+            )
+        try:
+            create_active_install_sentinel(source_root)
+        except FileExistsError as e:
+            raise InstallCancellationConflictError(
+                f"Cannot use local model source {source_root}: another install or orphan cleanup is using it."
+            ) from e
+        return source_root, True, has_recovery
+
+    def _release_job_source_protection(self, job: ModelInstallJob, *, preserve_recovery: bool = False) -> None:
+        self._release_install_tmpdir_claim(job)
+        if job._source_active_sentinel_created:
+            assert job._source_protection_root is not None
+            delete_active_install_sentinel(job._source_protection_root)
+            job._source_active_sentinel_created = False
+        if not preserve_recovery:
+            if job._install_tmpdir is not None and job._install_tmpdir_recovery_sentinel_created:
+                self._delete_recovery_sentinel(job._install_tmpdir)
+                job._install_tmpdir_recovery_sentinel_created = False
+            if job._source_recovery_sentinel_created or (job._source_recovery_sentinel_preexisting and job.complete):
+                assert job._source_protection_root is not None
+                self._delete_recovery_sentinel(job._source_protection_root)
+                job._source_recovery_sentinel_created = False
+
+    @staticmethod
+    def _release_install_tmpdir_claim(job: ModelInstallJob) -> None:
+        if job._install_tmpdir is not None and job._install_tmpdir_active_sentinel_created:
+            delete_active_install_sentinel(job._install_tmpdir)
+            job._install_tmpdir_active_sentinel_created = False
+
+    def _claim_install_tmpdir(self, job: ModelInstallJob) -> None:
+        if job._install_tmpdir is None or job._install_tmpdir_active_sentinel_created:
+            return
+        try:
+            create_active_install_sentinel(job._install_tmpdir)
+        except FileExistsError as e:
+            job._install_tmpdir_claim_conflict = True
+            raise InstallCancellationConflictError(
+                f"Cannot use install staging path {job._install_tmpdir}: another install or orphan cleanup is using it."
+            ) from e
+        job._install_tmpdir_active_sentinel_created = True
+        job._install_tmpdir_claim_conflict = False
+
+    def _remove_unclaimed_install_tmpdir(self, tmpdir: Path) -> bool:
+        """Remove a stale staging tree only after atomically excluding active install work."""
+        try:
+            create_active_install_sentinel(tmpdir)
+        except FileExistsError:
+            self._logger.debug(f"Preserving active install directory {tmpdir}")
+            return False
+        try:
+            self._safe_rmtree(tmpdir, self._logger)
+        finally:
+            delete_active_install_sentinel(tmpdir)
+        return True
+
+    def _remove_stale_install_source_claims(self) -> None:
+        """Remove active-claim sidecars left by processes that exited before releasing them."""
+        for claim_path in self.app_config.models_path.glob(f"*{INSTALL_ACTIVE_SENTINEL}"):
+            try:
+                pid_text, create_time_text = claim_path.read_text(encoding="ascii").split()
+                pid = int(pid_text)
+                create_time = float(create_time_text)
+                process = psutil.Process(pid)
+                # On Linux, psutil derives process start time from boot time plus kernel ticks. A small boot-time
+                # adjustment can change that value for a live process, so exact float equality can remove its claim.
+                if process.status() == psutil.STATUS_ZOMBIE or abs(process.create_time() - create_time) > 1.0:
+                    claim_path.unlink(missing_ok=True)
+            except (psutil.NoSuchProcess, psutil.ZombieProcess):
+                claim_path.unlink(missing_ok=True)
+            except psutil.AccessDenied:
+                continue
+            except ValueError:
+                claim_path.unlink(missing_ok=True)
+            except OSError:
+                # Permission errors mean the owner process may still be active. Unknown failures are conservative too.
+                continue
+
+    def _retain_recovery_destination(self, dest_dir: Path) -> None:
+        try:
+            if dest_dir.exists() and not self._has_recovery_sentinel(dest_dir):
+                self._write_recovery_sentinel(dest_dir)
+        except Exception as sentinel_error:
+            self._logger.error(f"Failed to persist destination recovery sentinel in {dest_dir}: {sentinel_error}")
 
     def _write_install_marker(self, job: ModelInstallJob, status: Optional[InstallStatus] = None) -> None:
         if job._install_tmpdir is None:
@@ -175,6 +342,8 @@ class ModelInstallService(ModelInstallServiceBase):
                         "resume_message": part.resume_message,
                     }
                 )
+        elif job._resume_metadata:
+            files.extend(dict(metadata) for metadata in job._resume_metadata.values())
         marker = {
             "version": INSTALL_MARKER_VERSION,
             "source": str(job.source),
@@ -186,6 +355,8 @@ class ModelInstallService(ModelInstallServiceBase):
             "updated_at": get_iso_timestamp(),
             "files": files,
         }
+        if job._recovery_required:
+            marker["recovery_required"] = True
         path = self._marker_path(job._install_tmpdir)
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "wt", encoding="utf-8") as f:
@@ -218,12 +389,16 @@ class ModelInstallService(ModelInstallServiceBase):
         source_str = str(source)
         candidates: list[tuple[str, Path]] = []
         for tmpdir in path.glob(f"{TMPDIR_PREFIX}*"):
+            if has_active_install_sentinel(tmpdir) or self._has_recovery_sentinel(tmpdir):
+                continue
             marker = self._read_install_marker(tmpdir)
             if not marker:
                 continue
             if marker.get("source") != source_str:
                 continue
             status = marker.get("status")
+            if marker.get("recovery_required") is True:
+                continue
             if status in {InstallStatus.COMPLETED.value, InstallStatus.ERROR.value, InstallStatus.CANCELLED.value}:
                 continue
             candidates.append((marker.get("updated_at", ""), tmpdir))
@@ -241,14 +416,25 @@ class ModelInstallService(ModelInstallServiceBase):
             active_sources = {str(j.source) for j in self._install_jobs if not j.in_terminal_state}
             active_sources.update(str(j.source) for j in self._download_cache.values() if not j.in_terminal_state)
         for tmpdir in path.glob(f"{TMPDIR_PREFIX}*"):
+            if self._stop_event.is_set():
+                return
+            if has_active_install_sentinel(tmpdir):
+                self._logger.debug(f"Skipping active install directory {tmpdir}")
+                continue
+            if self._has_recovery_sentinel(tmpdir):
+                self._logger.warning(f"Preserving install recovery data in {tmpdir}")
+                continue
             marker = self._read_install_marker(tmpdir)
             if not marker:
                 continue
             status = marker.get("status")
-            if status in {InstallStatus.COMPLETED.value, InstallStatus.ERROR.value, InstallStatus.CANCELLED.value}:
+            if marker.get("recovery_required") is True:
+                self._logger.warning(f"Preserving install recovery data in {tmpdir}")
                 continue
-
             try:
+                parsed_status = InstallStatus(status) if status else InstallStatus.WAITING
+                if parsed_status in {InstallStatus.COMPLETED, InstallStatus.ERROR, InstallStatus.CANCELLED}:
+                    continue
                 source_str = marker.get("source")
                 if not isinstance(source_str, str):
                     raise ValueError("Missing source in install marker")
@@ -262,7 +448,7 @@ class ModelInstallService(ModelInstallServiceBase):
                     continue
                 if source_str in seen_sources:
                     self._logger.info(f"Removing duplicate temporary directory {tmpdir}")
-                    self._safe_rmtree(tmpdir, self._logger)
+                    self._remove_unclaimed_install_tmpdir(tmpdir)
                     continue
                 # Inside the `try`: a marker written by an older version can hold a config that no longer
                 # validates, and that must skip this marker, not abort the restore of every marker after it. Note
@@ -283,10 +469,17 @@ class ModelInstallService(ModelInstallServiceBase):
                 local_path=tmpdir,
             )
             job._install_tmpdir = tmpdir
+            try:
+                # Protect paused and completed downloads as soon as they are restored, before any
+                # later orphan scan can mistake finalized staging files for unregistered models.
+                self._claim_install_tmpdir(job)
+            except InstallCancellationConflictError as e:
+                self._logger.info(f"Skipping restore of claimed install directory {tmpdir}: {e}")
+                continue
             files_meta = marker.get("files") or []
             if files_meta:
                 job._resume_metadata = {f.get("url"): f for f in files_meta if f.get("url")}
-            job.status = InstallStatus(status) if status else InstallStatus.WAITING
+            job.status = parsed_status
             self._install_jobs.append(job)
 
             if job.paused:
@@ -298,10 +491,24 @@ class ModelInstallService(ModelInstallServiceBase):
             else:
                 try:
                     self._resume_remote_download(job)
+                except ModelMetadataUnavailableError as e:
+                    self._logger.warning(f"Could not resume install {source_str} because metadata is unavailable: {e}")
+                    job.status = InstallStatus.PAUSED
+                    self._write_install_marker(job, status=InstallStatus.PAUSED)
+                    if self._stop_event.is_set():
+                        return
                 except Exception as e:
+                    if self._stop_event.is_set():
+                        self._logger.info(f"Leaving interrupted install in {job._install_tmpdir} for next startup")
+                        job.status = InstallStatus.PAUSED
+                        return
                     self._set_error(job, e)
-                    if job._install_tmpdir is not None:
-                        self._safe_rmtree(job._install_tmpdir, self._logger)
+                    if job._install_tmpdir is not None and not job._install_tmpdir_claim_conflict:
+                        if job._install_tmpdir_active_sentinel_created:
+                            self._safe_rmtree(job._install_tmpdir, self._logger)
+                            self._release_install_tmpdir_claim(job)
+                        else:
+                            self._remove_unclaimed_install_tmpdir(job._install_tmpdir)
 
     def _restore_incomplete_installs_async(self) -> None:
         self._restore_completed_event.clear()
@@ -316,7 +523,8 @@ class ModelInstallService(ModelInstallServiceBase):
             finally:
                 self._restore_completed_event.set()
 
-        threading.Thread(target=_run, daemon=True).start()
+        self._restore_thread = threading.Thread(target=_run, daemon=True)
+        self._restore_thread.start()
 
     def _wait_for_restore_complete(self, timeout: Optional[float] = None) -> bool:
         deadline = time.monotonic() + timeout if timeout is not None else None
@@ -335,37 +543,82 @@ class ModelInstallService(ModelInstallServiceBase):
         remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
         return self._restore_completed_event.wait(timeout=remaining)
 
-    def _resume_remote_download(self, job: ModelInstallJob) -> None:
-        job.status = InstallStatus.WAITING
-        # Sources whose partial file has vanished. _enqueue_remote_download replaces job.download_parts
-        # with fresh parts, so the flag must be carried onto them or the resume response loses it.
-        restarted_from_scratch: set[str] = set()
-        if job.download_parts:
-            for part in job.download_parts:
-                if part.complete or part.bytes <= 0:
-                    continue
-                if not part.download_path:
-                    continue
-                in_progress_path = part.download_path.with_name(part.download_path.name + ".downloading")
-                if not in_progress_path.exists():
-                    part.bytes = 0
-                    part.resume_from_scratch = True
-                    part.resume_message = "Partial file missing. Restarted download from the beginning."
-                    restarted_from_scratch.add(str(part.source))
-            job.bytes = sum(p.bytes for p in job.download_parts)
-        remote_files, metadata = self._remote_files_from_source(job.source)
-        subfolders = job.source.subfolders if isinstance(job.source, HFModelSource) else []
-        self._enqueue_remote_download(
-            job=job,
-            source=job.source,
-            remote_files=remote_files,
-            metadata=metadata,
-            destdir=job._install_tmpdir or job.local_path,
-            subfolder=job.source.subfolder if isinstance(job.source, HFModelSource) and len(subfolders) <= 1 else None,
-            subfolders=subfolders if len(subfolders) > 1 else None,
-            resume_metadata=job._resume_metadata,
-            restarted_from_scratch=restarted_from_scratch,
-        )
+    def _resume_remote_download(self, job: ModelInstallJob, *, operation_reserved: bool = False) -> None:
+        if not operation_reserved:
+            self._begin_remote_download_operation(job)
+        previous_status = job.status
+        try:
+            # Sources whose partial file has vanished. _enqueue_remote_download replaces job.download_parts
+            # with fresh parts, so the flag must be carried onto them or the resume response loses it.
+            restarted_from_scratch: set[str] = set()
+            if job.download_parts:
+                for part in job.download_parts:
+                    if part.complete or part.bytes <= 0:
+                        continue
+                    if not part.download_path:
+                        continue
+                    in_progress_path = part.download_path.with_name(part.download_path.name + ".downloading")
+                    if not in_progress_path.exists():
+                        part.bytes = 0
+                        part.resume_from_scratch = True
+                        part.resume_message = "Partial file missing. Restarted download from the beginning."
+                        restarted_from_scratch.add(str(part.source))
+                job.bytes = sum(p.bytes for p in job.download_parts)
+            remote_files, metadata = self._remote_files_from_source(job.source)
+            if not remote_files:
+                raise RuntimeError("No remote files are available to download")
+            subfolders = job.source.subfolders if isinstance(job.source, HFModelSource) else []
+            job.status = InstallStatus.WAITING
+            self._enqueue_remote_download(
+                job=job,
+                source=job.source,
+                remote_files=remote_files,
+                metadata=metadata,
+                destdir=job._install_tmpdir or job.local_path,
+                subfolder=job.source.subfolder
+                if isinstance(job.source, HFModelSource) and len(subfolders) <= 1
+                else None,
+                subfolders=subfolders if len(subfolders) > 1 else None,
+                resume_metadata=job._resume_metadata,
+                restarted_from_scratch=restarted_from_scratch,
+            )
+        except BaseException:
+            job.status = previous_status
+            raise
+        finally:
+            if not operation_reserved:
+                self._end_remote_download_operation(job)
+
+    def _begin_remote_download_operation(self, job: ModelInstallJob, *, require_paused: bool = False) -> bool:
+        """Serialize resume/restart handoffs and reject replacements before old callbacks finish."""
+        with self._remote_download_condition:
+            if self._stop_event.is_set():
+                raise InstallDownloadConflictError("The model install service is stopping; retry after it starts.")
+            download_active = job.id in self._remote_download_operations or any(
+                cached_job is job for cached_job in self._download_cache.values()
+            )
+            if require_paused:
+                if download_active:
+                    raise InstallDownloadConflictError(
+                        "A previous download is still active; wait for it to finish before resuming or restarting."
+                    )
+                if not job.paused:
+                    return False
+            if job.cancelled or job.complete:
+                raise InstallDownloadConflictError(
+                    "The install is already terminal and cannot be resumed or restarted."
+                )
+            if download_active:
+                raise InstallDownloadConflictError(
+                    "A previous download is still active; wait for it to finish before resuming or restarting."
+                )
+            self._remote_download_operations.add(job.id)
+            return True
+
+    def _end_remote_download_operation(self, job: ModelInstallJob) -> None:
+        with self._remote_download_condition:
+            self._remote_download_operations.discard(job.id)
+            self._remote_download_condition.notify_all()
 
     @property
     def app_config(self) -> InvokeAIAppConfig:  # noqa D102
@@ -390,6 +643,7 @@ class ModelInstallService(ModelInstallServiceBase):
             self._startup_error = None
             self._restore_completed_event.clear()
             try:
+                self._remove_stale_install_source_claims()
                 self._start_installer_thread()
                 self._remove_dangling_install_dirs()
                 self._migrate_yaml()
@@ -417,13 +671,26 @@ class ModelInstallService(ModelInstallServiceBase):
         if not self._running:
             return
         self._logger.debug("calling stop_event.set()")
-        self._stop_event.set()
-        self._clear_pending_jobs()
         with self._lock:
-            self._download_cache.clear()
+            self._stop_event.set()
         assert self._install_thread is not None
-        self._install_thread.join()
-        self._running = False
+        try:
+            # Let the worker finish (or leave a dequeued job untouched) before cleaning pending jobs. Otherwise
+            # shutdown can mistake a job between Queue.get() and _active_install_job assignment for pending work.
+            self._install_thread.join()
+            restore_thread = self._restore_thread
+            if restore_thread is not None and restore_thread is not threading.current_thread():
+                restore_thread.join()
+        finally:
+            try:
+                with self._remote_download_condition:
+                    self._remote_download_condition.wait_for(lambda: not self._remote_download_operations)
+                self._clear_pending_jobs()
+            finally:
+                with self._lock:
+                    # Download cancellation is asynchronous. Keep these job references until their
+                    # callbacks have stopped touching staging paths and release their active claims.
+                    self._running = False
 
     def _write_invoke_managed_models_dir_readme(self) -> None:
         """Write a README file to the Invoke-managed models directory warning users to not fiddle with it."""
@@ -434,14 +701,53 @@ class ModelInstallService(ModelInstallServiceBase):
             )
 
     def _clear_pending_jobs(self) -> None:
-        for job in self.list_jobs():
-            if not job.in_terminal_state:
-                if job._multifile_job is not None:
-                    self._logger.warning(f"Pausing job {job.id}")
-                    self.pause_job(job)
-                else:
-                    self._logger.warning(f"Cancelling job {job.id}")
-                    self.cancel_job(job)
+        for job in list(self.list_jobs()):
+            with self._lock:
+                if job.in_terminal_state or self._active_install_job is job:
+                    continue
+                if job._recovery_required or (
+                    job._install_tmpdir is not None and self._has_recovery_sentinel(job._install_tmpdir)
+                ):
+                    self._logger.warning(f"Preserving recovery data for job {job.id} during shutdown")
+                    continue
+                multifile_job = job._multifile_job
+                download_callback_pending = any(cached_job is job for cached_job in self._download_cache.values())
+                downloads_complete = multifile_job is not None and multifile_job.complete
+                preserve_download_status = (
+                    job.status
+                    if multifile_job is None and job.status in {InstallStatus.PAUSED, InstallStatus.DOWNLOADS_DONE}
+                    else None
+                )
+                if preserve_download_status is None and multifile_job is None:
+                    job.cancel()
+                elif preserve_download_status is None and downloads_complete:
+                    job.status = InstallStatus.DOWNLOADS_DONE
+                elif preserve_download_status is None:
+                    job.status = InstallStatus.PAUSED
+
+            if preserve_download_status is not None:
+                self._write_install_marker(job, status=preserve_download_status)
+                if not download_callback_pending:
+                    self._release_install_tmpdir_claim(job)
+            elif multifile_job is not None and downloads_complete:
+                self._write_install_marker(job, status=InstallStatus.DOWNLOADS_DONE)
+                if not download_callback_pending:
+                    self._release_install_tmpdir_claim(job)
+            elif multifile_job is not None:
+                self._logger.warning(f"Pausing job {job.id}")
+                for part in multifile_job.download_parts:
+                    self._download_queue.pause_job(part)
+                self._write_install_marker(job, status=InstallStatus.PAUSED)
+                if self._stop_event.is_set() and not download_callback_pending:
+                    # The pause callback already ran, so no download worker can still touch staging.
+                    self._release_install_tmpdir_claim(job)
+            elif job._install_tmpdir is not None:
+                self._logger.warning(f"Cancelling job {job.id}")
+                if not job._install_tmpdir_claim_conflict:
+                    self._write_install_marker(job, status=InstallStatus.CANCELLED)
+                    self._delete_install_marker(job._install_tmpdir)
+                    self._safe_rmtree(job._install_tmpdir, self._logger)
+                    self._release_install_tmpdir_claim(job)
         while True:
             try:
                 job = self._install_queue.get(block=False)
@@ -450,10 +756,21 @@ class ModelInstallService(ModelInstallServiceBase):
                 break
 
     def _put_in_queue(self, job: ModelInstallJob) -> None:
+        with self._lock:
+            queued = self._queue_install_job_locked(job)
+        if not queued:
+            if self._stop_event.is_set():
+                # A completed download that races shutdown remains resumable on the next start.
+                job.status = InstallStatus.DOWNLOADS_DONE
+            else:
+                self.cancel_job(job)
+
+    def _queue_install_job_locked(self, job: ModelInstallJob) -> bool:
+        """Queue an install while holding _lock, preserving shutdown and wait_for_installs ordering."""
         if self._stop_event.is_set():
-            self.cancel_job(job)
-        else:
-            self._install_queue.put(job)
+            return False
+        self._install_queue.put(job)
+        return True
 
     def register_path(
         self,
@@ -465,7 +782,20 @@ class ModelInstallService(ModelInstallServiceBase):
         if not config.source:
             config.source = model_path.resolve().as_posix()
         config.source_type = ModelSourceType.Path
-        return self._register(model_path, config)
+        source_root, active_sentinel_created, had_recovery_sentinel = self._protect_managed_source_path(
+            model_path, allow_recovery=True
+        )
+        had_recovery_sentinel = source_root is not None and had_recovery_sentinel
+        registered = False
+        try:
+            model_id = self._register(model_path, config)
+            registered = True
+            return model_id
+        finally:
+            if active_sentinel_created and source_root is not None:
+                delete_active_install_sentinel(source_root)
+            if registered and had_recovery_sentinel and source_root is not None:
+                self._delete_recovery_sentinel(source_root)
 
     # TODO: Replace this with a proper fix for underlying problem of Windows holding open
     # the file when it needs to be moved.
@@ -477,11 +807,91 @@ class ModelInstallService(ModelInstallServiceBase):
                 move(src, dst)
                 return
             except PermissionError:
+                if dst.exists() or dst.is_symlink():
+                    # On Windows, shutil.move may copy a file successfully and then fail unlinking its
+                    # source. Accept that state only when both regular files have identical contents.
+                    if (
+                        src.is_file()
+                        and not src.is_symlink()
+                        and dst.is_file()
+                        and not dst.is_symlink()
+                        and filecmp.cmp(src, dst, shallow=False)
+                    ):
+                        try:
+                            src.unlink()
+                            return
+                        except PermissionError:
+                            pass
+                    else:
+                        raise
                 gc.collect()
                 if tries_left == 1:
                     raise
                 time.sleep(delay)
                 delay *= 2  # Exponential backoff
+
+    @staticmethod
+    def _rename_noreplace(src: Path, dst: Path) -> None:
+        """Atomically restore a path only if its destination is still absent."""
+        if sys.platform.startswith("linux"):
+            libc = ctypes.CDLL(None, use_errno=True)
+            renameat2 = getattr(libc, "renameat2", None)
+            if renameat2 is None:
+                raise OSError("atomic no-replace rename is unavailable")
+            renameat2.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+            renameat2.restype = ctypes.c_int
+            result = renameat2(-100, os.fsencode(src), -100, os.fsencode(dst), 1)  # AT_FDCWD, RENAME_NOREPLACE
+            if result != 0:
+                error = ctypes.get_errno()
+                raise OSError(error, os.strerror(error), str(dst))
+            return
+        if sys.platform == "darwin":
+            libc = ctypes.CDLL(None, use_errno=True)
+            renamex_np = getattr(libc, "renamex_np", None)
+            if renamex_np is None:
+                raise OSError("atomic no-replace rename is unavailable")
+            renamex_np.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint]
+            renamex_np.restype = ctypes.c_int
+            result = renamex_np(os.fsencode(src), os.fsencode(dst), 0x00000004)  # RENAME_EXCL
+            if result != 0:
+                error = ctypes.get_errno()
+                raise OSError(error, os.strerror(error), str(dst))
+            return
+        if os.name == "nt":
+            # Windows rename fails when the destination already exists.
+            os.rename(src, dst)
+            return
+        raise OSError("atomic no-replace rename is unavailable on this platform")
+
+    @classmethod
+    def _restore_moved_path(cls, src: Path, dst: Path) -> None:
+        if dst.exists() or dst.is_symlink():
+            raise FileExistsError(f"Refusing to overwrite recreated source {dst}")
+        try:
+            cls._rename_noreplace(src, dst)
+        except OSError as e:
+            if e.errno != errno.EXDEV:
+                raise
+            # Local imports can span filesystems. Stage a full copy beside the original source, then
+            # atomically claim its name with a no-replace rename before removing the managed copy.
+            staging_dir = Path(mkdtemp(prefix=f".{dst.name}.restore-", dir=dst.parent))
+            staged_path = staging_dir / "restored"
+            try:
+                if src.is_symlink():
+                    os.symlink(os.readlink(src), staged_path)
+                elif src.is_dir():
+                    copytree(src, staged_path, symlinks=True)
+                elif src.is_file():
+                    copy2(src, staged_path)
+                else:
+                    raise OSError(f"Cannot restore unsupported filesystem object {src}")
+                cls._rename_noreplace(staged_path, dst)
+                if src.is_dir() and not src.is_symlink():
+                    rmtree(src)
+                else:
+                    src.unlink()
+            finally:
+                rmtree(staging_dir, ignore_errors=True)
 
     def install_path(
         self,
@@ -490,30 +900,169 @@ class ModelInstallService(ModelInstallServiceBase):
     ) -> str:
         model_path = Path(model_path)
         config = config or ModelRecordChanges()
-        info: AnyModelConfig = self._probe(Path(model_path), config)  # type: ignore
+        source_root, active_sentinel_created, had_recovery_sentinel = self._protect_managed_source_path(
+            model_path, allow_recovery=True
+        )
+        source_recovery_sentinel_created = False
+        preserve_source = False
+        installed = False
+        try:
+            info: AnyModelConfig = self._probe(Path(model_path), config)  # type: ignore
 
+            def begin_transfer() -> bool:
+                nonlocal source_recovery_sentinel_created
+                if source_root is not None and active_sentinel_created and not self._has_recovery_sentinel(source_root):
+                    self._write_recovery_sentinel(source_root)
+                    source_recovery_sentinel_created = True
+                return True
+
+            model_id = self._install_path_with_info(model_path, config, info, before_transfer=begin_transfer)
+            installed = True
+            return model_id
+        except InstallRecoveryRequiredError:
+            preserve_source = True
+            raise
+        finally:
+            if active_sentinel_created and source_root is not None:
+                delete_active_install_sentinel(source_root)
+            if (
+                active_sentinel_created
+                and source_root is not None
+                and (installed or (source_recovery_sentinel_created and not preserve_source))
+            ):
+                self._delete_recovery_sentinel(source_root)
+
+    def _install_path_with_info(
+        self,
+        model_path: Path,
+        config: ModelRecordChanges,
+        info: AnyModelConfig,
+        before_transfer: Optional[Callable[[], bool]] = None,
+    ) -> str:
         # The key names the directory the model is moved into. `ModelRecordChanges` validates a client-supplied key,
         # but a caller can build one without validation, so check again here - before anything is created or moved.
         if not is_plain_filename(info.key):
             raise ValueError(f"Invalid model key {info.key!r}: it must be a plain filename")
         dest_dir = self.app_config.models_path / info.key
         try:
+            create_active_install_sentinel(dest_dir)
+        except FileExistsError as e:
+            raise InstallCancellationConflictError(
+                f"Cannot install model to {dest_dir}: another install or orphan cleanup is using it."
+            ) from e
+        try:
+            return self._install_path_with_info_claimed(model_path, config, info, before_transfer)
+        finally:
+            delete_active_install_sentinel(dest_dir)
+
+    def _install_path_with_info_claimed(
+        self,
+        model_path: Path,
+        config: ModelRecordChanges,
+        info: AnyModelConfig,
+        before_transfer: Optional[Callable[[], bool]],
+    ) -> str:
+        dest_dir = self.app_config.models_path / info.key
+        moved: list[tuple[Path, Path]] = []
+        source_is_directory = model_path.is_dir()
+        destination_created = False
+        pending_dest: Optional[Path] = None
+        try:
             if dest_dir.exists():
-                raise FileExistsError(
+                raise DuplicateModelException(
                     f"Cannot install model {model_path.name} to {dest_dir}: destination already exists"
                 )
             dest_dir.mkdir(parents=True)
+            destination_created = True
+            # Protect every file in the destination until the model record is committed. An admin can run orphan
+            # cleanup concurrently with this transfer, and the directory is not registered until _register().
+            self._write_recovery_sentinel(dest_dir)
+            if before_transfer is not None and not before_transfer():
+                raise _InstallCancelledBeforeTransfer()
             dest_path = dest_dir / model_path.name if model_path.is_file() else dest_dir
             if model_path.is_file():
-                self._move_with_retries(model_path, dest_path)  # Windows workaround TODO: fix root cause
+                try:
+                    self._move_with_retries(model_path, dest_path)
+                except Exception as move_error:
+                    if dest_path.exists() or dest_path.is_symlink():
+                        raise InstallRecoveryRequiredError(
+                            f"Install recovery required after {move_error}. Source: {model_path.resolve()}; "
+                            f"destination: {dest_dir.resolve()}. Unrecognized destination artifact: "
+                            f"{dest_path.resolve()}"
+                        ) from move_error
+                    raise
             elif model_path.is_dir():
                 # Move the contents of the directory, not the directory itself
                 for item in model_path.iterdir():
-                    move(item, dest_dir / item.name)
-        except FileExistsError as e:
-            raise DuplicateModelException(
-                f"A model named {model_path.name} is already installed at {dest_dir.as_posix()}"
-            ) from e
+                    item_dest = dest_dir / item.name
+                    pending_dest = item_dest
+                    self._move_with_retries(item, item_dest)
+                    moved.append((item, item_dest))
+                    pending_dest = None
+        except InstallRecoveryRequiredError:
+            # Recovery destinations can share TMPDIR_PREFIX with remote staging dirs. Keep their artifacts out of
+            # startup's dangling-install cleanup even when the configured model key uses that prefix.
+            self._retain_recovery_destination(dest_dir)
+            raise
+        except Exception as transfer_error:
+            if not destination_created:
+                if isinstance(transfer_error, FileExistsError):
+                    raise DuplicateModelException(
+                        f"A model named {model_path.name} is already installed at {dest_dir.as_posix()}"
+                    ) from transfer_error
+                raise
+            if source_is_directory:
+                rollback_errors: list[str] = []
+                if pending_dest is not None and (pending_dest.exists() or pending_dest.is_symlink()):
+                    rollback_errors.append(f"unrecognized destination artifact: {pending_dest.resolve()}")
+                for moved_source, moved_dest in reversed(moved):
+                    try:
+                        if moved_source.exists() or moved_source.is_symlink():
+                            raise FileExistsError(f"Refusing to overwrite recreated source {moved_source}")
+                        self._restore_moved_path(moved_dest, moved_source)
+                    except Exception as rollback_error:
+                        rollback_errors.append(
+                            f"could not restore {moved_dest.resolve()} to {moved_source.resolve()}: {rollback_error}"
+                        )
+                if rollback_errors:
+                    details = "; ".join(rollback_errors)
+                    self._retain_recovery_destination(dest_dir)
+                    raise InstallRecoveryRequiredError(
+                        f"Install recovery required after {transfer_error}. Source: {model_path.resolve()}; "
+                        f"destination: {dest_dir.resolve()}. {details}"
+                    ) from transfer_error
+                moved.clear()
+                try:
+                    remaining = list(dest_dir.iterdir())
+                    if remaining:
+                        leftovers = ", ".join(str(path.resolve()) for path in remaining)
+                        raise OSError(f"unexpected destination artifacts remain: {leftovers}")
+                    dest_dir.rmdir()
+                    self._delete_recovery_sentinel(dest_dir)
+                except Exception as cleanup_error:
+                    self._retain_recovery_destination(dest_dir)
+                    raise InstallRecoveryRequiredError(
+                        f"Install recovery required after {transfer_error}. Source: {model_path.resolve()}; "
+                        f"destination: {dest_dir.resolve()}. Could not remove owned empty destination: "
+                        f"{cleanup_error}"
+                    ) from transfer_error
+                raise
+            if dest_dir.exists():
+                try:
+                    remaining = list(dest_dir.iterdir())
+                    if remaining:
+                        leftovers = ", ".join(str(path.resolve()) for path in remaining)
+                        raise OSError(f"unexpected destination artifacts remain: {leftovers}")
+                    dest_dir.rmdir()
+                    self._delete_recovery_sentinel(dest_dir)
+                except Exception as cleanup_error:
+                    self._retain_recovery_destination(dest_dir)
+                    raise InstallRecoveryRequiredError(
+                        f"Install recovery required after {transfer_error}. Source: {model_path.resolve()}; "
+                        f"destination: {dest_dir.resolve()}. Could not remove owned empty destination: "
+                        f"{cleanup_error}"
+                    ) from transfer_error
+            raise
 
         return self._register(
             dest_path,
@@ -634,21 +1183,48 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def cancel_job(self, job: ModelInstallJob) -> None:
         """Cancel the indicated job."""
-        job.cancel()
+        with self._lock:
+            if job.id in self._remote_download_operations:
+                raise InstallDownloadConflictError(
+                    "A remote download is being prepared; wait for it to finish before cancelling."
+                )
+            if job.complete or job.cancelled:
+                return
+            if job._recovery_required or (
+                job._install_tmpdir is not None and self._has_recovery_sentinel(job._install_tmpdir)
+            ):
+                raise InstallRecoveryRequiredError(
+                    "Cannot cancel an install that requires recovery; preserve its files for manual recovery."
+                )
+            if self._active_install_job is job:
+                if job._install_phase == "transferring":
+                    raise InstallCancellationConflictError(
+                        "Cannot cancel while install files are being moved; allow the transfer to finish."
+                    )
+                job._cancel_requested = True
+                return
+            job.cancel()
+            download_callback_pending = any(cached_job is job for cached_job in self._download_cache.values())
         self._logger.warning(f"Cancelling {job.source}")
         if dj := job._multifile_job:
-            self._download_queue.cancel_job(dj)
-        if job._install_tmpdir is not None:
-            # Mark cancelled before cleanup so we don't reuse the folder if deletion fails.
-            self._write_install_marker(job, status=InstallStatus.CANCELLED)
-            self._delete_install_marker(job._install_tmpdir)
-            self._safe_rmtree(job._install_tmpdir, self._logger)
+            if not dj.in_terminal_state or download_callback_pending:
+                # The terminal queue callback still owns cleanup while the job remains in _download_cache.
+                self._download_queue.cancel_job(dj)
+                return
+        self._cleanup_cancelled_install(job)
 
     def pause_job(self, job: ModelInstallJob) -> None:
         """Pause the indicated job, preserving partial downloads."""
-        if job.in_terminal_state:
-            return
-        job.status = InstallStatus.PAUSED
+        with self._lock:
+            if job.id in self._remote_download_operations:
+                raise InstallDownloadConflictError(
+                    "A remote download is being prepared; wait for it to finish before pausing."
+                )
+            if job.in_terminal_state:
+                return
+            if job.downloads_done or job.running or self._active_install_job is job:
+                raise InstallDownloadConflictError("The install has started and cannot be paused.")
+            job.status = InstallStatus.PAUSED
         self._logger.warning(f"Pausing {job.source}")
         if dj := job._multifile_job:
             for part in dj.download_parts:
@@ -657,13 +1233,20 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def resume_job(self, job: ModelInstallJob) -> None:
         """Resume a previously paused job."""
-        if not job.paused:
+        if not self._begin_remote_download_operation(job, require_paused=True):
             return
         self._logger.info(f"Resuming {job.source}")
-        self._resume_remote_download(job)
+        try:
+            self._resume_remote_download(job, operation_reserved=True)
+        finally:
+            self._end_remote_download_operation(job)
 
     def restart_failed(self, job: ModelInstallJob) -> None:
         """Restart failed or non-resumable downloads for a job."""
+        if job._recovery_required or (
+            job._install_tmpdir is not None and self._has_recovery_sentinel(job._install_tmpdir)
+        ):
+            raise InstallRecoveryRequiredError("Cannot restart an install that requires recovery.")
         if not isinstance(job.source, (HFModelSource, URLModelSource)):
             return
         if not job.download_parts:
@@ -673,41 +1256,67 @@ class ModelInstallService(ModelInstallServiceBase):
         sources_to_restart = {str(part.source) for part in job.download_parts if not part.complete}
         if not sources_to_restart:
             return
-        job.status = InstallStatus.WAITING
-        remote_files, metadata = self._remote_files_from_source(job.source)
-        remote_files = [rf for rf in remote_files if str(rf.url) in sources_to_restart]
-        subfolders = job.source.subfolders if isinstance(job.source, HFModelSource) else []
-        self._enqueue_remote_download(
-            job=job,
-            source=job.source,
-            remote_files=remote_files,
-            metadata=metadata,
-            destdir=job._install_tmpdir or job.local_path,
-            subfolder=job.source.subfolder if isinstance(job.source, HFModelSource) and len(subfolders) <= 1 else None,
-            subfolders=subfolders if len(subfolders) > 1 else None,
-            clear_partials=True,
-        )
+        self._begin_remote_download_operation(job)
+        previous_status = job.status
+        try:
+            remote_files, metadata = self._remote_files_from_source(job.source)
+            remote_files = [rf for rf in remote_files if str(rf.url) in sources_to_restart]
+            if not remote_files:
+                raise RuntimeError("No remote files are available to download")
+            subfolders = job.source.subfolders if isinstance(job.source, HFModelSource) else []
+            job.status = InstallStatus.WAITING
+            self._enqueue_remote_download(
+                job=job,
+                source=job.source,
+                remote_files=remote_files,
+                metadata=metadata,
+                destdir=job._install_tmpdir or job.local_path,
+                subfolder=job.source.subfolder
+                if isinstance(job.source, HFModelSource) and len(subfolders) <= 1
+                else None,
+                subfolders=subfolders if len(subfolders) > 1 else None,
+                clear_partials=True,
+            )
+        except BaseException:
+            job.status = previous_status
+            raise
+        finally:
+            self._end_remote_download_operation(job)
 
     def restart_file(self, job: ModelInstallJob, file_source: str) -> None:
         """Restart a specific file download for a job."""
+        if job._recovery_required or (
+            job._install_tmpdir is not None and self._has_recovery_sentinel(job._install_tmpdir)
+        ):
+            raise InstallRecoveryRequiredError("Cannot restart an install that requires recovery.")
         if not isinstance(job.source, (HFModelSource, URLModelSource)):
             return
-        job.status = InstallStatus.WAITING
-        remote_files, metadata = self._remote_files_from_source(job.source)
-        remote_files = [rf for rf in remote_files if str(rf.url) == file_source]
-        if not remote_files:
-            return
-        subfolders = job.source.subfolders if isinstance(job.source, HFModelSource) else []
-        self._enqueue_remote_download(
-            job=job,
-            source=job.source,
-            remote_files=remote_files,
-            metadata=metadata,
-            destdir=job._install_tmpdir or job.local_path,
-            subfolder=job.source.subfolder if isinstance(job.source, HFModelSource) and len(subfolders) <= 1 else None,
-            subfolders=subfolders if len(subfolders) > 1 else None,
-            clear_partials=True,
-        )
+        self._begin_remote_download_operation(job)
+        previous_status = job.status
+        try:
+            remote_files, metadata = self._remote_files_from_source(job.source)
+            remote_files = [rf for rf in remote_files if str(rf.url) == file_source]
+            if not remote_files:
+                return
+            subfolders = job.source.subfolders if isinstance(job.source, HFModelSource) else []
+            job.status = InstallStatus.WAITING
+            self._enqueue_remote_download(
+                job=job,
+                source=job.source,
+                remote_files=remote_files,
+                metadata=metadata,
+                destdir=job._install_tmpdir or job.local_path,
+                subfolder=job.source.subfolder
+                if isinstance(job.source, HFModelSource) and len(subfolders) <= 1
+                else None,
+                subfolders=subfolders if len(subfolders) > 1 else None,
+                clear_partials=True,
+            )
+        except BaseException:
+            job.status = previous_status
+            raise
+        finally:
+            self._end_remote_download_operation(job)
 
     def prune_jobs(self) -> None:
         """Prune all completed and errored jobs."""
@@ -986,8 +1595,15 @@ class ModelInstallService(ModelInstallServiceBase):
             except Empty:
                 continue
             assert job.local_path is not None
+            with self._lock:
+                should_process = not self._stop_event.is_set()
+                if should_process:
+                    self._active_install_job = job
             try:
-                if job.cancelled:
+                if not should_process:
+                    continue
+                if job.cancelled or job._cancel_requested:
+                    job.cancel()
                     self._signal_job_cancelled(job)
 
                 elif job.errored:
@@ -1000,17 +1616,87 @@ class ModelInstallService(ModelInstallServiceBase):
                 # Expected errors include InvalidModelConfigException, DuplicateModelException, OSError, but we must
                 # gracefully handle _any_ error here.
                 self._set_error(job, e)
+                if job._recovery_required:
+                    try:
+                        self._write_install_marker(job, status=InstallStatus.ERROR)
+                    except Exception as marker_error:
+                        self._logger.error(
+                            f"Failed to persist install recovery marker in {job._install_tmpdir}: {marker_error}"
+                        )
 
             finally:
-                # if this is an install of a remote file, then clean up the temporary directory
-                if job._install_tmpdir is not None:
-                    self._safe_rmtree(job._install_tmpdir, self._logger)
+                if should_process:
+                    with self._lock:
+                        if self._active_install_job is job:
+                            self._active_install_job = None
+                        job._install_phase = None
+                    # Keep our staging claim until cleanup is finished so orphan cleanup cannot
+                    # acquire the path in the gap before the directory is removed.
+                    if (
+                        job._install_tmpdir is not None
+                        and not job._recovery_required
+                        and not job._install_tmpdir_claim_conflict
+                    ):
+                        self._safe_rmtree(job._install_tmpdir, self._logger)
+                    self._release_job_source_protection(
+                        job,
+                        preserve_recovery=job._recovery_required
+                        or (job._source_recovery_sentinel_preexisting and not job.complete),
+                    )
                 self._install_completed_event.set()
                 self._install_queue.task_done()
         self._logger.info(f"Installer thread {threading.get_ident()} exiting")
 
+    def _begin_install_transfer(self, job: ModelInstallJob) -> bool:
+        with self._lock:
+            if job._cancel_requested:
+                return False
+            if job._install_tmpdir is not None:
+                self._claim_install_tmpdir(job)
+                self._write_recovery_sentinel(job._install_tmpdir)
+                job._install_tmpdir_recovery_sentinel_created = True
+            if job._source_protection_root is not None and job._source_active_sentinel_created:
+                if not self._has_recovery_sentinel(job._source_protection_root):
+                    self._write_recovery_sentinel(job._source_protection_root)
+                    job._source_recovery_sentinel_created = True
+            job._install_phase = "transferring"
+            return True
+
     def _register_or_install(self, job: ModelInstallJob) -> None:
+        with self._lock:
+            if job._cancel_requested:
+                job.cancel()
+                cancel_before_start = True
+            else:
+                job._install_phase = "preflight"
+                cancel_before_start = False
+        if cancel_before_start:
+            self._signal_job_cancelled(job)
+            return
+
+        # A restored completed download has no in-memory claim yet. Claim it before probing or
+        # touching its marker so orphan cleanup cannot delete the staging tree concurrently.
+        self._claim_install_tmpdir(job)
+
+        if isinstance(job.source, LocalModelSource):
+            source_root, active_sentinel_created, recovery_sentinel_preexisting = self._protect_managed_source_path(
+                Path(job.source.path), allow_recovery=True
+            )
+            job._source_protection_root = source_root
+            job._source_active_sentinel_created = active_sentinel_created
+            job._source_recovery_sentinel_preexisting = recovery_sentinel_preexisting
+
         if isinstance(job.source, ExternalModelSource):
+            with self._lock:
+                if job._cancel_requested:
+                    job.cancel()
+                    cancel_before_registering = True
+                else:
+                    job._install_phase = "transferring"
+                    cancel_before_registering = False
+            if cancel_before_registering:
+                self._signal_job_cancelled(job)
+                return
             self._register_external_model(job)
             return
         # local jobs will be in waiting state, remote jobs will be downloading state
@@ -1027,9 +1713,48 @@ class ModelInstallService(ModelInstallServiceBase):
             self._delete_install_marker(job._install_tmpdir)
 
         if job.inplace:
-            key = self.register_path(job.local_path, job.config_in)
+            with self._lock:
+                if job._cancel_requested:
+                    job.cancel()
+                    cancel_before_start = True
+                else:
+                    job._install_phase = "transferring"
+                    cancel_before_start = False
+            if cancel_before_start:
+                self._signal_job_cancelled(job)
+                return
+            key = self._register(job.local_path, job.config_in)
         else:
-            key = self.install_path(job.local_path, job.config_in)
+            try:
+                info = self._probe(Path(job.local_path), job.config_in)  # type: ignore
+                key = self._install_path_with_info(
+                    Path(job.local_path),
+                    job.config_in,
+                    info,
+                    before_transfer=lambda: self._begin_install_transfer(job),
+                )
+            except _InstallCancelledBeforeTransfer:
+                with self._lock:
+                    job._install_phase = None
+                    job.cancel()
+                self._signal_job_cancelled(job)
+                return
+            except InstallRecoveryRequiredError:
+                job._recovery_required = True
+                if job._install_tmpdir is not None:
+                    try:
+                        self._write_install_marker(job, status=job.status)
+                    except Exception as marker_error:
+                        self._logger.error(
+                            f"Failed to persist install recovery marker in {job._install_tmpdir}: {marker_error}"
+                        )
+                raise
+            except Exception:
+                if job._install_tmpdir is not None:
+                    self._delete_recovery_sentinel(job._install_tmpdir)
+                raise
+            if job._install_tmpdir is not None:
+                self._delete_recovery_sentinel(job._install_tmpdir)
         job.config_out = self.record_store.get_model(key)
         self._signal_job_completed(job)
 
@@ -1121,16 +1846,35 @@ class ModelInstallService(ModelInstallServiceBase):
     def _remove_dangling_install_dirs(self) -> None:
         """Remove leftover tmpdirs from aborted installs."""
         path = self._app_config.models_path
+        registered_model_paths = {
+            (path / model.path).resolve() for model in self.record_store.all_models() if model.path
+        }
         for tmpdir in path.glob(f"{TMPDIR_PREFIX}*"):
+            if has_active_install_sentinel(tmpdir):
+                self._logger.debug(f"Preserving active install directory {tmpdir}")
+                continue
+            resolved_tmpdir = tmpdir.resolve()
+            if any(
+                model_path == resolved_tmpdir or model_path.is_relative_to(resolved_tmpdir)
+                for model_path in registered_model_paths
+            ):
+                self._logger.debug(f"Preserving registered model directory {tmpdir}")
+                continue
+            if self._has_recovery_sentinel(tmpdir):
+                self._logger.warning(f"Preserving install recovery data in {tmpdir}")
+                continue
             marker = self._read_install_marker(tmpdir)
             if marker is None:
                 self._logger.info(f"Removing dangling temporary directory {tmpdir}")
-                self._safe_rmtree(tmpdir, self._logger)
+                self._remove_unclaimed_install_tmpdir(tmpdir)
                 continue
             status = marker.get("status")
+            if marker.get("recovery_required") is True:
+                self._logger.warning(f"Preserving install recovery data in {tmpdir}")
+                continue
             if status in {InstallStatus.COMPLETED.value, InstallStatus.ERROR.value, InstallStatus.CANCELLED.value}:
                 self._logger.info(f"Removing completed/errored temporary directory {tmpdir}")
-                self._safe_rmtree(tmpdir, self._logger)
+                self._remove_unclaimed_install_tmpdir(tmpdir)
 
     def _scan_for_missing_models(self) -> list[AnyModelConfig]:
         """Scan the models directory for missing models and return a list of them."""
@@ -1151,10 +1895,14 @@ class ModelInstallService(ModelInstallServiceBase):
         installed_model_paths = {
             (self._app_config.models_path / x.path).resolve() for x in self.record_store.all_models()
         }
+        models_path = self._app_config.models_path.resolve()
 
         # The bool returned by this callback determines if the model is added to the list of models found by the search
         def on_model_found(model_path: Path) -> bool:
             resolved_path = model_path.resolve()
+            if is_recovery_protected_path(resolved_path, models_path):
+                self._logger.warning(f"Skipping recovery-protected model path {model_path}")
+                return False
             # Already registered models should be in the list of found models, but not re-registered.
             if resolved_path in installed_model_paths:
                 return True
@@ -1232,6 +1980,7 @@ class ModelInstallService(ModelInstallServiceBase):
         apply_lora_metadata(info, model_path.resolve(), model_images_path)
 
         model_path = model_path.resolve()
+        recovery_root = model_path if model_path.is_dir() else model_path.parent
 
         # Models in the Invoke-managed models dir should use relative paths.
         if model_path.is_relative_to(self.app_config.models_path):
@@ -1247,6 +1996,8 @@ class ModelInstallService(ModelInstallServiceBase):
                 legacy_config_path = legacy_config_path.relative_to(self.app_config.legacy_conf_path)
             info.config_path = legacy_config_path.as_posix()
         self.record_store.add_model(info)
+        if self._has_recovery_sentinel(recovery_root):
+            self._delete_recovery_sentinel(recovery_root)
         return info.key
 
     def _next_id(self) -> int:
@@ -1367,62 +2118,113 @@ class ModelInstallService(ModelInstallServiceBase):
         clear_partials: bool = False,
         restarted_from_scratch: Optional[set[str]] = None,
     ) -> ModelInstallJob:
-        job.source_metadata = metadata
-        job.local_path = destdir
+        previous_source_metadata = job.source_metadata
+        previous_status = job.status
+        previous_local_path = job.local_path
+        previous_install_tmpdir = job._install_tmpdir
+        previous_total_bytes = job.total_bytes
+        previous_multifile_job = job._multifile_job
+        previous_download_parts = job.download_parts
         job._install_tmpdir = destdir
-        job.total_bytes = sum((x.size or 0) for x in remote_files)
+        claim_was_already_held = job._install_tmpdir_active_sentinel_created
+        self._claim_install_tmpdir(job)
 
-        multifile_job = self._multifile_download(
-            remote_files=remote_files,
-            dest=destdir,
-            subfolder=subfolder,
-            subfolders=subfolders,
-            access_token=source.access_token,
-            submit_job=False,  # Important! Don't submit the job until we have set our _download_cache dict
-        )
-        if clear_partials:
-            for part in multifile_job.download_parts:
-                target_path = part.dest
-                if target_path.exists():
-                    try:
-                        self._logger.info(f"Deleting partial file before restart: {target_path}")
-                        target_path.unlink()
-                    except Exception:
-                        pass
-                in_progress_path = target_path.with_name(target_path.name + ".downloading")
-                if in_progress_path.exists():
-                    try:
-                        self._logger.info(f"Deleting partial file before restart: {in_progress_path}")
-                        in_progress_path.unlink()
-                    except Exception:
-                        pass
-        if resume_metadata:
-            for part in multifile_job.download_parts:
-                meta = resume_metadata.get(str(part.source))
-                if not meta:
-                    continue
-                part.canonical_url = meta.get("canonical_url") or part.canonical_url
-                part.etag = meta.get("etag") or part.etag
-                part.last_modified = meta.get("last_modified") or part.last_modified
-                part.expected_total_bytes = meta.get("expected_total_bytes") or part.expected_total_bytes
-                part.final_url = meta.get("final_url") or part.final_url
-                if meta.get("download_path"):
-                    part.download_path = Path(meta.get("download_path"))
-        if restarted_from_scratch:
-            for part in multifile_job.download_parts:
-                if str(part.source) in restarted_from_scratch:
-                    part.resume_from_scratch = True
-                    part.resume_message = "Partial file missing. Restarted download from the beginning."
-        with self._lock:
-            self._download_cache[multifile_job.id] = job
-        job._multifile_job = multifile_job
-        job.download_parts = multifile_job.download_parts
+        multifile_job: Optional[MultiFileDownloadJob] = None
+        try:
+            multifile_job = self._multifile_download(
+                remote_files=remote_files,
+                dest=destdir,
+                subfolder=subfolder,
+                subfolders=subfolders,
+                access_token=source.access_token,
+                submit_job=False,  # Important! Don't submit the job until we have set our _download_cache dict
+            )
+            if resume_metadata:
+                for part in multifile_job.download_parts:
+                    meta = resume_metadata.get(str(part.source))
+                    if not meta:
+                        continue
+                    part.canonical_url = meta.get("canonical_url") or part.canonical_url
+                    part.etag = meta.get("etag") or part.etag
+                    part.last_modified = meta.get("last_modified") or part.last_modified
+                    part.expected_total_bytes = meta.get("expected_total_bytes") or part.expected_total_bytes
+                    part.final_url = meta.get("final_url") or part.final_url
+                    if meta.get("download_path"):
+                        part.download_path = Path(meta.get("download_path"))
+            if restarted_from_scratch:
+                for part in multifile_job.download_parts:
+                    if str(part.source) in restarted_from_scratch:
+                        part.resume_from_scratch = True
+                        part.resume_message = "Partial file missing. Restarted download from the beginning."
+            with self._lock:
+                if self._stop_event.is_set():
+                    raise InstallDownloadConflictError(
+                        "The model install service is stopping; the download was not submitted."
+                    )
+                if job.cancelled or job.paused:
+                    raise InstallDownloadConflictError(
+                        "The install changed state before the download could be submitted; retry the operation."
+                    )
+                if clear_partials:
+                    for part in multifile_job.download_parts:
+                        target_path = part.dest
+                        if target_path.exists():
+                            try:
+                                self._logger.info(f"Deleting partial file before restart: {target_path}")
+                                target_path.unlink()
+                            except Exception:
+                                pass
+                        in_progress_path = target_path.with_name(target_path.name + ".downloading")
+                        if in_progress_path.exists():
+                            try:
+                                self._logger.info(f"Deleting partial file before restart: {in_progress_path}")
+                                in_progress_path.unlink()
+                            except Exception:
+                                pass
+                job.source_metadata = metadata
+                job.local_path = destdir
+                job._install_tmpdir = destdir
+                job.total_bytes = sum((x.size or 0) for x in remote_files)
+                job._multifile_job = multifile_job
+                job.download_parts = multifile_job.download_parts
+                job.status = InstallStatus.WAITING
+                self._write_install_marker(job, status=InstallStatus.WAITING)
+                self._download_cache[multifile_job.id] = job
+        except BaseException:
+            with self._lock:
+                if multifile_job is not None:
+                    if self._download_cache.get(multifile_job.id) is job:
+                        self._download_cache.pop(multifile_job.id, None)
+                job.source_metadata = previous_source_metadata
+                job.status = previous_status
+                job.local_path = previous_local_path
+                job._install_tmpdir = previous_install_tmpdir
+                job.total_bytes = previous_total_bytes
+                job._multifile_job = previous_multifile_job
+                job.download_parts = previous_download_parts
+            if not claim_was_already_held:
+                self._release_install_tmpdir_claim(job)
+            raise
 
-        self._write_install_marker(job, status=InstallStatus.WAITING)
         files_string = "file" if len(remote_files) == 1 else "files"
         self._logger.info(f"Queueing model install: {source} ({len(remote_files)} {files_string})")
         self._logger.debug(f"remote_files={remote_files}")
-        self._download_queue.submit_multifile_download(multifile_job)
+        try:
+            self._download_queue.submit_multifile_download(multifile_job)
+        except BaseException:
+            with self._lock:
+                if self._download_cache.get(multifile_job.id) is job:
+                    self._download_cache.pop(multifile_job.id, None)
+                job.source_metadata = previous_source_metadata
+                job.status = previous_status
+                job.local_path = previous_local_path
+                job._install_tmpdir = previous_install_tmpdir
+                job.total_bytes = previous_total_bytes
+                job._multifile_job = previous_multifile_job
+                job.download_parts = previous_download_parts
+            if not claim_was_already_held:
+                self._release_install_tmpdir_claim(job)
+            raise
         return job
 
     def _stat_size(self, path: Path) -> int:
@@ -1531,6 +2333,8 @@ class ModelInstallService(ModelInstallServiceBase):
     def _download_started_callback(self, download_job: MultiFileDownloadJob) -> None:
         with self._lock:
             if install_job := self._download_cache.get(download_job.id, None):
+                if install_job.cancelled or install_job.paused:
+                    return
                 install_job.status = InstallStatus.DOWNLOADING
 
                 if install_job.local_path == install_job._install_tmpdir:  # first time
@@ -1557,43 +2361,92 @@ class ModelInstallService(ModelInstallServiceBase):
                     self._signal_job_downloading(install_job)
 
     def _download_complete_callback(self, download_job: MultiFileDownloadJob) -> None:
+        install_job: Optional[ModelInstallJob] = None
+        queued = False
         with self._lock:
             if install_job := self._download_cache.pop(download_job.id, None):
-                self._signal_job_downloads_done(install_job)
-                self._put_in_queue(install_job)  # this starts the installation and registration
-
-                # Let other threads know that the number of downloads has changed
+                if install_job.cancelled:
+                    self._cleanup_cancelled_install(install_job)
+                elif install_job.paused:
+                    # A pause requested before this callback must not turn into an automatic install.
+                    self._write_install_marker(install_job, status=InstallStatus.PAUSED)
+                    if self._stop_event.is_set():
+                        self._release_install_tmpdir_claim(install_job)
+                else:
+                    self._signal_job_downloads_done(install_job)
+                    if self._stop_event.is_set():
+                        # Every part is complete, so the staging tree is safe to recover without this process's claim.
+                        self._release_install_tmpdir_claim(install_job)
+                        queued = True
+                    else:
+                        queued = self._queue_install_job_locked(install_job)
+            if install_job is not None:
                 self._downloads_changed_event.set()
+        if install_job is not None:
+            if not queued and not install_job.cancelled and not install_job.paused:
+                self.cancel_job(install_job)
+            # Let other threads know that the number of downloads has changed.
+            self._downloads_changed_event.set()
 
     def _download_error_callback(self, download_job: MultiFileDownloadJob, excp: Optional[Exception] = None) -> None:
         with self._lock:
             if install_job := self._download_cache.pop(download_job.id, None):
                 assert excp is not None
-                self._set_error(install_job, excp)
-                self._download_queue.cancel_job(download_job)
-                if install_job._install_tmpdir is not None:
-                    self._safe_rmtree(install_job._install_tmpdir, self._logger)
+                if install_job.cancelled:
+                    self._cleanup_cancelled_install(install_job)
+                elif install_job.paused:
+                    # Preserve the explicit pause even if an already-terminal download reports its error late.
+                    self._write_install_marker(install_job, status=InstallStatus.PAUSED)
+                    if self._stop_event.is_set():
+                        self._release_install_tmpdir_claim(install_job)
+                else:
+                    self._set_error(install_job, excp)
+                    self._download_queue.cancel_job(download_job)
+                    if install_job._install_tmpdir is not None and not install_job._install_tmpdir_claim_conflict:
+                        if not self._has_recovery_sentinel(install_job._install_tmpdir):
+                            self._safe_rmtree(install_job._install_tmpdir, self._logger)
+                        self._release_install_tmpdir_claim(install_job)
 
                 # Let other threads know that the number of downloads has changed
                 self._downloads_changed_event.set()
+
+    def _cleanup_cancelled_install(self, install_job: ModelInstallJob) -> None:
+        """Remove cancelled staging only after its download callback has stopped using it."""
+        if install_job._install_tmpdir is None or install_job._install_tmpdir_claim_conflict:
+            return
+        if not self._has_recovery_sentinel(install_job._install_tmpdir):
+            self._write_install_marker(install_job, status=InstallStatus.CANCELLED)
+            self._delete_install_marker(install_job._install_tmpdir)
+            self._safe_rmtree(install_job._install_tmpdir, self._logger)
+        self._release_install_tmpdir_claim(install_job)
 
     def _download_cancelled_callback(self, download_job: MultiFileDownloadJob) -> None:
         with self._lock:
             if install_job := self._download_cache.pop(download_job.id, None):
                 self._downloads_changed_event.set()
-                if any(part.resume_required for part in download_job.download_parts):
+                if install_job.cancelled:
+                    self._cleanup_cancelled_install(install_job)
+                    return
+                if install_job.paused or any(part.resume_required for part in download_job.download_parts):
                     install_job.status = InstallStatus.PAUSED
                     self._write_install_marker(install_job, status=InstallStatus.PAUSED)
+                    # A user-paused install remains protected from orphan cleanup until resumed or cancelled.
+                    # Shutdown releases only after the download queue has quiesced this callback.
+                    if self._stop_event.is_set():
+                        self._release_install_tmpdir_claim(install_job)
                     self._downloads_changed_event.set()
                     return
                 # if install job has already registered an error, then do not replace its status with cancelled
                 if not install_job.errored and not install_job.paused:
                     install_job.cancel()
-                    if install_job._install_tmpdir is not None:
+                    if install_job._install_tmpdir is not None and not install_job._install_tmpdir_claim_conflict:
                         # Mark cancelled before cleanup so we don't reuse the folder if deletion fails.
-                        self._write_install_marker(install_job, status=InstallStatus.CANCELLED)
-                        self._delete_install_marker(install_job._install_tmpdir)
-                        self._safe_rmtree(install_job._install_tmpdir, self._logger)
+                        if not self._has_recovery_sentinel(install_job._install_tmpdir):
+                            self._write_install_marker(install_job, status=InstallStatus.CANCELLED)
+                            self._delete_install_marker(install_job._install_tmpdir)
+                            self._safe_rmtree(install_job._install_tmpdir, self._logger)
+                if not install_job._install_tmpdir_claim_conflict:
+                    self._release_install_tmpdir_claim(install_job)
 
                 # Let other threads know that the number of downloads has changed
                 self._downloads_changed_event.set()
@@ -1644,7 +2497,7 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _signal_job_errored(self, job: ModelInstallJob) -> None:
         self._logger.error(f"Model install error: {job.source}\n{job.error_type}: {job.error}")
-        if job._install_tmpdir is not None:
+        if job._install_tmpdir is not None and not job._install_tmpdir_claim_conflict:
             self._delete_install_marker(job._install_tmpdir)
         if self._event_bus:
             assert job.error_type is not None

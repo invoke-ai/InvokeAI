@@ -1,5 +1,6 @@
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 
+import { documentFrom, layerContract } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { describe, expect, it, vi } from 'vitest';
 
 import { LayerController } from './layerController';
@@ -39,7 +40,7 @@ describe('LayerController', () => {
       dispatch: vi.fn(() => true),
       getDocument: () => null,
       getEditRevision: () => 0,
-      getReducerDocument: () => null,
+      getReducerDocument: () => documentFrom([layerContract('layer')]),
       historyTop: () => null,
       isGestureActive: () => false,
       projectId: 'p',

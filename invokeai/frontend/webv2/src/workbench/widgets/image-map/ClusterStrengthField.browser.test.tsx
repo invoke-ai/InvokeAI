@@ -108,6 +108,7 @@ const render = async (resolved: number | null) => {
     clusterLabelsHash: null,
     data: {
       clusterEps: resolved,
+      modelId: null,
       modelName: null,
       pointCount: 1,
       points: [],

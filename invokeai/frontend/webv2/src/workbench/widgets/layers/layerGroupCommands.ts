@@ -36,6 +36,7 @@ export const groupLayers = (
   ids: readonly string[],
   label: string
 ): PreparedCommitOutcome => {
+  engine?.layers.endStructuralPreview();
   const model = engine?.document.model() ?? null;
   if (!engine || !model) {
     return { status: 'not-ready' };

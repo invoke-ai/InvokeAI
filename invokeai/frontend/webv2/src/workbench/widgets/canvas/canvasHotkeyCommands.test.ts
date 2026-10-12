@@ -65,6 +65,7 @@ const createEngine = (interaction: Partial<CanvasInteractionState> = {}) => {
     layers: {
       clearMask: vi.fn(() => ({ status: 'committed' })),
       commitPrepared: vi.fn(() => ({ status: 'committed' as const })),
+      endStructuralPreview: vi.fn(),
       commitStructural: vi.fn(),
       duplicateLayers: vi.fn(() =>
         Promise.resolve<

@@ -62,8 +62,7 @@ class _ExecutionNodeBuilder:
         iteration_node_map: list[tuple[str, str]],
         input_edges: Optional[list[Edge]] = None,
     ) -> Optional[tuple[int, ...]]:
-        parent_paths: list[tuple[int, ...]] = []
-        parent_iteration_axes: list[tuple[str, ...]] = []
+        parent_contexts: list[tuple[tuple[int, ...], tuple[str, ...]]] = []
         registry = self._state._prepared_registry()
         input_edges_by_source: dict[str, list[Edge]] = {}
         for edge in input_edges or []:
@@ -79,25 +78,21 @@ class _ExecutionNodeBuilder:
                     key=lambda path: (len(path), path),
                 )
             if parent_path:
-                parent_paths.append(parent_path)
-                parent_iteration_axes.append(self._get_iteration_axes(source_node_id))
+                parent_contexts.append((parent_path, self._get_iteration_axes(source_node_id)))
 
-        unique_parent_paths = set(parent_paths)
-        paths_share_iteration_axes = len(set(parent_iteration_axes)) <= 1
+        deepest_path = max((path for path, _ in parent_contexts), key=len, default=())
+        deepest_axes = max((axes for _, axes in parent_contexts), key=len, default=())
+        compatible_parent_contexts = all(
+            deepest_path[: len(path)] == path and deepest_axes[: len(axes)] == axes for path, axes in parent_contexts
+        )
+        if not compatible_parent_contexts:
+            return None
 
         # Materialized iteration boundaries use non-negative indexes; ordinary execution nodes use -1. Keeping this
         # generic allows other scheduler-managed loop nodes to reuse the same path cache.
         if iteration_index >= 0:
-            if len(unique_parent_paths) > 1 or not paths_share_iteration_axes:
-                return None
-            parent_path = next(iter(unique_parent_paths), ())
-            return (*parent_path, iteration_index)
-
-        if not unique_parent_paths:
-            return ()
-        if len(unique_parent_paths) == 1 and paths_share_iteration_axes:
-            return next(iter(unique_parent_paths))
-        return None
+            return (*deepest_path, iteration_index)
+        return deepest_path
 
     def _get_iterator_iteration_count(self, node_id: str, iteration_node_map: list[tuple[str, str]]) -> int:
         input_collection_edge = next(iter(self._state.graph._get_input_edges(node_id, COLLECTION_FIELD)))
@@ -1409,8 +1404,8 @@ class _ExecutionNodeBuilder:
             new_node = self._create_execution_node_copy(node, node_id, iteration_index)
             if new_node_iteration_path is not None:
                 self._state._prepared_registry().set_iteration_path(new_node.id, new_node_iteration_path)
-            self._state._record_activation_dependencies(new_node.id)
             attached_edges = self._attach_execution_edges(new_node.id, new_edges)
+            self._state._record_activation_dependencies(new_node.id)
             self._initialize_execution_node(new_node.id, attached_edges)
             new_nodes.append(new_node.id)
 

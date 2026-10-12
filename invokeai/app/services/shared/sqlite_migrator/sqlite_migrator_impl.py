@@ -1,53 +1,86 @@
+import logging
 import sqlite3
-from contextlib import closing
+import tempfile
+from collections import Counter
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import NoReturn, Optional
 
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
-from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration, MigrationError, MigrationSet
+from alembic.migration import MigrationContext
+from alembic.operations import Operations
+from sqlalchemy import Connection, insert, inspect, select
+from sqlalchemy.exc import DBAPIError
+
+from invokeai.app.services.config.config_default import DefaultInvokeAIAppConfig
+from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
+from invokeai.app.services.shared.database.copy import copy_rows
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.schema import metadata
+from invokeai.app.services.shared.database.schema.migrator import applied_migrations, migrations
+from invokeai.app.services.shared.database.session_lock import SessionLock
+from invokeai.app.services.shared.sqlite_migrator.migration_loader import MigrationBuildContext, build_migrations
+from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import (
+    Migration,
+    MigrationBase,
+    MigrationError,
+    MigrationSet,
+    PortableMigration,
+    PortableMigrationContext,
+)
+
+# How long the migration of a server database waits for another process's migration of it to finish.
+MIGRATION_LOCK_TIMEOUT_SECONDS = 600
 
 
-class SqliteMigrator:
+class Migrator:
     """
-    Manages migrations for a SQLite database.
+    Brings the database up to date by running the migrations it has not had, in dependency order.
 
-    :param db: The instance of :class:`SqliteDatabase` to migrate.
+    :param database: The database to migrate.
 
-    Migrations should be registered with :meth:`register_migration`, either directly or via the migration loader.
+    Migrations are registered with :meth:`register_migration`, either directly or via the migration loader.
     They are planned by stable migration ID dependencies and recorded in the ``applied_migrations`` table.
     Legacy numeric versions are still written for migrations that define ``to_version``.
 
-    Each migration is run in a transaction. If a migration fails, the transaction is rolled back.
+    A SQLite database runs every migration, the legacy cursor migrations and the portable ones, each in a
+    transaction of its own that a failure rolls back, after a backup of the database file.
+
+    A MySQL or MariaDB database is created at the newest schema instead (see :meth:`_bootstrap`), so only the
+    portable migrations added after its creation run on it. A server-wide lock keeps two processes from migrating
+    the same database at once. DDL commits as it runs there, so a failed portable migration is not rolled back:
+    its id is recorded only once it succeeds, and it runs again, from the start, the next time.
 
     Example Usage:
     ```py
-    db = SqliteDatabase(db_path="my_db.db", logger=logger)
-    migrator = SqliteMigrator(db=db)
-    migrator.register_migration(build_migration_1())
-    migrator.register_migration(build_migration_2())
+    migrator = Migrator(database)
+    for migration in build_migrations(migration_context):
+        migrator.register_migration(migration)
     migrator.run_migrations()
     ```
     """
 
     backup_path: Optional[Path] = None
 
-    def __init__(self, db: SqliteDatabase) -> None:
-        self._db = db
-        self._logger = db._logger
+    def __init__(self, database: Database) -> None:
+        self._database = database
+        self._logger = database.logger
         self._migration_set = MigrationSet()
         self._backup_path: Optional[Path] = None
 
-    def register_migration(self, migration: Migration) -> None:
+    def register_migration(self, migration: MigrationBase) -> None:
         """Registers a migration."""
         self._migration_set.register(migration)
         self._logger.debug(f"Registered migration {migration.from_version} -> {migration.to_version}")
 
     def run_migrations(self) -> bool:
-        """Migrates the database to the latest version."""
+        """Migrates the database to the latest version. Returns whether a migration ran or the database was created."""
         # This throws if there is a problem.
         self._migration_set.validate_dependency_graph()
-        cursor = self._db._conn.cursor()
+        if self._database.dialect_name != "sqlite":
+            return self._run_server_migrations()
+        cursor = self._database.sqlite.conn.cursor()
         self._validate_existing_applied_migrations(cursor=cursor)
         self._create_migrations_table(cursor=cursor)
         self._validate_existing_legacy_migrations(cursor=cursor)
@@ -80,21 +113,31 @@ class SqliteMigrator:
         """Makes a backup of the db if it is a file db and a backup has not already been made."""
         if self._backup_path is not None:
             return
-        if self._db._db_path is not None:
+        db_path = self._database.sqlite.path
+        if db_path is not None:
             timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-            self._backup_path = self._db._db_path.parent / f"{self._db._db_path.stem}_backup_{timestamp}.db"
+            self._backup_path = db_path.parent / f"{db_path.stem}_backup_{timestamp}.db"
+            # A backup of the same second exists when the database was migrated again right away, e.g. on a restart
+            # after a failed migration: keep it, and number this one.
+            attempt = 1
+            while self._backup_path.exists():
+                self._backup_path = db_path.parent / f"{db_path.stem}_backup_{timestamp}-{attempt}.db"
+                attempt += 1
             self._logger.info(f"Backing up database to {str(self._backup_path)}")
-            with closing(sqlite3.connect(self._backup_path)) as backup_conn:
-                self._db._conn.backup(backup_conn)
+            self._database.backup(self._backup_path)
         else:
             self._logger.info("Using in-memory database, no backup needed")
 
-    def _run_migration(self, migration: Migration) -> None:
-        """Runs a single migration."""
+    def _run_migration(self, migration: MigrationBase) -> None:
+        """Runs a single migration on the SQLite database."""
+        if isinstance(migration, PortableMigration):
+            self._run_portable_migration(migration)
+            return
+        assert isinstance(migration, Migration)
         try:
             # Using sqlite3.Connection as a context manager commits a the transaction on exit, or rolls it back if an
             # exception is raised.
-            with self._db._conn as conn:
+            with self._database.sqlite.conn as conn:
                 cursor = conn.cursor()
                 # Begun explicitly, because the context manager above only commits or rolls back a
                 # transaction that is already open — it does not start one. The connection runs in
@@ -311,3 +354,221 @@ class SqliteMigrator:
             if "no such table" in str(e):
                 return 0
             raise
+
+    def _run_portable_migration(self, migration: PortableMigration) -> None:
+        """Runs a portable migration and records it in one transaction (on a server, its DDL commits as it runs).
+
+        On SQLite, foreign keys are off while it runs: rebuilding a table (Alembic's batch mode) drops the old
+        one, which would otherwise delete the rows of every table that references it, by cascade. The pragma
+        cannot change inside a transaction, so it is set before, under the database's lock, and the foreign
+        keys are checked before the transaction commits (see `_check_foreign_keys`).
+        """
+        self._logger.debug(f"Running migration '{migration.id}'")
+        try:
+            if self._database.dialect_name != "sqlite":
+                self._apply_portable_migration(migration)
+            else:
+                sqlite = self._database.sqlite
+                with sqlite.lock:
+                    sqlite.conn.execute("PRAGMA foreign_keys = OFF")
+                    try:
+                        self._apply_portable_migration(migration)
+                    finally:
+                        sqlite.conn.execute("PRAGMA foreign_keys = ON")
+        except Exception as e:
+            msg = f"Error running migration '{migration.id}': {e}"
+            self._logger.error(msg)
+            raise MigrationError(msg) from e
+        self._logger.debug(f"Successfully ran migration '{migration.id}'")
+
+    def _apply_portable_migration(self, migration: PortableMigration) -> None:
+        with self._database.begin(write=True) as conn:
+            violations_before = self._foreign_key_violations(conn)
+            if violations_before:
+                self._logger.warning(
+                    "The database holds rows whose foreign keys match nothing (table, referenced table): "
+                    f"{dict(violations_before)}"
+                )
+            migration.callback(
+                PortableMigrationContext(
+                    conn=conn, op=Operations(MigrationContext.configure(conn)), logger=self._logger
+                )
+            )
+            self._check_foreign_keys(conn, violations_before)
+            conn.execute(insert(applied_migrations).values(migration_id=migration.id))
+
+    def _check_foreign_keys(self, conn: Connection, before: Optional[Counter[tuple[str, str]]]) -> None:
+        """Fails a SQLite migration that leaves rows whose foreign keys match nothing.
+
+        Only rows the migration orphaned count: a database can hold orphans from before (tools that wrote with
+        foreign keys off did leave some), and those must not stop every migration from then on. So the migration
+        fails when there are more such rows after it than before. They are counted, not identified: a rebuilt
+        table renumbers its rows, and a renamed one reports them under its new name.
+        """
+        if before is None:
+            return
+        after = self._foreign_key_violations(conn)
+        if after is None:
+            raise MigrationError("The migration leaves a foreign key that names no table or key")
+        if after.total() > before.total():
+            raise MigrationError(
+                f"The migration leaves rows whose foreign keys match nothing (table, referenced table): {dict(after)}"
+            )
+
+    def _foreign_key_violations(self, conn: Connection) -> Optional[Counter[tuple[str, str]]]:
+        """On SQLite, the rows whose foreign keys match nothing, per table and referenced table.
+
+        None when SQLite cannot check (a foreign key in the database names no table or key), or on a server,
+        which enforces foreign keys as rows are written.
+        """
+        if self._database.dialect_name != "sqlite":
+            return None
+        try:
+            rows = conn.exec_driver_sql("PRAGMA foreign_key_check").all()
+        except DBAPIError as e:
+            self._logger.warning(f"The database's foreign keys could not be checked: {e}")
+            return None
+        return Counter((str(row[0]), str(row[2])) for row in rows)
+
+    def has_pending_migrations(self) -> bool:
+        """Whether the database lacks a registered migration, without changing it. A database without the migrator's
+        records (a new one, or one from before them) lacks them all. Raises for a server database with tables but
+        no records, which the app refuses as well."""
+        if self._database.dialect_name != "sqlite" and self._server_has_tables():
+            applied_ids = self._server_applied_migration_ids()
+            return bool(self._migration_set.get_migration_plan(applied_migration_ids=applied_ids))
+        with self._database.begin(write=False) as conn:
+            if not inspect(conn).has_table(applied_migrations.name):
+                return self._migration_set.count > 0
+            applied = set(conn.execute(select(applied_migrations.c.migration_id)).scalars())
+        return bool(self._migration_set.get_migration_plan(applied_migration_ids=applied))
+
+    def _run_server_migrations(self) -> bool:
+        with self._server_migration_lock() as lock:
+            bootstrapped = False
+            if not self._server_has_tables():
+                self._bootstrap()
+                bootstrapped = True
+            plan = self._migration_set.get_migration_plan(applied_migration_ids=self._server_applied_migration_ids())
+            portable: list[PortableMigration] = []
+            for migration in plan:
+                if not isinstance(migration, PortableMigration):
+                    raise MigrationError(
+                        f"Migration '{migration.id}' runs on SQLite only, and this {self._database.dialect_name} "
+                        "database has not had it"
+                    )
+                portable.append(migration)
+            if portable:
+                self._logger.info("Database update needed")
+            for migration in portable:
+                lock.verify()
+                self._run_portable_migration(migration)
+            if portable:
+                self._logger.info("Database updated successfully")
+            return bootstrapped or bool(portable)
+
+    @contextmanager
+    def _server_migration_lock(self) -> Iterator["_ServerMigrationLock"]:
+        """Holds a lock that one process at a time can hold for this database, on a connection of its own."""
+        session_lock = SessionLock(self._database.engine, "migrate")
+        try:
+            lock = _ServerMigrationLock(session_lock)
+            lock.acquire(self._logger)
+            yield lock
+        finally:
+            session_lock.close()
+
+    def _server_has_tables(self) -> bool:
+        with self._database.begin(write=False) as conn:
+            return bool(inspect(conn).get_table_names())
+
+    def _server_applied_migration_ids(self) -> set[str]:
+        with self._database.begin(write=False) as conn:
+            applied_ids: set[str] = set()
+            if inspect(conn).has_table(applied_migrations.name):
+                applied_ids = set(conn.execute(select(applied_migrations.c.migration_id)).scalars())
+        if not applied_ids:
+            # The records are written last, so this is an interrupted creation, if not another application's tables.
+            raise MigrationError(
+                "The database has tables but no record of the migrations it has had: it is not an InvokeAI "
+                "database, or its creation was interrupted. Use an empty database."
+            )
+        return applied_ids
+
+    def _bootstrap(self) -> None:
+        """Creates the newest schema in the empty server database, with the rows the migrations seed.
+
+        The rows come from a reference: an in-memory SQLite database that the migration chain builds, in a
+        temporary root, so the migrations' clean-ups of old files touch nothing real. The migrator's records go in
+        last, so a creation that is interrupted leaves a database `_server_applied_migration_ids` refuses.
+        """
+        self._logger.info("Creating the database schema")
+        # The reference's migrations report clean-ups of a root that is not the user's.
+        quiet = self._logger.getChild("reference")
+        quiet.setLevel(logging.WARNING)
+        with tempfile.TemporaryDirectory() as root:
+            # Settings from the environment or a config file would point the clean-ups at real directories.
+            config = DefaultInvokeAIAppConfig()
+            config._root = Path(root)
+            reference = Database.open_sqlite(None, quiet)
+            try:
+                reference_migrator = Migrator(reference)
+                context = MigrationBuildContext(app_config=config, logger=quiet, image_files=NoImageFiles())
+                for migration in build_migrations(context):
+                    reference_migrator.register_migration(migration)
+                reference_migrator.run_migrations()
+
+                with self._database.begin(write=True) as conn:
+                    metadata.create_all(conn)
+                records = [migrations, applied_migrations]
+                copy_rows(reference, self._database, tables=[t for t in metadata.sorted_tables if t not in records])
+                # `applied_migrations` last of all: a database without its rows is refused as incomplete.
+                copy_rows(reference, self._database, tables=[migrations])
+                copy_rows(reference, self._database, tables=[applied_migrations])
+            finally:
+                reference.dispose()
+
+
+def _no_image_files(*args: object, **kwargs: object) -> NoReturn:
+    raise RuntimeError("No image files were given: a migration that reads them cannot run here")
+
+
+# For the migrations that read image files, where none runs or there are no images: the reference database of a
+# bootstrap, and the check for pending migrations.
+NoImageFiles = type(
+    "NoImageFiles",
+    (ImageFileStorageBase,),
+    dict.fromkeys(ImageFileStorageBase.__abstractmethods__, _no_image_files),
+)
+
+
+_LOCK_LOST = (
+    "The connection holding the migration lock was lost, so another process may be migrating the database; start again"
+)
+
+
+class _ServerMigrationLock:
+    """The lock on migrating one server database, which one process at a time holds. It is verified before each
+    migration rather than assumed: the server releases it with its connection, even one cut off while idle."""
+
+    def __init__(self, lock: SessionLock) -> None:
+        self._lock = lock
+
+    def acquire(self, logger: logging.Logger) -> None:
+        try:
+            if self._lock.take(0):
+                return
+            logger.info("Waiting for another process to finish migrating the database")
+            if self._lock.take(MIGRATION_LOCK_TIMEOUT_SECONDS):
+                return
+        except RuntimeError as e:
+            raise MigrationError(str(e)) from e
+        raise MigrationError(
+            f"Another process has been migrating this database for {MIGRATION_LOCK_TIMEOUT_SECONDS} s; "
+            "let it finish before starting again"
+        )
+
+    def verify(self) -> None:
+        """Raises if the lock is no longer held."""
+        if not self._lock.held():
+            raise MigrationError(_LOCK_LOST)

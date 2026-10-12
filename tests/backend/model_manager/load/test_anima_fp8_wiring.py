@@ -121,6 +121,10 @@ def test_single_file_loader_applies_fp8_layerwise_casting(monkeypatch, tmp_path)
 
     monkeypatch.setattr(anima_transformer_module, "AnimaTransformer", _TinyAnimaTransformer)
     monkeypatch.setattr(safetensors.torch, "load_file", lambda _path: {"weight": torch.ones(2, 2)})
+    # The stand-in state dict has no DiT blocks to read a depth from, and the tiny model takes no config.
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.anima.anima_transformer_config", lambda _sd: {}
+    )
     monkeypatch.setattr(
         "invokeai.backend.model_manager.load.model_loaders.anima.TorchDevice.choose_torch_device",
         lambda: torch.device("cpu"),

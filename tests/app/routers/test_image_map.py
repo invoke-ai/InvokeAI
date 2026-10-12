@@ -11,32 +11,33 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
+from sqlalchemy import insert
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api_app import app
-from invokeai.app.services.board_video_records.board_video_records_sqlite import SqliteBoardVideoRecordStorage
+from invokeai.app.services.board_video_records.board_video_records_default import BoardVideoRecordStorage
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
+from invokeai.app.services.gallery.gallery_default import GalleryService
 from invokeai.app.services.image_index.image_index_base import ImageIndexServiceBase
 from invokeai.app.services.image_index.image_index_common import (
     ImageIndexStatus,
     IndexedItem,
 )
-from invokeai.app.services.image_index.image_index_records_sqlite import ImageIndexRecordsSqlite
+from invokeai.app.services.image_index.image_index_records_default import ImageIndexRecords
 from invokeai.app.services.image_index.projection import (
     DEFAULT_CLUSTER_MIN_SAMPLES,
     cluster_with_diagnostics,
     scope_hash,
 )
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
-from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.schema.image_index import image_embeddings
 from invokeai.app.services.users.users_common import UserCreateRequest
-from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
+from invokeai.app.services.video_records.video_records_default import VideoRecordStorage
 from invokeai.app.services.videos.videos_default import VideoService
-from invokeai.backend.util.logging import InvokeAILogger
-from tests.fixtures.sqlite_database import create_mock_sqlite_database
 
 MODEL_ID = "test-model-hash"
 DIM = 4
@@ -50,12 +51,22 @@ class MockApiDependencies(ApiDependencies):
         self.invoker = invoker
 
 
+def _png_bytes() -> bytes:
+    from io import BytesIO
+
+    from PIL import Image
+
+    buffer = BytesIO()
+    Image.new("RGB", (8, 8), color=(200, 30, 30)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
 class FakeImageIndexService(ImageIndexServiceBase):
     """Records projection/search requests instead of running a worker."""
 
     def __init__(self, model_id: str | None = MODEL_ID) -> None:
         self._model_id = model_id
-        self.index_records: ImageIndexRecordsSqlite | None = None
+        self.index_records: ImageIndexRecords | None = None
         self.projection_requests: list[tuple[str, bool]] = []
         self.spent_failed_scopes: dict[str, str] = {}
         self.search_calls: list[tuple[str | None, int]] = []
@@ -67,10 +78,15 @@ class FakeImageIndexService(ImageIndexServiceBase):
         self.embedded_images: list = []
         self.vocab_invalidations = 0
         self.vocab_state: tuple[str, str | None] = ("idle", None)
+        self.replacing = False
 
     @property
     def model_id(self) -> str | None:
         return self._model_id
+
+    @property
+    def replacing_model(self) -> bool:
+        return self.replacing
 
     def get_status(self) -> ImageIndexStatus | None:
         if self._model_id is None:
@@ -169,7 +185,7 @@ def image_index_service() -> FakeImageIndexService:
     return FakeImageIndexService()
 
 
-def _video_service(thumbnails: Path, video_records: SqliteVideoRecordStorage) -> VideoService:
+def _video_service(thumbnails: Path, video_records: VideoRecordStorage) -> VideoService:
     """A video service that resolves thumbnails to real files, which is all these endpoints read.
 
     It goes through the record store first, like the real one: a name with no video raises
@@ -190,35 +206,37 @@ def _video_service(thumbnails: Path, video_records: SqliteVideoRecordStorage) ->
 
 
 @pytest.fixture
-def mock_services(image_index_service: FakeImageIndexService, tmp_path: Path) -> InvocationServices:
-    from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
-    from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
+def mock_services(
+    image_index_service: FakeImageIndexService, tmp_path: Path, mock_sqlite_database: Database
+) -> InvocationServices:
+    from invokeai.app.services.board_image_records.board_image_records_default import BoardImageRecordStorage
+    from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
     from invokeai.app.services.boards.boards_default import BoardService
     from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
-    from invokeai.app.services.client_state_persistence.client_state_persistence_sqlite import (
-        ClientStatePersistenceSqlite,
+    from invokeai.app.services.client_state_persistence.client_state_persistence_default import (
+        ClientStatePersistence,
     )
     from invokeai.app.services.images.images_default import ImageService
     from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
     from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
-    from invokeai.app.services.project_records.project_records_sqlite import ProjectRecordsSqlite
+    from invokeai.app.services.project_records.project_records_default import ProjectRecordsStorage
     from invokeai.app.services.users.users_default import UserService
     from tests.test_nodes import TestEventService
 
     configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
-    logger = InvokeAILogger.get_logger()
-    db = create_mock_sqlite_database(configuration, logger)
+    db = mock_sqlite_database
 
     services = InvocationServices(
-        board_image_records=SqliteBoardImageRecordStorage(db=db),
+        board_image_records=BoardImageRecordStorage(db),
         board_images=None,  # type: ignore
-        board_records=SqliteBoardRecordStorage(db=db),
+        board_records=BoardRecordStorage(db),
         boards=BoardService(),
         bulk_download=BulkDownloadService(),
         configuration=configuration,
+        database=db,
         events=TestEventService(),
         image_files=None,  # type: ignore
-        image_records=SqliteImageRecordStorage(db=db),
+        image_records=ImageRecordStorage(db),
         images=ImageService(),
         invocation_cache=MemoryInvocationCache(max_cache_size=0),
         logger=logging,  # type: ignore
@@ -238,17 +256,17 @@ def mock_services(image_index_service: FakeImageIndexService, tmp_path: Path) ->
         workflow_thumbnails=None,  # type: ignore
         model_relationship_records=None,  # type: ignore
         model_relationships=None,  # type: ignore
-        client_state_persistence=ClientStatePersistenceSqlite(db=db),
-        project_records=ProjectRecordsSqlite(db=db),
+        client_state_persistence=ClientStatePersistence(db),
+        project_records=ProjectRecordsStorage(db),
         users=UserService(db),
         wildcard_records=None,  # type: ignore
         system_prompt_records=None,  # type: ignore
-        videos=_video_service(tmp_path, video_records := SqliteVideoRecordStorage(db=db)),
+        videos=_video_service(tmp_path, video_records := VideoRecordStorage(db)),
         video_files=None,  # type: ignore
         video_records=video_records,
-        board_video_records=SqliteBoardVideoRecordStorage(db=db),
-        gallery=SqliteGalleryService(db=db),
-        image_index_records=(index_records := ImageIndexRecordsSqlite(db=db)),
+        board_video_records=BoardVideoRecordStorage(db),
+        gallery=GalleryService(db),
+        image_index_records=(index_records := ImageIndexRecords(db)),
         image_index=image_index_service,
         intermediates=None,  # type: ignore
         external_generation=None,  # type: ignore
@@ -273,7 +291,7 @@ def client(monkeypatch, mock_invoker: Invoker) -> TestClient:
     return TestClient(app)
 
 
-def _records(mock_invoker: Invoker) -> ImageIndexRecordsSqlite:
+def _records(mock_invoker: Invoker) -> ImageIndexRecords:
     return mock_invoker.services.image_index_records
 
 
@@ -382,6 +400,7 @@ def test_points_computing_and_enqueues_when_cache_missing(
 
     body = response.json()
     assert body["state"] == "computing"
+    assert body["model_id"] == MODEL_ID
     assert body["stale"] is True
     # System user is admin in single-user mode -> all_images scope.
     assert image_index_service.projection_requests == [(SYSTEM_USER_ID, True)]
@@ -471,6 +490,14 @@ def test_status_model_missing_when_enabled_without_model(
         pytest.param(lambda client: client.get("/api/v1/image_map/points"), id="points"),
         pytest.param(lambda client: client.get("/api/v1/image_map/status"), id="status"),
         pytest.param(lambda client: client.post("/api/v1/image_map/refresh"), id="refresh"),
+        # Gallery search runs without the map open, so it must recover on its own.
+        pytest.param(lambda client: client.get("/api/v1/image_map/search", params={"q": "a cat"}), id="search"),
+        pytest.param(
+            lambda client: client.post(
+                "/api/v1/image_map/search_by_image", files={"image": ("ref.png", _png_bytes(), "image/png")}
+            ),
+            id="search_by_image",
+        ),
     ],
 )
 def test_endpoints_activate_a_model_installed_since_startup(
@@ -515,6 +542,78 @@ def test_points_serve_the_index_once_it_is_activated(
     assert client.get("/api/v1/image_map/status").json()["enabled"] is True
 
 
+@pytest.mark.parametrize("endpoint", ["points", "status"])
+def test_reads_revalidate_an_encoder_deleted_after_activation(
+    endpoint: str, mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    mock_invoker.services.configuration.image_index_enabled = True
+
+    def revalidate() -> bool:
+        image_index_service._model_id = None
+        return False
+
+    image_index_service.try_activate = revalidate  # type: ignore[method-assign]
+    body = client.get(f"/api/v1/image_map/{endpoint}").json()
+    projection = body["projection"] if endpoint == "status" else body
+    assert projection["state"] == "model_missing"
+    assert body["model_id"] is None
+    assert body["model_name"] == mock_invoker.services.configuration.image_index_model
+    if endpoint == "status":
+        assert body["enabled"] is False
+        assert body["index"] is None
+
+
+@pytest.mark.parametrize("endpoint", ["points", "status"])
+def test_reads_report_a_draining_replacement_as_computing_rather_than_missing(
+    endpoint: str, mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    # The replacement is installed; offering to install it again would invite a
+    # duplicate install while the retired encoder's work drains.
+    mock_invoker.services.configuration.image_index_enabled = True
+    image_index_service._model_id = None
+    image_index_service.replacing = True
+    body = client.get(f"/api/v1/image_map/{endpoint}").json()
+    projection = body["projection"] if endpoint == "status" else body
+    assert projection["state"] == "computing"
+    assert body["model_id"] is None
+    assert body["model_name"] is None
+
+    mock_invoker.services.configuration.image_index_enabled = False
+    body = client.get(f"/api/v1/image_map/{endpoint}").json()
+    assert (body["projection"] if endpoint == "status" else body)["state"] == "disabled"
+
+
+def test_search_during_a_replacement_says_the_model_is_switching(
+    mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    mock_invoker.services.configuration.image_index_enabled = True
+    image_index_service._model_id = None
+    image_index_service.replacing = True
+    response = client.get("/api/v1/image_map/search", params={"q": "a cat"})
+    assert response.status_code == 409
+    assert "switching" in response.json()["detail"]
+
+
+@pytest.mark.parametrize("endpoint", ["points", "status"])
+def test_encoder_fingerprint_changes_without_a_missing_model_response(
+    endpoint: str, mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    _seed_embedded_image(mock_invoker, "a.png")
+    _seed_projection(mock_invoker, SYSTEM_USER_ID, imgs("a.png"), np.zeros((1, 2), dtype=np.float32))
+    before = client.get(f"/api/v1/image_map/{endpoint}").json()
+    assert before["model_id"] == MODEL_ID
+    assert (before["projection"] if endpoint == "status" else before)["point_count"] == 1
+
+    # The browser can miss the whole removal/reinstall while closed or suspended.
+    # The new encoder must identify itself before it has any projected points.
+    image_index_service._model_id = "replacement-model-hash"
+    after = client.get(f"/api/v1/image_map/{endpoint}").json()
+    assert after["model_id"] == "replacement-model-hash"
+    projection = after["projection"] if endpoint == "status" else after
+    assert projection["state"] == "empty"
+    assert projection["point_count"] == 0
+
+
 def test_status_disabled(mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient) -> None:
     image_index_service._model_id = None
     mock_invoker.services.configuration.image_index_enabled = False
@@ -522,6 +621,19 @@ def test_status_disabled(mock_invoker: Invoker, image_index_service: FakeImageIn
     assert body["enabled"] is False
     assert body["model_name"] is None
     assert body["projection"]["state"] == "disabled"
+
+
+def test_search_refuses_a_model_replaced_after_query_embedding(
+    image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    def embed_then_replace(text: str) -> np.ndarray:
+        image_index_service._model_id = "replacement-model"
+        return np.ones(DIM, dtype=np.float32)
+
+    image_index_service.embed_text = embed_then_replace  # type: ignore[method-assign]
+    response = client.get("/api/v1/image_map/search", params={"q": "a cat"})
+    assert response.status_code == 409
+    assert image_index_service.search_calls == []
 
 
 def test_eps_validation(client: TestClient) -> None:
@@ -1172,18 +1284,12 @@ def test_cluster_labels_skips_the_embedding_gather_when_nothing_clustered(
 def test_search_by_image_upload_returns_ranked_results(
     image_index_service: FakeImageIndexService, client: TestClient
 ) -> None:
-    from io import BytesIO
-
-    from PIL import Image
-
-    buffer = BytesIO()
-    Image.new("RGB", (8, 8), color=(200, 30, 30)).save(buffer, format="PNG")
     image_index_service.search_results = [(IndexedItem("image", "a.png"), 0.9), (IndexedItem("image", "b.png"), 0.4)]
 
     response = client.post(
         "/api/v1/image_map/search_by_image",
         params={"limit": 5},
-        files={"image": ("ref.png", buffer.getvalue(), "image/png")},
+        files={"image": ("ref.png", _png_bytes(), "image/png")},
     )
 
     assert response.status_code == 200
@@ -1571,7 +1677,10 @@ def test_image_labels_rank_the_vocabulary_for_one_image(mock_invoker: Invoker, c
 
     assert body["label"] == "beta"
     assert body["alternates"] == ["alpha", "gamma"]
-    assert body["score"] == pytest.approx(0.8 / float(np.linalg.norm(vector)))
+    stored_vector = (vector / np.linalg.norm(vector)).astype("<f2")
+    expected_embedding = stored_vector.astype(np.float32)
+    expected_embedding /= np.linalg.norm(expected_embedding.astype(np.float64))
+    assert body["score"] == pytest.approx(float(expected_embedding[1]))
 
     # top_k bounds the total label count (best + alternates).
     body = client.get("/api/v1/image_map/image_labels", params={"image_name": "leaning.png", "top_k": 1}).json()
@@ -1616,7 +1725,13 @@ def test_multiuser_image_labels_enforce_read_access(multiuser, mock_invoker: Inv
     assert response.status_code == 403
 
 
-def _seed_degenerate_embedding(mock_invoker: Invoker, image_name: str, vector: np.ndarray) -> None:
+def _insert_embedding_row(db: Database, image_name: str, dim: int, blob: bytes) -> None:
+    """Write an embedding row straight to the table, bypassing the writer's guards."""
+    with db.begin(write=True) as conn:
+        conn.execute(insert(image_embeddings).values(image_name=image_name, model_id=MODEL_ID, dim=dim, embedding=blob))
+
+
+def _seed_degenerate_embedding(mock_invoker: Invoker, db: Database, image_name: str, vector: np.ndarray) -> None:
     """Write an embedding blob straight to the table, bypassing the writer's guards.
 
     `embedding_to_blob` refuses non-finite and all-zero vectors, but rows
@@ -1624,13 +1739,8 @@ def _seed_degenerate_embedding(mock_invoker: Invoker, image_name: str, vector: n
     validates only the blob's length.
     """
     _save_unembedded_image(mock_invoker, image_name)
-    records = _records(mock_invoker)
     blob = np.ascontiguousarray(vector, dtype=np.float32).tobytes()
-    with records._db.transaction() as cursor:
-        cursor.execute(
-            "INSERT INTO image_embeddings (image_name, model_id, dim, embedding) VALUES (?, ?, ?, ?);",
-            (image_name, MODEL_ID, vector.shape[0], blob),
-        )
+    _insert_embedding_row(db, image_name, vector.shape[0], blob)
 
 
 @pytest.mark.parametrize(
@@ -1641,7 +1751,7 @@ def _seed_degenerate_embedding(mock_invoker: Invoker, image_name: str, vector: n
     ],
 )
 def test_image_labels_refuse_a_degenerate_stored_embedding(
-    mock_invoker: Invoker, client: TestClient, vector: np.ndarray
+    mock_invoker: Invoker, client: TestClient, mock_sqlite_database: Database, vector: np.ndarray
 ) -> None:
     """A degenerate row must not yield confident nonsense.
 
@@ -1650,7 +1760,7 @@ def test_image_labels_refuse_a_degenerate_stored_embedding(
     phrases presented as this image's tags, with a `score` that serializes as
     JSON null against a schema declaring it a float.
     """
-    _seed_degenerate_embedding(mock_invoker, "degenerate.png", vector)
+    _seed_degenerate_embedding(mock_invoker, mock_sqlite_database, "degenerate.png", vector)
 
     response = client.get("/api/v1/image_map/image_labels", params={"image_name": "degenerate.png"})
 
@@ -1661,7 +1771,9 @@ def test_image_labels_refuse_a_degenerate_stored_embedding(
     assert response.json()["detail"] == "This item's stored embedding cannot be labeled"
 
 
-def test_image_labels_corrupt_blob_is_404_not_500(mock_invoker: Invoker, client: TestClient) -> None:
+def test_image_labels_corrupt_blob_is_404_not_500(
+    mock_invoker: Invoker, client: TestClient, mock_sqlite_database: Database
+) -> None:
     """A row whose blob length disagrees with its `dim` column.
 
     `blob_to_embedding` raises on it. Unhandled that is a 500, and because
@@ -1669,12 +1781,7 @@ def test_image_labels_corrupt_blob_is_404_not_500(mock_invoker: Invoker, client:
     a second for as long as the point is hovered.
     """
     _save_unembedded_image(mock_invoker, "corrupt.png")
-    records = _records(mock_invoker)
-    with records._db.transaction() as cursor:
-        cursor.execute(
-            "INSERT INTO image_embeddings (image_name, model_id, dim, embedding) VALUES (?, ?, ?, ?);",
-            ("corrupt.png", MODEL_ID, DIM, np.zeros(DIM - 1, dtype=np.float32).tobytes()),
-        )
+    _insert_embedding_row(mock_sqlite_database, "corrupt.png", DIM, np.zeros(DIM - 1, dtype=np.float32).tobytes())
 
     response = client.get("/api/v1/image_map/image_labels", params={"image_name": "corrupt.png"})
 
@@ -1682,17 +1789,12 @@ def test_image_labels_corrupt_blob_is_404_not_500(mock_invoker: Invoker, client:
 
 
 def test_image_labels_dim_mismatch_with_the_vocabulary_is_404_not_500(
-    mock_invoker: Invoker, client: TestClient
+    mock_invoker: Invoker, client: TestClient, mock_sqlite_database: Database
 ) -> None:
     """A stored embedding from a different-width model than the vocab matrix."""
     _save_unembedded_image(mock_invoker, "wide.png")
-    records = _records(mock_invoker)
     wide = np.ones(DIM + 3, dtype=np.float32)
-    with records._db.transaction() as cursor:
-        cursor.execute(
-            "INSERT INTO image_embeddings (image_name, model_id, dim, embedding) VALUES (?, ?, ?, ?);",
-            ("wide.png", MODEL_ID, wide.shape[0], wide.tobytes()),
-        )
+    _insert_embedding_row(mock_sqlite_database, "wide.png", wide.shape[0], wide.tobytes())
 
     response = client.get("/api/v1/image_map/image_labels", params={"image_name": "wide.png"})
 
@@ -1732,6 +1834,30 @@ def test_a_new_video_makes_the_projection_stale(mock_invoker: Invoker, client: T
     _seed_embedded_video(mock_invoker, "clip.mp4")
 
     assert client.get("/api/v1/image_map/points").json()["stale"] is True
+
+
+def test_deleted_image_is_filtered_from_cached_projection_without_reembedding(
+    mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    _seed_embedded_image(mock_invoker, "kept.png")
+    _seed_embedded_image(mock_invoker, "removed.png")
+    _seed_projection(
+        mock_invoker,
+        SYSTEM_USER_ID,
+        imgs("kept.png", "removed.png"),
+        np.array([[0.0, 0.0], [10.0, 10.0]], dtype=np.float32),
+    )
+
+    mock_invoker.services.image_records.delete("removed.png")
+
+    response = client.get("/api/v1/image_map/points")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["stale"] is True
+    assert [point["image_name"] for point in body["points"]] == ["kept.png"]
+    assert image_index_service.embedded_images == []
+    assert image_index_service.projection_requests == [(SYSTEM_USER_ID, True)]
 
 
 def test_search_by_video_reference_uses_its_stored_embedding(

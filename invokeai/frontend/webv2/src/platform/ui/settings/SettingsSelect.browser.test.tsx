@@ -1,5 +1,6 @@
-import { ChakraProvider, Dialog, Portal } from '@chakra-ui/react';
+import { ChakraProvider, Portal } from '@chakra-ui/react';
 import { WORKBENCH_LANGUAGE_OPTIONS } from '@platform/i18n/languages';
+import { Dialog } from '@platform/ui/Dialog';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { system } from '@theme/system';
 import { act, useCallback, useState } from 'react';

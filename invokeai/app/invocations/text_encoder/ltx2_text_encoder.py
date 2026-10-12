@@ -26,7 +26,6 @@ from invokeai.backend.ltx2.text_conditioning import (
     estimate_connector_working_memory,
     estimate_tower_working_memory,
 )
-from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
 
 
@@ -92,8 +91,39 @@ class LTX2TextEncoderInvocation(BaseInvocation):
             prompts.append(self.negative_prompt)
 
         # The 12B tower and the 6 GB connectors run in two phases with the states parked in RAM in
-        # between, so only one of them is resident at a time. Loading the tower first also keeps the
-        # cache from evicting the small tokenizer record to make room for it (issue #7513).
+        # between, so only one of them is resident at a time.
+        hidden_states = self._encode_with_tower(context, prompts)
+
+        connectors_info = context.models.load(self.text_encoder.connectors)
+        connector_memory = estimate_connector_working_memory(hidden_states[0][0])
+        with connectors_info.model_on_device(working_mem_bytes=connector_memory) as (_, connectors):
+            context.util.signal_progress("Running the LTX-2 text connectors")
+            names = [
+                context.conditioning.save(
+                    ConditioningFieldData(
+                        conditionings=[apply_connectors(connectors, *state, device=connectors_info.compute_device)]
+                    )
+                )
+                for state in hidden_states
+            ]
+
+        return LTX2TextEncoderOutput(
+            conditioning=LTX2ConditioningField(conditioning_name=names[0]),
+            negative_conditioning=LTX2ConditioningField(conditioning_name=names[1]) if len(names) > 1 else None,
+        )
+
+    def _encode_with_tower(
+        self, context: InvocationContext, prompts: list[str]
+    ) -> list[tuple[torch.Tensor, torch.Tensor]]:
+        """Run the Gemma-4 tower over each prompt and return the packed states and masks, on the CPU.
+
+        A method of its own so every reference to the tower is gone when it returns. Loading the
+        connectors next can evict the tower from a small RAM cache while its weights are still on the
+        device, and a reference kept past that point pins those weights in VRAM where the cache no
+        longer accounts for them.
+        """
+        # Loading the tower first keeps the cache from evicting the small tokenizer record to make
+        # room for it (issue #7513).
         text_encoder_info = context.models.load(self.text_encoder.text_encoder)
         tokenizer_info = context.models.load(self.text_encoder.tokenizer)
         # Read off the unlocked model, before the VRAM lock the reservation applies to.
@@ -103,7 +133,6 @@ class LTX2TextEncoderInvocation(BaseInvocation):
             tokenizer_info.model_on_device() as (_, tokenizer),
             text_encoder_info.model_on_device(working_mem_bytes=tower_memory) as (_, text_encoder),
         ):
-            device = get_effective_device(text_encoder)
             context.util.signal_progress("Running the LTX-2 Gemma-4 text encoder")
             for prompt in prompts:
                 states, mask = encode_hidden_states(
@@ -111,20 +140,7 @@ class LTX2TextEncoderInvocation(BaseInvocation):
                     tokenizer,
                     prompt,
                     max_sequence_length=self.max_sequence_length,
-                    device=device,
+                    device=text_encoder_info.compute_device,
                 )
                 hidden_states.append((states.cpu(), mask.cpu()))
-
-        connectors_info = context.models.load(self.text_encoder.connectors)
-        connector_memory = estimate_connector_working_memory(hidden_states[0][0])
-        with connectors_info.model_on_device(working_mem_bytes=connector_memory) as (_, connectors):
-            context.util.signal_progress("Running the LTX-2 text connectors")
-            names = [
-                context.conditioning.save(ConditioningFieldData(conditionings=[apply_connectors(connectors, *state)]))
-                for state in hidden_states
-            ]
-
-        return LTX2TextEncoderOutput(
-            conditioning=LTX2ConditioningField(conditioning_name=names[0]),
-            negative_conditioning=LTX2ConditioningField(conditioning_name=names[1]) if len(names) > 1 else None,
-        )
+        return hidden_states

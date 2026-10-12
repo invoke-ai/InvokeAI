@@ -22,6 +22,7 @@ import { GalleryHostProvider, type GalleryHost } from '@features/gallery/picker'
 import { WorkflowGraphPreviewProvider, WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
 import {
   openWorkflowLibraryAtProjectWorkflow,
+  setWorkflowLibraryOpen,
   setWorkflowLibraryTab,
   workflowUiStore,
 } from '@features/workflow/ui/workflowUiStore';
@@ -409,6 +410,13 @@ const UI_ADAPTER = {
   project: project.port,
 } as unknown as WorkflowUiAdapter;
 const GRAPH_PREVIEW = { openDocumentInNewProject: vi.fn() } as unknown as WorkflowGraphPreviewPort;
+
+/** The library as the workflow dialog host mounts it: open while the UI store says so. */
+const StoreBoundLibraryDialog = () => {
+  const isOpen = workflowUiStore.useSelector((snapshot) => snapshot.isLibraryOpen);
+
+  return <WorkflowLibraryDialog isOpen={isOpen} onOpenChange={setWorkflowLibraryOpen} />;
+};
 
 describe('WorkflowLibraryDialog', () => {
   let host: HTMLDivElement;
@@ -1106,7 +1114,8 @@ describe('WorkflowLibraryDialog — This project', () => {
       setTimeout(resolve, 0);
     });
 
-  const renderDialog = async () => {
+  /** `storeBound` opens and closes the dialog through the UI store, as the workflow dialog host does. */
+  const renderDialog = async ({ storeBound = false }: { storeBound?: boolean } = {}) => {
     await act(async () => {
       root.render(
         <StrictMode>
@@ -1114,7 +1123,11 @@ describe('WorkflowLibraryDialog — This project', () => {
             <WorkflowUiProvider adapter={UI_ADAPTER}>
               <GalleryHostProvider host={GALLERY_HOST}>
                 <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
-                  <WorkflowLibraryDialog isOpen onOpenChange={onOpenChange} />
+                  {storeBound ? (
+                    <StoreBoundLibraryDialog />
+                  ) : (
+                    <WorkflowLibraryDialog isOpen onOpenChange={onOpenChange} />
+                  )}
                 </WorkflowGraphPreviewProvider>
               </GalleryHostProvider>
             </WorkflowUiProvider>
@@ -1347,6 +1360,39 @@ describe('WorkflowLibraryDialog — This project', () => {
     await click(menuItem('update-template'));
 
     expect(workflowUiStore.getSnapshot().publicationIntent).toEqual({ kind: 'update-source', workflowId: 'wf-user' });
+  });
+
+  it('reopens on the active workflow, so its template update writes the workflow being edited', async () => {
+    const LANDSCAPE_COPY: ProjectWorkflowEntry = {
+      document: { ...createProjectGraph('wf-landscape'), name: 'Landscape copy' },
+      source: { libraryWorkflowId: 'wf-landscape-template', revision: 2 },
+    };
+    const workflows = [...PROJECT_WORKFLOWS, LANDSCAPE_COPY];
+
+    project.setSnapshot(projectSnapshot(workflows, 'wf-user'));
+    openWorkflowLibraryAtProjectWorkflow(PROJECT_ID, 'wf-user');
+    await renderDialog({ storeBound: true });
+    expect(rail()?.dataset.projectWorkflowDetail).toBe('wf-user');
+
+    // The library closes, another template's copy becomes the workflow being edited, and Library… opens it again.
+    await act(async () => {
+      setWorkflowLibraryOpen(false);
+      project.setSnapshot(projectSnapshot(workflows, 'wf-landscape'));
+      await settleFrame();
+    });
+    await act(async () => {
+      setWorkflowLibraryOpen(true);
+      await settleFrame();
+    });
+
+    expect(rail()?.dataset.projectWorkflowDetail).toBe('wf-landscape');
+
+    await clickRailMenuItem('update-template');
+
+    expect(workflowUiStore.getSnapshot().publicationIntent).toEqual({
+      kind: 'update-source',
+      workflowId: 'wf-landscape',
+    });
   });
 
   it('previews a project workflow from its own document', async () => {

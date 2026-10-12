@@ -83,8 +83,8 @@ export const ProjectCard = ({
       </Box>
       <Flex align="center" gap="2" p="3" pointerEvents="none">
         <Stack flex="1" gap="0" minW="0">
-          <MiddleTruncate fontSize="xs" fontWeight="600" text={summary.name} />
-          <Text color="fg.muted" fontSize="2xs">
+          <MiddleTruncate fontWeight="600" text={summary.name} />
+          <Text color="fg.muted" fontSize="xs">
             {t('projects.editedRelative', { time: formatRelativeTime(summary.updatedAt) })}
           </Text>
           <ProjectCompatibilityBadge summary={summary} />
@@ -97,7 +97,7 @@ export const ProjectCard = ({
           aria-pressed={isPinned}
           color={isPinned ? 'fg' : 'fg.muted'}
           opacity={isPinned ? 1 : 0}
-          size="2xs"
+          size="sm"
           title={isPinned ? t('projects.unpin') : t('projects.pin')}
           variant="subtle"
           _focusVisible={REVEAL_ON_HOVER}
@@ -114,7 +114,7 @@ export const ProjectCard = ({
           aria-haspopup="menu"
           aria-label={t('common.actions')}
           color="fg.muted"
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={menuTrigger.onClick}
           onPointerDown={menuTrigger.onPointerDown}

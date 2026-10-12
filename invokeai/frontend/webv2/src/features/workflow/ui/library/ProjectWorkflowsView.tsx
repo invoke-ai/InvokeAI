@@ -144,11 +144,11 @@ export const ProjectWorkflowsView = ({
     <>
       <Stack flex="1" gap="2" minH="0" minW="0">
         <HStack gap="2" justify="space-between" minW="0">
-          <Text color="fg.muted" fontSize="xs" minW="0" truncate>
+          <Text color="fg.muted" fontSize="md" minW="0" truncate>
             {t('workflowLibrary.projectWorkflowCount', { count: workflows.length })}
           </Text>
           <HStack flexShrink={0} gap="1">
-            <Button size="xs" variant="outline" onClick={handleNewWorkflow}>
+            <Button variant="outline" onClick={handleNewWorkflow}>
               <PlusIcon />
               {t('workflowLibrary.newWorkflow')}
             </Button>
@@ -401,37 +401,37 @@ const ProjectWorkflowDetailPanel = ({
               ) : (
                 <Flex align="center" direction="column" gap="1" h="full" justify="center" w="full">
                   <Icon aria-hidden as={ImageOffIcon} boxSize="5" color="fg.subtle" opacity={0.6} />
-                  <Text color="fg.subtle" fontSize="2xs">
+                  <Text color="fg.subtle" fontSize="xs">
                     {t('workflowLibrary.notRunYet')}
                   </Text>
                 </Flex>
               )}
             </Box>
             {lastRun ? (
-              <Text color="fg.subtle" fontSize="2xs">
+              <Text color="fg.subtle" fontSize="xs">
                 {t('workflowLibrary.lastRun', { when: lastRun })}
               </Text>
             ) : null}
           </Stack>
 
           <HStack gap="1.5" minW="0">
-            <Text fontSize="sm" fontWeight="600" minW="0" overflowWrap="anywhere">
+            <Text fontSize="lg" fontWeight="600" minW="0" overflowWrap="anywhere">
               {name}
             </Text>
             {isActive ? (
-              <Badge flexShrink={0} size="xs" variant="solid">
+              <Badge flexShrink={0} variant="solid">
                 {t('workflowLibrary.activeWorkflow')}
               </Badge>
             ) : null}
           </HStack>
 
           {entry.document.description ? (
-            <Text color="fg.muted" fontSize="2xs" lineClamp={4}>
+            <Text color="fg.muted" fontSize="xs" lineClamp={4}>
               {entry.document.description}
             </Text>
           ) : null}
 
-          <Text color="fg.subtle" fontSize="2xs" data-workflow-source={source?.libraryWorkflowId ?? 'none'}>
+          <Text color="fg.subtle" fontSize="xs" data-workflow-source={source?.libraryWorkflowId ?? 'none'}>
             {source
               ? isBundledLibraryWorkflowId(source.libraryWorkflowId)
                 ? t('workflowLibrary.sourceBundled')
@@ -444,7 +444,7 @@ const ProjectWorkflowDetailPanel = ({
           {libraryEntry.tags.length > 0 ? (
             <HStack flexWrap="wrap" gap="1" minW="0">
               {libraryEntry.tags.map((tag) => (
-                <Badge key={tag} size="xs" variant="subtle">
+                <Badge key={tag} variant="subtle">
                   {tag}
                 </Badge>
               ))}
@@ -457,7 +457,7 @@ const ProjectWorkflowDetailPanel = ({
 
       <Stack borderColor="border.subtle" borderTopWidth="1px" gap="2" p="2.5">
         <HStack gap="2" minW="0">
-          <Button disabled={isActive} flex="1" minW="0" size="sm" onClick={handleOpen}>
+          <Button disabled={isActive} flex="1" minW="0" size="lg" onClick={handleOpen}>
             {isActive ? t('workflowLibrary.activeWorkflow') : t('workflowLibrary.open')}
           </Button>
           <Menu.Root ids={moreActionsIds}>
@@ -465,7 +465,7 @@ const ProjectWorkflowDetailPanel = ({
                 menu never takes focus and the first pointer move onto it closes it. */}
             <Menu.Trigger asChild>
               <Tooltip content={t('workflowLibrary.moreActions')} ids={moreActionsIds}>
-                <IconButton aria-label={t('workflowLibrary.moreActions')} size="sm" variant="outline">
+                <IconButton aria-label={t('workflowLibrary.moreActions')} size="lg" variant="outline">
                   <EllipsisIcon />
                 </IconButton>
               </Tooltip>
@@ -479,7 +479,7 @@ const ProjectWorkflowDetailPanel = ({
         </HStack>
         <Button
           disabled={libraryEntry.enrichment.status !== 'ready'}
-          size="sm"
+          size="lg"
           variant="outline"
           w="full"
           onClick={handlePreview}
@@ -488,7 +488,7 @@ const ProjectWorkflowDetailPanel = ({
           {t('workflowLibrary.previewGraph')}
         </Button>
         {missingCount > 0 ? (
-          <Text color="fg.warning" fontSize="2xs">
+          <Text color="fg.warning" fontSize="xs">
             {t('workflowLibrary.installModels', { count: missingCount })}
           </Text>
         ) : null}

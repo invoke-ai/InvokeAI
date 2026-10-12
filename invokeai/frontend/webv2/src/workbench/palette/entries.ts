@@ -167,6 +167,10 @@ const PALETTE_HIDDEN_COMMANDS = new Set([
   'canvas.nextEntity',
   'canvas.prevEntity',
   'gallery.clearSelection',
+  'gallery.extendSelectionDown',
+  'gallery.extendSelectionLeft',
+  'gallery.extendSelectionRight',
+  'gallery.extendSelectionUp',
   'gallery.galleryNavDown',
   'gallery.galleryNavDownAlt',
   'gallery.galleryNavLeft',
@@ -175,6 +179,14 @@ const PALETTE_HIDDEN_COMMANDS = new Set([
   'gallery.galleryNavRightAlt',
   'gallery.galleryNavUp',
   'gallery.galleryNavUpAlt',
+  // Focus moves and the toggle act on the focused thumbnail, which a palette open over the gallery has taken.
+  'gallery.moveFocusDown',
+  'gallery.moveFocusLeft',
+  'gallery.moveFocusRight',
+  'gallery.moveFocusUp',
+  'gallery.toggleFocusedInSelection',
+  'viewer.nextItem',
+  'viewer.previousItem',
 ]);
 
 /** App-category commands regrouped into palette-facing sections. */

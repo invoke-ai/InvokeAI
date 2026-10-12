@@ -191,6 +191,8 @@ export interface GenerateSettings {
   dynamicPromptsMaxPrompts: number;
   /** Seeds the random sampler so the preview matches what generates. */
   dynamicPromptsSampleSeed: number;
+  /** Draw a new sample seed after each queued random-mode submission. */
+  dynamicPromptsResample: boolean;
   dynamicPromptsSeedBehaviour: DynamicPromptsSeedBehaviour;
   width: number;
   height: number;
@@ -229,6 +231,8 @@ export interface GenerateSettings {
   qwenVLEncoderModel: ComponentModelConfig | null;
   /** Krea-2's text encoder. Distinct from `qwenVLEncoderModel` (Qwen2.5-VL). */
   qwen3VLEncoderModel: ComponentModelConfig | null;
+  /** Anima-3.8B's second text encoder, read by its bundled semantic connector. */
+  qwen35EncoderModel: ComponentModelConfig | null;
   /** Wan 2.2's UMT5-XXL text encoder. */
   wanT5EncoderModel: ComponentModelConfig | null;
   /** The low-noise expert is optional; the selected expert can span the full schedule. */

@@ -78,7 +78,7 @@ describe('queue transport mappers', () => {
   });
 
   it('maps status and id-list response names at the adapter boundary', () => {
-    expect(mapQueueItemIdsDTO({ item_ids: [9, 8], total_count: 2 })).toEqual({ itemIds: [9, 8], totalCount: 2 });
+    expect(mapQueueItemIdsDTO({ item_ids: [9, 8] })).toEqual({ itemIds: [9, 8] });
     expect(
       mapQueueStatusDTO({
         processor: { is_processing: true, is_started: true },

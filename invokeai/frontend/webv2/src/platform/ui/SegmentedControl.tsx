@@ -22,7 +22,7 @@ export interface SegmentedControlProps extends Omit<SegmentGroup.RootProps, 'onC
   value: string | null;
 }
 
-/** The house segmented control: an `xs` group of equal centered segments with `2xs` labels. */
+/** The house segmented control: an `md` group of equal centered segments with `xs` labels. */
 export const SegmentedControl = ({
   ariaLabel,
   disabled,
@@ -45,7 +45,6 @@ export const SegmentedControl = ({
     <SegmentGroup.Root
       aria-label={ariaLabel}
       disabled={disabled}
-      size="xs"
       value={value}
       w={isFullWidth ? 'full' : undefined}
       onValueChange={handleValueChange}
@@ -63,7 +62,7 @@ export const SegmentedControl = ({
           _checked={CHECKED_ITEM_STYLES}
         >
           <SegmentGroup.ItemHiddenInput />
-          <SegmentGroup.ItemText fontSize="2xs">{option.label}</SegmentGroup.ItemText>
+          <SegmentGroup.ItemText fontSize="xs">{option.label}</SegmentGroup.ItemText>
         </SegmentGroup.Item>
       ))}
     </SegmentGroup.Root>

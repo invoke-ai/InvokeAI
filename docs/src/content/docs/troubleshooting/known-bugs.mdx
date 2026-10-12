@@ -1,19 +1,27 @@
 ---
 title: Known Bugs
 description: Places where the current release does not yet behave as the documentation describes, with workarounds.
-lastUpdated: 2026-09-30
+lastUpdated: 2026-10-07
 ---
 
-This page lists known cases where InvokeAI does not yet behave as this documentation describes. Each entry explains what happens instead and how to work around it. Entries are removed once the fix is released.
+This page lists known cases where InvokeAI does not yet behave as this documentation describes, or no longer behaves as v6 did. Each entry explains what happens instead and how to work around it. Entries are removed once the fix is released.
 
 ## v7.0.0-alpha
 
-### Canvas: shapes do not add to inpaint masks or regional guidance
+### Multi-user mode: boards and workflows cannot be shared
 
-**Documented behavior:** With an inpaint mask or regional guidance layer selected, the **Shape** tool adds the drawn shape to the mask or region. See the [Canvas guide](/users-guide/canvas/canvas-guide/#tool-options).
+**Documented behavior:** In multi-user mode, a board's owner can set it to **Shared** or **Public** so that other users can view it, and a workflow's owner can mark it as shared so that it appears in every user's workflow library. See [Working with Your Content in Multi-User Mode](/configuration/multi-user-mode/user-guide/#working-with-your-content-in-multi-user-mode).
 
-**Current behavior:** The Shape tool creates a new raster layer named "Shape N" instead, and the mask or region is unchanged. With an inpaint mask selected, the new raster layer also becomes part of the image inside the generation frame, which can change the result of the next generation.
+**Current behavior:** v7 has no controls for changing a board's visibility or sharing a workflow. Boards and workflows you create stay private: only you and administrators can see them.
 
-**Workaround:** Paint masks and regions with the **Brush** (**B**). If a Shape layer was created by mistake, delete it or undo with **Ctrl+Z**.
+**Workaround:** None in the v7 interface. Administrators can still view and manage all users' boards, images, and workflows.
 
-**Tracking:** [invoke-ai/InvokeAI-7#386](https://github.com/invoke-ai/InvokeAI-7/issues/386)
+**Tracking:** [invoke-ai/InvokeAI#9673](https://github.com/invoke-ai/InvokeAI/issues/9673)
+
+### Plain-HTTP access: another tab can take a still-open tab's unsaved changes
+
+**Documented behavior:** If a change cannot be saved yet, your browser keeps it and the tab that made it keeps retrying until the save goes through. See [Saving and syncing](/users-guide/projects/introduction/#saving-and-syncing).
+
+**Current behavior:** When Invoke is opened over plain HTTP from another computer (for example `http://192.168.1.20:9090` on your local network), the browser turns off a feature Invoke uses to tell open tabs apart (Web Locks), so Invoke cannot tell whether another tab is still open. Opening Invoke in another tab, or reloading another tab, then takes over the unsaved changes a still-open tab is holding: an edit whose save had not finished when the tab was hidden, or one kept while the server was unreachable. The second tab saves them, and undoing the edit in the first tab no longer removes it.
+
+**Workaround:** Open Invoke over HTTPS, or at `localhost` on the computer running it, where browsers provide Web Locks.

@@ -17,6 +17,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Optional
 
+import httpx
 import requests
 from huggingface_hub import HfApi, hf_hub_url
 from huggingface_hub.errors import RepositoryNotFoundError, RevisionNotFoundError
@@ -25,8 +26,10 @@ from requests.sessions import Session
 
 from invokeai.backend.model_manager.metadata.fetch.fetch_base import ModelMetadataFetchBase
 from invokeai.backend.model_manager.metadata.metadata_base import (
+    HF_METADATA_REQUEST_TIMEOUT_SECONDS,
     AnyModelRepoMetadata,
     HuggingFaceMetadata,
+    ModelMetadataUnavailableError,
     RemoteModelFile,
     UnknownMetadataException,
 )
@@ -60,7 +63,7 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
         url = f"https://huggingface.co/api/models/{repo_id}"
         if variant is not None:
             url += f"/revision/{variant}"
-        resp = self._requests.get(url, params=params)
+        resp = self._requests.get(url, params=params, timeout=HF_METADATA_REQUEST_TIMEOUT_SECONDS)
         if resp.status_code == 404:
             error_code = resp.headers.get("X-Error-Code", "")
             if error_code == "RevisionNotFound" or (variant is not None):
@@ -97,7 +100,14 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
                 if self._has_custom_session:
                     model_info = self._model_info_via_session(repo_id, variant)
                 else:
-                    model_info = HfApi().model_info(repo_id=repo_id, files_metadata=True, revision=variant)
+                    model_info = HfApi().model_info(
+                        repo_id=repo_id,
+                        files_metadata=True,
+                        revision=variant,
+                        timeout=HF_METADATA_REQUEST_TIMEOUT_SECONDS,
+                    )
+            except (requests.RequestException, httpx.TransportError) as e:
+                raise ModelMetadataUnavailableError(f"Could not fetch Hugging Face metadata for '{repo_id}'") from e
             except RepositoryNotFoundError as excp:
                 raise UnknownMetadataException(f"'{repo_id}' not found. See trace for details.") from excp
             except RevisionNotFoundError:

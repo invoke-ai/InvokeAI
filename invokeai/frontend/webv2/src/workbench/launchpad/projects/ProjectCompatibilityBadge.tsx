@@ -14,7 +14,7 @@ export const ProjectCompatibilityBadge = ({ summary }: { summary: ProjectSummary
   }
 
   return (
-    <Badge alignSelf="flex-start" colorPalette="orange" size="xs" variant="surface">
+    <Badge alignSelf="flex-start" colorPalette="orange" variant="surface">
       {t(
         summary.minimumCanvasSchemaVersion < MIN_SUPPORTED_CANVAS_SCHEMA_VERSION
           ? 'projects.legacyFormat'

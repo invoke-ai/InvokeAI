@@ -32,7 +32,7 @@ export const OverviewPane = () => {
 
   if (!engine) {
     return (
-      <Flex align="center" color="fg.muted" fontSize="xs" h="full" justify="center" p="4">
+      <Flex align="center" color="fg.muted" fontSize="md" h="full" justify="center" p="4">
         {t('widgets.properties.noCanvas')}
       </Flex>
     );

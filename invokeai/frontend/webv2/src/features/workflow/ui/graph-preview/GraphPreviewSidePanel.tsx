@@ -59,17 +59,17 @@ const SummaryNotice = ({
     <Box alignItems="flex-start" display="flex" gap="1.5">
       <Icon as={SquareDashedIcon} boxSize="3" color="orange.fg" flexShrink={0} mt="0.5" />
       <Stack gap="0.5" minW="0">
-        <Text color="fg.muted" fontSize="2xs">
+        <Text color="fg.muted" fontSize="xs">
           {message}
         </Text>
         {nodeId ? (
           <Button
             alignSelf="flex-start"
-            fontSize="2xs"
+            fontSize="xs"
             fontWeight="normal"
             h="auto"
             px="1"
-            size="2xs"
+            size="sm"
             variant="plain"
             onClick={handleShowNode}
           >
@@ -94,33 +94,33 @@ const GraphSummary = ({
   return (
     <Stack gap="2" p="2">
       <Stack gap="0.5">
-        <Text fontSize="sm" fontWeight="semibold">
+        <Text fontSize="lg" fontWeight="semibold">
           {t('graphPreview.thisGraph')}
         </Text>
-        <Text color="fg.muted" fontSize="2xs">
+        <Text color="fg.muted" fontSize="xs">
           {t('graphPreview.selectNode')}
         </Text>
       </Stack>
-      <DataList.Root gap="1.5" orientation="horizontal" size="sm">
+      <DataList.Root gap="1.5" orientation="horizontal">
         <DataList.Item>
-          <DataList.ItemLabel fontSize="2xs">{t('graphPreview.nodes')}</DataList.ItemLabel>
-          <DataList.ItemValue fontSize="2xs" minW="0">
+          <DataList.ItemLabel fontSize="xs">{t('graphPreview.nodes')}</DataList.ItemLabel>
+          <DataList.ItemValue fontSize="xs" minW="0">
             {nodeCount !== undefined ? String(nodeCount) : '—'}
           </DataList.ItemValue>
         </DataList.Item>
 
         {source.destinationLabel === null ? null : (
           <DataList.Item>
-            <DataList.ItemLabel fontSize="2xs">{t('graphPreview.destination')}</DataList.ItemLabel>
-            <DataList.ItemValue fontSize="2xs" minW="0">
+            <DataList.ItemLabel fontSize="xs">{t('graphPreview.destination')}</DataList.ItemLabel>
+            <DataList.ItemValue fontSize="xs" minW="0">
               {source.destinationLabel}
             </DataList.ItemValue>
           </DataList.Item>
         )}
         {source.summaryRows.map((row) => (
           <DataList.Item key={row.id}>
-            <DataList.ItemLabel fontSize="2xs">{row.label}</DataList.ItemLabel>
-            <DataList.ItemValue fontSize="2xs" minW="0">
+            <DataList.ItemLabel fontSize="xs">{row.label}</DataList.ItemLabel>
+            <DataList.ItemValue fontSize="xs" minW="0">
               {row.value}
             </DataList.ItemValue>
           </DataList.Item>
@@ -215,14 +215,14 @@ const NodeInspector = ({
   return (
     <Stack gap="3" p="2">
       <Box alignItems="center" display="flex" gap="2">
-        <IconButton aria-label={t('graphPreview.back')} size="2xs" variant="ghost" onClick={onBack}>
+        <IconButton aria-label={t('graphPreview.back')} size="sm" variant="ghost" onClick={onBack}>
           <ArrowLeftIcon />
         </IconButton>
         <Stack gap="0" minW="0">
-          <Badge fontFamily="mono" size="xs" w="fit-content">
+          <Badge fontFamily="mono" w="fit-content">
             {node.type}
           </Badge>
-          <Text color="fg.muted" fontSize="2xs" truncate>
+          <Text color="fg.muted" fontSize="xs" truncate>
             {node.id}
           </Text>
         </Stack>
@@ -230,7 +230,7 @@ const NodeInspector = ({
 
       {provenanceLabels.length > 0 ? (
         <Stack gap="1">
-          <Text color="fg.muted" fontSize="2xs" fontWeight="semibold">
+          <Text color="fg.muted" fontSize="xs" fontWeight="semibold">
             {t('graphPreview.setBy')}
           </Text>
           <Stack gap="0.5">
@@ -238,11 +238,11 @@ const NodeInspector = ({
               <Button
                 key={label}
                 alignSelf="flex-start"
-                fontSize="2xs"
+                fontSize="xs"
                 fontWeight="normal"
                 h="auto"
                 px="1"
-                size="2xs"
+                size="sm"
                 variant="plain"
                 onClick={onProvenanceClick}
               >
@@ -254,17 +254,17 @@ const NodeInspector = ({
       ) : null}
 
       <Stack gap="1">
-        <Text color="fg.muted" fontSize="2xs" fontWeight="semibold">
+        <Text color="fg.muted" fontSize="xs" fontWeight="semibold">
           {t('graphPreview.resolvedInputs')}
         </Text>
-        <DataList.Root gap="1.5" orientation="horizontal" size="sm">
+        <DataList.Root gap="1.5" orientation="horizontal">
           {resolvedFields.map(({ field, value }) => {
             const { display, isTruncated } = truncateForDisplay(value);
 
             return (
               <DataList.Item key={field}>
-                <DataList.ItemLabel fontSize="2xs">{field}</DataList.ItemLabel>
-                <DataList.ItemValue fontSize="2xs" minW="0" title={isTruncated ? value : undefined}>
+                <DataList.ItemLabel fontSize="xs">{field}</DataList.ItemLabel>
+                <DataList.ItemValue fontSize="xs" minW="0" title={isTruncated ? value : undefined}>
                   {display}
                 </DataList.ItemValue>
               </DataList.Item>
@@ -274,13 +274,13 @@ const NodeInspector = ({
       </Stack>
 
       <Stack gap="1">
-        <Text color="fg.muted" fontSize="2xs" fontWeight="semibold">
+        <Text color="fg.muted" fontSize="xs" fontWeight="semibold">
           {t('graphPreview.edges')}
         </Text>
         <Stack gap="0.5">
-          <Text fontSize="2xs">{getEdgesInLine(node, source.graph, t)}</Text>
+          <Text fontSize="xs">{getEdgesInLine(node, source.graph, t)}</Text>
           {outgoingEdges.map((edge) => (
-            <Text key={edge.id} fontSize="2xs">
+            <Text key={edge.id} fontSize="xs">
               {t('graphPreview.edgesOut', { field: edge.sourceField, target: edge.targetNodeId })}
             </Text>
           ))}

@@ -36,7 +36,7 @@ import {
   Trash2Icon,
   UngroupIcon,
 } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { COLOR_LABEL_ITEMS } from './colorLabels';
@@ -84,7 +84,17 @@ export const LayerGroupContextMenu = ({
   const projectId = useActiveProjectId();
   const document = useActiveProjectSelector((project) => project.canvas.document);
   const { selectedIds } = useLayerPanelState(projectId, document.selectedLayerId);
+  const [menuOpen, setMenuOpen] = useState(true);
   const [renaming, setRenaming] = useState(false);
+  // Choosing Rename closes the menu; the host's surface must outlive it until the rename dialog has animated out.
+  const renameChosen = useRef(false);
+  // Every request brings a new anchor. One for this same group while its rename animates out keeps this instance
+  // mounted, so it must reopen the menu here.
+  const [requestAnchor, setRequestAnchor] = useState(anchor);
+  if (anchor !== requestAnchor) {
+    setRequestAnchor(anchor);
+    setMenuOpen(true);
+  }
 
   const selection = useCallback(
     (): readonly string[] => (selectedIds.includes(group.id) ? selectedIds : [group.id]),
@@ -102,7 +112,11 @@ export const LayerGroupContextMenu = ({
   );
   const handleOpenChange = useCallback(
     (details: { open: boolean }) => {
-      if (!details.open) {
+      if (details.open) {
+        return;
+      }
+      setMenuOpen(false);
+      if (!renameChosen.current) {
         onClose();
       }
     },
@@ -121,8 +135,18 @@ export const LayerGroupContextMenu = ({
     },
     [patch, t]
   );
-  const openRename = useCallback(() => setRenaming(true), []);
+  const openRename = useCallback(() => {
+    renameChosen.current = true;
+    setRenaming(true);
+  }, []);
   const closeRename = useCallback(() => setRenaming(false), []);
+  // A menu reopened while the rename animated out now owns the surface and closes it itself.
+  const handleRenameExitComplete = useCallback(() => {
+    renameChosen.current = false;
+    if (!menuOpen) {
+      onClose();
+    }
+  }, [menuOpen, onClose]);
   const handleToggleEnabled = useCallback(
     () => patch(t('widgets.layers.actions.toggleVisibility'), { isEnabled: !group.isEnabled }),
     [group.isEnabled, patch, t]
@@ -264,7 +288,7 @@ export const LayerGroupContextMenu = ({
             <Menu.TriggerItem aria-label={t('widgets.layers.menu.addAdjustment')}>
               <HStack gap="2" minW="0" w="full">
                 <Icon as={SlidersHorizontalIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-                <Text flex="1" fontSize="xs">
+                <Text flex="1" fontSize="md">
                   {t('widgets.layers.menu.addAdjustment')}
                 </Text>
                 <Icon as={ChevronRightIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
@@ -317,7 +341,7 @@ export const LayerGroupContextMenu = ({
           <Menu.TriggerItem aria-label={t('widgets.layers.menu.colorLabel')}>
             <HStack gap="2" minW="0" w="full">
               <Icon as={PaletteIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-              <Text flex="1" fontSize="xs">
+              <Text flex="1" fontSize="md">
                 {t('widgets.layers.menu.colorLabel')}
               </Text>
               <Icon as={ChevronRightIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
@@ -370,7 +394,7 @@ export const LayerGroupContextMenu = ({
 
   return (
     <>
-      <Menu.Root lazyMount open positioning={positioning} unmountOnExit onOpenChange={handleOpenChange}>
+      <Menu.Root lazyMount open={menuOpen} positioning={positioning} unmountOnExit onOpenChange={handleOpenChange}>
         <Portal>
           <Menu.Positioner>{items}</Menu.Positioner>
         </Portal>
@@ -382,6 +406,7 @@ export const LayerGroupContextMenu = ({
         submitLabel={t('widgets.layers.actions.rename')}
         title={t('widgets.layers.actions.rename')}
         onClose={closeRename}
+        onExitComplete={handleRenameExitComplete}
         onSubmit={handleRename}
       />
     </>

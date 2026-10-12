@@ -8,8 +8,10 @@ import { useDroppable } from '@dnd-kit/core';
 import { WorkflowUiProvider } from '@features/workflow/react';
 import { createProjectGraph, projectGraphReducer } from '@features/workflow/utility';
 import { system } from '@theme/system';
+import { createInstance } from 'i18next';
 import { act, useCallback, useMemo, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { I18nextProvider } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
@@ -91,6 +93,14 @@ vi.mock('@features/workflow/react', async (importOriginal) => ({
     selector({ error: null, status: 'loaded', templates: { entry: entryTemplate } }),
 }));
 
+// Provided only where a test reads translated copy; the field-entry harness still reads raw keys.
+const i18n = createInstance();
+await i18n.init({
+  interpolation: { escapeValue: false },
+  lng: 'en',
+  resources: { en: { translation: await fetch('/locales/en.json').then((response) => response.json()) } },
+});
+
 describe('Workflow Linear panel mode toggle', () => {
   let host: HTMLDivElement;
   let root: Root;
@@ -159,6 +169,10 @@ describe('Workflow Linear panel mode toggle', () => {
 describe('Form builder drag and drop (dnd-kit)', () => {
   let host: HTMLDivElement;
   let root: Root;
+  const HEADING = i18n.t('widgets.workflow.formBuilder.elements.heading');
+  const DIVIDER = i18n.t('widgets.workflow.formBuilder.elements.divider');
+  const COLUMN_CONTAINER = i18n.t('widgets.workflow.formBuilder.elements.containerColumn');
+  const EMPTY_CONTAINER_HINT = i18n.t('widgets.workflow.formBuilder.containerEmpty');
 
   beforeEach(() => {
     host = document.createElement('div');
@@ -199,9 +213,11 @@ describe('Form builder drag and drop (dnd-kit)', () => {
     );
 
     return (
-      <WorkflowUiProvider adapter={adapter}>
-        <FormBuilderTab projectGraph={projectGraph} />
-      </WorkflowUiProvider>
+      <I18nextProvider i18n={i18n}>
+        <WorkflowUiProvider adapter={adapter}>
+          <FormBuilderTab projectGraph={projectGraph} />
+        </WorkflowUiProvider>
+      </I18nextProvider>
     );
   };
 
@@ -306,30 +322,30 @@ describe('Form builder drag and drop (dnd-kit)', () => {
 
     // Drag 1: "Field A" (a heading) into the empty container's drop zone.
     const emptyHint = [...host.querySelectorAll<HTMLElement>('*')].find(
-      (element) => element.textContent === 'Empty container — drag elements here'
+      (element) => element.textContent === EMPTY_CONTAINER_HINT
     );
 
     expect(emptyHint).toBeDefined();
 
     const dropZoneRect = emptyHint!.getBoundingClientRect();
 
-    await dragTo('Heading', dropZoneRect.left + dropZoneRect.width / 2, dropZoneRect.top + dropZoneRect.height / 2);
+    await dragTo(HEADING, dropZoneRect.left + dropZoneRect.width / 2, dropZoneRect.top + dropZoneRect.height / 2);
 
-    const containerContent = cardContentFor('Container (column)');
+    const containerContent = cardContentFor(COLUMN_CONTAINER);
 
-    expect(containerContent.textContent).toContain('Heading');
-    expect(containerContent.textContent).not.toContain('Empty container');
+    expect(containerContent.textContent).toContain(HEADING);
+    expect(containerContent.textContent).not.toContain(EMPTY_CONTAINER_HINT);
 
     // Immediately drag again after reparenting to catch lost completion state from the remounted source.
-    const headingCardRect = titleBarFor('Heading').parentElement!.getBoundingClientRect();
+    const headingCardRect = titleBarFor(HEADING).parentElement!.getBoundingClientRect();
 
-    await dragTo('Divider', headingCardRect.left + headingCardRect.width / 2, headingCardRect.bottom - 2);
+    await dragTo(DIVIDER, headingCardRect.left + headingCardRect.width / 2, headingCardRect.bottom - 2);
 
     // The divider moved into the container, next to the heading.
-    const containerContentAfter = cardContentFor('Container (column)');
+    const containerContentAfter = cardContentFor(COLUMN_CONTAINER);
 
-    expect(containerContentAfter.textContent).toContain('Heading');
-    expect(containerContentAfter.textContent).toContain('Divider');
+    expect(containerContentAfter.textContent).toContain(HEADING);
+    expect(containerContentAfter.textContent).toContain(DIVIDER);
 
     // No card is left stuck at the mid-drag 40% opacity.
     const opacities = [...host.querySelectorAll<HTMLElement>('*')].map((element) => getComputedStyle(element).opacity);
@@ -342,34 +358,34 @@ describe('Form builder drag and drop (dnd-kit)', () => {
     await renderHarness();
 
     const emptyHint = [...host.querySelectorAll<HTMLElement>('*')].find(
-      (element) => element.textContent === 'Empty container — drag elements here'
+      (element) => element.textContent === EMPTY_CONTAINER_HINT
     );
 
     expect(emptyHint).toBeDefined();
 
     const dropZoneRect = emptyHint!.getBoundingClientRect();
 
-    await dragToWithKeyboard('Heading', dropZoneRect.top + dropZoneRect.height / 2);
+    await dragToWithKeyboard(HEADING, dropZoneRect.top + dropZoneRect.height / 2);
 
-    const containerContent = cardContentFor('Container (column)');
+    const containerContent = cardContentFor(COLUMN_CONTAINER);
 
-    expect(containerContent.textContent).toContain('Heading');
-    expect(containerContent.textContent).not.toContain('Empty container');
+    expect(containerContent.textContent).toContain(HEADING);
+    expect(containerContent.textContent).not.toContain(EMPTY_CONTAINER_HINT);
   });
 
   /** Test keyboard edge targeting separately from container drops to exercise the translated-card-center fallback. */
   it('reorders a form element above a sibling with the keyboard', async () => {
     await renderHarness();
 
-    const headingCardRect = titleBarFor('Heading').parentElement!.getBoundingClientRect();
+    const headingCardRect = titleBarFor(HEADING).parentElement!.getBoundingClientRect();
 
-    await dragToWithKeyboard('Divider', headingCardRect.top + headingCardRect.height * 0.25);
+    await dragToWithKeyboard(DIVIDER, headingCardRect.top + headingCardRect.height * 0.25);
 
     const leafElements = [...host.querySelectorAll<HTMLElement>('*')].filter(
       (element) => element.children.length === 0
     );
-    const dividerIndex = leafElements.findIndex((element) => element.textContent?.trim() === 'Divider');
-    const headingIndex = leafElements.findIndex((element) => element.textContent?.trim() === 'Heading');
+    const dividerIndex = leafElements.findIndex((element) => element.textContent?.trim() === DIVIDER);
+    const headingIndex = leafElements.findIndex((element) => element.textContent?.trim() === HEADING);
 
     expect(dividerIndex).toBeGreaterThanOrEqual(0);
     expect(headingIndex).toBeGreaterThanOrEqual(0);
@@ -389,7 +405,7 @@ describe('Form builder drag and drop (dnd-kit)', () => {
 
     // Capture the empty hint's rect before drag changes its text to Drop here.
     const emptyHint = [...host.querySelectorAll<HTMLElement>('*')].find(
-      (element) => element.textContent === 'Empty container — drag elements here'
+      (element) => element.textContent === EMPTY_CONTAINER_HINT
     );
 
     expect(emptyHint).toBeDefined();
@@ -398,7 +414,7 @@ describe('Form builder drag and drop (dnd-kit)', () => {
     const midX = dropZoneRect.left + dropZoneRect.width / 2;
     const midY = dropZoneRect.top + dropZoneRect.height / 2;
 
-    const handle = titleBarFor('Heading');
+    const handle = titleBarFor(HEADING);
     const startRect = handle.getBoundingClientRect();
     const startX = startRect.left + startRect.width / 2;
     const startY = startRect.top + startRect.height / 2;
@@ -640,5 +656,77 @@ describe('Linear form field entry', () => {
     expect(listRow(1).getAttribute('aria-invalid')).toBeNull();
     expect(listRow(1).getAttribute('data-invalid')).toBeNull();
     expect(listRow(2).getAttribute('aria-invalid')).toBeNull();
+  });
+});
+
+const emptyStateOpen = vi.fn();
+const EMPTY_STATE_ADAPTER = {
+  commands: { editGraph: vi.fn(), redo: vi.fn(), undo: vi.fn() },
+  project: TEST_PROJECT_PORT,
+  widgets: { open: emptyStateOpen, patchValues: vi.fn() },
+} as unknown as WorkflowUiAdapter;
+const EMPTY_GRAPH = createProjectGraph('empty-form');
+
+describe('Workflow form empty states', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    emptyStateOpen.mockClear();
+    host = document.createElement('div');
+    // Well under the side panel's 350px minimum: the copy must wrap rather than widen the panel.
+    host.style.width = '200px';
+    document.body.append(host);
+    root = createRoot(host);
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+  });
+
+  const renderEmpty = async (View: typeof LinearFormView) => {
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <I18nextProvider i18n={i18n}>
+            <WorkflowUiProvider adapter={EMPTY_STATE_ADAPTER}>
+              <View projectGraph={EMPTY_GRAPH} />
+            </WorkflowUiProvider>
+          </I18nextProvider>
+        </ChakraProvider>
+      );
+    });
+  };
+
+  const overflowingElements = () =>
+    [host, ...host.querySelectorAll<HTMLElement>('*')].filter((element) => element.scrollWidth > element.clientWidth);
+
+  it('tells a View-mode user what the form is for and opens the workflow editor to add fields', async () => {
+    await renderEmpty(LinearFormView);
+    const button = [...host.querySelectorAll('button')].find(
+      (candidate) => candidate.textContent === 'Open workflow editor'
+    );
+
+    expect(host.textContent).toContain(
+      "This form collects the workflow's key fields as simple controls. Pin fields on nodes in the workflow editor to add them here."
+    );
+    expect(host.textContent).not.toMatch(/legacy|linear/i);
+    expect(button).toBeDefined();
+    expect(overflowingElements()).toEqual([]);
+
+    await act(() => userEvent.click(button!));
+
+    expect(emptyStateOpen).toHaveBeenCalledExactlyOnceWith({ region: 'center', widgetId: 'workflow' });
+  });
+
+  it('tells a form builder how to add and arrange fields', async () => {
+    await renderEmpty(FormBuilderTab);
+
+    expect(host.textContent).toContain(
+      'The form is empty. Pin fields on nodes in the workflow editor to add them here, then drag cards by their title bars to arrange them.'
+    );
+    expect([...host.querySelectorAll('button')].map((button) => button.textContent)).toEqual(['Add form element']);
+    expect(overflowingElements()).toEqual([]);
   });
 });

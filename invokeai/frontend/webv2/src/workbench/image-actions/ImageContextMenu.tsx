@@ -10,11 +10,13 @@ import {
   legacyGeneratedImageToGalleryItem,
   toGalleryItemKey,
 } from '@features/gallery';
+import { getGalleryBoardDestinationGroups, getGalleryBoardLabel } from '@features/gallery/contracts';
 import { MenuContent, MenuIconItem } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
+import { useProjectLibrarySelector } from '@workbench/projects/library';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
-import { useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { useActiveProjectId, useActiveProjectName, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import {
   ClapperboardIcon,
   AsteriskIcon,
@@ -266,6 +268,7 @@ const GalleryItemContextMenuContent = ({
             {isBulk ? (
               <BulkItemMenuItems
                 actions={actions}
+                allStarred={target.allStarred}
                 boards={boards}
                 itemRefs={target.itemRefs}
                 loadedItems={target.items}
@@ -514,6 +517,7 @@ const SingleItemMenuItems = ({
 
 const BulkItemMenuItems = ({
   actions,
+  allStarred: knownAllStarred,
   boards,
   itemRefs,
   loadedItems,
@@ -521,13 +525,15 @@ const BulkItemMenuItems = ({
   onRequestDeletion,
 }: {
   actions: ImageActions;
+  allStarred: boolean | undefined;
   boards: GalleryBoard[];
   itemRefs: GalleryItemRef[];
   loadedItems: GalleryItem[];
   primaryItem: GalleryItem;
   onRequestDeletion: (itemRefs: GalleryItemRef[]) => void;
 }) => {
-  const allStarred = loadedItems.length === itemRefs.length && loadedItems.every((item) => item.starred);
+  const allStarred =
+    knownAllStarred ?? (loadedItems.length === itemRefs.length && loadedItems.every((item) => item.starred));
   const handleOpenInNewTab = useCallback(() => actions.openItemInNewTab(primaryItem), [actions, primaryItem]);
   const handleOpenPreview = useCallback(() => actions.openItemInPreview(primaryItem), [actions, primaryItem]);
   const handleToggleStarred = useCallback(
@@ -546,7 +552,7 @@ const BulkItemMenuItems = ({
 
   return (
     <>
-      <Text color="fg.subtle" fontSize="2xs" fontWeight="700" px="3" py="1.5" textTransform="uppercase">
+      <Text color="fg.subtle" fontSize="xs" fontWeight="700" px="3" py="1.5" textTransform="uppercase">
         {itemRefs.length} items selected
       </Text>
       <Menu.Separator borderColor="border.subtle" />
@@ -827,6 +833,7 @@ const SingleImageMenuItems = ({
         />
       </ContextSubMenu>
       <Menu.Separator borderColor="border.subtle" />
+      <CanvasDestinationMenuItems actions={actions} images={images} isBulk={false} />
       <ContextMenuItem icon={ScanIcon} label="Send to Upscale" value="send-to-upscale" onClick={handleSendToUpscale} />
       <ContextMenuItem
         icon={ClapperboardIcon}
@@ -856,7 +863,6 @@ const SingleImageMenuItems = ({
         onClick={handleSelectForCompare}
       />
       <Menu.Separator borderColor="border.subtle" />
-      <NewFromImageSubMenu actions={actions} images={images} isBulk={false} />
       <FindInGalleryMenuItem itemRef={imageItemRef} />
       <ChangeBoardSubMenu boards={boards} currentBoardId={image.boardId} onMove={handleMove} />
       <Menu.Separator borderColor="border.subtle" />
@@ -947,9 +953,11 @@ const BulkMenuItems = ({
 
   return (
     <>
-      <Text color="fg.subtle" fontSize="2xs" fontWeight="700" px="3" py="1.5" textTransform="uppercase">
+      <Text color="fg.subtle" fontSize="xs" fontWeight="700" px="3" py="1.5" textTransform="uppercase">
         {images.length} images selected
       </Text>
+      <Menu.Separator borderColor="border.subtle" />
+      <CanvasDestinationMenuItems actions={actions} images={images} isBulk />
       <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem
         icon={StarIcon}
@@ -964,7 +972,6 @@ const BulkMenuItems = ({
         value="download-selection"
         onClick={handleDownload}
       />
-      <NewFromImageSubMenu actions={actions} images={images} isBulk />
       <ChangeBoardSubMenu boards={boards} currentBoardId={null} onMove={handleMove} />
       <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem
@@ -978,31 +985,8 @@ const BulkMenuItems = ({
   );
 };
 
-const NewFromImageSubMenu = ({
-  actions,
-  images,
-  isBulk,
-}: {
-  actions: ImageActions;
-  images: GalleryImage[];
-  isBulk: boolean;
-}) => {
-  const { t } = useTranslation();
-  const handleNewCanvas = useCallback(() => void actions.createCanvasFromImages(images), [actions, images]);
-  return (
-    <ContextSubMenu icon={FileImageIcon} label={t('widgets.canvas.import.newFromImage', { count: images.length })}>
-      <ContextMenuItem
-        icon={FileImageIcon}
-        label={t('widgets.canvas.import.newCanvasFromImage', { count: images.length })}
-        value="new-canvas-from-image"
-        onClick={handleNewCanvas}
-      />
-      <GalleryCanvasImportSubMenu actions={actions} images={images} isBulk={isBulk} />
-    </ContextSubMenu>
-  );
-};
-
-const GalleryCanvasImportSubMenu = ({
+/** The open project's canvas leads; starting a separate project from the images is the explicit alternative. */
+const CanvasDestinationMenuItems = ({
   actions,
   images,
   isBulk,
@@ -1013,13 +997,27 @@ const GalleryCanvasImportSubMenu = ({
 }) => {
   const { t } = useTranslation();
   const items = getGalleryCanvasImportMenuItems(isBulk);
+  const handleNewProject = useCallback(() => void actions.createCanvasFromImages(images), [actions, images]);
 
   return (
-    <ContextSubMenu icon={LayersIcon} label={t('widgets.canvas.import.newLayerFromImage', { count: images.length })}>
-      {items.map((item) => (
-        <GalleryCanvasImportDestinationMenuItem key={item.destination} actions={actions} images={images} item={item} />
-      ))}
-    </ContextSubMenu>
+    <>
+      <ContextSubMenu icon={LayersIcon} label={t('widgets.canvas.import.addToCurrentCanvas')}>
+        {items.map((item) => (
+          <GalleryCanvasImportDestinationMenuItem
+            key={item.destination}
+            actions={actions}
+            images={images}
+            item={item}
+          />
+        ))}
+      </ContextSubMenu>
+      <ContextMenuItem
+        icon={FileImageIcon}
+        label={t('widgets.canvas.import.newProjectFromImage', { count: images.length })}
+        value="new-project-from-image"
+        onClick={handleNewProject}
+      />
+    </>
   );
 };
 
@@ -1065,35 +1063,52 @@ const ChangeBoardSubMenu = ({
   currentBoardId: string | null;
   onMove: (boardId: string) => void;
 }) => {
+  const { t } = useTranslation();
+  const projectId = useActiveProjectId();
+  const projectName = useActiveProjectName();
+  const librarySummaries = useProjectLibrarySelector((snapshot) => snapshot.summaries);
   const handleRemoveFromBoard = useCallback(() => onMove('none'), [onMove]);
-  const visibleBoards = useMemo(
-    () => boards.filter((board) => board.kind === 'board' && board.id !== currentBoardId),
-    [boards, currentBoardId]
+  const groups = useMemo(
+    () =>
+      getGalleryBoardDestinationGroups({
+        boards: boards.filter((board) => board.kind === 'board' && board.id !== currentBoardId),
+        projectId,
+        projectName,
+        projectNames: new Map(librarySummaries.map((summary) => [summary.id, summary.name])),
+        t,
+      }),
+    [boards, currentBoardId, librarySummaries, projectId, projectName, t]
   );
 
   return (
-    <ContextSubMenu icon={FolderIcon} label="Change Board" scrollArea>
+    <ContextSubMenu icon={FolderIcon} label={t('widgets.gallery.changeBoard')} scrollArea>
       {currentBoardId !== 'none' && (
         <ContextMenuItem
           icon={FolderIcon}
-          label="Remove from Board"
+          label={t('widgets.gallery.removeFromBoard')}
           value="remove-from-board"
           onClick={handleRemoveFromBoard}
         />
       )}
-      {visibleBoards.map((board) => (
-        <ChangeBoardMenuItem key={board.id} board={board} onMove={onMove} />
+      {groups.map((group) => (
+        <Menu.ItemGroup key={group.id}>
+          <Menu.ItemGroupLabel>{group.label}</Menu.ItemGroupLabel>
+          {group.boards.map((board) => (
+            <ChangeBoardMenuItem key={board.id} board={board} onMove={onMove} />
+          ))}
+        </Menu.ItemGroup>
       ))}
     </ContextSubMenu>
   );
 };
 
 const ChangeBoardMenuItem = ({ board, onMove }: { board: GalleryBoard; onMove: (boardId: string) => void }) => {
+  const { t } = useTranslation();
   const handleClick = useCallback(() => onMove(board.id), [board.id, onMove]);
 
   return (
     <Menu.Item value={`move-to-${board.id}`} onClick={handleClick}>
-      <MiddleTruncate fontSize="xs" minW="0" text={board.name} />
+      <MiddleTruncate fontSize="md" minW="0" text={getGalleryBoardLabel(board, t)} />
     </Menu.Item>
   );
 };
@@ -1113,7 +1128,7 @@ const ContextSubMenu = ({
     <Menu.TriggerItem>
       <HStack gap="2" minW="0" w="full">
         <Icon as={icon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-        <Text flex="1" fontSize="xs">
+        <Text flex="1" fontSize="md">
           {label}
         </Text>
         <Icon as={ChevronRightIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
@@ -1123,7 +1138,7 @@ const ContextSubMenu = ({
       <Menu.Positioner>
         <MenuContent {...MENU_CONTENT_PROPS} maxH="18rem" overflowY={scrollArea ? undefined : 'auto'}>
           {scrollArea ? (
-            <ScrollArea.Root maxH="inherit" size="xs" variant="hover" w="full">
+            <ScrollArea.Root maxH="inherit" variant="hover" w="full">
               <ScrollArea.Viewport maxH="inherit" w="full">
                 <ScrollArea.Content>{children}</ScrollArea.Content>
               </ScrollArea.Viewport>
@@ -1161,7 +1176,7 @@ const ContextMenuItem = ({
   <Menu.Item data-danger={isDanger ? '' : undefined} disabled={disabled} value={value} onClick={onClick}>
     <HStack gap="2" minW="0" w="full">
       <Icon as={icon} boxSize="3.5" color={isDanger ? undefined : 'fg.subtle'} fill={iconFill} flexShrink={0} />
-      <Text flex="1" fontSize="xs">
+      <Text flex="1" fontSize="md">
         {label}
       </Text>
     </HStack>

@@ -37,13 +37,7 @@ export const ToolbarButton = ({
   label: string;
 } & Omit<ComponentProps<typeof IconButton>, 'aria-label' | 'aria-labelledby'>) => (
   <Tooltip content={label} positioning={TOOLBAR_TOOLTIP_POSITIONING}>
-    <IconButton
-      aria-label={label}
-      aria-pressed={isActive}
-      size="xs"
-      variant={isActive ? 'solid' : 'ghost'}
-      {...buttonProps}
-    >
+    <IconButton aria-label={label} aria-pressed={isActive} variant={isActive ? 'solid' : 'ghost'} {...buttonProps}>
       <Icon as={icon} boxSize="3.5" />
     </IconButton>
   </Tooltip>

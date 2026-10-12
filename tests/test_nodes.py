@@ -97,6 +97,20 @@ class AnyTypeTestInvocation(BaseInvocation):
         return AnyTypeTestInvocationOutput(value=self.value)
 
 
+@invocation_output("test_fixed_collection_output")
+class FixedCollectionTestInvocationOutput(BaseInvocationOutput):
+    condition: bool = OutputField()
+    collection: list[Any] = OutputField()
+
+
+@invocation("test_fixed_collection", version="1.0.0")
+class FixedCollectionTestInvocation(BaseInvocation):
+    value: Any = InputField()
+
+    def invoke(self, context: InvocationContext) -> FixedCollectionTestInvocationOutput:
+        return FixedCollectionTestInvocationOutput(condition=bool(self.value), collection=[0, 1])
+
+
 @invocation("test_marked_any", version="1.0.0")
 class MarkedAnyTypeTestInvocation(AnyTypeTestInvocation):
     marker: str = InputField(default="")

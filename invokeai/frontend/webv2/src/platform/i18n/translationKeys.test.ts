@@ -29,6 +29,11 @@ const flattenCatalog = (value: unknown, prefix = '', keys = new Set<string>()): 
     const path = prefix ? `${prefix}.${segment}` : segment;
 
     if (typeof child === 'object' && child !== null) {
+      // An array is read whole with `t('x', { returnObjects: true })`, so its own path is a key too.
+      if (Array.isArray(child)) {
+        keys.add(path);
+      }
+
       flattenCatalog(child, path, keys);
       continue;
     }

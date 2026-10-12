@@ -1,7 +1,7 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { OrphanedModelInfo } from '@features/models/core/types';
 
-import { Checkbox, Dialog, Flex, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
+import { Checkbox, Flex, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import { deleteOrphanedModels, getOrphanedModels } from '@features/models/data/api';
 import { refreshModels } from '@features/models/data/modelsStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
@@ -16,12 +16,22 @@ import {
 } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, CloseButton } from '@platform/ui/Button';
+import { Dialog } from '@platform/ui/Dialog';
 import { Panel } from '@platform/ui/Panel';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /** Rescan after partial orphan deletion and keep the dialog open for retrying remaining paths. */
-export const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
+export const OrphanedModelsDialog = ({
+  isOpen,
+  onClose,
+  onExitComplete,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  /** After the close animation; the host releases the retained dialog here. */
+  onExitComplete: () => void;
+}) => {
   const { t } = useTranslation();
   const notify = useNotify();
   const [orphans, setOrphans] = useState<OrphanedModelInfo[] | null>(null);
@@ -105,9 +115,10 @@ export const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
 
   return (
     <Dialog.Root
-      open
+      open={isOpen}
       scrollBehavior="inside"
       size="md"
+      onExitComplete={onExitComplete}
       onOpenChange={(event) => {
         if (!event.open) {
           onClose();
@@ -126,15 +137,15 @@ export const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
             </Dialog.Header>
             <Dialog.Body>
               {loadError ? (
-                <Text color="fg.error" fontSize="xs" py="4">
+                <Text color="fg.error" fontSize="md" py="4">
                   {loadError}
                 </Text>
               ) : orphans === null ? (
                 <Flex align="center" justify="center" py="8">
-                  <Spinner color="fg.subtle" size="sm" />
+                  <Spinner color="fg.subtle" size="lg" />
                 </Flex>
               ) : orphans.length === 0 ? (
-                <Text color="fg.muted" fontSize="xs" py="4" textAlign="center">
+                <Text color="fg.muted" fontSize="md" py="4" textAlign="center">
                   {t('models.noOrphaned')}
                 </Text>
               ) : (
@@ -145,7 +156,6 @@ export const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
                     }
                     colorPalette="accent"
                     ps="2"
-                    size="sm"
                     onCheckedChange={() => {
                       setSelectedPaths(
                         selectedPaths.size === orphans.length
@@ -156,7 +166,7 @@ export const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
                   >
                     <Checkbox.HiddenInput />
                     <Checkbox.Control />
-                    <Checkbox.Label color="fg.muted" fontSize="2xs">
+                    <Checkbox.Label color="fg.muted" fontSize="xs">
                       {t('models.selectAllCount', { count: orphans.length })}
                     </Checkbox.Label>
                   </Checkbox.Root>
@@ -165,17 +175,16 @@ export const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
                       <Checkbox.Root
                         checked={selectedPaths.has(orphan.path)}
                         colorPalette="accent"
-                        size="sm"
                         onCheckedChange={() => togglePath(orphan.path)}
                       >
                         <Checkbox.HiddenInput />
                         <Checkbox.Control />
                       </Checkbox.Root>
                       <Stack flex="1" gap="0" minW="0">
-                        <Text fontSize="2xs" fontWeight="600" overflowWrap="anywhere">
+                        <Text fontSize="xs" fontWeight="600" overflowWrap="anywhere">
                           {orphan.path}
                         </Text>
-                        <Text color="fg.subtle" fontSize="2xs">
+                        <Text color="fg.subtle" fontSize="xs">
                           {t('models.fileCount', { count: orphan.files.length })} · {formatBytes(orphan.size_bytes)}
                         </Text>
                       </Stack>
@@ -185,14 +194,13 @@ export const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
               )}
             </Dialog.Body>
             <Dialog.Footer>
-              <Button disabled={isDeleting} size="xs" variant="ghost" onClick={onClose}>
+              <Button disabled={isDeleting} variant="ghost" onClick={onClose}>
                 {t('common.close')}
               </Button>
               <Button
                 colorPalette="red"
                 disabled={selectedPaths.size === 0 || !orphans || orphans.length === 0}
                 loading={isDeleting}
-                size="xs"
                 variant="solid"
                 onClick={() => void handleDelete()}
               >

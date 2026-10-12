@@ -2,16 +2,57 @@ import type { Rect } from '@xyflow/react';
 
 import { downloadBlob } from '@platform/browser/downloadBlob';
 
+import { rasterizeWorkflowImage } from './workflowImageRaster';
+
 const WORKFLOW_GRID_SIZE = 25;
 
 export const EXPORT_PADDING = 100;
 export const EXPORT_SCALE = 2;
 export const WORKFLOW_EXPORT_TIMEOUT_MS = 30_000;
 export const WORKFLOW_EXPORT_IMAGE_TIMEOUT_MS = 5_000;
-const WORKFLOW_EXPORT_IMAGE_PLACEHOLDER = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
-// html-to-image has no abort signal; bound captures that remain active after their caller times out.
+export const WORKFLOW_EXPORT_LAYOUT_TIMEOUT_MS = 5_000;
+// A capture cannot be interrupted, so bound how many may still be running after their callers timed out.
 const MAX_ACTIVE_WORKFLOW_RASTERIZATIONS = 2;
 let activeWorkflowRasterizations = 0;
+
+export type WorkflowImageExportLimits = {
+  /** Output pixels (width x height). */
+  maxPixels: number;
+  /** Output pixels on either side. */
+  maxSide: number;
+  /** Below this many output pixels per workflow pixel the export is refused rather than shrunk further. */
+  minScale: number;
+};
+
+/**
+ * Application headroom, not a browser guarantee: engines reject canvases above 268,435,456 px (Chromium, desktop
+ * WebKit), 67,108,864 px (iOS WebKit) or 65,535 px per side, and can fail to allocate well below that. A capture holds
+ * several output-sized RGBA surfaces at once (the decoded SVG page, the canvas and its PNG snapshot); 32 MiP is half
+ * the smallest engine area check and keeps each surface at 128 MiB. 16,384 px per side is a conservative application
+ * choice, html-to-image's own heuristic, well under the engines' side checks. At 0.5x a workflow reads like the editor
+ * at 50% zoom; below that field text stops being legible, so the image would no longer document the workflow.
+ */
+const WORKFLOW_IMAGE_EXPORT_LIMITS: WorkflowImageExportLimits = {
+  maxPixels: 2 ** 25,
+  maxSide: 16_384,
+  minScale: 0.5,
+};
+
+export type WorkflowImageExportPlan = {
+  /** Padded workflow size in layout pixels. */
+  width: number;
+  height: number;
+  /** Output pixels per layout pixel: `EXPORT_SCALE` unless the budget requires less. */
+  scale: number;
+  outputWidth: number;
+  outputHeight: number;
+};
+
+export type WorkflowImageExportOutcome =
+  /** `reduced`: the image is smaller than the editor's 1:1 layout, which is worth telling the user. */
+  | { status: 'exported'; reduced: boolean; width: number; height: number }
+  | { status: 'busy' | 'canceled' | 'too-large' };
+
 export const EXPORT_STYLE_PROPERTIES = [
   'box-sizing',
   'display',
@@ -122,20 +163,6 @@ export const SVG_EXPORT_STYLE_PROPERTIES = [
   'mask',
 ] as const;
 
-type WorkflowImageDimensions = {
-  width: number;
-  height: number;
-  canvasWidth: number;
-  canvasHeight: number;
-};
-
-const getPaddedWorkflowBounds = (bounds: Rect): Rect => ({
-  x: bounds.x - EXPORT_PADDING,
-  y: bounds.y - EXPORT_PADDING,
-  width: bounds.width + EXPORT_PADDING * 2,
-  height: bounds.height + EXPORT_PADDING * 2,
-});
-
 type WorkflowContentBoundsOptions = {
   includeInputFieldLabels?: boolean;
 };
@@ -231,39 +258,54 @@ export const getWorkflowContentBounds = (
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 };
 
-export const getWorkflowImageDimensions = (bounds: Rect): WorkflowImageDimensions => {
-  const paddedBounds = getPaddedWorkflowBounds(bounds);
+/**
+ * Chooses the largest scale up to `EXPORT_SCALE` that keeps the output within `limits`, or null when even
+ * `limits.minScale` does not fit. The capture renders its SVG page and canvas at the output size, so this bounds every
+ * raster surface; the serialized SVG data URL grows with the DOM and embedded images instead, and is not bounded here.
+ */
+export const planWorkflowImageExport = (
+  bounds: Rect,
+  limits: WorkflowImageExportLimits = WORKFLOW_IMAGE_EXPORT_LIMITS
+): WorkflowImageExportPlan | null => {
+  const width = Math.max(1, Math.ceil(bounds.width + EXPORT_PADDING * 2));
+  const height = Math.max(1, Math.ceil(bounds.height + EXPORT_PADDING * 2));
+  if (!Number.isFinite(width) || !Number.isFinite(height)) {
+    throw new RangeError('Workflow image bounds are not finite');
+  }
 
-  const width = Math.max(1, Math.ceil(paddedBounds.width));
-  const height = Math.max(1, Math.ceil(paddedBounds.height));
+  const scale = Math.min(
+    EXPORT_SCALE,
+    limits.maxSide / width,
+    limits.maxSide / height,
+    Math.sqrt(limits.maxPixels / (width * height))
+  );
+  if (scale < limits.minScale) {
+    return null;
+  }
 
-  const canvasWidth = width * EXPORT_SCALE;
-  const canvasHeight = height * EXPORT_SCALE;
-
-  return { width, height, canvasWidth, canvasHeight };
+  // Rounding down keeps both sides and their product within the limits.
+  return {
+    width,
+    height,
+    scale,
+    outputWidth: Math.max(1, Math.floor(width * scale)),
+    outputHeight: Math.max(1, Math.floor(height * scale)),
+  };
 };
 
-export const getWorkflowExportCloneStyle = (dimensions: WorkflowImageDimensions) => ({
-  width: `${dimensions.width}px`,
-  height: `${dimensions.height}px`,
+export const getWorkflowExportCloneStyle = (plan: WorkflowImageExportPlan) => ({
+  width: `${plan.width}px`,
+  height: `${plan.height}px`,
   position: 'relative',
   left: '0',
   top: '0',
   pointerEvents: 'none',
 });
 
-export const getWorkflowExportOptions = (dimensions: WorkflowImageDimensions, backgroundColor: string) => ({
-  width: dimensions.width,
-  height: dimensions.height,
-  canvasWidth: dimensions.canvasWidth,
-  canvasHeight: dimensions.canvasHeight,
-  backgroundColor,
-  pixelRatio: 1,
-  skipAutoScale: true,
-  includeStyleProperties: [...EXPORT_STYLE_PROPERTIES],
-  imagePlaceholder: WORKFLOW_EXPORT_IMAGE_PLACEHOLDER,
-  onImageErrorHandler: () => WORKFLOW_EXPORT_IMAGE_PLACEHOLDER,
-  skipFonts: false,
+/** Lays the clone out at workflow size and paints it at output size, so scaling never reflows labels. */
+const getWorkflowExportCaptureStyles = (plan: WorkflowImageExportPlan) => ({
+  root: { width: `${plan.outputWidth}px`, height: `${plan.outputHeight}px`, overflow: 'hidden' },
+  clone: { transform: `scale(${plan.scale})`, transformOrigin: '0 0' },
 });
 
 export const getWorkflowSvgExportStyles = (computedStyle: Pick<CSSStyleDeclaration, 'getPropertyValue'>) =>
@@ -291,12 +333,12 @@ const setExportElementStyle = (element: HTMLElement | SVGElement, property: stri
   element.style.setProperty(property, value, 'important');
 };
 
-export const getWorkflowExportStagingStyle = (dimensions: WorkflowImageDimensions) => ({
+export const getWorkflowExportStagingStyle = (plan: WorkflowImageExportPlan) => ({
   position: 'fixed',
   left: '-100000px',
   top: '0',
-  width: `${dimensions.width}px`,
-  height: `${dimensions.height}px`,
+  width: `${plan.width}px`,
+  height: `${plan.height}px`,
   pointerEvents: 'none',
 });
 
@@ -398,7 +440,7 @@ const namespaceWorkflowExportIds = (clone: HTMLElement) => {
   });
 };
 
-const prepareExportClone = (clone: HTMLElement, bounds: Rect, dimensions: WorkflowImageDimensions) => {
+const prepareExportClone = (clone: HTMLElement, bounds: Rect, plan: WorkflowImageExportPlan) => {
   const root = clone.matches('.react-flow') ? clone : clone.querySelector<HTMLElement>('.react-flow');
   const viewport = clone.querySelector<HTMLElement>('.react-flow__viewport');
   if (!root || !viewport) {
@@ -410,10 +452,10 @@ const prepareExportClone = (clone: HTMLElement, bounds: Rect, dimensions: Workfl
     y: EXPORT_PADDING - bounds.y,
   };
 
-  Object.assign(clone.style, getWorkflowExportCloneStyle(dimensions));
+  Object.assign(clone.style, getWorkflowExportCloneStyle(plan));
 
-  root.style.width = `${dimensions.width}px`;
-  root.style.height = `${dimensions.height}px`;
+  root.style.width = `${plan.width}px`;
+  root.style.height = `${plan.height}px`;
   setExportElementStyle(root, 'background-color', 'var(--xy-background-color)');
   viewport.style.transform = `translate(${translation.x}px, ${translation.y}px) scale(1)`;
   setBackgroundGridForExport(root, translation);
@@ -477,39 +519,82 @@ const prepareExportClone = (clone: HTMLElement, bounds: Rect, dimensions: Workfl
   });
 };
 
-const toBlobWithTimeout = async (clone: HTMLElement, options: ReturnType<typeof getWorkflowExportOptions>) => {
-  if (activeWorkflowRasterizations >= MAX_ACTIVE_WORKFLOW_RASTERIZATIONS) {
-    throw new Error('A previous workflow image export is still running');
-  }
-
-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
-  let timedOut = false;
+/** Holds a rasterization slot until the capture itself settles, which can be long after its caller timed out. */
+const rasterizeWithTimeout = async (
+  captureRoot: HTMLElement,
+  plan: WorkflowImageExportPlan,
+  backgroundColor: string
+): Promise<Blob> => {
+  const controller = new AbortController();
   activeWorkflowRasterizations += 1;
   const releaseRasterizationSlot = () => {
     activeWorkflowRasterizations -= 1;
   };
-  const rasterize = import('html-to-image').then(({ toBlob }) => (timedOut ? null : toBlob(clone, options)));
-  void rasterize.then(releaseRasterizationSlot, releaseRasterizationSlot);
+  const capture = rasterizeWorkflowImage(captureRoot, {
+    backgroundColor,
+    height: plan.outputHeight,
+    signal: controller.signal,
+    styleProperties: EXPORT_STYLE_PROPERTIES,
+    width: plan.outputWidth,
+  });
+  void capture.then(releaseRasterizationSlot, releaseRasterizationSlot);
 
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
-      rasterize,
+      capture,
       new Promise<never>((_, reject) => {
         timeoutId = setTimeout(() => {
-          timedOut = true;
+          // Skips the capture's remaining stages; work already running cannot be interrupted.
+          controller.abort();
           reject(new Error(`Workflow image export timed out after ${WORKFLOW_EXPORT_TIMEOUT_MS} ms`));
         }, WORKFLOW_EXPORT_TIMEOUT_MS);
       }),
     ]);
   } finally {
-    if (timeoutId !== undefined) {
-      clearTimeout(timeoutId);
-    }
+    clearTimeout(timeoutId);
   }
 };
 
 const downloadPng = (blob: Blob, workflowName: string, fallbackWorkflowName: string) => {
   downloadBlob(blob, `${sanitizeWorkflowImageFilename(workflowName, fallbackWorkflowName)}.png`);
+};
+
+/**
+ * React Flow keeps a freshly mounted node hidden until it has measured it, so a capture taken earlier omits it. The
+ * export view mounts just before capture, and measurement waits for a rendered frame. A zero-size node is never
+ * measured and paints nothing, and a removed node no longer matters, so neither is waited for.
+ */
+const waitForMeasuredNodes = (flowElement: HTMLElement): Promise<boolean> => {
+  // A removed node measures 0 x 0 too.
+  const isPending = (node: HTMLElement) => {
+    if (node.style.visibility !== 'hidden') {
+      return false;
+    }
+    const rect = node.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  };
+  let pending = Array.from(flowElement.querySelectorAll<HTMLElement>('.react-flow__node')).filter(isPending);
+  if (!pending.length) {
+    return Promise.resolve(true);
+  }
+
+  return new Promise((resolve) => {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const observer = new MutationObserver(() => {
+      pending = pending.filter(isPending);
+      if (!pending.length) {
+        observer.disconnect();
+        clearTimeout(timeoutId);
+        resolve(true);
+      }
+    });
+    observer.observe(flowElement, { attributeFilter: ['style'], attributes: true, childList: true, subtree: true });
+    timeoutId = setTimeout(() => {
+      observer.disconnect();
+      resolve(false);
+    }, WORKFLOW_EXPORT_LAYOUT_TIMEOUT_MS);
+  });
 };
 
 const SOURCE_IMAGE_SELECTOR = '[data-workflow-export-field-value="true"] img';
@@ -550,81 +635,174 @@ const decodeSourceImages = async (flowElement: HTMLElement): Promise<Map<HTMLIma
   }
 };
 
-const replaceFailedSourceImages = (
+const replaceWithAltText = (image: HTMLImageElement) => {
+  const fallback = document.createElement('span');
+  fallback.textContent = image.alt;
+  fallback.style.overflowWrap = 'anywhere';
+  fallback.style.maxWidth = '100%';
+  image.replaceWith(fallback);
+};
+
+const readAsDataUrl = (blob: Blob) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error ?? new Error('Workflow image source could not be read'));
+    reader.readAsDataURL(blob);
+  });
+
+const embedImageBytes = async (image: HTMLImageElement, signal: AbortSignal) => {
+  const response = await fetch(image.src, { signal });
+  if (!response.ok) {
+    throw new Error(`Workflow image source returned ${response.status}`);
+  }
+  image.src = await readAsDataUrl(await response.blob());
+  await image.decode();
+};
+
+/**
+ * Inlines decoded source images into the clone before html-to-image sees them, because its own embedding keeps every
+ * fetched image in a module cache for the rest of the session. An image that did not decode, or whose bytes are not
+ * fetched, read and decoded again within the image timeout, becomes its alt text so it can neither hang nor fail the
+ * export; work still running past the timeout is abandoned.
+ */
+const embedSourceImages = async (
   flowElement: HTMLElement,
   clone: HTMLElement,
   decoded: Map<HTMLImageElement, string>
 ) => {
   const sourceImages = flowElement.querySelectorAll<HTMLImageElement>(SOURCE_IMAGE_SELECTOR);
-  clone.querySelectorAll<HTMLImageElement>(SOURCE_IMAGE_SELECTOR).forEach((image, index) => {
-    const original = sourceImages[index];
-    if (original && decoded.get(original) === original.src && original.src === image.src) {
-      return;
-    }
-    const fallback = document.createElement('span');
-    fallback.textContent = image.alt;
-    fallback.style.overflowWrap = 'anywhere';
-    fallback.style.maxWidth = '100%';
-    image.replaceWith(fallback);
+  const controller = new AbortController();
+  const timedOut = new Promise<never>((_, reject) => {
+    controller.signal.addEventListener('abort', () => reject(new Error('Workflow image source timed out')), {
+      once: true,
+    });
   });
+  // Observed by each image's race; this only keeps a timeout with no image left racing from going unhandled.
+  timedOut.catch(() => undefined);
+  const timeoutId = setTimeout(() => controller.abort(), WORKFLOW_EXPORT_IMAGE_TIMEOUT_MS);
+  try {
+    await Promise.all(
+      Array.from(clone.querySelectorAll<HTMLImageElement>(SOURCE_IMAGE_SELECTOR)).map(async (image, index) => {
+        const original = sourceImages[index];
+        if (!original || decoded.get(original) !== original.src || original.src !== image.src) {
+          replaceWithAltText(image);
+          return;
+        }
+        if (image.src.startsWith('data:')) {
+          return;
+        }
+        try {
+          await Promise.race([embedImageBytes(image, controller.signal), timedOut]);
+        } catch {
+          replaceWithAltText(image);
+        }
+      })
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
 };
 
+/**
+ * Refuses an export before any preparation when the rasterization slots are taken or the node bounds alone exceed the
+ * budget. The caller can run this before mounting an export view; `exportWorkflowAsPng` repeats it.
+ */
+export const preflightWorkflowImageExport = (
+  bounds: Rect,
+  limits: WorkflowImageExportLimits = WORKFLOW_IMAGE_EXPORT_LIMITS
+): WorkflowImageExportOutcome | null => {
+  if (activeWorkflowRasterizations >= MAX_ACTIVE_WORKFLOW_RASTERIZATIONS) {
+    return { status: 'busy' };
+  }
+  return planWorkflowImageExport(bounds, limits) ? null : { status: 'too-large' };
+};
+
+/**
+ * Downloads the workflow as a PNG. Expected outcomes resolve; unexpected failures reject. The size budget is checked
+ * from the node bounds before any waiting, and from measured content before cloning and again before capture.
+ */
 export const exportWorkflowAsPng = async ({
   flowElement,
   bounds,
   workflowName,
   fallbackWorkflowName,
+  limits = WORKFLOW_IMAGE_EXPORT_LIMITS,
 }: {
   flowElement: HTMLElement;
   bounds: Rect;
   workflowName: string;
   fallbackWorkflowName: string;
-}): Promise<void> => {
-  if (activeWorkflowRasterizations >= MAX_ACTIVE_WORKFLOW_RASTERIZATIONS) {
-    throw new Error('A previous workflow image export is still running');
+  limits?: WorkflowImageExportLimits;
+}): Promise<WorkflowImageExportOutcome> => {
+  const refusal = preflightWorkflowImageExport(bounds, limits);
+  if (refusal) {
+    return refusal;
   }
 
-  const decoded = await decodeSourceImages(flowElement);
+  const [measured, decoded] = await Promise.all([waitForMeasuredNodes(flowElement), decodeSourceImages(flowElement)]);
   if (!flowElement.isConnected) {
-    throw new Error('Workflow image export canceled because the editor was unmounted');
+    return { status: 'canceled' };
+  }
+  if (!measured) {
+    throw new Error('Workflow nodes were not measured before export');
   }
   const contentBounds = getWorkflowContentBounds(flowElement, bounds, { includeInputFieldLabels: false });
-  const dimensions = getWorkflowImageDimensions(contentBounds);
+  const plan = planWorkflowImageExport(contentBounds, limits);
+  if (!plan) {
+    return { status: 'too-large' };
+  }
   const clone = flowElement.cloneNode(true) as HTMLElement;
   const stagingWrapper = document.createElement('div');
+  const captureRoot = document.createElement('div');
 
   try {
-    replaceFailedSourceImages(flowElement, clone, decoded);
+    await embedSourceImages(flowElement, clone, decoded);
+    if (!flowElement.isConnected) {
+      return { status: 'canceled' };
+    }
     namespaceWorkflowExportIds(clone);
-    prepareExportClone(clone, contentBounds, dimensions);
-    Object.assign(stagingWrapper.style, getWorkflowExportStagingStyle(dimensions));
-    stagingWrapper.appendChild(clone);
+    prepareExportClone(clone, contentBounds, plan);
+    Object.assign(stagingWrapper.style, getWorkflowExportStagingStyle(plan));
+    captureRoot.appendChild(clone);
+    stagingWrapper.appendChild(captureRoot);
     (flowElement.parentElement ?? document.body).appendChild(stagingWrapper);
 
     const measuredContentBounds = getWorkflowContentBounds(clone, contentBounds);
-    const measuredDimensions = getWorkflowImageDimensions(measuredContentBounds);
+    const measuredPlan = planWorkflowImageExport(measuredContentBounds, limits);
+    if (!measuredPlan) {
+      return { status: 'too-large' };
+    }
     if (
       measuredContentBounds.x !== contentBounds.x ||
       measuredContentBounds.y !== contentBounds.y ||
-      measuredDimensions.width !== dimensions.width ||
-      measuredDimensions.height !== dimensions.height
+      measuredPlan.width !== plan.width ||
+      measuredPlan.height !== plan.height
     ) {
-      prepareExportClone(clone, measuredContentBounds, measuredDimensions);
-      Object.assign(stagingWrapper.style, getWorkflowExportStagingStyle(measuredDimensions));
+      prepareExportClone(clone, measuredContentBounds, measuredPlan);
+      Object.assign(stagingWrapper.style, getWorkflowExportStagingStyle(measuredPlan));
     }
 
     inlineSvgStylesForExport(clone);
-    const blob = await toBlobWithTimeout(
-      clone,
-      getWorkflowExportOptions(measuredDimensions, getComputedStyle(clone).backgroundColor)
-    );
-    if (!blob) {
-      throw new Error('Workflow image export returned an empty Blob');
+    const backgroundColor = getComputedStyle(clone).backgroundColor;
+    // Scaled only after measuring: the bounds above are read in unscaled layout pixels.
+    const captureStyles = getWorkflowExportCaptureStyles(measuredPlan);
+    Object.assign(captureRoot.style, captureStyles.root);
+    Object.assign(clone.style, captureStyles.clone);
+    if (activeWorkflowRasterizations >= MAX_ACTIVE_WORKFLOW_RASTERIZATIONS) {
+      return { status: 'busy' };
     }
+    const blob = await rasterizeWithTimeout(captureRoot, measuredPlan, backgroundColor);
     if (!flowElement.isConnected) {
-      throw new Error('Workflow image export canceled because the editor was unmounted');
+      return { status: 'canceled' };
     }
     downloadPng(blob, workflowName, fallbackWorkflowName);
+    return {
+      status: 'exported',
+      reduced: measuredPlan.scale < 1,
+      width: measuredPlan.outputWidth,
+      height: measuredPlan.outputHeight,
+    };
   } finally {
     stagingWrapper.remove();
   }

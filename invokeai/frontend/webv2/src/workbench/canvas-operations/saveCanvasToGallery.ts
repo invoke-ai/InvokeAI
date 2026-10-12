@@ -46,7 +46,8 @@ const buildCanvasSaveMetadata = (project: Project, rect: Rect): Record<string, u
   };
 };
 
-const getCanvasSaveBoardId = (project: Project): string | undefined => {
+/** Where Canvas puts new gallery images: the project's auto-add board, or no board (Uncategorized). */
+export const getCanvasSaveBoardId = (project: Project): string | undefined => {
   const boardId = getGalleryAutoAddBoardId(getProjectWidgetValues(project, 'gallery'));
 
   return boardId !== null && boardId !== 'none' ? boardId : undefined;

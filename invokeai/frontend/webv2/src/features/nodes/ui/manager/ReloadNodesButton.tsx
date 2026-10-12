@@ -47,7 +47,7 @@ export const ReloadNodesButton = () => {
     );
 
   return (
-    <Button loading={isReloading} size="2xs" variant="ghost" onClick={() => void handleReload()}>
+    <Button loading={isReloading} size="sm" variant="ghost" onClick={() => void handleReload()}>
       <Icon as={RefreshCwIcon} boxSize="3.5" />
       {isReloading ? t('nodes.reloading') : t('common.reload')}
     </Button>

@@ -63,7 +63,7 @@ export const TriggerPhrasesEditor = ({
         blurBehavior="add"
         disabled={isSaving}
         editable
-        size="sm"
+        size="xl"
         validate={({ inputValue, value: current }) => {
           const parsed = triggerPhraseSchema.safeParse(inputValue);
 
@@ -107,7 +107,7 @@ export const TriggerPhrasesEditor = ({
         <TagsInput.HiddenInput />
       </TagsInput.Root>
       {value.length === 0 ? (
-        <Text color="fg.subtle" fontSize="2xs">
+        <Text color="fg.subtle" fontSize="xs">
           {t('models.noTriggerPhrasesYet')}
         </Text>
       ) : null}

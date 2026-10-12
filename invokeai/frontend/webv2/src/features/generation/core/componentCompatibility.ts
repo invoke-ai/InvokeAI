@@ -74,6 +74,10 @@ export const isClipVariant =
 export const isAnimaQwen3Encoder: GenerateComponentFilter = (model) =>
   model.type === 'qwen3_encoder' && model.variant === 'qwen3_06b';
 
+/** Anima-3.8B's semantic connector was trained on the Qwen3.5 4B. */
+export const isAnimaQwen35Encoder: GenerateComponentFilter = (model) =>
+  model.type === 'qwen3_5_encoder' && model.variant === 'qwen3_5_4b';
+
 export const isNonAnimaQwen3Encoder: GenerateComponentFilter = (model) =>
   model.type === 'qwen3_encoder' && model.variant !== 'qwen3_06b';
 
@@ -93,11 +97,11 @@ export const isKrea2Qwen3VlEncoder: GenerateComponentFilter = (model) =>
 export const isIdeogram4Qwen3VlEncoder: GenerateComponentFilter = (model) =>
   model.type === 'qwen3_vl_encoder' && model.variant === 'qwen3_vl_8b';
 
-/** Exclude only single-file unconditional branches; Diffusers bundles both branches. */
+/** Exclude only single-file unconditional branches (safetensors or GGUF); Diffusers bundles both branches. */
 export const isIdeogram4UnconditionalBranch: GenerateComponentFilter = (model) =>
   model.type === 'main' &&
   model.base === 'ideogram-4' &&
-  model.format === 'checkpoint' &&
+  model.format !== 'diffusers' &&
   model.branch === 'unconditional';
 
 export const isFlux2Qwen3EncoderForModel = (selectedModel: GenerateModelConfig): GenerateComponentFilter => {

@@ -36,3 +36,5 @@ export const galleryVideoUrls = {
   full: getGalleryVideoFullUrl,
   thumbnail: getGalleryVideoThumbnailUrl,
 } as const;
+
+export { abortGalleryLocatorRequests, createGalleryLocatorRequest, type GalleryLocatorRequest } from './core/selection';

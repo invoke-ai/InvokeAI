@@ -33,7 +33,7 @@ const CreateFromBboxMenuItem = ({
     <Menu.Item disabled={disabled} value={destination} onSelect={onSelect}>
       <HStack gap="2" minW="0" w="full">
         <Icon as={ImagePlusIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-        <Text flex="1" fontSize="xs">
+        <Text flex="1" fontSize="md">
           {t(labelKey)}
         </Text>
       </HStack>
@@ -56,7 +56,7 @@ export const CanvasCreateFromBboxSubmenu = ({
         <button disabled={disabled} type="button">
           <HStack gap="2" minW="0" w="full">
             <Icon as={ImagePlusIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-            <Text flex="1" fontSize="xs">
+            <Text flex="1" fontSize="md">
               {t('widgets.canvas.contextMenu.createFromBbox')}
             </Text>
             <Icon as={ChevronRightIcon} boxSize="3" color="fg.subtle" flexShrink={0} />

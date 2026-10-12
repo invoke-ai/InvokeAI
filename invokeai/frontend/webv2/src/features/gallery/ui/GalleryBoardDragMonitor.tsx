@@ -1,12 +1,17 @@
 import { useDndMonitor, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
 import { useCallback, useRef } from 'react';
 
-import { forwardGalleryBoardDrop, isGalleryItemDragData, resolveGallerySemanticSearchDrop } from './galleryDnd';
+import {
+  forwardGalleryBoardDrop,
+  isGalleryItemDragData,
+  resolveGalleryBoardMove,
+  resolveGallerySemanticSearchDrop,
+} from './galleryDnd';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
-/** Forward board drops and temporarily expose collapsed board targets during item drags. */
+/** Forward item and board drops, and temporarily expose collapsed board targets during item drags. */
 export const GalleryBoardDragMonitor = () => {
-  const { actions, gallery, itemActions } = useGalleryWidget();
+  const { actions, gallery, itemActions, region } = useGalleryWidget();
   const dragOpenedPanelRef = useRef(false);
 
   const restoreDisclosure = useCallback(() => {
@@ -32,6 +37,13 @@ export const GalleryBoardDragMonitor = () => {
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
+      const boardMove = resolveGalleryBoardMove(event.active.data.current, event.over?.data.current, region);
+
+      if (boardMove) {
+        void actions.moveBoard(boardMove.boardId, boardMove.projectId, boardMove.label);
+        return;
+      }
+
       const semanticDrop = resolveGallerySemanticSearchDrop(event.active.data.current, event.over?.id);
 
       if (semanticDrop) {
@@ -48,7 +60,7 @@ export const GalleryBoardDragMonitor = () => {
       });
       restoreDisclosure();
     },
-    [actions, gallery.items, itemActions, restoreDisclosure]
+    [actions, gallery.items, itemActions, region, restoreDisclosure]
   );
 
   useDndMonitor({

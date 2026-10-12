@@ -2,7 +2,8 @@ import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
 import type { WorkflowRecordDTO } from '@features/workflow/queries';
 import type { FormEvent } from 'react';
 
-import { chakra, Dialog, Input, Portal, Stack, Text } from '@chakra-ui/react';
+import { chakra, Input, Portal, Stack, Text } from '@chakra-ui/react';
+import { savedWorkflowDetailQueryOptions } from '@features/workflow/data/savedWorkflowQueries';
 import { getLibraryWorkflowRecord } from '@features/workflow/queries';
 import { useInvocationTemplatesSnapshot } from '@features/workflow/react';
 import { useWorkflowProjectSelector, useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
@@ -17,7 +18,9 @@ import {
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, CloseButton } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
+import { Dialog } from '@platform/ui/Dialog';
 import { Field } from '@platform/ui/Field';
+import { useQuery } from '@tanstack/react-query';
 import { Suspense, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -381,16 +384,28 @@ export const WorkflowPublicationHost = () => {
     close();
   }, [activeStage, close]);
 
+  // The template an update replaces is the one the workflow is linked to now (a save as new re-links it), which
+  // need not share the workflow's name; the confirmation names only that template, once its record is read.
+  const confirmTemplateId = activeStage.kind === 'confirm-update' ? activeStage.libraryWorkflowId : '';
+  const confirmTemplateName = useQuery({
+    ...savedWorkflowDetailQueryOptions(confirmTemplateId),
+    enabled: confirmTemplateId !== '',
+    select: (record) => record.name,
+  }).data;
   const updateConfirmBody = useMemo(
     () => (
       <Stack gap="2">
-        <Text>{t('workflowLibrary.updateConfirmBody', { name: workflowName })}</Text>
-        <Text color="fg.muted" fontSize="xs">
+        <Text>
+          {confirmTemplateName
+            ? t('workflowLibrary.updateConfirmNamedBody', { template: confirmTemplateName })
+            : t('workflowLibrary.updateConfirmBody')}
+        </Text>
+        <Text color="fg.muted" fontSize="md">
           {t('workflowLibrary.updateConfirmCallers')}
         </Text>
       </Stack>
     ),
-    [t, workflowName]
+    [confirmTemplateName, t]
   );
   const conflictOptions = useMemo(
     () => [
@@ -501,15 +516,14 @@ export const WorkflowPublicationHost = () => {
                 ) : null}
               </Dialog.Body>
               <Dialog.Footer>
-                <Button size="xs" variant="ghost" onClick={close}>
+                <Button variant="ghost" onClick={close}>
                   {t('common.cancel')}
                 </Button>
-                <Button size="xs" variant="outline" onClick={switchToSaveAsNew}>
+                <Button variant="outline" onClick={switchToSaveAsNew}>
                   {t('workflowLibrary.saveAsNew')}
                 </Button>
                 <Button
                   disabled={activeStage.kind !== 'review' || !activeStage.record}
-                  size="xs"
                   variant="solid"
                   onClick={confirmReplaceReviewed}
                 >
@@ -555,7 +569,7 @@ const ReviewBody = ({
 
   if (error) {
     return (
-      <Text color="fg.error" fontSize="sm">
+      <Text color="fg.error" fontSize="lg">
         {error}
       </Text>
     );
@@ -563,7 +577,7 @@ const ReviewBody = ({
 
   if (!record) {
     return (
-      <Text color="fg.subtle" fontSize="sm" role="status">
+      <Text color="fg.subtle" fontSize="lg" role="status">
         {t('workflowLibrary.reviewLoading')}
       </Text>
     );
@@ -571,17 +585,17 @@ const ReviewBody = ({
 
   return (
     <Stack gap="2">
-      <Text fontSize="sm">{t('workflowLibrary.reviewBody', { name: workflowName })}</Text>
+      <Text fontSize="lg">{t('workflowLibrary.reviewBody', { name: workflowName })}</Text>
       <Stack gap="0.5">
-        <Text fontSize="sm" fontWeight="600" overflowWrap="anywhere">
+        <Text fontSize="lg" fontWeight="600" overflowWrap="anywhere">
           {record.name || t('workflowLibrary.untitled')}
         </Text>
         {record.description ? (
-          <Text color="fg.muted" fontSize="xs" lineClamp={3}>
+          <Text color="fg.muted" fontSize="md" lineClamp={3}>
             {record.description}
           </Text>
         ) : null}
-        <Text color="fg.subtle" fontSize="2xs">
+        <Text color="fg.subtle" fontSize="xs">
           {t('workflowLibrary.reviewRevision', {
             revision: record.revision,
             when: record.updated_at ? formatRelativeTime(record.updated_at, new Date()) : '',
@@ -589,7 +603,7 @@ const ReviewBody = ({
         </Text>
       </Stack>
       {onPreview ? (
-        <Button alignSelf="flex-start" size="xs" variant="outline" onClick={onPreview}>
+        <Button alignSelf="flex-start" variant="outline" onClick={onPreview}>
           {t('workflowLibrary.previewGraph')}
         </Button>
       ) : null}
@@ -634,10 +648,10 @@ const ChoiceDialog = ({
               <Dialog.Title>{title}</Dialog.Title>
             </Dialog.Header>
             <Dialog.Body>
-              <Text fontSize="sm">{body}</Text>
+              <Text fontSize="lg">{body}</Text>
             </Dialog.Body>
             <Dialog.Footer>
-              <Button disabled={isBusy} size="xs" variant="ghost" onClick={onClose}>
+              <Button disabled={isBusy} variant="ghost" onClick={onClose}>
                 {t('common.cancel')}
               </Button>
               {options.map((option) => (
@@ -661,7 +675,7 @@ const ChoiceButton = ({
   isBusy: boolean;
   option: { label: string; onSelect: () => void; value: string };
 }) => (
-  <Button data-choice={option.value} loading={isBusy} size="xs" variant="solid" onClick={option.onSelect}>
+  <Button data-choice={option.value} loading={isBusy} variant="solid" onClick={option.onSelect}>
     {option.label}
   </Button>
 );
@@ -714,18 +728,18 @@ export const SaveToLibraryDialog = ({
               <Dialog.Body>
                 <Stack gap="3">
                   <Field label={t('workflowLibrary.templateName')}>
-                    <Input defaultValue={initialName} name="templateName" size="sm" />
+                    <Input defaultValue={initialName} name="templateName" size="lg" />
                   </Field>
-                  <Text color="fg.muted" fontSize="xs">
+                  <Text color="fg.muted" fontSize="md">
                     {t('workflowLibrary.saveToLibraryExplanation')}
                   </Text>
                 </Stack>
               </Dialog.Body>
               <Dialog.Footer>
-                <Button disabled={isPending} size="xs" type="button" variant="ghost" onClick={onClose}>
+                <Button disabled={isPending} type="button" variant="ghost" onClick={onClose}>
                   {t('common.cancel')}
                 </Button>
-                <Button loading={isPending} size="xs" type="submit" variant="solid">
+                <Button loading={isPending} type="submit" variant="solid">
                   {t('workflowLibrary.saveToLibraryConfirm')}
                 </Button>
               </Dialog.Footer>

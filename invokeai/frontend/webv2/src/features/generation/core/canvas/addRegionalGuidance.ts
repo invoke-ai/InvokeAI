@@ -157,8 +157,10 @@ const copyEncoderFields = (base: RegionalGuidanceBase, modelVariant?: string | n
     case 'krea-2':
       return ['qwen3_vl_encoder'];
     case 'z-image':
-    case 'anima':
       return ['qwen3_encoder'];
+    case 'anima':
+      // Copied only where the global prompt has it: Anima-3.8B's second encoder.
+      return ['qwen3_encoder', 'qwen3_5_encoder'];
     case 'sd-1':
     case 'sd-2':
       return ['clip'];

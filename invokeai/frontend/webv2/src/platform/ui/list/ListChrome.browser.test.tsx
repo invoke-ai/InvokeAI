@@ -4,9 +4,11 @@ import { system } from '@theme/system';
 import { act, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import { List, type ListRowProps } from './List';
 import { ListItem } from './ListItem';
+import { LIST_ROW_GAP_PX } from './listLayout';
 import { ListPager } from './ListPager';
 import { listRowsFromItems, listRowsFromSections } from './listRows';
 import { ListSelectionBar } from './ListSelectionBar';
@@ -164,8 +166,8 @@ describe('list dividers', () => {
     const line = lines[0]!.getBoundingClientRect();
 
     // The row gap is unchanged by the divider, which sits in its middle.
-    expect(second.top - first.bottom).toBeCloseTo(4, 0);
-    expect(line.top - first.bottom).toBeCloseTo(1.5, 0);
+    expect(second.top - first.bottom).toBeCloseTo(LIST_ROW_GAP_PX, 0);
+    expect(line.top - first.bottom).toBeCloseTo((LIST_ROW_GAP_PX - 1) / 2, 0);
     // Inset from both edges so rounded row corners never touch it.
     expect(line.left - first.left).toBeCloseTo(8, 0);
     expect(first.right - line.right).toBeCloseTo(8, 0);
@@ -210,9 +212,132 @@ describe('list dividers', () => {
     const line = hairlines()[0]!.getBoundingClientRect();
 
     // Same geometry as stacked rows: centred in the gap, inset from both row edges.
-    expect(rowB.top - rowA.bottom).toBeCloseTo(4, 0);
-    expect(line.top - rowA.bottom).toBeCloseTo(1.5, 0);
+    expect(rowB.top - rowA.bottom).toBeCloseTo(LIST_ROW_GAP_PX, 0);
+    expect(line.top - rowA.bottom).toBeCloseTo((LIST_ROW_GAP_PX - 1) / 2, 0);
     expect(line.left - rowA.left).toBeCloseTo(8, 0);
     expect(rowA.right - line.right).toBeCloseTo(8, 0);
+  });
+
+  it('keeps static rows and their neighbouring dividers unchanged on hover', async () => {
+    await render(
+      <ListStack dividers label="subjects">
+        <ListItem title="one" />
+        <div role="listitem">
+          <ListItem role="presentation" title="two" />
+        </div>
+        <ListItem title="three" />
+      </ListStack>
+    );
+    const row = host.querySelectorAll<HTMLElement>('[data-list-surface]')[1]!;
+    const background = getComputedStyle(row).backgroundColor;
+
+    await userEvent.hover(row);
+    expect(row.querySelector('button')).toBeNull();
+    expect(getComputedStyle(row).backgroundColor).toBe(background);
+    expect(hairlines().map((line) => getComputedStyle(line).opacity)).toEqual(['1', '1']);
+  });
+
+  it('opens a menu-only row from keyboard, assistive-tech, and touch activation, but not a mouse click', async () => {
+    const onContextMenu = vi.fn();
+    await render(
+      <ListStack label="subjects">
+        <ListItem title="one" onContextMenu={onContextMenu} />
+      </ListStack>
+    );
+    const primary = host.querySelector<HTMLButtonElement>('[data-list-primary]')!;
+    const tap = (pointerType: string) => {
+      primary.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType }));
+      primary.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    };
+
+    await act(() => tap('mouse'));
+    expect(onContextMenu).not.toHaveBeenCalled();
+
+    // NVDA/JAWS in Firefox click with detail 1 and no pointer press.
+    await act(() => primary.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 })));
+    await act(() => tap('touch'));
+    await act(() => tap('pen'));
+    expect(onContextMenu).toHaveBeenCalledTimes(3);
+  });
+
+  it('points a row whose only interaction is its actions', async () => {
+    await render(
+      <ListStack dividers label="subjects">
+        <ListItem title="one" />
+        <ListItem actions={<button type="button">Install</button>} title="two" />
+        <ListItem title="three" />
+      </ListStack>
+    );
+    const row = host.querySelectorAll<HTMLElement>('[data-list-surface]')[1]!;
+    const background = getComputedStyle(row).backgroundColor;
+
+    await userEvent.hover(row);
+    // Still not a button itself: the install button is the row's only control.
+    expect(row.querySelector('[data-list-primary]')?.tagName).toBe('DIV');
+    await expect.poll(() => getComputedStyle(row).backgroundColor).not.toBe(background);
+    await expect.poll(() => hairlines().map((line) => getComputedStyle(line).opacity)).toEqual(['0', '0']);
+  });
+
+  it('hides the hairlines either side of a pointed row, stacked or virtualized', async () => {
+    const opacities = () =>
+      [...host.querySelectorAll<HTMLElement>('[data-list-divider]')].map((line) => getComputedStyle(line).opacity);
+
+    await render(
+      <ListStack dividers label="subjects">
+        <ListItem onPress={() => undefined} title="one" />
+        <ListItem onPress={() => undefined} title="two" />
+        <ListItem onPress={() => undefined} title="three" />
+        <ListItem onPress={() => undefined} title="four" />
+      </ListStack>
+    );
+    const stacked = host.querySelectorAll<HTMLElement>('[role="listitem"]');
+
+    await userEvent.hover(stacked[1]!);
+    await expect.poll(opacities).toEqual(['0', '0', '1']);
+    await render(
+      <ListStack dividers label="subjects">
+        <ListItem onContextMenu={() => undefined} isMenuOpen title="one" />
+        <ListItem onPress={() => undefined} title="two" />
+        <ListItem onPress={() => undefined} title="three" />
+        <ListItem onPress={() => undefined} title="four" />
+      </ListStack>
+    );
+    await userEvent.unhover(host);
+    await expect.poll(opacities).toEqual(['0', '1', '1']);
+
+    // A caller-wrapped row (its own list item around the row) holding an open menu.
+    await render(
+      <ListStack dividers label="subjects">
+        <ListItem onPress={() => undefined} title="one" />
+        <div role="listitem">
+          <ListItem onContextMenu={() => undefined} isMenuOpen role="presentation" title="two" />
+        </div>
+        <ListItem onPress={() => undefined} title="three" />
+        <ListItem onPress={() => undefined} title="four" />
+      </ListStack>
+    );
+    await expect.poll(opacities).toEqual(['0', '0', '1']);
+
+    const rows = listRowsFromSections(
+      [{ items: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }], key: 'one', label: 'One' }],
+      (item) => item.id
+    );
+
+    await render(
+      <List
+        dividers
+        label="subjects"
+        renderItem={(item: { id: string }, rowProps: ListRowProps) => <ListItem {...rowProps} title={item.id} />}
+        rows={rows}
+      />
+    );
+    await act(async () => {
+      await new Promise((resolve) => {
+        requestAnimationFrame(() => resolve(undefined));
+      });
+    });
+
+    await userEvent.hover(host.querySelector<HTMLElement>('[data-list-row="c"]')!);
+    await expect.poll(opacities).toEqual(['1', '0', '0']);
   });
 });

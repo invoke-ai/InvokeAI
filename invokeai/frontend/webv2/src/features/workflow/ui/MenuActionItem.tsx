@@ -37,7 +37,7 @@ export const MenuActionItem = ({ hint, icon, isDisabled, label, tone, value, onS
     {hint ? (
       <Stack gap="0" minW="0">
         <Menu.ItemText>{label}</Menu.ItemText>
-        <Text color="fg.subtle" fontSize="2xs">
+        <Text color="fg.subtle" fontSize="xs">
           {hint}
         </Text>
       </Stack>

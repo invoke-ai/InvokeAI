@@ -45,7 +45,12 @@ const sdxlLora = createModel({ base: 'sdxl', key: 'sdxl-lora', name: 'SDXL LoRA'
 const t5Encoder = createModel({ base: 'any', key: 't5-xxl', name: 'T5 XXL', type: 't5_encoder' });
 const externalMain = createModel({ base: 'external', key: 'gpt-image', name: 'GPT Image', type: 'main' });
 
-const MODELS_UI_ADAPTER = { enableModelDescriptions: false, managerProjectId: null };
+const MODELS_UI_ADAPTER = {
+  canManageModels: true,
+  enableModelDescriptions: false,
+  isProjectActive: () => true,
+  managerProjectId: null,
+};
 const SECTION_MODEL = { base: 'flux', key: 'flux-main', type: 'main' } as const;
 
 describe('RelatedModelsSection', () => {

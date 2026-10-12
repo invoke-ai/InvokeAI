@@ -36,8 +36,8 @@ const IMAGE_ONLY = ['image'] as const;
 
 interface GenerateReferenceImagesContentProps {
   models: readonly ModelConfig[];
+  referenceImages: GenerateReferenceImage[];
   selectedModel: GenerateModelConfig | undefined;
-  settings: GenerateSettings;
   onCommit: (update: GenerateSettingsUpdate) => void;
   onCommitImmediate: (patch: Partial<GenerateSettings>) => void;
 }
@@ -46,12 +46,11 @@ export const GenerateReferenceImagesContent = ({
   models,
   onCommit,
   onCommitImmediate,
+  referenceImages,
   selectedModel,
-  settings,
 }: GenerateReferenceImagesContentProps) => {
   const { t } = useTranslation();
   const { gallery } = useGenerationUi();
-  const referenceImages = settings.referenceImages;
   const isSupported = isReferenceImageSupported(selectedModel);
   const maxReferenceImages = getMaxReferenceImages(selectedModel);
   const canAdd = referenceImages.length < maxReferenceImages;
@@ -203,10 +202,10 @@ export const GenerateReferenceImagesContent = ({
   if (!isSupported) {
     return (
       <HStack gap="2" justify="space-between">
-        <Text color="fg.muted" fontSize="2xs" minW="0">
+        <Text color="fg.muted" fontSize="xs" minW="0">
           {t('widgets.generate.referenceImagesUnsupported')}
         </Text>
-        <Button colorPalette="red" flexShrink="0" size="xs" variant="outline" onClick={clearReferenceImages}>
+        <Button colorPalette="red" flexShrink="0" variant="outline" onClick={clearReferenceImages}>
           {t('widgets.generate.clearReferenceImages')}
         </Button>
       </HStack>
@@ -233,7 +232,7 @@ export const GenerateReferenceImagesContent = ({
           disabled={!canAdd}
           display="flex"
           flexDirection="column"
-          fontSize="2xs"
+          fontSize="xs"
           gap="1"
           isDisabled={!canAdd}
           isOver={isOver}
@@ -245,7 +244,7 @@ export const GenerateReferenceImagesContent = ({
           w="full"
           _hover={canAdd ? UPLOAD_ZONE_HOVER_STYLES : undefined}
         >
-          <HStack as="span" color="fg" fontSize="xs" fontWeight="600" gap="1.5">
+          <HStack as="span" color="fg" fontSize="md" fontWeight="600" gap="1.5">
             <Icon as={ImagePlusIcon} boxSize="4" />
             {t('widgets.generate.addReferenceImage')}
             <Icon as={ChevronDownIcon} boxSize="3" color="fg.subtle" />
