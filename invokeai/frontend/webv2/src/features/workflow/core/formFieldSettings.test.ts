@@ -294,6 +294,18 @@ describe('getNodeFieldSliderRange', () => {
     });
   });
 
+  it('keeps the precision of a step written in exponent form', () => {
+    // String(1e-7) is "1e-7": rounding to its digits after the point alone would collapse every stop to 0.
+    expect(getNodeFieldSliderRange(template('FloatField', { maximum: 9e-7, minimum: 1e-7, multipleOf: 1e-7 }))).toEqual(
+      { max: 9e-7, min: 1e-7, step: 1e-7 }
+    );
+    expect(getNodeFieldSliderRange(template('FloatField', { maximum: 3e-7, minimum: 0, multipleOf: 1.5e-7 }))).toEqual({
+      max: 3e-7,
+      min: 0,
+      step: 1.5e-7,
+    });
+  });
+
   it('keeps a bound that is itself a multiple despite float noise, and steps past an exclusive one', () => {
     // 1.1 / 0.1 and 0.3 / 0.1 are not integers in floating point; validation tolerates that and so must the track.
     expect(getNodeFieldSliderRange(template('FloatField', { maximum: 1.1, minimum: 0.3, multipleOf: 0.1 }))).toEqual({

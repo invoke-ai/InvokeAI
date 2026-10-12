@@ -445,6 +445,10 @@ describe('getRandomWorkflowFieldValue', () => {
     const decimal = input({ maximum: 1, minimum: 0, multipleOf: 0.1, type: single('FloatField') });
 
     expect(getRandomWorkflowFieldValue(decimal, () => 0.3)).toBe(0.3);
+
+    const tiny = input({ maximum: 9e-7, minimum: 1e-7, multipleOf: 1e-7, type: single('FloatField') });
+
+    expect(getRandomWorkflowFieldValue(tiny, () => 0.5)).toBe(5e-7);
   });
 
   it('respects exclusive bounds for integers and keeps floats unrounded', () => {

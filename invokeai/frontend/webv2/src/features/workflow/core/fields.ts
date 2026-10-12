@@ -79,10 +79,13 @@ export const isShuffleableField = (template: FieldInputTemplate): boolean =>
   isDirectInputField(template) &&
   admitsWorkflowFieldStepValue(template);
 
+/** Digits after the point in `value`'s shortest form, counting those its exponent implies: 1.5e-7 has eight. */
 const countDecimals = (value: number): number => {
-  const [, fraction = ''] = String(value).split('.');
+  const [mantissa = '', exponent = '0'] = String(value).split('e');
+  const [, fraction = ''] = mantissa.split('.');
 
-  return fraction.length;
+  // `toFixed` accepts at most 100 digits.
+  return Math.min(100, Math.max(0, fraction.length - Number(exponent)));
 };
 
 export const finiteNumberOrNull = (value: number | null | undefined): number | null =>
