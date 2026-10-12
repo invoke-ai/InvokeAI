@@ -127,6 +127,7 @@ jobs:
               - 'invokeai/frontend/webv2/src/features/generation/core/__snapshots__/**'
               - 'invokeai/frontend/webv2/src/features/generation/core/__fixtures__/**'
               - 'invokeai/frontend/webv2/src/features/video/core/__snapshots__/**'
+              - 'invokeai/frontend/webv2/src/features/upscale/core/__snapshots__/**'
               # test_ideogram4_frontend_bounds.py reads the Ideogram 4 control bounds from here.
               - 'invokeai/frontend/webv2/src/features/generation/core/settings.ts'
               - 'tests/**'
