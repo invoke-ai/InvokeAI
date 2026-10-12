@@ -48,7 +48,7 @@ from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
     has_cosmos_dit_peft_keys_strict,
 )
 from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import is_state_dict_likely_flux_control
-from invokeai.backend.patches.lora_conversions.krea2_lora_constants import is_kohya_krea2_lora_key
+from invokeai.backend.patches.lora_conversions.krea2_lora_constants import LOKR_WEIGHT_KEYS, is_kohya_krea2_lora_key
 from invokeai.backend.patches.lora_conversions.ltx2_lora_constants import (
     has_ltx2_lora_keys,
     has_non_ltx2_architecture_keys,
@@ -956,32 +956,54 @@ def _has_complete_lora_pair(state_dict: dict[str | int, Any], key_filter: Callab
     return False
 
 
-# LyCORIS LoKr layers carry their Kronecker factors instead of a lora_A/B (or lora_down/up) pair: either the
-# full `lokr_w1`/`lokr_w2`, or the further-factored `lokr_w1_a`/`lokr_w1_b` / `lokr_w2_a`/`lokr_w2_b` (+ the
-# optional `lokr_t2` tucker core). Each such layer is self-contained, so there is no "orphaned half" notion to
-# check — presence of any factor is enough to call the layer complete.
-_LOKR_WEIGHT_SUFFIXES = (
-    ".lokr_w1",
-    ".lokr_w2",
-    ".lokr_w1_a",
-    ".lokr_w1_b",
-    ".lokr_w2_a",
-    ".lokr_w2_b",
-    ".lokr_t2",
-)
+# LyCORIS LoKr layers carry Kronecker operands instead of a lora_A/B (or lora_down/up) pair. `LoKRLayer` needs
+# both operands, each exactly once: whole (`lokr_w1` / `lokr_w2`) or factored into a complete `_a`/`_b` pair.
+# A module missing an operand, holding half a factored pair, or spelling one operand both ways installs fine
+# but fails when the layer is built at generation time — the LoKr counterpart of an orphaned lora_A/B half —
+# so completeness is checked per module, like the A/B pairing.
+_LOKR_WEIGHT_SUFFIXES = tuple(f".{key}" for key in LOKR_WEIGHT_KEYS)
 
 
-def _has_lokr_layer(state_dict: dict[str | int, Any], key_filter: Callable[[str], bool] | None = None) -> bool:
-    """True if the state dict contains at least one LoKr layer, optionally restricted to the keys
-    `key_filter` accepts."""
+def _lokr_suffixes_by_module(
+    state_dict: dict[str | int, Any], key_filter: Callable[[str], bool] | None = None
+) -> dict[str, set[str]]:
+    """Group the LoKr weight keys (optionally restricted to the keys `key_filter` accepts) by module path."""
+    suffixes_by_module: dict[str, set[str]] = {}
     for key in state_dict:
-        if not isinstance(key, str):
+        if not isinstance(key, str) or not key.endswith(_LOKR_WEIGHT_SUFFIXES):
             continue
         if key_filter is not None and not key_filter(key):
             continue
-        if key.endswith(_LOKR_WEIGHT_SUFFIXES):
-            return True
-    return False
+        module_path, _, suffix = key.rpartition(".")
+        suffixes_by_module.setdefault(module_path, set()).add(suffix)
+    return suffixes_by_module
+
+
+def _lokr_operand_is_complete(suffixes: set[str], operand: str) -> bool:
+    """True if a LoKr operand (`lokr_w1` or `lokr_w2`) is present exactly once: whole, or as a full `_a`/`_b` pair."""
+    whole = operand in suffixes
+    factored = suffixes & {f"{operand}_a", f"{operand}_b"}
+    return (whole and not factored) or (not whole and len(factored) == 2)
+
+
+def _lokr_module_is_complete(suffixes: set[str]) -> bool:
+    return _lokr_operand_is_complete(suffixes, "lokr_w1") and _lokr_operand_is_complete(suffixes, "lokr_w2")
+
+
+def _has_complete_lokr_layer(state_dict: dict[str | int, Any], key_filter: Callable[[str], bool] | None = None) -> bool:
+    """True if at least one complete LoKr module exists, optionally restricted to the keys `key_filter` accepts.
+
+    Like :func:`_has_complete_lora_pair`, this does not reject incomplete modules elsewhere — callers pair it
+    with :func:`_lokr_layers_are_all_complete`.
+    """
+    return any(
+        _lokr_module_is_complete(suffixes) for suffixes in _lokr_suffixes_by_module(state_dict, key_filter).values()
+    )
+
+
+def _lokr_layers_are_all_complete(state_dict: dict[str | int, Any]) -> bool:
+    """True if *every* LoKr module in the state dict is complete. Returns True when there are none."""
+    return all(_lokr_module_is_complete(suffixes) for suffixes in _lokr_suffixes_by_module(state_dict).values())
 
 
 # Dotted layouts the converter understands for an explicit Krea-2 override (a transformer-only or
@@ -1032,12 +1054,18 @@ class LoRA_LyCORIS_Krea2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
 
         state_dict = mod.load_state_dict()
         explicit_krea2_override = override_fields.get("base") is BaseModelType.Krea2
-        has_supported_explicit_pair = _has_complete_lora_pair(
+        has_supported_explicit_layer = _has_complete_lora_pair(
             state_dict, _key_is_supported_krea2_layout
-        ) or _has_lokr_layer(state_dict, _key_is_supported_krea2_layout)
-        # Reject an orphaned half *anywhere* in the state dict (e.g. a dangling text_fusion half not under
-        # the approved prefixes) — it would install here but fail during LoRA conversion at generation time.
-        if explicit_krea2_override and has_supported_explicit_pair and _lora_weight_keys_are_all_paired(state_dict):
+        ) or _has_complete_lokr_layer(state_dict, _key_is_supported_krea2_layout)
+        # Reject an orphaned half or incomplete LoKr module *anywhere* in the state dict (e.g. a dangling
+        # text_fusion half not under the approved prefixes) — it would install here but fail during LoRA
+        # conversion at generation time.
+        if (
+            explicit_krea2_override
+            and has_supported_explicit_layer
+            and _lora_weight_keys_are_all_paired(state_dict)
+            and _lokr_layers_are_all_complete(state_dict)
+        ):
             return cls(**override_fields)
 
         cls._validate_looks_like_lora(mod)
@@ -1047,20 +1075,25 @@ class LoRA_LyCORIS_Krea2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
     @classmethod
     def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
         """Krea-2 LoRAs have keys like transformer.text_fusion.* / transformer.transformer_blocks.* with
-        a lora_A/lora_B (or lora_down/lora_up) suffix. The text-fusion stage is unique to Krea-2."""
+        a lora_A/lora_B (or lora_down/lora_up) suffix, or LyCORIS LoKr ``lokr_*`` factors. The text-fusion
+        stage is unique to Krea-2."""
         state_dict = mod.load_state_dict()
-        # Require a *complete* lora_A/B (or lora_down/up) pair, not merely any lora/dora suffix: a file with
-        # only ``dora_scale`` and no A/B weights would pass a suffix check but fail later on missing weights.
+        # Require a *complete* lora_A/B (or lora_down/up) pair or LoKr module, not merely any lora/dora/lokr
+        # suffix: a file with only ``dora_scale`` and no A/B weights would pass a suffix check but fail later on
+        # missing weights.
         if not (
-            _has_krea2_lora_keys(state_dict) and (_has_complete_lora_pair(state_dict) or _has_lokr_layer(state_dict))
+            _has_krea2_lora_keys(state_dict)
+            and (_has_complete_lora_pair(state_dict) or _has_complete_lokr_layer(state_dict))
         ):
             raise NotAMatchError(
                 "model does not match Krea-2 LoRA heuristics (no complete lora_A/B, lora_down/up or LoKr layer)"
             )
-        # Reject a file with an orphaned LoRA half (a valid layer plus a dangling lora_A/B/down/up); it
-        # would install here but fail later during LoRA conversion.
+        # Reject a file with an orphaned LoRA half (a valid layer plus a dangling lora_A/B/down/up) or an
+        # incomplete LoKr module; it would install here but fail later during LoRA conversion.
         if not _lora_weight_keys_are_all_paired(state_dict):
             raise NotAMatchError("Krea-2 LoRA has an incomplete lora_A/B (or lora_down/up) weight pair")
+        if not _lokr_layers_are_all_complete(state_dict):
+            raise NotAMatchError("Krea-2 LoRA has an incomplete LoKr module (lokr_w1 / lokr_w2 operands)")
 
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:

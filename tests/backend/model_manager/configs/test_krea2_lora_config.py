@@ -373,16 +373,19 @@ def test_explicit_krea2_override_accepts_single_module_native_lora(_raise_if_not
     assert config.base is BaseModelType.Krea2
 
 
+_LOKR_MODULE = "diffusion_model.txtfusion.layerwise_blocks.0.attn.wq"
+
+
+def _lokr_mod(keys: dict[str, object]) -> MagicMock:
+    mod = MagicMock()
+    mod.load_state_dict.return_value = keys
+    return mod
+
+
 def _native_lokr_lora() -> MagicMock:
     # LyCORIS LoKr adapter targeting the Krea-2 text-fusion stage (the layout ai-toolkit emits). It carries
     # Kronecker factors instead of a lora_A/lora_B pair.
-    mod = MagicMock()
-    mod.load_state_dict.return_value = {
-        "diffusion_model.txtfusion.layerwise_blocks.0.attn.wq.lokr_w1": object(),
-        "diffusion_model.txtfusion.layerwise_blocks.0.attn.wq.lokr_w2": object(),
-        "diffusion_model.txtfusion.layerwise_blocks.0.attn.wq.alpha": object(),
-    }
-    return mod
+    return _lokr_mod({f"{_LOKR_MODULE}.{suffix}": object() for suffix in ("lokr_w1", "lokr_w2", "alpha")})
 
 
 @patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
@@ -392,24 +395,94 @@ def test_automatic_probe_accepts_lokr_lora(_raise_if_not_file) -> None:
     assert config.base is BaseModelType.Krea2
 
 
+@pytest.mark.parametrize(
+    "suffixes",
+    [
+        ("lokr_w1", "lokr_w2_a", "lokr_w2_b", "alpha"),
+        ("lokr_w1_a", "lokr_w1_b", "lokr_w2", "alpha"),
+        ("lokr_w1_a", "lokr_w1_b", "lokr_w2_a", "lokr_w2_b", "lokr_t2", "alpha"),
+        # The DoRA magnitude of a weight-decomposed LoKr is dropped by the converter, so the file installs.
+        ("lokr_w1", "lokr_w2", "dora_scale", "alpha"),
+    ],
+)
 @patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
-def test_explicit_krea2_override_accepts_lokr_lora(_raise_if_not_file) -> None:
+def test_automatic_probe_accepts_every_complete_lokr_spelling(_raise_if_not_file, suffixes: tuple[str, ...]) -> None:
+    mod = _lokr_mod({f"{_LOKR_MODULE}.{suffix}": object() for suffix in suffixes})
+
+    config = LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
+
+    assert config.base is BaseModelType.Krea2
+
+
+@pytest.mark.parametrize(
+    "suffixes",
+    [
+        # Each of these used to install and then fail building LoKRLayer at generation time.
+        ("lokr_w1", "alpha"),
+        ("lokr_w2", "alpha"),
+        ("lokr_w1", "lokr_w2_a", "alpha"),
+        ("lokr_w1_a", "lokr_w2", "alpha"),
+        # Both spellings of one operand: LoKRLayer requires exactly one.
+        ("lokr_w1", "lokr_w1_a", "lokr_w1_b", "lokr_w2", "alpha"),
+        ("lokr_t2", "alpha"),
+    ],
+)
+@pytest.mark.parametrize("override_base", [False, True])
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_incomplete_lokr_module_is_rejected(_raise_if_not_file, suffixes: tuple[str, ...], override_base: bool) -> None:
+    # A complete module elsewhere in the file does not excuse the incomplete one: like an orphaned lora_A/B
+    # half, it would take the whole adapter down at generation time.
+    keys: dict[str, object] = {f"{_LOKR_MODULE}.{suffix}": object() for suffix in suffixes}
+    keys.update({f"diffusion_model.blocks.0.attn.wq.{suffix}": object() for suffix in ("lokr_w1", "lokr_w2")})
+    override = {"base": BaseModelType.Krea2} if override_base else {}
+
+    with pytest.raises(NotAMatchError):
+        LoRA_LyCORIS_Krea2_Config.from_model_on_disk(_lokr_mod(keys), {**_REQUIRED_FIELDS, **override})
+
+
+@pytest.mark.parametrize(
+    "module",
+    [
+        # Dotted layout without the Krea-2 signature modules (no text fusion, no gated attention pair).
+        "transformer.transformer_blocks.0.attn.to_q",
+        # kohya-flattened Krea-2 module; the automatic probe only reads dotted names.
+        "lora_unet_blocks_0_attn_wq",
+    ],
+)
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_explicit_krea2_override_accepts_lokr_the_probe_cannot_identify(_raise_if_not_file, module: str) -> None:
+    keys = {f"{module}.{suffix}": object() for suffix in ("lokr_w1", "lokr_w2", "alpha")}
+
+    with pytest.raises(NotAMatchError):
+        LoRA_LyCORIS_Krea2_Config.from_model_on_disk(_lokr_mod(keys), {**_REQUIRED_FIELDS})
+
     config = LoRA_LyCORIS_Krea2_Config.from_model_on_disk(
-        _native_lokr_lora(), {**_REQUIRED_FIELDS, "base": BaseModelType.Krea2}
+        _lokr_mod(keys), {**_REQUIRED_FIELDS, "base": BaseModelType.Krea2}
     )
 
     assert config.base is BaseModelType.Krea2
 
 
 @patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_explicit_krea2_override_rejects_wan_kohya_lokr(_raise_if_not_file) -> None:
+    # Wan writes the same `lora_unet_blocks_<idx>_` spelling, but `self_attn_q` is no Krea-2 module, so forcing
+    # the base must not let it install here and silently no-op at generation time.
+    keys = {f"lora_unet_blocks_0_self_attn_q.{suffix}": object() for suffix in ("lokr_w1", "lokr_w2", "alpha")}
+
+    with pytest.raises(NotAMatchError):
+        LoRA_LyCORIS_Krea2_Config.from_model_on_disk(_lokr_mod(keys), {**_REQUIRED_FIELDS, "base": BaseModelType.Krea2})
+
+
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
 def test_automatic_probe_rejects_lokr_without_krea2_modules(_raise_if_not_file) -> None:
     # A LoKr that does not touch the Krea-2 signature modules belongs to another base and must not be
     # claimed here just because it is a LoKr.
-    mod = MagicMock()
-    mod.load_state_dict.return_value = {
-        "transformer.transformer_blocks.0.attn.to_q.lokr_w1": object(),
-        "transformer.transformer_blocks.0.attn.to_q.lokr_w2": object(),
-    }
+    mod = _lokr_mod(
+        {
+            "transformer.transformer_blocks.0.attn.to_q.lokr_w1": object(),
+            "transformer.transformer_blocks.0.attn.to_q.lokr_w2": object(),
+        }
+    )
 
     with pytest.raises(NotAMatchError):
         LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
