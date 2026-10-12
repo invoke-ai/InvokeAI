@@ -12,8 +12,17 @@ import { useTranslation } from 'react-i18next';
 import { refreshQueue } from './queueDataStore';
 import { useQueueUi } from './QueueUiContext';
 
-/** Re-queues a failed or canceled root item from its saved session; the backend reports which ids it took. */
-export const RetryQueueItemButton = ({ itemId }: { itemId: number }) => {
+/**
+ * Re-queues a failed or canceled root item from its saved session; the backend reports which ids it took. A Canvas
+ * job whose project is closed here is staged by another tab, so the confirmation says where its result goes.
+ */
+export const RetryQueueItemButton = ({
+  isProjectClosedHere = false,
+  itemId,
+}: {
+  isProjectClosedHere?: boolean;
+  itemId: number;
+}) => {
   const { t } = useTranslation();
   const { notify } = useQueueUi();
   const [busy, setBusy] = useState(false);
@@ -29,7 +38,15 @@ export const RetryQueueItemButton = ({ itemId }: { itemId: number }) => {
         if (retriedItemIds.length === 0) {
           notify.info(t('widgets.queue.retryNotQueued'), t('widgets.queue.retryNotQueuedDescription', { id: itemId }));
         } else {
-          notify.success(t('widgets.queue.retryQueued'), t('widgets.queue.retryQueuedDescription', { id: itemId }));
+          notify.success(
+            t('widgets.queue.retryQueued'),
+            t(
+              isProjectClosedHere
+                ? 'widgets.queue.retryQueuedProjectClosedDescription'
+                : 'widgets.queue.retryQueuedDescription',
+              { id: itemId }
+            )
+          );
         }
       } catch (error) {
         notify.error(t('widgets.queue.retryFailed'), getApiErrorMessage(error, t('widgets.queue.couldNotRetryItem')));
@@ -37,7 +54,7 @@ export const RetryQueueItemButton = ({ itemId }: { itemId: number }) => {
         setBusy(false);
       }
     },
-    [itemId, notify, t]
+    [isProjectClosedHere, itemId, notify, t]
   );
 
   return (

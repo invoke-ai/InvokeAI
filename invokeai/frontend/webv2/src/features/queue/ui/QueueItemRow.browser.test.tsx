@@ -2,6 +2,7 @@
 import type { QueueItemReadModel } from '@features/queue/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { buildQueueItemOrigin } from '@features/queue/data/events';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -54,6 +55,7 @@ const adapter = (overrides: Partial<QueueUiAdapter> = {}): QueueUiAdapter => ({
   canManageProcessor: true,
   canViewItemDetails: () => true,
   isConnected: true,
+  isProjectOpen: () => true,
   notify: { error: () => undefined, info: () => undefined, success: () => undefined },
   openQueue: () => undefined,
   preloadItemActions: () => undefined,
@@ -177,6 +179,38 @@ describe('QueueItemRow', () => {
     });
     expect(commands.retryItems).toHaveBeenCalledWith([12]);
     expect(success).toHaveBeenCalledWith('widgets.queue.retryQueued', 'widgets.queue.retryQueuedDescription');
+  });
+
+  it('retries a Canvas job of a project closed here, and says another tab with it open receives the result', async () => {
+    const success = vi.fn();
+    const canvasJob = (id: number, projectId: string) =>
+      item({ destination: 'canvas', id, origin: buildQueueItemOrigin('run-1', projectId), status: 'failed' });
+    const retry = async (queueItem: QueueItemReadModel) => {
+      await act(() => root.unmount());
+      root = createRoot(host);
+      await render(
+        adapter({
+          isProjectOpen: (projectId) => projectId === 'open-project',
+          notify: { error: () => undefined, info: () => undefined, success },
+        }),
+        queueItem
+      );
+      await act(async () => {
+        host.querySelector<HTMLButtonElement>('button[aria-label="widgets.queue.retryItem"]')!.click();
+        await Promise.resolve();
+      });
+    };
+    commands.retryItems.mockClear();
+
+    await retry(canvasJob(15, 'closed-project'));
+    expect(commands.retryItems).toHaveBeenCalledWith([15]);
+    expect(success).toHaveBeenLastCalledWith(
+      'widgets.queue.retryQueued',
+      'widgets.queue.retryQueuedProjectClosedDescription'
+    );
+
+    await retry(canvasJob(16, 'open-project'));
+    expect(success).toHaveBeenLastCalledWith('widgets.queue.retryQueued', 'widgets.queue.retryQueuedDescription');
   });
 
   it('hides retry on a failed workflow-call child and on rows the viewer cannot manage', async () => {

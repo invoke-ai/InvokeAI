@@ -18,6 +18,8 @@ export interface QueueUiAdapter {
   canManageItem(item: QueueItemReadModel): boolean;
   canViewItemDetails(item: QueueItemReadModel): boolean;
   isConnected: boolean;
+  /** Whether `projectId` is open in this tab; a Canvas rerun is staged only into a project open here. */
+  isProjectOpen(projectId: string): boolean;
   notify: QueueUiNotificationPort;
   openQueue(): void;
   /**

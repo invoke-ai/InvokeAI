@@ -3,6 +3,7 @@ import type { QueueItemReadModel } from '@features/queue/core/types';
 
 import { Box, HStack, Icon, Text } from '@chakra-ui/react';
 import { extractGenerationMeta, getResultImageName } from '@features/queue/core/generationMeta';
+import { parseQueueItemOriginProjectId } from '@features/queue/data/events';
 import { useItemProgress } from '@features/queue/data/itemProgressStore';
 import { ListItem } from '@platform/ui/list/ListItem';
 import { ChevronRightIcon } from 'lucide-react';
@@ -27,7 +28,7 @@ const CHEVRON_OPEN = { transform: 'rotate(90deg)' } as const;
 export const QueueItemRow = memo(
   ({ item, revealRequest }: { item: QueueItemReadModel; revealRequest?: QueueItemRevealRequest | null }) => {
     const { t } = useTranslation();
-    const { canManageItem, canViewItemDetails, preloadItemActions } = useQueueUi();
+    const { canManageItem, canViewItemDetails, isProjectOpen, preloadItemActions } = useQueueUi();
     const [expanded, setExpanded] = useState(false);
     const toggle = useCallback(() => setExpanded((open) => !open), []);
     // Warm the actions chunk on intent so the first expand has nothing to wait for.
@@ -41,6 +42,10 @@ export const QueueItemRow = memo(
     const canManage = canManageItem(item);
     const isCancellable = isCancellableQueueItem(item) && canManage;
     const isRetryable = isRetryableQueueItem(item) && canManage;
+    const originProjectId = parseQueueItemOriginProjectId(item.origin);
+    // A Canvas rerun is staged by a tab with its project open, which need not be this one (or this user's).
+    const isRetryForProjectClosedHere =
+      item.destination === 'canvas' && originProjectId !== null && !isProjectOpen(originProjectId);
     const canExpand = canViewItemDetails(item);
 
     const consumeReveal = useCallback(
@@ -78,7 +83,7 @@ export const QueueItemRow = memo(
             isCancellable ? (
               <CancelQueueItemButton itemId={item.id} />
             ) : isRetryable ? (
-              <RetryQueueItemButton itemId={item.id} />
+              <RetryQueueItemButton isProjectClosedHere={isRetryForProjectClosedHere} itemId={item.id} />
             ) : undefined
           }
           description={

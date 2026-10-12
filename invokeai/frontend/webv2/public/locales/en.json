@@ -2973,6 +2973,7 @@
       "retryNotQueuedDescription": "Queue item #{{id}} is not a failed or canceled job the server can retry.",
       "retryQueued": "Retry queued",
       "retryQueuedDescription": "Queue item #{{id}} was queued again from its saved session.",
+      "retryQueuedProjectClosedDescription": "Queue item #{{id}} was queued again. Its result is staged on its project's Canvas in a tab where that project is open; with none open, it will not appear.",
       "sendToCanvas": "Send to canvas",
       "sendToCanvasComingSoon": "Sending queue results to the canvas is coming soon.",
       "settingsRecalled": "Settings recalled",

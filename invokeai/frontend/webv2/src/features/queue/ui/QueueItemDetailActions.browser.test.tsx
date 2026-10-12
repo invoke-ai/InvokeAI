@@ -41,6 +41,7 @@ const adapter = (canManage: boolean): QueueUiAdapter => ({
   canManageProcessor: true,
   canViewItemDetails: () => true,
   isConnected: true,
+  isProjectOpen: () => true,
   notify,
   openQueue: () => undefined,
   queueJobsScope: 'all',
