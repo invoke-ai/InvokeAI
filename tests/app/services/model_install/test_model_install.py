@@ -665,9 +665,19 @@ def test_directory_install_rollback_race_preserves_both_source_artifacts(
     mm2_app_config: InvokeAIAppConfig,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    real_iterdir = Path.iterdir
+
+    def files_first(path: Path):
+        items = real_iterdir(path)
+        if path == diffusers_dir:
+            # Move a file before the locked directory, regardless of filesystem enumeration order.
+            return iter(sorted(items, key=lambda item: (not item.is_file(), item.name)))
+        return items
+
+    monkeypatch.setattr(Path, "iterdir", files_first)
     items = list(diffusers_dir.iterdir())
+    first_item = next(path for path in items if path.is_file())
     locked_item = items[-1]
-    first_item = next(path for path in items[:-1] if path.is_file())
     original_bytes = first_item.read_bytes()
     real_move = shutil.move
     real_rename_noreplace = ModelInstallService._rename_noreplace
