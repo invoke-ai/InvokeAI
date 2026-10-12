@@ -19,6 +19,7 @@ from unittest.mock import MagicMock
 import pytest
 from pydantic_core import Url
 from requests import Timeout
+from requests_testadapter import TestAdapter
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.download import DownloadJob, DownloadJobStatus, MultiFileDownloadJob
@@ -2319,6 +2320,91 @@ def test_restore_paused_hf_install_preserves_access_token(
     finally:
         active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
         shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+_HF_EMBEDDING_SOURCE = "InvokeAI-test/textual_inversion_tests::learned_embeds-steps-1000.safetensors"
+_HF_EMBEDDING_URL = (
+    "https://huggingface.co/InvokeAI-test/textual_inversion_tests/resolve/main/learned_embeds-steps-1000.safetensors"
+)
+_URL_EMBEDDING_URL = "https://www.test.foo/download/test_embedding.safetensors"
+
+
+class _AuthorizationAdapter(TestAdapter):
+    """Records each request's Authorization header; with `required_token`, refuses others like a gated HF repo."""
+
+    def __init__(self, data: bytes, required_token: str | None = None) -> None:
+        super().__init__(data, headers={"Content-Length": len(data)})
+        self.required_token = required_token
+        self.authorizations: list[str | None] = []
+
+    def send(self, request, **kwargs):
+        authorization = request.headers.get("Authorization")
+        self.authorizations.append(authorization)
+        if self.required_token is not None and authorization != f"Bearer {self.required_token}":
+            return TestAdapter(b"", status=401).send(request, **kwargs)
+        return super().send(request, **kwargs)
+
+
+@pytest.mark.parametrize("login_at_failure", [None, "hf_revoked"], ids=["no_login", "outdated_login"])
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_restart_failed_uses_hf_login_made_after_the_failure(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_session,
+    embedding_file: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    login_at_failure: str | None,
+) -> None:
+    hf_login = {"token": login_at_failure}
+    monkeypatch.setattr(model_install_default, "hf_get_token", lambda: hf_login["token"])
+    mm2_session.mount(
+        _HF_EMBEDDING_URL, _AuthorizationAdapter(embedding_file.read_bytes(), required_token="hf_granted")
+    )
+
+    job = mm2_installer.heuristic_import(
+        source=_HF_EMBEDDING_SOURCE, config=ModelRecordChanges(type=ModelType.TextualInversion)
+    )
+    mm2_installer.wait_for_installs(timeout=10)
+    assert job.errored
+    assert job.error_type == "HTTPError"
+    assert job.error is not None and "UNAUTHORIZED" in job.error
+
+    hf_login["token"] = "hf_granted"
+    mm2_installer.restart_failed(job)
+    mm2_installer.wait_for_installs(timeout=10)
+
+    assert job.complete, job.error
+
+
+@pytest.mark.parametrize(
+    ("source", "download_url", "explicit_token", "expected_authorization"),
+    [
+        (_HF_EMBEDDING_SOURCE, _HF_EMBEDDING_URL, "hf_explicit", "Bearer hf_explicit"),
+        (_URL_EMBEDDING_URL, _URL_EMBEDDING_URL, None, None),
+    ],
+    ids=["explicit_token_wins_over_login", "url_source_never_gets_login"],
+)
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_download_authorization_while_logged_in_to_hf(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_session,
+    embedding_file: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    source: str,
+    download_url: str,
+    explicit_token: str | None,
+    expected_authorization: str | None,
+) -> None:
+    monkeypatch.setattr(model_install_default, "hf_get_token", lambda: "hf_login")
+    adapter = _AuthorizationAdapter(embedding_file.read_bytes())
+    mm2_session.mount(download_url, adapter)
+
+    job = mm2_installer.heuristic_import(
+        source=source, config=ModelRecordChanges(type=ModelType.TextualInversion), access_token=explicit_token
+    )
+    mm2_installer.wait_for_installs(timeout=10)
+
+    assert job.complete, job.error
+    assert adapter.authorizations == [expected_authorization]
 
 
 def test_restore_claims_downloads_done_staging_before_queueing(
