@@ -548,12 +548,17 @@ const toRecordedModelRef = (value: unknown): RecordedModelRef | null => {
 
 /**
  * Resolve the install-local key first, then a portable identifier: the content hash when one was recorded, otherwise
- * name and base (and type, when recorded). A recorded hash never falls back to a same-named file, and a portable
- * identifier counts only when exactly one installed model matches it.
+ * name and base (and type, when recorded). A portable identifier counts only when exactly one installed model matches
+ * it.
+ *
+ * By default a recorded hash never falls back to a same-named file, so the main model, VAE, components and concepts
+ * restore only the exact weights that ran. `hashMiss: 'matchName'` lets a hash that matches nothing fall through to
+ * name and base, as legacy web does for reference-image adapters after a reinstall changes their hash.
  */
 const resolveRecordedModel = <T extends ComponentModelConfig>(
   ref: RecordedModelRef,
-  models: readonly T[]
+  models: readonly T[],
+  hashMiss: 'refuse' | 'matchName' = 'refuse'
 ): T | 'ambiguous' | null => {
   const byKey = ref.key ? models.find((model) => model.key === ref.key) : undefined;
 
@@ -561,13 +566,15 @@ const resolveRecordedModel = <T extends ComponentModelConfig>(
     return byKey;
   }
 
-  const matches = ref.hash
-    ? models.filter((model) => model.hash === ref.hash)
-    : ref.name && ref.base
-      ? models.filter(
-          (model) => model.name === ref.name && model.base === ref.base && (!ref.type || model.type === ref.type)
-        )
-      : [];
+  const byHash = ref.hash ? models.filter((model) => model.hash === ref.hash) : [];
+  const matches =
+    byHash.length > 0 || (ref.hash && hashMiss === 'refuse')
+      ? byHash
+      : ref.name && ref.base
+        ? models.filter(
+            (model) => model.name === ref.name && model.base === ref.base && (!ref.type || model.type === ref.type)
+          )
+        : [];
 
   return matches.length > 1 ? 'ambiguous' : (matches[0] ?? null);
 };
@@ -689,6 +696,34 @@ export const getMetadataReferenceImages = (metadata: unknown): GenerateReference
 
   return legacy.length > 0 ? legacy : null;
 };
+
+/**
+ * Point each recorded adapter at the installed model it names, or clear it so Generate asks for one: a reinstall gives
+ * the adapter a new key, and a stale key would pass validation and fail only on the server.
+ */
+const resolveReferenceImageModels = (
+  referenceImages: GenerateReferenceImage[],
+  models: readonly ComponentModelConfig[]
+): GenerateReferenceImage[] =>
+  referenceImages.map((referenceImage) => {
+    const { config } = referenceImage;
+
+    if ((config.type !== 'ip_adapter' && config.type !== 'flux_redux') || !config.model) {
+      return referenceImage;
+    }
+
+    const recordedType = config.model.type;
+    const ref = toRecordedModelRef(config.model);
+    const installed = ref
+      ? resolveRecordedModel(
+          ref,
+          models.filter((model) => model.type === recordedType),
+          'matchName'
+        )
+      : null;
+
+    return { ...referenceImage, config: { ...config, model: installed === 'ambiguous' ? null : installed } };
+  });
 
 export const withDimensions = (
   values: GenerateWidgetValues,
@@ -886,7 +921,11 @@ export const buildImageRecallSettings = ({
     // metadata model was not recalled (e.g. uninstalled), `values.model` is
     // still the current one and incompatible configs are re-targeted or dropped.
     const recordedReferenceImages = getMetadataReferenceImages(metadata);
-    const referenceImages = getCompatibleReferenceImages(recordedReferenceImages ?? [], values.model, models);
+    const referenceImages = getCompatibleReferenceImages(
+      resolveReferenceImageModels(recordedReferenceImages ?? [], models),
+      values.model,
+      models
+    );
 
     // A record of no references clears the current ones; a record whose references do not fit leaves them.
     if (referenceImages.length > 0 || (recordedReferenceImages?.length === 0 && values.referenceImages.length > 0)) {

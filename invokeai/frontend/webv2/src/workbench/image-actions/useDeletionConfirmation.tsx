@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { Checkbox, List, Stack, Text } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
-import { patchWorkbenchPreferences } from '@workbench/settings/store';
+import { patchWorkbenchPreferences, useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { useCallback, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -40,6 +40,9 @@ export const useDeletionConfirmation = (): {
   const deletionInFlightRef = useRef(false);
   // Read only when deletion is confirmed, so ticking it and then cancelling changes nothing.
   const [skipFutureConfirmations, setSkipFutureConfirmations] = useState(false);
+  // With routine confirmations already off, the dialog only appears because the media is in use, which the opt-out
+  // does not cover.
+  const canSkipFutureConfirmations = useWorkbenchPreferenceSelector((preferences) => preferences.confirmImageDeletion);
   const skipHintId = useId();
   const usageHeadingId = useId();
 
@@ -124,7 +127,8 @@ export const useDeletionConfirmation = (): {
                 </Text>
                 <List.Root gap="0.5" ps="4">
                   {usage.map((entry, index) => (
-                    <List.Item key={`${entry.surface}:${entry.label ?? index}`}>
+                    // Captured when the dialog opens and never reordered; labels such as workflow names can repeat.
+                    <List.Item key={index}>
                       {t(`widgets.gallery.deleteInUse.surface.${entry.surface}`, { name: entry.label })}
                       <Text as="span" color="fg.muted">
                         {' · '}
@@ -138,18 +142,20 @@ export const useDeletionConfirmation = (): {
                 </Text>
               </Stack>
             ) : null}
-            <Stack gap="1" pt="1">
-              <Checkbox.Root checked={skipFutureConfirmations} size="sm" onCheckedChange={handleSkipChange}>
-                <Checkbox.HiddenInput aria-describedby={skipHintId} />
-                <Checkbox.Control>
-                  <Checkbox.Indicator />
-                </Checkbox.Control>
-                <Checkbox.Label>{t('widgets.gallery.deleteConfirmSkip')}</Checkbox.Label>
-              </Checkbox.Root>
-              <Text color="fg.muted" fontSize="sm" id={skipHintId} ps="4.5">
-                {t('widgets.gallery.deleteConfirmSkipHint')}
-              </Text>
-            </Stack>
+            {canSkipFutureConfirmations ? (
+              <Stack gap="1" pt="1">
+                <Checkbox.Root checked={skipFutureConfirmations} size="sm" onCheckedChange={handleSkipChange}>
+                  <Checkbox.HiddenInput aria-describedby={skipHintId} />
+                  <Checkbox.Control>
+                    <Checkbox.Indicator />
+                  </Checkbox.Control>
+                  <Checkbox.Label>{t('widgets.gallery.deleteConfirmSkip')}</Checkbox.Label>
+                </Checkbox.Root>
+                <Text color="fg.muted" fontSize="sm" id={skipHintId} ps="4.5">
+                  {t('widgets.gallery.deleteConfirmSkipHint')}
+                </Text>
+              </Stack>
+            ) : null}
           </>
         }
         confirmLabel={t('widgets.gallery.deleteConfirmLabel')}

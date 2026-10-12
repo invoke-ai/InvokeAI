@@ -3,6 +3,7 @@ import type { GalleryItemContextMenuTarget } from '@features/gallery/react';
 
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 import { ChakraProvider } from '@chakra-ui/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -14,6 +15,7 @@ import { ImageContextMenu, type ImageContextMenuTarget } from './ImageContextMen
 import { EMPTY_IMAGE_RECALL_CAPABILITIES } from './imageRecall';
 
 const NO_BOARDS: [] = [];
+const LOAD_WORKFLOW = 'widgets.gallery.itemActions.loadWorkflow.label';
 
 const findGalleryItem = vi.fn();
 
@@ -165,9 +167,11 @@ const renderMenu = async (actions: ImageActions, images: GalleryImage[]) => {
 
   await interact(() => {
     root?.render(
-      <ChakraProvider value={system}>
-        <Harness actions={actions} images={images} />
-      </ChakraProvider>
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <ChakraProvider value={system}>
+          <Harness actions={actions} images={images} />
+        </ChakraProvider>
+      </QueryClientProvider>
     );
   });
 };
@@ -205,15 +209,17 @@ const renderItemMenu = async (
 
   await interact(() => {
     root?.render(
-      <ChakraProvider value={system}>
-        <ImageContextMenu
-          actions={actions}
-          boards={NO_BOARDS}
-          previewVideoActions={previewVideoActions}
-          target={target as unknown as ImageContextMenuTarget}
-          onClose={vi.fn()}
-        />
-      </ChakraProvider>
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <ChakraProvider value={system}>
+          <ImageContextMenu
+            actions={actions}
+            boards={NO_BOARDS}
+            previewVideoActions={previewVideoActions}
+            target={target as unknown as ImageContextMenuTarget}
+            onClose={vi.fn()}
+          />
+        </ChakraProvider>
+      </QueryClientProvider>
     );
   });
 };
@@ -271,8 +277,8 @@ describe('ImageContextMenu load workflow', () => {
     );
     await renderMenu(actions, [image('made-by-workflow.png')]);
 
-    await vi.waitFor(() => expect(getMenuItem('Load Workflow').getAttribute('aria-disabled')).not.toBe('true'));
-    await interact(() => getMenuItem('Load Workflow').click());
+    await vi.waitFor(() => expect(getMenuItem(LOAD_WORKFLOW).getAttribute('aria-disabled')).not.toBe('true'));
+    await interact(() => getMenuItem(LOAD_WORKFLOW).click());
 
     expect(actions.loadImageWorkflow).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({ imageName: 'made-by-workflow.png' })
@@ -284,7 +290,7 @@ describe('ImageContextMenu load workflow', () => {
     await renderMenu(actions, [image('plain.png')]);
 
     await vi.waitFor(() => expect(actions.getImageRecallCapabilities).toHaveBeenCalled());
-    expect(getMenuItem('Load Workflow').getAttribute('aria-disabled')).toBe('true');
+    expect(getMenuItem(LOAD_WORKFLOW).getAttribute('aria-disabled')).toBe('true');
     expect(actions.loadImageWorkflow).not.toHaveBeenCalled();
   });
 });
@@ -454,10 +460,27 @@ describe('ImageContextMenu video placement', () => {
     actions.hasVideoWorkflow = vi.fn(() => Promise.resolve(true));
     await renderVideoMenu(actions, video);
 
-    await vi.waitFor(() => expect(getMenuItem('Load Workflow').getAttribute('aria-disabled')).not.toBe('true'));
-    await interact(() => getMenuItem('Load Workflow').click());
+    await vi.waitFor(() => expect(getMenuItem(LOAD_WORKFLOW).getAttribute('aria-disabled')).not.toBe('true'));
+    await interact(() => getMenuItem(LOAD_WORKFLOW).click());
 
     expect(actions.loadVideoWorkflow).toHaveBeenCalledExactlyOnceWith(video);
+  });
+
+  it('aborts the video capability reads when the menu closes before they answer', async () => {
+    const actions = createActions(vi.fn());
+    const pending = () => new Promise<never>(() => {});
+    actions.getVideoRecallCapabilities = vi.fn(pending);
+    actions.hasVideoWorkflow = vi.fn(pending);
+    await renderVideoMenu(actions, item('video', 'slow.mp4'));
+    await vi.waitFor(() => expect(actions.hasVideoWorkflow).toHaveBeenCalled());
+
+    await interact(() => root?.unmount());
+
+    const signals = [
+      vi.mocked(actions.getVideoRecallCapabilities).mock.calls[0]?.[1],
+      vi.mocked(actions.hasVideoWorkflow).mock.calls[0]?.[1],
+    ];
+    expect(signals.map((signal) => signal?.aborted)).toEqual([true, true]);
   });
 
   it('keeps Load Workflow disabled for a video without one', async () => {
@@ -465,7 +488,7 @@ describe('ImageContextMenu video placement', () => {
     await renderVideoMenu(actions, item('video', 'plain.mp4'));
 
     await vi.waitFor(() => expect(actions.hasVideoWorkflow).toHaveBeenCalled());
-    expect(getMenuItem('Load Workflow').getAttribute('aria-disabled')).toBe('true');
+    expect(getMenuItem(LOAD_WORKFLOW).getAttribute('aria-disabled')).toBe('true');
     expect(actions.loadVideoWorkflow).not.toHaveBeenCalled();
   });
 

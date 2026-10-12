@@ -11,8 +11,10 @@ import {
   toGalleryItemKey,
 } from '@features/gallery';
 import { getGalleryBoardDestinationGroups, getGalleryBoardLabel } from '@features/gallery/contracts';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { MenuContent, MenuIconItem } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { useQuery } from '@tanstack/react-query';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import { useProjectLibrarySelector } from '@workbench/projects/library';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
@@ -332,45 +334,28 @@ const SingleItemMenuItems = ({
     [actions, itemRef]
   );
   const handleDelete = useCallback(() => onRequestDeletion([itemRef]), [itemRef, onRequestDeletion]);
-  const [videoCapabilities, setVideoCapabilities] = useState<VideoItemCapabilities>(EMPTY_VIDEO_ITEM_CAPABILITIES);
-  const { recall: videoRecallCapabilities, workflow: hasVideoWorkflow } = videoCapabilities;
-  const [isLoadingVideoRecall, setIsLoadingVideoRecall] = useState(false);
-  const videoItemName = item.kind === 'video' ? item.name : null;
-  const getVideoRecallCapabilities = actions.getVideoRecallCapabilities;
-  const getHasVideoWorkflow = actions.hasVideoWorkflow;
+  const owner = captureAccountScope();
+  const videoItem = item.kind === 'video' ? item : null;
+  // The record answers whether a workflow is embedded only when the listing did not say.
+  const videoCapabilitiesQuery = useQuery({
+    enabled: videoItem !== null,
+    queryKey: ['gallery', 'item-menu', 'video-capabilities', owner.epoch, videoItem?.name ?? null],
+    queryFn: async ({ signal }): Promise<VideoItemCapabilities> => {
+      if (!videoItem) {
+        return EMPTY_VIDEO_ITEM_CAPABILITIES;
+      }
 
-  useEffect(() => {
-    if (!videoItemName || item.kind !== 'video') {
-      return;
-    }
+      const [recall, workflow] = await Promise.all([
+        actions.getVideoRecallCapabilities(videoItem, signal),
+        actions.hasVideoWorkflow(videoItem, signal),
+      ]);
 
-    let isCancelled = false;
-    const videoItem = item;
-
-    setVideoCapabilities(EMPTY_VIDEO_ITEM_CAPABILITIES);
-    setIsLoadingVideoRecall(true);
-    Promise.all([getVideoRecallCapabilities(videoItem), getHasVideoWorkflow(videoItem)])
-      .then(([recall, workflow]) => {
-        if (!isCancelled) {
-          setVideoCapabilities({ recall, workflow });
-        }
-      })
-      .catch(() => {
-        if (!isCancelled) {
-          setVideoCapabilities(EMPTY_VIDEO_ITEM_CAPABILITIES);
-        }
-      })
-      .finally(() => {
-        if (!isCancelled) {
-          setIsLoadingVideoRecall(false);
-        }
-      });
-
-    return () => {
-      isCancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by name; the item identity churns per render
-  }, [getHasVideoWorkflow, getVideoRecallCapabilities, videoItemName]);
+      return { recall, workflow };
+    },
+  });
+  const isLoadingVideoRecall = videoCapabilitiesQuery.isPending;
+  const { recall: videoRecallCapabilities, workflow: hasVideoWorkflow } =
+    videoCapabilitiesQuery.data ?? EMPTY_VIDEO_ITEM_CAPABILITIES;
   const handleLoadVideoWorkflow = useCallback(() => {
     if (item.kind === 'video') {
       void actions.loadVideoWorkflow(item);
@@ -396,12 +381,14 @@ const SingleItemMenuItems = ({
   }, [actions, item]);
   const handleUseAsReferenceVideo = useCallback(() => {
     if (item.kind === 'video') {
+      // eslint-disable-next-line react/hooks -- `useAsReferenceVideo` is a plain action method; the compiler reads its name as a hook.
       actions.useAsReferenceVideo(item);
     }
   }, [actions, item]);
   const makeConditioningClipHandler = useCallback(
     (role: VideoConditioningRole) => () => {
       if (item.kind === 'video') {
+        // eslint-disable-next-line react/hooks -- `useAsConditioningClip` is a plain action method; the compiler reads its name as a hook.
         actions.useAsConditioningClip(item, role);
       }
     },
@@ -440,7 +427,7 @@ const SingleItemMenuItems = ({
           <ContextMenuItem
             disabled={isLoadingVideoRecall || !hasVideoWorkflow}
             icon={WorkflowIcon}
-            label="Load Workflow"
+            label={t('widgets.gallery.itemActions.loadWorkflow.label')}
             value="load-video-workflow"
             onClick={handleLoadVideoWorkflow}
           />
@@ -757,6 +744,7 @@ const SingleImageMenuItems = ({
   onRequestDeletion: (imageNames: string[]) => void;
   recallCapabilities: ImageRecallCapabilities;
 }) => {
+  const { t } = useTranslation();
   const handleMove = useCallback(
     (boardId: string) => void actions.moveImagesToBoard([image.imageName], boardId),
     [actions, image.imageName]
@@ -807,7 +795,7 @@ const SingleImageMenuItems = ({
       <ContextMenuItem
         disabled={isLoadingRecallCapabilities || !recallCapabilities.workflow}
         icon={WorkflowIcon}
-        label="Load Workflow"
+        label={t('widgets.gallery.itemActions.loadWorkflow.label')}
         value="load-workflow"
         onClick={handleLoadWorkflow}
       />

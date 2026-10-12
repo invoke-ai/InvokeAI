@@ -482,7 +482,7 @@ export const useRegisterFirstPartyCommands = () => {
       commandApi.register({
         handler: () => loadSelectedItemWorkflow(),
         id: LOAD_WORKFLOW_COMMAND_ID,
-        title: 'Load workflow from image',
+        title: 'Load workflow from image or video',
       }),
     ];
 

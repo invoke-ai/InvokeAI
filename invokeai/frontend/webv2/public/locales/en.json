@@ -4218,6 +4218,7 @@
           "editorUnavailable": "The workflow editor is not available in this layout.",
           "failed": "Could not load the image's workflow",
           "failedVideo": "Could not load the video's workflow",
+          "label": "Load Workflow",
           "loadedLabel": "Loaded “{{name}}” from image",
           "loadedLabelVideo": "Loaded “{{name}}” from video",
           "missing": "This image has no workflow embedded.",

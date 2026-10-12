@@ -11,6 +11,7 @@ import type { TFunction } from 'i18next';
 
 import { galleryImages, galleryVideos } from '@features/gallery';
 import {
+  getCompatibleReferenceImages,
   getDefaultGenerateSettings,
   getEffectiveReferenceImage,
   hasArchitectureCapabilities,
@@ -302,7 +303,14 @@ export const executeImageRecall = async ({
       result.values.referenceImages = await filterAvailableReferenceImages(result.values.referenceImages, owner.signal);
       assertAccountScopeCurrent(owner);
 
+      // Every recorded reference was deleted: keep the current ones, fitted to the recalled model as an unrecorded list
+      // would be, rather than clearing them as if the record listed none.
       if (result.values.referenceImages.length === 0) {
+        result.values.referenceImages = getCompatibleReferenceImages(
+          currentGenerateValues.referenceImages,
+          result.values.model,
+          models
+        );
         result.fields = result.fields.filter((field) => field !== 'referenceImages');
       }
     }

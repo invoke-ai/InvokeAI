@@ -1451,5 +1451,58 @@ describe('legacy records', () => {
       expect(result?.values.vae?.key).toBe(vae.key);
       expect(result?.fields).toEqual(expect.arrayContaining(['components', 'vae']));
     });
+
+    describe('reference-image adapters', () => {
+      const adapter: ComponentModelConfig = {
+        base: 'sdxl',
+        hash: 'blake3:adapter-new',
+        key: 'adapter-new',
+        name: 'Adapter',
+        type: 'ip_adapter',
+      };
+      const recallAdapter = (installed: ComponentModelConfig[]) =>
+        recall(
+          {
+            model: { key: sdxlModel.key },
+            ref_images: [
+              {
+                config: {
+                  image: { height: 512, image_name: 'reference.png', width: 512 },
+                  model: {
+                    base: 'sdxl',
+                    hash: 'blake3:adapter-old',
+                    key: 'adapter-old',
+                    name: 'Adapter',
+                    type: 'ip_adapter',
+                  },
+                  type: 'ip_adapter',
+                },
+                id: 'reference',
+                isEnabled: true,
+              },
+            ],
+          },
+          {},
+          [sdxlModel],
+          [sdxlModel, ...installed]
+        )?.values.referenceImages[0]?.config;
+
+      it('resolves a reinstalled adapter by its recorded hash', () => {
+        const rehashed = { ...adapter, hash: 'blake3:adapter-old', key: 'adapter-rehashed' };
+
+        expect(recallAdapter([adapter, rehashed])).toMatchObject({ model: { key: rehashed.key } });
+      });
+
+      // Unlike the main model, legacy web falls back to the name when an adapter's hash matches nothing.
+      it('falls back to name, base and type when the recorded hash matches nothing', () => {
+        expect(recallAdapter([adapter, { ...adapter, key: 'lora-named-adapter', type: 'lora' }])).toMatchObject({
+          model: { key: adapter.key },
+        });
+      });
+
+      it('leaves the adapter unset when the name matches more than one installed adapter', () => {
+        expect(recallAdapter([adapter, { ...adapter, key: 'adapter-twin' }])).toMatchObject({ model: null });
+      });
+    });
   });
 });
