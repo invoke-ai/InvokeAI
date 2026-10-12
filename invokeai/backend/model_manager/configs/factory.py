@@ -58,6 +58,7 @@ from invokeai.backend.model_manager.configs.lora import (
     LoRA_Diffusers_SDXL_Config,
     LoRA_Diffusers_ZImage_Config,
     LoRA_LyCORIS_Anima_Config,
+    LoRA_LyCORIS_ErnieImage_Config,
     LoRA_LyCORIS_Flux2_Config,
     LoRA_LyCORIS_FLUX_Config,
     LoRA_LyCORIS_Krea2_Config,
@@ -500,6 +501,10 @@ AnyModelConfig = Annotated[
         # ``test_minimax_h3_lora_probe_independence.py``).
         Annotated[LoRA_LyCORIS_LTX2_Config, LoRA_LyCORIS_LTX2_Config.get_tag()],
         Annotated[LoRA_LyCORIS_MiniMaxH3_Config, LoRA_LyCORIS_MiniMaxH3_Config.get_tag()],
+        # ERNIE-Image keys on its `self_attention` / `mlp.gate_proj` block names, which Z-Image's probe now
+        # rejects, so the two are mutually exclusive regardless of order (locked in by
+        # `test_ernie_image_lora_probe_independence.py`).
+        Annotated[LoRA_LyCORIS_ErnieImage_Config, LoRA_LyCORIS_ErnieImage_Config.get_tag()],
         # Wan and Anima both target ``blocks.X`` shapes; their LoRA probes are
         # mutually exclusive — Wan rejects Anima's ``_proj``/``mlp``/
         # ``adaln_modulation`` markers, Anima requires at least one of those

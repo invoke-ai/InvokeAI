@@ -99,7 +99,21 @@ Selecting an ERNIE-Image model applies these defaults:
 - **Schedulers**: *Euler* (the default), *Heun (2nd order)* and *LCM*.
 - **Resolution**: width and height must be multiples of 16.
 
-LoRA, ControlNet, reference images and regional prompting are not available for ERNIE-Image.
+ControlNet, reference images and regional prompting are not available for ERNIE-Image.
+
+## LoRA
+
+ERNIE-Image LoRAs are supported in the layouts trainers publish them in: ai-toolkit and Civitai's trainer
+(`diffusion_model.` prefix) and diffusers/PEFT exports (`transformer.` or `base_model.model.` prefix), including
+LoKR and LoHA layers. DoRA files, and files with layers that match no ERNIE-Image transformer module, are refused
+when you install them. ERNIE-Image LoRAs train the transformer only.
+
+On a GGUF build, and with **FP8 Storage**, the LoRA is applied alongside the weights instead of being merged into
+them. It then stays in VRAM for the whole generation, and InvokeAI reserves room for it on top of the
+`device_working_mem_gb` reserve.
+
+Earlier versions identified ERNIE-Image LoRAs as Z-Image LoRAs. Select such a LoRA in the Model Manager and use
+**Re-identify** to fix it.
 
 ## Prompt enhancer
 
