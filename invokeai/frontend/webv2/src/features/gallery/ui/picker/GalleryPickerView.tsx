@@ -76,7 +76,7 @@ export const GalleryPickerView = ({
   onPick: (item: GalleryItem) => void;
 }) => {
   const { t } = useTranslation();
-  const { galleryValues, projectName, revealInGallery } = useGalleryHost();
+  const { galleryValues, projectId = null, projectName, projects, revealInGallery } = useGalleryHost();
   const { data, gallerySelectedItem, scope, selectBoard, setSearchTerm, setView, settings, togglePane } =
     useGalleryPickerScope();
   const idBase = useId();
@@ -249,7 +249,8 @@ export const GalleryPickerView = ({
     const groups = getGalleryBoardGroups({
       boards: data.boards,
       projectBoardId: getGalleryProjectBoardId(galleryValues),
-      projectName,
+      projectId,
+      projectNames: new Map((projects ?? []).map((project) => [project.id, project.name])),
       searchTerm: scope.searchTerm,
       showArchived: settings.showArchivedBoards,
       showDates: settings.showDateBoards,
@@ -257,16 +258,23 @@ export const GalleryPickerView = ({
       showOtherProjects: true,
       t,
     });
-
     return [
-      { boards: groups.yourBoards, id: 'boards', label: t('widgets.gallery.boardGroups.boards') },
+      { boards: groups.projectBoards, id: 'project', label: projectName },
+      { boards: groups.libraryBoards, id: 'library', label: t('widgets.gallery.boardGroups.library') },
+      ...groups.otherProjects.map((group) => ({
+        boards: group.boards,
+        id: `project:${group.projectId}`,
+        label: group.label,
+      })),
       { boards: groups.dateBoards, id: 'dates', label: t('widgets.gallery.boardGroups.byDate') },
       { boards: groups.archivedBoards, id: 'archived', label: t('common.archived') },
     ].filter((group) => group.boards.length > 0);
   }, [
     data.boards,
     galleryValues,
+    projectId,
     projectName,
+    projects,
     scope.searchTerm,
     settings.showArchivedBoards,
     settings.showDateBoards,

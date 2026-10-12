@@ -3021,6 +3021,31 @@ const removeGalleryItemsFromAllProjects = (
   return didChange ? { ...state, projects } : state;
 };
 
+/**
+ * The boards a project's gallery and unfinished queue items will act on: its selected board, its auto-add board and the
+ * boards pending or running results are bound for. Its own inbox is left out: a draft project's inbox exists only once
+ * the project does, and it goes only with the project.
+ */
+export const getProjectGalleryBoardReferences = (project: Project): string[] => {
+  const values = getWidgetValues(project, 'gallery');
+  const { autoAddBoardId } = getGallerySettings(values);
+  const references = new Set<string>();
+
+  for (const boardId of [
+    values.selectedBoardId,
+    autoAddBoardId,
+    ...project.queue.items
+      .filter((item) => item.status === 'pending' || item.status === 'running')
+      .map((item) => item.snapshot.galleryBoardId),
+  ]) {
+    if (typeof boardId === 'string' && boardId !== GALLERY_AUTO_ADD_FOLLOW && boardId !== values.projectBoardId) {
+      references.add(boardId);
+    }
+  }
+
+  return [...references];
+};
+
 const reconcileDeletedGalleryBoard = (
   state: WorkbenchState,
   boardId: string,

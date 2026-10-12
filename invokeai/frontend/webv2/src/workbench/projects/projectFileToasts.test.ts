@@ -48,7 +48,7 @@ describe('startProjectFileReport', () => {
 
     report.report({ completed: 1, phase: 'bundling', total: 3 });
     report.report({ completed: 2, phase: 'bundling', total: 3 });
-    report.succeed('projects.exported', { boardItemIssues: [], documentReferenceIssues: [] });
+    report.succeed('projects.exported', { boardIssues: [], boardItemIssues: [], documentReferenceIssues: [] });
 
     expect(toaster.create).toHaveBeenCalledTimes(1);
     expect(toaster.update.mock.calls.every(([id]) => id === 'toast-1')).toBe(true);
@@ -104,7 +104,7 @@ describe('startProjectFileReport', () => {
   it('does not take back a verdict it has already given', () => {
     const report = toasts.startProjectFileReport(t, 'projects.importing');
 
-    report.succeed('projects.imported', { boardItemIssues: [], documentReferenceIssues: [] });
+    report.succeed('projects.imported', { boardIssues: [], boardItemIssues: [], documentReferenceIssues: [] });
     report.fail('projects.importFailed', new Error('navigation blew up'));
 
     const settles = toaster.update.mock.calls.filter(([, options]) => options.duration === undefined);
@@ -120,6 +120,16 @@ describe('startProjectFileReport', () => {
 
     expect(toaster.update.mock.calls[0]![1].description).toBe(
       'projects.file.restoringProgress({"completed":1,"total":4})'
+    );
+  });
+
+  it('counts the boards moved into the project once the media is in', () => {
+    const report = toasts.startProjectFileReport(t, 'projects.importing');
+
+    report.report({ completed: 1, phase: 'placing-boards', total: 3 });
+
+    expect(toaster.update.mock.calls[0]![1].description).toBe(
+      'projects.file.placingBoardsProgress({"completed":1,"total":3})'
     );
   });
 
@@ -153,11 +163,29 @@ describe('startProjectFileReport', () => {
     const report = toasts.startProjectFileReport(t, 'projects.exporting');
 
     report.succeed('projects.exported', {
+      boardIssues: [],
       boardItemIssues: boardNames.map(issue),
       documentReferenceIssues: referenceNames.map(issue),
     });
 
     expect(toaster.update).toHaveBeenCalledWith('toast-1', { duration: undefined, ...expected });
+  });
+
+  it('leads with the boards that stayed in the Library, before the items that were lost', () => {
+    const report = toasts.startProjectFileReport(t, 'projects.importing');
+
+    report.succeed('projects.imported', {
+      boardIssues: [{ name: 'Old' }],
+      boardItemIssues: [{ kind: 'image', name: 'a.png', reason: 'upload-failed' }],
+      documentReferenceIssues: [],
+    });
+
+    expect(toaster.update).toHaveBeenCalledWith('toast-1', {
+      description: 'projects.file.unplacedBoards({"count":1}) projects.file.missingBoardItems({"count":1})',
+      duration: undefined,
+      title: 'projects.imported',
+      type: 'warning',
+    });
   });
 
   it('translates a format error into its reason rather than its message', async () => {
