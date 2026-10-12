@@ -21,7 +21,6 @@ import { coerceSchedulerForGraph, isBundledMainForBase } from '@features/generat
 import type { UpscaleBase } from './settings';
 import type { CompiledUpscaleGraph, UpscaleWidgetValues } from './types';
 
-import { getIndexClippedDenoisingStart, getUpscaleDenoisingStart } from './denoisingStart';
 import {
   activeUpscaleComponents,
   getUpscaleValidationReasons,
@@ -29,6 +28,39 @@ import {
   upscaleDenoiseDimension,
   wiresUpscaleNegativePrompt,
 } from './settings';
+
+/** The legacy formula: creativity -10..10 to a value-clipped start of 0.998..0. */
+export const getUpscaleDenoisingStart = (creativity: number): number => ((creativity * -1 + 10) * 4.99) / 100;
+
+/**
+ * The start an index-clipping node needs to enter where a value-clipping one would.
+ *
+ * Creativity is defined by where FLUX enters: `flux_denoise` clips the schedule by *value*, so a start
+ * of 0.499 enters at sigma 0.501 whatever the shift or step count. Z-Image and Anima clip by *index*
+ * instead, so the same number enters far noisier there -- 0.499 starts Z-Image at sigma 0.78. Both
+ * build `sigma = shift * t / (1 + (shift - 1) * t)` at `t = 1 - i / steps` and begin at
+ * `i = int(start * steps)`. This picks the `i` whose sigma is nearest `1 - valueStart` and aims at the
+ * middle of that step, so float error in the node's product cannot floor it one step short. It goes
+ * away when those nodes clip by value; `test_upscale_index_clipped_starts.py` fails when they do.
+ */
+export const getIndexClippedDenoisingStart = (valueStart: number, steps: number, shift: number): number => {
+  const target = 1 - valueStart;
+  let entryIndex = 0;
+  let entryDistance = Number.POSITIVE_INFINITY;
+
+  // The last index would leave nothing to denoise, so it is never a candidate.
+  for (let index = 0; index < steps; index += 1) {
+    const t = 1 - index / steps;
+    const distance = Math.abs((shift * t) / (1 + (shift - 1) * t) - target);
+
+    if (distance < entryDistance) {
+      entryIndex = index;
+      entryDistance = distance;
+    }
+  }
+
+  return entryIndex === 0 ? 0 : (entryIndex + 0.5) / steps;
+};
 
 export const getUpscaleControlNetValues = (structure: number) => {
   const splitPoint = (structure + 10) * 0.025 + 0.3;

@@ -2,10 +2,11 @@
 
 `flux_denoise` clips `denoising_start` by sigma value; `z_image_denoise` and `anima_denoise` clip it by
 step index on a shifted schedule, so the same number enters them far noisier. The widget therefore
-does not send them FLUX's start: `features/upscale/core/denoisingStart.ts` picks the step whose sigma
-is nearest the one FLUX would enter at, from its own copy of each node's shift and clipping rule.
+does not send them FLUX's start: `getIndexClippedDenoisingStart` (`features/upscale/core/graph.ts`)
+picks the step whose sigma is nearest the one FLUX would enter at, from its own copy of each node's
+shift (`settings.ts`) and clipping rule.
 
-`upscaleIndexClippedStarts.json`, written by `denoisingStart.test.ts` (regenerate with `vitest -u`),
+`upscaleIndexClippedStarts.json`, written by `indexClippedStarts.test.ts` (regenerate with `vitest -u`),
 records what the widget sends. Each case here drives the real `_run_diffusion` -- the real shift, the
 real `_get_sigmas`, the real clipping and the real img2img blend -- and reads the entry sigma back out
 of the blended tensor. It has to be the step nearest FLUX's entry. A change to either node's shift,

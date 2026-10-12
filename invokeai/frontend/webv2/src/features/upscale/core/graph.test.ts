@@ -6,8 +6,12 @@ import { describe, expect, it } from 'vitest';
 
 import type { TileControlNetModelConfig, UpscaleWidgetValues } from './types';
 
-import { getUpscaleDenoisingStart } from './denoisingStart';
-import { compileUpscaleGraph, getUpscaleControlNetValues, getZImageTileControlValues } from './graph';
+import {
+  compileUpscaleGraph,
+  getUpscaleControlNetValues,
+  getUpscaleDenoisingStart,
+  getZImageTileControlValues,
+} from './graph';
 import { createDefaultUpscaleWidgetValues } from './settings';
 
 const model = (key: string, type: string, base: string, name = key): ModelConfig => ({

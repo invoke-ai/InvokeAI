@@ -32,7 +32,26 @@ import { isSeedMode, SEED_MAX } from '@platform/core/seed';
 
 import type { SpandrelModelConfig, TileControlNetModelConfig, UpscaleWidgetValues } from './types';
 
-import { ANIMA_SCHEDULE_SHIFT, zImageScheduleShift } from './denoisingStart';
+// The schedule shifts of the two denoise nodes that clip `denoising_start` by step index, for the
+// table's `indexClippedShift`; `getIndexClippedDenoisingStart` in graph.ts uses them to start those
+// nodes where FLUX would. They go away when those nodes clip by value.
+
+/** `z_image_denoise._calculate_shift`, held at the fit's 4096-token end since the clamp (#378). */
+const Z_IMAGE_SHIFT_MIN_SEQ_LEN = 256;
+const Z_IMAGE_SHIFT_MAX_SEQ_LEN = 4096;
+const Z_IMAGE_BASE_SHIFT = 0.5;
+const Z_IMAGE_MAX_SHIFT = 1.15;
+
+/** Z-Image's linear shift for a frame: one token per 16x16 pixels, as `z_image_denoise` patches it. */
+const zImageScheduleShift = ({ width, height }: { width: number; height: number }): number => {
+  const seqLen = Math.min(Math.floor(width / 16) * Math.floor(height / 16), Z_IMAGE_SHIFT_MAX_SEQ_LEN);
+  const slope = (Z_IMAGE_MAX_SHIFT - Z_IMAGE_BASE_SHIFT) / (Z_IMAGE_SHIFT_MAX_SEQ_LEN - Z_IMAGE_SHIFT_MIN_SEQ_LEN);
+
+  return Math.exp(seqLen * slope + Z_IMAGE_BASE_SHIFT - slope * Z_IMAGE_SHIFT_MIN_SEQ_LEN);
+};
+
+/** `ANIMA_SHIFT`: Anima's schedule is shifted by a constant, not by resolution. */
+const ANIMA_SCHEDULE_SHIFT = 3;
 
 /** A text encoder the widget can be asked for; each is its own persisted field. */
 export type UpscaleComponentField = 't5EncoderModel' | 'clipEmbedModel' | 'qwen3EncoderModel' | 'qwen35EncoderModel';
