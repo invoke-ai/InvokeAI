@@ -108,8 +108,6 @@ describe('compileUpscaleGraph', () => {
       tile_size: 1024,
       upscale_scale: 4,
     });
-    expect(hasEdge(edges, 'spandrel_autoscale', 'width', 'core_metadata', 'width')).toBe(true);
-    expect(hasEdge(edges, 'spandrel_autoscale', 'height', 'core_metadata', 'height')).toBe(true);
     expect(
       hasEdge(edges, 'controlnet_collector', 'collection', 'tiled_multidiffusion_denoise_latents', 'control')
     ).toBe(true);
@@ -448,7 +446,45 @@ describe('Creativity on index-clipping architectures', () => {
   });
 });
 
+describe('schedulers on the upscale pass', () => {
+  // A stored Heun or LCM on a flow model -- left from SD, recalled, or picked before the list was
+  // narrowed -- would start the pass from pure noise, or on Anima below the blend.
+  it.each([
+    ['flux', () => createFluxValues(), 'lcm', 'euler'],
+    ['z-image', () => createZImageValues(), 'heun', 'euler'],
+    ['anima', () => createAnimaValues(), 'heun', 'euler'],
+    ['anima', () => createAnimaValues(), 'dpmpp_2m', 'dpmpp_2m'],
+    ['sd-1', () => createValues('sd-1'), 'heun', 'heun'],
+  ] as const)('runs %s with %s stored as %s, and records what ran', (_base, createBaseValues, stored, runs) => {
+    const { nodes } = compileUpscaleGraph({ ...createBaseValues(), scheduler: stored }, 'gallery', {
+      useCpuNoise: true,
+    }).backendGraph;
+    const denoise = nodes.denoise_latents ?? nodes.tiled_multidiffusion_denoise_latents;
+
+    expect([denoise?.scheduler, nodes.core_metadata?.scheduler]).toEqual([runs, runs]);
+  });
+});
+
 describe('upscale metadata', () => {
+  it.each([
+    ['sd-1', () => createValues('sd-1')],
+    ['flux', () => createFluxValues()],
+    ['z-image', () => createZImageValues()],
+    ['anima', () => createAnimaValues()],
+  ] as const)('records the size of the image the %s pass encoded, which is the size of the result', (_base, create) => {
+    // Where a pass resizes Spandrel's frame, the result does not have Spandrel's size: a 1x
+    // restoration model leaves the frame unscaled, and its multiple of 8 is not FLUX's or Z-Image's
+    // 16. Recall restores the size recorded here.
+    const { edges } = compileUpscaleGraph(create(), 'gallery', { useCpuNoise: true }).backendGraph;
+    const sourceOf = (nodeId: string, field: string) =>
+      edges.find((edge) => edge.destination.node_id === nodeId && edge.destination.field === field)?.source;
+    const encoded = sourceOf('i2l', 'image')?.node_id;
+
+    expect(encoded).toBeDefined();
+    expect(sourceOf('core_metadata', 'width')).toEqual({ field: 'width', node_id: encoded });
+    expect(sourceOf('core_metadata', 'height')).toEqual({ field: 'height', node_id: encoded });
+  });
+
   it.each([
     ['sd-1', () => createValues('sd-1')],
     ['sdxl', () => createValues('sdxl')],

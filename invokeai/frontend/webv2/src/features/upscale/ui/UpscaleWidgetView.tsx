@@ -17,6 +17,7 @@ import {
   Text,
 } from '@chakra-ui/react';
 import {
+  CapabilitiesGate,
   ConceptList,
   type ConceptModelPort,
   ConceptRow,
@@ -34,8 +35,6 @@ import {
   isLoraCompatibleWithModel,
   isLoraModelConfig,
   isMainModelConfig,
-  coerceSchedulerForGraph,
-  getSchedulerOptions,
   isModelIdentifierConfig,
   isVaeCompatibleWithGenerateModel,
   isVaeModelConfig,
@@ -50,6 +49,7 @@ import {
 } from '@features/models';
 import { ModelSelect } from '@features/models/react';
 import {
+  coerceUpscaleScheduler,
   createDefaultUpscaleWidgetValues,
   getUpscaleOutputDimensions,
   isSpandrelModelConfig,
@@ -72,6 +72,7 @@ import {
   UPSCALE_TILE_SIZE_MIN,
   upscaleComponentsFor,
   upscaleMinSteps,
+  upscaleSchedulerOptions,
 } from '@features/upscale/core/settings';
 import { SEED_MAX } from '@platform/core/seed';
 import { useMountEffect } from '@platform/react/useMountEffect';
@@ -146,7 +147,8 @@ const COMPONENT_FIELD_UI: Record<
   },
 };
 
-const selectCapabilitiesStatus = (snapshot: ArchitectureCapabilitiesSnapshot) => snapshot.status;
+// Revision zero means the table is absent, whatever its request's status.
+const selectCapabilitiesRevision = (snapshot: ArchitectureCapabilitiesSnapshot) => snapshot.revision;
 const SCALE_MARKS = [1, 2, 4, 8, 16];
 const CREATIVITY_MARKS = [UPSCALE_CREATIVITY_MIN, 0, UPSCALE_CREATIVITY_MAX];
 const STRUCTURE_MARKS = [UPSCALE_STRUCTURE_MIN, 0, UPSCALE_STRUCTURE_MAX];
@@ -200,9 +202,11 @@ const getRangeError = (label: string, value: number, min: number, max: number): 
 const UpscaleOutputPreflight = memo(
   function UpscaleOutputPreflight({
     inputImage,
+    model,
     scale,
   }: {
     inputImage: UpscaleWidgetValues['inputImage'];
+    model: UpscaleWidgetValues['model'];
     scale: number;
   }) {
     const { t } = useTranslation();
@@ -211,7 +215,7 @@ const UpscaleOutputPreflight = memo(
       return null;
     }
 
-    const output = getUpscaleOutputDimensions(inputImage, scale);
+    const output = getUpscaleOutputDimensions(inputImage, scale, model);
     const outputMegapixels = (output.width * output.height) / 1_000_000;
     const isLargeOutput = outputMegapixels >= LARGE_OUTPUT_MEGAPIXELS;
 
@@ -294,7 +298,11 @@ const UpscaleOutputPreflight = memo(
       </Stack>
     );
   },
-  (previous, next) => previous.scale === next.scale && areInputImagesEquivalent(previous.inputImage, next.inputImage)
+  (previous, next) =>
+    previous.scale === next.scale &&
+    // The grid comes from the architecture, so another model of the same base changes nothing.
+    previous.model?.base === next.model?.base &&
+    areInputImagesEquivalent(previous.inputImage, next.inputImage)
 );
 
 const UpscaleModelReconciler = ({
@@ -334,14 +342,16 @@ export const UpscaleWidgetView = () => {
   const selection = useUpscaleUi();
   const models = useModelsSelector((snapshot) => snapshot.models);
   const modelsStatus = useModelsSelector((snapshot) => snapshot.status);
-  const capabilitiesStatus = useExternalStoreSelector(
+  const capabilitiesRevision = useExternalStoreSelector(
     subscribeArchitectureCapabilities,
     getArchitectureCapabilitiesSnapshot,
-    selectCapabilitiesStatus
+    selectCapabilitiesRevision
   );
-  // The sync picks VAEs and a new model's CFG from the served table, so like Generate's reconcile it
-  // waits for that table. A failed fetch still syncs; the CFG rule then leaves CFG alone.
-  const canSync = modelsStatus === 'loaded' && (capabilitiesStatus === 'loaded' || capabilitiesStatus === 'error');
+  // The sync picks VAEs and a new model's CFG from the served table, and a default applied without it
+  // would stick: nothing re-applies one to a model already selected. So the sync waits for the table,
+  // and until then the gate holds back the form, its model picker included.
+  const hasCapabilities = capabilitiesRevision > 0;
+  const canSync = modelsStatus === 'loaded' && hasCapabilities;
   const { patchPromptDraft: patchDraft, patchValues, projectId, promptDraft, rawValues } = selection;
   // Reuse normalization/reconciliation results across unrelated renders to preserve section identities.
   const values = useMemo(() => {
@@ -547,17 +557,25 @@ export const UpscaleWidgetView = () => {
   );
 
   const vaePrecisionValue = useMemo(() => [values.vaePrecision], [values.vaePrecision]);
-  // The architecture's own list, showing the scheduler the graph will really run. The stored value is
-  // left alone, so switching back to SD brings back an SD scheduler the flow models do not have.
-  const schedulerOptions = useMemo(() => getSchedulerOptions(values.model ?? undefined), [values.model]);
-  const scheduler = coerceSchedulerForGraph(values.model ?? undefined, values.scheduler);
+  // The architecture's own list, less the schedulers that would ignore Creativity, showing the one the
+  // graph will really run. Where one is left there is nothing to choose, and the field goes.
+  const schedulerOptions = useMemo(() => upscaleSchedulerOptions(values.model), [values.model]);
+  const scheduler = coerceUpscaleScheduler(values.model, values.scheduler);
+  const gateLabels = useMemo(
+    () => ({
+      loadFailed: t('widgets.upscale.capabilitiesLoadFailed'),
+      loading: t('widgets.upscale.loadingCapabilities'),
+      retry: t('widgets.upscale.retry'),
+    }),
+    [t]
+  );
 
   const sharedBadge = useMemo(() => <Badge fontFamily="mono">{t('widgets.upscale.shared')}</Badge>, [t]);
 
-  return (
+  const form = (
     <Stack gap={1} minW={0} p="1">
       <UpscaleModelReconciler
-        key={`${projectId}:${modelsStatus}:${capabilitiesStatus}:${modelsFingerprint}`}
+        key={`${projectId}:${modelsStatus}:${capabilitiesRevision}:${modelsFingerprint}`}
         rawValues={rawValues}
         values={values}
       />
@@ -565,7 +583,7 @@ export const UpscaleWidgetView = () => {
       <GenerationSettingsSection label={t('widgets.upscale.sourceAndTreatment')} defaultOpen>
         <Stack gap="3" p="2">
           <UpscaleImageField inputImage={values.inputImage} onChange={set.inputImage} />
-          <UpscaleOutputPreflight inputImage={values.inputImage} scale={values.scale} />
+          <UpscaleOutputPreflight inputImage={values.inputImage} model={values.model} scale={values.scale} />
           <Field
             error={values.upscaleModel ? undefined : t('widgets.upscale.spandrelModelRequired')}
             helpText={values.upscaleModel ? t('widgets.upscale.spandrelModelHelp') : undefined}
@@ -702,14 +720,16 @@ export const UpscaleWidgetView = () => {
             value={values.cfgScale}
             onChange={set.cfgScale}
           />
-          <Field hint="scheduler" label={t('widgets.upscale.scheduler')}>
-            <Combobox
-              aria-label={t('widgets.upscale.scheduler')}
-              options={schedulerOptions}
-              value={scheduler}
-              onValueChange={set.scheduler}
-            />
-          </Field>
+          {schedulerOptions.length > 1 ? (
+            <Field hint="scheduler" label={t('widgets.upscale.scheduler')}>
+              <Combobox
+                aria-label={t('widgets.upscale.scheduler')}
+                options={schedulerOptions}
+                value={scheduler}
+                onValueChange={set.scheduler}
+              />
+            </Field>
+          ) : null}
           <Separator borderColor="border.subtle" />
           <SeedField
             batchCount={values.batchCount}
@@ -850,5 +870,11 @@ export const UpscaleWidgetView = () => {
         </Stack>
       </GenerationSettingsSection>
     </Stack>
+  );
+
+  return (
+    <CapabilitiesGate isReady={hasCapabilities} labels={gateLabels}>
+      {form}
+    </CapabilitiesGate>
   );
 };

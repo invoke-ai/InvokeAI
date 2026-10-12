@@ -12,6 +12,10 @@ real `_get_sigmas`, the real clipping and the real img2img blend -- and reads th
 of the blended tensor. It has to be the step nearest FLUX's entry. A change to either node's shift,
 schedule or clipping fails here instead of silently moving every Upscale preset; that includes a move
 to value clipping, which would leave the translation entering far too late.
+
+The blend only helps if the scheduler then starts where it left the latents. The fixture also records
+which schedulers the widget offers each node, and that has to be exactly the set that does: one that
+builds its own schedule would denoise the frame as if it were pure noise, or leave noise in it.
 """
 
 import json
@@ -25,6 +29,8 @@ import torch
 
 from invokeai.app.invocations.anima.anima_denoise import AnimaDenoiseInvocation
 from invokeai.app.invocations.z_image.z_image_denoise import ZImageDenoiseInvocation
+from invokeai.backend.anima.scheduler_driver import AnimaSchedulerDriver
+from invokeai.backend.flux.schedulers import ANIMA_SCHEDULER_MAP, ZIMAGE_SCHEDULER_MAP
 
 FIXTURE = (
     Path(__file__).parents[3]
@@ -38,11 +44,27 @@ FIXTURE = (
     / "__snapshots__"
     / "upscaleIndexClippedStarts.json"
 )
-CASES = json.loads(FIXTURE.read_text(encoding="utf-8"))["cases"]
+FIXTURE_DATA = json.loads(FIXTURE.read_text(encoding="utf-8"))
+CASES = FIXTURE_DATA["cases"]
+OFFERED_SCHEDULERS = FIXTURE_DATA["schedulers"]
+Z_IMAGE_MODULE = "invokeai.app.invocations.z_image.z_image_denoise"
+ANIMA_MODULE = "invokeai.app.invocations.anima.anima_denoise"
 
 
-class _StopAfterBlend(Exception):
-    """Ends the run at the first call after the img2img blend."""
+class _Stop(Exception):
+    """Ends the run at the probe that raised it."""
+
+
+def _run_until_stopped(node, module: str, dtype_attr: str, context, noise: torch.Tensor, patches) -> None:
+    with ExitStack() as stack:
+        stack.enter_context(patch(f"{module}.TorchDevice.choose_torch_device", return_value=torch.device("cpu")))
+        # float32: the entry sigma is read back out of the tensor, and bfloat16 keeps three digits.
+        stack.enter_context(patch(f"{module}.TorchDevice.{dtype_attr}", return_value=torch.float32))
+        stack.enter_context(patch.object(node, "_prepare_noise_tensor", return_value=noise))
+        for extra in patches:
+            stack.enter_context(extra)
+        with pytest.raises(_Stop):
+            node._run_diffusion(context)
 
 
 def _entry(node, module: str, dtype_attr: str, latents: torch.Tensor, noise: torch.Tensor, patches) -> tuple:
@@ -62,28 +84,25 @@ def _entry(node, module: str, dtype_attr: str, latents: torch.Tensor, noise: tor
 
     def capture(_context, blended):
         captured["latents"] = blended
-        raise _StopAfterBlend
+        raise _Stop
 
     context = MagicMock()
     context.tensors.load.return_value = latents
-    with ExitStack() as stack:
-        stack.enter_context(patch(f"{module}.TorchDevice.choose_torch_device", return_value=torch.device("cpu")))
-        # float32: the entry sigma is read back out of the tensor, and bfloat16 keeps three digits.
-        stack.enter_context(patch(f"{module}.TorchDevice.{dtype_attr}", return_value=torch.float32))
-        stack.enter_context(patch.object(node, "_prepare_noise_tensor", return_value=noise))
-        stack.enter_context(patch.object(node, "_get_sigmas", record))
-        stack.enter_context(patch.object(node, "_prep_inpaint_mask", capture))
-        for extra in patches:
-            stack.enter_context(extra)
-        with pytest.raises(_StopAfterBlend):
-            node._run_diffusion(context)
+    _run_until_stopped(
+        node,
+        module,
+        dtype_attr,
+        context,
+        noise,
+        [patch.object(node, "_get_sigmas", record), patch.object(node, "_prep_inpaint_mask", capture), *patches],
+    )
 
     blended = captured["latents"]
     assert torch.allclose(blended, blended.flatten()[:1].expand_as(blended)), "the blend should be uniform"
     return schedule["sigmas"], float(blended.flatten()[0])
 
 
-def z_image_entry(side: int, steps: int, denoising_start: float) -> tuple[list[float], float]:
+def _z_image_node(side: int, steps: int, denoising_start: float, scheduler: str) -> tuple:
     node = ZImageDenoiseInvocation.model_construct(
         id="upscale",
         latents=MagicMock(latents_name="latents"),
@@ -97,30 +116,65 @@ def z_image_entry(side: int, steps: int, denoising_start: float) -> tuple[list[f
         positive_conditioning=SimpleNamespace(conditioning_name="positive", mask=None),
         transformer=MagicMock(transformer="transformer"),
         seed=0,
-        scheduler="euler",
+        scheduler=scheduler,
     )
     regional = SimpleNamespace(regional_text_conditioning=SimpleNamespace(prompt_embeds=torch.zeros(1, 4, 16)))
+    conditioning = [
+        patch(f"{Z_IMAGE_MODULE}.ZImageRegionalPromptingExtension.from_text_conditionings", return_value=regional),
+        patch.object(
+            node,
+            "_load_text_conditioning",
+            return_value=[SimpleNamespace(prompt_embeds=torch.zeros(1, 4, 16), mask=None)],
+        ),
+    ]
+    return node, conditioning
+
+
+def z_image_entry(side: int, steps: int, denoising_start: float) -> tuple[list[float], float]:
+    node, conditioning = _z_image_node(side, steps, denoising_start, "euler")
     return _entry(
         node,
-        "invokeai.app.invocations.z_image.z_image_denoise",
+        Z_IMAGE_MODULE,
         "choose_bfloat16_safe_dtype",
         torch.zeros(1, 16, 8, 8),
         torch.ones(1, 16, 8, 8),
-        [
-            patch(
-                "invokeai.app.invocations.z_image.z_image_denoise.ZImageRegionalPromptingExtension.from_text_conditionings",
-                return_value=regional,
-            ),
-            patch.object(
-                node,
-                "_load_text_conditioning",
-                return_value=[SimpleNamespace(prompt_embeds=torch.zeros(1, 4, 16), mask=None)],
-            ),
-        ],
+        conditioning,
     )
 
 
-def anima_entry(side: int, steps: int, denoising_start: float) -> tuple[list[float], float]:
+def z_image_scheduler_entry(side: int, steps: int, denoising_start: float, scheduler: str) -> float:
+    """The sigma `z_image_denoise` hands the transformer first, read off the scheduler it set up."""
+    node, conditioning = _z_image_node(side, steps, denoising_start, scheduler)
+    made = []
+
+    def recording(scheduler_class):
+        def make(**kwargs):
+            made.append(scheduler_class(**kwargs))
+            return made[-1]
+
+        return make
+
+    context = MagicMock()
+    context.tensors.load.return_value = torch.zeros(1, 16, 8, 8)
+    # The first call after the scheduler has its timesteps.
+    context.models.get_config.side_effect = _Stop
+    _run_until_stopped(
+        node,
+        Z_IMAGE_MODULE,
+        "choose_bfloat16_safe_dtype",
+        context,
+        torch.ones(1, 16, 8, 8),
+        [
+            patch.dict(ZIMAGE_SCHEDULER_MAP, {name: recording(cls) for name, cls in ZIMAGE_SCHEDULER_MAP.items()}),
+            patch.object(node, "_prep_inpaint_mask", return_value=None),
+            *conditioning,
+        ],
+    )
+    (scheduler_instance,) = made
+    return scheduler_instance.timesteps[0].item() / scheduler_instance.config.num_train_timesteps
+
+
+def _anima_node(side: int, steps: int, denoising_start: float, scheduler: str) -> tuple:
     node = AnimaDenoiseInvocation.model_construct(
         id="upscale",
         latents=MagicMock(latents_name="latents"),
@@ -138,19 +192,56 @@ def anima_entry(side: int, steps: int, denoising_start: float) -> tuple[list[flo
         transformer=MagicMock(transformer="transformer"),
         control_lllite=None,
         seed=0,
-        scheduler="euler",
+        scheduler=scheduler,
     )
+    return node, [patch.object(node, "_load_text_conditionings", return_value=[SimpleNamespace(mask=None)])]
+
+
+def anima_entry(side: int, steps: int, denoising_start: float) -> tuple[list[float], float]:
+    node, conditioning = _anima_node(side, steps, denoising_start, "euler")
     return _entry(
         node,
-        "invokeai.app.invocations.anima.anima_denoise",
+        ANIMA_MODULE,
         "choose_anima_inference_dtype",
         torch.zeros(1, 16, 8, 8),
         torch.ones(1, 16, 1, 8, 8),
-        [patch.object(node, "_load_text_conditionings", return_value=[SimpleNamespace(mask=None)])],
+        conditioning,
     )
 
 
+def anima_scheduler_entry(side: int, steps: int, denoising_start: float, scheduler: str) -> float:
+    """The sigma `anima_denoise` hands the transformer first, read off the real scheduler driver."""
+    node, conditioning = _anima_node(side, steps, denoising_start, scheduler)
+    first: dict[str, float] = {}
+
+    def probe(**kwargs):
+        first["sigma"] = next(AnimaSchedulerDriver(**kwargs).iterations()).sigma_curr
+        raise _Stop
+
+    context = MagicMock()
+    context.tensors.load.return_value = torch.zeros(1, 16, 8, 8)
+    _run_until_stopped(
+        node,
+        ANIMA_MODULE,
+        "choose_anima_inference_dtype",
+        context,
+        torch.ones(1, 16, 1, 8, 8),
+        [
+            patch(f"{ANIMA_MODULE}.AnimaSchedulerDriver", probe),
+            patch.object(node, "_prep_inpaint_mask", return_value=None),
+            *conditioning,
+        ],
+    )
+    return first["sigma"]
+
+
 ENTRY = {"z-image": z_image_entry, "anima": anima_entry}
+SCHEDULER_ENTRY = {"z-image": z_image_scheduler_entry, "anima": anima_scheduler_entry}
+SCHEDULERS = {"z-image": ZIMAGE_SCHEDULER_MAP, "anima": ANIMA_SCHEDULER_MAP}
+# Under half the narrowest step at any fixture entry (0.011), so no scheduler passes a step off. DPM++
+# builds its own schedule, ending at 1/1000 rather than 0, and rounds its timesteps to integers: that
+# moves its entry by up to 0.0013, which is not a step.
+ENTRY_TOLERANCE = 0.005
 
 
 def test_the_fixture_covers_both_index_clipping_nodes():
@@ -173,4 +264,31 @@ def test_the_pass_enters_at_the_step_nearest_where_flux_enters(case: dict) -> No
     assert entry == pytest.approx(nearest, abs=1e-5), (
         f"the widget sends denoising_start={case['denoisingStart']:.6f}, which enters at sigma {entry:.4f}; "
         f"the step nearest FLUX's {target:.4f} is at {nearest:.4f}"
+    )
+
+
+@pytest.mark.parametrize("base", sorted(ENTRY))
+def test_the_widget_offers_exactly_the_schedulers_that_start_where_the_blend_left_the_latents(base: str) -> None:
+    cases = [case for case in CASES if case["base"] == base]
+    blends = [ENTRY[base](case["side"], case["steps"], case["denoisingStart"])[1] for case in cases]
+    misses: dict[str, float] = {}
+
+    for scheduler in SCHEDULERS[base]:
+        # Euler is not handed to a diffusers scheduler: the node steps the schedule it blended from.
+        if scheduler == "euler":
+            continue
+        entries = [
+            SCHEDULER_ENTRY[base](case["side"], case["steps"], case["denoisingStart"], scheduler) for case in cases
+        ]
+        worst = max(abs(entry - blend) for entry, blend in zip(entries, blends, strict=True))
+        if worst > ENTRY_TOLERANCE:
+            misses[scheduler] = worst
+
+    starting_at_the_blend = sorted(set(SCHEDULERS[base]) - set(misses))
+    assert sorted(OFFERED_SCHEDULERS[base]) == starting_at_the_blend, (
+        f"the widget offers {base} {sorted(OFFERED_SCHEDULERS[base])}, but the schedulers that start where the "
+        f"blend left the latents are {starting_at_the_blend} (worst misses: "
+        + ", ".join(f"{name} {miss:.3f}" for name, miss in sorted(misses.items()))
+        + "). Update `schedulers` in `features/upscale/core/settings.ts`, and FLUX.1's with Z-Image's: "
+        + "`flux/denoise.py` uses the same diffusers schedulers."
     )

@@ -6,6 +6,7 @@ import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
 } from '@features/generation/core/architectureCapabilities.testing';
+import { getSchedulerOptions } from '@features/generation/settings';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -17,11 +18,13 @@ import {
   spandrelAutoscaleDimension,
   upscaleDenoiseDimension,
   activeUpscaleComponents,
+  coerceUpscaleScheduler,
   isTileControlNetCandidate,
   selectUpscaleMainModel,
   syncUpscaleWidgetValuesWithModels,
   UPSCALE_ARCHITECTURES,
   UPSCALE_PRESETS,
+  upscaleSchedulerOptions,
 } from './settings';
 
 // VAE compatibility is served by the backend now, and the accessor fails closed without it.
@@ -91,7 +94,10 @@ describe('upscale settings', () => {
       scale: 4,
       tileSize: 1024,
     });
-    expect(getUpscaleOutputDimensions({ height: 101, width: 203 }, 2.5)).toEqual({ height: 248, width: 504 });
+    expect(getUpscaleOutputDimensions({ height: 101, width: 203 }, 2.5, MODELS[0] as never)).toEqual({
+      height: 248,
+      width: 504,
+    });
   });
 
   it('reconciles required models, refreshes configs, and removes incompatible selections', () => {
@@ -385,12 +391,23 @@ describe('picking a main model', () => {
     expect([turbo.cfgScale, fellBack.model?.key, fellBack.cfgScale]).toEqual([1, 'sd15', 2]);
   });
 
-  it('leaves CFG alone while the served table is missing, rather than writing the fallback 7', () => {
+  it('refuses to run without the served table, rather than compile its fallbacks', () => {
+    // A model picked without the table would keep a fallback CFG for good, every VAE would read as
+    // incompatible and the schedulers would fall back; the widget is gated on the table for the same reason.
+    const turbo = selectUpscaleMainModel(
+      {
+        ...createDefaultUpscaleWidgetValues(MODELS_BY_BASE),
+        inputImage: { height: 8, image_name: 'in.png', width: 8 },
+      },
+      MODELS_BY_BASE[2] as never,
+      MODELS_BY_BASE
+    );
+
     resetArchitectureCapabilities();
 
-    const fresh = syncUpscaleWidgetValuesWithModels(createDefaultUpscaleWidgetValues(), [MODELS_BY_BASE[2]!]);
-
-    expect([fresh.model?.key, fresh.cfgScale]).toEqual(['z-turbo', 2]);
+    expect(getUpscaleValidationReasons(turbo)).toEqual([
+      'Model capabilities are not available. Upscale is blocked until they load; if this persists, retry from the Upscale panel.',
+    ]);
   });
 
   it('keeps the CFG the user tuned when the same model is picked again', () => {
@@ -412,6 +429,35 @@ describe('picking a main model', () => {
 
     expect(getUpscaleValidationReasons(zImage)).toContain('Steps must be between 2 and 1000.');
     expect(getUpscaleValidationReasons(sd).some((reason) => reason.startsWith('Steps'))).toBe(false);
+  });
+});
+
+describe('schedulers per architecture', () => {
+  it('offers only the schedulers that start where Creativity puts the pass', () => {
+    const offered = (base: string) =>
+      upscaleSchedulerOptions(model(base, 'main', base) as never).map((option) => option.value);
+
+    // A single scheduler hides the field.
+    expect(offered('flux')).toEqual(['euler']);
+    expect(offered('z-image')).toEqual(['euler']);
+    expect(offered('anima')).toEqual(['euler', 'dpmpp_2m', 'dpmpp_2m_sde', 'er_sde']);
+    // SD's pass adds noise with the scheduler itself, so every one of its schedulers starts there.
+    expect(offered('sdxl')).toEqual(
+      getSchedulerOptions(model('sdxl', 'main', 'sdxl') as never).map((option) => option.value)
+    );
+  });
+
+  it('runs one of the schedulers it shows, whatever is stored', () => {
+    const stored = ['euler', 'heun', 'lcm', 'dpmpp_2m', 'dpmpp_2m_sde', 'er_sde', 'kdpm_2', 'euler_a'];
+
+    for (const base of Object.keys(UPSCALE_ARCHITECTURES)) {
+      const main = model(base, 'main', base) as never;
+      const shown = upscaleSchedulerOptions(main).map((option) => option.value);
+
+      for (const scheduler of stored) {
+        expect(shown, `${base} with ${scheduler} stored`).toContain(coerceUpscaleScheduler(main, scheduler));
+      }
+    }
   });
 });
 
@@ -458,5 +504,14 @@ describe('upscaleDenoiseDimension', () => {
 
   it('never returns zero for a tiny frame', () => {
     expect(upscaleDenoiseDimension(4, 1, 16)).toBe(16);
+  });
+
+  it("shows the size the result comes out at, which a 16px pass makes smaller than Spandrel's", () => {
+    // 1004 at 2x: Spandrel gives 2008, which FLUX.1 and Z-Image resize to 2000.
+    const widths = ['sd-1', 'flux', 'z-image', 'anima'].map(
+      (base) => getUpscaleOutputDimensions({ height: 1004, width: 1004 }, 2, model(base, 'main', base) as never).width
+    );
+
+    expect(widths).toEqual([2008, 2000, 2000, 2008]);
   });
 });

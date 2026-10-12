@@ -9,9 +9,11 @@ import type {
 import type { ModelConfig } from '@features/models';
 
 import {
+  coerceSchedulerForGraph,
   DEFAULT_NEGATIVE_PROMPT_HEIGHT_PX,
   DEFAULT_POSITIVE_PROMPT_HEIGHT_PX,
   getDefaultGenerateSettings,
+  getSchedulerOptions,
   hasArchitectureCapabilities,
   isAnimaQwen35Encoder,
   isAnimaQwen3Encoder,
@@ -171,6 +173,14 @@ export interface UpscaleArchitecture {
    */
   readonly indexClippedShift: ((size: { width: number; height: number }) => number) | null;
   /**
+   * The schedulers that start where Creativity puts the pass; null where all of the base's do. The
+   * img2img blend noises the frame to the clipped schedule's first sigma, but Heun and LCM on the
+   * flow models build their own schedule from pure noise and denoise the frame as if it were noise.
+   * Anima's Heun clips its own schedule, which runs from 1 to nearly 0, so it starts below the blend
+   * and leaves noise behind. `test_upscale_index_clipped_starts.py` checks the index-clipped lists.
+   */
+  readonly schedulers: readonly string[] | null;
+  /**
    * Whether a new main model sets CFG to that model's served default. Z-Image Turbo is distilled for
    * CFG 1, and anything above runs a second, unconditional pass per step at upscale resolution;
    * Z-Image Base and Anima want 4 to 6. SD and FLUX keep the user's CFG -- SD's multi-diffusion pass
@@ -190,6 +200,7 @@ export const UPSCALE_ARCHITECTURES = {
     indexClippedShift: null,
     label: 'SD1.5',
     negativePrompt: 'always',
+    schedulers: null,
     takesModelGuidance: false,
     tileControlNet: SD_TILE_CONTROLNET,
   },
@@ -199,6 +210,7 @@ export const UPSCALE_ARCHITECTURES = {
     indexClippedShift: null,
     label: 'SDXL',
     negativePrompt: 'always',
+    schedulers: null,
     takesModelGuidance: false,
     tileControlNet: SD_TILE_CONTROLNET,
   },
@@ -212,6 +224,9 @@ export const UPSCALE_ARCHITECTURES = {
     indexClippedShift: null,
     label: 'FLUX.1',
     negativePrompt: 'never',
+    // `flux/denoise.py` hands Heun and LCM to the same diffusers schedulers as `z_image_denoise`, so
+    // when the backend contract finds Z-Image's Heun starting at the blend, this list is due as well.
+    schedulers: ['euler'],
     takesModelGuidance: false,
     tileControlNet: null,
   },
@@ -223,6 +238,7 @@ export const UPSCALE_ARCHITECTURES = {
     indexClippedShift: zImageScheduleShift,
     label: 'Z-Image',
     negativePrompt: 'cfg-gated',
+    schedulers: ['euler'],
     takesModelGuidance: true,
     tileControlNet: { matchesName: nameIncludes('tile'), required: false },
   },
@@ -236,6 +252,7 @@ export const UPSCALE_ARCHITECTURES = {
     indexClippedShift: () => ANIMA_SCHEDULE_SHIFT,
     label: 'Anima',
     negativePrompt: 'cfg-gated',
+    schedulers: ['euler', 'dpmpp_2m', 'dpmpp_2m_sde', 'er_sde'],
     takesModelGuidance: true,
     tileControlNet: null,
   },
@@ -282,6 +299,26 @@ export const wiresUpscaleNegativePrompt = (model: MainModelConfig | null, cfgSca
  */
 export const upscaleMinSteps = (model: MainModelConfig | null): number =>
   upscaleArchitectureFor(model)?.indexClippedShift ? 2 : 1;
+
+/** The base's schedulers, less those that would ignore Creativity; see `schedulers`. */
+export const upscaleSchedulerOptions = (model: MainModelConfig | null) => {
+  const options = getSchedulerOptions(model ?? undefined);
+  const allowed = upscaleArchitectureFor(model)?.schedulers;
+
+  return allowed ? options.filter((option) => allowed.includes(option.value)) : options;
+};
+
+/**
+ * The scheduler the pass runs with. The stored value is left alone, so a switch back to SD brings back
+ * the SD scheduler the flow models do not have; until then the graph and the metadata record the one
+ * that runs, and so does the field where there is more than one to choose.
+ */
+export const coerceUpscaleScheduler = (model: MainModelConfig | null, scheduler: string): string => {
+  const coerced = coerceSchedulerForGraph(model ?? undefined, scheduler);
+  const allowed = upscaleArchitectureFor(model)?.schedulers;
+
+  return !allowed || allowed.includes(coerced) ? coerced : (allowed[0] ?? coerced);
+};
 
 /** What Spandrel's autoscale produces: the scaled dimension floored to a multiple of 8. */
 export const spandrelAutoscaleDimension = (dimension: number, scale: number): number =>
@@ -455,17 +492,15 @@ const DEFAULT_UPSCALE_CFG_SCALE = 2;
  * The CFG a change of main model leaves, see `takesModelGuidance`. Leaving a model that took its
  * served guidance for one that keeps the user's restores the widget's default, so SD's tuned pass
  * does not inherit Turbo's 1, nor FLUX Anima-3.8B's 6.
+ *
+ * The default is applied once, at the change, so the change must not happen before the served table
+ * has loaded: the widget is gated on it, and validation refuses to run without it.
  */
 const guidanceAfterModelChange = (
   previous: MainModelConfig | null,
   next: MainModelConfig | null,
   current: number
 ): number => {
-  // Without the served table the defaults fall back to a generic 7, which would burn a Turbo pass
-  // and then stick, since nothing re-applies a default to a model that is already selected.
-  if (!hasArchitectureCapabilities()) {
-    return current;
-  }
   if (next && upscaleArchitectureFor(next)?.takesModelGuidance) {
     return getDefaultGenerateSettings(next).cfgScale;
   }
@@ -658,6 +693,14 @@ const addRangeReason = (reasons: string[], label: string, value: number, min: nu
 };
 
 export const getUpscaleValidationReasons = (values: UpscaleWidgetValues, models?: readonly ModelConfig[]): string[] => {
+  // As in Generate: without the served table every VAE reads as incompatible and the schedulers fall
+  // back, so the other reasons would mislead and the graph would be wrong.
+  if (!hasArchitectureCapabilities()) {
+    return [
+      'Model capabilities are not available. Upscale is blocked until they load; if this persists, retry from the Upscale panel.',
+    ];
+  }
+
   const reasons: string[] = [];
 
   if (!values.inputImage) {
@@ -787,13 +830,23 @@ export const getUpscaleValidationReasons = (values: UpscaleWidgetValues, models?
   return reasons;
 };
 
+/**
+ * The size the result comes out at: Spandrel's scaled frame, floored to the grid of a pass that
+ * resizes it. One exception cannot be seen from here: a 1x restoration model leaves the frame at the
+ * source size, and SD's pass keeps that size. Spandrel's model configs do not carry the scale.
+ */
 export const getUpscaleOutputDimensions = (
   image: Pick<ImageWithDims, 'width' | 'height'>,
-  scale: number
-): { width: number; height: number } => ({
-  height: Math.floor((image.height * scale) / 8) * 8,
-  width: Math.floor((image.width * scale) / 8) * 8,
-});
+  scale: number,
+  model: MainModelConfig | null
+): { width: number; height: number } => {
+  const grid = upscaleArchitectureFor(model)?.denoiseGrid ?? 8;
+
+  return {
+    height: upscaleDenoiseDimension(image.height, scale, grid),
+    width: upscaleDenoiseDimension(image.width, scale, grid),
+  };
+};
 
 export const clearDeletedUpscaleInput = (
   values: UpscaleWidgetValues,

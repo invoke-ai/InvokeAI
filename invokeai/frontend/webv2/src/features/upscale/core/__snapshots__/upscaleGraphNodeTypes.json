@@ -42,10 +42,12 @@
     "flux_text_encoder conditioning collect item",
     "flux_vae_encode latents flux_denoise latents",
     "i2l latents tiled_multi_diffusion_denoise_latents latents",
+    "img_resize height core_metadata height",
     "img_resize image anima_i2l image",
     "img_resize image flux_vae_encode image",
     "img_resize image z_image_control image",
     "img_resize image z_image_i2l image",
+    "img_resize width core_metadata width",
     "integer value anima_denoise seed",
     "integer value core_metadata seed",
     "integer value flux_denoise seed",
@@ -69,9 +71,7 @@
     "sdxl_model_loader unet sdxl_lora_collection_loader unet",
     "sdxl_model_loader vae i2l vae",
     "sdxl_model_loader vae l2i vae",
-    "spandrel_image_to_image_autoscale height core_metadata height",
     "spandrel_image_to_image_autoscale image unsharp_mask image",
-    "spandrel_image_to_image_autoscale width core_metadata width",
     "string value anima_text_encoder prompt",
     "string value compel prompt",
     "string value core_metadata negative_prompt",
@@ -81,10 +81,12 @@
     "string value sdxl_compel_prompt style",
     "string value z_image_text_encoder prompt",
     "tiled_multi_diffusion_denoise_latents latents l2i latents",
+    "unsharp_mask height core_metadata height",
     "unsharp_mask height noise height",
     "unsharp_mask image controlnet image",
     "unsharp_mask image i2l image",
     "unsharp_mask image img_resize image",
+    "unsharp_mask width core_metadata width",
     "unsharp_mask width noise width",
     "z_image_control control z_image_denoise control",
     "z_image_denoise latents z_image_l2i latents",
@@ -682,7 +684,9 @@
         ]
       },
       "outputs": [
-        "image"
+        "height",
+        "image",
+        "width"
       ]
     },
     "integer": {
@@ -876,9 +880,7 @@
         ]
       },
       "outputs": [
-        "height",
-        "image",
-        "width"
+        "image"
       ]
     },
     "string": {

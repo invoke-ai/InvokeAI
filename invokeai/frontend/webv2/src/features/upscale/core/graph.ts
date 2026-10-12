@@ -16,13 +16,14 @@ import {
   toGraphContract,
   toModelIdentifier,
 } from '@features/generation/graph';
-import { coerceSchedulerForGraph, isBundledMainForBase } from '@features/generation/settings';
+import { isBundledMainForBase } from '@features/generation/settings';
 
 import type { UpscaleBase } from './settings';
 import type { CompiledUpscaleGraph, UpscaleWidgetValues } from './types';
 
 import {
   activeUpscaleComponents,
+  coerceUpscaleScheduler,
   getUpscaleValidationReasons,
   upscaleArchitectureFor,
   upscaleDenoiseDimension,
@@ -92,7 +93,7 @@ export const getZImageTileControlValues = (structure: number) => ({
 
 const addUpscaleMetadata = (
   graph: BackendGraphContract,
-  output: BackendInvocationContract,
+  { frame, output }: UpscalePathResult,
   settings: UpscaleWidgetValues,
   projectSettings: GenerationProjectSettings,
   randDevice: string
@@ -118,7 +119,7 @@ const addUpscaleMetadata = (
     loras: getLoadedLoras(graph),
     model: toModelIdentifier(settings.model),
     rand_device: randDevice,
-    scheduler: coerceSchedulerForGraph(settings.model, settings.scheduler),
+    scheduler: coerceUpscaleScheduler(settings.model, settings.scheduler),
     steps: settings.steps,
     structure: settings.structure,
     tile_overlap: settings.tileOverlap,
@@ -139,8 +140,8 @@ const addUpscaleMetadata = (
     addEdge(graph, graph.nodes.negative_prompt, 'value', metadata, 'negative_prompt');
   }
   addEdge(graph, graph.nodes.seed, 'value', metadata, 'seed');
-  addEdge(graph, graph.nodes.spandrel_autoscale, 'width', metadata, 'width');
-  addEdge(graph, graph.nodes.spandrel_autoscale, 'height', metadata, 'height');
+  addEdge(graph, frame, 'width', metadata, 'width');
+  addEdge(graph, frame, 'height', metadata, 'height');
   addEdge(graph, metadata, 'metadata', output, 'metadata');
 };
 
@@ -176,6 +177,11 @@ interface UpscalePathContext {
 interface UpscalePathResult {
   /** The node whose image is the result; the caller hangs metadata off it. */
   output: BackendInvocationContract;
+  /**
+   * The image the pass encoded, which the result matches in size: Spandrel's frame, or the one
+   * resized to the denoise size. The metadata records its size, so Recall restores the real one.
+   */
+  frame: BackendInvocationContract;
   /** Names the pass in the queue, so "multi-diffusion" is not claimed where none runs. */
   title: string;
 }
@@ -249,7 +255,7 @@ const buildSdUpscalePath: UpscalePathBuilder = ({
     denoising_end: 1,
     denoising_start: denoisingStart,
     id: 'tiled_multidiffusion_denoise_latents',
-    scheduler: coerceSchedulerForGraph(model, settings.scheduler),
+    scheduler: coerceUpscaleScheduler(model, settings.scheduler),
     steps: settings.steps,
     tile_height: settings.tileSize,
     tile_overlap: settings.tileOverlap,
@@ -354,7 +360,7 @@ const buildSdUpscalePath: UpscalePathBuilder = ({
   addEdge(graph, controlNet2, 'control', controlNetCollector, 'item');
   addEdge(graph, controlNetCollector, 'collection', denoise, 'control');
 
-  return { output, title: `${model.name} multi-diffusion upscale` };
+  return { frame, output, title: `${model.name} multi-diffusion upscale` };
 };
 
 /**
@@ -405,7 +411,7 @@ const buildFluxUpscalePath: UpscalePathBuilder = ({
     height: denoiseSize.height,
     id: 'denoise_latents',
     num_steps: settings.steps,
-    scheduler: coerceSchedulerForGraph(model, settings.scheduler),
+    scheduler: coerceUpscaleScheduler(model, settings.scheduler),
     type: 'flux_denoise',
     width: denoiseSize.width,
   });
@@ -427,13 +433,15 @@ const buildFluxUpscalePath: UpscalePathBuilder = ({
   addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
   addEdge(graph, seed, 'value', denoise, 'seed');
 
-  addEdge(graph, fitFrameToDenoiseSize(graph, frame, denoiseSize), 'image', imageToLatents, 'image');
+  const fitted = fitFrameToDenoiseSize(graph, frame, denoiseSize);
+
+  addEdge(graph, fitted, 'image', imageToLatents, 'image');
   addEdge(graph, modelLoader, 'vae', imageToLatents, 'vae');
   addEdge(graph, imageToLatents, 'latents', denoise, 'latents');
   addEdge(graph, denoise, 'latents', output, 'latents');
   addEdge(graph, modelLoader, 'vae', output, 'vae');
 
-  return { output, title: `${model.name} upscale` };
+  return { frame: fitted, output, title: `${model.name} upscale` };
 };
 
 /**
@@ -484,7 +492,7 @@ const buildZImageUpscalePath: UpscalePathBuilder = ({
     guidance_scale: settings.cfgScale,
     height: denoiseSize.height,
     id: 'denoise_latents',
-    scheduler: coerceSchedulerForGraph(model, settings.scheduler),
+    scheduler: coerceUpscaleScheduler(model, settings.scheduler),
     steps: settings.steps,
     type: 'z_image_denoise',
     width: denoiseSize.width,
@@ -532,7 +540,7 @@ const buildZImageUpscalePath: UpscalePathBuilder = ({
     addEdge(graph, tileControl, 'control', denoise, 'control');
   }
 
-  return { output, title: `${model.name} upscale` };
+  return { frame: fitted, output, title: `${model.name} upscale` };
 };
 
 /**
@@ -580,7 +588,7 @@ const buildAnimaUpscalePath: UpscalePathBuilder = ({
     guidance_scale: settings.cfgScale,
     height: denoiseSize.height,
     id: 'denoise_latents',
-    scheduler: coerceSchedulerForGraph(model, settings.scheduler),
+    scheduler: coerceUpscaleScheduler(model, settings.scheduler),
     steps: settings.steps,
     type: 'anima_denoise',
     width: denoiseSize.width,
@@ -605,13 +613,15 @@ const buildAnimaUpscalePath: UpscalePathBuilder = ({
   });
   addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
   addEdge(graph, seed, 'value', denoise, 'seed');
-  addEdge(graph, fitFrameToDenoiseSize(graph, frame, denoiseSize), 'image', imageToLatents, 'image');
+  const fitted = fitFrameToDenoiseSize(graph, frame, denoiseSize);
+
+  addEdge(graph, fitted, 'image', imageToLatents, 'image');
   addEdge(graph, modelLoader, 'vae', imageToLatents, 'vae');
   addEdge(graph, imageToLatents, 'latents', denoise, 'latents');
   addEdge(graph, denoise, 'latents', output, 'latents');
   addEdge(graph, modelLoader, 'vae', output, 'vae');
 
-  return { output, title: `${model.name} upscale` };
+  return { frame: fitted, output, title: `${model.name} upscale` };
 };
 
 /**
@@ -714,7 +724,7 @@ export const compileUpscaleGraph = (
 
   addEdge(graph, spandrelAutoscale, 'image', unsharpMask, 'image');
 
-  const { output, title } = buildPath({
+  const path = buildPath({
     components: activeUpscaleComponents(settings),
     denoiseSize,
     denoisingStart,
@@ -729,11 +739,11 @@ export const compileUpscaleGraph = (
     settings,
   });
 
-  addUpscaleMetadata(graph, output, settings, projectSettings, randDevice);
+  addUpscaleMetadata(graph, path, settings, projectSettings, randDevice);
 
   return {
     backendGraph: graph,
-    graph: toGraphContract(graph, title),
+    graph: toGraphContract(graph, path.title),
     negativePromptNodeId: 'negative_prompt',
     outputNodeId: 'upscale_output',
     positivePromptNodeId: 'positive_prompt',
