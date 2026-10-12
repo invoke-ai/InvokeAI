@@ -9,7 +9,7 @@ import { JsonPreview } from '@platform/ui/JsonPreview';
 import { Tabs } from '@platform/ui/Tabs';
 import { useNotify } from '@workbench/useNotify';
 import { FileTextIcon, WandSparklesIcon } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type DetailView = 'graph' | 'item' | 'results' | 'workflow';
@@ -37,9 +37,21 @@ const getDetailValue = (item: QueueItemReadModel, detail: QueueItemDetailReadMod
 /** The saved execution data, read when the dialog opens so a failed or outputless job can still be inspected. */
 const QueueItemDetailBody = ({ item, open }: { item: QueueItemReadModel; open: boolean }) => {
   const { t } = useTranslation();
-  const { detail, error, loadState, retry } = useQueueItemDetail(item.id, open);
+  const { detail, error, loadState, retry, retrying } = useQueueItemDetail(item.id, open);
   const [view, setView] = useState<DetailView>('item');
   const onViewChange = useCallback((details: { value: string }) => setView(details.value as DetailView), []);
+  // A successful retry replaces the focused Retry button with the views; focus follows onto the selected one.
+  const focusAfterRetryRef = useRef(false);
+  const onRetry = useCallback(() => {
+    focusAfterRetryRef.current = true;
+    retry();
+  }, [retry]);
+  const focusRestoredViews = useCallback((node: HTMLDivElement | null) => {
+    if (node && focusAfterRetryRef.current) {
+      focusAfterRetryRef.current = false;
+      node.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();
+    }
+  }, []);
 
   if (loadState === 'error') {
     return (
@@ -54,7 +66,7 @@ const QueueItemDetailBody = ({ item, open }: { item: QueueItemReadModel; open: b
             </Text>
           ) : null}
         </Stack>
-        <Button size="sm" variant="surface" onClick={retry}>
+        <Button loading={retrying} size="sm" variant="surface" onClick={onRetry}>
           {t('common.retry')}
         </Button>
       </Stack>
@@ -77,7 +89,7 @@ const QueueItemDetailBody = ({ item, open }: { item: QueueItemReadModel; open: b
 
   return (
     <Tabs.Root lazyMount size="lg" value={activeView} variant="line" onValueChange={onViewChange}>
-      <Tabs.List>
+      <Tabs.List ref={focusRestoredViews}>
         {views.map((candidate) => (
           <Tabs.Trigger key={candidate} value={candidate}>
             {t(`widgets.queue.detailViews.${candidate}`)}

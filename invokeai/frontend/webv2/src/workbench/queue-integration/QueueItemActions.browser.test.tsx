@@ -83,9 +83,14 @@ describe('QueueItemActions View JSON', () => {
     expect(document.querySelector('[role="dialog"] [role="alert"]')?.textContent).toContain('Queue item 9 not found');
 
     readDetail.mockResolvedValueOnce(detail(null));
-    await act(() => button('common.retry')!.click());
+    const retry = button('common.retry')!;
+    retry.focus();
+    await act(() => retry.click());
 
     await vi.waitFor(() => expect(dialogText()).toContain('widgets.queue.detailViews.graph'));
+    // The Retry button is gone; focus lands on the view now shown instead of falling to the page.
+    expect(document.activeElement?.getAttribute('role')).toBe('tab');
+    expect(document.activeElement?.getAttribute('aria-selected')).toBe('true');
     expect(dialogText()).not.toContain('widgets.queue.detailViews.workflow');
     expect(readDetail).toHaveBeenCalledTimes(2);
   });

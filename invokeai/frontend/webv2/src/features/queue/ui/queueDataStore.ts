@@ -85,6 +85,8 @@ export interface QueueItemDetailState {
   error: string | null;
   loadState: 'idle' | 'loading' | 'loaded' | 'error';
   retry: () => void;
+  /** A retry of a failed read is in flight; the failure stays shown until it settles. */
+  retrying: boolean;
 }
 
 /** One item's saved execution data, fetched only while `enabled` (a details dialog is open). */
@@ -93,7 +95,7 @@ export const useQueueItemDetail = (itemId: number, enabled: boolean): QueueItemD
   const retry = query.refetch;
 
   if (!enabled) {
-    return { detail: null, error: null, loadState: 'idle', retry };
+    return { detail: null, error: null, loadState: 'idle', retry, retrying: false };
   }
 
   if (query.isError) {
@@ -103,8 +105,15 @@ export const useQueueItemDetail = (itemId: number, enabled: boolean): QueueItemD
       error: query.error instanceof Error ? query.error.message : null,
       loadState: 'error',
       retry,
+      retrying: query.isFetching,
     };
   }
 
-  return { detail: query.data ?? null, error: null, loadState: query.isPending ? 'loading' : 'loaded', retry };
+  return {
+    detail: query.data ?? null,
+    error: null,
+    loadState: query.isPending ? 'loading' : 'loaded',
+    retry,
+    retrying: false,
+  };
 };

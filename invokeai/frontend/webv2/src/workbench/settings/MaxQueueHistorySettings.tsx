@@ -6,7 +6,7 @@ import { refreshGenerationDevices, updateMaxQueueHistory, useGenerationDevices }
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button } from '@platform/ui/Button';
 import { ModifiedSettingIndicator } from '@platform/ui/settings/ModifiedSettingIndicator';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const LIMIT_PATTERN = /^\d+$/;
@@ -39,10 +39,19 @@ export const MaxQueueHistorySettings = () => {
   });
 
   const [retrying, setRetrying] = useState(false);
+  // A successful retry replaces the focused Retry button with the field; focus follows onto it.
+  const focusAfterRetryRef = useRef(false);
   const onRetry = useCallback(async () => {
+    focusAfterRetryRef.current = true;
     setRetrying(true);
     await refreshGenerationDevices();
     setRetrying(false);
+  }, []);
+  const focusRestoredInput = useCallback((node: HTMLInputElement | null) => {
+    if (node && focusAfterRetryRef.current) {
+      focusAfterRetryRef.current = false;
+      node.focus();
+    }
   }, []);
 
   const savedText = formatLimit(maxQueueHistory);
@@ -77,7 +86,8 @@ export const MaxQueueHistorySettings = () => {
     [isDirty, parsed, t]
   );
 
-  if (loadState === 'loading' || loadState === 'idle') {
+  // A retry keeps its own button (showing progress) mounted, so focus stays on it if the read fails again.
+  if ((loadState === 'loading' || loadState === 'idle') && !retrying) {
     return <Spinner size="lg" />;
   }
 
@@ -120,6 +130,7 @@ export const MaxQueueHistorySettings = () => {
       </Text>
       <HStack gap="2">
         <Input
+          ref={focusRestoredInput}
           aria-invalid={parsed === 'invalid' ? true : undefined}
           aria-label={t('settings.maxQueueHistory.inputLabel')}
           inputMode="numeric"

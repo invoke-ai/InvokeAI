@@ -108,10 +108,14 @@ describe('MaxQueueHistorySettings', () => {
       mocks.snapshot = { ...mocks.snapshot!, error: null, loadState: 'loaded', maxQueueHistory: 25 };
       return Promise.resolve();
     });
-    await act(() => button('Retry').click());
+    const retry = button('Retry');
+    retry.focus();
+    await act(() => retry.click());
     await render({ maxQueueHistory: mocks.snapshot!.maxQueueHistory });
 
     expect(limitInput()?.value).toBe('25');
+    // The Retry button is gone; focus lands on the restored field instead of falling to the page.
+    expect(document.activeElement).toBe(limitInput());
   });
 
   it('still asks for a restart when the server accepted a limit but its answer was unreadable', async () => {
