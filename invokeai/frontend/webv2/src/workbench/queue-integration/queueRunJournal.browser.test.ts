@@ -227,7 +227,8 @@ describe('IndexedDB queue run journal', () => {
     const { journal } = await createJournal();
     const store = createWorkbenchStore();
     const projectId = store.getState().activeProjectId;
-    const item = createItem({ backendBatchId: 'batch-1', backendItemIds: [11], status: 'running' });
+    const baseItem = createItem({ backendBatchId: 'batch-1', backendItemIds: [11], status: 'running' });
+    const item = { ...baseItem, snapshot: { ...baseItem.snapshot, prepend: true } };
     await journal.record(projectId, item);
 
     const loaded = await journal.listForProject(projectId);
@@ -245,6 +246,7 @@ describe('IndexedDB queue run journal', () => {
         snapshot: expect.objectContaining({
           canvas: item.snapshot.canvas,
           graph: { id: 'graph-1', label: 'Graph' },
+          prepend: true,
         }),
         status: 'running',
       }),

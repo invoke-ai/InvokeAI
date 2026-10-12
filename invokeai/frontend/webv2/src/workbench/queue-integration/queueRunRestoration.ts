@@ -154,6 +154,8 @@ export const normalizeRestoredQueueItem = (value: unknown): WorkbenchQueueItem |
           : { positivePrompt: snapshot.presentation.positivePrompt }),
         width: snapshot.presentation.width,
       },
+      // Invoke Front must survive a reload before admission, or the replayed enqueue appends instead.
+      ...(snapshot.prepend === true ? { prepend: true } : {}),
       ...(recall ? { recall } : {}),
       ...(snapshot.resultNodeIds === undefined ? {} : { resultNodeIds: [...snapshot.resultNodeIds] }),
       sourceId: snapshot.sourceId,

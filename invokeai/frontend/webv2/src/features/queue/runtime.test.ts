@@ -146,6 +146,18 @@ describe('queue runtime', () => {
       kind: 'generate',
       request: { prepend: true },
     });
+
+    const workflow = createPendingQueueItem();
+    workflow.snapshot = {
+      ...workflow.snapshot,
+      backendSubmission: { batchCount: 1, graph: { edges: [], id: 'workflow-graph', nodes: {} }, kind: 'workflow' },
+      prepend: true,
+    };
+
+    expect(createQueueItemBackendSubmission({ id: 'project-1' }, workflow)).toMatchObject({
+      kind: 'workflow',
+      request: { prepend: true },
+    });
   });
 
   it('replays items queued before seed modes with the step their random toggle implied', () => {

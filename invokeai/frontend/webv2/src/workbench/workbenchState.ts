@@ -385,13 +385,7 @@ type WorkbenchReducerAction =
     }
   | { type: 'undoWorkflowChange'; projectId?: string; workflowId?: string }
   | { type: 'redoWorkflowChange'; projectId?: string; workflowId?: string }
-  | {
-      type: 'submitInvocationSnapshot';
-      backendSupportsCancellation: boolean;
-      models?: readonly ModelConfig[];
-      /** Invoke Front: the backend runs the batch ahead of the user's other pending work. */
-      prepend?: boolean;
-    }
+  | { type: 'submitInvocationSnapshot'; backendSupportsCancellation: boolean; models?: readonly ModelConfig[] }
   | ({
       type: 'submitResolvedInvocationSnapshot';
       backendSupportsCancellation: boolean;
@@ -4793,16 +4787,7 @@ export const __workbenchReducerInternal = (
       return withEnqueueNotification(
         state,
         updateActiveProject(state, (project) =>
-          submitInvocationSnapshot(
-            project,
-            action.backendSupportsCancellation,
-            undefined,
-            action.models,
-            undefined,
-            undefined,
-            undefined,
-            action.prepend === true
-          )
+          submitInvocationSnapshot(project, action.backendSupportsCancellation, undefined, action.models)
         ),
         state.activeProjectId
       );

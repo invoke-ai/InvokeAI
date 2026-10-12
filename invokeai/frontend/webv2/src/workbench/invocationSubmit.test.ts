@@ -305,7 +305,7 @@ describe('submitResolvedInvocation with a random dynamic prompt', () => {
 
   const drawn = { positivePrompts: ['a green cat'], positivePromptsSampleSeed: 7 };
 
-  const submitDrawn = async (sourceId: 'canvas' | 'generate') => {
+  const submitDrawn = async (sourceId: 'canvas' | 'generate', prepend?: boolean) => {
     const model: MainModelConfig = { base: 'sd-1', key: 'main', name: 'Main', type: 'main' };
     const initial = createInitialWorkbenchState();
     const state = workbenchReducer(
@@ -347,6 +347,7 @@ describe('submitResolvedInvocation with a random dynamic prompt', () => {
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,
+      ...(prepend === undefined ? {} : { prepend }),
       project,
       route,
     });
@@ -366,5 +367,13 @@ describe('submitResolvedInvocation with a random dynamic prompt', () => {
 
     expect(submitResolved).not.toHaveBeenCalled();
     expect(prepareCanvasInvocation).toHaveBeenCalledWith(expect.objectContaining({ expansion: drawn }));
+  });
+
+  it('keeps Invoke Front through prompt expansion to the Generate dispatch and the Canvas preparation', async () => {
+    const generate = await submitDrawn('generate', true);
+    const canvas = await submitDrawn('canvas', true);
+
+    expect(generate.submitResolved.mock.calls[0]?.[0]).toMatchObject({ prepend: true });
+    expect(canvas.prepareCanvasInvocation).toHaveBeenCalledWith(expect.objectContaining({ prepend: true }));
   });
 });

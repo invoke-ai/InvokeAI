@@ -438,20 +438,55 @@ const primeGenerate = (
   overrides: Partial<GenerateWidgetValues> = {}
 ) => workbenchReducer(state, { type: 'setGenerateSettings', values: createGenerateValues(overrides) });
 
-const submitGenerate = (state: WorkbenchState, prepend?: boolean) =>
-  workbenchReducer(state, {
-    backendSupportsCancellation: true,
-    ...(prepend === undefined ? {} : { prepend }),
-    type: 'submitInvocationSnapshot',
-  });
+const submitGenerate = (state: WorkbenchState) =>
+  workbenchReducer(state, { backendSupportsCancellation: true, type: 'submitInvocationSnapshot' });
 
 describe('Invoke Front', () => {
-  it('records front priority on the queued snapshot only when the command asks for it', () => {
-    const appended = submitGenerate(primeGenerate());
-    const prepended = submitGenerate(primeGenerate(), true);
+  const getQueuedSnapshot = (state: WorkbenchState) => getActiveProject(state).queue.items[0]?.snapshot;
 
-    expect(getActiveProject(appended).queue.items[0]?.snapshot).not.toHaveProperty('prepend');
-    expect(getActiveProject(prepended).queue.items[0]?.snapshot.prepend).toBe(true);
+  it('records front priority on resolved submissions only when the command asks for it', () => {
+    const submitResolved = (prepend?: boolean) => {
+      const state = primeGenerate();
+
+      return workbenchReducer(state, {
+        backendSupportsCancellation: true,
+        ...(prepend === undefined ? {} : { prepend }),
+        projectId: state.activeProjectId,
+        route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
+        type: 'submitResolvedInvocationSnapshot',
+      });
+    };
+
+    expect(getQueuedSnapshot(submitResolved())).not.toHaveProperty('prepend');
+    expect(getQueuedSnapshot(submitResolved(true))?.prepend).toBe(true);
+  });
+
+  it('records front priority on prepared Canvas submissions', () => {
+    const state = primeGenerate();
+    const queued = workbenchReducer(state, {
+      backendSupportsCancellation: true,
+      canvas: structuredClone(getActiveProject(state).canvas),
+      destination: 'canvas',
+      generate: {
+        negativePromptNodeId: 'negative_prompt',
+        positivePromptNodeId: 'positive_prompt',
+        seedNodeId: 'seed',
+        values: createGenerateValues({ seed: 1, seedMode: 'fixed' }),
+      },
+      graph: {
+        edges: [],
+        id: 'canvas-graph',
+        label: 'Canvas',
+        nodes: [],
+        updatedAt: '2026-06-09T00:00:00.000Z',
+        version: 1,
+      },
+      prepend: true,
+      projectId: state.activeProjectId,
+      type: 'submitCanvasInvocationSnapshot',
+    });
+
+    expect(getQueuedSnapshot(queued)?.prepend).toBe(true);
   });
 });
 
