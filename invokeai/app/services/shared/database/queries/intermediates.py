@@ -52,7 +52,7 @@ from invokeai.app.services.shared.database.dialect import (
 )
 from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, read, write
 from invokeai.app.services.shared.database.queries.session_queue import ACTIVE_QUEUE_STATUSES
-from invokeai.app.services.shared.database.schema.boards import board_images
+from invokeai.app.services.shared.database.schema.boards import board_images, boards
 from invokeai.app.services.shared.database.schema.images import images
 from invokeai.app.services.shared.database.schema.intermediates import (
     intermediates_browser_holds,
@@ -475,11 +475,35 @@ def _mark_unmeasurable(dialect_name: str) -> Any:
     return insert_ignore(dialect_name, intermediates_unmeasurable)
 
 
+_PROJECT_BOARD = boards.alias("project_board")
+
+
+def _newest_durable_on_project_board(column: ColumnElement[Any]) -> Any:
+    """A column of the newest durable image on one project board, walked newest first through its board's index."""
+    return (
+        select(column)
+        .join(images, images.c.image_name == board_images.c.image_name)
+        .where(board_images.c.board_id == _PROJECT_BOARD.c.board_id, images.c.is_intermediate == false())
+        .order_by(board_images.c.created_at.desc(), board_images.c.image_name.desc())
+        .limit(fixed_limit(1))
+        .scalar_subquery()
+    )
+
+
+# The newest across all of the project's boards, its inbox among them: results can land on every one. Each board's
+# newest comes from its own index range, so the cost follows the number of boards rather than the images on them.
 _COVER = (
-    select(board_images.c.image_name)
-    .join(images, images.c.image_name == board_images.c.image_name)
-    .where(board_images.c.board_id == _P.board_id, images.c.is_intermediate == false())
-    .order_by(board_images.c.created_at.desc(), board_images.c.image_name.desc())
+    select(_newest_durable_on_project_board(board_images.c.image_name))
+    .where(
+        _PROJECT_BOARD.c.user_id == _P.user_id,
+        _PROJECT_BOARD.c.project_id == _P.project_id,
+        # A board with no durable image has nothing to offer, wherever a dialect would sort its NULL.
+        _newest_durable_on_project_board(board_images.c.created_at).is_not(None),
+    )
+    .order_by(
+        _newest_durable_on_project_board(board_images.c.created_at).desc(),
+        _newest_durable_on_project_board(board_images.c.image_name).desc(),
+    )
     .limit(fixed_limit(1))
     .scalar_subquery()
 )
@@ -737,7 +761,7 @@ class IntermediateQueries(QueryModule):
     @read
     def projects(self, conn: Connection, user_id: Optional[str]) -> list[tuple[str, str, str, Optional[str]]]:
         """(owner, project, name, cover) of the account's projects (None: everyone's); the cover is the newest image
-        on the project's board that is not an intermediate."""
+        on any of the project's boards that is not an intermediate."""
         statement = _OWNERS_PROJECTS if user_id is not None else _PROJECTS
         return [(str(r[0]), str(r[1]), str(r[2]), r[3]) for r in conn.execute(statement, {"user_id": user_id}).all()]
 

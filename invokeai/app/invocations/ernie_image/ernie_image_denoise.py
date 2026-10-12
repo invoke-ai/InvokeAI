@@ -24,6 +24,7 @@ from invokeai.backend.flux.schedulers import (
     ERNIE_IMAGE_SHIFT,
 )
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
+from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ErnieImageConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
@@ -100,9 +101,15 @@ class ErnieImageDenoiseInvocation(BaseInvocation):
             neg_info = self._load_conditioning(context, self.negative_conditioning, dtype, device)
 
         transformer_info = context.models.load(self.transformer.transformer)
+        # A GGUF build dequantizes each Linear per forward, a transient its resident size does not cover.
+        # Passed alone because this node has no activation estimate, so the cache floors it at
+        # `device_working_mem_gb`; zero for other builds. Read from the unlocked model, before the lock.
+        dequant_bytes = peak_dequant_transient_bytes(transformer_info.model, dtype)
 
         with ExitStack() as exit_stack:
-            (_, transformer) = exit_stack.enter_context(transformer_info.model_on_device())
+            (_, transformer) = exit_stack.enter_context(
+                transformer_info.model_on_device(working_mem_bytes=dequant_bytes)
+            )
 
             text_in_dim = int(transformer.config.text_in_dim)
             in_channels = int(transformer.config.in_channels)  # 128 -- already patched
@@ -225,12 +232,12 @@ class ErnieImageDenoiseInvocation(BaseInvocation):
         model_path = (context.config.get().models_path / config.path).resolve()
         scheduler_dir = model_path / "scheduler"
         if not scheduler_dir.is_dir():
-            # A single-file checkpoint has no `scheduler/` by construction -- `config.path` is the
-            # file itself -- so there is nothing to read and nothing worth warning about. What
+            # A single file (safetensors or GGUF) has no `scheduler/` by construction -- `config.path`
+            # is the file itself -- so only a Diffusers folder missing one is worth warning about. What
             # matters is the value: both released pipelines ship `shift=4.0`, and the driver hands
             # the scheduler raw sigmas expecting it to apply that shift, so default-constructing
             # would silently denoise on the unshifted schedule. Turbo feels it worst at 8 steps.
-            if config.format is not ModelFormat.Checkpoint:
+            if config.format is ModelFormat.Diffusers:
                 context.logger.warning(
                     f"No scheduler config found at {scheduler_dir}; using {scheduler_cls.__name__} "
                     f"with the released ERNIE-Image shift={ERNIE_IMAGE_SHIFT}."

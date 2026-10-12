@@ -34,7 +34,7 @@ jobs:
         - cuda
         - cpu
         - rocm
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     name: ${{ matrix.gpu-driver }}
     env:
       # torch/arm64 does not support GPU currently, so arm64 builds
@@ -66,7 +66,7 @@ jobs:
           df -h
 
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: useblacksmith/checkout@v1
 
       - name: Docker meta
         id: meta
@@ -86,10 +86,8 @@ jobs:
             latest=${{ matrix.gpu-driver == 'cuda' && github.ref == 'refs/heads/main' }}
             suffix=-${{ matrix.gpu-driver }},onlatest=false
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-        with:
-          platforms: ${{ env.PLATFORMS }}
+      - name: Setup Blacksmith Builder
+        uses: useblacksmith/setup-docker-builder@v1
 
       - name: Login to GitHub Container Registry
         if: github.event_name != 'pull_request'
@@ -108,7 +106,7 @@ jobs:
         # 2026-09-22).
         timeout-minutes: 90
         id: docker_build
-        uses: docker/build-push-action@v7
+        uses: useblacksmith/build-push-action@v2
         with:
           context: .
           file: docker/Dockerfile
