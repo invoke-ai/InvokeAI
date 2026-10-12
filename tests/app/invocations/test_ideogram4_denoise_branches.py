@@ -251,6 +251,21 @@ def test_an_int8_branch_adds_its_dequantization_headroom() -> None:
     )
 
 
+def test_an_fp8_branch_adds_no_dequantization_headroom() -> None:
+    """The row-wise fp8 build casts one weight per forward too, but the activation estimate's fixed base already
+    holds that cast; counting it again cost the fp8 pair its full residency on a 24 GB card (34 s -> 42 s)."""
+    from invokeai.backend.ideogram4.quantized_loading import quantize_weight_to_fp8, swap_linears_to_fp8
+
+    model = Ideogram4Transformer(TINY)
+    state_dict = {}
+    for name, module in model.named_modules():
+        if isinstance(module, torch.nn.Linear) and name.startswith("layers."):
+            state_dict[f"{name}.weight"], state_dict[f"{name}.weight_scale"] = quantize_weight_to_fp8(module.weight)
+    swap_linears_to_fp8(model, state_dict, compute_dtype=torch.bfloat16)
+
+    assert Ideogram4DenoiseInvocation._dequant_transient(model) == 0
+
+
 def _gguf_branch(*packed: str) -> Ideogram4Transformer:
     """A tiny bfloat16 branch whose `packed` Linears are stored Q8_0, as a community GGUF's are."""
     model = Ideogram4Transformer(TINY).to(torch.bfloat16)

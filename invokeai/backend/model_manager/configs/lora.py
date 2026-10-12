@@ -21,6 +21,7 @@ from invokeai.backend.model_manager.configs.flux2_variant import (
     flux2_variant_from_vec_dim,
 )
 from invokeai.backend.model_manager.configs.identification_utils import (
+    InvalidMatchError,
     NotAMatchError,
     raise_for_override_fields,
     raise_if_not_dir,
@@ -48,6 +49,11 @@ from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
     has_cosmos_dit_peft_keys_strict,
 )
 from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import is_state_dict_likely_flux_control
+from invokeai.backend.patches.lora_conversions.ideogram4_lora_constants import (
+    has_ideogram4_lora_keys,
+    ideogram4_lora_refusal,
+    split_ideogram4_lora_key,
+)
 from invokeai.backend.patches.lora_conversions.krea2_lora_constants import is_kohya_krea2_lora_key
 from invokeai.backend.patches.lora_conversions.ltx2_lora_constants import (
     has_ltx2_lora_keys,
@@ -741,6 +747,11 @@ class LoRA_LyCORIS_ZImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
 
         state_dict = mod.load_state_dict()
 
+        # Ideogram 4 names its blocks like Z-Image (`layers.N.attention`, `feed_forward.w1..3`), so the prefixes
+        # below admit its LoRAs too; its widths (4608, not 3840) are what tell the two apart.
+        if has_ideogram4_lora_keys(state_dict):
+            raise NotAMatchError("model looks like an Ideogram 4 LoRA, not a Z-Image LoRA")
+
         # Check for Kohya format first
         if is_state_dict_likely_z_image_kohya_lora(state_dict):
             return
@@ -1320,6 +1331,38 @@ class LoRA_LyCORIS_LTX2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             return BaseModelType.LTX2
 
         raise NotAMatchError("model does not look like an LTX-2 LoRA")
+
+
+class LoRA_LyCORIS_Ideogram4_Config(LoRA_LyCORIS_Config_Base, Config_Base):
+    """Model config for Ideogram 4 LoRA models (single file; PEFT, kohya-style or LoKR tensors).
+
+    Ideogram 4 LoRAs name the vendored transformer's modules (fused `attention.qkv`, `attention.o`,
+    `feed_forward.w1..3`, `adaln_modulation`) or diffusers' split ones behind a container prefix. Z-Image uses the
+    same block names, so the match also needs a patched weight at one of Ideogram 4's widths; see
+    `ideogram4_lora_constants`.
+    """
+
+    base: Literal[BaseModelType.Ideogram4] = Field(default=BaseModelType.Ideogram4)
+
+    @classmethod
+    def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
+        state_dict = mod.load_state_dict()
+        if not has_ideogram4_lora_keys(state_dict):
+            raise NotAMatchError("model does not match Ideogram 4 LoRA heuristics")
+        # A transformer checkpoint carries the same module names, but only `.weight`/`.bias` tensors.
+        if not any(isinstance(k, str) and split_ideogram4_lora_key(k) is not None for k in state_dict):
+            raise NotAMatchError("model has Ideogram 4 module names but no LoRA tensors")
+        refusal = ideogram4_lora_refusal(state_dict)
+        if refusal is not None:
+            # Recognised, but it would fail -- or silently do less -- once a generation applies it; refuse the
+            # install instead.
+            raise InvalidMatchError(f"Ideogram 4 LoRA cannot be applied: {refusal}")
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        if has_ideogram4_lora_keys(mod.load_state_dict()):
+            return BaseModelType.Ideogram4
+        raise NotAMatchError("model does not look like an Ideogram 4 LoRA")
 
 
 class ControlAdapter_Config_Base(ABC, BaseModel):
