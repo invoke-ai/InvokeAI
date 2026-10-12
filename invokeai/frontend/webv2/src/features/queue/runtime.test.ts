@@ -6,10 +6,12 @@ import type {
   QueueResultVideo,
 } from '@features/queue/core/types';
 import type { BackendConnectionStatus } from '@platform/transport/types';
+import type { WorkbenchQueueItem } from '@workbench/queueHistoryContracts';
 
 import { activeProgressTargetStore } from '@features/queue/data/activeProgressTargetStore';
 import { buildQueueItemOrigin } from '@features/queue/data/events';
 import { ApiError } from '@platform/transport/http';
+import { createInitialWorkbenchState, type WorkbenchAction, workbenchReducer } from '@workbench/workbenchState.testing';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -91,11 +93,13 @@ const createTestCommands = (overrides: Partial<QueueHistoryCommands> = {}): Queu
   setLocalRecoveryState: vi.fn(),
   recordError: vi.fn(),
   refreshBackendData: vi.fn(),
+  reopenForRetry: vi.fn(),
   restoreFromJournal: vi.fn(),
   routePartialResults: vi.fn(),
   routeResults: vi.fn(),
   setConnectionStatus: vi.fn(),
   setStatus: vi.fn(),
+  stageRetriedCanvasResults: vi.fn(),
   ...overrides,
 });
 
@@ -373,11 +377,13 @@ describe('queue runtime', () => {
       setLocalRecoveryState: vi.fn(),
       recordError: vi.fn(),
       refreshBackendData: vi.fn(),
+      reopenForRetry: vi.fn(),
       restoreFromJournal: vi.fn(),
       routePartialResults: vi.fn(),
       routeResults: vi.fn(),
       setConnectionStatus: vi.fn(),
       setStatus: vi.fn(),
+      stageRetriedCanvasResults: vi.fn(),
     };
     const runtime = createQueueRuntime({
       backend,
@@ -2329,11 +2335,13 @@ describe('queue runtime video board routing', () => {
       setLocalRecoveryState: vi.fn(),
       recordError: vi.fn(),
       refreshBackendData: vi.fn(),
+      reopenForRetry: vi.fn(),
       restoreFromJournal: vi.fn(),
       routePartialResults: vi.fn(),
       routeResults: vi.fn(),
       setConnectionStatus: vi.fn(),
       setStatus: vi.fn(),
+      stageRetriedCanvasResults: vi.fn(),
     };
     const destinations = {
       addImagesToGalleryBoard: vi.fn(),
@@ -2770,5 +2778,341 @@ describe('queue runtime video board routing', () => {
     expect(destinations.addImagesToGalleryBoard).not.toHaveBeenCalled();
 
     runtime.dispose();
+  });
+});
+
+describe('queue runtime retries', () => {
+  const createRetryHarness = (queueItem: QueueItem, backendOverrides: Partial<QueueBackendPort> = {}) => {
+    const project = { id: 'project-1', queue: { items: [queueItem] } };
+    const listeners = new Set<() => void>();
+    const notify = () => listeners.forEach((listener) => listener());
+    const handlers = new Map<string, Set<(payload: never) => void>>();
+    const backend = createTestBackend({
+      on: vi.fn((event: string, handler: (payload: never) => void) => {
+        const eventHandlers = handlers.get(event) ?? new Set();
+        eventHandlers.add(handler);
+        handlers.set(event, eventHandlers);
+        return () => eventHandlers.delete(handler);
+      }),
+      ...backendOverrides,
+    });
+    const commands = createTestCommands({
+      routeResults: vi.fn(() => {
+        queueItem.status = 'completed';
+        notify();
+      }),
+    });
+    const runtime = createQueueRuntime({
+      ...runtimeServices,
+      backend,
+      history: {
+        commands,
+        getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
+        subscribe: (listener) => {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+      },
+    });
+    const emit = (event: string, payload: unknown) =>
+      handlers.get(event)?.forEach((handler) => handler(payload as never));
+
+    return { backend, commands, emit, notify, project, runtime };
+  };
+
+  const retriedEvent = (pairs: { item_id: number; source_item_id: number }[]) => ({
+    queue_id: 'default',
+    retried_item_ids: pairs.map((pair) => pair.source_item_id),
+    retried_item_ids_by_user: {},
+    retried_items: pairs,
+    timestamp: 0,
+    user_ids: [],
+  });
+
+  const completedEvent = (itemId: number, origin: string, destination: string) => ({
+    batch_id: 'batch',
+    completed_at: null,
+    created_at: '2026-07-17T00:00:00.000Z',
+    destination,
+    error_message: null,
+    error_traceback: null,
+    error_type: null,
+    item_id: itemId,
+    origin,
+    queue_id: 'default',
+    session_id: `session-${itemId}`,
+    started_at: null,
+    status: 'completed',
+    status_sequence: null,
+    timestamp: 0,
+    updated_at: '2026-07-17T00:00:00.000Z',
+    user_id: 'user',
+  });
+
+  it('reopens the run that owns a retried item and routes its rerun to the run destination', async () => {
+    const queueItem: QueueItem = {
+      ...createPendingQueueItem(),
+      backendBatchId: 'batch',
+      backendItemIds: [41],
+      error: 'Out of memory',
+      status: 'failed',
+    };
+    const rerunImage = { imageName: 'rerun.png' } as QueueResultImage;
+    const getResultImages = vi.fn().mockResolvedValue([rerunImage]);
+    const { commands, emit, notify, project, runtime } = createRetryHarness(queueItem, {
+      getItem: vi.fn().mockResolvedValue({
+        batchId: 'batch',
+        id: 99,
+        origin: buildQueueItemOrigin(queueItem.id, 'project-1'),
+        status: 'completed',
+      }),
+      getResultImages,
+    });
+    vi.mocked(commands.reopenForRetry).mockImplementation(({ retriedItems }) => {
+      queueItem.backendItemIds = retriedItems.map(({ itemId }) => itemId);
+      queueItem.status = 'running';
+      delete queueItem.error;
+      notify();
+    });
+
+    runtime.start();
+    emit('queue_items_retried', retriedEvent([{ item_id: 99, source_item_id: 41 }]));
+
+    await vi.waitFor(() => {
+      expect(commands.routeResults).toHaveBeenCalledWith(
+        expect.objectContaining({ images: [rerunImage], projectId: project.id, queueItemId: queueItem.id })
+      );
+    });
+    expect(commands.reopenForRetry).toHaveBeenCalledWith({
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      retriedItems: [{ itemId: 99, sourceItemId: 41 }],
+    });
+    expect(getResultImages).toHaveBeenCalledWith(99, queueItem.id, queueItem.snapshot.submittedAt, {
+      resultNodeIds: ['canvas_output'],
+    });
+    expect(commands.stageRetriedCanvasResults).not.toHaveBeenCalled();
+
+    await runtime.dispose();
+  });
+
+  it('stages reruns through the workbench at the run bbox, including a later retry of an item the first left', async () => {
+    let state = createInitialWorkbenchState();
+    const projectId = state.activeProjectId;
+    const { canvas } = state.projects.find((project) => project.id === projectId)!;
+    const submittedBbox = { ...canvas.document.bbox };
+    const queueItem: WorkbenchQueueItem = {
+      ...createPendingQueueItem(),
+      backendItemIds: [41, 42],
+      snapshot: {
+        ...createPendingQueueItem().snapshot,
+        canvas: {
+          document: { bbox: submittedBbox, height: canvas.document.height, width: canvas.document.width },
+          documentRevision: canvas.documentRevision,
+        },
+      },
+      status: 'failed',
+    };
+    state = {
+      ...state,
+      projects: state.projects.map((project) =>
+        project.id === projectId ? { ...project, queue: { items: [queueItem] } } : project
+      ),
+    };
+    const listeners = new Set<() => void>();
+    const dispatch = (action: WorkbenchAction): void => {
+      state = workbenchReducer(state, action);
+      listeners.forEach((listener) => listener());
+    };
+    dispatch({
+      mutation: { bbox: { ...submittedBbox, x: submittedBbox.x + 64 }, type: 'setCanvasBbox' },
+      projectId,
+      type: 'applyCanvasProjectMutation',
+    });
+    const handlers = new Map<string, Set<(payload: never) => void>>();
+    const backend = createTestBackend({
+      getItem: vi.fn((id: number) =>
+        Promise.resolve({
+          batchId: 'batch',
+          id,
+          origin: buildQueueItemOrigin(queueItem.id, projectId),
+          status: 'completed' as const,
+        })
+      ),
+      getResultImages: vi.fn((id: number) =>
+        Promise.resolve([
+          {
+            height: 64,
+            imageName: `rerun-${id}.png`,
+            imageUrl: `/rerun-${id}.png`,
+            queuedAt: queueItem.snapshot.submittedAt,
+            sourceQueueItemId: queueItem.id,
+            thumbnailUrl: `/rerun-${id}.png`,
+            width: 64,
+          },
+        ])
+      ),
+      on: vi.fn((event: string, handler: (payload: never) => void) => {
+        const eventHandlers = handlers.get(event) ?? new Set();
+        eventHandlers.add(handler);
+        handlers.set(event, eventHandlers);
+        return () => eventHandlers.delete(handler);
+      }),
+    });
+    const commands = createTestCommands({
+      markBackendCancelled: (payload) => dispatch({ ...payload, type: 'markQueueItemBackendCancelled' }),
+      markBackendSubmitted: (payload) => dispatch({ ...payload, type: 'markQueueItemBackendSubmitted' }),
+      reopenForRetry: (payload) => dispatch({ ...payload, type: 'reopenQueueItemForRetry' }),
+      routePartialResults: (payload) => dispatch({ ...payload, type: 'routeQueueItemPartialResults' }),
+      routeResults: (payload) => dispatch({ ...payload, type: 'routeQueueItemResults' }),
+      setStatus: (payload) => dispatch({ ...payload, type: 'setQueueItemStatus' }),
+      stageRetriedCanvasResults: vi.fn(),
+    });
+    const runtime = createQueueRuntime({
+      ...runtimeServices,
+      backend,
+      history: {
+        commands,
+        getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: state.projects }),
+        subscribe: (listener) => {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+      },
+    });
+    const emitRetried = (itemId: number, sourceItemId: number) =>
+      handlers
+        .get('queue_items_retried')
+        ?.forEach((handler) => handler(retriedEvent([{ item_id: itemId, source_item_id: sourceItemId }]) as never));
+    const getRun = () => state.projects.find((project) => project.id === projectId)!.queue.items[0]!;
+    const getStaged = () =>
+      state.projects.find((project) => project.id === projectId)!.canvas.stagingArea.pendingImages;
+
+    runtime.start();
+    emitRetried(99, 41);
+    await vi.waitFor(() => expect(getRun().status).toBe('completed'));
+    emitRetried(100, 42);
+    await vi.waitFor(() => expect(getStaged().map((image) => image.imageName)).toContain('rerun-100.png'));
+
+    expect(getStaged()).toEqual([
+      expect.objectContaining({
+        imageName: 'rerun-99.png',
+        placement: expect.objectContaining({ x: submittedBbox.x }),
+      }),
+      expect.objectContaining({
+        imageName: 'rerun-100.png',
+        placement: expect.objectContaining({ x: submittedBbox.x }),
+      }),
+    ]);
+    expect(commands.stageRetriedCanvasResults).not.toHaveBeenCalled();
+
+    await runtime.dispose();
+  });
+
+  it("stages what another tab's Workflow rerun produced, and nothing for a rerun that failed", async () => {
+    const queueItem: QueueItem = { ...createPendingQueueItem(), backendItemIds: [7], status: 'completed' };
+    const image = (imageName: string, createdAt: string, isIntermediate = false) =>
+      ({ createdAt, imageName, isIntermediate }) as QueueResultImage;
+    const produced = image('produced.png', '2026-07-17T00:00:05.000Z');
+    const getResultImages = vi.fn((_id: number, _queueItemId: string, _queuedAt: string, options?: object) =>
+      Promise.resolve(
+        options
+          ? []
+          : [
+              produced,
+              image('echoed-input.png', '2026-07-16T00:00:00.000Z'),
+              image('preview.png', '2026-07-17T00:00:04.000Z', true),
+            ]
+      )
+    );
+    const { commands, emit, project, runtime } = createRetryHarness(queueItem, { getResultImages });
+    const otherTabOrigin = buildQueueItemOrigin('run-in-another-tab', project.id);
+
+    runtime.start();
+    emit(
+      'queue_items_retried',
+      retriedEvent([
+        { item_id: 99, source_item_id: 41 },
+        { item_id: 100, source_item_id: 42 },
+      ])
+    );
+    emit('queue_item_status_changed', { ...completedEvent(100, otherTabOrigin, 'canvas'), status: 'failed' });
+    emit('queue_item_status_changed', completedEvent(99, otherTabOrigin, 'canvas'));
+
+    await vi.waitFor(() => {
+      expect(commands.stageRetriedCanvasResults).toHaveBeenCalledWith({
+        backendItemId: 99,
+        images: [produced],
+        projectId: project.id,
+        queueItemId: 'run-in-another-tab',
+      });
+    });
+    expect(getResultImages).toHaveBeenNthCalledWith(1, 99, 'run-in-another-tab', '2026-07-17T00:00:00.000Z', {
+      resultNodeIds: ['canvas_output', 'upscale_output'],
+    });
+    expect(commands.stageRetriedCanvasResults).toHaveBeenCalledTimes(1);
+
+    await runtime.dispose();
+  });
+
+  it("adds a Gallery rerun its run could not adopt to that run's board", async () => {
+    // Still running from an earlier retry, so this rerun of its other failed item cannot reopen it.
+    const queueItem: QueueItem = {
+      ...createPendingQueueItem(),
+      backendItemIds: [99],
+      retriedBackendItemIds: [41, 42],
+      snapshot: { ...createPendingQueueItem().snapshot, destination: 'gallery', galleryBoardId: 'board-1' },
+      status: 'running',
+    };
+    const getResultImages = vi.fn().mockResolvedValue([{ imageName: 'rerun.png' } as QueueResultImage]);
+    const { commands, emit, project, runtime } = createRetryHarness(queueItem, { getResultImages });
+
+    runtime.start();
+    emit('queue_items_retried', retriedEvent([{ item_id: 100, source_item_id: 42 }]));
+    emit('queue_item_status_changed', completedEvent(100, buildQueueItemOrigin(queueItem.id, project.id), 'gallery'));
+
+    await vi.waitFor(() => expect(commands.refreshBackendData).toHaveBeenCalled());
+    expect(commands.reopenForRetry).toHaveBeenCalledWith(expect.objectContaining({ queueItemId: queueItem.id }));
+    expect(runtimeServices.destinations.addImagesToGalleryBoard).toHaveBeenCalledWith('board-1', ['rerun.png']);
+
+    await runtime.dispose();
+  });
+
+  it('delivers reruns no run adopted to the Gallery or the current Canvas, and nothing else', async () => {
+    // The owning run refuses to reopen (its Canvas document was replaced); the other rerun belongs to another tab.
+    const queueItem: QueueItem = { ...createPendingQueueItem(), backendItemIds: [41], status: 'failed' };
+    const rerunImage = { imageName: 'rerun.png' } as QueueResultImage;
+    const getResultImages = vi.fn().mockResolvedValue([rerunImage]);
+    const { commands, emit, project, runtime } = createRetryHarness(queueItem, { getResultImages });
+    const canvasOrigin = buildQueueItemOrigin(queueItem.id, project.id);
+
+    runtime.start();
+    emit(
+      'queue_items_retried',
+      retriedEvent([
+        { item_id: 99, source_item_id: 41 },
+        { item_id: 100, source_item_id: 42 },
+      ])
+    );
+    emit('queue_item_status_changed', completedEvent(99, canvasOrigin, 'canvas'));
+    emit('queue_item_status_changed', completedEvent(100, buildQueueItemOrigin('other-run', project.id), 'gallery'));
+    emit('queue_item_status_changed', completedEvent(101, canvasOrigin, 'canvas'));
+
+    await vi.waitFor(() => {
+      expect(commands.stageRetriedCanvasResults).toHaveBeenCalledWith({
+        backendItemId: 99,
+        images: [rerunImage],
+        projectId: project.id,
+        queueItemId: queueItem.id,
+      });
+    });
+    expect(getResultImages).toHaveBeenCalledTimes(1);
+    expect(getResultImages).toHaveBeenCalledWith(99, queueItem.id, '2026-07-17T00:00:00.000Z', {
+      resultNodeIds: ['canvas_output'],
+    });
+    expect(commands.refreshBackendData).toHaveBeenCalledTimes(1);
+    expect(queueItem.status).toBe('failed');
+
+    await runtime.dispose();
   });
 });

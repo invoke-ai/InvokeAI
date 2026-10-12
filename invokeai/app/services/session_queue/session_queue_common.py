@@ -536,9 +536,17 @@ class EnqueueBatchReceipt(BaseModel):
         return self
 
 
+class RetriedQueueItem(BaseModel):
+    source_item_id: int = Field(description="The ID of the retried root queue item")
+    item_id: int = Field(description="The ID of the queue item that re-runs it")
+
+
 class RetryItemsResult(BaseModel):
     queue_id: str = Field(description="The ID of the queue")
     retried_item_ids: list[int] = Field(description="The IDs of the queue items that were retried")
+    retried_items: list[RetriedQueueItem] = Field(
+        default_factory=list, description="Each retried root queue item with the queue item that re-runs it"
+    )
 
 
 class ClearResult(BaseModel):

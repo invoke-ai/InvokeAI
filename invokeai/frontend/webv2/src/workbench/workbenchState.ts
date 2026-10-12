@@ -150,7 +150,7 @@ import {
   sanitizeBatchCount,
   syncGenerateWidgetValuesWithModels,
 } from '@features/generation/settings';
-import { MAX_QUEUE_BATCH_ITEMS } from '@features/queue';
+import { getQueueSourceResultSelection, MAX_QUEUE_BATCH_ITEMS } from '@features/queue';
 import { getGenerationDevicesSnapshot, resolveRandDeviceMetadata } from '@features/queue/devices';
 import {
   clearDeletedUpscaleInput,
@@ -439,6 +439,19 @@ type WorkbenchReducerAction =
       videos?: GeneratedVideoContract[];
     }
   | { type: 'restoreQueueItemsFromJournal'; projectId: string; items: unknown[] }
+  | {
+      type: 'reopenQueueItemForRetry';
+      projectId: string;
+      queueItemId: string;
+      retriedItems: { itemId: number; sourceItemId: number }[];
+    }
+  | {
+      type: 'stageRetriedCanvasResults';
+      projectId: string;
+      queueItemId: string;
+      backendItemId: number;
+      images: GeneratedImageContract[];
+    }
   | { type: 'appendCanvasStagingCandidate'; projectId: string; candidate: CanvasStagingCandidateContract }
   | {
       type: 'selectGalleryItem';
@@ -971,15 +984,49 @@ const stageCanvasResultImages = (
 ): Project => {
   const queueItem = project.queue.items.find((item) => item.id === queueItemId);
 
-  if (
-    images.length === 0 ||
-    !queueItem ||
-    queueItem.snapshot.canvas.documentRevision !== project.canvas.documentRevision
-  ) {
+  if (!queueItem || queueItem.snapshot.canvas.documentRevision !== project.canvas.documentRevision) {
     return project;
   }
 
-  const queueDocument = queueItem.snapshot.canvas.document;
+  return stageCanvasImages(
+    project,
+    queueItemId,
+    queueItem.snapshot.canvas.document,
+    images,
+    sourceBackendItemIds,
+    previousSelectedSlot
+  );
+};
+
+/**
+ * Where a rerun no run adopted stages: where its run would have while that document is still open, else at the current
+ * bbox.
+ */
+const getRetriedCanvasResultDocument = (
+  project: Project,
+  queueItemId: string
+): Pick<CanvasDocumentContractV3, 'bbox' | 'height' | 'width'> => {
+  const queueItem = project.queue.items.find((item) => item.id === queueItemId);
+
+  return queueItem?.snapshot.destination === 'canvas' &&
+    queueItem.snapshot.canvas.documentRevision === project.canvas.documentRevision
+    ? queueItem.snapshot.canvas.document
+    : project.canvas.document;
+};
+
+/** Stage images at `queueDocument`'s bbox: the submitted document's, or the current one for a run nobody captured. */
+const stageCanvasImages = (
+  project: Project,
+  queueItemId: string,
+  queueDocument: Pick<CanvasDocumentContractV3, 'bbox' | 'height' | 'width'>,
+  images: GeneratedImageContract[],
+  sourceBackendItemIds?: readonly (number | undefined)[],
+  previousSelectedSlot?: CanvasStagingSlot
+): Project => {
+  if (images.length === 0) {
+    return project;
+  }
+
   const { bbox } = queueDocument;
   const incomingImages = images.map((image, index) =>
     normalizeStagingCandidate(
@@ -3180,6 +3227,50 @@ const mergeImageResults = (
   return [...existing, ...incomingImages.filter((image) => !existingNames.has(image.imageName))];
 };
 
+/**
+ * Reopen a finished run around the backend items that re-run its failed or canceled ones, so its captured destination
+ * receives their results. A run already active, or a Canvas run whose document was since replaced, stays finished.
+ */
+const reopenQueueItemForRetry = (
+  project: Project,
+  queueItemId: string,
+  retriedItems: readonly { itemId: number; sourceItemId: number }[]
+): Project => {
+  const queueItem = project.queue.items.find((item) => item.id === queueItemId);
+  const ownedItemIds = new Set([...(queueItem?.backendItemIds ?? []), ...(queueItem?.retriedBackendItemIds ?? [])]);
+  const itemIds = retriedItems.filter(({ sourceItemId }) => ownedItemIds.has(sourceItemId)).map(({ itemId }) => itemId);
+
+  if (
+    !queueItem ||
+    itemIds.length === 0 ||
+    queueItem.cancellationPending === true ||
+    (queueItem.status !== 'completed' && queueItem.status !== 'failed' && queueItem.status !== 'cancelled') ||
+    (queueItem.snapshot.destination === 'canvas' &&
+      queueItem.snapshot.canvas.documentRevision !== project.canvas.documentRevision)
+  ) {
+    return project;
+  }
+
+  return updateQueueItem(project, queueItemId, (item) => {
+    const {
+      cancelledBackendItemIds: _cancelled,
+      completedBackendItemIds: _completed,
+      error: _error,
+      localRecoveryState: _localRecoveryState,
+      ...reopened
+    } = item;
+
+    // The run tracks only the reruns from here; it remembers the items it left so that retrying another of them
+    // later still returns its results here.
+    return {
+      ...reopened,
+      backendItemIds: itemIds,
+      retriedBackendItemIds: [...ownedItemIds],
+      status: 'running',
+    };
+  });
+};
+
 const mergeBackendItemId = (ids: number[] | undefined, backendItemId: number): number[] =>
   ids?.includes(backendItemId) ? ids : [...(ids ?? []), backendItemId];
 
@@ -3396,7 +3487,8 @@ const routeQueueItemResults = (
     completedBackendItemIds: item.backendItemIds
       ? item.backendItemIds.filter((backendItemId) => !item.cancelledBackendItemIds?.includes(backendItemId))
       : item.completedBackendItemIds,
-    resultImages: images,
+    // A run a retry reopened keeps the results its other items delivered before.
+    resultImages: item.retriedBackendItemIds ? mergeImageResults(item.resultImages, images) : images,
     status: 'completed',
   }));
 
@@ -3602,13 +3694,7 @@ const enqueueCompiledSnapshot = (
         width: presentationDimensions.width,
       },
       sourceId: route.sourceId,
-      ...(route.sourceId === 'generate' || route.sourceId === 'canvas'
-        ? { resultNodeIds: ['canvas_output'] }
-        : route.sourceId === 'upscale'
-          ? { resultNodeIds: ['upscale_output'] }
-          : route.sourceId === 'video'
-            ? { resultNodeIds: ['video_output'] }
-            : {}),
+      ...getQueueSourceResultSelection(route.sourceId),
       submittedAt,
       ...(recall ? { recall } : {}),
       ...(prepend ? { prepend: true } : {}),
@@ -4995,6 +5081,25 @@ export const __workbenchReducerInternal = (
           ? project
           : { ...project, queue: { items: [...liveItems, ...restoredItems] } };
       });
+    }
+    case 'reopenQueueItemForRetry': {
+      return updateProjectById(state, action.projectId, (project) =>
+        reopenQueueItemForRetry(project, action.queueItemId, action.retriedItems)
+      );
+    }
+    case 'stageRetriedCanvasResults': {
+      return updateProjectById(state, action.projectId, (project) =>
+        clampCanvasStagingSelection(
+          stageCanvasImages(
+            project,
+            action.queueItemId,
+            getRetriedCanvasResultDocument(project, action.queueItemId),
+            action.images,
+            action.images.map(() => action.backendItemId),
+            getSelectedCanvasStagingSlot(project)
+          )
+        )
+      );
     }
     case 'appendCanvasStagingCandidate': {
       return updateProjectById(state, action.projectId, (project) =>

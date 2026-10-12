@@ -36,6 +36,8 @@ export interface QueueItem {
   backendItemIds?: number[];
   completedBackendItemIds?: number[];
   cancelledBackendItemIds?: number[];
+  /** Backend items a retry reopened this run away from; retrying another of them later still returns here. */
+  retriedBackendItemIds?: number[];
   backendBatchId?: string;
   error?: string;
   resultImages?: QueueResultImage[];

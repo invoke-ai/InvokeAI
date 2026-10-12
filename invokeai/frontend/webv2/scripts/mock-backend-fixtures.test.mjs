@@ -951,15 +951,46 @@ test('queue retry clones failed or canceled roots once, cancel-by-batch spares o
 
     assert.ok(failed && pending && completed, 'the representative queue has failed, pending and completed items');
 
+    const summaries = await getJson(backend, '/api/v1/queue/default/item_summaries_by_ids', {
+      body: JSON.stringify({ item_ids: [completed.item_id, 999_999, failed.item_id] }),
+      method: 'POST',
+    });
+    // In the requested order, unknown ids skipped, with the lineage and status a scoped clear chooses roots by.
+    assert.deepEqual(
+      summaries.map(({ item_id, parent_item_id, status }) => ({ item_id, parent_item_id, status })),
+      [
+        { item_id: completed.item_id, parent_item_id: null, status: 'completed' },
+        { item_id: failed.item_id, parent_item_id: null, status: 'failed' },
+      ]
+    );
+    assert.equal('session' in summaries[0], false);
+
     const retried = await getJson(backend, '/api/v1/queue/default/retry_items_by_id', {
       body: JSON.stringify([failed.item_id, failed.item_id, completed.item_id]),
       method: 'PUT',
     });
+    const reruns = (await getJson(backend, '/api/v1/queue/default/list_all')).filter(
+      (item) => item.retried_from_item_id === failed.item_id
+    );
 
-    assert.equal(retried.retried_item_ids.length, 1);
-    const clone = await getJson(backend, `/api/v1/queue/default/i/${retried.retried_item_ids[0]}`);
+    // Like the backend, the result names the retried root, not its rerun; the pairing names the rerun.
+    assert.deepEqual(retried.retried_item_ids, [failed.item_id]);
+    assert.equal(reruns.length, 1);
+    const [clone] = reruns;
+    assert.deepEqual(retried.retried_items, [{ item_id: clone.item_id, source_item_id: failed.item_id }]);
     assert.equal(clone.status, 'pending');
-    assert.equal(clone.retried_from_item_id, failed.item_id);
+    assert.notEqual(clone.session_id, failed.session_id);
+    assert.deepEqual(clone.session.results, {});
+
+    // Retrying the rerun pairs the new rerun with it while the lineage still names the original.
+    await getJson(backend, `/api/v1/queue/default/i/${clone.item_id}/cancel`, { method: 'PUT' });
+    const again = await getJson(backend, '/api/v1/queue/default/retry_items_by_id', {
+      body: JSON.stringify([clone.item_id]),
+      method: 'PUT',
+    });
+    assert.deepEqual(again.retried_item_ids, [clone.item_id]);
+    const secondRerun = await getJson(backend, `/api/v1/queue/default/i/${again.retried_items[0].item_id}`);
+    assert.equal(secondRerun.retried_from_item_id, failed.item_id);
 
     const canceled = await getJson(backend, '/api/v1/queue/default/cancel_by_batch_ids', {
       body: JSON.stringify({ batch_ids: [pending.batch_id] }),
@@ -968,8 +999,8 @@ test('queue retry clones failed or canceled roots once, cancel-by-batch spares o
 
     assert.ok(canceled.canceled >= 1);
     assert.equal((await getJson(backend, `/api/v1/queue/default/i/${pending.item_id}`)).status, 'canceled');
-    if (clone.batch_id !== pending.batch_id) {
-      assert.equal((await getJson(backend, `/api/v1/queue/default/i/${clone.item_id}`)).status, 'pending');
+    if (secondRerun.batch_id !== pending.batch_id) {
+      assert.equal((await getJson(backend, `/api/v1/queue/default/i/${secondRerun.item_id}`)).status, 'pending');
     }
 
     const pruned = await getJson(backend, '/api/v1/queue/default/prune', { method: 'PUT' });

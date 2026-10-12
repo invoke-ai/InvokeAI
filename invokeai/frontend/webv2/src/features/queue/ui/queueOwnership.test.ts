@@ -1,5 +1,6 @@
 import type { QueueItemReadModel } from '@features/queue/core/types';
 
+import { buildUtilityQueueItemOrigin } from '@features/queue/data/events';
 import { describe, expect, it } from 'vitest';
 
 import { getQueueItemAccess, isCancellableQueueItem, isRetryableQueueItem } from './queueOwnership';
@@ -48,5 +49,6 @@ describe('queue item row actions', () => {
     expect(isRetryableQueueItem({ parentItemId: 3, status: 'failed' })).toBe(false);
     expect(isRetryableQueueItem({ parentItemId: null, status: 'completed' })).toBe(false);
     expect(isRetryableQueueItem({ parentItemId: null, status: 'pending' })).toBe(false);
+    expect(isRetryableQueueItem({ origin: buildUtilityQueueItemOrigin('thumbnail'), status: 'failed' })).toBe(false);
   });
 });

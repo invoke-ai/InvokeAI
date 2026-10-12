@@ -39429,6 +39429,11 @@ export type components = {
             retried_item_ids_by_user: {
                 [key: string]: number[];
             };
+            /**
+             * Retried Items
+             * @description Each retried root queue item with the queue item that re-runs it
+             */
+            retried_items: components["schemas"]["RetriedQueueItem"][];
         };
         /**
          * Qwen35EncoderField
@@ -41819,6 +41824,19 @@ export type components = {
          * @enum {string}
          */
         ResourceOrigin: "internal" | "external";
+        /** RetriedQueueItem */
+        RetriedQueueItem: {
+            /**
+             * Source Item Id
+             * @description The ID of the retried root queue item
+             */
+            source_item_id: number;
+            /**
+             * Item Id
+             * @description The ID of the queue item that re-runs it
+             */
+            item_id: number;
+        };
         /** RetryItemsResult */
         RetryItemsResult: {
             /**
@@ -41831,6 +41849,11 @@ export type components = {
              * @description The IDs of the queue items that were retried
              */
             retried_item_ids: number[];
+            /**
+             * Retried Items
+             * @description Each retried root queue item with the queue item that re-runs it
+             */
+            retried_items?: components["schemas"]["RetriedQueueItem"][];
         };
         /**
          * Round Float

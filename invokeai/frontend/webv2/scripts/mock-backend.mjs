@@ -1184,6 +1184,28 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         }
       }
 
+      const queueItemCancelMatch = /^\/api\/v1\/queue\/[^/]+\/i\/(\d+)\/cancel$/.exec(path);
+      if (queueItemCancelMatch && method === 'PUT') {
+        const item = state.queueItems.get(Number(queueItemCancelMatch[1]));
+
+        if (!item) {
+          return json(404, { detail: 'Queue item not found' });
+        }
+        // Like the backend, canceling any item of a workflow-call chain cancels the whole chain.
+        const rootId = item.root_item_id ?? item.item_id;
+        for (const chainItem of state.queueItems.values()) {
+          if (
+            (chainItem.root_item_id ?? chainItem.item_id) === rootId &&
+            ['pending', 'waiting', 'in_progress'].includes(chainItem.status)
+          ) {
+            chainItem.status = 'canceled';
+            chainItem.completed_at = timestamp(state);
+            chainItem.updated_at = chainItem.completed_at;
+          }
+        }
+        return json(200, item);
+      }
+
       const queueMatch = /^\/api\/v1\/queue\/[^/]+\/(.+)$/.exec(path);
       if (queueMatch) {
         const action = queueMatch[1];
@@ -1301,17 +1323,18 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           return json(200, { canceled });
         }
         if (action === 'retry_items_by_id' && method === 'PUT') {
-          // Like the backend: only failed or canceled roots are cloned, once each, as new pending items.
+          // Like the backend: a failed or canceled item retries its failed or canceled root, once, as a new pending
+          // item with a fresh session; the result names the retried roots and pairs each with its rerun.
           const itemIds = await readJsonBody(request, []);
-          const retriedItemIds = [];
+          const retriedItems = [];
           const seenRoots = new Set();
+          const isRetryable = (item) => ['failed', 'canceled'].includes(item?.status);
 
           for (const itemId of Array.isArray(itemIds) ? itemIds : []) {
             const item = state.queueItems.get(itemId);
-            const rootId = item?.root_item_id ?? item?.item_id;
-            const root = rootId === undefined ? undefined : state.queueItems.get(rootId);
+            const root = state.queueItems.get(item?.root_item_id ?? item?.item_id);
 
-            if (!root || seenRoots.has(root.item_id) || !['failed', 'canceled'].includes(root.status)) {
+            if (!isRetryable(item) || !isRetryable(root) || seenRoots.has(root.item_id)) {
               continue;
             }
             seenRoots.add(root.item_id);
@@ -1327,14 +1350,20 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
               error_traceback: null,
               error_type: null,
               item_id: nextId,
-              retried_from_item_id: root.item_id,
+              retried_from_item_id: root.retried_from_item_id ?? root.item_id,
+              session: { prepared_source_mapping: {}, results: {} },
+              session_id: `${root.session_id}-retry-${nextId}`,
               started_at: null,
               status: 'pending',
               updated_at: now,
             });
-            retriedItemIds.push(nextId);
+            retriedItems.push({ item_id: nextId, source_item_id: root.item_id });
           }
-          return json(200, { queue_id: 'default', retried_item_ids: retriedItemIds });
+          return json(200, {
+            queue_id: 'default',
+            retried_item_ids: retriedItems.map((item) => item.source_item_id),
+            retried_items: retriedItems,
+          });
         }
 
         return json(200, null);

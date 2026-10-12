@@ -15,7 +15,7 @@ import { QueueUiProvider, type QueueUiAdapter } from './QueueUiContext';
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 const commands = vi.hoisted(() => ({
   cancelItem: vi.fn(() => Promise.resolve()),
-  retryItems: vi.fn((itemIds: number[]) => Promise.resolve(itemIds.map((id) => id + 100))),
+  retryItems: vi.fn((itemIds: number[]) => Promise.resolve(itemIds)),
 }));
 
 vi.mock('@features/queue/publicApi', () => ({

@@ -19,7 +19,15 @@ import {
   MAX_QUEUE_BATCH_ITEMS,
   type QueueWorkflowSeed,
 } from '@features/queue/core/promptBatch';
-import { shouldSubmitPendingQueueItem } from '@features/queue/core/submissionRules';
+import { QUEUE_SOURCE_RESULT_NODE_IDS, shouldSubmitPendingQueueItem } from '@features/queue/core/submissionRules';
+import {
+  isTerminalBackendStatus,
+  isUtilityQueueItemOrigin,
+  parseQueueItemOrigin,
+  parseQueueItemOriginProjectId,
+  type QueueItemStatusChangedEvent,
+  type QueueItemsRetriedEvent,
+} from '@features/queue/data/events';
 import { progressImageStore } from '@features/queue/data/progressImageStore';
 import {
   createQueueCoordinator,
@@ -33,6 +41,7 @@ import {
 } from '@features/queue/runtime/coordinator';
 import { mapWithConcurrency } from '@platform/core/concurrency';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
+import { normalizeServerTimestamp } from '@platform/time/serverTimestamp';
 import { ApiError, getApiErrorMessage } from '@platform/transport/http';
 
 export interface QueueResultDestinationPort {
@@ -86,6 +95,12 @@ export interface QueueHistoryCommands {
   }): void;
   recordError(payload: { area: string; message: string; namespace: 'queue'; projectId?: string }): void;
   refreshBackendData(): void;
+  /** Reopen a finished run around the backend items re-running its failed or canceled ones; refused runs stay. */
+  reopenForRetry(payload: {
+    projectId: string;
+    queueItemId: string;
+    retriedItems: { itemId: number; sourceItemId: number }[];
+  }): void;
   restoreFromJournal(payload: { items: unknown[]; projectId: string }): void;
   routePartialResults(payload: {
     backendItemId: number;
@@ -101,6 +116,13 @@ export interface QueueHistoryCommands {
     videos: QueueResultVideo[];
   }): void;
   setConnectionStatus(payload: { error?: string; status: BackendConnectionStatus }): void;
+  /** Stage a retried Canvas run's results at the current bbox when no open run could adopt it. */
+  stageRetriedCanvasResults(payload: {
+    backendItemId: number;
+    images: QueueResultImage[];
+    projectId: string;
+    queueItemId: string;
+  }): void;
   setStatus(payload: {
     error?: string;
     notify?: boolean;
@@ -354,6 +376,11 @@ const getRouteTarget = (history: QueueHistoryPort, localQueueItemId: string) =>
 const getRunKey = (projectId: string, queueItemId: string): string => JSON.stringify([projectId, queueItemId]);
 
 const QUEUE_RUNTIME_CONCURRENCY = 16;
+/**
+ * Reruns no open run adopted, remembered until they finish so their results still reach the Gallery or Canvas; one
+ * retry can re-run up to the backend's default `max_queue_size`.
+ */
+const UNADOPTED_RERUN_LIMIT = 10_000;
 
 interface RunAttempt {
   generation: number;
@@ -996,19 +1023,21 @@ export const createQueueRuntime = ({
     }
   };
 
-  /**
-   * Remove input passthroughs and requested intermediates before routing; echoed source media must not move boards
-   * on every run.
-   */
+  /** Drop input passthroughs and requested intermediates; echoed source media must not move boards on every run. */
+  const selectVisibleImages = (queueItem: QueueItem, allImages: QueueResultImage[]): QueueResultImage[] => {
+    const inputMedia = collectGraphInputMediaNames(getQueueItemCompiledGraph(queueItem));
+    const producedImages = allImages.filter((image) => !inputMedia.imageNames.has(image.imageName));
+
+    return queueItem.snapshot.filterIntermediateResults
+      ? producedImages.filter((image) => !image.isIntermediate)
+      : producedImages;
+  };
+
   const deliverVisibleImages = async (
     queueItem: QueueItem,
     allImages: QueueResultImage[]
   ): Promise<QueueResultImage[]> => {
-    const inputMedia = collectGraphInputMediaNames(getQueueItemCompiledGraph(queueItem));
-    const producedImages = allImages.filter((image) => !inputMedia.imageNames.has(image.imageName));
-    const images = queueItem.snapshot.filterIntermediateResults
-      ? producedImages.filter((image) => !image.isIntermediate)
-      : producedImages;
+    const images = selectVisibleImages(queueItem, allImages);
 
     await addImagesToDestination(queueItem, images);
 
@@ -1249,6 +1278,163 @@ export const createQueueRuntime = ({
     },
     { backend: coordinatorBackend, modelLoads, nodeExecution }
   );
+
+  /** Backend ids of reruns no run in this tab adopted. */
+  const unadoptedReruns = new Set<number>();
+  const rememberUnadoptedRerun = (itemId: number): void => {
+    unadoptedReruns.add(itemId);
+    for (const oldest of unadoptedReruns) {
+      if (unadoptedReruns.size <= UNADOPTED_RERUN_LIMIT) {
+        break;
+      }
+      unadoptedReruns.delete(oldest);
+    }
+  };
+
+  /**
+   * A retry, from any tab or client, re-runs failed or canceled backend items under new ids. The open run that owns
+   * the retried items, or once owned them before an earlier retry, reopens around the reruns, so its captured
+   * destination receives their results; reconciliation then tracks them like any resumed run.
+   */
+  const handleItemsRetried = (event: QueueItemsRetriedEvent): void => {
+    if (!isActive() || !event.retried_items?.length) {
+      return;
+    }
+
+    const runsByBackendItemId = new Map<number, { projectId: string; queueItemId: string }>();
+    for (const project of history.getSnapshot().projects) {
+      for (const queueItem of project.queue.items) {
+        for (const backendItemId of [...(queueItem.backendItemIds ?? []), ...(queueItem.retriedBackendItemIds ?? [])]) {
+          runsByBackendItemId.set(backendItemId, { projectId: project.id, queueItemId: queueItem.id });
+        }
+      }
+    }
+
+    const retriedItemsByRun = new Map<
+      string,
+      { projectId: string; queueItemId: string; retriedItems: { itemId: number; sourceItemId: number }[] }
+    >();
+    for (const { item_id: itemId, source_item_id: sourceItemId } of event.retried_items) {
+      const owner = runsByBackendItemId.get(sourceItemId);
+
+      if (!owner) {
+        rememberUnadoptedRerun(itemId);
+        continue;
+      }
+      const key = getRunKey(owner.projectId, owner.queueItemId);
+      const run = retriedItemsByRun.get(key) ?? { ...owner, retriedItems: [] };
+      run.retriedItems.push({ itemId, sourceItemId });
+      retriedItemsByRun.set(key, run);
+    }
+
+    for (const [key, run] of retriedItemsByRun) {
+      commands.reopenForRetry(run);
+      const reopened = getRouteTarget(history, run.queueItemId)?.queueItem;
+      let isAdopted = false;
+
+      for (const { itemId } of run.retriedItems) {
+        if (reopened?.status === 'running' && reopened.backendItemIds?.includes(itemId)) {
+          isAdopted = true;
+        } else {
+          rememberUnadoptedRerun(itemId);
+        }
+      }
+      if (isAdopted) {
+        // A settle still waiting on the journal belongs to the finished run; it must not remove the reopened record.
+        pendingJournalSettles.delete(key);
+        pendingReconcileRunKeys.add(key);
+      }
+    }
+    synchronize();
+  };
+
+  /**
+   * The images a rerun no run adopted produced. Its run, when this tab still holds it, says which nodes are results;
+   * otherwise the product sources' result nodes are tried before every image the rerun created, as for a Workflow.
+   */
+  const readUnadoptedRerunImages = async (
+    event: QueueItemStatusChangedEvent,
+    queueItemId: string,
+    run: QueueItem | undefined
+  ): Promise<QueueResultImage[]> => {
+    const read = (options?: QueueResultImageOptions) =>
+      runResultRead(() => backend.getResultImages(event.item_id, queueItemId, event.created_at, options));
+
+    if (run) {
+      return selectVisibleImages(run, await read(getQueueItemResultImageOptions(run)));
+    }
+
+    const productResults = await read({
+      resultNodeIds: [
+        ...(QUEUE_SOURCE_RESULT_NODE_IDS.generate ?? []),
+        ...(QUEUE_SOURCE_RESULT_NODE_IDS.upscale ?? []),
+      ],
+    });
+    if (productResults.length > 0) {
+      return productResults;
+    }
+    // Images older than the rerun are inputs its graph echoed back, not results.
+    const queuedAt = Date.parse(normalizeServerTimestamp(event.created_at));
+    return (await read()).filter(
+      (image) => !image.isIntermediate && (!image.createdAt || Date.parse(image.createdAt) >= queuedAt)
+    );
+  };
+
+  /**
+   * Deliver a rerun no open run adopted the way its destination would see any untracked result: the Gallery refreshes
+   * (onto its run's board when this tab still holds that run), and a Canvas project open here stages it.
+   */
+  const handleUnadoptedRerunSettled = (event: QueueItemStatusChangedEvent): void => {
+    if (!isActive() || !isTerminalBackendStatus(event.status) || !unadoptedReruns.delete(event.item_id)) {
+      return;
+    }
+    if (event.status !== 'completed' || isUtilityQueueItemOrigin(event.origin)) {
+      return;
+    }
+
+    const projectId = parseQueueItemOriginProjectId(event.origin);
+    const queueItemId = parseQueueItemOrigin(event.origin);
+    const target = queueItemId ? getRouteTarget(history, queueItemId) : undefined;
+    const run = target?.project.id === projectId ? target?.queueItem : undefined;
+    const isProjectOpen = history.getSnapshot().projects.some((project) => project.id === projectId);
+    const recordError = (error: unknown): void => {
+      if (isActive()) {
+        commands.recordError({
+          area: 'queue-results',
+          message: toErrorMessage(error),
+          namespace: 'queue',
+          ...(projectId ? { projectId } : {}),
+        });
+      }
+    };
+
+    if (event.destination === 'gallery') {
+      if (!run || !queueItemId) {
+        commands.refreshBackendData();
+        return;
+      }
+      void readUnadoptedRerunImages(event, queueItemId, run)
+        .then((images) => addImagesToDestination(run, images))
+        .catch(recordError)
+        .finally(() => {
+          if (isActive()) {
+            commands.refreshBackendData();
+          }
+        });
+      return;
+    }
+    if (event.destination !== 'canvas' || !projectId || !queueItemId || !isProjectOpen) {
+      return;
+    }
+
+    void readUnadoptedRerunImages(event, queueItemId, run)
+      .then((images) => {
+        if (isActive() && images.length > 0) {
+          commands.stageRetriedCanvasResults({ backendItemId: event.item_id, images, projectId, queueItemId });
+        }
+      })
+      .catch(recordError);
+  };
 
   const submitQueueItem = async (
     project: QueueHistoryProject,
@@ -1938,6 +2124,8 @@ export const createQueueRuntime = ({
     ensureTemplatesLoaded();
     detachers.push(
       history.subscribe(synchronize),
+      backend.on('queue_items_retried', handleItemsRetried),
+      backend.on('queue_item_status_changed', handleUnadoptedRerunSettled),
       backend.onConnectionChange((status, error) => {
         if (!isActive()) {
           return;

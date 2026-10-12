@@ -2286,6 +2286,200 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(activeProject.queue.items).toEqual([]);
   });
 
+  it('reopens a failed Canvas run around its rerun and stages the rerun at the submitted bbox', () => {
+    let state = submitGenerate(primeGenerate());
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0]!;
+    const submittedBbox = queueItem.snapshot.canvas.document.bbox;
+
+    state = workbenchReducer(state, {
+      backendItemIds: [41],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'markQueueItemBackendSubmitted',
+    });
+    state = workbenchReducer(state, {
+      error: 'Out of memory',
+      notify: false,
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      status: 'failed',
+      type: 'setQueueItemStatus',
+    });
+    state = workbenchReducer(state, {
+      bbox: { ...submittedBbox, x: submittedBbox.x + 64 },
+      type: 'setCanvasBbox',
+    });
+    state = workbenchReducer(state, {
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      // A rerun of another run's item is not this run's to adopt.
+      retriedItems: [
+        { itemId: 99, sourceItemId: 41 },
+        { itemId: 100, sourceItemId: 7 },
+      ],
+      type: 'reopenQueueItemForRetry',
+    });
+
+    const reopened = getProject(state, project.id).queue.items[0];
+    expect(reopened).toEqual(expect.objectContaining({ backendItemIds: [99], status: 'running' }));
+    expect(reopened).not.toHaveProperty('error');
+
+    state = workbenchReducer(state, {
+      images: [createImage('rerun.png', queueItem.id)],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemResults',
+    });
+
+    const { stagingArea } = getProject(state, project.id).canvas;
+    expect(stagingArea.pendingImageIds).toEqual(['rerun.png']);
+    expect(stagingArea.pendingImages[0]).toEqual(
+      expect.objectContaining({
+        placement: expect.objectContaining({ x: submittedBbox.x, y: submittedBbox.y }),
+        sourceBackendItemId: 99,
+      })
+    );
+  });
+
+  it('leaves a run finished when it is still active or its Canvas document was replaced', () => {
+    let state = submitGenerate(primeGenerate());
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0]!;
+    const reopen = (current: WorkbenchState) =>
+      workbenchReducer(current, {
+        projectId: project.id,
+        queueItemId: queueItem.id,
+        retriedItems: [{ itemId: 99, sourceItemId: 41 }],
+        type: 'reopenQueueItemForRetry',
+      });
+
+    state = workbenchReducer(state, {
+      backendItemIds: [41],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'markQueueItemBackendSubmitted',
+    });
+    expect(reopen(state)).toBe(state);
+
+    state = workbenchReducer(state, {
+      notify: false,
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      status: 'failed',
+      type: 'setQueueItemStatus',
+    });
+    state = workbenchReducer(state, { document: createEmptyCanvasDocument(), type: 'replaceCanvasDocument' });
+    expect(reopen(state)).toBe(state);
+  });
+
+  it('returns a later retry of another item the run left behind to that run, keeping its earlier results', () => {
+    let state = submitGenerate(primeGenerate());
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0]!;
+    const reopen = (current: WorkbenchState, itemId: number, sourceItemId: number) =>
+      workbenchReducer(current, {
+        projectId: project.id,
+        queueItemId: queueItem.id,
+        retriedItems: [{ itemId, sourceItemId }],
+        type: 'reopenQueueItemForRetry',
+      });
+    const finish = (current: WorkbenchState, imageName: string) =>
+      workbenchReducer(current, {
+        images: [createImage(imageName, queueItem.id)],
+        projectId: project.id,
+        queueItemId: queueItem.id,
+        type: 'routeQueueItemResults',
+      });
+
+    state = workbenchReducer(state, {
+      backendItemIds: [40, 41, 42],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'markQueueItemBackendSubmitted',
+    });
+    state = workbenchReducer(state, {
+      backendItemId: 40,
+      images: [createImage('first.png', queueItem.id)],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemPartialResults',
+    });
+    state = workbenchReducer(state, {
+      notify: false,
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      status: 'failed',
+      type: 'setQueueItemStatus',
+    });
+
+    state = finish(reopen(state, 99, 41), 'rerun-41.png');
+    expect(getProject(state, project.id).queue.items[0]).toEqual(
+      expect.objectContaining({
+        resultImages: [
+          expect.objectContaining({ imageName: 'first.png' }),
+          expect.objectContaining({ imageName: 'rerun-41.png' }),
+        ],
+        status: 'completed',
+      })
+    );
+
+    state = reopen(state, 100, 42);
+    expect(getProject(state, project.id).queue.items[0]).toEqual(
+      expect.objectContaining({ backendItemIds: [100], status: 'running' })
+    );
+  });
+
+  it('stages a rerun its active run could not adopt where that run stages', () => {
+    let state = submitGenerate(primeGenerate());
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0]!;
+    const submittedBbox = queueItem.snapshot.canvas.document.bbox;
+
+    state = workbenchReducer(state, {
+      bbox: { ...submittedBbox, x: submittedBbox.x + 64 },
+      type: 'setCanvasBbox',
+    });
+    state = workbenchReducer(state, {
+      backendItemId: 100,
+      images: [createImage('rerun.png', queueItem.id)],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'stageRetriedCanvasResults',
+    });
+
+    expect(getCanvas(state).stagingArea.pendingImages[0]).toEqual(
+      expect.objectContaining({ placement: expect.objectContaining({ x: submittedBbox.x, y: submittedBbox.y }) })
+    );
+  });
+
+  it('stages a rerun no run adopted at the current bbox', () => {
+    let state = primeGenerate();
+    const projectId = state.activeProjectId;
+    const initialBbox = getCanvas(state).document.bbox;
+
+    state = workbenchReducer(state, { bbox: { ...initialBbox, x: initialBbox.x + 64 }, type: 'setCanvasBbox' });
+    const currentBbox = getCanvas(state).document.bbox;
+    expect(currentBbox.x).not.toBe(initialBbox.x);
+    state = workbenchReducer(state, {
+      backendItemId: 99,
+      images: [createImage('rerun.png', 'run-from-another-tab')],
+      projectId,
+      queueItemId: 'run-from-another-tab',
+      type: 'stageRetriedCanvasResults',
+    });
+
+    const { stagingArea } = getCanvas(state);
+    expect(stagingArea.pendingImageIds).toEqual(['rerun.png']);
+    expect(stagingArea.isVisible).toBe(true);
+    expect(stagingArea.pendingImages[0]).toEqual(
+      expect.objectContaining({
+        placement: expect.objectContaining({ x: currentBbox.x, y: currentBbox.y }),
+        sourceBackendItemId: 99,
+      })
+    );
+  });
+
   it("keeps the selected workflow candidate when auto-switch is 'off'", () => {
     let state = createInitialWorkbenchState();
     const projectId = state.activeProjectId;

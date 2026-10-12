@@ -30,6 +30,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     ItemIdsResult,
     NodeFieldValue,
     PruneResult,
+    RetriedQueueItem,
     RetryItemsResult,
     SessionQueueCountsByDestination,
     SessionQueueItem,
@@ -46,7 +47,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries import Queries
 from invokeai.app.services.shared.database.queries.locks import DatabaseLock
-from invokeai.app.services.shared.database.queries.session_queue import Scope, SettledReceipt
+from invokeai.app.services.shared.database.queries.session_queue import ITEM_COLUMNS, Scope, SettledReceipt
 from invokeai.app.services.shared.execution_state_migration import dump_execution_state
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from invokeai.app.services.shared.pagination import CursorPaginatedResults, SQLiteDirection
@@ -1151,15 +1152,16 @@ class SessionQueue(SessionQueueBase):
 
         clones = self._queries.run(survey, read_only=True)
 
-        def admit(q: Queries) -> Optional[list[tuple[int, str, ValueToInsertTuple]]]:
-            """The clones the queue had room for, inserted; None when it is full."""
+        def admit(q: Queries) -> Optional[list[tuple[int, str, int]]]:
+            """The clones the queue had room for, inserted one by one for their ids; None when it is full."""
             q.locks.acquire(*_ADMISSION, also_shared=_PROTECTING_MEDIA)
             max_new_queue_items = max_queue_size - q.session_queue.pending_count(queue_id)
             if max_new_queue_items <= 0:
                 return None
-            admitted = clones[:max_new_queue_items]
-            q.session_queue.insert_items([values for _, _, values in admitted])
-            return admitted
+            return [
+                (root_item_id, user_id, q.session_queue.insert_item(dict(zip(ITEM_COLUMNS, values, strict=True))))
+                for root_item_id, user_id, values in clones[:max_new_queue_items]
+            ]
 
         admitted = self._queries.run(admit)
         if admitted is None:
@@ -1168,7 +1170,11 @@ class SessionQueue(SessionQueueBase):
         for root_item_id, user_id, _ in admitted:
             retried_item_ids_by_user.setdefault(user_id, []).append(root_item_id)
         retry_result = RetryItemsResult(
-            queue_id=queue_id, retried_item_ids=[root_item_id for root_item_id, _, _ in admitted]
+            queue_id=queue_id,
+            retried_item_ids=[root_item_id for root_item_id, _, _ in admitted],
+            retried_items=[
+                RetriedQueueItem(source_item_id=root_item_id, item_id=item_id) for root_item_id, _, item_id in admitted
+            ],
         )
         self.__invoker.services.events.emit_queue_items_retried(
             retry_result,
