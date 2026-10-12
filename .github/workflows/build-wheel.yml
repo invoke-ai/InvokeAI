@@ -8,11 +8,11 @@ on:
 
 jobs:
   build-installer:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5 # expected run time: <2 min
     steps:
       - name: checkout
-        uses: actions/checkout@v6
+        uses: useblacksmith/checkout@v1
 
       - name: setup python
         uses: actions/setup-python@v6

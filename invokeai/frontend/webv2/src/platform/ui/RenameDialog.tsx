@@ -8,6 +8,7 @@ import { Field } from './Field';
 
 /** Submit only changed, nonempty names; async failures keep the dialog open and callers surface the error. */
 export const RenameDialog = ({
+  cancelLabel = 'Cancel',
   finalFocusEl,
   initialName,
   isOpen,
@@ -19,6 +20,7 @@ export const RenameDialog = ({
   submitUnchanged = false,
   title = 'Rename project',
 }: {
+  cancelLabel?: string;
   finalFocusEl?: () => HTMLElement | null;
   initialName: string;
   isOpen: boolean;
@@ -33,7 +35,7 @@ export const RenameDialog = ({
 }) => {
   const [isPending, setIsPending] = useState(false);
   // Keep the labels the dialog showed while it animates out, even if the host clears its subject on close.
-  const live = useMemo(() => ({ label, submitLabel, title }), [label, submitLabel, title]);
+  const live = useMemo(() => ({ cancelLabel, label, submitLabel, title }), [cancelLabel, label, submitLabel, title]);
   const shown = useExitRetainedValue(isOpen ? live : null);
   const text = shown.value ?? live;
   const { release } = shown;
@@ -110,7 +112,7 @@ export const RenameDialog = ({
               </Dialog.Body>
               <Dialog.Footer>
                 <Button disabled={isPending} type="button" variant="ghost" onClick={onClose}>
-                  Cancel
+                  {text.cancelLabel}
                 </Button>
                 <Button loading={isPending} type="submit" variant="solid">
                   {text.submitLabel}

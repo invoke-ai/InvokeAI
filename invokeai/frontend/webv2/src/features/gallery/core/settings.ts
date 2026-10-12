@@ -5,7 +5,7 @@ export type GalleryThumbnailFit = 'square' | 'aspect';
 export type GalleryPaginationMode = 'infinite' | 'paginated';
 
 /** The collapsible groups in the board panel, in render order. */
-export const GALLERY_BOARD_SECTION_IDS = ['boards', 'dates', 'archived'] as const;
+export const GALLERY_BOARD_SECTION_IDS = ['project', 'library', 'other-projects', 'dates', 'archived'] as const;
 
 export type GalleryBoardSectionId = (typeof GALLERY_BOARD_SECTION_IDS)[number];
 
