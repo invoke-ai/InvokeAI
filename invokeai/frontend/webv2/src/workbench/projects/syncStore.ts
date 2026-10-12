@@ -3,6 +3,7 @@ import type { Project } from '@workbench/projectContracts';
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
+import type { DeleteProjectBoards } from './api';
 import type { ProjectPushOutcome, ProjectSchemaRefusal } from './projectFlush';
 
 /** Only the sync engine mutates open projects; closed projects use HTTP. */
@@ -52,7 +53,7 @@ export interface OpenProjectHandle {
   /** Close the tab, after the project has been deleted on the server. */
   close: () => void;
   /** Delete through the sync engine's mutation queue so in-flight saves finish first. */
-  deleteOnServer: () => Promise<void>;
+  deleteOnServer: (boards?: DeleteProjectBoards) => Promise<void>;
   /** Flush returns an acknowledgement outcome; callers reading server bytes must assert success. */
   flush: () => Promise<ProjectPushOutcome>;
   /** Persists unsaved canvas pixels into the document; rejects when they cannot be saved. */

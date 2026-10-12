@@ -1,7 +1,7 @@
 import type { GalleryBoard } from '@features/gallery/core/types';
 
 import { Flex, Icon, Image } from '@chakra-ui/react';
-import { CalendarIcon, ImageIcon, PlayIcon, type LucideIcon } from 'lucide-react';
+import { CalendarIcon, ImageIcon, InboxIcon, PlayIcon, type LucideIcon } from 'lucide-react';
 
 /** Square swatch shown at the start of every board row and in the stacked header. */
 export const BoardCoverIcon = ({ icon }: { icon: LucideIcon }) => (
@@ -54,5 +54,5 @@ export const BoardCover = ({ board }: { board: GalleryBoard }) => {
     );
   }
 
-  return <BoardCoverIcon icon={board.kind === 'date' ? CalendarIcon : ImageIcon} />;
+  return <BoardCoverIcon icon={board.kind === 'date' ? CalendarIcon : board.isInbox ? InboxIcon : ImageIcon} />;
 };

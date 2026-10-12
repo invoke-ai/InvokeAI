@@ -10,9 +10,11 @@ import { createSingleFlight } from '@platform/state/singleFlight';
 import { normalizeServerTimestamp } from '@platform/time/serverTimestamp';
 import { DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION, isCanvasSchemaVersionSupported } from '@workbench/canvasSchemaVersion';
 
+import type { DuplicateProjectDeps } from './invk/duplicateProject';
 import type { ProjectTransferIssues } from './invk/transfer';
 
 import {
+  type DeleteProjectBoards,
   deleteProject as apiDeleteProject,
   getProject as apiGetProject,
   getProjectBoardSnapshot,
@@ -179,8 +181,14 @@ export const isProjectSummaryCompatible = (summary: ProjectSummary): boolean =>
 
 /** Open projects mutate through their sync engine; closed projects use the HTTP API directly. */
 
-/** Permanently remove a project from the server, its board with it. The only deletion path. */
-export const deleteLibraryProject = async (projectId: string): Promise<void> => {
+/**
+ * Permanently remove a project from the server, its inbox with it. The only deletion path. Its other boards are
+ * released to the Library unless asked to go too; media survives either way.
+ */
+export const deleteLibraryProject = async (
+  projectId: string,
+  boards: DeleteProjectBoards = 'release'
+): Promise<void> => {
   const owner = captureAccountScope();
   const [{ acquireProjectMutationLock }, { createAccountOwnedQueueRunJournal }] = await Promise.all([
     import('./projectLifecycleLocks'),
@@ -209,9 +217,9 @@ export const deleteLibraryProject = async (projectId: string): Promise<void> => 
 
     if (openProject) {
       // Queueing ensures an in-flight save finishes before DELETE is sent.
-      await openProject.deleteOnServer();
+      await openProject.deleteOnServer(boards);
     } else {
-      await apiDeleteProject(projectId, owner.signal);
+      await apiDeleteProject(projectId, owner.signal, boards);
     }
 
     assertAccountScopeCurrent(owner);
@@ -305,7 +313,7 @@ export interface DuplicatedProject extends ProjectTransferIssues {
  */
 export const duplicateLibraryProject = async (
   projectId: string,
-  options: { onProgress?: (progress: { completed: number; total: number }) => void; owner?: AccountScope } = {}
+  options: Pick<DuplicateProjectDeps, 'onProgress'> & { owner?: AccountScope } = {}
 ): Promise<DuplicatedProject> => {
   const owner = options.owner ?? captureAccountScope();
   const record = await readAcknowledgedProject(projectId, owner);
@@ -318,7 +326,7 @@ export const duplicateLibraryProject = async (
 
   const { duplicateProjectRecord } = await import('./invk/duplicateProject');
   const duplicated = await duplicateProjectRecord(
-    { boardItems: snapshot.items, owner, record },
+    { boards: snapshot.boards, owner, record },
     options.onProgress ? { onProgress: options.onProgress } : {}
   );
 
@@ -329,6 +337,7 @@ export const duplicateLibraryProject = async (
   }
 
   return {
+    boardIssues: duplicated.boardIssues,
     boardItemIssues: duplicated.boardItemIssues,
     documentReferenceIssues: duplicated.documentReferenceIssues,
     summary: adoptCreatedProject(duplicated.record, owner),

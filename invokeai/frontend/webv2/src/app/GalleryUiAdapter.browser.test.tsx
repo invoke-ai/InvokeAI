@@ -53,6 +53,8 @@ vi.mock('@workbench/WorkbenchContext', () => ({
       shallowEqual
     ),
   useWorkbenchCommands: () => store.commands,
+  useWorkbenchInternalStore: () => store,
+  useWorkbenchPersistenceService: () => ({ ensureProjectOnServer: () => Promise.resolve() }),
   useWorkbenchQueries: () => store.queries,
 }));
 

@@ -6,9 +6,9 @@ from sqlalchemy import insert, select
 from invokeai.app.services.board_image_records.board_image_records_default import BoardImageRecordStorage
 from invokeai.app.services.board_records.board_records_common import (
     BoardChanges,
+    BoardRecordInboxException,
     BoardRecordNotFoundException,
     BoardRecordOrderBy,
-    BoardRecordProjectOwnedException,
     BoardVisibility,
 )
 from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
@@ -117,13 +117,13 @@ def test_a_saved_board_is_read_back_with_the_project_that_claims_it(
     _claim(database, claimed.board_id)
 
     assert board_records.get(free.board_id) == free
-    assert board_records.get_with_project_id(free.board_id) == (free, None)
-    assert board_records.get_with_project_id(claimed.board_id) == (claimed, "project")
-    assert board_records.get_project_ids_for_boards([free.board_id, claimed.board_id]) == {claimed.board_id: "project"}
+    assert board_records.get_with_inbox_project(free.board_id) == (free, None)
+    assert board_records.get_with_inbox_project(claimed.board_id) == (claimed, "project")
+    assert board_records.get_inbox_board_ids([free.board_id, claimed.board_id]) == {claimed.board_id}
     with pytest.raises(BoardRecordNotFoundException):
         board_records.get("missing")
     with pytest.raises(BoardRecordNotFoundException):
-        board_records.get_with_project_id("missing")
+        board_records.get_with_inbox_project("missing")
 
 
 def test_project_ids_are_looked_up_in_chunks(
@@ -134,9 +134,7 @@ def test_project_ids_are_looked_up_in_chunks(
     for index, board_id in enumerate(board_ids):
         _claim(database, board_id, f"project {index}")
 
-    assert board_records.get_project_ids_for_boards(board_ids) == {
-        board_id: f"project {index}" for index, board_id in enumerate(board_ids)
-    }
+    assert board_records.get_inbox_board_ids(board_ids) == set(board_ids)
 
 
 def test_users_list_their_own_shared_and_public_boards(database: Database, board_records: BoardRecordStorage) -> None:
@@ -258,7 +256,7 @@ def test_a_project_board_keeps_what_its_project_owns(database: Database, board_r
         BoardChanges(archived=True),
         BoardChanges(board_visibility=BoardVisibility.Public),
     ):
-        with pytest.raises(BoardRecordProjectOwnedException):
+        with pytest.raises(BoardRecordInboxException):
             board_records.update(board.board_id, changes)
     updated = board_records.update(board.board_id, BoardChanges(cover_image_name="cover.png"))
 
