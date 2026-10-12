@@ -79,9 +79,9 @@ def extract_audio_pcm(video_path: Path, *, float_pcm: bool = False) -> tuple[np.
             raise AudioExtractionError(f"ffmpeg timed out extracting audio from {video_path.name}") from e
         if proc.returncode != 0:
             stderr = proc.stderr.decode("utf-8", errors="replace")
-            # ffmpeg's phrasing for an input with no audio track ("Output file #0 does not
-            # contain any stream" / newer "does not contain any stream" variants).
-            if "does not contain any stream" in stderr:
+            # A PCM output without a stream is an error even with an optional map.
+            # Classify the input structurally, not by FFmpeg's version-dependent prose.
+            if _is_silent_container(video_path):
                 return None
             raise AudioExtractionError(
                 f"ffmpeg could not extract audio from {video_path.name}: {stderr.strip()[-500:]}"
@@ -103,6 +103,51 @@ def extract_audio_pcm(video_path: Path, *, float_pcm: bool = False) -> tuple[np.
         return data.astype(np.float32) / 32768.0, rate
     finally:
         out_path.unlink(missing_ok=True)
+
+
+def _is_silent_container(video_path: Path) -> bool:
+    """Confirm no audio stream with the bundled FFmpeg; unknown/failed probes aren't silence.
+
+    Unlike PCM muxers, ffmetadata can emit a valid header with zero streams. Optional
+    audio mapping emits a [STREAM] section when audio exists, without decoding samples.
+    Suppress non-audio streams and copied metadata so neither automatic selection nor
+    user-supplied tags can masquerade as a stream section. Only failed decodes pay for
+    this extra process; normal extraction and its stream-selection semantics are unchanged.
+    """
+    try:
+        proc = subprocess.run(
+            [
+                _ffmpeg_exe(),
+                "-loglevel",
+                "error",
+                "-i",
+                str(video_path),
+                "-map",
+                "0:a:0?",
+                "-vn",
+                "-sn",
+                "-dn",
+                "-map_metadata",
+                "-1",
+                "-map_chapters",
+                "-1",
+                "-c",
+                "copy",
+                "-t",
+                "0",
+                "-f",
+                "ffmetadata",
+                "pipe:1",
+            ],
+            capture_output=True,
+            timeout=60,
+        )
+    except subprocess.TimeoutExpired as e:
+        raise AudioExtractionError(f"ffmpeg timed out probing audio in {video_path.name}") from e
+    except OSError:
+        return False  # Preserve the original extraction error if probing cannot start.
+    lines = proc.stdout.splitlines()
+    return proc.returncode == 0 and bool(lines) and lines[0] == b";FFMETADATA1" and b"[STREAM]" not in lines
 
 
 def _probe_audio_sample_rate(video_path: Path) -> int | None:
