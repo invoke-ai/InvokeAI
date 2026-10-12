@@ -2782,7 +2782,11 @@ describe('queue runtime video board routing', () => {
 });
 
 describe('queue runtime retries', () => {
-  const createRetryHarness = (queueItem: QueueItem, backendOverrides: Partial<QueueBackendPort> = {}) => {
+  const createRetryHarness = (
+    queueItem: QueueItem,
+    backendOverrides: Partial<QueueBackendPort> = {},
+    services: { locks?: QueueRunLockPort } = {}
+  ) => {
     const project = { id: 'project-1', queue: { items: [queueItem] } };
     const listeners = new Set<() => void>();
     const notify = () => listeners.forEach((listener) => listener());
@@ -2804,6 +2808,7 @@ describe('queue runtime retries', () => {
     });
     const runtime = createQueueRuntime({
       ...runtimeServices,
+      ...services,
       backend,
       history: {
         commands,
@@ -3107,6 +3112,52 @@ describe('queue runtime retries', () => {
     await vi.waitFor(() => expect(commands.refreshBackendData).toHaveBeenCalled());
     expect(getResultVideoNames).toHaveBeenCalledWith(100, { resultNodeIds: ['video_output'] });
     expect(runtimeServices.destinations.addVideosToGalleryBoard).toHaveBeenCalledWith('board-1', ['rerun.mp4']);
+
+    await runtime.dispose();
+  });
+
+  it('leaves a Canvas rerun to the tab tracking its run, and stages it here only while holding the run lock', async () => {
+    const queueItem: QueueItem = { ...createPendingQueueItem(), backendItemIds: [7], status: 'completed' };
+    const getResultImages = vi.fn().mockResolvedValue([{ imageName: 'rerun.png' } as QueueResultImage]);
+    const release = vi.fn().mockResolvedValue(undefined);
+    // Another tab tracks the run behind rerun 99; nobody tracks the one behind rerun 100 any more.
+    const acquire = vi.fn((_projectId: string, queueItemId: string) =>
+      Promise.resolve(
+        queueItemId === 'tracked-elsewhere'
+          ? ({ kind: 'contended' } as const)
+          : ({ kind: 'acquired', release } as const)
+      )
+    );
+    const { commands, emit, project, runtime } = createRetryHarness(
+      queueItem,
+      { getResultImages },
+      { locks: { acquire } }
+    );
+
+    runtime.start();
+    emit(
+      'queue_items_retried',
+      retriedEvent([
+        { item_id: 99, source_item_id: 41 },
+        { item_id: 100, source_item_id: 42 },
+      ])
+    );
+    emit(
+      'queue_item_status_changed',
+      completedEvent(99, buildQueueItemOrigin('tracked-elsewhere', project.id), 'canvas')
+    );
+    emit('queue_item_status_changed', completedEvent(100, buildQueueItemOrigin('run-gone', project.id), 'canvas'));
+
+    await vi.waitFor(() => expect(release).toHaveBeenCalledTimes(1));
+    expect(commands.stageRetriedCanvasResults).toHaveBeenCalledTimes(1);
+    expect(commands.stageRetriedCanvasResults).toHaveBeenCalledWith(
+      expect.objectContaining({ backendItemId: 100, queueItemId: 'run-gone' })
+    );
+    expect(getResultImages).toHaveBeenCalledTimes(1);
+    // Released only after staging, so a tab that sees the same completion meanwhile finds the lock taken.
+    expect(release.mock.invocationCallOrder[0]).toBeGreaterThan(
+      vi.mocked(commands.stageRetriedCanvasResults).mock.invocationCallOrder[0]!
+    );
 
     await runtime.dispose();
   });

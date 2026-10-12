@@ -1381,8 +1381,35 @@ export const createQueueRuntime = ({
   };
 
   /**
+   * Elect the one tab that stages a Canvas rerun no run adopted: staging lands in the synced project document, so a
+   * second tab staging it would duplicate it. A tab that holds the run stages it; otherwise the run's lock decides,
+   * kept until staging is done, and while the tab tracking the run is alive it holds that lock and other tabs skip.
+   * Resolves to the claim's release, or null when another tab has it. Tabs in other browsers cannot be coordinated.
+   */
+  const claimUnadoptedRerunStaging = async (
+    projectId: string,
+    queueItemId: string
+  ): Promise<(() => Promise<void>) | null> => {
+    const key = getRunKey(projectId, queueItemId);
+    if (!locks || ownedLocks.has(key)) {
+      return () => Promise.resolve();
+    }
+    // This tab's own claim on the run is still being decided; competing with it would leave the rerun to no tab.
+    const ownRequest = lockRequests.get(key);
+    if (ownRequest) {
+      return (await ownRequest) ? () => Promise.resolve() : null;
+    }
+    const lock = await locks.acquire(projectId, queueItemId);
+    if (lock.kind === 'acquired') {
+      return () => lock.release();
+    }
+    // Without browser locks no tab coordinates; staging here is what every tab does then.
+    return lock.kind === 'unavailable' ? () => Promise.resolve() : null;
+  };
+
+  /**
    * Deliver a rerun no open run adopted the way its destination would see any untracked result: the Gallery refreshes
-   * (onto its run's board when this tab still holds that run), and a Canvas project open here stages it.
+   * (onto its run's board when this tab still holds that run), and one tab with its Canvas project open stages it.
    */
   const handleUnadoptedRerunSettled = (event: QueueItemStatusChangedEvent): void => {
     if (!isActive() || !isTerminalBackendStatus(event.status) || !unadoptedReruns.delete(event.item_id)) {
@@ -1430,10 +1457,18 @@ export const createQueueRuntime = ({
       return;
     }
 
-    void readUnadoptedRerunImages(event, queueItemId, run)
-      .then((images) => {
-        if (isActive() && images.length > 0) {
-          commands.stageRetriedCanvasResults({ backendItemId: event.item_id, images, projectId, queueItemId });
+    void claimUnadoptedRerunStaging(projectId, queueItemId)
+      .then(async (release) => {
+        if (!release) {
+          return;
+        }
+        try {
+          const images = await readUnadoptedRerunImages(event, queueItemId, run);
+          if (isActive() && images.length > 0) {
+            commands.stageRetriedCanvasResults({ backendItemId: event.item_id, images, projectId, queueItemId });
+          }
+        } finally {
+          await release().catch(() => undefined);
         }
       })
       .catch(recordError);
