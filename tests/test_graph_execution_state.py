@@ -3019,6 +3019,43 @@ def test_graph_static_nested_ifs_ignore_unselected_loop_branch_context():
     assert state.is_complete()
 
 
+def test_nested_if_literal_condition_activates_selected_branch():
+    """A literal outer If must activate the branch containing an inner If.
+
+    The inner condition is only needed by the outer If's selected branch.
+    Waiting for that condition to be prepared before activating the outer
+    branch causes the compatibility scheduler to return None prematurely.
+    """
+    graph = Graph()
+    graph.add_node(BooleanInvocation(id="inner_condition", value=False))
+    graph.add_node(AddInvocation(id="inner_true", a=100, b=0))
+    graph.add_node(AddInvocation(id="inner_false", a=2, b=3))
+    graph.add_node(IfInvocation(id="inner_if"))
+    graph.add_node(AddInvocation(id="outer_true", a=10, b=20))
+    graph.add_node(IfInvocation(id="outer_if", condition=False))
+    graph.add_node(AddInvocation(id="sink", b=1))
+
+    graph.add_edge(create_edge("inner_condition", "value", "inner_if", "condition"))
+    graph.add_edge(create_edge("inner_true", "value", "inner_if", "true_input"))
+    graph.add_edge(create_edge("inner_false", "value", "inner_if", "false_input"))
+    graph.add_edge(create_edge("inner_if", "value", "outer_if", "false_input"))
+    graph.add_edge(create_edge("outer_true", "value", "outer_if", "true_input"))
+    graph.add_edge(create_edge("outer_if", "value", "sink", "a"))
+
+    state = GraphExecutionState(graph=graph)
+    assert not state._can_use_fresh_flat_if_activation()
+
+    executed_source_ids = execute_all_nodes(state)
+
+    assert state.is_complete(), (
+        "Scheduler returned no ready node with unfinished source nodes: "
+        f"{sorted(set(graph.nodes) - state._completed_source_ids())}"
+    )
+    assert {"inner_if", "outer_if", "sink"} <= set(executed_source_ids)
+    sink_exec_id = next(iter(state.source_prepared_mapping["sink"]))
+    assert state.results[sink_exec_id].value == 6
+
+
 def test_graph_for_final_state_materializes_after_last_direct_return():
     graph = Graph()
     graph.add_node(ForInvocation(id="for", collection=["alpha", "beta"]))

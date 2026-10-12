@@ -37,7 +37,7 @@ const projectDocument = (): Record<string, unknown> => ({
 
 const planInput = {
   appVersion: '7.0',
-  boardItems: [],
+  boards: [{ archived: false, isInbox: true, items: [], name: 'My project' }],
   createdAt: '2026-08-04T00:00:00.000Z',
   minimumCanvasSchemaVersion: 3,
   name: 'My project',
@@ -110,6 +110,7 @@ describe('executeInvkExport', () => {
     });
 
     expect(result).toEqual({
+      boardIssues: [],
       boardItemIssues: [],
       bundledImageCount: 2,
       bundledVideoCount: 0,
@@ -151,6 +152,7 @@ describe('executeInvkExport', () => {
     });
 
     expect(result).toEqual({
+      boardIssues: [],
       boardItemIssues: [],
       bundledImageCount: 1,
       bundledVideoCount: 0,
@@ -211,6 +213,7 @@ describe('executeInvkExport', () => {
     });
 
     expect(result).toEqual({
+      boardIssues: [],
       boardItemIssues: [],
       bundledImageCount: 2,
       bundledVideoCount: 1,
@@ -247,6 +250,7 @@ describe('executeInvkExport', () => {
     });
 
     expect(result).toEqual({
+      boardIssues: [],
       boardItemIssues: [],
       bundledImageCount: 2,
       bundledVideoCount: 0,
@@ -414,13 +418,14 @@ describe('board membership', () => {
 
     return JSON.parse(readEntryText(entries.get('board.json')!));
   };
+  const withInbox = (items: ReturnType<typeof boardItem>[]) => ({
+    ...planInput,
+    boards: [{ archived: false, isInbox: true, items, name: 'My project' }],
+  });
 
   it('carries board media the document never references', async () => {
     const download = vi.fn();
-    const plan = planInvkExport({
-      ...planInput,
-      boardItems: [boardItem('unreferenced.png', { category: 'user', starred: true })],
-    });
+    const plan = planInvkExport(withInbox([boardItem('unreferenced.png', { category: 'user', starred: true })]));
 
     expect(plan.transferItems.map((item) => item.name)).toEqual(['live-a.png', 'live-b.png', 'unreferenced.png']);
 
@@ -438,15 +443,54 @@ describe('board membership', () => {
     expect(entries.has('images/unreferenced.png')).toBe(true);
     // Category and starring travel: they are what the item was, not merely that it existed.
     expect(await readBoard(blob)).toEqual({
-      items: [{ category: 'user', kind: 'image', name: 'unreferenced.png', starred: true }],
-      version: 1,
+      boards: [
+        {
+          archived: false,
+          isInbox: true,
+          items: [{ category: 'user', kind: 'image', name: 'unreferenced.png', starred: true }],
+          name: 'My project',
+        },
+      ],
+      version: 2,
     });
+  });
+
+  it('carries every board of the project, each with its own media', async () => {
+    const download = vi.fn();
+    const plan = planInvkExport({
+      ...planInput,
+      boards: [
+        { archived: true, isInbox: false, items: [boardItem('old.png')], name: 'Old façades' },
+        { archived: false, isInbox: true, items: [boardItem('inbox.png')], name: 'My project' },
+      ],
+    });
+
+    // Items of every board are fetched once each; the inbox leads in the plan as in the file.
+    expect(plan.transferItems.map((item) => item.name)).toEqual(['inbox.png', 'live-a.png', 'live-b.png', 'old.png']);
+
+    await executeInvkExport(plan, {
+      download,
+      fetchImageBytes: (imageName) => Promise.resolve(bytesFor(imageName)),
+      fetchImageThumbnail: () => Promise.resolve(null),
+    });
+
+    const [blob] = download.mock.calls[0]! as [Blob];
+
+    expect(
+      (await readBoard(blob)).boards.map((board: { name: string; items: { name: string }[] }) => [
+        board.name,
+        board.items.map((item) => item.name),
+      ])
+    ).toEqual([
+      ['My project', ['inbox.png']],
+      ['Old façades', ['old.png']],
+    ]);
   });
 
   it('fetches an item that is both board media and a reference exactly once', async () => {
     const fetchImageBytes = vi.fn((imageName: string) => Promise.resolve(bytesFor(imageName)));
 
-    await executeInvkExport(planInvkExport({ ...planInput, boardItems: [boardItem('live-a.png')] }), {
+    await executeInvkExport(planInvkExport(withInbox([boardItem('live-a.png')])), {
       download: vi.fn(),
       fetchImageBytes,
       fetchImageThumbnail: () => Promise.resolve(null),
@@ -456,7 +500,7 @@ describe('board membership', () => {
   });
 
   it('reports an overlapping failure against both roles', async () => {
-    const result = await executeInvkExport(planInvkExport({ ...planInput, boardItems: [boardItem('live-a.png')] }), {
+    const result = await executeInvkExport(planInvkExport(withInbox([boardItem('live-a.png')])), {
       download: vi.fn(),
       fetchImageBytes: (imageName) =>
         imageName === 'live-a.png' ? Promise.resolve(null) : Promise.resolve(bytesFor(imageName)),
@@ -471,7 +515,7 @@ describe('board membership', () => {
   it('keeps the descriptor for an item whose bytes could not be fetched', async () => {
     const download = vi.fn();
 
-    await executeInvkExport(planInvkExport({ ...planInput, boardItems: [boardItem('gone.png')] }), {
+    await executeInvkExport(planInvkExport(withInbox([boardItem('gone.png')])), {
       download,
       fetchImageBytes: (imageName) =>
         imageName === 'gone.png' ? Promise.resolve(null) : Promise.resolve(bytesFor(imageName)),
@@ -481,7 +525,7 @@ describe('board membership', () => {
     const [blob] = download.mock.calls[0]! as [Blob];
     const board = await readBoard(blob);
 
-    expect(board.items.map((item: { name: string }) => item.name)).toEqual(['gone.png']);
+    expect(board.boards[0].items.map((item: { name: string }) => item.name)).toEqual(['gone.png']);
   });
 
   it('records an empty board rather than omitting the entry', async () => {
@@ -495,13 +539,29 @@ describe('board membership', () => {
 
     const [blob] = download.mock.calls[0]! as [Blob];
 
-    expect(await readBoard(blob)).toEqual({ items: [], version: 1 });
+    expect(await readBoard(blob)).toEqual({
+      boards: [{ archived: false, isInbox: true, items: [], name: 'My project' }],
+      version: 2,
+    });
   });
 
   /** Refused before a single round trip: discovering it after hundreds would be the wrong order. */
   it('refuses a project that could never be packed, before fetching anything', () => {
     const boardItems = Array.from({ length: 20_001 }, (_unused, index) => boardItem(`image-${index}.png`));
 
-    expect(() => planInvkExport({ ...planInput, boardItems })).toThrowError(/archive entries/u);
+    expect(() => planInvkExport(withInbox(boardItems))).toThrowError(/archive entries/u);
+  });
+
+  it('refuses a project with more boards than an archive may name, before fetching anything', () => {
+    const members = Array.from({ length: 1000 }, (_unused, index) => ({
+      archived: false,
+      isInbox: false,
+      items: [],
+      name: `Board ${String(index)}`,
+    }));
+
+    expect(() => planInvkExport({ ...withInbox([]), boards: [...withInbox([]).boards, ...members] })).toThrowError(
+      expect.objectContaining({ reason: 'too-large' })
+    );
   });
 });

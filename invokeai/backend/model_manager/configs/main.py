@@ -3845,3 +3845,32 @@ class Main_Checkpoint_ErnieImage_Config(Checkpoint_Config_Base, Main_Config_Base
             raise NotAMatchError("state dict looks like GGUF quantized")
 
         return cls(**override_fields)
+
+
+class Main_GGUF_ErnieImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized ERNIE-Image transformers (single-file).
+
+    The community GGUFs carry the diffusers key layout unchanged, so the same fingerprint identifies
+    them. Their `general.architecture` says nothing about ERNIE -- unsloth's builds declare `wan`,
+    others `flux` -- so identification rests on the keys alone. As with the safetensors file, Turbo
+    and base are told apart by the model name.
+    """
+
+    base: Literal[BaseModelType.ErnieImage] = Field(default=BaseModelType.ErnieImage)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        state_dict = mod.load_state_dict()
+
+        if not _has_ernie_image_keys(state_dict):
+            raise NotAMatchError("state dict does not look like an ERNIE-Image model")
+
+        if not _has_ggml_tensors(state_dict):
+            raise NotAMatchError("state dict does not look like GGUF quantized")
+
+        return cls(**override_fields)

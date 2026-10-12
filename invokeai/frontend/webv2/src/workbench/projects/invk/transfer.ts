@@ -34,8 +34,16 @@ export interface InvkMediaIssue extends InvkMediaRef {
   reason: InvkMediaIssueReason;
 }
 
+/** A board of the project, other than the inbox, that could not be set up at the destination. Its media is
+ * reported through the item issues; this is about the board itself. */
+/** A board that exists with everything on it, but could not be moved into the project: it stays in the Library. */
+export interface InvkBoardIssue {
+  name: string;
+}
+
 /** Report losses separately by role; an item may fail in both. */
 export interface ProjectTransferIssues {
+  boardIssues: InvkBoardIssue[];
   boardItemIssues: InvkMediaIssue[];
   documentReferenceIssues: InvkMediaIssue[];
 }
@@ -45,17 +53,21 @@ const compareIssues = (left: InvkMediaIssue, right: InvkMediaIssue): number =>
 
 /** Collects issues in whatever order they happen and hands them back in a stable one. */
 export const createTransferIssueLog = (): {
+  addBoardIssue: (name: string) => void;
   addBoardItemIssue: (ref: InvkMediaRef, reason: InvkMediaIssueReason) => void;
   addDocumentReferenceIssue: (ref: InvkMediaRef, reason: InvkMediaIssueReason) => void;
   toIssues: () => ProjectTransferIssues;
 } => {
+  const boardIssues: InvkBoardIssue[] = [];
   const boardItemIssues: InvkMediaIssue[] = [];
   const documentReferenceIssues: InvkMediaIssue[] = [];
 
   return {
+    addBoardIssue: (name) => boardIssues.push({ name }),
     addBoardItemIssue: ({ kind, name }, reason) => boardItemIssues.push({ kind, name, reason }),
     addDocumentReferenceIssue: ({ kind, name }, reason) => documentReferenceIssues.push({ kind, name, reason }),
     toIssues: () => ({
+      boardIssues: [...boardIssues].sort((left, right) => left.name.localeCompare(right.name)),
       boardItemIssues: [...boardItemIssues].sort(compareIssues),
       documentReferenceIssues: [...documentReferenceIssues].sort(compareIssues),
     }),

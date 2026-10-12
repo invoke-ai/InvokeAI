@@ -138,7 +138,10 @@ describe('createOpenProjectBroker', () => {
     handle.close();
 
     expect(harness.deps.markProjectDeleted).toHaveBeenCalledWith('a');
-    expect(harness.deps.deleteProject).toHaveBeenCalledWith('a');
+    expect(harness.deps.deleteProject).toHaveBeenCalledWith('a', undefined);
+
+    await handle.deleteOnServer('delete');
+    expect(harness.deps.deleteProject).toHaveBeenLastCalledWith('a', 'delete');
     expect(harness.deps.closeProject).toHaveBeenCalledWith('a');
   });
 
