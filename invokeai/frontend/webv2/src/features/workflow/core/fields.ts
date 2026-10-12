@@ -71,7 +71,6 @@ export const isDirectInputField = (template: FieldInputTemplate): boolean =>
 /** A field can be exposed to the Linear UI when it can be edited directly. */
 export const isExposableField = (template: FieldInputTemplate): boolean => isDirectInputField(template);
 
-/** Scalar numeric fields whose linear-form element can show a randomize button. */
 /** Direct numeric fields whose bounds admit at least one value; shuffling any other would write an invalid one. */
 export const isShuffleableField = (template: FieldInputTemplate): boolean =>
   (template.type.name === 'IntegerField' || template.type.name === 'FloatField') &&

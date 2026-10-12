@@ -341,6 +341,15 @@ describe('getNodeFieldSettingsIssue', () => {
     expect(getNodeFieldSettingsIssue(closed, { component: 'number-input', kind: 'number', min: 200 })).toBe(
       'outOfRange'
     );
+    // A fractional step on an integer field, or one off the node's own step, is ignored rather than applied.
+    expect(getNodeFieldSettingsIssue(closed, { component: 'number-input', kind: 'number', step: 2.5 })).toBe(
+      'stepIgnored'
+    );
+    const halves = template('FloatField', { maximum: 10, minimum: 0, multipleOf: 0.5 });
+    expect(getNodeFieldSettingsIssue(halves, { component: 'number-input', kind: 'number', step: 0.3 })).toBe(
+      'stepIgnored'
+    );
+    expect(getNodeFieldSettingsIssue(halves, { component: 'number-input', kind: 'number', step: 1.5 })).toBeNull();
     // Bounds and step are each valid, but no multiple of 8 lies between 1 and 7: every value fails validation.
     expect(
       getNodeFieldSettingsIssue(closed, { component: 'number-input', kind: 'number', max: 7, min: 1, step: 8 })

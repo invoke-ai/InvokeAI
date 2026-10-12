@@ -34,6 +34,7 @@ const SETTINGS_ISSUE_KEYS = {
   noTrack: 'widgets.workflow.formBuilder.sliderNeedsBounds',
   noValue: 'widgets.workflow.formBuilder.noValidValue',
   outOfRange: 'widgets.workflow.formBuilder.boundsOutsideNode',
+  stepIgnored: 'widgets.workflow.formBuilder.stepOutsideNode',
 } as const satisfies Record<NodeFieldSettingsIssue, string>;
 
 const toOptionalNumber = (raw: string): number | undefined => {

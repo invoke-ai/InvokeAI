@@ -209,6 +209,11 @@ const isMaximumInsideTemplate = (template: FieldInputTemplate, max: number): boo
   return minimum !== null ? max >= minimum : exclusiveMinimum === null || max > exclusiveMinimum;
 };
 
+/** A whole step for an integer field, and a multiple of the node's own step when it has one. */
+const isStepAcceptedByTemplate = (template: FieldInputTemplate, step: number): boolean =>
+  (template.type.name !== 'IntegerField' || Number.isInteger(step)) &&
+  (template.multipleOf === null || template.multipleOf <= 0 || isMultipleOf(step, template.multipleOf));
+
 /**
  * The template narrowed by the authored number settings: a bound applies only where it tightens the template's own
  * end and stays inside its other one (an inverted pair not at all), and a step only when the template has none or
@@ -250,11 +255,7 @@ export const applyNodeFieldFormSettings = (
     }
   }
 
-  if (
-    settings.step !== undefined &&
-    (template.type.name !== 'IntegerField' || Number.isInteger(settings.step)) &&
-    (template.multipleOf === null || template.multipleOf <= 0 || isMultipleOf(settings.step, template.multipleOf))
-  ) {
+  if (settings.step !== undefined && isStepAcceptedByTemplate(template, settings.step)) {
     patch({ multipleOf: settings.step });
   }
 
@@ -307,12 +308,13 @@ export const getNodeFieldSliderRange = (template: FieldInputTemplate): NodeField
   return { max, min, step: FLOAT_SLIDER_STEP };
 };
 
-export type NodeFieldSettingsIssue = 'inverted' | 'outOfRange' | 'noValue' | 'noTrack';
+export type NodeFieldSettingsIssue = 'inverted' | 'outOfRange' | 'stepIgnored' | 'noValue' | 'noTrack';
 
 /**
  * Why the form cannot honour authored number settings as written, in the order an author would fix them; null when
- * it can. `inverted` and `outOfRange` bounds are ignored by `applyNodeFieldFormSettings`; with `noValue` no value
- * passes validation, so Invoke stays blocked; with `noTrack` a slider control falls back to the number input.
+ * it can. `inverted` and `outOfRange` bounds and a `stepIgnored` step are ignored by `applyNodeFieldFormSettings`;
+ * with `noValue` no value passes validation, so Invoke stays blocked; with `noTrack` a slider control falls back to
+ * the number input.
  */
 export const getNodeFieldSettingsIssue = (
   template: FieldInputTemplate,
@@ -331,6 +333,10 @@ export const getNodeFieldSettingsIssue = (
     (settings.max !== undefined && !isMaximumInsideTemplate(template, settings.max))
   ) {
     return 'outOfRange';
+  }
+
+  if (settings.step !== undefined && !isStepAcceptedByTemplate(template, settings.step)) {
+    return 'stepIgnored';
   }
 
   const effectiveTemplate = applyNodeFieldFormSettings(template, settings);
