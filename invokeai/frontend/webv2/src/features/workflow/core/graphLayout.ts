@@ -264,3 +264,72 @@ export const getSizedLayeredPositions = (
 
   return positions;
 };
+
+export interface ArrangeNode extends LayoutGraphNode {
+  position: { x: number; y: number };
+}
+
+export interface ArrangeEdge {
+  source: string;
+  target: string;
+  type: string;
+}
+
+export interface ArrangedLayout {
+  /** The arranged nodes' footprint, for the view to fit before the rendered positions catch up. */
+  bounds: { height: number; width: number; x: number; y: number };
+  positions: Record<string, { x: number; y: number }>;
+}
+
+/** The size assumed for a node the view has not measured yet (a large graph renders only what is visible). */
+export const UNMEASURED_ARRANGE_SIZE = { height: 160, width: 288 } as const;
+
+/**
+ * The editor's Arrange command: lays out `selectedIds` (every node when null) with `getSizedLayeredPositions`,
+ * anchored at the arranged nodes' current top-left corner so the result stays where the author was working. Nodes
+ * outside the selection keep their positions, and edges to them do not rank the arranged ones. Loop linkages are
+ * ignored too: they point backwards, and ranking by them would fold a loop body onto its own head.
+ */
+export const getArrangedLayout = (
+  nodes: readonly ArrangeNode[],
+  edges: readonly ArrangeEdge[],
+  selectedIds: ReadonlySet<string> | null,
+  measuredSizes: ReadonlyMap<string, { height?: number; width?: number } | undefined>
+): ArrangedLayout => {
+  const targets = nodes.filter((node) => !selectedIds || selectedIds.has(node.id));
+  const origin = targets.reduce(
+    (corner, node) => ({ x: Math.min(corner.x, node.position.x), y: Math.min(corner.y, node.position.y) }),
+    { x: Infinity, y: Infinity }
+  );
+  const sized = targets.map((node) => {
+    const measured = measuredSizes.get(node.id);
+
+    return {
+      height: measured?.height || UNMEASURED_ARRANGE_SIZE.height,
+      id: node.id,
+      width: measured?.width || UNMEASURED_ARRANGE_SIZE.width,
+    };
+  });
+  const layoutEdges = edges
+    .filter((edge) => edge.type !== 'loop_linkage')
+    .map((edge) => ({ sourceNodeId: edge.source, targetNodeId: edge.target }));
+  const positions = getSizedLayeredPositions(sized, layoutEdges, { origin });
+  const rect = sized.reduce(
+    (current, node) => {
+      const position = positions[node.id]!;
+
+      return {
+        maxX: Math.max(current.maxX, position.x + node.width),
+        maxY: Math.max(current.maxY, position.y + node.height),
+        minX: Math.min(current.minX, position.x),
+        minY: Math.min(current.minY, position.y),
+      };
+    },
+    { maxX: -Infinity, maxY: -Infinity, minX: Infinity, minY: Infinity }
+  );
+
+  return {
+    bounds: { height: rect.maxY - rect.minY, width: rect.maxX - rect.minX, x: rect.minX, y: rect.minY },
+    positions,
+  };
+};

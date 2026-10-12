@@ -179,6 +179,7 @@ const MEDIA_WELL_INVALID_PROPS = {
 type ScalarInputProps = WorkflowFieldInputProps & { ariaLabel?: string };
 
 const StringInput = ({ ariaLabel, formSettings, id, invalid, onChange, template, value }: ScalarInputProps) => {
+  const { t } = useTranslation();
   const [draft, setDraft, clearDraft] = useFocusedDraft();
   const text = draft ?? (typeof value === 'string' ? value : '');
   const onTextChange = useCallback(
@@ -194,11 +195,12 @@ const StringInput = ({ ariaLabel, formSettings, id, invalid, onChange, template,
     () =>
       stringSettings?.component === 'dropdown'
         ? stringSettings.options.map((option, index) => ({
-            label: option.label || option.value || `Option ${index + 1}`,
+            label:
+              option.label || option.value || t('widgets.workflow.formBuilder.unnamedOption', { index: index + 1 }),
             value: option.value,
           }))
         : [],
-    [stringSettings]
+    [stringSettings, t]
   );
 
   if (component === 'dropdown') {

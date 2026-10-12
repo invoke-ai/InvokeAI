@@ -1,6 +1,11 @@
 import type { FieldInputTemplate, WorkflowForm } from './types';
 
-import { finiteNumberOrNull, getWorkflowFieldStepIndexBounds, toWorkflowFieldStepMultiple } from './fields';
+import {
+  admitsWorkflowFieldStepValue,
+  finiteNumberOrNull,
+  getWorkflowFieldStepIndexBounds,
+  toWorkflowFieldStepMultiple,
+} from './fields';
 
 /**
  * Per-element control settings an author gives a form field: which control renders it and, for numbers, the
@@ -19,7 +24,10 @@ export interface NodeFieldStringOption {
 export interface NodeFieldNumberSettings {
   kind: 'number';
   component: NumberFieldComponent;
-  /** Authored bounds and step; each applies only where it tightens the invocation template's own constraint. */
+  /**
+   * Authored bounds and step; each applies only where it tightens the invocation template's own constraint without
+   * leaving its range.
+   */
   min?: number;
   max?: number;
   step?: number;
@@ -134,25 +142,34 @@ export const getNodeFieldFormSettings = (
 };
 
 /** Authored bounds that cannot form a range; the form ignores both until the author fixes one. */
-export const hasInvertedNodeFieldBounds = (settings: NodeFieldFormSettings | null): boolean =>
+const hasInvertedNodeFieldBounds = (settings: NodeFieldFormSettings | null): boolean =>
   settings?.kind === 'number' &&
   settings.min !== undefined &&
   settings.max !== undefined &&
   settings.min > settings.max;
 
+// The bag keys these settings own; a cleared one is left out rather than carried over from the stored bag.
+const OWNED_SETTINGS_KEYS = new Set(['component', 'max', 'min', 'options', 'showShuffle', 'step', 'type']);
+
 /**
  * The settings bag to store for `settings` on a field of `template`, in the legacy shape: tagged with the field
- * kind, and carrying `showShuffle` on number fields as the v6 editor does.
+ * kind, and carrying `showShuffle` on number fields as the v6 editor does. Keys of `stored` these settings do not
+ * own (another editor's) are kept.
  */
 export const serializeNodeFieldFormSettings = (
   settings: NodeFieldFormSettings,
   template: FieldInputTemplate,
-  showShuffle: boolean
+  showShuffle: boolean,
+  stored?: Record<string, unknown>
 ): Record<string, unknown> => {
   const type = isSettingsFieldTypeName(template.type.name) ? LEGACY_SETTINGS_TYPES[template.type.name] : undefined;
+  const unowned = stored
+    ? Object.fromEntries(Object.entries(stored).filter(([key]) => !OWNED_SETTINGS_KEYS.has(key)))
+    : {};
 
   if (settings.kind === 'string') {
     return {
+      ...unowned,
       component: settings.component,
       type,
       ...(settings.component === 'dropdown' ? { options: settings.options.map((option) => ({ ...option })) } : {}),
@@ -160,6 +177,7 @@ export const serializeNodeFieldFormSettings = (
   }
 
   return {
+    ...unowned,
     component: settings.component,
     showShuffle,
     type,
@@ -175,11 +193,28 @@ const isMultipleOf = (step: number, base: number): boolean => {
   return Math.abs(ratio - Math.round(ratio)) < 1e-9;
 };
 
+// Whether an authored bound lies inside the template's opposite end. One beyond it (a minimum above the template's
+// maximum) would leave no value in range, so the form ignores it as it does an inverted pair.
+const isMinimumInsideTemplate = (template: FieldInputTemplate, min: number): boolean => {
+  const maximum = finiteNumberOrNull(template.maximum);
+  const exclusiveMaximum = finiteNumberOrNull(template.exclusiveMaximum);
+
+  return maximum !== null ? min <= maximum : exclusiveMaximum === null || min < exclusiveMaximum;
+};
+
+const isMaximumInsideTemplate = (template: FieldInputTemplate, max: number): boolean => {
+  const minimum = finiteNumberOrNull(template.minimum);
+  const exclusiveMinimum = finiteNumberOrNull(template.exclusiveMinimum);
+
+  return minimum !== null ? max >= minimum : exclusiveMinimum === null || max > exclusiveMinimum;
+};
+
 /**
- * The template narrowed by the authored number settings: a bound applies only inside the template's own range (and
- * an inverted pair not at all), and a step only when the template has none or the step keeps every value a multiple
- * of the template's. Validation, shuffle and the control all read this template, so the form can never offer a
- * value the node would reject.
+ * The template narrowed by the authored number settings: a bound applies only where it tightens the template's own
+ * end and stays inside its other one (an inverted pair not at all), and a step only when the template has none or
+ * the step keeps every value a multiple of the template's. Validation, shuffle and the control all read this
+ * template, so the form never offers a value the node would reject. Ignored settings stay stored for the author to
+ * correct; `getNodeFieldSettingsIssue` says why.
  */
 export const applyNodeFieldFormSettings = (
   template: FieldInputTemplate,
@@ -195,7 +230,7 @@ export const applyNodeFieldFormSettings = (
     next = next === template ? { ...template, ...fields } : { ...next, ...fields };
   };
 
-  if (settings.min !== undefined && !inverted) {
+  if (settings.min !== undefined && !inverted && isMinimumInsideTemplate(template, settings.min)) {
     if (template.minimum !== null) {
       if (settings.min > template.minimum) {
         patch({ minimum: settings.min });
@@ -205,7 +240,7 @@ export const applyNodeFieldFormSettings = (
     }
   }
 
-  if (settings.max !== undefined && !inverted) {
+  if (settings.max !== undefined && !inverted && isMaximumInsideTemplate(template, settings.max)) {
     if (template.maximum !== null) {
       if (settings.max < template.maximum) {
         patch({ maximum: settings.max });
@@ -237,7 +272,8 @@ const FLOAT_SLIDER_STEP = 0.01;
 
 /**
  * The range a slider can show for `template` (already narrowed by `applyNodeFieldFormSettings`), or null when it
- * has no track: an end is unbounded, or no stop would pass validation. The host then keeps the number input.
+ * has no track: an end is unbounded, or fewer than two stops would pass validation. The host then keeps the number
+ * input.
  *
  * Validation accepts only multiples of the step counted from zero (every integer, for an integer field without
  * one), so the track runs between the first and last multiples inside the bounds rather than the bounds
@@ -250,7 +286,7 @@ export const getNodeFieldSliderRange = (template: FieldInputTemplate): NodeField
   if (step !== null) {
     const { first, last } = getWorkflowFieldStepIndexBounds(template, step);
 
-    if (first === null || last === null || first > last) {
+    if (first === null || last === null || first >= last) {
       return null;
     }
 
@@ -264,11 +300,48 @@ export const getNodeFieldSliderRange = (template: FieldInputTemplate): NodeField
   const max =
     finiteNumberOrNull(template.maximum) ?? (exclusiveMaximum !== null ? exclusiveMaximum - FLOAT_SLIDER_STEP : null);
 
-  if (min === null || max === null || min > max) {
+  if (min === null || max === null || min >= max) {
     return null;
   }
 
   return { max, min, step: FLOAT_SLIDER_STEP };
+};
+
+export type NodeFieldSettingsIssue = 'inverted' | 'outOfRange' | 'noValue' | 'noTrack';
+
+/**
+ * Why the form cannot honour authored number settings as written, in the order an author would fix them; null when
+ * it can. `inverted` and `outOfRange` bounds are ignored by `applyNodeFieldFormSettings`; with `noValue` no value
+ * passes validation, so Invoke stays blocked; with `noTrack` a slider control falls back to the number input.
+ */
+export const getNodeFieldSettingsIssue = (
+  template: FieldInputTemplate,
+  settings: NodeFieldFormSettings | null
+): NodeFieldSettingsIssue | null => {
+  if (settings?.kind !== 'number') {
+    return null;
+  }
+
+  if (hasInvertedNodeFieldBounds(settings)) {
+    return 'inverted';
+  }
+
+  if (
+    (settings.min !== undefined && !isMinimumInsideTemplate(template, settings.min)) ||
+    (settings.max !== undefined && !isMaximumInsideTemplate(template, settings.max))
+  ) {
+    return 'outOfRange';
+  }
+
+  const effectiveTemplate = applyNodeFieldFormSettings(template, settings);
+
+  if (!admitsWorkflowFieldStepValue(effectiveTemplate)) {
+    return 'noValue';
+  }
+
+  return settings.component !== 'number-input' && getNodeFieldSliderRange(effectiveTemplate) === null
+    ? 'noTrack'
+    : null;
 };
 
 /**

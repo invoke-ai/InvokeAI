@@ -118,11 +118,13 @@ export const NodeFieldControl = ({
     (seedMode: SeedMode) => editGraph({ fieldName, nodeId, seedMode, type: 'setFieldSeedMode' }),
     [editGraph, fieldName, nodeId]
   );
+  // Read the narrowed template: authored bounds and step can leave no value to shuffle to.
   const showsShuffle =
     element.data.showShuffle &&
     !!template &&
+    !!effectiveTemplate &&
     !isConnected &&
-    isShuffleableField(template) &&
+    isShuffleableField(effectiveTemplate) &&
     !isSeedInputField(template);
   const onShuffleClick = useCallback(() => {
     if (effectiveTemplate) {

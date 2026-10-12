@@ -2,6 +2,7 @@ import type { FieldInputTemplate, NodeFieldFormElement, ProjectGraphState } from
 import type {
   NodeFieldFormSettings,
   NodeFieldNumberSettings,
+  NodeFieldSettingsIssue,
   NodeFieldStringOption,
   NodeFieldStringSettings,
 } from '@features/workflow/utility';
@@ -11,10 +12,8 @@ import { isSeedInputField } from '@features/workflow/graph';
 import { useFocusedDraft } from '@features/workflow/ui/fields/NumericInput';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import {
-  applyNodeFieldFormSettings,
   getDefaultNodeFieldFormSettings,
-  getNodeFieldSliderRange,
-  hasInvertedNodeFieldBounds,
+  getNodeFieldSettingsIssue,
   hasNodeFieldFormSettings,
   serializeNodeFieldFormSettings,
 } from '@features/workflow/utility';
@@ -23,12 +22,19 @@ import { PopoverContent } from '@platform/ui/Popover';
 import { SegmentedControl } from '@platform/ui/SegmentedControl';
 import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import { PlusIcon, SlidersHorizontalIcon, XIcon } from 'lucide-react';
-import { useCallback, useMemo, type ChangeEvent } from 'react';
+import { useCallback, useId, useMemo, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useNodeFieldBinding } from './NodeFieldControl';
 
 const POPOVER_POSITIONING = { placement: 'bottom-end' } as const;
+
+const SETTINGS_ISSUE_KEYS = {
+  inverted: 'widgets.workflow.formBuilder.invertedBounds',
+  noTrack: 'widgets.workflow.formBuilder.sliderNeedsBounds',
+  noValue: 'widgets.workflow.formBuilder.noValidValue',
+  outOfRange: 'widgets.workflow.formBuilder.boundsOutsideNode',
+} as const satisfies Record<NodeFieldSettingsIssue, string>;
 
 const toOptionalNumber = (raw: string): number | undefined => {
   const parsed = Number(raw);
@@ -38,11 +44,13 @@ const toOptionalNumber = (raw: string): number | undefined => {
 
 /** One authored bound: the text stays as typed while focused; a blank or unparseable entry clears the bound. */
 const BoundInput = ({
+  describedBy,
   label,
   onChange,
   placeholder,
   value,
 }: {
+  describedBy: string;
   label: string;
   onChange: (value: number | undefined) => void;
   placeholder: string;
@@ -63,6 +71,7 @@ const BoundInput = ({
         {label}
       </Text>
       <Input
+        aria-describedby={describedBy}
         aria-label={label}
         className="nodrag"
         fontVariantNumeric="tabular-nums"
@@ -107,12 +116,8 @@ const NumberSettingsBody = ({
     (step: number | undefined) => onChange({ ...settings, step: step !== undefined && step > 0 ? step : undefined }),
     [onChange, settings]
   );
-  const inverted = hasInvertedNodeFieldBounds(settings);
-  // The form falls back to an input whenever the narrowed template yields no track, so say so here.
-  const needsBounds =
-    settings.component !== 'number-input' &&
-    !inverted &&
-    getNodeFieldSliderRange(applyNodeFieldFormSettings(template, settings)) === null;
+  const issue = getNodeFieldSettingsIssue(template, settings);
+  const hintId = useId();
 
   return (
     <Stack gap="2">
@@ -125,30 +130,29 @@ const NumberSettingsBody = ({
       />
       <HStack alignItems="start" gap="2">
         <BoundInput
+          describedBy={hintId}
           label={t('widgets.workflow.formBuilder.minimum')}
           placeholder={templateBounds.min}
           value={settings.min}
           onChange={onMinChange}
         />
         <BoundInput
+          describedBy={hintId}
           label={t('widgets.workflow.formBuilder.maximum')}
           placeholder={templateBounds.max}
           value={settings.max}
           onChange={onMaxChange}
         />
         <BoundInput
+          describedBy={hintId}
           label={t('widgets.workflow.formBuilder.step')}
           placeholder={templateBounds.step}
           value={settings.step}
           onChange={onStepChange}
         />
       </HStack>
-      <Text color={inverted || needsBounds ? 'fg.warning' : 'fg.subtle'} fontSize="xs" lineHeight={1.3}>
-        {inverted
-          ? t('widgets.workflow.formBuilder.invertedBounds')
-          : needsBounds
-            ? t('widgets.workflow.formBuilder.sliderNeedsBounds')
-            : t('widgets.workflow.formBuilder.boundsHint')}
+      <Text aria-live="polite" color={issue ? 'fg.warning' : 'fg.subtle'} fontSize="xs" id={hintId} lineHeight={1.3}>
+        {t(issue ? SETTINGS_ISSUE_KEYS[issue] : 'widgets.workflow.formBuilder.boundsHint')}
       </Text>
     </Stack>
   );
@@ -297,12 +301,12 @@ export const NodeFieldSettingsPopover = ({
       if (template) {
         editGraph({
           elementId: element.id,
-          settings: serializeNodeFieldFormSettings(settings, template, element.data.showShuffle),
+          settings: serializeNodeFieldFormSettings(settings, template, element.data.showShuffle, element.data.settings),
           type: 'setNodeFieldSettings',
         });
       }
     },
-    [editGraph, element.data.showShuffle, element.id, template]
+    [editGraph, element.data.settings, element.data.showShuffle, element.id, template]
   );
   const templateBounds = useMemo(
     () =>

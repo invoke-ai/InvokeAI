@@ -2,7 +2,7 @@ import type { ProjectGraphState, WorkflowEdge as WorkflowDocumentEdge, XYPositio
 import type { WorkflowPerfSource, WorkflowRuntimeApi } from '@features/workflow/ui/contracts';
 
 import { Box, Flex, HStack, Spinner, Stack, Text } from '@chakra-ui/react';
-import { getSizedLayeredPositions } from '@features/workflow/core/graphLayout';
+import { getArrangedLayout } from '@features/workflow/core/graphLayout';
 import '@xyflow/react/dist/style.css';
 import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSelector } from '@features/workflow/react';
 import { FlowMiniMap, flowThemeCss, getFlowColorMode } from '@features/workflow/ui/graph-preview';
@@ -100,9 +100,6 @@ import { WorkflowEdge } from './WorkflowEdge';
 import { WORKFLOW_HOTKEYS } from './workflowHotkeys';
 import { WorkflowSelectionRequestRuntime } from './WorkflowSelectionRequestRuntime';
 import { getWorkflowViewport, getWorkflowViewportKey, setWorkflowViewport } from './workflowViewportStore';
-
-// A node xyflow has not measured yet (a large graph renders only what is visible) counts at a typical node size.
-const UNMEASURED_ARRANGE_SIZE = { height: 160, width: 288 };
 
 const nodeTypes: NodeTypes = {
   connector: ConnectorFlowNode,
@@ -1227,50 +1224,16 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
       return;
     }
 
-    const targetIds = arrangeScope === 'selection' ? new Set(selectedNodeIds) : null;
-    const measuredById = new Map(flowInstance.getNodes().map((node) => [node.id, node.measured]));
-    const targets = projectGraph.nodes.filter((node) => !targetIds || targetIds.has(node.id));
-    const origin = targets.reduce(
-      (corner, node) => ({ x: Math.min(corner.x, node.position.x), y: Math.min(corner.y, node.position.y) }),
-      { x: Infinity, y: Infinity }
+    const { bounds, positions } = getArrangedLayout(
+      projectGraph.nodes,
+      projectGraph.edges,
+      arrangeScope === 'selection' ? new Set(selectedNodeIds) : null,
+      new Map(flowInstance.getNodes().map((node) => [node.id, node.measured]))
     );
-    const sized = targets.map((node) => {
-      const measured = measuredById.get(node.id);
-
-      return {
-        height: measured?.height || UNMEASURED_ARRANGE_SIZE.height,
-        id: node.id,
-        width: measured?.width || UNMEASURED_ARRANGE_SIZE.width,
-      };
-    });
-    const sizedIds = new Set(sized.map((node) => node.id));
-    // Loop linkages point backwards; ranking by them would fold a loop body onto its own head.
-    const edges = projectGraph.edges
-      .filter((edge) => edge.type !== 'loop_linkage' && sizedIds.has(edge.source) && sizedIds.has(edge.target))
-      .map((edge) => ({ sourceNodeId: edge.source, targetNodeId: edge.target }));
-    const positions = getSizedLayeredPositions(sized, edges, { origin });
 
     editGraph({ positions, type: 'setNodePositions' });
-
     // The flow shows the new positions after the model rebuilds; the bounds are known now, so fit them directly.
-    const bounds = sized.reduce(
-      (rect, node) => {
-        const position = positions[node.id]!;
-
-        return {
-          maxX: Math.max(rect.maxX, position.x + node.width),
-          maxY: Math.max(rect.maxY, position.y + node.height),
-          minX: Math.min(rect.minX, position.x),
-          minY: Math.min(rect.minY, position.y),
-        };
-      },
-      { maxX: -Infinity, maxY: -Infinity, minX: Infinity, minY: Infinity }
-    );
-
-    void flowInstance.fitBounds(
-      { height: bounds.maxY - bounds.minY, width: bounds.maxX - bounds.minX, x: bounds.minX, y: bounds.minY },
-      { duration: reduceMotion ? 0 : 300 }
-    );
+    void flowInstance.fitBounds(bounds, { duration: reduceMotion ? 0 : 300 });
   }, [arrangeScope, editGraph, flowInstance, projectGraph.edges, projectGraph.nodes, reduceMotion, selectedNodeIds]);
 
   if (isPreparing) {

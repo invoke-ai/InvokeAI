@@ -503,10 +503,14 @@ describe('getRandomWorkflowFieldValue', () => {
     expect(isWorkflowFieldValueValid(legacy, value)).toBe(true);
   });
 
-  it('shuffles only direct numeric fields', () => {
+  it('shuffles only direct numeric fields with a value in range', () => {
     expect(isShuffleableField(input({ type: single('IntegerField') }))).toBe(true);
     expect(isShuffleableField(input({ type: single('FloatField') }))).toBe(true);
     expect(isShuffleableField(input({ input: 'connection', type: single('IntegerField') }))).toBe(false);
     expect(isShuffleableField(input())).toBe(false);
+    // No multiple of 8 lies between 1 and 7, so any value a shuffle wrote would be invalid.
+    expect(isShuffleableField(input({ maximum: 7, minimum: 1, multipleOf: 8, type: single('IntegerField') }))).toBe(
+      false
+    );
   });
 });

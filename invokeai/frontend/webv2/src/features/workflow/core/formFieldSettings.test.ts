@@ -6,6 +6,7 @@ import {
   applyNodeFieldFormSettings,
   getDefaultNodeFieldFormSettings,
   getNodeFieldFormSettings,
+  getNodeFieldSettingsIssue,
   getNodeFieldSliderRange,
   serializeNodeFieldFormSettings,
 } from './formFieldSettings';
@@ -160,6 +161,32 @@ describe('serializeNodeFieldFormSettings', () => {
       )
     ).toEqual({ component: 'input', type: 'string-field-config' });
   });
+
+  it('keeps keys of the stored bag it does not own and drops owned ones the edit cleared', () => {
+    expect(
+      serializeNodeFieldFormSettings({ component: 'slider', kind: 'number', max: 8 }, template('IntegerField'), false, {
+        component: 'slider',
+        max: 8,
+        min: 2,
+        showShuffle: true,
+        sliderMarks: [2, 8],
+        type: 'integer-field-config',
+      })
+    ).toEqual({ component: 'slider', max: 8, showShuffle: false, sliderMarks: [2, 8], type: 'integer-field-config' });
+    expect(
+      serializeNodeFieldFormSettings(
+        { component: 'input', kind: 'string', options: [] },
+        template('StringField'),
+        false,
+        {
+          component: 'dropdown',
+          options: [{ label: 'A', value: 'a' }],
+          placeholder: 'Pick one',
+          type: 'string-field-config',
+        }
+      )
+    ).toEqual({ component: 'input', placeholder: 'Pick one', type: 'string-field-config' });
+  });
 });
 
 describe('applyNodeFieldFormSettings', () => {
@@ -201,6 +228,26 @@ describe('applyNodeFieldFormSettings', () => {
     expect(
       applyNodeFieldFormSettings(base, { component: 'slider', kind: 'number', max: 5, min: 10, step: 5 })
     ).toMatchObject({ maximum: 100, minimum: 0, multipleOf: 5 });
+  });
+
+  it("ignores a bound beyond the template's other end, which would leave no valid value", () => {
+    const closed = template('IntegerField', { maximum: 10, minimum: 0 });
+
+    expect(applyNodeFieldFormSettings(closed, { component: 'slider', kind: 'number', min: 20 })).toBe(closed);
+    expect(applyNodeFieldFormSettings(closed, { component: 'slider', kind: 'number', max: -5 })).toBe(closed);
+    // Either end may be reached exactly, which leaves a single valid value.
+    expect(applyNodeFieldFormSettings(closed, { component: 'slider', kind: 'number', min: 10 })).toMatchObject({
+      maximum: 10,
+      minimum: 10,
+    });
+    // An exclusive end admits values up to, not at, the bound.
+    const open = template('FloatField', { exclusiveMaximum: 10, exclusiveMinimum: 0 });
+
+    expect(applyNodeFieldFormSettings(open, { component: 'slider', kind: 'number', min: 10 })).toBe(open);
+    expect(applyNodeFieldFormSettings(open, { component: 'slider', kind: 'number', max: 0 })).toBe(open);
+    expect(applyNodeFieldFormSettings(open, { component: 'slider', kind: 'number', max: 9.5, min: 0.5 })).toMatchObject(
+      { exclusiveMaximum: null, exclusiveMinimum: null, maximum: 9.5, minimum: 0.5 }
+    );
   });
 
   it('returns the template itself for string settings and unchanged bounds', () => {
@@ -263,5 +310,41 @@ describe('getNodeFieldSliderRange', () => {
     expect(getNodeFieldSliderRange(template('IntegerField', { minimum: 0 }))).toBeNull();
     expect(getNodeFieldSliderRange(template('IntegerField', { maximum: 7, minimum: 1, multipleOf: 8 }))).toBeNull();
     expect(getNodeFieldSliderRange(template('IntegerField', { maximum: 2.9, minimum: 2.1 }))).toBeNull();
+  });
+
+  it('has no range when the bounds admit a single stop, which a track could not move between', () => {
+    expect(getNodeFieldSliderRange(template('IntegerField', { maximum: 8, minimum: 8 }))).toBeNull();
+    expect(getNodeFieldSliderRange(template('IntegerField', { maximum: 12, minimum: 5, multipleOf: 8 }))).toBeNull();
+    expect(getNodeFieldSliderRange(template('FloatField', { maximum: 0.5, minimum: 0.5 }))).toBeNull();
+  });
+});
+
+describe('getNodeFieldSettingsIssue', () => {
+  const closed = template('IntegerField', { maximum: 100, minimum: 0 });
+
+  it('names the problem the author has to fix first', () => {
+    expect(getNodeFieldSettingsIssue(closed, { component: 'number-input', kind: 'number', max: 5, min: 10 })).toBe(
+      'inverted'
+    );
+    expect(getNodeFieldSettingsIssue(closed, { component: 'number-input', kind: 'number', min: 200 })).toBe(
+      'outOfRange'
+    );
+    // Bounds and step are each valid, but no multiple of 8 lies between 1 and 7: every value fails validation.
+    expect(
+      getNodeFieldSettingsIssue(closed, { component: 'number-input', kind: 'number', max: 7, min: 1, step: 8 })
+    ).toBe('noValue');
+    expect(getNodeFieldSettingsIssue(closed, { component: 'slider', kind: 'number', max: 8, min: 8 })).toBe('noTrack');
+  });
+
+  it('reports nothing for settings the form honours, including an input on an open-ended field', () => {
+    expect(getNodeFieldSettingsIssue(closed, { component: 'slider', kind: 'number', max: 50, min: 10 })).toBeNull();
+    // Bounds that do not tighten the template are not applied, but they leave the range intact.
+    expect(getNodeFieldSettingsIssue(closed, { component: 'slider', kind: 'number', max: 500, min: -5 })).toBeNull();
+    expect(
+      getNodeFieldSettingsIssue(template('IntegerField', { minimum: 0 }), { component: 'number-input', kind: 'number' })
+    ).toBeNull();
+    expect(
+      getNodeFieldSettingsIssue(template('StringField'), { component: 'dropdown', kind: 'string', options: [] })
+    ).toBeNull();
   });
 });

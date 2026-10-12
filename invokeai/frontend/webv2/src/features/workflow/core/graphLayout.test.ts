@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import type { LayoutGraphEdge, LayoutGraphNode } from './graphLayout';
 
-import { getLayeredPositions, getNodeDepths, getSizedLayeredPositions, getTopologicalOrder } from './graphLayout';
+import {
+  getArrangedLayout,
+  getLayeredPositions,
+  getNodeDepths,
+  getSizedLayeredPositions,
+  getTopologicalOrder,
+  UNMEASURED_ARRANGE_SIZE,
+} from './graphLayout';
 
 // Diamond: a -> b, a -> c, b -> d, c -> d
 const DIAMOND_NODES: LayoutGraphNode[] = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }];
@@ -160,5 +167,60 @@ describe('getSizedLayeredPositions', () => {
       a: { x: 0, y: 0 },
       b: { x: 110, y: 0 },
     });
+  });
+});
+
+describe('getArrangedLayout', () => {
+  const sizes = (entries: Record<string, { height: number; width: number }>) => new Map(Object.entries(entries));
+
+  it('arranges only the selection, anchored at its top-left corner, and leaves other nodes alone', () => {
+    const nodes = [
+      { id: 'a', position: { x: 400, y: 300 } },
+      { id: 'b', position: { x: 900, y: 200 } },
+      { id: 'outside', position: { x: 0, y: 0 } },
+    ];
+    const edges = [
+      { source: 'a', target: 'b', type: 'default' },
+      { source: 'outside', target: 'a', type: 'default' },
+    ];
+    const { bounds, positions } = getArrangedLayout(
+      nodes,
+      edges,
+      new Set(['a', 'b']),
+      sizes({ a: { height: 50, width: 100 }, b: { height: 60, width: 120 } })
+    );
+
+    expect(positions).toEqual({ a: { x: 400, y: 200 }, b: { x: 580, y: 200 } });
+    expect(bounds).toEqual({ height: 60, width: 300, x: 400, y: 200 });
+  });
+
+  it('ranks by data edges only, so a loop linkage does not fold the body onto its head', () => {
+    const nodes = [
+      { id: 'head', position: { x: 0, y: 0 } },
+      { id: 'body', position: { x: 0, y: 0 } },
+    ];
+    const edges = [
+      { source: 'head', target: 'body', type: 'default' },
+      { source: 'body', target: 'head', type: 'loop_linkage' },
+    ];
+    const { positions } = getArrangedLayout(
+      nodes,
+      edges,
+      null,
+      sizes({ body: { height: 50, width: 100 }, head: { height: 50, width: 100 } })
+    );
+
+    expect(positions.head!.x).toBeLessThan(positions.body!.x);
+  });
+
+  it('sizes a node the view has not measured at a typical node size', () => {
+    const { bounds } = getArrangedLayout(
+      [{ id: 'a', position: { x: 10, y: 20 } }],
+      [],
+      null,
+      new Map([['a', { height: 0, width: 0 }]])
+    );
+
+    expect(bounds).toEqual({ ...UNMEASURED_ARRANGE_SIZE, x: 10, y: 20 });
   });
 });

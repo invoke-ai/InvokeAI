@@ -72,10 +72,12 @@ export const isDirectInputField = (template: FieldInputTemplate): boolean =>
 export const isExposableField = (template: FieldInputTemplate): boolean => isDirectInputField(template);
 
 /** Scalar numeric fields whose linear-form element can show a randomize button. */
+/** Direct numeric fields whose bounds admit at least one value; shuffling any other would write an invalid one. */
 export const isShuffleableField = (template: FieldInputTemplate): boolean =>
   (template.type.name === 'IntegerField' || template.type.name === 'FloatField') &&
   template.type.cardinality !== 'COLLECTION' &&
-  isDirectInputField(template);
+  isDirectInputField(template) &&
+  admitsWorkflowFieldStepValue(template);
 
 const countDecimals = (value: number): number => {
   const [, fraction = ''] = String(value).split('.');
@@ -138,6 +140,23 @@ export const getWorkflowFieldStepIndexBounds = (
           ? stepIndex(exclusiveMaximum, step, Math.ceil) - 1
           : null,
   };
+};
+
+/**
+ * False when the bounds admit no multiple of the field's step (every integer, for an integer field without one), so
+ * no value passes validation: a field stepping by 8 between 1 and 7. Fields without a step admit any value in range.
+ */
+export const admitsWorkflowFieldStepValue = (template: FieldInputTemplate): boolean => {
+  const multipleOf = finiteNumberOrNull(template.multipleOf);
+  const step = multipleOf !== null && multipleOf > 0 ? multipleOf : template.type.name === 'IntegerField' ? 1 : null;
+
+  if (step === null) {
+    return true;
+  }
+
+  const { first, last } = getWorkflowFieldStepIndexBounds(template, step);
+
+  return first === null || last === null || first <= last;
 };
 
 /** The multiple of `step` at `index`, written at the step's own precision so three tenths reads 0.3. */
