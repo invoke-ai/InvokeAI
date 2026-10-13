@@ -19,11 +19,8 @@ def _get_effective_iteration_paths_for_edge(
     visited_source_ids: set[str],
     get_prepared_nodes_for_source: Callable[[str], set[str]],
     get_prepared_edge_iteration_path: Callable[[Edge, str], tuple[int, ...]],
-    source_graph: Optional["nx.DiGraph"] = None,
-    iterator_ancestry: Optional[_IteratorAncestry] = None,
+    iterator_ancestry: _IteratorAncestry,
 ) -> set[tuple[int, ...]]:
-    if iterator_ancestry is None:
-        iterator_ancestry = _IteratorAncestry(state, source_graph)
     pending: list[tuple[Optional[Edge], Optional[str]]] = [(edge, None)]
     active_source_ids = set(visited_source_ids)
     paths: set[tuple[int, ...]] = set()
@@ -49,13 +46,12 @@ def _get_effective_iteration_paths_for_edge(
         source_node = state.graph.get_node(current_source_id)
         if isinstance(source_node, IfInvocation):
             paths.update(
-                _get_if_iteration_paths(
+                _get_if_iteration_paths_with_ancestry(
                     state,
                     current_source_id,
                     active_source_ids,
                     get_prepared_nodes_for_source,
                     get_prepared_edge_iteration_path,
-                    source_graph,
                     iterator_ancestry,
                 )
             )
@@ -79,11 +75,27 @@ def _get_if_iteration_paths(
     get_prepared_nodes_for_source: Callable[[str], set[str]],
     get_prepared_edge_iteration_path: Callable[[Edge, str], tuple[int, ...]],
     source_graph: Optional["nx.DiGraph"] = None,
-    iterator_ancestry: Optional[_IteratorAncestry] = None,
 ) -> list[tuple[int, ...]]:
     """Infer the selected branch's effective iteration paths for an If output."""
-    if iterator_ancestry is None:
-        iterator_ancestry = _IteratorAncestry(state, source_graph)
+    return _get_if_iteration_paths_with_ancestry(
+        state,
+        node_id,
+        visited_source_ids,
+        get_prepared_nodes_for_source,
+        get_prepared_edge_iteration_path,
+        _IteratorAncestry(state, source_graph),
+    )
+
+
+def _get_if_iteration_paths_with_ancestry(
+    state: "GraphExecutionState",
+    node_id: str,
+    visited_source_ids: set[str],
+    get_prepared_nodes_for_source: Callable[[str], set[str]],
+    get_prepared_edge_iteration_path: Callable[[Edge, str], tuple[int, ...]],
+    iterator_ancestry: _IteratorAncestry,
+) -> list[tuple[int, ...]]:
+    """Infer selected branch paths using one ancestry context for all recursion."""
     node = state.graph.get_node(node_id)
     assert isinstance(node, IfInvocation)
     next_visited_source_ids = {*visited_source_ids, node_id}
@@ -139,7 +151,6 @@ def _get_if_iteration_paths(
                             next_visited_source_ids,
                             get_prepared_nodes_for_source,
                             get_prepared_edge_iteration_path,
-                            source_graph,
                             iterator_ancestry,
                         )
                         for edge in compatible_edges

@@ -674,9 +674,10 @@ materialization.
   - If the node is ready and not deferred by an unresolved `If`, enqueue it into its class queue.
 
 Literal-condition `If` fallback checks use the private `_IteratorAncestry` context. One context belongs to one
-compatibility `prepare()` call and its source DAG, shared by candidate admission and selected-node materialization;
+`_ExecutionNodeBuilder.prepare()` call and its source DAG, shared by candidate admission and selected-node materialization;
 a standalone iteration-path lookup creates its own context and passes it through both `If` and ordinary-node
-recursion. The filtered iterator graph is built only when an unresolved selected branch needs the ancestry fallback.
+recursion. The filtered iterator graph is built lazily for condition-edge iterator compatibility and, for literal conditions,
+only when an unresolved selected branch needs the ancestry fallback.
 The context computes boolean proper-ancestor reachability with collector and final-`For` boundaries preserved, and
 reuses that analysis within the call. No context is retained on execution state or serialized, so later calls observe
 new supplied graphs and source mutations without cache invalidation.

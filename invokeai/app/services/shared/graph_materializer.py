@@ -1540,7 +1540,7 @@ class _ExecutionNodeBuilder:
         return new_nodes
 
     def _has_admitted_source_mapping(
-        self, node_id: str, graph: "nx.DiGraph", iterator_ancestry: Optional[_IteratorAncestry] = None
+        self, node_id: str, graph: "nx.DiGraph", iterator_ancestry: _IteratorAncestry
     ) -> bool:
         if not any(isinstance(node, IfInvocation) for node in self._state.graph.nodes.values()):
             return True
@@ -1549,13 +1549,12 @@ class _ExecutionNodeBuilder:
             if not condition_edges:
                 return any(
                     self._state._is_source_activation_admitted(node_id, iteration_path)
-                    for iteration_path in graph_if_runtime._get_if_iteration_paths(
+                    for iteration_path in graph_if_runtime._get_if_iteration_paths_with_ancestry(
                         self._state,
                         node_id,
                         set(),
                         self._get_prepared_nodes_for_source,
                         self._get_prepared_edge_iteration_path,
-                        graph,
                         iterator_ancestry,
                     )
                 )
@@ -2091,13 +2090,12 @@ class _ExecutionNodeBuilder:
                 create_results = self.create_execution_node(next_node_id, iteration_mappings, iteration_path)
                 new_node_ids.extend(create_results)
         elif isinstance(next_node, IfInvocation):
-            condition_paths = graph_if_runtime._get_if_iteration_paths(
+            condition_paths = graph_if_runtime._get_if_iteration_paths_with_ancestry(
                 self._state,
                 next_node_id,
                 set(),
                 self._get_prepared_nodes_for_source,
                 self._get_prepared_edge_iteration_path,
-                g,
                 iterator_ancestry,
             )
             condition_edges = self._state.graph._get_input_edges(next_node_id, "condition")

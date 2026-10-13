@@ -39,6 +39,7 @@ from invokeai.app.services.shared.graph import (
     _GenericGraphSchedulerAdapter,
 )
 from invokeai.app.services.shared.graph_if_runtime import _get_effective_iteration_paths_for_edge
+from invokeai.app.services.shared.graph_iterator_ancestry import _IteratorAncestry
 from invokeai.app.services.shared.graph_nested_iterate_planner import get_nested_iterate_sequence_depth
 from invokeai.app.services.shared.invocation_context import InvocationContextData, build_invocation_context
 from tests.test_nodes import (
@@ -9021,6 +9022,7 @@ def test_effective_iteration_paths_handles_deep_any_chain() -> None:
         set(),
         lambda source_id: state.source_prepared_mapping.get(source_id, set()),
         lambda _edge, prepared_id: state.prepared_iteration_paths[prepared_id],
+        _IteratorAncestry(state),
     )
 
     assert effective_paths == {(7,)}
