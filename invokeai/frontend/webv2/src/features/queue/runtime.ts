@@ -55,6 +55,12 @@ export interface QueueRuntime {
 }
 
 export interface QueueRunJournalPort {
+  /** Claim delivering a backend rerun of a local run; only the first claim across the account's tabs succeeds. */
+  claimRerunDelivery(rerun: {
+    backendItemId: number;
+    projectId: string;
+    queueItemId: string;
+  }): Promise<{ kind: 'claimed' | 'taken' | 'unavailable' }>;
   listForProject(
     projectId: string
   ): Promise<
@@ -72,6 +78,8 @@ export type QueueRunLock = { kind: 'acquired'; release(): Promise<void> } | { ki
 
 export interface QueueRunLockPort {
   acquire(projectId: string, queueItemId: string): Promise<QueueRunLock>;
+  /** Whether any tab holds the run, asked without requesting it; null when the browser cannot tell. */
+  isHeld(projectId: string, queueItemId: string): Promise<boolean | null>;
 }
 
 export interface QueueHistoryProject {
@@ -446,8 +454,8 @@ export const createQueueRuntime = ({
   const reportedCancelFailures = new Set<string>();
   const ownedLocks = new Map<string, Extract<QueueRunLock, { kind: 'acquired' }>>();
   const lockRequests = new Map<string, Promise<boolean>>();
-  /** Run locks this tab gave up whose browser lock is not yet free. */
-  const lockReleases = new Map<string, Promise<void>>();
+  /** Runs this tab gave up whose browser lock is not yet free; their lock still reads as held. */
+  const releasingRuns = new Map<string, Promise<void>>();
   const preparingRunKeys = new Set<string>();
   const activeAttempts = new Map<string, RunAttempt>();
   const ownershipEpochs = new Map<string, number>();
@@ -649,10 +657,10 @@ export const createQueueRuntime = ({
     }
     ownedLocks.delete(key);
     const released = lock.release().catch(() => undefined);
-    lockReleases.set(key, released);
+    releasingRuns.set(key, released);
     void released.finally(() => {
-      if (lockReleases.get(key) === released) {
-        lockReleases.delete(key);
+      if (releasingRuns.get(key) === released) {
+        releasingRuns.delete(key);
       }
     });
   };
@@ -1303,6 +1311,26 @@ export const createQueueRuntime = ({
   };
 
   /**
+   * Claim delivering a rerun in the account's journal, which every tab shares and which outlives this one: the tab that
+   * adopts or stages a rerun first keeps any tab handling its completion later, run lock released or not, from staging
+   * it again. Without the journal no tab can coordinate, so each delivers.
+   */
+  const claimRerunDelivery = async (rerun: {
+    backendItemId: number;
+    projectId: string;
+    queueItemId: string;
+  }): Promise<boolean> => {
+    if (!journal) {
+      return true;
+    }
+    try {
+      return (await journal.claimRerunDelivery(rerun)).kind !== 'taken';
+    } catch {
+      return true;
+    }
+  };
+
+  /**
    * A retry, from any tab or client, re-runs failed or canceled backend items under new ids. The open run that owns
    * the retried items, or once owned them before an earlier retry, reopens around the reruns, so its captured
    * destination receives their results; reconciliation then tracks them like any resumed run.
@@ -1361,6 +1389,10 @@ export const createQueueRuntime = ({
       for (const { itemId } of run.retriedItems) {
         if (reopened?.status === 'running' && reopened.backendItemIds?.includes(itemId)) {
           isAdopted = true;
+          // The run delivers it, so a tab that took it for unadopted must not stage it once this one lets the run go.
+          // A claim already taken would mean another tab staged its completion before this retry reached here, which
+          // the rerun's execution time rules out; the run delivers regardless.
+          void claimRerunDelivery({ backendItemId: itemId, projectId: run.projectId, queueItemId: run.queueItemId });
         } else {
           rememberUnadoptedRerun(itemId);
         }
@@ -1407,99 +1439,20 @@ export const createQueueRuntime = ({
   };
 
   /**
-   * Elect the one tab that stages a Canvas rerun no run adopted: staging lands in the synced project document, so a
-   * second tab staging it would duplicate it. A tab that holds the run stages it; otherwise the run's lock decides,
-   * kept until staging is done, and while the tab tracking the run is alive it holds that lock and other tabs skip.
-   * Tabs in other browsers cannot be coordinated.
+   * Whether another tab tracks the run behind a Canvas rerun no run adopted. That tab knows the run's result nodes, so
+   * it stages the rerun and this one leaves it; the lock is only looked at, never requested, so that tab is never
+   * turned away. Tabs that do not track the run are kept apart by the rerun's delivery claim instead.
    */
-  const acquireUnadoptedRerunStaging = async (
-    projectId: string,
-    queueItemId: string
-  ): Promise<(() => Promise<void>) | null> => {
+  const isRunTrackedElsewhere = async (projectId: string, queueItemId: string): Promise<boolean> => {
     const key = getRunKey(projectId, queueItemId);
-    // Competing with this tab's own lock, while its claim is decided or its release is still freeing it, would leave
-    // the rerun to no tab; either can end with this tab holding the run or not, so look again after each.
-    for (;;) {
-      if (!locks || ownedLocks.has(key)) {
-        return () => Promise.resolve();
-      }
-      const ownRequest = lockRequests.get(key);
-      const releasing = lockReleases.get(key);
-      if (ownRequest) {
-        if (!(await ownRequest)) {
-          return null;
-        }
-      } else if (releasing) {
-        await releasing;
-      } else {
-        break;
-      }
+    if (!locks || ownedLocks.has(key) || lockRequests.has(key) || releasingRuns.has(key)) {
+      return false;
     }
-    const lock = await locks.acquire(projectId, queueItemId);
-    if (lock.kind === 'acquired') {
-      return () => lock.release();
-    }
-    // Without browser locks no tab coordinates; staging here is what every tab does then.
-    return lock.kind === 'unavailable' ? () => Promise.resolve() : null;
-  };
-
-  /** Staging claims this tab holds or is deciding, per run, with the reruns delivering under each. */
-  const stagingClaims = new Map<
-    string,
-    { claim: Promise<(() => Promise<void>) | null>; holders: number; released?: Promise<void> }
-  >();
-
-  /**
-   * Claim staging for one rerun. Sibling reruns of a run this tab is already staging share its claim, since the lock
-   * would refuse this tab's second request and leave them to no tab; a claim being released is awaited before the
-   * next one asks. Resolves to this rerun's release, or null when another tab has the run.
-   */
-  const claimUnadoptedRerunStaging = async (
-    projectId: string,
-    queueItemId: string
-  ): Promise<(() => Promise<void>) | null> => {
-    const key = getRunKey(projectId, queueItemId);
-    const current = stagingClaims.get(key);
-    const entry =
-      current && !current.released
-        ? current
-        : {
-            claim: (current?.released ?? Promise.resolve()).then(() =>
-              acquireUnadoptedRerunStaging(projectId, queueItemId)
-            ),
-            holders: 0,
-          };
-    stagingClaims.set(key, entry);
-    entry.holders += 1;
-
-    const leave = (release?: () => Promise<void>): Promise<void> => {
-      entry.holders -= 1;
-      if (entry.holders > 0) {
-        return Promise.resolve();
-      }
-      const released: Promise<void> = (release?.() ?? Promise.resolve())
-        .catch(() => undefined)
-        .finally(() => {
-          if (stagingClaims.get(key) === entry) {
-            stagingClaims.delete(key);
-          }
-        });
-      entry.released = released;
-      return released;
-    };
-
-    let release: (() => Promise<void>) | null;
     try {
-      release = await entry.claim;
-    } catch (error) {
-      await leave();
-      throw error;
+      return (await locks.isHeld(projectId, queueItemId)) === true;
+    } catch {
+      return false;
     }
-    if (!release) {
-      await leave();
-      return null;
-    }
-    return () => leave(release);
   };
 
   /**
@@ -1552,21 +1505,22 @@ export const createQueueRuntime = ({
       return;
     }
 
-    void claimUnadoptedRerunStaging(projectId, queueItemId)
-      .then(async (release) => {
-        if (!release) {
-          return;
-        }
-        try {
-          const images = await readUnadoptedRerunImages(event, queueItemId, run);
-          if (isActive() && images.length > 0) {
-            commands.stageRetriedCanvasResults({ backendItemId: event.item_id, images, projectId, queueItemId });
-          }
-        } finally {
-          await release().catch(() => undefined);
-        }
-      })
-      .catch(recordError);
+    const stage = async (): Promise<void> => {
+      if (await isRunTrackedElsewhere(projectId, queueItemId)) {
+        return;
+      }
+      const images = await readUnadoptedRerunImages(event, queueItemId, run);
+      // Claimed only with something to stage, so a failed or empty read leaves the rerun to a tab that sees it later.
+      if (
+        images.length > 0 &&
+        isActive() &&
+        (await claimRerunDelivery({ backendItemId: event.item_id, projectId, queueItemId })) &&
+        isActive()
+      ) {
+        commands.stageRetriedCanvasResults({ backendItemId: event.item_id, images, projectId, queueItemId });
+      }
+    };
+    void stage().catch(recordError);
   };
 
   const submitQueueItem = async (

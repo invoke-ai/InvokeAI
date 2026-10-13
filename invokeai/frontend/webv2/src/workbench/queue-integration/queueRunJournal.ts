@@ -17,6 +17,15 @@ import { normalizeRestoredQueueItem } from '@workbench/queue-integration/queueRu
 export const QUEUE_RUN_MAX_BYTES = 32 * 1024 * 1024;
 export const QUEUE_RUN_TOTAL_MAX_BYTES = 128 * 1024 * 1024;
 export const QUEUE_RUN_MAX_ENTRIES = 10_000;
+/** How long a rerun delivery claim is kept: past any tab still handling the rerun's completion, even one long queued. */
+export const QUEUE_RERUN_DELIVERY_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** A backend rerun of a local run; the run names it apart from an id the server reuses after its database is reset. */
+export interface QueueRerunDelivery {
+  backendItemId: number;
+  projectId: string;
+  queueItemId: string;
+}
 
 export interface QueueRunJournalEntry {
   /** Untrusted serialized candidate. Normalize it against the current project before restoration. */
@@ -31,11 +40,14 @@ export type QueueRunJournalLoadResult =
   | { kind: 'unavailable' };
 export type QueueRunJournalWriteResult = { kind: 'invalid' | 'quota' | 'stored' | 'too-large' | 'unavailable' };
 export type QueueRunJournalSettleResult = { kind: 'removed' | 'unavailable' };
+export type QueueRerunDeliveryClaimResult = { kind: 'claimed' | 'taken' | 'unavailable' };
 
 export interface QueueRunJournal {
   readonly availability: 'available' | 'unavailable';
   close(): void;
   acknowledgeReceipt(projectId: string, queueItemId: string): Promise<QueueRunJournalSettleResult>;
+  /** Claim delivering a backend rerun's results; only the first claim across the account's tabs succeeds. */
+  claimRerunDelivery(rerun: QueueRerunDelivery): Promise<QueueRerunDeliveryClaimResult>;
   listPendingReceipts(): Promise<
     { entries: QueueReceiptAcknowledgement[]; kind: 'available' } | { kind: 'unavailable' }
   >;
@@ -51,6 +63,8 @@ const getByteSize = (value: string): number => new TextEncoder().encode(value).b
 const QUEUE_RUN_SUBMISSION_SEQUENCE_KEY = 'queueRunSubmissionSequence';
 const QUEUE_RUN_TOTAL_BYTES_KEY = 'queueRunTotalBytes';
 const QUEUE_RUN_COUNT_KEY = 'queueRunCount';
+// Claims share the metadata store, under a prefix of their own, rather than needing a database upgrade.
+const QUEUE_RERUN_DELIVERY_KEY_PREFIX = 'queueRerunDelivery:';
 const QUEUE_RUN_STORES = [
   WORKBENCH_DATABASE_METADATA_STORE,
   WORKBENCH_QUEUE_RUN_STORE,
@@ -324,6 +338,38 @@ export const createIndexedDbQueueRunJournal = (
         return { kind: 'unavailable' };
       }
     },
+    async claimRerunDelivery({ backendItemId, projectId, queueItemId }) {
+      if (!isAvailable()) {
+        return { kind: 'unavailable' };
+      }
+      try {
+        const transaction = observeTransaction(database.transaction(WORKBENCH_DATABASE_METADATA_STORE, 'readwrite'));
+        const metadataStore = transaction.store;
+        const key = `${QUEUE_RERUN_DELIVERY_KEY_PREFIX}${JSON.stringify([backendItemId, projectId, queueItemId])}`;
+        const claimedAt = now();
+        // One read of every claim, so the store the queue journal writes to is held only briefly.
+        const claims = await metadataStore.getAll(
+          IDBKeyRange.bound(QUEUE_RERUN_DELIVERY_KEY_PREFIX, `${QUEUE_RERUN_DELIVERY_KEY_PREFIX}\uffff`)
+        );
+        const isLive = (claim: { value: number }) =>
+          Number.isFinite(claim.value) && claimedAt - claim.value < QUEUE_RERUN_DELIVERY_RETENTION_MS;
+        const isTaken = claims.some((claim) => claim.key === key && isLive(claim));
+        const kept = claims.filter((claim) => claim.key !== key && isLive(claim));
+        const stale = claims.filter((claim) => !isLive(claim));
+        if (!isTaken) {
+          kept.sort((left, right) => left.value - right.value);
+          stale.push(...kept.slice(0, Math.max(0, kept.length - Math.max(0, entryBudget - 1))));
+        }
+        await Promise.all([
+          ...stale.map((claim) => metadataStore.delete(claim.key)),
+          ...(isTaken ? [] : [metadataStore.put({ key, value: claimedAt })]),
+        ]);
+        await transaction.done;
+        return { kind: isTaken ? 'taken' : 'claimed' };
+      } catch {
+        return { kind: 'unavailable' };
+      }
+    },
     async deleteForProject(projectId) {
       if (!isAvailable()) {
         return { kind: 'unavailable' };
@@ -523,6 +569,7 @@ export const createAccountOwnedQueueRunJournal = async (
     return {
       availability: 'unavailable',
       acknowledgeReceipt: () => Promise.resolve({ kind: 'unavailable' }),
+      claimRerunDelivery: () => Promise.resolve({ kind: 'unavailable' }),
       listPendingReceipts: () => Promise.resolve({ kind: 'unavailable' }),
       close: () => undefined,
       deleteForProject: () => Promise.resolve({ kind: 'unavailable' }),

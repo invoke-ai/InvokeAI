@@ -104,10 +104,17 @@ const createTestCommands = (overrides: Partial<QueueHistoryCommands> = {}): Queu
 });
 
 const createTestJournal = (overrides: Partial<QueueRunJournalPort> = {}): QueueRunJournalPort => ({
+  claimRerunDelivery: vi.fn().mockResolvedValue({ kind: 'claimed' }),
   listForProject: vi.fn().mockResolvedValue({ entries: [], kind: 'available' }),
   record: vi.fn().mockResolvedValue({ kind: 'stored' }),
   settle: vi.fn().mockResolvedValue({ kind: 'removed' }),
   ...overrides,
+});
+
+/** Run locks that no other tab holds, around the given acquire. */
+const createTestLocks = (acquire: QueueRunLockPort['acquire']): QueueRunLockPort => ({
+  acquire,
+  isHeld: () => Promise.resolve(false),
 });
 
 const runtimeServices = {
@@ -854,6 +861,7 @@ describe('queue runtime', () => {
     let finishAcquire: (result: { kind: 'acquired'; release(): Promise<void> }) => void = () => undefined;
     const release = vi.fn().mockResolvedValue(undefined);
     const locks: QueueRunLockPort = {
+      isHeld: () => Promise.resolve(false),
       acquire: vi.fn(
         () =>
           new Promise<QueueRunLock>((resolve) => {
@@ -919,6 +927,7 @@ describe('queue runtime', () => {
     const release = vi.fn().mockResolvedValue(undefined);
     let acquisitionCount = 0;
     const locks: QueueRunLockPort = {
+      isHeld: () => Promise.resolve(false),
       acquire: vi.fn(() => {
         acquisitionCount += 1;
         if (acquisitionCount > 1) {
@@ -1058,7 +1067,7 @@ describe('queue runtime', () => {
         },
       },
       journal: createTestJournal({ record }),
-      locks: { acquire: vi.fn().mockResolvedValue({ kind: 'acquired', release }) },
+      locks: createTestLocks(vi.fn().mockResolvedValue({ kind: 'acquired', release })),
     });
 
     runtime.start();
@@ -1151,7 +1160,7 @@ describe('queue runtime', () => {
         },
       },
       journal,
-      locks: { acquire: vi.fn().mockResolvedValue({ kind: 'acquired', release }) },
+      locks: createTestLocks(vi.fn().mockResolvedValue({ kind: 'acquired', release })),
     });
 
     runtime.start();
@@ -1211,7 +1220,7 @@ describe('queue runtime', () => {
         },
       },
       journal: createTestJournal({ settle }),
-      locks: { acquire: vi.fn().mockResolvedValue({ kind: 'acquired', release }) },
+      locks: createTestLocks(vi.fn().mockResolvedValue({ kind: 'acquired', release })),
     });
 
     runtime.start();
@@ -1666,7 +1675,7 @@ describe('queue runtime', () => {
         },
       },
       journal,
-      locks: { acquire },
+      locks: createTestLocks(acquire),
     });
 
     runtime.start();
@@ -1715,7 +1724,7 @@ describe('queue runtime', () => {
         subscribe: vi.fn(() => vi.fn()),
       },
       journal: createTestJournal({ record }),
-      locks: { acquire },
+      locks: createTestLocks(acquire),
     });
 
     runtime.start();
@@ -1931,7 +1940,7 @@ describe('queue runtime', () => {
       }),
     });
     const acquire = vi.fn().mockResolvedValue({ kind: 'contended' });
-    const locks: QueueRunLockPort = { acquire };
+    const locks = createTestLocks(acquire);
     const backend = createTestBackend();
     const runtime = createQueueRuntime({
       ...runtimeServices,
@@ -1999,7 +2008,7 @@ describe('queue runtime', () => {
           kind: 'available',
         }),
       }),
-      locks: { acquire },
+      locks: createTestLocks(acquire),
     });
 
     runtime.start();
@@ -2019,6 +2028,7 @@ describe('queue runtime', () => {
     const journal = createTestJournal();
     const release = vi.fn().mockResolvedValue(undefined);
     const locks: QueueRunLockPort = {
+      isHeld: () => Promise.resolve(false),
       acquire: vi.fn().mockResolvedValue({ kind: 'acquired', release }),
     };
     const commands = createTestCommands({
@@ -2220,7 +2230,7 @@ describe('queue runtime', () => {
         },
       },
       journal,
-      locks: { acquire: vi.fn().mockResolvedValue({ kind: 'acquired', release }) },
+      locks: createTestLocks(vi.fn().mockResolvedValue({ kind: 'acquired', release })),
     });
 
     runtime.start();
@@ -2785,7 +2795,7 @@ describe('queue runtime retries', () => {
   const createRetryHarness = (
     queueItem: QueueItem,
     backendOverrides: Partial<QueueBackendPort> = {},
-    services: { locks?: QueueRunLockPort; viewerUserId?: string | null } = {}
+    services: { journal?: QueueRunJournalPort; locks?: QueueRunLockPort; viewerUserId?: string | null } = {}
   ) => {
     const project = { id: 'project-1', queue: { items: [queueItem] } };
     const listeners = new Set<() => void>();
@@ -3120,23 +3130,15 @@ describe('queue runtime retries', () => {
     await runtime.dispose();
   });
 
-  it('leaves a Canvas rerun to the tab tracking its run, and stages it here only while holding the run lock', async () => {
+  it('leaves a Canvas rerun to the tab tracking its run, without taking that run from it', async () => {
     const queueItem: QueueItem = { ...createPendingQueueItem(), backendItemIds: [7], status: 'completed' };
     const getResultImages = vi.fn().mockResolvedValue([{ imageName: 'rerun.png' } as QueueResultImage]);
-    const release = vi.fn().mockResolvedValue(undefined);
     // Another tab tracks the run behind rerun 99; nobody tracks the one behind rerun 100 any more.
-    const acquire = vi.fn((_projectId: string, queueItemId: string) =>
-      Promise.resolve(
-        queueItemId === 'tracked-elsewhere'
-          ? ({ kind: 'contended' } as const)
-          : ({ kind: 'acquired', release } as const)
-      )
-    );
-    const { commands, emit, project, runtime } = createRetryHarness(
-      queueItem,
-      { getResultImages },
-      { locks: { acquire } }
-    );
+    const locks: QueueRunLockPort = {
+      acquire: vi.fn(),
+      isHeld: (_projectId, queueItemId) => Promise.resolve(queueItemId === 'tracked-elsewhere'),
+    };
+    const { commands, emit, project, runtime } = createRetryHarness(queueItem, { getResultImages }, { locks });
 
     runtime.start();
     emit(
@@ -3152,139 +3154,197 @@ describe('queue runtime retries', () => {
     );
     emit('queue_item_status_changed', completedEvent(100, buildQueueItemOrigin('run-gone', project.id), 'canvas'));
 
-    await vi.waitFor(() => expect(release).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(commands.stageRetriedCanvasResults).toHaveBeenCalledTimes(1));
+    await settleEvents();
     expect(commands.stageRetriedCanvasResults).toHaveBeenCalledTimes(1);
     expect(commands.stageRetriedCanvasResults).toHaveBeenCalledWith(
       expect.objectContaining({ backendItemId: 100, queueItemId: 'run-gone' })
     );
     expect(getResultImages).toHaveBeenCalledTimes(1);
-    // Released only after staging, so a tab that sees the same completion meanwhile finds the lock taken.
-    expect(release.mock.invocationCallOrder[0]).toBeGreaterThan(
-      vi.mocked(commands.stageRetriedCanvasResults).mock.invocationCallOrder[0]!
-    );
+    expect(locks.acquire).not.toHaveBeenCalled();
 
     await runtime.dispose();
   });
 
-  it('stages sibling Canvas reruns that finish while this tab is still staging their run', async () => {
-    const queueItem: QueueItem = { ...createPendingQueueItem(), backendItemIds: [7], status: 'completed' };
-    let finishFirstRead!: (images: QueueResultImage[]) => void;
-    const getResultImages = vi.fn((itemId: number) =>
-      itemId === 99
-        ? new Promise<QueueResultImage[]>((resolve) => {
-            finishFirstRead = resolve;
-          })
-        : Promise.resolve([{ imageName: `rerun-${itemId}.png` } as QueueResultImage])
-    );
-    // Web Locks are requested ifAvailable, so a held lock refuses its own tab too.
-    const held = new Set<string>();
-    const release = vi.fn();
-    const acquire = vi.fn((projectId: string, queueItemId: string) => {
-      const name = `${projectId}:${queueItemId}`;
-      if (held.has(name)) {
-        return Promise.resolve({ kind: 'contended' } as const);
-      }
-      held.add(name);
-      return Promise.resolve({
-        kind: 'acquired',
-        release: () => {
-          release();
-          held.delete(name);
-          return Promise.resolve();
-        },
-      } as const);
+  /** The account's journal of rerun delivery claims, shared by every tab of the browser. */
+  const createSharedDeliveryJournal = () => {
+    const claims = new Set<string>();
+    return createTestJournal({
+      claimRerunDelivery: vi.fn((rerun: { backendItemId: number; projectId: string; queueItemId: string }) => {
+        const key = JSON.stringify([rerun.backendItemId, rerun.projectId, rerun.queueItemId]);
+        if (claims.has(key)) {
+          return Promise.resolve({ kind: 'taken' } as const);
+        }
+        claims.add(key);
+        return Promise.resolve({ kind: 'claimed' } as const);
+      }),
     });
-    const { commands, emit, project, runtime } = createRetryHarness(
-      queueItem,
+  };
+  const openCanvasTab = (
+    journal: QueueRunJournalPort,
+    getResultImages: QueueBackendPort['getResultImages'] = vi.fn((itemId: number) =>
+      Promise.resolve([{ imageName: `rerun-${itemId}.png` } as QueueResultImage])
+    )
+  ) =>
+    createRetryHarness(
+      { ...createPendingQueueItem(), backendItemIds: [7], status: 'completed' },
       { getResultImages },
-      { locks: { acquire } }
+      { journal, locks: createTestLocks(vi.fn()) }
     );
-    const origin = buildQueueItemOrigin('run-gone', project.id);
-    const staged = () =>
-      vi.mocked(commands.stageRetriedCanvasResults).mock.calls.map(([payload]) => payload.backendItemId);
-
-    runtime.start();
-    emit(
+  const stagedItemIds = (tab: ReturnType<typeof openCanvasTab>) =>
+    vi.mocked(tab.commands.stageRetriedCanvasResults).mock.calls.map(([payload]) => payload.backendItemId);
+  const emitReruns = (tab: ReturnType<typeof openCanvasTab>, itemIds: number[]) =>
+    tab.emit(
       'queue_items_retried',
-      retriedEvent([
-        { item_id: 99, source_item_id: 41 },
-        { item_id: 100, source_item_id: 42 },
-        { item_id: 101, source_item_id: 43 },
-      ])
+      retriedEvent(itemIds.map((itemId) => ({ item_id: itemId, source_item_id: itemId + 1_000 })))
     );
-    emit('queue_item_status_changed', completedEvent(99, origin, 'canvas'));
-    await vi.waitFor(() => expect(getResultImages).toHaveBeenCalledTimes(1));
-    emit('queue_item_status_changed', completedEvent(100, origin, 'canvas'));
+  const settleEvents = () =>
+    new Promise((resolve) => {
+      setTimeout(resolve);
+    });
 
-    finishFirstRead([{ imageName: 'rerun-99.png' } as QueueResultImage]);
+  it('stages a Canvas rerun once across tabs, however late another tab sees it and after the first tab closed', async () => {
+    const journal = createSharedDeliveryJournal();
+    const first = openCanvasTab(journal);
+    const second = openCanvasTab(journal);
+    const completed = (itemId: number) =>
+      completedEvent(itemId, buildQueueItemOrigin('run-gone', first.project.id), 'canvas');
 
-    await vi.waitFor(() => expect(release).toHaveBeenCalledTimes(1));
-    expect(staged()).toEqual([99, 100]);
-    expect(acquire).toHaveBeenCalledTimes(1);
+    for (const tab of [first, second]) {
+      tab.runtime.start();
+      emitReruns(tab, [99, 100, 101]);
+    }
+    first.emit('queue_item_status_changed', completed(99));
+    first.emit('queue_item_status_changed', completed(100));
+    await vi.waitFor(() => expect(stagedItemIds(first).sort((left, right) => left - right)).toEqual([99, 100]));
+    await first.runtime.dispose();
 
-    // Once released, a later sibling claims the run again.
-    emit('queue_item_status_changed', completedEvent(101, origin, 'canvas'));
-    await vi.waitFor(() => expect(release).toHaveBeenCalledTimes(2));
-    expect(staged()).toEqual([99, 100, 101]);
-    expect(acquire).toHaveBeenCalledTimes(2);
+    for (const itemId of [99, 100, 101]) {
+      second.emit('queue_item_status_changed', completed(itemId));
+    }
+    await vi.waitFor(() => expect(stagedItemIds(second)).toEqual([101]));
+    await settleEvents();
+    expect(stagedItemIds(second)).toEqual([101]);
 
-    await runtime.dispose();
+    await second.runtime.dispose();
+  });
+
+  it('leaves a Canvas rerun to a tab that sees it later when this one could not read its results', async () => {
+    const journal = createSharedDeliveryJournal();
+    const failing = openCanvasTab(journal, vi.fn().mockRejectedValue(new Error('Server restarting')));
+    const later = openCanvasTab(journal);
+    const completed = completedEvent(99, buildQueueItemOrigin('run-gone', failing.project.id), 'canvas');
+
+    for (const tab of [failing, later]) {
+      tab.runtime.start();
+      emitReruns(tab, [99]);
+    }
+    failing.emit('queue_item_status_changed', completed);
+    await vi.waitFor(() =>
+      expect(failing.commands.recordError).toHaveBeenCalledWith(expect.objectContaining({ area: 'queue-results' }))
+    );
+    later.emit('queue_item_status_changed', completed);
+
+    await vi.waitFor(() => expect(stagedItemIds(later)).toEqual([99]));
+    expect(stagedItemIds(failing)).toEqual([]);
+
+    await failing.runtime.dispose();
+    await later.runtime.dispose();
+  });
+
+  it('stages a Canvas rerun when the delivery journal cannot answer', async () => {
+    const tab = openCanvasTab(
+      createTestJournal({ claimRerunDelivery: vi.fn().mockRejectedValue(new Error('IndexedDB closed')) })
+    );
+
+    tab.runtime.start();
+    emitReruns(tab, [99]);
+    tab.emit(
+      'queue_item_status_changed',
+      completedEvent(99, buildQueueItemOrigin('run-gone', tab.project.id), 'canvas')
+    );
+
+    await vi.waitFor(() => expect(stagedItemIds(tab)).toEqual([99]));
+
+    await tab.runtime.dispose();
   });
 
   it('stages a Canvas rerun that finishes while this tab is still freeing the run lock it gave up', async () => {
     const queueItem: QueueItem = { ...createPendingQueueItem(), backendItemIds: [88], status: 'running' };
-    const getResultImages = vi.fn().mockResolvedValue([{ imageName: 'rerun.png' } as QueueResultImage]);
     let held = false;
-    let freeRunLock!: () => void;
-    const acquire = vi.fn(() => {
-      if (held) {
-        return Promise.resolve({ kind: 'contended' } as const);
-      }
-      held = true;
-      const release =
-        acquire.mock.calls.length === 1
-          ? () =>
-              new Promise<void>((resolve) => {
-                freeRunLock = () => {
-                  held = false;
-                  resolve();
-                };
-              })
-          : () => {
-              held = false;
-              return Promise.resolve();
-            };
-      return Promise.resolve({ kind: 'acquired', release } as const);
-    });
+    let freeRunLock: (() => void) | undefined;
+    const locks: QueueRunLockPort = {
+      acquire: vi.fn(() => {
+        held = true;
+        return Promise.resolve({
+          kind: 'acquired',
+          release: () =>
+            new Promise<void>((resolve) => {
+              freeRunLock = () => {
+                held = false;
+                resolve();
+              };
+            }),
+        } as const);
+      }),
+      isHeld: () => Promise.resolve(held),
+    };
     const { commands, emit, notify, project, runtime } = createRetryHarness(
       queueItem,
-      { getResultImages },
-      { locks: { acquire } }
+      { getResultImages: vi.fn().mockResolvedValue([{ imageName: 'rerun.png' } as QueueResultImage]) },
+      { journal: createSharedDeliveryJournal(), locks }
     );
 
     runtime.start();
-    await vi.waitFor(() => expect(acquire).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(held).toBe(true));
     emit('queue_items_retried', retriedEvent([{ item_id: 100, source_item_id: 42 }]));
     // Removing the run gives up its lock; the browser frees it only later.
     project.queue.items = [];
     notify();
     await vi.waitFor(() => expect(freeRunLock).toBeDefined());
     emit('queue_item_status_changed', completedEvent(100, buildQueueItemOrigin(queueItem.id, project.id), 'canvas'));
-    // Let the staging claim settle as far as it can before the lock is free.
-    await new Promise((resolve) => {
-      setTimeout(resolve);
-    });
-    expect(acquire).toHaveBeenCalledTimes(1);
-    freeRunLock();
 
     await vi.waitFor(() =>
       expect(commands.stageRetriedCanvasResults).toHaveBeenCalledWith(
         expect.objectContaining({ backendItemId: 100, queueItemId: queueItem.id })
       )
     );
-    expect(acquire).toHaveBeenCalledTimes(2);
+    expect(held).toBe(true);
 
+    freeRunLock?.();
     await runtime.dispose();
+  });
+
+  it('leaves a rerun another tab adopted to that tab, after its run is let go', async () => {
+    const journal = createSharedDeliveryJournal();
+    const failedRun: QueueItem = { ...createPendingQueueItem(), backendItemIds: [41], status: 'failed' };
+    const adopting = createRetryHarness(failedRun, {}, { journal });
+    vi.mocked(adopting.commands.reopenForRetry).mockImplementation(({ retriedItems }) => {
+      failedRun.retriedBackendItemIds = [41];
+      failedRun.backendItemIds = retriedItems.map(({ itemId }) => itemId);
+      failedRun.status = 'running';
+      adopting.notify();
+    });
+    // This tab opened the project after the run was gone from it, so it remembers the rerun as unadopted; the
+    // adopting tab no longer holds the run's lock when the completion reaches this one.
+    const late = openCanvasTab(journal);
+
+    adopting.runtime.start();
+    late.runtime.start();
+    for (const tab of [adopting, late]) {
+      tab.emit('queue_items_retried', retriedEvent([{ item_id: 99, source_item_id: 41 }]));
+    }
+    expect(failedRun.backendItemIds).toEqual([99]);
+    late.emit(
+      'queue_item_status_changed',
+      completedEvent(99, buildQueueItemOrigin(failedRun.id, late.project.id), 'canvas')
+    );
+    await settleEvents();
+
+    expect(late.commands.stageRetriedCanvasResults).not.toHaveBeenCalled();
+
+    await adopting.runtime.dispose();
+    await late.runtime.dispose();
   });
 
   it("handles a retry once when both the tab's own answer and the socket deliver it, and ignores others' retries", async () => {

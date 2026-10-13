@@ -5,6 +5,7 @@ import {
   acquireSharedLock,
   type BrowserLockResult,
   type ExclusiveLockResult,
+  isLockHeld,
 } from '@platform/browser/webLocks';
 import { getProjectLifecycleLockName } from '@workbench/projects/projectLifecycleLocks';
 
@@ -16,8 +17,10 @@ export const getQueueRunLockName = (storageSuffix: string, projectId: string, qu
 export const createQueueRunLockPort = (
   storageSuffix: string,
   acquireRun: (name: string) => Promise<ExclusiveLockResult> = acquireExclusiveLock,
-  acquireProject: (name: string) => Promise<BrowserLockResult> = acquireSharedLock
+  acquireProject: (name: string) => Promise<BrowserLockResult> = acquireSharedLock,
+  isHeld: (name: string) => Promise<boolean | null> = isLockHeld
 ): QueueRunLockPort => ({
+  isHeld: (projectId, queueItemId) => isHeld(getQueueRunLockName(storageSuffix, projectId, queueItemId)),
   async acquire(projectId, queueItemId) {
     const projectLock = await acquireProject(getProjectLifecycleLockName(storageSuffix, projectId));
     if (projectLock.kind !== 'acquired') {

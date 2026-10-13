@@ -18,6 +18,22 @@ describe('queue run locks', () => {
     expect(acquire.mock.calls[0]?.[0]).not.toBe(acquire.mock.calls[1]?.[0]);
   });
 
+  it('asks whether a run is held under the name its owner acquires', async () => {
+    const acquire = vi.fn().mockResolvedValue({ kind: 'contended' });
+    const isHeld = vi.fn().mockResolvedValue(true);
+    const locks = createQueueRunLockPort(
+      ':account-1',
+      acquire,
+      vi.fn().mockResolvedValue({ kind: 'acquired', release: vi.fn() }),
+      isHeld
+    );
+
+    await locks.acquire('project-1', 'item-1');
+    await expect(locks.isHeld('project-1', 'item-1')).resolves.toBe(true);
+
+    expect(isHeld).toHaveBeenCalledWith(acquire.mock.calls[0]?.[0]);
+  });
+
   it('holds a shared project lease for the lifetime of an acquired run', async () => {
     const calls: string[] = [];
     const locks = createQueueRunLockPort(
