@@ -153,8 +153,8 @@ def _record_activation_dependencies(
         return dependencies
     source_node_id = state._prepared_registry().get_source_node_id(exec_node_id)
     if any(isinstance(node, IfInvocation) for node in state.graph.nodes.values()):
-        dependencies = state._get_source_activation_dependencies(
-            source_node_id, state._get_iteration_path(exec_node_id)
+        dependencies = _get_source_activation_dependencies_for_preparation(
+            state, source_node_id, state._get_iteration_path(exec_node_id)
         )
     else:
         dependencies = ()
@@ -162,10 +162,31 @@ def _record_activation_dependencies(
     return dependencies
 
 
+def _get_source_activation_dependencies_for_preparation(
+    state: "GraphExecutionState", source_node_id: str, iteration_path: tuple[int, ...]
+) -> tuple[ActivationDependency, ...]:
+    dependencies = state._get_source_activation_dependencies(source_node_id, iteration_path)
+    if iteration_path or not dependencies:
+        return dependencies
+
+    # Root-frame sources can feed a branch selected by one of several loop-local If executions.
+    # Bind the source to a frame that actually selected it so scheduler admission uses that gate.
+    candidate_frames = sorted(
+        {frame for dependency in dependencies for frame in state._prepared_if_exec_frames(dependency.owner_id)}
+    )
+    for frame in candidate_frames:
+        frame_dependencies = state._get_source_activation_dependencies(source_node_id, frame)
+        if frame_dependencies and all(
+            state._is_activation_dependency_satisfied(dependency) for dependency in frame_dependencies
+        ):
+            return frame_dependencies
+    return dependencies
+
+
 def _is_source_activation_admitted(
     state: "GraphExecutionState", source_node_id: str, iteration_path: tuple[int, ...] = ()
 ) -> bool:
-    dependencies = state._get_source_activation_dependencies(source_node_id, iteration_path)
+    dependencies = _get_source_activation_dependencies_for_preparation(state, source_node_id, iteration_path)
     return not dependencies or all(state._is_activation_dependency_satisfied(dependency) for dependency in dependencies)
 
 

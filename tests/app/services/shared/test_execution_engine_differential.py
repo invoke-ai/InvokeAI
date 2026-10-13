@@ -8489,3 +8489,50 @@ def test_fresh_four_nested_ifs_shared_ancestor_checkpoint_resume_matches_both_sc
     assert _activation_projection(resumed_state) == _activation_projection(expected_state)
     assert _execution_token_projection(resumed_state) == _execution_token_projection(expected_state)
     assert resumed_state.is_complete()
+
+
+def _run_to_completion(
+    state: GraphExecutionState, *, max_steps: int = 100_000
+) -> tuple[list[str], GraphExecutionState]:
+    trace: list[str] = []
+    for _ in range(max_steps):
+        node = state.next()
+        if node is None:
+            return trace, state
+        trace.append(state.prepared_source_mapping[node.id])
+        state.complete(node.id, node.invoke(Mock()))
+    raise AssertionError(f"Execution exceeded {max_steps} scheduled nodes")
+
+
+@pytest.mark.parametrize(
+    ("collection", "expected"),
+    [
+        ([False, True], ["false-root", "true-root"]),
+        ([True, True], ["true-root", "true-root"]),
+        ([False, False], ["false-root", "false-root"]),
+    ],
+    ids=["mixed", "all-true", "all-false"],
+)
+def test_for_condition_if_reads_root_frame_sources_and_skips_unselected_root(
+    collection: list[bool], expected: list[str]
+) -> None:
+    graph = Graph()
+    graph.add_node(ForInvocation(id="for", collection=collection))
+    graph.add_node(AnyTypeTestInvocation(id="root_true", value="true-root"))
+    graph.add_node(AnyTypeTestInvocation(id="root_false", value="false-root"))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(ForReturnInvocation(id="return"))
+    graph.add_node(AnyTypeTestInvocation(id="after"))
+    graph.add_edge(create_edge("for", "item", "if", "condition"))
+    graph.add_edge(create_edge("root_true", "value", "if", "true_input"))
+    graph.add_edge(create_edge("root_false", "value", "if", "false_input"))
+    graph.add_edge(create_edge("if", "value", "return", "output"))
+    graph.add_edge(create_loop_linkage("for", "return"))
+    graph.add_edge(create_edge("for", "output_collection", "after", "value"))
+
+    trace, state = _run_to_completion(GraphExecutionState(graph=graph))
+
+    assert state.is_complete()
+    assert _source_output(state, "after").value == expected
+    assert trace.count("root_true") == (1 if True in collection else 0)
+    assert trace.count("root_false") == (1 if False in collection else 0)

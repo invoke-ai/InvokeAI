@@ -309,7 +309,10 @@ class _ExecutionNodeBuilder:
 
             node = self._state.graph.get_node(source_node_id)
             new_edges: list[Edge] = []
-            for edge in self._state.graph._get_input_edges(source_node_id):
+            input_edges = self._state.graph._get_input_edges(source_node_id)
+            if isinstance(node, IfInvocation):
+                input_edges = [edge for edge in input_edges if edge.destination.field == "condition"]
+            for edge in input_edges:
                 prepared_source_id = source_to_prepared.get(edge.source.node_id)
                 if prepared_source_id is None:
                     prepared_source_id = self.get_iteration_node(
@@ -1549,16 +1552,17 @@ class _ExecutionNodeBuilder:
                 if source_edge.source.node_id not in self._state.source_prepared_mapping:
                     continue
                 candidates = [
-                    prepared_id
+                    (prepared_id, self._get_prepared_edge_iteration_path(source_edge, prepared_id))
                     for prepared_id in self._get_ordered_prepared_nodes_for_edge(source_edge)
-                    if self._get_prepared_edge_iteration_path(source_edge, prepared_id) == target_path
                 ]
+                candidates = [candidate for candidate in candidates if target_path[: len(candidate[1])] == candidate[1]]
                 if not candidates:
                     continue
-                selected_exec_ids.append(candidates[0])
+                selected_exec_id, _ = min(candidates, key=lambda candidate: (-len(candidate[1]), candidate[0]))
+                selected_exec_ids.append(selected_exec_id)
                 attached_edges.append(
                     Edge(
-                        source=EdgeConnection(node_id=candidates[0], field=source_edge.source.field),
+                        source=EdgeConnection(node_id=selected_exec_id, field=source_edge.source.field),
                         destination=EdgeConnection(node_id=exec_node_id, field=selected_field),
                     )
                 )
