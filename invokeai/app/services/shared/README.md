@@ -669,6 +669,14 @@ materialization.
   - Try to resolve any `If`-specific scheduling state.
   - If the node is ready and not deferred by an unresolved `If`, enqueue it into its class queue.
 
+Literal-condition `If` fallback checks use the private `_IteratorAncestry` context. One context belongs to one
+compatibility `prepare()` call and its source DAG, shared by candidate admission and selected-node materialization;
+a standalone iteration-path lookup creates its own context and passes it through both `If` and ordinary-node
+recursion. The filtered iterator graph is built only when an unresolved selected branch needs the ancestry fallback.
+The context computes boolean proper-ancestor reachability with collector and final-`For` boundaries preserved, and
+reuses that analysis within the call. No context is retained on execution state or serialized, so later calls observe
+new supplied graphs and source mutations without cache invalidation.
+
 ### 4.5 Readiness and class ordering
 
 - `_enqueue_if_ready(nid)` applies generic readiness: `indegree == 0`, not executed or claimed, and, for an `If`

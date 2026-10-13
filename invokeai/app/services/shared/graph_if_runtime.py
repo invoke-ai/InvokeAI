@@ -5,8 +5,9 @@ from typing import TYPE_CHECKING, Callable, Optional
 from invokeai.app.invocations.logic import IfInvocation
 from invokeai.app.services.shared.execution_engine.primitives import ActivationGate
 from invokeai.app.services.shared.execution_engine.scheduler import ActivationDependency
+from invokeai.app.services.shared.graph_iterator_ancestry import _IteratorAncestry
 from invokeai.app.services.shared.graph_models import Edge, ExecutionToken
-from invokeai.app.services.shared.graph_validation import ForInvocation, IterateInvocation, nx
+from invokeai.app.services.shared.graph_validation import IterateInvocation, nx
 
 if TYPE_CHECKING:
     from invokeai.app.services.shared.graph import GraphExecutionState
@@ -19,6 +20,7 @@ def _get_effective_iteration_paths_for_edge(
     get_prepared_nodes_for_source: Callable[[str], set[str]],
     get_prepared_edge_iteration_path: Callable[[Edge, str], tuple[int, ...]],
     source_graph: Optional["nx.DiGraph"] = None,
+    iterator_ancestry: Optional[_IteratorAncestry] = None,
 ) -> set[tuple[int, ...]]:
     source_node_id = edge.source.node_id
     prepared_nodes: set[str] = set()
@@ -41,6 +43,7 @@ def _get_effective_iteration_paths_for_edge(
                 get_prepared_nodes_for_source,
                 get_prepared_edge_iteration_path,
                 source_graph,
+                iterator_ancestry,
             )
         )
 
@@ -57,6 +60,7 @@ def _get_effective_iteration_paths_for_edge(
                 get_prepared_nodes_for_source,
                 get_prepared_edge_iteration_path,
                 source_graph,
+                iterator_ancestry,
             )
             for input_edge in input_edges
         )
@@ -70,8 +74,11 @@ def _get_if_iteration_paths(
     get_prepared_nodes_for_source: Callable[[str], set[str]],
     get_prepared_edge_iteration_path: Callable[[Edge, str], tuple[int, ...]],
     source_graph: Optional["nx.DiGraph"] = None,
+    iterator_ancestry: Optional[_IteratorAncestry] = None,
 ) -> list[tuple[int, ...]]:
     """Infer the selected branch's effective iteration paths for an If output."""
+    if iterator_ancestry is None:
+        iterator_ancestry = _IteratorAncestry(state, source_graph)
     node = state.graph.get_node(node_id)
     assert isinstance(node, IfInvocation)
     next_visited_source_ids = {*visited_source_ids, node_id}
@@ -113,6 +120,7 @@ def _get_if_iteration_paths(
                         get_prepared_nodes_for_source,
                         get_prepared_edge_iteration_path,
                         source_graph,
+                        iterator_ancestry,
                     )
                     for edge in selected_edges
                 )
@@ -132,14 +140,7 @@ def _get_if_iteration_paths(
         if not has_selected_edges:
             return [()]
         if not condition_edges and has_unresolved_selected_source:
-            iterator_graph = state._iterator_graph(
-                source_graph if source_graph is not None else state._get_source_graph_flat()
-            )
-            has_iterator_ancestor = any(
-                isinstance(state.graph.get_node(ancestor_id), (ForInvocation, IterateInvocation))
-                for ancestor_id in nx.ancestors(iterator_graph, node_id)
-            )
-            if not has_iterator_ancestor:
+            if not iterator_ancestry.has_iterator_ancestor(node_id):
                 return [()]
         return []
     return sorted(path for path in paths if not any(path != other and other[: len(path)] == path for other in paths))

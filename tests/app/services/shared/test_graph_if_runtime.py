@@ -172,3 +172,71 @@ def test_nested_if_iteration_paths_use_supplied_source_graph_recursively() -> No
         lambda _edge, _prepared_id: (),
         constrained_graph,
     ) == [()]
+
+
+def test_unresolved_nested_literal_ifs_share_one_iterator_graph(monkeypatch: pytest.MonkeyPatch) -> None:
+    nodes = {"iterator": IterateInvocation(id="iterator"), "guarded": IfInvocation(id="guarded")}
+    nodes.update({f"if-{i}": IfInvocation(id=f"if-{i}", condition=True) for i in range(24)})
+    edges = [
+        Edge(
+            source=EdgeConnection(node_id="iterator", field="item"),
+            destination=EdgeConnection(node_id="guarded", field="condition"),
+        )
+    ]
+    previous = "guarded"
+    for i in range(24):
+        edges.append(
+            Edge(
+                source=EdgeConnection(node_id=previous, field="value"),
+                destination=EdgeConnection(node_id=f"if-{i}", field="true_input"),
+            )
+        )
+        previous = f"if-{i}"
+    state = GraphExecutionState(graph=Graph())
+    state.graph = Graph(nodes=nodes, edges=edges)
+    original = GraphExecutionState._iterator_graph
+    builds = []
+
+    def count_build(self, graph=None):
+        builds.append(graph)
+        return original(self, graph)
+
+    monkeypatch.setattr(GraphExecutionState, "_iterator_graph", count_build)
+    assert graph_if_runtime._get_if_iteration_paths(state, previous, set(), lambda _: set(), lambda *_: ()) == []
+    assert len(builds) == 1
+
+
+def test_resolved_literal_if_does_not_build_iterator_graph(monkeypatch: pytest.MonkeyPatch) -> None:
+    state = GraphExecutionState(graph=Graph(nodes={"if": IfInvocation(id="if", condition=True, true_input=42)}))
+
+    def unexpected_build(*_args, **_kwargs):
+        pytest.fail("resolved paths must not build the iterator graph")
+
+    monkeypatch.setattr(GraphExecutionState, "_iterator_graph", unexpected_build)
+    assert graph_if_runtime._get_if_iteration_paths(state, "if", set(), lambda _: set(), lambda *_: ()) == [()]
+
+
+@pytest.mark.parametrize("executed", [False, True])
+def test_prepared_selected_source_preserves_paths_without_ancestry(
+    executed: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    state = GraphExecutionState(
+        graph=Graph(nodes={"if": IfInvocation(id="if", condition=True), "source": AddInvocation(id="source")})
+    )
+    state.graph.add_edge(
+        Edge(
+            source=EdgeConnection(node_id="source", field="value"),
+            destination=EdgeConnection(node_id="if", field="true_input"),
+        )
+    )
+    state.source_prepared_mapping["source"] = set() if executed else {"source-exec"}
+    if executed:
+        state.executed.add("source")
+
+    def unexpected_build(*_args, **_kwargs):
+        pytest.fail("prepared selected sources must not build the iterator graph")
+
+    monkeypatch.setattr(GraphExecutionState, "_iterator_graph", unexpected_build)
+    assert graph_if_runtime._get_if_iteration_paths(
+        state, "if", set(), lambda source_id: state.source_prepared_mapping[source_id], lambda *_: (2,)
+    ) == ([] if executed else [(2,)])
