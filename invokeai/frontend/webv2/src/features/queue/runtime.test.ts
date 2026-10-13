@@ -20,6 +20,7 @@ import {
   type QueueHistoryCommands,
   type QueueRunJournalPort,
   type QueueRunLock,
+  type QueueRerunDelivery,
   type QueueRunLockPort,
 } from './runtime';
 
@@ -105,6 +106,7 @@ const createTestCommands = (overrides: Partial<QueueHistoryCommands> = {}): Queu
 
 const createTestJournal = (overrides: Partial<QueueRunJournalPort> = {}): QueueRunJournalPort => ({
   claimRerunDelivery: vi.fn().mockResolvedValue({ kind: 'claimed' }),
+  releaseRerunDelivery: vi.fn().mockResolvedValue({ kind: 'removed' }),
   listForProject: vi.fn().mockResolvedValue({ entries: [], kind: 'available' }),
   record: vi.fn().mockResolvedValue({ kind: 'stored' }),
   settle: vi.fn().mockResolvedValue({ kind: 'removed' }),
@@ -2798,8 +2800,13 @@ describe('queue runtime retries', () => {
     services: { journal?: QueueRunJournalPort; locks?: QueueRunLockPort; viewerUserId?: string | null } = {}
   ) => {
     const project = { id: 'project-1', queue: { items: [queueItem] } };
+    const projects = [project];
     const listeners = new Set<() => void>();
     const notify = () => listeners.forEach((listener) => listener());
+    const closeProject = () => {
+      projects.splice(0);
+      notify();
+    };
     const handlers = new Map<string, Set<(payload: never) => void>>();
     const backend = createTestBackend({
       on: vi.fn((event: string, handler: (payload: never) => void) => {
@@ -2822,7 +2829,7 @@ describe('queue runtime retries', () => {
       backend,
       history: {
         commands,
-        getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
+        getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects }),
         subscribe: (listener) => {
           listeners.add(listener);
           return () => listeners.delete(listener);
@@ -2832,7 +2839,7 @@ describe('queue runtime retries', () => {
     const emit = (event: string, payload: unknown) =>
       handlers.get(event)?.forEach((handler) => handler(payload as never));
 
-    return { backend, commands, emit, notify, project, runtime };
+    return { backend, closeProject, commands, emit, notify, project, runtime };
   };
 
   const retriedEvent = (pairs: { item_id: number; source_item_id: number }[]) => ({
@@ -3169,14 +3176,20 @@ describe('queue runtime retries', () => {
   /** The account's journal of rerun delivery claims, shared by every tab of the browser. */
   const createSharedDeliveryJournal = () => {
     const claims = new Set<string>();
+    const keyOf = (rerun: QueueRerunDelivery, kind: 'adoption' | 'delivery') =>
+      JSON.stringify([rerun.backendItemId, rerun.projectId, rerun.queueItemId, kind]);
     return createTestJournal({
-      claimRerunDelivery: vi.fn((rerun: { backendItemId: number; projectId: string; queueItemId: string }) => {
-        const key = JSON.stringify([rerun.backendItemId, rerun.projectId, rerun.queueItemId]);
-        if (claims.has(key)) {
+      claimRerunDelivery: vi.fn((rerun: QueueRerunDelivery, kind: 'adoption' | 'delivery') => {
+        const refusedBy = kind === 'delivery' ? (['adoption', 'delivery'] as const) : (['delivery'] as const);
+        if (refusedBy.some((refusing) => claims.has(keyOf(rerun, refusing)))) {
           return Promise.resolve({ kind: 'taken' } as const);
         }
-        claims.add(key);
+        claims.add(keyOf(rerun, kind));
         return Promise.resolve({ kind: 'claimed' } as const);
+      }),
+      releaseRerunDelivery: vi.fn((rerun: QueueRerunDelivery, kind: 'adoption' | 'delivery') => {
+        claims.delete(keyOf(rerun, kind));
+        return Promise.resolve({ kind: 'removed' });
       }),
     });
   };
@@ -3315,6 +3328,120 @@ describe('queue runtime retries', () => {
     await runtime.dispose();
   });
 
+  it('leaves a Canvas rerun to another tab when its project closed here while the results loaded', async () => {
+    const journal = createSharedDeliveryJournal();
+    let finishRead!: (images: QueueResultImage[]) => void;
+    const closing = openCanvasTab(
+      journal,
+      vi.fn(
+        () =>
+          new Promise<QueueResultImage[]>((resolve) => {
+            finishRead = resolve;
+          })
+      )
+    );
+    const open = openCanvasTab(journal);
+    const completed = completedEvent(99, buildQueueItemOrigin('run-gone', closing.project.id), 'canvas');
+
+    for (const tab of [closing, open]) {
+      tab.runtime.start();
+      emitReruns(tab, [99]);
+    }
+    closing.emit('queue_item_status_changed', completed);
+    await vi.waitFor(() => expect(finishRead).toBeDefined());
+    closing.closeProject();
+    finishRead([{ imageName: 'rerun-99.png' } as QueueResultImage]);
+    await settleEvents();
+    open.emit('queue_item_status_changed', completed);
+
+    await vi.waitFor(() => expect(stagedItemIds(open)).toEqual([99]));
+    expect(stagedItemIds(closing)).toEqual([]);
+
+    await closing.runtime.dispose();
+    await open.runtime.dispose();
+  });
+
+  it('gives back the claim of a rerun whose project closed while it was being claimed', async () => {
+    const journal = createSharedDeliveryJournal();
+    const claim = vi.mocked(journal.claimRerunDelivery).getMockImplementation()!;
+    const closing = openCanvasTab(journal);
+    vi.mocked(journal.claimRerunDelivery).mockImplementationOnce((rerun, kind) => {
+      closing.closeProject();
+      return claim(rerun, kind);
+    });
+    const open = openCanvasTab(journal);
+    const completed = completedEvent(99, buildQueueItemOrigin('run-gone', closing.project.id), 'canvas');
+
+    for (const tab of [closing, open]) {
+      tab.runtime.start();
+      emitReruns(tab, [99]);
+    }
+    closing.emit('queue_item_status_changed', completed);
+    await vi.waitFor(() => expect(journal.releaseRerunDelivery).toHaveBeenCalled());
+    open.emit('queue_item_status_changed', completed);
+
+    await vi.waitFor(() => expect(stagedItemIds(open)).toEqual([99]));
+    expect(stagedItemIds(closing)).toEqual([]);
+
+    await closing.runtime.dispose();
+    await open.runtime.dispose();
+  });
+
+  it('does not adopt a rerun another tab already staged before this one learned of the retry', async () => {
+    const journal = createSharedDeliveryJournal();
+    const failedRun: QueueItem = { ...createPendingQueueItem(), backendItemIds: [41], status: 'failed' };
+    const delayed = createRetryHarness(failedRun, {}, { journal });
+    const staging = openCanvasTab(journal);
+    const retried = retriedEvent([{ item_id: 99, source_item_id: 41 }]);
+
+    staging.runtime.start();
+    staging.emit('queue_items_retried', retried);
+    staging.emit(
+      'queue_item_status_changed',
+      completedEvent(99, buildQueueItemOrigin(failedRun.id, staging.project.id), 'canvas')
+    );
+    await vi.waitFor(() => expect(stagedItemIds(staging)).toEqual([99]));
+    delayed.runtime.start();
+    delayed.emit('queue_items_retried', retried);
+    await settleEvents();
+
+    expect(delayed.commands.reopenForRetry).not.toHaveBeenCalled();
+    expect(failedRun.status).toBe('failed');
+
+    await delayed.runtime.dispose();
+    await staging.runtime.dispose();
+  });
+
+  it('gives back the reservation of a rerun its run refused, so another tab can stage it', async () => {
+    const journal = createSharedDeliveryJournal();
+    // Still running, so the run refuses to reopen around the rerun of its other failed item.
+    const activeRun: QueueItem = {
+      ...createPendingQueueItem(),
+      backendItemIds: [99],
+      retriedBackendItemIds: [41, 42],
+      status: 'running',
+    };
+    const refusing = createRetryHarness(activeRun, {}, { journal });
+    const other = openCanvasTab(journal);
+    const retried = retriedEvent([{ item_id: 100, source_item_id: 42 }]);
+
+    refusing.runtime.start();
+    refusing.emit('queue_items_retried', retried);
+    await vi.waitFor(() => expect(refusing.commands.reopenForRetry).toHaveBeenCalled());
+    await vi.waitFor(() => expect(journal.releaseRerunDelivery).toHaveBeenCalled());
+    other.runtime.start();
+    other.emit('queue_items_retried', retried);
+    other.emit(
+      'queue_item_status_changed',
+      completedEvent(100, buildQueueItemOrigin(activeRun.id, other.project.id), 'canvas')
+    );
+
+    await vi.waitFor(() => expect(stagedItemIds(other)).toEqual([100]));
+
+    await refusing.runtime.dispose();
+    await other.runtime.dispose();
+  });
+
   it('leaves a rerun another tab adopted to that tab, after its run is let go', async () => {
     const journal = createSharedDeliveryJournal();
     const failedRun: QueueItem = { ...createPendingQueueItem(), backendItemIds: [41], status: 'failed' };
@@ -3334,7 +3461,7 @@ describe('queue runtime retries', () => {
     for (const tab of [adopting, late]) {
       tab.emit('queue_items_retried', retriedEvent([{ item_id: 99, source_item_id: 41 }]));
     }
-    expect(failedRun.backendItemIds).toEqual([99]);
+    await vi.waitFor(() => expect(failedRun.backendItemIds).toEqual([99]));
     late.emit(
       'queue_item_status_changed',
       completedEvent(99, buildQueueItemOrigin(failedRun.id, late.project.id), 'canvas')
@@ -3374,9 +3501,9 @@ describe('queue runtime retries', () => {
       completedEvent(200, buildQueueItemOrigin('their-run', 'their-project'), 'gallery')
     );
 
+    await vi.waitFor(() => expect(project.queue.items[0]?.backendItemIds).toEqual([99]));
     expect(commands.reopenForRetry).toHaveBeenCalledTimes(1);
     expect(commands.refreshBackendData).not.toHaveBeenCalled();
-    expect(project.queue.items[0]?.backendItemIds).toEqual([99]);
 
     await runtime.dispose();
   });

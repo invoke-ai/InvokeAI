@@ -54,13 +54,25 @@ export interface QueueRuntime {
   start(): void;
 }
 
+/** A backend rerun of a local run; the run names it apart from an id the server reuses after its database is reset. */
+export interface QueueRerunDelivery {
+  backendItemId: number;
+  projectId: string;
+  queueItemId: string;
+}
+
 export interface QueueRunJournalPort {
-  /** Claim delivering a backend rerun of a local run; only the first claim across the account's tabs succeeds. */
-  claimRerunDelivery(rerun: {
-    backendItemId: number;
-    projectId: string;
-    queueItemId: string;
-  }): Promise<{ kind: 'claimed' | 'taken' | 'unavailable' }>;
+  /**
+   * Claim a backend rerun of a local run for this tab, across the account's tabs: an adoption reserves it for the run
+   * that reopened around it and is refused only by a delivery; a delivery, made just before staging, is refused by
+   * either.
+   */
+  claimRerunDelivery(
+    rerun: QueueRerunDelivery,
+    kind: 'adoption' | 'delivery'
+  ): Promise<{ kind: 'claimed' | 'taken' | 'unavailable' }>;
+  /** Give back a claim whose delivery cannot happen. */
+  releaseRerunDelivery(rerun: QueueRerunDelivery, kind: 'adoption' | 'delivery'): Promise<unknown>;
   listForProject(
     projectId: string
   ): Promise<
@@ -1311,22 +1323,71 @@ export const createQueueRuntime = ({
   };
 
   /**
-   * Claim delivering a rerun in the account's journal, which every tab shares and which outlives this one: the tab that
-   * adopts or stages a rerun first keeps any tab handling its completion later, run lock released or not, from staging
-   * it again. Without the journal no tab can coordinate, so each delivers.
+   * Claim a rerun in the account's journal, which every tab shares and which outlives this one, so a rerun one tab
+   * adopted or staged is never staged again by a tab that handles it later. Without the journal no tab can coordinate,
+   * so each delivers.
    */
-  const claimRerunDelivery = async (rerun: {
-    backendItemId: number;
-    projectId: string;
-    queueItemId: string;
-  }): Promise<boolean> => {
+  const claimRerunDelivery = async (rerun: QueueRerunDelivery, kind: 'adoption' | 'delivery'): Promise<boolean> => {
     if (!journal) {
       return true;
     }
     try {
-      return (await journal.claimRerunDelivery(rerun)).kind !== 'taken';
+      return (await journal.claimRerunDelivery(rerun, kind)).kind !== 'taken';
     } catch {
       return true;
+    }
+  };
+  const releaseRerunDelivery = (rerun: QueueRerunDelivery, kind: 'adoption' | 'delivery'): void => {
+    void journal?.releaseRerunDelivery(rerun, kind).catch(() => undefined);
+  };
+
+  /**
+   * Reopen a run around its reruns once each is reserved for it. A rerun another tab already staged is left alone,
+   * since adopting it would deliver it twice; a rerun the run refuses gives its reservation back and stays remembered
+   * as unadopted.
+   */
+  const adoptRetriedItems = async (run: {
+    projectId: string;
+    queueItemId: string;
+    retriedItems: { itemId: number; sourceItemId: number }[];
+  }): Promise<void> => {
+    const toRerun = (itemId: number): QueueRerunDelivery => ({
+      backendItemId: itemId,
+      projectId: run.projectId,
+      queueItemId: run.queueItemId,
+    });
+    const reservations = await Promise.all(
+      run.retriedItems.map(async (item) => ({
+        isReserved: await claimRerunDelivery(toRerun(item.itemId), 'adoption'),
+        item,
+      }))
+    );
+    const retriedItems = reservations.filter(({ isReserved }) => isReserved).map(({ item }) => item);
+    if (!isActive()) {
+      retriedItems.forEach(({ itemId }) => releaseRerunDelivery(toRerun(itemId), 'adoption'));
+      return;
+    }
+    if (retriedItems.length === 0) {
+      return;
+    }
+    commands.reopenForRetry({ ...run, retriedItems });
+    const reopened = getRouteTarget(history, run.queueItemId)?.queueItem;
+    let isAdopted = false;
+
+    for (const { itemId } of retriedItems) {
+      if (reopened?.status === 'running' && reopened.backendItemIds?.includes(itemId)) {
+        isAdopted = true;
+        unadoptedReruns.delete(itemId);
+      } else {
+        releaseRerunDelivery(toRerun(itemId), 'adoption');
+      }
+    }
+    if (isAdopted) {
+      const key = getRunKey(run.projectId, run.queueItemId);
+      // A settle still waiting on the journal belongs to the finished run; it must not remove the reopened record.
+      pendingJournalSettles.delete(key);
+      pendingReconcileRunKeys.add(key);
+      synchronize();
     }
   };
 
@@ -1381,29 +1442,21 @@ export const createQueueRuntime = ({
       retriedItemsByRun.set(key, run);
     }
 
-    for (const [key, run] of retriedItemsByRun) {
-      commands.reopenForRetry(run);
-      const reopened = getRouteTarget(history, run.queueItemId)?.queueItem;
-      let isAdopted = false;
-
-      for (const { itemId } of run.retriedItems) {
-        if (reopened?.status === 'running' && reopened.backendItemIds?.includes(itemId)) {
-          isAdopted = true;
-          // The run delivers it, so a tab that took it for unadopted must not stage it once this one lets the run go.
-          // A claim already taken would mean another tab staged its completion before this retry reached here, which
-          // the rerun's execution time rules out; the run delivers regardless.
-          void claimRerunDelivery({ backendItemId: itemId, projectId: run.projectId, queueItemId: run.queueItemId });
-        } else {
-          rememberUnadoptedRerun(itemId);
+    for (const run of retriedItemsByRun.values()) {
+      // Remembered until adopted, so a completion arriving while the run's reservation is made is handled like any
+      // unadopted one; the reservation, or the delivery that beat it, keeps the rerun from being delivered twice.
+      run.retriedItems.forEach(({ itemId }) => rememberUnadoptedRerun(itemId));
+      void adoptRetriedItems(run).catch((error: unknown) => {
+        if (isActive()) {
+          commands.recordError({
+            area: 'queue-results',
+            message: toErrorMessage(error),
+            namespace: 'queue',
+            projectId: run.projectId,
+          });
         }
-      }
-      if (isAdopted) {
-        // A settle still waiting on the journal belongs to the finished run; it must not remove the reopened record.
-        pendingJournalSettles.delete(key);
-        pendingReconcileRunKeys.add(key);
-      }
+      });
     }
-    synchronize();
   };
 
   /**
@@ -1505,20 +1558,24 @@ export const createQueueRuntime = ({
       return;
     }
 
+    const rerun: QueueRerunDelivery = { backendItemId: event.item_id, projectId, queueItemId };
+    const canStage = (): boolean =>
+      isActive() && history.getSnapshot().projects.some((project) => project.id === projectId);
     const stage = async (): Promise<void> => {
       if (await isRunTrackedElsewhere(projectId, queueItemId)) {
         return;
       }
       const images = await readUnadoptedRerunImages(event, queueItemId, run);
-      // Claimed only with something to stage, so a failed or empty read leaves the rerun to a tab that sees it later.
-      if (
-        images.length > 0 &&
-        isActive() &&
-        (await claimRerunDelivery({ backendItemId: event.item_id, projectId, queueItemId })) &&
-        isActive()
-      ) {
-        commands.stageRetriedCanvasResults({ backendItemId: event.item_id, images, projectId, queueItemId });
+      // Claimed only when staging can happen, and given back when the project closed during the claim, so a rerun this
+      // tab cannot stage is left to a tab that can.
+      if (images.length === 0 || !canStage() || !(await claimRerunDelivery(rerun, 'delivery'))) {
+        return;
       }
+      if (!canStage()) {
+        releaseRerunDelivery(rerun, 'delivery');
+        return;
+      }
+      commands.stageRetriedCanvasResults({ backendItemId: event.item_id, images, projectId, queueItemId });
     };
     void stage().catch(recordError);
   };
