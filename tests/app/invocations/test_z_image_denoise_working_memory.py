@@ -19,9 +19,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import torch
+from PIL import Image
 
-from invokeai.app.invocations.fields import ZImageConditioningField
-from invokeai.app.invocations.z_image.z_image_control import ZImageControlField
+from invokeai.app.invocations.fields import ImageField, ZImageConditioningField
+from invokeai.app.invocations.model import ModelIdentifierField
+from invokeai.app.invocations.vae.z_image_image_to_latents import ZImageImageToLatentsInvocation
+from invokeai.app.invocations.z_image.z_image_control import ZImageControlField, ZImageControlInvocation
 from invokeai.app.invocations.z_image.z_image_denoise import ZImageDenoiseInvocation
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 from invokeai.backend.quantization.int8_convrot import CONVROT_GROUP_SIZE, Int8ConvrotLinear
@@ -144,7 +147,17 @@ class TestNodeReservation:
     """The wire from the node to `model_on_device()`: deleting any of these arguments leaves the estimate's own tests
     green."""
 
-    def _run(self, transformer=None, *, control_blocks=None, negative_tokens=None, loras=0, regional_mask=None):
+    def _run(
+        self,
+        transformer=None,
+        *,
+        control_blocks=None,
+        control_tiling=None,
+        force_tiled_decode=False,
+        negative_tokens=None,
+        loras=0,
+        regional_mask=None,
+    ):
         from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
             ConditioningFieldData,
             ZImageConditioningInfo,
@@ -161,16 +174,25 @@ class TestNodeReservation:
         else:
             # Past the transformer's lock, up to the adapter's.
             transformer_info.model_on_device = MagicMock(return_value=nullcontext((None, transformer)))
-            control = ZImageControlField.model_construct(control_model=MagicMock(), image_name="control")
+            control = ZImageControlField.model_construct(
+                control_model=MagicMock(), image_name="control", **(control_tiling or {})
+            )
             control_info.model = MagicMock(spec=ZImageControlAdapter)
             control_info.model.control_layers = [torch.nn.Identity()] * control_blocks
-            control_info.model_on_device = MagicMock(side_effect=_StopBeforeLoad)
+            if control_tiling is None:
+                control_info.model_on_device = MagicMock(side_effect=_StopBeforeLoad)
+            else:
+                # Past the adapter's lock too, up to the control image's encode.
+                control_info.model.config = {"control_in_dim": 33}
+                control_info.model_on_device = MagicMock(return_value=nullcontext((None, control_info.model)))
 
         caption_tokens = {"pos": POSITIVE_TOKENS, "neg": negative_tokens}
         context = MagicMock()
         context.models.load.side_effect = lambda identifier: (
             control_info if control is not None and identifier is control.control_model else transformer_info
         )
+        context.images.get_pil.return_value = Image.new("RGB", (256, 256))
+        context.config.get.return_value.force_tiled_decode = force_tiled_decode
         context.models.get_config.return_value = SimpleNamespace(
             base=BaseModelType.ZImage, type=ModelType.Main, format=ModelFormat.Checkpoint
         )
@@ -189,7 +211,7 @@ class TestNodeReservation:
             positive_conditioning=ZImageConditioningField(conditioning_name="pos"),
             negative_conditioning=ZImageConditioningField(conditioning_name="neg") if negative_tokens else None,
             control=control,
-            vae=None,
+            vae=MagicMock() if control is not None else None,
             guidance_scale=2.0 if negative_tokens else 1.0,
             width=256,
             height=256,
@@ -217,6 +239,9 @@ class TestNodeReservation:
             estimate = stack.enter_context(
                 patch.object(ZImageDenoiseInvocation, "_estimate_working_memory", return_value=ACTIVATION_ESTIMATE)
             )
+            control_encode = stack.enter_context(
+                patch.object(ZImageImageToLatentsInvocation, "vae_encode", side_effect=_StopBeforeLoad)
+            )
             if regional_mask is not None:
                 regional = ZImageRegionalPromptingExtension(
                     regional_text_conditioning=ZImageRegionalTextConditioning(
@@ -236,6 +261,7 @@ class TestNodeReservation:
             adapter_reserved=(
                 control_info.model_on_device.call_args.kwargs.get("working_mem_bytes") if control is not None else None
             ),
+            control_encode=control_encode.call_args.kwargs if control_encode.called else None,
         )
 
     def test_an_unquantized_transformer_reserves_the_estimate_for_its_sequence(self):
@@ -284,3 +310,33 @@ class TestNodeReservation:
 
         assert (run.estimate["num_control_blocks"], run.estimate["has_attention_mask"]) == (15, True)
         assert run.adapter_reserved == run.reserved == ACTIVATION_ESTIMATE
+
+    def test_the_control_fields_tiling_reaches_the_control_encode(self):
+        """The control image is encoded at generation size. For an upscale that is the enlarged frame, whose untiled
+        encode does not fit on a consumer card, so the tiling the control field asks for has to reach the encode."""
+        run = self._run(control_blocks=15, control_tiling={"tiled": True, "tile_size": 768})
+
+        assert (run.control_encode["tiled"], run.control_encode["tile_size"]) == (True, 768)
+
+    def test_force_tiled_decode_tiles_a_control_encode_the_field_leaves_whole(self):
+        """Low-VRAM setups force every VAE pass to tile, and the control encode is one of them."""
+        run = self._run(control_blocks=15, control_tiling={"tiled": False, "tile_size": 0}, force_tiled_decode=True)
+
+        assert run.control_encode["tiled"] is True
+
+
+def test_the_control_node_hands_its_tiling_to_the_field():
+    """The denoise reads the tiling off the field, so a node that stopped copying it would encode whole."""
+    node = ZImageControlInvocation(
+        id="control",
+        image=ImageField(image_name="frame"),
+        control_model=ModelIdentifierField(
+            key="tile", hash="tile", name="tile", base=BaseModelType.ZImage, type=ModelType.ControlNet
+        ),
+        tiled=True,
+        tile_size=768,
+    )
+
+    control = node.invoke(MagicMock()).control
+
+    assert (control.tiled, control.tile_size) == (True, 768)
