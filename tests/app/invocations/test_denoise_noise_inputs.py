@@ -766,7 +766,13 @@ def test_flux2_lcm_scheduler_setup_passes_mu():
         def set_timesteps(self, num_inference_steps: int, device: str | torch.device, mu: float | None = None) -> None:
             self.received_mu = mu
 
-        def step(self, model_output: torch.Tensor, timestep: torch.Tensor, sample: torch.Tensor):
+        def step(
+            self,
+            model_output: torch.Tensor,
+            timestep: torch.Tensor,
+            sample: torch.Tensor,
+            generator: torch.Generator | None = None,
+        ):
             return SimpleNamespace(prev_sample=sample)
 
     class DummyModel(torch.nn.Module):
@@ -799,6 +805,40 @@ def test_flux2_lcm_scheduler_setup_passes_mu():
     )
 
     assert scheduler.received_mu == pytest.approx(0.42)
+
+
+@pytest.mark.skipif(FLUX_SCHEDULER_MAP.get("lcm") is None, reason="FlowMatchLCMScheduler not available")
+def test_flux2_lcm_step_noise_follows_the_generator():
+    """LCM re-noises the sample on every step, so FLUX.2 must draw that noise from the seeded
+    generator instead of the global RNG."""
+    from invokeai.backend.flux2.denoise import denoise
+
+    class DummyModel(torch.nn.Module):
+        def forward(self, hidden_states: torch.Tensor, **kwargs: object):
+            del kwargs
+            return (0.1 * hidden_states,)
+
+    img = torch.randn(1, 4, 8, generator=torch.Generator().manual_seed(7))
+
+    def run(seed: int) -> torch.Tensor:
+        # Advance the global RNG between runs, like a long-lived server process does.
+        torch.rand(64)
+        return denoise(
+            model=DummyModel(),
+            img=img.clone(),
+            img_ids=torch.zeros(1, 4, 4, dtype=torch.long),
+            txt=torch.zeros(1, 4, 8),
+            txt_ids=torch.zeros(1, 4, 4, dtype=torch.long),
+            timesteps=[1.0, 0.75, 0.5, 0.25, 0.0],
+            step_callback=lambda _: None,
+            guidance=1.0,
+            cfg_scale=[1.0] * 4,
+            scheduler=FLUX_SCHEDULER_MAP["lcm"](num_train_timesteps=1000),
+            generator=torch.Generator().manual_seed(seed),
+        )
+
+    assert torch.equal(run(1234), run(1234))
+    assert not torch.equal(run(1), run(2))
 
 
 @pytest.mark.parametrize(
