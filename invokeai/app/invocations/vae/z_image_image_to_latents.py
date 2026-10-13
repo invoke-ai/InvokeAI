@@ -53,9 +53,9 @@ class ZImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
     ) -> torch.Tensor:
         """Encode an image to a Z-Image latent.
 
-        `tiled` defaults to off so `z_image_denoise`'s control-latent call keeps the behaviour it
-        has: a control image is already at generation resolution, not the upscaled frame tiling
-        exists for.
+        `z_image_denoise` also encodes its control image here, at generation resolution. That is
+        usually small enough to encode whole, but an upscale's generation resolution is the
+        enlarged frame, so the control field carries its own `tiled` and `tile_size`.
         """
         if not isinstance(vae_info.model, AutoencoderKL):
             raise TypeError(
