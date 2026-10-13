@@ -3478,6 +3478,27 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/queue/{queue_id}/i/{item_id}/delivery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Claim Queue Item Delivery
+         * @description Claims, confirms or releases staging a queue item's results, so that only one of its owner's browsers stages
+         *     them. A claim is held for a while unless confirmed, released or renewed.
+         */
+        post: operations["claim_queue_item_delivery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queue/{queue_id}/counts_by_destination": {
         parameters: {
             query?: never;
@@ -39259,6 +39280,40 @@ export type components = {
             user_id: string | null;
         };
         /**
+         * QueueItemDeliveryRequest
+         * @description A change to who stages a queue item's results, so that only one browser does.
+         */
+        QueueItemDeliveryRequest: {
+            /**
+             * Action
+             * @description claim: take delivering the results; confirm: mark them delivered; release: give up a claim
+             * @enum {string}
+             */
+            action: "claim" | "confirm" | "release";
+            /**
+             * Claimant
+             * @description An id the client chooses for the browser tab or run claiming
+             */
+            claimant: string;
+        };
+        /**
+         * QueueItemDeliveryResult
+         * @description Who stages a queue item's results after a delivery request.
+         */
+        QueueItemDeliveryResult: {
+            /**
+             * Status
+             * @description claimed: the claimant may deliver; delivered: the results were delivered; held: another claimant is delivering them; released: the claimant holds no claim
+             * @enum {string}
+             */
+            status: "claimed" | "delivered" | "held" | "released";
+            /**
+             * Retry After Ms
+             * @description When held, how long until the other claim lapses, in milliseconds
+             */
+            retry_after_ms?: number | null;
+        };
+        /**
          * QueueItemStatusChangedEvent
          * @description Event model for queue_item_status_changed
          */
@@ -59014,6 +59069,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionQueueItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    claim_queue_item_delivery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+                /** @description The queue item whose results are delivered */
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueItemDeliveryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueItemDeliveryResult"];
                 };
             };
             /** @description Validation Error */

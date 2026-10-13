@@ -2,7 +2,7 @@ import datetime
 import json
 from collections.abc import Mapping
 from itertools import chain, product
-from typing import Any, Generator, Literal, Optional, TypeAlias, Union
+from typing import Any, Generator, Literal, NamedTuple, Optional, TypeAlias, Union
 
 from pydantic import (
     AliasChoices,
@@ -546,6 +546,40 @@ class RetryItemsResult(BaseModel):
     retried_item_ids: list[int] = Field(description="The IDs of the queue items that were retried")
     retried_items: list[RetriedQueueItem] = Field(
         default_factory=list, description="Each retried root queue item with the queue item that re-runs it"
+    )
+
+
+QueueItemDeliveryAction: TypeAlias = Literal["claim", "confirm", "release"]
+QueueItemDeliveryStatus: TypeAlias = Literal["claimed", "delivered", "held", "released"]
+
+
+class QueueItemDeliveryRequest(BaseModel):
+    """A change to who stages a queue item's results, so that only one browser does."""
+
+    action: QueueItemDeliveryAction = Field(
+        description="claim: take delivering the results; confirm: mark them delivered; release: give up a claim"
+    )
+    claimant: str = Field(
+        min_length=1, max_length=128, description="An id the client chooses for the browser tab or run claiming"
+    )
+
+
+class QueueItemOwner(NamedTuple):
+    """The queue a queue item is in and the account that owns it."""
+
+    queue_id: str
+    user_id: str
+
+
+class QueueItemDeliveryResult(BaseModel):
+    """Who stages a queue item's results after a delivery request."""
+
+    status: QueueItemDeliveryStatus = Field(
+        description="claimed: the claimant may deliver; delivered: the results were delivered; "
+        "held: another claimant is delivering them; released: the claimant holds no claim"
+    )
+    retry_after_ms: Optional[int] = Field(
+        default=None, description="When held, how long until the other claim lapses, in milliseconds"
     )
 
 
