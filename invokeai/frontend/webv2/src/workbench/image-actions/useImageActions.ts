@@ -322,7 +322,7 @@ export const useImageActions = ({
           new Error(
             t(`widgets.gallery.itemActions.${action}.${result.succeeded.length > 0 ? 'partial' : 'failure'}`, {
               board: boardId ? getBoardName(boardId) : undefined,
-              count: requestedCount + withheldStarredCount - skippedStarredCount,
+              count: requestedCount - keptStarredCount,
               failed: failedCount,
               succeeded: result.succeeded.length,
             })
@@ -331,25 +331,20 @@ export const useImageActions = ({
         return;
       }
 
-      // Protection is a deliberate choice, so it is reported only where deletion is confirmed; otherwise it stays
-      // silent and the starred items simply remain.
-      if (skippedStarredCount > 0) {
-        if (confirmImageDeletion) {
-          notifications.add({
-            kind: 'info',
-            title: t(
-              result.succeeded.length > 0
-                ? 'widgets.gallery.itemActions.delete.starredKept'
-                : 'widgets.gallery.itemActions.delete.starredOnly',
-              { count: skippedStarredCount, succeeded: result.succeeded.length }
-            ),
-          });
-          return;
-        }
-
-        if (result.succeeded.length === 0) {
-          return;
-        }
+      // Protection is a deliberate choice, so what it kept is reported where deletion is confirmed. Without
+      // confirmation the success message stands alone, unless nothing was deleted: a key press that does nothing
+      // would look broken.
+      if (skippedStarredCount > 0 && (confirmImageDeletion || result.succeeded.length === 0)) {
+        notifications.add({
+          kind: 'info',
+          title: t(
+            result.succeeded.length > 0
+              ? 'widgets.gallery.itemActions.delete.starredKept'
+              : 'widgets.gallery.itemActions.delete.starredOnly',
+            { count: skippedStarredCount, succeeded: result.succeeded.length }
+          ),
+        });
+        return;
       }
 
       recordSuccess(
@@ -478,8 +473,6 @@ export const useImageActions = ({
           }
 
           if (result.succeeded.length === 0) {
-            // Nothing went away (every item was refused or kept), so the widget values cleared up front come back too.
-            restoreGalleryItemRemoval(galleryWidgetSnapshot);
             return;
           }
 
@@ -598,7 +591,7 @@ export const useImageActions = ({
       const withheldStarredCount = items.length - deletable.length;
 
       if (deletable.length === 0) {
-        if (withheldStarredCount > 0 && confirmImageDeletion) {
+        if (withheldStarredCount > 0) {
           notifications.add({
             kind: 'info',
             title: t('widgets.gallery.itemActions.delete.starredOnly', { count: withheldStarredCount }),

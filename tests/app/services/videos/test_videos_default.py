@@ -215,10 +215,21 @@ class TestStarredProtection:
     def test_unstarred_video_is_deleted_when_protected(self, video_service: VideoService):
         invoker = video_service._VideoService__invoker  # type: ignore[attr-defined]
         invoker.services.video_records.get.return_value = _make_record(starred=False)
+        invoker.services.video_records.delete_many_keeping_starred.return_value = []
 
         assert video_service.delete("normal.mp4", delete_starred=False) is True
 
-        invoker.services.video_records.delete.assert_called_once_with("normal.mp4")
+        invoker.services.video_records.delete_many_keeping_starred.assert_called_once_with(["normal.mp4"])
+
+    def test_video_starred_after_the_check_is_kept_and_its_files_restored(self, video_service: VideoService):
+        invoker = video_service._VideoService__invoker  # type: ignore[attr-defined]
+        invoker.services.video_records.get.return_value = _make_record(starred=False)
+        invoker.services.video_records.delete_many_keeping_starred.return_value = ["late.mp4"]
+
+        assert video_service.delete("late.mp4", delete_starred=False) is False
+
+        invoker.services.video_files.rollback_delete.assert_called_once()
+        invoker.services.video_files.commit_delete.assert_not_called()
 
     def test_board_delete_reports_protected_starred_videos(self, video_service: VideoService):
         invoker = video_service._VideoService__invoker  # type: ignore[attr-defined]
@@ -230,13 +241,14 @@ class TestStarredProtection:
             _make_record(video_name="starred.mp4", starred=True),
             _make_record(video_name="normal.mp4", starred=False),
         ]
+        invoker.services.video_records.delete_many_keeping_starred.return_value = []
 
         deleted, failed, starred_skipped = video_service.delete_videos_on_board("board-1", delete_starred=False)
 
         assert deleted == ["normal.mp4"]
         assert failed == []
         assert starred_skipped == ["starred.mp4"]
-        invoker.services.video_records.delete_many.assert_called_once_with(["normal.mp4"])
+        invoker.services.video_records.delete_many_keeping_starred.assert_called_once_with(["normal.mp4"])
         invoker.services.video_files.stage_delete.assert_called_once_with("normal.mp4", video_subfolder="")
 
     def test_board_delete_removes_starred_videos_by_default(self, video_service: VideoService):

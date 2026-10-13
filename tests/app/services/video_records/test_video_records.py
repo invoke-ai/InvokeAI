@@ -652,7 +652,9 @@ def test_a_size_backfill_fills_only_sizes_not_known_yet(store: VideoRecordStorag
     assert [store.get(name).file_size_bytes for name in ("unknown.mp4", "measured.mp4")] == [7, 100]
 
 
-@pytest.mark.parametrize("operation", ["delete_intermediates_by_names", "delete_many", "get_subfolders"])
+@pytest.mark.parametrize(
+    "operation", ["delete_intermediates_by_names", "delete_many", "delete_many_keeping_starred", "get_subfolders"]
+)
 def test_every_name_is_covered_and_no_statement_binds_more_than_sqlite_takes(
     database: Database, store: VideoRecordStorage, operation: str
 ) -> None:

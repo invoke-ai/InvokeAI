@@ -253,18 +253,21 @@ export const GalleryBoardMenu = ({
   );
 };
 
-/** Says how many starred items a "Delete Board and Media" keeps; silent until the count is known and non-zero. */
+/**
+ * Says how many starred items a "Delete Board and Media" keeps. The status region stays mounted so the notice is
+ * announced when it arrives; it is empty while the count loads or when there is nothing to keep.
+ */
 const BoardStarredNotice = ({ boardId }: { boardId: string }) => {
   const { t } = useTranslation();
-  const { data: starredCount } = useQuery(galleryBoardStarredCountOptions(boardId));
-
-  if (!starredCount) {
-    return null;
-  }
+  const { data: starredCount, isError } = useQuery(galleryBoardStarredCountOptions(boardId));
 
   return (
     <Text color="fg.warning" fontSize="xs" role="status">
-      {t('widgets.gallery.deleteBoardStarredNotice', { count: starredCount })}
+      {isError
+        ? t('widgets.gallery.deleteBoardStarredNoticeUnknown')
+        : starredCount
+          ? t('widgets.gallery.deleteBoardStarredNotice', { count: starredCount })
+          : null}
     </Text>
   );
 };

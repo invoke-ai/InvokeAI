@@ -393,7 +393,9 @@ class TestDeleteIntermediatesByNames:
         assert store.get(survivor).is_intermediate is False
         assert _intermediates(database) == []
 
-    @pytest.mark.parametrize("operation", ["delete_intermediates_by_names", "delete_many", "get_subfolders"])
+    @pytest.mark.parametrize(
+        "operation", ["delete_intermediates_by_names", "delete_many", "delete_many_keeping_starred", "get_subfolders"]
+    )
     def test_every_name_is_covered_and_no_statement_binds_more_than_sqlite_takes(
         self, database: Database, store: ImageRecordStorage, operation: str
     ) -> None:

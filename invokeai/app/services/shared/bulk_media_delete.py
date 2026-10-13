@@ -1,8 +1,10 @@
 """Transactional coordination for deleting batches of media records and files.
 
 Images and videos have different stores but the same invariant: files are staged first, records
-are deleted only for successful stages, and every stage rolls back if the record batch fails. The
-adapter is the seam between that policy and the two storage implementations.
+are deleted only for successful stages, and every stage rolls back if the record batch fails. When
+starred media is protected, the record delete itself refuses starred rows, so a star that lands
+after the check still keeps its record, and the files staged for it are restored. The adapter is
+the seam between that policy and the two storage implementations.
 """
 
 from collections.abc import Callable
@@ -19,6 +21,7 @@ class StagedMediaDeleteAdapter(Generic[RecordT]):
     is_starred: Callable[[RecordT], bool]
     stage: Callable[[str, RecordT], object]
     delete_records: Callable[[list[str]], None]
+    delete_unstarred_records: Callable[[list[str]], list[str]]
     rollback: Callable[[object], None]
     commit: Callable[[object], None]
     notify_deleted: Callable[[str], None]
@@ -31,7 +34,7 @@ def delete_media_by_names(
     """Delete exactly ``names``, preserving records whenever their files cannot be staged.
 
     Returns ``(deleted, failed, starred_skipped)``. With ``delete_starred=False`` starred items are
-    left untouched and reported in ``starred_skipped``.
+    left untouched and reported in ``starred_skipped``, including ones starred after they were read.
     """
     deleted: list[str] = []
     failed: list[str] = []
@@ -52,7 +55,19 @@ def delete_media_by_names(
             adapter.log_error(f"Failed to delete {adapter.kind} file {name}; keeping record: {error}")
 
     try:
-        adapter.delete_records(deleted)
+        if delete_starred:
+            adapter.delete_records(deleted)
+        else:
+            # The starred check and the delete share one transaction, so only a row nobody starred meanwhile goes.
+            kept_names = set(adapter.delete_unstarred_records(deleted))
+            for name, token in [entry for entry in staged if entry[0] in kept_names]:
+                try:
+                    adapter.rollback(token)
+                except Exception as rollback_error:
+                    adapter.log_error(f"Failed to restore starred {adapter.kind} files for {name}: {rollback_error}")
+            staged = [entry for entry in staged if entry[0] not in kept_names]
+            starred_skipped.extend(name for name in deleted if name in kept_names)
+            deleted = [name for name in deleted if name not in kept_names]
     except Exception:
         for name, token in staged:
             try:

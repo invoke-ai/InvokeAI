@@ -15,13 +15,15 @@ import { GalleryBoardMenu } from './GalleryBoardMenu';
 import { GalleryUiProvider, type GalleryUiAdapter } from './GalleryUiContext';
 import { GalleryWidgetContext } from './GalleryWidgetContext';
 
-const mocks = vi.hoisted(() => ({ starredCount: 0 }));
+const mocks = vi.hoisted(() => ({ starredCount: 0, starredCountFails: false }));
 
 vi.mock('@features/gallery/data/queries', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   galleryBoardStarredCountOptions: (boardId: string) => ({
-    queryFn: () => Promise.resolve(mocks.starredCount),
+    queryFn: () =>
+      mocks.starredCountFails ? Promise.reject(new Error('count unavailable')) : Promise.resolve(mocks.starredCount),
     queryKey: ['board-starred-count', boardId],
+    retry: false,
   }),
 }));
 
@@ -40,6 +42,7 @@ vi.mock('react-i18next', () => ({
         'widgets.gallery.deleteBoardOnly': 'Delete Board Only',
         'widgets.gallery.deleteBoardQuestion': `Delete board "${String(values?.name)}"?`,
         'widgets.gallery.deleteBoardStarredNotice': `${String(values?.count)} starred kept`,
+        'widgets.gallery.deleteBoardStarredNoticeUnknown': 'starred count unknown',
         'widgets.gallery.downloadBoardWithOmission': `Download Board (${String(values?.count)} video omitted)`,
         'widgets.gallery.imageCount': `${String(values?.count)} images`,
         'widgets.gallery.videoCount': `${String(values?.count)} videos`,
@@ -136,6 +139,7 @@ const openDeleteDialog = async () => {
 
 beforeEach(async () => {
   mocks.starredCount = 0;
+  mocks.starredCountFails = false;
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -280,6 +284,16 @@ it('says how many starred items stay when starred media is protected', async () 
 
   await vi.waitFor(() => {
     expect(document.body.textContent).toContain('3 starred kept');
+  });
+});
+
+it('says the starred count is unknown when it cannot be read', async () => {
+  mocks.starredCountFails = true;
+  await renderMenu(context, true);
+  await openDeleteDialog();
+
+  await vi.waitFor(() => {
+    expect(document.body.textContent).toContain('starred count unknown');
   });
 });
 

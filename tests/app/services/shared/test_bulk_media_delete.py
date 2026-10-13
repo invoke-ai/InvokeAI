@@ -16,6 +16,7 @@ def _adapter(
     *,
     stage_failures: frozenset[str] = frozenset(),
     delete_records: MagicMock | None = None,
+    delete_unstarred_records: MagicMock | None = None,
 ) -> tuple[StagedMediaDeleteAdapter[_Record], MagicMock, MagicMock, MagicMock]:
     rollback = MagicMock()
     commit = MagicMock()
@@ -32,6 +33,7 @@ def _adapter(
         is_starred=lambda record: record.starred,
         stage=stage,
         delete_records=delete_records or MagicMock(),
+        delete_unstarred_records=delete_unstarred_records or MagicMock(return_value=[]),
         rollback=rollback,
         commit=commit,
         notify_deleted=notify,
@@ -50,25 +52,25 @@ def test_starred_names_are_deleted_unless_protection_is_requested() -> None:
 
 
 def test_protection_skips_starred_names_without_staging_or_deleting_them() -> None:
-    delete_records = MagicMock()
-    adapter, rollback, commit, notify = _adapter(dict(RECORDS), delete_records=delete_records)
+    delete_unstarred_records = MagicMock(return_value=[])
+    adapter, rollback, commit, notify = _adapter(dict(RECORDS), delete_unstarred_records=delete_unstarred_records)
 
     result = delete_media_by_names(["plain.png", "star.png"], adapter, delete_starred=False)
 
     assert result == (["plain.png"], [], ["star.png"])
-    delete_records.assert_called_once_with(["plain.png"])
+    delete_unstarred_records.assert_called_once_with(["plain.png"])
     commit.assert_called_once_with("token:plain.png")
     notify.assert_called_once_with("plain.png")
     rollback.assert_not_called()
 
 
 def test_protection_with_only_starred_names_deletes_no_records() -> None:
-    delete_records = MagicMock()
-    adapter, _, commit, notify = _adapter(dict(RECORDS), delete_records=delete_records)
+    delete_unstarred_records = MagicMock(return_value=[])
+    adapter, _, commit, notify = _adapter(dict(RECORDS), delete_unstarred_records=delete_unstarred_records)
 
     assert delete_media_by_names(["star.png"], adapter, delete_starred=False) == ([], [], ["star.png"])
 
-    delete_records.assert_called_once_with([])
+    delete_unstarred_records.assert_called_once_with([])
     commit.assert_not_called()
     notify.assert_not_called()
 
@@ -82,8 +84,8 @@ def test_a_failed_stage_is_reported_failed_not_starred_and_protection_still_appl
 
 
 def test_a_record_delete_failure_restores_only_the_staged_items() -> None:
-    delete_records = MagicMock(side_effect=RuntimeError("database is locked"))
-    adapter, rollback, commit, notify = _adapter(dict(RECORDS), delete_records=delete_records)
+    delete_unstarred_records = MagicMock(side_effect=RuntimeError("database is locked"))
+    adapter, rollback, commit, notify = _adapter(dict(RECORDS), delete_unstarred_records=delete_unstarred_records)
 
     with pytest.raises(RuntimeError):
         delete_media_by_names(["plain.png", "star.png"], adapter, delete_starred=False)
@@ -91,3 +93,15 @@ def test_a_record_delete_failure_restores_only_the_staged_items() -> None:
     rollback.assert_called_once_with("token:plain.png")
     commit.assert_not_called()
     notify.assert_not_called()
+
+
+def test_a_name_starred_after_it_was_read_is_kept_and_its_files_are_restored() -> None:
+    delete_unstarred_records = MagicMock(return_value=["plain.png"])
+    adapter, rollback, commit, notify = _adapter(dict(RECORDS), delete_unstarred_records=delete_unstarred_records)
+
+    result = delete_media_by_names(["plain.png", "other.png"], adapter, delete_starred=False)
+
+    assert result == (["other.png"], [], ["plain.png"])
+    rollback.assert_called_once_with("token:plain.png")
+    commit.assert_called_once_with("token:other.png")
+    notify.assert_called_once_with("other.png")

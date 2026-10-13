@@ -853,7 +853,7 @@ describe('mixed item mutation outcomes', () => {
     await act(async () => {
       await executeDeletion?.();
     });
-    expect(mocks.itemDelete).toHaveBeenCalledWith(refs, expect.any(AbortSignal));
+    expect(mocks.itemDelete).toHaveBeenCalledWith(refs, expect.any(AbortSignal), { deleteStarred: true });
   });
 
   it('uses the localized Uncategorized label in move notifications', async () => {
@@ -1047,7 +1047,7 @@ describe('starred media protection', () => {
       await getItemActions().deleteItems([plain, starred, starredVideo]);
     });
 
-    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith([plain], expect.any(Function), undefined);
+    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith([plain], expect.any(Function), undefined, []);
     expect(mocks.itemDelete).toHaveBeenCalledWith([plain], expect.any(AbortSignal), { deleteStarred: false });
     expect(mocks.galleryRemoveItems).toHaveBeenCalledWith(['image:plain.png']);
     expect(mocks.notificationsAdd).toHaveBeenCalledWith({
@@ -1073,19 +1073,26 @@ describe('starred media protection', () => {
     });
   });
 
-  it('stays silent about protection when deletion is not confirmed', async () => {
+  it('without confirmation, speaks up only when protection left nothing to delete', async () => {
     mocks.itemDelete.mockResolvedValue({ affectedBoardIds: ['none'], failed: [], succeeded: [plain] });
 
     await act(async () => {
       await getItemActions().deleteItems([starred]);
     });
+
+    expect(mocks.itemDelete).not.toHaveBeenCalled();
+    expect(mocks.notificationsAdd).toHaveBeenCalledExactlyOnceWith({
+      kind: 'info',
+      title: 'widgets.gallery.itemActions.delete.starredOnly:1:undefined',
+    });
+
+    mocks.notificationsAdd.mockClear();
     await act(async () => {
       await getItemActions().deleteItems([plain, starred]);
     });
 
     expect(mocks.itemDelete).toHaveBeenCalledOnce();
-    expect(mocks.notificationsAdd).toHaveBeenCalledOnce();
-    expect(mocks.notificationsAdd).toHaveBeenCalledWith({
+    expect(mocks.notificationsAdd).toHaveBeenCalledExactlyOnceWith({
       kind: 'success',
       message: undefined,
       title: 'widgets.gallery.itemActions.delete.success',
@@ -1243,6 +1250,36 @@ describe('total transport failure rollback', () => {
       'project-1',
       'system'
     );
+  });
+
+  it('keeps the gallery references of an item the backend protected while the deleted one stays removed', async () => {
+    const deletedItem = { kind: 'image' as const, name: 'deleted.png' };
+    const protectedItem = { kind: 'image' as const, name: 'starred.png' };
+    const before = makeMockProject('project-1', { recentImages: [recentImageFixture] });
+    const afterRemoval = makeMockProject('project-1', { recentImages: [] });
+
+    mocks.getSnapshot.mockReturnValueOnce({ activeProject: before, projects: [before] }).mockReturnValue({
+      activeProject: afterRemoval,
+      projects: [afterRemoval],
+    });
+    mocks.itemDelete.mockResolvedValue({
+      affectedBoardIds: ['none'],
+      failed: [protectedItem],
+      starredSkipped: [protectedItem],
+      succeeded: [deletedItem],
+    });
+
+    await act(async () => {
+      await getItemActions().deleteItems([deletedItem, protectedItem]);
+    });
+
+    expect(mocks.galleryWidgetsPatchValues).toHaveBeenCalledWith(
+      'gallery',
+      { recentImages: [recentImageFixture] },
+      'project-1',
+      'system'
+    );
+    expect(mocks.galleryRemoveItems).toHaveBeenLastCalledWith(['image:deleted.png']);
   });
 
   it('does not clobber a gallery widget field something else changed before the rollback runs', async () => {

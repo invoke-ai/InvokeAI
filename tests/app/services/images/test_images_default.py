@@ -1506,10 +1506,11 @@ class TestStarredProtection:
     def test_unstarred_image_is_deleted_when_protected(self, image_service: ImageService):
         invoker = image_service._ImageService__invoker  # type: ignore
         invoker.services.image_records.get.return_value = _make_record(starred=False)
+        invoker.services.image_records.delete_many_keeping_starred.return_value = []
 
         assert image_service.delete("normal.png", delete_starred=False) is True
 
-        invoker.services.image_records.delete.assert_called_once_with("normal.png")
+        invoker.services.image_records.delete_many_keeping_starred.assert_called_once_with(["normal.png"])
 
     def test_board_delete_reports_protected_starred_images(self, image_service: ImageService):
         invoker = image_service._ImageService__invoker  # type: ignore
@@ -1521,13 +1522,14 @@ class TestStarredProtection:
             _make_record(image_name="starred.png", starred=True),
             _make_record(image_name="normal.png", starred=False),
         ]
+        invoker.services.image_records.delete_many_keeping_starred.return_value = []
 
         deleted, failed, starred_skipped = image_service.delete_images_on_board("board-1", delete_starred=False)
 
         assert deleted == ["normal.png"]
         assert failed == []
         assert starred_skipped == ["starred.png"]
-        invoker.services.image_records.delete_many.assert_called_once_with(["normal.png"])
+        invoker.services.image_records.delete_many_keeping_starred.assert_called_once_with(["normal.png"])
         invoker.services.image_files.stage_delete.assert_called_once_with("normal.png", image_subfolder="")
 
     def test_board_delete_removes_starred_images_by_default(self, image_service: ImageService):
@@ -1571,6 +1573,44 @@ class TestStarredProtectionAgainstRealStores:
 
         assert svc.delete_images_by_names(["star.png"]) == (["star.png"], [], [])
         assert not storage.get_path("star.png").exists()
+
+    def test_an_image_starred_during_a_protected_batch_keeps_its_record_and_files(self, wired, monkeypatch) -> None:
+        svc, records, storage = wired
+        self._seed(wired, "plain.png", starred=False)
+        self._seed(wired, "late.png", starred=False)
+        real_delete = records.delete_many_keeping_starred
+
+        def starred_while_files_are_staged(image_names: list[str]) -> list[str]:
+            records.update("late.png", ImageRecordChanges(starred=True))
+            return real_delete(image_names)
+
+        monkeypatch.setattr(records, "delete_many_keeping_starred", starred_while_files_are_staged)
+
+        result = svc.delete_images_by_names(["plain.png", "late.png"], delete_starred=False)
+
+        assert result == (["plain.png"], [], ["late.png"])
+        assert records.get("late.png").starred is True
+        assert storage.get_path("late.png").exists()
+        assert storage.get_path("late.png", thumbnail=True).exists()
+        assert not storage.get_path("plain.png").exists()
+        assert _staging_dirs(storage) == []
+
+    def test_an_image_starred_during_a_protected_single_delete_is_kept(self, wired, monkeypatch) -> None:
+        svc, records, storage = wired
+        self._seed(wired, "late.png", starred=False)
+        real_delete = records.delete_many_keeping_starred
+
+        def starred_before_the_delete(image_names: list[str]) -> list[str]:
+            records.update("late.png", ImageRecordChanges(starred=True))
+            return real_delete(image_names)
+
+        monkeypatch.setattr(records, "delete_many_keeping_starred", starred_before_the_delete)
+
+        assert svc.delete("late.png", delete_starred=False) is False
+
+        assert records.get("late.png").starred is True
+        assert storage.get_path("late.png").exists()
+        assert _staging_dirs(storage) == []
 
     def test_protected_single_delete_leaves_a_starred_image_and_no_staging_behind(self, wired) -> None:
         svc, records, storage = wired

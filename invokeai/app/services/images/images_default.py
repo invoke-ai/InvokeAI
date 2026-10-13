@@ -520,17 +520,31 @@ class ImageService(ImageServiceABC):
                 if not delete_starred and record.starred:
                     return False
                 token = self.__invoker.services.image_files.begin_delete([(image_name, record.image_subfolder)])
-                try:
-                    self.__invoker.services.image_records.delete(image_name)
-                except Exception:
-                    # The image is still live: drop the journal and leave its files alone.
+
+                def abandon_journal() -> None:
                     try:
                         self.__invoker.services.image_files.abandon_delete(token)
                     except Exception as cleanup_error:
                         self.__invoker.services.logger.error(
                             f"Failed to discard the delete journal for {image_name}: {cleanup_error}"
                         )
+
+                try:
+                    if delete_starred:
+                        self.__invoker.services.image_records.delete(image_name)
+                        starred_since = False
+                    else:
+                        # The starred check is part of the delete, so a star that arrives after the read above wins.
+                        starred_since = bool(
+                            self.__invoker.services.image_records.delete_many_keeping_starred([image_name])
+                        )
+                except Exception:
+                    # The image is still live: drop the journal and leave its files alone.
+                    abandon_journal()
                     raise
+                if starred_since:
+                    abandon_journal()
+                    return False
                 try:
                     self.__invoker.services.image_files.commit_delete(token)
                 except Exception as cleanup_error:
@@ -588,6 +602,7 @@ class ImageService(ImageServiceABC):
                         is_starred=lambda record: record.starred,
                         stage=lambda name, record: files.stage_delete(name, image_subfolder=record.image_subfolder),
                         delete_records=records.delete_many,
+                        delete_unstarred_records=records.delete_many_keeping_starred,
                         rollback=files.rollback_delete,
                         commit=files.commit_delete,
                         notify_deleted=self.notify_deleted,

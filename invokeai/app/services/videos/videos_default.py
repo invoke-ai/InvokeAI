@@ -379,7 +379,12 @@ class VideoService(VideoServiceABC):
                 token = self.__invoker.services.video_files.stage_delete(
                     video_name, video_subfolder=record.video_subfolder
                 )
-                self.__invoker.services.video_records.delete(video_name)
+                if delete_starred:
+                    self.__invoker.services.video_records.delete(video_name)
+                elif self.__invoker.services.video_records.delete_many_keeping_starred([video_name]):
+                    # Starred after the read above: the delete refused the row, so the files go back.
+                    self.__invoker.services.video_files.rollback_delete(token)
+                    return False
                 record_deleted = True
                 try:
                     self.__invoker.services.video_files.commit_delete(token)
@@ -452,6 +457,7 @@ class VideoService(VideoServiceABC):
                         is_starred=lambda record: record.starred,
                         stage=lambda name, record: files.stage_delete(name, video_subfolder=record.video_subfolder),
                         delete_records=records.delete_many,
+                        delete_unstarred_records=records.delete_many_keeping_starred,
                         rollback=files.rollback_delete,
                         commit=files.commit_delete,
                         notify_deleted=self._on_deleted,
