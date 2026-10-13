@@ -14,6 +14,7 @@ from invokeai.app.invocations.loops import (
     LoopState,
 )
 from invokeai.app.services.shared import graph_if_runtime
+from invokeai.app.services.shared.graph_iterator_ancestry import _IteratorAncestry
 from invokeai.app.services.shared.graph_models import Edge, EdgeConnection
 from invokeai.app.services.shared.graph_validation import (
     COLLECTION_FIELD,
@@ -1411,7 +1412,9 @@ class _ExecutionNodeBuilder:
 
         return new_nodes
 
-    def _has_admitted_source_mapping(self, node_id: str, graph: "nx.DiGraph") -> bool:
+    def _has_admitted_source_mapping(
+        self, node_id: str, graph: "nx.DiGraph", iterator_ancestry: Optional[_IteratorAncestry] = None
+    ) -> bool:
         if not any(isinstance(node, IfInvocation) for node in self._state.graph.nodes.values()):
             return True
         if isinstance(self._state.graph.get_node(node_id), IfInvocation):
@@ -1426,6 +1429,7 @@ class _ExecutionNodeBuilder:
                         self._get_prepared_nodes_for_source,
                         self._get_prepared_edge_iteration_path,
                         graph,
+                        iterator_ancestry,
                     )
                 )
             mappings = self._get_if_condition_iteration_mappings(node_id, graph)
@@ -1705,6 +1709,7 @@ class _ExecutionNodeBuilder:
 
     def prepare(self, base_g: Optional["nx.DiGraph"] = None) -> Optional[str]:
         g = base_g if base_g is not None else self._state._get_source_graph_flat()
+        iterator_ancestry = _IteratorAncestry(self._state, g)
         self._attach_pending_if_inputs()
         next_node_id = next(
             (
@@ -1734,7 +1739,7 @@ class _ExecutionNodeBuilder:
                     and self._is_if_condition_ready(node_id)
                     or not isinstance(self._state.graph.get_node(node_id), IfInvocation)
                 )
-                and self._has_admitted_source_mapping(node_id, g)
+                and self._has_admitted_source_mapping(node_id, g, iterator_ancestry)
                 and (
                     not isinstance(self._state.graph.get_node(node_id), (ForInvocation, IterateInvocation))
                     or all(source_id in self._state.executed for source_id, _ in g.in_edges(node_id))
@@ -1769,6 +1774,7 @@ class _ExecutionNodeBuilder:
                 self._get_prepared_nodes_for_source,
                 self._get_prepared_edge_iteration_path,
                 g,
+                iterator_ancestry,
             )
             condition_edges = self._state.graph._get_input_edges(next_node_id, "condition")
             if condition_edges:
