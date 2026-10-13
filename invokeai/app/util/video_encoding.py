@@ -71,11 +71,12 @@ def make_mp4_writer(path: Path | str, fps: float, audio_path: Path | str | None 
     )
 
 
-_writer_decoder_configs: dict[tuple[int, int, float], bytes] = {}
+_writer_sample_entrys: dict[tuple[int, int, float], bytes] = {}
 
 
-def writer_decoder_config(width: int, height: int, fps: float) -> bytes | None:
-    """The ``avcC`` bytes ``make_mp4_writer`` writes for this canvas and rate.
+def writer_sample_entry(width: int, height: int, fps: float) -> bytes | None:
+    """The sample entry ``make_mp4_writer`` writes for this canvas and rate (see
+    ``H264Layout.sample_entry``).
 
     They depend only on the encoder settings, canvas and rate, never on the content, so one
     encoded frame tells a splice up front whether a file can share a track with new output
@@ -83,15 +84,15 @@ def writer_decoder_config(width: int, height: int, fps: float) -> bytes | None:
     successful probe is remembered.
     """
     key = (width, height, fps)
-    if key not in _writer_decoder_configs:
-        config = _probe_decoder_config(width, height, fps)
+    if key not in _writer_sample_entrys:
+        config = _probe_sample_entry(width, height, fps)
         if config is None:
             return None
-        _writer_decoder_configs[key] = config
-    return _writer_decoder_configs[key]
+        _writer_sample_entrys[key] = config
+    return _writer_sample_entrys[key]
 
 
-def _probe_decoder_config(width: int, height: int, fps: float) -> bytes | None:
+def _probe_sample_entry(width: int, height: int, fps: float) -> bytes | None:
     from invokeai.app.util.h264_splice import read_h264_layout
 
     with tempfile.TemporaryDirectory(prefix="invokeai_encoder_probe_") as work:
@@ -102,7 +103,7 @@ def _probe_decoder_config(width: int, height: int, fps: float) -> bytes | None:
         finally:
             writer.close()
         layout = read_h264_layout(path)
-    return layout.decoder_config if layout is not None else None
+    return layout.sample_entry if layout is not None else None
 
 
 def write_stereo_wav(path: Path | str, samples: np.ndarray, sample_rate: int) -> None:

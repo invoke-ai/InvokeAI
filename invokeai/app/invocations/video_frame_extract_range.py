@@ -54,11 +54,12 @@ from invokeai.app.util.h264_splice import (
     SpliceError,
     concat_stream_copy,
     copy_frames,
+    probes_as,
     read_h264_layout,
 )
 from invokeai.app.util.mp4_metadata import write_mp4_tags
 from invokeai.app.util.video_audio import extract_audio_pcm, mux_audio_into_video, resample_linear
-from invokeai.app.util.video_encoding import make_mp4_writer, write_stereo_wav, writer_decoder_config
+from invokeai.app.util.video_encoding import make_mp4_writer, write_stereo_wav, writer_sample_entry
 from invokeai.app.util.video_thumbnails import decoder_frame_count, iter_video_frames, probe_video
 
 
@@ -295,6 +296,9 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
                 f"Encoded trimmed MP4: {num_frames} frames @ {output_fps:.2f} fps "
                 f"({out_duration:.2f}s) at {width}x{height}" + (", with AAC audio" if audio is not None else ", silent")
             )
+            # A cancellation that arrived during an uninterruptible stage must not be saved.
+            if context.util.is_canceled():
+                raise CanceledException
             video_dto = context.videos.save(
                 source_path=source_path,
                 width=width,
@@ -338,7 +342,7 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
         node's encoder writes and a constant frame duration, or the re-encoded ends could not
         share its track.
         """
-        if layout.frame_duration is None or layout.decoder_config != writer_decoder_config(width, height, fps):
+        if layout.frame_duration is None or layout.sample_entry != writer_sample_entry(width, height, fps):
             return None
         boundaries = [*layout.sync_samples, layout.sample_count]
         inner_starts = [k for k in layout.sync_samples if k >= start and not 0 < k - start < MIN_ENCODED_FRAMES]
@@ -392,25 +396,27 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
             middle_path = work_dir / "middle.mp4"
             reason: Optional[str] = None
             if any(
-                (part := read_h264_layout(path)) is None or part.decoder_config != layout.decoder_config
+                (part := read_h264_layout(path)) is None or part.sample_entry != layout.sample_entry
                 for _, _, path in encoded
             ):
                 reason = "its encoding differs from this node's"
             else:
                 try:
-                    copy_frames(video_path, k1, k2, layout.sample_count, middle_path)
+                    copy_frames(video_path, k1, k2, layout.sample_count, middle_path, context.util.is_canceled)
                     middle = read_h264_layout(middle_path)
-                    if middle is None or middle.sample_count != k2 - k1:
+                    if middle is None or middle.sample_count != k2 - k1 or middle.sample_entry != layout.sample_entry:
                         reason = "copying its frames did not yield the expected count"
                     else:
                         parts = [head[2]] if head in encoded else []
                         parts += [middle_path] + ([tail[2]] if tail in encoded else [])
-                        concat_stream_copy(parts, out_path)
+                        concat_stream_copy(parts, out_path, context.util.is_canceled)
                         joined = read_h264_layout(out_path)
                         if (
                             joined is None
+                            or joined.sample_entry != layout.sample_entry
                             or joined.sample_count != written + (k2 - k1)
                             or joined.frame_duration != layout.frame_duration
+                            or not probes_as(out_path, output_fps, joined.sample_count)
                         ):
                             reason = "the joined file does not hold the expected frames on one timeline"
                 except SpliceError as e:
@@ -436,6 +442,9 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
             # A stream-copy remux that drops the source's keyed metadata: save() writes this
             # node's record, and if that rewrite fails the source's must not be read back as it.
             write_mp4_tags(video_path, copy_path, {})
+            # A cancellation that arrived during an uninterruptible stage must not be saved.
+            if context.util.is_canceled():
+                raise CanceledException
             video_dto = context.videos.save(
                 source_path=copy_path,
                 width=width,

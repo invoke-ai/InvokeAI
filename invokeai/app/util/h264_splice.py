@@ -6,10 +6,11 @@ segment through N generations of artifacts. When the head of a clip can be reuse
 :func:`copy_frames` cuts out a keyframe-aligned run of frames without decoding, and
 :func:`concat_stream_copy` joins it to freshly encoded neighbours.
 
-That join is only valid when every part carries the *same* decoder configuration: an MP4
-stores one ``avcC`` (profile, level, SPS and PPS) per track, so a part encoded with
-different parameters would be decoded against the wrong headers. :func:`read_h264_layout`
-exposes the ``avcC`` bytes so callers can require an exact match. Parts written by this
+That join is only valid when every part carries the *same* sample entry: an MP4 stores
+one per track — the ``avcC`` (profile, level, SPS and PPS) a decoder needs, and boxes such
+as ``colr`` and ``pasp`` that say how to present the frames — so a part encoded or tagged
+differently would be decoded or displayed against the wrong ones.
+:func:`read_h264_layout` exposes those bytes so callers can require an exact match. Parts written by this
 app's own encoder (``make_mp4_writer``) at the same canvas and frame rate match; anything
 else is reported as not spliceable rather than guessed at.
 
@@ -32,30 +33,42 @@ rotation applied as metadata, which decoding applies to the frames this app re-e
 a stream copy carries into the joined file for all of them).
 """
 
+import math
 import shutil
 import struct
 import subprocess
 import tempfile
+import time
 from pathlib import Path
-from typing import BinaryIO, NamedTuple, Optional
+from typing import BinaryIO, Callable, NamedTuple, Optional
 
 import imageio_ffmpeg
+import numpy as np
 
+from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.util.mp4_metadata import find_box, iter_boxes
 
 # A stream copy is disk-bound; this only stops a wedged child from holding the node forever.
 SPLICE_TIMEOUT_SECONDS = 600
+# How often a running ffmpeg child is checked for cancellation.
+_CANCEL_POLL_SECONDS = 0.1
 # ``moov`` precedes or follows ``mdat`` in a real file; a dozen top-level boxes at most.
 _MAX_TOP_LEVEL_BOXES = 1024
-# A sync-sample table for even an hour of 120 fps all-intra video is ~430k entries.
-_MAX_SYNC_ENTRIES = 1 << 20
-# VisualSampleEntry fields before its child boxes (SampleEntry 8 + visual header 70).
+# Keyframes examined per track: at the 2 s interval this app writes, nine hours of video.
+_MAX_SYNC_ENTRIES = 1 << 14
+# VisualSampleEntry fields before its child boxes (SampleEntry 8 + visual header 70), and where
+# among them the 32-byte compressor name sits.
 _VISUAL_SAMPLE_ENTRY_HEADER = 78
+_COMPRESSOR_NAME = slice(42, 74)
+# A real sample entry holds a handful of boxes (avcC, btrt, colr, pasp...); more is hostile.
+_MAX_ENTRY_CHILDREN = 32
+# NAL units examined per keyframe before its first slice (AUD, SEI, SPS, PPS precede it).
+_MAX_NALS_BEFORE_SLICE = 64
 # Shortest part x264 (bframes=3, as make_mp4_writer leaves it) encodes with its full B-frame
 # reorder delay; a shorter part joined to full-delay parts distorts the joined timestamps.
 MIN_ENCODED_FRAMES = 3
-# A sample table for an hour of 120 fps video is ~430k entries.
-_MAX_SAMPLES = 1 << 22
+# Samples per track: over four hours at 60 fps. Bounds every table read before it is allocated.
+_MAX_SAMPLES = 1 << 20
 # NAL unit types: 1-5 are coded slices, 5 an IDR picture's.
 _NAL_IDR = 5
 _NAL_VCL = range(1, 6)
@@ -72,6 +85,11 @@ class H264Layout(NamedTuple):
     """0-based decode-order indices of the IDR pictures — the only clean cut points — ascending."""
     decoder_config: bytes
     """The raw ``avcC`` payload: profile, level, SPS and PPS."""
+    sample_entry: bytes
+    """What a joined track inherits from this one's sample entry: its fixed fields and every
+    child box — ``avcC``, and any ``colr``, ``pasp``, ``clap`` and the like, which change how
+    frames are presented without changing ``avcC`` — except ``btrt``, a per-file bitrate.
+    Two tracks can share a joined track only if these bytes match."""
     frame_duration: Optional[int]
     """Every sample's duration in media ticks, or None if they are not all equal."""
 
@@ -216,58 +234,82 @@ def _read_stts(fh: BinaryIO, stbl: tuple[int, int]) -> Optional[list[tuple[int, 
     return list(zip(flat[::2], flat[1::2], strict=True))
 
 
-def _sample_locations(fh: BinaryIO, stbl: tuple[int, int], sample_count: int) -> Optional[list[tuple[int, int]]]:
-    """``(file_offset, size)`` of every sample, from the size, chunk and chunk-offset tables."""
-    stsz, stsc = find_box(fh, *stbl, b"stsz"), find_box(fh, *stbl, b"stsc")
-    stco, co64 = find_box(fh, *stbl, b"stco"), find_box(fh, *stbl, b"co64")
-    offsets_box, offset_format = (stco, "I") if stco is not None else (co64, "Q")
-    if stsz is None or stsc is None or offsets_box is None or sample_count > _MAX_SAMPLES:
-        return None
-    # Each table opens with version/flags and a 4-byte count (stsz: a size and a count).
-    if any(box[0] + 8 > box[1] for box in (stsz, stsc, offsets_box)):
+def _sample_sizes(fh: BinaryIO, stsz: tuple[int, int], sample_count: int, file_size: int) -> Optional[np.ndarray]:
+    """Every sample's size, or None unless the table is plausible for a file of ``file_size``.
+
+    The count comes from the file, so it is bounded before anything is allocated by it: by
+    ``_MAX_SAMPLES``, by the table actually holding that many entries, and by the samples
+    fitting in the file.
+    """
+    if not 0 < sample_count <= _MAX_SAMPLES or stsz[0] + 12 > stsz[1]:
         return None
     fh.seek(stsz[0] + 4)
     (uniform_size,) = struct.unpack(">I", fh.read(4))
     if uniform_size:
-        sizes: tuple[int, ...] = (uniform_size,) * sample_count
-    else:
-        if stsz[0] + 12 + 4 * sample_count > stsz[1]:
+        if uniform_size * sample_count > file_size:
             return None
-        fh.seek(stsz[0] + 12)
-        sizes = struct.unpack(f">{sample_count}I", fh.read(4 * sample_count))
+        return np.full(sample_count, uniform_size, dtype=np.int64)
+    if stsz[0] + 12 + 4 * sample_count > stsz[1]:
+        return None
+    fh.seek(stsz[0] + 12)
+    sizes = np.frombuffer(fh.read(4 * sample_count), dtype=">u4").astype(np.int64)
+    return sizes if int(sizes.sum()) <= file_size else None
+
+
+def _sample_locations(
+    fh: BinaryIO, stbl: tuple[int, int], sizes: np.ndarray, wanted: tuple[int, ...], file_size: int
+) -> Optional[list[tuple[int, int]]]:
+    """``(file_offset, size)`` of each sample in ``wanted`` (ascending), from the chunk tables."""
+    stsc = find_box(fh, *stbl, b"stsc")
+    stco, co64 = find_box(fh, *stbl, b"stco"), find_box(fh, *stbl, b"co64")
+    offsets_box, offset_format = (stco, "I") if stco is not None else (co64, "Q")
+    # Each table opens with version/flags and a 4-byte count.
+    if stsc is None or offsets_box is None or any(box[0] + 8 > box[1] for box in (stsc, offsets_box)):
+        return None
+    sample_count = len(sizes)
     fh.seek(stsc[0] + 4)
     (run_count,) = struct.unpack(">I", fh.read(4))
-    if run_count == 0 or stsc[0] + 8 + 12 * run_count > stsc[1]:
+    if not 0 < run_count <= _MAX_SAMPLES or stsc[0] + 8 + 12 * run_count > stsc[1]:
         return None
     flat = struct.unpack(f">{3 * run_count}I", fh.read(12 * run_count))
     runs = [(flat[i], flat[i + 1]) for i in range(0, len(flat), 3)]
     fh.seek(offsets_box[0] + 4)
     (chunk_count,) = struct.unpack(">I", fh.read(4))
     entry = struct.calcsize(offset_format)
-    if chunk_count > _MAX_SAMPLES or offsets_box[0] + 8 + entry * chunk_count > offsets_box[1]:
+    if chunk_count > sample_count or offsets_box[0] + 8 + entry * chunk_count > offsets_box[1]:
         return None
     chunk_offsets = struct.unpack(f">{chunk_count}{offset_format}", fh.read(entry * chunk_count))
+    # Byte position of each sample relative to the start of the sample table's data.
+    starts = np.concatenate([[0], np.cumsum(sizes)])
 
     locations: list[tuple[int, int]] = []
+    pending = iter(wanted)
+    target = next(pending, None)
+    first_sample = 0
     for run, (first_chunk, per_chunk) in enumerate(runs):
         last_chunk = runs[run + 1][0] - 1 if run + 1 < len(runs) else chunk_count
-        if not 1 <= first_chunk <= last_chunk + 1 or last_chunk > chunk_count:
+        if not 1 <= first_chunk <= last_chunk + 1 or last_chunk > chunk_count or per_chunk > sample_count:
             return None
         for chunk in range(first_chunk - 1, last_chunk):
-            position = chunk_offsets[chunk]
-            for _ in range(per_chunk):
-                if len(locations) == sample_count:
+            end_sample = first_sample + per_chunk
+            if end_sample > sample_count:
+                return None
+            while target is not None and target < end_sample:
+                offset = chunk_offsets[chunk] + int(starts[target] - starts[first_sample])
+                if offset + int(sizes[target]) > file_size:
                     return None
-                size = sizes[len(locations)]
-                locations.append((position, size))
-                position += size
-    return locations if len(locations) == sample_count else None
+                locations.append((offset, int(sizes[target])))
+                target = next(pending, None)
+            first_sample = end_sample
+    return locations if first_sample == sample_count and target is None else None
 
 
 def _is_idr(fh: BinaryIO, offset: int, size: int, length_size: int) -> bool:
     """True if the sample's first coded slice is an IDR slice (AUD, SEI, SPS and PPS may precede it)."""
     position, end = offset, offset + size
-    while position + length_size + 1 <= end:
+    for _ in range(_MAX_NALS_BEFORE_SLICE):
+        if position + length_size + 1 > end:
+            return False
         fh.seek(position)
         header = fh.read(length_size + 1)
         if len(header) < length_size + 1:
@@ -303,17 +345,39 @@ def _read_video_stbl(fh: BinaryIO, stbl_start: int, stbl_end: int) -> Optional[H
         return None
     fh.seek(avcc[0])
     decoder_config = fh.read(avcc[1] - avcc[0])
+    fh.seek(entry_start)
+    header_fields = bytearray(fh.read(_VISUAL_SAMPLE_ENTRY_HEADER))
+    # The compressor name records the encoder's version: masked, so files this app wrote before
+    # an ffmpeg upgrade still match what it writes after one.
+    header_fields[_COMPRESSOR_NAME] = bytes(_COMPRESSOR_NAME.stop - _COMPRESSOR_NAME.start)
+    parts = [bytes(header_fields)]
+    children = list(
+        iter_boxes(fh, entry_start + _VISUAL_SAMPLE_ENTRY_HEADER, entry_end, max_boxes=_MAX_ENTRY_CHILDREN + 1)
+    )
+    if len(children) > _MAX_ENTRY_CHILDREN:
+        return None
+    for child, child_start, child_end in children:
+        if child != b"btrt":
+            fh.seek(child_start)
+            parts.append(struct.pack(">I", child_end - child_start) + child + fh.read(child_end - child_start))
+    sample_entry = b"".join(parts)
 
-    sizes = _read_full_box_table(fh, *stsz, ">II")
+    header = _read_full_box_table(fh, *stsz, ">II")
+    if header is None:
+        return None
+    fh.seek(0, 2)
+    file_size = fh.tell()
+    sizes = _sample_sizes(fh, stsz, header[1], file_size)
     if sizes is None:
         return None
-    sample_count = sizes[1]
-    if sample_count == 0:
-        return None
+    sample_count = len(sizes)
 
     stss = find_box(fh, *stbl, b"stss")
     if stss is None:
-        # No sync-sample table means every sample is a sync sample.
+        # No sync-sample table means every sample is a sync sample (an all-intra stream), each
+        # of which would be examined below: only a short one is worth splicing.
+        if sample_count > _MAX_SYNC_ENTRIES:
+            return None
         sync_samples = tuple(range(sample_count))
     else:
         count = _read_full_box_table(fh, *stss, ">I")
@@ -328,10 +392,12 @@ def _read_video_stbl(fh: BinaryIO, stbl_start: int, stbl_end: int) -> Optional[H
     if len(decoder_config) < 5:
         return None
     length_size = (decoder_config[4] & 0x03) + 1
-    locations = _sample_locations(fh, stbl, sample_count)
+    locations = _sample_locations(fh, stbl, sizes, sync_samples, file_size)
     if locations is None:
         return None
-    idr_samples = tuple(k for k in sync_samples if _is_idr(fh, *locations[k], length_size))
+    idr_samples = tuple(
+        k for k, location in zip(sync_samples, locations, strict=True) if _is_idr(fh, *location, length_size)
+    )
 
     runs = _read_stts(fh, stbl)
     if runs is None:
@@ -342,25 +408,56 @@ def _read_video_stbl(fh: BinaryIO, stbl_start: int, stbl_end: int) -> Optional[H
         sample_count=sample_count,
         sync_samples=idr_samples,
         decoder_config=decoder_config,
+        sample_entry=sample_entry,
         frame_duration=frame_duration,
     )
 
 
-def run_ffmpeg(args: list[str], description: str) -> None:
-    try:
-        proc = subprocess.run(
+def run_ffmpeg(args: list[str], description: str, is_canceled: Optional[Callable[[], bool]] = None) -> None:
+    """Run the bundled ffmpeg, raising SpliceError if it fails or outlasts the timeout.
+
+    ``is_canceled`` is polled while the child runs; a cancellation kills and reaps it and
+    raises CanceledException, so a canceled node never waits on a long copy.
+    """
+    if is_canceled is not None and is_canceled():
+        raise CanceledException
+    with tempfile.TemporaryFile() as stderr:
+        proc = subprocess.Popen(
             [imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-loglevel", "error", *args],
-            capture_output=True,
-            timeout=SPLICE_TIMEOUT_SECONDS,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=stderr,
         )
-    except subprocess.TimeoutExpired as e:
-        raise SpliceError(f"ffmpeg timed out {description}") from e
-    if proc.returncode != 0:
-        stderr = proc.stderr.decode("utf-8", errors="replace").strip()
-        raise SpliceError(f"ffmpeg failed {description}: {stderr[-500:]}")
+        deadline = time.monotonic() + SPLICE_TIMEOUT_SECONDS
+        try:
+            while True:
+                try:
+                    proc.wait(timeout=_CANCEL_POLL_SECONDS)
+                    break
+                except subprocess.TimeoutExpired:
+                    pass
+                if is_canceled is not None and is_canceled():
+                    raise CanceledException
+                if time.monotonic() > deadline:
+                    raise SpliceError(f"ffmpeg timed out {description}")
+        finally:
+            if proc.returncode is None:
+                proc.kill()
+                proc.wait()
+        if proc.returncode != 0:
+            stderr.seek(0)
+            message = stderr.read().decode("utf-8", errors="replace").strip()
+            raise SpliceError(f"ffmpeg failed {description}: {message[-500:]}")
 
 
-def copy_frames(src: Path, start: int, end: int, sample_count: int, dst: Path) -> None:
+def copy_frames(
+    src: Path,
+    start: int,
+    end: int,
+    sample_count: int,
+    dst: Path,
+    is_canceled: Optional[Callable[[], bool]] = None,
+) -> None:
     """Write ``dst`` = frames ``[start, end)`` of ``src``'s video, stream-copied.
 
     ``start`` and ``end`` are decode-order sample indices that must each be a keyframe (or
@@ -373,6 +470,7 @@ def copy_frames(src: Path, start: int, end: int, sample_count: int, dst: Path) -
         run_ffmpeg(
             ["-i", str(src), "-map", "0:v:0", "-c", "copy", "-frames:v", str(end), "-f", "mp4", str(dst)],
             description,
+            is_canceled,
         )
         return
     # The segment muxer splits at exact packet counts; the wanted range is the second segment.
@@ -398,11 +496,27 @@ def copy_frames(src: Path, start: int, end: int, sample_count: int, dst: Path) -
                 str(pattern),
             ],
             description,
+            is_canceled,
         )
         segment = Path(work) / "segment1.mp4"
         if not segment.exists():
             raise SpliceError(f"ffmpeg wrote no segment {description}")
         shutil.move(str(segment), str(dst))
+
+
+def probes_as(path: Path, fps: float, frames: int) -> bool:
+    """Whether a player's probe of ``path`` agrees with the timeline it should hold: ``frames``
+    at ``fps``. A last check on a joined file, independent of the sample tables it was built
+    from — a squeezed or stretched timestamp shows up as a wrong rate or duration."""
+    from invokeai.app.util.video_thumbnails import probe_video
+
+    _, _, duration, probed_fps = probe_video(path)
+    # The probe reports duration to the hundredth of a second.
+    return (
+        probed_fps is not None
+        and math.isclose(probed_fps, fps, rel_tol=1e-3)
+        and abs(duration - frames / fps) <= 0.5 / fps + 0.01
+    )
 
 
 def _concat_list_entry(path: Path) -> str:
@@ -411,7 +525,7 @@ def _concat_list_entry(path: Path) -> str:
     return f"file '{escaped}'\n"
 
 
-def concat_stream_copy(parts: list[Path], dst: Path) -> None:
+def concat_stream_copy(parts: list[Path], dst: Path, is_canceled: Optional[Callable[[], bool]] = None) -> None:
     """Write ``dst`` = ``parts``' video streams joined end to end, stream-copied.
 
     Every part must share one decoder configuration (see :func:`read_h264_layout`) and
@@ -439,6 +553,7 @@ def concat_stream_copy(parts: list[Path], dst: Path) -> None:
                 str(dst),
             ],
             f"joining {len(parts)} stream-copied parts",
+            is_canceled,
         )
     finally:
         list_path.unlink(missing_ok=True)

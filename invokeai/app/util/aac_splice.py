@@ -28,7 +28,7 @@ the copied head decodes bit-exact before trusting the result.
 import struct
 import tempfile
 from pathlib import Path
-from typing import BinaryIO, NamedTuple, Optional
+from typing import BinaryIO, Callable, NamedTuple, Optional
 
 import numpy as np
 
@@ -151,7 +151,17 @@ def _read_audio_track(fh: BinaryIO, trak: tuple[int, int], mdia: tuple[int, int]
     fh.seek(entry_start + 8)
     if fh.read(2) != b"\x00\x00":  # QuickTime v1/v2 sound entries lay their fields out differently
         return None
-    esds = find_box(fh, entry_start + _AUDIO_SAMPLE_ENTRY_HEADER, entry_end, b"esds")
+    # Anything beyond the decoder config (and a per-file bitrate) — a channel layout, say —
+    # would describe the copied packets differently from the ones encoded beside them. Read
+    # lazily and bounded: the entry is the uploader's.
+    # Each allowed box at most once, so a third box of any kind is refused and no more are read.
+    esds, seen = None, set()
+    for child, start, end in iter_boxes(fh, entry_start + _AUDIO_SAMPLE_ENTRY_HEADER, entry_end, max_boxes=3):
+        if child not in (b"esds", b"btrt") or child in seen:
+            return None
+        seen.add(child)
+        if child == b"esds":
+            esds = (start, end)
     if esds is None:
         return None
     fh.seek(esds[0])
@@ -295,6 +305,7 @@ def mux_spliced_aac(
     sample_rate: int,
     total_samples: int,
     out_path: Path,
+    is_canceled: Optional[Callable[[], bool]] = None,
 ) -> np.ndarray:
     """Write ``out_path`` = ``video_path``'s video plus a soundtrack spliced from ``source``.
 
@@ -316,9 +327,12 @@ def mux_spliced_aac(
         run_ffmpeg(
             ["-i", str(source), "-map", "0:a:0", "-c", "copy", "-frames:a", str(head_packets), "-f", "adts", str(head)],
             f"copying the first {head_packets} audio packets of {source.name}",
+            is_canceled,
         )
         write_stereo_wav(tail_wav, tail_pcm, sample_rate)
-        run_ffmpeg(["-i", str(tail_wav), *AAC_ENCODE_ARGS, "-f", "adts", str(tail)], "encoding the new audio")
+        run_ffmpeg(
+            ["-i", str(tail_wav), *AAC_ENCODE_ARGS, "-f", "adts", str(tail)], "encoding the new audio", is_canceled
+        )
         head_frames = _adts_frames(head.read_bytes())
         if len(head_frames) != head_packets:
             raise SpliceError(f"copied {len(head_frames)} audio packets, expected {head_packets}")
@@ -354,6 +368,7 @@ def mux_spliced_aac(
                 str(out_path),
             ],
             "muxing the spliced audio",
+            is_canceled,
         )
     _set_track_duration(out_path, b"soun", total_samples, sample_rate)
     return seam_reference

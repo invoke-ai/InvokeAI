@@ -342,3 +342,31 @@ def test_squeezed_join_falls_back_to_re_encoding(tmp_path: Path, monkeypatch: py
     _, _, _, fps = probe_video(saved)
     assert fps == pytest.approx(16.0, rel=1e-3)
     assert len(_decode(saved)) == 65
+
+
+def test_cancellation_during_a_trim_splice_saves_nothing(tmp_path: Path) -> None:
+    source = tmp_path / "source.mp4"
+    _textured_source(source, 200)
+    canceled = [False]
+    raised: list[BaseException] = []
+    from invokeai.app.invocations import video_frame_extract_range
+
+    real = video_frame_extract_range.copy_frames
+
+    def cancel_then_copy(*args, **kwargs):
+        canceled[0] = True
+        try:
+            return real(*args, **kwargs)
+        except BaseException as e:
+            raised.append(e)
+            raise
+
+    context = MagicMock()
+    context.videos.get_path.return_value = source
+    context.util.is_canceled.side_effect = lambda: canceled[0]
+    invocation = ExtractVideoRangeInvocation(video=VideoField(video_name="source.mp4"), start_frame=31, end_frame=130)
+    with patch("invokeai.app.invocations.video_frame_extract_range.copy_frames", side_effect=cancel_then_copy):
+        with pytest.raises(CanceledException):
+            invocation.invoke(context)
+    assert len(raised) == 1 and isinstance(raised[0], CanceledException)
+    context.videos.save.assert_not_called()

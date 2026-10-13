@@ -63,6 +63,7 @@ from invokeai.app.util.h264_splice import (
     SpliceError,
     concat_stream_copy,
     copy_frames,
+    probes_as,
     read_h264_layout,
 )
 from invokeai.app.util.video_audio import (
@@ -71,7 +72,7 @@ from invokeai.app.util.video_audio import (
     mux_audio_into_video,
     resample_linear,
 )
-from invokeai.app.util.video_encoding import make_mp4_writer, write_stereo_wav, writer_decoder_config
+from invokeai.app.util.video_encoding import make_mp4_writer, write_stereo_wav, writer_sample_entry
 from invokeai.app.util.video_thumbnails import iter_video_frames, probe_video
 
 TransitionMode = Literal["cut", "crossfade", "fade_through_black"]
@@ -235,7 +236,9 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
                 keyframe, layout = splice
                 rest_path = work_dir / "rest.mp4"
                 rest = self._encode_joined(context, paths, (width, height), output_fps, rest_path, skip=keyframe)
-                if self._splice(context, paths[0], keyframe, layout, rest_path, rest[0][0], work_dir, tmp_path):
+                if self._splice(
+                    context, paths[0], keyframe, layout, rest_path, rest[0][0], output_fps, work_dir, tmp_path
+                ):
                     joined = rest
             if joined is None:
                 joined = self._encode_joined(context, paths, (width, height), output_fps, tmp_path, skip=0)
@@ -287,6 +290,9 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
             f"Encoded concatenated MP4: {num_frames} frames @ {output_fps:.2f} fps "
             f"({duration:.2f}s) at {width}x{height}" + (", with AAC audio" if audio is not None else ", silent")
         )
+        # Splice stages run uninterrupted; a cancellation that arrived meanwhile must not be saved.
+        if context.util.is_canceled():
+            raise CanceledException
         video_dto = context.videos.save(
             source_path=source_path,
             width=width,
@@ -324,7 +330,7 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
         if (
             layout is None
             or layout.frame_duration is None
-            or layout.decoder_config != writer_decoder_config(*canvas, output_fps)
+            or layout.sample_entry != writer_sample_entry(*canvas, output_fps)
         ):
             return None
         tail_need, _ = self._transition_windows()
@@ -383,6 +389,7 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
         layout: H264Layout,
         rest_path: Path,
         first_clip_frames: int,
+        output_fps: float,
         work_dir: Path,
         out_path: Path,
     ) -> bool:
@@ -397,24 +404,28 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
         rest = read_h264_layout(rest_path)
         if first_clip_frames != layout.sample_count:
             reason = f"it decoded to {first_clip_frames} frames but lists {layout.sample_count}"
-        elif rest is None or rest.decoder_config != layout.decoder_config or rest.sync_samples[:1] != (0,):
+        elif rest is None or rest.sample_entry != layout.sample_entry or rest.sync_samples[:1] != (0,):
             reason = "its encoding differs from this node's"
         else:
             reason = None
         if reason is None:
             head_path = work_dir / "head.mp4"
             try:
-                copy_frames(first_path, 0, keyframe, layout.sample_count, head_path)
+                copy_frames(first_path, 0, keyframe, layout.sample_count, head_path, context.util.is_canceled)
                 head = read_h264_layout(head_path)
-                if head is None or head.sample_count != keyframe:
+                # ffmpeg can derive presentation boxes (e.g. a pasp from a tkhd display size) while
+                # copying, so the copied head must keep the source's own sample entry.
+                if head is None or head.sample_count != keyframe or head.sample_entry != layout.sample_entry:
                     reason = "copying its head did not yield the expected frames"
                 else:
-                    concat_stream_copy([head_path, rest_path], out_path)
+                    concat_stream_copy([head_path, rest_path], out_path, context.util.is_canceled)
                     joined = read_h264_layout(out_path)
                     if (
                         joined is None
+                        or joined.sample_entry != layout.sample_entry
                         or joined.sample_count != keyframe + rest.sample_count
                         or joined.frame_duration != layout.frame_duration
+                        or not probes_as(out_path, output_fps, joined.sample_count)
                     ):
                         reason = "the joined file does not hold the expected frames on one timeline"
             except SpliceError as e:
@@ -480,6 +491,7 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
                 rate,
                 pcm.shape[1],
                 out_path,
+                context.util.is_canceled,
             )
             muxed = extract_audio_pcm(out_path)
         except (SpliceError, AudioExtractionError) as e:
