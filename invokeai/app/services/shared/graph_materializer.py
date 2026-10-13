@@ -44,6 +44,9 @@ class _ExecutionNodeBuilder:
     def __init__(self, state: "GraphExecutionState") -> None:
         self._state = state
         self._iteration_axes_by_source: dict[str, tuple[str, ...]] = {}
+        # Keyed by the identity of the cached flat source graph, which every graph edit replaces.
+        self._flat_iterator_graph: Optional[tuple["nx.DiGraph", "nx.DiGraph"]] = None
+        self._node_iterators: dict[str, tuple[str, ...]] = {}
 
     def _get_iteration_axes(self, source_node_id: str) -> tuple[str, ...]:
         cached = self._iteration_axes_by_source.get(source_node_id)
@@ -1589,8 +1592,20 @@ class _ExecutionNodeBuilder:
                 self._state._enqueue_if_ready(exec_node_id)
 
     def iterator_graph(self, base: Optional["nx.DiGraph"] = None) -> "nx.DiGraph":
-        """Gets a DiGraph with edges to collectors removed so an ancestor search produces all active iterators for any node"""
-        g = base.copy() if base is not None else self._state._get_source_graph_flat().copy()
+        """Gets a DiGraph with edges to collectors removed so an ancestor search produces all active iterators for any node
+
+        The result for the flat source graph is shared; callers must not mutate it.
+        """
+        source_graph = self._state._get_source_graph_flat()
+        if base is not None and base is not source_graph:
+            return self._build_iterator_graph(base)
+        if self._flat_iterator_graph is None or self._flat_iterator_graph[0] is not source_graph:
+            self._flat_iterator_graph = (source_graph, self._build_iterator_graph(source_graph))
+            self._node_iterators = {}
+        return self._flat_iterator_graph[1]
+
+    def _build_iterator_graph(self, base: "nx.DiGraph") -> "nx.DiGraph":
+        g = base.copy()
         collectors = (
             n for n in self._state.graph.nodes if isinstance(self._state.graph.get_node(n), CollectInvocation)
         )
@@ -1607,10 +1622,19 @@ class _ExecutionNodeBuilder:
         return g
 
     def get_node_iterators(self, node_id: str, it_graph: Optional["nx.DiGraph"] = None) -> list[str]:
-        g = it_graph or self.iterator_graph()
+        flat_iterator_graph = self.iterator_graph()
+        if it_graph is not None and it_graph is not flat_iterator_graph:
+            return self._find_node_iterators(node_id, it_graph)
+        cached = self._node_iterators.get(node_id)
+        if cached is None:
+            cached = tuple(self._find_node_iterators(node_id, flat_iterator_graph))
+            self._node_iterators[node_id] = cached
+        return list(cached)
+
+    def _find_node_iterators(self, node_id: str, it_graph: "nx.DiGraph") -> list[str]:
         return [
             n
-            for n in nx.ancestors(g, node_id)
+            for n in nx.ancestors(it_graph, node_id)
             if isinstance(self._state.graph.get_node(n), (ForInvocation, IterateInvocation))
         ]
 

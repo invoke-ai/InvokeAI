@@ -287,17 +287,29 @@ def _is_activation_dependency_rejected(state: "GraphExecutionState", dependency:
     matching_gate_ids = state._prepared_if_exec_ids(dependency.owner_id, dependency.frame)
     for gate_id in matching_gate_ids:
         gate = state._activation_gate(gate_id)
-        expected_frame = state._expected_execution_ref(gate_id).frame
-        if (
-            gate.frame.state_id != expected_frame.state_id
-            or gate.frame.frame_id != expected_frame.frame_id
-            or gate.frame.iteration_path != expected_frame.iteration_path
-            or gate.frame.workflow_call_depth != expected_frame.workflow_call_depth
-        ):
+        if not _gate_matches_expected_frame(state, gate_id, gate):
             return False
         if gate.resolved and gate.selected_branch != dependency.branch:
             return True
     return False
+
+
+def _gate_matches_expected_frame(state: "GraphExecutionState", gate_id: str, gate: ActivationGate) -> bool:
+    # Gates registered in this process share the frame instance built for the prepared path, which makes the
+    # field-by-field scope check below trivially true; rehydrated or mismatched gates take the full check.
+    if (
+        gate_id in state.execution_graph.nodes
+        and state.prepared_source_mapping.get(gate_id) is not None
+        and gate.frame is state._engine_frame(state.prepared_iteration_paths.get(gate_id, ()))
+    ):
+        return True
+    expected_frame = state._expected_execution_ref(gate_id).frame
+    return (
+        gate.frame.state_id == expected_frame.state_id
+        and gate.frame.frame_id == expected_frame.frame_id
+        and gate.frame.iteration_path == expected_frame.iteration_path
+        and gate.frame.workflow_call_depth == expected_frame.workflow_call_depth
+    )
 
 
 def _resolve_activation_gate(state: "GraphExecutionState", exec_node_id: str, branch: str) -> bool:

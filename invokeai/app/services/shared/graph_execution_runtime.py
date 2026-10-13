@@ -51,7 +51,7 @@ class _ExecutionRuntime:
         return self._state._prepared_registry().get_source_node_id(exec_node_id)
 
     def _get_ordered_iterator_sources(self, source_node_id: str) -> list[str]:
-        iterator_graph = self._state._iterator_graph(self._state.graph.nx_graph())
+        iterator_graph = self._state._iterator_graph(self._state._get_source_graph_flat())
         iterator_sources = [
             node_id
             for node_id in nx.ancestors(iterator_graph, source_node_id)
