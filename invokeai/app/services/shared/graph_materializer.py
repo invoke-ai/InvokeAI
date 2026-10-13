@@ -1425,6 +1425,7 @@ class _ExecutionNodeBuilder:
                         set(),
                         self._get_prepared_nodes_for_source,
                         self._get_prepared_edge_iteration_path,
+                        graph,
                     )
                 )
             mappings = self._get_if_condition_iteration_mappings(node_id, graph)
@@ -1767,6 +1768,7 @@ class _ExecutionNodeBuilder:
                 set(),
                 self._get_prepared_nodes_for_source,
                 self._get_prepared_edge_iteration_path,
+                g,
             )
             condition_edges = self._state.graph._get_input_edges(next_node_id, "condition")
             if condition_edges:

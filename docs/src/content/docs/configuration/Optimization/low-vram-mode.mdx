@@ -210,8 +210,8 @@ To always decode untiled unless you ask for tiling, turn this off. A decode too 
 auto_tiled_decode: false
 ```
 
-- **Always tile:** set `force_tiled_decode: true` in `invokeai.yaml`. It covers the VAE decode and encode for SD1.5/SDXL, FLUX.1, Z-Image and Qwen-Image, the Anima encode, and the Krea-2 style reference. Other model families (for example SD3, FLUX.2, Wan and LTX-2) ignore it.
-- **Per node:** the SD, FLUX.1, Z-Image and Qwen-Image **Latents to Image** and **Image to Latents** nodes, and **Image to Latents - Anima**, have **Tiled** and **Tile Size** fields for workflows. The [Upscale panel](/users-guide/image-generation/upscale/) turns tiling on by itself.
+- **Always tile:** set `force_tiled_decode: true` in `invokeai.yaml`. It covers the VAE decode and encode for SD1.5/SDXL, FLUX.1, Z-Image and Qwen-Image, the Anima encode, the control image of a Z-Image ControlNet, and the Krea-2 style reference. Other model families (for example SD3, FLUX.2, Wan and LTX-2) ignore it.
+- **Per node:** the SD, FLUX.1, Z-Image and Qwen-Image **Latents to Image** and **Image to Latents** nodes, and **Image to Latents - Anima**, have **Tiled** and **Tile Size** fields for workflows. So does the **Z-Image ControlNet** node, for the control image the denoise encodes. The [Upscale panel](/users-guide/image-generation/upscale/) turns tiling on by itself.
 - **Automatic retry:** if a FLUX.1, Z-Image or Anima decode, or a FLUX.1 encode, runs out of memory, InvokeAI retries it once with tiling and logs that it did.
 
 A tiled decode is not pixel-identical to a single-pass one. The VAE looks at the whole image at once, so the difference is spread over the image rather than limited to the tile seams; it is small, but the same seed will not reproduce an untiled result exactly.

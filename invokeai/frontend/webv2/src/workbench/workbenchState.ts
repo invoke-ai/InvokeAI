@@ -3537,7 +3537,7 @@ const enqueueCompiledSnapshot = (
     route.sourceId === 'video' && videoSettings?.model ? getVideoDimensions(videoSettings.model, videoSettings) : null;
   const presentationDimensions =
     route.sourceId === 'upscale' && upscaleSettings?.inputImage
-      ? getUpscaleOutputDimensions(upscaleSettings.inputImage, upscaleSettings.scale)
+      ? getUpscaleOutputDimensions(upscaleSettings.inputImage, upscaleSettings.scale, upscaleSettings.model)
       : videoPresentationDimensions
         ? videoPresentationDimensions
         : {
