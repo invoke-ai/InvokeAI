@@ -20,9 +20,9 @@ def _edge(source: str, destination: str, field: str) -> Any:
 
 
 class _Graph:
-    def __init__(self) -> None:
+    def __init__(self, *, condition_input: bool = True, condition: bool = False) -> None:
         self.nodes = {
-            "if": IfInvocation(id="if"),
+            "if": IfInvocation(id="if", condition=condition),
             "true": object(),
             "false": object(),
             "outside": object(),
@@ -31,6 +31,8 @@ class _Graph:
             ("if", "true_input"): [_edge("true", "if", "true_input")],
             ("if", "false_input"): [_edge("false", "if", "false_input")],
         }
+        if condition_input:
+            self._input_edges[("if", "condition")] = [_edge("condition", "if", "condition")]
         self._output_edges = {
             "true": self._input_edges[("if", "true_input")],
             "false": self._input_edges[("if", "false_input")],
@@ -123,3 +125,34 @@ def test_controller_dependencies_admission_rejection_and_inactive(monkeypatch: p
     assert controller.is_source_rejected("true")
     state.rejected.add(ActivationDependency(owner_id="if", branch="true_input", frame=(1,)))
     assert controller.is_source_inactive("true", (1,))
+
+
+@pytest.mark.parametrize(
+    ("condition", "selected_source", "unselected_source", "unselected_field"),
+    [
+        (True, "true", "false", "false_input"),
+        (False, "false", "true", "true_input"),
+    ],
+)
+def test_controller_admits_only_source_level_selected_branch(
+    monkeypatch: pytest.MonkeyPatch,
+    condition: bool,
+    selected_source: str,
+    unselected_source: str,
+    unselected_field: str,
+) -> None:
+    class _NetworkX:
+        def ancestors(self, _graph: object, _node_id: str) -> set[str]:
+            return set()
+
+    monkeypatch.setattr(graph_module, "nx", _NetworkX())
+    state = _State()
+    state.graph = _Graph(condition_input=False, condition=condition)
+    controller = _IfActivationController(state)
+
+    assert controller.get_source_dependencies(selected_source) == ()
+    assert controller.is_source_admitted(selected_source)
+    assert not controller.is_source_inactive(selected_source)
+    assert controller.get_source_dependencies(unselected_source) == (
+        ActivationDependency(owner_id="if", branch=unselected_field, frame=()),
+    )

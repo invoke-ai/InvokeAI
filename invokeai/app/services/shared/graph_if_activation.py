@@ -21,6 +21,7 @@ class _IfActivationController:
         self._branch_sources_cache: dict[tuple[str, str], frozenset[str]] = {}
         self._if_node_ids: Optional[tuple[str, ...]] = None
         self._branch_memberships_by_source: dict[str, tuple[tuple[str, tuple[str, ...]], ...]] = {}
+        self._source_level_selected_fields: dict[str, Optional[str]] = {}
 
     def _branch_sources(self, if_node_id: str, branch_field: str, source_graph: "nx.DiGraph") -> set[str]:
         cache_key = (if_node_id, branch_field)
@@ -55,6 +56,15 @@ class _IfActivationController:
             )
         return self._if_node_ids
 
+    def _get_source_level_selected_field(self, if_node_id: str) -> Optional[str]:
+        if if_node_id not in self._source_level_selected_fields:
+            if_node = self._state.graph.nodes[if_node_id]
+            selected_field = None
+            if not self._state.graph._get_input_edges(if_node_id, "condition"):
+                selected_field = "true_input" if if_node.condition else "false_input"
+            self._source_level_selected_fields[if_node_id] = selected_field
+        return self._source_level_selected_fields[if_node_id]
+
     def _branch_memberships(self, source_node_id: str) -> tuple[tuple[str, tuple[str, ...]], ...]:
         """Return each If with the branch fields whose exclusive sources include this source."""
         cached = self._branch_memberships_by_source.get(source_node_id)
@@ -62,17 +72,20 @@ class _IfActivationController:
             return cached
 
         source_graph = self._state._get_source_graph_flat()
-        memberships = tuple(
-            (if_node_id, fields)
-            for if_node_id in self._get_if_node_ids()
-            if (
-                fields := tuple(
-                    branch_field
-                    for branch_field in ("true_input", "false_input")
-                    if source_node_id in self._branch_sources(if_node_id, branch_field, source_graph)
-                )
+        memberships = []
+        for if_node_id in self._get_if_node_ids():
+            fields = tuple(
+                branch_field
+                for branch_field in ("true_input", "false_input")
+                if source_node_id in self._branch_sources(if_node_id, branch_field, source_graph)
             )
-        )
+            if not fields:
+                continue
+            selected_field = self._get_source_level_selected_field(if_node_id)
+            if selected_field is not None and selected_field in fields:
+                continue
+            memberships.append((if_node_id, fields))
+        memberships = tuple(memberships)
         self._branch_memberships_by_source[source_node_id] = memberships
         return memberships
 

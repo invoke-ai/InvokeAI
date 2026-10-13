@@ -4241,6 +4241,27 @@ def test_graph_state_collects():
     assert sorted(g.results[n6[0].id].collection) == sorted(test_prompts)
 
 
+def test_single_if_in_iterate_body_completes():
+    graph = Graph()
+    graph.add_node(IntegerCollectionInvocation(id="collection", collection=[1, 2]))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(AddInvocation(id="add", b=10))
+    graph.add_node(IfInvocation(id="if", condition=True))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_edge(create_edge("collection", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "add", "a"))
+    graph.add_edge(create_edge("add", "value", "if", "true_input"))
+    graph.add_edge(create_edge("if", "value", "collect", "item"))
+
+    state = GraphExecutionState(graph=graph)
+    executed_source_ids = execute_all_nodes(state)
+
+    assert state.is_complete(), f"stalled after executing source nodes: {executed_source_ids}"
+    assert not state.errors
+    collect_exec_id = next(iter(state.source_prepared_mapping["collect"]))
+    assert state.results[collect_exec_id].collection == [11, 12]
+
+
 def test_graph_state_empty_iterator_collects_and_completes():
     graph = Graph()
     graph.add_node(IntegerCollectionInvocation(id="collection", collection=[]))
