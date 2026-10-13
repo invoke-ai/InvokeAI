@@ -6,6 +6,10 @@ from typing import Any, ClassVar, Literal, Self
 import torch
 from pydantic import BaseModel, Field
 
+from invokeai.backend.flux.controlnet.state_dict_utils import (
+    is_state_dict_instantx_controlnet,
+    is_state_dict_xlabs_controlnet,
+)
 from invokeai.backend.ltx2 import checkpoint_layout as ltx2_layout
 from invokeai.backend.model_manager.checkpoint_prefix import COMFYUI_KEY_PREFIXES
 from invokeai.backend.model_manager.configs.base import (
@@ -589,6 +593,9 @@ class Main_Checkpoint_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Conf
             },
         ):
             raise NotAMatchError("state dict does not look like a FLUX checkpoint")
+
+        if is_state_dict_xlabs_controlnet(state_dict) or is_state_dict_instantx_controlnet(state_dict):
+            raise NotAMatchError("state dict is a FLUX ControlNet, not a main model")
 
         # Exclude FLUX.2 models - they have their own config class
         if _is_flux2_model(state_dict):
