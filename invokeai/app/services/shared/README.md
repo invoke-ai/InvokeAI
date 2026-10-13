@@ -676,11 +676,17 @@ materialization.
 Literal-condition `If` fallback checks use the private `_IteratorAncestry` context. One context belongs to one
 `_ExecutionNodeBuilder.prepare()` call and its source DAG, shared by candidate admission and selected-node materialization;
 a standalone iteration-path lookup creates its own context and passes it through both `If` and ordinary-node
-recursion. The filtered iterator graph is built lazily for condition-edge iterator compatibility and, for literal conditions,
+traversal. The filtered iterator graph is built lazily for condition-edge iterator compatibility and, for literal conditions,
 only when an unresolved selected branch needs the ancestry fallback.
 The context computes boolean proper-ancestor reachability with collector and final-`For` boundaries preserved, and
 reuses that analysis within the call. No context is retained on execution state or serialized, so later calls observe
 new supplied graphs and source mutations without cache invalidation.
+
+Ordinary source nodes are traversed with an explicit stack, but path inference recurses when a selected input comes from
+another unprepared `If`. A direct lookup over a 400-node literal-`If` chain raises `RecursionError` with CPython 3.12's
+default recursion limit of 1,000; serial execution of the equivalent 1,100-node graph completes. This is a pathological
+depth limit in the unresolved compatibility fallback, not a general graph-size limit. Supporting arbitrary nested-`If`
+depth requires converting that path inference to an explicit stack.
 
 ### 4.5 Readiness and class ordering
 
