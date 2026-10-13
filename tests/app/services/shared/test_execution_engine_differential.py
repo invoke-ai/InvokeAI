@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import random
 from itertools import product
 from pathlib import Path
 from typing import Any, Callable
@@ -8570,24 +8571,56 @@ def test_iterate_for_collect_preserves_empty_inner_collection(force_compatibilit
     assert state.is_complete()
 
 
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
 @pytest.mark.parametrize(
     ("left_values", "expected"),
     [([1, 2], ["fallback", [12, 22]]), ([1, 1], ["fallback", "fallback"])],
     ids=["mixed", "branch-never-selected"],
 )
-def test_sibling_iterates_collect_through_if_branch_without_unsupported_frames(left_values, expected):
+@pytest.mark.parametrize(
+    "node_order",
+    [
+        tuple(order)
+        for order in (
+            random.Random(seed).sample(
+                (
+                    "left_source",
+                    "right_source",
+                    "left",
+                    "right",
+                    "body",
+                    "branch_collect",
+                    "minus_one",
+                    "condition",
+                    "fallback",
+                    "if",
+                    "collect",
+                ),
+                11,
+            )
+            for seed in range(20)
+        )
+    ],
+)
+def test_sibling_iterates_collect_through_if_branch_without_unsupported_frames(
+    left_values, expected, node_order, force_compatibility_scheduler
+):
     graph = Graph()
-    graph.add_node(CollectionConcatInvocation(id="left_source", first=left_values))
-    graph.add_node(CollectionConcatInvocation(id="right_source", first=[10, 20]))
-    graph.add_node(IterateInvocation(id="left"))
-    graph.add_node(IterateInvocation(id="right"))
-    graph.add_node(AddInvocation(id="body"))
-    graph.add_node(CollectInvocation(id="branch_collect"))
-    graph.add_node(AddInvocation(id="minus_one", b=-1))
-    graph.add_node(FixedCollectionTestInvocation(id="condition"))
-    graph.add_node(AnyTypeTestInvocation(id="fallback", value="fallback"))
-    graph.add_node(IfInvocation(id="if"))
-    graph.add_node(CollectInvocation(id="collect"))
+    nodes = {
+        "left_source": CollectionConcatInvocation(id="left_source", first=left_values),
+        "right_source": CollectionConcatInvocation(id="right_source", first=[10, 20]),
+        "left": IterateInvocation(id="left"),
+        "right": IterateInvocation(id="right"),
+        "body": AddInvocation(id="body"),
+        "branch_collect": CollectInvocation(id="branch_collect"),
+        "minus_one": AddInvocation(id="minus_one", b=-1),
+        "condition": FixedCollectionTestInvocation(id="condition"),
+        "fallback": AnyTypeTestInvocation(id="fallback", value="fallback"),
+        "if": IfInvocation(id="if"),
+        "collect": CollectInvocation(id="collect"),
+    }
+    for node_id in node_order:
+        graph.add_node(nodes[node_id])
     for source, source_field, destination, destination_field in (
         ("left_source", "collection", "left", "collection"),
         ("right_source", "collection", "right", "collection"),
@@ -8603,13 +8636,55 @@ def test_sibling_iterates_collect_through_if_branch_without_unsupported_frames(l
     ):
         graph.add_edge(create_edge(source, source_field, destination, destination_field))
 
-    trace, state = _run_to_completion(GraphExecutionState(graph=graph))
+    state = GraphExecutionState(graph=graph)
+    if force_compatibility_scheduler:
+        state._execution_scheduler = _ExecutionScheduler(state)
+    trace, state = _run_to_completion(state)
 
     assert state.is_complete()
     assert state.results[next(iter(state.source_prepared_mapping["collect"]))].collection == expected
     if left_values == [1, 1]:
         assert "right" not in trace
         assert "body" not in trace
+
+
+def test_nested_iterate_collected_in_if_branch_is_not_misclassified_as_sibling():
+    graph = Graph()
+    graph.add_node(CollectionConcatInvocation(id="outer_source", first=[["a", "b"], ["c"]]))
+    graph.add_node(IterateInvocation(id="outer"))
+    graph.add_node(PolymorphicStringTestInvocation(id="inner_collection"))
+    graph.add_node(IterateInvocation(id="inner"))
+    graph.add_node(AnyTypeTestInvocation(id="body"))
+    graph.add_node(CollectInvocation(id="branch_collect"))
+    graph.add_node(FixedCollectionTestInvocation(id="condition"))
+    graph.add_node(AnyTypeTestInvocation(id="fallback", value="fallback"))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(CollectInvocation(id="result_collect"))
+    for source, source_field, destination, destination_field in (
+        ("outer_source", "collection", "outer", "collection"),
+        ("outer", "item", "inner_collection", "value"),
+        ("inner_collection", "collection", "inner", "collection"),
+        ("inner", "item", "body", "value"),
+        ("body", "value", "branch_collect", "item"),
+        ("outer", "item", "condition", "value"),
+        ("condition", "condition", "if", "condition"),
+        ("branch_collect", "collection", "if", "true_input"),
+        ("fallback", "value", "if", "false_input"),
+        ("if", "value", "result_collect", "item"),
+    ):
+        graph.add_edge(create_edge(source, source_field, destination, destination_field))
+
+    state = GraphExecutionState(graph=graph)
+
+    assert state._materializer()._get_sibling_iterate_if_collect_branch("inner") is None
+
+    trace, state = _run_to_completion(state)
+
+    assert state.is_complete()
+    assert state.results[next(iter(state.source_prepared_mapping["result_collect"]))].collection == [
+        ["a", "b"],
+        ["c"],
+    ]
 
 
 def test_if_does_not_combine_unrelated_open_iterator_frames():
@@ -8704,7 +8779,7 @@ def test_execution_materializer_cache_refreshes_after_sibling_iterate_edge_addit
     original_materializer = state._materializer()
     source_graph = state._get_source_graph_flat()
     assert not original_materializer._is_inactive_sibling_if_collect_source("right", source_graph)
-    assert original_materializer._sibling_iterate_if_collect_ids == ()
+    assert original_materializer._get_sibling_iterate_if_collect_branch("right") is None
 
     state.add_edge(create_edge("right", "item", "body", "b"))
 
