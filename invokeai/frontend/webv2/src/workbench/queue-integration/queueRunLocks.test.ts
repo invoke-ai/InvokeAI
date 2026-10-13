@@ -34,6 +34,27 @@ describe('queue run locks', () => {
     expect(isHeld).toHaveBeenCalledWith(acquire.mock.calls[0]?.[0]);
   });
 
+  it('waits on a run under the name its owner acquires, taking it only for a moment', async () => {
+    const acquire = vi.fn().mockResolvedValue({ kind: 'contended' });
+    const release = vi.fn().mockResolvedValue(undefined);
+    const waitShared = vi.fn().mockResolvedValue({ kind: 'acquired', release });
+    const locks = createQueueRunLockPort(
+      ':account-1',
+      acquire,
+      vi.fn().mockResolvedValue({ kind: 'acquired', release: vi.fn() }),
+      vi.fn(),
+      waitShared
+    );
+    const signal = new AbortController().signal;
+
+    await locks.acquire('project-1', 'item-1');
+    await locks.waitForRunRelease('project-1', 'item-1', signal);
+
+    expect(waitShared).toHaveBeenCalledWith(acquire.mock.calls[0]?.[0], signal);
+    // Released at once, so the tab that wants the run next is not kept out.
+    expect(release).toHaveBeenCalledOnce();
+  });
+
   it('holds a shared project lease for the lifetime of an acquired run', async () => {
     const calls: string[] = [];
     const locks = createQueueRunLockPort(

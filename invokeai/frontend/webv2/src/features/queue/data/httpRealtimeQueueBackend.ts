@@ -13,6 +13,7 @@ import {
 import {
   cancelByBatchIds,
   cancelCurrentQueueItem,
+  claimQueueItemDelivery,
   cancelQueueItem,
   cancelQueueItems,
   cancelScopedQueueItems,
@@ -103,6 +104,13 @@ export const queueBackend: QueueBackendPort = {
     return item ? mapQueueItemDTO(item) : null;
   },
   readStatus: async (scope, signal) => mapQueueStatusDTO(await getQueueStatus(scope, signal)),
+  claimItemDelivery: async (itemId, action, claimant) => {
+    const result = await claimQueueItemDelivery(itemId, action, claimant);
+
+    return result.status === 'held'
+      ? { kind: 'held', retryInMs: Math.max(1, result.retry_after_ms ?? 0) }
+      : { kind: result.status };
+  },
   retryItems: async (itemIds) => {
     const result = await retryItemsById(itemIds);
     if (result.retried_items?.length) {

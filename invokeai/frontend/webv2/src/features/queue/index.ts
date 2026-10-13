@@ -66,5 +66,5 @@ export {
   getQueueReadModelOptions,
   queueCommands,
 } from './publicApi';
-export type { QueueRerunDelivery, QueueRunLockPort } from './runtime';
+export type { QueueRunLockPort } from './runtime';
 export { hasPendingWorkflowQueueItem } from './ui/queueViewModel';

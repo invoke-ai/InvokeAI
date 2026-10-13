@@ -1,4 +1,3 @@
-import type { QueueRerunDelivery } from '@features/queue';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { IDBPObjectStore } from 'idb';
 
@@ -18,8 +17,6 @@ import { normalizeRestoredQueueItem } from '@workbench/queue-integration/queueRu
 export const QUEUE_RUN_MAX_BYTES = 32 * 1024 * 1024;
 export const QUEUE_RUN_TOTAL_MAX_BYTES = 128 * 1024 * 1024;
 export const QUEUE_RUN_MAX_ENTRIES = 10_000;
-/** How long a rerun delivery claim is kept: past any tab still handling the rerun's completion, even one long queued. */
-export const QUEUE_RERUN_DELIVERY_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 export interface QueueRunJournalEntry {
   /** Untrusted serialized candidate. Normalize it against the current project before restoration. */
@@ -34,21 +31,11 @@ export type QueueRunJournalLoadResult =
   | { kind: 'unavailable' };
 export type QueueRunJournalWriteResult = { kind: 'invalid' | 'quota' | 'stored' | 'too-large' | 'unavailable' };
 export type QueueRunJournalSettleResult = { kind: 'removed' | 'unavailable' };
-export type QueueRerunDeliveryClaimResult = { kind: 'claimed' | 'taken' | 'unavailable' };
-/**
- * An adoption reserves a rerun for the run that reopened around it, which delivers it later; a delivery records that a
- * tab staged it. A delivery is refused by either, an adoption only by a delivery.
- */
-export type QueueRerunDeliveryKind = 'adoption' | 'delivery';
 
 export interface QueueRunJournal {
   readonly availability: 'available' | 'unavailable';
   close(): void;
   acknowledgeReceipt(projectId: string, queueItemId: string): Promise<QueueRunJournalSettleResult>;
-  /** Claim a backend rerun's delivery for this tab, shared by every tab of the account. */
-  claimRerunDelivery(rerun: QueueRerunDelivery, kind: QueueRerunDeliveryKind): Promise<QueueRerunDeliveryClaimResult>;
-  /** Give back a claim whose delivery cannot happen, so another tab may still deliver the rerun. */
-  releaseRerunDelivery(rerun: QueueRerunDelivery, kind: QueueRerunDeliveryKind): Promise<QueueRunJournalSettleResult>;
   listPendingReceipts(): Promise<
     { entries: QueueReceiptAcknowledgement[]; kind: 'available' } | { kind: 'unavailable' }
   >;
@@ -64,12 +51,6 @@ const getByteSize = (value: string): number => new TextEncoder().encode(value).b
 const QUEUE_RUN_SUBMISSION_SEQUENCE_KEY = 'queueRunSubmissionSequence';
 const QUEUE_RUN_TOTAL_BYTES_KEY = 'queueRunTotalBytes';
 const QUEUE_RUN_COUNT_KEY = 'queueRunCount';
-// Claims share the metadata store, under a prefix of their own, rather than needing a database upgrade.
-const QUEUE_RERUN_DELIVERY_KEY_PREFIX = 'queueRerunDelivery:';
-const getRerunDeliveryKey = (
-  { backendItemId, projectId, queueItemId }: QueueRerunDelivery,
-  kind: QueueRerunDeliveryKind
-): string => `${QUEUE_RERUN_DELIVERY_KEY_PREFIX}${JSON.stringify([backendItemId, projectId, queueItemId, kind])}`;
 const QUEUE_RUN_STORES = [
   WORKBENCH_DATABASE_METADATA_STORE,
   WORKBENCH_QUEUE_RUN_STORE,
@@ -343,54 +324,6 @@ export const createIndexedDbQueueRunJournal = (
         return { kind: 'unavailable' };
       }
     },
-    async claimRerunDelivery(rerun, kind) {
-      if (!isAvailable()) {
-        return { kind: 'unavailable' };
-      }
-      try {
-        const transaction = observeTransaction(database.transaction(WORKBENCH_DATABASE_METADATA_STORE, 'readwrite'));
-        const metadataStore = transaction.store;
-        const key = getRerunDeliveryKey(rerun, kind);
-        const refusedBy = new Set(
-          kind === 'delivery'
-            ? [getRerunDeliveryKey(rerun, 'adoption'), getRerunDeliveryKey(rerun, 'delivery')]
-            : [getRerunDeliveryKey(rerun, 'delivery')]
-        );
-        const claimedAt = now();
-        // One read of every claim, so the store the queue journal writes to is held only briefly.
-        const claims = await metadataStore.getAll(
-          IDBKeyRange.bound(QUEUE_RERUN_DELIVERY_KEY_PREFIX, `${QUEUE_RERUN_DELIVERY_KEY_PREFIX}\uffff`)
-        );
-        const isLive = (claim: { value: number }) =>
-          Number.isFinite(claim.value) && claimedAt - claim.value < QUEUE_RERUN_DELIVERY_RETENTION_MS;
-        const isTaken = claims.some((claim) => refusedBy.has(claim.key) && isLive(claim));
-        const kept = claims.filter((claim) => claim.key !== key && isLive(claim));
-        const stale = claims.filter((claim) => !isLive(claim));
-        if (!isTaken) {
-          kept.sort((left, right) => left.value - right.value);
-          stale.push(...kept.slice(0, Math.max(0, kept.length - Math.max(0, entryBudget - 1))));
-        }
-        await Promise.all([
-          ...stale.map((claim) => metadataStore.delete(claim.key)),
-          ...(isTaken ? [] : [metadataStore.put({ key, value: claimedAt })]),
-        ]);
-        await transaction.done;
-        return { kind: isTaken ? 'taken' : 'claimed' };
-      } catch {
-        return { kind: 'unavailable' };
-      }
-    },
-    async releaseRerunDelivery(rerun, kind) {
-      if (!isAvailable()) {
-        return { kind: 'unavailable' };
-      }
-      try {
-        await database.delete(WORKBENCH_DATABASE_METADATA_STORE, getRerunDeliveryKey(rerun, kind));
-        return { kind: 'removed' };
-      } catch {
-        return { kind: 'unavailable' };
-      }
-    },
     async deleteForProject(projectId) {
       if (!isAvailable()) {
         return { kind: 'unavailable' };
@@ -590,8 +523,6 @@ export const createAccountOwnedQueueRunJournal = async (
     return {
       availability: 'unavailable',
       acknowledgeReceipt: () => Promise.resolve({ kind: 'unavailable' }),
-      claimRerunDelivery: () => Promise.resolve({ kind: 'unavailable' }),
-      releaseRerunDelivery: () => Promise.resolve({ kind: 'unavailable' }),
       listPendingReceipts: () => Promise.resolve({ kind: 'unavailable' }),
       close: () => undefined,
       deleteForProject: () => Promise.resolve({ kind: 'unavailable' }),

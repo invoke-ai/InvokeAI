@@ -46,6 +46,11 @@ export interface RetryItemsResultDTO {
   retried_items?: { item_id: number; source_item_id: number }[];
 }
 
+export interface QueueItemDeliveryResultDTO {
+  retry_after_ms?: number | null;
+  status: 'claimed' | 'delivered' | 'held' | 'released';
+}
+
 export interface CancelByBatchIdsResultDTO {
   canceled: number;
 }

@@ -992,6 +992,21 @@ test('queue retry clones failed or canceled roots once, cancel-by-batch spares o
     const secondRerun = await getJson(backend, `/api/v1/queue/default/i/${again.retried_items[0].item_id}`);
     assert.equal(secondRerun.retried_from_item_id, failed.item_id);
 
+    // One claimant at a time stages a rerun's results; a confirmed rerun stays delivered.
+    const deliver = (action, claimant) =>
+      getJson(backend, `/api/v1/queue/default/i/${clone.item_id}/delivery`, {
+        body: JSON.stringify({ action, claimant }),
+        method: 'POST',
+      });
+    assert.deepEqual(await deliver('claim', 'tab:a'), { status: 'claimed' });
+    const held = await deliver('claim', 'tab:b');
+    assert.equal(held.status, 'held');
+    assert.ok(held.retry_after_ms > 0);
+    assert.deepEqual(await deliver('release', 'tab:a'), { status: 'released' });
+    assert.deepEqual(await deliver('claim', 'tab:b'), { status: 'claimed' });
+    assert.deepEqual(await deliver('confirm', 'tab:b'), { status: 'delivered' });
+    assert.deepEqual(await deliver('claim', 'tab:a'), { status: 'delivered' });
+
     const canceled = await getJson(backend, '/api/v1/queue/default/cancel_by_batch_ids', {
       body: JSON.stringify({ batch_ids: [pending.batch_id] }),
       method: 'PUT',

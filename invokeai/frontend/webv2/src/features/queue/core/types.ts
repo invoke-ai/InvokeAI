@@ -336,8 +336,22 @@ export interface QueueProgressPreviewPayload {
   image: { width: number; height: number; dataURL: string } | null;
 }
 
+/** Who stages a retried item's results, as the server agreed it across every browser and tab of the account. */
+export type QueueItemDeliveryClaim =
+  | { kind: 'claimed' | 'delivered' | 'released' }
+  | { kind: 'held'; retryInMs: number };
+
 export interface QueueBackendPort extends QueueFeatureCommands {
   acknowledgeEnqueue?(projectId: string, sourceQueueItemId: string): Promise<void>;
+  /**
+   * Claim, confirm or release the delivery of an item's results. A claim is held until its claimant confirms or
+   * releases it, or until it expires; an item once confirmed is delivered for good.
+   */
+  claimItemDelivery(
+    itemId: number,
+    action: 'claim' | 'confirm' | 'release',
+    claimant: string
+  ): Promise<QueueItemDeliveryClaim>;
   getEnqueueReceipt?(projectId: string, sourceQueueItemId: string): Promise<QueueEnqueueResult | null>;
   /** The latest preview frame of each of the user's running items (`GET queue/{id}/previews`). */
   readProgressPreviews?(signal?: AbortSignal): Promise<QueueProgressPreviewPayload[]>;

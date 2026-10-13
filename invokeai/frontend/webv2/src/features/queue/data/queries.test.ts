@@ -58,6 +58,7 @@ const createBackend = (): QueueBackendPort => ({
   }),
   retryItems: vi.fn(),
   resumeProcessor: vi.fn(),
+  claimItemDelivery: vi.fn(),
 });
 
 describe('queue queries', () => {

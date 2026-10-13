@@ -3,6 +3,7 @@ import type {
   CancelByBatchIdsResultDTO,
   InvocationCacheStatusDTO,
   QueueAndProcessorStatusDTO,
+  QueueItemDeliveryResultDTO,
   QueueItemIdsResultDTO,
   QueueServerItemDTO,
   RetryItemsResultDTO,
@@ -269,6 +270,23 @@ export const retryItemsById = async (itemIds: number[]): Promise<RetryItemsResul
   const result = await apiFetchJson<RetryItemsResultDTO>(buildQueueUrl('retry_items_by_id'), {
     body: JSON.stringify(itemIds),
     method: 'PUT',
+    signal: owner.signal,
+  });
+
+  assertAccountScopeCurrent(owner);
+
+  return result;
+};
+
+export const claimQueueItemDelivery = async (
+  itemId: number,
+  action: 'claim' | 'confirm' | 'release',
+  claimant: string
+): Promise<QueueItemDeliveryResultDTO> => {
+  const owner = captureAccountScope();
+  const result = await apiFetchJson<QueueItemDeliveryResultDTO>(buildQueueUrl(`i/${itemId}/delivery`), {
+    body: JSON.stringify({ action, claimant }),
+    method: 'POST',
     signal: owner.signal,
   });
 

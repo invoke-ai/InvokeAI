@@ -110,6 +110,8 @@ const STARTER_MODELS_RESPONSE = {
   starter_models: [STARTER_MODEL],
 };
 
+const DELIVERY_CLAIM_TTL_MS = 120_000;
+
 const createState = (profile) => {
   const fixture = assertMockBackendFixture(createMockBackendFixture(profile));
 
@@ -137,6 +139,7 @@ const createState = (profile) => {
     intermediatesOperations: new Map(),
     intermediatesPreviews: new Map(),
     queueItems: new Map(fixture.queueItems.map((item) => [item.item_id, clone(item)])),
+    deliveryClaims: new Map(),
     runtimeConfig: { generation_devices: 'auto', max_queue_history: null },
     invocationCache: { enabled: true, hits: 0, max_size: 1000, misses: 0, size: 0 },
     videos: new Map(fixture.videos.map((video) => [video.video_name, clone(video)])),
@@ -1191,6 +1194,37 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           state.queueItems.delete(itemId);
           return json(200, { ok: true });
         }
+      }
+
+      const queueItemDeliveryMatch = /^\/api\/v1\/queue\/[^/]+\/i\/(\d+)\/delivery$/.exec(path);
+      if (queueItemDeliveryMatch && method === 'POST') {
+        // Like the backend: one claimant at a time stages an item's results until it confirms, releases, or its claim
+        // expires; a confirmed item stays delivered.
+        const itemId = Number(queueItemDeliveryMatch[1]);
+        if (!state.queueItems.has(itemId)) {
+          return json(404, { detail: 'Queue item not found' });
+        }
+        const { action, claimant } = await readJsonBody(request);
+        const claim = state.deliveryClaims.get(itemId);
+        const now = Date.now();
+        if (action === 'confirm') {
+          state.deliveryClaims.set(itemId, { claimant, claimedAt: now, isDelivered: true });
+          return json(200, { status: 'delivered' });
+        }
+        if (action === 'release') {
+          if (claim?.claimant === claimant && !claim.isDelivered) {
+            state.deliveryClaims.delete(itemId);
+          }
+          return json(200, { status: 'released' });
+        }
+        if (claim?.isDelivered) {
+          return json(200, { status: 'delivered' });
+        }
+        if (claim && claim.claimant !== claimant && now - claim.claimedAt < DELIVERY_CLAIM_TTL_MS) {
+          return json(200, { retry_after_ms: DELIVERY_CLAIM_TTL_MS - (now - claim.claimedAt), status: 'held' });
+        }
+        state.deliveryClaims.set(itemId, { claimant, claimedAt: now, isDelivered: false });
+        return json(200, { status: 'claimed' });
       }
 
       const queueItemCancelMatch = /^\/api\/v1\/queue\/[^/]+\/i\/(\d+)\/cancel$/.exec(path);

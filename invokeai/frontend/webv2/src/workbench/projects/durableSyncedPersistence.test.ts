@@ -163,8 +163,6 @@ beforeEach(() => {
   vi.mocked(createAccountOwnedQueueRunJournal).mockResolvedValue({
     availability: 'available',
     acknowledgeReceipt: vi.fn(),
-    claimRerunDelivery: vi.fn(),
-    releaseRerunDelivery: vi.fn(),
     listPendingReceipts: vi.fn(),
     close: vi.fn(),
     deleteForProject: vi.fn(),
@@ -337,8 +335,6 @@ describe('durable project persistence', () => {
     vi.mocked(createAccountOwnedQueueRunJournal).mockResolvedValueOnce({
       availability: 'available',
       acknowledgeReceipt: vi.fn(),
-      claimRerunDelivery: vi.fn(),
-      releaseRerunDelivery: vi.fn(),
       listPendingReceipts: vi.fn(),
       close: vi.fn(),
       deleteForProject: vi.fn(),

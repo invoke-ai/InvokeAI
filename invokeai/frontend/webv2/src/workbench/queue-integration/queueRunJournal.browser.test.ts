@@ -8,7 +8,7 @@ import {
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { createIndexedDbQueueRunJournal, QUEUE_RERUN_DELIVERY_RETENTION_MS } from './queueRunJournal';
+import { createIndexedDbQueueRunJournal } from './queueRunJournal';
 
 const databases: WorkbenchDatabase[] = [];
 const suffixes = new Set<string>();
@@ -18,7 +18,7 @@ const createJournal = async (options?: Parameters<typeof createIndexedDbQueueRun
   suffixes.add(suffix);
   const database = await openWorkbenchDatabase(suffix);
   databases.push(database);
-  return { database, journal: createIndexedDbQueueRunJournal(database, options), suffix };
+  return { database, journal: createIndexedDbQueueRunJournal(database, options) };
 };
 
 const createItem = (overrides: Partial<WorkbenchQueueItem> = {}): WorkbenchQueueItem =>
@@ -126,67 +126,6 @@ describe('IndexedDB queue run journal', () => {
         },
       ],
     });
-  });
-
-  const rerun = (backendItemId: number, queueItemId = 'run-1') => ({
-    backendItemId,
-    projectId: 'project-1',
-    queueItemId,
-  });
-
-  it('lets only the first claim deliver a rerun, from any connection, until the claim expires', async () => {
-    let now = 1_000;
-    const { journal, suffix } = await createJournal({ now: () => now });
-    const otherTabDatabase = await openWorkbenchDatabase(suffix);
-    databases.push(otherTabDatabase);
-    const otherTab = createIndexedDbQueueRunJournal(otherTabDatabase, { now: () => now });
-
-    await expect(
-      Promise.all([
-        journal.claimRerunDelivery(rerun(99), 'delivery'),
-        otherTab.claimRerunDelivery(rerun(99), 'delivery'),
-      ]).then((results) => results.map((result) => result.kind).sort())
-    ).resolves.toEqual(['claimed', 'taken']);
-    await expect(otherTab.claimRerunDelivery(rerun(100), 'delivery')).resolves.toEqual({ kind: 'claimed' });
-    // A server whose database was reset hands the same id to another run's rerun.
-    await expect(otherTab.claimRerunDelivery(rerun(99, 'run-2'), 'delivery')).resolves.toEqual({ kind: 'claimed' });
-
-    now += QUEUE_RERUN_DELIVERY_RETENTION_MS;
-    await expect(journal.claimRerunDelivery(rerun(99), 'delivery')).resolves.toEqual({ kind: 'claimed' });
-  });
-
-  it('keeps rerun delivery claims within the entry budget by dropping the oldest, apart from active runs', async () => {
-    let now = 1_000;
-    const { journal } = await createJournal({ maxEntries: 2, now: () => now++ });
-    await journal.record('project-1', createItem());
-
-    for (const backendItemId of [1, 2, 3]) {
-      await expect(journal.claimRerunDelivery(rerun(backendItemId), 'delivery')).resolves.toEqual({ kind: 'claimed' });
-    }
-
-    await expect(journal.claimRerunDelivery(rerun(3), 'delivery')).resolves.toEqual({ kind: 'taken' });
-    await expect(journal.claimRerunDelivery(rerun(1), 'delivery')).resolves.toEqual({ kind: 'claimed' });
-    await expect(journal.listAll()).resolves.toMatchObject({ entries: [{ queueItemId: 'queue-item-1' }] });
-  });
-
-  it('lets an adoption reserve a rerun against staging, and a staged rerun refuse a later adoption', async () => {
-    const { journal } = await createJournal();
-
-    await expect(journal.claimRerunDelivery(rerun(99), 'adoption')).resolves.toEqual({ kind: 'claimed' });
-    await expect(journal.claimRerunDelivery(rerun(99), 'adoption')).resolves.toEqual({ kind: 'claimed' });
-    await expect(journal.claimRerunDelivery(rerun(99), 'delivery')).resolves.toEqual({ kind: 'taken' });
-    await expect(journal.releaseRerunDelivery(rerun(99), 'adoption')).resolves.toEqual({ kind: 'removed' });
-    await expect(journal.claimRerunDelivery(rerun(99), 'delivery')).resolves.toEqual({ kind: 'claimed' });
-    await expect(journal.claimRerunDelivery(rerun(99), 'adoption')).resolves.toEqual({ kind: 'taken' });
-    await expect(journal.releaseRerunDelivery(rerun(99), 'delivery')).resolves.toEqual({ kind: 'removed' });
-    await expect(journal.claimRerunDelivery(rerun(99), 'delivery')).resolves.toEqual({ kind: 'claimed' });
-  });
-
-  it('claims no rerun once closed', async () => {
-    const { journal } = await createJournal();
-    journal.close();
-
-    await expect(journal.claimRerunDelivery(rerun(99), 'delivery')).resolves.toEqual({ kind: 'unavailable' });
   });
 
   it('lists distinct projects without decoding their run payloads', async () => {
