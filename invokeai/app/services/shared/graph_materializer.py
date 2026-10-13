@@ -43,6 +43,7 @@ class _ExecutionNodeBuilder:
     def __init__(self, state: "GraphExecutionState") -> None:
         self._state = state
         self._iteration_axes_by_source: dict[str, tuple[str, ...]] = {}
+        self._sibling_iterate_if_collect_ids: Optional[tuple[str, ...]] = None
 
     def _get_iteration_axes(self, source_node_id: str) -> tuple[str, ...]:
         cached = self._iteration_axes_by_source.get(source_node_id)
@@ -1697,15 +1698,25 @@ class _ExecutionNodeBuilder:
         return None
 
     def _is_inactive_sibling_if_collect_source(self, node_id: str, graph: "nx.DiGraph") -> bool:
-        return self._state._is_source_inactive(node_id) and any(
-            self._get_sibling_iterate_if_collect_branch(iterate_node_id) is not None
-            and (
-                node_id == iterate_node_id
-                or nx.has_path(graph, node_id, iterate_node_id)
-                or nx.has_path(graph, iterate_node_id, node_id)
+        if self._sibling_iterate_if_collect_ids is None:
+            self._sibling_iterate_if_collect_ids = tuple(
+                iterate_node_id
+                for iterate_node_id, node in self._state.graph.nodes.items()
+                if isinstance(node, IterateInvocation)
+                and self._get_sibling_iterate_if_collect_branch(iterate_node_id) is not None
             )
-            for iterate_node_id, node in self._state.graph.nodes.items()
-            if isinstance(node, IterateInvocation)
+
+        return (
+            bool(self._sibling_iterate_if_collect_ids)
+            and self._state._is_source_inactive(node_id)
+            and any(
+                (
+                    node_id == iterate_node_id
+                    or nx.has_path(graph, node_id, iterate_node_id)
+                    or nx.has_path(graph, iterate_node_id, node_id)
+                )
+                for iterate_node_id in self._sibling_iterate_if_collect_ids
+            )
         )
 
     def _attach_pending_if_inputs(self, *, enqueue: bool = True) -> None:

@@ -37,6 +37,7 @@ from invokeai.app.services.shared.graph import (
     _ExecutionScheduler,
     _GenericGraphSchedulerAdapter,
 )
+from invokeai.app.services.shared.graph_if_runtime import _get_effective_iteration_paths_for_edge
 from invokeai.app.services.shared.graph_nested_iterate_planner import get_nested_iterate_sequence_depth
 from invokeai.app.services.shared.invocation_context import InvocationContextData, build_invocation_context
 from tests.test_nodes import (
@@ -8641,3 +8642,108 @@ def test_if_does_not_combine_unrelated_open_iterator_frames():
     assert "collect" not in state.source_prepared_mapping
     assert "branch_value" not in trace
     assert "collect" not in trace
+
+
+def test_deep_any_chain_inside_iterate_if_completes() -> None:
+    chain_length = 400
+    graph = Graph()
+    graph.add_node(CollectionConcatInvocation(id="source", first=[True, False]))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_node(MarkedAnyTypeTestInvocation(id="false_branch", marker="f"))
+    for index in range(chain_length):
+        graph.add_node(AnyTypeTestInvocation(id=f"chain_{index}"))
+    graph.add_edge(create_edge("source", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "if", "condition"))
+    graph.add_edge(create_edge("iterate", "item", "chain_0", "value"))
+    graph.add_edge(create_edge("iterate", "item", "false_branch", "value"))
+    graph.add_edge(create_edge("false_branch", "value", "if", "false_input"))
+    for index in range(chain_length - 1):
+        node_id = f"chain_{index}"
+        next_id = f"chain_{index + 1}"
+        graph.add_edge(create_edge(node_id, "value", next_id, "value"))
+    graph.add_edge(create_edge(f"chain_{chain_length - 1}", "value", "if", "true_input"))
+    graph.add_edge(create_edge("if", "value", "collect", "item"))
+
+    _, state = _run_to_completion(GraphExecutionState(graph=graph))
+
+    assert state.results[next(iter(state.source_prepared_mapping["collect"]))].collection == [True, "fFalse"]
+    assert state.is_complete()
+
+
+def test_execution_materializer_cache_refreshes_after_sibling_iterate_edge_addition() -> None:
+    graph = Graph()
+    graph.add_node(CollectionConcatInvocation(id="left_source", first=[1, 1]))
+    graph.add_node(CollectionConcatInvocation(id="right_source", first=[10, 20]))
+    graph.add_node(IterateInvocation(id="left"))
+    graph.add_node(IterateInvocation(id="right"))
+    graph.add_node(AddInvocation(id="body"))
+    graph.add_node(CollectInvocation(id="branch_collect"))
+    graph.add_node(AddInvocation(id="minus_one", b=-1))
+    graph.add_node(FixedCollectionTestInvocation(id="condition"))
+    graph.add_node(AnyTypeTestInvocation(id="fallback", value="fallback"))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(CollectInvocation(id="collect"))
+    for source, source_field, destination, destination_field in (
+        ("left_source", "collection", "left", "collection"),
+        ("right_source", "collection", "right", "collection"),
+        ("left", "item", "body", "a"),
+        ("body", "value", "branch_collect", "item"),
+        ("left", "item", "minus_one", "a"),
+        ("minus_one", "value", "condition", "value"),
+        ("condition", "condition", "if", "condition"),
+        ("branch_collect", "collection", "if", "true_input"),
+        ("fallback", "value", "if", "false_input"),
+        ("if", "value", "collect", "item"),
+    ):
+        graph.add_edge(create_edge(source, source_field, destination, destination_field))
+
+    state = GraphExecutionState(graph=graph)
+    original_materializer = state._materializer()
+    source_graph = state._get_source_graph_flat()
+    assert not original_materializer._is_inactive_sibling_if_collect_source("right", source_graph)
+    assert original_materializer._sibling_iterate_if_collect_ids == ()
+
+    state.add_edge(create_edge("right", "item", "body", "b"))
+
+    materializer = state._materializer()
+    assert materializer is not original_materializer
+    assert materializer._get_sibling_iterate_if_collect_branch("right") == ("if", "true_input")
+
+    trace, state = _run_to_completion(state)
+
+    assert state.results[next(iter(state.source_prepared_mapping["collect"]))].collection == ["fallback", "fallback"]
+    assert "right" not in trace
+    assert "body" not in trace
+    assert state.is_complete()
+
+
+def test_effective_iteration_paths_handles_deep_any_chain() -> None:
+    chain_length = 1000
+    graph = Graph()
+    graph.add_node(CollectionConcatInvocation(id="source", first=[True]))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(IfInvocation(id="if"))
+    for index in range(chain_length):
+        graph.add_node(AnyTypeTestInvocation(id=f"chain_{index}"))
+    graph.add_edge(create_edge("source", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "chain_0", "value"))
+    for index in range(chain_length - 1):
+        graph.add_edge(create_edge(f"chain_{index}", "value", f"chain_{index + 1}", "value"))
+    terminal_edge = create_edge(f"chain_{chain_length - 1}", "value", "if", "true_input")
+    graph.add_edge(terminal_edge)
+
+    state = GraphExecutionState(graph=graph)
+    state.source_prepared_mapping["iterate"] = {"prepared_iterate"}
+    state.prepared_iteration_paths["prepared_iterate"] = (7,)
+
+    effective_paths = _get_effective_iteration_paths_for_edge(
+        state,
+        terminal_edge,
+        set(),
+        lambda source_id: state.source_prepared_mapping.get(source_id, set()),
+        lambda _edge, prepared_id: state.prepared_iteration_paths[prepared_id],
+    )
+
+    assert effective_paths == {(7,)}

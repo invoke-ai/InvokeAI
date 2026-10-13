@@ -20,47 +20,51 @@ def _get_effective_iteration_paths_for_edge(
     get_prepared_edge_iteration_path: Callable[[Edge, str], tuple[int, ...]],
     source_graph: Optional["nx.DiGraph"] = None,
 ) -> set[tuple[int, ...]]:
-    source_node_id = edge.source.node_id
-    prepared_nodes: set[str] = set()
-    if source_node_id in state.source_prepared_mapping:
-        prepared_nodes = get_prepared_nodes_for_source(source_node_id)
-        if not prepared_nodes and source_node_id in state.executed:
-            return set()
-    if prepared_nodes:
-        return {get_prepared_edge_iteration_path(edge, prepared_id) for prepared_id in prepared_nodes}
-    if source_node_id in visited_source_ids:
-        return set()
+    pending: list[tuple[Optional[Edge], Optional[str]]] = [(edge, None)]
+    active_source_ids = set(visited_source_ids)
+    paths: set[tuple[int, ...]] = set()
 
-    source_node = state.graph.get_node(source_node_id)
-    if isinstance(source_node, IfInvocation):
-        return set(
-            _get_if_iteration_paths(
-                state,
-                source_node_id,
-                visited_source_ids,
-                get_prepared_nodes_for_source,
-                get_prepared_edge_iteration_path,
-                source_graph,
-            )
-        )
+    while pending:
+        current_edge, exiting_source_id = pending.pop()
+        if exiting_source_id is not None:
+            active_source_ids.remove(exiting_source_id)
+            continue
+        assert current_edge is not None
+        current_source_id = current_edge.source.node_id
+        prepared_nodes: set[str] = set()
+        if current_source_id in state.source_prepared_mapping:
+            prepared_nodes = get_prepared_nodes_for_source(current_source_id)
+            if not prepared_nodes and current_source_id in state.executed:
+                continue
+        if prepared_nodes:
+            paths.update(get_prepared_edge_iteration_path(current_edge, prepared_id) for prepared_id in prepared_nodes)
+            continue
+        if current_source_id in active_source_ids:
+            continue
 
-    input_edges = state.graph._get_input_edges(source_node_id)
-    if not input_edges:
-        return {()}
-    next_visited_source_ids = {*visited_source_ids, source_node_id}
-    return set().union(
-        *(
-            _get_effective_iteration_paths_for_edge(
-                state,
-                input_edge,
-                next_visited_source_ids,
-                get_prepared_nodes_for_source,
-                get_prepared_edge_iteration_path,
-                source_graph,
+        source_node = state.graph.get_node(current_source_id)
+        if isinstance(source_node, IfInvocation):
+            paths.update(
+                _get_if_iteration_paths(
+                    state,
+                    current_source_id,
+                    active_source_ids,
+                    get_prepared_nodes_for_source,
+                    get_prepared_edge_iteration_path,
+                    source_graph,
+                )
             )
-            for input_edge in input_edges
-        )
-    )
+            continue
+
+        input_edges = state.graph._get_input_edges(current_source_id)
+        if not input_edges:
+            paths.add(())
+            continue
+        active_source_ids.add(current_source_id)
+        pending.append((None, current_source_id))
+        pending.extend((input_edge, None) for input_edge in reversed(input_edges))
+
+    return paths
 
 
 def _get_if_iteration_paths(
