@@ -446,6 +446,8 @@ export const createQueueRuntime = ({
   const reportedCancelFailures = new Set<string>();
   const ownedLocks = new Map<string, Extract<QueueRunLock, { kind: 'acquired' }>>();
   const lockRequests = new Map<string, Promise<boolean>>();
+  /** Run locks this tab gave up whose browser lock is not yet free. */
+  const lockReleases = new Map<string, Promise<void>>();
   const preparingRunKeys = new Set<string>();
   const activeAttempts = new Map<string, RunAttempt>();
   const ownershipEpochs = new Map<string, number>();
@@ -646,7 +648,13 @@ export const createQueueRuntime = ({
       return;
     }
     ownedLocks.delete(key);
-    void lock.release().catch(() => undefined);
+    const released = lock.release().catch(() => undefined);
+    lockReleases.set(key, released);
+    void released.finally(() => {
+      if (lockReleases.get(key) === released) {
+        lockReleases.delete(key);
+      }
+    });
   };
 
   const releaseRunOwnershipAfterJournal = (projectId: string, queueItemId: string): void => {
@@ -1402,20 +1410,30 @@ export const createQueueRuntime = ({
    * Elect the one tab that stages a Canvas rerun no run adopted: staging lands in the synced project document, so a
    * second tab staging it would duplicate it. A tab that holds the run stages it; otherwise the run's lock decides,
    * kept until staging is done, and while the tab tracking the run is alive it holds that lock and other tabs skip.
-   * Resolves to the claim's release, or null when another tab has it. Tabs in other browsers cannot be coordinated.
+   * Tabs in other browsers cannot be coordinated.
    */
-  const claimUnadoptedRerunStaging = async (
+  const acquireUnadoptedRerunStaging = async (
     projectId: string,
     queueItemId: string
   ): Promise<(() => Promise<void>) | null> => {
     const key = getRunKey(projectId, queueItemId);
-    if (!locks || ownedLocks.has(key)) {
-      return () => Promise.resolve();
-    }
-    // This tab's own claim on the run is still being decided; competing with it would leave the rerun to no tab.
-    const ownRequest = lockRequests.get(key);
-    if (ownRequest) {
-      return (await ownRequest) ? () => Promise.resolve() : null;
+    // Competing with this tab's own lock, while its claim is decided or its release is still freeing it, would leave
+    // the rerun to no tab; either can end with this tab holding the run or not, so look again after each.
+    for (;;) {
+      if (!locks || ownedLocks.has(key)) {
+        return () => Promise.resolve();
+      }
+      const ownRequest = lockRequests.get(key);
+      const releasing = lockReleases.get(key);
+      if (ownRequest) {
+        if (!(await ownRequest)) {
+          return null;
+        }
+      } else if (releasing) {
+        await releasing;
+      } else {
+        break;
+      }
     }
     const lock = await locks.acquire(projectId, queueItemId);
     if (lock.kind === 'acquired') {
@@ -1423,6 +1441,65 @@ export const createQueueRuntime = ({
     }
     // Without browser locks no tab coordinates; staging here is what every tab does then.
     return lock.kind === 'unavailable' ? () => Promise.resolve() : null;
+  };
+
+  /** Staging claims this tab holds or is deciding, per run, with the reruns delivering under each. */
+  const stagingClaims = new Map<
+    string,
+    { claim: Promise<(() => Promise<void>) | null>; holders: number; released?: Promise<void> }
+  >();
+
+  /**
+   * Claim staging for one rerun. Sibling reruns of a run this tab is already staging share its claim, since the lock
+   * would refuse this tab's second request and leave them to no tab; a claim being released is awaited before the
+   * next one asks. Resolves to this rerun's release, or null when another tab has the run.
+   */
+  const claimUnadoptedRerunStaging = async (
+    projectId: string,
+    queueItemId: string
+  ): Promise<(() => Promise<void>) | null> => {
+    const key = getRunKey(projectId, queueItemId);
+    const current = stagingClaims.get(key);
+    const entry =
+      current && !current.released
+        ? current
+        : {
+            claim: (current?.released ?? Promise.resolve()).then(() =>
+              acquireUnadoptedRerunStaging(projectId, queueItemId)
+            ),
+            holders: 0,
+          };
+    stagingClaims.set(key, entry);
+    entry.holders += 1;
+
+    const leave = (release?: () => Promise<void>): Promise<void> => {
+      entry.holders -= 1;
+      if (entry.holders > 0) {
+        return Promise.resolve();
+      }
+      const released: Promise<void> = (release?.() ?? Promise.resolve())
+        .catch(() => undefined)
+        .finally(() => {
+          if (stagingClaims.get(key) === entry) {
+            stagingClaims.delete(key);
+          }
+        });
+      entry.released = released;
+      return released;
+    };
+
+    let release: (() => Promise<void>) | null;
+    try {
+      release = await entry.claim;
+    } catch (error) {
+      await leave();
+      throw error;
+    }
+    if (!release) {
+      await leave();
+      return null;
+    }
+    return () => leave(release);
   };
 
   /**

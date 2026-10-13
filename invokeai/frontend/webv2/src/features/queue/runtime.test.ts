@@ -3166,6 +3166,127 @@ describe('queue runtime retries', () => {
     await runtime.dispose();
   });
 
+  it('stages sibling Canvas reruns that finish while this tab is still staging their run', async () => {
+    const queueItem: QueueItem = { ...createPendingQueueItem(), backendItemIds: [7], status: 'completed' };
+    let finishFirstRead!: (images: QueueResultImage[]) => void;
+    const getResultImages = vi.fn((itemId: number) =>
+      itemId === 99
+        ? new Promise<QueueResultImage[]>((resolve) => {
+            finishFirstRead = resolve;
+          })
+        : Promise.resolve([{ imageName: `rerun-${itemId}.png` } as QueueResultImage])
+    );
+    // Web Locks are requested ifAvailable, so a held lock refuses its own tab too.
+    const held = new Set<string>();
+    const release = vi.fn();
+    const acquire = vi.fn((projectId: string, queueItemId: string) => {
+      const name = `${projectId}:${queueItemId}`;
+      if (held.has(name)) {
+        return Promise.resolve({ kind: 'contended' } as const);
+      }
+      held.add(name);
+      return Promise.resolve({
+        kind: 'acquired',
+        release: () => {
+          release();
+          held.delete(name);
+          return Promise.resolve();
+        },
+      } as const);
+    });
+    const { commands, emit, project, runtime } = createRetryHarness(
+      queueItem,
+      { getResultImages },
+      { locks: { acquire } }
+    );
+    const origin = buildQueueItemOrigin('run-gone', project.id);
+    const staged = () =>
+      vi.mocked(commands.stageRetriedCanvasResults).mock.calls.map(([payload]) => payload.backendItemId);
+
+    runtime.start();
+    emit(
+      'queue_items_retried',
+      retriedEvent([
+        { item_id: 99, source_item_id: 41 },
+        { item_id: 100, source_item_id: 42 },
+        { item_id: 101, source_item_id: 43 },
+      ])
+    );
+    emit('queue_item_status_changed', completedEvent(99, origin, 'canvas'));
+    await vi.waitFor(() => expect(getResultImages).toHaveBeenCalledTimes(1));
+    emit('queue_item_status_changed', completedEvent(100, origin, 'canvas'));
+
+    finishFirstRead([{ imageName: 'rerun-99.png' } as QueueResultImage]);
+
+    await vi.waitFor(() => expect(release).toHaveBeenCalledTimes(1));
+    expect(staged()).toEqual([99, 100]);
+    expect(acquire).toHaveBeenCalledTimes(1);
+
+    // Once released, a later sibling claims the run again.
+    emit('queue_item_status_changed', completedEvent(101, origin, 'canvas'));
+    await vi.waitFor(() => expect(release).toHaveBeenCalledTimes(2));
+    expect(staged()).toEqual([99, 100, 101]);
+    expect(acquire).toHaveBeenCalledTimes(2);
+
+    await runtime.dispose();
+  });
+
+  it('stages a Canvas rerun that finishes while this tab is still freeing the run lock it gave up', async () => {
+    const queueItem: QueueItem = { ...createPendingQueueItem(), backendItemIds: [88], status: 'running' };
+    const getResultImages = vi.fn().mockResolvedValue([{ imageName: 'rerun.png' } as QueueResultImage]);
+    let held = false;
+    let freeRunLock!: () => void;
+    const acquire = vi.fn(() => {
+      if (held) {
+        return Promise.resolve({ kind: 'contended' } as const);
+      }
+      held = true;
+      const release =
+        acquire.mock.calls.length === 1
+          ? () =>
+              new Promise<void>((resolve) => {
+                freeRunLock = () => {
+                  held = false;
+                  resolve();
+                };
+              })
+          : () => {
+              held = false;
+              return Promise.resolve();
+            };
+      return Promise.resolve({ kind: 'acquired', release } as const);
+    });
+    const { commands, emit, notify, project, runtime } = createRetryHarness(
+      queueItem,
+      { getResultImages },
+      { locks: { acquire } }
+    );
+
+    runtime.start();
+    await vi.waitFor(() => expect(acquire).toHaveBeenCalledTimes(1));
+    emit('queue_items_retried', retriedEvent([{ item_id: 100, source_item_id: 42 }]));
+    // Removing the run gives up its lock; the browser frees it only later.
+    project.queue.items = [];
+    notify();
+    await vi.waitFor(() => expect(freeRunLock).toBeDefined());
+    emit('queue_item_status_changed', completedEvent(100, buildQueueItemOrigin(queueItem.id, project.id), 'canvas'));
+    // Let the staging claim settle as far as it can before the lock is free.
+    await new Promise((resolve) => {
+      setTimeout(resolve);
+    });
+    expect(acquire).toHaveBeenCalledTimes(1);
+    freeRunLock();
+
+    await vi.waitFor(() =>
+      expect(commands.stageRetriedCanvasResults).toHaveBeenCalledWith(
+        expect.objectContaining({ backendItemId: 100, queueItemId: queueItem.id })
+      )
+    );
+    expect(acquire).toHaveBeenCalledTimes(2);
+
+    await runtime.dispose();
+  });
+
   it("handles a retry once when both the tab's own answer and the socket deliver it, and ignores others' retries", async () => {
     const queueItem: QueueItem = { ...createPendingQueueItem(), backendItemIds: [41], status: 'failed' };
     const { commands, emit, notify, project, runtime } = createRetryHarness(queueItem, {}, { viewerUserId: 'me' });
