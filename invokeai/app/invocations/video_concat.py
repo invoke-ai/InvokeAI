@@ -281,7 +281,7 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
             ):
                 wav_path = work_dir / "audio.wav"
                 write_stereo_wav(wav_path, pcm, rate)
-                mux_audio_into_video(tmp_path, wav_path, muxed_path)
+                mux_audio_into_video(tmp_path, wav_path, muxed_path, context.util.is_canceled)
             source_path = muxed_path
 
         duration = num_frames / output_fps
@@ -557,7 +557,7 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
         for path in paths:
             if context.util.is_canceled():
                 raise CanceledException
-            extracted.append(extract_audio_pcm(path))
+            extracted.append(extract_audio_pcm(path, is_canceled=context.util.is_canceled))
         if all(item is None for item in extracted):
             return None
         if context.util.is_canceled():

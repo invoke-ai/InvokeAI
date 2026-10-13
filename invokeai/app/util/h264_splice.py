@@ -38,30 +38,31 @@ import shutil
 import struct
 import subprocess
 import tempfile
-import time
 from pathlib import Path
 from typing import BinaryIO, Callable, NamedTuple, Optional
 
-import imageio_ffmpeg
 import numpy as np
 
-from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.util.mp4_metadata import find_box, iter_boxes
+from invokeai.app.util.video_audio import run_ffmpeg_process
 
 # A stream copy is disk-bound; this only stops a wedged child from holding the node forever.
 SPLICE_TIMEOUT_SECONDS = 600
-# How often a running ffmpeg child is checked for cancellation.
-_CANCEL_POLL_SECONDS = 0.1
 # ``moov`` precedes or follows ``mdat`` in a real file; a dozen top-level boxes at most.
 _MAX_TOP_LEVEL_BOXES = 1024
+# Children walked per container (moov, trak, mdia, minf, stbl, edts): real ones hold about a
+# dozen, and the boxes are the uploader's, so a flood is given up on rather than scanned.
+_MAX_CHILD_BOXES = 64
 # Keyframes examined per track: at the 2 s interval this app writes, nine hours of video.
 _MAX_SYNC_ENTRIES = 1 << 14
 # VisualSampleEntry fields before its child boxes (SampleEntry 8 + visual header 70), and where
 # among them the 32-byte compressor name sits.
 _VISUAL_SAMPLE_ENTRY_HEADER = 78
 _COMPRESSOR_NAME = slice(42, 74)
-# A real sample entry holds a handful of boxes (avcC, btrt, colr, pasp...); more is hostile.
+# A real sample entry holds a handful of boxes (avcC, btrt, colr, pasp...) in a few hundred
+# bytes; more of either is hostile, and refused before any of it is read.
 _MAX_ENTRY_CHILDREN = 32
+_MAX_SAMPLE_ENTRY_BYTES = 64 * 1024
 # NAL units examined per keyframe before its first slice (AUD, SEI, SPS, PPS precede it).
 _MAX_NALS_BEFORE_SLICE = 64
 # Shortest part x264 (bframes=3, as make_mp4_writer leaves it) encodes with its full B-frame
@@ -121,30 +122,30 @@ def read_h264_layout(path: Path) -> Optional[H264Layout]:
         moov = find_box(fh, 0, file_size, b"moov", max_boxes=_MAX_TOP_LEVEL_BOXES)
         if moov is None:
             return None
-        for box_type, trak_start, trak_end in iter_boxes(fh, *moov):
+        for box_type, trak_start, trak_end in iter_boxes(fh, *moov, max_boxes=_MAX_CHILD_BOXES):
             if box_type != b"trak":
                 continue
-            mdia = find_box(fh, trak_start, trak_end, b"mdia")
+            mdia = find_box(fh, trak_start, trak_end, b"mdia", max_boxes=_MAX_CHILD_BOXES)
             if mdia is None:
                 continue
-            hdlr = find_box(fh, *mdia, b"hdlr")
+            hdlr = find_box(fh, *mdia, b"hdlr", max_boxes=_MAX_CHILD_BOXES)
             if hdlr is None or hdlr[0] + 12 > hdlr[1]:
                 continue
             fh.seek(hdlr[0] + 8)
             if fh.read(4) != b"vide":
                 continue
             # First video track only: that is the stream every ffmpeg call here maps (0:v:0).
-            minf = find_box(fh, *mdia, b"minf")
-            stbl = find_box(fh, *minf, b"stbl") if minf is not None else None
-            movie_timescale = _read_timescale(fh, find_box(fh, *moov, b"mvhd"))
-            media_timescale = _read_timescale(fh, find_box(fh, *mdia, b"mdhd"))
+            minf = find_box(fh, *mdia, b"minf", max_boxes=_MAX_CHILD_BOXES)
+            stbl = find_box(fh, *minf, b"stbl", max_boxes=_MAX_CHILD_BOXES) if minf is not None else None
+            movie_timescale = _read_timescale(fh, find_box(fh, *moov, b"mvhd", max_boxes=_MAX_CHILD_BOXES))
+            media_timescale = _read_timescale(fh, find_box(fh, *mdia, b"mdhd", max_boxes=_MAX_CHILD_BOXES))
             if stbl is None or movie_timescale is None or media_timescale is None:
                 return None
-            if not _has_identity_matrix(fh, find_box(fh, trak_start, trak_end, b"tkhd")):
+            if not _has_identity_matrix(fh, find_box(fh, trak_start, trak_end, b"tkhd", max_boxes=_MAX_CHILD_BOXES)):
                 return None
-            edts = find_box(fh, trak_start, trak_end, b"edts")
+            edts = find_box(fh, trak_start, trak_end, b"edts", max_boxes=_MAX_CHILD_BOXES)
             if edts is not None and not _edits_show_every_sample(
-                fh, find_box(fh, *edts, b"elst"), stbl, movie_timescale, media_timescale
+                fh, find_box(fh, *edts, b"elst", max_boxes=_MAX_CHILD_BOXES), stbl, movie_timescale, media_timescale
             ):
                 return None
             return _read_video_stbl(fh, *stbl)
@@ -208,7 +209,7 @@ def _edits_show_every_sample(
     first_delta = runs[0][1]
 
     first_offset = 0
-    ctts = find_box(fh, *stbl, b"ctts")
+    ctts = find_box(fh, *stbl, b"ctts", max_boxes=_MAX_CHILD_BOXES)
     if ctts is not None:
         if ctts[0] + 16 > ctts[1]:
             return False
@@ -223,7 +224,7 @@ def _edits_show_every_sample(
 
 def _read_stts(fh: BinaryIO, stbl: tuple[int, int]) -> Optional[list[tuple[int, int]]]:
     """The ``(sample_count, sample_delta)`` runs of the time-to-sample table."""
-    stts = find_box(fh, *stbl, b"stts")
+    stts = find_box(fh, *stbl, b"stts", max_boxes=_MAX_CHILD_BOXES)
     if stts is None or stts[0] + 8 > stts[1]:
         return None
     fh.seek(stts[0] + 4)
@@ -260,8 +261,11 @@ def _sample_locations(
     fh: BinaryIO, stbl: tuple[int, int], sizes: np.ndarray, wanted: tuple[int, ...], file_size: int
 ) -> Optional[list[tuple[int, int]]]:
     """``(file_offset, size)`` of each sample in ``wanted`` (ascending), from the chunk tables."""
-    stsc = find_box(fh, *stbl, b"stsc")
-    stco, co64 = find_box(fh, *stbl, b"stco"), find_box(fh, *stbl, b"co64")
+    stsc = find_box(fh, *stbl, b"stsc", max_boxes=_MAX_CHILD_BOXES)
+    stco, co64 = (
+        find_box(fh, *stbl, b"stco", max_boxes=_MAX_CHILD_BOXES),
+        find_box(fh, *stbl, b"co64", max_boxes=_MAX_CHILD_BOXES),
+    )
     offsets_box, offset_format = (stco, "I") if stco is not None else (co64, "Q")
     # Each table opens with version/flags and a 4-byte count.
     if stsc is None or offsets_box is None or any(box[0] + 8 > box[1] for box in (stsc, offsets_box)):
@@ -326,8 +330,8 @@ def _is_idr(fh: BinaryIO, offset: int, size: int, length_size: int) -> bool:
 
 def _read_video_stbl(fh: BinaryIO, stbl_start: int, stbl_end: int) -> Optional[H264Layout]:
     stbl = (stbl_start, stbl_end)
-    stsd = find_box(fh, *stbl, b"stsd")
-    stsz = find_box(fh, *stbl, b"stsz")
+    stsd = find_box(fh, *stbl, b"stsd", max_boxes=_MAX_CHILD_BOXES)
+    stsz = find_box(fh, *stbl, b"stsz", max_boxes=_MAX_CHILD_BOXES)
     if stsd is None or stsz is None:
         return None
 
@@ -340,7 +344,15 @@ def _read_video_stbl(fh: BinaryIO, stbl_start: int, stbl_end: int) -> Optional[H
     if not entries or entries[0][0] != b"avc1":
         return None
     _, entry_start, entry_end = entries[0]
-    avcc = find_box(fh, entry_start + _VISUAL_SAMPLE_ENTRY_HEADER, entry_end, b"avcC")
+    # Everything read below lies inside the entry, so one size bound covers every child box.
+    if entry_end - entry_start > _MAX_SAMPLE_ENTRY_BYTES:
+        return None
+    children = list(
+        iter_boxes(fh, entry_start + _VISUAL_SAMPLE_ENTRY_HEADER, entry_end, max_boxes=_MAX_ENTRY_CHILDREN + 1)
+    )
+    if len(children) > _MAX_ENTRY_CHILDREN:
+        return None
+    avcc = next(((start, end) for child, start, end in children if child == b"avcC"), None)
     if avcc is None or avcc[0] >= avcc[1]:
         return None
     fh.seek(avcc[0])
@@ -351,11 +363,6 @@ def _read_video_stbl(fh: BinaryIO, stbl_start: int, stbl_end: int) -> Optional[H
     # an ffmpeg upgrade still match what it writes after one.
     header_fields[_COMPRESSOR_NAME] = bytes(_COMPRESSOR_NAME.stop - _COMPRESSOR_NAME.start)
     parts = [bytes(header_fields)]
-    children = list(
-        iter_boxes(fh, entry_start + _VISUAL_SAMPLE_ENTRY_HEADER, entry_end, max_boxes=_MAX_ENTRY_CHILDREN + 1)
-    )
-    if len(children) > _MAX_ENTRY_CHILDREN:
-        return None
     for child, child_start, child_end in children:
         if child != b"btrt":
             fh.seek(child_start)
@@ -372,7 +379,7 @@ def _read_video_stbl(fh: BinaryIO, stbl_start: int, stbl_end: int) -> Optional[H
         return None
     sample_count = len(sizes)
 
-    stss = find_box(fh, *stbl, b"stss")
+    stss = find_box(fh, *stbl, b"stss", max_boxes=_MAX_CHILD_BOXES)
     if stss is None:
         # No sync-sample table means every sample is a sync sample (an all-intra stream), each
         # of which would be examined below: only a short one is worth splicing.
@@ -416,38 +423,16 @@ def _read_video_stbl(fh: BinaryIO, stbl_start: int, stbl_end: int) -> Optional[H
 def run_ffmpeg(args: list[str], description: str, is_canceled: Optional[Callable[[], bool]] = None) -> None:
     """Run the bundled ffmpeg, raising SpliceError if it fails or outlasts the timeout.
 
-    ``is_canceled`` is polled while the child runs; a cancellation kills and reaps it and
-    raises CanceledException, so a canceled node never waits on a long copy.
+    ``is_canceled`` stops the child promptly and raises CanceledException (see
+    ``run_ffmpeg_process``), so a canceled node never waits on a long copy.
     """
-    if is_canceled is not None and is_canceled():
-        raise CanceledException
-    with tempfile.TemporaryFile() as stderr:
-        proc = subprocess.Popen(
-            [imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-loglevel", "error", *args],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=stderr,
-        )
-        deadline = time.monotonic() + SPLICE_TIMEOUT_SECONDS
-        try:
-            while True:
-                try:
-                    proc.wait(timeout=_CANCEL_POLL_SECONDS)
-                    break
-                except subprocess.TimeoutExpired:
-                    pass
-                if is_canceled is not None and is_canceled():
-                    raise CanceledException
-                if time.monotonic() > deadline:
-                    raise SpliceError(f"ffmpeg timed out {description}")
-        finally:
-            if proc.returncode is None:
-                proc.kill()
-                proc.wait()
-        if proc.returncode != 0:
-            stderr.seek(0)
-            message = stderr.read().decode("utf-8", errors="replace").strip()
-            raise SpliceError(f"ffmpeg failed {description}: {message[-500:]}")
+    try:
+        proc = run_ffmpeg_process(args, SPLICE_TIMEOUT_SECONDS, is_canceled)
+    except subprocess.TimeoutExpired as e:
+        raise SpliceError(f"ffmpeg timed out {description}") from e
+    if proc.returncode != 0:
+        message = proc.stderr.decode("utf-8", errors="replace").strip()
+        raise SpliceError(f"ffmpeg failed {description}: {message[-500:]}")
 
 
 def copy_frames(

@@ -25,9 +25,7 @@ import subprocess
 import tempfile
 from collections.abc import Collection, Iterator, Mapping
 from pathlib import Path
-from typing import BinaryIO, Optional
-
-import imageio_ffmpeg
+from typing import BinaryIO, Callable, Optional
 
 # A single tag is a JSON string the app itself produced; a graph JSON is the largest and
 # runs to a few hundred KiB. The cap exists only so a hostile file cannot make the reader
@@ -50,10 +48,6 @@ _FFMETADATA_HEADER = ";FFMETADATA1\n"
 
 class Mp4MetadataError(RuntimeError):
     """The MP4 could not be rewritten with the requested tags."""
-
-
-def _ffmpeg_exe() -> str:
-    return imageio_ffmpeg.get_ffmpeg_exe()
 
 
 def iter_boxes(fh: BinaryIO, start: int, end: int, max_boxes: Optional[int] = None) -> Iterator[tuple[bytes, int, int]]:
@@ -220,7 +214,9 @@ def _escape_ffmetadata(value: str) -> str:
     )
 
 
-def write_mp4_tags(src: Path, dst: Path, tags: Mapping[str, str]) -> None:
+def write_mp4_tags(
+    src: Path, dst: Path, tags: Mapping[str, str], is_canceled: Optional[Callable[[], bool]] = None
+) -> None:
     """Write ``dst`` = ``src``'s first video stream and every audio stream, stream-copied, with
     ``tags`` as the file's keyed metadata (replacing any global tags ``src`` had). An empty
     mapping therefore strips ``src``'s global tags.
@@ -243,12 +239,11 @@ def write_mp4_tags(src: Path, dst: Path, tags: Mapping[str, str]) -> None:
         ffmeta_path = Path(ffmeta.name)
     try:
         try:
-            proc = subprocess.run(
+            # Imported here: video_audio is a heavier module than this one's other callers need.
+            from invokeai.app.util.video_audio import run_ffmpeg_process
+
+            proc = run_ffmpeg_process(
                 [
-                    _ffmpeg_exe(),
-                    "-y",
-                    "-loglevel",
-                    "error",
                     "-i",
                     str(src),
                     "-i",
@@ -267,8 +262,8 @@ def write_mp4_tags(src: Path, dst: Path, tags: Mapping[str, str]) -> None:
                     "mp4",
                     str(dst),
                 ],
-                capture_output=True,
-                timeout=REMUX_TIMEOUT_SECONDS,
+                REMUX_TIMEOUT_SECONDS,
+                is_canceled,
             )
         except subprocess.TimeoutExpired as e:
             raise Mp4MetadataError(f"ffmpeg timed out writing metadata into {dst.name}") from e

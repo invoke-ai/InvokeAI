@@ -6,6 +6,7 @@ with an edit list, and a metadata rotation is applied to decoded frames but carr
 by a stream copy; either would misalign or misorient a join. Real ffmpeg throughout.
 """
 
+import io
 import os
 import struct
 import subprocess
@@ -201,13 +202,23 @@ def test_cancellation_kills_a_running_ffmpeg(tmp_path: Path) -> None:
     assert children and children[-1].returncode is not None, "the child was left running"
 
 
-def _grow_sample_entry(data: bytes, handler: bytes, blob: bytes) -> bytes:
-    """Append ``blob`` inside the ``handler`` track's sample entry, growing every ancestor box.
-    The file must keep ``moov`` after ``mdat`` so no chunk offset moves."""
+def _grow_sample_entry(
+    data: bytes,
+    handler: bytes,
+    blob: bytes,
+    first: bool = False,
+    inside: bytes | None = None,
+    in_stbl: bool = False,
+) -> bytes:
+    """Insert ``blob`` inside the ``handler`` track's sample entry — after its other child boxes,
+    before them if ``first``, or at the end of its ``inside`` child box — or, with ``in_stbl``,
+    at the start of the track's sample table, growing every ancestor box. The file must keep
+    ``moov`` after ``mdat`` so no chunk offset moves."""
 
     def boxes(start: int, end: int):
         while start + 8 <= end:
             size, kind = struct.unpack(">I4s", data[start : start + 8])
+            assert size >= 8, "the fixture must be a well-formed MP4"
             yield kind, start, size
             start += size
 
@@ -224,20 +235,33 @@ def _grow_sample_entry(data: bytes, handler: bytes, blob: bytes) -> bytes:
         hdlr = data.find(b"hdlr", trak, trak + trak_size)
         if data[hdlr + 12 : hdlr + 16] != handler:
             continue
+        grown = bytearray(data)
+        if in_stbl:
+            # Ahead of stsd and every other table.
+            chain.pop()
+            stbl_at = chain[-1][0]
+            grown[stbl_at + 8 : stbl_at + 8] = blob
+            for box_at, size in chain:
+                struct.pack_into(">I", grown, box_at, size + len(blob))
+            return bytes(grown)
         _, entry, entry_size = next(boxes(start + 8, end))
         chain.append((entry, entry_size))
-        grown = bytearray(data)
-        grown[entry + entry_size : entry + entry_size] = blob
+        # Child boxes follow the entry's box header and fixed fields: 78 bytes for avc1, 28 for mp4a.
+        children_at = entry + 8 + (78 if handler == b"vide" else 28)
+        at = children_at if first else entry + entry_size
+        if inside is not None:
+            _, child, child_size = next(b for b in boxes(children_at, entry + entry_size) if b[0] == inside)
+            chain.append((child, child_size))
+            at = child + child_size
+        grown[at:at] = blob
         for at, size in chain:
             struct.pack_into(">I", grown, at, size + len(blob))
         return bytes(grown)
     raise AssertionError(f"no {handler!r} track")
 
 
-@pytest.mark.parametrize("handler", [b"vide", b"soun"])
-def test_sample_entry_stuffed_with_boxes_is_refused_cheaply(tmp_path: Path, handler: bytes) -> None:
-    """The sample entry is the uploader's: a flood of child boxes must be refused after a
-    bounded look, not collected (memory) or concatenated (quadratic time)."""
+def _audio_clip(tmp_path: Path) -> Path:
+    """A clip of this app's own encoding, with a soundtrack, and moov after mdat."""
     wav = tmp_path / "a.wav"
     write_stereo_wav(wav, np.zeros((2, 48000), dtype=np.float32), 48000)
     source = tmp_path / "a.mp4"
@@ -245,6 +269,14 @@ def test_sample_entry_stuffed_with_boxes_is_refused_cheaply(tmp_path: Path, hand
     for _ in range(16):
         writer.append_data(np.zeros((64, 96, 3), dtype=np.uint8))
     writer.close()
+    return source
+
+
+@pytest.mark.parametrize("handler", [b"vide", b"soun"])
+def test_sample_entry_stuffed_with_boxes_is_refused_cheaply(tmp_path: Path, handler: bytes) -> None:
+    """The sample entry is the uploader's: a flood of child boxes must be refused after a
+    bounded look, not collected (memory) or concatenated (quadratic time)."""
+    source = _audio_clip(tmp_path)
     hostile = tmp_path / "hostile.mp4"
     hostile.write_bytes(_grow_sample_entry(source.read_bytes(), handler, struct.pack(">I4s", 8, b"free") * 200_000))
 
@@ -257,3 +289,76 @@ def test_sample_entry_stuffed_with_boxes_is_refused_cheaply(tmp_path: Path, hand
         tracemalloc.stop()
     # 200k boxes are 1.6 MB of file; reading a bounded handful of them allocates almost nothing.
     assert peak < 1 << 20
+
+
+@pytest.mark.parametrize(
+    "handler,inside", [(b"vide", None), (b"vide", b"avcC"), (b"soun", b"esds")], ids=["free", "avcC", "esds"]
+)
+def test_oversized_sample_entry_is_refused_unread(tmp_path: Path, handler: bytes, inside: bytes | None) -> None:
+    """One huge child box — a free box, or the decoder config padded out — must be refused by
+    size, not read into memory."""
+    source = _audio_clip(tmp_path)
+    hostile = tmp_path / "hostile.mp4"
+    padding = 16 << 20
+    blob = bytes(padding) if inside else struct.pack(">I4s", 8 + padding, b"free") + bytes(padding)
+    hostile.write_bytes(_grow_sample_entry(source.read_bytes(), handler, blob, inside=inside))
+    read = read_h264_layout if handler == b"vide" else read_aac_layout
+    tracemalloc.start()
+    try:
+        assert read(hostile) is None
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    assert peak < 1 << 20
+
+
+def test_box_flood_before_avcc_is_not_scanned(tmp_path: Path) -> None:
+    """``avcC`` is found among a bounded number of child boxes, so a flood placed before it is
+    refused after a fixed look rather than walked in full."""
+    source = _audio_clip(tmp_path)
+    hostile = tmp_path / "hostile.mp4"
+    hostile.write_bytes(
+        _grow_sample_entry(source.read_bytes(), b"vide", struct.pack(">I4s", 8, b"free") * 2_000_000, first=True)
+    )
+    seeks = [0]
+
+    class CountingFile(io.BufferedReader):
+        def seek(self, *args):
+            seeks[0] += 1
+            return super().seek(*args)
+
+    def counting_open(path, mode="r", *args, **kwargs):
+        return CountingFile(io.FileIO(path, "r"))
+
+    # The flood really sits inside the sample entry, ahead of its avcC.
+    data = hostile.read_bytes()
+    entry = data.find(b"avc1")
+    assert entry < data.find(b"\x00\x00\x00\x08free", entry) < data.find(b"avcC", entry)
+    with patch("invokeai.app.util.h264_splice.open", counting_open, create=True):
+        assert read_h264_layout(hostile) is None
+    # Walking the flood would take a seek per box: two million of them.
+    assert seeks[0] < 10_000
+
+
+@pytest.mark.parametrize("handler", [b"vide", b"soun"])
+def test_box_flood_in_a_container_is_not_scanned(tmp_path: Path, handler: bytes) -> None:
+    """Every container walk (moov, trak, mdia, minf, stbl) stops after a fixed number of boxes:
+    a flood ahead of the sample tables would otherwise be walked once per table looked up."""
+    source = _audio_clip(tmp_path)
+    hostile = tmp_path / "hostile.mp4"
+    hostile.write_bytes(
+        _grow_sample_entry(source.read_bytes(), handler, struct.pack(">I4s", 8, b"free") * 200_000, in_stbl=True)
+    )
+    module = "h264_splice" if handler == b"vide" else "aac_splice"
+    read = read_h264_layout if handler == b"vide" else read_aac_layout
+    seeks = [0]
+
+    class CountingFile(io.BufferedReader):
+        def seek(self, *args):
+            seeks[0] += 1
+            return super().seek(*args)
+
+    with patch(f"invokeai.app.util.{module}.open", lambda path, *a, **k: CountingFile(io.FileIO(path)), create=True):
+        assert read(hostile) is None
+    # Walking the flood would take a seek per box per lookup: hundreds of thousands at least.
+    assert seeks[0] < 10_000

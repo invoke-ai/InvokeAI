@@ -299,7 +299,7 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
                     wav_tmp.close()
                     wav_path = Path(wav_tmp.name)
                     write_stereo_wav(wav_path, pcm, rate)
-                    mux_audio_into_video(tmp_path, wav_path, muxed_path)
+                    mux_audio_into_video(tmp_path, wav_path, muxed_path, context.util.is_canceled)
                 source_path = muxed_path
 
             out_duration = num_frames / output_fps
@@ -452,7 +452,7 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
             copy_path = Path(work) / "source.mp4"
             # A stream-copy remux that drops the source's keyed metadata: save() writes this
             # node's record, and if that rewrite fails the source's must not be read back as it.
-            write_mp4_tags(video_path, copy_path, {})
+            write_mp4_tags(video_path, copy_path, {}, context.util.is_canceled)
             # A cancellation that arrived during an uninterruptible stage must not be saved.
             if context.util.is_canceled():
                 raise CanceledException
@@ -564,7 +564,7 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
         (matching what the retime does to the video).
         """
         context.util.signal_progress("Extracting audio")
-        extracted = extract_audio_pcm(video_path)
+        extracted = extract_audio_pcm(video_path, is_canceled=context.util.is_canceled)
         if extracted is None:
             return None
         if context.util.is_canceled():

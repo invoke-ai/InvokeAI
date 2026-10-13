@@ -47,7 +47,13 @@ PREROLL_FRAMES = 4
 # start (a lead-in) or its end-of-stream flush (a tail).
 EDGE_FRAMES = PREROLL_FRAMES + 1
 _MAX_TOP_LEVEL_BOXES = 1024
+# Children walked per container (moov, trak, mdia, minf, stbl, edts): real ones hold about a
+# dozen, and the boxes are the uploader's, so a flood is given up on rather than scanned.
+_MAX_CHILD_BOXES = 64
 _MAX_PACKETS = 1 << 24
+# A real AAC sample entry (esds with a two-to-five-byte AudioSpecificConfig, btrt) is well
+# under a hundred bytes.
+_MAX_SAMPLE_ENTRY_BYTES = 4 * 1024
 # AudioSampleEntry fields before its child boxes (SampleEntry 8 + version-0 audio header 20).
 _AUDIO_SAMPLE_ENTRY_HEADER = 28
 _ES_DESCRIPTOR, _DECODER_CONFIG_DESCRIPTOR, _DECODER_SPECIFIC_INFO = 3, 4, 5
@@ -122,11 +128,11 @@ def read_aac_layout(path: Path) -> Optional[AacLayout]:
         moov = find_box(fh, 0, fh.tell(), b"moov", max_boxes=_MAX_TOP_LEVEL_BOXES)
         if moov is None:
             return None
-        for box_type, trak_start, trak_end in iter_boxes(fh, *moov):
+        for box_type, trak_start, trak_end in iter_boxes(fh, *moov, max_boxes=_MAX_CHILD_BOXES):
             if box_type != b"trak":
                 continue
-            mdia = find_box(fh, trak_start, trak_end, b"mdia")
-            hdlr = find_box(fh, *mdia, b"hdlr") if mdia is not None else None
+            mdia = find_box(fh, trak_start, trak_end, b"mdia", max_boxes=_MAX_CHILD_BOXES)
+            hdlr = find_box(fh, *mdia, b"hdlr", max_boxes=_MAX_CHILD_BOXES) if mdia is not None else None
             if hdlr is None or hdlr[0] + 12 > hdlr[1]:
                 continue
             fh.seek(hdlr[0] + 8)
@@ -137,16 +143,16 @@ def read_aac_layout(path: Path) -> Optional[AacLayout]:
 
 
 def _read_audio_track(fh: BinaryIO, trak: tuple[int, int], mdia: tuple[int, int]) -> Optional[AacLayout]:
-    mdhd = find_box(fh, *mdia, b"mdhd")
-    minf = find_box(fh, *mdia, b"minf")
-    stbl = find_box(fh, *minf, b"stbl") if minf is not None else None
+    mdhd = find_box(fh, *mdia, b"mdhd", max_boxes=_MAX_CHILD_BOXES)
+    minf = find_box(fh, *mdia, b"minf", max_boxes=_MAX_CHILD_BOXES)
+    stbl = find_box(fh, *minf, b"stbl", max_boxes=_MAX_CHILD_BOXES) if minf is not None else None
     if mdhd is None or stbl is None or mdhd[0] + 24 > mdhd[1]:
         return None
     fh.seek(mdhd[0])
     fh.seek(mdhd[0] + (20 if fh.read(1)[0] == 1 else 12))
     (sample_rate,) = struct.unpack(">I", fh.read(4))
 
-    stsd = find_box(fh, *stbl, b"stsd")
+    stsd = find_box(fh, *stbl, b"stsd", max_boxes=_MAX_CHILD_BOXES)
     if stsd is None or stsd[0] + 8 > stsd[1]:
         return None
     fh.seek(stsd[0] + 4)
@@ -156,6 +162,10 @@ def _read_audio_track(fh: BinaryIO, trak: tuple[int, int], mdia: tuple[int, int]
     if not entries or entries[0][0] != b"mp4a":
         return None
     _, entry_start, entry_end = entries[0]
+    # Everything read below — the esds above all — lies inside the entry, which is the
+    # uploader's: bounded before any of it is read.
+    if entry_end - entry_start > _MAX_SAMPLE_ENTRY_BYTES:
+        return None
     fh.seek(entry_start + 8)
     if fh.read(2) != b"\x00\x00":  # QuickTime v1/v2 sound entries lay their fields out differently
         return None
@@ -179,7 +189,7 @@ def _read_audio_track(fh: BinaryIO, trak: tuple[int, int], mdia: tuple[int, int]
     if len(decoder_config) == 5 and decoder_config.endswith(_NO_SBR_EXTENSION):
         decoder_config = decoder_config[:2]
 
-    stts = find_box(fh, *stbl, b"stts")
+    stts = find_box(fh, *stbl, b"stts", max_boxes=_MAX_CHILD_BOXES)
     if stts is None or stts[0] + 8 > stts[1]:
         return None
     fh.seek(stts[0] + 4)
@@ -195,8 +205,8 @@ def _read_audio_track(fh: BinaryIO, trak: tuple[int, int], mdia: tuple[int, int]
     if packet_count > _MAX_PACKETS:
         return None
 
-    edts = find_box(fh, *trak, b"edts")
-    elst = find_box(fh, *edts, b"elst") if edts is not None else None
+    edts = find_box(fh, *trak, b"edts", max_boxes=_MAX_CHILD_BOXES)
+    elst = find_box(fh, *edts, b"elst", max_boxes=_MAX_CHILD_BOXES) if edts is not None else None
     priming = 0
     if elst is not None:
         if elst[0] + 8 > elst[1]:
@@ -275,7 +285,7 @@ def _set_audio_edit(path: Path, media_time: int, samples: int, sample_rate: int)
     with open(path, "r+b") as fh:
         fh.seek(0, 2)
         moov = find_box(fh, 0, fh.tell(), b"moov", max_boxes=_MAX_TOP_LEVEL_BOXES)
-        mvhd = find_box(fh, *moov, b"mvhd") if moov is not None else None
+        mvhd = find_box(fh, *moov, b"mvhd", max_boxes=_MAX_CHILD_BOXES) if moov is not None else None
         if mvhd is None:
             raise SpliceError(f"{path.name} has no movie header")
         fh.seek(mvhd[0])
@@ -285,12 +295,12 @@ def _set_audio_edit(path: Path, media_time: int, samples: int, sample_rate: int)
         duration = round(samples * movie_timescale / sample_rate)
         track_durations: list[int] = []
         patched = False
-        for box_type, trak_start, trak_end in iter_boxes(fh, *moov):
+        for box_type, trak_start, trak_end in iter_boxes(fh, *moov, max_boxes=_MAX_CHILD_BOXES):
             if box_type != b"trak":
                 continue
-            tkhd = find_box(fh, trak_start, trak_end, b"tkhd")
-            mdia = find_box(fh, trak_start, trak_end, b"mdia")
-            hdlr = find_box(fh, *mdia, b"hdlr") if mdia is not None else None
+            tkhd = find_box(fh, trak_start, trak_end, b"tkhd", max_boxes=_MAX_CHILD_BOXES)
+            mdia = find_box(fh, trak_start, trak_end, b"mdia", max_boxes=_MAX_CHILD_BOXES)
+            hdlr = find_box(fh, *mdia, b"hdlr", max_boxes=_MAX_CHILD_BOXES) if mdia is not None else None
             if tkhd is None or hdlr is None:
                 raise SpliceError(f"{path.name} has a malformed track")
             fh.seek(hdlr[0] + 8)
@@ -299,8 +309,8 @@ def _set_audio_edit(path: Path, media_time: int, samples: int, sample_rate: int)
             wide = fh.read(1)[0] == 1
             tkhd_duration_at, field = tkhd[0] + (28 if wide else 20), ">Q" if wide else ">I"
             if is_target and not patched:
-                edts = find_box(fh, trak_start, trak_end, b"edts")
-                elst = find_box(fh, *edts, b"elst") if edts is not None else None
+                edts = find_box(fh, trak_start, trak_end, b"edts", max_boxes=_MAX_CHILD_BOXES)
+                elst = find_box(fh, *edts, b"elst", max_boxes=_MAX_CHILD_BOXES) if edts is not None else None
                 if elst is None:
                     raise SpliceError(f"{path.name}'s {handler.decode()} track has no edit list")
                 fh.seek(elst[0])
@@ -328,7 +338,7 @@ def _encode(
     wav, adts = work / f"{name}.wav", work / f"{name}.aac"
     write_stereo_wav(wav, pcm, sample_rate)
     run_ffmpeg(["-i", str(wav), *AAC_ENCODE_ARGS, "-f", "adts", str(adts)], "encoding the new audio", is_canceled)
-    decoded = extract_audio_pcm(adts)
+    decoded = extract_audio_pcm(adts, is_canceled=is_canceled)
     if decoded is None:
         raise SpliceError("the new audio decoded to nothing")
     return _adts_frames(adts.read_bytes()), decoded[0]
@@ -398,7 +408,20 @@ def splice_soundtrack(
             # The source's packets as ADTS, sliced by index: an ADTS frame per packet.
             source_adts = work_dir / "source.aac"
             run_ffmpeg(
-                ["-i", str(source), "-map", "0:a:0", "-c", "copy", "-f", "adts", str(source_adts)],
+                # Only the packets up to the copied run's end are needed.
+                [
+                    "-i",
+                    str(source),
+                    "-map",
+                    "0:a:0",
+                    "-c",
+                    "copy",
+                    "-frames:a",
+                    str(end),
+                    "-f",
+                    "adts",
+                    str(source_adts),
+                ],
                 f"copying the audio packets of {source.name}",
                 is_canceled,
             )
@@ -463,7 +486,7 @@ def splice_soundtrack(
                 is_canceled,
             )
         _set_audio_edit(out_path, media_time, timeline.shape[1], sample_rate)
-        muxed = extract_audio_pcm(out_path)
+        muxed = extract_audio_pcm(out_path, is_canceled=is_canceled)
     except (SpliceError, AudioExtractionError, OSError) as e:
         return f"it cannot be stream-copied ({e})"
 

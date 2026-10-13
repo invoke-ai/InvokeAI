@@ -11,6 +11,7 @@ cannot be spliced losslessly still join correctly by re-encoding.
 Real ffmpeg (the imageio-ffmpeg bundled binary) encodes and decodes throughout.
 """
 
+import importlib
 import shutil
 import struct
 import subprocess
@@ -22,7 +23,6 @@ import imageio_ffmpeg
 import numpy as np
 import pytest
 
-from invokeai.app.invocations import video_concat
 from invokeai.app.invocations.fields import VideoField
 from invokeai.app.invocations.video_concat import VideoConcatInvocation
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
@@ -385,7 +385,16 @@ def test_first_clip_with_presentation_tags_is_re_encoded(tmp_path, tag):
     assert len(_decode(out)) == 138
 
 
-@pytest.mark.parametrize("stage", ["copy_frames", "splice_soundtrack"])
+@pytest.mark.parametrize(
+    "stage",
+    [
+        "invokeai.app.invocations.video_concat.copy_frames",
+        "invokeai.app.invocations.video_concat.splice_soundtrack",
+        # The audio decodes: an input's soundtrack, and the splice's own validation decodes.
+        "invokeai.app.invocations.video_concat.extract_audio_pcm",
+        "invokeai.app.util.aac_splice.extract_audio_pcm",
+    ],
+)
 def test_cancellation_during_a_splice_saves_nothing(tmp_path, stage):
     """Cancelling while a splice stage runs stops it — the stage itself raises, not just the
     pre-save check — and nothing is saved."""
@@ -393,7 +402,8 @@ def test_cancellation_during_a_splice_saves_nothing(tmp_path, stage):
     b = _encode(tmp_path / "b.mp4", _frames(40, seed=2), tone=660.0)
     canceled = [False]
     raised: list[BaseException] = []
-    real = getattr(video_concat, stage)
+    module, name = stage.rsplit(".", 1)
+    real = getattr(importlib.import_module(module), name)
 
     def cancel_then_run(*args, **kwargs):
         canceled[0] = True
@@ -407,7 +417,7 @@ def test_cancellation_during_a_splice_saves_nothing(tmp_path, stage):
     context.videos.get_path.side_effect = lambda name: {"a": a, "b": b}[name]
     context.util.is_canceled.side_effect = lambda: canceled[0]
     node = VideoConcatInvocation(videos=[VideoField(video_name="a"), VideoField(video_name="b")], transition="cut")
-    with patch(f"invokeai.app.invocations.video_concat.{stage}", side_effect=cancel_then_run):
+    with patch(stage, side_effect=cancel_then_run):
         with pytest.raises(CanceledException):
             node.invoke(context)
     assert len(raised) == 1 and isinstance(raised[0], CanceledException)
