@@ -1,10 +1,13 @@
 import pytest
 
-from invokeai.app.invocations.logic import IfInvocation
+from invokeai.app.invocations.logic import BooleanLogicInvocation, IfInvocation
 from invokeai.app.invocations.math import AddInvocation
+from invokeai.app.invocations.primitives import BooleanOutput
+from invokeai.app.services.shared import graph_if_runtime
 from invokeai.app.services.shared.execution_engine.scheduler import ActivationDependency
 from invokeai.app.services.shared.graph import Edge, EdgeConnection, Graph, GraphExecutionState
 from invokeai.app.services.shared.graph_runtime_records import _ApplyTransaction
+from invokeai.app.services.shared.graph_validation import IterateInvocation
 from tests.app.services.shared.import_test_utils import assert_module_imports_without_graph
 
 
@@ -103,3 +106,69 @@ def test_apply_rollback_reconstructs_pending_if_nodes(state: GraphExecutionState
     state._reset_apply_derived_caches()
 
     assert state._pending_if_exec_nodes == {"if-exec"}
+
+
+def test_nested_if_iteration_paths_use_supplied_source_graph_recursively() -> None:
+    state = GraphExecutionState(
+        graph=Graph(
+            nodes={
+                "if": IfInvocation(id="if", condition=True),
+                "inner": IfInvocation(id="inner", condition=True),
+                "guarded": IfInvocation(id="guarded"),
+                "condition": BooleanLogicInvocation(id="condition", a=True, b=True),
+                "bridge": AddInvocation(id="bridge"),
+            }
+        )
+    )
+    state.execution_graph.add_node(BooleanLogicInvocation(id="condition-exec", a=True, b=True))
+    state._prepared_registry().register("condition-exec", "condition")
+    state.results["condition-exec"] = BooleanOutput(value=True)
+    state.graph.add_node(IterateInvocation(id="iterator"))
+    state.graph.edges.extend(
+        [
+            Edge(
+                source=EdgeConnection(node_id="iterator", field="item"),
+                destination=EdgeConnection(node_id="guarded", field="condition"),
+            ),
+            Edge(
+                source=EdgeConnection(node_id="guarded", field="value"),
+                destination=EdgeConnection(node_id="inner", field="true_input"),
+            ),
+            Edge(
+                source=EdgeConnection(node_id="inner", field="value"),
+                destination=EdgeConnection(node_id="bridge", field="a"),
+            ),
+            Edge(
+                source=EdgeConnection(node_id="bridge", field="value"),
+                destination=EdgeConnection(node_id="if", field="true_input"),
+            ),
+            Edge(
+                source=EdgeConnection(node_id="condition", field="value"),
+                destination=EdgeConnection(node_id="if", field="condition"),
+            ),
+        ]
+    )
+    state.graph._invalidate_edge_indexes()
+    source_graph = state._get_source_graph_flat()
+    constrained_graph = source_graph.copy()
+    constrained_graph.remove_edge("iterator", "guarded")
+
+    assert (
+        graph_if_runtime._get_if_iteration_paths(
+            state,
+            "if",
+            set(),
+            lambda source_id: {"condition-exec"} if source_id == "condition" else set(),
+            lambda _edge, _prepared_id: (),
+            source_graph,
+        )
+        == []
+    )
+    assert graph_if_runtime._get_if_iteration_paths(
+        state,
+        "if",
+        set(),
+        lambda source_id: {"condition-exec"} if source_id == "condition" else set(),
+        lambda _edge, _prepared_id: (),
+        constrained_graph,
+    ) == [()]
