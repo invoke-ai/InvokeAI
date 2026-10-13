@@ -1060,9 +1060,6 @@ class _ExecutionNodeBuilder:
             and get_output_field_scope(source_node, edge.source.field) == OutputScope.Final
         ):
             parent_path = self._state._get_for_parent_iteration_path(edge.source.node_id)
-            if edge.destination.field == ITEM_FIELD:
-                group_depth = len(parent_path) if sibling_depth is None else sibling_depth
-                return parent_path[: max(group_depth - 1, 0)]
             return parent_path
         if edge.destination.field == ITEM_FIELD:
             if isinstance(source_node, ForInvocation) and source_node.index == -1:

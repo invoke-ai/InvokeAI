@@ -8564,8 +8564,9 @@ def test_iterate_for_collect_preserves_empty_inner_collection(force_compatibilit
 
     after_exec_ids = sorted(state.source_prepared_mapping["after"], key=state._get_iteration_path)
     assert trace.count("add") == 2
-    assert len(after_exec_ids) == 1
-    assert state.results[after_exec_ids[0]].value == [[11, 12], []]
+    assert trace.count("after") == 2
+    assert [state._get_iteration_path(exec_id) for exec_id in after_exec_ids] == [(0,), (1,)]
+    assert [state.results[exec_id].value for exec_id in after_exec_ids] == [[[11, 12]], [[]]]
     assert state.is_complete()
 
 
