@@ -11,7 +11,7 @@ import pytest
 from pydantic import ValidationError
 
 from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
-from invokeai.app.invocations.collections import CollectionConcatInvocation, RangeInvocation
+from invokeai.app.invocations.collections import CollectionConcatInvocation, RangeInvocation, RangeOfSizeInvocation
 from invokeai.app.invocations.logic import IfInvocation
 from invokeai.app.invocations.loops import (
     ForInvocation,
@@ -8684,6 +8684,207 @@ def test_nested_iterate_collected_in_if_branch_is_not_misclassified_as_sibling()
     assert state.results[next(iter(state.source_prepared_mapping["result_collect"]))].collection == [
         ["a", "b"],
         ["c"],
+    ]
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+def test_nested_collect_preserves_condition_frame_when_classifying_branch_iterate(
+    force_compatibility_scheduler: bool,
+) -> None:
+    graph = Graph()
+    graph.add_node(CollectionConcatInvocation(id="outer_source", first=[1, 2]))
+    graph.add_node(IterateInvocation(id="outer"))
+    graph.add_node(RangeOfSizeInvocation(id="middle_range", size=1))
+    graph.add_node(IterateInvocation(id="middle"))
+    graph.add_node(CollectInvocation(id="middle_collect"))
+    graph.add_node(CollectInvocation(id="middle_collect_2"))
+    graph.add_node(IterateInvocation(id="inner"))
+    graph.add_node(AddInvocation(id="body"))
+    graph.add_node(CollectInvocation(id="branch_collect"))
+    graph.add_node(FixedCollectionTestInvocation(id="condition"))
+    graph.add_node(AnyTypeTestInvocation(id="fallback", value="fallback"))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(CollectInvocation(id="result_collect"))
+    for source, source_field, destination, destination_field in (
+        ("outer_source", "collection", "outer", "collection"),
+        ("outer", "item", "middle_range", "start"),
+        ("middle_range", "collection", "middle", "collection"),
+        ("middle", "item", "middle_collect", "item"),
+        ("middle_collect", "collection", "middle_collect_2", "collection"),
+        ("middle_collect_2", "collection", "inner", "collection"),
+        ("outer", "item", "body", "a"),
+        ("inner", "item", "body", "b"),
+        ("body", "value", "branch_collect", "item"),
+        ("outer", "item", "condition", "value"),
+        ("condition", "condition", "if", "condition"),
+        ("branch_collect", "collection", "if", "true_input"),
+        ("fallback", "value", "if", "false_input"),
+        ("if", "value", "result_collect", "item"),
+    ):
+        graph.add_edge(create_edge(source, source_field, destination, destination_field))
+
+    state = GraphExecutionState(graph=graph)
+    if force_compatibility_scheduler:
+        state._execution_scheduler = _ExecutionScheduler(state)
+
+    assert state._materializer()._get_sibling_iterate_if_collect_branch("inner") is None
+
+    trace, state = _run_to_completion(state)
+
+    assert state.is_complete()
+    middle_collect_exec_ids = sorted(state.source_prepared_mapping["middle_collect"], key=state._get_iteration_path)
+    assert [
+        (state._get_iteration_path(exec_id), state.results[exec_id].collection) for exec_id in middle_collect_exec_ids
+    ] == [((0,), [1]), ((1,), [2])]
+    middle_collect_2_exec_ids = sorted(state.source_prepared_mapping["middle_collect_2"], key=state._get_iteration_path)
+    assert [
+        (state._get_iteration_path(exec_id), state.results[exec_id].collection) for exec_id in middle_collect_2_exec_ids
+    ] == [((0,), [1]), ((1,), [2])]
+    inner_exec_ids = sorted(state.source_prepared_mapping["inner"], key=state._get_iteration_path)
+    assert [state._get_iteration_path(exec_id) for exec_id in inner_exec_ids] == [(0, 0), (1, 0)]
+    branch_collect_exec_ids = sorted(state.source_prepared_mapping["branch_collect"], key=state._get_iteration_path)
+    assert [
+        (state._get_iteration_path(exec_id), state.results[exec_id].collection) for exec_id in branch_collect_exec_ids
+    ] == [((0,), [2]), ((1,), [4])]
+    assert state.results[next(iter(state.source_prepared_mapping["result_collect"]))].collection == [[2], [4]]
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+def test_direct_collect_collapses_condition_frame_for_branch_iterate(
+    force_compatibility_scheduler: bool,
+) -> None:
+    graph = Graph()
+    graph.add_node(CollectionConcatInvocation(id="outer_source", first=[1, 2]))
+    graph.add_node(IterateInvocation(id="outer"))
+    graph.add_node(CollectInvocation(id="middle_collect"))
+    graph.add_node(IterateInvocation(id="inner"))
+    graph.add_node(AddInvocation(id="body"))
+    graph.add_node(CollectInvocation(id="branch_collect"))
+    graph.add_node(FixedCollectionTestInvocation(id="condition"))
+    graph.add_node(AnyTypeTestInvocation(id="fallback", value="fallback"))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(CollectInvocation(id="result_collect"))
+    for source, source_field, destination, destination_field in (
+        ("outer_source", "collection", "outer", "collection"),
+        ("outer", "item", "middle_collect", "item"),
+        ("middle_collect", "collection", "inner", "collection"),
+        ("outer", "item", "body", "a"),
+        ("inner", "item", "body", "b"),
+        ("body", "value", "branch_collect", "item"),
+        ("outer", "item", "condition", "value"),
+        ("condition", "condition", "if", "condition"),
+        ("branch_collect", "collection", "if", "true_input"),
+        ("fallback", "value", "if", "false_input"),
+        ("if", "value", "result_collect", "item"),
+    ):
+        graph.add_edge(create_edge(source, source_field, destination, destination_field))
+
+    state = GraphExecutionState(graph=graph)
+    if force_compatibility_scheduler:
+        state._execution_scheduler = _ExecutionScheduler(state)
+
+    assert state._materializer()._get_sibling_iterate_if_collect_branch("inner") == ("if", "true_input")
+
+    trace, state = _run_to_completion(state)
+
+    assert state.is_complete()
+    middle_collect_id = next(iter(state.source_prepared_mapping["middle_collect"]))
+    assert state._get_iteration_path(middle_collect_id) == ()
+    assert state.results[middle_collect_id].collection == [1, 2]
+    inner_exec_ids = sorted(state.source_prepared_mapping["inner"], key=state._get_iteration_path)
+    assert [state._get_iteration_path(exec_id) for exec_id in inner_exec_ids] == [
+        (0, 0),
+        (0, 1),
+        (1, 0),
+        (1, 1),
+    ]
+    assert state.results[next(iter(state.source_prepared_mapping["result_collect"]))].collection == [[2, 3], [3, 4]]
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+@pytest.mark.parametrize("node_order", ["original", "reverse", "seed7", "renamed", "renamed_producers"])
+def test_independent_iterator_collect_preserves_ordered_parent_axis_for_branch_iterate(
+    force_compatibility_scheduler: bool,
+    node_order: str,
+) -> None:
+    graph = Graph()
+    condition_axis_id, other_axis_id = ("z_condition", "a_other") if node_order == "renamed" else ("left", "right")
+    condition_source_id, other_source_id = (
+        ("z_condition_source", "a_other_source")
+        if node_order == "renamed_producers"
+        else ("left_source", "right_source")
+    )
+    nodes = {
+        condition_source_id: CollectionConcatInvocation(id=condition_source_id, first=[1, 2]),
+        condition_axis_id: IterateInvocation(id=condition_axis_id),
+        other_source_id: CollectionConcatInvocation(id=other_source_id, first=[10, 20]),
+        other_axis_id: IterateInvocation(id=other_axis_id),
+        "middle_body": AddInvocation(id="middle_body"),
+        "middle_collect": CollectInvocation(id="middle_collect"),
+        "candidate": IterateInvocation(id="candidate"),
+        "body": AddInvocation(id="body"),
+        "branch_collect": CollectInvocation(id="branch_collect"),
+        "condition": FixedCollectionTestInvocation(id="condition"),
+        "fallback": AnyTypeTestInvocation(id="fallback", value="fallback"),
+        "if": IfInvocation(id="if"),
+        "result_collect": CollectInvocation(id="result_collect"),
+    }
+    ordered_node_ids = list(nodes)
+    if node_order == "reverse":
+        ordered_node_ids.reverse()
+    elif node_order == "seed7":
+        ordered_node_ids = random.Random(7).sample(ordered_node_ids, len(ordered_node_ids))
+    for node_id in ordered_node_ids:
+        graph.add_node(nodes[node_id])
+    for source, source_field, destination, destination_field in (
+        (condition_source_id, "collection", condition_axis_id, "collection"),
+        (other_source_id, "collection", other_axis_id, "collection"),
+        (condition_axis_id, "item", "middle_body", "a"),
+        (other_axis_id, "item", "middle_body", "b"),
+        ("middle_body", "value", "middle_collect", "item"),
+        ("middle_collect", "collection", "candidate", "collection"),
+        (condition_axis_id, "item", "body", "a"),
+        ("candidate", "item", "body", "b"),
+        ("body", "value", "branch_collect", "item"),
+        (condition_axis_id, "item", "condition", "value"),
+        ("condition", "condition", "if", "condition"),
+        ("branch_collect", "collection", "if", "true_input"),
+        ("fallback", "value", "if", "false_input"),
+        ("if", "value", "result_collect", "item"),
+    ):
+        if node_order == "renamed" and (source, source_field, destination, destination_field) == (
+            condition_axis_id,
+            "item",
+            "condition",
+            "value",
+        ):
+            continue
+        graph.add_edge(create_edge(source, source_field, destination, destination_field))
+
+    state = GraphExecutionState(graph=graph)
+    if node_order == "renamed":
+        state._materializer()._get_sibling_iterate_if_collect_branches()
+        state.add_edge(create_edge(condition_axis_id, "item", "condition", "value"))
+    if force_compatibility_scheduler:
+        state._execution_scheduler = _ExecutionScheduler(state)
+
+    trace, state = _run_to_completion(state)
+
+    assert state.is_complete()
+    middle_collect_exec_ids = sorted(state.source_prepared_mapping["middle_collect"], key=state._get_iteration_path)
+    assert [
+        (state._get_iteration_path(exec_id), state.results[exec_id].collection) for exec_id in middle_collect_exec_ids
+    ] == [((0,), [11, 21]), ((1,), [12, 22])]
+    candidate_exec_ids = sorted(state.source_prepared_mapping["candidate"], key=state._get_iteration_path)
+    assert [state._get_iteration_path(exec_id) for exec_id in candidate_exec_ids] == [
+        (0, 0),
+        (0, 1),
+        (1, 0),
+        (1, 1),
+    ]
+    assert state.results[next(iter(state.source_prepared_mapping["result_collect"]))].collection == [
+        [12, 22],
+        [14, 24],
     ]
 
 

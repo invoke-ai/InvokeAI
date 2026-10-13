@@ -44,6 +44,8 @@ class _ExecutionNodeBuilder:
         self._state = state
         self._iteration_axes_by_source: dict[str, tuple[str, ...]] = {}
         self._sibling_iterate_if_collect_branches: Optional[dict[str, tuple[str, str]]] = None
+        self._iteration_relationship_graph: Optional[nx.DiGraph] = None
+        self._iteration_relationship_topological_index: Optional[dict[str, int]] = None
 
     def _get_iteration_axes(self, source_node_id: str) -> tuple[str, ...]:
         cached = self._iteration_axes_by_source.get(source_node_id)
@@ -62,6 +64,16 @@ class _ExecutionNodeBuilder:
                     if isinstance(self._state.graph.get_node(condition_source_id), (ForInvocation, IterateInvocation)):
                         condition_axes.append(condition_source_id)
                 axes = list(dict.fromkeys([*condition_axes, *axes]))
+            if self._iteration_relationship_graph is not None:
+                relationship_ancestors = [
+                    iterator_id
+                    for iterator_id in nx.ancestors(self._iteration_relationship_graph, source_node_id)
+                    if isinstance(self._state.graph.get_node(iterator_id), (ForInvocation, IterateInvocation))
+                ]
+                relationship_order = self._iteration_relationship_topological_index
+                assert relationship_order is not None
+                relationship_ancestors.sort(key=relationship_order.__getitem__)
+                axes = list(dict.fromkeys([*relationship_ancestors, *axes]))
             axes.append(source_node_id)
         result = tuple(axes)
         self._iteration_axes_by_source[source_node_id] = result
@@ -1585,7 +1597,7 @@ class _ExecutionNodeBuilder:
                 if isinstance(self._state.graph.get_node(edge.source.node_id), (ForInvocation, IterateInvocation))
             )
             if condition_iterator_ids:
-                source_order = {source_id: index for index, source_id in enumerate(nx.topological_sort(iterator_graph))}
+                source_order = self._state._runtime()._get_iterator_source_order()
                 iterator_nodes = sorted(condition_iterator_ids, key=lambda source_id: source_order[source_id])
             else:
                 iterator_nodes = self.get_node_iterators(node_id, iterator_graph)
@@ -1683,6 +1695,35 @@ class _ExecutionNodeBuilder:
 
         graph = self._state._get_source_graph_flat()
         iterator_graph = self.iterator_graph(graph)
+        iterator_topological_index = self._state._runtime()._get_iterator_source_order()
+        relationship_graph = iterator_graph.copy()
+        for collect_node in self._state.graph.nodes.values():
+            if not isinstance(collect_node, CollectInvocation):
+                continue
+            for collection_edge in self._state.graph._get_input_edges(collect_node.id, COLLECTION_FIELD):
+                relationship_graph.add_edge(collection_edge.source.node_id, collect_node.id)
+            item_edges = self._state.graph._get_input_edges(collect_node.id, ITEM_FIELD)
+            if len(item_edges) != 1:
+                continue
+            item_edge = item_edges[0]
+            item_source_id = item_edge.source.node_id
+            source_node = self._state.graph.get_node(item_source_id)
+            if (
+                isinstance(source_node, ForInvocation)
+                and get_output_field_scope(source_node, item_edge.source.field) == OutputScope.Final
+            ):
+                continue
+            ordered_iterator_ids = [
+                iterator_id
+                for iterator_id in nx.ancestors(iterator_graph, item_source_id)
+                if isinstance(self._state.graph.get_node(iterator_id), (ForInvocation, IterateInvocation))
+            ]
+            ordered_iterator_ids.sort(key=iterator_topological_index.__getitem__)
+            if isinstance(source_node, IterateInvocation):
+                ordered_iterator_ids.append(item_source_id)
+            for parent_iterator_id in ordered_iterator_ids[:-1]:
+                relationship_graph.add_edge(parent_iterator_id, collect_node.id)
+
         for collect_node in self._state.graph.nodes.values():
             if not isinstance(collect_node, CollectInvocation):
                 continue
@@ -1718,13 +1759,18 @@ class _ExecutionNodeBuilder:
 
                 for iterate_node_id in iterator_ids - condition_iterator_ids:
                     if any(
-                        nx.has_path(iterator_graph, condition_iterator_id, iterate_node_id)
-                        or nx.has_path(iterator_graph, iterate_node_id, condition_iterator_id)
+                        nx.has_path(relationship_graph, condition_iterator_id, iterate_node_id)
+                        or nx.has_path(relationship_graph, iterate_node_id, condition_iterator_id)
                         for condition_iterator_id in condition_iterator_ids
                     ):
                         continue
                     branches.setdefault(iterate_node_id, (destination.id, output_edge.destination.field))
 
+        self._iteration_relationship_graph = relationship_graph
+        self._iteration_relationship_topological_index = {
+            node_id: index
+            for index, node_id in enumerate(nx.lexicographical_topological_sort(relationship_graph, key=str))
+        }
         self._sibling_iterate_if_collect_branches = branches
         return branches
 
@@ -1818,11 +1864,15 @@ class _ExecutionNodeBuilder:
     def iterator_graph(self, base: Optional["nx.DiGraph"] = None) -> "nx.DiGraph":
         """Gets a DiGraph with edges to collectors removed so an ancestor search produces all active iterators for any node"""
         g = base.copy() if base is not None else self._state._get_source_graph_flat().copy()
-        collectors = (
+        collectors = [
             n for n in self._state.graph.nodes if isinstance(self._state.graph.get_node(n), CollectInvocation)
-        )
+        ]
         for c in collectors:
+            collection_sources = {
+                edge.source.node_id for edge in self._state.graph._get_input_edges(c, COLLECTION_FIELD)
+            }
             g.remove_edges_from(list(g.in_edges(c)))
+            g.add_edges_from((source_id, c) for source_id in collection_sources)
         for edge in self._state.graph.edges:
             source_node = self._state.graph.get_node(edge.source.node_id)
             if (

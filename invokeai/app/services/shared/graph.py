@@ -730,6 +730,7 @@ class GraphExecutionState(BaseModel):
         runtime.if_activation_dependencies_by_exec = {}
         runtime.if_activation_controller_instance = None
         runtime.execution_materializer = None
+        runtime.execution_runtime = None
 
     def _materializer(self) -> _ExecutionMaterializer:
         runtime = self.__pydantic_private__["_runtime_state"]

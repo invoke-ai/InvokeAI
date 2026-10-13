@@ -41,6 +41,31 @@ class _ExecutionRuntime:
 
     def __init__(self, state: "GraphExecutionState") -> None:
         self._state = state
+        self._iterator_source_order: Optional[dict[str, int]] = None
+
+    def _get_iterator_source_order(self) -> dict[str, int]:
+        if self._iterator_source_order is not None:
+            return self._iterator_source_order
+
+        iterator_graph = self._state._iterator_graph(self._state.graph.nx_graph())
+        graph = self._state.graph.nx_graph()
+        condition_ancestry_ids: set[str] = set()
+        for node in self._state.graph.nodes.values():
+            if not isinstance(node, IfInvocation):
+                continue
+            for edge in self._state.graph._get_input_edges(node.id, "condition"):
+                source_id = edge.source.node_id
+                condition_ancestry_ids.update(nx.ancestors(graph, source_id))
+                condition_ancestry_ids.add(source_id)
+
+        topo = list(
+            nx.lexicographical_topological_sort(
+                iterator_graph,
+                key=lambda node_id: (node_id not in condition_ancestry_ids, str(node_id)),
+            )
+        )
+        self._iterator_source_order = {node_id: index for index, node_id in enumerate(topo)}
+        return self._iterator_source_order
 
     def _get_cached_iteration_path(self, exec_node_id: str) -> Optional[tuple[int, ...]]:
         return self._state._prepared_registry().get_iteration_path(exec_node_id)
@@ -58,8 +83,7 @@ class _ExecutionRuntime:
             if isinstance(self._state.graph.get_node(node_id), (ForInvocation, IterateInvocation))
         ]
 
-        topo = list(nx.topological_sort(iterator_graph))
-        topo_index = {node_id: i for i, node_id in enumerate(topo)}
+        topo_index = self._get_iterator_source_order()
         iterator_sources.sort(key=lambda node_id: topo_index.get(node_id, 0))
         return iterator_sources
 
