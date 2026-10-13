@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from invokeai.app.invocations.logic import IfInvocation
 from invokeai.app.services.shared.execution_engine.scheduler import ActivationDependency
@@ -19,6 +19,8 @@ class _IfActivationController:
     def __init__(self, state: "GraphExecutionState") -> None:
         self._state = state
         self._branch_sources_cache: dict[tuple[str, str], frozenset[str]] = {}
+        self._if_node_ids: Optional[tuple[str, ...]] = None
+        self._branch_memberships_by_source: dict[str, tuple[tuple[str, tuple[str, ...]], ...]] = {}
 
     def _branch_sources(self, if_node_id: str, branch_field: str, source_graph: "nx.DiGraph") -> set[str]:
         cache_key = (if_node_id, branch_field)
@@ -46,11 +48,39 @@ class _IfActivationController:
         self._branch_sources_cache[cache_key] = frozenset(branch_sources)
         return branch_sources
 
+    def _get_if_node_ids(self) -> tuple[str, ...]:
+        if self._if_node_ids is None:
+            self._if_node_ids = tuple(
+                node_id for node_id, node in self._state.graph.nodes.items() if isinstance(node, IfInvocation)
+            )
+        return self._if_node_ids
+
+    def _branch_memberships(self, source_node_id: str) -> tuple[tuple[str, tuple[str, ...]], ...]:
+        """Return each If with the branch fields whose exclusive sources include this source."""
+        cached = self._branch_memberships_by_source.get(source_node_id)
+        if cached is not None:
+            return cached
+
+        source_graph = self._state._get_source_graph_flat()
+        memberships = tuple(
+            (if_node_id, fields)
+            for if_node_id in self._get_if_node_ids()
+            if (
+                fields := tuple(
+                    branch_field
+                    for branch_field in ("true_input", "false_input")
+                    if source_node_id in self._branch_sources(if_node_id, branch_field, source_graph)
+                )
+            )
+        )
+        self._branch_memberships_by_source[source_node_id] = memberships
+        return memberships
+
     def get_dependencies(self, exec_node_id: str) -> tuple[ActivationDependency, ...]:
         """Return activation requirements for one concrete prepared node."""
 
         source_node_id = self._state._prepared_registry().get_source_node_id(exec_node_id)
-        if not any(isinstance(node, IfInvocation) for node in self._state.graph.nodes.values()):
+        if not self._get_if_node_ids():
             return ()
         return self.get_source_dependencies(source_node_id, self._state._get_iteration_path(exec_node_id))
 
@@ -59,29 +89,11 @@ class _IfActivationController:
     ) -> tuple[ActivationDependency, ...]:
         """Return branch requirements before a source node is materialized."""
 
-        if not any(isinstance(node, IfInvocation) for node in self._state.graph.nodes.values()):
-            return ()
-        source_graph = self._state._get_source_graph_flat()
-        dependencies: list[ActivationDependency] = []
-        for source_if_id, source_if_node in self._state.graph.nodes.items():
-            if not isinstance(source_if_node, IfInvocation):
-                continue
-
-            matching_fields = tuple(
-                branch_field
-                for branch_field in ("true_input", "false_input")
-                if source_node_id in self._branch_sources(source_if_id, branch_field, source_graph)
-            )
-            if len(matching_fields) != 1:
-                continue
-            dependencies.append(
-                ActivationDependency(
-                    owner_id=source_if_id,
-                    branch=matching_fields[0],
-                    frame=iteration_path,
-                )
-            )
-        return tuple(dependencies)
+        return tuple(
+            ActivationDependency(owner_id=if_node_id, branch=fields[0], frame=iteration_path)
+            for if_node_id, fields in self._branch_memberships(source_node_id)
+            if len(fields) == 1
+        )
 
     def is_source_admitted(self, source_node_id: str, iteration_path: tuple[int, ...] = ()) -> bool:
         dependencies = self.get_source_dependencies(source_node_id, iteration_path)
@@ -102,16 +114,7 @@ class _IfActivationController:
         if iteration_path:
             return self.is_source_rejected(source_node_id, iteration_path)
 
-        source_graph = self._state._get_source_graph_flat()
-        relevant_if_ids = {
-            if_node_id
-            for if_node_id, if_node in self._state.graph.nodes.items()
-            if isinstance(if_node, IfInvocation)
-            and any(
-                source_node_id in self._branch_sources(if_node_id, branch_field, source_graph)
-                for branch_field in ("true_input", "false_input")
-            )
-        }
+        relevant_if_ids = {if_node_id for if_node_id, _ in self._branch_memberships(source_node_id)}
         if not relevant_if_ids:
             return False
 
