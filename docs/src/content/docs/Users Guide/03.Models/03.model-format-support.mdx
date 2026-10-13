@@ -1,7 +1,7 @@
 ---
 title: Model Format Support
 description: Which file formats and quantizations InvokeAI loads for every model family, text encoder, VAE and adapter.
-lastUpdated: 2026-10-10
+lastUpdated: 2026-10-11
 sidebar:
   order: 3
 ---
@@ -96,7 +96,8 @@ not check, so a quantized file there fails with an unclear error or decodes inco
 | FLUX.2, Z-Image | ✓ (LyCORIS, Diffusers) | Z-Image only | |
 | Qwen-Image, Krea-2, Wan 2.2, Anima | ✓ (LyCORIS/kohya, including LoKR where noted on the family page) | Anima (ControlNet-LLLite) | |
 | LTX-2, MiniMax H3 | ✓ (plain low-rank; LoKR, LoHA and DoRA are refused) | ✗ | |
-| SD 3, CogView4, Ideogram 4, ERNIE-Image | ✗ | ✗ | |
+| Ideogram 4 | ✓ (ai-toolkit/ComfyUI and diffusers, LoKR too; DoRA is refused, LoHA is not recognized) | ✗ | |
+| SD 3, CogView4, ERNIE-Image | ✗ | ✗ | |
 
 [PiD decoders](/users-guide/image-generation/advanced-topics/pid-decode/) load for FLUX.1, FLUX.2, SD 3, SDXL and
 Qwen-Image (v1 and v1.5, bf16 and int8 builds).

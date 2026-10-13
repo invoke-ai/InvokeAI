@@ -120,8 +120,12 @@ class CachedModelWithPartialLoad:
         return added_bytes
 
     def _find_modules_that_support_autocast(self) -> dict[str, torch.nn.Module]:
-        """Find all modules that support autocasting."""
-        return {n: m for n, m in self._model.named_modules() if isinstance(m, CustomModuleMixin)}  # type: ignore
+        """Find all modules that support autocasting and let the cache stream their weights."""
+        return {
+            n: m
+            for n, m in self._model.named_modules()
+            if isinstance(m, CustomModuleMixin) and m.streams_weights  # type: ignore
+        }
 
     def _find_keys_in_modules_that_do_not_support_autocast(self, state_dict: dict[str, torch.Tensor]) -> set[str]:
         keys_in_modules_that_do_not_support_autocast: set[str] = set()
