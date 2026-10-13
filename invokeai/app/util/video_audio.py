@@ -23,6 +23,9 @@ from pathlib import Path
 
 import numpy as np
 
+# How every soundtrack the app writes is encoded; ``aac_splice`` matches a spliced tail to it.
+AAC_ENCODE_ARGS = ["-c:a", "aac"]
+
 
 def _ffmpeg_exe() -> str:
     import imageio_ffmpeg
@@ -188,8 +191,7 @@ def _run_mux(video_path: Path, wav_path: Path, output_path: Path) -> subprocess.
             "1:a:0",
             "-c:v",
             "copy",
-            "-c:a",
-            "aac",
+            *AAC_ENCODE_ARGS,
             str(output_path),
         ],
         capture_output=True,

@@ -6,6 +6,13 @@ video and emits a new MP4, so the output can be fed straight into
 Concatenate Videos to splice clips together — e.g. trim a generated clip
 to a usable middle section before chaining it to another shot.
 
+Frames are re-encoded only where they have to be. A range covering the whole
+source at its own frame rate is a copy of the source file, so passing a clip
+through this node (as video extension does with an untrimmed source) costs no
+quality. A trim of a source this app encoded stream-copies the keyframe-aligned
+run of frames inside the range and encodes only the partial keyframe intervals
+at either end (see ``h264_splice``). Anything else is re-encoded in full.
+
 If the source carries an audio track, the matching slice of it is carried
 through (and retimed alongside the video when the output fps differs from
 the source's). Like ``video_concat``, the audio path buffers the source
@@ -14,7 +21,9 @@ per second than decoded frames — and audio failures fail the node loudly
 rather than emit a silently-stripped clip.
 """
 
+import math
 import tempfile
+from contextlib import closing
 from itertools import islice
 from pathlib import Path
 from typing import Callable, Iterator, Optional, Protocol
@@ -39,8 +48,17 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.primitives import VideoOutput
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.util.h264_splice import (
+    MIN_ENCODED_FRAMES,
+    H264Layout,
+    SpliceError,
+    concat_stream_copy,
+    copy_frames,
+    read_h264_layout,
+)
+from invokeai.app.util.mp4_metadata import write_mp4_tags
 from invokeai.app.util.video_audio import extract_audio_pcm, mux_audio_into_video, resample_linear
-from invokeai.app.util.video_encoding import make_mp4_writer, write_stereo_wav
+from invokeai.app.util.video_encoding import make_mp4_writer, write_stereo_wav, writer_decoder_config
 from invokeai.app.util.video_thumbnails import decoder_frame_count, iter_video_frames, probe_video
 
 
@@ -161,7 +179,8 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
         video_path = context.videos.get_path(self.video.video_name)
         width, height, duration, source_fps = probe_video(video_path)
 
-        n_frames = decoder_frame_count(video_path)
+        exact_frame_count = decoder_frame_count(video_path)
+        n_frames = exact_frame_count
         if n_frames is None:
             if not source_fps or duration <= 0:
                 raise ValueError(
@@ -195,6 +214,18 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
         # clear message instead of surfacing an opaque ffmpeg error mid-encode.
         _validate_even_dimensions(width, height, self.video.video_name)
 
+        # Frames can be copied rather than re-encoded only at the source's own rate (a stream copy
+        # cannot retime), and only from a track whose sample indices are the decoder's frame indices:
+        # read_h264_layout refuses edit-list trims and rotations, and the count must agree.
+        layout = None
+        if source_fps is not None and math.isclose(output_fps, source_fps, rel_tol=1e-6):
+            layout = read_h264_layout(video_path)
+            if layout is not None and layout.sample_count != exact_frame_count:
+                layout = None
+        # The whole clip is the source itself; copying it avoids another lossy generation.
+        if layout is not None and start == 0 and end == layout.sample_count - 1:
+            return self._save_unchanged(context, video_path, width, height, n_frames, output_fps)
+
         context.util.signal_progress(f"Transcoding frames {start}-{end} of {n_frames} @ {output_fps:.2f} fps")
 
         tmp = tempfile.NamedTemporaryFile(prefix="invokeai_video_range_", suffix=".mp4", delete=False)
@@ -203,19 +234,26 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
         wav_path: Optional[Path] = None
         muxed_path: Optional[Path] = None
         try:
-            # imageio's iter_index isn't exposed by iio.imiter, so we enumerate and skip.
-            # Frames stream straight from the decoder into the encoder; see _write_frame_range.
-            writer = make_mp4_writer(tmp_path, output_fps)
-            try:
-                num_frames = _write_frame_range(
-                    iter_video_frames(video_path, is_canceled=context.util.is_canceled),
-                    writer,
-                    start,
-                    end,
-                    is_canceled=context.util.is_canceled,
+            num_frames: Optional[int] = None
+            copy_span = self._plan_copy_span(layout, start, end, width, height, output_fps) if layout else None
+            if copy_span is not None:
+                num_frames = self._write_spliced_range(
+                    context, video_path, start, end, *copy_span, output_fps, tmp_path
                 )
-            finally:
-                writer.close()
+            if num_frames is None:
+                # imageio's iter_index isn't exposed by iio.imiter, so we enumerate and skip.
+                # Frames stream straight from the decoder into the encoder; see _write_frame_range.
+                writer = make_mp4_writer(tmp_path, output_fps)
+                try:
+                    num_frames = _write_frame_range(
+                        iter_video_frames(video_path, is_canceled=context.util.is_canceled),
+                        writer,
+                        start,
+                        end,
+                        is_canceled=context.util.is_canceled,
+                    )
+                finally:
+                    writer.close()
 
             expected_frames = end - start + 1
             if num_frames != expected_frames:
@@ -285,6 +323,139 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
                     cleanup.unlink(missing_ok=True)
                 except Exception:
                     pass
+
+    @staticmethod
+    def _plan_copy_span(
+        layout: H264Layout, start: int, end: int, width: int, height: int, fps: float
+    ) -> Optional[tuple[int, int, H264Layout]]:
+        """The keyframe-aligned frames ``[k1, k2)`` inside ``[start, end]`` that can be
+        stream-copied rather than re-encoded, with the source's layout; None if there are none.
+
+        ``k1`` is the first keyframe at or after ``start``, ``k2`` the last keyframe at or
+        before ``end + 1`` — or the end of the track when the range runs to the last frame —
+        each moved one keyframe inward when it would leave an encoded end shorter than
+        ``MIN_ENCODED_FRAMES``. The source must also carry the decoder configuration this
+        node's encoder writes and a constant frame duration, or the re-encoded ends could not
+        share its track.
+        """
+        if layout.frame_duration is None or layout.decoder_config != writer_decoder_config(width, height, fps):
+            return None
+        boundaries = [*layout.sync_samples, layout.sample_count]
+        inner_starts = [k for k in layout.sync_samples if k >= start and not 0 < k - start < MIN_ENCODED_FRAMES]
+        inner_ends = [k for k in boundaries if k <= end + 1 and not 0 < end + 1 - k < MIN_ENCODED_FRAMES]
+        if not inner_starts or not inner_ends or inner_starts[0] >= inner_ends[-1]:
+            return None
+        return inner_starts[0], inner_ends[-1], layout
+
+    def _write_spliced_range(
+        self,
+        context: InvocationContext,
+        video_path: Path,
+        start: int,
+        end: int,
+        k1: int,
+        k2: int,
+        layout: H264Layout,
+        output_fps: float,
+        out_path: Path,
+    ) -> Optional[int]:
+        """Write frames ``[start, end]`` to ``out_path``, stream-copying ``[k1, k2)``.
+
+        Only the partial GOPs on either side — ``[start, k1)`` and ``[k2, end]`` — are
+        encoded. Returns the number of frames written, which the caller checks against the
+        range like a full encode's, or None (leaving the caller to re-encode the whole range)
+        when an encoded part's decoder configuration differs from the source's, so the parts
+        could not share one track.
+        """
+        with tempfile.TemporaryDirectory(prefix="invokeai_video_range_") as work:
+            work_dir = Path(work)
+            head = (start, k1, work_dir / "head.mp4")
+            tail = (k2, end + 1, work_dir / "tail.mp4")
+            encoded = [span for span in (head, tail) if span[0] < span[1]]
+            writers = [make_mp4_writer(path, output_fps) for _, _, path in encoded]
+            written = 0
+            # Closed explicitly: an open decoder holds the process-wide stream slot, which the
+            # copy and join below (and a fallback re-encode) must not wait behind.
+            with closing(iter_video_frames(video_path, is_canceled=context.util.is_canceled)) as frames:
+                try:
+                    for idx, frame in enumerate(islice(frames, end + 1)):
+                        if context.util.is_canceled():
+                            raise CanceledException
+                        for (lo, hi, _), writer in zip(encoded, writers, strict=True):
+                            if lo <= idx < hi:
+                                writer.append_data(np.ascontiguousarray(frame))
+                                written += 1
+                finally:
+                    for writer in writers:
+                        writer.close()
+
+            middle_path = work_dir / "middle.mp4"
+            reason: Optional[str] = None
+            if any(
+                (part := read_h264_layout(path)) is None or part.decoder_config != layout.decoder_config
+                for _, _, path in encoded
+            ):
+                reason = "its encoding differs from this node's"
+            else:
+                try:
+                    copy_frames(video_path, k1, k2, layout.sample_count, middle_path)
+                    middle = read_h264_layout(middle_path)
+                    if middle is None or middle.sample_count != k2 - k1:
+                        reason = "copying its frames did not yield the expected count"
+                    else:
+                        parts = [head[2]] if head in encoded else []
+                        parts += [middle_path] + ([tail[2]] if tail in encoded else [])
+                        concat_stream_copy(parts, out_path)
+                        joined = read_h264_layout(out_path)
+                        if (
+                            joined is None
+                            or joined.sample_count != written + (k2 - k1)
+                            or joined.frame_duration != layout.frame_duration
+                        ):
+                            reason = "the joined file does not hold the expected frames on one timeline"
+                except SpliceError as e:
+                    reason = str(e)
+            if reason is not None:
+                context.logger.info(f"Re-encoding the whole range: the source cannot be stream-copied ({reason})")
+                return None
+        context.logger.info(f"Stream-copied frames {k1}-{k2 - 1} of the source without re-encoding")
+        return written + (k2 - k1)
+
+    def _save_unchanged(
+        self,
+        context: InvocationContext,
+        video_path: Path,
+        width: int,
+        height: int,
+        n_frames: int,
+        fps: float,
+    ) -> ExtractVideoRangeOutput:
+        """Save a copy of the source as the output: the requested range is all of it."""
+        with tempfile.TemporaryDirectory(prefix="invokeai_video_range_") as work:
+            copy_path = Path(work) / "source.mp4"
+            # A stream-copy remux that drops the source's keyed metadata: save() writes this
+            # node's record, and if that rewrite fails the source's must not be read back as it.
+            write_mp4_tags(video_path, copy_path, {})
+            video_dto = context.videos.save(
+                source_path=copy_path,
+                width=width,
+                height=height,
+                duration=n_frames / fps,
+                fps=fps,
+            )
+        context.logger.info(f"Saved {video_dto.video_name}: the whole of the source, copied without re-encoding")
+        base = VideoOutput.build(video_dto)
+        return ExtractVideoRangeOutput(
+            video=base.video,
+            source_video=self.video,
+            width=base.width,
+            height=base.height,
+            num_frames=base.num_frames,
+            fps=base.fps,
+            duration=base.duration,
+            start_frame=0,
+            end_frame=n_frames - 1,
+        )
 
     def _build_audio_track(
         self,

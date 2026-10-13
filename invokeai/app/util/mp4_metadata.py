@@ -56,9 +56,7 @@ def _ffmpeg_exe() -> str:
     return imageio_ffmpeg.get_ffmpeg_exe()
 
 
-def _iter_boxes(
-    fh: BinaryIO, start: int, end: int, max_boxes: Optional[int] = None
-) -> Iterator[tuple[bytes, int, int]]:
+def iter_boxes(fh: BinaryIO, start: int, end: int, max_boxes: Optional[int] = None) -> Iterator[tuple[bytes, int, int]]:
     """Yield ``(type, payload_start, payload_end)`` for each box in ``[start, end)``.
 
     Stops silently at the first structurally impossible box (size smaller than its own
@@ -91,10 +89,10 @@ def _iter_boxes(
         position += size
 
 
-def _find_box(
+def find_box(
     fh: BinaryIO, start: int, end: int, box_type: bytes, max_boxes: Optional[int] = None
 ) -> Optional[tuple[int, int]]:
-    for found_type, payload_start, payload_end in _iter_boxes(fh, start, end, max_boxes):
+    for found_type, payload_start, payload_end in iter_boxes(fh, start, end, max_boxes):
         if found_type == box_type:
             return payload_start, payload_end
     return None
@@ -141,7 +139,7 @@ def _read_keys(fh: BinaryIO, start: int, end: int) -> dict[int, str]:
 
 def _read_utf8_data(fh: BinaryIO, start: int, end: int) -> Optional[str]:
     """The first UTF-8 ``data`` atom of an ``ilst`` item, or None."""
-    for box_type, payload_start, payload_end in _iter_boxes(fh, start, end):
+    for box_type, payload_start, payload_end in iter_boxes(fh, start, end):
         if box_type != b"data" or payload_end - payload_start < 8:
             continue
         fh.seek(payload_start)
@@ -169,22 +167,22 @@ def read_mp4_tags(path: Path, keys: Optional[Collection[str]] = None) -> dict[st
     with open(path, "rb") as fh:
         fh.seek(0, 2)
         file_size = fh.tell()
-        moov = _find_box(fh, 0, file_size, b"moov", max_boxes=_MAX_TOP_LEVEL_BOXES)
+        moov = find_box(fh, 0, file_size, b"moov", max_boxes=_MAX_TOP_LEVEL_BOXES)
         if moov is None:
             return result
-        udta = _find_box(fh, *moov, b"udta")
+        udta = find_box(fh, *moov, b"udta")
         if udta is None:
             return result
-        meta = _find_box(fh, *udta, b"meta")
+        meta = find_box(fh, *udta, b"meta")
         if meta is None:
             return result
         meta_start = _meta_payload_start(fh, *meta)
-        keys_box = _find_box(fh, meta_start, meta[1], b"keys")
-        ilst = _find_box(fh, meta_start, meta[1], b"ilst")
+        keys_box = find_box(fh, meta_start, meta[1], b"keys")
+        ilst = find_box(fh, meta_start, meta[1], b"ilst")
         if keys_box is None or ilst is None:
             return result
         names = _read_keys(fh, *keys_box)
-        for item_type, item_start, item_end in _iter_boxes(fh, *ilst):
+        for item_type, item_start, item_end in iter_boxes(fh, *ilst):
             name = names.get(int.from_bytes(item_type, "big"))
             if name is None or (wanted is not None and name not in wanted):
                 continue
@@ -200,7 +198,7 @@ def read_ftyp_major_brand(path: Path, search_limit: int = 64 * 1024) -> Optional
     with open(path, "rb") as fh:
         fh.seek(0, 2)
         end = min(fh.tell(), search_limit)
-        for box_type, payload_start, payload_end in _iter_boxes(fh, 0, end):
+        for box_type, payload_start, payload_end in iter_boxes(fh, 0, end):
             if box_type == b"ftyp":
                 if payload_end - payload_start < 4:
                     return None
