@@ -160,6 +160,7 @@ from invokeai.backend.model_manager.configs.t2i_adapter import (
 )
 from invokeai.backend.model_manager.configs.t5_encoder import (
     T5Encoder_BnBLLMint8_Config,
+    T5Encoder_Checkpoint_Config,
     T5Encoder_GGUF_Config,
     T5Encoder_SDNQ_Config,
     T5Encoder_T5Encoder_Config,
@@ -527,6 +528,7 @@ AnyModelConfig = Annotated[
         Annotated[T5Encoder_BnBLLMint8_Config, T5Encoder_BnBLLMint8_Config.get_tag()],
         Annotated[T5Encoder_SDNQ_Config, T5Encoder_SDNQ_Config.get_tag()],
         Annotated[T5Encoder_GGUF_Config, T5Encoder_GGUF_Config.get_tag()],
+        Annotated[T5Encoder_Checkpoint_Config, T5Encoder_Checkpoint_Config.get_tag()],
         # Qwen3-VL Encoder (Qwen3-VL multimodal encoder for Krea-2) - checked BEFORE the text-only Qwen3
         # encoder so single-file VL checkpoints (which also carry generic model.layers.* keys) are not
         # misclassified as the Z-Image Qwen3 encoder. The VL probe requires the visual tower.

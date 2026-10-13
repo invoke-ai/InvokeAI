@@ -1,7 +1,7 @@
 ---
 title: Model Format Support
 description: Which file formats and quantizations InvokeAI loads for every model family, text encoder, VAE and adapter.
-lastUpdated: 2026-10-10
+lastUpdated: 2026-10-11
 sidebar:
   order: 3
 ---
@@ -54,7 +54,7 @@ Ministral 3B encoder. Others are recognized by their layer names and fail, or mi
 
 | Encoder | Used by | Folder | Single file (bf16) | fp8 scaled | int8 | nvfp4 | GGUF | SDNQ |
 |---|---|---|---|---|---|---|---|---|
-| T5-XXL | FLUX.1, SD 3 | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ (and bitsandbytes int8) |
+| T5-XXL | FLUX.1, SD 3 | ✓ | ✓ | ✓ | R | R | ✓ | ✓ (and bitsandbytes int8) |
 | CLIP-L / CLIP-G | SD, SDXL, FLUX.1, SD 3 | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | CLIP-L inside a FLUX.1 SDNQ pipeline |
 | Qwen3 0.6B / 4B / 8B | Z-Image, FLUX.2 Klein, Anima | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Qwen3-VL 4B / 8B | Krea-2, Ideogram 4 | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ |
@@ -66,6 +66,12 @@ Ministral 3B encoder. Others are recognized by their layer names and fail, or mi
 | Gemma-2 2B | PiD decoders | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ |
 | Gemma-4 12B | LTX-2 | ✓ (bf16 or int8) | ✗ | L | in the folder | L | ✗ | ✗ |
 | UMT5 | Wan 2.2 | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+
+The single-file T5-XXL builds are ComfyUI's `t5xxl_fp16`, `t5xxl_fp8_e4m3fn` and `t5xxl_fp8_e4m3fn_scaled`. The
+fp8 builds keep their weights in fp8 on a GPU that can hold them, about 4.9 GB instead of about 9.5 GB. Prefer
+`t5xxl_fp8_e4m3fn_scaled` over `t5xxl_fp8_e4m3fn`: the unscaled build stores every tensor in fp8, its layer norms
+included, and its prompt embeddings stray measurably further from the full-precision encoder. Wan's UMT5 file looks
+similar but is not a T5-XXL and is not recognized as one.
 
 The Qwen3-VL GGUF encoder is the language model only; a separate `mmproj` vision file is refused, and split
 multi-part GGUFs have to be joined before installing. The Gemma-4 encoder installs only as a folder: its
