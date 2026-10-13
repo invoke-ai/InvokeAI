@@ -1058,7 +1058,11 @@ class _ExecutionNodeBuilder:
             isinstance(source_node, ForInvocation)
             and get_output_field_scope(source_node, edge.source.field) == OutputScope.Final
         ):
-            return self._state._get_for_parent_iteration_path(edge.source.node_id)
+            parent_path = self._state._get_for_parent_iteration_path(edge.source.node_id)
+            if edge.destination.field == ITEM_FIELD:
+                group_depth = len(parent_path) if sibling_depth is None else sibling_depth
+                return parent_path[: max(group_depth - 1, 0)]
+            return parent_path
         if edge.destination.field == ITEM_FIELD:
             if isinstance(source_node, ForInvocation) and source_node.index == -1:
                 return path
@@ -1079,8 +1083,22 @@ class _ExecutionNodeBuilder:
             key=lambda exec_node_id: (self._state._get_iteration_path(exec_node_id), exec_node_id),
         )
 
+    def _prepared_node_has_edge_output(self, edge: Edge, prepared_id: str) -> bool:
+        source_node = self._state.graph.get_node(edge.source.node_id)
+        if not (
+            isinstance(source_node, ForInvocation)
+            and get_output_field_scope(source_node, edge.source.field) == OutputScope.Iteration
+        ):
+            return True
+        prepared_node = self._state.execution_graph.get_node(prepared_id)
+        return isinstance(prepared_node, ForInvocation) and prepared_node.index >= 0
+
     def _get_ordered_prepared_nodes_for_edge(self, edge: Edge) -> list[str]:
-        prepared_nodes = self._get_ordered_prepared_nodes_for_source(edge.source.node_id)
+        prepared_nodes = [
+            prepared_id
+            for prepared_id in self._get_ordered_prepared_nodes_for_source(edge.source.node_id)
+            if self._prepared_node_has_edge_output(edge, prepared_id)
+        ]
         source_node = self._state.graph.get_node(edge.source.node_id)
         if not (
             isinstance(source_node, ForInvocation)
@@ -1279,8 +1297,11 @@ class _ExecutionNodeBuilder:
         self, prepared_nodes: set[str], input_edges: list[Edge]
     ) -> dict[tuple[int, ...], list[str]]:
         prepared_nodes_by_iteration_path: dict[tuple[int, ...], list[str]] = {}
+        edge = input_edges[0]
         for prepared_id in prepared_nodes:
-            iteration_path = self._get_prepared_edge_iteration_path(input_edges[0], prepared_id)
+            if not self._prepared_node_has_edge_output(edge, prepared_id):
+                continue
+            iteration_path = self._get_prepared_edge_iteration_path(edge, prepared_id)
             prepared_nodes_by_iteration_path.setdefault(iteration_path, []).append(prepared_id)
         return prepared_nodes_by_iteration_path
 
@@ -1331,7 +1352,16 @@ class _ExecutionNodeBuilder:
             for node_id in iterator_nodes
         ]
         prepared_nodes_by_source = {
-            node_id: self._get_prepared_nodes_for_source(node_id) for node_id in parent_node_ids
+            node_id: {
+                prepared_id
+                for prepared_id in self._get_prepared_nodes_for_source(node_id)
+                if all(
+                    self._prepared_node_has_edge_output(edge, prepared_id)
+                    for edge in input_edges
+                    if edge.source.node_id == node_id
+                )
+            }
+            for node_id in parent_node_ids
         }
         prepared_nodes_by_source_and_path = {
             node_id: self._index_prepared_nodes_by_iteration_path(
@@ -1850,7 +1880,7 @@ class _ExecutionNodeBuilder:
             self._state._invalidate_loop_caches_for_source(next_node_id)
             return next_node_id
 
-        if isinstance(next_node, ForInvocation) and all(
+        if isinstance(next_node, ForInvocation) and any(
             self._state.execution_graph.get_node(exec_node_id).index == -1 for exec_node_id in new_node_ids
         ):
             self._mark_empty_for_complete(next_node_id)

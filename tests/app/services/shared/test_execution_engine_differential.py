@@ -8536,3 +8536,33 @@ def test_for_condition_if_reads_root_frame_sources_and_skips_unselected_root(
     assert _source_output(state, "after").value == expected
     assert trace.count("root_true") == (1 if True in collection else 0)
     assert trace.count("root_false") == (1 if False in collection else 0)
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+def test_iterate_for_collect_preserves_empty_inner_collection(force_compatibility_scheduler: bool) -> None:
+    graph = Graph()
+    graph.add_node(CollectionConcatInvocation(id="source", first=[[1, 2], []]))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(ForInvocation(id="for"))
+    graph.add_node(AddInvocation(id="add", b=10))
+    graph.add_node(ForReturnInvocation(id="return"))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_node(AnyTypeTestInvocation(id="after"))
+    graph.add_edge(create_edge("source", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "for", "collection"))
+    graph.add_edge(create_edge("for", "item", "add", "a"))
+    graph.add_edge(create_edge("add", "value", "return", "output"))
+    graph.add_edge(create_loop_linkage("for", "return"))
+    graph.add_edge(create_edge("for", "output_collection", "collect", "item"))
+    graph.add_edge(create_edge("collect", "collection", "after", "value"))
+
+    state = GraphExecutionState(graph=graph)
+    if force_compatibility_scheduler:
+        state._execution_scheduler = _ExecutionScheduler(state)
+    trace, state = _run_to_completion(state)
+
+    after_exec_ids = sorted(state.source_prepared_mapping["after"], key=state._get_iteration_path)
+    assert trace.count("add") == 2
+    assert len(after_exec_ids) == 1
+    assert state.results[after_exec_ids[0]].value == [[11, 12], []]
+    assert state.is_complete()
