@@ -1200,6 +1200,7 @@ const isFluxKontextModel = (model: GenerateModelConfig | undefined): model is Ma
  */
 const LORA_SUPPORTED_BASES: ReadonlySet<string> = new Set<SupportedGenerateBase>([
   'anima',
+  'ernie-image',
   'flux',
   'flux2',
   'krea-2',

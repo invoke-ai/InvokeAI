@@ -36,6 +36,26 @@ const compileForShape = (
   return { filled, graph: compileGenerateGraph(settings, model, 'gallery', { useCpuNoise: true }).backendGraph };
 };
 
+/** The same shape with one concept applied, for bases that load LoRAs; `null` for the rest. */
+const compileWithLoraForShape = (base: SupportedGenerateBase, shape: ModelShape): BackendGraphContract | null => {
+  const { model, settings } = satisfiedSettingsFor(base, shape);
+
+  if (!isLoraSupported(model)) {
+    return null;
+  }
+
+  const lora = { base, key: 'concept', name: 'concept', type: 'lora' as const };
+
+  return compileGenerateGraph(
+    { ...settings, loras: [{ isEnabled: true, model: lora, weight: 0.75 }] },
+    model,
+    'gallery',
+    {
+      useCpuNoise: true,
+    }
+  ).backendGraph;
+};
+
 seedArchitectureCapabilities();
 
 describe('generate graph coverage', () => {
@@ -163,36 +183,43 @@ describe('generate graph coverage', () => {
       (fields[nodeType] ??= { inputs: new Set(), literals: new Map(), outputs: new Set() });
 
     for (const { base, shape } of generateGraphCases) {
-      const { filled, graph } = compileForShape(base, shape);
+      const { filled, graph: plainGraph } = compileForShape(base, shape);
+      // The concept slot adds its own loader nodes, whose names and fields the backend has to provide as well.
+      const graphs = [plainGraph, compileWithLoraForShape(base, shape)].filter(
+        (graph): graph is BackendGraphContract => graph !== null
+      );
       const entry = (byBase[base] ??= { componentsFilled: {}, nodeTypes: [] });
 
       entry.componentsFilled[shape.label] = filled;
-      entry.nodeTypes = [
-        ...new Set([...entry.nodeTypes, ...Object.values(graph.nodes).map((node) => node.type)]),
-      ].sort();
 
-      for (const node of Object.values(graph.nodes)) {
-        const { literals } = fieldsFor(node.type);
+      for (const graph of graphs) {
+        entry.nodeTypes = [
+          ...new Set([...entry.nodeTypes, ...Object.values(graph.nodes).map((node) => node.type)]),
+        ].sort();
 
-        for (const [field, value] of Object.entries(node)) {
-          // Node identity and undefined values are excluded from serialized input contracts.
-          if (field === 'id' || field === 'type' || value === undefined) {
-            continue;
-          }
+        for (const node of Object.values(graph.nodes)) {
+          const { literals } = fieldsFor(node.type);
 
-          const values = literals.get(field) ?? new Map<string, unknown>();
-          literals.set(field, values);
+          for (const [field, value] of Object.entries(node)) {
+            // Node identity and undefined values are excluded from serialized input contracts.
+            if (field === 'id' || field === 'type' || value === undefined) {
+              continue;
+            }
 
-          // Check scalar values, not only object names, for synthetic unhashed model fixtures.
-          if (value === null || typeof value !== 'object') {
-            values.set(JSON.stringify(value), value);
+            const values = literals.get(field) ?? new Map<string, unknown>();
+            literals.set(field, values);
+
+            // Check scalar values, not only object names, for synthetic unhashed model fixtures.
+            if (value === null || typeof value !== 'object') {
+              values.set(JSON.stringify(value), value);
+            }
           }
         }
-      }
 
-      for (const edge of graph.edges) {
-        fieldsFor(graph.nodes[edge.source.node_id]!.type).outputs.add(edge.source.field);
-        fieldsFor(graph.nodes[edge.destination.node_id]!.type).inputs.add(edge.destination.field);
+        for (const edge of graph.edges) {
+          fieldsFor(graph.nodes[edge.source.node_id]!.type).outputs.add(edge.source.field);
+          fieldsFor(graph.nodes[edge.destination.node_id]!.type).inputs.add(edge.destination.field);
+        }
       }
     }
 
