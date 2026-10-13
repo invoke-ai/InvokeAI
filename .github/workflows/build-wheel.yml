@@ -12,7 +12,7 @@ jobs:
     timeout-minutes: 5 # expected run time: <2 min
     steps:
       - name: checkout
-        uses: useblacksmith/checkout@v1
+        uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
 
       - name: setup python
         uses: actions/setup-python@v6

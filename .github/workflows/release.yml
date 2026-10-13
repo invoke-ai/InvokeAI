@@ -20,10 +20,10 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - name: checkout
-        uses: useblacksmith/checkout@v1
+        uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
 
       - name: check python version
-        uses: samuelcolvin/check-python-version@v4
+        uses: samuelcolvin/check-python-version@ee112e7afa6e57d4ead91bd84904fbfeb8955004 # v4
         id: check-python-version
         with:
           version_file_path: invokeai/version/invokeai_version.py
@@ -76,7 +76,7 @@ jobs:
           path: dist/
 
       - name: publish distribution to TestPyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         with:
           repository-url: https://test.pypi.org/legacy/
 
@@ -105,4 +105,4 @@ jobs:
           path: dist/
 
       - name: publish distribution to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
