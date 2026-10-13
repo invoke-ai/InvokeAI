@@ -11,7 +11,9 @@ source at its own frame rate is a copy of the source file, so passing a clip
 through this node (as video extension does with an untrimmed source) costs no
 quality. A trim of a source this app encoded stream-copies the keyframe-aligned
 run of frames inside the range and encodes only the partial keyframe intervals
-at either end (see ``h264_splice``). Anything else is re-encoded in full.
+at either end (see ``h264_splice``), and likewise copies the source's AAC
+packets for the audio inside the range, encoding only a short lead-in and tail
+(see ``aac_splice``). Anything else is re-encoded in full.
 
 If the source carries an audio track, the matching slice of it is carried
 through (and retimed alongside the video when the output fps differs from
@@ -48,6 +50,12 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.primitives import VideoOutput
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.util.aac_splice import (
+    AAC_FRAME_SAMPLES,
+    EDGE_FRAMES,
+    splice_soundtrack,
+    spliceable_aac_layout,
+)
 from invokeai.app.util.h264_splice import (
     MIN_ENCODED_FRAMES,
     H264Layout,
@@ -281,14 +289,17 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
             if audio is not None:
                 pcm, rate = audio
                 context.util.signal_progress("Muxing audio")
-                wav_tmp = tempfile.NamedTemporaryFile(prefix="invokeai_video_range_", suffix=".wav", delete=False)
-                wav_tmp.close()
-                wav_path = Path(wav_tmp.name)
-                write_stereo_wav(wav_path, pcm, rate)
                 mux_tmp = tempfile.NamedTemporaryFile(prefix="invokeai_video_range_", suffix=".mp4", delete=False)
                 mux_tmp.close()
                 muxed_path = Path(mux_tmp.name)
-                mux_audio_into_video(tmp_path, wav_path, muxed_path)
+                if not self._mux_spliced_audio(
+                    context, video_path, start, end, source_fps, output_fps, pcm, rate, tmp_path, muxed_path
+                ):
+                    wav_tmp = tempfile.NamedTemporaryFile(prefix="invokeai_video_range_", suffix=".wav", delete=False)
+                    wav_tmp.close()
+                    wav_path = Path(wav_tmp.name)
+                    write_stereo_wav(wav_path, pcm, rate)
+                    mux_audio_into_video(tmp_path, wav_path, muxed_path)
                 source_path = muxed_path
 
             out_duration = num_frames / output_fps
@@ -466,6 +477,68 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
             end_frame=n_frames - 1,
         )
 
+    def _mux_spliced_audio(
+        self,
+        context: InvocationContext,
+        video_path: Path,
+        start: int,
+        end: int,
+        source_fps: Optional[float],
+        output_fps: float,
+        pcm: np.ndarray,
+        rate: int,
+        trimmed_video: Path,
+        out_path: Path,
+    ) -> bool:
+        """Mux ``pcm`` onto ``trimmed_video``, stream-copying the source's own AAC packets
+        for the part of the range they hold whole (see ``aac_splice``).
+
+        ``pcm`` is the source's decoded audio over the range, sample for sample, when the
+        range plays at the source's own rate and its span maps one-to-one onto the output
+        timeline; the source's packets are then copied for every output frame that lies
+        inside both the range and the source's real audio, and only the partial frames at
+        each end are encoded. Returns False, leaving the caller to encode the whole
+        soundtrack, when the source's track is not one this app's encoder writes, the range
+        is too short, or the splice does not verify.
+        """
+        if source_fps is None or source_fps != output_fps:
+            return False
+        window_start = round(start * rate / source_fps)
+        window_end = round((end + 1) * rate / source_fps)
+        if window_end - window_start != pcm.shape[1]:
+            return False
+        layout = spliceable_aac_layout(video_path, rate)
+        if layout is None:
+            return False
+        frame, priming = AAC_FRAME_SAMPLES, layout.priming
+        # Packet k's output frame is decoded samples [k * frame - priming, (k + 1) * frame - priming).
+        if window_start == 0:
+            first, copied_at = 0, -priming
+        else:
+            # The first frame wholly inside the range that leaves a full lead-in before it.
+            first = -(-(window_start + priming + EDGE_FRAMES * frame) // frame)
+            copied_at = first * frame - priming - window_start
+        # The last packet that leaves a full encoded tail after the run (see aac_splice); past the
+        # source's own audio the tail is the silence the timeline was padded with.
+        end_packet = min(layout.packet_count, (window_end - EDGE_FRAMES * frame + priming) // frame)
+        reason = splice_soundtrack(
+            trimmed_video,
+            video_path,
+            priming,
+            first,
+            end_packet,
+            copied_at,
+            pcm,
+            rate,
+            out_path,
+            context.util.is_canceled,
+        )
+        if reason is not None:
+            context.logger.info(f"Re-encoding the whole soundtrack: {reason}")
+            return False
+        context.logger.info(f"Stream-copied audio packets {first}-{end_packet - 1} of the source without re-encoding")
+        return True
+
     def _build_audio_track(
         self,
         context: InvocationContext,
@@ -511,7 +584,9 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
             # Audio track shorter than the video (or the range lies past its end):
             # keep temporal alignment by padding the shortfall with silence.
             window = np.pad(window, ((0, 0), (0, (window_end - window_start) - window.shape[1])))
-        target = round((end - start + 1) / output_fps * rate)
+        # At the source's own rate the window maps sample for sample; rounding the span on its
+        # own could come out one off the window and interpolate the whole of it.
+        target = window.shape[1] if output_fps == eff_fps else round((end - start + 1) / output_fps * rate)
         return resample_linear(window, target), rate
 
     @staticmethod

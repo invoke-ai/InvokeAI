@@ -10,9 +10,11 @@ reproduces the source's first ``m`` output frames exactly, and the first freshly
 packet after them blends with the last copied one. That blend cancels cleanly only when
 both packets were coded from the same signal across their shared window, so two things
 keep the seam at coding-noise level rather than a glitch: the new encode starts
-``PREROLL_FRAMES`` frames before the cut (one is not enough — the encoder's first frames
-after a cold start make different window decisions), and callers keep the cut that many
-frames clear of anything the joined soundtrack changes. Callers also verify the seam.
+``PREROLL_FRAMES`` frames before the cut (the encoder takes several frames after a cold
+start to settle its window and bit-allocation decisions: one frame of pre-roll leaves
+glitches, two still leaves an occasional 40 ms burst on music), and callers keep the cut
+that many frames clear of anything the joined soundtrack changes. Callers also verify the
+seam.
 
 Packets are joined as ADTS, which carries no timing, so two things the MP4 encodes in
 its edit list are restored afterwards: the encoder priming the source's first packet
@@ -34,12 +36,16 @@ import numpy as np
 
 from invokeai.app.util.h264_splice import SpliceError, run_ffmpeg
 from invokeai.app.util.mp4_metadata import find_box, iter_boxes
-from invokeai.app.util.video_audio import AAC_ENCODE_ARGS, extract_audio_pcm
+from invokeai.app.util.video_audio import AAC_ENCODE_ARGS, AudioExtractionError, extract_audio_pcm
 
 AAC_FRAME_SAMPLES = 1024
 # Frames of already-known audio the new encode starts with before the cut, and the clearance
 # the cut keeps from the first changed sample.
-PREROLL_FRAMES = 2
+PREROLL_FRAMES = 4
+# The fewest whole frames an encoded lead-in or tail holds beside the copied run: the frame
+# it shares with the run plus PREROLL_FRAMES more, so the seam is far from the encoder's cold
+# start (a lead-in) or its end-of-stream flush (a tail).
+EDGE_FRAMES = PREROLL_FRAMES + 1
 _MAX_TOP_LEVEL_BOXES = 1024
 _MAX_PACKETS = 1 << 24
 # AudioSampleEntry fields before its child boxes (SampleEntry 8 + version-0 audio header 20).
@@ -57,7 +63,9 @@ class AacLayout(NamedTuple):
     sample_rate: int
     """The media timescale, which for AAC is the sample rate."""
     priming: int
-    """Leading samples the edit list skips: the encoder delay held by the first packet."""
+    """Leading samples the edit list skips. For a file the encoder wrote directly this is its
+    priming; a splice that opens on a lead-in skips the lead-in's padding too. Either way
+    packet ``k`` decodes to presented samples ``[k * 1024 - priming, (k + 1) * 1024 - priming)``."""
     decoder_config: bytes
     """The ``AudioSpecificConfig`` (object type, sample rate, channels), without the
     backward-compatible "no SBR" extension ffmpeg appends to its own encodes but cannot
@@ -232,6 +240,18 @@ def _probe_encoder_layout(sample_rate: int) -> Optional[AacLayout]:
         return read_aac_layout(probe)
 
 
+def spliceable_aac_layout(path: Path, sample_rate: int) -> Optional[AacLayout]:
+    """``path``'s audio layout if its packets can be spliced into a soundtrack this app
+    encodes at ``sample_rate``: the same AudioSpecificConfig as its encoder, and a leading edit
+    that skips at least that encoder's priming (anything less would be another encoder's)."""
+    layout, encoder = read_aac_layout(path), encoder_aac_layout(sample_rate)
+    if layout is None or encoder is None or layout.sample_rate != sample_rate:
+        return None
+    if layout.decoder_config != encoder.decoder_config or layout.priming < encoder.priming:
+        return None
+    return layout
+
+
 def _adts_frames(data: bytes) -> list[bytes]:
     frames: list[bytes] = []
     position = 0
@@ -247,9 +267,11 @@ def _adts_frames(data: bytes) -> list[bytes]:
     return frames
 
 
-def _set_track_duration(path: Path, handler: bytes, samples: int, sample_rate: int) -> None:
-    """Trim the ``handler`` track's presentation to ``samples`` via its edit list, and keep
-    ``tkhd`` and ``mvhd`` durations consistent with it. All fields are rewritten in place."""
+def _set_audio_edit(path: Path, media_time: int, samples: int, sample_rate: int) -> None:
+    """Make the audio track present ``samples`` samples starting ``media_time`` samples into
+    its media, via its edit list, and keep ``tkhd`` and ``mvhd`` durations consistent with it.
+    All fields are rewritten in place."""
+    handler = b"soun"
     with open(path, "r+b") as fh:
         fh.seek(0, 2)
         moov = find_box(fh, 0, fh.tell(), b"moov", max_boxes=_MAX_TOP_LEVEL_BOXES)
@@ -282,9 +304,9 @@ def _set_track_duration(path: Path, handler: bytes, samples: int, sample_rate: i
                 if elst is None:
                     raise SpliceError(f"{path.name}'s {handler.decode()} track has no edit list")
                 fh.seek(elst[0])
-                elst_field = ">Q" if fh.read(1)[0] == 1 else ">I"
+                wide_edit = fh.read(1)[0] == 1
                 fh.seek(elst[0] + 8)
-                fh.write(struct.pack(elst_field, duration))
+                fh.write(struct.pack(">Qq" if wide_edit else ">Ii", duration, media_time))
                 fh.seek(tkhd_duration_at)
                 fh.write(struct.pack(field, duration))
                 patched = True
@@ -296,79 +318,163 @@ def _set_track_duration(path: Path, handler: bytes, samples: int, sample_rate: i
         fh.write(struct.pack(">Q" if mvhd_version == 1 else ">I", max(track_durations)))
 
 
-def mux_spliced_aac(
-    video_path: Path,
-    source: Path,
-    head_packets: int,
-    priming: int,
-    tail_pcm: np.ndarray,
-    sample_rate: int,
-    total_samples: int,
-    out_path: Path,
-    is_canceled: Optional[Callable[[], bool]] = None,
-) -> np.ndarray:
-    """Write ``out_path`` = ``video_path``'s video plus a soundtrack spliced from ``source``.
-
-    The soundtrack is ``source``'s first ``head_packets`` AAC packets, stream-copied —
-    ``head_packets * 1024 - priming`` samples after priming — followed by ``tail_pcm``
-    encoded from ``PREROLL_FRAMES`` frames *before* that cut (``tail_pcm`` must start
-    there), presented for ``total_samples`` samples in all.
-
-    Returns the new encode's own decode of the ``PREROLL_FRAMES`` frames after the cut:
-    the coding noise this content gets from an ordinary encode, which is what a clean
-    seam over the same samples should be measured against.
-    """
+def _encode(
+    pcm: np.ndarray, sample_rate: int, work: Path, name: str, is_canceled: Optional[Callable[[], bool]]
+) -> tuple[list[bytes], np.ndarray]:
+    """Encode ``pcm`` as the app does; returns its ADTS frames, priming frames included, and
+    their standalone decode (which, knowing nothing of priming, starts with the priming)."""
     from invokeai.app.util.video_encoding import write_stereo_wav
 
-    if priming % AAC_FRAME_SAMPLES:
-        raise SpliceError(f"priming of {priming} samples is not a whole AAC frame")
-    with tempfile.TemporaryDirectory(prefix="invokeai_aac_splice_") as work:
-        head, tail_wav, tail = Path(work) / "head.aac", Path(work) / "tail.wav", Path(work) / "tail.aac"
-        run_ffmpeg(
-            ["-i", str(source), "-map", "0:a:0", "-c", "copy", "-frames:a", str(head_packets), "-f", "adts", str(head)],
-            f"copying the first {head_packets} audio packets of {source.name}",
-            is_canceled,
-        )
-        write_stereo_wav(tail_wav, tail_pcm, sample_rate)
-        run_ffmpeg(
-            ["-i", str(tail_wav), *AAC_ENCODE_ARGS, "-f", "adts", str(tail)], "encoding the new audio", is_canceled
-        )
-        head_frames = _adts_frames(head.read_bytes())
-        if len(head_frames) != head_packets:
-            raise SpliceError(f"copied {len(head_frames)} audio packets, expected {head_packets}")
-        # Drop the new encode's priming packets and its pre-roll.
-        dropped = priming // AAC_FRAME_SAMPLES + PREROLL_FRAMES
-        tail_frames = _adts_frames(tail.read_bytes())[dropped:]
-        decoded = extract_audio_pcm(tail)
-        if decoded is None:
-            raise SpliceError("the new audio decoded to nothing")
-        # An ADTS decode knows nothing of priming, so it starts with the priming frame.
-        seam_start = priming + PREROLL_FRAMES * AAC_FRAME_SAMPLES
-        seam_reference = decoded[0][:, seam_start : seam_start + PREROLL_FRAMES * AAC_FRAME_SAMPLES]
-        joined = Path(work) / "joined.aac"
-        joined.write_bytes(b"".join(head_frames + tail_frames))
-        run_ffmpeg(
-            [
-                "-i",
-                str(video_path),
-                # The first copied packet still holds the source's priming; presenting it from
-                # -priming makes ffmpeg write the leading edit that skips it.
-                "-itsoffset",
-                repr(-priming / sample_rate),
-                "-i",
-                str(joined),
-                "-map",
-                "0:v:0",
-                "-map",
-                "1:a:0",
-                "-c",
-                "copy",
-                "-f",
-                "mp4",
-                str(out_path),
-            ],
-            "muxing the spliced audio",
-            is_canceled,
-        )
-    _set_track_duration(out_path, b"soun", total_samples, sample_rate)
-    return seam_reference
+    wav, adts = work / f"{name}.wav", work / f"{name}.aac"
+    write_stereo_wav(wav, pcm, sample_rate)
+    run_ffmpeg(["-i", str(wav), *AAC_ENCODE_ARGS, "-f", "adts", str(adts)], "encoding the new audio", is_canceled)
+    decoded = extract_audio_pcm(adts)
+    if decoded is None:
+        raise SpliceError("the new audio decoded to nothing")
+    return _adts_frames(adts.read_bytes()), decoded[0]
+
+
+def _seam_defect(decoded: np.ndarray, timeline: np.ndarray, start: int, reference: np.ndarray) -> Optional[str]:
+    """Whether the seam ``decoded[:, start:]`` is noisier than an ordinary encode of the same
+    samples (``reference``). Whether copied and new packets overlap cleanly depends on the
+    encoder's window decisions around the content there, so it is measured, not assumed — and
+    against the seam's own content, since the audio either side may be silence that codes with
+    no error at all."""
+    length = min(reference.shape[1], timeline.shape[1] - start)
+    if start < 0 or length <= 0:
+        return "the new audio does not cover a seam"
+    seam, reference = slice(start, start + length), reference[:, :length]
+    seam_error = float(np.sqrt(np.mean((decoded[:, seam] - timeline[:, seam]) ** 2)))
+    coding_error = float(np.sqrt(np.mean((reference - timeline[:, seam]) ** 2)))
+    if seam_error > 2.0 * coding_error + 1e-3:
+        return "a seam between copied and new audio is not clean"
+    return None
+
+
+def splice_soundtrack(
+    video_path: Path,
+    source: Path,
+    source_skip: int,
+    first: int,
+    end: int,
+    copied_at: int,
+    timeline: np.ndarray,
+    sample_rate: int,
+    out_path: Path,
+    is_canceled: Optional[Callable[[], bool]] = None,
+) -> Optional[str]:
+    """Write ``out_path`` = ``video_path``'s video with ``timeline`` as its soundtrack,
+    stream-copying ``source``'s AAC packets ``[first, end)`` for the part of it they hold.
+
+    ``timeline`` (``(2, n)`` float PCM) is the soundtrack to present; packet ``first``'s
+    output frame begins at ``timeline[:, copied_at]``, and the copied packets must decode to
+    the timeline's samples there. ``source_skip`` is the source's leading edit (its layout's
+    ``priming``). ``first == 0`` copies the source's own start, leading edit included
+    (``copied_at == -source_skip``); otherwise the frames before the copied run are
+    encoded as a lead-in. The frames after it are encoded from ``PREROLL_FRAMES`` frames
+    before its end. Both seams are verified, as is every copied frame not on a seam, which
+    must decode bit-exact.
+
+    Returns None on success, or why the soundtrack could not be spliced — ``out_path`` is
+    then unusable and the caller encodes the whole soundtrack instead.
+    """
+    encoder = encoder_aac_layout(sample_rate)
+    if encoder is None or encoder.priming % AAC_FRAME_SAMPLES:
+        return "the AAC encoder's priming is not a whole number of frames"
+    frame, priming = AAC_FRAME_SAMPLES, encoder.priming
+    priming_frames = priming // frame
+    copied_end = copied_at + (end - first) * frame
+    if (first == 0) != (copied_at == -source_skip) or end - first < PREROLL_FRAMES:
+        return "the copied packets do not fit the soundtrack"
+    if first > 0 and copied_at < EDGE_FRAMES * frame:
+        return "the copied packets do not fit the soundtrack"
+    if copied_end < timeline.shape[1] and timeline.shape[1] - copied_end < EDGE_FRAMES * frame:
+        return "the copied packets do not fit the soundtrack"
+    if copied_end > timeline.shape[1] or copied_end - PREROLL_FRAMES * frame < 0:
+        return "the copied packets do not fit the soundtrack"
+    try:
+        with tempfile.TemporaryDirectory(prefix="invokeai_aac_splice_") as work:
+            work_dir = Path(work)
+            # The source's packets as ADTS, sliced by index: an ADTS frame per packet.
+            source_adts = work_dir / "source.aac"
+            run_ffmpeg(
+                ["-i", str(source), "-map", "0:a:0", "-c", "copy", "-f", "adts", str(source_adts)],
+                f"copying the audio packets of {source.name}",
+                is_canceled,
+            )
+            source_frames = _adts_frames(source_adts.read_bytes())
+            if len(source_frames) < end:
+                return f"{source.name} holds {len(source_frames)} audio packets, not {end}"
+            frames: list[bytes] = []
+            seams: list[tuple[int, np.ndarray]] = []
+            exact_from = 0
+            if first == 0:
+                # The stream opens with the source's own first packet, and keeps its leading edit.
+                media_time = source_skip
+            else:
+                # A lead-in encode up to the copied run, padded at its start so its frames fall on
+                # the copied packets' grid, and run on past the seam so its last kept packet was
+                # coded with the real signal in the window it shares with the first copied one.
+                pad = (-copied_at) % frame
+                lead_frames = (pad + copied_at) // frame
+                lead_input = np.concatenate(
+                    [
+                        np.zeros((2, pad), dtype=np.float32),
+                        timeline[:, : min(timeline.shape[1], copied_at + PREROLL_FRAMES * frame)],
+                    ],
+                    axis=1,
+                )
+                lead, lead_decoded = _encode(lead_input, sample_rate, work_dir, "lead", is_canceled)
+                frames += lead[: priming_frames + lead_frames]
+                media_time = priming + pad
+                seam_at = copied_at - frame
+                seams.append((seam_at, lead_decoded[:, priming + pad + seam_at :][:, : 2 * frame]))
+                exact_from = copied_at + frame
+            frames += source_frames[first:end]
+            if copied_end < timeline.shape[1]:
+                tail, tail_decoded = _encode(
+                    timeline[:, copied_end - PREROLL_FRAMES * frame :], sample_rate, work_dir, "tail", is_canceled
+                )
+                frames += tail[priming_frames + PREROLL_FRAMES :]
+                seams.append((copied_end, tail_decoded[:, priming + PREROLL_FRAMES * frame :][:, : 2 * frame]))
+            joined = work_dir / "joined.aac"
+            joined.write_bytes(b"".join(frames))
+            run_ffmpeg(
+                [
+                    "-i",
+                    str(video_path),
+                    # Presenting the audio from -media_time makes ffmpeg write a leading edit, whose
+                    # fields are then set exactly below.
+                    "-itsoffset",
+                    repr(-media_time / sample_rate),
+                    "-i",
+                    str(joined),
+                    "-map",
+                    "0:v:0",
+                    "-map",
+                    "1:a:0",
+                    "-c",
+                    "copy",
+                    "-f",
+                    "mp4",
+                    str(out_path),
+                ],
+                "muxing the spliced audio",
+                is_canceled,
+            )
+        _set_audio_edit(out_path, media_time, timeline.shape[1], sample_rate)
+        muxed = extract_audio_pcm(out_path)
+    except (SpliceError, AudioExtractionError, OSError) as e:
+        return f"it cannot be stream-copied ({e})"
+
+    if muxed is None or muxed[1] != sample_rate or muxed[0].shape[1] < timeline.shape[1]:
+        return "the spliced soundtrack did not decode to its full length"
+    decoded = muxed[0]
+    interior = slice(max(exact_from, 0), copied_end)
+    if not np.array_equal(decoded[:, interior], timeline[:, interior]):
+        return "the copied audio did not decode back exactly"
+    for start, reference in seams:
+        defect = _seam_defect(decoded, timeline, start, reference)
+        if defect is not None:
+            return defect
+    return None

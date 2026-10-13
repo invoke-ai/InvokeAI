@@ -36,6 +36,8 @@ from pathlib import Path
 import imageio.v2 as iio2
 import numpy as np
 
+from invokeai.app.util.video_audio import AAC_ENCODER_OPTIONS
+
 CRF = 18
 KEYFRAME_INTERVAL_SECONDS = 2.0
 
@@ -57,6 +59,8 @@ def make_mp4_writer(path: Path | str, fps: float, audio_path: Path | str | None 
             raise FileNotFoundError(f"Audio file for muxing does not exist: {audio_path}")
         kwargs["audio_path"] = str(audio_path)
         kwargs["audio_codec"] = audio_codec
+    # Soundtracks share the WAV-mux path's encoder options so either can be spliced onto the other.
+    audio_options = AAC_ENCODER_OPTIONS if audio_path is not None and audio_codec == "aac" else []
     keyframe_interval = max(1, round(fps * KEYFRAME_INTERVAL_SECONDS))
     return iio2.get_writer(
         str(path),
@@ -66,7 +70,7 @@ def make_mp4_writer(path: Path | str, fps: float, audio_path: Path | str | None 
         codec="libx264",
         macro_block_size=1,
         quality=None,
-        output_params=["-crf", str(CRF), "-g", str(keyframe_interval)],
+        output_params=["-crf", str(CRF), "-g", str(keyframe_interval), *audio_options],
         **kwargs,
     )
 

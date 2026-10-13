@@ -35,6 +35,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Optional
 
+from invokeai.app.util.video_audio import AAC_ENCODER_OPTIONS
+
 # Hard wall-clock bound for a single ffmpeg child (probe or convert). Matches the bound
 # used for audio extraction: generous enough for a worst-case ~1 GB 4K transcode on a
 # modest CPU, small enough that a hostile file cannot camp an upload slot forever.
@@ -123,7 +125,7 @@ def _audio_args(probe: MediaProbe) -> list[str]:
         return []
     if probe.audio_codec == "aac":
         return ["-c:a", "copy"]
-    return ["-c:a", "aac", "-b:a", "192k"]
+    return ["-c:a", "aac", "-b:a", "192k", *AAC_ENCODER_OPTIONS]
 
 
 def plan_ingest(probe: MediaProbe) -> IngestAction:
