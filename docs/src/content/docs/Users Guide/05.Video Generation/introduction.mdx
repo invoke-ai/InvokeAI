@@ -203,7 +203,7 @@ Extension is available on all three families. LTX-2's continues the soundtrack a
 
 ### Quality drift across iterations
 
-Each iteration's source is itself a generation output, so artifacts compound — by the 4th or 5th extension you may see softening or color drift. That drift is in the *new* footage: the segments already in the initial video are carried into the result without being re-encoded, picture and sound, apart from up to two seconds of picture at each cut — before the join, and at a trim's start. A trimmed initial video's soundtrack is re-encoded once. Extending a clip whose frame rate differs from the model's (MiniMax H3 always runs at 24 fps) re-encodes it in full, once, as does extending an uploaded video or one made by an earlier version of Invoke. Mitigations:
+Each iteration's source is itself a generation output, so artifacts compound — by the 4th or 5th extension you may see softening or color drift. That drift is in the *new* footage: the segments already in the initial video are carried into the result without being re-encoded, picture and sound, apart from up to two seconds of picture and about a tenth of a second of sound at each cut — before the join, and at each end of a trim. Extending a clip whose frame rate differs from the model's (MiniMax H3 always runs at 24 fps) re-encodes it in full, once, as does extending an uploaded video or one made by an earlier version of Invoke. Mitigations:
 
 1. **Trim the bridge point a few frames back from the end** — boundary frames are the most artifact-prone.
 2. **Refresh a bridge frame with a low-strength img2img pass** (SDXL or FLUX at ~0.2 strength) before using it as a first frame for the next segment.

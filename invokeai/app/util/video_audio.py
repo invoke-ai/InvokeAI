@@ -24,7 +24,11 @@ from pathlib import Path
 import numpy as np
 
 # How every soundtrack the app writes is encoded; ``aac_splice`` matches a spliced tail to it.
-AAC_ENCODE_ARGS = ["-c:a", "aac"]
+# Perceptual noise substitution is off: the decoder fills those bands from a random generator
+# whose state carries across packets, so a freshly encoded lead-in that used it would change
+# how the stream-copied packets after it decode, and a splice could not verify them exact.
+AAC_ENCODER_OPTIONS = ["-aac_pns", "0"]
+AAC_ENCODE_ARGS = ["-c:a", "aac", *AAC_ENCODER_OPTIONS]
 
 
 def _ffmpeg_exe() -> str:

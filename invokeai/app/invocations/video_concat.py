@@ -52,10 +52,10 @@ from invokeai.app.services.session_processor.session_processor_common import Can
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.aac_splice import (
     AAC_FRAME_SAMPLES,
+    EDGE_FRAMES,
     PREROLL_FRAMES,
-    encoder_aac_layout,
-    mux_spliced_aac,
-    read_aac_layout,
+    splice_soundtrack,
+    spliceable_aac_layout,
 )
 from invokeai.app.util.h264_splice import (
     MIN_ENCODED_FRAMES,
@@ -67,7 +67,6 @@ from invokeai.app.util.h264_splice import (
     read_h264_layout,
 )
 from invokeai.app.util.video_audio import (
-    AudioExtractionError,
     extract_audio_pcm,
     mux_audio_into_video,
     resample_linear,
@@ -455,15 +454,12 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
         transition — provided that clip plays at the output rate, so its audio is not
         retimed, and sets the soundtrack's sample rate. Returns False, leaving the caller to
         encode the whole soundtrack, when the clip's track is not one this app's encoder
-        writes, nothing whole-frame precedes the transition, or the result's head does not
-        decode back to exactly the samples it should hold.
+        writes, too little precedes the transition, or the splice does not verify.
         """
         if first_fps is None or first_fps != output_fps:
             return False
-        layout, encoder = read_aac_layout(first_path), encoder_aac_layout(rate)
-        if layout is None or encoder is None or layout.sample_rate != rate:
-            return False
-        if (layout.decoder_config, layout.priming) != (encoder.decoder_config, encoder.priming):
+        layout = spliceable_aac_layout(first_path, rate)
+        if layout is None:
             return False
         # The soundtrack holds the clip's own decoded samples only where its audio was mapped
         # one-to-one: the clip's span at its native rate must be exactly its span on the timeline.
@@ -475,65 +471,30 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
             layout.packet_count * AAC_FRAME_SAMPLES - layout.priming,
             pcm.shape[1],
         )
-        preroll = PREROLL_FRAMES * AAC_FRAME_SAMPLES
-        # Keep the cut PREROLL_FRAMES clear of the first changed sample (see aac_splice).
-        head_packets = (unchanged + layout.priming) // AAC_FRAME_SAMPLES - PREROLL_FRAMES
-        cut = head_packets * AAC_FRAME_SAMPLES - layout.priming
-        if cut < preroll:
-            return False
-        try:
-            seam_reference = mux_spliced_aac(
-                video_path,
-                first_path,
-                head_packets,
-                layout.priming,
-                pcm[:, cut - preroll :],
-                rate,
-                pcm.shape[1],
-                out_path,
-                context.util.is_canceled,
-            )
-            muxed = extract_audio_pcm(out_path)
-        except (SpliceError, AudioExtractionError) as e:
-            context.logger.info(f"Re-encoding the whole soundtrack: it cannot be stream-copied ({e})")
-            return False
-        reason = self._spliced_audio_defect(muxed, pcm, rate, cut, seam_reference)
+        # Keep the cut PREROLL_FRAMES clear of the first changed sample, and a full encoded tail
+        # after it (see aac_splice).
+        head_packets = min(
+            (unchanged + layout.priming) // AAC_FRAME_SAMPLES - PREROLL_FRAMES,
+            (pcm.shape[1] - EDGE_FRAMES * AAC_FRAME_SAMPLES + layout.priming) // AAC_FRAME_SAMPLES,
+        )
+        reason = splice_soundtrack(
+            video_path,
+            first_path,
+            layout.priming,
+            0,
+            head_packets,
+            -layout.priming,
+            pcm,
+            rate,
+            out_path,
+            context.util.is_canceled,
+        )
         if reason is not None:
             context.logger.info(f"Re-encoding the whole soundtrack: {reason}")
             return False
+        cut = head_packets * AAC_FRAME_SAMPLES - layout.priming
         context.logger.info(f"Stream-copied the first {cut} audio samples of the first clip without re-encoding")
         return True
-
-    @staticmethod
-    def _spliced_audio_defect(
-        muxed: Optional[tuple[np.ndarray, int]],
-        pcm: np.ndarray,
-        rate: int,
-        cut: int,
-        seam_reference: np.ndarray,
-    ) -> Optional[str]:
-        """Why the spliced soundtrack cannot be used, or None.
-
-        The copied head must decode back to exactly the samples it stands for, and the
-        seam — the frames where copied and new packets overlap — must be no noisier than an
-        ordinary encode of the same samples (``seam_reference``). Whether the overlap
-        cancels depends on the encoder's window decisions around the content there, so it is
-        measured, not assumed; and it is measured against the seam's own content, since the
-        audio after it may be silence that codes with no error at all.
-        """
-        if muxed is None or muxed[1] != rate or muxed[0].shape[1] < pcm.shape[1]:
-            return "the spliced soundtrack did not decode to its full length"
-        decoded = muxed[0]
-        if not np.array_equal(decoded[:, :cut], pcm[:, :cut]):
-            return "the copied audio did not decode back exactly"
-        seam = slice(cut, cut + seam_reference.shape[1])
-        if seam_reference.shape[1] != PREROLL_FRAMES * AAC_FRAME_SAMPLES or seam.stop > pcm.shape[1]:
-            return "the new audio does not cover the seam"
-        seam_error = float(np.sqrt(np.mean((decoded[:, seam] - pcm[:, seam]) ** 2)))
-        coding_error = float(np.sqrt(np.mean((seam_reference - pcm[:, seam]) ** 2)))
-        if seam_error > 2.0 * coding_error + 1e-3:
-            return "the seam between copied and new audio is not clean"
-        return None
 
     def _estimate_transition_memory(self, width: int, height: int) -> int:
         if self.transition == "cut" or self.transition_frames == 0:

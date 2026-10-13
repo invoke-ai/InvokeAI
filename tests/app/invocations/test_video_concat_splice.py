@@ -385,7 +385,7 @@ def test_first_clip_with_presentation_tags_is_re_encoded(tmp_path, tag):
     assert len(_decode(out)) == 138
 
 
-@pytest.mark.parametrize("stage", ["copy_frames", "mux_spliced_aac"])
+@pytest.mark.parametrize("stage", ["copy_frames", "splice_soundtrack"])
 def test_cancellation_during_a_splice_saves_nothing(tmp_path, stage):
     """Cancelling while a splice stage runs stops it — the stage itself raises, not just the
     pre-save check — and nothing is saved."""
