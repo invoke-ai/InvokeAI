@@ -14,6 +14,7 @@ from invokeai.app.invocations.loops import (
     LoopState,
 )
 from invokeai.app.services.shared import graph_if_runtime
+from invokeai.app.services.shared.graph_iterator_ancestry import _IteratorAncestry
 from invokeai.app.services.shared.graph_models import Edge, EdgeConnection
 from invokeai.app.services.shared.graph_validation import (
     COLLECTION_FIELD,
@@ -46,6 +47,9 @@ class _ExecutionNodeBuilder:
         self._sibling_iterate_if_collect_branches: Optional[dict[str, tuple[str, str]]] = None
         self._iteration_relationship_graph: Optional[nx.DiGraph] = None
         self._iteration_relationship_topological_index: Optional[dict[str, int]] = None
+        # Keyed by the identity of the cached flat source graph, which every graph edit replaces.
+        self._flat_iterator_graph: Optional[tuple["nx.DiGraph", "nx.DiGraph"]] = None
+        self._node_iterators: dict[str, tuple[str, ...]] = {}
 
     def _get_iteration_axes(self, source_node_id: str) -> tuple[str, ...]:
         cached = self._iteration_axes_by_source.get(source_node_id)
@@ -1535,7 +1539,9 @@ class _ExecutionNodeBuilder:
 
         return new_nodes
 
-    def _has_admitted_source_mapping(self, node_id: str, graph: "nx.DiGraph") -> bool:
+    def _has_admitted_source_mapping(
+        self, node_id: str, graph: "nx.DiGraph", iterator_ancestry: Optional[_IteratorAncestry] = None
+    ) -> bool:
         if not any(isinstance(node, IfInvocation) for node in self._state.graph.nodes.values()):
             return True
         if isinstance(self._state.graph.get_node(node_id), IfInvocation):
@@ -1550,6 +1556,7 @@ class _ExecutionNodeBuilder:
                         self._get_prepared_nodes_for_source,
                         self._get_prepared_edge_iteration_path,
                         graph,
+                        iterator_ancestry,
                     )
                 )
             mappings = self._get_if_condition_iteration_mappings(node_id, graph)
@@ -1862,14 +1869,31 @@ class _ExecutionNodeBuilder:
                 self._state._enqueue_if_ready(exec_node_id)
 
     def iterator_graph(self, base: Optional["nx.DiGraph"] = None) -> "nx.DiGraph":
-        """Gets a DiGraph with edges to collectors removed so an ancestor search produces all active iterators for any node"""
-        g = base.copy() if base is not None else self._state._get_source_graph_flat().copy()
+        """Gets a DiGraph with collector edges removed for iterator ancestry searches.
+
+        The result for the flat source graph is shared; callers must not mutate it.
+        """
+        source_graph = self._state._get_source_graph_flat()
+        if base is not None and base is not source_graph:
+            return self._build_iterator_graph(base)
+        if self._flat_iterator_graph is None or self._flat_iterator_graph[0] is not source_graph:
+            self._flat_iterator_graph = (source_graph, self._build_iterator_graph(source_graph))
+            self._node_iterators = {}
+        return self._flat_iterator_graph[1]
+
+    def _build_iterator_graph(self, base: "nx.DiGraph") -> "nx.DiGraph":
+        g = base.copy()
         collectors = [
-            n for n in self._state.graph.nodes if isinstance(self._state.graph.get_node(n), CollectInvocation)
+            n
+            for n in self._state.graph.nodes
+            if isinstance(self._state.graph.get_node(n), CollectInvocation)
+            if n in base
         ]
         for c in collectors:
             collection_sources = {
-                edge.source.node_id for edge in self._state.graph._get_input_edges(c, COLLECTION_FIELD)
+                edge.source.node_id
+                for edge in self._state.graph._get_input_edges(c, COLLECTION_FIELD)
+                if base.has_edge(edge.source.node_id, c)
             }
             g.remove_edges_from(list(g.in_edges(c)))
             g.add_edges_from((source_id, c) for source_id in collection_sources)
@@ -1884,10 +1908,19 @@ class _ExecutionNodeBuilder:
         return g
 
     def get_node_iterators(self, node_id: str, it_graph: Optional["nx.DiGraph"] = None) -> list[str]:
-        g = it_graph if it_graph is not None else self.iterator_graph()
+        flat_iterator_graph = self.iterator_graph()
+        if it_graph is not None and it_graph is not flat_iterator_graph:
+            return self._find_node_iterators(node_id, it_graph)
+        cached = self._node_iterators.get(node_id)
+        if cached is None:
+            cached = tuple(self._find_node_iterators(node_id, flat_iterator_graph))
+            self._node_iterators[node_id] = cached
+        return list(cached)
+
+    def _find_node_iterators(self, node_id: str, it_graph: "nx.DiGraph") -> list[str]:
         return [
             n
-            for n in nx.ancestors(g, node_id)
+            for n in nx.ancestors(it_graph, node_id)
             if isinstance(self._state.graph.get_node(n), (ForInvocation, IterateInvocation))
         ]
 
@@ -1986,6 +2019,7 @@ class _ExecutionNodeBuilder:
 
     def prepare(self, base_g: Optional["nx.DiGraph"] = None) -> Optional[str]:
         g = base_g if base_g is not None else self._state._get_source_graph_flat()
+        iterator_ancestry = _IteratorAncestry(self._state, g)
         self._attach_pending_if_inputs()
         if self._get_sibling_iterate_if_collect_branches():
             for node_id in nx.topological_sort(g):
@@ -2025,7 +2059,7 @@ class _ExecutionNodeBuilder:
                     and self._is_if_condition_ready(node_id)
                     or not isinstance(self._state.graph.get_node(node_id), IfInvocation)
                 )
-                and self._has_admitted_source_mapping(node_id, g)
+                and self._has_admitted_source_mapping(node_id, g, iterator_ancestry)
                 and (
                     not isinstance(self._state.graph.get_node(node_id), (ForInvocation, IterateInvocation))
                     or all(source_id in self._state.executed for source_id, _ in g.in_edges(node_id))
@@ -2064,6 +2098,7 @@ class _ExecutionNodeBuilder:
                 self._get_prepared_nodes_for_source,
                 self._get_prepared_edge_iteration_path,
                 g,
+                iterator_ancestry,
             )
             condition_edges = self._state.graph._get_input_edges(next_node_id, "condition")
             if condition_edges:

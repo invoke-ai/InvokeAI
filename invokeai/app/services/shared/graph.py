@@ -1,7 +1,7 @@
 import copy  # noqa: F401
 import json
 import weakref  # noqa: F401
-from functools import wraps  # noqa: F401
+from functools import lru_cache, wraps  # noqa: F401
 from typing import (
     TYPE_CHECKING,  # noqa: F401
     Any,
@@ -294,6 +294,17 @@ class _GraphExecutionStateRuntime:
         self.legacy_execution_snapshot = True
         self.legacy_snapshot_loaded = False
         self.fresh_flat_if_activation: Optional[bool] = None
+
+
+@lru_cache(maxsize=4096)
+def _engine_frame_for(state_id: str, workflow_call_depth: int, iteration_path: tuple[int, ...]) -> EngineExecutionFrame:
+    """Share one frozen frame per identity so gate scope checks compare by identity instead of by dump."""
+    return EngineExecutionFrame(
+        state_id=state_id,
+        frame_id=f"{state_id}:{workflow_call_depth}:{','.join(str(i) for i in iteration_path)}",
+        iteration_path=iteration_path,
+        workflow_call_depth=workflow_call_depth,
+    )
 
 
 class GraphExecutionState(BaseModel):
@@ -1461,13 +1472,7 @@ class GraphExecutionState(BaseModel):
             self._generic_graph_scheduler = None
 
     def _engine_frame(self, iteration_path: tuple[int, ...]) -> EngineExecutionFrame:
-        frame_id = f"{self.id}:{len(self.workflow_call_stack)}:{','.join(str(i) for i in iteration_path)}"
-        return EngineExecutionFrame(
-            state_id=self.id,
-            frame_id=frame_id,
-            iteration_path=iteration_path,
-            workflow_call_depth=len(self.workflow_call_stack),
-        )
+        return _engine_frame_for(self.id, len(self.workflow_call_stack), iteration_path)
 
     def _activation_gate(self, exec_node_id: str) -> ActivationGate:
         return graph_if_runtime._activation_gate(self, exec_node_id)

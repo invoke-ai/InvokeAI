@@ -5,8 +5,9 @@ from typing import TYPE_CHECKING, Callable, Optional
 from invokeai.app.invocations.logic import IfInvocation
 from invokeai.app.services.shared.execution_engine.primitives import ActivationGate
 from invokeai.app.services.shared.execution_engine.scheduler import ActivationDependency
+from invokeai.app.services.shared.graph_iterator_ancestry import _IteratorAncestry
 from invokeai.app.services.shared.graph_models import Edge, ExecutionToken
-from invokeai.app.services.shared.graph_validation import ForInvocation, IterateInvocation, nx
+from invokeai.app.services.shared.graph_validation import IterateInvocation, nx
 
 if TYPE_CHECKING:
     from invokeai.app.services.shared.graph import GraphExecutionState
@@ -19,7 +20,10 @@ def _get_effective_iteration_paths_for_edge(
     get_prepared_nodes_for_source: Callable[[str], set[str]],
     get_prepared_edge_iteration_path: Callable[[Edge, str], tuple[int, ...]],
     source_graph: Optional["nx.DiGraph"] = None,
+    iterator_ancestry: Optional[_IteratorAncestry] = None,
 ) -> set[tuple[int, ...]]:
+    if iterator_ancestry is None:
+        iterator_ancestry = _IteratorAncestry(state, source_graph)
     pending: list[tuple[Optional[Edge], Optional[str]]] = [(edge, None)]
     active_source_ids = set(visited_source_ids)
     paths: set[tuple[int, ...]] = set()
@@ -52,6 +56,7 @@ def _get_effective_iteration_paths_for_edge(
                     get_prepared_nodes_for_source,
                     get_prepared_edge_iteration_path,
                     source_graph,
+                    iterator_ancestry,
                 )
             )
             continue
@@ -74,27 +79,21 @@ def _get_if_iteration_paths(
     get_prepared_nodes_for_source: Callable[[str], set[str]],
     get_prepared_edge_iteration_path: Callable[[Edge, str], tuple[int, ...]],
     source_graph: Optional["nx.DiGraph"] = None,
+    iterator_ancestry: Optional[_IteratorAncestry] = None,
 ) -> list[tuple[int, ...]]:
     """Infer the selected branch's effective iteration paths for an If output."""
+    if iterator_ancestry is None:
+        iterator_ancestry = _IteratorAncestry(state, source_graph)
     node = state.graph.get_node(node_id)
     assert isinstance(node, IfInvocation)
     next_visited_source_ids = {*visited_source_ids, node_id}
     condition_edges = state.graph._get_input_edges(node_id, "condition")
 
     condition_selections: list[tuple[Optional[tuple[int, ...]], str]] = []
-    condition_iterator_ids: set[str] = set()
     if condition_edges:
         condition_edge = condition_edges[0]
         if condition_edge.source.node_id not in state.source_prepared_mapping:
             return []
-        condition_node_id = condition_edge.source.node_id
-        condition_iterator_ids = {
-            ancestor_id
-            for ancestor_id in nx.ancestors(source_graph or state._get_source_graph_flat(), condition_node_id)
-            if isinstance(state.graph.get_node(ancestor_id), (ForInvocation, IterateInvocation))
-        }
-        if isinstance(state.graph.get_node(condition_node_id), (ForInvocation, IterateInvocation)):
-            condition_iterator_ids.add(condition_node_id)
         for prepared_id in get_prepared_nodes_for_source(condition_edge.source.node_id):
             if prepared_id not in state.results:
                 return []
@@ -117,33 +116,38 @@ def _get_if_iteration_paths(
             for edge in selected_edges
         )
         if selected_edges:
-            branch_paths: set[tuple[int, ...]] = set()
-            source_graph_for_axes = source_graph or state._get_source_graph_flat()
-            for edge in selected_edges:
-                branch_source_id = edge.source.node_id
-                branch_iterator_ids = {
-                    ancestor_id
-                    for ancestor_id in nx.ancestors(source_graph_for_axes, branch_source_id)
-                    if isinstance(state.graph.get_node(ancestor_id), (ForInvocation, IterateInvocation))
-                }
-                if isinstance(state.graph.get_node(branch_source_id), (ForInvocation, IterateInvocation)):
-                    branch_iterator_ids.add(branch_source_id)
-                if (
-                    condition_iterator_ids
-                    and branch_iterator_ids
-                    and not (condition_iterator_ids & branch_iterator_ids)
-                ):
-                    continue
-                branch_paths.update(
-                    _get_effective_iteration_paths_for_edge(
-                        state,
-                        edge,
-                        next_visited_source_ids,
-                        get_prepared_nodes_for_source,
-                        get_prepared_edge_iteration_path,
-                        source_graph,
+            compatible_edges = []
+            if condition_edges:
+                condition_iterators = iterator_ancestry.get_iterator_ancestors(condition_edges[0].source.node_id)
+                for edge in selected_edges:
+                    branch_iterators = iterator_ancestry.get_iterator_ancestors(edge.source.node_id)
+                    if (
+                        condition_iterators
+                        and branch_iterators
+                        and not condition_iterators.intersection(branch_iterators)
+                    ):
+                        continue
+                    compatible_edges.append(edge)
+            else:
+                compatible_edges = selected_edges
+            branch_paths = (
+                set().union(
+                    *(
+                        _get_effective_iteration_paths_for_edge(
+                            state,
+                            edge,
+                            next_visited_source_ids,
+                            get_prepared_nodes_for_source,
+                            get_prepared_edge_iteration_path,
+                            source_graph,
+                            iterator_ancestry,
+                        )
+                        for edge in compatible_edges
                     )
                 )
+                if compatible_edges
+                else set()
+            )
         else:
             branch_paths = {condition_path or ()}
 
@@ -159,14 +163,7 @@ def _get_if_iteration_paths(
         if not has_selected_edges:
             return [()]
         if not condition_edges and has_unresolved_selected_source:
-            iterator_graph = state._iterator_graph(
-                source_graph if source_graph is not None else state._get_source_graph_flat()
-            )
-            has_iterator_ancestor = any(
-                isinstance(state.graph.get_node(ancestor_id), (ForInvocation, IterateInvocation))
-                for ancestor_id in nx.ancestors(iterator_graph, node_id)
-            )
-            if not has_iterator_ancestor:
+            if not iterator_ancestry.has_iterator_ancestor(node_id):
                 return [()]
         return []
     return sorted(path for path in paths if not any(path != other and other[: len(path)] == path for other in paths))
