@@ -18,9 +18,14 @@ from invokeai.backend.ltx2 import component_configs as cc
 from invokeai.backend.model_manager.configs.factory import ModelConfigFactory
 from invokeai.backend.model_manager.configs.gemma4_encoder import Gemma4Encoder_Gemma4Encoder_LTX2_Config
 from invokeai.backend.model_manager.configs.identification_utils import InvalidMatchError, NotAMatchError
-from invokeai.backend.model_manager.configs.main import Main_Checkpoint_LTX2_Config, Main_Diffusers_LTX2_Config
+from invokeai.backend.model_manager.configs.main import (
+    Main_Checkpoint_LTX2_Config,
+    Main_Diffusers_LTX2_Config,
+    Main_GGUF_LTX2_Config,
+)
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, LTX2VariantType, ModelFormat, ModelType
+from tests.fixtures.quantized_payloads import q8_cr_marker, write_gguf
 
 T = "model.diffusion_model."
 
@@ -237,11 +242,126 @@ def test_the_variant_override_wins_over_the_filename(tmp_path) -> None:
     assert config.variant is LTX2VariantType.Distilled
 
 
-def test_a_transformer_with_video_feed_forward_biases_is_an_earlier_generation(tmp_path) -> None:
+def test_a_transformer_with_video_feed_forward_biases_is_refused_as_an_earlier_generation(tmp_path) -> None:
+    """Without a header version the structure still dates it: refused with the reason, not left as an
+    unknown model. Its biases say 2.0 or 2.3, which the structure cannot tell apart."""
     path = tmp_path / "ltx-2.3-22b-dev.safetensors"
     save_file(_transformer_tensors(video_ff_bias=True), path)
-    rejection = _rejection(path, Main_Checkpoint_LTX2_Config)
-    assert "cannot tell which LTX-2 generation" in str(rejection)
+    result = _probe(path)
+    assert result.config is None
+    rejection = result.details[Main_Checkpoint_LTX2_Config.__name__]
+    assert isinstance(rejection, InvalidMatchError)
+    assert "is an LTX-2.0/2.3 file" in str(rejection)
+
+
+# --- GGUF single-file transformer config -----------------------------------------------------------
+
+
+def _write_transformer_gguf(
+    path: Path,
+    *,
+    prefix: str = "",
+    architecture: str = "ltxv",
+    metadata: dict[str, str] | None = None,
+    video_ff_bias: bool = False,
+    keyframe: bool = True,
+) -> Path:
+    """The transformer keys as the community GGUFs carry them: bare or prefixed, under a borrowed or
+    misleading `general.architecture`, with or without the official `model_version` string."""
+    tensors = _transformer_tensors(video_ff_bias=video_ff_bias, keyframe=keyframe)
+    write_gguf(
+        path,
+        {prefix + key[len(T) :]: value for key, value in tensors.items()},
+        architecture=architecture,
+        metadata=metadata,
+    )
+    return path
+
+
+@pytest.mark.parametrize(
+    ("name", "prefix", "architecture", "metadata", "variant"),
+    [
+        # vantagewithai / Abiray: bare keys, the official version carried over.
+        ("ltx-2.5-22b-dev-transformer-Q4_K_M.gguf", "", "ltxv", {"model_version": "2.5.0"}, LTX2VariantType.Dev),
+        # realrebelai / molbal: no version string, dated by structure.
+        ("LTX-2.5-Distilled-Q8_0.gguf", "", "ltxv", None, LTX2VariantType.Distilled),
+        # ruygar: prefixed keys, another model's architecture and a renamed version key.
+        (
+            "ltx-2.5-22b-distilled-transformer-bf16-Q4_K_M.gguf",
+            T,
+            "llama",
+            {"safetensors.model_version": "2.5.0"},
+            LTX2VariantType.Distilled,
+        ),
+    ],
+    ids=["vantagewithai", "realrebelai", "ruygar"],
+)
+def test_a_published_gguf_installs_as_the_ltx2_transformer_whatever_its_header_says(
+    tmp_path: Path, name: str, prefix: str, architecture: str, metadata: dict[str, str] | None, variant
+) -> None:
+    path = _write_transformer_gguf(tmp_path / name, prefix=prefix, architecture=architecture, metadata=metadata)
+
+    result = _probe(path)
+
+    assert result.match_count == 1, [type(match).__name__ for match in result.all_matches]
+    assert isinstance(result.config, Main_GGUF_LTX2_Config)
+    assert result.config.format is ModelFormat.GGUFQuantized
+    assert result.config.generation == "2.5"
+    assert result.config.variant is variant
+
+
+@pytest.mark.parametrize(
+    ("metadata", "named"),
+    [
+        # QuantStack keeps the version.
+        ({"model_version": "2.3.0"}, "is an LTX-2.3 file"),
+        # unsloth drops it: the structure dates the file, as far as it can.
+        (None, "is an LTX-2.0/2.3 file"),
+    ],
+    ids=["quantstack", "unsloth"],
+)
+def test_an_ltx2_3_gguf_is_refused_naming_its_generation(tmp_path: Path, metadata, named: str) -> None:
+    path = _write_transformer_gguf(
+        tmp_path / "ltx-2.3-22b-dev-Q4_K_M.gguf", metadata=metadata, video_ff_bias=True, keyframe=False
+    )
+
+    result = _probe(path)
+
+    assert result.config is None, "an invalid match is final: nothing is registered"
+    rejection = result.details[Main_GGUF_LTX2_Config.__name__]
+    assert isinstance(rejection, InvalidMatchError)
+    assert named in str(rejection) and "only LTX-2.5" in str(rejection)
+
+
+def test_a_q8_cr_gguf_is_refused_as_q8_cr_whatever_its_markers_name(tmp_path: Path) -> None:
+    """molbal's Q8_CR build marks the keyframe embedding too, which is not a weight. Refused for what the
+    file is, not for that detail of it: no LTX-2 loader decodes ComfyUI-GGUF's own schemes."""
+    path = tmp_path / "ltx-2.5-22b-distilled-transformer-Q8_CR.gguf"
+    tensors = {key[len(T) :]: value for key, value in _transformer_tensors().items()}
+    tensors["keyframes_abs_pos_embedding"] = torch.zeros(1, 2, dtype=torch.int8)
+    tensors["keyframes_abs_pos_embedding_scale"] = torch.ones(1, 1)
+    write_gguf(path, tensors, quant={"keyframes_abs_pos_embedding": q8_cr_marker()}, architecture="ltxv")
+
+    result = _probe(path)
+
+    assert result.config is None
+    assert any("Q8_CR" in str(reason) for reason in result.invalid_matches)
+    assert not any("not a weight" in str(reason) for reason in result.invalid_matches)
+
+
+def test_an_ltxv_gguf_without_the_transformer_fingerprint_is_not_claimed(tmp_path: Path) -> None:
+    path = tmp_path / "something-ltxv.gguf"
+    write_gguf(path, {"transformer_blocks.0.attn1.to_q.weight": torch.zeros(2, 2)}, architecture="ltxv")
+
+    assert isinstance(_rejection(path, Main_GGUF_LTX2_Config), NotAMatchError)
+
+
+def test_a_safetensors_transformer_is_not_claimed_as_gguf(tmp_path: Path) -> None:
+    path = tmp_path / "ltx-2.5-22b-dev_diffusion_model_bf16.safetensors"
+    save_file(_transformer_tensors(), path)
+
+    assert isinstance(_rejection(path, Main_GGUF_LTX2_Config), NotAMatchError)
+    assert isinstance(_probe(path).config, Main_Checkpoint_LTX2_Config)
 
 
 # --- Gemma-4 encoder folder ---------------------------------------------------------------------
