@@ -1449,6 +1449,54 @@ def test_graph_update_node_reconnects_source_feeding_collector_chain():
     graph.validate_self()
 
 
+def test_graph_validate_self_accepts_iterator_before_collectors_with_float_roots():
+    float_source = FloatInvocation(id="float", value=2.5)
+    downstream_collector = CollectInvocation(id="collector_y")
+    upstream_collector = CollectInvocation(id="collector_x")
+    first_iterate = IterateInvocation(id="iterate_1")
+    second_iterate = IterateInvocation(id="iterate_2")
+    # Keep iterators earlier in nodes order than the collectors, as in issue #9695.
+    graph = Graph(
+        nodes={
+            node.id: node
+            for node in (float_source, first_iterate, second_iterate, downstream_collector, upstream_collector)
+        },
+        edges=[
+            create_edge(float_source.id, "value", downstream_collector.id, "item"),
+            create_edge(downstream_collector.id, "collection", upstream_collector.id, "collection"),
+            create_edge(upstream_collector.id, "collection", first_iterate.id, "collection"),
+            create_edge(upstream_collector.id, "collection", second_iterate.id, "collection"),
+        ],
+    )
+
+    graph.validate_self()
+
+
+def test_graph_update_node_renames_float_source_with_transiently_invalid_collector_order():
+    integer_one = IntegerInvocation(id="i1", value=1)
+    float_source = FloatInvocation(id="f", value=2.5)
+    first_collector = CollectInvocation(id="c")
+    second_collector = CollectInvocation(id="d")
+    integer_two = IntegerInvocation(id="i2", value=2)
+    graph = Graph(
+        nodes={node.id: node for node in (integer_one, float_source, first_collector, second_collector, integer_two)}
+    )
+    for edge in (
+        create_edge("i1", "value", "c", "item"),
+        create_edge("f", "value", "c", "item"),
+        create_edge("c", "collection", "d", "collection"),
+        create_edge("i2", "value", "d", "item"),
+    ):
+        graph.add_edge(edge)
+
+    graph.update_node("f", FloatInvocation(id="f2", value=2.5))
+
+    assert "f" not in graph.nodes
+    assert create_edge("f2", "value", "c", "item") in graph.edges
+    assert all(edge.source.node_id != "f" and edge.destination.node_id != "f" for edge in graph.edges)
+    graph.validate_self()
+
+
 def test_graph_add_collection_input_revalidates_iterator_consumers():
     integer_source = IntegerInvocation(id="integer", value=1)
     float_collection = FloatCollectionInvocation(id="float_collection", collection=[2.5])
