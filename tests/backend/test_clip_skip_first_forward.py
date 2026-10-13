@@ -2,7 +2,8 @@
 
 import pytest
 import torch
-from transformers import CLIPTextConfig, CLIPTextModel, CLIPTextModelWithProjection
+from compel import Compel, ReturnedEmbeddingsType
+from transformers import CLIPTextConfig, CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
 
 from invokeai.backend.model_patcher import ModelPatcher
 
@@ -125,3 +126,51 @@ def test_warmed_encoder_retains_existing_skip_semantics(model_class, skip):
         for actual_state, expected_state in zip(actual.hidden_states, target_states, strict=True):
             torch.testing.assert_close(actual_state, expected_state)
     _assert_restored(fresh(ids, output_hidden_states=True), expected)
+
+
+@pytest.mark.parametrize("model_class", MODEL_CLASSES)
+@torch.no_grad()
+def test_first_skipped_compel_prompt_preserves_later_sdxl_conditioning(model_class):
+    fresh, reference, _ids = _encoders(model_class)
+    tokenizer = CLIPTokenizer(
+        vocab={"<|startoftext|>": 0, "<|pad|>": 1, "<|endoftext|>": 2, "a</w>": 3, "b</w>": 4},
+        merges=[],
+        pad_token="<|pad|>",
+        model_max_length=8,
+    )
+    assert tokenizer("a b", add_special_tokens=False).input_ids == [3, 4]
+
+    def conditioning_provider(encoder):
+        return Compel(
+            tokenizer=tokenizer,
+            text_encoder=encoder,
+            returned_embeddings_type=ReturnedEmbeddingsType.PENULTIMATE_HIDDEN_STATES_NON_NORMALIZED,
+            truncate_long_prompts=False,
+            device=torch.device("cpu"),
+        )
+
+    with ModelPatcher.apply_clip_skip(fresh, 1):
+        conditioning_provider(fresh)("a b")
+
+    for prompt in ["a b", "a++ b", "a b " * 5]:
+        # SDXL creates a new Compel per prompt while reusing the cached encoder.
+        actual_compel = conditioning_provider(fresh)
+        reference_compel = conditioning_provider(reference)
+        actual = actual_compel(prompt)
+        expected = reference_compel(prompt)
+        torch.testing.assert_close(actual, expected)
+        if prompt == "a b":
+            # An independent tensor oracle also guards the consumer's penultimate, non-normalized selection.
+            ids = tokenizer(prompt, padding="max_length", return_tensors="pt").input_ids
+            reference_output = reference(ids, output_hidden_states=True)
+            torch.testing.assert_close(actual, reference_output.hidden_states[-2])
+        elif prompt == "a++ b":
+            assert not torch.allclose(actual, conditioning_provider(fresh)("a b"))
+        else:
+            assert actual.shape[1] > tokenizer.model_max_length
+
+        if model_class is CLIPTextModelWithProjection:
+            torch.testing.assert_close(
+                actual_compel.conditioning_provider.get_pooled_embeddings([prompt]),
+                reference_compel.conditioning_provider.get_pooled_embeddings([prompt]),
+            )
