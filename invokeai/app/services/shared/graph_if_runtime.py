@@ -78,10 +78,19 @@ def _get_if_iteration_paths(
     condition_edges = state.graph._get_input_edges(node_id, "condition")
 
     condition_selections: list[tuple[Optional[tuple[int, ...]], str]] = []
+    condition_iterator_ids: set[str] = set()
     if condition_edges:
         condition_edge = condition_edges[0]
         if condition_edge.source.node_id not in state.source_prepared_mapping:
             return []
+        condition_node_id = condition_edge.source.node_id
+        condition_iterator_ids = {
+            ancestor_id
+            for ancestor_id in nx.ancestors(source_graph or state._get_source_graph_flat(), condition_node_id)
+            if isinstance(state.graph.get_node(ancestor_id), (ForInvocation, IterateInvocation))
+        }
+        if isinstance(state.graph.get_node(condition_node_id), (ForInvocation, IterateInvocation)):
+            condition_iterator_ids.add(condition_node_id)
         for prepared_id in get_prepared_nodes_for_source(condition_edge.source.node_id):
             if prepared_id not in state.results:
                 return []
@@ -104,8 +113,24 @@ def _get_if_iteration_paths(
             for edge in selected_edges
         )
         if selected_edges:
-            branch_paths = set().union(
-                *(
+            branch_paths: set[tuple[int, ...]] = set()
+            source_graph_for_axes = source_graph or state._get_source_graph_flat()
+            for edge in selected_edges:
+                branch_source_id = edge.source.node_id
+                branch_iterator_ids = {
+                    ancestor_id
+                    for ancestor_id in nx.ancestors(source_graph_for_axes, branch_source_id)
+                    if isinstance(state.graph.get_node(ancestor_id), (ForInvocation, IterateInvocation))
+                }
+                if isinstance(state.graph.get_node(branch_source_id), (ForInvocation, IterateInvocation)):
+                    branch_iterator_ids.add(branch_source_id)
+                if (
+                    condition_iterator_ids
+                    and branch_iterator_ids
+                    and not (condition_iterator_ids & branch_iterator_ids)
+                ):
+                    continue
+                branch_paths.update(
                     _get_effective_iteration_paths_for_edge(
                         state,
                         edge,
@@ -114,9 +139,7 @@ def _get_if_iteration_paths(
                         get_prepared_edge_iteration_path,
                         source_graph,
                     )
-                    for edge in selected_edges
                 )
-            )
         else:
             branch_paths = {condition_path or ()}
 
@@ -166,13 +189,16 @@ def _get_source_activation_dependencies_for_preparation(
     state: "GraphExecutionState", source_node_id: str, iteration_path: tuple[int, ...]
 ) -> tuple[ActivationDependency, ...]:
     dependencies = state._get_source_activation_dependencies(source_node_id, iteration_path)
-    if iteration_path or not dependencies:
+    if not dependencies:
         return dependencies
 
-    # Root-frame sources can feed a branch selected by one of several loop-local If executions.
-    # Bind the source to a frame that actually selected it so scheduler admission uses that gate.
     candidate_frames = sorted(
-        {frame for dependency in dependencies for frame in state._prepared_if_exec_frames(dependency.owner_id)}
+        {
+            frame
+            for dependency in dependencies
+            for frame in state._prepared_if_exec_frames(dependency.owner_id)
+            if not iteration_path or iteration_path[: len(frame)] == frame
+        }
     )
     for frame in candidate_frames:
         frame_dependencies = state._get_source_activation_dependencies(source_node_id, frame)
@@ -181,6 +207,17 @@ def _get_source_activation_dependencies_for_preparation(
         ):
             return frame_dependencies
     return dependencies
+
+
+def _get_selected_if_frames_for_preparation(
+    state: "GraphExecutionState", if_node_id: str, branch_field: str
+) -> list[tuple[int, ...]]:
+    """Return only resolved If frames that selected a Collect-backed branch."""
+    return [
+        state._get_iteration_path(exec_node_id)
+        for exec_node_id in state.source_prepared_mapping.get(if_node_id, ())
+        if state._resolved_if_exec_branches.get(exec_node_id) == branch_field
+    ]
 
 
 def _is_source_activation_admitted(

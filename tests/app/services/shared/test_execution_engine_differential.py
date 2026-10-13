@@ -8566,3 +8566,78 @@ def test_iterate_for_collect_preserves_empty_inner_collection(force_compatibilit
     assert len(after_exec_ids) == 1
     assert state.results[after_exec_ids[0]].value == [[11, 12], []]
     assert state.is_complete()
+
+
+@pytest.mark.parametrize(
+    ("left_values", "expected"),
+    [([1, 2], ["fallback", [12, 22]]), ([1, 1], ["fallback", "fallback"])],
+    ids=["mixed", "branch-never-selected"],
+)
+def test_sibling_iterates_collect_through_if_branch_without_unsupported_frames(left_values, expected):
+    graph = Graph()
+    graph.add_node(CollectionConcatInvocation(id="left_source", first=left_values))
+    graph.add_node(CollectionConcatInvocation(id="right_source", first=[10, 20]))
+    graph.add_node(IterateInvocation(id="left"))
+    graph.add_node(IterateInvocation(id="right"))
+    graph.add_node(AddInvocation(id="body"))
+    graph.add_node(CollectInvocation(id="branch_collect"))
+    graph.add_node(AddInvocation(id="minus_one", b=-1))
+    graph.add_node(FixedCollectionTestInvocation(id="condition"))
+    graph.add_node(AnyTypeTestInvocation(id="fallback", value="fallback"))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(CollectInvocation(id="collect"))
+    for source, source_field, destination, destination_field in (
+        ("left_source", "collection", "left", "collection"),
+        ("right_source", "collection", "right", "collection"),
+        ("left", "item", "body", "a"),
+        ("right", "item", "body", "b"),
+        ("body", "value", "branch_collect", "item"),
+        ("left", "item", "minus_one", "a"),
+        ("minus_one", "value", "condition", "value"),
+        ("condition", "condition", "if", "condition"),
+        ("branch_collect", "collection", "if", "true_input"),
+        ("fallback", "value", "if", "false_input"),
+        ("if", "value", "collect", "item"),
+    ):
+        graph.add_edge(create_edge(source, source_field, destination, destination_field))
+
+    trace, state = _run_to_completion(GraphExecutionState(graph=graph))
+
+    assert state.is_complete()
+    assert state.results[next(iter(state.source_prepared_mapping["collect"]))].collection == expected
+    if left_values == [1, 1]:
+        assert "right" not in trace
+        assert "body" not in trace
+
+
+def test_if_does_not_combine_unrelated_open_iterator_frames():
+    graph = Graph()
+    graph.add_node(CollectionConcatInvocation(id="branch_source", first=[1, 2]))
+    graph.add_node(IterateInvocation(id="branch_iterate"))
+    graph.add_node(AnyTypeTestInvocation(id="branch_value"))
+    graph.add_node(CollectionConcatInvocation(id="condition_source", first=[True]))
+    graph.add_node(IterateInvocation(id="condition_iterate"))
+    graph.add_node(FixedCollectionTestInvocation(id="condition"))
+    graph.add_node(AnyTypeTestInvocation(id="fallback", value="fallback"))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(CollectInvocation(id="collect"))
+    for source, source_field, destination, destination_field in (
+        ("branch_source", "collection", "branch_iterate", "collection"),
+        ("branch_iterate", "item", "branch_value", "value"),
+        ("condition_source", "collection", "condition_iterate", "collection"),
+        ("condition_iterate", "item", "condition", "value"),
+        ("condition", "condition", "if", "condition"),
+        ("branch_value", "value", "if", "true_input"),
+        ("fallback", "value", "if", "false_input"),
+        ("if", "value", "collect", "item"),
+    ):
+        graph.add_edge(create_edge(source, source_field, destination, destination_field))
+
+    graph.validate_self()
+    trace, state = _run_to_completion(GraphExecutionState(graph=graph))
+    assert not state.is_complete()
+    assert not state.errors
+    assert "branch_value" not in state.source_prepared_mapping
+    assert "collect" not in state.source_prepared_mapping
+    assert "branch_value" not in trace
+    assert "collect" not in trace

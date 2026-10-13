@@ -1337,13 +1337,80 @@ class _ExecutionNodeBuilder:
                 return None
         return None
 
+    def _matches_sibling_if_collect_context(
+        self, iterator_nodes: list[str], prepared_iterators: tuple[str, ...]
+    ) -> bool:
+        """Match a branch Collect's sibling iterator to the selected If parent frame."""
+        for index, iterator_node_id in enumerate(iterator_nodes):
+            collapsed_branch = self._get_sibling_iterate_if_collect_branch(iterator_node_id)
+            if collapsed_branch is None:
+                continue
+            if_node_id, branch_field = collapsed_branch
+            selected_frames = graph_if_runtime._get_selected_if_frames_for_preparation(
+                self._state, if_node_id, branch_field
+            )
+            branch_path = self._state._get_iteration_path(prepared_iterators[index])
+            matching_frames = [
+                frame
+                for frame in selected_frames
+                if len(branch_path) == len(frame) + 1 and branch_path[: len(frame)] == frame
+            ]
+            condition_edges = self._state.graph._get_input_edges(if_node_id, "condition")
+            condition_iterator_ids = {
+                ancestor_id
+                for edge in condition_edges
+                for ancestor_id in nx.ancestors(self._state._get_source_graph_flat(), edge.source.node_id)
+                if isinstance(self._state.graph.get_node(ancestor_id), (ForInvocation, IterateInvocation))
+            }
+            condition_iterator_ids.update(
+                edge.source.node_id
+                for edge in condition_edges
+                if isinstance(self._state.graph.get_node(edge.source.node_id), (ForInvocation, IterateInvocation))
+            )
+            for frame in matching_frames:
+                if any(
+                    self._state._get_iteration_path(prepared_iterators[iterator_nodes.index(condition_iterator_id)])
+                    != frame
+                    for condition_iterator_id in condition_iterator_ids
+                    if condition_iterator_id in iterator_nodes
+                ):
+                    return False
+            if not matching_frames:
+                return False
+        return True
+
     def _get_parent_iteration_mappings(
-        self, next_node_id: str, graph: "nx.DiGraph", input_edges: Optional[list[Edge]] = None
+        self,
+        next_node_id: str,
+        graph: "nx.DiGraph",
+        input_edges: Optional[list[Edge]] = None,
+        iterator_node_ids: Optional[list[str]] = None,
     ) -> Iterable[list[tuple[str, str]]]:
         input_edges = input_edges or self._state.graph._get_input_edges(next_node_id)
         parent_node_ids = list(dict.fromkeys(edge.source.node_id for edge in input_edges))
         iterator_graph = self.iterator_graph(graph)
-        iterator_nodes = self.get_node_iterators(next_node_id, iterator_graph)
+        iterator_nodes = (
+            iterator_node_ids
+            if iterator_node_ids is not None
+            else self.get_node_iterators(next_node_id, iterator_graph)
+        )
+        if isinstance(self._state.graph.get_node(next_node_id), CollectInvocation) and len(input_edges) == 1:
+            source_node = self._state.graph.get_node(input_edges[0].source.node_id)
+            if isinstance(source_node, IfInvocation):
+                condition_edges = self._state.graph._get_input_edges(source_node.id, "condition")
+                condition_iterator_ids = {
+                    ancestor_id
+                    for edge in condition_edges
+                    for ancestor_id in nx.ancestors(iterator_graph, edge.source.node_id)
+                    if isinstance(self._state.graph.get_node(ancestor_id), (ForInvocation, IterateInvocation))
+                }
+                condition_iterator_ids.update(
+                    edge.source.node_id
+                    for edge in condition_edges
+                    if isinstance(self._state.graph.get_node(edge.source.node_id), (ForInvocation, IterateInvocation))
+                )
+                if condition_iterator_ids:
+                    iterator_nodes = [node_id for node_id in iterator_nodes if node_id in condition_iterator_ids]
         if not iterator_nodes:
             return iter(self._get_parent_iteration_mappings_without_iterators(next_node_id, input_edges))
 
@@ -1374,6 +1441,8 @@ class _ExecutionNodeBuilder:
         def iter_mappings() -> Iterable[list[tuple[str, str]]]:
             execution_graph: Optional["nx.DiGraph"] = None
             for prepared_iterators in itertools.product(*iterator_nodes_prepared):
+                if not self._matches_sibling_if_collect_context(iterator_nodes, prepared_iterators):
+                    continue
                 mapping: list[tuple[str, str]] = []
                 for node_id in parent_node_ids:
                     prepared_id = self._get_indexed_iteration_node(
@@ -1493,7 +1562,25 @@ class _ExecutionNodeBuilder:
     ) -> Iterable[list[tuple[str, str]]]:
         condition_edges = self._state.graph._get_input_edges(node_id, "condition")
         iterator_graph = self.iterator_graph(graph)
-        iterator_nodes = self.get_node_iterators(node_id, iterator_graph)
+        if condition_edges:
+            condition_iterator_ids = {
+                ancestor_id
+                for edge in condition_edges
+                for ancestor_id in nx.ancestors(iterator_graph, edge.source.node_id)
+                if isinstance(self._state.graph.get_node(ancestor_id), (ForInvocation, IterateInvocation))
+            }
+            condition_iterator_ids.update(
+                edge.source.node_id
+                for edge in condition_edges
+                if isinstance(self._state.graph.get_node(edge.source.node_id), (ForInvocation, IterateInvocation))
+            )
+            if condition_iterator_ids:
+                source_order = {source_id: index for index, source_id in enumerate(nx.topological_sort(iterator_graph))}
+                iterator_nodes = sorted(condition_iterator_ids, key=lambda source_id: source_order[source_id])
+            else:
+                iterator_nodes = self.get_node_iterators(node_id, iterator_graph)
+        else:
+            iterator_nodes = self.get_node_iterators(node_id, iterator_graph)
         if condition_edges and not iterator_nodes:
             return self._get_parent_iteration_mappings(node_id, graph, input_edges=condition_edges)
         if not iterator_nodes:
@@ -1504,19 +1591,30 @@ class _ExecutionNodeBuilder:
             or nx.has_path(iterator_graph, iterator_nodes[0], edge.source.node_id)
             for edge in condition_edges
         ):
-            return self._get_parent_iteration_mappings(node_id, graph, input_edges=condition_edges)
+            return self._get_parent_iteration_mappings(
+                node_id, graph, input_edges=condition_edges, iterator_node_ids=iterator_nodes
+            )
 
         # This bounded path derives one frame axis. Leave mixed/nested axes on the existing path because
         # _get_known_iteration_path() intentionally rejects incompatible parent paths.
-        if len(iterator_nodes) != 1 or any(
-            not any(
-                source_edge.source.node_id == iterator_nodes[0]
-                or nx.has_path(iterator_graph, iterator_nodes[0], source_edge.source.node_id)
-                for source_edge in self._state.graph._get_input_edges(node_id, branch_field)
-            )
-            for branch_field in ("true_input", "false_input")
-        ):
+        if len(iterator_nodes) != 1:
             return iter([[]])
+        source_graph = self._state._get_source_graph_flat()
+        for branch_field in ("true_input", "false_input"):
+            branch_edges = self._state.graph._get_input_edges(node_id, branch_field)
+            branch_iterator_ids = {
+                ancestor_id
+                for edge in branch_edges
+                for ancestor_id in nx.ancestors(source_graph, edge.source.node_id)
+                if isinstance(self._state.graph.get_node(ancestor_id), (ForInvocation, IterateInvocation))
+            }
+            branch_iterator_ids.update(
+                edge.source.node_id
+                for edge in branch_edges
+                if isinstance(self._state.graph.get_node(edge.source.node_id), (ForInvocation, IterateInvocation))
+            )
+            if branch_iterator_ids and not (branch_iterator_ids & set(iterator_nodes)):
+                return iter([])
 
         if any(iterator_node_id not in self._state.source_prepared_mapping for iterator_node_id in iterator_nodes):
             return iter([])
@@ -1542,9 +1640,72 @@ class _ExecutionNodeBuilder:
         )
 
     def _is_if_condition_ready(self, node_id: str) -> bool:
-        return all(
-            edge.source.node_id in self._state.source_prepared_mapping or edge.source.node_id in self._state.executed
-            for edge in self._state.graph._get_input_edges(node_id, "condition")
+        for edge in self._state.graph._get_input_edges(node_id, "condition"):
+            source_node_id = edge.source.node_id
+            if source_node_id in self._state.executed and not self._state.source_prepared_mapping.get(source_node_id):
+                continue
+            prepared_nodes = self._get_ordered_prepared_nodes_for_edge(edge)
+            if not prepared_nodes or any(prepared_id not in self._state.results for prepared_id in prepared_nodes):
+                return False
+        return True
+
+    def _get_if_readiness_ancestors(self, node_id: str, graph: "nx.DiGraph") -> set[str]:
+        """Get iterator ancestors that must finish before preparing an If execution."""
+        condition_edges = self._state.graph._get_input_edges(node_id, "condition")
+        if not condition_edges:
+            return set(nx.ancestors(graph, node_id))
+        ancestors: set[str] = set()
+        for edge in condition_edges:
+            condition_source_id = edge.source.node_id
+            ancestors.update(nx.ancestors(graph, condition_source_id))
+            ancestors.add(condition_source_id)
+        return ancestors
+
+    def _get_sibling_iterate_if_collect_branch(self, iterate_node_id: str) -> Optional[tuple[str, str]]:
+        """Return the branch input whose Collect collapses this sibling Iterate axis."""
+        for collect_node in self._state.graph.nodes.values():
+            if not isinstance(collect_node, CollectInvocation):
+                continue
+            item_edges = self._state.graph._get_input_edges(collect_node.id, ITEM_FIELD)
+            if len(item_edges) != 1:
+                continue
+            item_source_id = item_edges[0].source.node_id
+            iterator_ids = set(self._get_collect_source_iterator_ids(item_source_id))
+            if len(iterator_ids) != 2 or iterate_node_id not in iterator_ids:
+                continue
+            for output_edge in self._state.graph._get_output_edges(collect_node.id):
+                destination = self._state.graph.get_node(output_edge.destination.node_id)
+                if not isinstance(destination, IfInvocation) or output_edge.destination.field not in {
+                    "true_input",
+                    "false_input",
+                }:
+                    continue
+                condition_edges = self._state.graph._get_input_edges(destination.id, "condition")
+                condition_iterator_ids = {
+                    ancestor_id
+                    for edge in condition_edges
+                    for ancestor_id in nx.ancestors(self._state._get_source_graph_flat(), edge.source.node_id)
+                    if isinstance(self._state.graph.get_node(ancestor_id), (ForInvocation, IterateInvocation))
+                }
+                condition_iterator_ids.update(
+                    edge.source.node_id
+                    for edge in condition_edges
+                    if isinstance(self._state.graph.get_node(edge.source.node_id), (ForInvocation, IterateInvocation))
+                )
+                if condition_iterator_ids & iterator_ids and not (condition_iterator_ids & {iterate_node_id}):
+                    return destination.id, output_edge.destination.field
+        return None
+
+    def _is_inactive_sibling_if_collect_source(self, node_id: str, graph: "nx.DiGraph") -> bool:
+        return self._state._is_source_inactive(node_id) and any(
+            self._get_sibling_iterate_if_collect_branch(iterate_node_id) is not None
+            and (
+                node_id == iterate_node_id
+                or nx.has_path(graph, node_id, iterate_node_id)
+                or nx.has_path(graph, iterate_node_id, node_id)
+            )
+            for iterate_node_id, node in self._state.graph.nodes.items()
+            if isinstance(node, IterateInvocation)
         )
 
     def _attach_pending_if_inputs(self, *, enqueue: bool = True) -> None:
@@ -1740,6 +1901,15 @@ class _ExecutionNodeBuilder:
     def prepare(self, base_g: Optional["nx.DiGraph"] = None) -> Optional[str]:
         g = base_g if base_g is not None else self._state._get_source_graph_flat()
         self._attach_pending_if_inputs()
+        for node_id in nx.topological_sort(g):
+            if (
+                node_id not in self._state.source_prepared_mapping
+                and node_id not in self._state.executed
+                and self._is_inactive_sibling_if_collect_source(node_id, g)
+            ):
+                self._mark_source_node_empty(node_id)
+                self._state._invalidate_loop_caches_for_source(node_id)
+                return node_id
         next_node_id = next(
             (
                 node_id
@@ -1776,7 +1946,11 @@ class _ExecutionNodeBuilder:
                 and not any(
                     isinstance(self._state.graph.get_node(ancestor_id), (ForInvocation, IterateInvocation))
                     and ancestor_id not in self._state.executed
-                    for ancestor_id in nx.ancestors(g, node_id)
+                    for ancestor_id in (
+                        self._get_if_readiness_ancestors(node_id, g)
+                        if isinstance(self._state.graph.get_node(node_id), IfInvocation)
+                        else nx.ancestors(g, node_id)
+                    )
                 )
             ),
             None,
@@ -1831,13 +2005,13 @@ class _ExecutionNodeBuilder:
                                 input_fields={"condition"},
                             )
                             new_node_ids.extend(create_results)
-                else:
+                elif not self.get_node_iterators(next_node_id):
+                    # Root-frame If nodes may be prepared from their condition while branch sources
+                    # are still being materialized; branch inputs attach after the gate resolves.
                     for iteration_mapping in iteration_mappings:
-                        iteration_path = self._get_known_iteration_path(-1, iteration_mapping, condition_edges)
                         create_results = self.create_execution_node(
                             next_node_id,
                             iteration_mapping,
-                            iteration_path,
                             input_fields={"condition"},
                         )
                         new_node_ids.extend(create_results)
@@ -1866,13 +2040,40 @@ class _ExecutionNodeBuilder:
                         key=lambda path: (len(path), path),
                         default=(),
                     )
-                create_results = self.create_execution_node(
-                    next_node_id,
-                    iteration_mappings,
-                    iteration_path,
-                    input_fields={"condition"} if isinstance(next_node, IfInvocation) else None,
+                collapsed_branch = (
+                    self._get_sibling_iterate_if_collect_branch(next_node_id)
+                    if isinstance(next_node, IterateInvocation)
+                    else None
                 )
-                new_node_ids.extend(create_results)
+                activation_frames = (
+                    graph_if_runtime._get_selected_if_frames_for_preparation(self._state, *collapsed_branch)
+                    if collapsed_branch is not None
+                    else []
+                )
+                if activation_frames:
+                    for activation_frame in activation_frames:
+                        new_node_ids.extend(
+                            self.create_execution_node(next_node_id, iteration_mappings, activation_frame)
+                        )
+                elif collapsed_branch is not None:
+                    if_node_id, _ = collapsed_branch
+                    if_exec_ids = self._state.source_prepared_mapping.get(if_node_id, set())
+                    if if_exec_ids and all(
+                        exec_id in self._state._resolved_if_exec_branches for exec_id in if_exec_ids
+                    ):
+                        self._mark_source_node_empty(next_node_id)
+                        self._state._invalidate_loop_caches_for_source(next_node_id)
+                        return next_node_id
+                    # Wait for the owning If to resolve before deriving the branch's parent frames.
+                    return None
+                else:
+                    create_results = self.create_execution_node(
+                        next_node_id,
+                        iteration_mappings,
+                        iteration_path,
+                        input_fields={"condition"} if isinstance(next_node, IfInvocation) else None,
+                    )
+                    new_node_ids.extend(create_results)
 
         if not new_node_ids:
             # No parent mappings means zero loop contexts, unlike a context with an empty collection.

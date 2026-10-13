@@ -658,6 +658,10 @@ materialization.
   execution. Unsupported fresh shapes and legacy snapshots use the compatibility controller. Rejected branch sources
   are not materialized. Pending `If` state is reconstructed from its durable execution edges, prepared mappings, and
   activation token after rehydration.
+- A branch `Collect` whose `item` source combines exactly two sibling `Iterate` axes can close the axis beside the
+  `If` condition axis. The compatibility materializer expands that sibling `Iterate` beneath each resolved `If` frame
+  selecting the `Collect` branch, pairs only the matching condition frame, and closes the branch interval empty when no
+  frame selects it. An unrelated open branch axis is not combined with the condition frame.
 
 - For each new exec node:
 
