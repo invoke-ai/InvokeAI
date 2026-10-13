@@ -1206,6 +1206,7 @@ const LORA_SUPPORTED_BASES: ReadonlySet<string> = new Set<SupportedGenerateBase>
   'qwen-image',
   'sd-1',
   'sd-2',
+  'sd-3',
   'sdxl',
   'wan',
   'z-image',

@@ -34,8 +34,10 @@ describe('variant options', () => {
     expect(getVariantOptionsFor('minimax-h3', 'main')).toEqual(['fl2va', 'ref2va']);
   });
 
-  it('distinguishes wan main and wan lora variants', () => {
+  it('offers LoRA variants where the LoRA size decides which mains it fits', () => {
     expect(getVariantOptionsFor('wan', 'lora')).toEqual(['a14b', '5b']);
+    expect(getVariantOptionsFor('sd-3', 'lora')).toEqual(['sd3_medium', 'sd3_large']);
+    expect(getVariantOptionsFor('sd-3', 'main')).toEqual(['sd3_medium', 'sd3_large']);
     expect(getVariantOptionsFor('sdxl', 'lora')).toEqual([]);
   });
 

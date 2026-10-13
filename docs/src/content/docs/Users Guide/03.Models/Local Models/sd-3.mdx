@@ -1,7 +1,7 @@
 ---
 title: Stable Diffusion 3.5
 description: Generate images with Stability AI's Stable Diffusion 3.5 Medium and Large models, including text encoder options and PiD super-resolution decoding.
-lastUpdated: 2026-09-30
+lastUpdated: 2026-10-12
 sidebar:
   order: 11
 ---
@@ -80,7 +80,29 @@ reference settings:
 ## Canvas
 
 On the Canvas, SD3 supports text-to-image, image-to-image, inpainting and outpainting. ControlNet,
-reference images and regional guidance are **not** available for SD3. LoRAs are not supported either.
+reference images and regional guidance are **not** available for SD3.
+
+## LoRA
+
+SD 3 and SD 3.5 LoRAs are supported in the layouts trainers publish them in: the diffusers DreamBooth script (a folder
+with `pytorch_lora_weights.safetensors`, or the file itself), ai-toolkit, PEFT adapters, SimpleTuner's LyCORIS files
+(LoKR) and kohya sd-scripts (`lora_unet_joint_blocks_…`). A LoRA that also trains the CLIP-L and CLIP-G text encoders
+applies to them too; T5 layers in a LoRA are skipped with a warning, because the T5 encoder takes no LoRA. DoRA files,
+and files with layers that match no SD 3 module, are refused when you install them.
+
+- **Medium and Large.** A LoRA is trained for one size: SD 3 Medium and SD 3.5 Medium share one, SD 3.5 Large (and
+  Large Turbo) the other. Invoke records the size of LoRAs and of SD 3 models when you install them, and the concept
+  picker only offers LoRAs that fit the selected model. SD 3 models installed with an earlier version carry no size;
+  the picker then offers every SD 3 LoRA. To add it, select the model in the Model Manager and use **Re-identify**
+  (which also resets the model's default settings). A LoRA that does not fit is refused when the generation starts,
+  before anything is applied.
+- **SD 3.5 Medium LoRAs on SD 3 Medium.** SD 3.5 Medium adds a second attention to its first 13 blocks. A LoRA that
+  trains it does not fit SD 3 Medium and is refused there.
+- **FP8 Storage.** With FP8 Storage the LoRA is applied alongside the weights instead of being merged into them; it then
+  stays in VRAM for the whole generation, and InvokeAI reserves room for it.
+
+Earlier versions identified some SD 3 LoRAs as Qwen-Image LoRAs and others not at all. Select such a LoRA in the Model
+Manager and use **Re-identify** to fix it.
 
 ## PiD super-resolution decode
 

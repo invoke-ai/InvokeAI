@@ -1,3 +1,4 @@
+from contextlib import ExitStack
 from typing import Callable, Optional, Tuple
 
 import torch
@@ -24,11 +25,27 @@ from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.text_encoder.sd3_text_encoder import SD3_T5_MAX_SEQ_LEN
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
-from invokeai.backend.model_manager.taxonomy import BaseModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, SD3VariantType
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
+from invokeai.backend.patches.layers.lora_layer import LoRALayer
+from invokeai.backend.patches.lora_conversions.sd3_lora_constants import (
+    SD3_LORA_TRANSFORMER_PREFIX,
+    sd3_variant_from_width,
+)
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.quantization.dequantizing_linear import requires_sidecar_patching
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import SD3ConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.fp8 import FP8_STORAGE_DTYPES
+
+# How the sizes read in a message; the UI uses the same names.
+_SD3_SIZES = {SD3VariantType.Medium: "SD 3 / 3.5 Medium", SD3VariantType.Large: "SD 3.5 Large"}
+
+# What one sidecar-patched layer holds while it computes its residual -- a second copy of the layer's output, or for a
+# LoKR/LoHA layer its full weight delta. Same margin as LTX-2 and ERNIE-Image.
+_SIDECAR_TRANSIENT_BYTES = 1024**3
 
 
 @invocation(
@@ -36,7 +53,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="Denoise - SD3",
     tags=["image", "sd3"],
     category="latents",
-    version="1.2.0",
+    version="1.3.0",
 )
 class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Run denoising process with a SD3 model."""
@@ -280,8 +297,43 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             ),
         )
 
-        with transformer_info.model_on_device() as (cached_weights, transformer):
+        # Loaded before the lock, so a LoRA that does not fit fails before the transformer moves, and the
+        # reservation below can be sized from the patches.
+        lora_patch_specs = self._materialize_lora_patches(context)
+        self._raise_unless_loras_fit(context, transformer_info.model, lora_patch_specs)
+        transformer_config = context.models.get_config(self.transformer.transformer)
+        force_sidecar = bool(lora_patch_specs) and requires_sidecar_patching(
+            transformer_info.model, transformer_config.format
+        )
+        # The patcher also picks the sidecar on its own for fp8 weights (FP8 Storage), which cannot be added to.
+        lora_on_device = force_sidecar or (
+            bool(lora_patch_specs) and any(p.dtype in FP8_STORAGE_DTYPES for p in transformer_info.model.parameters())
+        )
+        # This node has no activation estimate, so the cache floors its request at `device_working_mem_gb`, which then
+        # stands in for the activations. Sidecar patches stay on the device for the whole run, so they come on top of
+        # that floor rather than out of it. Patches merged into the weights leave nothing resident.
+        working_mem_bytes: Optional[int] = None
+        if lora_on_device:
+            floor = int(context.config.get().device_working_mem_gb * 2**30)
+            lora_bytes = sum(spec[0].calc_size() for spec in lora_patch_specs)
+            working_mem_bytes = floor + lora_bytes + _SIDECAR_TRANSIENT_BYTES
+
+        with ExitStack() as exit_stack:
+            (cached_weights, transformer) = exit_stack.enter_context(
+                transformer_info.model_on_device(working_mem_bytes=working_mem_bytes)
+            )
             assert isinstance(transformer, SD3Transformer2DModel)
+            if lora_patch_specs:
+                exit_stack.enter_context(
+                    LayerPatcher.apply_smart_model_patches(
+                        model=transformer,
+                        patches=lora_patch_specs,
+                        prefix=SD3_LORA_TRANSFORMER_PREFIX,
+                        dtype=inference_dtype,
+                        cached_weights=cached_weights,
+                        force_sidecar_patching=force_sidecar,
+                    )
+                )
 
             # 6. Denoising loop
             for step_idx, (t_curr, t_prev) in tqdm(
@@ -328,6 +380,55 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 )
 
         return latents
+
+    def _materialize_lora_patches(self, context: InvocationContext) -> list[PatchSpec]:
+        """Load every LoRA on the transformer field into (patch, weight, cache-pin) specs."""
+        patch_specs: list[PatchSpec] = []
+        for lora in self.transformer.loras:
+            lora_info = context.models.load(lora.lora)
+            if not isinstance(lora_info.model, ModelPatchRaw):
+                raise TypeError(
+                    f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}."
+                )
+            patch_specs.append((lora_info.model, lora.weight, lora_info.model_in_ram()))
+        return patch_specs
+
+    def _raise_unless_loras_fit(
+        self, context: InvocationContext, transformer: SD3Transformer2DModel, patch_specs: list[PatchSpec]
+    ) -> None:
+        """Refuse a LoRA trained for another SD 3 size, or for modules this model does not have.
+
+        Medium and Large name the same modules at different widths, so the patcher would only log and skip every
+        layer; and a LoRA for SD 3.5 Medium's dual attention (`attn2`) targets modules SD 3 Medium lacks.
+        """
+        width = int(transformer.config.num_attention_heads) * int(transformer.config.attention_head_dim)
+        model_variant = sd3_variant_from_width(width)
+        for lora, spec in zip(self.transformer.loras, patch_specs, strict=True):
+            name = lora.lora.name or lora.lora.key
+            lora_variant = getattr(context.models.get_config(lora.lora), "variant", None)
+            if lora_variant is not None and model_variant is not None and lora_variant is not model_variant:
+                # A hand-built workflow can route another base's LoRA here, with a variant SD 3 has no name for.
+                trained_for = _SD3_SIZES.get(lora_variant, getattr(lora_variant, "value", lora_variant))
+                raise ValueError(
+                    f"LoRA '{name}' was trained for {trained_for} and does not fit this "
+                    f"{_SD3_SIZES[model_variant]} model."
+                )
+            for key, layer in spec[0].layers.items():
+                if not key.startswith(SD3_LORA_TRANSFORMER_PREFIX):
+                    continue
+                path = key.removeprefix(SD3_LORA_TRANSFORMER_PREFIX)
+                try:
+                    module = transformer.get_submodule(path)
+                except AttributeError:
+                    hint = " (it was trained for SD 3.5 Medium's dual attention)" if ".attn2." in path else ""
+                    raise ValueError(f"LoRA '{name}' patches `{path}`, which this SD 3 model does not have{hint}.")
+                if isinstance(layer, LoRALayer) and (
+                    layer.up.shape[0] != module.weight.shape[0] or layer.down.shape[1] != module.weight.shape[1]
+                ):
+                    raise ValueError(
+                        f"LoRA '{name}' does not fit this SD 3 model: `{path}` is {tuple(module.weight.shape)} here. "
+                        "It was trained for another SD 3 size."
+                    )
 
     def _prepare_noise_tensor(
         self, context: InvocationContext, num_channels_latents: int, inference_dtype: torch.dtype, device: torch.device
