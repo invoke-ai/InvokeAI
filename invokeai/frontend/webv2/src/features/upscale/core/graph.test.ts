@@ -447,11 +447,13 @@ describe('Creativity on index-clipping architectures', () => {
 });
 
 describe('schedulers on the upscale pass', () => {
-  // A stored Heun or LCM on a flow model -- left from SD, recalled, or picked before the list was
-  // narrowed -- would start the pass from pure noise, or on Anima below the blend.
+  // A stored LCM on a flow model, or Heun on Anima -- left from SD, recalled, or picked before the
+  // list was narrowed -- would start the pass from pure noise, or on Anima below the blend.
   it.each([
     ['flux', () => createFluxValues(), 'lcm', 'euler'],
-    ['z-image', () => createZImageValues(), 'heun', 'euler'],
+    ['flux', () => createFluxValues(), 'heun', 'heun'],
+    ['z-image', () => createZImageValues(), 'lcm', 'euler'],
+    ['z-image', () => createZImageValues(), 'heun', 'heun'],
     ['anima', () => createAnimaValues(), 'heun', 'euler'],
     ['anima', () => createAnimaValues(), 'dpmpp_2m', 'dpmpp_2m'],
     ['sd-1', () => createValues('sd-1'), 'heun', 'heun'],
