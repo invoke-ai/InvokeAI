@@ -245,17 +245,21 @@ def test_whole_clip_copy_keeps_a_soundtrack_that_ends_with_the_video(tmp_path, n
 
 
 @pytest.mark.parametrize(
-    "audio_args,audio_frames,copied",
+    "audio_args,audio_frames,copied,video_only_probe",
     [
-        ([], 80, "Stream-copied frames 0-39"),
-        (["-itsoffset", "1.0"], 39, "Stream-copied frames 0-39"),
-        ([], 40, "the whole of the source, copied"),
+        ([], 80, "Stream-copied frames 0-39", False),
+        (["-itsoffset", "1.0"], 39, "Stream-copied frames 0-39", False),
+        ([], 40, "the whole of the source, copied", False),
+        ([], 80, "Stream-copied frames 0-39", True),
     ],
-    ids=["longer-audio", "delayed-audio", "second-audio-track"],
+    ids=["longer-audio", "delayed-audio", "second-audio-track", "longer-audio-opencv-probe"],
 )
-def test_whole_clip_copy_carries_only_the_soundtrack_a_trim_would(tmp_path, audio_args, audio_frames, copied):
+def test_whole_clip_copy_carries_only_the_soundtrack_a_trim_would(
+    tmp_path, monkeypatch, audio_args, audio_frames, copied, video_only_probe
+):
     """An uploaded H.264 MP4 is stored as-is, so its audio can outlast its video, start late,
-    or come as several tracks. Copying the file whole would keep audio past the last frame
+    or come as several tracks. The OpenCV probe fallback knows only the video duration, so the
+    MP4 movie duration must also guard a whole-file copy that would keep audio past its last frame
     (or every track) where any other range is cut to the frames it keeps (and the first track)."""
     video = tmp_path / "video.mp4"
     writer = make_mp4_writer(video, FPS)
@@ -274,6 +278,13 @@ def test_whole_clip_copy_carries_only_the_soundtrack_a_trim_would(tmp_path, audi
         + ["-c:v", "copy", "-c:a", "aac", "-aac_pns", "0", str(source)],
         check=True,
     )
+
+    if video_only_probe:
+        # video_decode_worker._probe() returns frame_count / fps when it falls back to OpenCV.
+        monkeypatch.setattr(
+            "invokeai.app.invocations.video_frame_extract_range.probe_video",
+            lambda _path: (SIZE, SIZE, 40 / FPS, FPS),
+        )
 
     saved, context = _trim(tmp_path, source, 0, -1)
     # Nothing plays past the last frame (the probe reports to the hundredth of a second).

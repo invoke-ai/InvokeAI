@@ -38,6 +38,8 @@ _MAX_KEY_NAME_BYTES = 1024
 # fragmented file, so a raw upload padded with tiny top-level boxes is given up on rather than
 # walked. Children of ``moov`` are bounded by ``moov``'s own size.
 _MAX_TOP_LEVEL_BOXES = 1024
+# Movie headers are near the start of ``moov``; bound this walk for uploaded files.
+_MAX_MOVIE_HEADER_CHILDREN = 64
 # Same wall-clock bound as the audio mux: a stream copy of a 1 GB upload is disk-bound and
 # finishes in seconds, so this only stops a wedged child from holding the save forever.
 REMUX_TIMEOUT_SECONDS = 600
@@ -90,6 +92,43 @@ def find_box(
         if found_type == box_type:
             return payload_start, payload_end
     return None
+
+
+def read_mp4_movie_duration(path: Path) -> Optional[float]:
+    """Return the MP4 movie-header duration in seconds, or None if it is unavailable or invalid.
+
+    Unlike OpenCV's video-only fallback probe, ``mvhd`` covers the movie timeline across tracks.
+    The bounded box walks and fixed-size reads keep this safe for uploaded containers.
+    """
+    with open(path, "rb") as fh:
+        fh.seek(0, 2)
+        moov = find_box(fh, 0, fh.tell(), b"moov", max_boxes=_MAX_TOP_LEVEL_BOXES)
+        if moov is None:
+            return None
+        mvhd = find_box(fh, *moov, b"mvhd", max_boxes=_MAX_MOVIE_HEADER_CHILDREN)
+        if mvhd is None or mvhd[0] >= mvhd[1]:
+            return None
+        fh.seek(mvhd[0])
+        version = fh.read(1)
+        if not version or version[0] not in (0, 1):
+            return None
+        if version[0] == 0:
+            timescale_offset, duration_offset, duration_size = 12, 16, 4
+        else:
+            timescale_offset, duration_offset, duration_size = 20, 24, 8
+        if mvhd[0] + duration_offset + duration_size > mvhd[1]:
+            return None
+        fh.seek(mvhd[0] + timescale_offset)
+        timescale_raw = fh.read(4)
+        fh.seek(mvhd[0] + duration_offset)
+        duration_raw = fh.read(duration_size)
+        if len(timescale_raw) != 4 or len(duration_raw) != duration_size:
+            return None
+        timescale = struct.unpack(">I", timescale_raw)[0]
+        duration = int.from_bytes(duration_raw, "big")
+        if timescale == 0 or duration == (1 << (duration_size * 8)) - 1:
+            return None
+        return duration / timescale
 
 
 def _meta_payload_start(fh: BinaryIO, start: int, end: int) -> int:

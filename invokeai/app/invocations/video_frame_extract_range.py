@@ -65,7 +65,7 @@ from invokeai.app.util.h264_splice import (
     probes_as,
     read_h264_layout,
 )
-from invokeai.app.util.mp4_metadata import write_mp4_tags
+from invokeai.app.util.mp4_metadata import read_mp4_movie_duration, write_mp4_tags
 from invokeai.app.util.video_audio import extract_audio_pcm, mux_audio_into_video, resample_linear
 from invokeai.app.util.video_encoding import make_mp4_writer, write_stereo_wav, writer_sample_entry
 from invokeai.app.util.video_thumbnails import decoder_frame_count, iter_video_frames, probe_video
@@ -231,14 +231,15 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
             layout = read_h264_layout(video_path)
             if layout is not None and layout.sample_count != exact_frame_count:
                 layout = None
-        # The whole clip is the source itself; copying it avoids another lossy generation. Unless
-        # some stream plays past the last frame — audio that outlasts the video or starts late
-        # (the probed duration is the longest stream's, end trims applied) — which a trim must cut.
+        # The whole clip is the source itself; copying it avoids another lossy generation. The
+        # OpenCV probe fallback knows only the video duration, so also require the MP4 movie header
+        # to fit the selected frames before bypassing the ordinary path that trims the soundtrack.
+        whole_range = layout is not None and start == 0 and end == layout.sample_count - 1
+        movie_duration = read_mp4_movie_duration(video_path) if whole_range else None
         if (
-            layout is not None
-            and start == 0
-            and end == layout.sample_count - 1
-            and duration <= n_frames / output_fps + 0.5 / output_fps + 0.01
+            whole_range
+            and movie_duration is not None
+            and max(duration, movie_duration) <= n_frames / output_fps + 0.5 / output_fps + 0.01
         ):
             return self._save_unchanged(context, video_path, width, height, n_frames, output_fps)
 
