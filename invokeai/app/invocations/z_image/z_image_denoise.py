@@ -710,13 +710,13 @@ class ZImageDenoiseInvocation(BaseInvocation):
             user_step = 0
 
             if use_scheduler and scheduler is not None:
-                # Use diffusers scheduler for stepping
-                # Use tqdm with total_steps (user-facing steps) not num_scheduler_steps (internal steps)
-                # This ensures progress bar shows 1/8, 2/8, etc. even when scheduler uses more internal steps
                 # LCM re-noises the sample on every step. Without an explicit generator that noise
                 # comes from the global RNG and the same seed gives a different image each run.
                 # XOR keeps the step noise decorrelated from the initial noise (as in ERNIE-Image).
                 step_generator = torch.Generator(device="cpu").manual_seed(self.seed ^ 0xFFFFFFFF)
+                # Use diffusers scheduler for stepping
+                # Use tqdm with total_steps (user-facing steps) not num_scheduler_steps (internal steps)
+                # This ensures progress bar shows 1/8, 2/8, etc. even when scheduler uses more internal steps
                 pbar = tqdm(total=total_steps, desc=f"Denoising{TorchDevice.get_session_device_label()}")
                 for step_index in range(num_scheduler_steps):
                     sched_timestep = scheduler.timesteps[step_index]

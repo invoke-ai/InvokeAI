@@ -220,7 +220,7 @@ def denoise(
             preview_img = img - t_curr * pred if should_emit_preview else None
 
             # Use scheduler.step() for the update. `generator` matters for LCM, which re-noises every
-            # step; Euler and Heun only consult it when `s_churn > 0`, which is 0 here.
+            # step. Euler and Heun don't use step noise here: with `s_churn` at 0 it is never applied.
             step_output = scheduler.step(model_output=pred, timestep=timestep, sample=img, generator=generator)
             img = step_output.prev_sample
 
