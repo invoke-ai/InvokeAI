@@ -298,7 +298,7 @@ class FluxDenoiseInvocation(BaseInvocation):
             shift=not is_schnell,
         )
 
-        # Create scheduler if not using default euler
+        # Create the selected Diffusers scheduler.
         scheduler = None
         if self.scheduler in FLUX_SCHEDULER_MAP:
             scheduler_class = FLUX_SCHEDULER_MAP[self.scheduler]
@@ -322,12 +322,9 @@ class FluxDenoiseInvocation(BaseInvocation):
                 # Noise the orig_latents by the appropriate amount for the first
                 # timestep in InvokeAI's clipped schedule.
                 #
-                # Known limitation: if the selected scheduler later replaces this
-                # schedule with its own first effective timestep/sigma (for example
-                # Heun internal expansion or LCM's scheduler-defined schedule), the
-                # img2img preblend below may not match that scheduler's true first
-                # step exactly. This is an existing pipeline limitation and affects
-                # both internally generated noise and externally supplied noise.
+                # Euler and Heun consume this InvokeAI schedule. LCM intentionally
+                # creates its own discrete schedule: clipping limits its step count,
+                # but its exact start and terminal sigmas can differ from this schedule.
                 t_0 = timesteps[0]
                 x = t_0 * noise + (1.0 - t_0) * init_latents
             else:
