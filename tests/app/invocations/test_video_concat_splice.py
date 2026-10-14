@@ -1,16 +1,11 @@
-"""Joining onto a clip this app encoded must not re-encode that clip's head.
+"""Verify GOP-aware smart concatenation and the inherited H.264/AAC splice contracts.
 
-Extend Video joins each continuation onto the video it extends, so a video extended N
-times used to carry its first segment through N lossy re-encodes, with artifacts
-compounding in the earliest footage. The concat node now stream-copies the first clip up
-to its last usable keyframe and encodes only the rest. These tests pin that the copied
-frames come through bit-exact (also across repeated extensions), that the joined
-timeline has the same length and audio as a full re-encode would, and that inputs which
-cannot be spliced losslessly still join correctly by re-encoding.
-
-Real ffmpeg (the imageio-ffmpeg bundled binary) encodes and decodes throughout.
+The smart-render cases assert that copied picture data bypasses the video encoder, while
+the bridge cases use the existing full-timeline blending and audio behavior. Real FFmpeg
+(the imageio-ffmpeg bundled binary) encodes and decodes throughout.
 """
 
+import hashlib
 import importlib
 import shutil
 import struct
@@ -77,6 +72,23 @@ def _encode(path: Path, frames: list[np.ndarray], tone: float | None = None, leg
     return path
 
 
+def _encode_open_gop(path: Path, frames: list[np.ndarray]) -> Path:
+    writer = iio2.get_writer(
+        str(path),
+        format="FFMPEG",
+        mode="I",
+        fps=FPS,
+        codec="libx264",
+        macro_block_size=1,
+        quality=None,
+        output_params=["-crf", "18", "-g", "32", "-x264-params", "open-gop=1"],
+    )
+    for frame in frames:
+        writer.append_data(frame)
+    writer.close()
+    return path
+
+
 def _decode(path: Path) -> list[np.ndarray]:
     reader = iio2.get_reader(str(path), format="FFMPEG")
     try:
@@ -104,6 +116,66 @@ def _dominant_freq(pcm: np.ndarray, rate: int) -> float:
     spectrum = np.abs(np.fft.rfft(pcm[0]))
     spectrum[0] = 0.0
     return float(np.fft.rfftfreq(pcm.shape[1], 1.0 / rate)[int(np.argmax(spectrum))])
+
+
+def _sample_payload_hashes(path: Path, start: int, end: int) -> list[str]:
+    """Hash coded picture NALs, ignoring legal parameter-set and framing changes."""
+    from invokeai.app.util import h264_splice
+    from invokeai.app.util.mp4_metadata import find_box, iter_boxes
+
+    with path.open("rb") as stream:
+        stream.seek(0, 2)
+        moov = find_box(stream, 0, stream.tell(), b"moov")
+        assert moov is not None
+        stbl = None
+        for box_type, trak_start, trak_end in iter_boxes(stream, *moov):
+            if box_type != b"trak":
+                continue
+            mdia = find_box(stream, trak_start, trak_end, b"mdia")
+            if mdia is None:
+                continue
+            hdlr = find_box(stream, *mdia, b"hdlr")
+            if hdlr is None:
+                continue
+            stream.seek(hdlr[0] + 8)
+            if stream.read(4) != b"vide":
+                continue
+            minf = find_box(stream, *mdia, b"minf")
+            stbl = find_box(stream, *minf, b"stbl") if minf is not None else None
+            break
+        assert stbl is not None
+        stsz = find_box(stream, *stbl, b"stsz")
+        assert stsz is not None
+        stream.seek(stsz[0] + 8)
+        sample_count = int.from_bytes(stream.read(4), "big")
+        stream.seek(0, 2)
+        file_size = stream.tell()
+        sizes = h264_splice._sample_sizes(stream, stsz, sample_count, file_size)
+        assert sizes is not None
+        locations = h264_splice._sample_locations(stream, stbl, sizes, tuple(range(start, end)), file_size)
+        assert locations is not None
+        layout = read_h264_layout(path)
+        assert layout is not None
+        length_size = (layout.decoder_config[4] & 0x03) + 1
+        hashes = []
+        for offset, size in locations:
+            stream.seek(offset)
+            sample = stream.read(size)
+            digest = hashlib.sha256()
+            position = 0
+            has_picture = False
+            while position + length_size < len(sample):
+                nal_size = int.from_bytes(sample[position : position + length_size], "big")
+                position += length_size
+                nal = sample[position : position + nal_size]
+                assert len(nal) == nal_size
+                if nal and (nal[0] & 0x1F) in range(1, 6):
+                    digest.update(nal)
+                    has_picture = True
+                position += nal_size
+            assert position == len(sample) and has_picture
+            hashes.append(digest.hexdigest())
+        return hashes
 
 
 def _concat(tmp_path: Path, inputs: list[Path], out_name: str, **fields: object) -> tuple[Path, MagicMock]:
@@ -147,8 +219,8 @@ def test_first_clip_head_is_copied_bit_exact(tmp_path, transition, transition_fr
     out, context = _concat(tmp_path, [a, b], "out", transition=transition, transition_frames=transition_frames)
 
     tail = {"crossfade": transition_frames, "fade_through_black": transition_frames // 2}.get(transition, 0)
-    keyframe = _last_usable_keyframe(a, tail)
     a_frames, out_frames = _decode(a), _decode(out)
+    keyframe = len(a_frames) if transition == "cut" else _last_usable_keyframe(a, tail)
     assert len(out_frames) == expected_len
     assert all(np.array_equal(x, y) for x, y in zip(a_frames[:keyframe], out_frames[:keyframe], strict=True))
     assert f"Stream-copied the first {keyframe} frames" in _logged(context)
@@ -389,11 +461,12 @@ def test_first_clip_with_presentation_tags_is_re_encoded(tmp_path, tag):
 @pytest.mark.parametrize(
     "stage",
     [
-        "invokeai.app.invocations.video_concat.copy_frames",
-        "invokeai.app.invocations.video_concat.splice_soundtrack",
+        ("invokeai.app.invocations.video_concat.copy_frames", "crossfade"),
+        ("invokeai.app.invocations.video_concat.concat_stream_copy", "cut"),
+        ("invokeai.app.invocations.video_concat.splice_soundtrack", "cut"),
         # The audio decodes: an input's soundtrack, and the splice's own validation decodes.
-        "invokeai.app.invocations.video_concat.extract_audio_pcm",
-        "invokeai.app.util.aac_splice.extract_audio_pcm",
+        ("invokeai.app.invocations.video_concat.extract_audio_pcm", "cut"),
+        ("invokeai.app.util.aac_splice.extract_audio_pcm", "cut"),
     ],
 )
 def test_cancellation_during_a_splice_saves_nothing(tmp_path, stage):
@@ -403,6 +476,7 @@ def test_cancellation_during_a_splice_saves_nothing(tmp_path, stage):
     b = _encode(tmp_path / "b.mp4", _frames(40, seed=2), tone=660.0)
     canceled = [False]
     raised: list[BaseException] = []
+    stage, transition = stage
     module, name = stage.rsplit(".", 1)
     real = getattr(importlib.import_module(module), name)
 
@@ -417,7 +491,11 @@ def test_cancellation_during_a_splice_saves_nothing(tmp_path, stage):
     context = MagicMock()
     context.videos.get_path.side_effect = lambda name: {"a": a, "b": b}[name]
     context.util.is_canceled.side_effect = lambda: canceled[0]
-    node = VideoConcatInvocation(videos=[VideoField(video_name="a"), VideoField(video_name="b")], transition="cut")
+    node = VideoConcatInvocation(
+        videos=[VideoField(video_name="a"), VideoField(video_name="b")],
+        transition=transition,
+        transition_frames=2 if transition == "crossfade" else 0,
+    )
     with patch(stage, side_effect=cancel_then_run):
         with pytest.raises(CanceledException):
             node.invoke(context)
@@ -442,3 +520,374 @@ def test_tkhd_display_size_does_not_leak_onto_the_join(tmp_path):
     layout = read_h264_layout(out)
     assert layout is not None and b"pasp" not in layout.sample_entry
     assert len(_decode(out)) == 140
+
+
+def test_smart_render_false_disables_video_packet_copy(tmp_path):
+    a = _encode(tmp_path / "a.mp4", _frames(100, seed=1))
+    b = _encode(tmp_path / "b.mp4", _frames(40, seed=2))
+
+    out, context = _concat(tmp_path, [a, b], "full", transition="cut", transition_frames=0, smart_render=False)
+
+    assert len(_decode(out)) == 140
+    assert "Stream-copied" not in _logged(context)
+
+
+def test_smart_render_defaults_to_true():
+    node = VideoConcatInvocation(videos=[VideoField(video_name="a"), VideoField(video_name="b")])
+    assert node.smart_render is True
+
+
+def test_smart_render_preserves_safe_regions_on_both_sides_of_transition(tmp_path, monkeypatch):
+    a = _encode(tmp_path / "a.mp4", _frames(100, seed=21))
+    b = _encode(tmp_path / "b.mp4", _frames(100, seed=22))
+    a_layout, b_layout = read_h264_layout(a), read_h264_layout(b)
+    assert a_layout is not None and b_layout is not None
+    a_boundary = max(k for k in a_layout.sync_samples if k <= a_layout.sample_count - 2)
+    b_boundary = min(k for k in b_layout.sync_samples if k >= 2)
+    bridge_frames = a_layout.sample_count - a_boundary + b_boundary - 2
+    encoded_counts: list[int] = []
+    video_concat = __import__("invokeai.app.invocations.video_concat", fromlist=["encode_rgb_frames"])
+    encode_frames = video_concat.encode_rgb_frames
+
+    def count_encoded_frames(frames, *args, **kwargs):
+        count = 0
+
+        def counted_frames():
+            nonlocal count
+            for frame in frames:
+                count += 1
+                yield frame
+
+        encoded = encode_frames(counted_frames(), *args, **kwargs)
+        encoded_counts.append(count)
+        return encoded
+
+    monkeypatch.setattr(video_concat, "encode_rgb_frames", count_encoded_frames)
+    out, context = _concat(tmp_path, [a, b], "smart", transition="crossfade", transition_frames=2)
+
+    a_frames, b_frames, output_frames = _decode(a), _decode(b), _decode(out)
+    expected_frames = len(a_frames) + len(b_frames) - 2
+    assert len(output_frames) == expected_frames
+    assert _sample_payload_hashes(a, 0, a_boundary) == _sample_payload_hashes(out, 0, a_boundary)
+    b_copy_frames = len(b_frames) - b_boundary
+    assert _sample_payload_hashes(b, b_boundary, len(b_frames)) == _sample_payload_hashes(
+        out, expected_frames - b_copy_frames, expected_frames
+    )
+    assert all(np.array_equal(x, y) for x, y in zip(a_frames[:a_boundary], output_frames[:a_boundary], strict=True))
+    assert all(
+        np.array_equal(x, y)
+        for x, y in zip(b_frames[b_boundary:], output_frames[-(len(b_frames) - b_boundary) :], strict=True)
+    )
+    copied_frames = a_boundary + len(b_frames) - b_boundary
+    assert encoded_counts == [bridge_frames]
+    assert f"copying {copied_frames}, encoding {bridge_frames} across 1 bridge" in _logged(context)
+
+
+@pytest.mark.parametrize(
+    "transition,transition_frames",
+    [("crossfade", 8), ("fade_through_black", 4), ("fade_through_black", 5)],
+    ids=["crossfade", "fade-even", "fade-odd"],
+)
+def test_smart_render_transition_values_match_full_encoding(tmp_path, transition, transition_frames):
+    a = _encode(tmp_path / "a.mp4", _frames(100, seed=71))
+    b = _encode(tmp_path / "b.mp4", _frames(100, seed=72))
+
+    smart, smart_context = _concat(
+        tmp_path, [a, b], "smart", transition=transition, transition_frames=transition_frames
+    )
+    full, _ = _concat(
+        tmp_path,
+        [a, b],
+        "full",
+        transition=transition,
+        transition_frames=transition_frames,
+        smart_render=False,
+    )
+
+    smart_log = _logged(smart_context)
+    assert "Smart rendering selected" in smart_log
+    assert "falling back to full video encoding" not in smart_log
+    assert "Stream-copied" in smart_log
+    a_frames, b_frames = _decode(a), _decode(b)
+    smart_frames, full_frames = _decode(smart), _decode(full)
+    tail_frames = transition_frames if transition == "crossfade" else transition_frames // 2
+    head_frames = transition_frames if transition == "crossfade" else transition_frames - tail_frames
+    transition_start = 100 - tail_frames
+    transition_end = transition_start + transition_frames
+    assert len(smart_frames) == len(full_frames)
+
+    if transition == "crossfade":
+        expected_frames = [
+            np.clip(
+                a_frames[100 - tail_frames + i].astype(np.float32) * (1 - (i + 1) / (transition_frames + 1))
+                + b_frames[i].astype(np.float32) * ((i + 1) / (transition_frames + 1)),
+                0,
+                255,
+            ).astype(np.uint8)
+            for i in range(transition_frames)
+        ]
+    else:
+        expected_frames = [
+            np.clip(
+                a_frames[100 - tail_frames + i].astype(np.float32) * (1 - (i + 1) / (tail_frames + 1)), 0, 255
+            ).astype(np.uint8)
+            for i in range(tail_frames)
+        ] + [
+            np.clip(
+                b_frames[i].astype(np.float32) * ((i + 1) / (head_frames + 1)),
+                0,
+                255,
+            ).astype(np.uint8)
+            for i in range(head_frames)
+        ]
+
+    # The smart bridge has different GOP context, so allow codec noise while requiring the
+    # decoded transition to match both the existing full-encode path and independent math.
+    full_encode_errors = [
+        float(np.abs(actual.astype(np.int16) - expected.astype(np.int16)).mean())
+        for actual, expected in zip(
+            full_frames[transition_start:transition_end],
+            expected_frames,
+            strict=True,
+        )
+    ]
+    smart_render_errors = [
+        float(np.abs(actual.astype(np.int16) - expected.astype(np.int16)).mean())
+        for actual, expected in zip(
+            smart_frames[transition_start:transition_end],
+            full_frames[transition_start:transition_end],
+            strict=True,
+        )
+    ]
+    assert len(full_encode_errors) == len(smart_render_errors) == transition_frames
+    assert max(full_encode_errors) < 8.0
+    assert max(smart_render_errors) < 8.0
+
+
+def test_smart_render_copies_intermediate_clip_gap_between_bridges(tmp_path):
+    sources = [
+        _encode(tmp_path / f"{name}.mp4", _frames(100, seed=seed))
+        for name, seed in zip("abc", (31, 32, 33), strict=True)
+    ]
+    layouts = [read_h264_layout(path) for path in sources]
+    assert all(layout is not None for layout in layouts)
+    a0 = max(k for k in layouts[0].sync_samples if k <= 98)
+    b1 = min(k for k in layouts[1].sync_samples if k >= 2)
+    a1 = max(k for k in layouts[1].sync_samples if k <= 98)
+    b2 = min(k for k in layouts[2].sync_samples if k >= 2)
+    out, context = _concat(tmp_path, sources, "three", transition="crossfade", transition_frames=2)
+
+    output_frames = _decode(out)
+    first_bridge_frames = 100 - a0 + b1 - 2
+    copied_middle_start = a0 + first_bridge_frames
+    assert len(output_frames) == 3 * 100 - 2 * 2
+    middle_copy_frames = a1 - b1
+    third_copy_frames = 100 - b2
+    assert _sample_payload_hashes(sources[0], 0, a0) == _sample_payload_hashes(out, 0, a0)
+    assert _sample_payload_hashes(sources[1], b1, a1) == _sample_payload_hashes(
+        out, copied_middle_start, copied_middle_start + middle_copy_frames
+    )
+    assert _sample_payload_hashes(sources[2], b2, 100) == _sample_payload_hashes(
+        out, len(output_frames) - third_copy_frames, len(output_frames)
+    )
+    assert all(
+        np.array_equal(source, output)
+        for source, output in zip(
+            _decode(sources[1])[b1:a1],
+            output_frames[copied_middle_start : copied_middle_start + a1 - b1],
+            strict=True,
+        )
+    )
+    assert f"{a1 - b1} frames from clip 2" in _logged(context)
+    assert all(
+        np.array_equal(source, output)
+        for source, output in zip(_decode(sources[2])[b2:], output_frames[-third_copy_frames:], strict=True)
+    )
+    assert f"{third_copy_frames} frames from clip 3" in _logged(context)
+
+
+@pytest.mark.parametrize("transition_frames", [4, 5], ids=["even", "odd"])
+def test_smart_render_fade_through_black_keeps_asymmetric_transition_counts(tmp_path, transition_frames):
+    a = _encode(tmp_path / "a.mp4", _frames(100, seed=41))
+    b = _encode(tmp_path / "b.mp4", _frames(100, seed=42))
+    a_layout, b_layout = read_h264_layout(a), read_h264_layout(b)
+    assert a_layout is not None and b_layout is not None
+    tail = transition_frames // 2
+    head = transition_frames - tail
+    a_boundary = max(k for k in a_layout.sync_samples if k <= 100 - tail)
+    b_boundary = min(k for k in b_layout.sync_samples if k >= head)
+    encoded = 100 - a_boundary + b_boundary
+    out, context = _concat(
+        tmp_path,
+        [a, b],
+        f"fade_{transition_frames}",
+        transition="fade_through_black",
+        transition_frames=transition_frames,
+    )
+
+    output_frames = _decode(out)
+    assert len(output_frames) == 200
+    assert all(np.array_equal(x, y) for x, y in zip(_decode(a)[:a_boundary], output_frames[:a_boundary], strict=True))
+    assert all(
+        np.array_equal(x, y) for x, y in zip(_decode(b)[b_boundary:], output_frames[-(100 - b_boundary) :], strict=True)
+    )
+    assert f"encoding {encoded} across 1 bridge" in _logged(context)
+
+
+@pytest.mark.parametrize(
+    "transition,transition_frames",
+    [("cut", 8), ("crossfade", 0), ("fade_through_black", 0)],
+)
+def test_smart_render_copy_only_joins_do_not_encode_frames(tmp_path, monkeypatch, transition, transition_frames):
+    a = _encode(tmp_path / "a.mp4", _frames(100, seed=51))
+    b = _encode(tmp_path / "b.mp4", _frames(40, seed=52))
+
+    def unexpected_encode(*args, **kwargs):
+        raise AssertionError("copy-only smart rendering must not invoke a video encoder")
+
+    monkeypatch.setattr("invokeai.app.invocations.video_concat.encode_rgb_frames", unexpected_encode)
+    out, context = _concat(
+        tmp_path,
+        [a, b],
+        "copy_only",
+        transition=transition,
+        transition_frames=transition_frames,
+    )
+
+    output_frames = _decode(out)
+    assert len(output_frames) == 140
+    assert all(np.array_equal(x, y) for x, y in zip(_decode(a), output_frames[:100], strict=True))
+    assert all(np.array_equal(x, y) for x, y in zip(_decode(b), output_frames[100:], strict=True))
+    assert "copying 140, encoding 0 across 0 bridge" in _logged(context)
+
+
+def test_failed_smart_output_validation_falls_back_before_saving(tmp_path, monkeypatch):
+    from invokeai.app.util.h264_splice import SpliceError
+
+    a = _encode(tmp_path / "a.mp4", _frames(100, seed=61))
+    b = _encode(tmp_path / "b.mp4", _frames(100, seed=62))
+    validate = VideoConcatInvocation._validate_smart_part
+
+    def fail_joined_output(self, path, *args, **kwargs):
+        if path.name == "smart_joined.mp4":
+            raise SpliceError("test rejected assembled timestamps")
+        return validate(self, path, *args, **kwargs)
+
+    monkeypatch.setattr(VideoConcatInvocation, "_validate_smart_part", fail_joined_output)
+    out, context = _concat(tmp_path, [a, b], "validated", transition="crossfade", transition_frames=2)
+
+    assert len(_decode(out)) == 198
+    assert "falling back to full video encoding: test rejected assembled timestamps" in _logged(context)
+    assert context.videos.save.call_count == 1
+
+
+@pytest.mark.parametrize("open_side", ["left", "right"])
+def test_smart_render_extends_bridge_to_source_edge_when_no_interior_idr(tmp_path, open_side):
+    normal = _encode(tmp_path / "normal.mp4", _frames(100, seed=71))
+    open_gop = _encode_open_gop(tmp_path / "open.mp4", _frames(100, seed=72))
+    assert read_h264_layout(open_gop).sync_samples == (0,)
+    a, b = (open_gop, normal) if open_side == "left" else (normal, open_gop)
+    a_layout, b_layout = read_h264_layout(a), read_h264_layout(b)
+    assert a_layout is not None and b_layout is not None
+    a_boundary = 0 if open_side == "left" else max(k for k in a_layout.sync_samples if k <= 98)
+    b_boundary = min(k for k in b_layout.sync_samples if k >= 2) if open_side == "left" else 100
+    encoded = 100 - a_boundary + b_boundary - 2
+    copied = a_boundary + 100 - b_boundary
+
+    out, context = _concat(tmp_path, [a, b], "edge", transition="crossfade", transition_frames=2)
+
+    output_frames = _decode(out)
+    assert len(output_frames) == 198
+    if a_boundary:
+        assert all(
+            np.array_equal(x, y) for x, y in zip(_decode(a)[:a_boundary], output_frames[:a_boundary], strict=True)
+        )
+    if b_boundary < 100:
+        assert all(
+            np.array_equal(x, y)
+            for x, y in zip(_decode(b)[b_boundary:], output_frames[-(100 - b_boundary) :], strict=True)
+        )
+    assert f"copying {copied}, encoding {encoded} across 1 bridge" in _logged(context)
+
+
+def test_overlapping_intermediate_bridges_fall_back_to_full_encoding(tmp_path):
+    clips = [
+        _encode(tmp_path / "a.mp4", _frames(100, seed=81)),
+        _encode(tmp_path / "b.mp4", _frames(40, seed=82)),
+        _encode(tmp_path / "c.mp4", _frames(100, seed=83)),
+    ]
+    out, context = _concat(tmp_path, clips, "overlap", transition="crossfade", transition_frames=16)
+
+    assert len(_decode(out)) == 100 + 40 + 100 - 2 * 16
+    assert "overlap around clip 2" in _logged(context)
+    assert "falling back to full video encoding" in _logged(context)
+
+
+def test_bridge_ffmpeg_failure_falls_back_to_full_encoding(tmp_path, monkeypatch):
+    from invokeai.app.util.h264_splice import SpliceError
+
+    a = _encode(tmp_path / "a.mp4", _frames(100, seed=91))
+    b = _encode(tmp_path / "b.mp4", _frames(100, seed=92))
+
+    def fail_bridge(*args, **kwargs):
+        raise SpliceError("test bridge encoder failure")
+
+    monkeypatch.setattr("invokeai.app.invocations.video_concat.encode_rgb_frames", fail_bridge)
+    out, context = _concat(tmp_path, [a, b], "ffmpeg_failure", transition="crossfade", transition_frames=2)
+
+    assert len(_decode(out)) == 198
+    assert "falling back to full video encoding: test bridge encoder failure" in _logged(context)
+
+
+def test_bridge_timeout_falls_back_to_full_encoding(tmp_path, monkeypatch):
+    a = _encode(tmp_path / "a.mp4", _frames(100, seed=101))
+    b = _encode(tmp_path / "b.mp4", _frames(100, seed=102))
+
+    def timeout_bridge(*args, **kwargs):
+        raise TimeoutError("test bridge decoder timeout")
+
+    monkeypatch.setattr("invokeai.app.invocations.video_concat.encode_rgb_frames", timeout_bridge)
+    out, context = _concat(tmp_path, [a, b], "bridge_timeout", transition="crossfade", transition_frames=2)
+
+    assert len(_decode(out)) == 198
+    assert "falling back to full video encoding: test bridge decoder timeout" in _logged(context)
+
+
+def test_internal_bridge_abort_is_not_reported_as_user_cancellation(tmp_path, monkeypatch):
+    from invokeai.app.util.h264_splice import SpliceError
+
+    a = _encode(tmp_path / "a.mp4", _frames(100, seed=111))
+    b = _encode(tmp_path / "b.mp4", _frames(100, seed=112))
+
+    def fail_after_internal_abort(frames, output_path, canvas, fps, expected_frames, is_canceled, abort_event):
+        del frames, output_path, canvas, fps, expected_frames
+        abort_event.set()
+        assert not is_canceled(), "an internal encoder abort must not appear as user cancellation"
+        raise SpliceError("simulated bridge encoder timeout")
+
+    monkeypatch.setattr("invokeai.app.invocations.video_concat.encode_rgb_frames", fail_after_internal_abort)
+    out, context = _concat(tmp_path, [a, b], "internal_abort", transition="crossfade", transition_frames=2)
+
+    assert len(_decode(out)) == 198
+    assert "falling back to full video encoding: simulated bridge encoder timeout" in _logged(context)
+
+
+def test_bridge_source_decode_failure_falls_back_to_full_encoding(tmp_path, monkeypatch):
+    a = _encode(tmp_path / "a.mp4", _frames(100, seed=121))
+    b = _encode(tmp_path / "b.mp4", _frames(100, seed=122))
+    module = __import__("invokeai.app.invocations.video_concat", fromlist=["encode_rgb_frames"])
+    encode = module.encode_rgb_frames
+
+    def decode_failure(frames, output_path, canvas, fps, expected_frames, **kwargs):
+        def broken_frames():
+            yield next(iter(frames))
+            raise ValueError("simulated bridge decoder failure")
+
+        return encode(broken_frames(), output_path, canvas, fps, expected_frames, **kwargs)
+
+    monkeypatch.setattr(module, "encode_rgb_frames", decode_failure)
+    out, context = _concat(tmp_path, [a, b], "decoder_failure", transition="crossfade", transition_frames=2)
+
+    assert len(_decode(out)) == 198
+    assert "falling back to full video encoding" in _logged(context)
+    assert "simulated bridge decoder failure" in _logged(context)
