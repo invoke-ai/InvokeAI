@@ -1,5 +1,6 @@
 import type { ModelConfig } from '@features/models';
 
+import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState.testing';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -23,6 +24,9 @@ const MODELS = [
   model('spandrel', 'spandrel_image_to_image', 'any'),
   model('tile', 'controlnet', 'sdxl', 'SDXL Tile ControlNet'),
 ];
+
+// Upscale, like Generate, does not submit without the served architecture table.
+seedArchitectureCapabilities();
 
 describe('Upscale snapshot submission', () => {
   it('captures a resolved immutable snapshot, prompt history, graph preview, and generate-style backend request', () => {

@@ -959,6 +959,18 @@
         "Compel and Dynamic Prompts syntaxes and embeddings."
       ]
     },
+    "qwen35Encoder": {
+      "heading": "Qwen3.5 Encoder",
+      "paragraphs": [
+        "Anima-3.8B's prompt adapter also reads a Qwen3.5 4B text encoder. The checkpoint does not carry one, so it has to be selected here."
+      ]
+    },
+    "qwen3Encoder": {
+      "heading": "Qwen3 Encoder",
+      "paragraphs": [
+        "Z-Image and Anima read your prompt with a Qwen3 text encoder: Z-Image with the 4B, Anima with the 0.6B. A bare checkpoint does not carry one, so it has to be selected here."
+      ]
+    },
     "referenceImage": {
       "heading": "Global Reference Image",
       "paragraphs": ["Applies a reference image to influence the entire generation."]
@@ -2748,6 +2760,9 @@
       "negativePromptAdd": "Negative prompt…",
       "negativePromptHide": "Turn off negative prompt",
       "notReady": "Upscale is not ready",
+      "capabilitiesLoadFailed": "Could not load model capabilities from the backend. Upscale needs them to check its models and settings.",
+      "loadingCapabilities": "Loading model capabilities…",
+      "retry": "Retry",
       "outputMegapixels": "Output area",
       "outputSize": "Output",
       "positivePrompt": "Positive prompt",
@@ -2793,10 +2808,19 @@
       "selectT5Encoder": "Select a T5 encoder",
       "t5Encoder": "T5 Encoder",
       "t5EncoderRequired": "This model needs a T5 encoder selected.",
+      "qwen3Encoder": "Qwen3 Encoder",
+      "qwen3EncoderRequired": "This model needs a Qwen3 encoder selected.",
+      "selectQwen3Encoder": "Select a Qwen3 encoder",
+      "qwen35Encoder": "Qwen3.5 Encoder",
+      "qwen35EncoderRequired": "This model needs a Qwen3.5 encoder selected.",
+      "selectQwen35Encoder": "Select a Qwen3.5 encoder",
+      "negativePromptCfgGated": "Used only when CFG is greater than 1.",
       "vaeRequired": "This model needs a VAE selected.",
       "tileControlNet": "Tile ControlNet",
       "tileControlNetHelp": "Guides detail generation with the source image and must match the main model architecture.",
       "tileControlNetRequired": "Select a compatible Tile or Union ControlNet.",
+      "tileControlNetOptionalHelp": "Optional. Holds the result to the source image; Structure sets how firmly.",
+      "selectOptionalTileControlNet": "None (Creativity alone anchors the pass)",
       "tileOverlap": "Tile overlap",
       "tileOverlapHelp": "More overlap reduces seams but increases processing and memory use.",
       "tileSize": "Tile size",
