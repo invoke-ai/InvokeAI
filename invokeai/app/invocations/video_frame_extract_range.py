@@ -231,8 +231,15 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
             layout = read_h264_layout(video_path)
             if layout is not None and layout.sample_count != exact_frame_count:
                 layout = None
-        # The whole clip is the source itself; copying it avoids another lossy generation.
-        if layout is not None and start == 0 and end == layout.sample_count - 1:
+        # The whole clip is the source itself; copying it avoids another lossy generation. Unless
+        # some stream plays past the last frame — audio that outlasts the video or starts late
+        # (the probed duration is the longest stream's, end trims applied) — which a trim must cut.
+        if (
+            layout is not None
+            and start == 0
+            and end == layout.sample_count - 1
+            and duration <= n_frames / output_fps + 0.5 / output_fps + 0.01
+        ):
             return self._save_unchanged(context, video_path, width, height, n_frames, output_fps)
 
         context.util.signal_progress(f"Transcoding frames {start}-{end} of {n_frames} @ {output_fps:.2f} fps")
@@ -452,7 +459,8 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
             copy_path = Path(work) / "source.mp4"
             # A stream-copy remux that drops the source's keyed metadata: save() writes this
             # node's record, and if that rewrite fails the source's must not be read back as it.
-            write_mp4_tags(video_path, copy_path, {}, context.util.is_canceled)
+            # Only the first soundtrack: the ordinary path carries no other.
+            write_mp4_tags(video_path, copy_path, {}, context.util.is_canceled, first_audio_only=True)
             # A cancellation that arrived during an uninterruptible stage must not be saved.
             if context.util.is_canceled():
                 raise CanceledException

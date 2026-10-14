@@ -118,7 +118,9 @@ def _patch_box(data: bytearray, box: bytes, offset: int, value: bytes) -> None:
     data[at + 4 + offset : at + 4 + offset + len(value)] = value
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="bounds the child's address space with RLIMIT_AS")
+@pytest.mark.skipif(
+    sys.platform != "linux", reason="bounds the child's address space with RLIMIT_AS, which only Linux enforces"
+)
 @pytest.mark.parametrize("uniform_size", [0, 1], ids=["size-table", "uniform-size"])
 def test_oversized_sample_count_is_refused_without_allocating(tmp_path: Path, uniform_size: int) -> None:
     """Uploads that are already H.264 MP4s are stored as-is, so the sample tables are the

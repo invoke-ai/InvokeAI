@@ -215,11 +215,17 @@ def _escape_ffmetadata(value: str) -> str:
 
 
 def write_mp4_tags(
-    src: Path, dst: Path, tags: Mapping[str, str], is_canceled: Optional[Callable[[], bool]] = None
+    src: Path,
+    dst: Path,
+    tags: Mapping[str, str],
+    is_canceled: Optional[Callable[[], bool]] = None,
+    *,
+    first_audio_only: bool = False,
 ) -> None:
-    """Write ``dst`` = ``src``'s first video stream and every audio stream, stream-copied, with
-    ``tags`` as the file's keyed metadata (replacing any global tags ``src`` had). An empty
-    mapping therefore strips ``src``'s global tags.
+    """Write ``dst`` = ``src``'s first video stream and every audio stream (or only the first,
+    with ``first_audio_only``), stream-copied, with ``tags`` as the file's keyed metadata
+    (replacing any global tags ``src`` had). An empty mapping therefore strips ``src``'s
+    global tags.
 
     Subtitle, data and further video tracks are not carried: InvokeAI stores only what it
     serves, and the ingest path already narrows uploads the same way. ``dst`` is written with
@@ -251,7 +257,7 @@ def write_mp4_tags(
                     "-map",
                     "0:v:0",
                     "-map",
-                    "0:a?",
+                    "0:a:0?" if first_audio_only else "0:a?",
                     "-map_metadata",
                     "1",
                     "-c",

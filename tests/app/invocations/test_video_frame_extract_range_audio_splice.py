@@ -12,10 +12,12 @@ Real ffmpeg (the imageio-ffmpeg bundled binary) encodes and decodes throughout.
 """
 
 import struct
+import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import imageio.v2 as iio2
+import imageio_ffmpeg
 import numpy as np
 import pytest
 
@@ -220,3 +222,65 @@ def test_trim_splices_when_frames_hold_fractional_samples(tmp_path):
     want = decoded[0][:, round(7 * rate / fps) : round(101 * rate / fps)]
     interior = slice(LEAD_IN_LIMIT, want.shape[1] - TAIL_LIMIT)
     assert np.array_equal(got[0][:, interior], want[:, interior])
+
+
+@pytest.mark.parametrize("n_frames,fps,rate", [(40, 16.0, 32000), (97, 24.0, 32000), (81, 16.0, 16000)])
+def test_whole_clip_copy_keeps_a_soundtrack_that_ends_with_the_video(tmp_path, n_frames, fps, rate):
+    """The app's own soundtracks decode up to a packet past their end (the decoder does not
+    apply the end trim); that must not cost them the copy. 97 frames at 24 fps and 32 kHz is
+    a MiniMax H3 clip, 81 at 16 fps and 16 kHz a 16 kHz Wan-length one."""
+    n = round(n_frames / fps * rate)
+    wav, source = tmp_path / "source.wav", tmp_path / "source.mp4"
+    write_stereo_wav(wav, np.stack([np.sin(np.arange(n) / 7.0)] * 2).astype(np.float32) * 0.4, rate)
+    writer = make_mp4_writer(source, fps, audio_path=wav)
+    for i in range(n_frames):
+        writer.append_data(np.full((SIZE, SIZE, 3), i, dtype=np.uint8))
+    writer.close()
+
+    saved, context = _trim(tmp_path, source, 0, -1)
+    assert "the whole of the source, copied" in _logged(context)
+    want, got = extract_audio_pcm(source), extract_audio_pcm(saved)
+    assert want is not None and got is not None
+    assert np.array_equal(got[0], want[0])
+
+
+@pytest.mark.parametrize(
+    "audio_args,audio_frames,copied",
+    [
+        ([], 80, "Stream-copied frames 0-39"),
+        (["-itsoffset", "1.0"], 39, "Stream-copied frames 0-39"),
+        ([], 40, "the whole of the source, copied"),
+    ],
+    ids=["longer-audio", "delayed-audio", "second-audio-track"],
+)
+def test_whole_clip_copy_carries_only_the_soundtrack_a_trim_would(tmp_path, audio_args, audio_frames, copied):
+    """An uploaded H.264 MP4 is stored as-is, so its audio can outlast its video, start late,
+    or come as several tracks. Copying the file whole would keep audio past the last frame
+    (or every track) where any other range is cut to the frames it keeps (and the first track)."""
+    video = tmp_path / "video.mp4"
+    writer = make_mp4_writer(video, FPS)
+    rng = np.random.default_rng(0)
+    for _ in range(40):
+        writer.append_data(rng.integers(0, 256, (SIZE, SIZE, 3), dtype=np.uint8))
+    writer.close()
+    audio = tmp_path / "audio.wav"
+    write_stereo_wav(audio, _signal("tone", audio_frames, 0), RATE)
+    extra_track = copied.startswith("the whole")
+    inputs = ["-i", str(video), *audio_args, "-i", str(audio)] + (["-i", str(audio)] if extra_track else [])
+    maps = ["-map", "0:v", "-map", "1:a"] + (["-map", "2:a"] if extra_track else [])
+    source = tmp_path / "source.mp4"
+    subprocess.run(
+        [imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-loglevel", "error", *inputs, *maps]
+        + ["-c:v", "copy", "-c:a", "aac", "-aac_pns", "0", str(source)],
+        check=True,
+    )
+
+    saved, context = _trim(tmp_path, source, 0, -1)
+    # Nothing plays past the last frame (the probe reports to the hundredth of a second).
+    assert _movie_duration(saved) <= 40 / FPS + 0.5 / FPS
+    banner = subprocess.run(
+        [imageio_ffmpeg.get_ffmpeg_exe(), "-hide_banner", "-i", str(saved)], capture_output=True, text=True
+    ).stderr
+    assert banner.count("Audio:") == 1
+    # The video is still copied, not re-encoded.
+    assert copied in _logged(context)
