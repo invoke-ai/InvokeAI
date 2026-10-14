@@ -13,6 +13,7 @@ Real ffmpeg (the imageio-ffmpeg bundled binary) encodes and decodes throughout.
 
 import struct
 import subprocess
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -24,6 +25,7 @@ import pytest
 from invokeai.app.invocations.fields import VideoField
 from invokeai.app.invocations.video_concat import VideoConcatInvocation
 from invokeai.app.invocations.video_frame_extract_range import ExtractVideoRangeInvocation
+from invokeai.app.util import video_thumbnails
 from invokeai.app.util.aac_splice import EDGE_FRAMES, PREROLL_FRAMES, splice_soundtrack, spliceable_aac_layout
 from invokeai.app.util.mp4_metadata import find_box, write_mp4_tags
 from invokeai.app.util.video_audio import extract_audio_pcm
@@ -59,6 +61,36 @@ def _clip(dirpath: Path, name: str, n_frames: int, kind: str, seed: int) -> Path
         writer.append_data(rng.integers(0, 256, (SIZE, SIZE, 3), dtype=np.uint8))
     writer.close()
     return path
+
+
+def _uploaded_clip_with_audio(
+    tmp_path: Path,
+    *,
+    audio_args: list[str],
+    audio_frames: int,
+    second_audio_track: bool = False,
+) -> Path:
+    video = tmp_path / "video.mp4"
+    writer = make_mp4_writer(video, FPS)
+    rng = np.random.default_rng(0)
+    for _ in range(40):
+        writer.append_data(rng.integers(0, 256, (SIZE, SIZE, 3), dtype=np.uint8))
+    writer.close()
+
+    audio = tmp_path / "audio.wav"
+    write_stereo_wav(audio, _signal("tone", audio_frames, 0), RATE)
+    inputs = ["-i", str(video), *audio_args, "-i", str(audio)]
+    maps = ["-map", "0:v", "-map", "1:a"]
+    if second_audio_track:
+        inputs += ["-i", str(audio)]
+        maps += ["-map", "2:a"]
+    source = tmp_path / "source.mp4"
+    subprocess.run(
+        [imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-loglevel", "error", *inputs, *maps]
+        + ["-c:v", "copy", "-c:a", "aac", "-aac_pns", "0", str(source)],
+        check=True,
+    )
+    return source
 
 
 def _save_to(saved: Path):
@@ -245,42 +277,28 @@ def test_whole_clip_copy_keeps_a_soundtrack_that_ends_with_the_video(tmp_path, n
 
 
 @pytest.mark.parametrize(
-    "audio_args,audio_frames,copied,video_only_probe",
+    "audio_args,audio_frames,copied,second_audio_track,video_only_probe",
     [
-        ([], 80, "Stream-copied frames 0-39", False),
-        (["-itsoffset", "1.0"], 39, "Stream-copied frames 0-39", False),
-        ([], 40, "the whole of the source, copied", False),
-        ([], 80, "Stream-copied frames 0-39", True),
+        ([], 80, "Stream-copied frames 0-39", False, False),
+        (["-itsoffset", "1.0"], 39, "Stream-copied frames 0-39", False, False),
+        ([], 40, "the whole of the source, copied", True, False),
+        ([], 80, "Stream-copied frames 0-39", False, True),
     ],
-    ids=["longer-audio", "delayed-audio", "second-audio-track", "longer-audio-opencv-probe"],
+    ids=["longer-audio", "delayed-audio", "second-audio-track", "longer-audio-video-only-probe-result"],
 )
-def test_whole_clip_copy_carries_only_the_soundtrack_a_trim_would(
-    tmp_path, monkeypatch, audio_args, audio_frames, copied, video_only_probe
+def test_whole_clip_copy_does_not_trust_a_video_only_probe_duration(
+    tmp_path, monkeypatch, audio_args, audio_frames, copied, second_audio_track, video_only_probe
 ):
-    """An uploaded H.264 MP4 is stored as-is, so its audio can outlast its video, start late,
-    or come as several tracks. The OpenCV probe fallback knows only the video duration, so the
-    MP4 movie duration must also guard a whole-file copy that would keep audio past its last frame
-    (or every track) where any other range is cut to the frames it keeps (and the first track)."""
-    video = tmp_path / "video.mp4"
-    writer = make_mp4_writer(video, FPS)
-    rng = np.random.default_rng(0)
-    for _ in range(40):
-        writer.append_data(rng.integers(0, 256, (SIZE, SIZE, 3), dtype=np.uint8))
-    writer.close()
-    audio = tmp_path / "audio.wav"
-    write_stereo_wav(audio, _signal("tone", audio_frames, 0), RATE)
-    extra_track = copied.startswith("the whole")
-    inputs = ["-i", str(video), *audio_args, "-i", str(audio)] + (["-i", str(audio)] if extra_track else [])
-    maps = ["-map", "0:v", "-map", "1:a"] + (["-map", "2:a"] if extra_track else [])
-    source = tmp_path / "source.mp4"
-    subprocess.run(
-        [imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-loglevel", "error", *inputs, *maps]
-        + ["-c:v", "copy", "-c:a", "aac", "-aac_pns", "0", str(source)],
-        check=True,
+    """The invocation must trim out-of-range audio even when its probe reports only video duration."""
+    source = _uploaded_clip_with_audio(
+        tmp_path,
+        audio_args=audio_args,
+        audio_frames=audio_frames,
+        second_audio_track=second_audio_track,
     )
 
     if video_only_probe:
-        # video_decode_worker._probe() returns frame_count / fps when it falls back to OpenCV.
+        # Simulate the duration returned by video_decode_worker._probe()'s OpenCV fallback.
         monkeypatch.setattr(
             "invokeai.app.invocations.video_frame_extract_range.probe_video",
             lambda _path: (SIZE, SIZE, 40 / FPS, FPS),
@@ -295,3 +313,42 @@ def test_whole_clip_copy_carries_only_the_soundtrack_a_trim_would(
     assert banner.count("Audio:") == 1
     # The video is still copied, not re-encoded.
     assert copied in _logged(context)
+
+
+def test_whole_clip_longer_audio_trims_when_opencv_probe_fallback_runs(tmp_path, monkeypatch):
+    """Force imageio's probe to fail in the worker and exercise its real OpenCV fallback."""
+    source = _uploaded_clip_with_audio(tmp_path, audio_args=[], audio_frames=80)
+    worker_wrapper = tmp_path / "force_opencv_probe.py"
+    worker_wrapper.write_text(
+        "import imageio.v3 as iio\n"
+        "import runpy\n"
+        "import sys\n"
+        "\n"
+        "def fail_immeta(*_args, **_kwargs):\n"
+        "    raise RuntimeError('force the OpenCV fallback')\n"
+        "\n"
+        "iio.immeta = fail_immeta\n"
+        "worker_path = sys.argv[1]\n"
+        "sys.argv = [worker_path, *sys.argv[2:]]\n"
+        "runpy.run_path(worker_path, run_name='__main__')\n"
+    )
+    original_worker_command = video_thumbnails._worker_command
+    worker_path = original_worker_command("probe", str(source))[1]
+
+    def worker_command(*args: str) -> list[str]:
+        if args[0] == "probe":
+            return [sys.executable, str(worker_wrapper), worker_path, *args]
+        return original_worker_command(*args)
+
+    monkeypatch.setattr(video_thumbnails, "_worker_command", worker_command)
+
+    width, height, probed_duration, fps = video_thumbnails.probe_video(source)
+    assert (width, height) == (SIZE, SIZE)
+    assert probed_duration == pytest.approx(40 / FPS, abs=0.1)
+    assert fps == pytest.approx(FPS)
+    assert _movie_duration(source) > 4.9
+
+    saved, context = _trim(tmp_path, source, 0, -1)
+
+    assert _movie_duration(saved) <= 40 / FPS + 0.5 / FPS
+    assert "Stream-copied frames 0-39" in _logged(context)
