@@ -5307,8 +5307,8 @@ def test_if_graph_optimized_behavior_executes_only_selected_simple_branch_and_re
     assert set(executed_source_ids) == {"condition", "true_value", "if", "selected_output"}
     assert "false_value" not in executed_source_ids
 
-    assert set(g.executed_history) == {"condition", "true_value", "if", "selected_output"}
-    assert "false_value" not in g.executed_history
+    assert set(g.executed_history) == {"condition", "true_value", "false_value", "if", "selected_output"}
+    assert "false_value" not in executed_source_ids
 
 
 def test_if_graph_lowers_legacy_branch_choice_to_frame_scoped_activation_token():

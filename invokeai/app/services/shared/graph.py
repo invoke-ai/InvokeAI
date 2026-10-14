@@ -223,6 +223,9 @@ class _GraphExecutionStateRuntime:
         "if_branch_sources_cache",
         "if_activation_dependencies_by_source",
         "if_activation_dependencies_by_exec",
+        "if_activation_dependents_by_dependency",
+        "if_activation_dependents_indexed_exec_ids",
+        "if_activation_dependents_index_complete",
         "prepared_if_exec_ids_by_source_and_frame",
         "prepared_if_exec_frames_by_source",
         "prepared_if_exec_indexed_sources",
@@ -233,6 +236,7 @@ class _GraphExecutionStateRuntime:
         "generic_for_planner",
         "execution_scheduler",
         "execution_runtime",
+        "engine_frames",
         "for_parent_iteration_paths_cache",
         "all_for_contexts_finalized_cache",
         "prepared_for_index",
@@ -265,6 +269,9 @@ class _GraphExecutionStateRuntime:
             tuple[str, tuple[int, ...]], tuple[ActivationDependency, ...]
         ] = {}
         self.if_activation_dependencies_by_exec: dict[str, tuple[ActivationDependency, ...]] = {}
+        self.if_activation_dependents_by_dependency: dict[ActivationDependency, tuple[str, ...]] = {}
+        self.if_activation_dependents_indexed_exec_ids: set[str] = set()
+        self.if_activation_dependents_index_complete = False
         self.prepared_if_exec_ids_by_source_and_frame: dict[tuple[str, tuple[int, ...]], tuple[str, ...]] = {}
         self.prepared_if_exec_frames_by_source: dict[str, tuple[tuple[int, ...], ...]] = {}
         self.prepared_if_exec_indexed_sources: set[str] = set()
@@ -275,6 +282,7 @@ class _GraphExecutionStateRuntime:
         self.generic_for_planner: Optional[_GenericForPlanner] = None
         self.execution_scheduler: Optional[_ExecutionScheduler | _GenericGraphSchedulerAdapter] = None
         self.execution_runtime: Optional[_ExecutionRuntime] = None
+        self.engine_frames: dict[tuple[str, int, tuple[int, ...]], EngineExecutionFrame] = {}
         self.for_parent_iteration_paths_cache: dict[str, set[tuple[int, ...]]] = {}
         self.all_for_contexts_finalized_cache: dict[str, bool] = {}
         self.prepared_for_index: Optional[dict[tuple[str, tuple[int, ...]], str]] = None
@@ -294,17 +302,6 @@ class _GraphExecutionStateRuntime:
         self.legacy_execution_snapshot = True
         self.legacy_snapshot_loaded = False
         self.fresh_flat_if_activation: Optional[bool] = None
-
-
-@lru_cache(maxsize=4096)
-def _engine_frame_for(state_id: str, workflow_call_depth: int, iteration_path: tuple[int, ...]) -> EngineExecutionFrame:
-    """Share one frozen frame per identity so gate scope checks compare by identity instead of by dump."""
-    return EngineExecutionFrame(
-        state_id=state_id,
-        frame_id=f"{state_id}:{workflow_call_depth}:{','.join(str(i) for i in iteration_path)}",
-        iteration_path=iteration_path,
-        workflow_call_depth=workflow_call_depth,
-    )
 
 
 class GraphExecutionState(BaseModel):
@@ -411,14 +408,22 @@ class GraphExecutionState(BaseModel):
     def model_copy(self, *, update: Optional[dict[str, Any]] = None, deep: bool = False) -> "GraphExecutionState":
         copied = super().model_copy(update=update, deep=deep)
         if not deep:
-            copied.__pydantic_private__["_runtime_state"] = copy.copy(self.__pydantic_private__["_runtime_state"])
+            runtime_state = copy.copy(self.__pydantic_private__["_runtime_state"])
+            runtime_state.engine_frames = {
+                key: frame for key, frame in runtime_state.engine_frames.items() if key[0] == copied.id
+            }
+            copied.__pydantic_private__["_runtime_state"] = runtime_state
         if update is not None and "graph" in update:
             copied._invalidate_source_graph_cache()
         return copied
 
     def __copy__(self) -> "GraphExecutionState":
         copied = super().__copy__()
-        copied.__pydantic_private__["_runtime_state"] = copy.copy(self.__pydantic_private__["_runtime_state"])
+        runtime_state = copy.copy(self.__pydantic_private__["_runtime_state"])
+        runtime_state.engine_frames = {
+            key: frame for key, frame in runtime_state.engine_frames.items() if key[0] == copied.id
+        }
+        copied.__pydantic_private__["_runtime_state"] = runtime_state
         return copied
 
     def _tx_record_once(self, key: tuple[Any, ...], undo: Callable[[], None]) -> None:
@@ -526,6 +531,9 @@ class GraphExecutionState(BaseModel):
         self._if_branch_sources_cache = {}
         self._if_activation_dependencies_by_source = {}
         self._if_activation_dependencies_by_exec = {}
+        self._if_activation_dependents_by_dependency = {}
+        self._if_activation_dependents_indexed_exec_ids = set()
+        self._if_activation_dependents_index_complete = False
         self._prepared_if_exec_ids_by_source_and_frame = {}
         self._prepared_if_exec_frames_by_source = {}
         self._prepared_if_exec_indexed_sources = set()
@@ -624,6 +632,46 @@ class GraphExecutionState(BaseModel):
 
     def _record_activation_dependencies(self, exec_node_id: str) -> tuple[ActivationDependency, ...]:
         return graph_if_runtime._record_activation_dependencies(self, exec_node_id)
+
+    def _index_activation_dependencies(self, exec_node_id: str, dependencies: tuple[ActivationDependency, ...]) -> None:
+        if exec_node_id in self._if_activation_dependents_indexed_exec_ids:
+            return
+        for dependency in dependencies:
+            dependents = self._if_activation_dependents_by_dependency.get(dependency, ())
+            if exec_node_id not in dependents:
+                self._tx_set_mapping(
+                    self._if_activation_dependents_by_dependency,
+                    dependency,
+                    (*dependents, exec_node_id),
+                )
+        self._tx_add_set(self._if_activation_dependents_indexed_exec_ids, exec_node_id)
+
+    def _get_activation_dependents_for_if(self, source_if_id: str, iteration_path: tuple[int, ...]) -> tuple[str, ...]:
+        if not self._if_activation_dependents_index_complete:
+            for exec_node_id in self.prepared_source_mapping:
+                if exec_node_id not in self._if_activation_dependents_indexed_exec_ids:
+                    self._record_activation_dependencies(exec_node_id)
+            self._tx_set_attr(self, "_if_activation_dependents_index_complete", True)
+
+        candidates = {
+            exec_node_id
+            for branch in ("true_input", "false_input")
+            for exec_node_id in self._if_activation_dependents_by_dependency.get(
+                ActivationDependency(owner_id=source_if_id, branch=branch, frame=iteration_path), ()
+            )
+        }
+        if iteration_path:
+            candidates.update(
+                exec_node_id
+                for branch in ("true_input", "false_input")
+                for exec_node_id in self._if_activation_dependents_by_dependency.get(
+                    ActivationDependency(owner_id=source_if_id, branch=branch, frame=()), ()
+                )
+            )
+        if not candidates:
+            return ()
+        execution_graph = self._get_execution_graph_flat()
+        return tuple(nx.topological_sort(execution_graph.subgraph(candidates)))
 
     def _is_source_activation_admitted(self, source_node_id: str, iteration_path: tuple[int, ...] = ()) -> bool:
         return graph_if_runtime._is_source_activation_admitted(self, source_node_id, iteration_path)
@@ -739,6 +787,9 @@ class GraphExecutionState(BaseModel):
         runtime.if_branch_sources_cache = {}
         runtime.if_activation_dependencies_by_source = {}
         runtime.if_activation_dependencies_by_exec = {}
+        runtime.if_activation_dependents_by_dependency = {}
+        runtime.if_activation_dependents_indexed_exec_ids = set()
+        runtime.if_activation_dependents_index_complete = False
         runtime.if_activation_controller_instance = None
         runtime.execution_materializer = None
         runtime.execution_runtime = None
@@ -1472,7 +1523,18 @@ class GraphExecutionState(BaseModel):
             self._generic_graph_scheduler = None
 
     def _engine_frame(self, iteration_path: tuple[int, ...]) -> EngineExecutionFrame:
-        return _engine_frame_for(self.id, len(self.workflow_call_stack), iteration_path)
+        runtime_state = self.__pydantic_private__["_runtime_state"]
+        key = (self.id, len(self.workflow_call_stack), iteration_path)
+        frame = runtime_state.engine_frames.get(key)
+        if frame is None:
+            frame = EngineExecutionFrame(
+                state_id=self.id,
+                frame_id=f"{self.id}:{len(self.workflow_call_stack)}:{','.join(str(i) for i in iteration_path)}",
+                iteration_path=iteration_path,
+                workflow_call_depth=len(self.workflow_call_stack),
+            )
+            runtime_state.engine_frames[key] = frame
+        return frame
 
     def _activation_gate(self, exec_node_id: str) -> ActivationGate:
         return graph_if_runtime._activation_gate(self, exec_node_id)
@@ -3311,8 +3373,11 @@ class GraphExecutionState(BaseModel):
         self._tx_set_mapping(self._resolved_if_exec_branches, exec_node_id, selected_field)
         self._record_compatibility_activation_token(exec_node_id, selected_field)
         assert isinstance(scheduler, _ExecutionScheduler)
-        scheduler._discard_rejected_activation_nodes()
-        scheduler._enqueue_activation_ready_nodes()
+        source_if_id = self._prepared_registry().get_source_node_id(exec_node_id)
+        iteration_path = self._get_iteration_path(exec_node_id)
+        activation_dependents = self._get_activation_dependents_for_if(source_if_id, iteration_path)
+        scheduler._discard_rejected_activation_nodes(activation_dependents)
+        scheduler._enqueue_activation_ready_nodes(activation_dependents)
         if enqueue:
             self._enqueue_if_ready(exec_node_id)
 
@@ -3440,6 +3505,9 @@ class GraphExecutionState(BaseModel):
         self._if_activation_controller_instance = None
         self._if_activation_dependencies_by_source = {}
         self._if_activation_dependencies_by_exec = {}
+        self._if_activation_dependents_by_dependency = {}
+        self._if_activation_dependents_indexed_exec_ids = set()
+        self._if_activation_dependents_index_complete = False
         self._prepared_if_exec_ids_by_source_and_frame = {}
         self._prepared_if_exec_indexed_sources = set()
         self._source_graph_flat = None
@@ -4175,6 +4243,9 @@ _GRAPH_RUNTIME_ATTRIBUTE_NAMES = (
     "if_branch_sources_cache",
     "if_activation_dependencies_by_source",
     "if_activation_dependencies_by_exec",
+    "if_activation_dependents_by_dependency",
+    "if_activation_dependents_indexed_exec_ids",
+    "if_activation_dependents_index_complete",
     "prepared_if_exec_ids_by_source_and_frame",
     "prepared_if_exec_frames_by_source",
     "prepared_if_exec_indexed_sources",

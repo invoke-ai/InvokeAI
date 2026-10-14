@@ -33,6 +33,10 @@ if TYPE_CHECKING:
     from invokeai.app.services.shared.graph import GraphExecutionState
 
 
+class UnsupportedSharedIfCollectBranchesError(ValueError):
+    """Raised when one sibling Collect-backed Iterate must serve multiple If frames."""
+
+
 class _ExecutionNodeBuilder:
     """Builds concrete execution-graph nodes for a selected runtime planner.
 
@@ -43,13 +47,15 @@ class _ExecutionNodeBuilder:
 
     def __init__(self, state: "GraphExecutionState") -> None:
         self._state = state
+        self._has_if_nodes = any(isinstance(node, IfInvocation) for node in state.graph.nodes.values())
         self._iteration_axes_by_source: dict[str, tuple[str, ...]] = {}
         self._sibling_iterate_if_collect_branches: Optional[dict[str, tuple[str, str]]] = None
         self._iteration_relationship_graph: Optional[nx.DiGraph] = None
         self._iteration_relationship_topological_index: Optional[dict[str, int]] = None
         # Keyed by the identity of the cached flat source graph, which every graph edit replaces.
         self._flat_iterator_graph: Optional[tuple["nx.DiGraph", "nx.DiGraph"]] = None
-        self._node_iterators: dict[str, tuple[str, ...]] = {}
+        self._iterator_ancestry_graph: Optional["nx.DiGraph"] = None
+        self._iterator_ancestry: Optional[_IteratorAncestry] = None
 
     def _get_iteration_axes(self, source_node_id: str) -> tuple[str, ...]:
         cached = self._iteration_axes_by_source.get(source_node_id)
@@ -83,6 +89,26 @@ class _ExecutionNodeBuilder:
         self._iteration_axes_by_source[source_node_id] = result
         return result
 
+    def _get_ordered_input_iterator_axes(self, input_edges: list[Edge]) -> tuple[str, ...]:
+        if not input_edges:
+            return ()
+
+        destination = self._state.graph.get_node(input_edges[0].destination.node_id)
+        input_field_order = {field: index for index, field in enumerate(type(destination).model_fields)}
+        ordered_edges = sorted(
+            input_edges,
+            key=lambda edge: (
+                input_field_order.get(edge.destination.field, len(input_field_order)),
+                edge.source.node_id,
+            ),
+        )
+        axes: list[str] = []
+        for edge in ordered_edges:
+            for axis_id in self._get_iteration_axes(edge.source.node_id):
+                if axis_id not in axes:
+                    axes.append(axis_id)
+        return tuple(axes)
+
     def _get_known_iteration_path(
         self,
         iteration_index: int,
@@ -112,14 +138,32 @@ class _ExecutionNodeBuilder:
         compatible_parent_contexts = all(
             deepest_path[: len(path)] == path and deepest_axes[: len(axes)] == axes for path, axes in parent_contexts
         )
-        if not compatible_parent_contexts:
-            return None
+        if compatible_parent_contexts:
+            iteration_path = deepest_path
+        else:
+            # Independent input axes contribute separate path components. Merge their indexes in destination-port
+            # order instead of rejecting them as incompatible prefixes.
+            ordered_axes = self._get_ordered_input_iterator_axes(input_edges or [])
+            axis_indexes: dict[str, int] = {}
+            for path, axes in parent_contexts:
+                if len(path) > len(axes):
+                    return None
+                for axis_id, axis_index in zip(axes, path, strict=False):
+                    if axis_id not in ordered_axes:
+                        return None
+                    previous_index = axis_indexes.setdefault(axis_id, axis_index)
+                    if previous_index != axis_index:
+                        return None
+            populated_positions = [index for index, axis_id in enumerate(ordered_axes) if axis_id in axis_indexes]
+            if populated_positions != list(range(len(populated_positions))):
+                return None
+            iteration_path = tuple(axis_indexes[axis_id] for axis_id in ordered_axes[: len(populated_positions)])
 
         # Materialized iteration boundaries use non-negative indexes; ordinary execution nodes use -1. Keeping this
         # generic allows other scheduler-managed loop nodes to reuse the same path cache.
         if iteration_index >= 0:
-            return (*deepest_path, iteration_index)
-        return deepest_path
+            return (*iteration_path, iteration_index)
+        return iteration_path
 
     def _get_iterator_iteration_count(self, node_id: str, iteration_node_map: list[tuple[str, str]]) -> int:
         input_collection_edge = next(iter(self._state.graph._get_input_edges(node_id, COLLECTION_FIELD)))
@@ -204,6 +248,17 @@ class _ExecutionNodeBuilder:
                 final_for_source_ids.add(edge.source.node_id)
 
         return any(not self._state._all_for_contexts_finalized(source_for_id) for source_for_id in final_for_source_ids)
+
+    def _get_ordered_iterator_axes_for_edges(self, edges: Iterable[Edge], iterator_graph: "nx.DiGraph") -> list[str]:
+        ancestry = self._get_iterator_ancestry(iterator_graph)
+        return list(dict.fromkeys(axis_id for edge in edges for axis_id in ancestry.get_iterator_axes_for_edge(edge)))
+
+    def _get_iterator_ancestry(self, iterator_graph: "nx.DiGraph") -> _IteratorAncestry:
+        if self._iterator_ancestry_graph is not iterator_graph:
+            self._iterator_ancestry_graph = iterator_graph
+            self._iterator_ancestry = _IteratorAncestry(self._state, iterator_graph=iterator_graph)
+        assert self._iterator_ancestry is not None
+        return self._iterator_ancestry
 
     def _create_execution_node_copy(
         self, node: BaseInvocation, node_id: str, iteration_index: int, *, deep_copy: bool = True
@@ -1085,8 +1140,7 @@ class _ExecutionNodeBuilder:
             isinstance(source_node, ForInvocation)
             and get_output_field_scope(source_node, edge.source.field) == OutputScope.Final
         ):
-            parent_path = self._state._get_for_parent_iteration_path(edge.source.node_id)
-            return parent_path
+            return self._state._get_for_parent_iteration_path(edge.source.node_id)
         if edge.destination.field == ITEM_FIELD:
             if isinstance(source_node, ForInvocation) and source_node.index == -1:
                 return path
@@ -1176,10 +1230,12 @@ class _ExecutionNodeBuilder:
             group_depth = max(group_depth - 1, 0)
 
         group_keys: set[tuple[int, ...]] = set()
-        for iterator_node_id in iterator_node_ids:
+        # A Collect.item edge groups by the outer `group_depth` axes. Read input paths from the current item axis
+        # too: an empty stream still carries its parent groups even when it has no prepared items.
+        for axis_index, iterator_node_id in enumerate(iterator_node_ids[: group_depth + 1]):
             prepared_nodes = self._get_ordered_prepared_nodes_for_source(iterator_node_id)
-            # Prepared paths use the active group depth. Input paths stay full to preserve scope across collectors.
-            if prepared_nodes and group_depth:
+            # Only outer group axes contribute prepared paths; the current item axis is collapsed by Collect.
+            if axis_index < group_depth and prepared_nodes:
                 group_keys.update(
                     iteration_path[:group_depth]
                     for prepared_id in prepared_nodes
@@ -1382,16 +1438,8 @@ class _ExecutionNodeBuilder:
                 if len(branch_path) == len(frame) + 1 and branch_path[: len(frame)] == frame
             ]
             condition_edges = self._state.graph._get_input_edges(if_node_id, "condition")
-            condition_iterator_ids = {
-                ancestor_id
-                for edge in condition_edges
-                for ancestor_id in nx.ancestors(self._state._get_source_graph_flat(), edge.source.node_id)
-                if isinstance(self._state.graph.get_node(ancestor_id), (ForInvocation, IterateInvocation))
-            }
-            condition_iterator_ids.update(
-                edge.source.node_id
-                for edge in condition_edges
-                if isinstance(self._state.graph.get_node(edge.source.node_id), (ForInvocation, IterateInvocation))
+            condition_iterator_ids = set(
+                self._get_ordered_iterator_axes_for_edges(condition_edges, self.iterator_graph())
             )
             for frame in matching_frames:
                 if any(
@@ -1424,17 +1472,8 @@ class _ExecutionNodeBuilder:
             source_node = self._state.graph.get_node(input_edges[0].source.node_id)
             if isinstance(source_node, IfInvocation):
                 condition_edges = self._state.graph._get_input_edges(source_node.id, "condition")
-                condition_iterator_ids = {
-                    ancestor_id
-                    for edge in condition_edges
-                    for ancestor_id in nx.ancestors(iterator_graph, edge.source.node_id)
-                    if isinstance(self._state.graph.get_node(ancestor_id), (ForInvocation, IterateInvocation))
-                }
-                condition_iterator_ids.update(
-                    edge.source.node_id
-                    for edge in condition_edges
-                    if isinstance(self._state.graph.get_node(edge.source.node_id), (ForInvocation, IterateInvocation))
-                )
+                condition_axes = self._get_ordered_iterator_axes_for_edges(condition_edges, iterator_graph)
+                condition_iterator_ids = set(condition_axes)
                 if condition_iterator_ids:
                     iterator_nodes = [node_id for node_id in iterator_nodes if node_id in condition_iterator_ids]
         if not iterator_nodes:
@@ -1591,20 +1630,10 @@ class _ExecutionNodeBuilder:
         condition_edges = self._state.graph._get_input_edges(node_id, "condition")
         iterator_graph = self.iterator_graph(graph)
         if condition_edges:
-            condition_iterator_ids = {
-                ancestor_id
-                for edge in condition_edges
-                for ancestor_id in nx.ancestors(iterator_graph, edge.source.node_id)
-                if isinstance(self._state.graph.get_node(ancestor_id), (ForInvocation, IterateInvocation))
-            }
-            condition_iterator_ids.update(
-                edge.source.node_id
-                for edge in condition_edges
-                if isinstance(self._state.graph.get_node(edge.source.node_id), (ForInvocation, IterateInvocation))
-            )
+            condition_axes = self._get_ordered_iterator_axes_for_edges(condition_edges, iterator_graph)
+            condition_iterator_ids = set(condition_axes)
             if condition_iterator_ids:
-                source_order = self._state._runtime()._get_iterator_source_order()
-                iterator_nodes = sorted(condition_iterator_ids, key=lambda source_id: source_order[source_id])
+                iterator_nodes = condition_axes
             else:
                 iterator_nodes = self.get_node_iterators(node_id, iterator_graph)
         else:
@@ -1623,24 +1652,16 @@ class _ExecutionNodeBuilder:
                 node_id, graph, input_edges=condition_edges, iterator_node_ids=iterator_nodes
             )
 
-        # This bounded path derives one frame axis. Leave mixed/nested axes on the existing path because
-        # _get_known_iteration_path() intentionally rejects incompatible parent paths.
+        # This specialization derives one branch axis against a root-frame condition. Mixed or nested condition
+        # axes use the general parent-mapping path.
         if len(iterator_nodes) != 1:
             return iter([[]])
-        source_graph = self._state._get_source_graph_flat()
+        iterator_ancestry = self._get_iterator_ancestry(iterator_graph)
         for branch_field in ("true_input", "false_input"):
             branch_edges = self._state.graph._get_input_edges(node_id, branch_field)
             branch_iterator_ids = {
-                ancestor_id
-                for edge in branch_edges
-                for ancestor_id in nx.ancestors(source_graph, edge.source.node_id)
-                if isinstance(self._state.graph.get_node(ancestor_id), (ForInvocation, IterateInvocation))
+                axis_id for edge in branch_edges for axis_id in iterator_ancestry.get_iterator_axes_for_edge(edge)
             }
-            branch_iterator_ids.update(
-                edge.source.node_id
-                for edge in branch_edges
-                if isinstance(self._state.graph.get_node(edge.source.node_id), (ForInvocation, IterateInvocation))
-            )
             if branch_iterator_ids and not (branch_iterator_ids & set(iterator_nodes)):
                 return iter([])
 
@@ -1701,7 +1722,7 @@ class _ExecutionNodeBuilder:
 
         graph = self._state._get_source_graph_flat()
         iterator_graph = self.iterator_graph(graph)
-        iterator_topological_index = self._state._runtime()._get_iterator_source_order()
+        iterator_ancestry = self._get_iterator_ancestry(iterator_graph)
         relationship_graph = iterator_graph.copy()
         for collect_node in self._state.graph.nodes.values():
             if not isinstance(collect_node, CollectInvocation):
@@ -1719,14 +1740,7 @@ class _ExecutionNodeBuilder:
                 and get_output_field_scope(source_node, item_edge.source.field) == OutputScope.Final
             ):
                 continue
-            ordered_iterator_ids = [
-                iterator_id
-                for iterator_id in nx.ancestors(iterator_graph, item_source_id)
-                if isinstance(self._state.graph.get_node(iterator_id), (ForInvocation, IterateInvocation))
-            ]
-            ordered_iterator_ids.sort(key=iterator_topological_index.__getitem__)
-            if isinstance(source_node, IterateInvocation):
-                ordered_iterator_ids.append(item_source_id)
+            ordered_iterator_ids = list(iterator_ancestry.get_iterator_axes_for_edge(item_edge))
             for parent_iterator_id in ordered_iterator_ids[:-1]:
                 relationship_graph.add_edge(parent_iterator_id, collect_node.id)
 
@@ -1749,17 +1763,7 @@ class _ExecutionNodeBuilder:
                     continue
 
                 condition_edges = self._state.graph._get_input_edges(destination.id, "condition")
-                condition_iterator_ids = {
-                    ancestor_id
-                    for edge in condition_edges
-                    for ancestor_id in nx.ancestors(graph, edge.source.node_id)
-                    if isinstance(self._state.graph.get_node(ancestor_id), (ForInvocation, IterateInvocation))
-                }
-                condition_iterator_ids.update(
-                    edge.source.node_id
-                    for edge in condition_edges
-                    if isinstance(self._state.graph.get_node(edge.source.node_id), (ForInvocation, IterateInvocation))
-                )
+                condition_iterator_ids = set(self._get_ordered_iterator_axes_for_edges(condition_edges, iterator_graph))
                 if not condition_iterator_ids.intersection(iterator_ids):
                     continue
 
@@ -1770,9 +1774,19 @@ class _ExecutionNodeBuilder:
                         for condition_iterator_id in condition_iterator_ids
                     ):
                         continue
-                    branches.setdefault(iterate_node_id, (destination.id, output_edge.destination.field))
+                    branch = (destination.id, output_edge.destination.field)
+                    existing_branch = branches.get(iterate_node_id)
+                    if existing_branch is not None and existing_branch != branch:
+                        raise UnsupportedSharedIfCollectBranchesError(
+                            f"Sibling Iterate '{iterate_node_id}' cannot supply Collect-backed inputs to multiple "
+                            f"If branches: '{existing_branch[0]}.{existing_branch[1]}' and "
+                            f"'{branch[0]}.{branch[1]}'"
+                        )
+                    branches[iterate_node_id] = branch
 
         self._iteration_relationship_graph = relationship_graph
+        # Cached axes may have been queried before this graph established sibling order.
+        self._iteration_axes_by_source.clear()
         self._iteration_relationship_topological_index = {
             node_id: index
             for index, node_id in enumerate(nx.lexicographical_topological_sort(relationship_graph, key=str))
@@ -1782,19 +1796,6 @@ class _ExecutionNodeBuilder:
 
     def _get_sibling_iterate_if_collect_branch(self, iterate_node_id: str) -> Optional[tuple[str, str]]:
         return self._get_sibling_iterate_if_collect_branches().get(iterate_node_id)
-
-    def _is_inactive_sibling_if_collect_source(self, node_id: str, graph: "nx.DiGraph") -> bool:
-        sibling_iterate_ids = self._get_sibling_iterate_if_collect_branches().keys()
-        return (
-            bool(sibling_iterate_ids)
-            and self._state._is_source_inactive(node_id)
-            and any(
-                node_id == iterate_node_id
-                or nx.has_path(graph, node_id, iterate_node_id)
-                or nx.has_path(graph, iterate_node_id, node_id)
-                for iterate_node_id in sibling_iterate_ids
-            )
-        )
 
     def _attach_pending_if_inputs(self, *, enqueue: bool = True) -> None:
         """Attach only the selected branch edge to condition-ready If executions."""
@@ -1877,7 +1878,6 @@ class _ExecutionNodeBuilder:
             return self._build_iterator_graph(base)
         if self._flat_iterator_graph is None or self._flat_iterator_graph[0] is not source_graph:
             self._flat_iterator_graph = (source_graph, self._build_iterator_graph(source_graph))
-            self._node_iterators = {}
         return self._flat_iterator_graph[1]
 
     def _build_iterator_graph(self, base: "nx.DiGraph") -> "nx.DiGraph":
@@ -1907,21 +1907,11 @@ class _ExecutionNodeBuilder:
         return g
 
     def get_node_iterators(self, node_id: str, it_graph: Optional["nx.DiGraph"] = None) -> list[str]:
-        flat_iterator_graph = self.iterator_graph()
-        if it_graph is not None and it_graph is not flat_iterator_graph:
-            return self._find_node_iterators(node_id, it_graph)
-        cached = self._node_iterators.get(node_id)
-        if cached is None:
-            cached = tuple(self._find_node_iterators(node_id, flat_iterator_graph))
-            self._node_iterators[node_id] = cached
-        return list(cached)
+        iterator_graph = it_graph if it_graph is not None else self.iterator_graph()
+        return self._find_node_iterators(node_id, iterator_graph)
 
     def _find_node_iterators(self, node_id: str, it_graph: "nx.DiGraph") -> list[str]:
-        return [
-            n
-            for n in nx.ancestors(it_graph, node_id)
-            if isinstance(self._state.graph.get_node(n), (ForInvocation, IterateInvocation))
-        ]
+        return self._get_iterator_ancestry(it_graph).get_ordered_iterator_ancestors(node_id)
 
     def _get_prepared_nodes_for_source(self, source_node_id: str) -> set[str]:
         return {
@@ -2016,16 +2006,31 @@ class _ExecutionNodeBuilder:
 
         return self._find_prepared_node_matching_iterators(prepared_nodes, parent_iterators, execution_graph)
 
+    def _should_defer_sibling_if_collect_iterate(self, node_id: str) -> bool:
+        if not isinstance(self._state.graph.get_node(node_id), IterateInvocation):
+            return False
+        collapsed_branch = self._get_sibling_iterate_if_collect_branch(node_id)
+        if collapsed_branch is None:
+            return False
+        if graph_if_runtime._get_selected_if_frames_for_preparation(self._state, *collapsed_branch):
+            return False
+
+        if_node_id, _ = collapsed_branch
+        if_exec_ids = self._state.source_prepared_mapping.get(if_node_id, set())
+        return not if_exec_ids or not all(exec_id in self._state._resolved_if_exec_branches for exec_id in if_exec_ids)
+
     def prepare(self, base_g: Optional["nx.DiGraph"] = None) -> Optional[str]:
         g = base_g if base_g is not None else self._state._get_source_graph_flat()
-        iterator_ancestry = _IteratorAncestry(self._state, g)
+        self._get_sibling_iterate_if_collect_branches()
+        iterator_ancestry = self._get_iterator_ancestry(self.iterator_graph(g))
+        iterator_ancestry.clear_effective_iteration_paths()
         self._attach_pending_if_inputs()
-        if self._get_sibling_iterate_if_collect_branches():
+        if self._has_if_nodes:
             for node_id in nx.topological_sort(g):
                 if (
                     node_id not in self._state.source_prepared_mapping
                     and node_id not in self._state.executed
-                    and self._is_inactive_sibling_if_collect_source(node_id, g)
+                    and self._state._is_source_inactive(node_id)
                 ):
                     self._mark_source_node_empty(node_id)
                     self._state._invalidate_loop_caches_for_source(node_id)
@@ -2059,6 +2064,7 @@ class _ExecutionNodeBuilder:
                     or not isinstance(self._state.graph.get_node(node_id), IfInvocation)
                 )
                 and self._has_admitted_source_mapping(node_id, g, iterator_ancestry)
+                and not self._should_defer_sibling_if_collect_iterate(node_id)
                 and (
                     not isinstance(self._state.graph.get_node(node_id), (ForInvocation, IterateInvocation))
                     or all(source_id in self._state.executed for source_id, _ in g.in_edges(node_id))

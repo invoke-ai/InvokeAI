@@ -35,6 +35,27 @@ class _MappingTraversalCounter:
         self.visits_by_mapping[mapping_name] = self.visits_by_mapping.get(mapping_name, 0) + 1
 
 
+class _ActivationDependencyScanCounter:
+    def __init__(self) -> None:
+        self.active = False
+        self.entries_visited = 0
+        self.resolutions = 0
+        self.prepared_node_count = 0
+        self.states_by_id: dict[int, _ActivationDependencyScanCounter] = {}
+
+
+class _PreparedSourceCountingMapping(dict[str, str]):
+    def __init__(self, values: dict[str, str], counter: _ActivationDependencyScanCounter) -> None:
+        super().__init__(values)
+        self._counter = counter
+
+    def __iter__(self):  # type: ignore[override]
+        for key in super().__iter__():
+            if self._counter.active:
+                self._counter.entries_visited += 1
+            yield key
+
+
 class _CountingMapping(dict[str, object]):
     """Count mapping accesses and iteration without constraining the scheduler algorithm."""
 
@@ -99,6 +120,8 @@ def _run_trivial_loop(
     mapping_counter: _MappingTraversalCounter | None = None,
     include_if: bool = False,
     external_condition: bool = False,
+    condition_value: bool = True,
+    activation_scan_counter: _ActivationDependencyScanCounter | None = None,
 ) -> float:
     graph = Graph()
     graph.add_node(RangeInvocation(id="range", start=0, stop=count))
@@ -107,9 +130,11 @@ def _run_trivial_loop(
     if include_if:
         graph.add_node(AnyTypeTestInvocation(id="true_body"))
         graph.add_node(AnyTypeTestInvocation(id="false_body"))
-        graph.add_node(IfInvocation(id="if") if external_condition else IfInvocation(id="if", condition=True))
+        graph.add_node(
+            IfInvocation(id="if") if external_condition else IfInvocation(id="if", condition=condition_value)
+        )
         if external_condition:
-            graph.add_node(BooleanInvocation(id="condition", value=True))
+            graph.add_node(BooleanInvocation(id="condition", value=condition_value))
             graph.add_edge(create_edge("condition", "value", "if", "condition"))
         graph.add_edge(create_edge("loop", "item", "true_body", "value"))
         graph.add_edge(create_edge("loop", "item", "false_body", "value"))
@@ -128,6 +153,12 @@ def _run_trivial_loop(
         graph.add_node(CollectInvocation(id="collect"))
         graph.add_edge(create_edge(output_source, "value", "collect", "item"))
     state = GraphExecutionState(graph=graph)
+    if activation_scan_counter is not None:
+        state.prepared_source_mapping = _PreparedSourceCountingMapping(
+            state.prepared_source_mapping, activation_scan_counter
+        )  # type: ignore[assignment]
+        state._prepared_registry()._prepared_source_mapping = state.prepared_source_mapping
+        activation_scan_counter.states_by_id[id(state)] = activation_scan_counter
     if mapping_counter is not None:
         scheduler = state._scheduler()
         state.execution_refs = _CountingMapping(state.execution_refs, mapping_counter, "execution_refs")  # type: ignore[assignment]
@@ -143,7 +174,101 @@ def _run_trivial_loop(
     while (node := state.next()) is not None:
         state.complete(node.id, node.invoke(context))
     assert state.is_complete()
+    if activation_scan_counter is not None:
+        activation_scan_counter.prepared_node_count = len(state.prepared_source_mapping)
     return clock() - started
+
+
+@pytest.mark.parametrize("loop_type", ["iterate", "for"])
+@pytest.mark.parametrize("condition_value", [True, False])
+def test_repeated_if_resolution_indexes_activation_dependencies_once(
+    monkeypatch: pytest.MonkeyPatch, loop_type: str, condition_value: bool
+) -> None:
+    counter = _ActivationDependencyScanCounter()
+    get_dependents = GraphExecutionState._get_activation_dependents_for_if
+
+    def count_lookup_scans(
+        state: GraphExecutionState, source_if_id: str, iteration_path: tuple[int, ...]
+    ) -> tuple[str, ...]:
+        state_counter = counter.states_by_id.get(id(state))
+        if state_counter is None:
+            return get_dependents(state, source_if_id, iteration_path)
+        state_counter.active = True
+        try:
+            return get_dependents(state, source_if_id, iteration_path)
+        finally:
+            state_counter.active = False
+            state_counter.resolutions += 1
+
+    monkeypatch.setattr(GraphExecutionState, "_get_activation_dependents_for_if", count_lookup_scans)
+    _run_trivial_loop(
+        loop_type,
+        300,
+        include_if=True,
+        external_condition=True,
+        condition_value=condition_value,
+        activation_scan_counter=counter,
+    )
+
+    assert counter.resolutions >= 300
+    assert counter.entries_visited <= counter.prepared_node_count, (
+        f"If resolution scanned {counter.entries_visited} prepared nodes across {counter.resolutions} resolutions; "
+        f"session contains {counter.prepared_node_count} prepared nodes"
+    )
+
+
+@pytest.mark.slow
+def test_if_activation_dependency_scan_performance_comparison(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Compare 1,200 If resolutions with the former repeated scan and the indexed lookup."""
+
+    original_get_dependents = GraphExecutionState._get_activation_dependents_for_if
+    measurements: dict[str, tuple[float, _ActivationDependencyScanCounter]] = {}
+    for legacy_scan in (True, False):
+        counter = _ActivationDependencyScanCounter()
+
+        def measure_lookup(
+            state: GraphExecutionState,
+            source_if_id: str,
+            iteration_path: tuple[int, ...],
+            active_counter: _ActivationDependencyScanCounter = counter,
+            use_legacy_scan: bool = legacy_scan,
+        ) -> tuple[str, ...]:
+            state_counter = active_counter.states_by_id.get(id(state))
+            if state_counter is not None:
+                if use_legacy_scan:
+                    state._if_activation_dependents_index_complete = False
+                state_counter.active = True
+            try:
+                return original_get_dependents(state, source_if_id, iteration_path)
+            finally:
+                if state_counter is not None:
+                    state_counter.active = False
+                    state_counter.resolutions += 1
+
+        monkeypatch.setattr(GraphExecutionState, "_get_activation_dependents_for_if", measure_lookup)
+        started = time.perf_counter()
+        _run_trivial_loop(
+            "iterate",
+            1200,
+            include_if=True,
+            external_condition=True,
+            condition_value=True,
+            activation_scan_counter=counter,
+        )
+        measurements["legacy repeated scan" if legacy_scan else "indexed"] = (time.perf_counter() - started, counter)
+
+    legacy_seconds, legacy_counter = measurements["legacy repeated scan"]
+    indexed_seconds, indexed_counter = measurements["indexed"]
+    print(
+        "\n1,200-item Iterate/If comparison: "
+        f"legacy={legacy_seconds:.3f}s/{legacy_counter.entries_visited} prepared-node visits; "
+        f"indexed={indexed_seconds:.3f}s/{indexed_counter.entries_visited} prepared-node visits; "
+        f"prepared_nodes={indexed_counter.prepared_node_count}"
+    )
+    assert legacy_counter.resolutions >= 1200
+    assert indexed_counter.resolutions >= 1200
+    assert indexed_counter.entries_visited <= indexed_counter.prepared_node_count
+    assert legacy_counter.entries_visited > indexed_counter.entries_visited
 
 
 @pytest.mark.parametrize(

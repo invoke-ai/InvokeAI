@@ -6,6 +6,7 @@ from invokeai.app.invocations.primitives import BooleanOutput
 from invokeai.app.services.shared import graph_if_runtime
 from invokeai.app.services.shared.execution_engine.scheduler import ActivationDependency
 from invokeai.app.services.shared.graph import Edge, EdgeConnection, Graph, GraphExecutionState
+from invokeai.app.services.shared.graph_iterator_ancestry import _IteratorAncestry
 from invokeai.app.services.shared.graph_runtime_records import _ApplyTransaction
 from invokeai.app.services.shared.graph_validation import IterateInvocation
 from tests.app.services.shared.import_test_utils import assert_module_imports_without_graph
@@ -154,27 +155,27 @@ def test_nested_if_iteration_paths_use_supplied_source_graph_recursively() -> No
     constrained_graph.remove_edge("iterator", "guarded")
 
     assert (
-        graph_if_runtime._get_if_iteration_paths(
+        graph_if_runtime._get_if_iteration_paths_with_ancestry(
             state,
             "if",
             set(),
             lambda source_id: {"condition-exec"} if source_id == "condition" else set(),
             lambda _edge, _prepared_id: (),
-            source_graph,
+            _IteratorAncestry(state, source_graph),
         )
         == []
     )
-    assert graph_if_runtime._get_if_iteration_paths(
+    assert graph_if_runtime._get_if_iteration_paths_with_ancestry(
         state,
         "if",
         set(),
         lambda source_id: {"condition-exec"} if source_id == "condition" else set(),
         lambda _edge, _prepared_id: (),
-        constrained_graph,
+        _IteratorAncestry(state, constrained_graph),
     ) == [()]
 
 
-def test_unresolved_nested_literal_ifs_share_one_iterator_graph(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_unresolved_nested_literal_if_chain_has_no_condition_path() -> None:
     nodes = {"iterator": IterateInvocation(id="iterator"), "guarded": IfInvocation(id="guarded")}
     nodes.update({f"if-{i}": IfInvocation(id=f"if-{i}", condition=True) for i in range(24)})
     edges = [
@@ -194,32 +195,23 @@ def test_unresolved_nested_literal_ifs_share_one_iterator_graph(monkeypatch: pyt
         previous = f"if-{i}"
     state = GraphExecutionState(graph=Graph())
     state.graph = Graph(nodes=nodes, edges=edges)
-    original = GraphExecutionState._iterator_graph
-    builds = []
-
-    def count_build(self, graph=None):
-        builds.append(graph)
-        return original(self, graph)
-
-    monkeypatch.setattr(GraphExecutionState, "_iterator_graph", count_build)
-    assert graph_if_runtime._get_if_iteration_paths(state, previous, set(), lambda _: set(), lambda *_: ()) == []
-    assert len(builds) == 1
+    assert (
+        graph_if_runtime._get_if_iteration_paths_with_ancestry(
+            state, previous, set(), lambda _: set(), lambda *_: (), _IteratorAncestry(state)
+        )
+        == []
+    )
 
 
-def test_resolved_literal_if_does_not_build_iterator_graph(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolved_literal_if_uses_root_frame_path() -> None:
     state = GraphExecutionState(graph=Graph(nodes={"if": IfInvocation(id="if", condition=True, true_input=42)}))
-
-    def unexpected_build(*_args, **_kwargs):
-        pytest.fail("resolved paths must not build the iterator graph")
-
-    monkeypatch.setattr(GraphExecutionState, "_iterator_graph", unexpected_build)
-    assert graph_if_runtime._get_if_iteration_paths(state, "if", set(), lambda _: set(), lambda *_: ()) == [()]
+    assert graph_if_runtime._get_if_iteration_paths_with_ancestry(
+        state, "if", set(), lambda _: set(), lambda *_: (), _IteratorAncestry(state)
+    ) == [()]
 
 
 @pytest.mark.parametrize("executed", [False, True])
-def test_prepared_selected_source_preserves_paths_without_ancestry(
-    executed: bool, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_prepared_selected_source_preserves_paths_without_ancestry(executed: bool) -> None:
     state = GraphExecutionState(
         graph=Graph(nodes={"if": IfInvocation(id="if", condition=True), "source": AddInvocation(id="source")})
     )
@@ -233,10 +225,11 @@ def test_prepared_selected_source_preserves_paths_without_ancestry(
     if executed:
         state.executed.add("source")
 
-    def unexpected_build(*_args, **_kwargs):
-        pytest.fail("prepared selected sources must not build the iterator graph")
-
-    monkeypatch.setattr(GraphExecutionState, "_iterator_graph", unexpected_build)
-    assert graph_if_runtime._get_if_iteration_paths(
-        state, "if", set(), lambda source_id: state.source_prepared_mapping[source_id], lambda *_: (2,)
+    assert graph_if_runtime._get_if_iteration_paths_with_ancestry(
+        state,
+        "if",
+        set(),
+        lambda source_id: state.source_prepared_mapping[source_id],
+        lambda *_: (2,),
+        _IteratorAncestry(state),
     ) == ([] if executed else [(2,)])

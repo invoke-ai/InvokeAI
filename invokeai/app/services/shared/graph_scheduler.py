@@ -145,12 +145,12 @@ class _ExecutionScheduler:
         self.mark_skipped(exec_node_id)
         return True
 
-    def _discard_rejected_activation_nodes(self) -> None:
-        for exec_node_id in tuple(nx.topological_sort(self._state._get_execution_graph_flat())):
+    def _discard_rejected_activation_nodes(self, exec_node_ids: Iterable[str]) -> None:
+        for exec_node_id in exec_node_ids:
             self._discard_rejected_activation_node(exec_node_id)
 
-    def _enqueue_activation_ready_nodes(self) -> None:
-        for exec_node_id in tuple(self._state.prepared_source_mapping):
+    def _enqueue_activation_ready_nodes(self, exec_node_ids: Iterable[str]) -> None:
+        for exec_node_id in exec_node_ids:
             if exec_node_id not in self._state.indegree or exec_node_id in self._state.executed:
                 continue
             self.enqueue_if_ready(exec_node_id)
@@ -429,7 +429,9 @@ class _GenericGraphSchedulerAdapter:
         self._state._resolve_activation_gate(exec_node_id, selected_field)
         self._state._tx_set_mapping(runtime.resolved_if_exec_branches, exec_node_id, selected_field)
         self._state._record_compatibility_activation_token(exec_node_id, selected_field)
-        self._discard_rejected_nodes()
+        source_if_id = self._state._prepared_registry().get_source_node_id(exec_node_id)
+        iteration_path = self._state._get_iteration_path(exec_node_id)
+        self._discard_rejected_nodes(self._state._get_activation_dependents_for_if(source_if_id, iteration_path))
         self._sync_indegree()
         if enqueue:
             self._project_ready_nodes()
@@ -443,10 +445,10 @@ class _GenericGraphSchedulerAdapter:
         ):
             self._retire_unselected_node(exec_node_id)
 
-    def _discard_rejected_nodes(self) -> None:
-        """Discard plan nodes whose opaque activation requirements are rejected."""
+    def _discard_rejected_nodes(self, exec_node_ids: Iterable[str]) -> None:
+        """Discard only prepared plan nodes governed by the resolved If frame."""
 
-        for exec_node_id in tuple(self._scheduler.plan.nodes):
+        for exec_node_id in exec_node_ids:
             self._discard_rejected_node(exec_node_id)
 
     def _sync_executed_state(self, excluded: Iterable[str] = ()) -> None:
@@ -537,7 +539,7 @@ class _GenericGraphSchedulerAdapter:
     def _enqueue_activation_ready_nodes(self) -> None:
         """Recheck prepared nodes whose activation input arrived after plan registration."""
 
-        for exec_node_id in tuple(self._if_exec_ids):
+        for exec_node_id in tuple(self._state._pending_if_exec_nodes):
             if exec_node_id not in self._state.indegree or exec_node_id in self._state.executed:
                 continue
             self._state._tx_set_mapping(
@@ -648,7 +650,7 @@ class _GenericGraphSchedulerAdapter:
         # Fresh If branch inputs may be materialized after the If dependency was
         # registered, so no ordinary plan edge exists to re-enqueue the If when
         # its selected branch completes. Recheck activation readiness here.
-        if any(isinstance(node, IfInvocation) for node in self._state.graph.nodes.values()):
+        if self._if_exec_ids:
             self._enqueue_activation_ready_nodes()
         if can_use_nested_iterate_planner(self._state):
             prepare_nested_iterate_bodies(self._state)

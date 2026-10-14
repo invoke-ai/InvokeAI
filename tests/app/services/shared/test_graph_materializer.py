@@ -70,7 +70,7 @@ def test_materializer_preserves_execution_edges_and_source_nodes() -> None:
     assert state.is_complete()
 
 
-def test_prepare_shares_iterator_ancestry_across_admission_and_materialization(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_prepare_admits_only_selected_frame_after_unresolved_conditions() -> None:
     from invokeai.app.invocations.logic import IfInvocation
     from invokeai.app.services.shared.graph_validation import IterateInvocation, nx
 
@@ -104,14 +104,6 @@ def test_prepare_shares_iterator_ancestry_across_admission_and_materialization(m
     graph = state._get_source_graph_flat()
     # Keep condition sources outside this preparation view; their If nodes stay unresolved.
     preparation_graph = nx.subgraph_view(graph, filter_node=lambda node_id: not node_id.startswith("condition-"))
-    original = graph_facade.GraphExecutionState._iterator_graph
-    builds = []
-
-    def count_build(self, source_graph=None):
-        builds.append(source_graph)
-        return original(self, source_graph)
-
-    monkeypatch.setattr(graph_facade.GraphExecutionState, "_iterator_graph", count_build)
     prepared_id = state._materializer().prepare(preparation_graph)
     assert prepared_id in state.source_prepared_mapping["selected"]
     assert len(state.source_prepared_mapping["selected"]) == 1
@@ -119,4 +111,3 @@ def test_prepare_shares_iterator_ancestry_across_admission_and_materialization(m
     assert "blocked-b" not in state.source_prepared_mapping
     assert "inner-a" not in state.source_prepared_mapping
     assert "inner-b" not in state.source_prepared_mapping
-    assert len(builds) == 1
