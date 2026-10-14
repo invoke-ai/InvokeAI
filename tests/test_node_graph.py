@@ -21,6 +21,7 @@ from invokeai.app.invocations.fields import InputField, OutputField, OutputScope
 from invokeai.app.invocations.logic import IfInvocation
 from invokeai.app.invocations.loops import ForInvocation, ForReturnInvocation
 from invokeai.app.invocations.math import AddInvocation
+from invokeai.app.invocations.metadata import MetadataInvocation, MetadataItemInvocation
 from invokeai.app.invocations.primitives import (
     ColorInvocation,
     FloatCollectionInvocation,
@@ -50,6 +51,7 @@ from tests.test_nodes import (
     AnyTypeTestInvocation,
     ImageToImageTestInvocation,
     ListPassThroughInvocation,
+    OptionalCollectionTestInvocation,
     PolymorphicStringTestInvocation,
     PromptCollectionTestInvocation,
     PromptTestInvocation,
@@ -2197,6 +2199,49 @@ def test_graph_collector_rejects_mismatched_item_with_union_collection_input():
     g.add_edge(create_edge("1", "value", "2", "collection"))
     with pytest.raises(InvalidEdgeError):
         g.add_edge(create_edge("3", "color", "2", "item"))
+
+
+# A collection input whose annotation is not a bare list: the item type lives in a union branch.
+COLLECTION_TARGETS_WITH_LIST_BRANCH = [
+    pytest.param(lambda: MetadataInvocation(id="target"), "items", id="list-first-union"),
+    pytest.param(lambda: OptionalCollectionTestInvocation(id="target"), "value", id="optional-list"),
+]
+
+
+@pytest.mark.parametrize(("make_target", "field"), COLLECTION_TARGETS_WITH_LIST_BRANCH)
+def test_graph_collector_rejects_mismatched_items_for_collection_union_input(make_target, field: str):
+    g = Graph()
+    g.add_node(IntegerInvocation(id="1", value=1))
+    g.add_node(IntegerInvocation(id="2", value=2))
+    g.add_node(CollectInvocation(id="collect"))
+    g.add_node(make_target())
+    g.add_edge(create_edge("1", "value", "collect", "item"))
+    g.add_edge(create_edge("2", "value", "collect", "item"))
+
+    with pytest.raises(InvalidEdgeError, match="matching type"):
+        g.add_edge(create_edge("collect", "collection", "target", field))
+
+
+def test_graph_collector_accepts_matching_items_for_list_first_union_input():
+    g = Graph()
+    g.add_node(MetadataItemInvocation(id="1", label="a", value=1))
+    g.add_node(MetadataItemInvocation(id="2", label="b", value=2))
+    g.add_node(CollectInvocation(id="collect"))
+    g.add_node(MetadataInvocation(id="target"))
+    g.add_edge(create_edge("1", "item", "collect", "item"))
+    g.add_edge(create_edge("2", "item", "collect", "item"))
+
+    g.add_edge(create_edge("collect", "collection", "target", "items"))
+
+
+def test_graph_collector_accepts_matching_items_for_optional_list_input():
+    g = Graph()
+    g.add_node(StringInvocation(id="1", value="a"))
+    g.add_node(CollectInvocation(id="collect"))
+    g.add_node(OptionalCollectionTestInvocation(id="target"))
+    g.add_edge(create_edge("1", "value", "collect", "item"))
+
+    g.add_edge(create_edge("collect", "collection", "target", "value"))
 
 
 def test_graph_connects_iterator():

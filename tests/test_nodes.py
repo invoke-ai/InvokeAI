@@ -142,6 +142,14 @@ class UnionCollectionTestInvocation(BaseInvocation):
         return UnionCollectionTestInvocationOutput(value=self.value)
 
 
+@invocation("test_optional_collection", version="1.0.0")
+class OptionalCollectionTestInvocation(BaseInvocation):
+    value: Union[list[str], None] = InputField(default=None)
+
+    def invoke(self, context: InvocationContext) -> PromptCollectionTestInvocationOutput:
+        return PromptCollectionTestInvocationOutput(collection=self.value or [])
+
+
 # Importing these must happen after test invocations are defined or they won't register
 from invokeai.app.services.events.events_base import EventServiceBase  # noqa: E402
 from invokeai.app.services.shared.graph import Edge, EdgeConnection, GraphExecutionState  # noqa: E402
