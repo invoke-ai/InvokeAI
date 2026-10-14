@@ -2,9 +2,11 @@ from types import SimpleNamespace
 
 import pytest
 import torch
+from diffusers import FlowMatchEulerDiscreteScheduler, FlowMatchHeunDiscreteScheduler
 
+from invokeai.app.util.step_callback import calc_percentage
 from invokeai.backend.flux.denoise import denoise
-from invokeai.backend.flux.schedulers import FLUX_SCHEDULER_MAP
+from invokeai.backend.flux.schedulers import _HAS_LCM, FLUX_SCHEDULER_MAP
 
 
 class _FakeFluxModel:
@@ -27,6 +29,68 @@ class _FakeFluxModel:
         return torch.zeros_like(img)
 
 
+class _ConstantFluxModel:
+    def __init__(self, value: float) -> None:
+        self.value = value
+        self.timesteps: list[float] = []
+
+    def __call__(self, img: torch.Tensor, timesteps: torch.Tensor, **kwargs: object) -> torch.Tensor:
+        del kwargs
+        self.timesteps.append(float(timesteps[0]))
+        return torch.full_like(img, self.value)
+
+
+class _PromptFluxModel:
+    def __init__(self) -> None:
+        self.outputs: list[float] = []
+
+    def __call__(self, img: torch.Tensor, txt: torch.Tensor, **kwargs: object) -> torch.Tensor:
+        del kwargs
+        value = float(txt.mean())
+        self.outputs.append(value)
+        return torch.full_like(img, value)
+
+
+class _SampleDependentFluxModel:
+    def __init__(self) -> None:
+        self.evaluations: list[tuple[float, torch.Tensor]] = []
+
+    def __call__(self, img: torch.Tensor, timesteps: torch.Tensor, **kwargs: object) -> torch.Tensor:
+        del kwargs
+        sigma = float(timesteps[0])
+        self.evaluations.append((sigma, img.clone()))
+        return 0.1 * img + 0.2 * sigma
+
+
+class _NonUniformCFGFluxModel:
+    def __init__(self) -> None:
+        self.calls: list[tuple[int, float, torch.Tensor]] = []
+
+    def __call__(
+        self,
+        img: torch.Tensor,
+        txt: torch.Tensor,
+        timesteps: torch.Tensor,
+        timestep_index: int,
+        **kwargs: object,
+    ) -> torch.Tensor:
+        del kwargs
+        sigma = float(timesteps[0])
+        prompt_value = float(txt.mean())
+        if prompt_value > 0:
+            self.calls.append((timestep_index, prompt_value, img.clone()))
+        return 0.1 * img + prompt_value * sigma
+
+
+class _RecordingInpaintExtension:
+    def __init__(self) -> None:
+        self.sigmas: list[float] = []
+
+    def merge_intermediate_latents_with_init_latents(self, img: torch.Tensor, sigma: float) -> torch.Tensor:
+        self.sigmas.append(sigma)
+        return img
+
+
 class _FakeDyPEExtension:
     def __init__(self) -> None:
         self.sigmas: list[float] = []
@@ -36,45 +100,6 @@ class _FakeDyPEExtension:
 
     def update_step_state(self, embedder: object, sigma: float) -> None:
         self.sigmas.append(sigma)
-
-
-class _FakeScheduler:
-    def __init__(self) -> None:
-        self.config = SimpleNamespace(num_train_timesteps=1000)
-        self.timesteps = torch.tensor([], dtype=torch.float32)
-        self.sigmas = torch.tensor([], dtype=torch.float32)
-
-    def set_timesteps(self, sigmas: list[float], device: torch.device) -> None:
-        del device
-        self.sigmas = torch.tensor(sigmas, dtype=torch.float32)
-        self.timesteps = torch.tensor([900.0, 400.0], dtype=torch.float32)
-
-    def step(self, model_output: torch.Tensor, timestep: torch.Tensor, sample: torch.Tensor) -> SimpleNamespace:
-        del model_output, timestep
-        return SimpleNamespace(prev_sample=sample)
-
-
-class _FakeHeunScheduler:
-    def __init__(self) -> None:
-        self.config = SimpleNamespace(num_train_timesteps=1000)
-        self.timesteps = torch.tensor([], dtype=torch.float32)
-        self.sigmas = torch.tensor([], dtype=torch.float32)
-        self.state_in_first_order = True
-        self._step_index = 0
-
-    def set_timesteps(self, sigmas: list[float], device: torch.device) -> None:
-        del device
-        # Duplicate each user-facing step to mimic a second-order scheduler.
-        self.sigmas = torch.tensor([1.0, 1.0, 0.25, 0.25, 0.0], dtype=torch.float32)
-        self.timesteps = torch.tensor([900.0, 850.0, 400.0, 350.0], dtype=torch.float32)
-        self._step_index = 0
-        self.state_in_first_order = True
-
-    def step(self, model_output: torch.Tensor, timestep: torch.Tensor, sample: torch.Tensor) -> SimpleNamespace:
-        del model_output, timestep
-        self._step_index += 1
-        self.state_in_first_order = self._step_index % 2 == 0
-        return SimpleNamespace(prev_sample=sample)
 
 
 class _FakePbar:
@@ -142,7 +167,7 @@ def test_denoise_scheduler_path_prefers_scheduler_sigmas_for_dype(monkeypatch):
     monkeypatch.setattr("invokeai.backend.flux.denoise.tqdm", _fake_tqdm)
 
     model = _FakeFluxModel()
-    scheduler = _FakeScheduler()
+    scheduler = FlowMatchEulerDiscreteScheduler(num_train_timesteps=1000, shift=1.0)
     dype_extension = _FakeDyPEExtension()
     img = torch.zeros(1, 2, 4)
     img_ids = torch.zeros(1, 2, 3)
@@ -172,42 +197,6 @@ def test_denoise_scheduler_path_prefers_scheduler_sigmas_for_dype(monkeypatch):
     # Scheduler timesteps normalize to [0.9, 0.4], so this asserts the scheduler
     # sigma sequence is what DyPE actually consumes.
     assert dype_extension.sigmas == [1.0, 0.25]
-
-
-def test_denoise_heun_scheduler_path_uses_internal_scheduler_sigmas(monkeypatch):
-    monkeypatch.setattr("invokeai.backend.flux.denoise.tqdm", _fake_tqdm)
-
-    model = _FakeFluxModel()
-    scheduler = _FakeHeunScheduler()
-    dype_extension = _FakeDyPEExtension()
-    img = torch.zeros(1, 2, 4)
-    img_ids = torch.zeros(1, 2, 3)
-    regional_prompting_extension = _build_regional_prompting_extension(batch_size=1)
-    callback_steps: list[int] = []
-
-    denoise(
-        model=model,
-        img=img,
-        img_ids=img_ids,
-        pos_regional_prompting_extension=regional_prompting_extension,
-        neg_regional_prompting_extension=None,
-        timesteps=[1.0, 0.25, 0.0],
-        step_callback=lambda state: callback_steps.append(state.step),
-        guidance=1.0,
-        cfg_scale=[1.0, 1.0],
-        inpaint_extension=None,
-        controlnet_extensions=[],
-        pos_ip_adapter_extensions=[],
-        neg_ip_adapter_extensions=[],
-        img_cond=None,
-        img_cond_seq=None,
-        img_cond_seq_ids=None,
-        dype_extension=dype_extension,
-        scheduler=scheduler,
-    )
-
-    assert dype_extension.sigmas == [1.0, 1.0, 0.25, 0.25]
-    assert callback_steps == [1, 2]
 
 
 @pytest.mark.parametrize("scheduler_name", sorted(FLUX_SCHEDULER_MAP))
@@ -247,3 +236,340 @@ def test_denoise_real_flux_schedulers_update_dype_from_internal_sigma_schedule(m
     expected_sigmas = [float(sigma) for sigma in scheduler.sigmas[: len(dype_extension.sigmas)]]
     assert dype_extension.sigmas == expected_sigmas
     assert callback_steps
+
+
+def _run_with_scheduler(scheduler, timesteps: list[float], **kwargs):
+    model = kwargs.pop("model", _ConstantFluxModel(0.25))
+    img = kwargs.pop("img", torch.tensor([[[1.0], [-0.5]]], dtype=torch.float32))
+    cfg_scale = kwargs.pop("cfg_scale", [1.0] * (len(timesteps) - 1))
+    prompt = kwargs.pop("pos_regional_prompting_extension", _build_regional_prompting_extension(batch_size=1))
+    negative_prompt = kwargs.pop("neg_regional_prompting_extension", None)
+    callbacks = []
+    result = denoise(
+        model=model,
+        img=img,
+        img_ids=torch.zeros(1, img.shape[1], 3),
+        pos_regional_prompting_extension=prompt,
+        neg_regional_prompting_extension=negative_prompt,
+        timesteps=timesteps,
+        step_callback=callbacks.append,
+        guidance=1.0,
+        cfg_scale=cfg_scale,
+        inpaint_extension=None,
+        controlnet_extensions=[],
+        pos_ip_adapter_extensions=[],
+        neg_ip_adapter_extensions=[],
+        img_cond=None,
+        scheduler=scheduler,
+        **kwargs,
+    )
+    return result, img, model, callbacks
+
+
+@pytest.mark.parametrize("terminal_sigma", [0.0, 0.2])
+def test_euler_uses_model_sigmas_and_requested_terminal_sigma(monkeypatch, terminal_sigma):
+    monkeypatch.setattr("invokeai.backend.flux.denoise.tqdm", _fake_tqdm)
+    schedule = [1.0, 0.7, 0.35, terminal_sigma]
+    scheduler = FlowMatchEulerDiscreteScheduler(num_train_timesteps=1000, shift=1.0)
+
+    result, img, model, callbacks = _run_with_scheduler(scheduler, schedule)
+
+    expected = img + (terminal_sigma - schedule[0]) * 0.25
+    assert torch.allclose(result, expected)
+    assert len(model.timesteps) == len(schedule) - 1
+    assert model.timesteps == pytest.approx(schedule[:-1])
+    assert len(scheduler.timesteps) == len(schedule) - 1
+    assert torch.equal(scheduler.sigmas[-1], torch.tensor(terminal_sigma))
+    assert len(callbacks) == len(schedule) - 1
+    assert scheduler.step_index == len(schedule) - 1
+
+
+@pytest.mark.parametrize("terminal_sigma", [0.0, 0.2])
+def test_default_scheduler_matches_explicit_euler_and_clean_preview(monkeypatch, terminal_sigma):
+    monkeypatch.setattr("invokeai.backend.flux.denoise.tqdm", _fake_tqdm)
+    schedule = [1.0, 0.7, 0.35, terminal_sigma]
+    scheduler = FlowMatchEulerDiscreteScheduler(num_train_timesteps=1000, shift=1.0)
+
+    scheduled, img, _, callbacks = _run_with_scheduler(scheduler, schedule)
+    default, _, model, default_callbacks = _run_with_scheduler(None, schedule)
+
+    assert torch.equal(scheduled, default)
+    assert model.timesteps == pytest.approx(schedule[:-1])
+    assert [callback.timestep for callback in default_callbacks] == [1000, 700, 350]
+    assert [callback.step for callback in default_callbacks] == [1, 2, 3]
+    assert all(callback.order == 1 and callback.total_steps == 3 for callback in default_callbacks)
+    for explicit_callback, default_callback in zip(callbacks, default_callbacks, strict=True):
+        assert torch.equal(explicit_callback.latents, default_callback.latents)
+    expected_clean = img - 0.25
+    assert all(torch.allclose(callback.latents, expected_clean) for callback in callbacks)
+
+
+@pytest.mark.parametrize("step_count", [4, 5])
+def test_heun_progress_is_linear_across_completed_user_steps(monkeypatch, step_count):
+    monkeypatch.setattr("invokeai.backend.flux.denoise.tqdm", _fake_tqdm)
+    schedule = torch.linspace(1.0, 0.0, step_count + 1).tolist()
+    scheduler = FlowMatchHeunDiscreteScheduler(num_train_timesteps=1000)
+
+    _, _, _, callbacks = _run_with_scheduler(scheduler, schedule)
+
+    progress = [calc_percentage(callback) for callback in callbacks]
+    assert [callback.step for callback in callbacks] == list(range(1, step_count + 1))
+    assert [callback.order for callback in callbacks] == [1] * step_count
+    assert progress == pytest.approx([step / step_count for step in range(1, step_count + 1)])
+    assert progress[-1] == 1.0
+
+
+def test_heun_uses_custom_schedule_and_completes_each_user_step(monkeypatch):
+    monkeypatch.setattr("invokeai.backend.flux.denoise.tqdm", _fake_tqdm)
+    schedule = [1.0, 0.7, 0.35, 0.2]
+    scheduler = FlowMatchHeunDiscreteScheduler(num_train_timesteps=1000)
+
+    result, img, model, callbacks = _run_with_scheduler(scheduler, schedule)
+
+    expected = img + (schedule[-1] - schedule[0]) * 0.25
+    expected_timesteps = torch.tensor([1000.0, 700.0, 700.0, 350.0, 350.0])
+    expected_sigmas = torch.tensor([1.0, 0.7, 0.7, 0.35, 0.35, 0.2])
+    assert torch.allclose(result, expected, atol=1e-6, rtol=0)
+    assert torch.allclose(scheduler.timesteps.cpu(), expected_timesteps, atol=1e-6, rtol=0)
+    assert torch.allclose(scheduler.sigmas.cpu(), expected_sigmas, atol=1e-6, rtol=0)
+    assert len(model.timesteps) == 2 * (len(schedule) - 1) - 1
+    assert [callback.step for callback in callbacks] == [1, 2, 3]
+    assert [callback.order for callback in callbacks] == [1, 1, 1]
+
+
+def test_heun_partial_start_and_end_use_custom_sigmas(monkeypatch):
+    monkeypatch.setattr("invokeai.backend.flux.denoise.tqdm", _fake_tqdm)
+    schedule = [0.7, 0.45, 0.2]
+    scheduler = FLUX_SCHEDULER_MAP["heun"](num_train_timesteps=1000)
+
+    result, img, model, callbacks = _run_with_scheduler(scheduler, schedule)
+
+    assert torch.allclose(result, img + (0.2 - 0.7) * 0.25, atol=1e-6, rtol=0)
+    assert torch.allclose(scheduler.timesteps.cpu(), torch.tensor([700.0, 450.0, 450.0]), atol=1e-6, rtol=0)
+    assert torch.allclose(scheduler.sigmas.cpu(), torch.tensor([0.7, 0.45, 0.45, 0.2]), atol=1e-6, rtol=0)
+    assert len(model.timesteps) == 3
+    assert [callback.step for callback in callbacks] == [1, 2]
+    assert [callback.order for callback in callbacks] == [1, 1]
+
+
+def test_heun_custom_schedule_resets_an_interrupted_diffusers_scheduler():
+    from invokeai.backend.flux.schedulers import set_heun_timesteps_from_sigmas
+
+    scheduler = FlowMatchHeunDiscreteScheduler(num_train_timesteps=1000)
+    set_heun_timesteps_from_sigmas(scheduler, [0.9, 0.6, 0.3], 0.1, "cpu")
+    scheduler.step(torch.ones(1, 1, 1), scheduler.timesteps[0], torch.ones(1, 1, 1))
+
+    assert scheduler.state_in_first_order is False
+    assert scheduler.prev_derivative is not None
+    assert scheduler.dt is not None
+    assert scheduler.sample is not None
+    assert scheduler.step_index == 1
+
+    set_heun_timesteps_from_sigmas(scheduler, [0.8, 0.4], 0.2, "cpu")
+
+    assert scheduler.state_in_first_order is True
+    assert scheduler.prev_derivative is None
+    assert scheduler.dt is None
+    assert scheduler.sample is None
+    assert scheduler.step_index is None
+    assert scheduler._begin_index is None
+    assert scheduler.num_inference_steps == 2
+
+
+def test_heun_preserves_cfg_and_inpainting_callback_behavior(monkeypatch):
+    monkeypatch.setattr("invokeai.backend.flux.denoise.tqdm", _fake_tqdm)
+    img = torch.tensor([[[1.0]]])
+    schedule = [1.0, 0.7, 0.35, 0.0]
+    scheduler = FlowMatchHeunDiscreteScheduler(num_train_timesteps=1000)
+    model = _PromptFluxModel()
+    extension = _RecordingInpaintExtension()
+    prompt = _build_regional_prompting_extension(batch_size=1)
+    negative_prompt = _build_regional_prompting_extension(batch_size=1)
+    prompt.regional_text_conditioning.t5_embeddings.fill_(1.0)
+    negative_prompt.regional_text_conditioning.t5_embeddings.fill_(-1.0)
+    callbacks = []
+
+    result = denoise(
+        model=model,
+        img=img,
+        img_ids=torch.zeros(1, 1, 3),
+        pos_regional_prompting_extension=prompt,
+        neg_regional_prompting_extension=negative_prompt,
+        timesteps=schedule,
+        step_callback=callbacks.append,
+        guidance=1.0,
+        cfg_scale=[2.0] * (len(schedule) - 1),
+        inpaint_extension=extension,
+        controlnet_extensions=[],
+        pos_ip_adapter_extensions=[],
+        neg_ip_adapter_extensions=[],
+        img_cond=None,
+        scheduler=scheduler,
+    )
+
+    guided_prediction = -1.0 + 2.0 * (1.0 - -1.0)
+    assert torch.allclose(result, img + (schedule[-1] - schedule[0]) * guided_prediction)
+    assert model.outputs == [1.0, -1.0] * 5
+    assert [callback.step for callback in callbacks] == [1, 2, 3]
+    assert [callback.order for callback in callbacks] == [1, 1, 1]
+    assert all(torch.allclose(callback.latents, img - guided_prediction) for callback in callbacks)
+    assert extension.sigmas == pytest.approx([0.7, 0.7, 0.0, 0.35, 0.35, 0.0, 0.0, 0.0])
+
+
+def test_heun_keeps_second_order_correction_for_sample_dependent_predictions(monkeypatch):
+    monkeypatch.setattr("invokeai.backend.flux.denoise.tqdm", _fake_tqdm)
+    schedule = [0.9, 0.6, 0.3, 0.1]
+    scheduler = FLUX_SCHEDULER_MAP["heun"](num_train_timesteps=1000)
+    model = _SampleDependentFluxModel()
+
+    result, img, _, callbacks = _run_with_scheduler(scheduler, schedule, model=model)
+
+    expected = img.clone()
+    for index, sigma in enumerate(schedule[:-2]):
+        sigma_next = schedule[index + 1]
+        first_prediction = 0.1 * expected + 0.2 * sigma
+        euler_sample = expected + (sigma_next - sigma) * first_prediction
+        second_prediction = 0.1 * euler_sample + 0.2 * sigma_next
+        expected = expected + (sigma_next - sigma) * (first_prediction + second_prediction) / 2
+    terminal_prediction = 0.1 * expected + 0.2 * schedule[-2]
+    expected = expected + (schedule[-1] - schedule[-2]) * terminal_prediction
+
+    assert torch.allclose(result, expected, atol=1e-6, rtol=0)
+    assert len(model.evaluations) == 2 * (len(schedule) - 1) - 1
+    assert [callback.order for callback in callbacks] == [1, 1, 1]
+    callback_evaluations = [1, 3, 4]
+    for callback, evaluation_index in zip(callbacks, callback_evaluations, strict=True):
+        sigma, sample = model.evaluations[evaluation_index]
+        prediction = 0.1 * sample + 0.2 * sigma
+        assert torch.allclose(callback.latents, sample - sigma * prediction)
+
+
+def test_heun_uses_each_cfg_scale_for_both_interval_evaluations_and_matches_reference(monkeypatch):
+    monkeypatch.setattr("invokeai.backend.flux.denoise.tqdm", _fake_tqdm)
+    schedule = [0.9, 0.6, 0.3, 0.1]
+    cfg_scales = [2.0, 3.0, 4.0]
+    scheduler = FlowMatchHeunDiscreteScheduler(num_train_timesteps=1000)
+    model = _NonUniformCFGFluxModel()
+    img = torch.tensor([[[1.0], [-0.5]]])
+    prompt = _build_regional_prompting_extension(batch_size=1)
+    negative_prompt = _build_regional_prompting_extension(batch_size=1)
+    prompt.regional_text_conditioning.t5_embeddings.fill_(0.2)
+    negative_prompt.regional_text_conditioning.t5_embeddings.fill_(-0.1)
+
+    result, _, _, callbacks = _run_with_scheduler(
+        scheduler,
+        schedule,
+        img=img,
+        model=model,
+        cfg_scale=cfg_scales,
+        pos_regional_prompting_extension=prompt,
+        neg_regional_prompting_extension=negative_prompt,
+    )
+
+    expected = img.clone()
+    for index, sigma in enumerate(schedule[:-2]):
+        sigma_next = schedule[index + 1]
+        scale = cfg_scales[index]
+        pos_first = 0.1 * expected + 0.2 * sigma
+        neg_first = 0.1 * expected - 0.1 * sigma
+        first_prediction = neg_first + scale * (pos_first - neg_first)
+        euler_sample = expected + (sigma_next - sigma) * first_prediction
+        pos_second = 0.1 * euler_sample + 0.2 * sigma_next
+        neg_second = 0.1 * euler_sample - 0.1 * sigma_next
+        second_prediction = neg_second + scale * (pos_second - neg_second)
+        expected = expected + (sigma_next - sigma) * (first_prediction + second_prediction) / 2
+    sigma = schedule[-2]
+    scale = cfg_scales[-1]
+    pos_final = 0.1 * expected + 0.2 * sigma
+    neg_final = 0.1 * expected - 0.1 * sigma
+    expected = expected + (schedule[-1] - sigma) * (neg_final + scale * (pos_final - neg_final))
+
+    assert torch.allclose(result, expected, atol=1e-6, rtol=0)
+    assert [call[0] for call in model.calls] == [0, 0, 1, 1, 2]
+    assert [callback.step for callback in callbacks] == [1, 2, 3]
+
+
+def test_scheduler_preview_preserves_cfg_and_inpainting_callback(monkeypatch):
+    monkeypatch.setattr("invokeai.backend.flux.denoise.tqdm", _fake_tqdm)
+    img = torch.tensor([[[1.0]]])
+    scheduler = FlowMatchEulerDiscreteScheduler(num_train_timesteps=1000, shift=1.0)
+    model = _PromptFluxModel()
+    extension = _RecordingInpaintExtension()
+    prompt = _build_regional_prompting_extension(batch_size=1)
+    negative_prompt = _build_regional_prompting_extension(batch_size=1)
+    prompt.regional_text_conditioning.t5_embeddings.fill_(1.0)
+    negative_prompt.regional_text_conditioning.t5_embeddings.fill_(-1.0)
+    callbacks = []
+    result = denoise(
+        model=model,
+        img=img,
+        img_ids=torch.zeros(1, 1, 3),
+        pos_regional_prompting_extension=prompt,
+        neg_regional_prompting_extension=negative_prompt,
+        timesteps=[1.0, 0.5, 0.0],
+        step_callback=callbacks.append,
+        guidance=1.0,
+        cfg_scale=[2.0, 2.0],
+        inpaint_extension=extension,
+        controlnet_extensions=[],
+        pos_ip_adapter_extensions=[],
+        neg_ip_adapter_extensions=[],
+        img_cond=None,
+        scheduler=scheduler,
+    )
+
+    guided_prediction = -1.0 + 2.0 * (1.0 - -1.0)
+    assert torch.allclose(result, img + (0.0 - 1.0) * guided_prediction)
+    assert model.outputs == [1.0, -1.0, 1.0, -1.0]
+    assert [callback.step for callback in callbacks] == [1, 2]
+    assert all(torch.allclose(callback.latents, img - guided_prediction) for callback in callbacks)
+    assert extension.sigmas == [0.5, 0.0, 0.0, 0.0]
+
+
+@pytest.mark.skipif(not _HAS_LCM, reason="FlowMatchLCMScheduler not available in this Diffusers version")
+def test_lcm_preview_uses_the_model_evaluation_sample_and_sigma(monkeypatch):
+    monkeypatch.setattr("invokeai.backend.flux.denoise.tqdm", _fake_tqdm)
+    scheduler = FLUX_SCHEDULER_MAP["lcm"](num_train_timesteps=1000)
+    result, img, model, callbacks = _run_with_scheduler(scheduler, [1.0, 0.5, 0.0])
+
+    current_sigma = scheduler.timesteps[0] / scheduler.config.num_train_timesteps
+    expected_preview = img - current_sigma * 0.25
+    assert result.shape == img.shape
+    assert len(model.timesteps) == len(scheduler.timesteps) == len(callbacks) == 2
+    assert model.timesteps == pytest.approx(
+        [float(timestep / scheduler.config.num_train_timesteps) for timestep in scheduler.timesteps]
+    )
+    assert model.timesteps == pytest.approx([1.0, 0.001])
+    assert not torch.allclose(scheduler.sigmas, torch.tensor([1.0, 0.5, 0.0]))
+    assert torch.allclose(callbacks[0].latents, expected_preview)
+
+
+def test_denoise_rejects_an_unrelated_scheduler_with_custom_sigmas_support(monkeypatch):
+    class _UnrelatedScheduler:
+        def __init__(self) -> None:
+            self.config = SimpleNamespace(num_train_timesteps=1000)
+            self.timesteps = torch.tensor([])
+            self.sigmas = torch.tensor([])
+
+        def set_timesteps(self, sigmas: list[float], device: torch.device) -> None:
+            self.sigmas = torch.tensor([*sigmas, 0.0], device=device)
+            self.timesteps = torch.tensor(sigmas, device=device) * 1000
+
+        def step(self, model_output: torch.Tensor, timestep: torch.Tensor, sample: torch.Tensor) -> SimpleNamespace:
+            del model_output, timestep
+            return SimpleNamespace(prev_sample=sample)
+
+    monkeypatch.setattr("invokeai.backend.flux.denoise.tqdm", _fake_tqdm)
+    scheduler = _UnrelatedScheduler()
+
+    with pytest.raises(TypeError, match="Unsupported FLUX scheduler"):
+        _run_with_scheduler(scheduler, [1.0, 0.5, 0.0])
+
+
+@pytest.mark.parametrize("schedule", [[], [0.4]])
+def test_default_scheduler_without_intervals_returns_input(schedule):
+    result, img, model, callbacks = _run_with_scheduler(None, schedule)
+
+    assert result is img
+    assert model.timesteps == []
+    assert callbacks == []
