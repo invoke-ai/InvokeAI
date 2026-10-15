@@ -146,6 +146,7 @@ def _run_trivial_loop(
     return clock() - started
 
 
+@pytest.mark.platform_independent
 @pytest.mark.parametrize(
     ("loop_type", "include_if", "external_condition"),
     [

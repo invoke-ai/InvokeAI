@@ -13,6 +13,10 @@ Only a fresh process starting at `invocation_api` sees it, which is why this run
 import subprocess
 import sys
 
+import pytest
+
+pytestmark = pytest.mark.platform_independent
+
 PROGRAM = """
 import sys
 
