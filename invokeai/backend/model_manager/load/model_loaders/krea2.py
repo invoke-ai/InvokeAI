@@ -34,8 +34,8 @@ from invokeai.backend.model_manager.taxonomy import (
 )
 from invokeai.backend.model_manager.util.llamacpp_keys import convert_llamacpp_decoder_keys
 from invokeai.backend.model_manager.util.qwen3_vl import (
+    drop_qwen3vl_unloaded_keys,
     drop_qwen3vl_visual_tower,
-    drop_qwen3vl_visual_tower_keys,
     normalize_qwen3vl_rope_config,
     qwen3vl_target_key,
 )
@@ -43,6 +43,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     INPUT_SCALE_SUFFIXES,
     attach_fp8_scales,
     cast_state_dict,
+    count_fp8_weights,
     dequantize_fp8_scaled,
     detach_layer_sidechannel,
     extract_comfy_quant_hints,
@@ -866,9 +867,10 @@ class _Qwen3VLEncoderSingleFileLoader(ModelLoader, Generic[_Qwen3VLSingleFileCon
 class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEncoder_Checkpoint_Config]):
     """Loads a single-file Qwen3-VL encoder checkpoint (e.g. ComfyUI ``qwen3vl_4b_bf16`` / ``_fp8_scaled``).
 
-    The checkpoint bundles the language model + visual tower; the tower is dropped on the way in (see
-    ``drop_qwen3vl_visual_tower_keys``). ComfyUI 'scaled fp8' weights are dequantized to the compute
-    dtype on load.
+    The checkpoint bundles the language model + visual tower; the tower is dropped on the way in, with the
+    LM head (see ``drop_qwen3vl_unloaded_keys``). ComfyUI 'scaled fp8' weights are kept for the fp8 matmul or fp8
+    storage where the device has either, and folded into the compute dtype otherwise. ``int8_tensorwise``
+    layers stay int8 and Comfy's ``nvfp4`` layers stay packed, both dequantized per forward.
     """
 
     CONFIG_CLASS = Qwen3VLEncoder_Checkpoint_Config
@@ -886,7 +888,19 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
         # Ahead of every pass that reads tensors, so the tower is never dequantized, cast, copied or
         # reserved for. (The file *header* is still read below for quantization metadata, which can
         # therefore still name visual layers; those hints match no surviving key and are ignored.)
-        sd = drop_qwen3vl_visual_tower_keys(sd)
+        # The LM head goes with it: this model has none, and a packed one would name no module.
+        sd = drop_qwen3vl_unloaded_keys(sd)
+        metadata = read_safetensors_metadata(model_path, self._logger)
+
+        # Comfy's nvfp4 build packs every language-model projection and names the layers in `.comfy_quant`
+        # markers (a header in some repacks). Take them out before either side-channel branch reads a scale:
+        # the int8 branch strips every remaining marker -- one of the two things that name an nvfp4 layer --
+        # and the fp8 extraction pops every `weight_scale` and discards those whose weight is not float8,
+        # nvfp4's block scales included. `install_nvfp4_layers` puts them back, packed, under the paths the
+        # remap gives their weights.
+        nvfp4_payloads = pop_nvfp4_layers(sd, header_layers=parse_quantization_metadata(metadata))
+        nvfp4_payloads = _remap_qwen3vl_singlefile_keys(nvfp4_payloads)
+
         # Same one-or-the-other split as the transformer above, and here it also guards the fp8
         # *detection*: an int8 layer ships a `.weight_scale` too, so probing for scales without
         # ruling out int8 first would keep the encoder "fp8-resident" over weights that were never
@@ -913,7 +927,6 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
             # only what this path already left dense -- work with no saving on the layers that matter.
             use_fp8_storage = False
         else:
-            metadata = read_safetensors_metadata(model_path, self._logger)
             # Per-layer markers must be read before extract_fp8_scaled_layers() drops them, and before
             # the key remap, which would not carry a ".comfy_quant" suffix to a sensible destination.
             layer_hints = {**extract_comfy_quant_hints(sd), **parse_quantization_metadata(metadata)}
@@ -942,19 +955,22 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
             # for the byte count the file already had.
             use_fp8_storage = source_is_fp8 and _device_supports_fp8_storage(self._torch_device, self._logger)
 
+        # Every layer that arrived scaled, before the split folds the ones the matmul cannot take. The storage
+        # pass below must leave those alone: cast again, they would be re-quantized *without* their scale.
+        scaled_paths = set(fp8_layers)
+
         te_config = self._load_te_config(config)
         with accelerate.init_empty_weights():
             model = Qwen3VLModel._from_config(te_config)
         # Its weights were dropped from the state dict above, so the module has to go too -- left in
         # place it would stay on the meta device and `_reject_incomplete_load` would rightly refuse.
         drop_qwen3vl_visual_tower(model)
+        # `Qwen3VLModel` declares no precision-sensitive modules, but read them rather than assume: in the
+        # int8 split they are also what keeps a marker on a non-Linear (a "quantize everything" repack's 1-D
+        # norms) out of `swap_in_int8_linears`, and the nvfp4 install decodes rather than packs under them.
+        skip_patterns = _model_declared_skip_patterns(model)
 
         if int8_markers:
-            # `Qwen3VLModel` declares no precision-sensitive modules, but read them rather than
-            # assume: the split is also what keeps a marker on a non-Linear (a "quantize
-            # everything" repack's 1-D norms) out of `swap_in_int8_linears`.
-            skip_patterns = _model_declared_skip_patterns(model)
-
             quantized = install_int8_convrot_layers(
                 model,
                 sd,
@@ -963,6 +979,9 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
                 architecture="Qwen3-VL encoder",
                 reserve=self._ram_cache.make_room,
                 skip_patterns=skip_patterns,
+                # The nvfp4 layers taken out above are held beside the int8 ones, and this is the
+                # branch's only reservation.
+                extra_reserved_bytes=predict_nvfp4_install_size(model, nvfp4_payloads, model_dtype, skip_patterns),
             )
             self._logger.info(
                 f"Qwen3-VL encoder: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
@@ -999,21 +1018,27 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
                 keep_fp8=keep_fp8,
                 model=model,
                 fp8_layers=fp8_layers,
-                nvfp4_payloads={},
+                nvfp4_payloads=nvfp4_payloads,
+                skip_patterns=skip_patterns,
             )
             if fp8_layers and not keep_fp8:
                 # Neither consumer wants them packed: fold the scales into the weights. Both consumers
                 # were resolved above, next to the matmul probe, because this fold is irreversible.
                 dequantize_fp8_scaled(sd, fp8_layers, model_dtype)
                 fp8_layers = {}
-            fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, model_dtype, model=model)
-            # No `skip_patterns` here on purpose: this model declares none, and the storage pass below
-            # applies `_FP8_DEFAULT_SKIP_PATTERNS` itself. Those two lists used to have to not intersect
-            # on a layer class with no fp8-capable wrapper -- a `pos_embed` or a `patch_embed.proj`
-            # would arrive fp8 from the state dict, be skipped by the cast pass, and then raise on the
-            # first forward. `_apply_fp8_to_nn_module` now restores the compute dtype on the modules it
-            # skips, so the two lists are independent again.
-            cast_state_dict(sd, model_dtype, keep_fp8=keep_fp8, model=model)
+            # The model's own patterns (none, today) go to the reservation, the split, the cast and the nvfp4
+            # install alike, so the prediction answers for what each of them then does. They are independent
+            # of `_FP8_DEFAULT_SKIP_PATTERNS`, which the storage pass below applies itself: a `pos_embed` or
+            # `patch_embed.proj` arriving fp8 and skipped there used to raise on the first forward, and
+            # `_apply_fp8_to_nn_module` now restores the compute dtype on the modules it skips.
+            fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, model_dtype, model=model, skip_patterns=skip_patterns)
+            cast_state_dict(sd, model_dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
+
+        if nvfp4_payloads:
+            packed = install_nvfp4_layers(model, sd, nvfp4_payloads, model_dtype, skip_patterns)
+            self._logger.info(
+                f"Qwen3-VL encoder '{config.name}': kept {packed} of {len(nvfp4_payloads)} nvfp4 layer(s) packed."
+            )
 
         load_state_dict_ignoring_extras(
             model, sd, source="Qwen3-VL encoder checkpoint", assign=True, allow_missing=True
@@ -1074,7 +1099,22 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
         if use_fp8_storage:
             # `model.dtype` now reports the float8 storage dtype; `_apply_fp8_to_nn_module` records
             # the real compute dtype so callers can recover it via `get_model_compute_dtype`.
-            self._apply_fp8_to_nn_module(model, storage_dtype=torch.float8_e4m3fn, compute_dtype=model_dtype)
+            #
+            # A scaled layer reaches this branch only when the split folded it -- every one it had, or the
+            # attach branch above would have run. The Linears among them go to fp8 storage like any other,
+            # which is what this pass is for: an MXFP8 build's block scales are folded, and its language model
+            # is held in fp8 rather than at twice the size. A folded embedding is not: Comfy's nvfp4 8B build
+            # scales its token table, and cast again it would lose that scale for the accuracy cost measured
+            # above for exactly this table -- the reason the attach branch leaves every embedding alone.
+            self._apply_fp8_to_nn_module(
+                model,
+                storage_dtype=torch.float8_e4m3fn,
+                compute_dtype=model_dtype,
+                skip=lambda name, module: name in scaled_paths and not isinstance(module, torch.nn.Linear),
+            )
+        # Counted rather than assumed: on that nvfp4 build every Linear is packed and the embedding skipped, so
+        # the pass leaves nothing in fp8, and saying it did would misdescribe the encoder.
+        if use_fp8_storage and count_fp8_weights(model):
             self._logger.info(
                 f"FP8 layerwise casting enabled for Qwen3-VL encoder '{config.name}' "
                 f"(storage=float8_e4m3fn, compute={model_dtype})."

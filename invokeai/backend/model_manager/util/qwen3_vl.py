@@ -103,3 +103,18 @@ def drop_qwen3vl_visual_tower_keys(sd: dict[str, Any]) -> dict[str, Any]:
     and ``comfy_quant``). Enumerating suffixes instead would silently start leaving orphans behind.
     """
     return {k: v for k, v in sd.items() if not (isinstance(k, str) and qwen3vl_target_key(k).startswith("visual."))}
+
+
+def drop_qwen3vl_unloaded_keys(sd: dict[str, Any]) -> dict[str, Any]:
+    """Keep only what the single-file encoder loader reads: drop the visual tower and the LM head.
+
+    ``Qwen3VLModel`` has no LM head, so a non-strict load would discard it anyway -- but only after the
+    side-channel handling had folded and reserved for it: on the 8B fp8 builds a 151936x4096 bf16 copy.
+    Identification judges a file's quantization by the same view, so it refuses nothing the loader would
+    never read.
+    """
+    return {
+        k: v
+        for k, v in drop_qwen3vl_visual_tower_keys(sd).items()
+        if not (isinstance(k, str) and k.startswith("lm_head."))
+    }

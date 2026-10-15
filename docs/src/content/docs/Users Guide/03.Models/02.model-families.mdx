@@ -1,7 +1,7 @@
 ---
 title: Model Formats and Families
 description: An overview of the models InvokeAI supports — checkpoint, Diffusers and quantized formats, the components that make up a model, and the model families with their licenses.
-lastUpdated: 2026-09-30
+lastUpdated: 2026-10-11
 sidebar:
   order: 2
 ---
@@ -48,7 +48,7 @@ InvokeAI recognizes the format from the file's contents, so you install them lik
 - **NF4** (bitsandbytes): 4-bit, CUDA only.
 - **SDNQ**: see [SDNQ Quantization](/configuration/optimization/sdnq-quantization/).
 - **int8** (`int8_convrot`, from ComfyUI repackages): the weights stay int8 in memory on every device, including Apple Silicon, and need no setting to turn on. Supported for FLUX.1, FLUX.2 Klein, Z-Image, Krea-2, Ideogram 4, MiniMax H3, LTX-2 and the PiD decoders, and for the Qwen3 8B, Qwen3-VL and LTX-2 Gemma encoders.
-- **nvfp4** (4-bit, in ComfyUI's checkpoint format, such as Comfy-Org's builds; other nvfp4 exports such as AWQ are refused): the weights stay packed in memory and are unpacked per layer, so no special GPU is needed. Supported for the Z-Image, Krea-2, Qwen-Image and LTX-2 transformers and for the Qwen3, Qwen2.5-VL and FLUX.2 Mistral encoders; the Ideogram 4 nvfp4 files are refused at install.
+- **nvfp4** (4-bit, in ComfyUI's checkpoint format, such as Comfy-Org's builds; other nvfp4 exports such as AWQ are refused): the weights stay packed in memory and are unpacked per layer, so no special GPU is needed. Supported for the Z-Image, Krea-2, Qwen-Image and LTX-2 transformers and for the Qwen3, Qwen3-VL 4B/8B, Qwen2.5-VL and FLUX.2 Mistral encoders; the Ideogram 4 nvfp4 transformer files are refused at install.
 - **fp8** (plain or `fp8_scaled`): InvokeAI keeps the weights in fp8 when [FP8 Storage](/configuration/optimization/fp8-storage/) is on, which installation does for you, or when `fp8_compute` is enabled.
 - **MXFP8** (fp8 with one scale per block of 32 weights): loaded by unpacking to BF16. Turn FP8 Storage off for these; see the [FP8 Storage caution](/configuration/optimization/fp8-storage/).
 

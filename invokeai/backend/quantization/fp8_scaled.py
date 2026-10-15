@@ -651,9 +651,32 @@ def dequantize_fp8_scaled(
         weight = sd.get(key)
         if weight is None:
             continue
-        weight = weight.float()
-        sd[key] = (weight * expand_weight_scale(weight, layer.weight_scale, path)).to(dtype)
+        sd[key] = _fold_scale(weight, expand_weight_scale(weight, layer.weight_scale, path), dtype)
     return sd
+
+
+# The most elements a fold widens to float32 at once. The multiply holds two float32 copies of what it works
+# on, so folding a tensor whole peaks at 10 bytes per element in RAM: 5.8 GiB for the 151936x4096 token
+# table of Comfy's nvfp4 Qwen3-VL 8B, against a 1.2 GiB result and a reservation sized for that result.
+_FOLD_SLAB_ELEMENTS = 1 << 24
+
+
+def _fold_scale(weight: torch.Tensor, scale: torch.Tensor, dtype: torch.dtype) -> torch.Tensor:
+    """``(weight.float() * scale).to(dtype)``, element for element, a slab of rows at a time.
+
+    ``scale`` is already expanded against ``weight``: a 0-d scalar, or a tensor whose leading axis runs over
+    the weight's rows. Each slab rounds exactly as the whole would, since every element is computed alone.
+    """
+    if weight.numel() <= _FOLD_SLAB_ELEMENTS:
+        return (weight.float() * scale).to(dtype)
+    rows = weight.shape[0]
+    step = max(1, _FOLD_SLAB_ELEMENTS // (weight.numel() // rows))
+    per_row = scale.dim() > 0 and scale.shape[0] == rows
+    out = torch.empty(weight.shape, dtype=dtype, device=weight.device)
+    for start in range(0, rows, step):
+        slab = slice(start, start + step)
+        out[slab] = weight[slab].float() * (scale[slab] if per_row else scale)
+    return out
 
 
 def attach_fp8_scales(
