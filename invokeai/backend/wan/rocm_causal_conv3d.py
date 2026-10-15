@@ -140,7 +140,7 @@ def patch_wan_causal_conv3d_for_rocm() -> None:
     implicit-GEMM conv3d kernels, so CUDA builds keep the stock path. There is
     deliberately no HIP-version gate (see the module docstring). The row tearing once
     blamed on this decomposition on HIP 7.2 has two known causes, both since fixed: the
-    ROCm fused-SDPA head-dim defect (``install_rocm_sdpa_head_dim_guard`` in
+    ROCm fused-SDPA head-dim defect (``install_rocm_sdpa_guard`` in
     ``invokeai.backend.util.attention``; the Wan VAE mid-block attention is wider than its
     threshold) and MIOpen faulting on the strided views the decomposition used to hand it
     (see ``_decomposed_conv3d``). With both in place the decomposition matches native

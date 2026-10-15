@@ -19,6 +19,7 @@ import { HsvWheelPicker } from '@platform/ui/HsvWheelPicker';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { getDocumentLayer } from '@workbench/canvas-engine/api';
+import { useCanvasEngine } from '@workbench/canvas-operations/react';
 import { armMaskTintTarget, clearMaskTintTarget } from '@workbench/widgets/canvas/color-system/maskTintTarget';
 import {
   useActiveColorCommands,
@@ -27,7 +28,6 @@ import {
 } from '@workbench/widgets/canvas/color-system/useActiveColors';
 import { useMaskTintEditor, type MaskTintEditor } from '@workbench/widgets/canvas/color-system/useMaskTintEditor';
 import { FormNumberField } from '@workbench/widgets/canvas/tool-presentation/FormControls';
-import { useCanvasEngine } from '@workbench/widgets/canvas/useCanvasEngine';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { ArrowLeftRightIcon, CircleIcon, PipetteIcon, RotateCcwIcon, SquareIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -169,7 +169,7 @@ export const ColorPane = () => {
               <IconButton
                 aria-label={t('widgets.canvas.commands.swapColors')}
                 color="fg.muted"
-                size="2xs"
+                size="sm"
                 variant="ghost"
                 onClick={commands.swapPair}
               >
@@ -180,7 +180,7 @@ export const ColorPane = () => {
               <IconButton
                 aria-label={t('widgets.canvas.commands.resetColors')}
                 color="fg.muted"
-                size="2xs"
+                size="sm"
                 variant="ghost"
                 onClick={commands.resetPair}
               >
@@ -193,7 +193,7 @@ export const ColorPane = () => {
                 <IconButton
                   aria-label={t('common.colorPicker.sampleFromCanvas')}
                   color="fg.muted"
-                  size="2xs"
+                  size="sm"
                   variant="ghost"
                   onClick={sampleFromCanvas}
                 >
@@ -202,7 +202,7 @@ export const ColorPane = () => {
               </Tooltip>
             ) : null}
             <Tooltip content={modeLabel}>
-              <IconButton aria-label={modeLabel} color="fg.muted" size="2xs" variant="ghost" onClick={toggleMode}>
+              <IconButton aria-label={modeLabel} color="fg.muted" size="sm" variant="ghost" onClick={toggleMode}>
                 {mode === 'wheel' ? <SquareIcon size={14} /> : <CircleIcon size={14} />}
               </IconButton>
             </Tooltip>
@@ -373,7 +373,7 @@ const ChannelFields = ({
         aria-label={t('widgets.layers.colorPane.format')}
         color="fg.muted"
         flexShrink={0}
-        fontSize="2xs"
+        fontSize="xs"
         fontWeight="700"
         px="1.5"
         rounded="sm"
@@ -448,9 +448,7 @@ const HexField = ({ hex, onCommit }: { hex: string; onCommit: (hex: string) => v
       aria-label={t('widgets.layers.colorPane.channels.hex')}
       flex="1"
       fontFamily="mono"
-      fontSize="xs"
       minW="24"
-      size="xs"
       value={draft ?? hex}
       onBlur={commit}
       onChange={onChange}

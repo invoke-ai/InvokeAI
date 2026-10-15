@@ -4,6 +4,7 @@ import type * as workbenchContext from '@workbench/WorkbenchContext';
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
 import { FocusRegionProvider } from '@workbench/focusRegions';
+import { createTestFocusController } from '@workbench/focusRegions.testing';
 import i18next from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -47,6 +48,8 @@ await i18n.use(initReactI18next).init({
   resources: { en: { translation: { widgets: { panelLabel: '{{region}} panel' } } } },
 });
 
+const focusController = createTestFocusController();
+
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -62,7 +65,7 @@ const renderFrame = async (region: 'bottom' | 'left' | 'right' = 'left') => {
     root?.render(
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
-          <FocusRegionProvider>
+          <FocusRegionProvider controller={focusController}>
             <WidgetPanelFrame instanceId="test-instance" region={region} typeId="gallery">
               <div />
             </WidgetPanelFrame>
@@ -124,6 +127,8 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  // Focus is per test: the next one starts with no region outlined and no move pending.
+  focusController.clear();
   await interact(() => root?.unmount());
   host?.remove();
   host = null;
@@ -237,7 +242,7 @@ describe('WidgetPanelFrame squeezed by the viewport', () => {
       root?.render(
         <I18nextProvider i18n={i18n}>
           <ChakraProvider value={system}>
-            <FocusRegionProvider>
+            <FocusRegionProvider controller={focusController}>
               <WidgetPanelFrame instanceId="test-instance" region="left" typeId="gallery">
                 <div />
               </WidgetPanelFrame>

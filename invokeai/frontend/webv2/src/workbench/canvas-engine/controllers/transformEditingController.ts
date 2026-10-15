@@ -1,9 +1,9 @@
+import type { CanvasEditRefusal, StructuralCommitResult } from '@workbench/canvas-engine/capabilities';
 import type { CanvasDocumentContractV3 } from '@workbench/canvas-engine/contracts';
 import type { TransformSession } from '@workbench/canvas-engine/engineStores';
-import type { HistoryEntry } from '@workbench/canvas-engine/history/history';
 import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 import type { LayerCacheEntry } from '@workbench/canvas-engine/render/layerCache';
-import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
+import type { RasterBackend } from '@workbench/canvas-engine/render/raster';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { Rect } from '@workbench/canvas-engine/types';
 
@@ -11,27 +11,39 @@ import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/docu
 import { getDocumentLayer } from '@workbench/canvas-engine/document/documentIndex';
 import { isLeafEditable } from '@workbench/canvas-engine/document/layerEligibility';
 import { isRenderableLayer } from '@workbench/canvas-engine/document/sources';
-import { createDocumentPatchEntry } from '@workbench/canvas-engine/history/documentPatch';
-import { NO_HELD_ASSET_REFS } from '@workbench/canvas-engine/history/history';
+import { HISTORY_ENTRY_OVERHEAD_BYTES, NO_HELD_ASSET_REFS } from '@workbench/canvas-engine/history/history';
 import { isEmpty, roundOut, transformBounds } from '@workbench/canvas-engine/math/rect';
 import { hittableLayerSize } from '@workbench/canvas-engine/tools/moveHitTest';
 import { bakeMatrix } from '@workbench/canvas-engine/transform/transformMath';
 
+import type { CanvasMutationContext, EditStep } from './mutationContext';
+
+import { rgbaBytes, withReplayReservation } from './editSteps';
+
 export interface TransformEditingControllerOptions {
   readonly session: { get(): TransformSession | null; set(value: TransformSession | null): void };
   readonly backend: RasterBackend;
+  readonly ctx: Pick<CanvasMutationContext, 'applyStep' | 'begin' | 'reserveRaster'>;
   readonly getDocument: () => CanvasDocumentContractV3 | null;
   readonly getCache: (layerId: string) => LayerCacheEntry | null;
   readonly setOverride: (layerId: string, transform: LayerTransform | null) => void;
-  readonly replaceCache: (layerId: string, rect: Rect, surface: RasterSurface) => void;
+  /** Installs whole-layer pixels at a layer-local rect, marking them painted and dirty. */
   readonly restoreCache: (layerId: string, rect: Rect, pixels: ImageData) => void;
-  readonly dispatch: (action: CanvasProjectMutation) => void;
-  readonly pushHistory: (entry: HistoryEntry) => void;
+  readonly commitStructural: (
+    label: string,
+    forward: CanvasProjectMutation,
+    inverse: CanvasProjectMutation
+  ) => StructuralCommitResult;
+  readonly reportRefusal: (refusal: CanvasEditRefusal) => void;
   readonly canEdit: () => boolean;
   readonly isGestureActive: () => boolean;
-  readonly endBurst: () => void;
   readonly invalidate: (payload: { layers: string[]; overlay: true }) => void;
 }
+
+const IDENTITY: LayerTransform = { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 };
+
+const isRefusal = (status: string): status is CanvasEditRefusal =>
+  status === 'busy' || status === 'gesture-active' || status === 'not-ready' || status === 'over-budget';
 
 const unchanged = (left: LayerTransform, right: LayerTransform): boolean =>
   left.x === right.x &&
@@ -90,30 +102,26 @@ export class TransformEditingController {
     this.deps.invalidate({ layers: [session.layerId], overlay: true });
   }
 
-  private bakeEntry(
-    layerId: string,
-    beforeRect: Rect,
-    before: ImageData,
-    afterRect: Rect,
-    after: ImageData,
-    oldTransform: LayerTransform,
-    newTransform: LayerTransform
-  ): HistoryEntry {
+  /** A step that sets the layer's transform and installs matching whole-layer pixels, or rolls the transform back. */
+  private bakeStep(layerId: string, from: LayerTransform, to: LayerTransform, rect: Rect, pixels: ImageData): EditStep {
+    const hasTransform =
+      (transform: LayerTransform) =>
+      (document: CanvasDocumentContractV3 | null): boolean => {
+        const current = getDocumentLayer(document, layerId);
+        return !!current && unchanged(current.transform, transform);
+      };
     return {
-      bytes: before.data.byteLength + after.data.byteLength + 256,
-      heldAssetRefs: NO_HELD_ASSET_REFS,
-      label: 'Transform layer',
-      redo: () => {
-        this.deps.dispatch({ id: layerId, patch: { transform: newTransform }, type: 'updateCanvasLayer' });
-        this.deps.restoreCache(layerId, afterRect, after);
-      },
-      undo: () => {
-        this.deps.dispatch({ id: layerId, patch: { transform: oldTransform }, type: 'updateCanvasLayer' });
-        this.deps.restoreCache(layerId, beforeRect, before);
+      accepted: hasTransform(to),
+      install: () => this.deps.restoreCache(layerId, rect, pixels),
+      mutation: { id: layerId, patch: { transform: to }, type: 'updateCanvasLayer' },
+      rollback: {
+        mutation: { id: layerId, patch: { transform: from }, type: 'updateCanvasLayer' },
+        restored: hasTransform(from),
       },
     };
   }
 
+  /** Commits the session; a refusal keeps it open and is reported, any other failure ends it. */
   apply(): void {
     if (this.disposed || !this.deps.canEdit() || this.deps.isGestureActive()) {
       return;
@@ -143,56 +151,71 @@ export class TransformEditingController {
       source?.type === 'gradient' ||
       source?.type === 'text'
     ) {
-      this.deps.endBurst();
-      this.deps.setOverride(session.layerId, null);
-      this.deps.session.set(null);
-      const forward: CanvasProjectMutation = {
-        id: session.layerId,
-        patch: { transform: session.transform },
-        type: 'updateCanvasLayer',
-      };
-      const inverse: CanvasProjectMutation = {
-        id: session.layerId,
-        patch: { transform: session.startTransform },
-        type: 'updateCanvasLayer',
-      };
-      this.deps.dispatch(forward);
-      this.deps.pushHistory(
-        createDocumentPatchEntry({ dispatch: this.deps.dispatch, forward, inverse, label: 'Transform layer' })
+      const result = this.deps.commitStructural(
+        'Transform layer',
+        { id: session.layerId, patch: { transform: session.transform }, type: 'updateCanvasLayer' },
+        { id: session.layerId, patch: { transform: session.startTransform }, type: 'updateCanvasLayer' }
       );
-      this.deps.invalidate({ layers: [session.layerId], overlay: true });
-      return;
-    }
-    if (source?.type !== 'paint') {
-      this.cancel();
+      this.settle(result.status);
       return;
     }
     const cache = this.deps.getCache(layer.id);
-    if (!cache || isEmpty(cache.rect)) {
+    if (source?.type !== 'paint' || !cache || isEmpty(cache.rect)) {
       this.cancel();
       return;
     }
-    this.deps.endBurst();
     const beforeRect = { ...cache.rect };
-    const before = cache.surface.ctx.getImageData(0, 0, beforeRect.width, beforeRect.height);
     const matrix = bakeMatrix(session.transform);
     const afterRect = roundOut(transformBounds(matrix, beforeRect));
-    const baked = this.deps.backend.createSurface(afterRect.width, afterRect.height);
-    const context = baked.ctx;
-    context.setTransform(1, 0, 0, 1, 0, 0);
-    context.clearRect(0, 0, afterRect.width, afterRect.height);
-    context.imageSmoothingEnabled = true;
-    context.setTransform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.e - afterRect.x, matrix.f - afterRect.y);
-    context.drawImage(cache.surface.canvas, beforeRect.x, beforeRect.y);
-    context.setTransform(1, 0, 0, 1, 0, 0);
-    const after = context.getImageData(0, 0, afterRect.width, afterRect.height);
-    const oldTransform = { ...session.startTransform };
-    const identity: LayerTransform = { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 };
-    this.deps.setOverride(layer.id, null);
-    this.deps.session.set(null);
-    this.deps.dispatch({ id: layer.id, patch: { transform: identity }, type: 'updateCanvasLayer' });
-    this.deps.replaceCache(layer.id, afterRect, baked);
-    this.deps.pushHistory(this.bakeEntry(layer.id, beforeRect, before, afterRect, after, oldTransform, identity));
+    const beforeBytes = rgbaBytes(beforeRect);
+    const afterBytes = rgbaBytes(afterRect);
+    const txn = this.deps.ctx.begin({ historyBytes: beforeBytes + afterBytes + HISTORY_ENTRY_OVERHEAD_BYTES });
+    if (!('publish' in txn)) {
+      this.settle(txn.status);
+      return;
+    }
+    try {
+      // The bake surface lives beside the cache until the step installs its pixels.
+      if (!txn.reserveRaster(afterBytes)) {
+        this.settle('over-budget');
+        return;
+      }
+      const before = cache.surface.ctx.getImageData(0, 0, beforeRect.width, beforeRect.height);
+      const baked = this.deps.backend.createSurface(afterRect.width, afterRect.height);
+      const context = baked.ctx;
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      context.clearRect(0, 0, afterRect.width, afterRect.height);
+      context.imageSmoothingEnabled = true;
+      context.setTransform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.e - afterRect.x, matrix.f - afterRect.y);
+      context.drawImage(cache.surface.canvas, beforeRect.x, beforeRect.y);
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      const after = context.getImageData(0, 0, afterRect.width, afterRect.height);
+      const oldTransform = { ...session.startTransform };
+      const forward = this.bakeStep(layer.id, oldTransform, IDENTITY, afterRect, after);
+      const backward = this.bakeStep(layer.id, IDENTITY, oldTransform, beforeRect, before);
+      const result = txn.publish('Transform layer', forward, {
+        bytes: before.data.byteLength + after.data.byteLength + HISTORY_ENTRY_OVERHEAD_BYTES,
+        heldAssetRefs: NO_HELD_ASSET_REFS,
+        redo: () => this.replay(forward, afterRect),
+        undo: () => this.replay(backward, beforeRect),
+      });
+      this.settle(result.status);
+    } finally {
+      txn.end();
+    }
+  }
+
+  /** Replays a bake step, reserving the whole-layer pixels it installs; throws, leaving it in place, when they do not fit. */
+  private replay(step: EditStep, rect: Rect): void {
+    withReplayReservation(this.deps.ctx, rgbaBytes(rect), () => this.deps.ctx.applyStep(step));
+  }
+
+  private settle(status: StructuralCommitResult['status']): void {
+    if (isRefusal(status)) {
+      this.deps.reportRefusal(status);
+      return;
+    }
+    this.cancel();
   }
 
   dispose(): void {

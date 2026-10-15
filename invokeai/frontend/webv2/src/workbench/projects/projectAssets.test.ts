@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   collectHeldAssetRefs,
   collectLiveAssetRefs,
-  createCanvasHeldMediaSources,
+  createLiveCanvasEngines,
   createOpenProjectsHeldMediaReader,
   remapAssetRefs,
   selectCoverImageName,
@@ -136,22 +136,37 @@ it('rescans only the workflow an edit touched, sharing the documents its history
 });
 
 it('announces engines registering and releasing their held media', () => {
-  const sources = createCanvasHeldMediaSources();
+  const sources = createLiveCanvasEngines();
   const onChange = vi.fn();
   sources.subscribe(onChange);
   let notifyEngine = () => undefined as void;
   const release = sources.register('project-1', {
-    read: () => ({ images: ['undo.png'], videos: [] }),
+    flushPendingPixels: () => Promise.resolve(),
+    heldAssets: () => ({ images: ['undo.png'], videos: [] }),
     subscribe: (listener) => {
       notifyEngine = listener;
       return () => undefined;
     },
   });
-  expect(sources.read('project-1')).toEqual({ images: ['undo.png'], videos: [] });
+  expect(sources.heldAssets('project-1')).toEqual({ images: ['undo.png'], videos: [] });
   notifyEngine();
   release();
-  expect(sources.read('project-1')).toBeUndefined();
+  expect(sources.heldAssets('project-1')).toBeUndefined();
   expect(onChange).toHaveBeenCalledTimes(3);
+});
+
+it("crosses a registered engine's paint barrier and treats an unregistered project as saved", async () => {
+  const sources = createLiveCanvasEngines();
+  const flushPendingPixels = vi.fn(() => Promise.reject(new Error('upload failed')));
+  sources.register('project-1', {
+    flushPendingPixels,
+    heldAssets: () => ({ images: [], videos: [] }),
+    subscribe: () => () => undefined,
+  });
+
+  await expect(sources.flushPendingPixels('project-1')).rejects.toThrow('upload failed');
+  await expect(sources.flushPendingPixels('project-2')).resolves.toBeUndefined();
+  expect(flushPendingPixels).toHaveBeenCalledOnce();
 });
 
 const projectDocument = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
@@ -339,7 +354,14 @@ describe('stripInstallationState', () => {
     const stripped = stripInstallationState({
       widgetInstances: {
         'gallery-1': {
-          state: { values: { galleryView: 'images', projectBoardId: 'board-1', selectedBoardId: 'board-2' } },
+          state: {
+            values: {
+              autoAddBoardId: 'board-3',
+              galleryView: 'images',
+              projectBoardId: 'board-1',
+              selectedBoardId: 'board-2',
+            },
+          },
           typeId: 'gallery',
         },
       },
@@ -348,6 +370,7 @@ describe('stripInstallationState', () => {
 
     expect(JSON.stringify(stripped)).not.toContain('board-1');
     expect(JSON.stringify(stripped)).not.toContain('board-2');
+    expect(JSON.stringify(stripped)).not.toContain('board-3');
     // Everything else the widget holds survives.
     expect(JSON.stringify(stripped)).toContain('galleryView');
   });

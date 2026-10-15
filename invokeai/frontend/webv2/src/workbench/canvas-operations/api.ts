@@ -26,6 +26,7 @@ export {
 export { getCreateFromBboxNotice, type CreateFromBboxNotice } from './createFromBboxNotice';
 export type {
   FilterOperationSessionState,
+  FilterSessionErrorCode,
   SamInput,
   SamModel,
   SamSessionError,
@@ -35,6 +36,11 @@ export type {
 export { getCanvasOperations } from './operationAccess';
 export { getCanvasEngine } from './engineRegistry';
 export { saveCanvasToGallery, type CanvasGallerySaveRegion } from './saveCanvasToGallery';
+export {
+  retryStagedResultBoard,
+  saveStagedResultToGallery,
+  type SaveStagedResultOutcome,
+} from './saveStagedResultToGallery';
 export {
   composeForGeneration,
   type ComposeForGenerationOptions,

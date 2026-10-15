@@ -19,8 +19,7 @@ from invokeai.app.services.shared.intermediate_delete import (
     JournaledDeleteAdapter,
     delete_journaled_intermediates,
 )
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults, SQLiteDirection
 from invokeai.app.services.video_files.video_files_common import (
     VideoFileDeleteException,
     VideoFileNotFoundException,
@@ -30,7 +29,6 @@ from invokeai.app.services.video_records.video_records_common import (
     VideoNamesResult,
     VideoRecord,
     VideoRecordChanges,
-    VideoRecordDeleteException,
     VideoRecordNotFoundException,
     VideoRecordSaveException,
 )
@@ -386,11 +384,6 @@ class VideoService(VideoServiceABC):
                 except Exception as cleanup_error:
                     self.__invoker.services.logger.error(f"Failed to purge staged video files: {cleanup_error}")
                 self._on_deleted(video_name)
-            except VideoRecordDeleteException:
-                if token is not None:
-                    self.__invoker.services.video_files.rollback_delete(token)
-                self.__invoker.services.logger.error("Failed to delete video record")
-                raise
             except VideoFileDeleteException:
                 self.__invoker.services.logger.error("Failed to delete video file")
                 raise
@@ -456,9 +449,6 @@ class VideoService(VideoServiceABC):
                         log_error=self.__invoker.services.logger.error,
                     ),
                 )
-            except VideoRecordDeleteException:
-                self.__invoker.services.logger.error("Failed to delete video records")
-                raise
             except VideoFileDeleteException:
                 self.__invoker.services.logger.error("Failed to delete video files")
                 raise

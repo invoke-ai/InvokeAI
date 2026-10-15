@@ -1,8 +1,10 @@
 import type * as transportModule from '@platform/transport/http';
 
+import { galleryKeys } from '@features/gallery/queries';
+import { queryClient } from '@platform/query/client';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 const transport = vi.hoisted(() => ({
   apiFetch: vi.fn(),
@@ -16,6 +18,7 @@ vi.mock('@platform/transport/http', async (importOriginal) => ({
 }));
 
 import {
+  deleteProject,
   createProject,
   createProjectSettled,
   getProjectWriteSizeRefusal,
@@ -47,6 +50,19 @@ describe('createProjectSettled', () => {
       project_id: 'project-1',
     });
     expect(transport.apiFetchJson).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks board lists fetched before the create stale, since they predate its board', async () => {
+    const owner = captureAccountScope();
+    const boardsKey = [...galleryKeys.boardsForAccount(owner), {}];
+    queryClient.setQueryData(boardsKey, []);
+    transport.apiFetchJson.mockResolvedValueOnce({ board_id: 'board-for-project-1', project_id: 'project-1' });
+
+    onTestFinished(() => queryClient.removeQueries({ queryKey: boardsKey }));
+
+    await createProjectSettled(request, owner);
+
+    await vi.waitFor(() => expect(queryClient.getQueryState(boardsKey)?.isInvalidated).toBe(true));
   });
 
   /** Settle with a retry write: GET 404 can race the initial create transaction. */
@@ -122,9 +138,43 @@ describe('createProjectSettled', () => {
   it('leaves an unresolved outcome unresolved rather than authorizing a rollback', async () => {
     const failure = new TypeError('network error');
 
-    transport.apiFetchJson.mockRejectedValueOnce(failure).mockRejectedValueOnce(new TypeError('still offline'));
+    transport.apiFetchJson
+      .mockRejectedValueOnce(failure)
+      .mockRejectedValueOnce(new TypeError('still offline'))
+      // A read that finds nothing may have raced the first create's commit.
+      .mockRejectedValueOnce(new ApiError('not found', 404));
 
     // The original failure, not a proof of absence: unknown must never authorize deletion.
+    await expect(createProjectSettled(request, captureAccountScope())).rejects.toBe(failure);
+  });
+
+  it('adopts the project a read finds when neither create was answered', async () => {
+    const project = {
+      board_id: 'board-for-project-1',
+      data: {},
+      minimum_canvas_schema_version: 3,
+      name: 'Imported',
+      project_id: 'project-1',
+    };
+    transport.apiFetchJson
+      .mockRejectedValueOnce(new TypeError('response lost'))
+      .mockRejectedValueOnce(new ApiError('bad gateway', 502))
+      .mockResolvedValueOnce(project);
+
+    await expect(createProjectSettled(request, captureAccountScope())).resolves.toMatchObject(project);
+    expect(transport.apiFetchJson).toHaveBeenNthCalledWith(
+      3,
+      '/api/v1/projects/project-1?max_canvas_schema_version=4',
+      expect.anything()
+    );
+
+    // Somebody else's project under the id is not this create's.
+    const failure = new TypeError('response lost');
+    transport.apiFetchJson
+      .mockRejectedValueOnce(failure)
+      .mockRejectedValueOnce(new TypeError('still offline'))
+      .mockResolvedValueOnce({ ...project, data: { owner: 'somebody-else' }, name: "Somebody else's project" });
+
     await expect(createProjectSettled(request, captureAccountScope())).rejects.toBe(failure);
   });
 
@@ -167,9 +217,11 @@ describe('createProjectSettled', () => {
     await vi.runAllTimersAsync();
     await settled;
 
-    expect(transport.apiFetchJson).toHaveBeenCalledTimes(9);
+    // Nine creates, then the read that finds nothing settled.
+    expect(transport.apiFetchJson).toHaveBeenCalledTimes(10);
     expect(serializedValueReads).toBe(1);
-    expect(new Set(transport.apiFetchJson.mock.calls.map((call) => (call[1] as RequestInit).body)).size).toBe(1);
+    const creates = transport.apiFetchJson.mock.calls.slice(0, 9);
+    expect(new Set(creates.map((call) => (call[1] as RequestInit).body)).size).toBe(1);
     vi.useRealTimers();
     random.mockRestore();
   });
@@ -410,5 +462,24 @@ describe('project write size refusals', () => {
     ],
   ])('rejects %s', (_name, error) => {
     expect(getProjectWriteSizeRefusal(error)).toBeNull();
+  });
+});
+
+describe('deleteProject', () => {
+  it('asks the server to release the boards unless told to delete them', async () => {
+    transport.apiFetch.mockResolvedValue(undefined);
+
+    await deleteProject('project-1');
+    await deleteProject('project-1', undefined, 'release');
+    await deleteProject('project-1', undefined, 'delete');
+
+    expect(transport.apiFetch.mock.calls.map(([url]) => url)).toEqual([
+      '/api/v1/projects/project-1',
+      '/api/v1/projects/project-1',
+      '/api/v1/projects/project-1?boards=delete',
+    ]);
+    expect(transport.apiFetch.mock.calls.every(([, init]) => (init as { method: string }).method === 'DELETE')).toBe(
+      true
+    );
   });
 });

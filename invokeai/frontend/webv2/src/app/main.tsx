@@ -1,6 +1,6 @@
 import '@fontsource/inter/index.css';
 import '@platform/i18n/client';
-import { identityTransportAuthAdapter } from '@features/identity';
+import { identityTransportAuthAdapter, startIdentityCredentialSync } from '@features/identity';
 import { registerServiceWorker } from '@platform/pwa/registerServiceWorker';
 import { configureHttpAuth } from '@platform/transport/http';
 import { StrictMode } from 'react';
@@ -14,6 +14,8 @@ import { configureAppLogging } from './loggingRuntime';
 configureAppAccountLifecycle();
 configureAppLogging();
 configureHttpAuth(identityTransportAuthAdapter);
+// Follows other tabs' sign-in, sign-out and token renewals for the page's lifetime.
+startIdentityCredentialSync();
 registerServiceWorker();
 
 const rootElement = document.getElementById('root');

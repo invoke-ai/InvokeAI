@@ -39,13 +39,13 @@ const TagChip = ({
       aria-pressed={isSelected}
       flexShrink={0}
       rounded="full"
-      size="2xs"
+      size="sm"
       variant={isSelected ? 'subtle' : 'ghost'}
       onClick={handleClick}
     >
       {label}
       {count === null ? null : (
-        <Text as="span" color="fg.subtle" fontSize="2xs">
+        <Text as="span" color="fg.subtle" fontSize="xs">
           {count}
         </Text>
       )}

@@ -49,13 +49,15 @@ export const ImageIndexProgressPanel = ({
 
   return (
     <Stack align="center" gap="2" maxW="sm" textAlign="center" w="full">
-      <Text fontWeight="semibold">Indexing gallery</Text>
-      <Text color="fg.muted" fontSize="sm">
+      <Text fontSize="xl" fontWeight="semibold">
+        Indexing gallery
+      </Text>
+      <Text color="fg.muted" fontSize="lg">
         Images and videos are being embedded so they can be mapped. The map appears here on its own once enough of them
         are done — you can keep working in the meantime.
       </Text>
       <Stack gap="1" mt="2" w="full">
-        <Progress.Root max={100} size="sm" value={progress.percent}>
+        <Progress.Root max={100} size="lg" value={progress.percent}>
           {/* The name goes on the track: that is the element carrying
               role="progressbar", and Chakra otherwise names it "25%", which
               tells a screen reader the number but never what it counts. */}
@@ -63,7 +65,7 @@ export const ImageIndexProgressPanel = ({
             <Progress.Range />
           </Progress.Track>
         </Progress.Root>
-        <HStack color="fg.muted" fontSize="xs" justify="space-between">
+        <HStack color="fg.muted" fontSize="md" justify="space-between">
           <Text fontVariantNumeric="tabular-nums">{progress.counts}</Text>
           <Text fontVariantNumeric="tabular-nums">{progress.percent}%</Text>
         </HStack>
@@ -71,24 +73,24 @@ export const ImageIndexProgressPanel = ({
             waiting out a generation from one that has died, and the first is
             routine, so neither may be claimed. */}
         {progress.stale ? (
-          <Text color="fg.subtle" fontSize="xs">
+          <Text color="fg.subtle" fontSize="md">
             {progress.stale}
           </Text>
         ) : null}
         {progress.skipped ? (
-          <Text color="fg.subtle" fontSize="xs">
+          <Text color="fg.subtle" fontSize="md">
             {progress.skipped}
           </Text>
         ) : null}
       </Stack>
       {error ? (
         // Wrap server URLs/identifiers anywhere to prevent min-content overflow in narrow panels.
-        <Text color="fg.error" fontSize="xs" maxW="full" minW="0" mt="2" overflowWrap="anywhere" role="alert">
+        <Text color="fg.error" fontSize="md" maxW="full" minW="0" mt="2" overflowWrap="anywhere" role="alert">
           {error}
         </Text>
       ) : null}
       {/* Refresh is the only control before map readiness and recovers counts missed while offline. */}
-      <Button mt={error ? '0' : '2'} onClick={onRetry} size="xs" variant="outline">
+      <Button mt={error ? '0' : '2'} onClick={onRetry} variant="outline">
         {error ? 'Retry' : 'Check again'}
       </Button>
     </Stack>
@@ -115,7 +117,7 @@ export const ImageIndexActivityBadge = ({ counts, updatedAt }: ImageIndexProgres
         borderRadius="md"
         borderWidth="1px"
         color="fg.muted"
-        fontSize="2xs"
+        fontSize="xs"
         gap="1.5"
         maxW="full"
         minW="0"
@@ -124,7 +126,7 @@ export const ImageIndexActivityBadge = ({ counts, updatedAt }: ImageIndexProgres
         py="1"
         title={label}
       >
-        <Progress.Root flexShrink="0" max={100} size="xs" value={progress.percent} w="10">
+        <Progress.Root flexShrink="0" max={100} value={progress.percent} w="10">
           <Progress.Track aria-label={`${PROGRESS_LABEL}: ${label}`} aria-valuenow={progress.percent}>
             <Progress.Range />
           </Progress.Track>
@@ -145,7 +147,7 @@ export const ImageIndexProgressInline = ({ counts, updatedAt }: ImageIndexProgre
     <Tooltip content={label}>
       {/* Use minW=0 and truncation so six-digit footer counts cannot cover refresh in narrow panels. */}
       <HStack gap="1.5" minW="0" overflow="hidden" title={label}>
-        <Progress.Root flexShrink="0" max={100} size="xs" value={progress.percent} w="10">
+        <Progress.Root flexShrink="0" max={100} value={progress.percent} w="10">
           {/* The counts go in the name too: at the widget's minimum width the
               label beside it truncates to a couple of characters, and the
               tooltip carrying the full text is hover-only. */}

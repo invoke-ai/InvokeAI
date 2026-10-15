@@ -1,16 +1,14 @@
 import type * as GalleryContracts from '@features/gallery/contracts';
 
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { act, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   activeProjectId: 'project-1',
-  /** Simulated page count of the cached infinite window; null = no cache. */
-  cachedPageCount: null as number | null,
   fetchBoards: vi.fn(),
-  fetchInfiniteQuery: vi.fn(),
-  fetchNames: vi.fn(),
+  fetchVerifiedPage: vi.fn(),
   galleryValues: {} as Record<string, unknown>,
   patchValues: vi.fn(),
   registerImageCluster: vi.fn(),
@@ -18,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   resolve: vi.fn(),
   selectBoard: vi.fn(),
   selectItem: vi.fn(),
+  locatorControllers: [] as AbortController[],
   setPage: vi.fn(),
   settings: { imageOrderDir: 'DESC', paginationMode: 'paginated' } as Record<string, unknown>,
   setView: vi.fn(),
@@ -37,26 +36,27 @@ vi.mock('@features/gallery/contracts', async (importOriginal) => ({
   requestGalleryItemReveal: mocks.requestReveal,
 }));
 
+vi.mock('@features/gallery/utility', () => ({
+  abortGalleryLocatorRequests: () => {
+    mocks.locatorControllers.forEach((controller) => controller.abort());
+  },
+  createGalleryLocatorRequest: () => {
+    const controller = new AbortController();
+    mocks.locatorControllers.push(controller);
+
+    return { signal: controller.signal, release: vi.fn() };
+  },
+}));
+
 vi.mock('@features/gallery/queries', () => ({
-  GALLERY_MAX_ROWS: 600,
   GALLERY_PAGE_SIZE: 60,
   galleryBoardsOptions: (query: unknown) => ({ kind: 'boards', query, queryKey: ['boards', query] }),
-  galleryItemNamesOptions: (filter: unknown) => ({ filter, kind: 'names', queryKey: ['names', filter] }),
-  galleryItemsInfiniteOptions: (filter: unknown, window: unknown) => ({
-    filter,
-    kind: 'items',
-    queryKey: ['items', filter, window],
-    window,
-  }),
+  fetchVerifiedGalleryItemPage: (...args: unknown[]) => mocks.fetchVerifiedPage(...args),
 }));
 
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({
-    fetchInfiniteQuery: (options: { pages: number }) => mocks.fetchInfiniteQuery(options),
-    fetchQuery: (options: { kind: string }) =>
-      options.kind === 'boards' ? mocks.fetchBoards(options) : mocks.fetchNames(options),
-    getQueryData: () =>
-      mocks.cachedPageCount === null ? undefined : { pages: Array.from({ length: mocks.cachedPageCount }) },
+    fetchQuery: (options: { kind: string }) => mocks.fetchBoards(options),
   }),
 }));
 
@@ -149,29 +149,22 @@ const deferred = <T,>() => {
   return { promise, resolve };
 };
 
-/** A names response placing `imageName` at `index` in its board's ordering. */
-const namesWithImageAt = (imageName: string, index: number) => ({
-  items: Array.from({ length: index + 1 }, (_, position) => ({
-    kind: 'image',
-    name: position === index ? imageName : `other-${String(position)}.png`,
-  })),
-  total: index + 1,
+const verifiedAt = (index: number, total = index + 1) => ({
+  index,
+  offset: Math.floor(index / 60) * 60,
+  page: { items: [], total },
+  total,
 });
 
 beforeEach(() => {
   mocks.activeProjectId = 'project-1';
-  mocks.cachedPageCount = null;
   mocks.galleryValues = {};
   mocks.settings = { imageOrderDir: 'DESC', paginationMode: 'paginated' };
+  mocks.locatorControllers.length = 0;
   // Empty boards read as "still loading" — the reveal gives the board the
   // benefit of the doubt, matching the gallery's own fallback rules.
   mocks.fetchBoards.mockResolvedValue([]);
-  mocks.fetchInfiniteQuery.mockImplementation((options: { pages: number }) => {
-    mocks.cachedPageCount = options.pages;
-
-    return Promise.resolve();
-  });
-  mocks.fetchNames.mockResolvedValue({ items: [], total: 0 });
+  mocks.fetchVerifiedPage.mockResolvedValue(verifiedAt(0));
   mocks.registerImageCluster.mockReturnValue('cluster-key-1');
 });
 
@@ -180,8 +173,7 @@ afterEach(async () => {
     await unmount();
   }
   mocks.fetchBoards.mockReset();
-  mocks.fetchInfiniteQuery.mockReset();
-  mocks.fetchNames.mockReset();
+  mocks.fetchVerifiedPage.mockReset();
   mocks.patchValues.mockReset();
   mocks.registerImageCluster.mockReset();
   mocks.requestReveal.mockReset();
@@ -209,19 +201,13 @@ describe('useMapSelection', () => {
       });
       // The reveal channel is what scrolls the grid; the selection alone must
       // not (auto-selected generation results would yank the scroll).
-      expect(mocks.requestReveal).toHaveBeenCalledWith('image:a.png');
+      expect(mocks.requestReveal).toHaveBeenCalledWith('image:a.png', expect.any(AbortSignal), 0);
     });
 
     it('reveals a clicked video through its own namespace', async () => {
       // Resolve videos through their own endpoint and item keys so gallery reveal matches.
       mocks.resolve.mockResolvedValue({ boardId: 'board-a', category: 'general', kind: 'video', name: 'clip.mp4' });
-      mocks.fetchNames.mockResolvedValue({
-        items: [
-          { kind: 'image', name: 'a.png' },
-          { kind: 'video', name: 'clip.mp4' },
-        ],
-        total_count: 2,
-      });
+      mocks.fetchVerifiedPage.mockResolvedValue(verifiedAt(1, 2));
       await mount();
 
       await flush(() => handle.click?.({ kind: 'video', name: 'clip.mp4' }));
@@ -233,7 +219,7 @@ describe('useMapSelection', () => {
         kind: 'video',
         name: 'clip.mp4',
       });
-      expect(mocks.requestReveal).toHaveBeenCalledWith('video:clip.mp4');
+      expect(mocks.requestReveal).toHaveBeenCalledWith('video:clip.mp4', expect.any(AbortSignal), 1);
     });
 
     it('finds a video at its own position in a mixed listing', async () => {
@@ -242,21 +228,14 @@ describe('useMapSelection', () => {
       // the image's page and the clip is nowhere on screen.
       mocks.settings = { imageOrderDir: 'DESC', paginationMode: 'paginated' };
       mocks.resolve.mockResolvedValue({ boardId: 'board-a', category: 'general', kind: 'video', name: 'shared' });
-      mocks.fetchNames.mockResolvedValue({
-        items: [
-          { kind: 'image', name: 'shared' },
-          ...Array.from({ length: 119 }, (_, index) => ({ kind: 'image', name: `img-${String(index)}.png` })),
-          { kind: 'video', name: 'shared' },
-        ],
-        total_count: 121,
-      });
+      mocks.fetchVerifiedPage.mockResolvedValue(verifiedAt(120, 121));
       await mount();
 
       await flush(() => handle.click?.({ kind: 'video', name: 'shared' }));
 
       // Index 120 of a 60-per-page listing is page 2; the image's index 0 is page 0.
       expect(mocks.setPage).toHaveBeenCalledWith(2);
-      expect(mocks.requestReveal).toHaveBeenCalledWith('video:shared');
+      expect(mocks.requestReveal).toHaveBeenCalledWith('video:shared', expect.any(AbortSignal), 120);
     });
 
     it("selects the image's board before the image itself", async () => {
@@ -278,7 +257,7 @@ describe('useMapSelection', () => {
     it('lands the gallery on the page holding the image in paginated mode', async () => {
       mocks.settings = { imageOrderDir: 'DESC', paginationMode: 'paginated' };
       mocks.resolve.mockResolvedValue({ boardId: 'board-a', category: 'general', kind: 'image', name: 'deep.png' });
-      mocks.fetchNames.mockResolvedValue(namesWithImageAt('deep.png', 130));
+      mocks.fetchVerifiedPage.mockResolvedValue(verifiedAt(130, 200));
       await mount();
 
       await flush(() => handle.click?.({ kind: 'image', name: 'deep.png' }));
@@ -293,12 +272,12 @@ describe('useMapSelection', () => {
     it("resolves the image's position against the listing the reveal lands on", async () => {
       mocks.settings = { imageOrderDir: 'ASC', paginationMode: 'paginated' };
       mocks.resolve.mockResolvedValue({ boardId: 'board-a', category: 'general', kind: 'image', name: 'a.png' });
-      mocks.fetchNames.mockResolvedValue(namesWithImageAt('a.png', 0));
+      mocks.fetchVerifiedPage.mockResolvedValue(verifiedAt(0));
       await mount();
 
       await flush(() => handle.click?.({ kind: 'image', name: 'a.png' }));
 
-      expect(mocks.fetchNames.mock.calls[0]?.[0].filter).toEqual({
+      expect(mocks.fetchVerifiedPage.mock.calls[0]?.[1]).toEqual({
         boardId: 'board-a',
         galleryView: 'images',
         orderDir: 'ASC',
@@ -307,69 +286,63 @@ describe('useMapSelection', () => {
       });
     });
 
-    it('force-fetches the pages down to the image in infinite mode', async () => {
-      // A plain prefetch is not enough: the mounted gallery keeps the query
-      // fresh, and a fresh cache short-circuits the fetch WITHOUT honoring
-      // the `pages` option — the window would never grow.
+    it('requests the resolved sparse slot directly in infinite mode', async () => {
       mocks.settings = { imageOrderDir: 'DESC', paginationMode: 'infinite' };
       mocks.resolve.mockResolvedValue({ boardId: 'board-a', category: 'general', kind: 'image', name: 'deep.png' });
-      mocks.fetchNames.mockResolvedValue(namesWithImageAt('deep.png', 130));
+      mocks.fetchVerifiedPage.mockResolvedValue(verifiedAt(130, 200));
       await mount();
 
       await flush(() => handle.click?.({ kind: 'image', name: 'deep.png' }));
 
       expect(mocks.setPage).not.toHaveBeenCalled();
-      expect(mocks.fetchInfiniteQuery).toHaveBeenCalledTimes(1);
-      expect(mocks.fetchInfiniteQuery.mock.calls[0]?.[0]).toMatchObject({ pages: 3, staleTime: 0 });
+      expect(mocks.requestReveal).toHaveBeenCalledWith('image:deep.png', expect.any(AbortSignal), 130);
       expect(mocks.selectItem.mock.calls[0]?.[2]).toBe(2);
     });
 
-    it('skips the fetch when the window already covers the image', async () => {
+    it('does not require earlier pages to reveal a loaded deep target', async () => {
       mocks.settings = { imageOrderDir: 'DESC', paginationMode: 'infinite' };
-      mocks.cachedPageCount = 5;
       mocks.resolve.mockResolvedValue({ boardId: 'board-a', category: 'general', kind: 'image', name: 'deep.png' });
-      mocks.fetchNames.mockResolvedValue(namesWithImageAt('deep.png', 130));
+      mocks.fetchVerifiedPage.mockResolvedValue(verifiedAt(130, 200));
       await mount();
 
       await flush(() => handle.click?.({ kind: 'image', name: 'deep.png' }));
 
-      expect(mocks.fetchInfiniteQuery).not.toHaveBeenCalled();
+      expect(mocks.fetchVerifiedPage).toHaveBeenCalledOnce();
       expect(mocks.selectItem).toHaveBeenCalledTimes(1);
     });
 
-    it('anchors the infinite window at the page of an image past the base reach', async () => {
-      // Anchor deep reveals at their page when loading from the base would exceed GALLERY_MAX_ROWS.
+    it('requests an absolute slot beyond the former infinite-window cap', async () => {
       mocks.settings = { imageOrderDir: 'DESC', paginationMode: 'infinite' };
       mocks.resolve.mockResolvedValue({ boardId: 'board-a', category: 'general', kind: 'image', name: 'deep.png' });
-      mocks.fetchNames.mockResolvedValue(namesWithImageAt('deep.png', 700));
+      mocks.fetchVerifiedPage.mockResolvedValue(verifiedAt(700, 800));
       await mount();
 
       await flush(() => handle.click?.({ kind: 'image', name: 'deep.png' }));
 
-      expect(mocks.fetchInfiniteQuery).not.toHaveBeenCalled();
-      expect(mocks.setPage).toHaveBeenCalledWith(11);
+      expect(mocks.setPage).not.toHaveBeenCalled();
       expect(mocks.selectItem).toHaveBeenCalledTimes(1);
       expect(mocks.selectItem.mock.calls[0]?.[2]).toBe(11);
+      expect(mocks.requestReveal).toHaveBeenCalledWith('image:deep.png', expect.any(AbortSignal), 700);
     });
 
     it('drops the page landing when the ordering settings changed mid-lookup', async () => {
-      // The computed index describes the ordering the name list was fetched
-      // under; landing on that page under a different ordering would show an
-      // unrelated screen of images.
-      const names = deferred<ReturnType<typeof namesWithImageAt>>();
+      // The verified position describes the ordering it was fetched under;
+      // changing sort before it settles must leave the Gallery untouched.
+      const location = deferred<ReturnType<typeof verifiedAt>>();
 
       mocks.settings = { imageOrderDir: 'DESC', paginationMode: 'paginated' };
       mocks.resolve.mockResolvedValue({ boardId: 'board-a', category: 'general', kind: 'image', name: 'deep.png' });
-      mocks.fetchNames.mockReturnValue(names.promise);
+      mocks.fetchVerifiedPage.mockReturnValue(location.promise);
       await mount();
 
       await flush(() => handle.click?.({ kind: 'image', name: 'deep.png' }));
       mocks.settings = { imageOrderDir: 'ASC', paginationMode: 'paginated' };
-      await flush(() => names.resolve(namesWithImageAt('deep.png', 130)));
+      await flush(() => location.resolve(verifiedAt(130, 200)));
 
       expect(mocks.setPage).not.toHaveBeenCalled();
-      expect(mocks.selectItem).toHaveBeenCalledTimes(1);
-      expect(mocks.selectItem.mock.calls[0]?.[2]).toBeUndefined();
+      expect(mocks.selectBoard).not.toHaveBeenCalled();
+      expect(mocks.selectItem).not.toHaveBeenCalled();
+      expect(mocks.requestReveal).not.toHaveBeenCalled();
     });
 
     it('drops the page landing when the board is not listable in the gallery', async () => {
@@ -382,7 +355,7 @@ describe('useMapSelection', () => {
         kind: 'image',
         name: 'deep.png',
       });
-      mocks.fetchNames.mockResolvedValue(namesWithImageAt('deep.png', 130));
+      mocks.fetchVerifiedPage.mockResolvedValue(verifiedAt(130, 200));
       await mount();
 
       await flush(() => handle.click?.({ kind: 'image', name: 'deep.png' }));
@@ -396,7 +369,7 @@ describe('useMapSelection', () => {
       mocks.settings = { imageOrderDir: 'DESC', paginationMode: 'paginated' };
       mocks.fetchBoards.mockRejectedValue(new Error('boards endpoint down'));
       mocks.resolve.mockResolvedValue({ boardId: 'board-a', category: 'general', kind: 'image', name: 'deep.png' });
-      mocks.fetchNames.mockResolvedValue(namesWithImageAt('deep.png', 130));
+      mocks.fetchVerifiedPage.mockResolvedValue(verifiedAt(130, 200));
       await mount();
 
       await flush(() => handle.click?.({ kind: 'image', name: 'deep.png' }));
@@ -429,12 +402,12 @@ describe('useMapSelection', () => {
         name: 'a.png',
         starred: true,
       });
-      mocks.fetchNames.mockResolvedValue(namesWithImageAt('a.png', 0));
+      mocks.fetchVerifiedPage.mockResolvedValue(verifiedAt(0));
       await mount();
 
       await flush(() => handle.click?.({ kind: 'image', name: 'a.png' }));
 
-      expect(mocks.fetchNames.mock.calls[0]?.[0].filter).toMatchObject({ boardId: 'board-a', starred: true });
+      expect(mocks.fetchVerifiedPage.mock.calls[0]?.[1]).toMatchObject({ boardId: 'board-a', starred: true });
       expect(mocks.patchValues).toHaveBeenCalledWith('gallery', {
         searchTerm: '',
         semanticImageQuery: null,
@@ -487,18 +460,17 @@ describe('useMapSelection', () => {
       expect(mocks.setView).not.toHaveBeenCalled();
     });
 
-    it('still selects when the position lookup fails', async () => {
+    it('leaves Gallery state untouched when a verified position is unavailable', async () => {
       mocks.resolve.mockResolvedValue({ boardId: 'board-a', category: 'general', kind: 'image', name: 'a.png' });
-      mocks.fetchNames.mockRejectedValue(new Error('names endpoint down'));
+      mocks.fetchVerifiedPage.mockResolvedValue(null);
       await mount();
 
       await flush(() => handle.click?.({ kind: 'image', name: 'a.png' }));
 
       expect(mocks.setPage).not.toHaveBeenCalled();
-      expect(mocks.selectBoard).toHaveBeenCalledWith('board-a');
-      expect(mocks.selectItem).toHaveBeenCalledTimes(1);
-      expect(mocks.selectItem.mock.calls[0]?.[2]).toBeUndefined();
-      expect(mocks.requestReveal).toHaveBeenCalledWith('image:a.png');
+      expect(mocks.selectBoard).not.toHaveBeenCalled();
+      expect(mocks.selectItem).not.toHaveBeenCalled();
+      expect(mocks.requestReveal).not.toHaveBeenCalled();
     });
 
     it('does not touch the board for a click that never resolves an image', async () => {
@@ -526,7 +498,7 @@ describe('useMapSelection', () => {
 
       expect(mocks.resolve).toHaveBeenCalledWith({ kind: 'video', name: 'clip.mp4' });
       expect(mocks.registerImageCluster).toHaveBeenCalledWith(['video:clip.mp4', 'image:a.png'], 'beaches');
-      expect(mocks.requestReveal).toHaveBeenCalledWith('video:clip.mp4');
+      expect(mocks.requestReveal).toHaveBeenCalledWith('video:clip.mp4', expect.any(AbortSignal));
     });
 
     it('shows the cluster as a gallery filter with the clicked image selected and revealed', async () => {
@@ -558,7 +530,7 @@ describe('useMapSelection', () => {
       // Re-clicking the same cluster point after scrolling away must return
       // the grid to the top; the reveal channel carries that even when the
       // selection is unchanged.
-      expect(mocks.requestReveal).toHaveBeenCalledWith('image:a.png');
+      expect(mocks.requestReveal).toHaveBeenCalledWith('image:a.png', expect.any(AbortSignal));
     });
 
     it("selects the primary image's board before the cluster filter", async () => {
@@ -588,6 +560,23 @@ describe('useMapSelection', () => {
 
       expect(mocks.registerImageCluster).not.toHaveBeenCalled();
       expect(mocks.patchValues).not.toHaveBeenCalled();
+      expect(mocks.selectItem).not.toHaveBeenCalled();
+      expect(mocks.requestReveal).not.toHaveBeenCalled();
+    });
+
+    it('retires a cluster click still hydrating when its account epoch changes', async () => {
+      accountLifecycle.activate('gallery-cluster-test');
+      const pending = deferred<{ boardId: string; category: string; kind: string; name: string }>();
+      mocks.resolve.mockReturnValueOnce(pending.promise);
+      await mount();
+
+      await flush(() => handle.clickCluster?.({ kind: 'image', name: 'a.png' }, ['image:a.png'], 'nearby'));
+      accountLifecycle.activate('gallery-cluster-next-account');
+      await flush(() => pending.resolve({ boardId: 'board-a', category: 'general', kind: 'image', name: 'a.png' }));
+
+      expect(mocks.registerImageCluster).not.toHaveBeenCalled();
+      expect(mocks.patchValues).not.toHaveBeenCalled();
+      expect(mocks.selectBoard).not.toHaveBeenCalled();
       expect(mocks.selectItem).not.toHaveBeenCalled();
       expect(mocks.requestReveal).not.toHaveBeenCalled();
     });
@@ -677,21 +666,20 @@ describe('useMapSelection', () => {
     expect(mocks.selectItem.mock.calls.map((call) => call[0].name)).toEqual(['fast.png']);
   });
 
-  it('ignores a click whose position lookup lands after a newer click', async () => {
-    // The guard must hold across BOTH async hops: the hydrate and the
-    // name-list fetch. A click whose names arrive late must not move the
-    // gallery after a newer click has already landed it elsewhere.
-    const slowNames = deferred<ReturnType<typeof namesWithImageAt>>();
+  it('ignores a click whose verified page lands after a newer click', async () => {
+    const slowLocation = deferred<ReturnType<typeof verifiedAt>>();
 
     mocks.resolve
       .mockResolvedValueOnce({ boardId: 'board-a', category: 'general', kind: 'image', name: 'slow.png' })
       .mockResolvedValueOnce({ boardId: 'board-b', category: 'general', kind: 'image', name: 'fast.png' });
-    mocks.fetchNames.mockReturnValueOnce(slowNames.promise).mockResolvedValueOnce(namesWithImageAt('fast.png', 0));
+    mocks.fetchVerifiedPage.mockReturnValueOnce(slowLocation.promise).mockResolvedValueOnce(verifiedAt(0));
     await mount();
 
     await flush(() => handle.click?.({ kind: 'image', name: 'slow.png' }));
+    const slowSignal = mocks.fetchVerifiedPage.mock.calls[0]?.[4] as AbortSignal;
     await flush(() => handle.click?.({ kind: 'image', name: 'fast.png' }));
-    await flush(() => slowNames.resolve(namesWithImageAt('slow.png', 0)));
+    expect(slowSignal.aborted).toBe(true);
+    await flush(() => slowLocation.resolve(verifiedAt(1, 2)));
 
     expect(mocks.selectBoard.mock.calls).toEqual([['board-b']]);
     expect(mocks.selectItem.mock.calls.map((call) => call[0].name)).toEqual(['fast.png']);

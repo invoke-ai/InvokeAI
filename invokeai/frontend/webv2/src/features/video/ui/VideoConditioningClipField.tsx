@@ -3,7 +3,7 @@ import type { VideoConditioningClip, VideoConditioningRole } from '@features/vid
 
 import { createListCollection, Stack, Text } from '@chakra-ui/react';
 import { GalleryMediaSlot, type GalleryMediaSlotLabels, type GalleryMediaSlotValue } from '@features/gallery/mediaSlot';
-import { createVideoConditioningClip } from '@features/video/core/settings';
+import { areFrameImagesHeld, createVideoConditioningClip } from '@features/video/core/settings';
 import { Field, Select } from '@platform/ui';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +13,8 @@ import { useVideoUiActions } from './VideoUiContext';
 /**
  * The whole-modality conditioning slot: a clip whose soundtrack the model generates a picture for,
  * or whose picture it generates a soundtrack for. One slot with a role, not two slots, because
- * LTX-2 holds exactly one modality clean and samples the other.
+ * LTX-2 holds exactly one modality clean and samples the other. Start and end images can anchor the
+ * generated picture in the soundtrack role only, so while they are set the picture role is closed.
  *
  * No trim bounds: the conditioning nodes consume the whole recording.
  */
@@ -27,6 +28,7 @@ export const VideoConditioningClipField = memo(
     disabled = false,
     disabledReason,
     derivedText,
+    pictureRoleDisabledReason,
     onChange,
   }: {
     conditioningClip: VideoConditioningClip | null;
@@ -35,10 +37,12 @@ export const VideoConditioningClipField = memo(
     disabledReason?: string;
     /** What the clip works out to — length, and the rate it will run at. */
     derivedText?: string;
+    /** Set while the picture role is unavailable because frames are held. */
+    pictureRoleDisabledReason?: string;
     onChange: (conditioning: VideoConditioningClip | null) => void;
   }) {
     const { t } = useTranslation();
-    const { findInGallery } = useVideoUiActions();
+    const { findInGallery, readValues } = useVideoUiActions();
     const slotLabels = useMemo<Partial<GalleryMediaSlotLabels>>(
       () => ({ drop: t('widgets.video.dropConditioningClip') }),
       [t]
@@ -60,10 +64,14 @@ export const VideoConditioningClipField = memo(
         createListCollection({
           items: [
             { label: t('widgets.video.conditioningRoleAudio'), value: 'audio' },
-            { label: t('widgets.video.conditioningRoleVideo'), value: 'video' },
+            {
+              disabled: pictureRoleDisabledReason !== undefined,
+              label: t('widgets.video.conditioningRoleVideo'),
+              value: 'video',
+            },
           ],
         }),
-      [t]
+      [pictureRoleDisabledReason, t]
     );
     const roleValue = useMemo(() => (conditioningClip ? [conditioningClip.role] : []), [conditioningClip]);
 
@@ -72,10 +80,11 @@ export const VideoConditioningClipField = memo(
         if (item === null) {
           onChange(null);
         } else if (item.kind === 'video') {
-          onChange(createVideoConditioningClip(item));
+          // Read when the drop lands, not when it began: a frame picked meanwhile must not be cleared by a picture role.
+          onChange(createVideoConditioningClip(item, { framesHeld: areFrameImagesHeld(readValues()) }));
         }
       },
-      [onChange]
+      [onChange, readValues]
     );
     // The whole premise of this field is what is inside the clip, so it gets the same way back to
     // the gallery record that every other media slot has.
@@ -113,20 +122,19 @@ export const VideoConditioningClipField = memo(
             helpText={
               conditioningClip.role === 'video'
                 ? `${t('widgets.video.conditioningRoleVideoHelp')}${derivedText ? ` ${derivedText}` : ''}`
-                : derivedText
+                : [derivedText, pictureRoleDisabledReason].filter(Boolean).join(' ') || undefined
             }
             label={t('widgets.video.conditioningRole')}
           >
             <Select
               collection={roleCollection}
               disabled={disabled}
-              size="xs"
               value={roleValue}
               onValueChange={handleRoleChange}
             />
           </Field>
         ) : (
-          <Text color="fg.muted" fontSize="2xs" textWrap="pretty">
+          <Text color="fg.muted" fontSize="xs" textWrap="pretty">
             {t('widgets.video.conditioningClipHelp')}
           </Text>
         )}
@@ -138,6 +146,7 @@ export const VideoConditioningClipField = memo(
     previous.disabled === next.disabled &&
     previous.disabledReason === next.disabledReason &&
     previous.derivedText === next.derivedText &&
+    previous.pictureRoleDisabledReason === next.pictureRoleDisabledReason &&
     previous.conditioningClip?.clip.video_name === next.conditioningClip?.clip.video_name &&
     previous.conditioningClip?.role === next.conditioningClip?.role
 );

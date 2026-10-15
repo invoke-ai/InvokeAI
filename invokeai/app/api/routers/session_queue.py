@@ -37,15 +37,16 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueStatus,
 )
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
 
 session_queue_router = APIRouter(prefix="/v1/queue", tags=["queue"])
 
 # Upper bound on the number of item ids a client may ask about in one request. Without it a
-# caller can post tens of thousands of ids, which the SQLite layer would either expand past the
-# per-statement bind limit or grind through in a long-running query. The list is meant to cover
-# the rows a client actually has on screen, so this is far above any legitimate use.
+# caller can post tens of thousands of ids and make the database grind through a long-running
+# query. The list is meant to cover the rows a client actually has on screen, so this is far
+# above any legitimate use. A limited id listing is capped at the same size, since its ids are
+# fetched to be hydrated that way.
 MAX_QUEUE_ITEM_IDS_PER_REQUEST = 1000
 
 
@@ -248,7 +249,7 @@ def get_queue_item_for_mutation(queue_id: str, item_id: int, current_user: Curre
 )
 async def enqueue_batch(
     current_user: CurrentUserOrDefault,
-    queue_id: str = Path(description="The queue id to perform this operation on"),
+    queue_id: str = Path(description="The queue id to perform this operation on", max_length=255),
     batch: Batch = Body(description="Batch to process"),
     prepend: bool = Body(default=False, description="Whether or not to prepend this batch in the queue"),
 ) -> EnqueueBatchResult:
@@ -346,8 +347,19 @@ def get_queue_item_ids(
     origin_prefix: Optional[str] = Query(
         default=None, description="Only include queue items whose origin starts with this prefix"
     ),
+    limit: Optional[int] = Query(
+        default=None,
+        ge=1,
+        le=MAX_QUEUE_ITEM_IDS_PER_REQUEST,
+        description="Return at most this many ids, from the start of the requested order. Omit to return every matching id",
+    ),
 ) -> ItemIdsResult:
-    """Gets all queue item ids that match the given parameters.
+    """Gets the queue item ids that match the given parameters, ordered by creation time.
+
+    `total_count` is the number of ids in `item_ids`. Without `limit`, every matching id is returned, so it
+    equals the number of matching items. With `limit`, only the first `limit` ids of the same order are
+    returned, and it is not a total (counting every match would read the whole queue history); use the queue
+    status for totals.
 
     IDs for every user's items are returned (item ids carry no sensitive data on their own).
     When the corresponding items are hydrated via get_queue_items_by_item_ids, those belonging
@@ -359,7 +371,7 @@ def get_queue_item_ids(
     """
     try:
         return ApiDependencies.invoker.services.session_queue.get_queue_item_ids(
-            queue_id=queue_id, order_dir=order_dir, origin_prefix=origin_prefix
+            queue_id=queue_id, order_dir=order_dir, origin_prefix=origin_prefix, limit=limit
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while listing all queue item ids: {e}")

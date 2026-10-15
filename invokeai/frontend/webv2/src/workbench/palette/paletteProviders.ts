@@ -69,7 +69,7 @@ export const createWorkflowsProvider = ({
       keywords: item.tags,
       run: () => {
         openWorkflowWidget();
-        requestLibraryWorkflowLoad(item.workflowId);
+        requestLibraryWorkflowLoad(item.workflowId, item.name);
       },
       subtitle:
         item.category === 'default'

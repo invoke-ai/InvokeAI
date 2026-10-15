@@ -2,87 +2,87 @@ import type { ModelConfig } from '@features/models';
 import type { CanvasControlLayerContract, CanvasLayerContract } from '@workbench/canvas-engine/api';
 
 import {
-  getControlLayerRejectionReason,
+  createControlValidationSequence,
   getControlValidationReason,
+  getSuggestedControlKind,
+  type ControlAdapterKind,
   type ControlValidationReason,
 } from '@features/generation/graph';
 import { isCompositableControlLayer } from '@workbench/canvasLayerContent';
 
+/** A control layer that blocks generation; the shell words it from the locale (see `controlLayerMessages`). */
 export interface ControlLayerIssue {
   code: ControlValidationReason;
   layerId: string;
   layerName: string;
-  /** Human-readable sentence (plain English, matching other invocation reasons). */
-  message: string;
+  /** For `switch_adapter_kind`: the kind the selected base runs. */
+  suggestedKind: ControlAdapterKind | null;
 }
 
 export { hasControlLayerContent } from '@workbench/canvasLayerContent';
 
-const resolveAdapterModel = (
-  adapterModel: string | null,
-  models: readonly ModelConfig[]
-): { base: string; type: string } | null => {
-  const resolved = adapterModel ? models.find((candidate) => candidate.key === adapterModel) : undefined;
-  return resolved ? { base: resolved.base, type: resolved.type } : null;
+const resolveAdapterModel = (adapterModel: string | null, models: readonly ModelConfig[]): ModelConfig | null =>
+  (adapterModel ? models.find((candidate) => candidate.key === adapterModel) : undefined) ?? null;
+
+type MainModel = { base: string; variant?: string | null };
+
+/** Validates control layers in generation order, as the invocation does. */
+const createLayerValidator = (mainModel: MainModel, models: readonly ModelConfig[]) => {
+  const validate = createControlValidationSequence(mainModel);
+  return ({ adapter }: CanvasControlLayerContract): ControlValidationReason | null =>
+    validate({
+      adapterModel: resolveAdapterModel(adapter.model, models),
+      beginEndStepPct: adapter.beginEndStepPct,
+      kind: adapter.kind,
+      weight: adapter.weight,
+    });
 };
 
 /**
  * Validate the same enabled, content-bearing layers as createControlLayerCollector; invalid layers do not consume
- * per-kind limits.
+ * per-generation limits.
  */
 export const getBlockingControlLayerIssues = (params: {
   layers: readonly CanvasLayerContract[];
-  mainModel: { base: string; variant?: string | null };
+  mainModel: MainModel;
   models: readonly ModelConfig[];
 }): ControlLayerIssue[] => {
   const { layers, mainModel, models } = params;
+  const validate = createLayerValidator(mainModel, models);
   const issues: ControlLayerIssue[] = [];
-  let controlLoraCount = 0;
-  let zImageControlCount = 0;
 
   for (const layer of layers) {
     if (!isCompositableControlLayer(layer)) {
       continue;
     }
-    const { adapter } = layer;
-    const adapterModel = resolveAdapterModel(adapter.model, models);
-    const controlLoraIndex = adapter.kind === 'control_lora' ? controlLoraCount : 0;
-    const zImageControlIndex = adapter.kind === 'z_image_control' ? zImageControlCount : 0;
-    const code = getControlValidationReason({
-      adapterModel,
-      beginEndStepPct: adapter.beginEndStepPct,
-      controlLoraIndex,
-      kind: adapter.kind,
-      mainBase: mainModel.base,
-      mainVariant: mainModel.variant ?? undefined,
-      weight: adapter.weight,
-      zImageControlIndex,
-    });
+    const code = validate(layer);
     if (code) {
-      const message =
-        getControlLayerRejectionReason({
-          adapterModel,
-          beginEndStepPct: adapter.beginEndStepPct,
-          controlLoraIndex,
-          hasContent: true,
-          kind: adapter.kind,
-          layerName: layer.name,
-          mainBase: mainModel.base,
-          mainVariant: mainModel.variant ?? undefined,
-          weight: adapter.weight,
-          zImageControlIndex,
-        }) ?? `Control layer "${layer.name}" is invalid.`;
-      issues.push({ code, layerId: layer.id, layerName: layer.name, message });
-      continue;
-    }
-    if (adapter.kind === 'control_lora') {
-      controlLoraCount += 1;
-    }
-    if (adapter.kind === 'z_image_control') {
-      zImageControlCount += 1;
+      issues.push({
+        code,
+        layerId: layer.id,
+        layerName: layer.name,
+        suggestedKind: code === 'switch_adapter_kind' ? getSuggestedControlKind(mainModel.base) : null,
+      });
     }
   }
   return issues;
+};
+
+/**
+ * The reason one layer would block generation, judged exactly as the invocation judges it: `earlier` are the
+ * contributing, content-bearing control layers above it in generation order, which may claim limited slots first.
+ */
+export const getControlLayerReasonInSequence = (params: {
+  earlier: readonly CanvasControlLayerContract[];
+  layer: CanvasControlLayerContract;
+  mainModel: MainModel;
+  models: readonly ModelConfig[];
+}): ControlValidationReason | null => {
+  const validate = createLayerValidator(params.mainModel, params.models);
+  for (const earlier of params.earlier) {
+    validate(earlier);
+  }
+  return validate(params.layer);
 };
 
 /** Ambient warnings include empty layers but omit per-kind limits, which belong in the Invoke tooltip. */
@@ -99,4 +99,26 @@ export const getControlLayerAttentionReason = (
     mainBase,
     weight: layer.adapter.weight,
     zImageControlIndex: 0,
+  });
+
+type Translate = (key: string, options?: Record<string, unknown>) => string;
+
+/** The one user-facing wording of a reason, shared by the settings panel, the layer row and the Invoke tooltip. */
+export const describeControlLayerReason = (
+  t: Translate,
+  code: ControlValidationReason,
+  suggestedKind: ControlAdapterKind | null
+): string =>
+  t(`widgets.layers.control.validation.${code}`, {
+    kind: suggestedKind ? t(`widgets.layers.control.kinds.${suggestedKind}`) : '',
+  });
+
+/** A blocking issue as the Invoke tooltip and the failed-invoke notice show it. */
+export const describeControlLayerIssue = (
+  t: Translate,
+  issue: Pick<ControlLayerIssue, 'code' | 'layerName' | 'suggestedKind'>
+): string =>
+  t('widgets.layers.control.invalidLayer', {
+    name: issue.layerName,
+    reason: describeControlLayerReason(t, issue.code, issue.suggestedKind),
   });

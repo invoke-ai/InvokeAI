@@ -239,7 +239,6 @@ export interface QueueStatusReadModel {
 
 export interface QueueItemIdsReadModel {
   itemIds: number[];
-  totalCount: number;
 }
 
 export interface QueueItemProgress {
@@ -329,7 +328,13 @@ export interface QueueBackendPort extends QueueFeatureCommands {
   getResultVideos(videoNames: string[], sourceQueueItemId: string, queuedAt: string): Promise<QueueResultVideo[]>;
   listItems(): Promise<QueueBackendItem[]>;
   readCurrent(scope?: QueueQueryScope, signal?: AbortSignal): Promise<QueueItemReadModel | null>;
-  readItemIds(order: 'asc' | 'desc', scope?: QueueQueryScope, signal?: AbortSignal): Promise<QueueItemIdsReadModel>;
+  /** With `limit`, the first ids of that order; a server that predates `limit` returns every id. */
+  readItemIds(
+    order: 'asc' | 'desc',
+    scope?: QueueQueryScope,
+    signal?: AbortSignal,
+    limit?: number
+  ): Promise<QueueItemIdsReadModel>;
   readItemsById(itemIds: number[], signal?: AbortSignal): Promise<QueueItemReadModel[]>;
   readNext(scope?: QueueQueryScope, signal?: AbortSignal): Promise<QueueItemReadModel | null>;
   readStatus(scope?: QueueQueryScope, signal?: AbortSignal): Promise<QueueStatusReadModel>;

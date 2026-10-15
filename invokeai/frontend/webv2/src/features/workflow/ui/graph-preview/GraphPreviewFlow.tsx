@@ -76,7 +76,7 @@ const PreviewNode = ({ data }: NodeProps<PreviewFlowNode>) => {
       bg="bg"
       borderColor={data.isSelected ? 'accent.solid' : 'border.emphasized'}
       borderWidth="1px"
-      fontSize="xs"
+      fontSize="md"
       minW="14rem"
       outlineColor="accent.solid"
       outlineStyle={data.isSelected ? 'solid' : undefined}
@@ -87,10 +87,10 @@ const PreviewNode = ({ data }: NodeProps<PreviewFlowNode>) => {
       <Handle position={Position.Left} style={handleStyle} type="target" />
       <Handle position={Position.Right} style={handleStyle} type="source" />
       <Stack gap="0.5" px="3" py="2">
-        <Badge fontFamily="mono" size="xs" w="fit-content">
+        <Badge fontFamily="mono" w="fit-content">
           {data.nodeType}
         </Badge>
-        <Text color="fg.subtle" fontSize="2xs" truncate>
+        <Text color="fg.subtle" fontSize="xs" truncate>
           {data.subtitle ?? `${data.nodeId} · ${t('graphPreview.inputCount', { count: data.inputCount })}`}
         </Text>
       </Stack>

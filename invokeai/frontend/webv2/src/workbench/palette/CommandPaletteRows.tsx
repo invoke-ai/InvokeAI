@@ -3,7 +3,7 @@ import type { ReactNode, Ref } from 'react';
 import { Box, HStack, Icon, Kbd, ScrollArea, Spacer, Text, chakra } from '@chakra-ui/react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { dropdownGroupLabel } from '@theme/recipes';
-import { ShortcutKeyGlyph } from '@workbench/hotkeys/keyGlyphs';
+import { ShortcutKeyGlyph, ShortcutKeycaps } from '@workbench/hotkeys/keyGlyphs';
 import { CheckIcon } from 'lucide-react';
 import { useCallback, useImperativeHandle, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -78,7 +78,7 @@ const EntryRow = ({
       {...rowButtonProps}
       id={domId}
       aria-selected={isActive}
-      bg={isActive ? 'bg.emphasized' : undefined}
+      bg={isActive ? 'bg.hover' : undefined}
       role="option"
       onClick={onRun}
       onMouseDown={preventFocusSteal}
@@ -87,26 +87,18 @@ const EntryRow = ({
       {entry.thumbnailUrl ? (
         <chakra.img alt="" boxSize="7" flexShrink={0} objectFit="cover" rounded="sm" src={entry.thumbnailUrl} />
       ) : null}
-      <Text fontSize="sm" truncate>
+      <Text fontSize="lg" truncate>
         {renderTitle(entry.title, matchIndexes)}
       </Text>
       {entry.isCurrent ? (
         <Icon as={CheckIcon} boxSize="3.5" color="fg.muted" flexShrink={0} />
       ) : entry.subtitle ? (
-        <Text color="fg.subtle" flexShrink={0} fontSize="xs" maxW="45%" truncate>
+        <Text color="fg.subtle" flexShrink={0} fontSize="md" maxW="45%" truncate>
           {entry.subtitle}
         </Text>
       ) : null}
       <Spacer />
-      {entry.keys ? (
-        <HStack flexShrink={0} gap="0.5">
-          {entry.keys.map((part) => (
-            <Kbd key={part} size="sm" textTransform="lowercase">
-              <ShortcutKeyGlyph fallback={part} part={part} />
-            </Kbd>
-          ))}
-        </HStack>
-      ) : null}
+      {entry.keys ? <ShortcutKeycaps parts={entry.keys} /> : null}
     </HStack>
   );
 };
@@ -135,7 +127,7 @@ const ProviderErrorRow = ({
     onMouseDown={preventFocusSteal}
     onMouseMove={onActive}
   >
-    <Text fontSize="sm" truncate>
+    <Text fontSize="lg" truncate>
       {label}
     </Text>
   </HStack>
@@ -158,17 +150,17 @@ const ScopeRow = ({
     {...rowButtonProps}
     id={domId}
     aria-selected={isActive}
-    bg={isActive ? 'bg.emphasized' : undefined}
+    bg={isActive ? 'bg.hover' : undefined}
     role="option"
     onClick={onRun}
     onMouseDown={preventFocusSteal}
     onMouseMove={onActive}
   >
-    <Text color="fg.muted" fontSize="sm" truncate>
+    <Text color="fg.muted" fontSize="lg" truncate>
       {label}
     </Text>
     <Spacer />
-    <Kbd size="sm" textTransform="lowercase">
+    <Kbd textTransform="lowercase">
       <ShortcutKeyGlyph fallback="tab" part="tab" />
     </Kbd>
   </HStack>
@@ -281,7 +273,7 @@ export const CommandPaletteRows = ({
   ]);
 
   return (
-    <ScrollArea.Root maxH="min(400px, 55dvh)" size="xs" variant="hover" w="full">
+    <ScrollArea.Root maxH="min(400px, 55dvh)" variant="hover" w="full">
       <ScrollArea.Viewport ref={setScrollElement} maxH="inherit" w="full">
         <ScrollArea.Content
           id={RESULT_LIST_ID}

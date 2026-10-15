@@ -109,11 +109,14 @@ export const beginPointerDrag = (
   return session;
 };
 
-/** Owns one gesture at a time and ends it silently when the component unmounts. */
+/**
+ * Owns one gesture at a time and ends it silently when the component unmounts. The returned controller lets the
+ * caller end the gesture early, without `onEnd`, when what it was dragging stops making sense.
+ */
 export const usePointerDrag = (): ((
   event: ReactPointerEvent<HTMLElement>,
   options: PointerDragOptions
-) => AbortSignal) => {
+) => AbortController) => {
   const sessionRef = useRef<AbortController | null>(null);
 
   useMountEffect(() => () => sessionRef.current?.abort());
@@ -122,7 +125,7 @@ export const usePointerDrag = (): ((
     sessionRef.current?.abort();
     const session = beginPointerDrag(event, options);
     sessionRef.current = session;
-    return session.signal;
+    return session;
   }, []);
 };
 
@@ -138,6 +141,15 @@ const setResizeActive = (isActive: boolean) => {
 
 /** True while a resize handle is being dragged; costly layout consumers may wait for it to end. */
 export const isResizeDragActive = (): boolean => activeResizeCount > 0;
+
+/** Count a resize gesture a caller runs itself, from now until its session aborts. */
+export const trackResizeDrag = (signal: AbortSignal): void => {
+  if (signal.aborted) {
+    return;
+  }
+  setResizeActive(true);
+  signal.addEventListener('abort', () => setResizeActive(false), { once: true });
+};
 
 export const subscribeResizeDrag = (listener: () => void): (() => void) => {
   resizeListeners.add(listener);
@@ -238,7 +250,7 @@ export const ResizeHandle = ({
 
       handle.setAttribute('data-dragging', '');
       setResizeActive(true);
-      const signal = startDrag(event, {
+      const { signal } = startDrag(event, {
         cursor: isVertical ? 'col-resize' : 'row-resize',
         onEnd: (reason) => {
           const shouldCollapse = isArmed && reason === 'release';
@@ -342,56 +354,39 @@ export const ResizeHandle = ({
 const toCssProperty = (property: NonNullable<ResizeHandleProps['sizeProperty']>) =>
   property === 'flexBasis' ? 'flex-basis' : property;
 
-/** A window's bottom-right resize grip; the caller applies the 2D offset. */
+/**
+ * A window's bottom-right resize grip: the labelled, keyboard-operable handle. The caller owns the pointer
+ * gesture, so it runs on the same path as the window's other handles, and marks the grip `data-dragging` while
+ * it does.
+ */
 export const ResizeCorner = ({
   label,
+  valueMax,
   valueMin,
   valueNow,
-  onDragCancel,
-  onDragEnd,
-  onDragMove,
+  valueText,
   onKeyDown,
+  onPointerDown,
 }: {
   label: string;
+  /** The widest the window can be; without it assistive tech assumes 100. */
+  valueMax: number;
   valueMin: number;
   valueNow: number;
-  /** The gesture stopped without ending, e.g. the corner unmounted, or `onDragEnd` threw; undo any live preview. */
-  onDragCancel: () => void;
-  onDragEnd: (reason: PointerDragEnd) => void;
-  onDragMove: (deltaX: number, deltaY: number) => void;
+  /** The size in words: the grip resizes two dimensions, and a separator's value carries only one. */
+  valueText: string;
   onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
+  onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
 }) => {
   const styles = useSlotRecipe({ recipe: resizeHandleSlotRecipe })({ orientation: 'corner' });
-  const startDrag = usePointerDrag();
-  const onPointerDown = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (event.button !== 0) {
-        return;
-      }
-      const handle = event.currentTarget;
-      let hasEnded = false;
-      handle.setAttribute('data-dragging', '');
-      setResizeActive(true);
-      const onEnd = (reason: PointerDragEnd) => {
-        onDragEnd(reason);
-        hasEnded = true;
-      };
-      startDrag(event, { cursor: 'nwse-resize', onEnd, onMove: onDragMove }).addEventListener('abort', () => {
-        handle.removeAttribute('data-dragging');
-        setResizeActive(false);
-        if (!hasEnded) {
-          onDragCancel();
-        }
-      });
-    },
-    [onDragCancel, onDragEnd, onDragMove, startDrag]
-  );
 
   return (
     <chakra.div
       aria-label={label}
+      aria-valuemax={valueMax}
       aria-valuemin={valueMin}
       aria-valuenow={valueNow}
+      aria-valuetext={valueText}
       css={styles.handle}
       role="separator"
       tabIndex={0}

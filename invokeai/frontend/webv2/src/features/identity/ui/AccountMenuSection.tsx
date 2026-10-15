@@ -38,16 +38,16 @@ export const AccountMenuSection = () => {
       <Box px="3" py="2">
         <HStack justify="space-between">
           <HStack gap="2" minW="0">
-            <Avatar.Root bg="accent.subtle" color="fg" size="2xs">
-              <Avatar.Fallback fontSize="2xs" name={label} />
+            <Avatar.Root bg="accent.subtle" color="fg" size="sm">
+              <Avatar.Fallback fontSize="xs" name={label} />
             </Avatar.Root>
             <Stack gap="0" minW="0">
-              <MiddleTruncate fontSize="xs" fontWeight="600" text={label} />
-              <MiddleTruncate color="fg.muted" fontSize="2xs" text={user.email} />
+              <MiddleTruncate fontSize="md" fontWeight="600" text={label} />
+              <MiddleTruncate color="fg.muted" fontSize="xs" text={user.email} />
             </Stack>
           </HStack>
           {user.is_admin ? (
-            <Badge colorPalette="purple" fontSize="2xs" variant="surface">
+            <Badge colorPalette="purple" fontSize="xs" variant="surface">
               {t('users.admin')}
             </Badge>
           ) : null}

@@ -46,9 +46,10 @@ const okPixels = (layerId: string, size = 4): ExportLayerPixelsResult => ({
 /** Mutable so a test can advance engine state mid-capture, the way an edit does. */
 interface Harness {
   deps: CreateRasterSnapshotCaptureDeps;
+  memory: RasterMemoryBudgetController;
   state: {
     canvas: CanvasStateContractV3 | null;
-    contentEpoch: number;
+    directPixelEpoch: number;
     disposed: boolean;
     documentGeneration: number;
     lifecycleGeneration: number;
@@ -59,10 +60,13 @@ interface Harness {
 
 let harness: Harness;
 
-const makeHarness = (overrides: Partial<CreateRasterSnapshotCaptureDeps> = {}): Harness => {
+const makeHarness = (
+  overrides: Partial<Omit<CreateRasterSnapshotCaptureDeps, 'memory'>> = {},
+  memory = new RasterMemoryBudgetController({ budgetBytes: 1_000_000 })
+): Harness => {
   const state = {
     canvas: canvasState() as CanvasStateContractV3 | null,
-    contentEpoch: 0,
+    directPixelEpoch: 0,
     disposed: false,
     documentGeneration: 1,
     lifecycleGeneration: 0,
@@ -76,17 +80,16 @@ const makeHarness = (overrides: Partial<CreateRasterSnapshotCaptureDeps> = {}): 
   const deps: CreateRasterSnapshotCaptureDeps = {
     createSurface: (width, height) => surface(width, height),
     getCanvasState: () => state.canvas,
-    getContentEpoch: () => state.contentEpoch,
+    getDirectPixelEpoch: () => state.directPixelEpoch,
     getDocumentGeneration: () => state.documentGeneration,
     getLifecycleGeneration: () => state.lifecycleGeneration,
     isDisposed: () => state.disposed,
     isGuardCurrent: (candidate) => currentGuards.has(candidate),
-    memory: new RasterMemoryBudgetController({ budgetBytes: 1_000_000 }),
+    memory,
     rasterizeLayerPixels: rasterize as unknown as CreateRasterSnapshotCaptureDeps['rasterizeLayerPixels'],
-    syncMemoryBaselines: vi.fn(),
     ...overrides,
   };
-  return { currentGuards, deps, rasterize, state };
+  return { currentGuards, deps, memory, rasterize, state };
 };
 
 beforeEach(() => {
@@ -119,7 +122,7 @@ describe('isDocumentSnapshotCurrent', () => {
 
   it.each([
     ['the canvas object is replaced', (h: Harness) => (h.state.canvas = canvasState())],
-    ['the raster content epoch advances', (h: Harness) => (h.state.contentEpoch += 1)],
+    ['the raster content epoch advances', (h: Harness) => (h.state.directPixelEpoch += 1)],
     ['the lifecycle generation advances', (h: Harness) => (h.state.lifecycleGeneration += 1)],
     ['the document generation advances', (h: Harness) => (h.state.documentGeneration += 1)],
     ['the engine is disposed', (h: Harness) => (h.state.disposed = true)],
@@ -147,7 +150,7 @@ describe('isDocumentSnapshotCurrent', () => {
 });
 
 describe('captureRasterSnapshot', () => {
-  it('holds and releases the purpose-built trim guard around live pixel capture', async () => {
+  it('pins every captured layer until the capture settles', async () => {
     let resolveRasterize!: (result: ExportLayerPixelsResult) => void;
     const rasterizeLayerPixels = vi.fn(
       () =>
@@ -155,15 +158,12 @@ describe('captureRasterSnapshot', () => {
           resolveRasterize = resolve;
         })
     );
-    const releaseTrimPin = vi.fn();
-    const pinForTrim = vi.fn(() => ({ release: releaseTrimPin }));
-    const guarded = makeHarness({ pinForTrim, rasterizeLayerPixels });
+    const guarded = makeHarness({ rasterizeLayerPixels });
     const capture = createRasterSnapshotCapture(guarded.deps);
     const snapshot = capture.captureDocumentSnapshot()!;
 
     const pending = capture.captureRasterSnapshot(snapshot, ['a']);
-    expect(pinForTrim).toHaveBeenCalledWith('a', 0);
-    expect(releaseTrimPin).not.toHaveBeenCalled();
+    expect(guarded.memory.isPinned('a')).toBe(true);
 
     const pixels = okPixels('a');
     if (pixels.status === 'ok') {
@@ -171,7 +171,7 @@ describe('captureRasterSnapshot', () => {
     }
     resolveRasterize(pixels);
     await expect(pending).resolves.toMatchObject({ status: 'ok' });
-    expect(releaseTrimPin).toHaveBeenCalledOnce();
+    expect(guarded.memory.isPinned('a')).toBe(false);
   });
 
   it('detaches a surface per layer and reports the empty ones separately', async () => {
@@ -257,7 +257,7 @@ describe('captureRasterSnapshot', () => {
   });
 
   it('reports over-budget without rasterizing when the estimate does not fit', async () => {
-    const harnessTiny = makeHarness({ memory: new RasterMemoryBudgetController({ budgetBytes: 8 }) });
+    const harnessTiny = makeHarness({}, new RasterMemoryBudgetController({ budgetBytes: 8 }));
     const capture = createRasterSnapshotCapture(harnessTiny.deps);
     const snapshot = capture.captureDocumentSnapshot()!;
     expect((await capture.captureRasterSnapshot(snapshot, ['a'])).status).toBe('over-budget');
@@ -266,7 +266,7 @@ describe('captureRasterSnapshot', () => {
 
   it('reports over-budget when a surface rasterizes larger than its estimate', async () => {
     // The 4x4 image estimates at 64 B; a 64x64 rasterized surface needs 16 KB more.
-    const tight = makeHarness({ memory: new RasterMemoryBudgetController({ budgetBytes: 128 }) });
+    const tight = makeHarness({}, new RasterMemoryBudgetController({ budgetBytes: 128 }));
     tight.rasterize.mockImplementation(() => {
       const result = { ...okPixels('a'), surface: surface(64, 64) } as ExportLayerPixelsResult;
       tight.currentGuards.add(result.status === 'ok' ? result.guard : guard('a'));
@@ -318,7 +318,7 @@ describe('captureRasterSnapshot', () => {
     harness.state.canvas = canvasState(['a', 'b']);
     harness.rasterize.mockImplementation((layerId: string) => {
       if (layerId === 'b') {
-        harness.state.contentEpoch += 1;
+        harness.state.directPixelEpoch += 1;
       }
       const result = okPixels(layerId);
       harness.currentGuards.add(result.status === 'ok' ? result.guard : guard(layerId));
@@ -335,7 +335,7 @@ describe('captureRasterSnapshot', () => {
     detaching.state.canvas = canvasState(['a', 'b']);
     detaching.rasterize.mockImplementation((layerId: string) => {
       // The edit lands while the FIRST layer is still rasterizing.
-      detaching.state.contentEpoch += 1;
+      detaching.state.directPixelEpoch += 1;
       const result = okPixels(layerId);
       detaching.currentGuards.add(result.status === 'ok' ? result.guard : guard(layerId));
       return Promise.resolve(result);
@@ -413,12 +413,12 @@ describe('snapshot lifetime', () => {
   it('frees the detached bytes it reserved once released', async () => {
     const capture = createRasterSnapshotCapture(harness.deps);
     const documentSnapshot = capture.captureDocumentSnapshot()!;
-    const before = harness.deps.memory.getAvailableBytes();
+    const before = harness.memory.getAvailableBytes();
     const result = await capture.captureRasterSnapshot(documentSnapshot, ['a']);
-    expect(harness.deps.memory.getAvailableBytes()).toBeLessThan(before);
+    expect(harness.memory.getAvailableBytes()).toBeLessThan(before);
     if (result.status === 'ok') {
       result.snapshot.release();
     }
-    expect(harness.deps.memory.getAvailableBytes()).toBe(before);
+    expect(harness.memory.getAvailableBytes()).toBe(before);
   });
 });

@@ -124,7 +124,7 @@ describe('high contrast conditions', () => {
 
 describe('native Chakra integration', () => {
   it('adds an icon-sized progress circle variant', () => {
-    expect(progressCircleSlotRecipe.variants?.size?.['2xs']).toMatchObject({
+    expect(progressCircleSlotRecipe.variants?.size?.sm).toMatchObject({
       circle: { '--size': '16px', '--thickness': '3px' },
     });
   });

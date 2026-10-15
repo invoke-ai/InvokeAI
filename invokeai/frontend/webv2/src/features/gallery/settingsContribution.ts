@@ -65,6 +65,14 @@ export const gallerySettingsContribution: SettingsContribution = {
       scope: 'instance',
     },
     {
+      id: 'followSelectedBoard',
+      kind: 'boolean',
+      label: (t) => t('widgets.gallery.followSelectedBoard'),
+      group: (t) => t('widgets.gallery.destination'),
+      keywords: 'auto add board destination results workflow',
+      scope: 'instance',
+    },
+    {
       id: 'showDateBoards',
       kind: 'boolean',
       label: (t) => t('widgets.gallery.dateBoards'),

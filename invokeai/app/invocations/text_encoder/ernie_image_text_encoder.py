@@ -13,10 +13,12 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import Mistral3EncoderField
 from invokeai.app.invocations.primitives import ErnieImageConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
     ErnieImageConditioningInfo,
 )
+from invokeai.backend.util.devices import TorchDevice
 
 
 @invocation(
@@ -61,8 +63,15 @@ class ErnieImageTextEncoderInvocation(BaseInvocation):
         text_encoder_info = context.models.load(self.text_encoder.text_encoder)
         tokenizer_info = context.models.load(self.text_encoder.tokenizer)
 
+        # A GGUF build dequantizes each Linear per forward, a transient its resident size does not cover;
+        # zero for other builds.
+        dequant_bytes = peak_dequant_transient_bytes(
+            text_encoder_info.model, TorchDevice.choose_bfloat16_safe_dtype(text_encoder_info.compute_device)
+        )
         with ExitStack() as exit_stack:
-            (_, text_encoder) = exit_stack.enter_context(text_encoder_info.model_on_device())
+            (_, text_encoder) = exit_stack.enter_context(
+                text_encoder_info.model_on_device(working_mem_bytes=dequant_bytes)
+            )
             (_, tokenizer) = exit_stack.enter_context(tokenizer_info.model_on_device())
 
             if not isinstance(text_encoder, PreTrainedModel):

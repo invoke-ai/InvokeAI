@@ -273,7 +273,7 @@ export const PromptTemplateEditor = ({
             : t('widgets.generate.promptTemplates.insertPlaceholderHelp')
         }
       >
-        <Button disabled={isPlaceholderPresent} size="2xs" variant="ghost" onClick={insertPlaceholder}>
+        <Button disabled={isPlaceholderPresent} size="sm" variant="ghost" onClick={insertPlaceholder}>
           {PROMPT_TEMPLATE_PLACEHOLDER}
         </Button>
       </Tooltip>
@@ -301,7 +301,6 @@ export const PromptTemplateEditor = ({
           aria-invalid={nameError !== null ? true : undefined}
           id={nameFieldId}
           placeholder={t('widgets.generate.promptTemplates.namePlaceholder')}
-          size="xs"
           value={draft.name}
           onChange={(event: ChangeEvent<HTMLInputElement>) => updateDraftField('name', event.currentTarget.value)}
         />
@@ -318,7 +317,6 @@ export const PromptTemplateEditor = ({
           placeholder={t('widgets.generate.promptTemplates.positivePromptPlaceholder')}
           resizeHandleAriaLabel={t('widgets.generate.promptTemplates.resizePositivePrompt')}
           showSyntaxHighlighting={showSyntaxHighlighting}
-          size="xs"
           value={draft.positivePrompt}
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
             updateDraftField('positivePrompt', event.currentTarget.value)
@@ -336,7 +334,6 @@ export const PromptTemplateEditor = ({
           placeholder={t('widgets.generate.promptTemplates.negativePromptPlaceholder')}
           resizeHandleAriaLabel={t('widgets.generate.promptTemplates.resizeNegativePrompt')}
           showSyntaxHighlighting={showSyntaxHighlighting}
-          size="xs"
           value={draft.negativePrompt}
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
             updateDraftField('negativePrompt', event.currentTarget.value)
@@ -357,17 +354,17 @@ export const PromptTemplateEditor = ({
       </Field>
 
       {error ? (
-        <Text color="fg.error" fontSize="2xs" wordBreak="break-word">
+        <Text color="fg.error" fontSize="xs" wordBreak="break-word">
           {error}
         </Text>
       ) : null}
 
       <HStack justify="end">
-        <Button disabled={isSaving} size="xs" variant="ghost" onClick={onCancel}>
+        <Button disabled={isSaving} variant="ghost" onClick={onCancel}>
           <XIcon />
           {t('common.cancel')}
         </Button>
-        <Button disabled={!trimmedName || nameError !== null} loading={isSaving} size="xs" onClick={handleSave}>
+        <Button disabled={!trimmedName || nameError !== null} loading={isSaving} onClick={handleSave}>
           <CheckIcon />
           {t('common.save')}
         </Button>

@@ -10,6 +10,18 @@ import {
 } from '@features/models/data/fp8StorageSupportStore';
 import { replaceModelInStore } from '@features/models/data/modelsStore';
 import { ModelSelect } from '@features/models/ui/components/ModelSelect';
+import {
+  applyModelDraftFields,
+  beginModelDraftSave,
+  discardModelDraft,
+  failModelDraftSave,
+  finishModelDraftSave,
+  hasDraftFields,
+  hasModelDraftConflict,
+  recordModelDraftFields,
+  useModelDraft,
+  type ModelDraft,
+} from '@features/models/ui/modelDraftsStore';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
@@ -21,14 +33,15 @@ import { useTranslation } from 'react-i18next';
 import type { DefaultSettingsControl, DefaultSettingsModel } from './defaultSettingsFields';
 
 import { getFieldsForModel, validateDefaults } from './defaultSettingsFields';
+import { DraftConflictNotice, UnsavedChangesLabel } from './ModelDraftNotices';
 
-/** Disabled defaults persist null to inherit app settings; defaultSettingsFields owns field policy and validation. */
+/**
+ * Disabled defaults persist null to inherit app settings; defaultSettingsFields owns field policy and validation.
+ * Unsaved values live in the model's retained draft, overlaid on the current server settings.
+ */
 
-interface DefaultSettingsDraft {
-  modelKey: string;
-  settings: AnyModelDefaultSettings;
-  source: AnyModelDefaultSettings | null | undefined;
-}
+const EMPTY_SETTINGS: AnyModelDefaultSettings = {};
+const selectDefaultsDraft = (draft: ModelDraft | undefined) => draft?.defaults;
 
 interface FieldControlProps {
   control: DefaultSettingsControl;
@@ -62,7 +75,7 @@ const FieldControl = ({ control, disabled, label, modelBase, setValue, value }: 
         max={control.max}
         min={control.min}
         position="relative"
-        size="sm"
+        size="lg"
         step={control.step ?? 1}
         value={typeof value === 'number' ? String(value) : ''}
         w="full"
@@ -88,7 +101,7 @@ const FieldControl = ({ control, disabled, label, modelBase, setValue, value }: 
         >
           <Icon as={MoveHorizontalIcon} boxSize="3" color="fg.subtle" />
         </NumberInput.Scrubber>
-        <NumberInput.Input ps="7" />
+        <NumberInput.Input aria-label={label} ps="7" />
       </NumberInput.Root>
     );
   }
@@ -99,7 +112,7 @@ const FieldControl = ({ control, disabled, label, modelBase, setValue, value }: 
         aria-label={label}
         collection={selectCollection}
         disabled={disabled}
-        size="sm"
+        size="lg"
         value={typeof value === 'string' ? [value] : []}
         onValueChange={({ value: next }) => {
           const nextValue = next[0];
@@ -118,7 +131,7 @@ const FieldControl = ({ control, disabled, label, modelBase, setValue, value }: 
         aria-label={label}
         disabled={disabled}
         options={comboboxOptions}
-        size="sm"
+        size="lg"
         value={typeof value === 'string' ? value : null}
         onValueChange={setValue}
       />
@@ -134,7 +147,7 @@ const FieldControl = ({ control, disabled, label, modelBase, setValue, value }: 
         modelTypes={control.modelTypes}
         placeholder={t(control.placeholderKey)}
         showManagerButton={false}
-        size="sm"
+        size="lg"
         // The 'default' sentinel renders as the placeholder: the toggle is on
         // but no specific model is pinned.
         value={typeof value === 'string' && value !== 'default' ? value : null}
@@ -165,31 +178,22 @@ export const DefaultSettingsSection = ({
   });
   const fp8StorageSupported = useFp8StorageSupportSelector((snapshot) => isFp8StorageSupported(snapshot, model));
   const fields = useMemo(() => getFieldsForModel(model, fp8StorageSupported), [fp8StorageSupported, model]);
-  const [draft, setDraft] = useState<DefaultSettingsDraft>(() => ({
-    modelKey: model.key,
-    settings: { ...model.default_settings },
-    source: model.default_settings,
-  }));
+  const saved = model.default_settings ?? EMPTY_SETTINGS;
+  const draft = useModelDraft(model.key, selectDefaultsDraft);
+  const settings = useMemo(() => applyModelDraftFields(saved, draft), [draft, saved]);
   const [error, setError] = useState<string | null>(null);
-  const { isBusy: isSaving, run } = useScopedAction();
-  const isDraftCurrent = draft.modelKey === model.key && draft.source === model.default_settings;
-  const savedSettingsDraft = useMemo(() => ({ ...model.default_settings }), [model.default_settings]);
-  const settings = isDraftCurrent ? draft.settings : savedSettingsDraft;
-  const visibleError = isDraftCurrent ? error : null;
-  const visibleIsSaving = isDraftCurrent ? isSaving : false;
-
-  const isDirty = useMemo(() => {
-    const saved = model.default_settings ?? {};
-
-    return fields.some((field) => (settings[field.key] ?? null) !== (saved[field.key] ?? null));
-  }, [fields, model.default_settings, settings]);
+  const { run } = useScopedAction();
+  // From the draft, not this instance: a save started before the user navigated away may still be in flight.
+  const isSaving = draft?.submitted !== undefined;
+  const isDirty = hasDraftFields(draft);
 
   const setFieldValue = (key: keyof AnyModelDefaultSettings, value: unknown) => {
-    setDraft({
-      modelKey: model.key,
-      settings: { ...settings, [key]: value as never },
-      source: model.default_settings,
-    });
+    recordModelDraftFields(model.key, 'defaults', { ...settings, [key]: value }, saved);
+    setError(null);
+  };
+
+  const handleReset = () => {
+    discardModelDraft(model.key, 'defaults');
     setError(null);
   };
 
@@ -201,16 +205,25 @@ export const DefaultSettingsSection = ({
       return;
     }
 
+    const submitted = settings;
+
     await run(
       async (owner) => {
-        const updated = await updateModel(model.key, { default_settings: settings }, owner.signal);
+        if (!beginModelDraftSave(model.key, 'defaults', submitted)) {
+          return;
+        }
+
+        const updated = await updateModel(model.key, { default_settings: submitted }, owner.signal);
 
         assertAccountScopeCurrent(owner);
         replaceModelInStore(updated);
+        finishModelDraftSave(model.key, 'defaults', updated.default_settings ?? EMPTY_SETTINGS);
         onSaved();
       },
-      (_message, saveError) =>
-        onError(saveError instanceof Error ? saveError.message : t('models.failedToSaveDefaults'))
+      (_message, saveError) => {
+        failModelDraftSave(model.key, 'defaults', saved, null);
+        onError(saveError instanceof Error ? saveError.message : t('models.failedToSaveDefaults'));
+      }
     );
   };
 
@@ -219,25 +232,30 @@ export const DefaultSettingsSection = ({
       <HStack justify="space-between">
         <Stack gap="0.5">
           <FieldLabel>{t('models.defaultSettings')}</FieldLabel>
-          <Text color="fg.subtle" fontSize="2xs">
+          <Text color="fg.subtle" fontSize="xs">
             {t('models.defaultSettingsHelp')}
           </Text>
         </Stack>
-        <Button
-          disabled={!isDirty}
-          loading={visibleIsSaving}
-          size="xs"
-          variant="solid"
-          onClick={() => void handleSave()}
-        >
-          {t('models.saveDefaults')}
-        </Button>
+        <HStack flexShrink={0} gap="2">
+          {isDirty ? (
+            <>
+              <UnsavedChangesLabel />
+              <Button disabled={isSaving} variant="ghost" onClick={handleReset}>
+                {t('common.reset')}
+              </Button>
+            </>
+          ) : null}
+          <Button disabled={!isDirty} loading={isSaving} variant="solid" onClick={() => void handleSave()}>
+            {t('models.saveDefaults')}
+          </Button>
+        </HStack>
       </HStack>
-      {visibleError ? (
-        <Text color="fg.error" fontSize="2xs" role="alert">
-          {visibleError}
+      {error ? (
+        <Text color="fg.error" fontSize="xs" role="alert">
+          {error}
         </Text>
       ) : null}
+      {hasModelDraftConflict(saved, draft) ? <DraftConflictNotice /> : null}
       <Grid gap="2.5" templateColumns="repeat(auto-fill, minmax(13rem, 1fr))">
         {fields.map((field) => {
           const value = settings[field.key] ?? null;
@@ -246,13 +264,13 @@ export const DefaultSettingsSection = ({
           return (
             <Panel key={field.key} gap="2" p="2.5" tone="surface">
               <HStack justify="space-between">
-                <Text fontSize="2xs" fontWeight="600" textTransform="uppercase">
+                <Text fontSize="xs" fontWeight="600" textTransform="uppercase">
                   {t(field.labelKey)}
                 </Text>
                 <Switch.Root
                   checked={isEnabled}
                   colorPalette="accent"
-                  size="xs"
+                  size="sm"
                   onCheckedChange={(event) => setFieldValue(field.key, event.checked ? field.defaultValue : null)}
                 >
                   <Switch.HiddenInput />
@@ -272,7 +290,7 @@ export const DefaultSettingsSection = ({
                   value={isEnabled ? value : field.defaultValue}
                 />
               ) : null}
-              <Text color="fg.subtle" fontSize="2xs">
+              <Text color="fg.subtle" fontSize="xs">
                 {isEnabled ? t('models.customizedForThisModel') : t(field.inheritLabelKey)}
               </Text>
             </Panel>

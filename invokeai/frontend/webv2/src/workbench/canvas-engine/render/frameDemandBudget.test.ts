@@ -41,7 +41,7 @@ describe('frame demand cache allocation', () => {
       for (const id of active) {
         caches.getOrCreate(id, 100, 100);
       }
-      caches.evictHidden(active, 40_000);
+      caches.evict((id) => active.has(id), 40_000);
       return active;
     };
 

@@ -46,22 +46,18 @@ echo
 
 # ---------------------- FRONTEND ----------------------
 
-pushd ../invokeai/frontend/web >/dev/null
-echo "Installing frontend dependencies..."
-echo
-pnpm i --frozen-lockfile
-echo
-if [[ ! -z ${CI} ]]; then
-    echo "Building frontend without checks..."
-    # In CI, we have already done the frontend checks and can just build
-    pnpm vite build
-else
-    echo "Running checks and building frontend..."
-    # This runs all the frontend checks and builds
-    pnpm build
-fi
-echo
-popd
+for frontend in webv2 webv1; do
+    pushd "../invokeai/frontend/$frontend" >/dev/null
+    echo "Installing $frontend dependencies..."
+    pnpm install --frozen-lockfile
+    if [[ ! -z ${CI} ]]; then
+        # CI validates webv2 separately; distribution builds only bundle the legacy fallback.
+        pnpm exec vite build
+    else
+        pnpm build
+    fi
+    popd
+done
 
 # ---------------------- BACKEND ----------------------
 
@@ -85,7 +81,7 @@ echo -e "${BGREEN}Built PyPi distribution: ./dist${RESET}"
 if [[ -z ${CI} ]]; then
     echo
     echo "Cleaning up intermediate build files..."
-    rm -rf InvokeAI-Installer tmp ../invokeai/frontend/web/dist/
+    rm -rf InvokeAI-Installer tmp ../invokeai/frontend/webv2/dist/ ../invokeai/frontend/webv1/dist/
 fi
 
 if [[ ! -z ${CI} ]]; then

@@ -1,4 +1,5 @@
 import type {
+  CanvasAdjustmentsContract,
   CanvasDocumentContractV3,
   CanvasImageRef,
   CanvasLayerContract,
@@ -30,6 +31,7 @@ import {
   createDerivedSurfaceCache,
   type DerivedSurfaceCache,
 } from '@workbench/canvas-engine/render/derivedSurfaceCache';
+import { createGroupSurfaceCache, type GroupSurfaceCache } from '@workbench/canvas-engine/render/groupSurfaceCache';
 import { createLayerCacheStore, DEFAULT_CACHE_BUDGET_BYTES } from '@workbench/canvas-engine/render/layerCache';
 
 import { RasterMemoryBudgetController } from './rasterMemoryBudgetController';
@@ -37,42 +39,124 @@ import { RasterMemoryBudgetController } from './rasterMemoryBudgetController';
 export interface RasterControllerOptions {
   readonly backend: RasterBackend;
   readonly diagnostics: CanvasDiagnostics;
+  readonly budgetBytes?: number;
   readonly onVersionChange?: (layerId: string) => void;
   readonly getDocument?: () => CanvasDocumentContractV3 | null;
-  readonly getLayerImageName?: (layer: CanvasLayerContract) => string | null;
   readonly imageResolver?: (imageName: string, signal?: AbortSignal) => Promise<Blob>;
+  /** Layers whose live pixels nothing else can reconstruct: unpersisted paint and open edit sessions. */
+  readonly isLayerHeld?: (layerId: string) => boolean;
+  /** Layers whose live cache already includes their adjustments (an open pixel transaction), drawn raw. */
+  readonly isAdjustmentBaked?: (layerId: string) => boolean;
 }
 
+/** Access clocks captured before a frame draws; artifacts read after them are that frame's working set. */
+export interface RasterFrameUsage {
+  readonly derivedTick: number;
+  readonly groupTick: number;
+}
+
+export interface RasterBudgetResult {
+  readonly evictedBaseLayerIds: readonly string[];
+  readonly overageBytes: number;
+}
+
+/** Owns every raster allocation class, their accounting, residency pins, and working-set eviction. */
 export class RasterController {
   readonly layers: LayerCacheStore;
   readonly derived: DerivedSurfaceCache;
   readonly adjustments: AdjustedSurfaceCache;
+  readonly groups: GroupSurfaceCache;
   readonly memory: RasterMemoryBudgetController;
   readonly bitmaps: DecodedBitmapPool;
+  private readonly diagnostics: CanvasDiagnostics;
+  private readonly isLayerHeld: (layerId: string) => boolean;
+  private readonly isAdjustmentBaked: (layerId: string) => boolean;
   private readonly jobs = new Map<string, RasterizationJob>();
   private readonly activeJobs = new Set<RasterizationJob>();
-  private readonly trackedImages = new Map<string, string>();
-  private readonly mirroredImages = new Map<string, string>();
   private readonly thumbnailKeys = new Map<string, string>();
   private documentGeneration = 0;
   private disposed = false;
   private readonly getDocument: () => CanvasDocumentContractV3 | null;
-  private readonly getLayerImageName: (layer: CanvasLayerContract) => string | null;
   private readonly backend: RasterBackend;
   private readonly imageResolver: ((imageName: string, signal?: AbortSignal) => Promise<Blob>) | null;
 
   constructor(options: RasterControllerOptions) {
     this.backend = options.backend;
-    this.memory = new RasterMemoryBudgetController({ budgetBytes: DEFAULT_CACHE_BUDGET_BYTES });
-    this.bitmaps = createDecodedBitmapPool({ onBytesChange: (bytes) => this.memory.setDecodedBytes(bytes) });
-    this.layers = createLayerCacheStore(options.backend, { onVersionChange: options.onVersionChange });
+    this.diagnostics = options.diagnostics;
+    this.isLayerHeld = options.isLayerHeld ?? (() => false);
+    this.isAdjustmentBaked = options.isAdjustmentBaked ?? (() => false);
+    const memory = new RasterMemoryBudgetController({ budgetBytes: options.budgetBytes ?? DEFAULT_CACHE_BUDGET_BYTES });
+    this.memory = memory;
+    this.bitmaps = createDecodedBitmapPool({ onBytesChange: (bytes) => memory.setCategoryBytes('decoded', bytes) });
+    this.layers = createLayerCacheStore(options.backend, {
+      onBytesChange: (bytes) => memory.setCategoryBytes('base', bytes),
+      onVersionChange: options.onVersionChange,
+    });
     this.getDocument = options.getDocument ?? (() => null);
-    this.getLayerImageName = options.getLayerImageName ?? (() => null);
     this.imageResolver = options.imageResolver ?? null;
-    this.derived = createDerivedSurfaceCache(options.diagnostics);
+    this.derived = createDerivedSurfaceCache(options.diagnostics, (bytes) => memory.setCategoryBytes('derived', bytes));
     this.adjustments = createAdjustedSurfaceCache(options.backend, this.derived, (layerId, version) =>
       this.layers.damageSince(layerId, version)
     );
+    this.groups = createGroupSurfaceCache({
+      createSurface: (width, height) => options.backend.createSurface(width, height),
+      damageSince: (layerId, version) => this.layers.damageSince(layerId, version),
+      diagnostics: options.diagnostics,
+      getAdjustedSurface: (layer, entry) => this.getAdjustedSurface(layer, entry),
+      getCacheEntry: (layerId) => this.layers.get(layerId),
+      onBytesChange: (bytes) => memory.setCategoryBytes('group', bytes),
+    });
+  }
+
+  /** Pinned or held layers survive eviction; their bytes become accounted overage instead. */
+  isProtected(layerId: string): boolean {
+    return this.memory.isPinned(layerId) || this.isLayerHeld(layerId);
+  }
+
+  beginFrame(): RasterFrameUsage {
+    return { derivedTick: this.derived.tick(), groupTick: this.groups.tick() };
+  }
+
+  /**
+   * Reclaims, in order, derived and group artifacts the frame did not use, then unprotected base caches outside
+   * the working set. Whatever the working set still needs stays resident as reported overage.
+   */
+  enforceBudget(workingSetLayerIds: ReadonlySet<string>, usage: RasterFrameUsage): RasterBudgetResult {
+    const excess = (): number => this.memory.snapshot().overageBytes;
+    if (excess() === 0) {
+      return { evictedBaseLayerIds: [], overageBytes: 0 };
+    }
+    this.derived.evict(
+      Math.max(0, this.derived.byteSize() - excess()),
+      (_layerId, lastUsed) => lastUsed > usage.derivedTick
+    );
+    if (excess() > 0) {
+      this.groups.evict(Math.max(0, this.groups.byteSize() - excess()), usage.groupTick);
+    }
+    const evictedBaseLayerIds =
+      excess() > 0
+        ? this.layers.evict(
+            (layerId) => workingSetLayerIds.has(layerId) || this.isProtected(layerId),
+            Math.max(0, this.layers.byteSize() - excess())
+          )
+        : [];
+    for (const layerId of evictedBaseLayerIds) {
+      this.deleteDerivedSurfaces(layerId);
+    }
+    const overageBytes = excess();
+    if (overageBytes > 0) {
+      this.diagnostics.add('rasterOverageBytes', overageBytes);
+    }
+    return { evictedBaseLayerIds, overageBytes };
+  }
+
+  /** Drops every derived and group surface and each base cache nothing pins or holds. */
+  releaseReconstructible(): void {
+    this.derived.dispose();
+    this.groups.clear();
+    for (const layerId of this.layers.evict((candidate) => this.isProtected(candidate), 0)) {
+      this.deleteDerivedSurfaces(layerId);
+    }
   }
 
   async decodeImage(
@@ -141,7 +225,21 @@ export class RasterController {
   }
 
   getAdjustedSurface(layer: CanvasLayerContract, entry: LayerCacheEntry): RasterSurface | null {
-    return layer.type === 'raster' ? this.adjustments.get(layer.id, entry, layer.adjustments) : null;
+    return layer.type === 'raster' && !this.isAdjustmentBaked(layer.id)
+      ? this.adjustments.get(layer.id, entry, layer.adjustments)
+      : null;
+  }
+
+  /** The adjusted copy of a layer's live cache (built and memoized on a miss), when `surface` is that cache and unbaked. */
+  getAdjustedCacheSurface(
+    layerId: string,
+    surface: RasterSurface,
+    adjustments: CanvasAdjustmentsContract
+  ): RasterSurface | null {
+    const entry = this.layers.peek(layerId);
+    return entry?.surface === surface && !this.isAdjustmentBaked(layerId)
+      ? this.adjustments.get(layerId, entry, adjustments)
+      : null;
   }
 
   deleteDerivedSurfaces(layerId: string): void {
@@ -200,41 +298,6 @@ export class RasterController {
     return false;
   }
 
-  getTrackedImage(layerId: string): string | undefined {
-    return this.trackedImages.get(layerId);
-  }
-  setTrackedImage(layerId: string, imageName: string): void {
-    this.trackedImages.set(layerId, imageName);
-  }
-  deleteTrackedImage(layerId: string): void {
-    this.trackedImages.delete(layerId);
-  }
-  trackedImageIds(): string[] {
-    return [...this.trackedImages.keys()];
-  }
-  hasTrackedImage(imageName: string): boolean {
-    return [...this.trackedImages.values()].includes(imageName);
-  }
-  clearTrackedImages(): void {
-    this.trackedImages.clear();
-  }
-
-  getMirroredImage(layerId: string): string | undefined {
-    return this.mirroredImages.get(layerId);
-  }
-  setMirroredImage(layerId: string, imageName: string): void {
-    this.mirroredImages.set(layerId, imageName);
-  }
-  deleteMirroredImage(layerId: string): void {
-    this.mirroredImages.delete(layerId);
-  }
-  mirroredImageNames(): string[] {
-    return [...this.mirroredImages.values()];
-  }
-  clearMirroredImages(): void {
-    this.mirroredImages.clear();
-  }
-
   getThumbnailKey(layerId: string): string | undefined {
     return this.thumbnailKeys.get(layerId);
   }
@@ -248,37 +311,8 @@ export class RasterController {
     this.thumbnailKeys.clear();
   }
 
-  releaseBitmapIfUnreferenced(imageName: string): void {
-    // Leases close decoded bitmaps after the final rasterizer releases them; this hook also supports tracking
-    // callers.
-    void imageName;
-  }
-
-  untrackLayerImage(layerId: string): void {
-    const imageName = this.getTrackedImage(layerId);
-    if (!imageName) {
-      return;
-    }
-    this.deleteTrackedImage(layerId);
-    this.releaseBitmapIfUnreferenced(imageName);
-  }
-
-  trackPublishedLayerImage(layer: CanvasLayerContract): void {
-    const previous = this.getTrackedImage(layer.id);
-    const current = this.getLayerImageName(layer);
-    if (current) {
-      this.setTrackedImage(layer.id, current);
-    } else {
-      this.deleteTrackedImage(layer.id);
-    }
-    if (previous && previous !== current) {
-      this.releaseBitmapIfUnreferenced(previous);
-    }
-  }
-
   dropLayer(layerId: string): void {
     this.cancelRasterization(layerId);
-    this.untrackLayerImage(layerId);
     this.layers.delete(layerId);
     this.deleteDerivedSurfaces(layerId);
   }
@@ -289,12 +323,11 @@ export class RasterController {
     }
     this.disposed = true;
     this.cancelAllRasterization();
-    this.clearTrackedImages();
-    this.clearMirroredImages();
     this.clearThumbnailKeys();
     this.layers.dispose();
+    this.derived.dispose();
+    this.groups.clear();
     this.bitmaps.dispose();
-    this.adjustments.dispose();
     this.memory.dispose();
   }
 }

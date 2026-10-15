@@ -8,10 +8,11 @@ enum:
   layer patcher.
 - The PiD decoder's resolution presets are one enum shared across five bases.
 
-Three variant enums cannot live here at all: `ClipVariantType`, `Qwen3VariantType` and
-`MistralVariantType` sit on `base=Any` configs, and `Any` is a sentinel the registry refuses to
-register. They are named explicitly in `tests/backend/architectures/test_variants.py` so the
-completeness check against `AnyVariant` stays total rather than quietly partial.
+The text-encoder variant enums (`ClipVariantType`, `Qwen3VariantType`, `Qwen3VLVariantType`,
+`Qwen35VariantType`, `MistralVariantType`) cannot live here at all: they sit on `base=Any` configs,
+and `Any` is a sentinel the registry refuses to register. They are named explicitly in
+`tests/backend/architectures/test_variants.py` so the completeness check against `AnyVariant` stays
+total rather than quietly partial.
 
 This facet is deliberately *not* wired into `configs/factory.py`. That module validates a bare
 variant string against `variant_type_adapter` without passing the base (`build_common_fields`), so
@@ -34,7 +35,7 @@ from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 class VariantFacet(Facet):
     """The variant enums an architecture's models are labelled with, by model type.
 
-    Optional: four registered architectures (CogView4, ERNIE-Image, Ideogram 4, Anima) model no
+    Optional: three registered architectures (CogView4, ERNIE-Image, Ideogram 4) model no
     variants at all, and declaring an empty facet would be indistinguishable from declaring nothing.
     """
 

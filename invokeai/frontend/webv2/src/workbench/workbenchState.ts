@@ -11,7 +11,12 @@ import type {
   CanvasStagingCandidateContract,
 } from '@workbench/canvas-engine/api';
 import type { GraphContract } from '@workbench/graphContracts';
-import type { InvocationRoute, InvocationSourceId, ResultDestination } from '@workbench/invocationContracts';
+import type {
+  ExpandedPositivePrompts,
+  InvocationRoute,
+  InvocationSourceId,
+  ResultDestination,
+} from '@workbench/invocationContracts';
 import type {
   BuiltInLayoutPresetId,
   CenterViewId,
@@ -25,11 +30,13 @@ import type {
   LayoutPresetRoute,
   LayoutPresetRouteOverrides,
   LayoutPresetSnapshot,
+  LayoutPresetWorkingCopy,
   ProjectLayoutState,
   WidgetRegion,
   WidgetRegionState,
 } from '@workbench/layoutContracts';
 import type {
+  AccountState,
   Project,
   ProjectUndoSnapshot,
   PromptHistoryItem,
@@ -55,11 +62,13 @@ import {
   getPersistedSelectedGalleryItemKeys,
   stripInfiniteWindowAnchor,
   stripUnresolvableGallerySearch,
+  GALLERY_AUTO_ADD_FOLLOW,
   gallerySemanticReferenceKey,
   getGallerySettings,
   parseGallerySemanticReference,
   toGallerySemanticTextReference,
-  getGalleryDestinationBoardId,
+  getGalleryAutoAddBoardId,
+  getGallerySelectionBoardId,
   getSelectedGalleryItemFromValues,
   legacyGeneratedImageToGalleryItem,
   normalizeGalleryImage,
@@ -111,6 +120,7 @@ import {
   recordProjectWorkflowRun,
   redoProjectWorkflow,
   removeProjectWorkflow,
+  replaceProjectWorkflowDocument,
   selectProjectWorkflow,
   setProjectWorkflowDocument,
   setProjectWorkflowSource,
@@ -127,6 +137,7 @@ import {
   addPromptHistoryItem,
   applyProjectPromptDraft,
   cloneGenerateWidgetValues,
+  createDynamicPromptsSampleSeed,
   getEffectivePrompts,
   getGenerationModelAvailabilityReasons,
   getPromptDraftFromValues,
@@ -178,8 +189,23 @@ import {
   getCanvasStagingSlots,
   getFirstCanvasPlaceholderSlotIndex,
   type CanvasStagingSlot,
+  isCancellableQueueItem,
 } from './canvasStagingView';
-import { cascadeDefaultGeometry, clampSizeToMinimum, nextStackOrder } from './floatingWindows';
+import {
+  cascadeDefaultGeometry,
+  clampSizeToMinimum,
+  fitWindowIntoViewport,
+  getRegionOrder,
+  isAwaitedCenterView,
+  nextStackOrder,
+  normalizeFloatingPlacement,
+  normalizeLastFloatingGeometry,
+  rememberClosedWindows,
+  toFloatingWidgetState,
+  withoutFloatedInstances,
+  writeRegionOrder,
+  type RegionOrderSlot,
+} from './floatingWindows';
 import { getSourceIdForWidgetTypeId } from './graphWidgets';
 import {
   defaultInvocationRoute,
@@ -198,9 +224,12 @@ import {
   resolveLayoutPresetId,
 } from './layoutPresets';
 import {
-  cloneFloatingWidgets,
+  areLayoutPresetSnapshotsEqual,
   cloneLayoutPresetWidgetRegions,
   createLayoutPresetSnapshot,
+  doesLayoutPresetExist,
+  findLayoutPresetWorkingCopy,
+  normalizeLayoutPresetSnapshot,
   resolveSavedLayoutPreset,
 } from './layoutPresetSnapshots';
 import { normalizeProjectSettings } from './settings/store';
@@ -239,6 +268,8 @@ type WorkbenchReducerAction =
   | { type: 'renameLayoutPreset'; presetId: LayoutPresetId; label: string }
   | { type: 'deleteLayoutPreset'; presetId: LayoutPresetId }
   | { type: 'resetActiveLayout' }
+  /** Drop a preset's unsaved arrangement: the active one reapplies its saved layout, an inactive one forgets its copy. */
+  | { type: 'revertLayoutPreset'; presetId: LayoutPresetId }
   | { type: 'recoverShellLayout' }
   | { type: 'setInvocationSource'; sourceId: InvocationSourceId }
   | { type: 'setInvocationDestination'; destination: ResultDestination }
@@ -276,6 +307,8 @@ type WorkbenchReducerAction =
       instanceId: WidgetInstanceId;
       /** The chrome the float was asked from; docking returns the window there. */
       region?: WidgetRegion;
+      /** The viewport the window opens into, so a remembered position from a larger one is brought on screen. */
+      viewport?: { width: number; height: number };
     }
   | { type: 'dockFloatingWidget'; instanceId: WidgetInstanceId }
   | { type: 'closeFloatingWidget'; instanceId: WidgetInstanceId }
@@ -288,7 +321,9 @@ type WorkbenchReducerAction =
       heightPx: number;
     }
   | { type: 'setFloatingWidgetMode'; instanceId: WidgetInstanceId; mode: FloatingWidgetMode }
-  | { type: 'focusFloatingWidget'; instanceId: WidgetInstanceId }
+  | { type: 'raiseFloatingWidget'; instanceId: WidgetInstanceId }
+  /** Bring a window forward so its content shows: raise it, and expand it when it is shaded. */
+  | { type: 'revealFloatingWidget'; instanceId: WidgetInstanceId }
   | { type: 'setGenerateSettings'; values: GenerateWidgetValues; projectId?: string; origin?: WorkbenchActionOrigin }
   | {
       type: 'patchGenerateSettings';
@@ -340,14 +375,20 @@ type WorkbenchReducerAction =
   | { type: 'duplicateProjectWorkflow'; workflowId: string; copyId: string; copyName: string; projectId?: string }
   | { type: 'removeProjectWorkflow'; workflowId: string; projectId?: string }
   | { type: 'setProjectWorkflowSource'; projectId: string; workflowId: string; source?: ProjectWorkflowSource }
+  | {
+      type: 'replaceProjectWorkflowDocument';
+      projectId: string;
+      workflowId: string;
+      document: ProjectGraphState;
+      label: string;
+      source: ProjectWorkflowSource;
+    }
   | { type: 'undoWorkflowChange'; projectId?: string; workflowId?: string }
   | { type: 'redoWorkflowChange'; projectId?: string; workflowId?: string }
   | { type: 'submitInvocationSnapshot'; backendSupportsCancellation: boolean; models?: readonly ModelConfig[] }
-  | {
+  | ({
       type: 'submitResolvedInvocationSnapshot';
       backendSupportsCancellation: boolean;
-      /** Expanded positive prompts, resolved by the caller before dispatch. */
-      positivePrompts?: string[];
       /** Async workflow generator outputs, resolved by the caller before dispatch. */
       workflowGenerators?: WorkflowGeneratorResolutions;
       route: InvocationRoute;
@@ -356,7 +397,7 @@ type WorkbenchReducerAction =
       projectId: string;
       /** The workflow the submission was prepared from; required for workflow routes. */
       workflowId?: string;
-    }
+    } & Partial<ExpandedPositivePrompts>)
   | {
       type: 'markQueueItemBackendSubmitted';
       projectId: string;
@@ -400,6 +441,11 @@ type WorkbenchReducerAction =
   | {
       type: 'selectGalleryItem';
       item: GalleryItem;
+      /**
+       * Navigate within the item's own board, unfiltered, instead of the listing the Gallery shows: for selections
+       * made outside the Gallery, such as a search result from any board.
+       */
+      navigateItemBoard?: boolean;
       preserveNavigationQuery?: boolean;
       projectId?: string;
       selectionPage?: number;
@@ -409,13 +455,17 @@ type WorkbenchReducerAction =
       item: GalleryItem;
       nextPrimaryItem: GalleryItem | null;
       projectId?: string;
+      /** The grid page of whichever item becomes primary: the added item, or `nextPrimaryItem`. */
+      selectionPage?: number;
     }
   | {
       type: 'setGalleryMultiSelection';
       itemKeys: GalleryItemKey[];
       primaryItem: GalleryItem;
+      /** Keep the navigation query already on the selection, as `selectGalleryItem` does for a host's own window. */
+      preserveNavigationQuery?: boolean;
       projectId?: string;
-      /** Stamps this page, in the navigation query already on the selection, instead of the grid's. */
+      /** Stamps this page instead of the grid's. */
       selectionPage?: number;
     }
   | { type: 'setGalleryCompareImage'; image: GalleryImageItem | null; projectId?: string }
@@ -453,18 +503,22 @@ type WorkbenchReducerAction =
       origin?: WorkbenchActionOrigin;
     }
   | { type: 'commitCanvasEdit'; projectId: string; intent: CanvasEditIntent }
-  | {
+  | ({
       type: 'submitCanvasInvocationSnapshot';
       backendSupportsCancellation: boolean;
       canvas: CanvasStateContractV3;
       destination: ResultDestination;
       generate: QueueGenerateSnapshot;
       graph: GraphContract;
-      /** Expanded positive prompts, resolved by the caller before dispatch. */
-      positivePrompts?: string[];
       projectId: string;
+    } & Partial<ExpandedPositivePrompts>)
+  | {
+      type: 'cancelQueueItem';
+      queueItemId: string;
+      projectId?: string;
+      /** Replaces the generic cancellation notice when the caller knows why the run stopped. */
+      notice?: { title: string; message: string };
     }
-  | { type: 'cancelQueueItem'; queueItemId: string; projectId?: string }
   | { type: 'cancelAllQueueItems'; projectId?: string }
   | { type: 'cancelAllQueueItemsExceptCurrent'; projectId?: string; currentQueueItemId?: string | null }
   | { type: 'clearCompletedQueueItems' }
@@ -1186,6 +1240,8 @@ const createUndoSnapshot = (project: Project): ProjectUndoSnapshot => ({
   floatingWidgets: project.floatingWidgets ? { ...project.floatingWidgets } : undefined,
   invocation: { ...project.invocation },
   layout: { ...project.layout, panels: { ...project.layout.panels } },
+  // Working copies are never mutated in place, so the snapshot shares them rather than copying.
+  presetWorkingLayouts: project.presetWorkingLayouts,
   widgetGraphs: cloneWidgetGraphs(project.widgetGraphs),
   widgetInstances: cloneWidgetInstances(project.widgetInstances),
   widgetRegions: cloneWidgetRegions(project.widgetRegions),
@@ -1195,8 +1251,17 @@ const restoreUndoSnapshot = (project: Project, snapshot: ProjectUndoSnapshot): P
   ...project,
   // Restore floating windows with widgetRegions to avoid duplicate or orphaned placements.
   floatingWidgets: snapshot.floatingWidgets ? { ...snapshot.floatingWidgets } : undefined,
+  // The memory is not part of the snapshot, but a window the undo closes is still remembered.
+  lastFloatingGeometry: rememberClosedWindows(
+    project.lastFloatingGeometry,
+    project.floatingWidgets,
+    snapshot.floatingWidgets,
+    // The snapshot's instances replace the project's, so an instance created since is gone.
+    (instanceId) => Object.hasOwn(snapshot.widgetInstances, instanceId)
+  ),
   invocation: { ...snapshot.invocation },
   layout: { ...snapshot.layout, panels: { ...snapshot.layout.panels } },
+  presetWorkingLayouts: snapshot.presetWorkingLayouts,
   widgetGraphs: cloneWidgetGraphs(snapshot.widgetGraphs),
   widgetInstances: cloneWidgetInstances(snapshot.widgetInstances),
   widgetRegions: cloneWidgetRegions(snapshot.widgetRegions),
@@ -1283,6 +1348,7 @@ const createWidgetInstance = (
 });
 
 const defaultWidgetInstanceTypes: Record<WidgetInstanceId, WidgetTypeId> = {
+  shortcuts: 'shortcuts',
   'autosave-status': 'autosave-status',
   canvas: 'canvas',
   diagnostics: 'diagnostics',
@@ -1412,7 +1478,7 @@ const withoutRetiredInstances = (
   };
 };
 
-// Adopt queue-status for the historical bottom default. reconcileFloatingWidgets removes any instance already
+// Adopt queue-status for the historical bottom default. Placement normalization removes any instance already
 // hosted in a window.
 const LEGACY_DEFAULT_BOTTOM_REGION_WIDGET_IDS: readonly WidgetInstanceId[] = [
   'server-status',
@@ -1480,127 +1546,6 @@ const ensureCenterRegion = (
     activeInstanceId: normalizedActiveInstanceId,
     instanceIds,
     isCollapsed: false,
-  };
-};
-
-const WIDGET_REGION_IDS: WidgetRegion[] = [...WIDGET_REGIONS];
-const FLOATING_WIDGET_MODES: FloatingWidgetMode[] = ['windowed', 'maximized', 'shaded'];
-
-const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
-
-const isFloatingWidgetMode = (value: unknown): value is FloatingWidgetMode =>
-  FLOATING_WIDGET_MODES.includes(value as FloatingWidgetMode);
-
-const isWidgetRegionId = (value: unknown): value is WidgetRegion => WIDGET_REGION_IDS.includes(value as WidgetRegion);
-
-/** Restore the pre-float tab index, clamped to the current rail, so float/dock does not reorder the layout. */
-const insertAtReturnIndex = (
-  instanceIds: WidgetInstanceId[],
-  instanceId: WidgetInstanceId,
-  returnIndex: number | undefined
-): WidgetInstanceId[] => {
-  const next = [...instanceIds];
-
-  next.splice(
-    isFiniteNumber(returnIndex) && returnIndex >= 0 ? Math.min(Math.floor(returnIndex), next.length) : next.length,
-    0,
-    instanceId
-  );
-
-  return next;
-};
-
-/**
- * Drop malformed floating entries so widgets remain docked and invalid region names or geometry cannot reach
- * reducers or CSS.
- */
-const normalizeFloatingWidgets = (
-  value: unknown,
-  widgetInstances: Record<WidgetInstanceId, WidgetInstanceContract>
-): Record<WidgetInstanceId, FloatingWidgetState> | undefined => {
-  if (!value || typeof value !== 'object') {
-    return undefined;
-  }
-
-  const floatingWidgets: Record<WidgetInstanceId, FloatingWidgetState> = {};
-
-  for (const [instanceId, entry] of Object.entries(value as Record<string, unknown>)) {
-    if (!entry || typeof entry !== 'object' || !widgetInstances[instanceId]) {
-      continue;
-    }
-
-    const state = entry as Partial<FloatingWidgetState>;
-    // The right rail's docks folded back into one region; a window floated out of one returns to the rail.
-    const rawReturnRegion: unknown = state.returnRegion;
-    const returnRegion =
-      rawReturnRegion === 'rightTop' || rawReturnRegion === 'rightBottom' ? 'right' : state.returnRegion;
-
-    if (
-      !isFiniteNumber(state.x) ||
-      !isFiniteNumber(state.y) ||
-      !isFiniteNumber(state.widthPx) ||
-      !isFiniteNumber(state.heightPx) ||
-      !isFiniteNumber(state.stackOrder) ||
-      !isFloatingWidgetMode(state.mode) ||
-      !isWidgetRegionId(returnRegion)
-    ) {
-      continue;
-    }
-
-    floatingWidgets[instanceId] = {
-      ...clampSizeToMinimum({ heightPx: state.heightPx, widthPx: state.widthPx, x: state.x, y: state.y }),
-      mode: state.mode,
-      // Omit invalid docking indices; docking then appends.
-      ...(isFiniteNumber(state.returnIndex) && state.returnIndex >= 0
-        ? { returnIndex: Math.floor(state.returnIndex) }
-        : {}),
-      returnRegion,
-      stackOrder: state.stackOrder,
-    };
-  }
-
-  return Object.keys(floatingWidgets).length > 0 ? floatingWidgets : undefined;
-};
-
-/**
- * Floating placement wins over migrated rail defaults to prevent duplicate rendering, even when it leaves the
- * center on its fallback view.
- */
-const reconcileFloatingWidgets = (
-  widgetRegions: Record<WidgetRegion, WidgetRegionState>,
-  floatingWidgets: Record<WidgetInstanceId, FloatingWidgetState> | undefined
-): {
-  widgetRegions: Record<WidgetRegion, WidgetRegionState>;
-  floatingWidgets: Record<WidgetInstanceId, FloatingWidgetState> | undefined;
-} => {
-  if (!floatingWidgets) {
-    return { floatingWidgets, widgetRegions };
-  }
-
-  let remainingFloating = floatingWidgets;
-  const reconciledRegions = { ...widgetRegions };
-
-  for (const regionId of WIDGET_REGION_IDS) {
-    const region = reconciledRegions[regionId];
-    const instanceIds = region.instanceIds.filter((instanceId) => !remainingFloating[instanceId]);
-
-    if (instanceIds.length === region.instanceIds.length) {
-      continue;
-    }
-
-    reconciledRegions[regionId] = {
-      ...region,
-      activeInstanceId: instanceIds.includes(region.activeInstanceId)
-        ? region.activeInstanceId
-        : (instanceIds[0] ?? emptiedActiveInstanceId(regionId, region)),
-      instanceIds,
-      isCollapsed: instanceIds.length === 0 ? regionId !== 'center' : region.isCollapsed,
-    };
-  }
-
-  return {
-    floatingWidgets: Object.keys(remainingFloating).length > 0 ? remainingFloating : undefined,
-    widgetRegions: reconciledRegions,
   };
 };
 
@@ -1778,14 +1723,15 @@ const assembleWorkbenchProject = (
     )
   );
 
-  const placement = reconcileFloatingWidgets(
+  const placement = normalizeFloatingPlacement(
     {
       left: leftRegion,
       right: rightRegion,
       bottom: bottomRegion,
       center: ensureCenterRegion(legacyWidgetRegions?.center, project.layout.centerViewId),
     },
-    normalizeFloatingWidgets((project as Partial<Project>).floatingWidgets, widgetInstances)
+    (project as Partial<Project>).floatingWidgets,
+    (instanceId) => Object.hasOwn(widgetInstances, instanceId)
   );
 
   return {
@@ -1793,8 +1739,17 @@ const assembleWorkbenchProject = (
     canvas,
     events: isArriving ? [] : project.events.slice(0, PROJECT_EVENT_LIMIT),
     floatingWidgets: placement.floatingWidgets,
+    lastFloatingGeometry: normalizeLastFloatingGeometry(
+      (project as Partial<Project>).lastFloatingGeometry,
+      (instanceId) => Object.hasOwn(widgetInstances, instanceId),
+      placement.floatingWidgets
+    ),
     // Resolve historical built-in preset ids to their current arrangements to avoid false layout drift.
     layout: { ...project.layout, presetId: resolveLayoutPresetId(project.layout.presetId) },
+    presetWorkingLayouts: normalizePresetWorkingLayouts(
+      (project as Partial<Project>).presetWorkingLayouts,
+      resolveLayoutPresetId(project.layout.presetId)
+    ),
     promptHistory: normalizePromptHistory((project as Partial<Project>).promptHistory),
     queue: isArriving ? { items: [] } : project.queue,
     settings: normalizeProjectSettings(project.settings),
@@ -1906,7 +1861,10 @@ export const resolvePanelToggle = (
   return { regions: occupied, shouldCollapse: occupied.some((region) => !widgetRegions[region].isCollapsed) };
 };
 
-/** A region with nothing left names no active instance; the center keeps its id because it never empties. */
+/**
+ * A region with nothing left names no active instance. The center keeps naming the view it lost: that pointer is
+ * what lets a floated last view come back (see `isAwaitedCenterView`).
+ */
 const emptiedActiveInstanceId = (regionId: WidgetRegion, region: WidgetRegionState): WidgetInstanceId =>
   regionId === 'center' ? region.activeInstanceId : '';
 
@@ -1918,13 +1876,36 @@ const getNextInstanceId = (region: WidgetRegionState, instanceId: WidgetInstance
   return region.instanceIds.find((enabledInstanceId) => enabledInstanceId !== instanceId) ?? null;
 };
 
-const insertAt = <Value>(values: Value[], value: Value, index: number): Value[] => {
-  const nextValues = values.filter((candidate) => candidate !== value);
-  const nextIndex = Math.min(nextValues.length, Math.max(0, index));
+/**
+ * An instance opened in the center can stay a member of a side panel, but is not shown twice: a side panel fronting
+ * it fronts its next member instead, or collapses when it has none. Only the pointer moves; no panel opens, so a
+ * hidden panel stays hidden and later shows its neighbour. The bottom region is left alone: its members include
+ * tooltip-only status items, and without the widget registry the reducer cannot tell which of them render a panel.
+ */
+const SIDE_PANEL_REGIONS = ['left', 'right'] as const satisfies readonly WidgetRegion[];
 
-  nextValues.splice(nextIndex, 0, value);
+const yieldSidePanelsTo = (
+  widgetRegions: Project['widgetRegions'],
+  instanceId: WidgetInstanceId
+): Project['widgetRegions'] => {
+  let next = widgetRegions;
 
-  return nextValues;
+  for (const regionId of SIDE_PANEL_REGIONS) {
+    const region = next[regionId];
+
+    if (region.activeInstanceId !== instanceId) {
+      continue;
+    }
+
+    const neighbour = getNextInstanceId(region, instanceId);
+
+    next = {
+      ...next,
+      [regionId]: neighbour ? { ...region, activeInstanceId: neighbour } : { ...region, isCollapsed: true },
+    };
+  }
+
+  return next;
 };
 
 const updateActiveWidgetRegion = (
@@ -1962,6 +1943,116 @@ const openPanelForRegion = (layout: ProjectLayoutState, region: WidgetRegion): P
   },
 });
 
+const withoutFloatingWidget = (
+  floatingWidgets: Project['floatingWidgets'],
+  instanceId: WidgetInstanceId
+): Project['floatingWidgets'] => {
+  const { [instanceId]: _removed, ...remaining } = floatingWidgets ?? {};
+
+  return Object.keys(remaining).length > 0 ? remaining : undefined;
+};
+
+/**
+ * Edit one region's complete order — docked members and floating markers together — so the markers' return
+ * indices stay in step with the members around them. A marker the edit docks or drops takes its window with it,
+ * which keeps an instance from ending up both docked and floating.
+ */
+const updateRegionOrder = (
+  project: Project,
+  regionId: WidgetRegion,
+  update: (slots: RegionOrderSlot[]) => RegionOrderSlot[]
+): Project => {
+  const region = project.widgetRegions[regionId];
+  const before = getRegionOrder(regionId, region.instanceIds, project.floatingWidgets);
+  const after = update(before);
+  const markerIds = new Set(after.filter((slot) => slot.isFloating).map((slot) => slot.instanceId));
+  const closedIds = before
+    .filter((slot) => slot.isFloating && !markerIds.has(slot.instanceId))
+    .map((slot) => slot.instanceId);
+  const remaining = closedIds.reduce(withoutFloatingWidget, project.floatingWidgets);
+  const order = writeRegionOrder(after, remaining);
+  // A window that docks or closes leaves its geometry behind, so floating the instance again reopens it there.
+  const lastFloatingGeometry = rememberClosedWindows(project.lastFloatingGeometry, project.floatingWidgets, remaining);
+  const isMembershipUnchanged =
+    order.instanceIds.length === region.instanceIds.length &&
+    order.instanceIds.every((instanceId, index) => instanceId === region.instanceIds[index]);
+
+  // An edit that only moves markers leaves the region object alone, so its subscribers do not re-render.
+  if (isMembershipUnchanged) {
+    return order.floatingWidgets === project.floatingWidgets
+      ? project
+      : { ...project, floatingWidgets: order.floatingWidgets, lastFloatingGeometry };
+  }
+
+  return {
+    ...project,
+    floatingWidgets: order.floatingWidgets,
+    lastFloatingGeometry,
+    widgetRegions: { ...project.widgetRegions, [regionId]: { ...region, instanceIds: order.instanceIds } },
+  };
+};
+
+/**
+ * Put a floating instance back where it came from: its return region, at its marker's position, and the center
+ * too when the center has stayed empty since the instance left it. `reveal` also fronts it in the return region.
+ */
+const restoreFloatingInstance = (
+  project: Project,
+  instanceId: WidgetInstanceId,
+  { reveal }: { reveal: boolean }
+): Project => {
+  const floating = project.floatingWidgets?.[instanceId];
+
+  if (!floating) {
+    return project;
+  }
+
+  const { returnRegion } = floating;
+  // Counting the docked members ahead of the marker keeps every other slot where the rail shows it.
+  const docked = updateProjectWidgetRegion(
+    updateRegionOrder(project, returnRegion, (slots) =>
+      slots.map((slot) => (slot.instanceId === instanceId ? { ...slot, isFloating: false } : slot))
+    ),
+    returnRegion,
+    (region) =>
+      reveal || !region.instanceIds.includes(region.activeInstanceId)
+        ? { ...region, activeInstanceId: instanceId, isCollapsed: reveal ? false : region.isCollapsed }
+        : region
+  );
+  const restored =
+    returnRegion !== 'center' && isAwaitedCenterView(project.widgetRegions.center, instanceId)
+      ? updateRegionOrder(docked, 'center', (slots) => [...slots, { instanceId, isFloating: false }])
+      : docked;
+
+  return reveal ? { ...restored, layout: openPanelForRegion(restored.layout, returnRegion) } : restored;
+};
+
+/** Raise a window to the top of the stack; the same map comes back when it is missing or already topmost. */
+const raiseFloatingWidget = (
+  floatingWidgets: Project['floatingWidgets'],
+  instanceId: WidgetInstanceId
+): Project['floatingWidgets'] => {
+  const floating = floatingWidgets?.[instanceId];
+
+  if (!floatingWidgets || !floating || floating.stackOrder === nextStackOrder(floatingWidgets) - 1) {
+    return floatingWidgets;
+  }
+
+  // Compact persisted stackOrder to 1..N rather than growing it on every raise.
+  const below = Object.entries(floatingWidgets)
+    .filter(([otherInstanceId]) => otherInstanceId !== instanceId)
+    .sort(([, left], [, right]) => left.stackOrder - right.stackOrder);
+  const raised: Record<WidgetInstanceId, FloatingWidgetState> = {};
+
+  for (const [otherInstanceId, windowState] of below) {
+    raised[otherInstanceId] = { ...windowState, stackOrder: Object.keys(raised).length + 1 };
+  }
+
+  raised[instanceId] = { ...floating, stackOrder: below.length + 1 };
+
+  return raised;
+};
+
 const cloneLayoutPresetSnapshot = (snapshot: LayoutPresetSnapshot): LayoutPresetSnapshot => {
   // Strip retired editor instances when rebuilding account presets to keep applied layouts drift-free.
   const retired = new Set(
@@ -1973,8 +2064,9 @@ const cloneLayoutPresetSnapshot = (snapshot: LayoutPresetSnapshot): LayoutPreset
   for (const region of Object.keys(widgetRegions) as WidgetRegion[]) {
     widgetRegions[region] = withoutRetiredInstances(widgetRegions[region], retired);
   }
-  return {
-    ...(snapshot.floatingWidgets ? { floatingWidgets: cloneFloatingWidgets(snapshot.floatingWidgets) } : {}),
+  // Stored placements are read the way a project's are, so an applied preset matches the snapshot it came from.
+  return normalizeLayoutPresetSnapshot({
+    floatingWidgets: snapshot.floatingWidgets,
     layout: { ...snapshot.layout, panels: { ...snapshot.layout.panels } },
     widgetInstances: Object.fromEntries(
       Object.entries(snapshot.widgetInstances)
@@ -1982,7 +2074,7 @@ const cloneLayoutPresetSnapshot = (snapshot: LayoutPresetSnapshot): LayoutPreset
         .map(([instanceId, instance]) => [instanceId, { ...instance }])
     ),
     widgetRegions,
-  };
+  });
 };
 
 const centerViewIds = new Set<CenterViewId>(['canvas', 'gallery', 'preview', 'workflow']);
@@ -2130,6 +2222,108 @@ const normalizeCustomLayoutPresets = (presets: unknown): LayoutPreset[] => {
   });
 };
 
+/**
+ * How many presets' working arrangements a project keeps. Each is a few kilobytes of placement; past this the oldest
+ * copy is forgotten, which loses an unsaved arrangement but never a saved preset or any widget state.
+ */
+export const PRESET_WORKING_LAYOUT_LIMIT = 16;
+
+const withSnapshotPresetId = (snapshot: LayoutPresetSnapshot, presetId: LayoutPresetId): LayoutPresetSnapshot => ({
+  ...snapshot,
+  layout: { ...snapshot.layout, presetId },
+});
+
+const toPresetWorkingLayouts = (copies: readonly LayoutPresetWorkingCopy[]): Project['presetWorkingLayouts'] =>
+  copies.length > 0 ? copies.slice(-PRESET_WORKING_LAYOUT_LIMIT) : undefined;
+
+/** Validated as stored presets are; the active preset's copy is dropped because the live layout is that copy. */
+const normalizePresetWorkingLayouts = (
+  stored: unknown,
+  activePresetId: LayoutPresetId
+): Project['presetWorkingLayouts'] => {
+  if (!Array.isArray(stored)) {
+    return undefined;
+  }
+
+  const copies: LayoutPresetWorkingCopy[] = [];
+
+  for (const entry of stored as unknown[]) {
+    const { presetId: storedId, snapshot } = (entry ?? {}) as Partial<Record<keyof LayoutPresetWorkingCopy, unknown>>;
+    const presetId = typeof storedId === 'string' ? resolveLayoutPresetId(storedId) : '';
+
+    if (!presetId || presetId === activePresetId || !isLayoutPresetSnapshot(snapshot)) {
+      continue;
+    }
+
+    const clone = cloneLayoutPresetSnapshot(snapshot);
+    // A historical id and its current one name the same preset; the later entry is the newer copy.
+    const earlier = copies.findIndex((copy) => copy.presetId === presetId);
+
+    if (earlier !== -1) {
+      copies.splice(earlier, 1);
+    }
+    copies.push({ presetId, snapshot: withSnapshotPresetId(clone, presetId) });
+  }
+
+  return toPresetWorkingLayouts(copies);
+};
+
+const withoutPresetWorkingLayouts = (
+  project: Project,
+  isDropped: (presetId: LayoutPresetId) => boolean
+): Project['presetWorkingLayouts'] => {
+  const copies = project.presetWorkingLayouts ?? [];
+  const kept = copies.filter((copy) => !isDropped(copy.presetId));
+
+  return kept.length === copies.length ? project.presetWorkingLayouts : toPresetWorkingLayouts(kept);
+};
+
+/**
+ * Drop copies that no longer hold anything: those of presets the account no longer has (they go with the preset and
+ * never take one of the bounded places), and those equal to what their preset has saved. Run where the account is
+ * the one the server holds (hydration, opening a project), so a copy whose save was lost still differs and stays.
+ */
+const withoutRedundantWorkingCopies = (account: AccountState, project: Project): Project => {
+  const presetWorkingLayouts = withoutPresetWorkingLayouts(
+    project,
+    (presetId) =>
+      !doesLayoutPresetExist(account, presetId) ||
+      areLayoutPresetSnapshotsEqual(
+        findLayoutPresetWorkingCopy(project.presetWorkingLayouts, presetId)!,
+        resolveSavedLayoutPreset(account, presetId).snapshot
+      )
+  );
+
+  return presetWorkingLayouts === project.presetWorkingLayouts ? project : { ...project, presetWorkingLayouts };
+};
+
+/**
+ * The working copies after leaving the active preset for `incomingPresetId`: the outgoing arrangement is kept,
+ * newest last, when it differs from what that preset has saved; the incoming copy leaves the list because it becomes
+ * the live layout; copies of presets the account no longer has are dropped.
+ */
+const captureOutgoingWorkingLayout = (
+  account: AccountState,
+  project: Project,
+  incomingPresetId: LayoutPresetId
+): Project['presetWorkingLayouts'] => {
+  const outgoingPresetId = project.layout.presetId;
+  const copies = (project.presetWorkingLayouts ?? []).filter(
+    ({ presetId }) =>
+      presetId !== outgoingPresetId && presetId !== incomingPresetId && doesLayoutPresetExist(account, presetId)
+  );
+
+  if (doesLayoutPresetExist(account, outgoingPresetId)) {
+    const live = cloneLayoutPresetSnapshot(createLayoutPresetSnapshot(project));
+
+    if (!areLayoutPresetSnapshotsEqual(live, resolveSavedLayoutPreset(account, outgoingPresetId).snapshot)) {
+      copies.push({ presetId: outgoingPresetId, snapshot: live });
+    }
+  }
+
+  return toPresetWorkingLayouts(copies);
+};
+
 const normalizeLayoutPresetRouteOverrides = (overrides: unknown): LayoutPresetRouteOverrides => {
   if (!overrides || typeof overrides !== 'object') {
     return {};
@@ -2213,7 +2407,9 @@ const normalizeWorkbenchState = (state: WorkbenchState): WorkbenchState => {
   // Built explicitly: legacy snapshots carried preferences inside the account
   // (they live in the settings store now) and must not resurface here.
   const account = normalizeWorkbenchAccount(state.account);
-  const restored = state.projects.map((project) => normalizeWorkbenchProject(project));
+  const restored = state.projects.map((project) =>
+    withoutRedundantWorkingCopies(account, normalizeWorkbenchProject(project))
+  );
   // Every hydrated editor needs an active project, including projectless cached snapshots returned after canvas
   // recovery fails; seed a draft here for all load paths.
   const projects = restored.length > 0 ? restored : [createDraftProject([], account)];
@@ -2277,7 +2473,8 @@ const setBuiltInLayoutPresetMetadata = (
 };
 
 const applyLayoutPresetToProject = (project: Project, preset: LayoutPreset): Project => {
-  const snapshot = preset.snapshot;
+  // Presets replace all placements, including floating windows, and bypass normalizeWorkbenchProject.
+  const snapshot = normalizeLayoutPresetSnapshot(preset.snapshot);
   const widgetInstances = { ...project.widgetInstances };
 
   for (const instance of Object.values(snapshot.widgetInstances)) {
@@ -2286,23 +2483,22 @@ const applyLayoutPresetToProject = (project: Project, preset: LayoutPreset): Pro
       : createWidgetInstance(instance.typeId, instance.id);
   }
 
-  // Presets replace all placements, including floating windows. Validate account-stored windows here because
-  // presets bypass normalizeWorkbenchProject.
-  const placement = reconcileFloatingWidgets(
-    cloneLayoutPresetWidgetRegions(snapshot.widgetRegions),
-    normalizeFloatingWidgets(snapshot.floatingWidgets, widgetInstances)
-  );
-
   return {
     ...project,
-    floatingWidgets: placement.floatingWidgets,
+    floatingWidgets: snapshot.floatingWidgets,
+    // Presets carry no memory of their own, but a window the preset closes is still remembered.
+    lastFloatingGeometry: rememberClosedWindows(
+      project.lastFloatingGeometry,
+      project.floatingWidgets,
+      snapshot.floatingWidgets
+    ),
     layout: {
       ...snapshot.layout,
       panels: { ...snapshot.layout.panels },
       presetId: preset.id,
     },
     widgetInstances,
-    widgetRegions: placement.widgetRegions,
+    widgetRegions: cloneLayoutPresetWidgetRegions(snapshot.widgetRegions),
   };
 };
 
@@ -2328,6 +2524,40 @@ const updateActiveProjectLayoutPreset = (
         : nextLayoutProject.invocation,
     };
   });
+
+/** Leave the active preset for another, keeping each preset's working arrangement in this project. */
+const switchActiveProjectLayoutPreset = (state: WorkbenchState, preset: LayoutPreset): WorkbenchState =>
+  updateActiveProject(state, (project) => {
+    const nextProject = pushUndo(project, 'Update layout');
+    const workingArrangement = findLayoutPresetWorkingCopy(project.presetWorkingLayouts, preset.id);
+    // The working copy takes the saved preset's place for the arrangement only; identity and route stay the preset's.
+    const nextLayoutProject = applyLayoutPresetToProject(
+      nextProject,
+      workingArrangement ? { ...preset, snapshot: workingArrangement } : preset
+    );
+
+    return {
+      ...nextLayoutProject,
+      events: prependProjectEvent(nextProject.events, {
+        createdAt: now(),
+        id: createId('event'),
+        summary: 'Updated active layout',
+        type: 'layout-updated',
+      }),
+      invocation: getInvocationAfterLayoutPreset(nextProject.invocation, preset),
+      presetWorkingLayouts: captureOutgoingWorkingLayout(state.account, project, preset.id),
+    };
+  });
+
+const resetActiveLayoutToSaved = (state: WorkbenchState): WorkbenchState => {
+  const preset = getAvailableLayoutPreset(
+    state,
+    state.projects.find((project) => project.id === state.activeProjectId)?.layout.presetId ??
+      state.account.activeLayoutPresetId
+  );
+
+  return updateActiveProjectLayoutPreset(state, preset, { applyDefaultRoute: false });
+};
 
 const updateActiveInvocation = (
   state: WorkbenchState,
@@ -2443,6 +2673,7 @@ const compileInvocationSnapshot = (
     }
 
     const plan = planWorkflowSubmission(workflowDocument, templatesSnapshot.templates, {
+      autoBoardId: getGalleryAutoAddBoardId(widgetStates.gallery?.values ?? {}),
       batchCount: sanitizeBatchCount(widgetStates.workflow?.values.batchCount),
       generators: workflowGenerators,
     });
@@ -2790,6 +3021,31 @@ const removeGalleryItemsFromAllProjects = (
   return didChange ? { ...state, projects } : state;
 };
 
+/**
+ * The boards a project's gallery and unfinished queue items will act on: its selected board, its auto-add board and the
+ * boards pending or running results are bound for. Its own inbox is left out: a draft project's inbox exists only once
+ * the project does, and it goes only with the project.
+ */
+export const getProjectGalleryBoardReferences = (project: Project): string[] => {
+  const values = getWidgetValues(project, 'gallery');
+  const { autoAddBoardId } = getGallerySettings(values);
+  const references = new Set<string>();
+
+  for (const boardId of [
+    values.selectedBoardId,
+    autoAddBoardId,
+    ...project.queue.items
+      .filter((item) => item.status === 'pending' || item.status === 'running')
+      .map((item) => item.snapshot.galleryBoardId),
+  ]) {
+    if (typeof boardId === 'string' && boardId !== GALLERY_AUTO_ADD_FOLLOW && boardId !== values.projectBoardId) {
+      references.add(boardId);
+    }
+  }
+
+  return [...references];
+};
+
 const reconcileDeletedGalleryBoard = (
   state: WorkbenchState,
   boardId: string,
@@ -2808,8 +3064,9 @@ const reconcileDeletedGalleryBoard = (
   const withBoardReferencesCleared = updateAllProjectGalleryValues(withSurvivorsMoved, (values) => {
     const selectedBoardWasDeleted = values.selectedBoardId === boardId;
     const projectBoardWasDeleted = values.projectBoardId === boardId;
+    const autoAddBoardWasDeleted = values.autoAddBoardId === boardId;
 
-    if (!selectedBoardWasDeleted && !projectBoardWasDeleted) {
+    if (!selectedBoardWasDeleted && !projectBoardWasDeleted && !autoAddBoardWasDeleted) {
       return values;
     }
 
@@ -2819,6 +3076,7 @@ const reconcileDeletedGalleryBoard = (
         ? { galleryPage: 0, selectedBoardId: 'none', semanticImageQuery: null, semanticSearchText: null }
         : {}),
       ...(projectBoardWasDeleted ? { projectBoardId: null } : {}),
+      ...(autoAddBoardWasDeleted ? { autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW } : {}),
     };
   });
   let didChangeQueue = false;
@@ -2902,9 +3160,6 @@ const updateQueueItem = (project: Project, queueItemId: string, getItem: (item: 
 
   return didChange ? { ...project, queue: { items } } : project;
 };
-
-const isCancellableQueueItem = (item: QueueItem): boolean =>
-  item.cancellable && (item.status === 'pending' || item.status === 'running');
 
 const isClearableQueueItem = (item: QueueItem): boolean => item.status === 'completed' || item.status === 'failed';
 
@@ -3172,10 +3427,9 @@ const routeQueueItemResults = (
 const enqueueCompiledSnapshot = (
   project: Project,
   route: InvocationRoute,
-  compiled: {
+  compiled: Partial<ExpandedPositivePrompts> & {
     generate?: QueueGenerateSnapshot;
     graph: GraphContract;
-    positivePrompts?: string[];
     widgetStates: WidgetStateMap;
     /** The serialized parent workflow, without its library record id. */
     workflowJson?: Record<string, unknown>;
@@ -3229,6 +3483,9 @@ const enqueueCompiledSnapshot = (
   const expandedSeedBehaviour = expandedPositivePrompts
     ? (canvasGenerateSettings ?? generateSettings)?.dynamicPromptsSeedBehaviour
     : undefined;
+  // The draw the expansion used. Generate expands before dispatch, so the project's sample seed may have rotated
+  // since; recall and rotation follow the expansion, not the project.
+  const expansionSampleSeed = expandedPositivePrompts ? (compiled.positivePromptsSampleSeed ?? null) : null;
   // Compilation already reserved the starting seed; failures and cancellations do not roll the sequence back.
   const seedPlan = sourceGenerateSettings
     ? planSeedSubmission({
@@ -3272,13 +3529,15 @@ const enqueueCompiledSnapshot = (
             seedStep: seedPlan?.step ?? 0,
           }
         : { error: `${route.sourceId} queue item is missing source submission metadata.`, kind: 'invalid' };
-  const galleryBoardId = getGalleryDestinationBoardId(widgetStates.gallery?.values ?? {});
+  // A workflow compiles every node's board in (Auto included), so its board-less results stay Uncategorized.
+  const galleryBoardId =
+    route.sourceId === 'workflow' ? null : getGalleryAutoAddBoardId(widgetStates.gallery?.values ?? {});
   const generatePresentationSettings = normalizeGenerateSettings(widgetStates.generate?.values);
   const videoPresentationDimensions =
     route.sourceId === 'video' && videoSettings?.model ? getVideoDimensions(videoSettings.model, videoSettings) : null;
   const presentationDimensions =
     route.sourceId === 'upscale' && upscaleSettings?.inputImage
-      ? getUpscaleOutputDimensions(upscaleSettings.inputImage, upscaleSettings.scale)
+      ? getUpscaleOutputDimensions(upscaleSettings.inputImage, upscaleSettings.scale, upscaleSettings.model)
       : videoPresentationDimensions
         ? videoPresentationDimensions
         : {
@@ -3293,7 +3552,12 @@ const enqueueCompiledSnapshot = (
         ? normalizeGenerateWidgetValues(widgetStates.generate?.values)
         : null;
   const recall = generateRecallValues
-    ? { generateValues: cloneGenerateWidgetValues(generateRecallValues) }
+    ? {
+        generateValues: {
+          ...cloneGenerateWidgetValues(generateRecallValues),
+          ...(expansionSampleSeed === null ? {} : { dynamicPromptsSampleSeed: expansionSampleSeed }),
+        },
+      }
     : videoSettings
       ? { videoValues: cloneVideoWidgetValues(videoSettings) }
       : undefined;
@@ -3358,9 +3622,26 @@ const enqueueCompiledSnapshot = (
       : compiled.workflow && compiled.workflow.seedAdvances.length > 0 && compiled.projectWorkflowId
         ? advanceWorkflowSeeds(project, compiled.projectWorkflowId, compiled.workflow.seedAdvances)
         : project;
+  // The queued item carries the previewed draw; rotating afterward makes the preview show the next one.
+  const dynamicPromptsSettings = canvasGenerateSettings ?? generateSettings;
+  // Fencing on the expansion's seed keeps a submission that drew an already-rotated sample from rotating again.
+  const resampledProject =
+    expansionSampleSeed !== null &&
+    dynamicPromptsSettings &&
+    dynamicPromptsSettings.dynamicPromptsCombinatorial === false &&
+    dynamicPromptsSettings.dynamicPromptsResample
+      ? updateProjectWidgetValues(
+          advancedProject,
+          route.sourceId === 'canvas' ? 'generate' : route.sourceId,
+          (values) =>
+            values.dynamicPromptsSampleSeed === expansionSampleSeed && values.dynamicPromptsCombinatorial === false
+              ? { ...values, dynamicPromptsSampleSeed: createDynamicPromptsSampleSeed() }
+              : values
+        )
+      : advancedProject;
 
   return {
-    ...advancedProject,
+    ...resampledProject,
     events: prependProjectEvent(project.events, {
       createdAt: submittedAt,
       id: createId('event'),
@@ -3403,7 +3684,7 @@ const submitInvocationSnapshot = (
   backendSupportsCancellation: boolean,
   route = resolveInvocationRoute(project),
   models?: readonly ModelConfig[],
-  positivePrompts?: string[],
+  expansion: Partial<ExpandedPositivePrompts> = {},
   workflowGenerators?: WorkflowGeneratorResolutions,
   workflowDocument?: ProjectGraphState
 ): Project => {
@@ -3417,7 +3698,7 @@ const submitInvocationSnapshot = (
     return project;
   }
 
-  return enqueueCompiledSnapshot(project, route, { ...compiledSnapshot, positivePrompts }, backendSupportsCancellation);
+  return enqueueCompiledSnapshot(project, route, { ...compiledSnapshot, ...expansion }, backendSupportsCancellation);
 };
 
 export const createInitialWorkbenchState = (): WorkbenchState => {
@@ -3431,6 +3712,49 @@ export const createInitialWorkbenchState = (): WorkbenchState => {
     notifications: [],
     projects: [draft],
     widgetFailures: [],
+  };
+};
+
+const hasGallerySelectionPage = (selectionPage: number | undefined): selectionPage is number =>
+  typeof selectionPage === 'number' && Number.isFinite(selectionPage);
+
+/** An explicit page for the item being selected, else the page the grid is on. */
+const getGallerySelectionPage = (values: Record<string, unknown>, selectionPage: number | undefined): number =>
+  hasGallerySelectionPage(selectionPage)
+    ? Math.max(0, Math.floor(selectionPage))
+    : typeof values.galleryPage === 'number' && Number.isFinite(values.galleryPage)
+      ? Math.max(0, Math.floor(values.galleryPage))
+      : 0;
+
+/**
+ * A host step keeps the selection's query but follows the Gallery's active ranking, except for a selection that
+ * navigates its item's own board.
+ */
+const getRankingStampFields = (
+  values: Record<string, unknown>,
+  existingNavigationQuery: Record<string, unknown>,
+  semanticKey: string
+): Record<string, unknown> =>
+  existingNavigationQuery.itemBoard === true
+    ? {}
+    : semanticKey
+      ? { boardId: getGallerySelectionBoardId(values), semanticKey }
+      : { semanticKey: null };
+
+/** The listing the Gallery shows now, which a selection made in it navigates within. */
+const getCurrentGallerySelectionQuery = (values: Record<string, unknown>, page: number): Record<string, unknown> => {
+  const settings = getGallerySettings(values);
+  const semanticKey = gallerySemanticReferenceKey(parseGallerySemanticReference(values.semanticImageQuery));
+
+  return {
+    boardId: getGallerySelectionBoardId(values),
+    galleryView: values.galleryView === 'assets' ? 'assets' : 'images',
+    imageOrderDir: settings.imageOrderDir,
+    page,
+    paginationMode: settings.paginationMode,
+    searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
+    ...(semanticKey ? { semanticKey } : {}),
+    starredOnly: values.starredOnly === true,
   };
 };
 
@@ -3450,7 +3774,7 @@ export const __workbenchReducerInternal = (
         return { ...state, activeProjectId: action.project.id };
       }
 
-      const project = normalizeWorkbenchProject(action.project);
+      const project = withoutRedundantWorkingCopies(state.account, normalizeWorkbenchProject(action.project));
 
       return { ...state, activeProjectId: project.id, projects: [...state.projects, project] };
     }
@@ -3498,7 +3822,12 @@ export const __workbenchReducerInternal = (
     }
     case 'applyPreset': {
       const preset = getAvailableLayoutPreset(state, action.presetId);
-      const nextState = updateActiveProjectLayoutPreset(state, preset, { applyDefaultRoute: true });
+      const activeProject = state.projects.find((project) => project.id === state.activeProjectId);
+      // Choosing the preset already in use reapplies its saved arrangement, which is how its shortcut reverts.
+      const nextState =
+        activeProject && activeProject.layout.presetId !== preset.id
+          ? switchActiveProjectLayoutPreset(state, preset)
+          : updateActiveProjectLayoutPreset(state, preset, { applyDefaultRoute: true });
 
       return {
         ...nextState,
@@ -3532,7 +3861,7 @@ export const __workbenchReducerInternal = (
         iconId: action.iconId,
         id: presetId,
         label: action.label.trim() || 'Custom layout',
-        snapshot: createLayoutPresetSnapshot(normalizeWorkbenchProject(activeProject)),
+        snapshot: withSnapshotPresetId(createLayoutPresetSnapshot(normalizeWorkbenchProject(activeProject)), presetId),
       };
       const customLayoutPresets = [
         ...(state.account.customLayoutPresets ?? []).filter((candidate) => candidate.id !== presetId),
@@ -3545,9 +3874,14 @@ export const __workbenchReducerInternal = (
         preset.id,
       ];
 
+      // The project moves onto the new preset, whose saved arrangement is the live one, so it opens clean; the
+      // preset it came from is left as saved, its changes having gone to the new preset rather than to a copy.
       return {
         ...state,
         account: { ...state.account, activeLayoutPresetId: preset.id, customLayoutPresets, layoutPresetOrder },
+        projects: state.projects.map((project) =>
+          project === activeProject ? { ...project, layout: { ...project.layout, presetId: preset.id } } : project
+        ),
       };
     }
     case 'saveLayoutPreset': {
@@ -3557,7 +3891,41 @@ export const __workbenchReducerInternal = (
         return state;
       }
 
-      const snapshot = createLayoutPresetSnapshot(normalizeWorkbenchProject(activeProject));
+      // The active preset saves the live arrangement; another preset saves this project's working copy of it, and
+      // with no copy it has nothing unsaved to write. That copy stays (equal to the saved preset, it no longer reads
+      // as unsaved): saving writes only the account, so if the write is lost the copy still holds the arrangement and
+      // shows as unsaved again. Hydration drops it once the account it loads proves it redundant.
+      const workingArrangement =
+        activeProject.layout.presetId === action.presetId
+          ? undefined
+          : findLayoutPresetWorkingCopy(activeProject.presetWorkingLayouts, action.presetId);
+
+      if (activeProject.layout.presetId !== action.presetId && !workingArrangement) {
+        return state;
+      }
+
+      const snapshot = workingArrangement ?? createLayoutPresetSnapshot(normalizeWorkbenchProject(activeProject));
+      const previouslySaved = resolveSavedLayoutPreset(state.account, action.presetId).snapshot;
+      // Another open project's copy that equals the old saved arrangement was never a change of its own (it would now
+      // show the outdated arrangement as unsaved, and saving it would overwrite this save); one equal to the new
+      // arrangement is redundant. Both go. A copy that differs from both is that project's own work and stays.
+      const projects = state.projects.map((project) => {
+        if (project === activeProject && workingArrangement) {
+          return project;
+        }
+
+        const presetWorkingLayouts = withoutPresetWorkingLayouts(project, (presetId) => {
+          if (presetId !== action.presetId) {
+            return false;
+          }
+
+          const copy = findLayoutPresetWorkingCopy(project.presetWorkingLayouts, presetId)!;
+
+          return areLayoutPresetSnapshotsEqual(copy, previouslySaved) || areLayoutPresetSnapshotsEqual(copy, snapshot);
+        });
+
+        return presetWorkingLayouts === project.presetWorkingLayouts ? project : { ...project, presetWorkingLayouts };
+      });
 
       // Built-in preset bodies are code, so their saved form lives in an
       // override map; custom presets own their snapshot outright.
@@ -3567,7 +3935,7 @@ export const __workbenchReducerInternal = (
           [action.presetId]: { ...snapshot, layout: { ...snapshot.layout, presetId: action.presetId } },
         };
 
-        return { ...state, account: { ...state.account, layoutPresetOverrides } };
+        return { ...state, account: { ...state.account, layoutPresetOverrides }, projects };
       }
 
       const customLayoutPresets = (state.account.customLayoutPresets ?? []).map((preset) =>
@@ -3576,7 +3944,7 @@ export const __workbenchReducerInternal = (
           : preset
       );
 
-      return { ...state, account: { ...state.account, customLayoutPresets } };
+      return { ...state, account: { ...state.account, customLayoutPresets }, projects };
     }
     case 'restoreLayoutPresetDefault': {
       if (!isBuiltInLayoutPresetId(action.presetId)) {
@@ -3701,11 +4069,29 @@ export const __workbenchReducerInternal = (
       const customLayoutPresets = (state.account.customLayoutPresets ?? []).filter(
         (preset) => preset.id !== action.presetId
       );
-      const projects = state.projects.map((project) =>
-        project.layout.presetId === action.presetId
-          ? { ...project, layout: { ...project.layout, presetId: defaultLayoutPreset.id } }
-          : project
-      );
+      const defaultPreset = resolveSavedLayoutPreset(state.account, defaultLayoutPreset.id);
+      // The deleted preset's arrangements go with it. A project that was on it moves to the default preset as a switch
+      // would: its working copy of the default if it has one, otherwise the saved default.
+      const projects = state.projects.map((project) => {
+        if (project.layout.presetId !== action.presetId) {
+          const presetWorkingLayouts = withoutPresetWorkingLayouts(project, (presetId) => presetId === action.presetId);
+
+          return presetWorkingLayouts === project.presetWorkingLayouts ? project : { ...project, presetWorkingLayouts };
+        }
+
+        const defaultCopy = findLayoutPresetWorkingCopy(project.presetWorkingLayouts, defaultPreset.id);
+
+        return {
+          ...applyLayoutPresetToProject(
+            project,
+            defaultCopy ? { ...defaultPreset, snapshot: defaultCopy } : defaultPreset
+          ),
+          presetWorkingLayouts: withoutPresetWorkingLayouts(
+            project,
+            (presetId) => presetId === action.presetId || presetId === defaultPreset.id
+          ),
+        };
+      });
 
       return {
         ...state,
@@ -3722,13 +4108,25 @@ export const __workbenchReducerInternal = (
       };
     }
     case 'resetActiveLayout': {
-      const preset = getAvailableLayoutPreset(
-        state,
-        state.projects.find((project) => project.id === state.activeProjectId)?.layout.presetId ??
-          state.account.activeLayoutPresetId
-      );
+      return resetActiveLayoutToSaved(state);
+    }
+    case 'revertLayoutPreset': {
+      const activeProject = state.projects.find((project) => project.id === state.activeProjectId);
 
-      return updateActiveProjectLayoutPreset(state, preset, { applyDefaultRoute: false });
+      if (!activeProject) {
+        return state;
+      }
+      if (activeProject.layout.presetId === action.presetId) {
+        return resetActiveLayoutToSaved(state);
+      }
+      if (!findLayoutPresetWorkingCopy(activeProject.presetWorkingLayouts, action.presetId)) {
+        return state;
+      }
+
+      return updateActiveProject(state, (project) => ({
+        ...pushUndo(project, 'Update layout'),
+        presetWorkingLayouts: withoutPresetWorkingLayouts(project, (presetId) => presetId === action.presetId),
+      }));
     }
     case 'recoverShellLayout': {
       return updateActiveLayout(state, (layout) => ({
@@ -3773,33 +4171,29 @@ export const __workbenchReducerInternal = (
           Object.values(project.widgetInstances).find((instance) => instance.typeId === action.widgetId);
         const instanceId =
           action.createNew || !existingInstance ? createId(`widget-${action.widgetId}`) : existingInstance.id;
-        const instanceIds = region.instanceIds.includes(instanceId)
-          ? region.instanceIds
-          : [...region.instanceIds, instanceId];
         const widgetInstances = project.widgetInstances[instanceId]
           ? project.widgetInstances
           : {
               ...project.widgetInstances,
               [instanceId]: createWidgetInstance(action.widgetId, instanceId, action.initialValues),
             };
-        // Placing an instance docks it to prevent simultaneous region/window rendering.
-        const { [instanceId]: _floated, ...floatingWidgets } = project.floatingWidgets ?? {};
+        // An explicit open docks a floating instance where it came from before placing it here, so it is never
+        // both a window and a region member.
+        const docked = restoreFloatingInstance({ ...project, widgetInstances }, instanceId, { reveal: false });
+        const placed = docked.widgetRegions[action.region].instanceIds.includes(instanceId)
+          ? docked
+          : updateRegionOrder(docked, action.region, (slots) => [...slots, { instanceId, isFloating: false }]);
+        const widgetRegions = {
+          ...placed.widgetRegions,
+          [action.region]: { ...placed.widgetRegions[action.region], activeInstanceId: instanceId, isCollapsed: false },
+        };
 
+        // One reveal, for the placement that ends up in front.
         return applyAutoRouteForWidgetReveal(
           {
-            ...project,
-            floatingWidgets,
-            layout: openPanelForRegion(project.layout, action.region),
-            widgetInstances,
-            widgetRegions: {
-              ...project.widgetRegions,
-              [action.region]: {
-                ...region,
-                activeInstanceId: instanceId,
-                instanceIds,
-                isCollapsed: false,
-              },
-            },
+            ...placed,
+            layout: openPanelForRegion(placed.layout, action.region),
+            widgetRegions: action.region === 'center' ? yieldSidePanelsTo(widgetRegions, instanceId) : widgetRegions,
           },
           action.widgetId,
           context
@@ -3810,14 +4204,16 @@ export const __workbenchReducerInternal = (
       return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) => {
         const region = project.widgetRegions[action.region];
 
-        // Selecting a region slot docks the instance to prevent simultaneous region/window rendering.
-        const { [action.widgetId]: _floated, ...floatingWidgets } = project.floatingWidgets ?? {};
+        // A request that names an instance the region no longer holds — it floated, or left — is stale. It changes
+        // nothing; in particular it must not discard the window.
+        if (!region.instanceIds.includes(action.widgetId)) {
+          return project;
+        }
 
         if (action.region === 'center') {
           return applyAutoRouteForRevealedInstance(
             {
               ...project,
-              floatingWidgets,
               widgetRegions: {
                 ...project.widgetRegions,
                 center: { ...region, activeInstanceId: action.widgetId, isCollapsed: false },
@@ -3832,7 +4228,6 @@ export const __workbenchReducerInternal = (
         if (region.activeInstanceId === action.widgetId) {
           const disclosed = {
             ...project,
-            floatingWidgets,
             layout: openPanelForRegion(project.layout, action.region),
             widgetRegions: {
               ...project.widgetRegions,
@@ -3848,7 +4243,6 @@ export const __workbenchReducerInternal = (
         return applyAutoRouteForRevealedInstance(
           {
             ...project,
-            floatingWidgets,
             layout: openPanelForRegion(project.layout, action.region),
             widgetRegions: {
               ...project.widgetRegions,
@@ -3863,90 +4257,102 @@ export const __workbenchReducerInternal = (
     case 'toggleRegionWidget': {
       return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) => {
         const previousRegion = project.widgetRegions[action.region];
-        const nextProject = updateProjectWidgetRegion(project, action.region, (region) => {
-          const isEnabled = region.instanceIds.includes(action.widgetId);
+        const isEnabled = previousRegion.instanceIds.includes(action.widgetId);
 
-          if (action.region === 'center' && isEnabled && region.instanceIds.length === 1) {
-            return region;
-          }
-
-          const instanceIds = isEnabled
-            ? region.instanceIds.filter((widgetId) => widgetId !== action.widgetId)
-            : [...region.instanceIds, action.widgetId];
-          const fallbackInstanceId = getNextInstanceId(region, action.widgetId);
-
-          return {
-            ...region,
-            activeInstanceId: isEnabled
-              ? (fallbackInstanceId ?? emptiedActiveInstanceId(action.region, region))
-              : action.widgetId,
-            instanceIds,
-            isCollapsed: action.region === 'center' ? false : instanceIds.length === 0 ? true : region.isCollapsed,
-          };
-        });
-
-        // A refused toggle (the work surface keeping its last view) must stay a
-        // no-op down to object identity: the persistence layer treats any new
-        // `projects` reference as a change worth autosaving.
-        if (nextProject === project) {
+        // A refused toggle must stay a no-op down to object identity: the persistence layer treats any new
+        // `projects` reference as a change worth autosaving. The work surface keeps its last view, and a floating
+        // instance belongs to no region.
+        if (
+          isEnabled
+            ? action.region === 'center' && previousRegion.instanceIds.length === 1
+            : project.floatingWidgets?.[action.widgetId] !== undefined
+        ) {
           return project;
         }
+
+        const nextProject = updateProjectWidgetRegion(
+          updateRegionOrder(project, action.region, (slots) =>
+            isEnabled
+              ? slots.filter((slot) => slot.instanceId !== action.widgetId)
+              : [...slots, { instanceId: action.widgetId, isFloating: false }]
+          ),
+          action.region,
+          (region) => ({
+            ...region,
+            activeInstanceId: isEnabled
+              ? (getNextInstanceId(previousRegion, action.widgetId) ??
+                emptiedActiveInstanceId(action.region, previousRegion))
+              : action.widgetId,
+            isCollapsed:
+              action.region === 'center' ? false : region.instanceIds.length === 0 ? true : region.isCollapsed,
+          })
+        );
 
         return applyAutoRouteForRegionFront(nextProject, previousRegion, action.region, context);
       });
     }
     case 'floatWidget': {
       return updateActiveProject(state, (project) => {
-        if (project.floatingWidgets?.[action.instanceId]) {
+        if (project.floatingWidgets?.[action.instanceId] || !project.widgetInstances[action.instanceId]) {
           return project;
         }
 
-        // Use the clicked region as the dock-back origin for multi-region widgets; map order is not a stable
-        // origin.
-        const findHost = (match: (regionId: WidgetRegion, region: WidgetRegionState) => boolean) =>
-          (Object.entries(project.widgetRegions) as [WidgetRegion, WidgetRegionState][]).find(([regionId, region]) =>
-            match(regionId, region)
-          );
-        const hostEntry = action.region
-          ? findHost((regionId, region) => regionId === action.region && region.instanceIds.includes(action.instanceId))
-          : undefined;
-        const resolvedHostEntry = hostEntry ?? findHost((_, region) => region.instanceIds.includes(action.instanceId));
+        const memberRegions = WIDGET_REGIONS.filter((regionId) =>
+          project.widgetRegions[regionId].instanceIds.includes(action.instanceId)
+        );
+        // The window returns to the chrome the float was asked from; without that hint, to its first member region.
+        // The reducer accepts a center origin; the UI float control only offers dockable panel origins.
+        const returnRegion = action.region && memberRegions.includes(action.region) ? action.region : memberRegions[0];
 
-        if (!resolvedHostEntry || !project.widgetInstances[action.instanceId]) {
+        if (!returnRegion) {
           return project;
         }
 
-        const [hostRegionId, hostRegion] = resolvedHostEntry;
-
-        // The reducer accepts center-origin floating and preserves its fallback; the UI float control only offers
-        // dockable panel origins.
-        const instanceIds = hostRegion.instanceIds.filter((instanceId) => instanceId !== action.instanceId);
-        const fallbackInstanceId = getNextInstanceId(hostRegion, action.instanceId);
-        const floating: FloatingWidgetState = {
-          ...cascadeDefaultGeometry(Object.keys(project.floatingWidgets ?? {}).length),
-          mode: 'windowed',
-          returnIndex: hostRegion.instanceIds.indexOf(action.instanceId),
-          returnRegion: hostRegionId,
-          stackOrder: nextStackOrder(project.floatingWidgets),
+        // The window reopens where it last floated, brought on screen if that was in a larger viewport; a first
+        // float takes the next cascade slot.
+        const remembered = project.lastFloatingGeometry?.[action.instanceId];
+        let floatingWidgets: Record<WidgetInstanceId, FloatingWidgetState> | undefined = {
+          ...project.floatingWidgets,
+          [action.instanceId]: toFloatingWidgetState({
+            ...(remembered
+              ? action.viewport
+                ? fitWindowIntoViewport(remembered, action.viewport)
+                : remembered
+              : cascadeDefaultGeometry(Object.keys(project.floatingWidgets ?? {}).length)),
+            mode: 'windowed',
+            returnRegion,
+            stackOrder: nextStackOrder(project.floatingWidgets),
+          }),
         };
+        const widgetRegions = { ...project.widgetRegions };
+
+        // A floating instance belongs to no region: it leaves every one that held it, and only the return region
+        // keeps its slot, as a marker.
+        for (const regionId of memberRegions) {
+          const region = project.widgetRegions[regionId];
+          const slots = getRegionOrder(regionId, region.instanceIds, project.floatingWidgets);
+          const order = writeRegionOrder(
+            regionId === returnRegion
+              ? slots.map((slot) => (slot.instanceId === action.instanceId ? { ...slot, isFloating: true } : slot))
+              : slots.filter((slot) => slot.instanceId !== action.instanceId),
+            floatingWidgets
+          );
+
+          floatingWidgets = order.floatingWidgets;
+          widgetRegions[regionId] = withoutFloatedInstances(regionId, region, order.instanceIds);
+        }
 
         return applyAutoRouteForRevealedInstance(
           {
             ...project,
-            floatingWidgets: { ...project.floatingWidgets, [action.instanceId]: floating },
-            widgetRegions: {
-              ...project.widgetRegions,
-              [hostRegionId]: {
-                ...hostRegion,
-                activeInstanceId:
-                  hostRegion.activeInstanceId === action.instanceId
-                    ? (fallbackInstanceId ?? emptiedActiveInstanceId(hostRegionId, hostRegion))
-                    : hostRegion.activeInstanceId,
-                instanceIds,
-                // Empty rails collapse; an empty center uses its fallback view.
-                isCollapsed: instanceIds.length === 0 && hostRegionId !== 'center' ? true : hostRegion.isCollapsed,
-              },
-            },
+            floatingWidgets,
+            // The memory is spent while the window is open: its geometry is the window's own state again.
+            lastFloatingGeometry: rememberClosedWindows(
+              project.lastFloatingGeometry,
+              project.floatingWidgets,
+              floatingWidgets
+            ),
+            widgetRegions,
           },
           // The window lands on top of everything, so it is the revealed
           // surface — not the tab the rail promotes behind it.
@@ -3956,6 +4362,17 @@ export const __workbenchReducerInternal = (
       });
     }
     case 'dockFloatingWidget': {
+      return updateActiveProject(state, (project) =>
+        project.floatingWidgets?.[action.instanceId]
+          ? applyAutoRouteForRevealedInstance(
+              restoreFloatingInstance(project, action.instanceId, { reveal: true }),
+              action.instanceId,
+              context
+            )
+          : project
+      );
+    }
+    case 'closeFloatingWidget': {
       return updateActiveProject(state, (project) => {
         const floating = project.floatingWidgets?.[action.instanceId];
 
@@ -3963,41 +4380,18 @@ export const __workbenchReducerInternal = (
           return project;
         }
 
-        const { [action.instanceId]: _docked, ...remaining } = project.floatingWidgets ?? {};
-        const region = project.widgetRegions[floating.returnRegion];
-        const instanceIds = region.instanceIds.includes(action.instanceId)
-          ? region.instanceIds
-          : insertAtReturnIndex(region.instanceIds, action.instanceId, floating.returnIndex);
-
-        return applyAutoRouteForRevealedInstance(
-          {
-            ...project,
-            floatingWidgets: remaining,
-            layout: openPanelForRegion(project.layout, floating.returnRegion),
-            widgetRegions: {
-              ...project.widgetRegions,
-              [floating.returnRegion]: {
-                ...region,
-                activeInstanceId: action.instanceId,
-                instanceIds,
-                isCollapsed: false,
-              },
-            },
-          },
-          action.instanceId,
-          context
+        // Removing closes the window and frees its rail slot. It opens no panel, but a center left empty by this
+        // instance gets its view back rather than staying blank.
+        const closed = updateRegionOrder(project, floating.returnRegion, (slots) =>
+          slots.filter((slot) => slot.instanceId !== action.instanceId)
         );
-      });
-    }
-    case 'closeFloatingWidget': {
-      return updateActiveProject(state, (project) => {
-        if (!project.floatingWidgets?.[action.instanceId]) {
-          return project;
-        }
 
-        const { [action.instanceId]: _closed, ...remaining } = project.floatingWidgets;
-
-        return { ...project, floatingWidgets: Object.keys(remaining).length > 0 ? remaining : undefined };
+        return isAwaitedCenterView(project.widgetRegions.center, action.instanceId)
+          ? updateRegionOrder(closed, 'center', (slots) => [
+              ...slots,
+              { instanceId: action.instanceId, isFloating: false },
+            ])
+          : closed;
       });
     }
     case 'setFloatingWidgetGeometry': {
@@ -4045,45 +4439,63 @@ export const __workbenchReducerInternal = (
         };
       });
     }
-    case 'focusFloatingWidget': {
+    case 'raiseFloatingWidget': {
       return updateActiveProject(state, (project) => {
-        const floating = project.floatingWidgets?.[action.instanceId];
-        const topOrder = nextStackOrder(project.floatingWidgets) - 1;
+        const floatingWidgets = raiseFloatingWidget(project.floatingWidgets, action.instanceId);
 
-        // Pointer capture runs for every interaction inside the window; only raising it should re-route or dirty
-        // the project.
-        if (!floating || floating.stackOrder === topOrder) {
-          return project;
-        }
+        // Every press and every focus arriving inside the window asks for this; only an actual raise should
+        // re-route or dirty the project.
+        return floatingWidgets === project.floatingWidgets
+          ? project
+          : applyAutoRouteForRevealedInstance({ ...project, floatingWidgets }, action.instanceId, context);
+      });
+    }
+    case 'revealFloatingWidget': {
+      return updateActiveProject(state, (project) => {
+        const raised = raiseFloatingWidget(project.floatingWidgets, action.instanceId);
+        const floating = raised?.[action.instanceId];
+        // A shaded window is rolled up to its title bar; raising it alone would still hide its content.
+        const floatingWidgets: Project['floatingWidgets'] =
+          floating?.mode === 'shaded' ? { ...raised, [action.instanceId]: { ...floating, mode: 'windowed' } } : raised;
 
-        // Compact persisted stackOrder to 1..N rather than growing it on every raise.
-        const below = Object.entries(project.floatingWidgets ?? {})
-          .filter(([instanceId]) => instanceId !== action.instanceId)
-          .sort(([, left], [, right]) => left.stackOrder - right.stackOrder);
-        const floatingWidgets: Record<WidgetInstanceId, FloatingWidgetState> = {};
-
-        for (const [instanceId, windowState] of below) {
-          floatingWidgets[instanceId] = { ...windowState, stackOrder: Object.keys(floatingWidgets).length + 1 };
-        }
-
-        floatingWidgets[action.instanceId] = { ...floating, stackOrder: below.length + 1 };
-
-        return applyAutoRouteForRevealedInstance({ ...project, floatingWidgets }, action.instanceId, context);
+        return floatingWidgets === project.floatingWidgets
+          ? project
+          : applyAutoRouteForRevealedInstance({ ...project, floatingWidgets }, action.instanceId, context);
       });
     }
     case 'moveWidgetInstance': {
       return updateActiveProject(state, (project) => {
         const fromRegion = project.widgetRegions[action.fromRegion];
-        const toRegion = project.widgetRegions[action.toRegion];
-        const nextFromInstanceIds = fromRegion.instanceIds.filter((instanceId) => instanceId !== action.instanceId);
-        const nextToInstanceIds = insertAt(toRegion.instanceIds, action.instanceId, action.toIndex);
+
+        // Only a docked member can be dragged; a stale request for one that has left or floated changes nothing.
+        if (!fromRegion.instanceIds.includes(action.instanceId)) {
+          return project;
+        }
+
+        const detached = updateRegionOrder(project, action.fromRegion, (slots) =>
+          slots.filter((slot) => slot.instanceId !== action.instanceId)
+        );
+        // `toIndex` counts docked members; the instance lands in front of the member at that index, wherever the
+        // region's markers sit.
+        const moved = updateRegionOrder(detached, action.toRegion, (slots) => {
+          const others = slots.filter((slot) => slot.instanceId !== action.instanceId);
+          const target = others.filter((slot) => !slot.isFloating)[Math.max(0, action.toIndex)];
+          const position = target ? others.indexOf(target) : others.length;
+
+          return [
+            ...others.slice(0, position),
+            { instanceId: action.instanceId, isFloating: false },
+            ...others.slice(position),
+          ];
+        });
+        const nextFromInstanceIds = detached.widgetRegions[action.fromRegion].instanceIds;
 
         return applyAutoRouteForRevealedInstance(
           {
-            ...project,
+            ...moved,
             layout: openPanelForRegion(project.layout, action.toRegion),
             widgetRegions: {
-              ...project.widgetRegions,
+              ...moved.widgetRegions,
               [action.fromRegion]: {
                 ...fromRegion,
                 activeInstanceId:
@@ -4095,9 +4507,9 @@ export const __workbenchReducerInternal = (
                   action.fromRegion === 'center' ? false : nextFromInstanceIds.length === 0 || fromRegion.isCollapsed,
               },
               [action.toRegion]: {
-                ...toRegion,
+                ...project.widgetRegions[action.toRegion],
                 activeInstanceId: action.instanceId,
-                instanceIds: nextToInstanceIds,
+                instanceIds: moved.widgetRegions[action.toRegion].instanceIds,
                 isCollapsed: false,
               },
             },
@@ -4111,6 +4523,18 @@ export const __workbenchReducerInternal = (
     case 'reorderWidgetInstances': {
       return updateActiveProject(state, (project) => {
         const previousRegion = project.widgetRegions[action.region];
+        const members = new Set(previousRegion.instanceIds);
+
+        // A reorder only permutes the docked members, which then fill the docked positions around stationary
+        // markers. Anything else is stale: it could re-add an instance that floated or left.
+        if (
+          action.instanceIds.length !== members.size ||
+          new Set(action.instanceIds).size !== members.size ||
+          !action.instanceIds.every((instanceId) => members.has(instanceId))
+        ) {
+          return project;
+        }
+
         const nextProject = updateProjectWidgetRegion(project, action.region, (region) => ({
           ...region,
           activeInstanceId: action.activeInstanceId ?? region.activeInstanceId,
@@ -4316,6 +4740,20 @@ export const __workbenchReducerInternal = (
         removeProjectWorkflow(project, action.workflowId)
       );
     }
+    case 'replaceProjectWorkflowDocument': {
+      return updateProjectById(state, action.projectId, (project) =>
+        selectProjectWorkflow(
+          replaceProjectWorkflowDocument(
+            project,
+            action.workflowId,
+            action.document,
+            { label: action.label, source: action.source },
+            now()
+          ),
+          action.workflowId
+        )
+      );
+    }
     case 'setProjectWorkflowSource': {
       return updateProjectById(state, action.projectId, (project) =>
         setProjectWorkflowSource(project, action.workflowId, action.source)
@@ -4374,7 +4812,7 @@ export const __workbenchReducerInternal = (
             action.backendSupportsCancellation,
             resolveInvocationRoute(project, 'global', action.route, action.models, workflow?.document),
             action.models,
-            action.positivePrompts,
+            { positivePrompts: action.positivePrompts, positivePromptsSampleSeed: action.positivePromptsSampleSeed },
             action.workflowGenerators,
             workflow?.document
           )
@@ -4552,29 +4990,35 @@ export const __workbenchReducerInternal = (
       return updateGalleryValuesAndPauseLiveFollow(
         state,
         (values) => {
+          // A selection navigated within its own board has no known page there; Preview locates it.
           const selectedImagePage =
-            typeof action.selectionPage === 'number' && Number.isFinite(action.selectionPage)
-              ? Math.max(0, Math.floor(action.selectionPage))
-              : typeof values.galleryPage === 'number' && Number.isFinite(values.galleryPage)
-                ? Math.max(0, Math.floor(values.galleryPage))
-                : 0;
-          const settings = getGallerySettings(values);
+            action.navigateItemBoard && !hasGallerySelectionPage(action.selectionPage)
+              ? 0
+              : getGallerySelectionPage(values, action.selectionPage);
+          const semanticKey = gallerySemanticReferenceKey(parseGallerySemanticReference(values.semanticImageQuery));
           const existingNavigationQuery =
             values.selectedImageQuery && typeof values.selectedImageQuery === 'object'
               ? (values.selectedImageQuery as Record<string, unknown>)
               : null;
-          const selectedImageQuery =
-            action.preserveNavigationQuery && existingNavigationQuery
-              ? { ...existingNavigationQuery, page: selectedImagePage }
-              : {
-                  boardId: typeof values.selectedBoardId === 'string' ? values.selectedBoardId : 'none',
-                  galleryView: values.galleryView === 'assets' ? 'assets' : 'images',
-                  imageOrderDir: settings.imageOrderDir,
+          const settings = getGallerySettings(values);
+          const selectedImageQuery = action.navigateItemBoard
+            ? {
+                boardId: action.item.boardId,
+                galleryView: action.item.category === 'general' ? 'images' : 'assets',
+                imageOrderDir: settings.imageOrderDir,
+                itemBoard: true,
+                page: selectedImagePage,
+                paginationMode: settings.paginationMode,
+                searchTerm: '',
+                starredOnly: false,
+              }
+            : action.preserveNavigationQuery && existingNavigationQuery
+              ? {
+                  ...existingNavigationQuery,
+                  ...getRankingStampFields(values, existingNavigationQuery, semanticKey),
                   page: selectedImagePage,
-                  paginationMode: settings.paginationMode,
-                  searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
-                  starredOnly: values.starredOnly === true,
-                };
+                }
+              : getCurrentGallerySelectionQuery(values, selectedImagePage);
           const itemKey = toGalleryItemKey(action.item);
 
           return {
@@ -4598,11 +5042,7 @@ export const __workbenchReducerInternal = (
           const selectedItemKeys = getPersistedSelectedGalleryItemKeys(values);
 
           if (!selectedItemKeys.includes(itemKey)) {
-            const settings = getGallerySettings(values);
-            const selectedImagePage =
-              typeof values.galleryPage === 'number' && Number.isFinite(values.galleryPage)
-                ? Math.max(0, Math.floor(values.galleryPage))
-                : 0;
+            const selectedImagePage = getGallerySelectionPage(values, action.selectionPage);
 
             return {
               ...values,
@@ -4611,15 +5051,7 @@ export const __workbenchReducerInternal = (
               selectedImageName: itemKey,
               selectedImageNames: [...selectedItemKeys, itemKey],
               selectedImagePage,
-              selectedImageQuery: {
-                boardId: typeof values.selectedBoardId === 'string' ? values.selectedBoardId : 'none',
-                galleryView: values.galleryView === 'assets' ? 'assets' : 'images',
-                imageOrderDir: settings.imageOrderDir,
-                page: selectedImagePage,
-                paginationMode: settings.paginationMode,
-                searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
-                starredOnly: values.starredOnly === true,
-              },
+              selectedImageQuery: getCurrentGallerySelectionQuery(values, selectedImagePage),
             };
           }
 
@@ -4648,6 +5080,11 @@ export const __workbenchReducerInternal = (
               ? action.nextPrimaryItem
               : null;
           const nextPrimaryKey = nextPrimaryItem ? toGalleryItemKey(nextPrimaryItem) : null;
+          // The next primary keeps the old primary's stamp unless the grid knows where the next one sits.
+          const nextPrimaryPage =
+            nextPrimaryItem && hasGallerySelectionPage(action.selectionPage)
+              ? getGallerySelectionPage(values, action.selectionPage)
+              : null;
 
           return {
             ...values,
@@ -4655,6 +5092,12 @@ export const __workbenchReducerInternal = (
             selectedImage: nextPrimaryItem,
             selectedImageName: nextPrimaryKey,
             selectedImageNames: expectedNextPrimaryKey && !nextPrimaryItem ? [] : remainingItemKeys,
+            ...(nextPrimaryPage === null
+              ? {}
+              : {
+                  selectedImagePage: nextPrimaryPage,
+                  selectedImageQuery: getCurrentGallerySelectionQuery(values, nextPrimaryPage),
+                }),
           };
         },
         action.projectId
@@ -4664,13 +5107,8 @@ export const __workbenchReducerInternal = (
       return updateGalleryValuesAndPauseLiveFollow(
         state,
         (values) => {
-          const settings = getGallerySettings(values);
-          const hasSelectionPage = typeof action.selectionPage === 'number' && Number.isFinite(action.selectionPage);
-          const selectedImagePage = hasSelectionPage
-            ? Math.max(0, Math.floor(action.selectionPage as number))
-            : typeof values.galleryPage === 'number' && Number.isFinite(values.galleryPage)
-              ? Math.max(0, Math.floor(values.galleryPage))
-              : 0;
+          const semanticKey = gallerySemanticReferenceKey(parseGallerySemanticReference(values.semanticImageQuery));
+          const selectedImagePage = getGallerySelectionPage(values, action.selectionPage);
           const existingNavigationQuery =
             values.selectedImageQuery && typeof values.selectedImageQuery === 'object'
               ? (values.selectedImageQuery as Record<string, unknown>)
@@ -4683,19 +5121,15 @@ export const __workbenchReducerInternal = (
             selectedImageName: toGalleryItemKey(action.primaryItem),
             selectedImageNames: action.itemKeys,
             selectedImagePage,
-            // An explicit host page belongs to the selection's query, matching preserveNavigationQuery.
+            // A Gallery range captures the current listing; only a host stepping within its own window keeps the old one.
             selectedImageQuery:
-              hasSelectionPage && existingNavigationQuery
-                ? { ...existingNavigationQuery, page: selectedImagePage }
-                : {
-                    boardId: typeof values.selectedBoardId === 'string' ? values.selectedBoardId : 'none',
-                    galleryView: values.galleryView === 'assets' ? 'assets' : 'images',
-                    imageOrderDir: settings.imageOrderDir,
+              action.preserveNavigationQuery && existingNavigationQuery
+                ? {
+                    ...existingNavigationQuery,
+                    ...getRankingStampFields(values, existingNavigationQuery, semanticKey),
                     page: selectedImagePage,
-                    paginationMode: settings.paginationMode,
-                    searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
-                    starredOnly: values.starredOnly === true,
-                  },
+                  }
+                : getCurrentGallerySelectionQuery(values, selectedImagePage),
           };
         },
         action.projectId
@@ -4935,6 +5369,7 @@ export const __workbenchReducerInternal = (
               generate: action.generate,
               graph: action.graph,
               positivePrompts: action.positivePrompts,
+              positivePromptsSampleSeed: action.positivePromptsSampleSeed,
               widgetStates: getWidgetStatesSnapshot(project.widgetInstances),
             },
             action.backendSupportsCancellation,
@@ -4975,9 +5410,9 @@ export const __workbenchReducerInternal = (
         nextState,
         createNotification({
           kind: 'info',
-          message: `${targetProject.name}: ${action.queueItemId}`,
+          message: action.notice?.message ?? `${targetProject.name}: ${action.queueItemId}`,
           projectId: targetProject.id,
-          title: 'Invocation cancellation requested',
+          title: action.notice?.title ?? 'Invocation cancellation requested',
         })
       );
     }

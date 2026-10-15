@@ -2278,20 +2278,22 @@ class FluxSDNQDiffusersModel(ModelLoader):
         with accelerate.init_empty_weights():
             model = CLIPTextModel(model_config)
 
+        # transformers >=5.6 flattened CLIPTextModel, dropping the `text_model.` prefix the checkpoint carries.
+        # (`from_pretrained` strips it with a conversion rule; `load_state_dict` does not.)
+        sd = {k.removeprefix("text_model."): v for k, v in sd.items()}
+
         # position_ids is a non-persistent buffer that may be absent from the checkpoint.
         missing, unexpected = model.load_state_dict(sd, strict=False, assign=True)
         raise_on_incomplete_sdnq_load(
-            "SDNQ CLIP text encoder", missing, unexpected, allowed_missing={"text_model.embeddings.position_ids"}
+            "SDNQ CLIP text encoder", missing, unexpected, allowed_missing={"embeddings.position_ids"}
         )
 
         # Dequantize embedding layer
-        if hasattr(model, "text_model") and hasattr(model.text_model, "embeddings"):
-            embed_weight = model.text_model.embeddings.token_embedding.weight
-            if isinstance(embed_weight, SDNQTensor):
-                dequantized = embed_weight.get_dequantized_tensor()
-                model.text_model.embeddings.token_embedding.weight = torch.nn.Parameter(
-                    dequantized, requires_grad=False
-                )
+        embed_weight = model.embeddings.token_embedding.weight
+        if isinstance(embed_weight, SDNQTensor):
+            model.embeddings.token_embedding.weight = torch.nn.Parameter(
+                embed_weight.get_dequantized_tensor(), requires_grad=False
+            )
 
         return model
 

@@ -7,35 +7,28 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
 
 ## Frontend Tests
 
-We use `vitest` to run the frontend tests. (See [vite.config.ts](https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/frontend/web/vite.config.mts) for the default `vitest` options.)
-
-Below are some common frontend test commands:
+The default frontend is `webv2`, with unit and Chromium suites. Run commands from the repository root:
 
 <Tabs>
   <TabItem label="Make">
     ```bash
-    # From the repository root, run the frontend test suite once.
+    # Run the default frontend unit suite once.
     make frontend-test
     ```
   </TabItem>
   <TabItem label="pnpm">
     ```bash
-    # From the repository root, run the full frontend test suite in watch mode.
-    pnpm --dir invokeai/frontend/web test
-
-    # Run the frontend test suite once without watch mode.
-    pnpm --dir invokeai/frontend/web test:no-watch
-
-    # Equivalent one-shot command using the underlying Vitest subcommand.
-    pnpm --dir invokeai/frontend/web test:run
-
-    # Open the Vitest UI and collect coverage data while running tests.
-    pnpm --dir invokeai/frontend/web test:ui
+    pnpm -C invokeai/frontend/webv2 test
+    pnpm -C invokeai/frontend/webv2 test:browser
+    # Complete milestone gates, including performance, project files, and accessibility.
+    pnpm -C invokeai/frontend/webv2 check:release
     ```
   </TabItem>
 </Tabs>
 
-If you are already working from `invokeai/frontend/web`, you can omit the `--dir` flag and run the same `pnpm` scripts directly from that directory.
+Install Chromium with `pnpm -C invokeai/frontend/webv2 exec playwright install chromium` if needed. Read `webv2/AGENTS.md` for test ownership and browser verification rules.
+
+The legacy frontend remains in `invokeai/frontend/webv1`. Run its separate suite with `pnpm -C invokeai/frontend/webv1 test:no-watch` and its checks with `pnpm -C invokeai/frontend/webv1 lint`.
 
 ## Backend Tests
 

@@ -24,7 +24,7 @@ export const RemovableTag = ({ children, disabled, onRemove, removeLabel }: Remo
   }, []);
 
   return (
-    <Tag.Root flexShrink={0} maxW="full" minW="0" size="sm" variant="surface">
+    <Tag.Root flexShrink={0} maxW="full" minW="0" variant="surface">
       <Tooltip content={children} open={isLabelTipOpen} onOpenChange={handleLabelTipChange}>
         <Tag.Label ref={labelRef} truncate>
           {children}

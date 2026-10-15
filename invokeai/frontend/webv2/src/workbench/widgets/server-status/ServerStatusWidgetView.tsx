@@ -20,10 +20,10 @@ export const ServerStatusWidgetView = ({ presentation }: WidgetViewProps) => {
   if (presentation === 'tooltip') {
     return (
       <Stack gap="2">
-        <Text fontSize="xs" fontWeight="700">
+        <Text fontSize="md" fontWeight="700">
           {t('widgets.serverStatus.label')}
         </Text>
-        <Text color="fg.subtle" fontSize="2xs">
+        <Text color="fg.subtle" fontSize="xs">
           {backendConnection.error
             ? t('widgets.serverStatus.labelWithError', { error: backendConnection.error, label })
             : label}

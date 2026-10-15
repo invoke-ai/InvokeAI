@@ -140,7 +140,7 @@ describe('createLayerCacheStore', () => {
     store.invalidate('hidden'); // version 1
     const budget = 100 * 100 * 4; // room for one surface
     store.getOrCreate('visible', 100, 100);
-    const evicted = store.evictHidden(['visible'], budget);
+    const evicted = store.evict((id) => id === 'visible', budget);
     expect(evicted).toContain('hidden');
 
     const reshown = store.getOrCreate('hidden', 100, 100);
@@ -162,15 +162,15 @@ describe('createLayerCacheStore', () => {
     expect(store.byteSize()).toBe(0);
   });
 
-  it('evictHidden does nothing when already within budget', () => {
+  it('evict does nothing when already within budget', () => {
     const store = createLayerCacheStore(createTestStubRasterBackend());
     store.getOrCreate('a', 10, 10);
-    const evicted = store.evictHidden([], DEFAULT_CACHE_BUDGET_BYTES);
+    const evicted = store.evict(() => false, DEFAULT_CACHE_BUDGET_BYTES);
     expect(evicted).toEqual([]);
     expect(store.get('a')).toBeDefined();
   });
 
-  it('evictHidden evicts least-recently-used hidden caches until within budget, never visible ones', () => {
+  it('evict removes least-recently-used unprotected caches until within budget, never protected ones', () => {
     const store = createLayerCacheStore(createTestStubRasterBackend());
     // Each surface is 100*100*4 = 40_000 bytes.
     store.getOrCreate('old-hidden', 100, 100);
@@ -181,7 +181,7 @@ describe('createLayerCacheStore', () => {
 
     // Budget allows exactly two surfaces; three exist -> one hidden must go.
     const budget = 100 * 100 * 4 * 2;
-    const evicted = store.evictHidden(['visible'], budget);
+    const evicted = store.evict((id) => id === 'visible', budget);
 
     expect(evicted).toEqual(['old-hidden']);
     expect(store.get('old-hidden')).toBeUndefined();
@@ -190,12 +190,66 @@ describe('createLayerCacheStore', () => {
     expect(store.byteSize()).toBeLessThanOrEqual(budget);
   });
 
-  it('evictHidden will not evict visible caches even if still over budget', () => {
+  it('evict keeps protected caches even when still over budget', () => {
     const store = createLayerCacheStore(createTestStubRasterBackend());
     store.getOrCreate('visible', 100, 100);
-    const evicted = store.evictHidden(['visible'], 1);
+    const evicted = store.evict((id) => id === 'visible', 1);
     expect(evicted).toEqual([]);
     expect(store.get('visible')).toBeDefined();
+  });
+
+  it('keeps a running byte total through allocation, resize, transfer and release', () => {
+    const backend = createTestStubRasterBackend();
+    const reported: number[] = [];
+    const store = createLayerCacheStore(backend, { onBytesChange: (bytes) => reported.push(bytes) });
+
+    store.getOrCreateRect('a', { height: 10, width: 10, x: 0, y: 0 });
+    store.growToRect('a', { height: 10, width: 20, x: 0, y: 0 });
+    store.shrinkToRect('a', { height: 5, width: 20, x: 0, y: 0 });
+    const before = store.captureState('a');
+    store.installReplacement(
+      store.prepareReplacement('a', { height: 4, width: 4, x: 0, y: 0 }, backend.createSurface(4, 4))
+    );
+    expect(store.byteSize()).toBe(64);
+    store.restoreState('a', before);
+    expect(store.byteSize()).toBe(400);
+    // An exact rollback: guards captured before the replacement describe the reinstated entry again.
+    expect(store.peek('a')).toMatchObject({ rect: before!.rect, surface: before!.surface, version: before!.version });
+    store.publishRasterized('b', { height: 2, width: 3, x: 0, y: 0 }, backend.createSurface(3, 2));
+    store.delete('a');
+
+    expect(reported).toEqual([400, 800, 400, 64, 400, 424, 24]);
+    expect(store.byteSize()).toBe(24);
+    store.dispose();
+    expect(reported.at(-1)).toBe(0);
+  });
+
+  it('publishRasterized resizes, replaces and publishes the live pixels at a copied rect', () => {
+    const backend = createTestStubRasterBackend();
+    const store = createLayerCacheStore(backend);
+    const entry = store.getOrCreateRect('a', { height: 4, width: 4, x: 0, y: 0 });
+    const rect = { height: 8, width: 6, x: 1, y: 2 };
+
+    const published = store.publishRasterized('a', rect, backend.createSurface(6, 8), 'face-1');
+
+    expect(published).toBe(entry);
+    expect([entry.surface.width, entry.surface.height]).toEqual([6, 8]);
+    expect(entry.rect).toEqual(rect);
+    expect(entry.rect).not.toBe(rect);
+    expect(entry).toMatchObject({ hasPublishedPixels: true, renderedFontFamily: 'face-1', stale: false });
+    expect(store.byteSize()).toBe(6 * 8 * 4);
+  });
+
+  it('publishRasterized clears without drawing an empty result', () => {
+    const backend = createTestStubRasterBackend();
+    const store = createLayerCacheStore(backend);
+    const entry = store.getOrCreateRect('a', { height: 4, width: 4, x: 0, y: 0 });
+    const calls = (entry.surface as ReturnType<typeof backend.createSurface>).callLog;
+
+    store.publishRasterized('a', { height: 0, width: 0, x: 0, y: 0 }, backend.createSurface(0, 0));
+
+    expect(calls.some((call) => call.op === 'clearRect')).toBe(true);
+    expect(calls.some((call) => call.op === 'drawImage')).toBe(false);
   });
 
   it('dispose clears caches', () => {

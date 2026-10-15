@@ -44,7 +44,7 @@ it('keeps base badges distinct and readable through theme changes and filter sel
           {Object.values(MODEL_BASES).map(({ base, label, colorPalette }) => (
             <HStack key={base} data-base={base} gap="4" mb="2">
               <ModelBaseBadge base={base} />
-              <Badge colorPalette={colorPalette} size="sm" variant="solid">
+              <Badge colorPalette={colorPalette} size="lg" variant="solid">
                 {label}
               </Badge>
             </HStack>

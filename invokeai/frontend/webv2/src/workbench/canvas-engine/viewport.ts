@@ -53,7 +53,7 @@ export interface Viewport {
   panBy(screenDelta: Vec2): void;
   /** Centers and zooms to fit `documentRect` within `viewportSize` (minus `padding`). */
   fitToView(documentRect: Rect, viewportSize: Size, padding?: number): void;
-  /** Records the CSS viewport size and device-pixel ratio (dpr clamped to {@link MAX_DPR}). */
+  /** Records the CSS viewport size and device-pixel ratio (capped at {@link MAX_DPR}; invalid ratios read as 1). */
   setViewportSize(width: number, height: number, dpr: number): void;
   /** Subscribes to any view change. Returns an unsubscribe function. */
   subscribe(listener: () => void): () => void;
@@ -123,7 +123,8 @@ export const createViewport = (initial?: Partial<ViewState>): Viewport => {
   };
 
   const setViewportSize = (width: number, height: number, nextDpr: number): void => {
-    const clampedDpr = Math.max(1, Math.min(MAX_DPR, nextDpr));
+    // Ratios below one (browser zoom-out) are real: the backing store must not exceed the device pixels.
+    const clampedDpr = Number.isFinite(nextDpr) && nextDpr > 0 ? Math.min(MAX_DPR, nextDpr) : 1;
     if (size.width === width && size.height === height && dpr === clampedDpr) {
       return;
     }

@@ -65,12 +65,25 @@ export interface PreparedLayerCacheReplacement {
 export interface LayerCacheStoreOptions {
   /** Called after a cache identity or pixels change; fresh allocations stay silent. */
   onVersionChange?(layerId: string): void;
+  /** Receives the running byte total after every allocation, resize, transfer and release. */
+  onBytesChange?(bytes: number): void;
+}
+
+/** A complete entry state, captured before a transaction and reinstated if it rolls back. */
+export interface LayerCacheEntryState {
+  readonly surface: RasterSurface;
+  readonly rect: Rect;
+  readonly hasPublishedPixels: boolean;
+  readonly stale: boolean;
+  readonly version: number;
 }
 
 /** The imperative store returned by {@link createLayerCacheStore}. */
 export interface LayerCacheStore {
   /** Returns an entry without changing LRU order. */
   peek(layerId: string): LayerCacheEntry | undefined;
+  /** Ids of every layer that holds a cache entry. */
+  layerIds(): string[];
   /** Returns the existing cache entry for a layer, or `undefined`. Touches LRU order. */
   get(layerId: string): LayerCacheEntry | undefined;
   /**
@@ -97,6 +110,15 @@ export interface LayerCacheStore {
   prepareReplacement(layerId: string, rect: Rect, pixels: RasterSurface): PreparedLayerCacheReplacement;
   /** Publishes a detached replacement without allocating, resizing, or drawing. */
   installReplacement(prepared: PreparedLayerCacheReplacement): LayerCacheEntry;
+  /** Copies rasterized `pixels` into the live entry at `rect` and publishes them. */
+  publishRasterized(layerId: string, rect: Rect, pixels: RasterSurface, renderedFontFamily?: string): LayerCacheEntry;
+  /** The entry's current state, or null when absent; the surface is shared, not copied. */
+  captureState(layerId: string): LayerCacheEntryState | null;
+  /**
+   * Reinstates a captured state exactly (null deletes the entry), version included, so guards captured before a
+   * rolled-back transaction stay current. The caller discards artifacts derived from versions issued since.
+   */
+  restoreState(layerId: string, state: LayerCacheEntryState | null): void;
   /**
    * Publish direct writes as current, bump version and notify. Optional surface-local damage enables partial
    * derived refresh; omission means the whole surface changed.
@@ -113,10 +135,12 @@ export interface LayerCacheStore {
   delete(layerId: string): void;
   /** The current `version` for a layer (0 if it has no cache yet). */
   version(layerId: string): number;
+  /** Advances whenever any cache's published pixels, bounds or identity change; equal values mean unchanged caches. */
+  revision(): number;
   /** Total bytes held across all cache surfaces (w*h*4 each). */
   byteSize(): number;
-  /** Evict unprotected ids in LRU order until within `budgetBytes`; never evict `visibleIds`. Returns evicted ids. */
-  evictHidden(visibleIds: Iterable<string>, budgetBytes?: number): string[];
+  /** Evicts unprotected entries least-recently-used first until within `budgetBytes`. Returns evicted ids. */
+  evict(isProtected: (layerId: string) => boolean, budgetBytes: number): string[];
   /** Releases every cache entry. Cache surfaces are GC'd with the store. */
   dispose(): void;
 }
@@ -129,6 +153,33 @@ export const createLayerCacheStore = (
   options: LayerCacheStoreOptions = {}
 ): LayerCacheStore => {
   const entries = new Map<string, LayerCacheEntry>();
+  const accountedBytes = new Map<string, number>();
+  let totalBytes = 0;
+
+  const reportBytes = (): void => options.onBytesChange?.(totalBytes);
+
+  /** Brings the running total in line with the entry's current surface. */
+  const account = (entry: LayerCacheEntry): void => {
+    const next = surfaceBytes(entry.surface);
+    const previous = accountedBytes.get(entry.layerId) ?? 0;
+    accountedBytes.set(entry.layerId, next);
+    if (next !== previous) {
+      totalBytes += next - previous;
+      reportBytes();
+    }
+  };
+
+  const unaccount = (layerId: string): void => {
+    const previous = accountedBytes.get(layerId);
+    if (previous === undefined) {
+      return;
+    }
+    accountedBytes.delete(layerId);
+    if (previous !== 0) {
+      totalBytes -= previous;
+      reportBytes();
+    }
+  };
   /** Per-layer trail of recent writes, oldest first. See {@link DAMAGE_TRAIL_LIMIT}. */
   const damageTrails = new Map<string, DamageStep[]>();
 
@@ -149,8 +200,10 @@ export const createLayerCacheStore = (
   // caches cannot mistake new pixels for old ones.
   const versionFloors = new Map<string, number>();
   let tick = 0;
+  let revision = 0;
 
   const notifyVersionChange = (layerId: string): void => {
+    revision += 1;
     try {
       options.onVersionChange?.(layerId);
     } catch {
@@ -205,6 +258,7 @@ export const createLayerCacheStore = (
       // Origin-anchored: this variant always places the surface at (0, 0).
       existing.rect = { height, width, x: 0, y: 0 };
       touch(existing);
+      account(existing);
       if (changed && hadPublishedPixels) {
         existing.version += 1;
         notifyVersionChange(layerId);
@@ -222,6 +276,7 @@ export const createLayerCacheStore = (
     };
     touch(entry);
     entries.set(layerId, entry);
+    account(entry);
     return entry;
   };
 
@@ -244,6 +299,7 @@ export const createLayerCacheStore = (
     };
     touch(entry);
     entries.set(layerId, entry);
+    account(entry);
     return entry;
   };
 
@@ -267,6 +323,7 @@ export const createLayerCacheStore = (
       };
       touch(entry);
       entries.set(layerId, entry);
+      account(entry);
       return entry;
     }
     const cur = existing.rect;
@@ -300,6 +357,7 @@ export const createLayerCacheStore = (
     }
     existing.rect = newRect;
     touch(existing);
+    account(existing);
     if (existing.hasPublishedPixels) {
       existing.version += 1;
       notifyVersionChange(layerId);
@@ -338,6 +396,7 @@ export const createLayerCacheStore = (
     }
     existing.rect = newRect;
     touch(existing);
+    account(existing);
     existing.version += 1;
     notifyVersionChange(layerId);
     return existing;
@@ -376,6 +435,7 @@ export const createLayerCacheStore = (
     touch(entry);
     damageTrails.delete(prepared.layerId);
     entries.set(prepared.layerId, entry);
+    account(entry);
     notifyVersionChange(prepared.layerId);
     return entry;
   };
@@ -388,9 +448,65 @@ export const createLayerCacheStore = (
     entry.hasPublishedPixels = true;
     entry.stale = false;
     entry.version += 1;
+    account(entry);
     recordDamage(entry, damage ?? null);
     notifyVersionChange(layerId);
     return entry;
+  };
+
+  const publishRasterized = (
+    layerId: string,
+    rect: Rect,
+    pixels: RasterSurface,
+    renderedFontFamily?: string
+  ): LayerCacheEntry => {
+    const entry = entries.get(layerId) ?? getOrCreateRect(layerId, rect);
+    if (entry.surface.width !== rect.width || entry.surface.height !== rect.height) {
+      entry.surface.resize(rect.width, rect.height);
+    }
+    const ctx = entry.surface.ctx;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    if (!isEmpty(rect)) {
+      ctx.drawImage(pixels.canvas, 0, 0);
+    }
+    entry.renderedFontFamily = renderedFontFamily;
+    entry.rect = { ...rect };
+    damageTrails.delete(layerId);
+    publishPixels(layerId);
+    return entry;
+  };
+
+  const captureState = (layerId: string): LayerCacheEntryState | null => {
+    const entry = entries.get(layerId);
+    return entry
+      ? {
+          hasPublishedPixels: entry.hasPublishedPixels,
+          rect: { ...entry.rect },
+          stale: entry.stale,
+          surface: entry.surface,
+          version: entry.version,
+        }
+      : null;
+  };
+
+  const restoreState = (layerId: string, state: LayerCacheEntryState | null): void => {
+    if (!state) {
+      del(layerId);
+      return;
+    }
+    const restored: LayerCacheEntry = entries.get(layerId) ?? {
+      ...state,
+      lastUsed: 0,
+      layerId,
+      rect: { ...state.rect },
+    };
+    Object.assign(restored, { ...state, rect: { ...state.rect } });
+    touch(restored);
+    damageTrails.delete(layerId);
+    entries.set(layerId, restored);
+    account(restored);
+    notifyVersionChange(layerId);
   };
 
   const damageSince = (layerId: string, version: number): Rect | null => {
@@ -427,62 +543,62 @@ export const createLayerCacheStore = (
     }
   };
 
-  const del = (layerId: string): void => {
+  function del(layerId: string): void {
     const entry = entries.get(layerId);
     if (entry) {
       rememberFloor(entry);
       entries.delete(layerId);
       damageTrails.delete(layerId);
+      unaccount(layerId);
       notifyVersionChange(layerId);
     }
-  };
+  }
 
   const version = (layerId: string): number => entries.get(layerId)?.version ?? 0;
 
-  const byteSize = (): number => {
-    let total = 0;
-    for (const entry of entries.values()) {
-      total += surfaceBytes(entry.surface);
-    }
-    return total;
-  };
-
-  const evictHidden = (visibleIds: Iterable<string>, budgetBytes: number = DEFAULT_CACHE_BUDGET_BYTES): string[] => {
-    const visible = new Set(visibleIds);
+  const evict = (isProtected: (layerId: string) => boolean, budgetBytes: number): string[] => {
     const evicted: string[] = [];
-    let total = byteSize();
-    if (total <= budgetBytes) {
+    if (totalBytes <= budgetBytes) {
       return evicted;
     }
-    // Hidden entries, least-recently-used first.
     const candidates = [...entries.values()]
-      .filter((entry) => !visible.has(entry.layerId))
+      .filter((entry) => !isProtected(entry.layerId))
       .sort((a, b) => a.lastUsed - b.lastUsed);
     for (const entry of candidates) {
-      if (total <= budgetBytes) {
+      if (totalBytes <= budgetBytes) {
         break;
       }
       // Retain version floors across eviction to prevent stale adjusted surfaces and thumbnails after recreation.
       rememberFloor(entry);
       entries.delete(entry.layerId);
       damageTrails.delete(entry.layerId);
+      unaccount(entry.layerId);
       evicted.push(entry.layerId);
-      total -= surfaceBytes(entry.surface);
       notifyVersionChange(entry.layerId);
     }
     return evicted;
   };
 
   const dispose = (): void => {
+    for (const entry of entries.values()) {
+      rememberFloor(entry);
+    }
+    revision += 1;
     entries.clear();
     damageTrails.clear();
+    accountedBytes.clear();
+    if (totalBytes !== 0) {
+      totalBytes = 0;
+      reportBytes();
+    }
   };
 
   return {
-    byteSize,
+    byteSize: () => totalBytes,
+    captureState,
     delete: del,
     dispose,
-    evictHidden,
+    evict,
     get,
     getOrCreate,
     getOrCreateRect,
@@ -490,9 +606,13 @@ export const createLayerCacheStore = (
     installReplacement,
     damageSince,
     invalidate,
+    layerIds: () => [...entries.keys()],
     peek,
     prepareReplacement,
     publishPixels,
+    publishRasterized,
+    restoreState,
+    revision: () => revision,
     shrinkToRect,
     version,
   };

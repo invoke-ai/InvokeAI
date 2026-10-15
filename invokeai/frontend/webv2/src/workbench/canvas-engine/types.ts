@@ -88,12 +88,21 @@ export interface RenderFlags {
   overlay: boolean;
   /** Force a full repaint, ignoring the other flags. */
   all: boolean;
-  /**
-   * Partial damage requires every contributing invalidation to name a region; null/default or any unknown damage
-   * forces full repaint.
-   */
-  damage: LayerDamage[] | null;
+  /** What of the composite must be repainted; any invalidation without a region widens it to full. */
+  damage: FrameDamage;
 }
+
+/**
+ * Composite repaint extent: everything, nothing visible, or the screen bounds of layer-local regions. Regions that
+ * resolve offscreen repaint nothing.
+ */
+export type FrameDamage =
+  | { readonly kind: 'full' }
+  | { readonly kind: 'none' }
+  | { readonly kind: 'regions'; readonly regions: readonly LayerDamage[] };
+
+export const FULL_DAMAGE: FrameDamage = { kind: 'full' };
+export const NO_DAMAGE: FrameDamage = { kind: 'none' };
 
 /** Changed region in layer-local coordinates; compositor applies the effective layer matrix to reach screen space. */
 export interface LayerDamage {

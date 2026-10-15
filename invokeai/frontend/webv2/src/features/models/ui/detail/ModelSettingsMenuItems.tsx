@@ -147,11 +147,11 @@ export const ModelSettingsMenuItems = ({ modelKey }: { modelKey: string }) => {
     <>
       <Menu.Item value="export-settings" onClick={() => void handleExport()}>
         <Icon as={DownloadIcon} boxSize="3.5" />
-        <Menu.ItemText fontSize="xs">{t('models.exportSettings')}</Menu.ItemText>
+        <Menu.ItemText fontSize="md">{t('models.exportSettings')}</Menu.ItemText>
       </Menu.Item>
       <Menu.Item value="import-settings" onClick={() => fileInputRef.current?.click()}>
         <Icon as={UploadIcon} boxSize="3.5" />
-        <Menu.ItemText fontSize="xs">{t('models.importSettings')}</Menu.ItemText>
+        <Menu.ItemText fontSize="md">{t('models.importSettings')}</Menu.ItemText>
       </Menu.Item>
       <input
         accept="application/json,.json"

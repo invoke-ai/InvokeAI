@@ -1,9 +1,10 @@
 import type { CanvasDocumentContractV3, LayerStackKind } from '@workbench/canvas-engine/api';
-import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
+import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import type { LucideIcon } from 'lucide-react';
 
 import { toaster } from '@platform/ui';
 import { canMergeVisibleRasters, compileDocumentNodes, getDocumentLeaves } from '@workbench/canvas-engine/api';
+import { useCanvasEngineRead } from '@workbench/widgets/canvas/engineStoreHooks';
 import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectName } from '@workbench/WorkbenchContext';
 import { EyeIcon, EyeOffIcon, FileDownIcon, LayersIcon, PlusIcon } from 'lucide-react';
@@ -55,11 +56,14 @@ export const useLayerStackActions = (
       nodes: own,
     };
   }, [axis, stack, stacks]);
-  const canMerge =
-    !editingLocked &&
-    !!engine &&
-    stack === 'raster' &&
-    canMergeVisibleRasters(engine.document.model()?.compileLeaves() ?? [], engine.exports.hasExportableLayerContent);
+  const canMerge = useCanvasEngineRead(
+    engine,
+    () =>
+      !editingLocked &&
+      !!engine &&
+      stack === 'raster' &&
+      canMergeVisibleRasters(engine.document.model()?.compileLeaves() ?? [], engine.exports.hasExportableLayerContent)
+  );
   const canExport = !!engine && exportable;
 
   return useMemo(() => {
@@ -98,6 +102,8 @@ export const useLayerStackActions = (
               toaster.create({ title: t('widgets.layers.groupActions.mergeNotReady'), type: 'warning' });
             } else if (result === 'over-budget') {
               toaster.create({ title: t('widgets.layers.groupActions.mergeOverBudget'), type: 'warning' });
+            } else if (result === 'failed') {
+              toaster.create({ title: t('widgets.layers.actions.operationFailed'), type: 'error' });
             }
           });
         },

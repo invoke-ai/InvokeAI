@@ -58,7 +58,10 @@ def run_app() -> None:
     import uvicorn
 
     from invokeai.app.services.config.config_default import get_config
-    from invokeai.app.util.torch_cuda_allocator import configure_torch_cuda_allocator
+    from invokeai.app.util.torch_cuda_allocator import (
+        apply_rocm_windows_allocator_default,
+        configure_torch_cuda_allocator,
+    )
     from invokeai.backend.util.logging import InvokeAILogger
 
     # Load config.
@@ -66,10 +69,25 @@ def run_app() -> None:
 
     logger = InvokeAILogger.get_logger(config=app_config)
 
+    # Before torch is imported anywhere: HIP reads its device list once, when torch initializes it, and an explicit
+    # allocator configuration below imports torch. Runs a short child process on Windows ROCm.
+    from invokeai.app.util.rocm_integrated_gpu import hide_integrated_gpus_on_rocm_windows
+
+    hide_integrated_gpus_on_rocm_windows(logger)
+
     # Configure the torch CUDA memory allocator.
     # NOTE: It is important that this happens before torch is imported.
     if app_config.pytorch_cuda_alloc_conf:
         configure_torch_cuda_allocator(app_config.pytorch_cuda_alloc_conf, logger)
+    else:
+        apply_rocm_windows_allocator_default(logger)
+
+    # Decide on AOTriton's experimental attention kernels before anything can run attention: torch reads the switch
+    # once, at its first fused-kernel check, and the server already runs attention while starting up. This imports
+    # torch, so it comes after the allocator configuration.
+    from invokeai.app.util.rocm_aotriton import apply_rocm_aotriton_setting
+
+    apply_rocm_aotriton_setting(app_config.rocm_aotriton_experimental, app_config.generation_devices, logger)
 
     # This import must happen after configure_torch_cuda_allocator() is called, because the module imports torch.
     from invokeai.app.invocations.baseinvocation import InvocationRegistry
@@ -82,6 +100,7 @@ def run_app() -> None:
     # Import from startup_utils here to avoid importing torch before configure_torch_cuda_allocator() is called.
     from invokeai.app.util.startup_utils import (
         apply_monkeypatches,
+        check_cuda_build_compatibility,
         check_cudnn,
         describe_torch_build,
         enable_dev_reload,
@@ -103,6 +122,7 @@ def run_app() -> None:
     apply_monkeypatches()
     register_mime_types()
     check_cudnn(logger)
+    check_cuda_build_compatibility(logger)
     # Fail here rather than inside a generation: the value is read per generation, so a typo would
     # otherwise surface as a failed queue item minutes after the server came up.
     resolve_krea2_sdpa_backends()
@@ -163,6 +183,10 @@ def run_app() -> None:
 
     try:
         loop.run_until_complete(server.serve())
+        if not server.started:
+            # The app refused to start (its log says why, e.g. a database another process serves); uvicorn returns
+            # normally, so name the failure to whatever runs this process. 3 is uvicorn's own startup-failure code.
+            raise SystemExit(3)
     except KeyboardInterrupt:
         logger.info("InvokeAI shutting down...")
         # Gracefully shut down services (e.g. model download and install managers) so that any

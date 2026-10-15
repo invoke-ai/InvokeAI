@@ -12,8 +12,8 @@ import type { Mat2d, Rect } from '@workbench/canvas-engine/types';
 
 import { compileDocumentLeaves } from '@workbench/canvas-engine/document-model/documentModel';
 import { getSourceContentRect } from '@workbench/canvas-engine/document/sources';
-import { fromTRS, multiply } from '@workbench/canvas-engine/math/mat2d';
-import { roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
+import { fromTRS, invert, multiply } from '@workbench/canvas-engine/math/mat2d';
+import { expand, intersect, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
 import { adjustmentsKey, applyAdjustments, isIdentityAdjustments } from '@workbench/canvas-engine/render/adjustments';
 import { blendToComposite } from '@workbench/canvas-engine/render/compositor';
 import {
@@ -53,7 +53,14 @@ export interface RenderRasterCompositeDeps {
   backend: {
     createSurface(width: number, height: number): RasterSurface;
   };
-  getLayerSurface(layerId: string): Promise<{ surface: RasterSurface; rect: Rect }>;
+  /** Owned access to a layer's pixels, released once they are drawn. */
+  getLayerSurface(layerId: string): Promise<{ surface: RasterSurface; rect: Rect; release(): void }>;
+  /** The display's layer-local adjusted copy of `surface` (built and memoized on a miss), or null when `surface` is not a live cache. */
+  adjustedSurface?(
+    layerId: string,
+    surface: RasterSurface,
+    adjustments: CanvasAdjustmentsContract
+  ): RasterSurface | null;
   readImageData?(surface: RasterSurface, rect: Rect): ImageData;
   writeImageData?(surface: RasterSurface, imageData: ImageData, x: number, y: number): void;
 }
@@ -231,32 +238,75 @@ export const renderRasterComposite = async (
 
   const drawRef = async (ctx: Ctx, ref: CompositeLayerRef): Promise<void> => {
     const layerSurface = await deps.getLayerSurface(ref.id);
+    try {
+      drawLayer(ctx, ref, layerSurface);
+    } finally {
+      layerSurface.release();
+    }
+  };
+
+  /** Adjusts `[source at origin]` after resampling into an output-sized buffer; bounded by the output, not the layer. */
+  const drawAdjustedAtOutput = (
+    ctx: Ctx,
+    ref: CompositeLayerRef,
+    source: RasterSurface,
+    origin: Rect,
+    placed: Mat2d,
+    adjustments: CanvasAdjustmentsContract
+  ): void => {
+    const temp = deps.backend.createSurface(width, height);
+    setTransform(temp.ctx, { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
+    temp.ctx.clearRect(0, 0, width, height);
+    setTransform(temp.ctx, placed);
+    temp.ctx.drawImage(source.canvas, origin.x, origin.y);
+    const pixels = readImageData(temp, fullRect);
+    applyAdjustments(pixels, adjustments);
+    writeImageData(temp, pixels, 0, 0);
+    ctx.save();
+    setTransform(ctx, { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
+    ctx.globalAlpha = ref.opacity;
+    ctx.globalCompositeOperation = blendToComposite(ref.blendMode);
+    ctx.drawImage(temp.canvas, 0, 0);
+    ctx.restore();
+  };
+
+  const drawLayer = (ctx: Ctx, ref: CompositeLayerRef, layerSurface: { surface: RasterSurface; rect: Rect }): void => {
+    const placed = multiply(view, layerMatrix(ref));
+    let source = layerSurface.surface;
+    let origin: Rect = layerSurface.rect;
     if (ref.adjustments) {
-      // Bake adjustments into an isolated bbox surface before applying layer opacity/blend to generation output.
-      const temp = deps.backend.createSurface(width, height);
-      const tempCtx = temp.ctx;
-      setTransform(tempCtx, { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
-      tempCtx.clearRect(0, 0, width, height);
-      setTransform(tempCtx, multiply(view, layerMatrix(ref)));
-      tempCtx.drawImage(layerSurface.surface.canvas, layerSurface.rect.x, layerSurface.rect.y);
-      const pixels = readImageData(temp, fullRect);
-      applyAdjustments(pixels, ref.adjustments);
-      writeImageData(temp, pixels, 0, 0);
-      ctx.save();
-      setTransform(ctx, { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
-      ctx.globalAlpha = ref.opacity;
-      ctx.globalCompositeOperation = blendToComposite(ref.blendMode);
-      ctx.drawImage(temp.canvas, 0, 0);
-      ctx.restore();
-      return;
+      // Adjust layer-local pixels before resampling, as the display does: reuse the display's adjusted copy, else
+      // adjust only the region the output samples. A downscaled layer samples more pixels than the output holds,
+      // so it adjusts after resampling instead, keeping the work bounded by the output.
+      const shared = deps.adjustedSurface?.(ref.id, source, ref.adjustments) ?? null;
+      if (shared) {
+        source = shared;
+      } else {
+        const inverse = invert(placed);
+        const sampled = inverse ? intersect(roundOut(expand(transformBounds(inverse, fullRect), 1)), origin) : origin;
+        if (!sampled) {
+          return;
+        }
+        if (sampled.width * sampled.height > width * height) {
+          drawAdjustedAtOutput(ctx, ref, source, origin, placed, ref.adjustments);
+          return;
+        }
+        const local = deps.backend.createSurface(sampled.width, sampled.height);
+        setTransform(local.ctx, { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
+        local.ctx.drawImage(source.canvas, origin.x - sampled.x, origin.y - sampled.y);
+        const pixels = readImageData(local, { height: sampled.height, width: sampled.width, x: 0, y: 0 });
+        applyAdjustments(pixels, ref.adjustments);
+        writeImageData(local, pixels, 0, 0);
+        source = local;
+        origin = sampled;
+      }
     }
     ctx.save();
     ctx.globalAlpha = ref.opacity;
     ctx.globalCompositeOperation = blendToComposite(ref.blendMode);
-    setTransform(ctx, multiply(view, layerMatrix(ref)));
-    // Draw the cache at its layer-local content origin (content-sized paint
-    // layers place their pixels off-zero).
-    ctx.drawImage(layerSurface.surface.canvas, layerSurface.rect.x, layerSurface.rect.y);
+    setTransform(ctx, placed);
+    // Draw at the layer-local content origin (content-sized paint layers place their pixels off-zero).
+    ctx.drawImage(source.canvas, origin.x, origin.y);
     ctx.restore();
   };
 

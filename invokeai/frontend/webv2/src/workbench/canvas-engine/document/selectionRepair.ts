@@ -1,6 +1,11 @@
 import type { CanvasStackForests } from '@workbench/canvas-engine/contracts';
 
-import { indexStacks, type CanvasDocumentIndex, type CanvasNodeEntry } from './documentIndex';
+import { compileSemanticLeaf } from '@workbench/canvas-engine/document-model/semanticLeaf';
+
+import { getDocumentIndex, indexStacks, type CanvasDocumentIndex, type CanvasNodeEntry } from './documentIndex';
+import { isGroupNode } from './documentTree';
+import { isLeafEditable } from './layerEligibility';
+import { isOverlayStack } from './layerStacks';
 
 const nearestInOrder = (
   entries: readonly CanvasNodeEntry[],
@@ -60,4 +65,26 @@ export const repairSelectedLayerId = (
     );
   }
   return next.nodes[0]?.node.id ?? null;
+};
+
+/**
+ * The primary selection once an accepted result lands as a new raster layer on top of the raster stack. A selected
+ * overlay leaf (an inpaint or regional mask, a control layer) stays the editing target while the next stroke can
+ * edit it, by the rule painting uses: it and every ancestor enabled and unlocked. Otherwise the result is selected:
+ * nothing, a missing node or a group (no paint target) was selected, the overlay leaf would refuse the stroke, or
+ * the selection was raster work the result now covers. The accept adds only a raster leaf, so the controller (on the
+ * stacks before it) and the rollback (on the stacks after it) see the same entry for the selection and agree.
+ */
+export const selectionAfterAcceptedResult = (
+  stacks: CanvasStackForests,
+  selectedLayerId: string | null,
+  acceptedLayerId: string
+): string => {
+  const entry = selectedLayerId === null ? undefined : getDocumentIndex({ stacks }).byId.get(selectedLayerId);
+  return entry &&
+    isOverlayStack(entry.stack) &&
+    !isGroupNode(entry.node) &&
+    isLeafEditable(compileSemanticLeaf(entry.node, entry))
+    ? entry.node.id
+    : acceptedLayerId;
 };

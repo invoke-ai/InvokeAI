@@ -1,20 +1,19 @@
-import type { CanvasDocumentContractV3 } from '@workbench/canvas-engine/contracts';
+import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { SamPreviewState } from '@workbench/canvas-engine/controllers/previewStateController';
 import type { EngineStores } from '@workbench/canvas-engine/engineStores';
 import type {
+  ColorLoupeOverlay,
   OverlayCursor,
   OverlayState,
   TransformFrameOverlay,
 } from '@workbench/canvas-engine/render/overlayRenderer';
 import type { FloatingSelection } from '@workbench/canvas-engine/selection/floatingSelection';
 import type { SelectionState } from '@workbench/canvas-engine/selection/selectionState';
-import type { Mat2d, ToolId, Vec2 } from '@workbench/canvas-engine/types';
+import type { ToolId, Vec2 } from '@workbench/canvas-engine/types';
 
-import {
-  compileDocumentLeaves,
-  lookupDocumentLayer,
-  lookupDocumentLeaf,
-} from '@workbench/canvas-engine/document-model/documentModel';
+import { lookupDocumentLayer, lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
+import { getDocumentIndex, type CanvasNodeEntry } from '@workbench/canvas-engine/document/documentIndex';
+import { isGroupNode } from '@workbench/canvas-engine/document/documentTree';
 import { applyToPoint } from '@workbench/canvas-engine/math/mat2d';
 import { hittableLayerRect, layerOutlineCorners } from '@workbench/canvas-engine/tools/moveHitTest';
 import { transformOverlayGeometry } from '@workbench/canvas-engine/transform/transformMath';
@@ -44,6 +43,8 @@ export interface CreateOverlayFrameDeps {
   readonly getActiveToolId: () => ToolId;
   readonly getFloatingSelection: () => FloatingSelection | null;
   readonly getOverlayCursor: () => OverlayCursor | null;
+  /** The picker's loupe over `doc`, sampled for this frame, or null while hidden. */
+  readonly getColorLoupe: (doc: CanvasDocumentContractV3) => ColorLoupeOverlay | null;
   readonly getAntsPhase: () => number;
   /** The clock while the SAM pulse animates, `null` for the static opacity (reduced motion, no preview). */
   readonly getSamPulseTime: () => number | null;
@@ -53,11 +54,14 @@ export interface OverlayFrame {
   /** Everything the overlay renderer draws this frame, gathered from live state. */
   describe(
     doc: CanvasDocumentContractV3,
-    view: Mat2d,
+    screen: OverlayScreen,
     floatFrame: FloatingSelectionFrame | null,
     samPreview: SamPreviewState | null
   ): OverlayState;
 }
+
+/** The overlay's screen: document→CSS transform, CSS viewport size and device-pixel ratio. */
+export type OverlayScreen = Pick<OverlayState, 'dpr' | 'view' | 'viewportSize'>;
 
 /**
  * Pure projection of engine state into overlay descriptors. Live previews replace committed geometry; stale frames
@@ -65,6 +69,19 @@ export interface OverlayFrame {
  */
 export const createOverlayFrame = (deps: CreateOverlayFrameDeps): OverlayFrame => {
   const { getActiveToolId, selection, stores, transformOverrides } = deps;
+
+  /** The topmost leaf carrying a live override, resolved from the override ids rather than a leaf scan. */
+  const firstOverriddenLayer = (doc: CanvasDocumentContractV3): CanvasLayerContract | null => {
+    let first: CanvasNodeEntry | null = null;
+    const index = getDocumentIndex(doc);
+    for (const id of transformOverrides.keys()) {
+      const entry = index.byId.get(id);
+      if (entry && !isGroupNode(entry.node) && (first === null || entry.order < first.order)) {
+        first = entry;
+      }
+    }
+    return first ? (first.node as CanvasLayerContract) : null;
+  };
 
   /**
    * The selected layer's bounds outline for the move tool. A layer mid-drag
@@ -75,8 +92,8 @@ export const createOverlayFrame = (deps: CreateOverlayFrameDeps): OverlayFrame =
     if (getActiveToolId() !== 'move') {
       return null;
     }
-    const overridden = compileDocumentLeaves(doc).find((leaf) => transformOverrides.has(leaf.id))?.layer;
-    const target = overridden ?? (doc.selectedLayerId ? lookupDocumentLayer(doc, doc.selectedLayerId) : null);
+    const target =
+      firstOverriddenLayer(doc) ?? (doc.selectedLayerId ? lookupDocumentLayer(doc, doc.selectedLayerId) : null);
     if (!target) {
       return null;
     }
@@ -120,7 +137,7 @@ export const createOverlayFrame = (deps: CreateOverlayFrameDeps): OverlayFrame =
   };
 
   return {
-    describe: (doc, view, floatFrame, samPreview) => {
+    describe: (doc, screen, floatFrame, samPreview) => {
       const activeTool = getActiveToolId();
       const bboxPreview = stores.bboxPreview.get();
       const samSession = stores.samInteraction.get();
@@ -130,6 +147,7 @@ export const createOverlayFrame = (deps: CreateOverlayFrameDeps): OverlayFrame =
         bboxOverlay: stores.bboxOverlay.get(),
         // The checker's darker square is the theme's canvas surround (`bg.inset`).
         bboxOverlayColor: stores.checkerColors.get().a,
+        colorLoupe: deps.getColorLoupe(doc),
         cursor: deps.getOverlayCursor(),
         gradientPreview: stores.gradientPreview.get(),
         // Grid spans the viewport at bbox snap size, independent of document bounds.
@@ -158,7 +176,7 @@ export const createOverlayFrame = (deps: CreateOverlayFrameDeps): OverlayFrame =
         showBbox: stores.showBbox.get() || activeTool === 'bbox',
         showGrid: stores.showGrid.get(),
         transformFrame: transformFrame(doc),
-        view,
+        ...screen,
       };
     },
   };

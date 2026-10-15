@@ -1,584 +1,306 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { HistoryEntry } from './history';
+import type { History, HistoryEntry } from './history';
 
 import { createHistory, HISTORY_BYTE_BUDGET, HISTORY_MAX_ENTRIES, NO_HELD_ASSET_REFS } from './history';
 
-/** A tiny entry that records undo/redo calls into a shared log. */
-const makeEntry = (label: string, log: string[], bytes = 0): HistoryEntry => ({
+const makeEntry = (label: string, log: string[], bytes = 1): HistoryEntry => ({
   bytes,
   heldAssetRefs: NO_HELD_ASSET_REFS,
   label,
-  redo: () => log.push(`redo:${label}`),
-  undo: () => log.push(`undo:${label}`),
+  redo: () => {
+    log.push(`redo:${label}`);
+  },
+  undo: () => {
+    log.push(`undo:${label}`);
+  },
 });
 
-describe('createHistory: push / undo / redo ordering', () => {
-  it('undoes and redoes entries in LIFO order', () => {
+const push = (history: History, entry: HistoryEntry) => {
+  const admission = history.admit(entry.bytes);
+  if (!admission) {
+    throw new Error(`"${entry.label}" was not admitted`);
+  }
+  return admission.publish(entry);
+};
+
+describe('createHistory: replay ordering', () => {
+  it('undoes and redoes entries in LIFO order', async () => {
     const log: string[] = [];
     const history = createHistory();
-    history.push(makeEntry('a', log));
-    history.push(makeEntry('b', log));
-    history.push(makeEntry('c', log));
+    push(history, makeEntry('a', log));
+    push(history, makeEntry('b', log));
 
-    history.undo();
-    history.undo();
-    expect(log).toEqual(['undo:c', 'undo:b']);
+    await history.undo();
+    await history.undo();
+    await history.redo();
 
-    history.redo();
-    expect(log).toEqual(['undo:c', 'undo:b', 'redo:b']);
-
-    history.undo();
-    history.undo();
-    expect(log).toEqual(['undo:c', 'undo:b', 'redo:b', 'undo:b', 'undo:a']);
+    expect(log).toEqual(['undo:b', 'undo:a', 'redo:a']);
+    expect(history.entries()).toEqual({ future: ['b'], past: ['a'] });
   });
 
-  it('undo / redo are no-ops on empty stacks', () => {
+  it('reports empty stacks without replaying', async () => {
+    const history = createHistory();
+    await expect(history.undo()).resolves.toEqual({ status: 'empty' });
+    await expect(history.redo()).resolves.toEqual({ status: 'empty' });
+  });
+
+  it('drops the redo stack when a new entry is published', async () => {
     const log: string[] = [];
     const history = createHistory();
-    history.undo();
-    history.redo();
-    expect(log).toEqual([]);
+    push(history, makeEntry('a', log));
+    await history.undo();
+    push(history, makeEntry('b', log));
+
+    expect(history.canRedo()).toBe(false);
+    expect(history.entries()).toEqual({ future: [], past: ['b'] });
+  });
+});
+
+describe('createHistory: entries', () => {
+  it('lists past oldest-first and future next-redo-first, tracking every mutation', async () => {
+    const log: string[] = [];
+    const history = createHistory();
+    expect(history.entries()).toEqual({ future: [], past: [] });
+
+    push(history, makeEntry('a', log));
+    push(history, makeEntry('b', log));
+    push(history, makeEntry('c', log));
+    expect(history.entries()).toEqual({ future: [], past: ['a', 'b', 'c'] });
+
+    await history.undo();
+    await history.undo();
+    expect(history.entries()).toEqual({ future: ['b', 'c'], past: ['a'] });
+
+    await history.redo();
+    expect(history.entries()).toEqual({ future: ['c'], past: ['a', 'b'] });
+
+    push(history, makeEntry('d', log));
+    expect(history.entries()).toEqual({ future: [], past: ['a', 'b', 'd'] });
+
+    history.clear();
+    expect(history.entries()).toEqual({ future: [], past: [] });
+  });
+});
+
+describe('createHistory: admission', () => {
+  it('reserves capacity without clearing redo or evicting retained steps', async () => {
+    const log: string[] = [];
+    const history = createHistory({ byteBudget: 10 });
+    push(history, makeEntry('kept', log, 6));
+    push(history, makeEntry('undone', log, 2));
+    await history.undo();
+
+    const admission = history.admit(10);
+
+    expect(admission).not.toBeNull();
+    expect(history.entries()).toEqual({ future: ['undone'], past: ['kept'] });
+    admission!.release();
+    admission!.release();
+    expect(history.admit(10)).not.toBeNull();
+  });
+
+  it('refuses an entry that could never be retained and leaves earlier steps undoable', () => {
+    const log: string[] = [];
+    const history = createHistory({ byteBudget: 10 });
+    push(history, makeEntry('previous', log, 2));
+
+    expect(history.admit(11)).toBeNull();
+    expect(history.entries().past).toEqual(['previous']);
+    expect(history.canUndo()).toBe(true);
+  });
+
+  it('keeps concurrent admissions within the budget so publishing one cannot evict the other', () => {
+    const history = createHistory({ byteBudget: 10 });
+    const first = history.admit(6)!;
+    expect(history.admit(6)).toBeNull();
+    const second = history.admit(4)!;
+
+    first.publish(makeEntry('first', [], 6));
+    second.publish(makeEntry('second', [], 4));
+
+    expect(history.entries().past).toEqual(['first', 'second']);
+  });
+
+  it('grows an admission only while the larger entry still fits', () => {
+    const history = createHistory({ byteBudget: 10 });
+    const admission = history.admit(4)!;
+    const other = history.admit(3)!;
+
+    expect(admission.grow(3)).toBe(true);
+    expect(admission.bytes).toBe(7);
+    expect(admission.grow(1)).toBe(false);
+    expect(admission.bytes).toBe(7);
+    other.release();
+    expect(admission.grow(3)).toBe(true);
+  });
+
+  it('refuses to publish an entry larger than its admission', () => {
+    const history = createHistory();
+    const admission = history.admit(1)!;
+    expect(() => admission.publish(makeEntry('too large', [], 2))).toThrow(/exceeds its admission/);
     expect(history.canUndo()).toBe(false);
-    expect(history.canRedo()).toBe(false);
   });
 });
 
-describe('createHistory: redo cleared on push', () => {
-  it('drops the redo stack when a new entry is pushed', () => {
+describe('createHistory: tokens and replacement', () => {
+  it('replaces only the expected newest entry and returns a fresh token', () => {
     const log: string[] = [];
     const history = createHistory();
-    history.push(makeEntry('a', log));
-    history.push(makeEntry('b', log));
-    history.undo(); // b -> redo
-    expect(history.canRedo()).toBe(true);
+    const first = push(history, makeEntry('nudge', log));
+    expect(history.top()).toBe(first);
 
-    history.push(makeEntry('c', log));
-    expect(history.canRedo()).toBe(false);
+    const second = history.admit(1)!.publish(makeEntry('nudge again', log), first);
 
-    // Redoing does nothing: the redo stack was cleared by the push.
-    history.redo();
-    expect(log).toEqual(['undo:b']);
+    expect(second).not.toBe(first);
+    expect(history.top()).toBe(second);
+    expect(history.entries().past).toEqual(['nudge again']);
+    expect(() => history.admit(1)!.publish(makeEntry('stale', log), first)).toThrow(/no longer the newest/);
   });
 });
 
-describe('createHistory: entry-count eviction', () => {
-  it('keeps undo and redo media held until their entry is evicted', () => {
+describe('createHistory: eviction', () => {
+  it('keeps undo and redo media held until their entry is evicted', async () => {
     const history = createHistory({ maxEntries: 1 });
     const first = { ...makeEntry('remove first', []), heldAssetRefs: { images: ['first.png'], videos: [] } };
     const second = { ...makeEntry('remove second', []), heldAssetRefs: { images: ['second.png'], videos: [] } };
-    history.push(first);
-    history.undo();
+    push(history, first);
+    await history.undo();
     expect(history.heldAssetRefs().images).toEqual(['first.png']);
-    history.redo();
-    history.push(second);
+    await history.redo();
+    push(history, second);
     expect(history.heldAssetRefs().images).toEqual(['second.png']);
     history.clear();
     expect(history.heldAssetRefs().images).toEqual([]);
   });
 
-  it('evicts the oldest entry beyond the 64-entry budget', () => {
-    const log: string[] = [];
+  it('evicts the oldest entry beyond the entry budget', () => {
     const history = createHistory();
-    // Push one past the default cap.
-    for (let i = 0; i < HISTORY_MAX_ENTRIES + 1; i += 1) {
-      history.push(makeEntry(`e${i}`, log));
+    for (let index = 0; index <= HISTORY_MAX_ENTRIES; index += 1) {
+      push(history, makeEntry(`entry-${index}`, []));
     }
-    let undos = 0;
-    while (history.canUndo()) {
-      history.undo();
-      undos += 1;
-    }
-    expect(undos).toBe(HISTORY_MAX_ENTRIES);
-    expect(log).not.toContain('undo:e0');
-    expect(log).toContain('undo:e1');
-    expect(log[log.length - 1]).toBe('undo:e1');
+    expect(history.entries().past).toHaveLength(HISTORY_MAX_ENTRIES);
+    expect(history.entries().past[0]).toBe('entry-1');
   });
 
-  it('honors a custom maxEntries', () => {
-    const log: string[] = [];
-    const history = createHistory({ maxEntries: 2 });
-    history.push(makeEntry('a', log));
-    history.push(makeEntry('b', log));
-    history.push(makeEntry('c', log)); // evicts 'a'
-    let undos = 0;
-    while (history.canUndo()) {
-      history.undo();
-      undos += 1;
-    }
-    expect(undos).toBe(2);
-    expect(log).toEqual(['undo:c', 'undo:b']);
-  });
-});
+  it('evicts oldest entries until under the byte budget, never the newest', () => {
+    const history = createHistory({ byteBudget: 10 });
+    push(history, makeEntry('a', [], 4));
+    push(history, makeEntry('b', [], 4));
+    push(history, makeEntry('c', [], 4));
 
-describe('createHistory: byte-budget eviction', () => {
-  it('evicts oldest entries until under the byte budget', () => {
-    const log: string[] = [];
-    // Budget fits two 10-byte entries but not three.
-    const history = createHistory({ byteBudget: 25 });
-    history.push(makeEntry('a', log, 10));
-    history.push(makeEntry('b', log, 10));
-    expect(history.canUndo()).toBe(true);
-    history.push(makeEntry('c', log, 10)); // total 30 > 25 -> evict 'a'
-
-    let undos = 0;
-    while (history.canUndo()) {
-      history.undo();
-      undos += 1;
-    }
-    expect(undos).toBe(2);
-    expect(log).toEqual(['undo:c', 'undo:b']);
-  });
-
-  it('exports the 256 MB default byte budget', () => {
+    expect(history.entries().past).toEqual(['b', 'c']);
+    expect(history.byteSize()).toBe(8);
     expect(HISTORY_BYTE_BUDGET).toBe(256 * 1024 * 1024);
-  });
-
-  it('reports whether one entry can remain undoable after eviction', () => {
-    const history = createHistory({ byteBudget: 25 });
-
-    expect(history.canRetain(25)).toBe(true);
-    expect(history.canRetain(26)).toBe(false);
-    expect(history.canRetain(Number.POSITIVE_INFINITY)).toBe(false);
-  });
-});
-
-describe('createHistory: change listener', () => {
-  it('fires on push / undo / redo / clear', () => {
-    const log: string[] = [];
-    const history = createHistory();
-    const listener = vi.fn();
-    const unsubscribe = history.subscribe(listener);
-
-    history.push(makeEntry('a', log));
-    expect(listener).toHaveBeenCalledTimes(1);
-    history.undo();
-    expect(listener).toHaveBeenCalledTimes(2);
-    history.redo();
-    expect(listener).toHaveBeenCalledTimes(3);
-    history.clear();
-    expect(listener).toHaveBeenCalledTimes(4);
-
-    // Clear again with empty stacks: no change, no notification.
-    history.clear();
-    expect(listener).toHaveBeenCalledTimes(4);
-
-    unsubscribe();
-    history.push(makeEntry('b', log));
-    expect(listener).toHaveBeenCalledTimes(4);
-  });
-
-  it('reflects canUndo / canRedo transitions', () => {
-    const log: string[] = [];
-    const history = createHistory();
-    expect(history.canUndo()).toBe(false);
-    history.push(makeEntry('a', log));
-    expect(history.canUndo()).toBe(true);
-    expect(history.canRedo()).toBe(false);
-    history.undo();
-    expect(history.canUndo()).toBe(false);
-    expect(history.canRedo()).toBe(true);
-  });
-});
-
-describe('createHistory: amendLast', () => {
-  it('replaces the most recent entry in place and adjusts the byte total', () => {
-    const log: string[] = [];
-    const history = createHistory({ byteBudget: 25 });
-    history.push(makeEntry('a', log, 10));
-    history.push(makeEntry('b', log, 10));
-    history.amendLast(makeEntry('b2', log, 10));
-
-    let undos = 0;
-    while (history.canUndo()) {
-      history.undo();
-      undos += 1;
-    }
-    // Two entries retained (a + b2), not three: amend did not grow the stack.
-    expect(undos).toBe(2);
-    expect(log).toEqual(['undo:b2', 'undo:a']);
-  });
-
-  it('pushes when the undo stack is empty', () => {
-    const log: string[] = [];
-    const history = createHistory();
-    history.amendLast(makeEntry('a', log));
-    expect(history.canUndo()).toBe(true);
-    history.undo();
-    expect(log).toEqual(['undo:a']);
-  });
-
-  it('clears the redo stack like push', () => {
-    const log: string[] = [];
-    const history = createHistory();
-    history.push(makeEntry('a', log));
-    history.push(makeEntry('b', log));
-    history.undo(); // b -> redo
-    expect(history.canRedo()).toBe(true);
-    history.amendLast(makeEntry('a2', log));
-    expect(history.canRedo()).toBe(false);
-  });
-
-  it('is a no-op while applying', () => {
-    const log: string[] = [];
-    const history = createHistory();
-    const reentrant: HistoryEntry = {
-      bytes: 0,
-      heldAssetRefs: NO_HELD_ASSET_REFS,
-      label: 'reentrant',
-      redo: () => {},
-      undo: () => history.amendLast(makeEntry('sneaky', log)),
-    };
-    history.push(reentrant);
-    history.undo();
-    // The amend during undo was dropped; only the reentrant entry is reachable.
-    history.redo();
-    let undos = 0;
-    while (history.canUndo()) {
-      history.undo();
-      undos += 1;
-    }
-    expect(undos).toBe(1);
-  });
-});
-
-describe('createHistory: re-entrancy guard', () => {
-  it('reports isApplying during undo/redo and drops entries pushed while applying', () => {
-    const log: string[] = [];
-    const history = createHistory();
-    const observed: boolean[] = [];
-
-    const reentrant: HistoryEntry = {
-      bytes: 0,
-      heldAssetRefs: NO_HELD_ASSET_REFS,
-      label: 'reentrant',
-      redo: () => {
-        observed.push(history.isApplying());
-        // A replay must not be able to record a new entry.
-        history.push(makeEntry('sneaky', log));
-      },
-      undo: () => {
-        observed.push(history.isApplying());
-        history.push(makeEntry('sneaky', log));
-      },
-    };
-
-    expect(history.isApplying()).toBe(false);
-    history.push(reentrant);
-    history.undo();
-    expect(observed).toEqual([true]);
-    expect(history.isApplying()).toBe(false);
-    expect(history.canRedo()).toBe(true);
-
-    history.redo();
-    expect(observed).toEqual([true, true]);
-    let undos = 0;
-    while (history.canUndo()) {
-      history.undo();
-      undos += 1;
-    }
-    expect(undos).toBe(1);
-  });
-});
-
-describe('createHistory: failure-atomic replay', () => {
-  it('keeps a failed undo on the undo stack and allows an exact retry', () => {
-    const history = createHistory();
-    const listener = vi.fn();
-    let shouldFail = true;
-    const undo = vi.fn(() => {
-      if (shouldFail) {
-        throw new Error('undo preparation failed');
-      }
-    });
-    const redo = vi.fn();
-    history.subscribe(listener);
-    history.push({
-      bytes: 17,
-      heldAssetRefs: NO_HELD_ASSET_REFS,
-      label: 'fallible',
-      redo,
-      replayFailureAtomic: true,
-      undo,
-    });
-    listener.mockClear();
-
-    expect(() => history.undo()).toThrow('undo preparation failed');
-    expect(history.canUndo()).toBe(true);
-    expect(history.canRedo()).toBe(false);
-    expect(history.isApplying()).toBe(false);
-    expect(listener).not.toHaveBeenCalled();
-
-    shouldFail = false;
-    history.undo();
-    expect(undo).toHaveBeenCalledTimes(2);
-    expect(history.canUndo()).toBe(false);
-    expect(history.canRedo()).toBe(true);
-    expect(listener).toHaveBeenCalledOnce();
-  });
-
-  it('keeps a failed redo on the redo stack and allows an exact retry', () => {
-    const history = createHistory();
-    const listener = vi.fn();
-    let shouldFail = true;
-    const undo = vi.fn();
-    const redo = vi.fn(() => {
-      if (shouldFail) {
-        throw new Error('redo preparation failed');
-      }
-    });
-    history.subscribe(listener);
-    history.push({
-      bytes: 23,
-      heldAssetRefs: NO_HELD_ASSET_REFS,
-      label: 'fallible',
-      redo,
-      replayFailureAtomic: true,
-      undo,
-    });
-    history.undo();
-    listener.mockClear();
-
-    expect(() => history.redo()).toThrow('redo preparation failed');
-    expect(history.canUndo()).toBe(false);
-    expect(history.canRedo()).toBe(true);
-    expect(history.isApplying()).toBe(false);
-    expect(listener).not.toHaveBeenCalled();
-
-    shouldFail = false;
-    history.redo();
-    expect(redo).toHaveBeenCalledTimes(2);
-    expect(history.canUndo()).toBe(true);
-    expect(history.canRedo()).toBe(false);
-    expect(listener).toHaveBeenCalledOnce();
-  });
-
-  it('preserves byte-budget accounting after a failed replay', () => {
-    const log: string[] = [];
-    const history = createHistory({ byteBudget: 20 });
-    let shouldFail = true;
-    history.push(makeEntry('a', log, 10));
-    history.push({
-      bytes: 10,
-      heldAssetRefs: NO_HELD_ASSET_REFS,
-      label: 'b',
-      redo: () => log.push('redo:b'),
-      replayFailureAtomic: true,
-      undo: () => {
-        if (shouldFail) {
-          throw new Error('failed');
-        }
-        log.push('undo:b');
-      },
-    });
-
-    expect(() => history.undo()).toThrow('failed');
-    shouldFail = false;
-    history.push(makeEntry('c', log, 10));
-
-    // Correct restored accounting is 30 bytes, so the oldest entry is evicted.
-    history.undo();
-    history.undo();
-    expect(log).toEqual(['undo:c', 'undo:b']);
-    expect(history.canUndo()).toBe(false);
-  });
-
-  it.each([false, true])(
-    'does not resurrect an entry when undo clears history (failure-atomic: %s)',
-    (replayFailureAtomic) => {
-      const history = createHistory();
-      const listener = vi.fn();
-      history.subscribe(listener);
-      history.push({
-        bytes: 10,
-        heldAssetRefs: NO_HELD_ASSET_REFS,
-        label: 'clear-on-undo',
-        redo: () => {},
-        replayFailureAtomic,
-        undo: () => history.clear(),
-      });
-      listener.mockClear();
-
-      history.undo();
-
-      expect(history.canUndo()).toBe(false);
-      expect(history.canRedo()).toBe(false);
-      expect(listener).toHaveBeenCalledOnce();
-    }
-  );
-
-  it.each([false, true])(
-    'does not resurrect an entry when redo clears history (failure-atomic: %s)',
-    (replayFailureAtomic) => {
-      const history = createHistory();
-      const listener = vi.fn();
-      let clearOnRedo = false;
-      history.subscribe(listener);
-      history.push({
-        bytes: 10,
-        heldAssetRefs: NO_HELD_ASSET_REFS,
-        label: 'clear-on-redo',
-        redo: () => {
-          if (clearOnRedo) {
-            history.clear();
-          }
-        },
-        replayFailureAtomic,
-        undo: () => {},
-      });
-      history.undo();
-      clearOnRedo = true;
-      listener.mockClear();
-
-      history.redo();
-
-      expect(history.canUndo()).toBe(false);
-      expect(history.canRedo()).toBe(false);
-      expect(listener).toHaveBeenCalledOnce();
-    }
-  );
-
-  it('moves a legacy undo before replay, notifies, and rethrows a post-application failure', () => {
-    const history = createHistory();
-    const listener = vi.fn();
-    const applied: string[] = [];
-    history.subscribe(listener);
-    history.push({
-      bytes: 10,
-      heldAssetRefs: NO_HELD_ASSET_REFS,
-      label: 'legacy-fallible-undo',
-      redo: () => applied.push('redo'),
-      undo: () => {
-        applied.push('undo');
-        throw new Error('undo observer failed');
-      },
-    });
-    listener.mockClear();
-
-    expect(() => history.undo()).toThrow('undo observer failed');
-
-    expect(history.canUndo()).toBe(false);
-    expect(history.canRedo()).toBe(true);
-    expect(history.isApplying()).toBe(false);
-    expect(applied).toEqual(['undo']);
-    expect(listener).toHaveBeenCalledOnce();
-
-    history.redo();
-    expect(applied).toEqual(['undo', 'redo']);
-  });
-
-  it('moves a legacy redo before replay, notifies, and rethrows a post-application failure', () => {
-    const history = createHistory();
-    const listener = vi.fn();
-    const applied: string[] = [];
-    let shouldFail = false;
-    history.subscribe(listener);
-    history.push({
-      bytes: 10,
-      heldAssetRefs: NO_HELD_ASSET_REFS,
-      label: 'legacy-fallible-redo',
-      redo: () => {
-        applied.push('redo');
-        if (shouldFail) {
-          throw new Error('redo observer failed');
-        }
-      },
-      undo: () => applied.push('undo'),
-    });
-    history.undo();
-    shouldFail = true;
-    listener.mockClear();
-
-    expect(() => history.redo()).toThrow('redo observer failed');
-
-    expect(history.canUndo()).toBe(true);
-    expect(history.canRedo()).toBe(false);
-    expect(history.isApplying()).toBe(false);
-    expect(applied).toEqual(['undo', 'redo']);
-    expect(listener).toHaveBeenCalledOnce();
-
-    history.undo();
-    expect(applied).toEqual(['undo', 'redo', 'undo']);
-  });
-
-  it('isolates listener failures after successful stack mutations', () => {
-    const log: string[] = [];
-    const history = createHistory();
-    const listener = vi.fn();
-    history.subscribe(() => {
-      throw new Error('history listener failed');
-    });
-    history.subscribe(listener);
-
-    expect(() => history.push(makeEntry('a', log))).not.toThrow();
-    expect(() => history.undo()).not.toThrow();
-    expect(() => history.redo()).not.toThrow();
-    expect(() => history.clear()).not.toThrow();
-
-    expect(listener).toHaveBeenCalledTimes(4);
-    expect(history.canUndo()).toBe(false);
-    expect(history.canRedo()).toBe(false);
   });
 
   it('trims oldest entries by retained bytes while preserving the newest undo history', () => {
     const log: string[] = [];
     const history = createHistory({ byteBudget: 1_000 });
-    history.push({ ...makeEntry('oldest', log), bytes: 40 });
-    history.push({ ...makeEntry('middle', log), bytes: 50 });
-    history.push({ ...makeEntry('newest', log), bytes: 60 });
+    push(history, makeEntry('oldest', log, 40));
+    push(history, makeEntry('middle', log, 50));
+    push(history, makeEntry('newest', log, 60));
 
     history.trimToBytes(110);
 
     expect(history.byteSize()).toBe(110);
-    history.undo();
-    history.undo();
-    history.undo();
-    expect(log).toEqual(['undo:newest', 'undo:middle']);
+    expect(history.entries().past).toEqual(['middle', 'newest']);
   });
 
-  it('disposes entries whenever stack ownership permanently ends', () => {
+  it('disposes entries whenever stack ownership permanently ends', async () => {
     const disposed: string[] = [];
-    const entry = (label: string) => ({
-      ...makeEntry(label, []),
-      dispose: () => disposed.push(label),
-    });
+    const entry = (label: string) => ({ ...makeEntry(label, []), dispose: () => disposed.push(label) });
     const history = createHistory({ maxEntries: 1 });
 
-    history.push(entry('evicted'));
-    history.push(entry('redo-cleared'));
+    const evicted = push(history, entry('evicted'));
+    void evicted;
+    push(history, entry('redo-cleared'));
     expect(disposed).toEqual(['evicted']);
-    history.undo();
-    history.push(entry('amended'));
+    await history.undo();
+    const replaced = push(history, entry('replaced'));
     expect(disposed).toEqual(['evicted', 'redo-cleared']);
-    history.amendLast(entry('cleared'));
-    expect(disposed).toEqual(['evicted', 'redo-cleared', 'amended']);
+    history.admit(1)!.publish(entry('cleared'), replaced);
+    expect(disposed).toEqual(['evicted', 'redo-cleared', 'replaced']);
     history.clear();
-    expect(disposed).toEqual(['evicted', 'redo-cleared', 'amended', 'cleared']);
+    expect(disposed).toEqual(['evicted', 'redo-cleared', 'replaced', 'cleared']);
   });
 });
 
-describe('createHistory: entries enumeration', () => {
-  it('lists past oldest-first and future next-redo-first, tracking every mutation', () => {
-    const log: string[] = [];
+describe('createHistory: failure-atomic asynchronous replay', () => {
+  it('keeps a failed undo in place for an exact retry', async () => {
     const history = createHistory();
+    let fail = true;
+    const undo = vi.fn(() => {
+      if (fail) {
+        throw new Error('pixels unavailable');
+      }
+    });
+    push(history, { ...makeEntry('stroke', []), undo });
+
+    await expect(history.undo()).resolves.toMatchObject({ label: 'stroke', status: 'failed' });
+    expect(history.entries()).toEqual({ future: [], past: ['stroke'] });
+
+    fail = false;
+    await expect(history.undo()).resolves.toEqual({ status: 'applied' });
+    expect(history.entries()).toEqual({ future: ['stroke'], past: [] });
+    expect(undo).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps a rejected asynchronous redo in place', async () => {
+    const history = createHistory();
+    push(history, { ...makeEntry('merge', []), redo: () => Promise.reject(new Error('over budget')) });
+    await history.undo();
+
+    await expect(history.redo()).resolves.toMatchObject({ status: 'failed' });
+    expect(history.entries()).toEqual({ future: ['merge'], past: [] });
+    expect(history.byteSize()).toBe(1);
+  });
+
+  it('refuses a second replay while one is pending and reports replay state', async () => {
+    const history = createHistory();
+    let finish!: () => void;
+    push(history, makeEntry('a', []));
+    push(history, {
+      ...makeEntry('b', []),
+      undo: () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    });
+
+    const pending = history.undo();
+    expect(history.isReplaying()).toBe(true);
+    await expect(history.undo()).resolves.toEqual({ status: 'busy' });
+    finish();
+    await expect(pending).resolves.toEqual({ status: 'applied' });
+    expect(history.isReplaying()).toBe(false);
+    expect(history.entries()).toEqual({ future: ['b'], past: ['a'] });
+  });
+
+  it('lets a replay that clears history win instead of resurrecting its entry', async () => {
+    const history = createHistory();
+    push(history, { ...makeEntry('replace document', []), undo: () => history.clear() });
+
+    await history.undo();
+
     expect(history.entries()).toEqual({ future: [], past: [] });
+  });
+});
 
-    history.push(makeEntry('a', log));
-    history.push(makeEntry('b', log));
-    history.push(makeEntry('c', log));
-    expect(history.entries()).toEqual({ future: [], past: ['a', 'b', 'c'] });
+describe('createHistory: change listener', () => {
+  it('fires on publication, replay and clear, isolating faulty observers', async () => {
+    const history = createHistory();
+    const listener = vi.fn();
+    history.subscribe(() => {
+      throw new Error('observer failed');
+    });
+    history.subscribe(listener);
 
-    history.undo();
-    history.undo();
-    expect(history.entries()).toEqual({ future: ['b', 'c'], past: ['a'] });
-
-    history.redo();
-    expect(history.entries()).toEqual({ future: ['c'], past: ['a', 'b'] });
-
-    history.push(makeEntry('d', log));
-    expect(history.entries()).toEqual({ future: [], past: ['a', 'b', 'd'] });
-
+    push(history, makeEntry('a', []));
+    await history.undo();
     history.clear();
-    expect(history.entries()).toEqual({ future: [], past: [] });
+
+    expect(listener.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(history.canUndo()).toBe(false);
   });
 });

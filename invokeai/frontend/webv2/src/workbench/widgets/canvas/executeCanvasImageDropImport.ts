@@ -1,5 +1,5 @@
+import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import type { Project } from '@workbench/projectContracts';
-import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import type { WorkbenchCanvasCommands, WorkbenchQueries } from '@workbench/workbenchStore';
 
 import { galleryImages } from '@features/gallery';

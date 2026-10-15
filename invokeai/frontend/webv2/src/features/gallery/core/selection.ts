@@ -136,6 +136,8 @@ export const getGalleryDeletionSuccessor = (
  */
 
 export interface GalleryRevealRequest {
+  accountSignal: AbortSignal;
+  absoluteIndex?: number;
   itemKey: GalleryItemKey;
   token: number;
 }
@@ -145,15 +147,24 @@ let nextToken = 0;
 
 const listeners = new Set<() => void>();
 
-export const requestGalleryItemReveal = (itemKey: GalleryItemKey): void => {
+export const requestGalleryItemReveal = (
+  itemKey: GalleryItemKey,
+  accountSignal: AbortSignal,
+  absoluteIndex?: number
+): void => {
   nextToken += 1;
-  currentRequest = { itemKey, token: nextToken };
+  currentRequest = { accountSignal, absoluteIndex, itemKey, token: nextToken };
   for (const listener of listeners) {
     listener();
   }
 };
 
-export const getGalleryRevealRequest = (): GalleryRevealRequest | null => currentRequest;
+/** Ignore a pending intent after its account lifetime changes, including when Gallery mounts later. */
+export const getGalleryRevealRequest = (): GalleryRevealRequest | null => {
+  const request = currentRequest;
+
+  return request && !request.accountSignal.aborted ? request : null;
+};
 
 export const subscribeGalleryRevealRequests = (listener: () => void): (() => void) => {
   listeners.add(listener);
@@ -168,6 +179,33 @@ export const subscribeGalleryRevealRequests = (listener: () => void): (() => voi
  * shared selection.
  */
 
+export interface GalleryLocatorRequest {
+  signal: AbortSignal;
+  release: () => void;
+}
+
+const activeGalleryLocatorRequests = new Set<AbortController>();
+
+/** Create a cancellable locator lifetime shared by Gallery reveal entry points. */
+export const createGalleryLocatorRequest = (): GalleryLocatorRequest => {
+  const controller = new AbortController();
+  activeGalleryLocatorRequests.add(controller);
+
+  return {
+    signal: controller.signal,
+    release: () => activeGalleryLocatorRequests.delete(controller),
+  };
+};
+
+/** A later Gallery navigation supersedes every locator currently in flight. */
+export const abortGalleryLocatorRequests = (): void => {
+  for (const controller of activeGalleryLocatorRequests) {
+    controller.abort();
+  }
+
+  activeGalleryLocatorRequests.clear();
+};
+
 let navigationSequence = 0;
 
 /** Claims this navigation's place in the global ordering; every later claim supersedes it. */
@@ -177,12 +215,13 @@ export const claimGalleryNavigationSequence = (): number => ++navigationSequence
 export const isGalleryNavigationCurrent = (sequence: number): boolean => sequence === navigationSequence;
 
 /*
- * Grid and Preview share section order; horizontal navigation crosses seams while vertical navigation preserves
- * columns.
+ * Grid and Preview share section order: the starred strip, the in-progress sessions, then the listing. Horizontal
+ * navigation crosses seams while vertical navigation preserves columns.
  */
 
 export type GalleryNavigationEntry =
   | { kind: 'item'; item: GalleryItem }
+  | { kind: 'slot'; id: string; navigable: boolean }
   | { kind: 'session'; id: string; navigable: boolean };
 
 export type GalleryNavigationDirection = 'down' | 'left' | 'right' | 'up';
@@ -190,28 +229,51 @@ export type GalleryNavigationDirection = 'down' | 'left' | 'right' | 'up';
 export const getGallerySessionNavigationKey = (sessionId: string): string => `session:${sessionId}`;
 
 const getGalleryNavigationEntryKey = (entry: GalleryNavigationEntry): string =>
-  entry.kind === 'item' ? toGalleryItemKey(entry.item) : getGallerySessionNavigationKey(entry.id);
+  entry.kind === 'item'
+    ? toGalleryItemKey(entry.item)
+    : entry.kind === 'slot'
+      ? entry.id
+      : getGallerySessionNavigationKey(entry.id);
 
-const isNavigable = (entry: GalleryNavigationEntry | undefined): entry is GalleryNavigationEntry =>
-  entry !== undefined && (entry.kind === 'item' || entry.navigable);
+/**
+ * Where an arrow steps from: the first candidate the sections show. A candidate they do not show (a followed session
+ * under a collapsed section, a selection on another page) is passed over rather than read as no cursor at all; null
+ * means no candidate is shown.
+ */
+export const getGalleryNavigationCursor = (
+  sections: readonly (readonly GalleryNavigationEntry[])[],
+  cursorKeys: readonly (string | null)[]
+): string | null => {
+  const shownKeys = new Set(sections.flat().map(getGalleryNavigationEntryKey));
+
+  return cursorKeys.find((key): key is string => key !== null && shownKeys.has(key)) ?? null;
+};
 
 /**
  * Each section starts its own rows. Vertical navigation preserves columns, selects the nearest navigable cell, and
- * skips empty rows; no cursor starts at the first entry.
+ * skips empty rows; with no cursor shown it starts at the first navigable entry. `itemsOnly` steps over sessions
+ * without removing them, so a session can still be the cursor and still holds its rows.
  */
 export const getGalleryNavigationStep = (
   sections: readonly (readonly GalleryNavigationEntry[])[],
-  cursorKey: string | null,
+  cursorKeys: readonly (string | null)[],
   direction: GalleryNavigationDirection,
-  columnCount = 1
+  columnCount = 1,
+  { itemsOnly = false }: { itemsOnly?: boolean } = {}
 ): GalleryNavigationEntry | null => {
+  const isNavigable = (entry: GalleryNavigationEntry | undefined): entry is GalleryNavigationEntry =>
+    entry !== undefined &&
+    (entry.kind === 'item' ||
+      (entry.kind === 'slot' && entry.navigable) ||
+      (entry.kind === 'session' && !itemsOnly && entry.navigable));
   const entries = sections.flat();
-  const index =
-    cursorKey === null ? -1 : entries.findIndex((entry) => getGalleryNavigationEntryKey(entry) === cursorKey);
+  const cursorKey = getGalleryNavigationCursor(sections, cursorKeys);
 
-  if (index === -1) {
+  if (cursorKey === null) {
     return entries.find(isNavigable) ?? null;
   }
+
+  const index = entries.findIndex((entry) => getGalleryNavigationEntryKey(entry) === cursorKey);
 
   if (direction === 'left' || direction === 'right') {
     const step = direction === 'right' ? 1 : -1;

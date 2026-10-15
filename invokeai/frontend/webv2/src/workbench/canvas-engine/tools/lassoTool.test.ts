@@ -117,14 +117,33 @@ describe('lassoTool: cancel + guards', () => {
     expect(commits).toHaveLength(0);
   });
 
-  it('decimates points closer than the minimum distance', () => {
-    const tool = createLassoTool();
-    const { ctx, stores } = createHarness();
-    down(tool, ctx, pointer(0, 0));
-    // These are all within 1px of each other → decimated away.
-    move(tool, ctx, pointer(0.5, 0));
-    move(tool, ctx, pointer(1, 0));
-    expect(stores.lassoPreview.get()?.points).toHaveLength(1);
+  it('decimates by on-screen travel, stores document points, and always keeps the release point', () => {
+    const at = (x: number, y: number, zoom: number): PointerInput => ({
+      ...pointer(x, y),
+      screenPoint: { x: x * zoom, y: y * zoom },
+    });
+    // Zoomed in 10×: half-pixel document steps are 5 CSS px apart and all survive.
+    const zoomedIn = createLassoTool();
+    const near = createHarness();
+    down(zoomedIn, near.ctx, at(0, 0, 10));
+    move(zoomedIn, near.ctx, at(0.5, 0, 10));
+    move(zoomedIn, near.ctx, at(0.5, 0.5, 10));
+    expect(near.stores.lassoPreview.get()?.points).toEqual([
+      { x: 0, y: 0 },
+      { x: 0.5, y: 0 },
+      { x: 0.5, y: 0.5 },
+    ]);
+
+    // Zoomed out 10×: 10-unit document steps are 1 CSS px apart and decimate away, but the release point stays.
+    const zoomedOut = createLassoTool();
+    const far = createHarness();
+    down(zoomedOut, far.ctx, at(0, 0, 0.1));
+    move(zoomedOut, far.ctx, at(10, 0, 0.1));
+    expect(far.stores.lassoPreview.get()?.points).toHaveLength(1);
+    move(zoomedOut, far.ctx, at(40, 0, 0.1));
+    move(zoomedOut, far.ctx, at(40, 40, 0.1));
+    up(zoomedOut, far.ctx, at(41, 40, 0.1));
+    expect(far.commits[0]?.bounds).toEqual({ height: 40, width: 41, x: 0, y: 0 });
   });
 });
 

@@ -53,7 +53,8 @@ describe('executeControlComposite — real browser pixels', () => {
     await executeControlComposite(entry, {
       backend,
       dedupe: createCompositeDedupeCache(),
-      getLayerSurface: () => Promise.resolve({ rect: { height: 1, width: 3, x: 0, y: 0 }, surface: layerSurface }),
+      getLayerSurface: () =>
+        Promise.resolve({ rect: { height: 1, width: 3, x: 0, y: 0 }, release: () => undefined, surface: layerSurface }),
       hashBlob: () => Promise.resolve('control-pixels'),
       uploadImage: async (blob) => {
         const bitmap = await backend.createImageBitmap(blob);

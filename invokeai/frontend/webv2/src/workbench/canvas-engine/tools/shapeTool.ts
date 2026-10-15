@@ -1,8 +1,8 @@
 /**
- * Shapes use box drags, polygon clicks or closed freehand. Commit pixels to eligible selected paint with
- * selection/bbox clipping, otherwise create a parametric layer. Locked/disabled/unready paint refuses. Shift
- * constrains box aspect; previews/cancellation do not dispatch, and nonzero shapes produce one structural or
- * stroke commit.
+ * Shapes use box drags, polygon clicks or closed freehand. Commit pixels to an eligible selected paint layer or
+ * mask (as opaque mask coverage) with selection/bbox clipping, otherwise create a parametric layer.
+ * Locked/disabled/unready paint or masks refuse. Shift constrains box aspect; previews/cancellation do not
+ * dispatch, and nonzero shapes produce one structural or stroke commit.
  */
 
 import type { CanvasLayerSourceContract, CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/contracts';
@@ -13,7 +13,8 @@ import type { PlacedSurface, Rect, Vec2 } from '@workbench/canvas-engine/types';
 
 import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
 import { getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
-import { isLeafPaintable } from '@workbench/canvas-engine/document/layerEligibility';
+import { isLayerTransparencyLocked, isLeafPaintable } from '@workbench/canvas-engine/document/layerEligibility';
+import { isMaskLayer, maskAsPaintSource } from '@workbench/canvas-engine/document/sources';
 import { polygonBounds } from '@workbench/canvas-engine/freehand';
 import { identity, invert, multiply, translate } from '@workbench/canvas-engine/math/mat2d';
 import { intersect, roundOut, transformBounds } from '@workbench/canvas-engine/math/rect';
@@ -22,12 +23,17 @@ import { drawShapeSource } from '@workbench/canvas-engine/render/rasterizers/sha
 import type { Tool, ToolContext } from './tool';
 
 import { layerMatrix } from './moveHitTest';
+import { MASK_PAINT_COLOR } from './paintConstants';
 import {
+  extendFreehandTrace,
+  finishFreehandTrace,
   MIN_POLYLINE_POINTS,
   movePolyline,
   polylinePreview,
   pressPolyline,
+  startFreehandTrace,
   startPolyline,
+  type FreehandTrace,
   type PolylineSession,
 } from './polylineSession';
 
@@ -39,13 +45,10 @@ const PRIMARY_BUTTON = 1;
 /** Screen-space distance (CSS px) the pointer must travel before a press becomes a drag. */
 export const SHAPE_DRAG_THRESHOLD_PX = 3;
 
-/** Minimum document-space gap between stored freehand points (input decimation). */
-const FREEHAND_MIN_POINT_DISTANCE = 2;
-
 type Session =
   | { kind: 'drag'; startDoc: Vec2; startScreen: Vec2; moved: boolean }
   | { kind: 'polyline'; session: PolylineSession }
-  | { kind: 'freehand'; points: Vec2[] };
+  | ({ kind: 'freehand' } & FreehandTrace);
 
 const distance = (a: Vec2, b: Vec2): number => Math.hypot(a.x - b.x, a.y - b.y);
 
@@ -96,8 +99,19 @@ export const polygonShapeFrom = (
   };
 };
 
-/** Where a finished shape went: pixels, refused by the paint layer, or not a paint layer at all. */
-type PixelPlacement = 'placed' | 'refused' | 'unsupported';
+/** Where a finished shape went: pixels, nothing to draw, refused by the paint layer or mask, or neither at all. */
+type PixelPlacement = 'placed' | 'nothing' | 'refused' | 'unsupported';
+
+/** With fill off and no stroke to draw, a shape changes no pixel, so it records no step and uploads nothing. */
+const drawsNothing = (source: ShapeSource): boolean =>
+  source.fill === null && (source.stroke === null || source.strokeWidth <= 0);
+
+/** A mask takes the shape's footprint as coverage: each enabled part paints opaque, whatever its color. */
+const maskCoverageOf = (source: ShapeSource): ShapeSource => ({
+  ...source,
+  fill: source.fill === null ? null : MASK_PAINT_COLOR,
+  stroke: source.stroke === null ? null : MASK_PAINT_COLOR,
+});
 
 /** Whether a session was started for the current kind option; a kind change mid-session drops it. */
 const sessionFitsKind = (session: Session, kind: ShapeToolOptions['kind']): boolean =>
@@ -135,17 +149,21 @@ export const createShapeTool = (): Tool => {
 
   /**
    * One pixel-shape stroke grows local bounds within selection/bbox clips, draws through the layer inverse and
-   * applies the same masks as brush painting.
+   * applies the same masks as brush painting, on paint pixels or mask alpha alike.
    */
   const commitPixels = (ctx: ToolContext, leaf: SemanticLeaf, placed: PlacedShape): PixelPlacement => {
     const layer = leaf.layer;
-    if (layer.type !== 'raster' || layer.source.type !== 'paint') {
+    const paint = layer.type === 'raster' && layer.source.type === 'paint' ? layer.source : maskAsPaintSource(layer);
+    if (!paint) {
       return 'unsupported';
+    }
+    if (drawsNothing(placed.source)) {
+      return 'nothing';
     }
     if (!isLeafPaintable(leaf)) {
       return 'refused';
     }
-    if (layer.source.bitmap) {
+    if (paint.bitmap) {
       const existing = ctx.layers.get(layer.id);
       if (!existing || existing.stale) {
         // The durable pixels are not in the cache yet: drawing now would lose them.
@@ -170,40 +188,73 @@ export const createShapeTool = (): Tool => {
     if (!dirtyRect || dirtyRect.width < 1 || dirtyRect.height < 1) {
       return 'refused';
     }
-    const entry = ctx.layers.growToRect(layer.id, dirtyRect);
-    const surfaceCtx = entry.surface.ctx;
-    const sx = dirtyRect.x - entry.rect.x;
-    const sy = dirtyRect.y - entry.rect.y;
-    const beforeImageData = surfaceCtx.getImageData(sx, sy, dirtyRect.width, dirtyRect.height);
+    // Admitted before the first pixel changes: the before/after pair is the step's footprint.
+    const edit = ctx.beginStrokeEdit(dirtyRect.width * dirtyRect.height * 8);
+    if (!edit) {
+      return 'refused';
+    }
+    const original = ctx.layers.peek(layer.id);
+    const originalRect = original ? { ...original.rect } : null;
+    let beforeImageData: ImageData | null = null;
+    let sx = 0;
+    let sy = 0;
+    /** Puts the pre-shape pixels and cache extent back and ends the edit unrecorded. */
+    const restore = (): void => {
+      const entry = ctx.layers.peek(layer.id);
+      if (entry && beforeImageData) {
+        entry.surface.ctx.putImageData(beforeImageData, sx, sy);
+      }
+      if (originalRect) {
+        ctx.layers.shrinkToRect(layer.id, originalRect);
+      } else {
+        ctx.layers.delete(layer.id);
+      }
+      ctx.notifyLayerPainted(layer.id);
+      edit.cancel();
+    };
+    try {
+      const entry = ctx.layers.growToRect(layer.id, dirtyRect);
+      const surfaceCtx = entry.surface.ctx;
+      sx = dirtyRect.x - entry.rect.x;
+      sy = dirtyRect.y - entry.rect.y;
+      beforeImageData = surfaceCtx.getImageData(sx, sy, dirtyRect.width, dirtyRect.height);
 
-    // Draw into dirty-rect-local scratch so clipping and transparency lock apply in one composite; map through
-    // layer inverse then scratch offset.
-    const scratch = ctx.backend.createSurface(dirtyRect.width, dirtyRect.height);
-    const draw = scratch.ctx;
-    const { rect, source } = placed;
-    const toScratch = multiply(translate(identity(), { x: -dirtyRect.x, y: -dirtyRect.y }), toLocal);
-    draw.setTransform(toScratch.a, toScratch.b, toScratch.c, toScratch.d, toScratch.e, toScratch.f);
-    drawShapeSource(draw, source, rect.x, rect.y, rect.width, rect.height);
-    draw.globalCompositeOperation = 'destination-in';
-    if (clipMask) {
-      // The mask sits in document space, so it goes through the same mapping.
-      draw.drawImage(clipMask.surface.canvas, clipMask.rect.x, clipMask.rect.y);
+      // Draw into dirty-rect-local scratch so clipping and transparency lock apply in one composite; map through
+      // layer inverse then scratch offset.
+      const scratch = ctx.backend.createSurface(dirtyRect.width, dirtyRect.height);
+      const draw = scratch.ctx;
+      const { rect } = placed;
+      const source = isMaskLayer(layer) ? maskCoverageOf(placed.source) : placed.source;
+      const toScratch = multiply(translate(identity(), { x: -dirtyRect.x, y: -dirtyRect.y }), toLocal);
+      draw.setTransform(toScratch.a, toScratch.b, toScratch.c, toScratch.d, toScratch.e, toScratch.f);
+      drawShapeSource(draw, source, rect.x, rect.y, rect.width, rect.height);
+      draw.globalCompositeOperation = 'destination-in';
+      if (clipMask) {
+        // The mask sits in document space, so it goes through the same mapping.
+        draw.drawImage(clipMask.surface.canvas, clipMask.rect.x, clipMask.rect.y);
+      }
+      if (clipRect && (toLocal.b !== 0 || toLocal.c !== 0)) {
+        // The dirty-rect clamp only bounds the AABB on a rotated/sheared layer;
+        // keep exactly the pixels inside the document-space rect.
+        draw.fillStyle = '#000';
+        draw.beginPath();
+        draw.rect(clipRect.x, clipRect.y, clipRect.width, clipRect.height);
+        draw.fill();
+      }
+      surfaceCtx.save();
+      surfaceCtx.setTransform(1, 0, 0, 1, 0, 0);
+      surfaceCtx.globalCompositeOperation = isLayerTransparencyLocked(layer) ? 'source-atop' : 'source-over';
+      surfaceCtx.drawImage(scratch.canvas, sx, sy);
+      surfaceCtx.restore();
+      const afterImageData = surfaceCtx.getImageData(sx, sy, dirtyRect.width, dirtyRect.height);
+      if (!edit.commit({ afterImageData, beforeImageData, dirtyRect, layerId: layer.id, tool: 'shape' })) {
+        restore();
+        return 'refused';
+      }
+    } catch (error) {
+      restore();
+      throw error;
     }
-    if (clipRect && (toLocal.b !== 0 || toLocal.c !== 0)) {
-      // The dirty-rect clamp only bounds the AABB on a rotated/sheared layer;
-      // keep exactly the pixels inside the document-space rect.
-      draw.fillStyle = '#000';
-      draw.beginPath();
-      draw.rect(clipRect.x, clipRect.y, clipRect.width, clipRect.height);
-      draw.fill();
-    }
-    surfaceCtx.save();
-    surfaceCtx.setTransform(1, 0, 0, 1, 0, 0);
-    surfaceCtx.globalCompositeOperation = layer.isTransparencyLocked ? 'source-atop' : 'source-over';
-    surfaceCtx.drawImage(scratch.canvas, sx, sy);
-    surfaceCtx.restore();
-    const afterImageData = surfaceCtx.getImageData(sx, sy, dirtyRect.width, dirtyRect.height);
-    ctx.emitStrokeCommitted({ afterImageData, beforeImageData, dirtyRect, layerId: layer.id, tool: 'shape' });
     return 'placed';
   };
 
@@ -233,7 +284,10 @@ export const createShapeTool = (): Tool => {
     ctx.commitStructural('Add shape', forward, inverse);
   };
 
-  /** Places a finished shape on the selected paint layer when asked, else on a new layer. */
+  /**
+   * Places a finished shape on the selected paint layer or mask when asked, else on a new layer. A refused
+   * selected target places nothing rather than adding a layer the user did not ask for.
+   */
   const commit = (ctx: ToolContext, placed: PlacedShape | null): void => {
     reset(ctx);
     const doc = ctx.getDocument();
@@ -305,7 +359,7 @@ export const createShapeTool = (): Tool => {
       }
       session =
         kind === 'freehand'
-          ? { kind: 'freehand', points: [{ x: input.documentPoint.x, y: input.documentPoint.y }] }
+          ? { ...startFreehandTrace(input), kind: 'freehand' }
           : { kind: 'drag', moved: false, startDoc: input.documentPoint, startScreen: input.screenPoint };
     },
     onPointerMove: (ctx, input, batch) => {
@@ -326,12 +380,7 @@ export const createShapeTool = (): Tool => {
         return;
       }
       if (session.kind === 'freehand') {
-        for (const sample of batch) {
-          const last = session.points[session.points.length - 1];
-          if (!last || distance(last, sample.documentPoint) >= FREEHAND_MIN_POINT_DISTANCE) {
-            session.points.push({ x: sample.documentPoint.x, y: sample.documentPoint.y });
-          }
-        }
+        extendFreehandTrace(session, batch);
         ctx.stores.lassoPreview.set({ kind: 'freehand', points: session.points.slice() });
         ctx.invalidate({ overlay: true });
         return;
@@ -355,7 +404,7 @@ export const createShapeTool = (): Tool => {
         return;
       }
       if (session.kind === 'freehand') {
-        commit(ctx, polygonShapeFrom([...session.points, input.documentPoint], styleFromOptions(ctx)));
+        commit(ctx, polygonShapeFrom(finishFreehandTrace(session, input), styleFromOptions(ctx)));
         return;
       }
       if (!session.moved) {

@@ -1,6 +1,7 @@
 /**
  * Snapshots selection-changing calls into individual engine-history steps. Unchanged selections record nothing;
- * replay restores snapshots directly without recording again.
+ * replay restores snapshots directly without recording again. A change is refused while a replay runs, and one
+ * whose step history could never keep is rolled back to the exact prior snapshot.
  */
 
 import type { History } from '@workbench/canvas-engine/history/history';
@@ -54,12 +55,14 @@ const commitLabel = (commit: SelectionCommit): string =>
   commit.op === 'replace' && isEmpty(commit.bounds) ? 'Deselect' : COMMIT_LABELS[commit.op];
 
 /** Wraps `selection` so its mutations record on `history`; reads and replay pass through untouched. */
-export const withSelectionHistory = (selection: SelectionState, history: History): SelectionState => {
+export const withSelectionHistory = (
+  selection: SelectionState,
+  history: Pick<History, 'admit' | 'isReplaying'>
+): SelectionState => {
   // Consecutive steps share their boundary capture; charge a plane once.
   let lastAfter: SelectionSnapshot | null = null;
   const record = (label: string, mutate: () => void): void => {
-    if (history.isApplying()) {
-      mutate();
+    if (history.isReplaying()) {
       return;
     }
     const before = selection.snapshot();
@@ -69,9 +72,15 @@ export const withSelectionHistory = (selection: SelectionState, history: History
       return;
     }
     const beforeBytes = before === lastAfter ? 0 : (before.alpha?.byteLength ?? 0);
+    // The result's size is known only once computed; restoring the snapshot is exact.
+    const admission = history.admit(beforeBytes + (after.alpha?.byteLength ?? 0));
+    if (!admission) {
+      selection.restore(before);
+      return;
+    }
     lastAfter = after;
-    history.push({
-      bytes: beforeBytes + (after.alpha?.byteLength ?? 0),
+    admission.publish({
+      bytes: admission.bytes,
       heldAssetRefs: NO_HELD_ASSET_REFS,
       label,
       redo: () => selection.restore(after),

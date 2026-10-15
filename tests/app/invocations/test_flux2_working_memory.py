@@ -36,7 +36,7 @@ from invokeai.backend.util.attention import (
     sdpa_score_matrix_bytes,
 )
 from invokeai.backend.util.vae_working_memory import (
-    _FLUX2_VAE_SCALING_CONSTANTS,
+    _FLUX_VAE_SCALING_CONSTANTS,
     estimate_vae_working_memory_flux2,
 )
 
@@ -370,7 +370,7 @@ class TestVaeConstantsFollowTheConvBackend:
     def test_the_constant_upper_bounds_its_own_backend(self, backend, operation, px, measured_gib):
         """Each column has to bound the hardware it was fitted on. Before this the cuDNN column was
         used everywhere, leaving a 2.3 GiB shortfall on a 1024px MIOpen decode."""
-        constant = _FLUX2_VAE_SCALING_CONSTANTS[backend][operation]
+        constant = _FLUX_VAE_SCALING_CONSTANTS[backend][operation]
         estimate = px * px * 2 * constant  # bf16 element size
         assert estimate >= measured_gib * GB
         assert estimate <= 1.3 * measured_gib * GB
@@ -378,14 +378,14 @@ class TestVaeConstantsFollowTheConvBackend:
     def test_the_cudnn_constant_would_not_cover_miopen(self):
         """The regression this guards: a 1024px MIOpen decode needs 6.58 GiB and the cuDNN constant
         reserves 4.30. That is the same class of shortfall #9500 reports, one backend over."""
-        cudnn = _FLUX2_VAE_SCALING_CONSTANTS["cudnn"]["decode"]
+        cudnn = _FLUX_VAE_SCALING_CONSTANTS["cudnn"]["decode"]
         assert 1024 * 1024 * 2 * cudnn < 6.578 * GB
 
     def test_the_encode_ratio_is_not_architectural(self):
         """cuDNN's encode is half its decode; MIOpen's is four fifths. A shared ratio cannot express
         both, which is why the table carries the two operations separately."""
         ratios = {
-            backend: consts["encode"] / consts["decode"] for backend, consts in _FLUX2_VAE_SCALING_CONSTANTS.items()
+            backend: consts["encode"] / consts["decode"] for backend, consts in _FLUX_VAE_SCALING_CONSTANTS.items()
         }
         assert ratios["cudnn"] == pytest.approx(0.50, abs=0.02)
         assert ratios["miopen"] == pytest.approx(0.76, abs=0.03)
@@ -456,7 +456,7 @@ class TestVaeConstantsFollowTheConvBackend:
             at_1024 = estimate(1024)
             at_1536 = estimate(1536)
 
-        miopen = _FLUX2_VAE_SCALING_CONSTANTS["miopen"]["decode"]
+        miopen = _FLUX_VAE_SCALING_CONSTANTS["miopen"]["decode"]
         assert at_1024 == 1024 * 1024 * 2 * miopen, "at 1024px the MIOpen linear term is the larger"
         assert at_1024 >= 6.703 * GB, "and it still covers the measured W7900 peak it was fitted to"
         assert at_1536 == 36864 * 36864 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT, "at 1536px the score matrix is"
@@ -937,7 +937,7 @@ class TestVaeTermsDoNotAdd:
 
     @pytest.mark.parametrize("px, measured_gib", MEASURED_W7900_DECODE)
     def test_the_max_model_bounds_the_measured_miopen_peak(self, px, measured_gib):
-        linear = px * px * 2 * _FLUX2_VAE_SCALING_CONSTANTS["miopen"]["decode"]
+        linear = px * px * 2 * _FLUX_VAE_SCALING_CONSTANTS["miopen"]["decode"]
         score = (px // 8) ** 4 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
         assert max(linear, score) >= measured_gib * GB
         assert max(linear, score) <= 1.15 * measured_gib * GB
@@ -945,7 +945,7 @@ class TestVaeTermsDoNotAdd:
     def test_the_sum_model_would_have_over_reserved_by_two_thirds(self):
         """At 1024px the sum reserves 11.1GiB for a decode that measures 6.7 -- on a 16GB card that
         is the difference between the transformer staying resident and being evicted."""
-        linear = 1024 * 1024 * 2 * _FLUX2_VAE_SCALING_CONSTANTS["miopen"]["decode"]
+        linear = 1024 * 1024 * 2 * _FLUX_VAE_SCALING_CONSTANTS["miopen"]["decode"]
         score = 16384 * 16384 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
         assert (linear + score) / (6.703 * GB) > 1.6
         assert max(linear, score) / (6.703 * GB) < 1.15
@@ -953,7 +953,7 @@ class TestVaeTermsDoNotAdd:
     def test_the_estimate_is_the_larger_term_not_the_sum(self):
         """At 1024px the two are within 2% of each other on the cuDNN column, which makes this the
         sharpest place to tell the models apart."""
-        linear = 1024 * 1024 * 2 * _FLUX2_VAE_SCALING_CONSTANTS["cudnn"]["decode"]
+        linear = 1024 * 1024 * 2 * _FLUX_VAE_SCALING_CONSTANTS["cudnn"]["decode"]
         score = 16384 * 16384 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
         assert self._estimate(1024, MATERIALIZING, materializing=True) == max(linear, score)
         assert self._estimate(1024, MATERIALIZING, materializing=True) < linear + score
@@ -976,7 +976,7 @@ class TestVaeTermsDoNotAdd:
         because the cache floors every reservation at `device_working_mem_gb` and the whole crossover
         region sits below that floor. Reproducible to three decimals across runs, so this is the
         model's real shape, not noise -- which is why it is pinned rather than rounded away."""
-        constant = _FLUX2_VAE_SCALING_CONSTANTS["cudnn"][operation]
+        constant = _FLUX_VAE_SCALING_CONSTANTS["cudnn"][operation]
         area = px * px if operation == "decode" else px * px
         linear = area * 2 * constant
         score = (px // 8) ** 4 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
@@ -986,7 +986,7 @@ class TestVaeTermsDoNotAdd:
     def test_a_fused_build_is_unaffected(self):
         """The max only ever removes reservation, never adds it: with no score matrix the estimate is
         the linear term, exactly as before."""
-        linear = 1024 * 1024 * 2 * _FLUX2_VAE_SCALING_CONSTANTS["cudnn"]["decode"]
+        linear = 1024 * 1024 * 2 * _FLUX_VAE_SCALING_CONSTANTS["cudnn"]["decode"]
         assert self._estimate(1024, FUSED, materializing=False) == linear
 
     def test_regional_prompting_adds_the_score_matrix(self):

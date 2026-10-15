@@ -25,6 +25,7 @@ const CPU_ONLY_TYPES: ReadonlySet<string> = new Set([
   'gemma2_encoder',
   'mistral_encoder',
   'qwen3_vl_encoder',
+  'qwen3_5_encoder',
 ]);
 
 export const supportsCpuOnlySetting = (model: Pick<ModelConfig, 'type'>): boolean => CPU_ONLY_TYPES.has(model.type);
@@ -77,18 +78,17 @@ export const CpuOnlySetting = ({
         checked={model.cpu_only === true}
         colorPalette="accent"
         disabled={isPending}
-        size="sm"
         onCheckedChange={handleCheckedChange}
       >
         <Switch.HiddenInput />
         <Switch.Control>
           <Switch.Thumb />
         </Switch.Control>
-        <Switch.Label fontSize="xs" fontWeight="600">
+        <Switch.Label fontSize="md" fontWeight="600">
           {isVae ? t('models.runVaeOnCpu') : t('models.runOnCpu')}
         </Switch.Label>
       </Switch.Root>
-      <Text color="fg.subtle" fontSize="2xs">
+      <Text color="fg.subtle" fontSize="xs">
         {isVae ? t('models.runVaeOnCpuHelp') : t('models.runOnCpuHelp')}
       </Text>
     </Stack>

@@ -1,8 +1,9 @@
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 
+import { HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbench/canvas-engine/history/history';
 import { describe, expect, it, vi } from 'vitest';
 
-import { createDocumentPatchEntry, DOCUMENT_PATCH_DEFAULT_BYTES } from './documentPatch';
+import { createDocumentPatchEntry } from './documentPatch';
 
 const forward: CanvasProjectMutation = { direction: 1, type: 'cycleStagedImage' };
 const inverse: CanvasProjectMutation = { direction: -1, type: 'cycleStagedImage' };
@@ -21,7 +22,7 @@ describe('createDocumentPatchEntry', () => {
   it('defaults bytes to a small nominal cost, overridable', () => {
     const dispatch = vi.fn();
     const entry = createDocumentPatchEntry({ dispatch, forward, inverse, label: 'Cycle' });
-    expect(entry.bytes).toBe(DOCUMENT_PATCH_DEFAULT_BYTES);
+    expect(entry.bytes).toBe(HISTORY_ENTRY_OVERHEAD_BYTES);
 
     const heavier = createDocumentPatchEntry({ bytes: 4096, dispatch, forward, inverse, label: 'Cycle' });
     expect(heavier.bytes).toBe(4096);

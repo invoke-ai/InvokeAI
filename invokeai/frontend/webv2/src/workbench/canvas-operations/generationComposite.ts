@@ -186,8 +186,9 @@ export const composeForGeneration = async (
     dedupe: operationDedupe,
     getLayerSurface: (layerId) => {
       const detached = rasterSnapshot.layerSurfaces.get(layerId);
+      // The raster snapshot owns these detached pixels until the whole operation releases it.
       return detached
-        ? Promise.resolve(detached)
+        ? Promise.resolve({ ...detached, release: () => undefined })
         : Promise.reject(new Error(`Canvas raster snapshot is missing layer ${layerId}.`));
     },
     uploadImage: async (blob) => {

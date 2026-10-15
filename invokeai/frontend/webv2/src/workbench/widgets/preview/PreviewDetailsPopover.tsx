@@ -20,7 +20,7 @@ import { PreviewDetails } from './PreviewMetadataPanel';
 type InteractOutsideHandler = NonNullable<ComponentProps<typeof Popover.Root>['onInteractOutside']>;
 
 const HeaderSeparator = () => (
-  <Text color="fg.subtle" flexShrink={0} fontSize="2xs">
+  <Text color="fg.subtle" flexShrink={0} fontSize="xs">
     ·
   </Text>
 );
@@ -56,7 +56,7 @@ const PreviewImageTags = ({ accountEpoch, item }: { accountEpoch: number; item: 
   // A zero basis gives the tags only the width the header leaves over, so they truncate before anything else and,
   // with the separator inside them, vanish whole rather than leave a dangling one.
   return (
-    <Text color="fg.muted" data-preview-image-tags flex="1 1 0" fontSize="2xs" minW="0" truncate>
+    <Text color="fg.muted" data-preview-image-tags flex="1 1 0" fontSize="xs" minW="0" truncate>
       <chakra.span aria-hidden="true" color="fg.subtle" marginInlineEnd="1">
         ·
       </chakra.span>
@@ -154,7 +154,7 @@ export const PreviewDetailsPopover = ({
             aria-label={t('widgets.preview.details')}
             aria-pressed={isOpen}
             color={isOpen ? undefined : 'fg.muted'}
-            size="2xs"
+            size="sm"
             variant={isOpen ? 'solid' : 'ghost'}
           >
             <Icon as={InfoIcon} boxSize="3.5" />
@@ -175,13 +175,13 @@ export const PreviewDetailsPopover = ({
               <HStack gap="1" minW="0">
                 {positionLabel === null ? null : (
                   <>
-                    <Text color="fg.muted" flexShrink={0} fontSize="2xs" fontVariantNumeric="tabular-nums">
+                    <Text color="fg.muted" flexShrink={0} fontSize="xs" fontVariantNumeric="tabular-nums">
                       {positionLabel}
                     </Text>
                     <HeaderSeparator />
                   </>
                 )}
-                <Text color="fg.muted" fontSize="2xs" fontVariantNumeric="tabular-nums" truncate>
+                <Text color="fg.muted" fontSize="xs" fontVariantNumeric="tabular-nums" truncate>
                   {mediaLabel}
                 </Text>
                 <PreviewImageTags accountEpoch={accountEpoch} item={item} />

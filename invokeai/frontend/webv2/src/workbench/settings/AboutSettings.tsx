@@ -32,15 +32,15 @@ export const AboutSettings = () => {
   return (
     <Stack gap="4">
       <HStack gap="4">
-        <Text fontSize="xs" fontWeight="700">
+        <Text fontSize="md" fontWeight="700">
           {info.version ? `Invoke v${info.version}` : 'Invoke'}
         </Text>
         <HStack gap="3">
-          <Link fontSize="xs" href={GITHUB_URL} rel="noreferrer" target="_blank">
+          <Link fontSize="md" href={GITHUB_URL} rel="noreferrer" target="_blank">
             <Icon as={GithubIcon} boxSize="3.5" />
             {t('settings.about.github')}
           </Link>
-          <Link fontSize="xs" href={DISCORD_URL} rel="noreferrer" target="_blank">
+          <Link fontSize="md" href={DISCORD_URL} rel="noreferrer" target="_blank">
             <Icon as={DiscordIcon} boxSize="3.5" />
             {t('settings.about.discord')}
           </Link>
@@ -49,11 +49,11 @@ export const AboutSettings = () => {
 
       {info.loadState === 'loading' || info.loadState === 'idle' ? (
         <HStack color="fg.muted" gap="2">
-          <Spinner size="xs" />
-          <Text fontSize="xs">{t('settings.about.loading')}</Text>
+          <Spinner />
+          <Text fontSize="md">{t('settings.about.loading')}</Text>
         </HStack>
       ) : info.loadState === 'error' ? (
-        <Text color="fg.error" fontSize="xs">
+        <Text color="fg.error" fontSize="md">
           {info.error}
         </Text>
       ) : (

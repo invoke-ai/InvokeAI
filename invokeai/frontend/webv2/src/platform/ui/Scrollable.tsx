@@ -53,7 +53,7 @@ export const Scrollable = ({
   useScrollAreaPhantomHeal(resolvedViewportRef);
 
   return (
-    <ScrollArea.Root size="xs" variant="hover" {...rootProps}>
+    <ScrollArea.Root variant="hover" {...rootProps}>
       <ScrollArea.Viewport
         aria-label={label}
         h="full"

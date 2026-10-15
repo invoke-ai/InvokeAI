@@ -18,8 +18,9 @@ export interface GenerationModelSelectProps {
   modelTypes: string[];
   onChange: (model: GenerationModelCatalogItem | null) => void;
   placeholder?: string;
+  scopeLabel?: string;
   showManagerButton?: boolean;
-  size?: 'xs' | 'sm' | 'md';
+  size?: 'md' | 'lg' | 'xl';
   value: string | null;
 }
 
@@ -35,6 +36,13 @@ export interface GenerationSeedHistoryItem {
   thumbnailUrl: string | null;
 }
 
+export interface GenerationQueueInsights {
+  /** Executed seeds of recent completed Generate runs for this project, newest first. */
+  seedHistory: readonly GenerationSeedHistoryItem[];
+  /** Mean seconds per completed recent Generate run; null with no history to ground it. */
+  secondsPerRun: number | null;
+}
+
 /** A named Generate settings snapshot; `values` is normalized by the feature on apply. */
 export interface GeneratePresetRecord {
   id: string;
@@ -42,9 +50,41 @@ export interface GeneratePresetRecord {
   values: Record<string, unknown>;
 }
 
+/** What the canvas tells the Size section about the size the model generates at. */
+export interface CanvasRenderSize {
+  /** The render-size controls, laid out in the Size section's footer. */
+  controls: ReactNode;
+  /** The result is generated at this size, then resized to the frame; null until a model is selected. */
+  size: { height: number; width: number } | null;
+}
+
+export interface CanvasRenderSizeProps {
+  /** Lays out the Size section around the canvas's render size. */
+  children: (renderSize: CanvasRenderSize) => ReactNode;
+  /** The frame as the Size section shows it, including a resize that has not been committed yet. */
+  frame: { height: number; width: number };
+}
+
+/** What the canvas adds to the Render section. */
+export interface CanvasDenoisingStrength {
+  /** The strength summary, shown with the section's header badges. */
+  badges: ReactNode;
+  /** The strength control, laid out under guidance. */
+  field: ReactNode;
+}
+
+export interface CanvasDenoisingStrengthProps {
+  /** Lays out the Render section around the canvas's denoising strength. */
+  children: (strength: CanvasDenoisingStrength) => ReactNode;
+}
+
 /** This port keeps Generation independent of Workbench. */
 export interface GenerationUiAdapter {
+  /** Wraps the Render section in canvas mode, which adds denoising strength to it. */
+  CanvasDenoisingStrength: ComponentType<CanvasDenoisingStrengthProps>;
   CanvasGenerationSections: ComponentType;
+  /** Wraps the Size section in canvas mode, where the frame and the render size can differ. */
+  CanvasRenderSize: ComponentType<CanvasRenderSizeProps>;
   account: {
     currentUserId: string | null;
     multiuserEnabled: boolean;
@@ -68,6 +108,9 @@ export interface GenerationUiAdapter {
     error: string | null;
     getBaseColorPalette(base: string): string;
     getBaseLabel(base: string): string;
+    getImageUrl(key: string): string;
+    /** Absent when this session may not manage models. */
+    openInModelManager?: (key: string) => void;
     /** Apply the optional model-type filter when opening Add Models. */
     openManager(options?: { modelType?: string }): void;
     status: 'error' | 'idle' | 'loaded' | 'loading';
@@ -97,12 +140,11 @@ export interface GenerationUiAdapter {
     rename(presetId: string, label: string): void;
     remove(presetId: string): void;
   };
-  queueInsights: {
-    /** Executed seeds of recent completed Generate runs for this project, newest first. */
-    seedHistory: readonly GenerationSeedHistoryItem[];
-    /** Mean seconds per completed recent Generate run; null with no history to ground it. */
-    secondsPerRun: number | null;
-  };
+  /**
+   * Insights from the project's recent queue runs. Subscribing keeps the backing queue read observed, so only the
+   * controls that display them read it, through `useGenerationQueueInsights`.
+   */
+  queueInsights: ReadableExternalStore<GenerationQueueInsights>;
   rebalancePresets: {
     /** User-saved conditioning rebalance curves; built-ins are not included. */
     presets: readonly RebalancePreset[];
@@ -151,6 +193,14 @@ export function useGenerateValues<Selected>(
   const { generateValues } = useGenerationUi();
   return useExternalStoreSelector(generateValues.subscribe, generateValues.getSnapshot, selector, isEqual);
 }
+
+export const useGenerationQueueInsights = <Selected,>(
+  selector: (insights: GenerationQueueInsights) => Selected,
+  isEqual: EqualityFn<Selected> = shallowEqual
+): Selected => {
+  const { queueInsights } = useGenerationUi();
+  return useExternalStoreSelector(queueInsights.subscribe, queueInsights.getSnapshot, selector, isEqual);
+};
 
 export const GenerationModelSelect = (props: GenerationModelSelectProps) => {
   const { ModelSelect } = useGenerationUi().models;

@@ -76,13 +76,13 @@ describe('calculateActiveFrameLayerIds', () => {
     const viewport = { height: 200, width: 200, x: 0, y: 0 };
 
     expect(calculateActiveFrameLayerIds({ document: doc, viewport })).toEqual(new Set(['base']));
-    expect(calculateActiveFrameLayerIds({ document: doc, isolationLayerIds: new Set(['hidden']), viewport })).toEqual(
+    expect(calculateActiveFrameLayerIds({ document: doc, isolationLayerId: 'hidden', viewport })).toEqual(
       new Set(['hidden'])
     );
     expect(
       calculateActiveFrameLayerIds({
         document: document([{ ...hiddenControl('off'), isEnabled: false }]),
-        isolationLayerIds: new Set(['off']),
+        isolationLayerId: 'off',
         viewport,
       })
     ).toEqual(new Set(['off']));
@@ -94,7 +94,7 @@ describe('calculateActiveFrameLayerIds', () => {
     expect(
       calculateActiveFrameLayerIds({
         document: doc,
-        isolationLayerIds: new Set(['isolated']),
+        isolationLayerId: 'isolated',
         viewport: { height: 200, width: 200, x: 0, y: 0 },
       })
     ).toEqual(new Set(['isolated']));

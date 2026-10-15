@@ -1,13 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('./transport', () => ({
-  browserNodesDataPort: {
-    buildUrl: (path: string) => `https://api.test${path}`,
-    request: vi.fn(),
-    requestJson: vi.fn(),
-  },
-}));
-
 import { nodeExecutionStore } from './nodeExecutionStore';
 
 beforeEach(() => {
@@ -21,7 +13,7 @@ describe('node execution lifecycle', () => {
 
     expect(nodeExecutionStore.get('node-1')).toMatchObject({
       latestOutput: { type: 'integer_output', value: 1 },
-      outputImageUrl: null,
+      outputImageName: null,
       status: 'completed',
     });
   });
@@ -35,7 +27,7 @@ describe('node execution lifecycle', () => {
 
     expect(nodeExecutionStore.get('node-1')).toEqual({
       error: 'Out of memory',
-      outputImageUrl: 'https://api.test/api/v1/images/i/result%20image.png/thumbnail',
+      outputImageName: 'result image.png',
       latestOutput: { image: { image_name: 'result image.png' } },
       progress: null,
       progressMessage: null,
@@ -61,9 +53,7 @@ describe('node execution lifecycle', () => {
       },
     });
 
-    expect(nodeExecutionStore.get('call-node')?.outputImageUrl).toBe(
-      'https://api.test/api/v1/images/i/returned%20image.png/thumbnail'
-    );
+    expect(nodeExecutionStore.get('call-node')?.outputImageName).toBe('returned image.png');
   });
 
   it('settles the named running nodes to the run outcome without disturbing terminal or other nodes', () => {

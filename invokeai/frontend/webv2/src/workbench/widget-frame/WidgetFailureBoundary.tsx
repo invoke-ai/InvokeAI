@@ -75,10 +75,10 @@ const WidgetFailureCard = ({
 
   return (
     <Stack bg="bg.muted" borderColor="border.error" borderWidth="1px" gap="2" p="3" rounded="md">
-      <Text color="fg.error" fontSize="xs" fontWeight="700">
+      <Text color="fg.error" fontSize="md" fontWeight="700">
         {t('widgets.failure.title', { label })}
       </Text>
-      <ScrollArea.Root maxH="8rem" size="xs" variant="hover">
+      <ScrollArea.Root maxH="8rem" variant="hover">
         <ScrollArea.Viewport ref={viewportRef} maxH="8rem">
           <ScrollArea.Content>
             <Code display="block" p="2" whiteSpace="pre-wrap">
@@ -95,10 +95,10 @@ const WidgetFailureCard = ({
         <ScrollArea.Corner />
       </ScrollArea.Root>
       <Stack direction="row" gap="2">
-        <Button alignSelf="start" size="2xs" variant="outline" onClick={onRetry}>
+        <Button alignSelf="start" size="sm" variant="outline" onClick={onRetry}>
           {t('widgets.failure.retry')}
         </Button>
-        <Button alignSelf="start" size="2xs" variant="outline" onClick={copy}>
+        <Button alignSelf="start" size="sm" variant="outline" onClick={copy}>
           {t('widgets.failure.copyError')}
         </Button>
       </Stack>
@@ -133,7 +133,7 @@ const WidgetFailureHeader = ({ label, region }: { label: string; region: WidgetV
     <HStack borderBottomWidth="1px" h="10" justify="space-between" pe="2" ps="3">
       <HStack color="fg.error" flex="1" gap="1.5" minW="0">
         <TriangleAlertIcon size={14} />
-        <Text data-widget-identity-label="" fontSize="xs" fontWeight="700">
+        <Text data-widget-identity-label="" fontSize="md" fontWeight="700">
           {label}
         </Text>
       </HStack>
@@ -162,10 +162,10 @@ const WidgetFailureFallback = ({
   if (presentation === 'tooltip' && widget) {
     return (
       <WidgetTooltipFrame icon={widget.manifest.icon}>
-        <Text color="fg.error" fontSize="xs" fontWeight="700">
+        <Text color="fg.error" fontSize="md" fontWeight="700">
           {t('widgets.failure.title', { label })}
         </Text>
-        <Text color="fg.muted" fontSize="2xs">
+        <Text color="fg.muted" fontSize="xs">
           {details}
         </Text>
       </WidgetTooltipFrame>

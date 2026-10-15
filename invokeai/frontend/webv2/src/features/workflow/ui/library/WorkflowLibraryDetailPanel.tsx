@@ -38,20 +38,9 @@ import {
   Tooltip,
   useTooltipTriggerIds,
 } from '@platform/ui';
-import {
-  CopyIcon,
-  CopyPlusIcon,
-  DownloadIcon,
-  EllipsisIcon,
-  GitForkIcon,
-  PencilIcon,
-  Trash2Icon,
-  WorkflowIcon,
-} from 'lucide-react';
+import { CopyIcon, DownloadIcon, EllipsisIcon, GitForkIcon, PencilIcon, Trash2Icon, WorkflowIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import type { OpenLibraryWorkflowMode } from './useOpenLibraryWorkflow';
 
 import { planLibraryWorkflowOpen } from './useOpenLibraryWorkflow';
 import {
@@ -84,37 +73,14 @@ export interface WorkflowLibraryDetailPanelProps {
   onDeleted: () => void;
   /** Carries the copy's id so the shell can select it once the list refreshes. */
   onDuplicated: (workflowId: string) => void;
-  onOpen: (item: WorkflowLibraryListItem, mode: OpenLibraryWorkflowMode) => void;
+  /** Adds the first copy, or asks what to do when the project already holds one. */
+  onOpen: (item: WorkflowLibraryListItem) => void;
   onPreview: (entry: WorkflowLibraryEntry) => void;
-  /** Activates a project copy the project already made from this template. */
-  onResume: (workflowId: string) => void;
-  /** The project's workflows, so the rail can offer the existing copies of this template. */
+  /** The project's workflows, so the rail can say when opening will ask about existing copies. */
   projectWorkflows: readonly ProjectWorkflowEntry[];
 }
 
 const toFileSlug = (name: string): string => name.trim().replaceAll(/\s+/g, '-').toLowerCase() || 'workflow';
-
-const CHOOSER_POSITIONING = { placement: 'top-start' } as const;
-
-const ProjectCopyItem = ({
-  copy,
-  onResume,
-}: {
-  copy: ProjectWorkflowEntry;
-  onResume: (workflowId: string) => void;
-}) => {
-  const { t } = useTranslation();
-  const handleSelect = useCallback(() => onResume(copy.document.id), [copy.document.id, onResume]);
-
-  return (
-    <MenuActionItem
-      icon={WorkflowIcon}
-      label={copy.document.name || t('workflowLibrary.untitled')}
-      value={`resume:${copy.document.id}`}
-      onSelect={handleSelect}
-    />
-  );
-};
 
 export const WorkflowLibraryDetailPanel = ({
   contextMenuPoint,
@@ -126,7 +92,6 @@ export const WorkflowLibraryDetailPanel = ({
   onDuplicated,
   onOpen,
   onPreview,
-  onResume,
   projectWorkflows,
 }: WorkflowLibraryDetailPanelProps) => {
   const { t } = useTranslation();
@@ -135,7 +100,8 @@ export const WorkflowLibraryDetailPanel = ({
   const { openDocumentInNewProject } = useWorkflowGraphPreview();
   const openAddModels = useOpenAddModels();
   const { installMany } = useInstallActions();
-  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  // The name is captured on request: a delete moves the selection, or empties this panel, before the dialog closes.
+  const [deleteTargetName, setDeleteTargetName] = useState<string | null>(null);
   // Guard duplicate creation until the copy exists, including copies landing outside the visible category.
   const [isDuplicatePending, setIsDuplicatePending] = useState(false);
   const isDuplicatePendingRef = useRef(false);
@@ -149,36 +115,15 @@ export const WorkflowLibraryDetailPanel = ({
   );
   const installableCount = resolved?.filter((requirement) => requirement.status === 'installable').length ?? 0;
 
-  const openPlan = useMemo(
-    () => (entry ? planLibraryWorkflowOpen(projectWorkflows, entry.item.workflow_id) : null),
+  const hasCopies = useMemo(
+    () => (entry ? planLibraryWorkflowOpen(projectWorkflows, entry.item.workflow_id).kind === 'choose' : false),
     [entry, projectWorkflows]
   );
-  const [isCopyChooserOpen, setIsCopyChooserOpen] = useState(false);
-
-  /** Open lands in the project: the first copy is added, an existing one resumed, several offered as a choice. */
   const handleOpen = useCallback(() => {
-    if (!entry || !openPlan) {
-      return;
-    }
-
-    if (openPlan.kind === 'choose') {
-      setIsCopyChooserOpen(true);
-      return;
-    }
-
-    if (openPlan.kind === 'resume') {
-      onResume(openPlan.workflowId);
-      return;
-    }
-
-    onOpen(entry.item, 'resume-or-add');
-  }, [entry, onOpen, onResume, openPlan]);
-  const handleAddCopy = useCallback(() => {
     if (entry) {
-      onOpen(entry.item, 'add-copy');
+      onOpen(entry.item);
     }
   }, [entry, onOpen]);
-  const handleCopyChooserOpenChange = useCallback((event: { open: boolean }) => setIsCopyChooserOpen(event.open), []);
 
   const handlePreview = useCallback(() => {
     if (entry && entry.enrichment.status === 'ready') {
@@ -246,7 +191,10 @@ export const WorkflowLibraryDetailPanel = ({
     setIsDuplicatePending(true);
 
     try {
-      const raw = await getLibraryWorkflowCached(entry.item.workflow_id, owner.signal);
+      const raw = await getLibraryWorkflowCached(entry.item.workflow_id, {
+        expectedRevision: entry.item.revision,
+        signal: owner.signal,
+      });
 
       assertAccountScopeCurrent(owner);
 
@@ -326,7 +274,10 @@ export const WorkflowLibraryDetailPanel = ({
     const owner = captureAccountScope();
 
     try {
-      const record = await getLibraryWorkflowRecordCached(entry.item.workflow_id, owner.signal);
+      const record = await getLibraryWorkflowRecordCached(entry.item.workflow_id, {
+        expectedRevision: entry.item.revision,
+        signal: owner.signal,
+      });
 
       assertAccountScopeCurrent(owner);
 
@@ -355,7 +306,10 @@ export const WorkflowLibraryDetailPanel = ({
     const owner = captureAccountScope();
 
     try {
-      const raw = await getLibraryWorkflowCached(entry.item.workflow_id, owner.signal);
+      const raw = await getLibraryWorkflowCached(entry.item.workflow_id, {
+        expectedRevision: entry.item.revision,
+        signal: owner.signal,
+      });
 
       assertAccountScopeCurrent(owner);
       downloadText(JSON.stringify(raw, null, 2), `${toFileSlug(entry.item.name)}.json`, 'application/json');
@@ -367,8 +321,12 @@ export const WorkflowLibraryDetailPanel = ({
   }, [entry, notify, t]);
   const handleDownload = useCallback(() => void download(), [download]);
 
-  const openDeleteConfirm = useCallback(() => setIsDeleteConfirmOpen(true), []);
-  const closeDeleteConfirm = useCallback(() => setIsDeleteConfirmOpen(false), []);
+  const openDeleteConfirm = useCallback(() => {
+    if (entry) {
+      setDeleteTargetName(entry.item.name || t('workflowLibrary.untitled'));
+    }
+  }, [entry, t]);
+  const closeDeleteConfirm = useCallback(() => setDeleteTargetName(null), []);
 
   // A pointer point is a fixed rect; the tile button is the menu's trigger, so the menu follows it as it scrolls.
   const contextMenuPositioning = useMemo(
@@ -400,9 +358,6 @@ export const WorkflowLibraryDetailPanel = ({
         : undefined,
     [contextMenuTriggerId, entry]
   );
-  // The chooser is anchored to the button that opened it, so closing returns focus there.
-  const openButtonId = entry ? `${getWorkflowLibraryCardId(entry.item.workflow_id)}-open` : undefined;
-  const chooserIds = useMemo(() => (openButtonId ? { trigger: openButtonId } : undefined), [openButtonId]);
   const moreActionsIds = useTooltipTriggerIds();
 
   const confirmDelete = useCallback(async () => {
@@ -425,36 +380,21 @@ export const WorkflowLibraryDetailPanel = ({
     }
   }, [entry, notify, onDeleted, t]);
 
-  if (!entry) {
-    return (
-      <Box borderColor="border.subtle" borderWidth="1px" flexShrink={0} minH="0" rounded="md" w={DETAIL_RAIL_WIDTH} />
-    );
-  }
-
-  const { item, tags } = entry;
-  const name = item.name || t('workflowLibrary.untitled');
-  const hasCopies = openPlan !== null && openPlan.kind !== 'add';
-  const openLabel = hasCopies ? t('workflowLibrary.openProjectCopy') : t('workflowLibrary.open');
+  const item = entry?.item ?? null;
+  const tags = entry?.tags ?? [];
+  const name = item ? item.name || t('workflowLibrary.untitled') : '';
+  const openLabel = hasCopies ? t('workflowLibrary.openWithEllipsis') : t('workflowLibrary.open');
 
   // One item set behind both the rail's overflow button and a card's right-click.
   const actionItems = (
     <>
       <MenuActionItem
-        hint={hasCopies ? t('workflowLibrary.openProjectCopyHint') : t('workflowLibrary.openHint')}
+        hint={hasCopies ? t('workflowLibrary.openExistingCopiesHint') : t('workflowLibrary.openHint')}
         icon={WorkflowIcon}
         label={openLabel}
         value="open"
         onSelect={handleOpen}
       />
-      {hasCopies ? (
-        <MenuActionItem
-          hint={t('workflowLibrary.addAnotherCopyHint')}
-          icon={CopyPlusIcon}
-          label={t('workflowLibrary.addAnotherCopy')}
-          value="add-copy"
-          onSelect={handleAddCopy}
-        />
-      ) : null}
       <MenuActionItem
         hint={t('workflowLibrary.duplicateHint')}
         icon={CopyIcon}
@@ -477,7 +417,7 @@ export const WorkflowLibraryDetailPanel = ({
         value="download-json"
         onSelect={handleDownload}
       />
-      {item.category === 'user' ? (
+      {item?.category === 'user' ? (
         <MenuActionItem
           hint={t('workflowLibrary.renameTemplateHint')}
           icon={PencilIcon}
@@ -486,7 +426,7 @@ export const WorkflowLibraryDetailPanel = ({
           onSelect={openRename}
         />
       ) : null}
-      {item.category === 'user' ? (
+      {item?.category === 'user' ? (
         // Bundled defaults are not the account's to delete.
         <MenuActionItem
           hint={t('workflowLibrary.deleteHint')}
@@ -501,158 +441,146 @@ export const WorkflowLibraryDetailPanel = ({
   );
 
   return (
-    <Stack
-      borderColor="border.subtle"
-      borderWidth="1px"
-      data-workflow-detail={item.workflow_id}
-      flexShrink={0}
-      gap="0"
-      minH="0"
-      rounded="md"
-      w={DETAIL_RAIL_WIDTH}
-    >
-      <Scrollable flex="1" label={name} minH="0">
-        <Stack gap="2" minW="0" p="2.5">
-          <WorkflowLibraryThumbnail
-            key={item.workflow_id}
-            item={item}
-            workflowDocument={entry.enrichment.status === 'ready' ? entry.enrichment.document : null}
-          />
+    <>
+      {item ? (
+        <Stack
+          borderColor="border.subtle"
+          borderWidth="1px"
+          data-workflow-detail={item.workflow_id}
+          flexShrink={0}
+          gap="0"
+          minH="0"
+          rounded="md"
+          w={DETAIL_RAIL_WIDTH}
+        >
+          <Scrollable flex="1" label={name} minH="0">
+            <Stack gap="2" minW="0" p="2.5">
+              <WorkflowLibraryThumbnail
+                key={item.workflow_id}
+                item={item}
+                workflowDocument={enrichment?.status === 'ready' ? enrichment.document : null}
+              />
 
-          {/*
-           * Wrap full names, including delimiter-free strings, in the detail rail; zero content min-width permits
-           * containment without truncation.
-           */}
-          <Text fontSize="sm" fontWeight="600" minW="0" overflowWrap="anywhere">
-            {name}
-          </Text>
+              {/*
+               * Wrap full names, including delimiter-free strings, in the detail rail; zero content min-width permits
+               * containment without truncation.
+               */}
+              <Text fontSize="lg" fontWeight="600" minW="0" overflowWrap="anywhere">
+                {name}
+              </Text>
 
-          {item.description ? (
-            <Text color="fg.muted" fontSize="2xs" lineClamp={4}>
-              {item.description}
-            </Text>
-          ) : null}
+              {item.description ? (
+                <Text color="fg.muted" fontSize="xs" lineClamp={4}>
+                  {item.description}
+                </Text>
+              ) : null}
 
-          {tags.length > 0 ? (
-            <HStack flexWrap="wrap" gap="1" minW="0">
-              {tags.map((tag) => (
-                <Badge key={tag} size="xs" variant="subtle">
-                  {tag}
-                </Badge>
-              ))}
-            </HStack>
-          ) : null}
+              {tags.length > 0 ? (
+                <HStack flexWrap="wrap" gap="1" minW="0">
+                  {tags.map((tag) => (
+                    <Badge key={tag} variant="subtle">
+                      {tag}
+                    </Badge>
+                  ))}
+                </HStack>
+              ) : null}
 
-          <WorkflowRequirementsList
-            errorMessage={enrichment?.status === 'error' ? enrichment.message : null}
-            resolved={resolved}
-            onFindModel={handleFindModel}
-          />
-        </Stack>
-      </Scrollable>
+              <WorkflowRequirementsList
+                errorMessage={enrichment?.status === 'error' ? enrichment.message : null}
+                resolved={resolved}
+                onFindModel={handleFindModel}
+              />
+            </Stack>
+          </Scrollable>
 
-      <Stack borderColor="border.subtle" borderTopWidth="1px" gap="2" p="2.5">
-        <HStack gap="2" minW="0">
-          {installableCount > 0 ? (
-            <Button
-              bg="bg.warning"
-              color="fg.warning"
-              flex="1"
-              minW="0"
-              size="sm"
-              _hover={INSTALL_HOVER}
-              onClick={handleInstall}
-            >
-              {t('workflowLibrary.installModels', { count: installableCount })}
-            </Button>
-          ) : (
-            <Button flex="1" id={openButtonId} minW="0" size="sm" onClick={handleOpen}>
-              {openLabel}
-            </Button>
-          )}
-          <Menu.Root ids={moreActionsIds}>
-            {/* Inside a dialog the tooltip must sit inside the menu trigger: wrapped the other way round, the
+          <Stack borderColor="border.subtle" borderTopWidth="1px" gap="2" p="2.5">
+            <HStack gap="2" minW="0">
+              {installableCount > 0 ? (
+                <Button
+                  bg="bg.warning"
+                  color="fg.warning"
+                  flex="1"
+                  minW="0"
+                  size="lg"
+                  _hover={INSTALL_HOVER}
+                  onClick={handleInstall}
+                >
+                  {t('workflowLibrary.installModels', { count: installableCount })}
+                </Button>
+              ) : (
+                <Button flex="1" minW="0" size="lg" onClick={handleOpen}>
+                  {openLabel}
+                </Button>
+              )}
+              <Menu.Root ids={moreActionsIds}>
+                {/* Inside a dialog the tooltip must sit inside the menu trigger: wrapped the other way round, the
                 menu never takes focus and the first pointer move onto it closes it. */}
-            <Menu.Trigger asChild>
-              <Tooltip content={t('workflowLibrary.moreActions')} ids={moreActionsIds}>
-                <IconButton aria-label={t('workflowLibrary.moreActions')} size="sm" variant="outline">
-                  <EllipsisIcon />
-                </IconButton>
-              </Tooltip>
-            </Menu.Trigger>
+                <Menu.Trigger asChild>
+                  <Tooltip content={t('workflowLibrary.moreActions')} ids={moreActionsIds}>
+                    <IconButton aria-label={t('workflowLibrary.moreActions')} size="lg" variant="outline">
+                      <EllipsisIcon />
+                    </IconButton>
+                  </Tooltip>
+                </Menu.Trigger>
+                <Portal>
+                  <Menu.Positioner>
+                    <MenuContent minW="16rem">{actionItems}</MenuContent>
+                  </Menu.Positioner>
+                </Portal>
+              </Menu.Root>
+            </HStack>
+            <Button
+              disabled={enrichment?.status !== 'ready'}
+              size="lg"
+              variant="outline"
+              w="full"
+              onClick={handlePreview}
+            >
+              <WorkflowIcon />
+              {t('workflowLibrary.previewGraph')}
+            </Button>
+          </Stack>
+
+          {/* Naming the card as the trigger makes this a nested layer of the dialog: the
+          dialog's focus trap then lets the menu keep focus, and closing returns it to the card. */}
+          <Menu.Root
+            ids={contextMenuIds}
+            open={contextMenuPoint !== null}
+            positioning={contextMenuPositioning}
+            onOpenChange={handleContextMenuOpenChange}
+            onPointerDownOutside={keepCardMenuOpenForRetarget}
+          >
             <Portal>
               <Menu.Positioner>
-                <MenuContent minW="16rem">{actionItems}</MenuContent>
+                <MenuContent data-workflow-context-menu minW="16rem">
+                  {actionItems}
+                </MenuContent>
               </Menu.Positioner>
             </Portal>
           </Menu.Root>
-        </HStack>
-        <Button disabled={enrichment?.status !== 'ready'} size="sm" variant="outline" w="full" onClick={handlePreview}>
-          <WorkflowIcon />
-          {t('workflowLibrary.previewGraph')}
-        </Button>
-      </Stack>
 
-      {/* Naming the card as the trigger makes this a nested layer of the dialog: the
-          dialog's focus trap then lets the menu keep focus, and closing returns it to the card. */}
-      <Menu.Root
-        ids={contextMenuIds}
-        open={contextMenuPoint !== null}
-        positioning={contextMenuPositioning}
-        onOpenChange={handleContextMenuOpenChange}
-        onPointerDownOutside={keepCardMenuOpenForRetarget}
-      >
-        <Portal>
-          <Menu.Positioner>
-            <MenuContent data-workflow-context-menu minW="16rem">
-              {actionItems}
-            </MenuContent>
-          </Menu.Positioner>
-        </Portal>
-      </Menu.Root>
-
-      {/* Several copies exist: the chooser lists them by name; another copy is a separate action. */}
-      <Menu.Root
-        ids={chooserIds}
-        open={isCopyChooserOpen && openPlan?.kind === 'choose'}
-        positioning={CHOOSER_POSITIONING}
-        onOpenChange={handleCopyChooserOpenChange}
-      >
-        <Portal>
-          <Menu.Positioner>
-            <MenuContent data-workflow-copy-chooser minW="16rem">
-              <Menu.ItemGroup>
-                <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
-                  {t('workflowLibrary.chooseProjectCopy')}
-                </Menu.ItemGroupLabel>
-                {openPlan?.kind === 'choose'
-                  ? openPlan.copies.map((copy) => (
-                      <ProjectCopyItem key={copy.document.id} copy={copy} onResume={onResume} />
-                    ))
-                  : null}
-              </Menu.ItemGroup>
-            </MenuContent>
-          </Menu.Positioner>
-        </Portal>
-      </Menu.Root>
-
-      <RenameDialog
-        initialName={name}
-        isOpen={isRenameOpen}
-        label={t('workflowLibrary.templateName')}
-        submitLabel={t('workflowLibrary.rename')}
-        title={t('workflowLibrary.renameTemplateTitle')}
-        onClose={closeRename}
-        onSubmit={submitRename}
-      />
+          <RenameDialog
+            initialName={name}
+            isOpen={isRenameOpen}
+            label={t('workflowLibrary.templateName')}
+            submitLabel={t('workflowLibrary.rename')}
+            title={t('workflowLibrary.renameTemplateTitle')}
+            onClose={closeRename}
+            onSubmit={submitRename}
+          />
+        </Stack>
+      ) : (
+        <Box borderColor="border.subtle" borderWidth="1px" flexShrink={0} minH="0" rounded="md" w={DETAIL_RAIL_WIDTH} />
+      )}
+      {/* Outside the rail: a delete empties or retargets it while this dialog animates out. */}
       <ConfirmDialog
-        body={t('workflowLibrary.deleteConfirmBody', { name })}
+        body={t('workflowLibrary.deleteConfirmBody', { name: deleteTargetName ?? '' })}
         confirmLabel={t('workflowLibrary.delete')}
-        isOpen={isDeleteConfirmOpen}
+        isOpen={deleteTargetName !== null}
         title={t('workflowLibrary.deleteConfirmTitle')}
         onClose={closeDeleteConfirm}
         onConfirm={confirmDelete}
       />
-    </Stack>
+    </>
   );
 };

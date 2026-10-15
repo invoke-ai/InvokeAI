@@ -109,7 +109,7 @@ const makeHarness = (readImageData?: (surface: RasterSurface, rect: Rect) => Ima
     encodeSurface,
   };
 
-  const getLayerSurface = (layerId: string): Promise<{ surface: RasterSurface; rect: Rect }> => {
+  const getLayerSurface = (layerId: string): Promise<{ surface: RasterSurface; rect: Rect; release(): void }> => {
     let surface = layerSurfaces.get(layerId);
     if (!surface) {
       // Layer caches are content-sized; created off the raw stub so they don't
@@ -117,7 +117,7 @@ const makeHarness = (readImageData?: (surface: RasterSurface, rect: Rect) => Ima
       surface = stub.createSurface(64, 48);
       layerSurfaces.set(layerId, surface);
     }
-    return Promise.resolve({ rect: { height: 48, width: 64, x: 0, y: 0 }, surface });
+    return Promise.resolve({ rect: { height: 48, width: 64, x: 0, y: 0 }, release: () => undefined, surface });
   };
 
   let counter = 0;

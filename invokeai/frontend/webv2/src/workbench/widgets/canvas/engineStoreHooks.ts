@@ -52,6 +52,33 @@ export const useLayerThumbnailVersion = (
   return useSyncExternalStore(subscribe, getSnapshot);
 };
 
+/**
+ * A primitive read of live engine state (document model, cached pixels), taken on every render and whenever the
+ * engine's document changes or a layer publishes pixels. The React Compiler memoizes a plain render-time engine call
+ * on its arguments, so it would keep a stale answer after a paint or another layer's edit; route such reads through
+ * here.
+ */
+export const useCanvasEngineRead = <T extends boolean | number | string | null>(
+  engine: CanvasCoreStoreCapability | null,
+  read: () => T
+): T => {
+  const subscribe = useCallback(
+    (listener: () => void) => {
+      if (!engine) {
+        return () => undefined;
+      }
+      const unsubscribePixels = engine.interaction.subscribe('layerPixelEpoch', listener);
+      const unsubscribeDocument = engine.interaction.subscribe('documentEpoch', listener);
+      return () => {
+        unsubscribePixels();
+        unsubscribeDocument();
+      };
+    },
+    [engine]
+  );
+  return useSyncExternalStore(subscribe, read, read);
+};
+
 /** Subscribes to one layer's thumbnail request state; an absent key is idle. */
 export const useLayerThumbnailStatus = (
   engine: CanvasCoreStoreCapability | null,
@@ -135,12 +162,12 @@ export const useCanvasDocumentEditingLocked = (engine: CanvasCoreStoreCapability
 };
 
 /** Re-renders when any live layer cache gains, loses, or changes pixels. */
-export const useCanvasRasterContentEpoch = (engine: CanvasCoreStoreCapability | null): number => {
+export const useCanvasLayerPixelEpoch = (engine: CanvasCoreStoreCapability | null): number => {
   const subscribe = useCallback(
-    (listener: () => void) => engine?.interaction.subscribe('rasterContentEpoch', listener) ?? (() => undefined),
+    (listener: () => void) => engine?.interaction.subscribe('layerPixelEpoch', listener) ?? (() => undefined),
     [engine]
   );
-  const getSnapshot = useCallback(() => engine?.interaction.get('rasterContentEpoch') ?? 0, [engine]);
+  const getSnapshot = useCallback(() => engine?.interaction.get('layerPixelEpoch') ?? 0, [engine]);
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 };
 

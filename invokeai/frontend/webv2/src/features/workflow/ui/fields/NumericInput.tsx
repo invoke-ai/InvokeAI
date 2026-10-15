@@ -57,12 +57,14 @@ export interface NumericInputProps {
   id?: string;
   invalid?: boolean;
   onChange: (value: number | undefined) => void;
-  size?: 'xs' | '2xs';
   /** The arrow-key increment when the template declares no `multipleOf`. */
   step?: number;
   template: NumericInputTemplate;
   value: unknown;
 }
+
+// Tenths, as in v6; a template's `multipleOf` or the host's `step` takes precedence.
+const FLOAT_STEP = '0.1';
 
 /** A double-click anywhere in the box selects the whole value, not just the word under the pointer. */
 const selectInputText = (event: MouseEvent<HTMLInputElement>) => event.currentTarget.select();
@@ -77,7 +79,6 @@ export const NumericInput = ({
   id,
   invalid,
   onChange,
-  size = 'xs',
   step,
   template,
   value,
@@ -158,8 +159,9 @@ export const NumericInput = ({
       max={max !== undefined ? String(max) : undefined}
       min={min !== undefined ? String(min) : undefined}
       fontVariantNumeric="tabular-nums"
-      size={size}
-      step={multipleOf !== undefined ? String(multipleOf) : step !== undefined ? String(step) : isInteger ? '1' : 'any'}
+      step={
+        multipleOf !== undefined ? String(multipleOf) : step !== undefined ? String(step) : isInteger ? '1' : FLOAT_STEP
+      }
       type="number"
       value={text}
       w="full"

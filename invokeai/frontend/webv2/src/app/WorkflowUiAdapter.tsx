@@ -18,15 +18,17 @@ import {
 } from '@platform/state/accountLifecycle';
 import { createProjectedExternalStore } from '@platform/state/projectedExternalStore';
 import { shallowEqual } from '@platform/state/selectors';
-import { focusOpenedWidget } from '@workbench/focusRegions';
+import { describeControlLayerIssue } from '@workbench/controlLayerChecks';
+import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { resolveAndSubmitGraphPreviewInvocation } from '@workbench/graphPreviewInvocation';
-import { registerHotkeyModalLayer } from '@workbench/hotkeys';
+import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import {
   createInvocationRouteInputSelector,
   formatRoute,
   isInvocationRouteValid,
   resolveInvocationRouteInput,
 } from '@workbench/invocation';
+import { useIsInvocationPreparing } from '@workbench/invocationPreparation';
 import { markWorkbenchPerf, measureWorkbenchPerf, timeWorkbenchPerf } from '@workbench/performanceMarks';
 import { getProjectSyncSnapshot, subscribeProjectSync } from '@workbench/projects/syncStore';
 import { getActiveProjectWorkflow } from '@workbench/projectWorkflows';
@@ -41,6 +43,9 @@ import {
   useWorkbenchQueries,
 } from '@workbench/WorkbenchContext';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import { WorkflowCommandShortcut } from './WorkflowCommandShortcut';
 
 const selectInvocationRouteInput = createInvocationRouteInputSelector();
 
@@ -49,6 +54,7 @@ const selectWorkflowPreferences = (preferences: WorkbenchPreferences) => ({
   themeId: preferences.themeId,
   workflowEdgeStyle: preferences.workflowEdgeStyle,
   workflowEdgesBehindNodes: preferences.workflowEdgesBehindNodes,
+  workflowGroupNodesByCategory: preferences.workflowGroupNodesByCategory,
   workflowShowMinimap: preferences.workflowShowMinimap,
   workflowSnapToGrid: preferences.workflowSnapToGrid,
   workflowValidateConnections: preferences.workflowValidateConnections,
@@ -119,6 +125,9 @@ const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode
   const commands = useWorkbenchCommands();
   const queries = useWorkbenchQueries();
   const openWidget = useOpenWorkbenchWidget();
+  const { t } = useTranslation();
+  // The preview submits under the topbar's lease, so it is unavailable while that is held.
+  const isPreparing = useIsInvocationPreparing(routeInput.projectId);
 
   const adapter = useMemo<WorkflowGraphPreviewPort>(
     () => ({
@@ -140,9 +149,13 @@ const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode
         );
 
         return {
-          canInvoke: isInvocationRouteValid(route),
+          canInvoke: isInvocationRouteValid(route) && !isPreparing,
           label: formatRoute(route),
-          validationMessage: route.validationMessage,
+          validationMessage: isPreparing
+            ? t('topbar.invoke.preparing')
+            : typeof route.validationMessage === 'object' && 'controlLayerIssue' in route.validationMessage
+              ? describeControlLayerIssue(t, route.validationMessage.controlLayerIssue)
+              : route.validationMessage,
         };
       },
       invoke: async (sourceId) => {
@@ -154,6 +167,7 @@ const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode
           assertAccountScopeCurrent(owner);
           return resolveAndSubmitGraphPreviewInvocation({
             commands,
+            formatControlLayerError: (rejection) => describeControlLayerIssue(t, rejection),
             models: availabilityModels,
             owner,
             prepareCanvasInvocation,
@@ -178,7 +192,7 @@ const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode
         openWidget('workflow');
       },
     }),
-    [availabilityModels, commands, openWidget, queries, routeInput]
+    [availabilityModels, commands, isPreparing, openWidget, queries, routeInput, t]
   );
 
   return <WorkflowGraphPreviewProvider adapter={adapter}>{children}</WorkflowGraphPreviewProvider>;
@@ -190,6 +204,7 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
   const commands = useWorkbenchCommands();
   const queries = useWorkbenchQueries();
   const notify = useNotify();
+  const { focusRegion } = useWorkbenchFocus();
 
   useMountEffect(() => {
     void ensureModelsLoaded();
@@ -245,8 +260,10 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
     []
   );
 
+  const findInGallery = useFindGalleryItem();
   const adapter = useMemo<WorkflowUiAdapter>(
     () => ({
+      CommandShortcut: WorkflowCommandShortcut,
       capabilities,
       commands: {
         addWorkflow: (document, options) => commands.workflows.add(document, options),
@@ -255,14 +272,16 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
         editGraph: commands.workflows.editGraph,
         redo: commands.workflows.redo,
         removeWorkflow: (workflowId) => commands.workflows.remove(workflowId),
-        renameWorkflow: (workflowId, name) => {
-          commands.workflows.rename(workflowId, name);
+        renameWorkflow: (workflowId, name, projectId) => {
+          commands.workflows.rename(workflowId, name, projectId);
         },
+        replaceWorkflow: (target, document, options) => commands.workflows.replaceDocument(target, document, options),
         selectWorkflow: (workflowId) => commands.workflows.select(workflowId),
         setWorkflowSource: (target, source) =>
           commands.workflows.setSource(target.projectId, target.workflowId, source),
         undo: commands.workflows.undo,
       },
+      findInGallery,
       getProjectGraph: () => getActiveProjectWorkflow(queries.getSnapshot().activeProject).document,
       nodeExecution: {
         get: nodeExecutionStore.get,
@@ -286,17 +305,28 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
       persistence,
       preferences,
       project,
-      registerModalHotkeyLayer: registerHotkeyModalLayer,
       widgets: {
         // Workflow opens widgets from its buttons: the opened widget takes focus and the region highlight.
         open: (options) => {
           commands.widgets.open(options);
-          focusOpenedWidget(options.region, options.widgetId);
+          focusRegion(options.region, options.widgetId);
         },
         patchValues: (widgetId, values) => commands.widgets.patchValues(widgetId, values),
       },
     }),
-    [capabilities, commands, notify.error, notify.info, notify.success, persistence, preferences, project, queries]
+    [
+      capabilities,
+      commands,
+      findInGallery,
+      focusRegion,
+      notify.error,
+      notify.info,
+      notify.success,
+      persistence,
+      preferences,
+      project,
+      queries,
+    ]
   );
 
   return (

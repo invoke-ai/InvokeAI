@@ -49,14 +49,7 @@ export const GalleryUploadButton = ({
     <>
       <input {...inputProps} />
       <Tooltip content={label}>
-        <IconButton
-          aria-label={label}
-          color="fg.muted"
-          disabled={!isAvailable}
-          size="xs"
-          variant="ghost"
-          onClick={openPicker}
-        >
+        <IconButton aria-label={label} color="fg.muted" disabled={!isAvailable} variant="ghost" onClick={openPicker}>
           <Icon as={UploadIcon} boxSize="3.5" />
         </IconButton>
       </Tooltip>

@@ -13,17 +13,18 @@ import {
 } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { getInvocationTemplatesSnapshot, subscribeInvocationTemplates } from '@features/workflow/react';
-import { localizeForLoopValidationReason } from '@features/workflow/utility';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { submitActiveInvocation } from '@workbench/activeInvocationSubmission';
-import { useIsCanvasInvocationPreparing } from '@workbench/canvasInvocationPreparation';
+import { describeControlLayerIssue } from '@workbench/controlLayerChecks';
 import { getPlacedWidgetTypeIds, getVisibleWidgetTypeIds, graphWidgetSources } from '@workbench/graphWidgets';
 import {
   createInvocationRouteInputSelector,
   isInvocationRouteValid,
+  localizeInvocationValidationReason,
   resolveInvocationRouteInput,
 } from '@workbench/invocation';
+import { useIsInvocationPreparing } from '@workbench/invocationPreparation';
 import {
   useActiveProjectSelector,
   useWorkbenchCommands,
@@ -72,6 +73,7 @@ const areTypeIdSetsEqual = (left: ReadonlySet<WidgetTypeId>, right: ReadonlySet<
 const readDynamicPromptsConfig = (values: Record<string, unknown>) => ({
   combinatorial: values.dynamicPromptsCombinatorial,
   maxPrompts: values.dynamicPromptsMaxPrompts,
+  resample: values.dynamicPromptsResample,
   sampleSeed: values.dynamicPromptsSampleSeed,
   seedBehaviour: values.dynamicPromptsSeedBehaviour,
 });
@@ -112,8 +114,7 @@ export const useInvocationState = (): InvocationState => {
   const modelsStatus = useModelsSelector((snapshot) => snapshot.status);
   const availabilityModels = modelsStatus === 'loaded' ? models : undefined;
   const { invocation } = routeInput;
-  const isCanvasPreparing = useIsCanvasInvocationPreparing(routeInput.projectId);
-  const isPreparing = invocation.sourceId === 'canvas' && isCanvasPreparing;
+  const isPreparing = useIsInvocationPreparing(routeInput.projectId);
 
   useMountEffect(() => {
     void ensureModelsLoaded();
@@ -155,7 +156,7 @@ export const useInvocationState = (): InvocationState => {
     () => [
       ...(isConnected ? [] : ['The backend is disconnected.']),
       ...(expansionReason === null ? [] : [expansionReason]),
-      ...resolvedRoute.validationReasons.map((reason) => localizeForLoopValidationReason(reason, t)),
+      ...resolvedRoute.validationReasons.map((reason) => localizeInvocationValidationReason(reason, t)),
     ],
     [expansionReason, isConnected, resolvedRoute.validationReasons, t]
   );
@@ -166,11 +167,7 @@ export const useInvocationState = (): InvocationState => {
       submitActiveInvocation({
         commands,
         destinationOverride,
-        formatControlLayerError: (code, layerName) =>
-          t('widgets.layers.control.invalidLayer', {
-            name: layerName,
-            reason: t(`widgets.layers.control.validation.${code}`),
-          }),
+        formatControlLayerError: (rejection) => describeControlLayerIssue(t, rejection),
         getModels: () => availabilityModels,
         queries,
       }),

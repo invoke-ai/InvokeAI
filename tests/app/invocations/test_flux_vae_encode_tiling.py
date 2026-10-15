@@ -48,6 +48,8 @@ def _build_encode_mocks(vae, image: torch.Tensor, force_tiled_decode: bool = Fal
 
     vae_info = MagicMock()
     vae_info.model = vae
+    # A real device: the node places the image and the generator on the VAE's own device.
+    vae_info.compute_device = torch.device("cpu")
     cm = MagicMock()
     cm.__enter__ = MagicMock(return_value=(None, vae))
     cm.__exit__ = MagicMock(return_value=None)

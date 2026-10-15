@@ -8,7 +8,7 @@ const LazyPreferencesPage = lazy(() =>
 
 const FALLBACK = (
   <Center h="full">
-    <Spinner color="fg.muted" size="sm" />
+    <Spinner color="fg.muted" size="lg" />
   </Center>
 );
 

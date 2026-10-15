@@ -101,4 +101,37 @@ describe('models ui store', () => {
     expect(snapshot.activeModelKey).toBeNull();
     expect([...snapshot.selectedKeys]).toEqual(['b']);
   });
+  // Which pane a single-pane manager shows follows every opener and clear, without callers naming it.
+  it('leaves the pane choice open until the user opens or leaves the detail', async () => {
+    const store = await import('./uiStore');
+    const detailOpen = () => store.getModelsUiSnapshotForTests().detailOpen;
+
+    expect(detailOpen()).toBeNull();
+    store.openModelDetail('a');
+    expect(detailOpen()).toBe(true);
+    store.closeModelDetail();
+    expect(detailOpen()).toBe(false);
+    // Re-opening the same model after Back reveals it again, as do tabs requested from elsewhere.
+    store.openModelDetail('a');
+    expect(detailOpen()).toBe(true);
+    store.closeModelDetail();
+    store.requestAddModelsSearch('flux');
+    expect(detailOpen()).toBe(true);
+  });
+
+  it('returns to the library only when a delete removes the model on screen', async () => {
+    const store = await import('./uiStore');
+    const detailOpen = () => store.getModelsUiSnapshotForTests().detailOpen;
+
+    store.openModelDetail('a');
+    store.pruneModelsUiKeys(['b']);
+    expect(detailOpen()).toBe(true);
+    store.pruneModelsUiKeys(['a']);
+    expect(detailOpen()).toBe(false);
+
+    store.openModelDetail('c');
+    store.openModelManagerTab('add');
+    store.pruneModelsUiKeys(['c']);
+    expect(detailOpen()).toBe(true);
+  });
 });

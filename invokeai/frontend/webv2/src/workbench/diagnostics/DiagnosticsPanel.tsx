@@ -293,7 +293,6 @@ export const DiagnosticsPanel = ({ projectId }: { projectId: string | null }) =>
           flex="1 1 13rem"
           minW="0"
           positioning={SELECT_POSITIONING}
-          size="xs"
           value={scopeValue}
           valueText={currentScopeLabel}
           onValueChange={changeScope}
@@ -304,7 +303,6 @@ export const DiagnosticsPanel = ({ projectId }: { projectId: string | null }) =>
           flex="1 1 9rem"
           minW="0"
           positioning={SELECT_POSITIONING}
-          size="xs"
           value={severityValue}
           valueText={severityCollection.items.find((item) => item.value === filters.severity)?.label}
           onValueChange={changeSeverity}
@@ -315,7 +313,6 @@ export const DiagnosticsPanel = ({ projectId }: { projectId: string | null }) =>
           flex="1 1 9rem"
           minW="0"
           positioning={SELECT_POSITIONING}
-          size="xs"
           value={namespaceValue}
           valueText={namespaceCollection.items.find((item) => item.value === filters.namespace)?.label}
           onValueChange={changeNamespace}
@@ -324,7 +321,6 @@ export const DiagnosticsPanel = ({ projectId }: { projectId: string | null }) =>
           <Input
             aria-label={t('widgets.diagnostics.search')}
             placeholder={t('widgets.diagnostics.search')}
-            size="xs"
             value={filters.query}
             onChange={changeQuery}
           />
@@ -333,13 +329,13 @@ export const DiagnosticsPanel = ({ projectId }: { projectId: string | null }) =>
       <RecordingStatus config={config} snapshot={snapshot} />
       <HStack flexWrap="wrap" gap="2" justify="space-between">
         <HStack flexWrap="wrap" gap="2">
-          <Button disabled={matched.length === 0} size="2xs" variant="outline" onClick={copyFiltered}>
+          <Button disabled={matched.length === 0} size="sm" variant="outline" onClick={copyFiltered}>
             {t('widgets.diagnostics.copyFiltered', { count: matched.length })}
           </Button>
-          <Button disabled={matched.length === 0} size="2xs" variant="outline" onClick={downloadFiltered}>
+          <Button disabled={matched.length === 0} size="sm" variant="outline" onClick={downloadFiltered}>
             {t('widgets.diagnostics.downloadFiltered', { count: matched.length })}
           </Button>
-          <Button disabled={scopedCount === 0} size="2xs" variant="outline" onClick={clearScope}>
+          <Button disabled={scopedCount === 0} size="sm" variant="outline" onClick={clearScope}>
             {t('widgets.diagnostics.clearScope', { scope: currentScopeLabel })}
           </Button>
         </HStack>
@@ -349,21 +345,21 @@ export const DiagnosticsPanel = ({ projectId }: { projectId: string | null }) =>
               <IconButton
                 aria-label={t('common.previousPage')}
                 disabled={page <= 1}
-                size="2xs"
+                size="sm"
                 variant="ghost"
                 onClick={previousPage}
               >
                 <ChevronLeftIcon />
               </IconButton>
             </Tooltip>
-            <Text color="fg.muted" fontSize="2xs" role="status">
+            <Text color="fg.muted" fontSize="xs" role="status">
               {t('widgets.diagnostics.page', { page, total: pageCount })}
             </Text>
             <Tooltip content={t('common.nextPage')}>
               <IconButton
                 aria-label={t('common.nextPage')}
                 disabled={page >= pageCount}
-                size="2xs"
+                size="sm"
                 variant="ghost"
                 onClick={nextPage}
               >
@@ -377,27 +373,27 @@ export const DiagnosticsPanel = ({ projectId }: { projectId: string | null }) =>
         <Stack gap="2" py="4">
           {!config.enabled && scopedCount === 0 ? (
             <>
-              <Text color="fg" fontSize="xs" fontWeight="600" role="status">
+              <Text color="fg" fontSize="md" fontWeight="600" role="status">
                 {t('widgets.diagnostics.recordingOff')}
               </Text>
-              <Text color="fg.muted" fontSize="2xs">
+              <Text color="fg.muted" fontSize="xs">
                 {t('widgets.diagnostics.recordingOffHint')}
               </Text>
-              <Button alignSelf="start" size="2xs" variant="outline" onClick={openDeveloperSettings}>
+              <Button alignSelf="start" size="sm" variant="outline" onClick={openDeveloperSettings}>
                 {t('widgets.diagnostics.openDeveloperSettings')}
               </Button>
             </>
           ) : scopedCount === 0 ? (
-            <Text color="fg.muted" fontSize="2xs" role="status">
+            <Text color="fg.muted" fontSize="xs" role="status">
               {t('widgets.diagnostics.emptyScope')}
             </Text>
           ) : (
             <>
-              <Text color="fg.muted" fontSize="2xs" role="status">
+              <Text color="fg.muted" fontSize="xs" role="status">
                 {t('widgets.diagnostics.noMatches')}
               </Text>
               {hasFilters ? (
-                <Button alignSelf="start" size="2xs" variant="outline" onClick={clearFilters}>
+                <Button alignSelf="start" size="sm" variant="outline" onClick={clearFilters}>
                   {t('widgets.diagnostics.clearFilters')}
                 </Button>
               ) : null}
@@ -425,7 +421,7 @@ const RecordingStatus = ({ config, snapshot }: { config: LoggingConfig; snapshot
   return (
     <HStack flexWrap="wrap" gap="1.5">
       {config.enabled ? (
-        <Badge colorPalette="green" size="xs">
+        <Badge colorPalette="green">
           {t('widgets.diagnostics.recordingStatus', {
             count: config.namespaces.length,
             level: t(`settings.catalog.options.${config.level}`),
@@ -433,21 +429,13 @@ const RecordingStatus = ({ config, snapshot }: { config: LoggingConfig; snapshot
           })}
         </Badge>
       ) : (
-        <Badge colorPalette="gray" size="xs">
-          {t('widgets.diagnostics.recordingOff')}
-        </Badge>
+        <Badge colorPalette="gray">{t('widgets.diagnostics.recordingOff')}</Badge>
       )}
       {config.performanceTimingsEnabled ? (
-        <Badge colorPalette="purple" size="xs">
-          {t('widgets.diagnostics.timingsOn')}
-        </Badge>
+        <Badge colorPalette="purple">{t('widgets.diagnostics.timingsOn')}</Badge>
       ) : null}
-      {config.consoleOutputEnabled ? (
-        <Badge colorPalette="blue" size="xs">
-          {t('widgets.diagnostics.consoleOn')}
-        </Badge>
-      ) : null}
-      <Text color="fg.muted" fontSize="2xs">
+      {config.consoleOutputEnabled ? <Badge colorPalette="blue">{t('widgets.diagnostics.consoleOn')}</Badge> : null}
+      <Text color="fg.muted" fontSize="xs">
         {t('widgets.diagnostics.retention', {
           problemLimit: retention.problems.limit,
           problems: retention.problems.count,
@@ -457,15 +445,9 @@ const RecordingStatus = ({ config, snapshot }: { config: LoggingConfig; snapshot
           verboseLimit: retention.verbose.limit,
         })}
       </Text>
-      {evicted > 0 ? (
-        <Badge colorPalette="orange" size="xs">
-          {t('widgets.diagnostics.evicted', { count: evicted })}
-        </Badge>
-      ) : null}
+      {evicted > 0 ? <Badge colorPalette="orange">{t('widgets.diagnostics.evicted', { count: evicted })}</Badge> : null}
       {truncatedCount > 0 ? (
-        <Badge colorPalette="orange" size="xs">
-          {t('widgets.diagnostics.truncated', { count: truncatedCount })}
-        </Badge>
+        <Badge colorPalette="orange">{t('widgets.diagnostics.truncated', { count: truncatedCount })}</Badge>
       ) : null}
     </HStack>
   );
@@ -488,36 +470,30 @@ const DiagnosticsEntryRow = memo(({ entry, showProject }: { entry: LogEntry; sho
         <HStack align="start" gap="2" justify="space-between">
           <Stack flex="1" gap="1" minW="0">
             <HStack flexWrap="wrap" gap="1.5">
-              <Badge colorPalette={LEVEL_COLOR_PALETTE[entry.level]} size="xs">
+              <Badge colorPalette={LEVEL_COLOR_PALETTE[entry.level]}>
                 {t(`settings.catalog.options.${entry.level}`)}
               </Badge>
               {entry.durationMs !== undefined ? (
-                <Badge colorPalette="purple" size="xs">
-                  {entry.durationMs.toFixed(1)}ms
-                </Badge>
+                <Badge colorPalette="purple">{entry.durationMs.toFixed(1)}ms</Badge>
               ) : null}
-              {entry.truncated ? (
-                <Badge colorPalette="orange" size="xs">
-                  {t('widgets.diagnostics.entryTruncated')}
-                </Badge>
-              ) : null}
-              <Text color="fg.muted" fontFamily="mono" fontSize="2xs" minW="0" wordBreak="break-all">
+              {entry.truncated ? <Badge colorPalette="orange">{t('widgets.diagnostics.entryTruncated')}</Badge> : null}
+              <Text color="fg.muted" fontFamily="mono" fontSize="xs" minW="0" wordBreak="break-all">
                 {formatSource(entry, showProject)}
               </Text>
             </HStack>
-            <Text color="fg" fontSize="xs" fontWeight="600" wordBreak="break-word">
+            <Text color="fg" fontSize="md" fontWeight="600" wordBreak="break-word">
               {entry.message || entry.name}
             </Text>
             {entry.error ? (
-              <Text color="fg.muted" fontFamily="mono" fontSize="2xs" wordBreak="break-word">
+              <Text color="fg.muted" fontFamily="mono" fontSize="xs" wordBreak="break-word">
                 {entry.error.name}: {entry.error.message}
               </Text>
             ) : null}
-            <Text color="fg.muted" fontSize="2xs">
+            <Text color="fg.muted" fontSize="xs">
               {new Date(entry.createdAt).toLocaleTimeString()} · {entry.name}
             </Text>
           </Stack>
-          <Button aria-expanded={isExpanded} flexShrink="0" size="2xs" variant="ghost" onClick={toggle}>
+          <Button aria-expanded={isExpanded} flexShrink="0" size="sm" variant="ghost" onClick={toggle}>
             {isExpanded ? t('widgets.diagnostics.hideDetails') : t('widgets.diagnostics.details')}
           </Button>
         </HStack>

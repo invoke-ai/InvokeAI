@@ -37,6 +37,7 @@ import {
   useQueueItemProgressImage,
   useQueueItemSwapProgressImage,
 } from '@features/queue/react';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import {
   imageUrlToStreamingSource,
   progressImageToStreamingSource,
@@ -59,7 +60,17 @@ import {
   useWorkbenchCommands,
   useWorkbenchQueries,
 } from '@workbench/WorkbenchContext';
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode, type Ref } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+  type Ref,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { PreviewLoupeControls } from './usePreviewLoupe';
@@ -107,6 +118,7 @@ const fallbackBoards: GalleryBoard[] = [
     assetVideoCount: 0,
     id: 'none',
     imageCount: 0,
+    isInbox: false,
     kind: 'uncategorized',
     name: '',
     projectId: null,
@@ -153,6 +165,17 @@ const FLOATING_RAIL_SX: SystemStyleObject = {
   position: 'absolute',
   top: 0,
   zIndex: 3,
+};
+
+/** A focused video seeks with the arrows; keep them from the workbench hotkeys, which would step to another item. */
+const keepVideoArrowKeys = (event: KeyboardEvent<HTMLElement>) => {
+  if (
+    (event.key === 'ArrowLeft' || event.key === 'ArrowRight') &&
+    event.target instanceof Element &&
+    event.target.closest('video')
+  ) {
+    event.stopPropagation();
+  }
 };
 
 export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
@@ -222,23 +245,24 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   );
 
   const selectGalleryItemAtPage = useCallback(
-    (item: GalleryItem, selectionPage: number) => {
+    (item: GalleryItem, selectionPage: number, absoluteIndex?: number) => {
       gallery.selectItem(item, undefined, selectionPage, true);
       // Deliberate navigation: the grid follows it, unlike auto-selection.
-      requestGalleryItemReveal(toGalleryItemKey(item));
+      requestGalleryItemReveal(toGalleryItemKey(item), captureAccountScope().signal, absoluteIndex);
     },
     [gallery]
   );
   const {
     boardItems,
     getSelectionPage,
-    handleNavigationKeyDown,
     isLoadingBoard,
+    loadOrderedRefs,
     navigate,
-    navigationCursor,
     navigationQueryKey,
     neighbors,
+    position,
     selectPreviewItem,
+    stripItemCount,
   } = usePreviewNavigation({
     followedSessionId: activeGalleryPlaceholder?.id ?? null,
     followSession: livePreview.follow,
@@ -267,13 +291,10 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       filterIdentity: navigationQueryKey,
       getItemSelectionPage: getSelectionPage,
       items: boardItems,
-      loadOrderedRefs: (signal: AbortSignal) => {
-        signal.throwIfAborted();
-        return Promise.resolve(boardItems.map(toGalleryItemRef));
-      },
+      loadOrderedRefs,
       selectedItemKey,
     }),
-    [boardItems, getSelectionPage, navigationQueryKey, selectedItemKey]
+    [boardItems, getSelectionPage, loadOrderedRefs, navigationQueryKey, selectedItemKey]
   );
   const projectId = useActiveProjectId();
   const { dialog: deletionConfirmationDialog, requestDeletionConfirmation } = useDeletionConfirmation();
@@ -429,13 +450,14 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       setContextMenuTarget({ itemRefs: [toGalleryItemRef(item)], items: [item], x, y }),
     []
   );
+  const { selectForCompare } = imageActions;
   const compareFilmstripItem = useCallback(
     (item: GalleryItem) => {
       if (isGalleryImageItem(item)) {
-        imageActions.selectForCompare(galleryImageItemToGalleryImage(item));
+        selectForCompare(galleryImageItemToGalleryImage(item));
       }
     },
-    [imageActions]
+    [selectForCompare]
   );
   const openItemContextMenu = useCallback(
     (x: number, y: number) => {
@@ -462,6 +484,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
             followedSessionId: livePreview.followedSessionId,
             isSessionPinned: livePreview.pinnedSessionId !== null,
             items: boardItems,
+            leadingItemCount: stripItemCount,
             onCompare: compareFilmstripItem,
             onContextMenu: openFilmstripItemContextMenu,
             onFollowSession: livePreview.follow,
@@ -482,6 +505,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       livePreview.gallerySessions,
       livePreview.pinnedSessionId,
       livePreview.showAll,
+      stripItemCount,
       openFilmstripItemContextMenu,
       selectPreviewItem,
     ]
@@ -497,14 +521,13 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       itemName: headerItemName,
       openItemMenu: shouldFollowLive ? null : openItemContextMenu,
       position: hasHeaderItem
-        ? { boardItemCount: boardItems.length, isLoadingBoard, selectedIndex: navigationCursor }
+        ? { boardItemCount: position.total, isLoadingBoard, selectedIndex: position.index }
         : null,
       // Only the single image frame carries a loupe: videos have none and
       // compare has its own synced pair.
       zoom: hasHeaderItem && !isComparing && contextMenuItem.kind === 'image' ? zoomCommands : null,
     });
   }, [
-    boardItems.length,
     boardName,
     contextMenuItem,
     copyCurrentVideoFrame,
@@ -514,8 +537,8 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     isComparing,
     isLoadingBoard,
     isVideoFrameCopyAvailable,
-    navigationCursor,
     openItemContextMenu,
+    position,
     shouldFollowLive,
     zoomCommands,
   ]);
@@ -549,6 +572,11 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       return;
     }
 
+    if (commandId === 'viewer.previousItem' || commandId === 'viewer.nextItem') {
+      void navigate(commandId === 'viewer.nextItem' ? 1 : -1);
+      return;
+    }
+
     if (commandId === 'viewer.toggleFilmstrip') {
       widgets.patchValues('preview', { filmstripVisible: !getPreviewFilmstripVisible(previewValues) });
     }
@@ -558,6 +586,14 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     const hotkeys = [
       ['viewer.deleteImage', t('widgets.preview.commands.deletePreviewImage'), ['delete', 'backspace']],
       ['viewer.toggleFilmstrip', t('widgets.preview.commands.toggleFilmstrip'), ['t']],
+      // Widget-scoped, so the arrows step wherever Preview holds the keys: focus inside it, or on the region it was
+      // just opened in. Comparison does not step saved images, so it leaves the arrows unclaimed.
+      ...(isComparing
+        ? []
+        : ([
+            ['viewer.previousItem', t('widgets.preview.commands.previousItem'), ['arrowleft']],
+            ['viewer.nextItem', t('widgets.preview.commands.nextItem'), ['arrowright']],
+          ] as const)),
       ...(selectedItem?.kind === 'image'
         ? ([
             ['viewer.swapImages', t('widgets.preview.commands.swapComparisonImages'), ['c']],
@@ -574,7 +610,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     return () => {
       disposers.forEach((dispose) => dispose());
     };
-  }, [runtime.commands, runtime.hotkeys, selectedItem?.kind, t]);
+  }, [isComparing, runtime.commands, runtime.hotkeys, selectedItem?.kind, t]);
 
   return (
     // Let the dot grid fill the widget; containerType bounds Details cqh sizing to this surface.
@@ -584,9 +620,9 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
        * without reflow.
        */}
       {region === 'floating' ? <QueueProgressRail css={FLOATING_RAIL_SX} /> : null}
-      {/* Single always-mounted keyboard boundary: DOM focus survives swaps
-          between the live, selected, and compare branches, so arrow
-          navigation keeps working across them. */}
+      {/* Single always-mounted focus target: DOM focus survives swaps
+          between the live, selected, and compare branches, so the keys
+          stay with Preview across them. */}
       <Stack
         ref={navigationBoundaryRef}
         aria-label={t('widgets.labels.preview')}
@@ -597,7 +633,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
         role="region"
         tabIndex={0}
         w="full"
-        onKeyDown={handleNavigationKeyDown}
+        onKeyDown={keepVideoArrowKeys}
       >
         {shouldFollowLive && activeGalleryPlaceholder ? (
           <LivePreview
@@ -648,11 +684,13 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
               target={contextMenuTarget}
               onClose={closeContextMenu}
             />
-            {deletionConfirmationDialog}
           </>
         ) : (
           <EmptyPreview />
         )}
+        {/* Outside the branches: deleting the shown item or a live session taking over must not unmount a pending
+            confirmation, nor cut its exit animation short. */}
+        {deletionConfirmationDialog}
       </Stack>
     </Box>
   );
@@ -874,10 +912,10 @@ const EmptyPreview = () => {
   return (
     <PreviewFrame frameHeight={1} frameWidth={1} isLive={false} shouldAntialiasLiveImage source={null} variant="inset">
       <Stack align="center" color="fg" gap="2" maxW="18rem" textAlign="center">
-        <Text fontSize="sm" fontWeight="800">
+        <Text fontSize="lg" fontWeight="800">
           {t('widgets.preview.noGallerySelection')}
         </Text>
-        <Text color="fg.muted" fontSize="2xs">
+        <Text color="fg.muted" fontSize="xs">
           {t('widgets.preview.emptyDescription')}
         </Text>
       </Stack>

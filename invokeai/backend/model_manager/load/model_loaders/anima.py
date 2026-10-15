@@ -1,7 +1,8 @@
 """Class for Anima model loading in InvokeAI."""
 
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import accelerate
 
@@ -9,7 +10,7 @@ from invokeai.backend.model_manager.checkpoint_prefix import CheckpointPrefix
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base
 from invokeai.backend.model_manager.configs.controlnet import ControlNet_Checkpoint_Anima_Config
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
-from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Anima_Config
+from invokeai.backend.model_manager.configs.main import ANIMA_V2_CONNECTOR_KEY_PREFIX, Main_Checkpoint_Anima_Config
 from invokeai.backend.model_manager.load.fp8_capability import NotApplicable
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
@@ -21,6 +22,7 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 from invokeai.backend.quantization.fp8_scaled import (
+    Fp8ScaledLayer,
     attach_fp8_scales,
     cast_state_dict,
     dequantize_fp8_scaled,
@@ -33,6 +35,13 @@ from invokeai.backend.quantization.fp8_scaled import (
     split_fp8_scaled_layers,
     strip_layer_path_prefix,
     warn_on_unattached_scales,
+)
+from invokeai.backend.quantization.int8_convrot import (
+    drop_unconsumed_quantization_sidecars,
+    extract_int8_convrot_markers,
+    install_int8_convrot_layers,
+    reject_unmarked_int8_weights,
+    resolve_quantized_module_paths,
 )
 from invokeai.backend.quantization.load_plan import reserve_for_load
 from invokeai.backend.util.devices import TorchDevice
@@ -86,9 +95,10 @@ def _filter_non_model_keys(sd: dict) -> dict:
     }
 
 
-# Anima's fixed transformer architecture. Kept at module level so tests can instantiate the real
-# module graph (e.g. to pin `_skip_layerwise_casting_patterns` to actual dotted module paths)
-# without duplicating these values.
+# Anima's transformer architecture at the depth of the official release. Kept at module level so tests
+# can instantiate the real module graph (e.g. to pin `_skip_layerwise_casting_patterns` to actual
+# dotted module paths) without duplicating these values. `num_blocks` is the only value that differs
+# between redistributions -- see `anima_transformer_config`.
 ANIMA_TRANSFORMER_CONFIG = {
     "max_img_h": 240,
     "max_img_w": 240,
@@ -116,6 +126,39 @@ ANIMA_TRANSFORMER_CONFIG = {
     "extra_per_block_abs_pos_emb": False,
     "image_model": "anima",
 }
+
+
+def count_anima_dit_blocks(sd: Mapping[str, Any]) -> int:
+    """Number of DiT blocks in a prefix-stripped Anima state dict.
+
+    Depth-expanded finetunes keep every other dimension of the official 28-block model: Anima-2.9B
+    has 40 blocks and Anima-3.8B 52, both grown by LLaMA-Pro style interleaved insertion. A model
+    built at the official depth would load the first 28 of them and drop the rest as unexpected
+    keys -- reported only at DEBUG, with the surviving blocks in the wrong order, so the result is
+    a degraded image rather than an error.
+
+    Raises:
+        ValueError: if the state dict has no DiT blocks or the block indices have gaps.
+    """
+    indices = {
+        int(parts[1])
+        for key in sd
+        if isinstance(key, str) and key.startswith("blocks.")
+        for parts in [key.split(".", 2)]
+        if parts[1].isdigit()
+    }
+    if not indices:
+        raise ValueError("Anima checkpoint has no DiT blocks (no `blocks.<n>.` keys after the prefix strip).")
+    count = max(indices) + 1
+    if len(indices) != count:
+        missing = sorted(set(range(count)) - indices)
+        raise ValueError(f"Anima checkpoint has gaps in its DiT blocks: {missing[:10]} missing of 0-{count - 1}.")
+    return count
+
+
+def anima_transformer_config(sd: Mapping[str, Any]) -> dict[str, Any]:
+    """`ANIMA_TRANSFORMER_CONFIG` at the depth of the checkpoint in `sd` (prefix-stripped)."""
+    return {**ANIMA_TRANSFORMER_CONFIG, "num_blocks": count_anima_dit_blocks(sd)}
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Anima, type=ModelType.Main, format=ModelFormat.Checkpoint)
@@ -150,6 +193,7 @@ class AnimaCheckpointModel(ModelLoader):
         from safetensors.torch import load_file
 
         from invokeai.backend.anima.anima_transformer import AnimaTransformer
+        from invokeai.backend.anima.semantic_connector import AnimaSemanticConnectorConfig
 
         if not isinstance(config, Main_Checkpoint_Anima_Config):
             raise TypeError(
@@ -170,59 +214,101 @@ class AnimaCheckpointModel(ModelLoader):
         target_device = TorchDevice.choose_torch_device()
         model_dtype = TorchDevice.choose_anima_inference_dtype(target_device)
 
-        # ComfyUI 'scaled fp8': an fp8 weight plus a `weight_scale`. `_filter_non_model_keys` above
-        # keeps those keys, and `load_state_dict` below rejects the checkpoint outright over them --
-        # 500 unexpected keys on a plain scaled export, 749 on one that also ships `comfy_quant`
-        # markers. Such a checkpoint therefore does not load at all today.
-        #
-        # Anima keeps `q_proj`/`k_proj`/`v_proj` separate and the only key rewrite is a prefix strip,
-        # so a sibling scale travels with its weight and nothing has to be split.
-        keep_fp8 = self._keep_fp8_weights(config, SubModelType.Transformer)
-        header_hints = parse_quantization_metadata(read_safetensors_metadata(model_path, logger))
-        # The header names layers in the checkpoint's own scheme -- `net.`-prefixed on every Anima
-        # redistribution measured -- while the scales are read after `_strip_anima_bundle_prefix`
-        # has run. Without this the per-layer flags, `full_precision_matrix_mult` above all, match
-        # nothing and are silently ignored.
-        layer_hints = {
-            **extract_comfy_quant_hints(sd),
-            **strip_layer_path_prefix(header_hints),
-        }
-        fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
+        # Two ComfyUI side-channel formats share the `weight` + `weight_scale` layout, and a checkpoint
+        # carries one or the other (Anima-2.9B ships an `int8_tensorwise` build beside its bf16 one).
+        # The int8 markers come out first: the fp8 path below reads `.comfy_quant` as layer hints and
+        # would take an int8 weight for an unscaled one. The rejection sits outside the branch so an
+        # int8 weight whose marker is missing or unreadable is refused instead of cast as raw codes.
+        int8_markers = extract_int8_convrot_markers(sd)
+        reject_unmarked_int8_weights(sd, int8_markers, "Anima")
 
-        # Create an empty AnimaTransformer with Anima's default architecture parameters
+        metadata = read_safetensors_metadata(model_path, logger)
+        # Anima-3.8B bundles a semantic connector whose hyperparameters live in the header. Without
+        # it in the model the connector's tensors would fall to `strict=False` and the 52-block DiT
+        # would generate from the native adapter alone, which its new blocks were not trained on.
+        semantic_connector = None
+        if any(key.startswith(ANIMA_V2_CONNECTOR_KEY_PREFIX) for key in sd):
+            semantic_connector = AnimaSemanticConnectorConfig.from_metadata(metadata)
+
+        keep_fp8 = False
+        fp8_layers: dict[str, Fp8ScaledLayer] = {}
+        if int8_markers:
+            sd = drop_unconsumed_quantization_sidecars(sd)
+            # The prefix strip is the only key rewrite, so the markers already name the model's modules.
+            quantized = resolve_quantized_module_paths(int8_markers, key_map={})
+        else:
+            # ComfyUI 'scaled fp8': an fp8 weight plus a `weight_scale`. `_filter_non_model_keys` above
+            # keeps those keys, and `load_state_dict` below rejects the checkpoint outright over them --
+            # 500 unexpected keys on a plain scaled export, 749 on one that also ships `comfy_quant`
+            # markers. Such a checkpoint therefore does not load at all today.
+            #
+            # Anima keeps `q_proj`/`k_proj`/`v_proj` separate and the only key rewrite is a prefix strip,
+            # so a sibling scale travels with its weight and nothing has to be split.
+            keep_fp8 = self._keep_fp8_weights(config, SubModelType.Transformer)
+            header_hints = parse_quantization_metadata(metadata)
+            # The header names layers in the checkpoint's own scheme -- `net.`-prefixed on every Anima
+            # redistribution measured -- while the scales are read after `_strip_anima_bundle_prefix`
+            # has run. Without this the per-layer flags, `full_precision_matrix_mult` above all, match
+            # nothing and are silently ignored.
+            layer_hints = {
+                **extract_comfy_quant_hints(sd),
+                **strip_layer_path_prefix(header_hints),
+            }
+            fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
+
+        # Build at the checkpoint's own depth: 28 blocks for the official release, more for the
+        # depth-expanded finetunes (Anima-2.9B: 40, Anima-3.8B: 52).
         with accelerate.init_empty_weights():
-            model = AnimaTransformer(**ANIMA_TRANSFORMER_CONFIG)
+            model = AnimaTransformer(**anima_transformer_config(sd), semantic_connector=semantic_connector)
+        if semantic_connector is not None:
+            logger.info(f"Anima: {len(model.blocks)}-block transformer with a bundled Qwen3.5 semantic connector")
 
         skip_patterns = _model_declared_skip_patterns(model)
-        # Reserve before anything below widens a weight -- the fold and the split both do, and
-        # reserving afterwards lets either peak land on a cache that was only ever sized for the
-        # file. `scaled_layers` is what keeps the prediction honest where the weights are kept: the
-        # split also widens layers whose scale layout `scaled_mm` cannot apply, and without the
-        # mapping the prediction would charge those 1 byte/element and arrive at 2. Where they are
-        # not kept the prediction charges every float at `model_dtype`, folded yet or not, so the
-        # number is the same on either side of the fold -- what changes is when the room exists.
-        # Building the model first costs nothing: `init_empty_weights` leaves every param on meta.
-        reserve_for_load(
-            self._ram_cache.make_room,
-            sd,
-            model_dtype,
-            keep_fp8=keep_fp8,
-            model=model,
-            skip_patterns=skip_patterns,
-            fp8_layers=fp8_layers,
-            nvfp4_payloads={},
-        )
+        if int8_markers:
+            quantized = install_int8_convrot_layers(
+                model,
+                sd,
+                quantized,
+                model_dtype,
+                architecture="Anima",
+                reserve=self._ram_cache.make_room,
+                skip_patterns=skip_patterns,
+            )
+            logger.info(
+                f"Anima: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
+                "(int8_tensorwise checkpoint, dequantized per forward)"
+            )
+            kept = 0
+        else:
+            # Reserve before anything below widens a weight -- the fold and the split both do, and
+            # reserving afterwards lets either peak land on a cache that was only ever sized for the
+            # file. `scaled_layers` is what keeps the prediction honest where the weights are kept: the
+            # split also widens layers whose scale layout `scaled_mm` cannot apply, and without the
+            # mapping the prediction would charge those 1 byte/element and arrive at 2. Where they are
+            # not kept the prediction charges every float at `model_dtype`, folded yet or not, so the
+            # number is the same on either side of the fold -- what changes is when the room exists.
+            # Building the model first costs nothing: `init_empty_weights` leaves every param on meta.
+            reserve_for_load(
+                self._ram_cache.make_room,
+                sd,
+                model_dtype,
+                keep_fp8=keep_fp8,
+                model=model,
+                skip_patterns=skip_patterns,
+                fp8_layers=fp8_layers,
+                nvfp4_payloads={},
+            )
 
-        if fp8_layers and not keep_fp8:
-            # Neither the matmul nor FP8 Storage asked for them, so keeping them quantized would
-            # dequantize on every forward to save memory nobody wanted saved. Fold the scale in.
-            dequantize_fp8_scaled(sd, fp8_layers, model_dtype)
-            fp8_layers = {}
+            if fp8_layers and not keep_fp8:
+                # Neither the matmul nor FP8 Storage asked for them, so keeping them quantized would
+                # dequantize on every forward to save memory nobody wanted saved. Fold the scale in.
+                dequantize_fp8_scaled(sd, fp8_layers, model_dtype)
+                fp8_layers = {}
 
-        # Layers the cast would dequantize anyway are folded here too, scale applied, so the cast
-        # never strips a scale that can no longer be put back.
-        fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, model_dtype, model=model, skip_patterns=skip_patterns)
-        kept = cast_state_dict(sd, model_dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
+            # Layers the cast would dequantize anyway are folded here too, scale applied, so the cast
+            # never strips a scale that can no longer be put back.
+            fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, model_dtype, model=model, skip_patterns=skip_patterns)
+            kept = cast_state_dict(sd, model_dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
 
         load_result = model.load_state_dict(sd, assign=True, strict=False)
         log_unexpected_keys("Anima transformer checkpoint", load_result.unexpected_keys)

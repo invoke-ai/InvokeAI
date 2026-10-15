@@ -1,4 +1,11 @@
 import { beforeEach } from 'vitest';
+import { server } from 'vitest/browser';
+
+declare module 'vitest/browser' {
+  interface BrowserCommands {
+    resetBrowserPointer: () => Promise<void>;
+  }
+}
 
 /**
  * Start every browser test with the pages around the test iframe scrolled to the origin.
@@ -9,7 +16,8 @@ import { beforeEach } from 'vitest';
  * action on them times out (FeatureHint's corner parking element fails all five of its tests this way). The test's
  * own document is left alone: its scroll belongs to the test.
  */
-beforeEach(() => {
+beforeEach(async () => {
+  await server.commands.resetBrowserPointer();
   let frame: Window = window;
 
   while (frame.parent !== frame) {

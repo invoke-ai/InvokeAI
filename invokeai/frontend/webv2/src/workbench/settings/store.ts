@@ -20,6 +20,7 @@ import {
 } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 import { createSingleFlight } from '@platform/state/singleFlight';
+import { isPromptFontSize } from '@theme/scale';
 import { DEFAULT_THEME_ID, resolveWorkbenchThemeId } from '@theme/themes';
 import { deleteClientStateValue, getClientStateValue, setClientStateValue } from '@workbench/projects/api';
 import { fetchSessionBlob } from '@workbench/projects/session';
@@ -62,13 +63,16 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   launchpadProjectsView: 'grid',
   notifyOnEnqueue: true,
   preferNumericAttentionStyle: false,
+  promptFontSize: 'default',
   queueJobsScope: 'all',
   reduceMotion: false,
   showPromptSyntaxHighlighting: true,
   showFocusRegionHighlight: true,
   themeId: DEFAULT_THEME_ID,
+  whatsNewSeenVersion: null,
   workflowEdgeStyle: 'curved',
   workflowEdgesBehindNodes: false,
+  workflowGroupNodesByCategory: true,
   workflowShowMinimap: true,
   workflowSnapToGrid: false,
   workflowValidateConnections: true,
@@ -324,6 +328,9 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.preferNumericAttentionStyle === 'boolean'
       ? preferences.preferNumericAttentionStyle
       : DEFAULT_PREFERENCES.preferNumericAttentionStyle,
+  promptFontSize: isPromptFontSize(preferences?.promptFontSize)
+    ? preferences.promptFontSize
+    : DEFAULT_PREFERENCES.promptFontSize,
   queueJobsScope:
     preferences?.queueJobsScope === 'all-projects'
       ? 'all'
@@ -347,6 +354,10 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
       ? preferences.showPromptSyntaxHighlighting
       : DEFAULT_PREFERENCES.showPromptSyntaxHighlighting,
   themeId: resolveWorkbenchThemeId(preferences?.themeId) ?? DEFAULT_PREFERENCES.themeId,
+  whatsNewSeenVersion:
+    typeof preferences?.whatsNewSeenVersion === 'string'
+      ? preferences.whatsNewSeenVersion
+      : DEFAULT_PREFERENCES.whatsNewSeenVersion,
   workflowEdgeStyle:
     preferences?.workflowEdgeStyle === 'square' || preferences?.workflowEdgeStyle === 'straight'
       ? 'square'
@@ -357,6 +368,10 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.workflowEdgesBehindNodes === 'boolean'
       ? preferences.workflowEdgesBehindNodes
       : DEFAULT_PREFERENCES.workflowEdgesBehindNodes,
+  workflowGroupNodesByCategory:
+    typeof preferences?.workflowGroupNodesByCategory === 'boolean'
+      ? preferences.workflowGroupNodesByCategory
+      : DEFAULT_PREFERENCES.workflowGroupNodesByCategory,
   workflowShowMinimap:
     typeof preferences?.workflowShowMinimap === 'boolean'
       ? preferences.workflowShowMinimap

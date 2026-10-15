@@ -5,8 +5,14 @@ import { Fragment, useCallback } from 'react';
 
 import { Tooltip } from './Tooltip';
 
-const TAB_HOVER_PROPS = { bg: 'gray.hoverTint/8', color: 'fg' };
+const TAB_HOVER_PROPS = { bg: 'bg.hover', color: 'fg' };
 const TAB_SHOWN_BG = 'gray.hoverTint/15';
+// A hovered tab's background replaces its neighbouring dividers, as the shown tab's does.
+const TABLIST_CSS = {
+  '& > [role="tab"]:hover + [data-segment-divider], & > [data-segment-divider]:has(+ [role="tab"]:hover)': {
+    opacity: 0,
+  },
+};
 
 /** The strip's fixed height; collapsed blocks and drag snaps size against it. */
 export const SEGMENT_TABS_HEIGHT_PX = 40;
@@ -74,6 +80,7 @@ export const SegmentTabs = <T extends string>({
     <HStack
       aria-label={ariaLabel}
       aria-orientation="horizontal"
+      css={TABLIST_CSS}
       flex="1"
       gap="0.5"
       minW="0"
@@ -87,9 +94,11 @@ export const SegmentTabs = <T extends string>({
             <Box
               aria-hidden
               bg="border.emphasized"
+              data-segment-divider=""
               flexShrink={0}
               h="3.5"
-              opacity={tab.id === activeId || tabs[index - 1]!.id === activeId ? 0 : 1}
+              // Only the shown tab's background replaces its neighbouring dividers; a collapsed strip keeps them all.
+              opacity={showActivePanel && (tab.id === activeId || tabs[index - 1]!.id === activeId) ? 0 : 1}
               rounded="full"
               transition="opacity var(--wb-motion-duration-fast)"
               w="1px"
@@ -141,7 +150,7 @@ const SegmentTabButton = <T extends string>({
       aria-selected={isSelected}
       bg={isShown ? TAB_SHOWN_BG : 'transparent'}
       color={isShown ? 'fg' : 'fg.muted'}
-      fontSize="xs"
+      fontSize="md"
       fontWeight="medium"
       h="7"
       id={segmentTabsTabId(idBase, id)}

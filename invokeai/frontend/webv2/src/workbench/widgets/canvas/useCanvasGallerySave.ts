@@ -1,4 +1,4 @@
-import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
+import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
 import { invalidateGallery } from '@features/gallery/queries';
 import {

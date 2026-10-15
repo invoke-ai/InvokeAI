@@ -6,6 +6,19 @@ import { Box, Icon } from '@chakra-ui/react';
 import { getFieldTypeColor, isModelFieldType } from '@features/workflow/utility';
 import { Tooltip } from '@platform/ui';
 import { CircleAlertIcon, CircleCheckIcon, InfoIcon } from 'lucide-react';
+import { createContext, useContext } from 'react';
+
+const WorkflowImageExportContext = createContext(false);
+
+export const WorkflowImageExportProvider = ({
+  children,
+  isExporting,
+}: {
+  children: ReactNode;
+  isExporting: boolean;
+}) => <WorkflowImageExportContext value={isExporting}>{children}</WorkflowImageExportContext>;
+
+export const useIsWorkflowImageExport = () => useContext(WorkflowImageExportContext);
 
 /** Share node styling across editor, static previews, and form builder to prevent visual drift. */
 
@@ -71,7 +84,7 @@ export const getWorkflowNodeChromeProps = (state: WorkflowNodeChromeState): BoxP
 /** The node surface itself: chrome plus background, radius, and base type size. */
 export const getWorkflowNodeShellProps = (state: WorkflowNodeChromeState): BoxProps => ({
   bg: 'bg',
-  fontSize: 'xs',
+  fontSize: 'md',
   rounded: 'lg',
   ...getWorkflowNodeChromeProps(state),
 });

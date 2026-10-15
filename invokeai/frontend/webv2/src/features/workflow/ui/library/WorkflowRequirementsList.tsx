@@ -160,10 +160,10 @@ const RequirementRow = ({
         {presentation.icon ? (
           <Icon aria-label={statusLabel} as={presentation.icon} boxSize="3" color={presentation.color} />
         ) : (
-          <Spinner aria-label={statusLabel} borderWidth="1.5px" color={presentation.color} size="xs" />
+          <Spinner aria-label={statusLabel} borderWidth="1.5px" color={presentation.color} />
         )}
       </DataList.ItemLabel>
-      <DataList.ItemValue color={presentation.color} fontSize="2xs" minW="0">
+      <DataList.ItemValue color={presentation.color} fontSize="xs" minW="0">
         {canFindModel ? (
           <Text asChild cursor="pointer" textAlign="start" truncate _hover={REQUIREMENT_LINK_HOVER}>
             <button
@@ -203,11 +203,11 @@ export const WorkflowRequirementsList = ({ errorMessage, resolved, onFindModel }
 
   return (
     <Stack gap="1" minW="0">
-      <Text color="fg.muted" fontSize="2xs" fontWeight="600">
+      <Text color="fg.muted" fontSize="xs" fontWeight="600">
         {t('workflowLibrary.requires')}
       </Text>
       {errorMessage ? (
-        <Text color="fg.subtle" fontSize="2xs">
+        <Text color="fg.subtle" fontSize="xs">
           {errorMessage}
         </Text>
       ) : null}
@@ -217,7 +217,7 @@ export const WorkflowRequirementsList = ({ errorMessage, resolved, onFindModel }
           ))
         : null}
       {!errorMessage && resolved !== null && resolved.length > 0 ? (
-        <DataList.Root gap="1.5" orientation="horizontal" size="sm">
+        <DataList.Root gap="1.5" orientation="horizontal">
           {resolved.map((requirement) => (
             <RequirementRow
               key={getRequirementKey(requirement.requirement)}

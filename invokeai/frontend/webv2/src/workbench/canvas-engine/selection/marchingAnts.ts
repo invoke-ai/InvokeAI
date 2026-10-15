@@ -7,7 +7,9 @@
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Mat2d } from '@workbench/canvas-engine/types';
 
-import { getScale, multiply } from '@workbench/canvas-engine/math/mat2d';
+import { getScale, identity, multiply } from '@workbench/canvas-engine/math/mat2d';
+
+const IDENTITY = identity();
 
 /** Dash length in screen pixels; the offset advances by {@link ANTS_STEP_PX} per tick. */
 export const ANTS_DASH_PX = 4;
@@ -32,11 +34,20 @@ export interface MarchingAntsRender {
   matrix?: Mat2d | null;
 }
 
-export const drawMarchingAnts = (ctx: RasterSurface['ctx'], view: Mat2d, render: MarchingAntsRender): void => {
+/**
+ * `view` maps document to CSS pixels; `base` maps CSS to backing pixels, so dash and width stay CSS-constant at any
+ * device-pixel ratio.
+ */
+export const drawMarchingAnts = (
+  ctx: RasterSurface['ctx'],
+  view: Mat2d,
+  render: MarchingAntsRender,
+  base: Mat2d = IDENTITY
+): void => {
   if (render.paths.length === 0) {
     return;
   }
-  const transform = render.matrix ? multiply(view, render.matrix) : view;
+  const transform = multiply(base, render.matrix ? multiply(view, render.matrix) : view);
   // Line width and dash stay screen-constant, so they follow the VIEW scale
   // only — a float scaled up must not thicken its own outline.
   const scale = getScale(view) || 1;

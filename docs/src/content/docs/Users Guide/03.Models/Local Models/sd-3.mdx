@@ -1,0 +1,100 @@
+---
+title: Stable Diffusion 3.5
+description: Generate images with Stability AI's Stable Diffusion 3.5 Medium and Large models, including text encoder options and PiD super-resolution decoding.
+lastUpdated: 2026-09-30
+sidebar:
+  order: 11
+---
+
+Stable Diffusion 3.5 is Stability AI's diffusion-transformer text-to-image family. It encodes prompts
+with three text encoders at once: **CLIP-L**, **CLIP-G** and **T5**. It uses a 16-channel VAE. InvokeAI
+supports two checkpoints:
+
+- **SD3.5 Medium**: the smaller model and the one InvokeAI's default settings are tuned for.
+- **SD3.5 Large**: the larger model.
+
+Both appear in InvokeAI under the **SD 3.x** base.
+
+## License
+
+SD 3.5 Medium and Large are released under the **Stability AI Community License**: free for individuals and organizations with less than $1M in annual revenue, above which an Enterprise license is needed. The downloads are gated: accept the license on the model's HuggingFace page and add your HuggingFace token under **API Keys** in the Model Manager.
+
+This is a summary, not legal advice. Read the full license on the model's HuggingFace page before using a model commercially.
+
+## Hardware
+
+The Diffusers downloads are about **16 GB** for Medium and **28 GB** for Large, including the text
+encoders and VAE. Medium is the better choice on smaller cards. See
+[System Requirements](/start-here/system-requirements/) for general guidance, and the
+[Low VRAM guide](/configuration/optimization/low-vram-mode/) if you run out of memory.
+
+## Installing
+
+Both models are **starter models** in the Model Manager. Search for **SD3.5 Medium** or **SD3.5 Large**.
+This family has no starter bundle.
+
+| Starter model | Source                                   | Size   |
+| ------------- | ---------------------------------------- | ------ |
+| SD3.5 Medium  | `stabilityai/stable-diffusion-3.5-medium` | ~16 GB |
+| SD3.5 Large   | `stabilityai/stable-diffusion-3.5-large`  | ~28 GB |
+
+SD3 models install in **Diffusers** format only. Each Diffusers folder contains everything the model
+needs: the transformer, both CLIP encoders, the T5 encoder and the VAE. InvokeAI does not recognize
+single-file or GGUF SD3 main models.
+
+:::note[Gated downloads]
+If the download fails with a permission error, open the model's HuggingFace page, accept its license
+terms, and add your HuggingFace token in the Model Manager's API Keys section. See
+[Model Manager](/users-guide/models/introduction/#external-models) for details.
+:::
+
+### Optional component overrides
+
+By default, every component comes from the main model. In the **Components** section next to the model,
+you can replace any of them with a model you have installed separately:
+
+- **T5 Encoder**
+- **CLIP L**
+- **CLIP G**
+- **VAE**: only SD3 VAEs are offered
+
+## Generation settings
+
+When you select an SD3 model, InvokeAI applies these defaults, which come from the SD3.5 Medium
+reference settings:
+
+| Setting    | Default     |
+| ---------- | ----------- |
+| Steps      | 40          |
+| CFG Scale  | 4.5         |
+| Resolution | 1024 × 1024 |
+
+- **CFG Scale** applies true classifier-free guidance. Stability's reference setting for **Large** is
+  about **28 steps at CFG 3.5**. Use that as a starting point when you switch to Large.
+- **Width and height** must be multiples of **16**.
+- **Negative prompts** are supported and always used.
+- **No scheduler choice.** SD3 always uses its own flow-matching sampler, so the Scheduler control is
+  hidden.
+- **Prompt weighting** (Compel syntax) does not apply to SD3. See [Prompt Syntax](/users-guide/image-generation/advanced-prompt-syntax/#attention-weighting).
+
+## Canvas
+
+On the Canvas, SD3 supports text-to-image, image-to-image, inpainting and outpainting. ControlNet,
+reference images and regional guidance are **not** available for SD3. LoRAs are not supported either.
+
+## PiD super-resolution decode
+
+SD3 works with **PiD** decoding. PiD replaces the VAE decode with a 4× super-resolving pixel diffusion
+pass. Two decoders are available as starter models: **PiD Decoder SD3 (2K)** and **PiD Decoder SD3
+(2K to 4K)**. Each is about 5 GB and installs the shared Gemma-2 caption encoder as a dependency. See
+[PiD Super-Resolution Decode](/users-guide/image-generation/advanced-topics/pid-decode/).
+
+## Workflow editor
+
+The SD3 nodes are **Main Model - SD3**, **Prompt - SD3**, **Denoise - SD3**, **Image to Latents - SD3**
+and **Latents to Image - SD3**. **Latents to Image - SD3 + PiD (4x SR)** decodes with PiD instead of the
+VAE.
+
+The **T5Encoder** input of **Prompt - SD3** is optional. SD3 was trained with text-encoder dropout, so
+leaving T5 unconnected still produces images and saves the time and memory of loading T5. When T5 is connected, it reads at most **256 tokens** of the
+prompt.

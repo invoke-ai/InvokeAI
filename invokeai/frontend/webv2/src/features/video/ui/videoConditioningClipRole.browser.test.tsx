@@ -58,6 +58,7 @@ const videoAdapter = {
   playVideoSpanInPreview: () => null,
   projectId: 'project-1',
   rawValues: {},
+  readValues: () => ({}),
   reportError: noop,
   showPromptSyntaxHighlighting: false,
   touchGalleryImages: noop,
@@ -79,6 +80,7 @@ void i18n.use(initReactI18next).init({
             conditioningRole: 'Use from this clip',
             conditioningRoleAudio: 'Its soundtrack',
             conditioningRoleVideo: 'Its picture',
+            conditioningRoleVideoBlocked: 'Clear the start and end images to use its picture.',
             conditioningRoleVideoHelp: 'The clip is re-encoded at the canvas.',
           },
         },
@@ -93,7 +95,11 @@ describe('the conditioning clip role control', () => {
   let host: HTMLDivElement;
   let root: Root;
   const onChange = vi.fn();
-  const mount = (conditioningClip: VideoConditioningClip | null, disabled?: { reason: string }) =>
+  const mount = (
+    conditioningClip: VideoConditioningClip | null,
+    disabled?: { reason: string },
+    pictureRoleDisabledReason?: string
+  ) =>
     act(() => {
       root.render(
         <I18nextProvider i18n={i18n}>
@@ -105,6 +111,7 @@ describe('the conditioning clip role control', () => {
                     conditioningClip={conditioningClip}
                     disabled={Boolean(disabled)}
                     disabledReason={disabled?.reason}
+                    pictureRoleDisabledReason={pictureRoleDisabledReason}
                     onChange={onChange}
                   />
                 </DndContext>
@@ -174,5 +181,22 @@ describe('the conditioning clip role control', () => {
     await act(() => picture!.click());
 
     expect(onChange).toHaveBeenCalledWith({ ...CLIP, role: 'video' });
+  });
+
+  it('closes the picture role while start or end images are held, and says why', async () => {
+    const reason = 'Clear the start and end images to use its picture.';
+
+    await mount(CLIP, undefined, reason);
+    expect(host.textContent).toContain(reason);
+    await act(() => trigger()!.click());
+    await expect.poll(() => document.querySelectorAll('[role="option"]').length).toBe(2);
+
+    const picture = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((option) =>
+      option.textContent?.includes('Its picture')
+    );
+
+    expect(picture?.getAttribute('aria-disabled')).toBe('true');
+    await act(() => picture!.click());
+    expect(onChange).not.toHaveBeenCalled();
   });
 });

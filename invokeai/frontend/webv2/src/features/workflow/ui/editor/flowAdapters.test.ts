@@ -292,7 +292,6 @@ describe('flowAdapters identity preservation', () => {
       pathType: 'default',
       stroke: '#f87171',
       strokeWidth: 2,
-      tooltip: 'Integer',
     });
   });
 
@@ -306,7 +305,6 @@ describe('flowAdapters identity preservation', () => {
       stroke: '#c4b5fd',
       strokeDasharray: '8 4',
       strokeWidth: 2.5,
-      tooltip: 'Image Collection',
     });
   });
 
@@ -317,7 +315,7 @@ describe('flowAdapters identity preservation', () => {
     const rendered = toFlowEdges(doc, [], 'step', new Set(), createTemplates());
 
     expect(rendered[0]).toMatchObject({
-      data: { fieldTypeLabel: 'Loop linkage', isLoopLinkage: true, stroke: '#22c55e', strokeDasharray: '6 4' },
+      data: { fieldTypeLabel: null, isLoopLinkage: true, stroke: '#22c55e', strokeDasharray: '6 4' },
       type: 'loop_linkage',
     });
   });
@@ -328,7 +326,8 @@ describe('flowAdapters identity preservation', () => {
     const typed = toFlowEdges(doc, untyped, 'default', new Set(), createTemplates());
 
     expect(typed[0]).not.toBe(untyped[0]);
-    expect(typed[0]?.data?.tooltip).toBe('Integer');
+    expect(untyped[0]?.data?.fieldTypeLabel).toBeNull();
+    expect(typed[0]?.data?.fieldTypeLabel).toBe('Integer');
   });
 
   it('styles edges connected to selected nodes without persisting the highlight after deselection', () => {

@@ -9,7 +9,7 @@ import type { ModelConfig } from '@features/models';
 import type { ProjectGraphState } from '@features/workflow/contracts';
 import type { WorkflowGeneratorResolutions, WorkflowPendingGenerator } from '@features/workflow/utility';
 import type { AccountScope } from '@platform/state/accountLifecycle';
-import type { ResolvedInvocationRoute } from '@workbench/invocationContracts';
+import type { ExpandedPositivePrompts, ResolvedInvocationRoute } from '@workbench/invocationContracts';
 import type { Project } from '@workbench/projectContracts';
 
 import { resolveDynamicPrompts } from '@features/generation/prompts';
@@ -58,8 +58,8 @@ export interface SubmitResolvedInvocationDeps {
    * submitResolvedInvocationSnapshot.
    */
   prepareCanvasInvocation: (args: PrepareCanvasInvocationArgs) => Promise<void> | void;
-  /** Localizes a control-layer rejection notice; defaults to the English validation sentence. */
-  formatControlLayerError?: PrepareCanvasInvocationArgs['formatControlLayerError'];
+  /** Words a control-layer rejection from the locale; its error message is for logs only. */
+  formatControlLayerError: PrepareCanvasInvocationArgs['formatControlLayerError'];
 }
 
 /**
@@ -86,13 +86,16 @@ const getExpandableSettings = (project: Project, route: ResolvedInvocationRoute)
  * Expand here to avoid a gallery → queue → generation cycle. Treat null or response.error as failure even if
  * prompts are present.
  */
-const resolveExpandedPrompts = async (settings: GenerateSettings): Promise<ParseDynamicPromptsResponse | null> => {
+const resolveExpandedPrompts = async (
+  settings: GenerateSettings,
+  sampleSeed: number | null
+): Promise<ParseDynamicPromptsResponse | null> => {
   try {
     return await resolveDynamicPrompts(queryClient, {
       combinatorial: settings.dynamicPromptsCombinatorial,
       max_prompts: settings.dynamicPromptsMaxPrompts,
       prompt: settings.positivePrompt,
-      seed: settings.dynamicPromptsCombinatorial ? null : settings.dynamicPromptsSampleSeed,
+      seed: sampleSeed,
     });
   } catch {
     return null;
@@ -213,7 +216,10 @@ export const submitResolvedInvocation = async ({
 
   // Only dynamic prompts require a round trip.
   if (expandableSettings) {
-    const expansion = await resolveExpandedPrompts(expandableSettings);
+    const sampleSeed = expandableSettings.dynamicPromptsCombinatorial
+      ? null
+      : expandableSettings.dynamicPromptsSampleSeed;
+    const expansion = await resolveExpandedPrompts(expandableSettings, sampleSeed);
     if (!isAccountScopeCurrent(owner)) {
       return;
     }
@@ -231,7 +237,9 @@ export const submitResolvedInvocation = async ({
 
     await dispatchResolvedInvocation(
       { commands, formatControlLayerError, models, owner, prepareCanvasInvocation, project, route, workflowId },
-      expansion.prompts.length > 0 ? expansion.prompts : undefined,
+      expansion.prompts.length > 0
+        ? { positivePrompts: expansion.prompts, positivePromptsSampleSeed: sampleSeed }
+        : undefined,
       workflowGenerators,
       workflowDocument?.id
     );
@@ -256,7 +264,7 @@ const dispatchResolvedInvocation = async (
     project,
     route,
   }: SubmitResolvedInvocationDeps,
-  positivePrompts: string[] | undefined,
+  expansion: ExpandedPositivePrompts | undefined,
   workflowGenerators: WorkflowGeneratorResolutions | undefined,
   workflowId: string | undefined
 ): Promise<void> => {
@@ -271,7 +279,7 @@ const dispatchResolvedInvocation = async (
       generateValues: getProjectWidgetValues(project, 'generate'),
       models,
       owner,
-      positivePrompts,
+      expansion,
       projectId: project.id,
       canvasValues: getProjectWidgetValues(project, 'canvas'),
       projectSettings: project.settings,
@@ -283,7 +291,7 @@ const dispatchResolvedInvocation = async (
   commands.generation.submitResolved({
     backendSupportsCancellation: true,
     models,
-    positivePrompts,
+    ...expansion,
     projectId: project.id,
     route,
     ...(workflowGenerators ? { workflowGenerators } : {}),

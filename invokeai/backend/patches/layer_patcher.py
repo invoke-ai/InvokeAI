@@ -3,6 +3,7 @@ from contextlib import AbstractContextManager, ExitStack, contextmanager
 from typing import Dict, Iterable, Optional, Tuple
 
 import torch
+from transformers import CLIPTextModel
 
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
@@ -390,6 +391,11 @@ class LayerPatcher:
         Returns:
             tuple[str, torch.nn.Module]: A tuple containing the module key and the submodule.
         """
+        # LoRA formats address CLIP text encoder 1 under `text_model`, a wrapper transformers >=5.6 removed from
+        # CLIPTextModel (CLIPTextModelWithProjection keeps it), so drop the prefix for that class.
+        if isinstance(model, CLIPTextModel):
+            layer_key = layer_key.removeprefix("text_model_" if layer_key_is_flattened else "text_model.")
+
         if not layer_key_is_flattened:
             return layer_key, model.get_submodule(layer_key)
 

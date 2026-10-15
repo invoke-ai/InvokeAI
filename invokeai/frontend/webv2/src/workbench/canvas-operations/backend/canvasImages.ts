@@ -7,7 +7,7 @@
 import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
 
 import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
-import { buildApiUrl, getHttpAuthToken } from '@platform/transport/http';
+import { apiFetchRaw, HttpRequestIdentityExpiredError } from '@platform/transport/http';
 
 export type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
 
@@ -34,8 +34,6 @@ export interface UploadCanvasImageOptions {
   metadata?: Record<string, unknown>;
   /** Optional backend resize dimensions sent as JSON in the multipart body. */
   resizeTo?: { width: number; height: number };
-  /** Injectable `fetch` implementation (defaults to the global). */
-  fetch?: typeof globalThis.fetch;
   /** Cancels the multipart request when its owning operation is superseded. */
   signal?: AbortSignal;
 }
@@ -69,7 +67,6 @@ export const uploadCanvasImage = async (
   options: UploadCanvasImageOptions = {}
 ): Promise<CanvasImageUploadResult> => {
   const owner = captureAccountScope();
-  const fetchImpl = options.fetch ?? globalThis.fetch;
   const signal = options.signal ? AbortSignal.any([options.signal, owner.signal]) : owner.signal;
 
   const query = new URLSearchParams({
@@ -94,22 +91,11 @@ export const uploadCanvasImage = async (
     body.append('resize_to', JSON.stringify(options.resizeTo));
   }
 
-  const headers = new Headers();
-  const token = getHttpAuthToken();
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
-  }
-
   let response: Response;
   try {
-    response = await fetchImpl(buildApiUrl(`/api/v1/images/upload?${query.toString()}`), {
-      body,
-      headers,
-      method: 'POST',
-      signal,
-    });
+    response = await apiFetchRaw(`/api/v1/images/upload?${query.toString()}`, { body, method: 'POST', signal });
   } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
+    if ((error instanceof Error && error.name === 'AbortError') || error instanceof HttpRequestIdentityExpiredError) {
       throw error;
     }
     throw new CanvasImageUploadError(

@@ -6,6 +6,8 @@ from typing import Callable
 import torch
 from einops import rearrange, repeat
 
+from invokeai.backend.util.devices import TorchDevice
+
 
 def get_noise(
     num_samples: int,
@@ -17,7 +19,7 @@ def get_noise(
 ):
     # We always generate noise on the same device and dtype then cast to ensure consistency across devices/dtypes.
     rand_device = "cpu"
-    rand_dtype = torch.float16
+    rand_dtype = TorchDevice.choose_noise_dtype(torch.float16)
     return torch.randn(
         num_samples,
         16,

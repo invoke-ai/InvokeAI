@@ -4,14 +4,14 @@ inputs:
   working-directory:
     description: Directory to install dependencies in
     required: false
-    default: invokeai/frontend/web
+    default: invokeai/frontend/webv2
 runs:
   using: 'composite'
   steps:
     - name: setup node 22
       uses: actions/setup-node@v6
       with:
-        node-version: '22'
+        node-version-file: '.nvmrc'
 
     - name: setup pnpm
       uses: pnpm/action-setup@v6

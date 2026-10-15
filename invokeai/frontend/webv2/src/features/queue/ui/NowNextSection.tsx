@@ -19,9 +19,10 @@ export const CurrentBatchSection = ({ revealRequest = null }: { revealRequest?: 
   }
 
   return (
-    <Stack gap="1">
+    // Row surfaces bleed into the widget padding so their content lines up with the controls above.
+    <Stack gap="1" mx="-2">
       <ListSectionHeader count={count} label={t('widgets.queue.currentBatch')} />
-      <ListStack label={t('widgets.queue.currentBatch')}>
+      <ListStack dividers label={t('widgets.queue.currentBatch')}>
         {items.map((item) => (
           <QueueItemRow
             key={item.id}

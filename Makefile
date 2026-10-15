@@ -1,6 +1,8 @@
 # simple Makefile with scripts that are otherwise hard to remember
 # to use, run from the repo root `make <command>`
 
+SHELL := /bin/bash
+
 default: help
 
 help:
@@ -13,11 +15,12 @@ help:
 	@echo "test                     Run the unit tests."
 	@echo "frontend-install         Install the pnpm modules needed for the frontend"
 	@echo "frontend-build           Build the frontend for localhost:9090"
-	@echo "frontendv2-install       Install the pnpm modules needed for the webv2 frontend"
-	@echo "frontendv2-build         Build the webv2 frontend for localhost:9090"
+	@echo "frontend-legacy-install  Install legacy frontend dependencies"
+	@echo "frontend-legacy-build    Build the legacy frontend for --web-legacy"
 	@echo "frontend-test            Run the frontend test suite once"
 	@echo "frontend-dev             Run the frontend in developer mode on localhost:5173"
-	@echo "frontendv2-dev           Run the webv2 frontend in developer mode on localhost:5173"
+	@echo "frontend-legacy-dev      Run the legacy frontend development server"
+	@echo "frontend-api-install     Install shared API generation dependencies"
 	@echo "frontend-openapi         Generate the OpenAPI schema"
 	@echo "frontend-typegen         Generate types for the frontend from the OpenAPI schema"
 	@echo "frontend-lint            Run frontend checks and fixable lint/format steps"
@@ -53,49 +56,55 @@ test:
 
 # Install the pnpm modules needed for the front end
 frontend-install:
-	rm -rf invokeai/frontend/web/node_modules
-	cd invokeai/frontend/web && pnpm install
-
-# Build the frontend
-frontend-build:
-	cd invokeai/frontend/web && pnpm build
-
-# Install the pnpm modules needed for the webv2 front end
-frontendv2-install:
 	rm -rf invokeai/frontend/webv2/node_modules
 	cd invokeai/frontend/webv2 && pnpm install
 
-# Build the webv2 frontend
-frontendv2-build:
+# Build the frontend
+frontend-build:
 	cd invokeai/frontend/webv2 && pnpm build
+
+# Compatibility aliases and explicit legacy commands
+frontendv2-install: frontend-install
+
+frontend-legacy-install:
+	rm -rf invokeai/frontend/webv1/node_modules
+	cd invokeai/frontend/webv1 && pnpm install
+
+# Build the legacy frontend
+frontendv2-build: frontend-build
+
+frontend-legacy-build:
+	cd invokeai/frontend/webv1 && pnpm build
 
 # Run the frontend test suite once
 frontend-test:
-	cd invokeai/frontend/web && pnpm run test:run
+	cd invokeai/frontend/webv2 && pnpm test
 
 # Run the frontend in dev mode
 frontend-dev:
-	cd invokeai/frontend/web && pnpm dev
+	cd invokeai/frontend/webv2 && pnpm dev
 
-# Run the webv2 frontend in dev mode
-frontendv2-dev:
-	cd invokeai/frontend/webv2 && pnpm run dev
+# Run the legacy frontend in dev mode
+frontendv2-dev: frontend-dev
+
+frontend-legacy-dev:
+	cd invokeai/frontend/webv1 && pnpm run dev
+
+# Install the shared contract generation tools
+frontend-api-install:
+	pnpm -C invokeai/frontend/api install --frozen-lockfile
 
 # Generate the OpenAPI Schema for the app
 frontend-openapi:
-	cd invokeai/frontend/web && \
+	cd invokeai/frontend/api && \
 	python ../../../scripts/generate_openapi_schema.py > openapi.json && \
-	pnpm prettier --write openapi.json
+	pnpm format:openapi
 
 frontend-typegen:
-	cd invokeai/frontend/web && python ../../../scripts/generate_openapi_schema.py | pnpm typegen
+	set -o pipefail; cd invokeai/frontend/api && python ../../../scripts/generate_openapi_schema.py | pnpm typegen
 
 frontend-lint:
-	cd invokeai/frontend/web/src && \
-	pnpm lint:tsc && \
-	pnpm lint:dpdm && \
-	pnpm lint:eslint --fix && \
-	pnpm lint:prettier --write
+	pnpm -C invokeai/frontend/webv2 lint
 
 # Tag the release
 wheel:

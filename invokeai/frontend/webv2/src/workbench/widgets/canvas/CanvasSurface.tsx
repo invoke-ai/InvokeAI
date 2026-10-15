@@ -1,5 +1,5 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop -- the container ref callback is intentionally re-created when `engine` changes, so a project switch detaches the old engine and attaches the new one. */
-import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
+import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 
 import { Box } from '@chakra-ui/react';
@@ -38,7 +38,7 @@ export const CanvasSurface = ({ engine }: { engine: CanvasSurfaceEngine }) => {
       return;
     }
 
-    engine.surface.attach(screen, overlay);
+    engine.surface.attach(screen, overlay, container);
 
     // A handle drag defers the resize and full recomposition to its release; pixel CSS sizes make the interim
     // canvas crop or reveal rather than stretch.

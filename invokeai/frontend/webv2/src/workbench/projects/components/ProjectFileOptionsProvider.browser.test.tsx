@@ -2,6 +2,8 @@ import { ChakraProvider } from '@chakra-ui/react';
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 import { settleAnimations } from '@platform/browser/settleAnimations.testing';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
+import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
+import { isModalPresent } from '@platform/ui/modalPresence';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
 import { act } from 'react';
@@ -90,4 +92,23 @@ it('cancels a pending choice when its account goes away', async () => {
   await act(() => accountLifecycle.activate('another-account'));
   expect(results).toEqual([null]);
   await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
+});
+
+it('animates the dialog out instead of unmounting it when the choice settles', async () => {
+  await render();
+  await act(() => page.getByRole('button', { name: 'Export', exact: true }).click());
+  await expect.poll(() => document.querySelector('[role="dialog"]')?.getAttribute('data-state')).toBe('open');
+  const dialog = document.querySelector('[role="dialog"]')!;
+
+  const frames = await recordDialogExit(dialog, async () => {
+    await act(() => page.getByRole('button', { name: 'Cancel', exact: true }).click());
+    expect(results).toEqual([null]);
+    // Workbench hotkeys resume at close, not after the exit animation.
+    expect(isModalPresent()).toBe(false);
+  });
+
+  // An unmounted dialog never reaches its closed state, so it cannot animate out; a retained one does, then leaves.
+  expect(closingFrames(frames)).not.toHaveLength(0);
+  await expect.poll(() => document.querySelector('[role="dialog"]')).toBeNull();
+  expect(results).toEqual([null]);
 });

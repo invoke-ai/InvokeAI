@@ -1289,3 +1289,57 @@ class TestTheInt8DequantTransientReachesTheReservation:
         transient = peak_dequant_transient_bytes(quantized, torch.float32)
         assert transient > 0
         assert quantized_bytes == dense_bytes + transient
+
+
+class TestTheAttentionScoreMatrixReachesTheReservation:
+    """The activation estimate assumes a fused attention kernel. Where the build has none -- ROCm on Windows, MPS --
+    the main blocks also build a score matrix (12.9 GiB per call for 1024px unchunked), and the reservation must
+    price it: for the heads of the loaded model and the sequence the transformer really attends over."""
+
+    def _reservation_for(
+        self, monkeypatch, tmp_path, score_bytes: int, invocation=None, **context_kwargs
+    ) -> tuple[int, list[dict], _Transformer]:
+        import invokeai.app.invocations.krea2.krea2_denoise as denoise_module
+
+        transformer = _Transformer()
+        transformer.config = SimpleNamespace(num_attention_heads=48, attention_head_dim=128)
+        info = _TransformerInfo(transformer)
+        context = _runtime_context(tmp_path, transformer, **context_kwargs)
+        context.models.load = lambda _identifier: info
+        _patch_runtime(monkeypatch)
+        asked: list[dict] = []
+
+        def score_matrix_bytes(**kwargs) -> int:
+            asked.append(kwargs)
+            return score_bytes
+
+        monkeypatch.setattr(denoise_module, "sdpa_score_matrix_bytes", score_matrix_bytes)
+        (invocation or _runtime_invocation(cfg_scale=1.0))._run_diffusion(context)
+        return info.working_mem_bytes, asked, transformer
+
+    def test_the_score_matrix_is_reserved_for_the_attended_sequence(self, monkeypatch, tmp_path) -> None:
+        fused_bytes, _, _ = self._reservation_for(monkeypatch, tmp_path, score_bytes=0)
+        materializing_bytes, asked, transformer = self._reservation_for(monkeypatch, tmp_path, score_bytes=12345)
+
+        assert materializing_bytes == fused_bytes + 12345
+        assert len(asked) == 1
+        assert (asked[0]["num_heads"], asked[0]["head_dim"]) == (48, 128)
+        assert asked[0]["seq_len"] == transformer.combined_sequence_lengths[0]
+        assert asked[0]["has_attn_mask"] is False
+
+    def test_the_longer_of_the_cfg_passes_and_the_regional_mask_are_priced(self, monkeypatch, tmp_path) -> None:
+        invocation = _runtime_invocation(cfg_scale=2.0)
+        invocation.positive_conditioning = Krea2ConditioningField(
+            conditioning_name="positive", mask=TensorField(tensor_name="positive-region")
+        )
+        invocation.negative_conditioning = Krea2ConditioningField(
+            conditioning_name="negative", mask=TensorField(tensor_name="negative-region")
+        )
+
+        _, asked, transformer = self._reservation_for(
+            monkeypatch, tmp_path, score_bytes=1, invocation=invocation, negative_text_seq_len=5
+        )
+
+        assert len(set(transformer.combined_sequence_lengths)) == 2, "the passes must attend over different lengths"
+        assert asked[0]["seq_len"] == max(transformer.combined_sequence_lengths)
+        assert asked[0]["has_attn_mask"] is True

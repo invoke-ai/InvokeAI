@@ -1,4 +1,5 @@
 import type { LayerExportGuard } from '@workbench/canvas-engine/api';
+import type { GuardedMutationRefusal } from '@workbench/canvas-engine/capabilities';
 import type {
   RasterFilterCommitTarget,
   RasterFilterSettings,
@@ -63,10 +64,25 @@ export interface FilterOperationPreview {
   height: number;
   origin: { x: number; y: number };
 }
+/**
+ * A refused apply, a source the filter cannot read (hidden, empty, over the raster budget), or an unexpected failure
+ * to process or apply whose message is kept as `detail`.
+ */
+export type FilterSessionErrorCode =
+  | GuardedMutationRefusal
+  | 'disabled'
+  | 'empty'
+  | 'source-over-budget'
+  | 'process-failed'
+  | 'apply-failed';
+export interface FilterSessionError {
+  code: FilterSessionErrorCode;
+  detail?: string;
+}
 export interface FilterOperationSessionState {
   autoProcess: boolean;
   draft: LayerFilterSettings;
-  error: string | null;
+  error: FilterSessionError | null;
   initialFilter: LayerFilterSettings | null;
   layerId: string;
   layerName: string;

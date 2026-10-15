@@ -1,5 +1,8 @@
 import { MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from '@workbench/canvas-engine/engineStores';
 
+/** Strokes and shapes paint a mask as an opaque stencil: only alpha matters, compositing colorizes it. */
+export const MASK_PAINT_COLOR = '#ffffff';
+
 /** Freehand `thinning` applied when brush pressure sensitivity is on. */
 export const PRESSURE_THINNING = 0.5;
 

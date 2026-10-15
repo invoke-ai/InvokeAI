@@ -39,7 +39,7 @@ const SELECT_CONTENT_PROPS = { maxH: '16rem' } as const;
 const READOUT_PROPS = {
   color: 'fg.subtle',
   fontFamily: 'mono',
-  fontSize: '2xs',
+  fontSize: 'xs',
   // Reserved so the header does not reflow as the readout appears and clears.
   minH: '4',
   whiteSpace: 'nowrap',
@@ -50,7 +50,7 @@ const DEFAULT_WEIGHT_VECTOR: readonly number[] = parseRebalanceWeights(DEFAULT_K
 type PresetDialog = { mode: 'save' } | { mode: 'rename'; preset: RebalancePreset };
 
 interface GenerateConditioningRebalanceFieldProps {
-  settings: GenerateSettings;
+  settings: Pick<GenerateSettings, 'krea2RebalanceEnabled' | 'krea2RebalanceMultiplier' | 'krea2RebalanceWeights'>;
   /** Debounced; used for the continuous controls. */
   onCommit: (patch: Partial<GenerateSettings>) => void;
   /** Immediate; used for discrete edits that should not sit in the draft. */
@@ -184,8 +184,6 @@ export const GenerateConditioningRebalanceField = ({
   return (
     <>
       <Field
-        borderColor="border.subtle"
-        borderTopWidth="1px"
         helpText={isEnabled ? undefined : t('widgets.generate.krea2RebalanceHelp')}
         hint="conditioningRebalance"
         label={t('widgets.generate.krea2Rebalance')}
@@ -195,7 +193,6 @@ export const GenerateConditioningRebalanceField = ({
             <Switch.Root
               checked={isEnabled}
               ids={{ hiddenInput: switchInputId, label: `${switchInputId}-label` }}
-              size="sm"
               onCheckedChange={({ checked }) => onCommitImmediate({ krea2RebalanceEnabled: checked })}
             >
               <Switch.HiddenInput aria-label={t('widgets.generate.krea2Rebalance')} />
@@ -205,7 +202,6 @@ export const GenerateConditioningRebalanceField = ({
             </Switch.Root>
           </HStack>
         }
-        pt="2"
       >
         {isEnabled ? (
           <Stack gap="2" w="full">
@@ -216,7 +212,6 @@ export const GenerateConditioningRebalanceField = ({
                 contentProps={SELECT_CONTENT_PROPS}
                 flex="1"
                 minW="0"
-                size="xs"
                 value={activePresetId === null ? [] : [activePresetId]}
                 valueText={activePreset?.label ?? t('widgets.generate.krea2RebalancePresetCustom')}
                 onValueChange={({ value }) => handlePresetChange(value)}
@@ -226,7 +221,7 @@ export const GenerateConditioningRebalanceField = ({
                   aria-label={t('widgets.generate.krea2RebalanceReset')}
                   color="fg.muted"
                   disabled={isAtDefault}
-                  size="2xs"
+                  size="sm"
                   variant="ghost"
                   onClick={handleReset}
                 >
@@ -238,7 +233,7 @@ export const GenerateConditioningRebalanceField = ({
                   <IconButton
                     aria-label={t('widgets.generate.krea2RebalancePresetActions')}
                     color="fg.muted"
-                    size="2xs"
+                    size="sm"
                     variant="ghost"
                   >
                     <Icon as={MoreHorizontalIcon} boxSize="3" />
@@ -295,7 +290,7 @@ export const GenerateConditioningRebalanceField = ({
                 onCommit={handleBarsCommit}
                 onPreview={setPreviewWeights}
               />
-              <HStack color="fg.subtle" fontSize="2xs" justify="space-between">
+              <HStack color="fg.subtle" fontSize="xs" justify="space-between">
                 <Text as="span">{t('widgets.generate.krea2RebalanceAxisShallow')}</Text>
                 <Text as="span">{t('widgets.generate.krea2RebalanceAxisDeep')}</Text>
               </HStack>
@@ -330,7 +325,6 @@ export const GenerateConditioningRebalanceField = ({
               <Input
                 aria-label={t('widgets.generate.krea2RebalanceWeights')}
                 fontFamily="mono"
-                size="xs"
                 value={
                   weightsDraft ??
                   (previewWeights ? serializeRebalanceWeights(previewWeights) : settings.krea2RebalanceWeights)

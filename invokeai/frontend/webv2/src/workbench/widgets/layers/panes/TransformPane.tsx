@@ -4,11 +4,11 @@ import { Flex, Stack, Text } from '@chakra-ui/react';
 import { Button } from '@platform/ui/Button';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { getDocumentNode, lookupDocumentLeaf } from '@workbench/canvas-engine/api';
+import { useCanvasEngine, type CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import { useCanvasHasFloatingSelection, useTransformSession } from '@workbench/widgets/canvas/engineStoreHooks';
 import { clampScalePercent, round2, wrapDegrees } from '@workbench/widgets/canvas/tool-options/geometryForm';
 import { FormNumberField, useNumberCommit } from '@workbench/widgets/canvas/tool-presentation/FormControls';
 import { PropertyControlRow } from '@workbench/widgets/canvas/tool-presentation/PropertyPrimitives';
-import { useCanvasEngine, type CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { useCallback } from 'react';
@@ -41,7 +41,7 @@ export const TransformPane = () => {
 
   if (!engine) {
     return (
-      <Flex align="center" color="fg.muted" fontSize="xs" h="full" justify="center" p="4">
+      <Flex align="center" color="fg.muted" fontSize="md" h="full" justify="center" p="4">
         {t('widgets.properties.noCanvas')}
       </Flex>
     );
@@ -167,15 +167,13 @@ const ConnectedTransform = ({ engine }: { engine: CanvasEngineHandle }) => {
         </PropertyControlRow>
         {pending ? (
           <Flex gap="2" justify="flex-end">
-            <Button size="xs" variant="ghost" onClick={onCancel}>
+            <Button variant="ghost" onClick={onCancel}>
               {t('common.cancel')}
             </Button>
-            <Button size="xs" onClick={onApply}>
-              {t('common.apply')}
-            </Button>
+            <Button onClick={onApply}>{t('common.apply')}</Button>
           </Flex>
         ) : (
-          <Text color="fg.muted" fontSize="2xs">
+          <Text color="fg.muted" fontSize="xs">
             {t('widgets.transform.hint')}
           </Text>
         )}

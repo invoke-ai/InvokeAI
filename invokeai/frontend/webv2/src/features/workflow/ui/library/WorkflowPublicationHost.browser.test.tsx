@@ -8,6 +8,7 @@ import { WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
 import { requestWorkflowPublication, workflowUiStore } from '@features/workflow/ui/workflowUiStore';
 import { createProjectGraph, serializeWorkflowJson } from '@features/workflow/utility';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -71,8 +72,10 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.untitled': 'Untitled Workflow',
   'workflowLibrary.updateConfirm': 'Update template',
   'workflowLibrary.updateConfirmBody':
-    'Replace the library template with the current graph, form, and input values of "{{name}}"?',
+    "Replace this workflow's library template with its current graph, form, and input values?",
   'workflowLibrary.updateConfirmCallers': 'Workflows that call this template will use the new version.',
+  'workflowLibrary.updateConfirmNamedBody':
+    'Replace the library template "{{template}}" with this workflow\'s current graph, form, and input values?',
   'workflowLibrary.updateTitle': 'Update library template',
 };
 
@@ -155,7 +158,7 @@ describe('WorkflowPublicationHost', () => {
   let host: HTMLDivElement;
   let root: Root;
   let project: ReturnType<typeof createMutablePort<ReturnType<typeof projectSnapshot>>>;
-  let commands: { setWorkflowSource: ReturnType<typeof vi.fn> };
+  let commands: { renameWorkflow: ReturnType<typeof vi.fn>; setWorkflowSource: ReturnType<typeof vi.fn> };
   let notifications: {
     error: ReturnType<typeof vi.fn>;
     info: ReturnType<typeof vi.fn>;
@@ -187,11 +190,13 @@ describe('WorkflowPublicationHost', () => {
     await act(async () => {
       root.render(
         <StrictMode>
-          <ChakraProvider value={system}>
-            <WorkflowUiProvider adapter={adapter}>
-              <WorkflowPublicationHost />
-            </WorkflowUiProvider>
-          </ChakraProvider>
+          <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+            <ChakraProvider value={system}>
+              <WorkflowUiProvider adapter={adapter}>
+                <WorkflowPublicationHost />
+              </WorkflowUiProvider>
+            </ChakraProvider>
+          </QueryClientProvider>
         </StrictMode>
       );
       await settleFrame();
@@ -254,7 +259,7 @@ describe('WorkflowPublicationHost', () => {
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
-    commands = { setWorkflowSource: vi.fn() };
+    commands = { renameWorkflow: vi.fn(), setWorkflowSource: vi.fn() };
     notifications = { error: vi.fn(), info: vi.fn(), success: vi.fn() };
     api.createLibraryWorkflowRecord.mockReset();
     api.getLibraryWorkflowRecord.mockReset();
@@ -293,8 +298,71 @@ describe('WorkflowPublicationHost', () => {
       { projectId: PROJECT_ID, workflowId: WORKFLOW_ID },
       { libraryWorkflowId: 'lib-new', revision: 1 }
     );
+    // It is now that template's working copy, so it takes the template's name.
+    expect(commands.renameWorkflow).toHaveBeenCalledWith(WORKFLOW_ID, 'Alpha, published', PROJECT_ID);
     expect(notifications.success).toHaveBeenCalledWith('Workflow saved', 'Saved "Alpha, published" to the library.');
     expect(saveDialog()).toBeNull();
+  });
+
+  it('keeps a rename made while the save was in flight instead of adopting the template name', async () => {
+    const pending = deferred<WorkflowRecordDTO>();
+    api.createLibraryWorkflowRecord.mockReturnValueOnce(pending.promise);
+
+    await renderHost([UNLINKED]);
+    await request('save-as-new');
+    await submitSaveAsNew('Alpha, published');
+    expect(api.createLibraryWorkflowRecord).toHaveBeenCalledTimes(1);
+
+    const renamed: ProjectWorkflowEntry = { ...UNLINKED, document: { ...UNLINKED.document, name: 'Alpha, renamed' } };
+    await act(() => project.setSnapshot(projectSnapshot([renamed])));
+
+    await act(async () => {
+      pending.resolve(record({ name: 'Alpha, published', revision: 1, workflow_id: 'lib-new' }));
+      await settleFrame();
+    });
+    await flush();
+
+    // The copy still links to the template it created; the name chosen meanwhile stands.
+    expect(commands.setWorkflowSource).toHaveBeenCalledWith(
+      { projectId: PROJECT_ID, workflowId: WORKFLOW_ID },
+      { libraryWorkflowId: 'lib-new', revision: 1 }
+    );
+    expect(commands.renameWorkflow).not.toHaveBeenCalled();
+    expect(notifications.success).toHaveBeenCalledWith('Workflow saved', 'Saved "Alpha, published" to the library.');
+  });
+
+  it('updates the template a save as new linked, naming it in the confirmation', async () => {
+    api.createLibraryWorkflowRecord.mockImplementation((workflow: Record<string, unknown>) =>
+      Promise.resolve(record({ name: String(workflow.name), revision: 1, workflow, workflow_id: 'lib-demo' }))
+    );
+    api.getLibraryWorkflowRecord.mockImplementation((id: string) =>
+      Promise.resolve(
+        record({ name: id === 'lib-demo' ? 'demo' : 'Library alpha', revision: id === 'lib-demo' ? 1 : 3 })
+      )
+    );
+    api.updateLibraryWorkflow.mockResolvedValue(record({ name: 'demo', revision: 2, workflow_id: 'lib-demo' }));
+    // Opened from a library template, then saved as a new one: the app re-links the copy to what was saved.
+    commands.setWorkflowSource.mockImplementation((_target, source: ProjectWorkflowEntry['source']) =>
+      project.setSnapshot(projectSnapshot([{ ...LINKED, source }]))
+    );
+
+    await renderHost([LINKED]);
+    await request('save-as-new');
+    await submitSaveAsNew('demo');
+    await request('update-source');
+    await flush();
+
+    const dialog = dialogTitled('Update library template');
+    // Only the template being replaced is named, never the one the workflow was first opened from.
+    expect(dialog?.textContent).toContain(
+      'Replace the library template "demo" with this workflow\'s current graph, form, and input values?'
+    );
+    expect(dialog?.textContent).not.toContain('Alpha');
+    await confirmUpdate();
+
+    expect(api.updateLibraryWorkflow).toHaveBeenCalledTimes(1);
+    expect(api.updateLibraryWorkflow.mock.calls[0]![0]).toBe('lib-demo');
+    expect(api.updateLibraryWorkflow.mock.calls[0]![2]).toMatchObject({ expectedRevision: 1 });
   });
 
   it('updates the template at the revision the copy knows, after confirmation, keeping its own name', async () => {
@@ -305,7 +373,8 @@ describe('WorkflowPublicationHost', () => {
     await request('update-source');
 
     const dialog = dialogTitled('Update library template');
-    expect(dialog?.textContent).toContain('input values of "Alpha"?');
+    await flush();
+    expect(dialog?.textContent).toContain('Replace the library template "Library alpha" with');
     expect(api.updateLibraryWorkflow).not.toHaveBeenCalled();
 
     await confirmUpdate();

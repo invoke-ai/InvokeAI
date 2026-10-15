@@ -12,8 +12,6 @@ import type {
   CanvasMaskFillContract,
   CanvasRasterLayerContractV2,
   CanvasRegionalGuidanceLayerContract,
-  CanvasLayerPreviewMutation,
-  CanvasStructuralEngine,
   RegionalGuidanceReferenceImage,
   Rect,
 } from '@workbench/canvas-engine/api';
@@ -22,7 +20,7 @@ export type { CanvasStructuralEngine } from '@workbench/canvas-engine/api';
 
 import { getRegionalGuidanceSupport } from '@features/generation/graph';
 import { getSourceContentRect, isMergeableRasterLayer, mergeDownEligibility } from '@workbench/canvas-engine/api';
-import { CONTROL_ADAPTER_DEFAULTS } from '@workbench/controlAdapters';
+import { CONTROL_ADAPTER_DEFAULTS, createDefaultControlAdapter } from '@workbench/controlAdapters';
 
 type LayerTransform = CanvasLayerBaseContract['transform'];
 
@@ -247,6 +245,9 @@ export const createIdentityAdjustment = (type: CanvasAdjustmentEntry['type']): C
   }
 };
 
+/** A new regional IP-Adapter reference's weight. */
+export const DEFAULT_REGIONAL_REFERENCE_WEIGHT = 1;
+
 /**
  * Create shared regional-reference defaults: FLUX uses Redux, other bases IP-Adapter. Users choose models and
  * assign images via drop/upload.
@@ -270,7 +271,7 @@ export const createRegionalReferenceImage = (
       method: 'full',
       model: null,
       type: 'ip_adapter',
-      weight: 1,
+      weight: DEFAULT_REGIONAL_REFERENCE_WEIGHT,
     },
     id,
     isEnabled: true,
@@ -303,6 +304,9 @@ export const CONTROL_WEIGHT_BOUNDS = {
 
 export const DEFAULT_CONTROL_ADAPTER = CONTROL_ADAPTER_DEFAULTS.controlnet;
 
+/** A new mask modifier's magnitude (legacy defaults): noise level and denoise limit. */
+export const MASK_MODIFIER_DEFAULTS = { denoise: 0.8, noise: 0.25 } as const;
+
 /** The next free "Control Layer N" name given the existing layer names (N ≥ 1, first gap). */
 export const nextControlLayerName = (existingNames: readonly string[]): string => {
   const used = new Set<number>();
@@ -328,9 +332,8 @@ export const createControlLayer = (
   base?: string | null,
   model?: string | null
 ): CanvasControlLayerContract => {
-  const adapter = base === 'z-image' ? CONTROL_ADAPTER_DEFAULTS.z_image_control : DEFAULT_CONTROL_ADAPTER;
   return {
-    adapter: { ...adapter, beginEndStepPct: [...adapter.beginEndStepPct], model: model ?? null },
+    adapter: createDefaultControlAdapter(base, model ?? null),
     blendMode: 'normal',
     id,
     isEnabled: true,
@@ -444,10 +447,9 @@ const pixelLayerToControl = (
   if (!source) {
     return null;
   }
-  const adapter = base === 'z-image' ? CONTROL_ADAPTER_DEFAULTS.z_image_control : DEFAULT_CONTROL_ADAPTER;
   return {
     ...destinationBase(layer, id, isCopy),
-    adapter: { ...adapter, beginEndStepPct: [...adapter.beginEndStepPct], model: model ?? null },
+    adapter: createDefaultControlAdapter(base, model ?? null),
     source,
     type: 'control',
     withTransparencyEffect: true,
@@ -578,9 +580,3 @@ export const convertRasterControlLayer = (
 /** Whether the layers panel may offer merge-down for `layerId`; merging is pixel work, so it needs an engine. */
 export const canMergeLayerDown = (document: CanvasDocumentContractV3, layerId: string, hasEngine: boolean): boolean =>
   hasEngine && mergeDownEligibility(document, layerId).status === 'eligible';
-
-/** Applies a guarded live edit without recording history until the interaction ends. */
-export const applyStructuralPreview = (
-  engine: CanvasStructuralEngine | null,
-  action: CanvasLayerPreviewMutation
-): boolean => engine?.layers.applyStructuralPreview(action) ?? false;

@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from invokeai.app.services.shared.pagination import PaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import PaginatedResults, SQLiteDirection
 from invokeai.app.services.workflow_records.workflow_records_common import (
     WORKFLOW_LIBRARY_DEFAULT_USER_ID,
     Workflow,

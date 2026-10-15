@@ -17,7 +17,7 @@ import type { OverlayCursor } from '@workbench/canvas-engine/render/overlayRende
 import type { RasterBackend } from '@workbench/canvas-engine/render/raster';
 import type { InvalidatePayload } from '@workbench/canvas-engine/render/scheduler';
 import type { SamInteractionState, SamVisualInput } from '@workbench/canvas-engine/samInteraction';
-import type { FloatingSelection } from '@workbench/canvas-engine/selection/floatingSelection';
+import type { FloatingSelection, FloatLiftResult } from '@workbench/canvas-engine/selection/floatingSelection';
 import type { SelectionCommit } from '@workbench/canvas-engine/selection/selectionState';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { PlacedSurface, PointerInput, PointerModifiers, Rect, ToolId, Vec2 } from '@workbench/canvas-engine/types';
@@ -45,11 +45,24 @@ export interface PixelEditPatch {
   after: ImageData;
 }
 
-export interface PixelEditTransaction {
-  readonly layerId: string;
-  commitPatch(label: string, patch: PixelEditPatch): void;
-  commitStroke(event: StrokeCommittedEvent): void;
+/**
+ * An admitted live pixel edit. Its undo footprint is admitted before pixels change: `grow` admits more before the
+ * edit expands, and a refusal means the caller must restore its pixels and cancel. `commit` records the
+ * already-applied pixels as one undo step and reports whether it did; `cancel` ends it unrecorded.
+ */
+export interface StrokeEdit {
+  grow(bytes: number): boolean;
+  commit(event: StrokeCommittedEvent): boolean;
   cancel(): void;
+}
+
+/**
+ * A pixel edit that may first materialize its layer (control layers, raster images) in place. A `false` commit
+ * leaves it open: the caller restores the pixels it touched, then cancels, which undoes the materialization.
+ */
+export interface PixelEditTransaction extends StrokeEdit {
+  readonly layerId: string;
+  commitPatch(label: string, patch: PixelEditPatch): boolean;
 }
 
 /**
@@ -74,6 +87,8 @@ export interface ToolContext {
   getSelectedLayerIds?(): readonly string[];
   /** Requests a re-render for the given flags. */
   invalidate(payload: InvalidatePayload): void;
+  /** Runs `task` once before the next composited frame so its invalidations render in that frame; returns a cancel. */
+  scheduleFrame(task: () => void): () => void;
   /** Reducer bridge. Painting tools use it for the single gesture-start `addCanvasLayer`. */
   dispatch(action: CanvasProjectMutation): void;
   /** Where a layer the tool creates lands: above `aboveId` when it belongs to `stack`, else the stack top. */
@@ -117,6 +132,8 @@ export interface ToolContext {
   getSamInteraction?(): SamInteractionState | null;
   /** Sets (or clears) the brush cursor ring drawn on the overlay. */
   setOverlayCursor(cursor: OverlayCursor | null): void;
+  /** Shows or hides the color picker's loupe, which follows the pointer while shown; optional in test harnesses. */
+  showColorLoupe?(shown: boolean): void;
   /**
    * Route samples to one-shot claim, then persistent workbench target. Return whether consumed; otherwise picker
    * falls back to brush color. Optional in test harnesses.
@@ -137,8 +154,8 @@ export interface ToolContext {
    * reevaluate it.
    */
   updateCursor(): void;
-  /** Emits a completed-stroke event to `engine.tools.onStrokeCommitted` subscribers. */
-  emitStrokeCommitted(event: StrokeCommittedEvent): void;
+  /** Admits a live pixel edit on a paint layer; null when refused (the engine reports why). */
+  beginStrokeEdit(initialBytes?: number): StrokeEdit | null;
   /** Bumps a layer's cache version (without marking it stale) after a direct paint, and recomposites. */
   notifyLayerPainted(layerId: string): void;
   commitSelection?(commit: SelectionCommit): void;
@@ -151,11 +168,11 @@ export interface ToolContext {
   getStrokeClipRect?(): Rect | null;
   /** Updates visual SAM input for the active engine-owned Select Object session. */
   updateSamInput?(input: SamVisualInput): void;
-  /** Optional lift of selected layer pixels into a float; returns whether any were lifted. */
-  liftFloatingSelection?(layerId: string): boolean;
+  /** Optional lift of selected layer pixels into a float; a refused lift has already been reported. */
+  liftFloatingSelection?(layerId: string): FloatLiftResult;
   /** The live floating selection, or `null`. */
   getFloatingSelection?(): FloatingSelection | null;
-  /** Sets the float's live transform (LAYER-LOCAL space). */
+  /** Sets the float's live transform (LAYER-LOCAL space); one its undo budget cannot cover keeps the last. */
   setFloatingTransform?(transform: LayerTransform): void;
   /** Bakes the float back into its layer as one undoable entry. */
   commitFloatingSelection?(): void;

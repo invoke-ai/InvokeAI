@@ -925,7 +925,7 @@ class RecallParametersUpdatedEvent(QueueEventBase):
         return cls(queue_id=queue_id, user_id=user_id, parameters=parameters)
 
 
-VideoRecallAction: TypeAlias = Literal["parameters", "initial_video", "reference_video", "conditioning_video"]
+VideoRecallAction: TypeAlias = Literal["parameters", "initial_video", "reference_video", "conditioning_video", "image"]
 VideoRecallConditioningRole: TypeAlias = Literal["audio", "video"]
 VideoRecallMode: TypeAlias = Literal["recall", "remix"]
 
@@ -941,6 +941,14 @@ class VideoRecallVideo(BaseModel):
     media_origin: Optional[str] = Field(
         default=None, description="How the video entered the gallery, e.g. `audio_upload` for wrapped audio"
     )
+
+
+class VideoRecallImage(BaseModel):
+    """The gallery image a video recall places into the Video panel."""
+
+    image_name: str = Field(description="The name of the gallery image")
+    width: int = Field(description="The image's width in pixels")
+    height: int = Field(description="The image's height in pixels")
 
 
 @payload_schema.register
@@ -968,11 +976,23 @@ class VideoRecallRequestedEvent(QueueEventBase):
         default=None,
         description="For `conditioning_video`: which stream of the video is the condition; the other is generated",
     )
+    image: Optional[VideoRecallImage] = Field(default=None, description="For `image`: the image to place")
+    append: bool = Field(
+        default=False,
+        description=(
+            "For `image`: add the image after the panel's own instead of replacing them -- to the reference images "
+            "of a model that takes references, otherwise to the free frame slot"
+        ),
+    )
 
     @model_validator(mode="after")
     def _role_iff_conditioning_video(self) -> "VideoRecallRequestedEvent":
         if (self.action == "conditioning_video") != (self.conditioning_role is not None):
             raise ValueError("conditioning_role is given with, and only with, a conditioning_video action")
+        if (self.action == "image") != (self.image is not None):
+            raise ValueError("image is given with, and only with, an image action")
+        if self.append and self.action != "image":
+            raise ValueError("append is given only with an image action")
         return self
 
     @classmethod
@@ -986,6 +1006,8 @@ class VideoRecallRequestedEvent(QueueEventBase):
         parameters: Optional[dict[str, Any]] = None,
         video: Optional[VideoRecallVideo] = None,
         conditioning_role: Optional[VideoRecallConditioningRole] = None,
+        image: Optional[VideoRecallImage] = None,
+        append: bool = False,
     ) -> "VideoRecallRequestedEvent":
         return cls(
             queue_id=queue_id,
@@ -996,6 +1018,8 @@ class VideoRecallRequestedEvent(QueueEventBase):
             parameters=parameters,
             video=video,
             conditioning_role=conditioning_role,
+            image=image,
+            append=append,
         )
 
 

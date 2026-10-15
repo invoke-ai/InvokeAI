@@ -19,6 +19,7 @@ import {
   isFilterConfigValid,
   recordLastUsedFilterType,
   type FilterOperationSessionState,
+  type FilterSessionErrorCode,
 } from '@workbench/canvas-operations/api';
 import { useFilterSession } from '@workbench/widgets/canvas/engineStoreHooks';
 import { PropertySwitchRow } from '@workbench/widgets/canvas/tool-presentation/PropertyPrimitives';
@@ -71,6 +72,25 @@ export const getFilterStatusTranslationKey = (status: FilterOperationSessionStat
       : status === 'error'
         ? 'widgets.layers.rasterFilter.statusError'
         : 'widgets.layers.selectObject.statusReady';
+
+const FILTER_ERROR_TRANSLATION_KEYS: Record<FilterSessionErrorCode, string> = {
+  aborted: 'widgets.layers.rasterFilter.aborted',
+  'apply-failed': 'widgets.layers.rasterFilter.applyFailed',
+  busy: 'widgets.layers.rasterFilter.busy',
+  disabled: 'widgets.layers.rasterFilter.disabled',
+  empty: 'widgets.layers.rasterFilter.empty',
+  locked: 'widgets.layers.rasterFilter.locked',
+  missing: 'widgets.layers.rasterFilter.missing',
+  'not-ready': 'widgets.layers.rasterFilter.notReady',
+  'over-budget': 'widgets.layers.rasterFilter.overBudget',
+  'process-failed': 'widgets.layers.rasterFilter.processFailed',
+  'source-over-budget': 'widgets.layers.rasterFilter.sourceOverBudget',
+  stale: 'widgets.layers.rasterFilter.stale',
+  unsupported: 'widgets.layers.rasterFilter.unsupported',
+};
+
+export const getFilterErrorTranslationKey = (code: FilterSessionErrorCode): string =>
+  FILTER_ERROR_TRANSLATION_KEYS[code];
 
 const useFilterDraft = (engine: ToolFormProps['engine']) => {
   const operations = getCanvasOperations(engine);
@@ -150,7 +170,6 @@ const FilterChooseSettings = ({ engine, isSurfaceInteractionLocked }: ToolFormPr
         groupBy={groupBy}
         itemsMaxH="18rem"
         renderGroupLabel={renderGroupLabel}
-        size="xs"
         value={filterValue}
         valueText={t(`widgets.layers.control.filters.${session.draft.type}`, session.draft.type)}
         w="full"
@@ -207,8 +226,8 @@ const FilterFooter = ({ engine, isExternalInteractionLocked }: ToolFooterProps) 
     <Flex align="center" gap="1" minW="0" w="full">
       <Box flex="1" minW="0" overflow="hidden" whiteSpace="nowrap">
         <OperationStatusChip
-          errorDetail={null}
-          errorText={session.error}
+          errorDetail={session.error?.detail ?? null}
+          errorText={session.error ? t(getFilterErrorTranslationKey(session.error.code)) : null}
           isBusy={isBusy}
           sourceLabel={sourceLabel}
           statusText={t(getFilterStatusTranslationKey(session.status))}
@@ -216,7 +235,7 @@ const FilterFooter = ({ engine, isExternalInteractionLocked }: ToolFooterProps) 
           title={t('widgets.layers.rasterFilter.title')}
         />
       </Box>
-      <Button disabled={!eligibility.canReset} flexShrink={0} size="xs" variant="ghost" onClick={reset}>
+      <Button disabled={!eligibility.canReset} flexShrink={0} variant="ghost" onClick={reset}>
         {t('widgets.layers.selectObject.reset')}
       </Button>
       {session.autoProcess ? null : (
@@ -224,7 +243,6 @@ const FilterFooter = ({ engine, isExternalInteractionLocked }: ToolFooterProps) 
           disabled={!eligibility.canProcess}
           flexShrink={0}
           loading={session.status === 'processing'}
-          size="xs"
           onClick={() => void operations.processFilterOperation()}
         >
           {t('widgets.layers.selectObject.process')}
@@ -236,7 +254,6 @@ const FilterFooter = ({ engine, isExternalInteractionLocked }: ToolFooterProps) 
           disabled={!eligibility.canApply}
           loading={session.status === 'committing'}
           roundedRight="none"
-          size="xs"
           variant="solid"
           onClick={onApply}
         >
@@ -249,7 +266,6 @@ const FilterFooter = ({ engine, isExternalInteractionLocked }: ToolFooterProps) 
               disabled={!eligibility.canSave}
               px="1"
               roundedLeft="none"
-              size="xs"
               variant="solid"
             >
               <Icon as={ChevronDownIcon} boxSize="3.5" />
@@ -279,7 +295,6 @@ const FilterFooter = ({ engine, isExternalInteractionLocked }: ToolFooterProps) 
         data-pane-action="cancel"
         disabled={!eligibility.canCancel}
         flexShrink={0}
-        size="xs"
         variant="ghost"
         onClick={onCancel}
       >

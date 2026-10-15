@@ -79,8 +79,31 @@ describe('createDerivedSurfaceCache', () => {
     get('a');
     get('b');
     get('a'); // a is now most recently used
-    expect(cache.evictToBudget(400)).toEqual(['b']);
+    expect(cache.evict(400, () => false)).toEqual(['b']);
     expect(cache.byteSize()).toBe(400);
+  });
+
+  it('keeps entries the current frame read, reporting every byte change', () => {
+    const backend = createTestStubRasterBackend();
+    const reported: number[] = [];
+    const cache = createDerivedSurfaceCache(undefined, (bytes) => reported.push(bytes));
+    const source = backend.createSurface(10, 10);
+    const request = (layerId: string) => ({
+      create: () => backend.createSurface(10, 10),
+      kind: 'adjustments' as const,
+      layerId,
+      paramsKey: 'k',
+      source,
+      sourceVersion: 0,
+    });
+    cache.get(request('stale'));
+    const frameStart = cache.tick();
+    cache.get(request('drawn'));
+
+    expect(cache.evict(0, (_layerId, lastUsed) => lastUsed > frameStart)).toEqual(['stale']);
+    expect(cache.byteSize()).toBe(400);
+    cache.dispose();
+    expect(reported).toEqual([400, 800, 400, 0]);
   });
 
   it('reports cache hits, misses, evictions, and allocated bytes when diagnostics are enabled', () => {
@@ -98,7 +121,7 @@ describe('createDerivedSurfaceCache', () => {
     };
     cache.get(request);
     cache.get(request);
-    cache.evictToBudget(0);
+    cache.evict(0, () => false);
 
     expect(diagnostics.snapshot()).toMatchObject({
       allocatedDerivedBytes: 100,

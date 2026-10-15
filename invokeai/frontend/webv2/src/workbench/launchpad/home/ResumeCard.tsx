@@ -81,25 +81,25 @@ export const ResumeCard = ({
       </Flex>
       <Flex align="center" flex="1" gap="3" justify="space-between" minW="0" p="4" pointerEvents="none" wrap="wrap">
         <Stack gap="0.5" minW="0">
-          <Text color="fg.muted" fontSize="2xs" fontWeight="600" textTransform="uppercase">
+          <Text color="fg.muted" fontSize="xs" fontWeight="600" textTransform="uppercase">
             {t('launchpad.home.resume')}
           </Text>
-          <MiddleTruncate fontSize="sm" fontWeight="700" text={summary.name} />
-          <Text color="fg.muted" fontSize="2xs">
+          <MiddleTruncate fontSize="lg" fontWeight="700" text={summary.name} />
+          <Text color="fg.muted" fontSize="xs">
             {t('projects.editedRelative', { time: formatRelativeTime(summary.updatedAt) })}
           </Text>
           <ProjectCompatibilityBadge summary={summary} />
         </Stack>
         <HStack gap="1.5" pointerEvents="auto">
           {isCompatible ? (
-            <Button asChild size="xs" variant="solid">
+            <Button asChild variant="solid">
               <Link search={search} to="/app">
                 {t('launchpad.home.resumeAction')}
                 <ArrowRightIcon />
               </Link>
             </Button>
           ) : (
-            <Button disabled size="xs" title={t('projects.file.updateClient')} variant="solid">
+            <Button disabled title={t('projects.file.updateClient')} variant="solid">
               {t('launchpad.home.resumeAction')}
               <ArrowRightIcon />
             </Button>
@@ -109,7 +109,6 @@ export const ResumeCard = ({
             aria-haspopup="menu"
             aria-label={t('common.actions')}
             color="fg.muted"
-            size="xs"
             variant="ghost"
             onClick={menuTrigger.onClick}
             onPointerDown={menuTrigger.onPointerDown}

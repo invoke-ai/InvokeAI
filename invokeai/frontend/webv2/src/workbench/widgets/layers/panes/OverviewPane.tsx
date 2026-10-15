@@ -1,8 +1,8 @@
 import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react';
 
 import { Box, chakra, Flex } from '@chakra-ui/react';
-import { useCanvasRasterContentEpoch } from '@workbench/widgets/canvas/engineStoreHooks';
-import { useCanvasEngine, type CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
+import { useCanvasEngine, type CanvasEngineHandle } from '@workbench/canvas-operations/react';
+import { useCanvasLayerPixelEpoch } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -32,7 +32,7 @@ export const OverviewPane = () => {
 
   if (!engine) {
     return (
-      <Flex align="center" color="fg.muted" fontSize="xs" h="full" justify="center" p="4">
+      <Flex align="center" color="fg.muted" fontSize="md" h="full" justify="center" p="4">
         {t('widgets.properties.noCanvas')}
       </Flex>
     );
@@ -56,7 +56,7 @@ const ConnectedOverview = ({ engine }: { engine: CanvasEngineHandle }) => {
   const drag = useRef<AbortController | null>(null);
   const [hostSize, setHostSize] = useState<{ width: number; height: number }>({ height: 0, width: 0 });
 
-  const contentEpoch = useCanvasRasterContentEpoch(engine);
+  const pixelEpoch = useCanvasLayerPixelEpoch(engine);
   const stacks = useActiveProjectSelector((project) => project.canvas.document.stacks);
   const docWidth = useActiveProjectSelector((project) => project.canvas.document.width);
   const docHeight = useActiveProjectSelector((project) => project.canvas.document.height);
@@ -143,7 +143,7 @@ const ConnectedOverview = ({ engine }: { engine: CanvasEngineHandle }) => {
   }, []);
   useEffect(() => {
     scheduleRedraw();
-  }, [contentEpoch, stacks, frame, scheduleRedraw]);
+  }, [pixelEpoch, stacks, frame, scheduleRedraw]);
 
   // Throttle DOM outline updates and let CSS interpolate between them.
   useEffect(() => {

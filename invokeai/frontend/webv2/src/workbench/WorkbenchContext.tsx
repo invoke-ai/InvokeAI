@@ -4,10 +4,13 @@ import type { ProjectSettings } from '@workbench/settings/contracts';
 import type { WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts';
 
 import { startIntermediatesHoldLease } from '@features/intermediates/holdLease';
+import { createLogger } from '@platform/logging/logger';
+import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
+import { useDebouncedValue } from '@platform/react/useDebouncedValue';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { captureAccountScope } from '@platform/state/accountLifecycle';
+import { captureAccountScope, type AccountScope } from '@platform/state/accountLifecycle';
 import { shallowEqual as selectorShallowEqual, useExternalStoreSelector } from '@platform/state/selectors';
-import { createContext, use, useEffect, useSyncExternalStore, useState, type ReactNode } from 'react';
+import { createContext, use, useSyncExternalStore, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { ProjectPushOutcome } from './projects/projectFlush';
@@ -16,12 +19,12 @@ import { WorkbenchSplashScreen } from './components/WorkbenchSplashScreen';
 import { WorkbenchUnavailableScreen } from './components/WorkbenchUnavailableScreen';
 import { createExtensionRegistry, type ExtensionRegistry } from './extensions/extensionRegistry';
 import { clearLayerPanelStates } from './layerPanelState';
-import { createWorkbenchPersistenceRuntime } from './persistenceRuntime';
+import { browserPageLifecycle, createWorkbenchPersistenceRuntime, type PersistenceExit } from './persistenceRuntime';
 import { createOpenProjectBroker } from './projects/openProjectBroker';
 import {
-  createCanvasHeldMediaSources,
+  createLiveCanvasEngines,
   createOpenProjectsHeldMediaReader,
-  type CanvasHeldMediaSources,
+  type LiveCanvasEngines,
 } from './projects/projectAssets';
 import { describeRefusedProjects } from './projects/projectLoadRefusal';
 import {
@@ -45,9 +48,16 @@ type WorkbenchSelector<T> = (snapshot: WorkbenchSnapshot) => T;
 const WorkbenchStoreContext = createContext<WorkbenchInternalStore | null>(null);
 const WorkbenchPersistenceContext = createContext<SyncedWorkbenchPersistence | null>(null);
 const WorkbenchExtensionsContext = createContext<ExtensionRegistry | null>(null);
-const WorkbenchCanvasHeldMediaContext = createContext<CanvasHeldMediaSources | null>(null);
+const WorkbenchLiveCanvasEnginesContext = createContext<LiveCanvasEngines | null>(null);
 const subscribeToNothing = (): (() => void) => () => {};
 const getNullSnapshot = (): null => null;
+
+/**
+ * Each account lifetime's latest editor exit in this tab. The next editor loads only after it settles (bounded by the
+ * runtime), so it never hydrates a snapshot older than the checkpoint and two editors never write at once. Keyed by
+ * the lifetime: another account neither waits for it nor sees it.
+ */
+const pendingEditorExits = new WeakMap<AccountScope, PersistenceExit>();
 
 export const shallowEqual = selectorShallowEqual;
 
@@ -64,11 +74,11 @@ export const WorkbenchProvider = ({
   const { t } = useTranslation();
   const [persistence] = useState(() => createSyncedWorkbenchPersistence(owner));
   const [extensions] = useState(createExtensionRegistry);
-  const [canvasHeldMedia] = useState(createCanvasHeldMediaSources);
+  const [liveCanvasEngines] = useState(createLiveCanvasEngines);
   const [loadUnavailable, setLoadUnavailable] = useState<{ message: string; retry(): void } | null>(null);
   const hasHydrated = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot).hasHydrated;
 
-  // The runtime is created inside the effect: disposal is terminal, so each
+  // The runtime is created inside the effect: exit is terminal, so each
   // mount (including a StrictMode remount) must get its own instance.
   useMountEffect(() => {
     const releasePersistence = persistence.retain();
@@ -107,8 +117,13 @@ export const WorkbenchProvider = ({
         setHasHydrated: store.setHasHydrated,
         subscribe: store.subscribe,
       },
+      // At exit, React runs a removed provider's cleanup before its descendants', so their flushers are still registered.
+      commitDrafts: flushWorkbenchDrafts,
       loadOptions,
+      logger: createLogger({ area: 'autosave', namespace: 'persistence' }, { owner }),
+      page: browserPageLifecycle,
       persistence,
+      previousExit: pendingEditorExits.get(owner),
       signal: owner.signal,
     });
     // Publish throughout the mount so sibling library surfaces mutate open projects through the sync engine.
@@ -119,7 +134,8 @@ export const WorkbenchProvider = ({
           store.commands.projects.close(projectId);
         }
       },
-      deleteProject: (projectId) => persistence.deleteProjectOnServer(projectId),
+      deleteProject: (projectId, boards) => persistence.deleteProjectOnServer(projectId, boards),
+      flushPixels: (projectId) => liveCanvasEngines.flushPendingPixels(projectId),
       flushProject: (projectId) => {
         const project = store.getSnapshot().projects.find((candidate) => candidate.id === projectId);
 
@@ -129,6 +145,7 @@ export const WorkbenchProvider = ({
           : Promise.resolve<ProjectPushOutcome>({ documentJson: '', kind: 'acknowledged' });
       },
       getOpenProjectIds: () => store.getSnapshot().projects.map((project) => project.id),
+      getProject: (projectId) => store.getSnapshot().projects.find((candidate) => candidate.id === projectId),
       markProjectDeleted: (projectId) => {
         persistence.markProjectDeleted(projectId);
       },
@@ -144,7 +161,7 @@ export const WorkbenchProvider = ({
     persistenceRuntime.start();
     const releaseIntermediateHold = startIntermediatesHoldLease({
       owner,
-      read: createOpenProjectsHeldMediaReader(() => store.getSnapshot().projects, canvasHeldMedia.read),
+      read: createOpenProjectsHeldMediaReader(() => store.getSnapshot().projects, liveCanvasEngines.heldAssets),
       subscribe: (onChange) => {
         let projects = store.getSnapshot().projects;
         const unsubscribeProjects = store.subscribe(() => {
@@ -154,7 +171,7 @@ export const WorkbenchProvider = ({
             onChange();
           }
         });
-        const unsubscribeCanvas = canvasHeldMedia.subscribe(onChange);
+        const unsubscribeCanvas = liveCanvasEngines.subscribe(onChange);
         return () => {
           unsubscribeProjects();
           unsubscribeCanvas();
@@ -166,14 +183,38 @@ export const WorkbenchProvider = ({
       releaseIntermediateHold();
       clearLayerPanelStates();
       openProjectBroker.dispose();
-      persistenceRuntime.dispose();
-      releasePersistence();
+      // The checkpoint outlives this unmount and keeps the persistence lease until it settles.
+      const exit = persistenceRuntime.exit({
+        beforeCapture: async () => {
+          const flushes = await Promise.allSettled(
+            store.getSnapshot().projects.map((project) => liveCanvasEngines.flushPendingPixels(project.id))
+          );
+          const failures = flushes.flatMap((flush) => (flush.status === 'rejected' ? [flush.reason] : []));
+          if (failures.length > 0) {
+            throw new AggregateError(failures, 'Unsaved Canvas pixels could not be persisted.');
+          }
+        },
+      });
+      const pendingExit: PersistenceExit = {
+        settled: exit.settled.then(releasePersistence),
+        supersede: () => {
+          exit.supersede();
+          // The lease itself stays until a stalled request returns: closing now could cut off a write in progress.
+          persistence.releaseMutationLocks();
+        },
+      };
+      pendingEditorExits.set(owner, pendingExit);
+      void pendingExit.settled.then(() => {
+        if (pendingEditorExits.get(owner) === pendingExit) {
+          pendingEditorExits.delete(owner);
+        }
+      });
     };
   });
 
   return (
     <WorkbenchPersistenceContext value={persistence}>
-      <WorkbenchCanvasHeldMediaContext value={canvasHeldMedia}>
+      <WorkbenchLiveCanvasEnginesContext value={liveCanvasEngines}>
         <WorkbenchExtensionsContext value={extensions}>
           <WorkbenchStoreContext value={store}>
             {loadUnavailable ? (
@@ -189,7 +230,7 @@ export const WorkbenchProvider = ({
             )}
           </WorkbenchStoreContext>
         </WorkbenchExtensionsContext>
-      </WorkbenchCanvasHeldMediaContext>
+      </WorkbenchLiveCanvasEnginesContext>
     </WorkbenchPersistenceContext>
   );
 };
@@ -220,30 +261,13 @@ export const useWorkbenchSelector = <Selected,>(
   return useExternalStoreSelector(store.subscribe, store.getSnapshot, selector, isEqual);
 };
 
+/** Debounce a selection; see `useDebouncedValue` for `settlesImmediately`. */
 export const useDebouncedWorkbenchSelector = <Selected,>(
   selector: WorkbenchSelector<Selected>,
   debounceMs = 300,
-  isEqual: EqualityFn<Selected> = Object.is
-): Selected => {
-  const liveSelection = useWorkbenchSelector(selector, isEqual);
-  const [selection, setSelection] = useState(liveSelection);
-
-  useEffect(() => {
-    if (isEqual(selection, liveSelection)) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setSelection(liveSelection);
-    }, debounceMs);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [debounceMs, isEqual, liveSelection, selection]);
-
-  return selection;
-};
+  isEqual: EqualityFn<Selected> = Object.is,
+  settlesImmediately?: (previous: Selected, next: Selected) => boolean
+): Selected => useDebouncedValue(useWorkbenchSelector(selector, isEqual), debounceMs, { isEqual, settlesImmediately });
 
 export const useActiveProject = (): Project => useWorkbenchSelector((snapshot) => snapshot.activeProject);
 
@@ -316,12 +340,12 @@ export const useOptionalWorkbenchPersistenceService = (): SyncedWorkbenchPersist
   use(WorkbenchPersistenceContext);
 
 /** Where live Canvas engines register the undo state the hold lease must keep. */
-export const useWorkbenchCanvasHeldMedia = (): CanvasHeldMediaSources => {
-  const heldMedia = use(WorkbenchCanvasHeldMediaContext);
-  if (!heldMedia) {
-    throw new Error('useWorkbenchCanvasHeldMedia must be used within a WorkbenchProvider.');
+export const useWorkbenchLiveCanvasEngines = (): LiveCanvasEngines => {
+  const liveEngines = use(WorkbenchLiveCanvasEnginesContext);
+  if (!liveEngines) {
+    throw new Error('useWorkbenchLiveCanvasEngines must be used within a WorkbenchProvider.');
   }
-  return heldMedia;
+  return liveEngines;
 };
 
 export const useWorkbenchExtensions = (): ExtensionRegistry => {

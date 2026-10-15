@@ -43,4 +43,39 @@ describe('DecodedBitmapPool', () => {
     await expect(pending).rejects.toThrow(/disposed/i);
     expect(decoded.close).toHaveBeenCalledTimes(1);
   });
+
+  it('refuses an already-aborted request before starting any decode', async () => {
+    const decode = vi.fn(() => Promise.resolve(bitmap()));
+    const pool = createDecodedBitmapPool();
+    const controller = new AbortController();
+    controller.abort(new Error('already cancelled'));
+
+    await expect(pool.acquire('cancelled', decode, controller.signal)).rejects.toThrow('already cancelled');
+    expect(decode).not.toHaveBeenCalled();
+    expect(pool.byteSize()).toBe(0);
+  });
+
+  it('keeps a shared decode for the remaining waiter when another cancels', async () => {
+    const decoded = bitmap();
+    let resolve!: (value: ImageBitmap) => void;
+    const decode = vi.fn(
+      () =>
+        new Promise<ImageBitmap>((next) => {
+          resolve = next;
+        })
+    );
+    const pool = createDecodedBitmapPool();
+    const cancelled = new AbortController();
+    const first = pool.acquire('shared', decode, cancelled.signal);
+    const second = pool.acquire('shared', decode);
+    cancelled.abort(new Error('first left'));
+    await expect(first).rejects.toThrow('first left');
+
+    resolve(decoded);
+    const lease = await second;
+    expect(lease.bitmap).toBe(decoded);
+    expect(decode).toHaveBeenCalledOnce();
+    lease.release();
+    expect(decoded.close).toHaveBeenCalledOnce();
+  });
 });

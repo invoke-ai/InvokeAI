@@ -4,6 +4,7 @@ import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 
 import { PixelEditController } from '@workbench/canvas-engine/controllers/controlPixelController';
+import { createCanvasMutationContext } from '@workbench/canvas-engine/controllers/mutationContext';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { createBitmapStore } from '@workbench/canvas-engine/document/bitmapStore';
 import { createHistory } from '@workbench/canvas-engine/history/history';
@@ -74,27 +75,46 @@ const setup = (
     width: 8,
   };
   const history = createHistory();
+  const ctx = createCanvasMutationContext({
+    commitEdit: vi.fn(),
+    createLayerId: () => 'unused',
+    dispatch: (action) => {
+      if (action.type !== 'replaceCanvasLayer' || action.layer.type !== 'raster') {
+        throw new Error('expected raster replacement');
+      }
+      layer = action.layer;
+      document = { ...document, stacks: stacksFrom([action.layer]) };
+      resources.onReplacement?.(action.layer);
+      return true;
+    },
+    editOwner: Symbol('owner'),
+    editingLocked: { get: () => false, subscribe: () => () => undefined },
+    getDocument: () => document,
+    getReducerDocument: () => document,
+    history,
+    installPrepared: () => undefined,
+    isGestureActive: () => false,
+    isGuardCurrent: () => true,
+    preparePixels: () => {
+      throw new Error('unused');
+    },
+    projectId: 'project',
+    refreshMirror: () => undefined,
+    reserveRaster: () => ({ lease: { release: () => undefined }, status: 'ok' }),
+    subscribeReducer: () => () => undefined,
+  });
   const controller = new PixelEditController({
-    applyImagePatch: vi.fn(),
+    applyImagePatch: vi.fn(() => Promise.resolve()),
     backend,
     bitmapStore,
     canEdit: () => true,
+    ctx,
     deleteDerived: (layerId) => adjusted.delete(layerId),
-    dispatchReplacement: (replacement) => {
-      if (replacement.type !== 'raster') {
-        throw new Error('expected raster replacement');
-      }
-      layer = replacement;
-      document = { ...document, stacks: stacksFrom([replacement]) };
-      resources.onReplacement?.(replacement);
-    },
-    endBurst: vi.fn(),
     getActiveProjectId: () => 'project',
     getAdjustedSurface: (candidate, candidateEntry) =>
       candidate.type === 'raster' ? adjusted.get(candidate.id, candidateEntry, candidate.adjustments) : null,
     getDocument: () => document,
     getTransformSession: () => null,
-    history,
     installPrepared: (prepared) => {
       layers.installReplacement(prepared);
     },
@@ -108,6 +128,7 @@ const setup = (
     preparePixels: (layerId, rect, pixels) => layers.prepareReplacement(layerId, rect, pixels),
     projectId: 'project',
     publishStroke: vi.fn(),
+    reportRefusal: vi.fn(),
     setTransformOverride: (layerId, transform) => {
       if (transform) {
         transformOverrides.set(layerId, transform);
@@ -119,6 +140,7 @@ const setup = (
   const composite = (): RasterSurface => {
     const target = backend.createSurface(document.width, document.height);
     compositeDocument(target, document, layers, IDENTITY, {
+      backend,
       adjustedSurface: (candidate, candidateEntry) =>
         controller.isOpenFor([candidate.id])
           ? null
@@ -138,7 +160,7 @@ const pixels = (surface: RasterSurface): number[] => [
 ];
 
 describe('image-layer erasing with real browser pixels', () => {
-  it('preserves adjustment-before-transform rendering for untouched pixels', () => {
+  it('preserves adjustment-before-transform rendering for untouched pixels', async () => {
     const original = imageLayer();
     const h = setup(original);
     const originalEntry = h.layers.get(original.id)!;
@@ -170,7 +192,7 @@ describe('image-layer erasing with real browser pixels', () => {
     // byte-identical to the pre-edit display, not a raw-then-adjusted variant.
     preview.surface.ctx.clearRect(preview.rect.width - 1, 0, 1, 1);
     const afterStroke = preview.surface.ctx.getImageData(0, 0, preview.rect.width, preview.rect.height);
-    transaction!.commitStroke({
+    transaction!.commit({
       afterImageData: afterStroke,
       beforeImageData: beforeStroke,
       dirtyRect: { ...preview.rect },
@@ -183,7 +205,7 @@ describe('image-layer erasing with real browser pixels', () => {
     expect(h.getLayer()).toMatchObject({ source: { type: 'paint' }, transform: { scaleX: 1, scaleY: 1 } });
     expect(h.getLayer()).not.toHaveProperty('adjustments');
 
-    h.history.undo();
+    expect(await h.history.undo()).toEqual({ status: 'applied' });
     expect(h.getLayer()).toEqual(original);
     expect(pixels(h.layers.get(original.id)!.surface)).toEqual([0, 0, 0, 255, 255, 255, 255, 255]);
     h.controller.dispose();
@@ -205,11 +227,15 @@ describe('image-layer erasing with real browser pixels', () => {
       getLayerSource: () => currentSource,
       getLayerSurface: (layerId) => {
         const entry = layers.get(layerId);
-        return entry && entry.rect.width > 0 && entry.rect.height > 0
+        if (!entry) {
+          return null;
+        }
+        return entry.rect.width > 0 && entry.rect.height > 0
           ? { offset: { x: entry.rect.x, y: entry.rect.y }, surface: entry.surface }
-          : null;
+          : 'empty';
       },
-      trimLayerPixels: (layerId) => trimPaintCacheToAlpha({ isLayerBusy: () => false, layers }, layerId),
+      trimLayerPixels: (layerId) =>
+        trimPaintCacheToAlpha({ isLayerBusy: () => false, isLayerPinned: () => false, layers }, layerId),
       uploadImage,
     });
 
@@ -226,7 +252,7 @@ describe('image-layer erasing with real browser pixels', () => {
     const beforeStroke = preview.surface.ctx.getImageData(0, 0, preview.rect.width, preview.rect.height);
     preview.surface.ctx.clearRect(0, 0, preview.rect.width, preview.rect.height);
     const afterStroke = preview.surface.ctx.getImageData(0, 0, preview.rect.width, preview.rect.height);
-    transaction.commitStroke({
+    transaction.commit({
       afterImageData: afterStroke,
       beforeImageData: beforeStroke,
       dirtyRect: { ...preview.rect },

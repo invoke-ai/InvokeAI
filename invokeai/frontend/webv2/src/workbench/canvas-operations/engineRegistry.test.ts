@@ -21,7 +21,7 @@ import {
 } from '@workbench/canvas-operations/generationCompositePlan';
 import { createEmptyCanvasDocument } from '@workbench/canvasMigration';
 import { applyCanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import { createCanvasHeldMediaSources } from '@workbench/projects/projectAssets';
+import { createLiveCanvasEngines } from '@workbench/projects/projectAssets';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -147,39 +147,39 @@ const createFakeTimers = (): { timers: RegistryTimers; flush: () => void; pendin
 describe('createEngineRegistry', () => {
   it('disposes the process registry synchronously when its account expires', () => {
     accountLifecycle.activate('user-a');
-    const heldMedia = createCanvasHeldMediaSources();
-    const engine = getOrCreateEngine('shared-project-id', { ...createFakeDeps(), heldMedia });
+    const liveEngines = createLiveCanvasEngines();
+    const engine = getOrCreateEngine('shared-project-id', { ...createFakeDeps(), liveEngines });
     const dispose = vi.spyOn(engine.lifecycle, 'dispose');
-    expect(heldMedia.read('shared-project-id')).toEqual({ images: [], videos: [] });
+    expect(liveEngines.heldAssets('shared-project-id')).toEqual({ images: [], videos: [] });
 
     accountLifecycle.invalidate();
 
     expect(getCanvasEngine('shared-project-id')).toBeUndefined();
-    expect(heldMedia.read('shared-project-id')).toBeUndefined();
+    expect(liveEngines.heldAssets('shared-project-id')).toBeUndefined();
     expect(dispose).toHaveBeenCalledOnce();
   });
 
   it('keeps a released engine for its own Workbench but replaces it for a remounted one', () => {
     const { flush, timers } = createFakeTimers();
     const registry = createEngineRegistry({ timers });
-    const first = createCanvasHeldMediaSources();
-    const second = createCanvasHeldMediaSources();
+    const first = createLiveCanvasEngines();
+    const second = createLiveCanvasEngines();
     const onHeldChange = vi.fn();
     first.subscribe(onHeldChange);
 
-    const engine = registry.getOrCreateEngine('p1', { ...createFakeDeps(), heldMedia: first });
+    const engine = registry.getOrCreateEngine('p1', { ...createFakeDeps(), liveEngines: first });
     registry.releaseEngine('p1');
-    expect(registry.getOrCreateEngine('p1', { ...createFakeDeps(), heldMedia: first })).toBe(engine);
+    expect(registry.getOrCreateEngine('p1', { ...createFakeDeps(), liveEngines: first })).toBe(engine);
     registry.releaseEngine('p1');
     const dispose = vi.spyOn(engine.lifecycle, 'dispose');
     onHeldChange.mockClear();
 
-    const replacement = registry.getOrCreateEngine('p1', { ...createFakeDeps(), heldMedia: second });
+    const replacement = registry.getOrCreateEngine('p1', { ...createFakeDeps(), liveEngines: second });
     expect(replacement).not.toBe(engine);
     expect(dispose).toHaveBeenCalledOnce();
-    expect(first.read('p1')).toBeUndefined();
+    expect(first.heldAssets('p1')).toBeUndefined();
     expect(onHeldChange).toHaveBeenCalled();
-    expect(second.read('p1')).toEqual({ images: [], videos: [] });
+    expect(second.heldAssets('p1')).toEqual({ images: [], videos: [] });
     flush();
     expect(registry.getEngine('p1')).toBe(replacement);
     registry.disposeAll();
@@ -187,14 +187,14 @@ describe('createEngineRegistry', () => {
 
   it('refuses an engine another Workbench still uses instead of sharing or replacing it', () => {
     const registry = createEngineRegistry();
-    const first = createCanvasHeldMediaSources();
-    const engine = registry.getOrCreateEngine('p1', { ...createFakeDeps(), heldMedia: first });
+    const first = createLiveCanvasEngines();
+    const engine = registry.getOrCreateEngine('p1', { ...createFakeDeps(), liveEngines: first });
 
     expect(() =>
-      registry.getOrCreateEngine('p1', { ...createFakeDeps(), heldMedia: createCanvasHeldMediaSources() })
+      registry.getOrCreateEngine('p1', { ...createFakeDeps(), liveEngines: createLiveCanvasEngines() })
     ).toThrow(/another Workbench/);
     expect(registry.getEngine('p1')).toBe(engine);
-    expect(first.read('p1')).toEqual({ images: [], videos: [] });
+    expect(first.heldAssets('p1')).toEqual({ images: [], videos: [] });
     registry.disposeAll();
   });
 
@@ -364,7 +364,7 @@ describe('createEngineRegistry', () => {
         if (!detached) {
           throw new Error(`Detached snapshot is missing ${layerId}`);
         }
-        return Promise.resolve(detached);
+        return Promise.resolve({ ...detached, release: () => undefined });
       },
       hashBlob: (blob: Blob) => blob.text(),
       uploadImage,

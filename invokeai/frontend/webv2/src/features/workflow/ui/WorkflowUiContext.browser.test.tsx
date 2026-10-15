@@ -57,7 +57,7 @@ const projectState = (id = 'project-1', projectGraph: ProjectGraphState = create
 const NODE_STATE = {
   error: null,
   latestOutput: null,
-  outputImageUrl: null,
+  outputImageName: null,
   progress: 0.5,
   progressMessage: null,
   status: 'running' as const,
@@ -108,7 +108,6 @@ describe('Workflow UI read-port isolation', () => {
       performance: { mark: vi.fn(), measure: vi.fn(), time: vi.fn() },
       preferences: preferences.port,
       project: project.port,
-      registerModalHotkeyLayer: vi.fn(() => vi.fn()),
       widgets: {},
     } as unknown as WorkflowUiAdapter;
 
@@ -232,7 +231,6 @@ describe('Workflow UI read-port isolation', () => {
       performance: { mark: vi.fn(), measure: vi.fn(), time: vi.fn() },
       preferences: createMutablePort(preferencesState()).port,
       project: project.port,
-      registerModalHotkeyLayer: vi.fn(() => vi.fn()),
       widgets: {},
     } as unknown as WorkflowUiAdapter;
     const Consumer = () => <output>{useWorkflowNodeExecutionState('node-1')?.status ?? 'none'}</output>;

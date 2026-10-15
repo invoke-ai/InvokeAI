@@ -1,0 +1,1 @@
+"""Default InvokeAI frontend package."""

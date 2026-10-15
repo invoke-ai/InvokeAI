@@ -18,8 +18,8 @@ const POSITIONING = { placement: 'bottom-start' } as const;
 /** Same header and search footprint as the view, so the popover does not jump when it lands. */
 const PICKER_FALLBACK = (
   <Stack aria-busy="true" gap="2" p="2">
-    <Skeleton h="7" rounded="control" />
-    <Skeleton h="7" rounded="control" />
+    <Skeleton h="control.md" rounded="control" />
+    <Skeleton h="control.md" rounded="control" />
     <Skeleton h="10rem" rounded="md" />
   </Stack>
 );

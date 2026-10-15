@@ -18,11 +18,14 @@ vi.mock('@platform/transport/http', () => ({
 
 import {
   addImagesToGalleryBoard,
+  createGalleryBoard,
   deleteGalleryBoard,
   deleteGalleryImages,
   downloadGalleryArchive,
+  fetchImageIndexAvailability,
   getGalleryImageByName,
   getGalleryImagesByNames,
+  getGalleryItemLocation,
   getGalleryVideoMetadata,
   getGalleryImageWorkflow,
   getGalleryVideoWorkflow,
@@ -35,6 +38,7 @@ import {
   removeImagesFromGalleryBoard,
   starGalleryImages,
   unstarGalleryImages,
+  updateGalleryBoard,
   uploadGalleryImage,
   uploadGalleryVideo,
 } from './backend';
@@ -156,6 +160,38 @@ describe('downloadGalleryArchive', () => {
     expect(pollSignal?.aborted).toBe(true);
     expect(sleepSignal.aborted).toBe(true);
     expect(mocks.apiFetchRaw).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('getGalleryItemLocation', () => {
+  beforeEach(() => {
+    accountLifecycle.activate('user-a');
+    mocks.apiFetchJson.mockReset();
+  });
+
+  it('sends the exact ordinary-page filters and maps the zero-based rank', async () => {
+    mocks.apiFetchJson.mockResolvedValue({ index: 123, kind: 'video', name: 'clip.mp4', total: 250 });
+    const signal = new AbortController().signal;
+
+    await expect(
+      getGalleryItemLocation({
+        boardId: 'board-1',
+        createdFrom: '2026-07-01',
+        createdTo: '2026-07-31',
+        galleryView: 'assets',
+        kind: 'video',
+        name: 'clip.mp4',
+        orderDir: 'ASC',
+        searchTerm: ' portrait ',
+        signal,
+        starred: false,
+      })
+    ).resolves.toEqual({ index: 123, kind: 'video', name: 'clip.mp4', total: 250 });
+
+    expect(mocks.apiFetchJson).toHaveBeenCalledWith(
+      '/api/v1/gallery/items/location?board_id=board-1&categories=control&categories=mask&categories=user&created_from=2026-07-01&created_to=2026-07-31&is_intermediate=false&kind=video&order_dir=ASC&name=clip.mp4&search_term=portrait&starred=false&starred_first=false',
+      { signal }
+    );
   });
 });
 
@@ -909,5 +945,74 @@ describe('gallery uploads', () => {
 
     const url = mocks.apiFetchJson.mock.calls[0]?.[0] as string;
     expect(new URLSearchParams(url.split('?')[1]).has('board_id')).toBe(false);
+  });
+});
+
+describe('fetchImageIndexAvailability', () => {
+  beforeEach(() => {
+    mocks.apiFetchJson.mockReset();
+  });
+
+  it.each([
+    [
+      { enabled: true, projection: { state: 'ready' } },
+      { modelName: null, state: 'ready' },
+    ],
+    [
+      { enabled: false, model_name: 'clip', projection: { state: 'model_missing' } },
+      { modelName: 'clip', state: 'model_missing' },
+    ],
+    // A draining replacement must keep search offered and polled, not read as indexing turned off.
+    [
+      { enabled: false, model_name: null, projection: { state: 'computing' } },
+      { modelName: null, state: 'switching' },
+    ],
+    [
+      { enabled: false, model_name: null, projection: { state: 'disabled' } },
+      { modelName: null, state: 'disabled' },
+    ],
+  ])('reads %o as %o', async (body, availability) => {
+    mocks.apiFetchJson.mockResolvedValue(body);
+
+    await expect(fetchImageIndexAvailability(new AbortController().signal)).resolves.toEqual(availability);
+  });
+});
+
+describe('board membership transport', () => {
+  const dto = { archived: false, asset_count: 0, board_id: 'b1', board_name: 'B', image_count: 0, is_inbox: false };
+
+  beforeEach(() => {
+    accountLifecycle.activate('user-a');
+    mocks.apiFetchJson.mockReset();
+    mocks.apiFetchJson.mockResolvedValue(dto);
+  });
+
+  it('creates in a project only when one is named', async () => {
+    await createGalleryBoard('B');
+    await createGalleryBoard('B', 'p1');
+
+    expect(mocks.apiFetchJson.mock.calls.map(([url]) => url)).toEqual([
+      '/api/v1/boards/?board_name=B',
+      '/api/v1/boards/?board_name=B&project_id=p1',
+    ]);
+  });
+
+  it('sends an explicit null to move a board to the Library, and no key to leave it alone', async () => {
+    await updateGalleryBoard('b1', { projectId: null });
+    await updateGalleryBoard('b1', { projectId: 'p2' });
+    await updateGalleryBoard('b1', { name: 'Renamed' });
+
+    const bodies = mocks.apiFetchJson.mock.calls.map(([, init]) => JSON.parse((init as { body: string }).body));
+    expect(bodies[0]).toEqual({ project_id: null });
+    expect(bodies[1]).toEqual({ project_id: 'p2' });
+    expect(bodies[2]).toEqual({ board_name: 'Renamed' });
+  });
+
+  it('reads membership and the inbox flag off the wire', async () => {
+    mocks.apiFetchJson.mockResolvedValueOnce({ ...dto, is_inbox: true, project_id: 'p1' });
+
+    const board = await createGalleryBoard('B', 'p1');
+
+    expect(board).toMatchObject({ id: 'b1', isInbox: true, projectId: 'p1' });
   });
 });

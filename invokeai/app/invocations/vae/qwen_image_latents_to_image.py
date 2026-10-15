@@ -22,7 +22,11 @@ from invokeai.backend.util.qwen_image_vae import (
     patch_qwen_image_vae_tiling,
     resolve_qwen_image_vae_tile_size,
 )
-from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_qwen_image
+from invokeai.backend.util.vae_working_memory import (
+    estimate_vae_working_memory_qwen_image,
+    qwen_image_untiled_decode_peak_bytes,
+    should_pretile_vae_decode,
+)
 
 
 @invocation(
@@ -53,7 +57,8 @@ class QwenImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
         latents = context.tensors.load(self.latents.latents_name)
 
         vae_info = context.models.load(self.vae.vae)
-        tiled = self.tiled or context.config.get().force_tiled_decode
+        config = context.config.get()
+        tiled = self.tiled or config.force_tiled_decode
         # Resolve tile_size=0 ("model default") before estimating, so the memory the cache reserves
         # matches the tiles the VAE will actually use. Without this the estimate stays at the
         # full-frame figure (~21 GB at 2560x1440 on CUDA) and tiling frees nothing: the VAE is
@@ -71,7 +76,27 @@ class QwenImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
             image_tensor=latents,
             vae=vae_info.model,
             tile_size=effective_tile_size,
+            device=vae_info.compute_device,
         )
+        # The tiling decision is priced from the measured peak, not from the reservation above: that one carries the
+        # headroom and cross-card conservatism a reservation needs, and tiling is not pixel-identical.
+        if (
+            not tiled
+            and config.auto_tiled_decode
+            and should_pretile_vae_decode(
+                vae_info.compute_device,
+                qwen_image_untiled_decode_peak_bytes(latents, vae_info.model, vae_info.compute_device),
+            )
+        ):
+            tiled = True
+            effective_tile_size = resolve_qwen_image_vae_tile_size(self.tile_size)
+            estimated_working_memory = estimate_vae_working_memory_qwen_image(
+                operation="decode",
+                image_tensor=latents,
+                vae=vae_info.model,
+                tile_size=effective_tile_size,
+                device=vae_info.compute_device,
+            )
         with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
             context.util.signal_progress("Running VAE")
             # A native-layout qwen_image_vae single file is classified with the Anima base and loaded

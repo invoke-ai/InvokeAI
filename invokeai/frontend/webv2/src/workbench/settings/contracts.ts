@@ -1,6 +1,7 @@
 import type { WorkbenchLanguage } from '@platform/i18n/languages';
 import type { LogLevel, LogNamespace } from '@platform/logging/contracts';
 import type { SettingsTarget } from '@platform/ui/settings/contracts';
+import type { PromptFontSize } from '@theme/scale';
 import type { WorkbenchThemeId } from '@theme/themes';
 import type { ProjectSortId, ProjectsViewId } from '@workbench/launchpad/projects/projectLibraryView';
 
@@ -45,6 +46,8 @@ export interface StoredGeneratePreset {
 export interface WorkbenchPreferences {
   /** The alpha-build notice was dismissed; shown once per account until then. */
   alphaNoticeAcknowledged: boolean;
+  /** Server version whose What's New notes were last dismissed; a different version shows them once. */
+  whatsNewSeenVersion: string | null;
   themeId: WorkbenchThemeId;
   reduceMotion: boolean;
   showFocusRegionHighlight: boolean;
@@ -61,12 +64,16 @@ export interface WorkbenchPreferences {
   preferNumericAttentionStyle: boolean;
   /** Color prompt syntax in prompt fields; changes rendering only. */
   showPromptSyntaxHighlighting: boolean;
+  /** Text size of the prompt fields. */
+  promptFontSize: PromptFontSize;
   developerLogEnabled: boolean;
   developerLogLevel: LogLevel;
   developerLogNamespaces: LogNamespace[];
   /** Mirror recorded entries to the browser console; obeys the same recording filters. */
   developerConsoleOutputEnabled: boolean;
   developerPerformanceTimingsEnabled: boolean;
+  /** Group add-node search results under their categories; off lists them flat by relevance. */
+  workflowGroupNodesByCategory: boolean;
   /** Always snap workflow nodes to the grid (Ctrl snaps temporarily when off). */
   workflowSnapToGrid: boolean;
   /** Show the minimap in the workflow editor. */

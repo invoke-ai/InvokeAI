@@ -3,6 +3,7 @@ import type { MainModelConfig } from '@features/generation/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
+import { createExternalStoreCore } from '@platform/state/externalStoreCore';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
 import { act } from 'react';
@@ -37,6 +38,11 @@ void i18n.use(initReactI18next).init({
             hiDiffusionT1Ratio: 'HiDiffusion: T1 Ratio',
             hiDiffusionT2Ratio: 'HiDiffusion: T2 Ratio',
             hiDiffusionWindowAttn: 'HiDiffusion: Window Attention',
+            pid: 'PiD Decode',
+            pidHelp: 'Replaces the VAE decode with a 4x super-resolution decode.',
+            pidFit: 'Fit to size',
+            pidNative: 'Native 4x',
+            pidOff: 'Off',
             seamlessTiling: 'Seamless tiling',
             tileX: 'Tile X',
             tileY: 'Tile Y',
@@ -54,6 +60,7 @@ void i18n.use(initReactI18next).init({
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1', name: 'SD 1.5', type: 'main' };
 const sd2Model: MainModelConfig = { base: 'sd-2', key: 'sd2', name: 'SD 2', type: 'main' };
+const fluxModel: MainModelConfig = { base: 'flux', key: 'flux', name: 'FLUX.1 dev', type: 'main' };
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -78,8 +85,8 @@ const render = async (model: MainModelConfig, hiDiffusionEnabled: boolean) => {
       <ChakraProvider value={system}>
         <I18nextProvider i18n={i18n}>
           <GenerateAdvancedFields
+            draft={createExternalStoreCore(settings)}
             selectedModel={model}
-            settings={settings}
             onCommit={onCommit}
             onCommitImmediate={vi.fn()}
           />
@@ -96,13 +103,18 @@ const switchByLabel = (label: string): HTMLElement | null =>
     (element) => element.textContent === label
   ) ?? null;
 
-/** The scrubber's slider is named by `aria-labelledby`, so resolve it through the label element. */
-const sliderByLabel = (label: string): Element | null =>
-  [...(host?.querySelectorAll<HTMLElement>('[role="slider"]') ?? [])].find((slider) => {
-    const labelId = slider.getAttribute('aria-labelledby');
+/** Sliders and select triggers are named by `aria-labelledby`, so resolve them through the label element. */
+const labelledBy = (selector: string, label: string): Element | null =>
+  [...(host?.querySelectorAll<HTMLElement>(selector) ?? [])].find((control) => {
+    const labelId = control.getAttribute('aria-labelledby');
 
     return labelId !== null && host?.querySelector(`#${CSS.escape(labelId)}`)?.textContent === label;
   }) ?? null;
+
+const sliderByLabel = (label: string): Element | null => labelledBy('[role="slider"]', label);
+
+const selectByLabel = (label: string): Element | null =>
+  labelledBy('[data-scope="select"][data-part="trigger"]', label);
 
 afterEach(async () => {
   await settle(() => root?.unmount());
@@ -130,5 +142,20 @@ describe('GenerateAdvancedFields HiDiffusion controls', () => {
 
     expect(switchByLabel('HiDiffusion')).toBeNull();
     expect(host?.textContent).not.toContain('HiDiffusion: T1 Ratio');
+  });
+});
+
+describe('GenerateAdvancedFields PiD control', () => {
+  // FLUX has no other advanced field, so the section must not hide itself while PiD is supported.
+  it('shows the PiD mode for a base whose only advanced field is PiD', async () => {
+    await render(fluxModel, false);
+
+    expect(selectByLabel('PiD Decode')).not.toBeNull();
+  });
+
+  it('omits the PiD mode for a base without PiD decoders', async () => {
+    await render(sd1Model, false);
+
+    expect(selectByLabel('PiD Decode')).toBeNull();
   });
 });

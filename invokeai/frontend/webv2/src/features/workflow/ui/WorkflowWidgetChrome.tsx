@@ -42,6 +42,7 @@ import { AddNodeDialog } from './editor/AddNodeDialog';
 import { CallSavedWorkflowSyncRuntime } from './editor/CallSavedWorkflowSyncRuntime';
 import { getWorkflowFlowInstance } from './editor/flowInstanceStore';
 import { releaseWorkflowViewportsExcept } from './editor/workflowViewportStore';
+import { LibraryCopyChoiceHost } from './library/LibraryCopyChoiceDialog';
 import { isUpdatableSource } from './library/projectWorkflowEntries';
 import { WorkflowLibraryDialog } from './library/WorkflowLibraryDialog';
 import { WorkflowPublicationHost } from './library/WorkflowPublicationHost';
@@ -92,11 +93,7 @@ export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
   );
 
   if (region !== 'center') {
-    return (
-      <Text fontSize="xs" fontWeight="700">
-        {t('widgets.labels.workflow')}
-      </Text>
-    );
+    return <Text fontWeight="700">{t('widgets.labels.workflow')}</Text>;
   }
 
   // Center chrome already names the widget; the workflow name opens the project's workflows with this one selected.
@@ -104,7 +101,7 @@ export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
 
   return (
     <HStack flex="1" gap="1" minW="0">
-      <Text color="fg.subtle" flexShrink={0} fontSize="xs">
+      <Text color="fg.subtle" flexShrink={0}>
         /
       </Text>
       <Tooltip content={t('widgets.workflow.projectWorkflows')}>
@@ -115,7 +112,7 @@ export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
           maxW="16rem"
           minW="0"
           overflow="hidden"
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={openProjectWorkflows}
         >
@@ -179,7 +176,7 @@ export const WorkflowMenuItems = (_props: WorkflowWidgetViewProps) => {
 
   return (
     <Menu.ItemGroup>
-      <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+      <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
         {t('widgets.labels.workflow')}
       </Menu.ItemGroupLabel>
       <Menu.Item value="details" onClick={openDetailsPanel}>
@@ -242,7 +239,7 @@ export const WorkflowHeaderActions = ({ region }: WorkflowWidgetViewProps) => {
           <IconButton
             aria-label={t('widgets.workflow.addNode')}
             color="fg.muted"
-            size="2xs"
+            size="sm"
             variant="ghost"
             onClick={openAddNode}
           >
@@ -257,7 +254,7 @@ export const WorkflowHeaderActions = ({ region }: WorkflowWidgetViewProps) => {
           <IconButton
             aria-label={t('widgets.workflow.library')}
             color="fg.muted"
-            size="2xs"
+            size="sm"
             variant="ghost"
             onClick={openWorkflowLibrary}
           >
@@ -271,7 +268,7 @@ export const WorkflowHeaderActions = ({ region }: WorkflowWidgetViewProps) => {
             <IconButton
               aria-label={t('widgets.workflow.saveToLibraryWithEllipsis')}
               color="fg.muted"
-              size="2xs"
+              size="sm"
               variant="ghost"
               onClick={saveToLibrary}
             >
@@ -571,6 +568,7 @@ export const WorkflowDialogHost = () => {
         onOpenChange={setAddNodeOpen}
       />
       <WorkflowLibraryDialog isOpen={isLibraryOpen} onOpenChange={setWorkflowLibraryOpen} />
+      <LibraryCopyChoiceHost />
       <RenameDialog
         key={renameRequest?.requestId ?? 0}
         initialName={renameTargetName}

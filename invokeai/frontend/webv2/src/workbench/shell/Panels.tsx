@@ -64,7 +64,14 @@ const WidgetPanelInstance = ({ instanceId, region }: { instanceId: WidgetInstanc
   const widget = instance ? getWidgetById(instance.typeId) : undefined;
 
   if (!instance || !widget || widget.status !== 'enabled') {
-    return <MissingWidgetFrame label={widget ? resolveWidgetLabel(widget.manifest, t) : instanceId} region={region} />;
+    return (
+      <MissingWidgetFrame
+        instanceId={instanceId}
+        label={widget ? resolveWidgetLabel(widget.manifest, t) : instanceId}
+        region={region}
+        typeId={instance?.typeId}
+      />
+    );
   }
 
   return <WidgetRendererById instanceId={instance.id} widget={widget} region={region} />;

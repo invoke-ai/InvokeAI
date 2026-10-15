@@ -68,6 +68,7 @@ def test_the_sd_family_grid_is_the_vae_compression() -> None:
         ("t2i_adapter", {"sd-1", "sdxl"}),
         ("control_lora", {"flux"}),
         ("z_image_control", {"z-image"}),
+        ("anima_lllite", {"anima"}),
     ],
 )
 def test_control_kinds_match_the_frontend_policy(kind: ControlKind, expected: set[str]) -> None:

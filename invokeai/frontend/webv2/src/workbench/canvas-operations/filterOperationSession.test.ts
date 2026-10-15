@@ -160,7 +160,7 @@ describe('createFilterOperationSession', () => {
 
     expect(deps.commit).not.toHaveBeenCalled();
     expect(session.getSnapshot()).toMatchObject({
-      error: 'promotion failed',
+      error: { code: 'apply-failed', detail: 'promotion failed' },
       preview: { imageName: 'filtered' },
       status: 'error',
     });
@@ -211,11 +211,92 @@ describe('createFilterOperationSession', () => {
     await session.commit('apply');
 
     expect(session.getSnapshot()).toMatchObject({
-      error: 'cache failed',
+      error: { code: 'apply-failed', detail: 'cache failed' },
       preview: { imageName: 'filtered' },
       status: 'error',
     });
     expect(deps.controller.getSnapshot()).toMatchObject({ identity: { kind: 'filter' }, status: 'active' });
+  });
+
+  it.each(['aborted', 'busy', 'locked', 'missing', 'not-ready', 'over-budget', 'stale', 'unsupported'] as const)(
+    'publishes a %s refusal as its code, keeping the preview for a retry',
+    async (refusal) => {
+      const commit = vi
+        .fn<FilterOperationSessionDeps['commit']>()
+        .mockResolvedValueOnce({ status: refusal })
+        .mockResolvedValueOnce({ layerId: layer.id, status: 'committed' });
+      const deps = createDeps({ commit });
+      const session = createFilterOperationSession({ deps, guard, initialFilter: layer.filter!, layerType: 'raster' })!;
+      await session.process();
+
+      expect(await session.commit('apply')).toBe(refusal === 'locked' ? 'blocked' : 'stale');
+      expect(session.getSnapshot()).toMatchObject({
+        error: { code: refusal },
+        preview: { imageName: 'filtered' },
+        status: 'error',
+      });
+      expect(session.getSnapshot().error).not.toHaveProperty('detail');
+
+      expect(await session.commit('apply')).toBe('committed');
+      expect(session.getSnapshot()).toMatchObject({ error: null, preview: null, status: 'ready' });
+    }
+  );
+
+  it('keeps the failure message of a filter run as detail', async () => {
+    const deps = createDeps({ runFilter: vi.fn(() => Promise.reject(new Error('graph exploded'))) });
+    const session = createFilterOperationSession({ deps, guard, initialFilter: layer.filter!, layerType: 'raster' })!;
+
+    expect(await session.process()).toBe('error');
+
+    expect(session.getSnapshot()).toMatchObject({
+      error: { code: 'process-failed', detail: 'graph exploded' },
+      preview: null,
+      status: 'error',
+    });
+  });
+
+  it.each([
+    ['disabled', 'disabled'],
+    ['empty', 'empty'],
+    ['missing', 'missing'],
+    ['not-ready', 'not-ready'],
+    ['aborted', 'not-ready'],
+    ['over-budget', 'source-over-budget'],
+    ['unsupported', 'unsupported'],
+  ] as const)('publishes a %s filter source as the %s code', async (status, code) => {
+    const deps = createDeps({ exportPixels: vi.fn(() => Promise.resolve({ status })) });
+    const session = createFilterOperationSession({ deps, guard, initialFilter: layer.filter!, layerType: 'raster' })!;
+
+    expect(await session.process()).toBe('error');
+
+    expect(session.getSnapshot()).toMatchObject({ error: { code }, preview: null, status: 'error' });
+    expect(session.getSnapshot().error).not.toHaveProperty('detail');
+    expect(deps.runFilter).not.toHaveBeenCalled();
+  });
+
+  it('publishes a filter source the guard no longer matches as stale', async () => {
+    const deps = createDeps({ isGuardCurrent: vi.fn(() => false) });
+    const session = createFilterOperationSession({ deps, guard, initialFilter: layer.filter!, layerType: 'raster' })!;
+
+    expect(await session.process()).toBe('error');
+
+    expect(session.getSnapshot()).toMatchObject({ error: { code: 'stale' }, status: 'error' });
+    expect(deps.runFilter).not.toHaveBeenCalled();
+  });
+
+  it('publishes no error when a cancelled apply is refused afterwards', async () => {
+    const pending = deferred<Awaited<ReturnType<FilterOperationSessionDeps['commit']>>>();
+    const deps = createDeps({ commit: vi.fn(() => pending.promise) });
+    const session = createFilterOperationSession({ deps, guard, initialFilter: layer.filter!, layerType: 'raster' })!;
+    await session.process();
+    const committing = session.commit('apply');
+    await vi.waitFor(() => expect(deps.commit).toHaveBeenCalledOnce());
+
+    session.cancel();
+    pending.resolve({ status: 'over-budget' });
+
+    expect(await committing).toBe('stale');
+    expect(session.getSnapshot()).toMatchObject({ error: null, preview: null, status: 'ready' });
   });
 
   it('cancel aborts work, clears preview, and closes the operation independently of subscribers', async () => {

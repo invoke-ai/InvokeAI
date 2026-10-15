@@ -17,7 +17,7 @@ export const PasswordInput = (props: InputProps) => {
       <IconButton
         aria-label={isVisible ? t('auth.hidePassword') : t('auth.showPassword')}
         color="fg.muted"
-        size="2xs"
+        size="sm"
         variant="ghost"
         onClick={handleToggleVisibility}
       >
@@ -63,7 +63,7 @@ export const PasswordStrengthMeter = ({ password }: { password: string }) => {
           />
         ))}
       </HStack>
-      <Text color={meta.tone} fontSize="2xs" fontWeight="600">
+      <Text color={meta.tone} fontSize="xs" fontWeight="600">
         {t(meta.labelKey)}
       </Text>
     </HStack>

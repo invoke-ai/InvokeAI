@@ -1,49 +1,51 @@
-"""Every registry entry must be an instantiable loader class.
+"""`ModelLoaderRegistry.register` refuses anything but a `ModelLoader` subclass.
 
-`ModelLoaderRegistry.register` does no runtime type check and returns its argument unchanged, so it
-happily decorates whatever follows it. Insert a helper function between the decorator and the class
-it was meant to decorate — a plausible outcome of extracting a loop into a named function — and the
-registry silently binds the helper instead. The helper keeps working everywhere it is called
-directly, the module imports, ruff is clean and the whole suite passes; the only symptom is that
-`ModelLoadService.load_model` calls `implementation(app_config=..., logger=..., ram_cache=...)` and
-gets `TypeError: <helper>() got an unexpected keyword argument 'app_config'` — i.e. that model type
-can no longer be loaded at all.
+Insert a helper function between the decorator and the class it was meant to decorate — a plausible
+outcome of extracting a loop into a named function — and a decorator without a type check binds the
+helper instead. The module imports and the helper keeps working where it is called directly; the only
+symptom is that `ModelLoadService.load_model` calls `implementation(app_config=..., ...)` and gets a
+`TypeError`, i.e. that model type can no longer be loaded at all. This happened to
+`Qwen3EncoderCheckpointLoader`.
 
-This happened to `Qwen3EncoderCheckpointLoader`. One assertion over the whole registry closes the
-class, so it cannot happen again to a loader nobody has an end-to-end test for.
+A class built directly on `ModelLoaderBase` is refused too: `ModelLoader` is where a cold load is checked
+against edits of its record, so such a loader could cache a model built from a superseded record.
 """
 
-import importlib
-import inspect
-import pkgutil
+from typing import Optional
 
-import invokeai.backend.model_manager.load.model_loaders as model_loaders_pkg
-from invokeai.backend.model_manager.load.load_base import ModelLoaderBase
+import pytest
+
+from invokeai.backend.model_manager.load.load_base import LoadedModel, ModelLoaderBase
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SubModelType
 
 
-def _import_every_loader_module() -> None:
-    """Registration is an import side effect, so nothing is in the registry until this runs."""
-    for module in pkgutil.iter_modules(model_loaders_pkg.__path__):
-        importlib.import_module(f"{model_loaders_pkg.__name__}.{module.name}")
+class _DirectLoader(ModelLoaderBase):
+    def __init__(self, app_config, logger, ram_cache) -> None:
+        pass
+
+    @property
+    def ram_cache(self):
+        raise NotImplementedError
+
+    def get_size_fs(self, config, model_path, submodel_type: Optional[SubModelType] = None) -> int:
+        return 0
+
+    def load_model(self, model_config, submodel_type: Optional[SubModelType] = None) -> LoadedModel:
+        raise NotImplementedError
 
 
-def test_every_registered_implementation_is_a_loader_class() -> None:
-    _import_every_loader_module()
-    assert ModelLoaderRegistry._registry, "no loaders registered — the import sweep above is broken"
-
-    not_classes = {key: impl for key, impl in ModelLoaderRegistry._registry.items() if not inspect.isclass(impl)}
-    assert not not_classes, (
-        "these registry keys are bound to something that is not a class, so instantiating them at "
-        f"load time raises TypeError: {not_classes}"
-    )
+def _helper() -> None:
+    pass
 
 
-def test_every_registered_implementation_subclasses_the_loader_base() -> None:
-    """A class is not enough on its own — `load_model` also needs the base's constructor signature."""
-    _import_every_loader_module()
+@pytest.mark.parametrize("implementation", [_helper, _DirectLoader], ids=["function", "direct-base-subclass"])
+def test_register_refuses_anything_but_a_model_loader(implementation) -> None:
+    before = dict(ModelLoaderRegistry._registry)
 
-    wrong_base = {
-        key: impl for key, impl in ModelLoaderRegistry._registry.items() if not issubclass(impl, ModelLoaderBase)
-    }
-    assert not wrong_base, f"registered implementations that are not ModelLoaderBase subclasses: {wrong_base}"
+    with pytest.raises(TypeError, match="must subclass ModelLoader"):
+        ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.Main, format=ModelFormat.Diffusers)(
+            implementation
+        )
+
+    assert ModelLoaderRegistry._registry == before

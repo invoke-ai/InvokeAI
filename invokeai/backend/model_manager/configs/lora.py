@@ -68,7 +68,7 @@ from invokeai.backend.patches.lora_conversions.wan_lora_constants import (
 
 # Defaults used to compute the effective slider range when one or both bounds
 # are unset. These intentionally mirror the frontend's DEFAULT_LORA_WEIGHT_CONFIG
-# in invokeai/frontend/web/src/features/controlLayers/store/lorasSlice.ts so that
+# in invokeai/frontend/webv1/src/features/controlLayers/store/lorasSlice.ts so that
 # bound/weight validation produces the same result whether it runs in the form
 # or in this pydantic model.
 _DEFAULT_LORA_WEIGHT_SLIDER_MIN = -1.0

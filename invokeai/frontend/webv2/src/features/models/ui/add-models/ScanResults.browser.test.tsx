@@ -5,10 +5,12 @@ import { addInstallJob, replaceInstallJob } from '@features/models/data/installs
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { getModelsUiSnapshotForTests, updateModelsUi } from '@features/models/ui/uiStore';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import { ScanResults } from './ScanResults';
 
@@ -107,6 +109,111 @@ describe('ScanResults install badge lifecycle', () => {
     const viewModel = [...host.querySelectorAll('button')].find((button) => button.textContent === 'models.viewModel');
     expect(viewModel).toBeDefined();
     await act(() => viewModel!.click());
+    expect(getModelsUiSnapshotForTests()).toMatchObject({ activeModelKey: 'installed-key', activeTab: 'details' });
+  });
+});
+
+describe('ScanResults row context menu', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+  const onInstall = vi.fn<(path: string) => void>();
+
+  const menuItem = (value: string) => document.querySelector<HTMLElement>(`[role="menuitem"][data-value="${value}"]`);
+  const openRowMenu = async (value: string) => {
+    await act(() => userEvent.click(host.querySelector<HTMLElement>('[data-list-primary]')!, { button: 'right' }));
+    await expect.poll(() => menuItem(value)).not.toBeNull();
+  };
+
+  beforeEach(async () => {
+    accountLifecycle.activate('scan-results-test-b', ':user:scan-results-test-b');
+    setModelsSnapshotForTests({ models: [], status: 'loaded' });
+    updateModelsUi({ activeModelKey: null, activeTab: 'add', queueExpanded: false });
+    onInstall.mockClear();
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <ScanResults
+            fp8Storage={false}
+            inplace
+            pendingSources={NO_PENDING}
+            scan={SCAN}
+            onClear={noop}
+            onInstall={onInstall}
+            onInstallAll={noop}
+            onSetFp8Storage={noop}
+            onSetInplace={noop}
+          />
+        </ChakraProvider>
+      );
+    });
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+    accountLifecycle.invalidate();
+  });
+
+  it('keeps the row out of the tab order beside its Install button', async () => {
+    const installButton = [...host.querySelectorAll('button')].find(
+      (button) => button.textContent === 'models.install'
+    )!;
+    installButton.focus();
+
+    await userEvent.tab({ shift: true });
+
+    expect(document.activeElement).not.toBe(host.querySelector('[data-list-primary]'));
+  });
+
+  it('animates the menu out on close, still offering the row it opened for', async () => {
+    await openRowMenu('install');
+    const menu = document.querySelector('[role="menu"]')!;
+
+    const frames = closingFrames(await recordDialogExit(menu, () => act(() => userEvent.keyboard('{Escape}'))));
+
+    expect(frames).not.toHaveLength(0);
+    for (const frame of frames) {
+      expect(frame.text).toContain('models.install');
+    }
+  });
+
+  it('installs the row from its context menu', async () => {
+    await openRowMenu('install');
+
+    await act(() => userEvent.click(menuItem('install')!));
+
+    expect(onInstall).toHaveBeenCalledExactlyOnceWith(SCANNED_PATH);
+  });
+
+  it('follows an install that starts while the menu is open to the queue', async () => {
+    await openRowMenu('install');
+
+    await act(async () => {
+      addInstallJob(queuedJob);
+      await Promise.resolve();
+    });
+
+    await expect.poll(() => menuItem('view-queue')).not.toBeNull();
+    expect(menuItem('install')).toBeNull();
+    await act(() => userEvent.click(menuItem('view-queue')!));
+
+    expect(getModelsUiSnapshotForTests().queueExpanded).toBe(true);
+    expect(onInstall).not.toHaveBeenCalled();
+  });
+
+  it('opens the model an installed row became', async () => {
+    await act(async () => {
+      setModelsSnapshotForTests({ models: [installedModel], status: 'loaded' });
+      await Promise.resolve();
+    });
+    await openRowMenu('view-model');
+
+    await act(() => userEvent.click(menuItem('view-model')!));
+
     expect(getModelsUiSnapshotForTests()).toMatchObject({ activeModelKey: 'installed-key', activeTab: 'details' });
   });
 });

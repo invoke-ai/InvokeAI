@@ -36,10 +36,10 @@ export const NodeActivityBar = () => {
       <Collapsible.Content>
         <Flex direction="column" h="min(22rem, 45dvh)" minH="0" overflow="hidden">
           <HStack borderBottomWidth={1} gap="2" justify="space-between" px="3" py="1.5">
-            <Text color="fg.muted" fontSize="2xs" fontWeight="700" textTransform="uppercase">
+            <Text color="fg.muted" fontSize="xs" fontWeight="700" textTransform="uppercase">
               {t('nodes.installActivity')}
             </Text>
-            <Button disabled={log.length === 0} size="2xs" variant="ghost" onClick={clearCustomNodeInstallLog}>
+            <Button disabled={log.length === 0} size="sm" variant="ghost" onClick={clearCustomNodeInstallLog}>
               <Icon as={Trash2Icon} boxSize="3" />
               {t('common.clear')}
             </Button>
@@ -67,9 +67,9 @@ export const NodeActivityBar = () => {
           ) : (
             <Icon as={ListOrderedIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
           )}
-          <MiddleTruncate flex="1" fontSize="xs" fontWeight="600" minW="0" text={summary} />
+          <MiddleTruncate flex="1" fontWeight="600" minW="0" text={summary} />
           {installingCount > 0 ? (
-            <Badge colorPalette="accent" flexShrink={0} fontSize="2xs" size="sm" variant="solid">
+            <Badge colorPalette="accent" flexShrink={0} fontSize="xs" size="lg" variant="solid">
               {installingCount}
             </Badge>
           ) : null}

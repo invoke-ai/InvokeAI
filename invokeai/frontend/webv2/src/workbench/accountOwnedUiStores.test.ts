@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 
 import type { ImageMapPoints } from './image-map/api';
 
-import { isHotkeyModalLayerActive, registerHotkeyModalLayer } from './hotkeys/modalLayer';
 import { imageMapStore } from './image-map/imageMapStore';
 import { commandPaletteStore } from './palette/paletteStore';
 import { openWorkbenchSettings, settingsDialogStore } from './settings/settingsDialogStore';
@@ -14,7 +13,6 @@ describe('account-owned workbench UI stores', () => {
     accountLifecycle.activate('user-a');
     commandPaletteStore.setSnapshot({ isOpen: true });
     openWorkbenchSettings('developer');
-    const unregisterModal = registerHotkeyModalLayer('settings');
     requestLayerProperties('user-a-layer');
     // Partial stand-in: the snapshot only needs to be observably non-empty.
     imageMapStore.patchSnapshot({
@@ -34,7 +32,6 @@ describe('account-owned workbench UI stores', () => {
       returnFocus: null,
     });
     expect(settingsDialogStore.getSnapshot().target).toBeUndefined();
-    expect(isHotkeyModalLayerActive()).toBe(false);
     expect(getLayerPropertiesRequest()).toBeNull();
     const imageMapSnapshot = imageMapStore.getSnapshot();
     expect(imageMapSnapshot.data).toBeNull();
@@ -42,6 +39,5 @@ describe('account-owned workbench UI stores', () => {
     expect(imageMapSnapshot.error).toBeNull();
     expect(imageMapSnapshot.indexCounts).toBeNull();
     expect(imageMapSnapshot.clusterLabels).toBeNull();
-    unregisterModal();
   });
 });

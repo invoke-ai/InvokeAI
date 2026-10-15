@@ -2,14 +2,17 @@
 import type { FoundModel } from '@features/models/core/types';
 
 import { HStack, Icon, Stack, Text } from '@chakra-ui/react';
-import { InstallSourceButton } from '@features/models/ui/shared/InstallSourceButton';
+import {
+  InstallSourceContextMenu,
+  type InstallSourceStatus,
+  useInstallSourceMenu,
+} from '@features/models/ui/shared/InstallSourceMenu';
+import { InstallPathRow } from '@features/models/ui/shared/InstallSourceRow';
 import { ResultsListHeader } from '@features/models/ui/shared/ResultsListHeader';
 import { useInstalledSourceKeys } from '@features/models/ui/shared/useInstalledSources';
-import { sourceFileName, sourceLocation, useSourceNameFilter } from '@features/models/ui/shared/useSourceNameFilter';
+import { sourceLocation, useSourceNameFilter } from '@features/models/ui/shared/useSourceNameFilter';
 import { IconButton } from '@platform/ui';
-import { ListItem } from '@platform/ui/list/ListItem';
 import { ListStack } from '@platform/ui/list/ListStack';
-import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { XIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -45,6 +48,13 @@ export const ScanResults = ({
   // installed from this list would otherwise keep offering Install forever.
   const installedSourceKeys = useInstalledSourceKeys();
   const isRowInstalled = (result: FoundModel) => result.is_installed || installedSourceKeys.has(result.path);
+  const statusOf = (result: FoundModel): InstallSourceStatus => ({
+    installedModelKey: installedSourceKeys.get(result.path) ?? null,
+    isInstalled: isRowInstalled(result),
+    isPending: pendingSources.has(result.path),
+  });
+  const menu = useInstallSourceMenu();
+  const menuResult = menu.shown ? filteredResults.find((result) => result.path === menu.shown?.source) : undefined;
 
   const notInstalledCount = scan.results.filter((result) => !isRowInstalled(result)).length;
   const installable = filteredResults.filter((result) => !isRowInstalled(result));
@@ -56,10 +66,10 @@ export const ScanResults = ({
   if (scan.results.length === 0) {
     return (
       <HStack justify="space-between">
-        <Text color="fg.subtle" fontSize="2xs">
+        <Text color="fg.subtle" fontSize="xs">
           {t('models.noModelFilesFound', { path: scan.path })}
         </Text>
-        <IconButton aria-label={t('models.dismissScanResults')} size="2xs" variant="ghost" onClick={onClear}>
+        <IconButton aria-label={t('models.dismissScanResults')} size="sm" variant="ghost" onClick={onClear}>
           <Icon as={XIcon} boxSize="3" />
         </IconButton>
       </HStack>
@@ -90,28 +100,30 @@ export const ScanResults = ({
         onSearchChange={setFilter}
       />
       <ListStack dividers label={scan.path}>
-        {filteredResults.map((result) => {
-          const location = sourceLocation(result.path, scan.path);
-
-          return (
-            <ListItem
-              key={result.path}
-              actions={
-                <InstallSourceButton
-                  installedModelKey={installedSourceKeys.get(result.path) ?? null}
-                  isInstalled={isRowInstalled(result)}
-                  isPending={pendingSources.has(result.path)}
-                  name={location ?? sourceFileName(result.path)}
-                  source={result.path}
-                  onInstall={() => onInstall(result.path)}
-                />
-              }
-              description={location ? <MiddleTruncate as="span" text={location} title={result.path} /> : undefined}
-              title={sourceFileName(result.path)}
-            />
-          );
-        })}
+        {filteredResults.map((result) => (
+          <InstallPathRow
+            key={result.path}
+            {...statusOf(result)}
+            isMenuOpen={menuResult?.path === result.path}
+            location={sourceLocation(result.path, scan.path)}
+            source={result.path}
+            onInstall={onInstall}
+            onOpenMenu={menu.open}
+          />
+        ))}
       </ListStack>
+      <InstallSourceContextMenu
+        status={menuResult ? statusOf(menuResult) : null}
+        isOpen={menu.target !== null}
+        target={menu.shown}
+        onClose={menu.close}
+        onExitComplete={menu.release}
+        onInstall={() => {
+          if (menuResult) {
+            onInstall(menuResult.path);
+          }
+        }}
+      />
     </Stack>
   );
 };

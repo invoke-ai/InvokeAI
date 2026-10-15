@@ -15,6 +15,9 @@ let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+// Border colors transition, so a fixed sleep can read an interpolated color on a loaded runner.
+const transitionsSettled = (element: Element) => expect.poll(() => element.getAnimations().length).toBe(0);
+
 afterEach(async () => {
   await act(() => root?.unmount());
   host?.remove();
@@ -53,6 +56,7 @@ describe('form control interaction styles', () => {
         globalThis.setTimeout(resolve, 200);
       });
     });
+    await transitionsSettled(input);
     expect(getComputedStyle(input).outlineStyle).toBe('none');
     expect(getComputedStyle(input).borderTopColor).toBe(accentBorderColor);
     await act(async () => {
@@ -62,6 +66,7 @@ describe('form control interaction styles', () => {
       });
     });
     expect(document.activeElement).toBe(trigger);
+    await transitionsSettled(trigger);
     expect(getComputedStyle(trigger).outlineStyle).toBe('none');
     expect(getComputedStyle(trigger).borderTopColor).toBe(accentBorderColor);
 
@@ -73,6 +78,7 @@ describe('form control interaction styles', () => {
       });
     });
     expect(trigger.getAttribute('data-state')).toBe('open');
+    await transitionsSettled(trigger);
     const hoveredFocusBorderColor = getComputedStyle(trigger).borderTopColor;
     expect(hoveredFocusBorderColor).toBe(accentBorderColor);
 
@@ -82,6 +88,7 @@ describe('form control interaction styles', () => {
         globalThis.setTimeout(resolve, 200);
       });
     });
+    await transitionsSettled(trigger);
     expect(hoveredFocusBorderColor).toBe(getComputedStyle(trigger).borderTopColor);
   });
 });

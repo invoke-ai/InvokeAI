@@ -1,5 +1,6 @@
 import type { ModelConfig, ModelTaxonomyType } from '@features/models/react';
 import type { FieldInputTemplate } from '@features/workflow/contracts';
+import type { WorkflowLibraryPage, WorkflowRecordDTO } from '@features/workflow/data/api';
 import type { LoraFieldCollectionEntry } from '@features/workflow/utility';
 import type { SeedInputPatch } from '@platform/ui/SeedInput';
 
@@ -29,6 +30,7 @@ import {
   type GalleryItem,
 } from '@features/gallery';
 import { getSelectedGalleryImageFromValues, toGalleryItemKey } from '@features/gallery/contracts';
+import { FindInGalleryThumbnailButton } from '@features/gallery/mediaSlot';
 import { GalleryPickerPopover, type GalleryPickerSelection } from '@features/gallery/picker';
 import { invalidateGallery } from '@features/gallery/queries';
 import { galleryImageUrls, galleryVideoUrls } from '@features/gallery/utility';
@@ -48,7 +50,9 @@ import {
 } from '@features/workflow/data/savedWorkflowFieldUtils';
 import {
   getWorkflowPagesItems,
+  savedWorkflowDetailQueryKey,
   savedWorkflowDetailQueryOptions,
+  savedWorkflowPickerQueryKeyPrefix,
   savedWorkflowPickerQueryOptions,
 } from '@features/workflow/data/savedWorkflowQueries';
 import { isSeedInputField } from '@features/workflow/graph';
@@ -99,7 +103,7 @@ import {
 } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { SeedInput } from '@platform/ui/SeedInput';
-import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { FilmIcon, ImageIcon, ImagePlusIcon, PlusIcon, RotateCcwIcon, Trash2Icon, XIcon } from 'lucide-react';
 import {
   lazy,
@@ -111,18 +115,19 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ChangeEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ModelSelect = lazy(() => import('@features/models/react').then((module) => ({ default: module.ModelSelect })));
 const MODEL_SELECT_FALLBACK = (
-  <Button disabled size="xs" w="full">
+  <Button disabled w="full">
     Loading models…
   </Button>
 );
 const RECORD_PICKER_FALLBACK = (
-  <Button disabled size="xs" w="full">
+  <Button disabled w="full">
     Loading…
   </Button>
 );
@@ -187,7 +192,6 @@ const StringInput = ({ ariaLabel, id, invalid, onChange, template, value }: Scal
         id={id ? `${id}-textarea` : undefined}
         minHeightPx={56}
         resizeHandleAriaLabel={`Resize ${template.title}`}
-        size="xs"
         value={text}
         w="full"
         {...invalidProps(invalid)}
@@ -202,7 +206,6 @@ const StringInput = ({ ariaLabel, id, invalid, onChange, template, value }: Scal
       aria-label={ariaLabel ?? template.title}
       className="nodrag"
       id={id ? `${id}-input` : undefined}
-      size="xs"
       value={text}
       w="full"
       {...invalidProps(invalid)}
@@ -282,7 +285,6 @@ const BooleanInput = ({ id, invalid, onChange, template, value }: WorkflowFieldI
       className="nodrag"
       ids={switchIds}
       invalid={invalid}
-      size="sm"
       onCheckedChange={onCheckedChange}
     >
       <Switch.HiddenInput aria-label={template.title} {...invalidProps(invalid)} />
@@ -335,7 +337,6 @@ const SelectInput = ({
       collection={collection}
       ids={selectIds}
       invalid={invalid}
-      size="xs"
       value={selectedValue}
       valueTextProps={SELECT_VALUE_TEXT_PROPS}
       w="full"
@@ -369,7 +370,6 @@ const EnumInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInpu
         id={id ? `${id}-scheduler-combobox` : undefined}
         invalid={invalid}
         options={options}
-        size="xs"
         value={typeof value === 'string' ? value : null}
         onValueChange={onOptionChange}
       />
@@ -422,7 +422,6 @@ const ModelIdentifierInput = ({ id, invalid, onChange, template, value }: Workfl
         invalid={invalid}
         isClearable={false}
         modelTypes={modelTypes}
-        size="xs"
         value={selectedKey}
         onChange={onModelChange}
       />
@@ -437,7 +436,6 @@ const SchedulerInput = ({ id, invalid, onChange, template, value }: WorkflowFiel
     id={id ? `${id}-scheduler-combobox` : undefined}
     invalid={invalid}
     options={SCHEDULER_OPTIONS}
-    size="xs"
     value={typeof value === 'string' ? value : null}
     onValueChange={onChange}
   />
@@ -687,7 +685,9 @@ const ImageCollectionTile = ({
   name: string;
   onRemove: (index: number) => void;
 }) => {
+  const { findInGallery } = useWorkflowUi();
   const onRemoveClick = useCallback(() => onRemove(index), [index, onRemove]);
+  const onFind = useCallback(() => findInGallery({ kind: 'image', name }), [findInGallery, name]);
 
   return (
     <Box aspectRatio="1" bg="bg.subtle" className="group" position="relative" rounded="xs">
@@ -706,7 +706,7 @@ const ImageCollectionTile = ({
         insetInlineEnd="0.5"
         opacity={0}
         position="absolute"
-        size="2xs"
+        size="sm"
         top="0.5"
         transition="opacity var(--wb-motion-duration-fast) ease"
         variant="subtle"
@@ -716,6 +716,7 @@ const ImageCollectionTile = ({
       >
         <Icon as={XIcon} boxSize="3" />
       </IconButton>
+      <FindInGalleryThumbnailButton bottom="0.5" insetInlineEnd="0.5" name={name} onFind={onFind} />
     </Box>
   );
 };
@@ -874,10 +875,10 @@ const ImageCollectionInput = ({
                 w="full"
                 {...(invalid ? MEDIA_WELL_INVALID_PROPS : MEDIA_WELL_PROPS)}
               >
-                <Text as="span" color="fg" fontSize="xs" fontWeight="600">
+                <Text as="span" color="fg" fontSize="md" fontWeight="600">
                   {pickerLabel}
                 </Text>
-                <Text as="span" color="fg.subtle" fontSize="2xs">
+                <Text as="span" color="fg.subtle" fontSize="xs">
                   {t('widgets.gallery.picker.dropHint')}
                 </Text>
               </Flex>
@@ -888,21 +889,21 @@ const ImageCollectionInput = ({
       </Box>
       <HStack gap="1.5" mt="1" w="full">
         <GalleryPickerPopover accept={IMAGE_ONLY} label={pickerLabel} selection={pickerSelection} onPick={onPick}>
-          <Button className="nodrag" size="2xs" variant="outline">
+          <Button className="nodrag" size="sm" variant="outline">
             <Icon as={ImagePlusIcon} boxSize="3" />
             {t('common.add')}
           </Button>
         </GalleryPickerPopover>
-        <Button className="nodrag" disabled={isUploading} size="2xs" variant="outline" onClick={onUploadClick}>
+        <Button className="nodrag" disabled={isUploading} size="sm" variant="outline" onClick={onUploadClick}>
           {isUploading ? 'Uploading…' : 'Upload'}
         </Button>
         {names.length > 0 ? (
-          <Button className="nodrag" size="2xs" variant="ghost" onClick={onClearClick}>
+          <Button className="nodrag" size="sm" variant="ghost" onClick={onClearClick}>
             Clear
           </Button>
         ) : null}
         {names.length > 0 ? (
-          <Text color="fg.subtle" fontSize="2xs" ms="auto">
+          <Text color="fg.subtle" fontSize="xs" ms="auto">
             {t('nodes.imageCollectionCount', { count: names.length })}
           </Text>
         ) : null}
@@ -922,6 +923,7 @@ const ImageCollectionInput = ({
 
 const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputProps & { kind: WorkflowMediaKind }) => {
   const { t } = useTranslation();
+  const { findInGallery } = useWorkflowUi();
   const config = MEDIA_FIELD_CONFIG[kind];
   const mediaName =
     typeof (value as Record<string, unknown> | null | undefined)?.[config.nameKey] === 'string'
@@ -946,6 +948,11 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
     [config.nameKey, onChange]
   );
   const onClearClick = useCallback(() => onChange(undefined), [onChange]);
+  const onFind = useCallback(() => {
+    if (mediaName) {
+      findInGallery({ kind, name: mediaName });
+    }
+  }, [findInGallery, kind, mediaName]);
 
   // Replace failed stale thumbnails with media icons; retry when the value changes.
   const [failedThumbnail, setFailedThumbnail] = useState<string | null>(null);
@@ -978,7 +985,7 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
     <Box position="relative" w="full" {...invalidAriaProps}>
       <MediaDropMonitor dropId={dropId} kind={kind} onDrop={onMediaDrop} />
       {/* The whole preview area is the drop target, like the legacy editor's widget. */}
-      <Box ref={setNodeRef} className="nodrag" h="32" position="relative" rounded="sm" w="full">
+      <Box ref={setNodeRef} className="nodrag group" h="32" position="relative" rounded="sm" w="full">
         <GalleryPickerPopover accept={pickerAccept} label={pickerLabel} onPick={onPick}>
           <chakra.button
             aria-label={pickerLabel}
@@ -1031,10 +1038,10 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
                 w="full"
                 {...(invalid ? MEDIA_WELL_INVALID_PROPS : MEDIA_WELL_PROPS)}
               >
-                <Text as="span" color="fg" fontSize="xs" fontWeight="600">
+                <Text as="span" color="fg" fontSize="md" fontWeight="600">
                   {pickerLabel}
                 </Text>
-                <Text as="span" color="fg.subtle" fontSize="2xs">
+                <Text as="span" color="fg.subtle" fontSize="xs">
                   {t('widgets.gallery.picker.dropHint')}
                 </Text>
               </Flex>
@@ -1048,11 +1055,14 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
             insetInlineEnd="1"
             pointerEvents="none"
             position="absolute"
-            size="xs"
             variant="solid"
           >
             {badge}
           </Badge>
+        ) : null}
+        {mediaName ? (
+          // Top corner: the size badge holds the bottom one.
+          <FindInGalleryThumbnailButton bottom="auto" name={mediaName} top="1" onFind={onFind} />
         ) : null}
         <DropTargetOverlay isActive={acceptsActiveDrag} isOver={isOver} label={`Drop ${config.noun}`} />
       </Box>
@@ -1060,7 +1070,7 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
         <Button
           className="nodrag"
           disabled={isUploading}
-          size="2xs"
+          size="sm"
           title={`Upload a ${config.noun} and use it here`}
           variant="outline"
           onClick={onUploadClick}
@@ -1068,7 +1078,7 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
           {isUploading ? 'Uploading…' : 'Upload'}
         </Button>
         {mediaName ? (
-          <Button className="nodrag" size="2xs" variant="ghost" onClick={onClearClick}>
+          <Button className="nodrag" size="sm" variant="ghost" onClick={onClearClick}>
             Clear
           </Button>
         ) : null}
@@ -1163,7 +1173,7 @@ const VideoFrameIndexInput = (props: WorkflowFieldInputProps) => {
         />
       ) : (
         <Flex borderStyle="dashed" borderWidth="1px" justifyContent="center" px="2" py="2" rounded="sm">
-          <Text color="fg.subtle" fontSize="xs" textAlign="center">
+          <Text color="fg.subtle" fontSize="md" textAlign="center">
             {isVideoConnected
               ? 'Frame preview unavailable while the video comes from a graph connection.'
               : videoName === null
@@ -1244,7 +1254,6 @@ const FrameScrubber = ({
           insetInlineEnd="1"
           pointerEvents="none"
           position="absolute"
-          size="xs"
           variant="solid"
         >
           {`${resolvedIndex} / ${frameCount - 1}`}
@@ -1256,7 +1265,6 @@ const FrameScrubber = ({
           aria-label={FRAME_SLIDER_ARIA_LABEL}
           max={frameCount - 1}
           min={0}
-          size="sm"
           step={1}
           value={sliderValue}
           withThumbTooltip
@@ -1366,7 +1374,6 @@ const LoRACollectionInput = ({ id, invalid, onChange, template, value }: Workflo
           invalid={invalid}
           modelTypes={(template.uiModelType as ModelTaxonomyType[] | null) ?? LORA_MODEL_TYPES}
           placeholder="Add LoRA…"
-          size="xs"
           value={null}
           onChange={onAdd}
         />
@@ -1439,7 +1446,7 @@ const LoRACollectionRow = ({
   return (
     <HStack gap="1" minW="0" w="full">
       <Tooltip content={entry ? label : 'This entry is not a readable LoRA and will block invoking.'}>
-        <MiddleTruncate color={entry ? undefined : 'fg.error'} flex="1" fontSize="2xs" minW="0" text={label} />
+        <MiddleTruncate color={entry ? undefined : 'fg.error'} flex="1" fontSize="xs" minW="0" text={label} />
       </Tooltip>
       {entry ? (
         <Field.Root flexShrink="0" invalid={!isLoraFieldWeightValid(entry.weight)} w="16">
@@ -1459,7 +1466,7 @@ const LoRACollectionRow = ({
         className="nodrag"
         color="fg.muted"
         flexShrink="0"
-        size="2xs"
+        size="sm"
         variant="ghost"
         onClick={onRemoveClick}
       >
@@ -1544,17 +1551,17 @@ const ScalarCollectionInput = ({ id, invalid, onChange, template, value }: Workf
         </Stack>
       ) : null}
       <HStack gap="1.5" w="full">
-        <Button ref={addButtonRef} className="nodrag" size="2xs" variant="outline" onClick={onAdd}>
+        <Button ref={addButtonRef} className="nodrag" size="sm" variant="outline" onClick={onAdd}>
           <Icon as={PlusIcon} boxSize="3" />
           {t('nodes.addItem')}
         </Button>
         {items.length > 0 ? (
-          <Button className="nodrag" size="2xs" variant="ghost" onClick={onClear}>
+          <Button className="nodrag" size="sm" variant="ghost" onClick={onClear}>
             {t('common.clear')}
           </Button>
         ) : null}
         {items.length > 0 ? (
-          <Text color="fg.subtle" fontSize="2xs" ms="auto">
+          <Text color="fg.subtle" fontSize="xs" ms="auto">
             {t('nodes.collectionItemCount', { count: items.length })}
           </Text>
         ) : null}
@@ -1587,7 +1594,7 @@ const ScalarCollectionRow = ({
 
   return (
     <HStack gap="1" w="full">
-      <Text color="fg.subtle" flexShrink="0" fontSize="2xs" fontVariantNumeric="tabular-nums" minW="4" textAlign="end">
+      <Text color="fg.subtle" flexShrink="0" fontSize="xs" fontVariantNumeric="tabular-nums" minW="4" textAlign="end">
         {index + 1}.
       </Text>
       {/* The host's Field.Root marks every control inside it invalid; a row scopes its own validity instead. */}
@@ -1608,7 +1615,7 @@ const ScalarCollectionRow = ({
           color="fg.muted"
           data-collection-remove=""
           flexShrink="0"
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={onRemoveClick}
         >
@@ -1620,7 +1627,7 @@ const ScalarCollectionRow = ({
 };
 
 const CONNECTION_ONLY_FALLBACK = (
-  <Text color="fg.subtle" fontSize="2xs">
+  <Text color="fg.subtle" fontSize="xs">
     Connection only
   </Text>
 );
@@ -1716,13 +1723,7 @@ const SavedWorkflowInput = ({ nodeId, onChange, template, value }: WorkflowField
           onValueChange={onWorkflowChange}
         />
         {nodeId && workflowId && detailQuery.isError ? (
-          <IconButton
-            aria-label={t('common.retry')}
-            className="nodrag"
-            size="xs"
-            variant="ghost"
-            onClick={retrySelection}
-          >
+          <IconButton aria-label={t('common.retry')} className="nodrag" variant="ghost" onClick={retrySelection}>
             <RotateCcwIcon />
           </IconButton>
         ) : null}
@@ -1730,7 +1731,6 @@ const SavedWorkflowInput = ({ nodeId, onChange, template, value }: WorkflowField
           <IconButton
             aria-label={t('nodes.savedWorkflowClear')}
             className="nodrag"
-            size="xs"
             variant="ghost"
             onClick={clearSelection}
           >
@@ -1740,31 +1740,31 @@ const SavedWorkflowInput = ({ nodeId, onChange, template, value }: WorkflowField
       </HStack>
       {selectionState.status === 'selected' ? (
         <HStack flexWrap="wrap" gap="1" minW="0">
-          <Text color="fg.muted" fontSize="2xs" minW="0" truncate>
+          <Text color="fg.muted" fontSize="xs" minW="0" truncate>
             {selectionState.workflow.name}
           </Text>
           {displayState.badges.includes('unsupported') ? (
-            <Badge fontSize="2xs">{t('nodes.savedWorkflowUnsupported')}</Badge>
+            <Badge fontSize="xs">{t('nodes.savedWorkflowUnsupported')}</Badge>
           ) : null}
           {displayState.badges.includes('default') ? (
-            <Badge fontSize="2xs">{t('nodes.savedWorkflowDefaultBadge')}</Badge>
+            <Badge fontSize="xs">{t('nodes.savedWorkflowDefaultBadge')}</Badge>
           ) : null}
           {displayState.badges.includes('shared') ? (
-            <Badge fontSize="2xs">{t('nodes.savedWorkflowShared')}</Badge>
+            <Badge fontSize="xs">{t('nodes.savedWorkflowShared')}</Badge>
           ) : null}
         </HStack>
       ) : (
-        <Badge alignSelf="flex-start" fontSize="2xs">
+        <Badge alignSelf="flex-start" fontSize="xs">
           {statusText}
         </Badge>
       )}
       {displayState.compatibility?.message ? (
-        <Text color="fg.subtle" fontSize="2xs">
+        <Text color="fg.subtle" fontSize="xs">
           {displayState.compatibility.message}
         </Text>
       ) : null}
       {isFetching ? (
-        <Text color="fg.subtle" fontSize="2xs">
+        <Text color="fg.subtle" fontSize="xs">
           {t('nodes.savedWorkflowUpdating')}
         </Text>
       ) : null}
@@ -1853,4 +1853,219 @@ export const WorkflowFieldInput = (props: WorkflowFieldInputProps) => {
     default:
       return CONNECTION_ONLY_FALLBACK;
   }
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const stringifySnapshotValue = (value: unknown): string | null => {
+  try {
+    return JSON.stringify(value) ?? null;
+  } catch {
+    return null;
+  }
+};
+
+const formatSnapshotObject = (value: Record<string, unknown>): string | null => {
+  const lora = value.lora;
+  if (isRecord(lora) && typeof lora.name === 'string') {
+    return typeof value.weight === 'number' ? `${lora.name} (${value.weight})` : lora.name;
+  }
+
+  for (const key of [
+    'name',
+    'image_name',
+    'video_name',
+    'latents_name',
+    'tensor_name',
+    'key',
+    'style_preset_id',
+    'system_prompt_id',
+    'workflow_id',
+    'board_id',
+    'id',
+  ]) {
+    const entry = value[key];
+    if (typeof entry === 'string' || typeof entry === 'number' || typeof entry === 'boolean') {
+      return String(entry);
+    }
+  }
+
+  if (['r', 'g', 'b', 'a'].every((channel) => typeof value[channel] === 'number')) {
+    return fromColorFieldValue(value);
+  }
+
+  return stringifySnapshotValue(value);
+};
+
+const formatSnapshotValue = (value: unknown, template: FieldInputTemplate): string | null => {
+  if (isWorkflowGeneratorFieldTypeName(template.type.name) && isRecord(value)) {
+    const { values: _resolvedValues, ...settings } = value;
+    return stringifySnapshotValue(settings);
+  }
+
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    if (template.type.name === 'EnumField') {
+      return template.uiChoiceLabels?.[String(value)] ?? String(value);
+    }
+
+    return value === '' ? null : String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return (
+      value
+        .map((entry) => (isRecord(entry) ? formatSnapshotObject(entry) : String(entry)))
+        .filter(Boolean)
+        .join(', ') || '[]'
+    );
+  }
+
+  return isRecord(value) ? formatSnapshotObject(value) : null;
+};
+
+const SNAPSHOT_VALUE_TEXT_PROPS = {
+  color: 'fg.muted',
+  fontSize: 'xs',
+  lineHeight: 'short',
+  mt: '0.5',
+  overflowWrap: 'anywhere',
+  whiteSpace: 'pre-wrap',
+} as const;
+
+/** Prefer detail metadata: appending picker pages does not refresh earlier records. */
+const SavedWorkflowSnapshot = ({ workflowId }: { workflowId: string }) => {
+  const queryClient = useQueryClient();
+  const getName = useCallback(() => {
+    const detailKey = savedWorkflowDetailQueryKey(workflowId);
+    const record = queryClient.getQueryData<WorkflowRecordDTO>(detailKey);
+    if (record?.name) {
+      return record.name;
+    }
+    for (const [, pages] of queryClient.getQueriesData<InfiniteData<WorkflowLibraryPage>>({
+      queryKey: savedWorkflowPickerQueryKeyPrefix,
+    })) {
+      for (const page of pages?.pages ?? []) {
+        const workflow = page.items.find((item) => item.workflow_id === workflowId);
+        if (workflow?.name) {
+          return workflow.name;
+        }
+      }
+    }
+    return workflowId;
+  }, [queryClient, workflowId]);
+  const subscribe = useCallback(
+    (onChange: () => void) =>
+      queryClient.getQueryCache().subscribe(({ query }) => {
+        const key = query.queryKey;
+        if (
+          key[0] === 'workflow' &&
+          key[1] === 'call-saved' &&
+          (key[2] === 'picker' || (key[2] === 'detail' && key[3] === workflowId))
+        ) {
+          onChange();
+        }
+      }),
+    [queryClient, workflowId]
+  );
+  const name = useSyncExternalStore(subscribe, getName, getName);
+
+  return (
+    <Text {...SNAPSHOT_VALUE_TEXT_PROPS} data-workflow-export-field-value="true">
+      {name}
+    </Text>
+  );
+};
+
+/** Renders authored values without mounting editors or resolving runtime diagnostics. */
+export const WorkflowFieldSnapshot = ({
+  seedMode = 'fixed',
+  template,
+  value,
+}: {
+  seedMode?: SeedMode;
+  template: FieldInputTemplate;
+  value: unknown;
+}) => {
+  const { t } = useTranslation();
+  let text = formatSnapshotValue(value, template);
+  if (isSeedInputField(template) && seedMode !== 'fixed') {
+    const modeLabel = t(`common.seedMode.${seedMode}`);
+    text = seedMode === 'random' || !text ? modeLabel : `${text} (${modeLabel})`;
+  }
+
+  if (template.type.name === 'SavedWorkflowField' && typeof value === 'string' && value) {
+    return <SavedWorkflowSnapshot workflowId={value} />;
+  }
+
+  if (template.type.name === 'ImageField') {
+    const names =
+      template.type.cardinality === 'COLLECTION'
+        ? getImageCollectionNames(value).filter(Boolean)
+        : isRecord(value) && typeof value.image_name === 'string' && value.image_name
+          ? [value.image_name]
+          : [];
+    if (names.length > 0) {
+      return (
+        <Box data-workflow-export-field-value="true" mt="0.5" w="full">
+          {template.type.cardinality === 'COLLECTION' ? (
+            <SimpleGrid borderWidth="1px" columns={3} gap="1" p="1" rounded="sm">
+              {names.map((name) => (
+                <Box key={name} aspectRatio="1" bg="bg.subtle" rounded="xs">
+                  <Image
+                    alt={name}
+                    h="full"
+                    objectFit="cover"
+                    rounded="xs"
+                    src={galleryImageUrls.thumbnail(name)}
+                    w="full"
+                  />
+                </Box>
+              ))}
+            </SimpleGrid>
+          ) : (
+            <Flex align="center" borderWidth="1px" h="32" justify="center" overflow="hidden" rounded="sm" w="full">
+              <Image
+                alt={names[0]!}
+                maxH="full"
+                maxW="full"
+                objectFit="contain"
+                src={galleryImageUrls.thumbnail(names[0]!)}
+              />
+            </Flex>
+          )}
+          <Text {...SNAPSHOT_VALUE_TEXT_PROPS}>{text}</Text>
+        </Box>
+      );
+    }
+  }
+
+  if (template.type.name === 'StringField') {
+    return (
+      <Box
+        borderColor="border"
+        borderRadius="control"
+        borderWidth="1px"
+        data-workflow-export-field-value="true"
+        fontFamily={template.uiComponent === 'textarea' ? 'mono' : undefined}
+        minH="control.md"
+        minW="0"
+        mt="0.5"
+        overflowWrap="anywhere"
+        px="2"
+        py="1"
+        textStyle="md"
+        w="full"
+        whiteSpace="pre-wrap"
+      >
+        {text}
+      </Box>
+    );
+  }
+
+  return text ? (
+    <Text {...SNAPSHOT_VALUE_TEXT_PROPS} data-workflow-export-field-value="true">
+      {text}
+    </Text>
+  ) : null;
 };

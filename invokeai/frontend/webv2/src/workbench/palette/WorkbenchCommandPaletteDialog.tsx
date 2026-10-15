@@ -61,8 +61,10 @@ const WorkbenchCommandPaletteDialog = ({
   catalog,
   formatHotkey,
   getWidgetsForRegion,
+  isOpen,
   modifierKeyLabel,
   onClose,
+  onExitComplete,
   openWidgetPlacement,
   preferences,
   requestQueueItemReveal,
@@ -71,8 +73,10 @@ const WorkbenchCommandPaletteDialog = ({
   catalog: readonly HotkeyDefinition[];
   formatHotkey: (hotkey: string) => string[];
   getWidgetsForRegion: typeof GetWidgetsForRegion;
+  isOpen: boolean;
   modifierKeyLabel: string;
   onClose: () => void;
+  onExitComplete: () => void;
   openWidgetPlacement: typeof OpenWidgetPlacement;
   preferences: WorkbenchPreferences;
   requestQueueItemReveal: (itemId: number) => void;
@@ -184,7 +188,7 @@ const WorkbenchCommandPaletteDialog = ({
     const imageEntryDeps = {
       openPreviewWidget: () => openWidget('preview'),
       revealImage: (image: GalleryImage) => findGalleryItem({ kind: 'image', name: image.imageName }),
-      selectImage: (image: GalleryImage) => gallery.selectImage(image),
+      selectImage: (image: GalleryImage) => gallery.selectImageInItsBoard(image),
       locale: i18n.resolvedLanguage,
       t,
     };
@@ -273,10 +277,11 @@ const WorkbenchCommandPaletteDialog = ({
   return (
     <CommandPaletteDialog
       entries={entries}
-      isOpen
+      isOpen={isOpen}
       modifierKeyLabel={modifierKeyLabel}
       providers={providers}
       onClose={onClose}
+      onExitComplete={onExitComplete}
     />
   );
 };

@@ -5,12 +5,14 @@ import type { CanvasLoadRefusal } from './canvasLoadContracts';
 import type { GraphContract } from './graphContracts';
 import type { InvocationControllerState } from './invocationContracts';
 import type {
+  FloatingWidgetGeometry,
   FloatingWidgetState,
   LayoutPreset,
   LayoutPresetId,
   LayoutPresetMetadataOverrides,
   LayoutPresetOverrides,
   LayoutPresetRouteOverrides,
+  LayoutPresetWorkingCopy,
   ProjectLayoutState,
   WidgetRegion,
   WidgetRegionState,
@@ -37,6 +39,17 @@ export interface Project {
   widgetRegions: Record<WidgetRegion, WidgetRegionState>;
   /** Floating instances leave their region's instanceIds; absent in older projects means no floating windows. */
   floatingWidgets?: Record<WidgetInstanceId, FloatingWidgetState>;
+  /**
+   * The last window geometry of instances that are not floating now. It is a convenience, not layout: presets,
+   * layout drift, and undo leave it out. Absent means nothing is remembered.
+   */
+  lastFloatingGeometry?: Record<WidgetInstanceId, FloatingWidgetGeometry>;
+  /**
+   * This project's arrangement of each preset it switched away from while that arrangement differed from the saved
+   * one, oldest first, at most one per preset. Arrangement only (no widget state), and never the active preset: the
+   * live layout is its working copy. Absent means every inactive preset opens as saved.
+   */
+  presetWorkingLayouts?: LayoutPresetWorkingCopy[];
   widgetGraphs: Partial<Record<WidgetTypeId, GraphContract>>;
   canvas: CanvasStateContractV3;
   promptHistory: PromptHistoryItem[];
@@ -133,6 +146,8 @@ export interface ProjectUndoSnapshot {
   widgetRegions: Record<WidgetRegion, WidgetRegionState>;
   /** Captured with widgetRegions: regions and floating windows are one placement fact. */
   floatingWidgets?: Record<WidgetInstanceId, FloatingWidgetState>;
+  /** Captured with `layout.presetId`, so undoing a preset switch brings back the working copies it moved. */
+  presetWorkingLayouts?: Project['presetWorkingLayouts'];
   widgetGraphs: Partial<Record<WidgetTypeId, GraphContract>>;
 }
 

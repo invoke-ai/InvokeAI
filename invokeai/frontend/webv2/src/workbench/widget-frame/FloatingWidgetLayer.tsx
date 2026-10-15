@@ -1,7 +1,7 @@
 import type { FloatingWidgetState } from '@workbench/layoutContracts';
 import type { WidgetInstanceId } from '@workbench/widgetContracts';
 
-import { shallowEqual, useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import { shallowEqual, useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { lazy, Suspense } from 'react';
 
 // The window chrome loads only once a widget actually floats, keeping it out
@@ -14,23 +14,39 @@ const EMPTY_FLOATING: Record<WidgetInstanceId, FloatingWidgetState> = {};
 
 /**
  * Render floating windows with z-order derived from stackOrder rank, keeping persisted ordering within UI layer
- * bounds.
+ * bounds. The windows render in a fixed order and stack by z-index alone: raising one must not move its DOM node,
+ * which would drop keyboard focus from the very window that focus just raised.
+ *
+ * Each host is keyed by project as well as instance: instance ids repeat across projects, and a window carried
+ * over from the previous project would keep that project's gesture, pending cleanup, and widget state.
  */
 export const FloatingWidgetLayer = () => {
+  const projectId = useActiveProjectId();
   const floatingWidgets = useActiveProjectSelector(
     (project) => project.floatingWidgets ?? EMPTY_FLOATING,
     shallowEqual
   );
-  const entries = Object.entries(floatingWidgets).sort(([, left], [, right]) => left.stackOrder - right.stackOrder);
+  const instanceIds = Object.keys(floatingWidgets).sort();
 
-  if (entries.length === 0) {
+  if (instanceIds.length === 0) {
     return null;
   }
 
+  const stackRanks = new Map(
+    [...instanceIds]
+      .sort((left, right) => floatingWidgets[left].stackOrder - floatingWidgets[right].stackOrder)
+      .map((instanceId, stackRank) => [instanceId, stackRank])
+  );
+
   return (
     <Suspense fallback={null}>
-      {entries.map(([instanceId, state], stackRank) => (
-        <FloatingWidgetWindow key={instanceId} instanceId={instanceId} stackRank={stackRank} state={state} />
+      {instanceIds.map((instanceId) => (
+        <FloatingWidgetWindow
+          key={`${projectId}:${instanceId}`}
+          instanceId={instanceId}
+          stackRank={stackRanks.get(instanceId) ?? 0}
+          state={floatingWidgets[instanceId]}
+        />
       ))}
     </Suspense>
   );

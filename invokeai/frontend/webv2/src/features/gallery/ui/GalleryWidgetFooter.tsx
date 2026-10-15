@@ -41,7 +41,7 @@ export const GalleryWidgetFooter = () => {
         siblingCount={1}
         onPageChange={handlePageChange}
       >
-        <ButtonGroup gap="1" size="2xs" variant="ghost">
+        <ButtonGroup gap="1" size="sm" variant="ghost">
           <Pagination.PrevTrigger asChild>
             <IconButton aria-label={t('common.previousPage')}>
               <ChevronLeftIcon />

@@ -59,10 +59,10 @@ describe('layer restore through history on an interleaved document', () => {
     expect(engine.layers.commitPrepared('Delete', remove.edit).status).toBe('committed');
     expect(getDocumentLeaves(document()).some((layer) => layer.id === 'r0')).toBe(false);
 
-    engine.history.undo();
+    expect(await engine.history.undo()).toBe('applied');
     expect(getDocumentLeaves(document()).find((layer) => layer.id === 'r0')).toEqual(r0);
 
-    expect(() => engine.history.undo()).not.toThrow();
+    expect(await engine.history.undo()).toBe('applied');
     expect(haveSameStructure(document().stacks, original.stacks)).toBe(true);
     expect(document().selectedLayerId).toBe('r0');
     expect(engine.stores.canUndo.get()).toBe(false);
@@ -87,14 +87,14 @@ describe('layer restore through history on an interleaved document', () => {
     expect(engine.layers.commitPrepared('Delete', remove.edit).status).toBe('committed');
     expect(getDocumentLeaves(document()).map((layer) => layer.id)).toEqual(['m1', 'r1']);
 
-    engine.history.undo();
+    expect(await engine.history.undo()).toBe('applied');
     expect(
       getDocumentLeaves(document())
         .filter((layer) => layer.type === 'raster')
         .map((layer) => layer.id)
     ).toEqual([duplicateId, 'r0', 'r1']);
 
-    expect(() => engine.history.undo()).not.toThrow();
+    expect(await engine.history.undo()).toBe('applied');
     expect(haveSameStructure(document().stacks, original.stacks)).toBe(true);
     expect(engine.stores.canUndo.get()).toBe(false);
     engine.lifecycle.dispose();
@@ -126,10 +126,10 @@ describe('layer restore through history on an interleaved document', () => {
     expect(new Set([...copiedIds, ...getDocumentLeaves(original).map((layer) => layer.id)]).size).toBe(7);
     expect(outline()).toHaveLength(10);
 
-    engine.history.undo();
+    expect(await engine.history.undo()).toBe('applied');
     expect(haveSameStructure(document().stacks, original.stacks)).toBe(true);
     expect(document().selectedLayerId).toBe('g');
-    engine.history.redo();
+    expect(await engine.history.redo()).toBe('applied');
     expect(getDocumentIndex(document()).byId.get(copyId!)?.node).toMatchObject({ name: 'g copy' });
     engine.lifecycle.dispose();
   });

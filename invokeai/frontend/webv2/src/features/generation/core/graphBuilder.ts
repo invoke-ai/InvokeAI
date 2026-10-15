@@ -57,6 +57,15 @@ export const toModelIdentifier = (
   ...(typeof model.submodel_type === 'string' ? { submodel_type: model.submodel_type } : {}),
 });
 
+/**
+ * The LoRAs a graph loads, as metadata records them. Read from the graph rather than the settings, so a record names
+ * only concepts that reached inference; a family whose graph has no LoRA loader loads none.
+ */
+export const getLoadedLoras = (graph: BackendGraphContract) =>
+  Object.values(graph.nodes)
+    .filter((node) => node.type === 'lora_selector')
+    .map((node) => ({ model: node.lora, weight: node.weight }));
+
 export const addMetadata = (
   graph: BackendGraphContract,
   outputNode: BackendInvocationContract,
@@ -66,7 +75,7 @@ export const addMetadata = (
   projectSettings: GenerationProjectSettings & { randDevice?: string },
   extras: Record<string, unknown> = {}
 ) => {
-  const activeLoras = getActiveCompatibleLoras(settings, model);
+  const loadedLoras = getLoadedLoras(graph);
   const scheduler = coerceSchedulerForGraph(model, settings.scheduler);
   const metadata = addNode(graph, {
     cfg_scale: settings.cfgScale,
@@ -84,14 +93,7 @@ export const addMetadata = (
     vae: settings.vae ?? undefined,
     width: settings.width,
     ...extras,
-    ...(activeLoras.length
-      ? {
-          loras: activeLoras.map((lora) => ({
-            model: toModelIdentifier(lora.model),
-            weight: lora.weight,
-          })),
-        }
-      : {}),
+    ...(loadedLoras.length ? { loras: loadedLoras } : {}),
     ...(model.base === 'sdxl' ? {} : { clip_skip: settings.clipSkip }),
   });
 

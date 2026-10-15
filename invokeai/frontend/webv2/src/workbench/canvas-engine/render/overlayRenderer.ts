@@ -1,18 +1,20 @@
 /**
- * Interaction overlays render in screen space through `view`, keeping strokes and handles constant-sized at any
- * zoom. The unbounded plane has no document outline; all drawing uses {@link RasterSurface} contexts.
+ * Interaction overlays render in CSS pixels through `view` under a device-pixel-ratio base transform, keeping
+ * strokes and handles constant in CSS pixels at any zoom and DPR, where pointer hit testing measures them. The
+ * unbounded plane has no document outline; all drawing uses {@link RasterSurface} contexts.
  */
 
 import type { ParametricShapeKind } from '@workbench/canvas-engine/contracts';
 import type { Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';
 
-import { applyToPoint, getScale, invert } from '@workbench/canvas-engine/math/mat2d';
+import { applyToPoint, getScale, invert, multiply } from '@workbench/canvas-engine/math/mat2d';
 import { transformBounds } from '@workbench/canvas-engine/math/rect';
 import { buildParametricShapePath } from '@workbench/canvas-engine/render/rasterizers/shapeRasterizer';
 import { drawMarchingAnts, type MarchingAntsRender } from '@workbench/canvas-engine/selection/marchingAnts';
 import { BBOX_HANDLES, bboxHandlePoint } from '@workbench/canvas-engine/tools/bboxHitTest';
 import { TRANSFORM_ROTATE_NUB_PX } from '@workbench/canvas-engine/transform/transformMath';
 
+import type { RgbaSample } from './colorSample';
 import type { RasterSurface } from './raster';
 
 /** Minimum screen-space grid spacing (px) below which the grid is too dense to draw. */
@@ -48,6 +50,33 @@ export interface OverlayCursor {
   radiusDoc: number;
 }
 
+/** The color picker's loupe diameter in CSS pixels. */
+const COLOR_LOUPE_DIAMETER_PX = 120;
+/** Each magnified pixel spans at least this many CSS pixels, and twice the canvas zoom. */
+const COLOR_LOUPE_MIN_CELL_PX = 8;
+const COLOR_LOUPE_RING = '#d4d4d4';
+const COLOR_LOUPE_LABEL_FONT = '600 11px ui-monospace, SFMono-Regular, Menlo, monospace';
+const COLOR_LOUPE_LABEL_FILL = 'rgba(0, 0, 0, 0.72)';
+
+/** Document pixels across the loupe at `zoom`: odd, so the sampled one sits at the center, and at least three. */
+export const colorLoupePixels = (zoom: number): number => {
+  const cell = Math.max(COLOR_LOUPE_MIN_CELL_PX, zoom * 2);
+  const count = Math.floor(COLOR_LOUPE_DIAMETER_PX / cell);
+  return Math.max(3, count % 2 === 0 ? count - 1 : count);
+};
+
+/** The color picker's magnified view of the pixels under the pointer. */
+export interface ColorLoupeOverlay {
+  /** The pointer in document space; the loupe is centered on it. */
+  point: Vec2;
+  /** A square of document pixels around the sampled one, which is the center pixel. */
+  pixels: RasterSurface;
+  /** The sampled color, or null over empty canvas. */
+  color: RgbaSample | null;
+  /** The canvas checkerboard tile, shown where the canvas is empty. */
+  checker: RasterSurface;
+}
+
 /** A live parametric-shape drag outline in document space (shape and marquee tools). */
 export interface RectShapePreview {
   rect: Rect;
@@ -56,8 +85,12 @@ export interface RectShapePreview {
 
 /** Everything the overlay needs to draw a frame. */
 export interface OverlayState {
-  /** Document→screen transform. */
+  /** Document→CSS-pixel transform. */
   view: Mat2d;
+  /** Backing-store pixels per CSS pixel. */
+  dpr: number;
+  /** The viewport in CSS pixels. */
+  viewportSize: { readonly width: number; readonly height: number };
   /** Generation bounding box in document space. */
   bbox: Rect;
   /** Whether to draw the eight bbox resize handles (bbox tool active). */
@@ -76,6 +109,8 @@ export interface OverlayState {
   gridSize?: number;
   /** Brush cursor ring, or `null`/absent to hide it. */
   cursor?: OverlayCursor | null;
+  /** The color picker's loupe, or `null`/absent to hide it. */
+  colorLoupe?: ColorLoupeOverlay | null;
   /** Move outline uses four document-space content corners projected through view; null/absence hides it. */
   layerOutline?: readonly Vec2[] | null;
   /**
@@ -137,7 +172,7 @@ const strokeRectScreen = (ctx: Ctx, screenRect: Rect): void => {
  * Project viewport bounds into document space and snap outward to grid cells for seamless pan/zoom. Skip overly
  * dense grids; never clip to document bounds.
  */
-const drawGrid = (ctx: Ctx, state: OverlayState, target: RasterSurface): void => {
+const drawGrid = (ctx: Ctx, state: OverlayState): void => {
   const gridSize = state.gridSize ?? 0;
   if (gridSize <= 0) {
     return;
@@ -155,9 +190,9 @@ const drawGrid = (ctx: Ctx, state: OverlayState, target: RasterSurface): void =>
   // Document-space bounds of the viewport's four screen corners.
   const corners = [
     applyToPoint(inv, { x: 0, y: 0 }),
-    applyToPoint(inv, { x: target.width, y: 0 }),
-    applyToPoint(inv, { x: 0, y: target.height }),
-    applyToPoint(inv, { x: target.width, y: target.height }),
+    applyToPoint(inv, { x: state.viewportSize.width, y: 0 }),
+    applyToPoint(inv, { x: 0, y: state.viewportSize.height }),
+    applyToPoint(inv, { x: state.viewportSize.width, y: state.viewportSize.height }),
   ];
   const xs = corners.map((p) => p.x);
   const ys = corners.map((p) => p.y);
@@ -208,6 +243,74 @@ const drawCursor = (ctx: Ctx, state: OverlayState): void => {
   ctx.strokeStyle = CURSOR_LIGHT;
   ctx.lineWidth = CURSOR_INNER_WIDTH_PX;
   ctx.stroke();
+  ctx.restore();
+};
+
+/** Strokes the current path dark-then-light so it reads over any pixels. */
+const strokeOutlined = (ctx: Ctx, light: string, lightWidth: number): void => {
+  ctx.strokeStyle = CURSOR_DARK;
+  ctx.lineWidth = lightWidth + 2;
+  ctx.stroke();
+  ctx.strokeStyle = light;
+  ctx.lineWidth = lightWidth;
+  ctx.stroke();
+};
+
+/**
+ * Draws the picker's loupe: the pixels around the pointer magnified without smoothing inside a ring, the sampled
+ * center pixel boxed as the target (the picker hides the system cursor), and its RGB values below.
+ */
+const drawColorLoupe = (ctx: Ctx, state: OverlayState): void => {
+  const loupe = state.colorLoupe;
+  if (!loupe) {
+    return;
+  }
+  const point = applyToPoint(state.view, loupe.point);
+  // Whole device pixels keep the magnified cells crisp.
+  const center = { x: Math.round(point.x * state.dpr) / state.dpr, y: Math.round(point.y * state.dpr) / state.dpr };
+  const radius = COLOR_LOUPE_DIAMETER_PX / 2;
+  const cell = COLOR_LOUPE_DIAMETER_PX / loupe.pixels.width;
+  ctx.save();
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+  ctx.clip();
+  const checker = ctx.createPattern(loupe.checker.canvas, 'repeat');
+  if (checker) {
+    ctx.fillStyle = checker;
+    ctx.fillRect(center.x - radius, center.y - radius, radius * 2, radius * 2);
+  }
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(loupe.pixels.canvas, center.x - radius, center.y - radius, radius * 2, radius * 2);
+  ctx.restore();
+
+  ctx.save();
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.rect(center.x - cell / 2, center.y - cell / 2, cell, cell);
+  strokeOutlined(ctx, CURSOR_LIGHT, 1);
+  ctx.beginPath();
+  ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+  strokeOutlined(ctx, COLOR_LOUPE_RING, 2);
+
+  if (loupe.color) {
+    const label = `${loupe.color.r} ${loupe.color.g} ${loupe.color.b}`;
+    ctx.font = COLOR_LOUPE_LABEL_FONT;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const width = ctx.measureText(label).width + 12;
+    const height = 18;
+    const labelY = center.y + cell / 2 + 12 + height / 2;
+    const end = height / 2;
+    ctx.beginPath();
+    ctx.arc(center.x - width / 2 + end, labelY, end, Math.PI / 2, (Math.PI * 3) / 2);
+    ctx.arc(center.x + width / 2 - end, labelY, end, -Math.PI / 2, Math.PI / 2);
+    ctx.closePath();
+    ctx.fillStyle = COLOR_LOUPE_LABEL_FILL;
+    ctx.fill();
+    ctx.fillStyle = CURSOR_LIGHT;
+    ctx.fillText(label, center.x, labelY);
+  }
   ctx.restore();
 };
 
@@ -401,19 +504,19 @@ const SAM_EXCLUDE_COLOR = '#ef4444';
 const SAM_POINT_RADIUS_PX = 5;
 const SAM_HANDLE_DRAW_PX = 8;
 
-const drawSamPreview = (ctx: Ctx, state: OverlayState): void => {
+const drawSamPreview = (ctx: Ctx, state: OverlayState, base: Mat2d): void => {
   const preview = state.samPreview;
   if (!preview) {
     return;
   }
-  const { view } = state;
+  const placed = multiply(base, state.view);
   ctx.save();
-  ctx.setTransform(view.a, view.b, view.c, view.d, view.e, view.f);
+  ctx.setTransform(placed.a, placed.b, placed.c, placed.d, placed.e, placed.f);
   ctx.globalAlpha = preview.opacity;
   ctx.drawImage(preview.surface.canvas, preview.rect.x, preview.rect.y, preview.rect.width, preview.rect.height);
   ctx.restore();
   if (preview.outline) {
-    drawMarchingAnts(ctx, state.view, { matrix: null, paths: [preview.outline], phase: preview.phase });
+    drawMarchingAnts(ctx, state.view, { matrix: null, paths: [preview.outline], phase: preview.phase }, base);
   }
 };
 
@@ -460,7 +563,7 @@ const drawSamGeometry = (ctx: Ctx, state: OverlayState): void => {
  * Even-odd viewport/bbox fill shades outside the generation frame; globalAlpha controls opacity independently of
  * theme color.
  */
-const drawBboxOverlayShade = (ctx: Ctx, state: OverlayState, target: RasterSurface): void => {
+const drawBboxOverlayShade = (ctx: Ctx, target: RasterSurface, state: OverlayState): void => {
   if (!state.bboxOverlay) {
     return;
   }
@@ -469,7 +572,8 @@ const drawBboxOverlayShade = (ctx: Ctx, state: OverlayState, target: RasterSurfa
   ctx.globalAlpha = BBOX_OVERLAY_ALPHA;
   ctx.fillStyle = state.bboxOverlayColor ?? BBOX_OVERLAY_FILL;
   ctx.beginPath();
-  ctx.rect(0, 0, target.width, target.height);
+  // The backing store rounds its device size, so cover it whole rather than the CSS viewport.
+  ctx.rect(0, 0, target.width / state.dpr, target.height / state.dpr);
   ctx.rect(bboxScreen.x, bboxScreen.y, bboxScreen.width, bboxScreen.height);
   ctx.fill('evenodd');
   ctx.restore();
@@ -517,20 +621,22 @@ const drawBboxHandles = (ctx: Ctx, state: OverlayState): void => {
   ctx.restore();
 };
 
-/** Clears and redraws the entire overlay for the given `state`. */
+/** Clears the backing store, then redraws the overlay in CSS pixels under the state's device-pixel ratio. */
 export const renderOverlay = (target: RasterSurface, state: OverlayState): void => {
   const ctx = target.ctx;
+  const base: Mat2d = { a: state.dpr, b: 0, c: 0, d: state.dpr, e: 0, f: 0 };
 
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, target.width, target.height);
+  ctx.setTransform(base.a, base.b, base.c, base.d, base.e, base.f);
 
   // Shade outside bbox first, then draw overlay chrome above it. The unbounded plane has no document outline.
-  drawBboxOverlayShade(ctx, state, target);
+  drawBboxOverlayShade(ctx, target, state);
 
   // Grid next (behind the bbox), spanning the whole viewport.
   if (state.showGrid) {
-    drawGrid(ctx, state, target);
+    drawGrid(ctx, state);
   }
 
   // Rule-of-thirds guides sit inside the bbox, behind its frame.
@@ -544,19 +650,20 @@ export const renderOverlay = (target: RasterSurface, state: OverlayState): void 
     ctx.setLineDash([]);
   }
 
-  drawSamPreview(ctx, state);
+  drawSamPreview(ctx, state, base);
   drawSamGeometry(ctx, state);
   drawLayerOutline(ctx, state);
   drawBboxHandles(ctx, state);
   drawTransformFrame(ctx, state);
   if (state.marchingAnts) {
-    drawMarchingAnts(ctx, state.view, state.marchingAnts);
+    drawMarchingAnts(ctx, state.view, state.marchingAnts, base);
   }
   drawLassoPreview(ctx, state);
   drawRectShapePreview(ctx, state, state.marqueePreview);
   drawRectShapePreview(ctx, state, state.shapePreview);
   drawGradientPreview(ctx, state);
   drawCursor(ctx, state);
+  drawColorLoupe(ctx, state);
 
   ctx.restore();
 };

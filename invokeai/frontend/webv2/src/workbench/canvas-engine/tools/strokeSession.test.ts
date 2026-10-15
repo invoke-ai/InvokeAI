@@ -1,13 +1,21 @@
 import type { LayerCacheEntry } from '@workbench/canvas-engine/render/layerCache';
 import type { StubRasterBackend, StubRasterSurface } from '@workbench/canvas-engine/render/raster.testStub';
-import type { ToolContext } from '@workbench/canvas-engine/tools/tool';
+import type { StrokeEdit, ToolContext } from '@workbench/canvas-engine/tools/tool';
 import type { PointerInput } from '@workbench/canvas-engine/types';
 
+import * as freehand from '@workbench/canvas-engine/freehand';
 import { fromTRS } from '@workbench/canvas-engine/math/mat2d';
 import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
+import { ADMIT_ALL, commitStroke, createRecordingStrokeEdit } from '@workbench/canvas-engine/tools/strokeEdit.testStub';
 import { createStrokeSession } from '@workbench/canvas-engine/tools/strokeSession';
 import { describe, expect, it, vi } from 'vitest';
+
+/** Renders a scheduled stroke frame immediately; frame timing is covered by the engine tests. */
+const runFrameNow = (task: () => void): (() => void) => {
+  task();
+  return () => undefined;
+};
 
 const pointer = (x: number, y: number): PointerInput => ({
   buttons: 1,
@@ -42,7 +50,6 @@ const runStroke = (opts: { withMask: boolean }) => {
   const entry: LayerCacheEntry = layers.getOrCreate('L', 100, 100);
   const mask = opts.withMask ? backend.createSurface(100, 100) : null;
   const clipMask = mask ? { rect: { height: 100, width: 100, x: 0, y: 0 }, surface: mask } : null;
-  const emitStrokeCommitted = vi.fn();
   const notifyLayerPainted = vi.fn();
 
   const ctx = {
@@ -51,15 +58,16 @@ const runStroke = (opts: { withMask: boolean }) => {
       const path = { closePath: () => {}, lineTo: () => {}, moveTo: () => {}, quadraticCurveTo: () => {} };
       return path as unknown as Path2D;
     },
-    emitStrokeCommitted,
     invalidate: vi.fn(),
     layers,
     notifyLayerPainted,
+    scheduleFrame: runFrameNow,
   } as unknown as ToolContext;
 
   // Only the scratch is created after this point.
   created.length = 0;
   const session = createStrokeSession({
+    edit: ADMIT_ALL,
     clipMask,
     color: '#ff0000',
     hardness: 1,
@@ -74,10 +82,10 @@ const runStroke = (opts: { withMask: boolean }) => {
   });
   session.addPoints([pointer(10, 10)]);
   session.addPoints([pointer(40, 10), pointer(40, 40)]);
-  const event = session.commit();
+  const event = commitStroke(session);
 
   const scratch = created[0]!;
-  return { cache: entry.surface as StubRasterSurface, emitStrokeCommitted, event, notifyLayerPainted, scratch };
+  return { cache: entry.surface as StubRasterSurface, event, notifyLayerPainted, scratch };
 };
 
 const compositeOps = (surface: StubRasterSurface): unknown[] =>
@@ -126,14 +134,15 @@ describe('strokeSession: bbox-clipped painting', () => {
         const path = { closePath: () => {}, lineTo: () => {}, moveTo: () => {}, quadraticCurveTo: () => {} };
         return path as unknown as Path2D;
       },
-      emitStrokeCommitted: vi.fn(),
       invalidate: vi.fn(),
       layers,
       notifyLayerPainted: vi.fn(),
+      scheduleFrame: runFrameNow,
     } as unknown as ToolContext;
     created.length = 0;
 
     const session = createStrokeSession({
+      edit: ADMIT_ALL,
       clipRect,
       color: '#ff0000',
       hardness: 1,
@@ -148,7 +157,7 @@ describe('strokeSession: bbox-clipped painting', () => {
     });
     session.addPoints([pointer(10, 10)]);
     session.addPoints([pointer(40, 10), pointer(40, 40)]);
-    const event = session.commit();
+    const event = commitStroke(session);
     return { cache: entry.surface as StubRasterSurface, event, scratch: created[0] as StubRasterSurface | undefined };
   };
 
@@ -196,12 +205,14 @@ describe('strokeSession: bbox-clipped painting', () => {
 });
 
 describe('strokeSession: content-sized cache growth', () => {
-  const makeSession = (initialRect: { x: number; y: number; width: number; height: number }) => {
+  const makeSession = (
+    initialRect: { x: number; y: number; width: number; height: number },
+    edit: Pick<StrokeEdit, 'grow'> = ADMIT_ALL
+  ) => {
     const { backend } = createCapturingBackend();
     const layers = createLayerCacheStore(backend);
     const entry = layers.getOrCreateRect('L', initialRect);
     entry.stale = false;
-    const emitStrokeCommitted = vi.fn();
     const notifyLayerPainted = vi.fn();
     const ctx = {
       backend,
@@ -209,31 +220,34 @@ describe('strokeSession: content-sized cache growth', () => {
         const path = { closePath: () => {}, lineTo: () => {}, moveTo: () => {}, quadraticCurveTo: () => {} };
         return path as unknown as Path2D;
       },
-      emitStrokeCommitted,
       invalidate: vi.fn(),
       layers,
       notifyLayerPainted,
+      scheduleFrame: runFrameNow,
     } as unknown as ToolContext;
+    const onRefused = vi.fn();
     const session = createStrokeSession({
+      edit,
       clipMask: null,
       color: '#ff0000',
       hardness: 1,
       composite: 'source-over',
       ctx,
       layerId: 'L',
+      onRefused,
       opacity: 1,
       size: 20,
       pressureOpacity: false,
       thinning: 0,
       tool: 'brush',
     });
-    return { emitStrokeCommitted, entry, notifyLayerPainted, session };
+    return { entry, layers, notifyLayerPainted, onRefused, session };
   };
 
   it('grows an EMPTY (brand-new) paint cache to the stroke bounds on the first stroke', () => {
     const { entry, session } = makeSession({ height: 0, width: 0, x: 0, y: 0 });
     session.addPoints([pointer(50, 60)]);
-    const event = session.commit();
+    const event = commitStroke(session);
 
     // A dab near (50,60) grows to a small outward chunk-aligned rect, not a document-sized surface.
     expect(entry.rect.width).toBeGreaterThan(0);
@@ -258,26 +272,100 @@ describe('strokeSession: content-sized cache growth', () => {
   });
 
   it('returns the completed event without publishing engine side effects', () => {
-    const { emitStrokeCommitted, notifyLayerPainted, session } = makeSession({ height: 0, width: 0, x: 0, y: 0 });
+    const { notifyLayerPainted, session } = makeSession({ height: 0, width: 0, x: 0, y: 0 });
     session.addPoints([pointer(10, 10)]);
-    const event = session.commit();
+    const event = commitStroke(session);
 
     expect(event).toMatchObject({ layerId: 'L', tool: 'brush' });
     expect(event!.dirtyRect.width).toBeGreaterThan(0);
     expect(event!.dirtyRect.height).toBeGreaterThan(0);
-    expect(emitStrokeCommitted).not.toHaveBeenCalled();
     expect(notifyLayerPainted).not.toHaveBeenCalled();
+  });
+
+  it('restores the layer and its extent once when the undo footprint cannot grow', () => {
+    const first = makeSession({ height: 20, width: 20, x: 0, y: 0 }, createRecordingStrokeEdit().edit);
+    first.session.addPoints([pointer(10, 10)]);
+    const firstFootprint = first.entry.rect.width * first.entry.rect.height * 8;
+
+    const { edit } = createRecordingStrokeEdit(firstFootprint);
+    const { layers, onRefused, session } = makeSession({ height: 20, width: 20, x: 0, y: 0 }, edit);
+    session.addPoints([pointer(10, 10)]);
+    session.addPoints([pointer(400, 400)]);
+    session.addPoints([pointer(410, 410)]);
+
+    expect(onRefused).toHaveBeenCalledOnce();
+    expect(layers.peek('L')!.rect).toEqual({ height: 20, width: 20, x: 0, y: 0 });
+    expect(session.commit(() => true)).toBe(false);
+  });
+
+  it('restores the layer when the final paint at commit cannot grow', () => {
+    const backend = createTestStubRasterBackend();
+    const layers = createLayerCacheStore(backend);
+    layers.getOrCreateRect('L', { height: 20, width: 20, x: 0, y: 0 }).stale = false;
+    const deferred: (() => void)[] = [];
+    const ctx = {
+      backend,
+      createPath2D: () =>
+        ({ closePath: () => {}, lineTo: () => {}, moveTo: () => {}, quadraticCurveTo: () => {} }) as unknown as Path2D,
+      invalidate: vi.fn(),
+      layers,
+      notifyLayerPainted: vi.fn(),
+      scheduleFrame: (task: () => void) => {
+        deferred.push(task);
+        return () => undefined;
+      },
+    } as unknown as ToolContext;
+    let admitted = Infinity;
+    const session = createStrokeSession({
+      clipMask: null,
+      color: '#ff0000',
+      composite: 'source-over',
+      ctx,
+      edit: { grow: (bytes) => bytes <= admitted },
+      hardness: 1,
+      layerId: 'L',
+      opacity: 1,
+      pressureOpacity: false,
+      size: 20,
+      thinning: 0,
+      tool: 'brush',
+    });
+    session.addPoints([pointer(10, 10)]);
+    deferred.splice(0).forEach((task) => task());
+    admitted = 0;
+    // Painted only by the commit-time render, whose growth is refused.
+    session.addPoints([pointer(400, 400)]);
+
+    expect(session.commit(() => true)).toBe(false);
+    expect(layers.peek('L')!.rect).toEqual({ height: 20, width: 20, x: 0, y: 0 });
+  });
+
+  it('restores the layer when publication is declined', () => {
+    const { layers, session } = makeSession({ height: 20, width: 20, x: 0, y: 0 });
+    session.addPoints([pointer(-40, -40)]);
+
+    expect(session.commit(() => false)).toBe(false);
+    expect(layers.peek('L')!.rect).toEqual({ height: 20, width: 20, x: 0, y: 0 });
+  });
+
+  it('returns an empty cache to empty when the stroke is cancelled', () => {
+    const { layers, session } = makeSession({ height: 0, width: 0, x: 0, y: 0 });
+    session.addPoints([pointer(10, 10)]);
+    expect(layers.peek('L')!.rect.width).toBeGreaterThan(0);
+    session.cancel();
+
+    expect(layers.peek('L')!.rect).toMatchObject({ height: 0, width: 0 });
   });
 
   it('returns null when the gesture produced no dirty pixels', () => {
     const { session } = makeSession({ height: 0, width: 0, x: 0, y: 0 });
-    expect(session.commit()).toBeNull();
+    expect(commitStroke(session)).toBeNull();
   });
 
   it('grows an existing cache to the UNION of its extent and an out-of-extent stroke (negative coords included)', () => {
     const { entry, session } = makeSession({ height: 20, width: 20, x: 0, y: 0 });
     session.addPoints([pointer(-40, -40)]);
-    session.commit();
+    commitStroke(session);
 
     // Union of the pre-stroke [0,20)² extent and the stroke bounds around
     // (-40,-40): the origin moved into negative layer-local space and the old
@@ -302,7 +390,7 @@ describe('strokeSession: content-sized cache growth', () => {
     for (let i = 0; i < batches; i++) {
       session.addPoints([pointer(100 + i * 10, 100)]);
     }
-    session.commit();
+    commitStroke(session);
 
     const resizes = resizeCount();
     expect(resizes).toBeLessThanOrEqual(2);
@@ -322,12 +410,13 @@ describe('strokeSession: cache version bump (live adjusted-surface invalidation)
         const path = { closePath: () => {}, lineTo: () => {}, moveTo: () => {}, quadraticCurveTo: () => {} };
         return path as unknown as Path2D;
       },
-      emitStrokeCommitted: vi.fn(),
       invalidate: vi.fn(),
       layers,
       notifyLayerPainted: vi.fn(),
+      scheduleFrame: runFrameNow,
     } as unknown as ToolContext;
     const session = createStrokeSession({
+      edit: ADMIT_ALL,
       clipMask: null,
       color: '#ff0000',
       hardness: 1,
@@ -375,12 +464,13 @@ describe('incremental "before" snapshot', () => {
         const path = { closePath: () => {}, lineTo: () => {}, moveTo: () => {}, quadraticCurveTo: () => {} };
         return path as unknown as Path2D;
       },
-      emitStrokeCommitted: vi.fn(),
       invalidate: vi.fn(),
       layers,
       notifyLayerPainted: vi.fn(),
+      scheduleFrame: runFrameNow,
     } as unknown as ToolContext;
     const session = createStrokeSession({
+      edit: ADMIT_ALL,
       color: '#ff0000',
       hardness: 1,
       composite: 'source-over',
@@ -457,14 +547,15 @@ describe('strokeSession: pressure-dependent opacity', () => {
         const path = { closePath: () => {}, lineTo: () => {}, moveTo: () => {}, quadraticCurveTo: () => {} };
         return path as unknown as Path2D;
       },
-      emitStrokeCommitted: vi.fn(),
       invalidate: vi.fn(),
       layers,
       notifyLayerPainted: vi.fn(),
+      scheduleFrame: runFrameNow,
     } as unknown as ToolContext;
 
     created.length = 0;
     const session = createStrokeSession({
+      edit: ADMIT_ALL,
       clipMask: null,
       color: '#ff0000',
       hardness: 1,
@@ -483,7 +574,7 @@ describe('strokeSession: pressure-dependent opacity', () => {
     // would couple these assertions to the batch count, so clear the log and let commit's
     // single repaint be the one under test.
     scratch.callLog.length = 0;
-    session.commit();
+    commitStroke(session);
 
     return scratch;
   };
@@ -546,12 +637,13 @@ describe('layer transforms', () => {
         const path = { closePath: () => {}, lineTo: () => {}, moveTo: () => {}, quadraticCurveTo: () => {} };
         return path as unknown as Path2D;
       },
-      emitStrokeCommitted: vi.fn(),
       invalidate: vi.fn(),
       layers,
       notifyLayerPainted: vi.fn(),
+      scheduleFrame: runFrameNow,
     } as unknown as ToolContext;
     const session = createStrokeSession({
+      edit: ADMIT_ALL,
       color: '#ff0000',
       hardness: 1,
       composite: 'source-over',
@@ -565,7 +657,7 @@ describe('layer transforms', () => {
       tool: 'brush',
     });
     session.addPoints([pointer(point.x, point.y)]);
-    return session.commit();
+    return commitStroke(session);
   };
 
   it('maps document points through the layer inverse, so the stroke lands under the cursor', () => {
@@ -595,12 +687,13 @@ describe('tap collapse', () => {
       backend,
       createPath2D: () =>
         ({ closePath: () => {}, lineTo: () => {}, moveTo: () => {}, quadraticCurveTo: () => {} }) as unknown as Path2D,
-      emitStrokeCommitted: vi.fn(),
       invalidate: vi.fn(),
       layers,
       notifyLayerPainted: vi.fn(),
+      scheduleFrame: runFrameNow,
     } as unknown as ToolContext;
     const session = createStrokeSession({
+      edit: ADMIT_ALL,
       clipMask: null,
       color: '#f00',
       composite: 'source-over',
@@ -618,7 +711,7 @@ describe('tap collapse', () => {
       session.addPoints([pointer(100 + drift / 2, 100)]);
       session.addPoints([pointer(100 + drift, 100)]);
     }
-    return session.commit();
+    return commitStroke(session);
   };
 
   it('renders a click that drifted under a quarter diameter as the round tap dot', () => {
@@ -630,5 +723,147 @@ describe('tap collapse', () => {
   it('still extends a deliberate drag past the collapse threshold', () => {
     const clean = sessionWithDrift(0)!.dirtyRect;
     expect(sessionWithDrift(40)!.dirtyRect.width).toBeGreaterThan(clean.width);
+  });
+});
+
+describe('frame-coalesced rendering', () => {
+  const makeFramedSession = () => {
+    const backend = createTestStubRasterBackend();
+    const layers = createLayerCacheStore(backend);
+    layers.getOrCreate('L', 100, 100);
+    const frames: (() => void)[] = [];
+    const invalidate = vi.fn();
+    const onRenderError = vi.fn();
+    const ctx = {
+      backend,
+      createPath2D: () => {
+        const path = { closePath: () => {}, lineTo: () => {}, moveTo: () => {}, quadraticCurveTo: () => {} };
+        return path as unknown as Path2D;
+      },
+      invalidate,
+      layers,
+      notifyLayerPainted: vi.fn(),
+      scheduleFrame: (task: () => void) => {
+        frames.push(task);
+        return () => {
+          const index = frames.indexOf(task);
+          if (index >= 0) {
+            frames.splice(index, 1);
+          }
+        };
+      },
+    } as unknown as ToolContext;
+    const session = createStrokeSession({
+      edit: ADMIT_ALL,
+      clipMask: null,
+      color: '#ff0000',
+      composite: 'source-over',
+      ctx,
+      hardness: 1,
+      layerId: 'L',
+      onRenderError,
+      opacity: 1,
+      pressureOpacity: false,
+      size: 20,
+      thinning: 0,
+      tool: 'brush',
+    });
+    /** Live stroke renders so far: each one reports its damage to the scheduler. */
+    const renders = (): number => invalidate.mock.calls.length;
+    const presentFrame = (): void => frames.splice(0).forEach((task) => task());
+    return { frames, layers, onRenderError, presentFrame, renders, session };
+  };
+
+  it('renders the accumulated stroke at most once per presented frame', () => {
+    const { frames, presentFrame, renders, session } = makeFramedSession();
+    for (let frame = 0; frame < 4; frame++) {
+      for (let batch = 0; batch < 6; batch++) {
+        const x = 10 + frame * 12 + batch * 2;
+        session.addPoints([pointer(x, 10), pointer(x + 1, 11)]);
+      }
+      expect(frames).toHaveLength(1);
+      expect(renders()).toBe(frame);
+      presentFrame();
+      expect(renders()).toBe(frame + 1);
+    }
+  });
+
+  it('commits the final stroke synchronously and withdraws the frame still scheduled', () => {
+    const { frames, renders, session } = makeFramedSession();
+    session.addPoints([pointer(10, 10)]);
+    session.addPoints([pointer(60, 10)]);
+    expect(renders()).toBe(0);
+
+    const event = commitStroke(session);
+
+    expect(renders()).toBe(1);
+    expect(frames).toHaveLength(0);
+    expect(event?.dirtyRect.width).toBeGreaterThan(50);
+    session.addPoints([pointer(80, 10)]);
+    expect(frames).toHaveLength(0);
+  });
+
+  it('cancellation removes scheduled work and leaves the cache untouched', () => {
+    const { frames, layers, renders, session } = makeFramedSession();
+    const version = layers.version('L');
+    session.addPoints([pointer(10, 10), pointer(40, 40)]);
+
+    session.cancel();
+
+    expect(frames).toHaveLength(0);
+    expect(renders()).toBe(0);
+    expect(layers.version('L')).toBe(version);
+    expect(commitStroke(session)).toBeNull();
+  });
+
+  it('hands a failed frame render to its owner before propagating it', () => {
+    const { layers, onRenderError, presentFrame, session } = makeFramedSession();
+    session.addPoints([pointer(10, 10)]);
+    const failure = new Error('frame paint failed');
+    vi.spyOn(layers, 'growToRect').mockImplementation(() => {
+      throw failure;
+    });
+
+    expect(presentFrame).toThrow(failure);
+    expect(onRenderError).toHaveBeenCalledWith(failure);
+  });
+});
+
+describe('strokeSession: incremental decimation', () => {
+  it('never re-decimates the whole stroke while it renders frame by frame', () => {
+    const decimate = vi.spyOn(freehand, 'decimateSamples');
+    const backend = createTestStubRasterBackend();
+    const layers = createLayerCacheStore(backend);
+    layers.getOrCreate('L', 400, 100);
+    const ctx = {
+      backend,
+      createPath2D: () =>
+        ({ closePath: () => {}, lineTo: () => {}, moveTo: () => {}, quadraticCurveTo: () => {} }) as unknown as Path2D,
+      invalidate: vi.fn(),
+      layers,
+      notifyLayerPainted: vi.fn(),
+      scheduleFrame: runFrameNow,
+    } as unknown as ToolContext;
+    const session = createStrokeSession({
+      edit: ADMIT_ALL,
+      clipMask: null,
+      color: '#ff0000',
+      composite: 'source-over',
+      ctx,
+      hardness: 1,
+      layerId: 'L',
+      opacity: 1,
+      pressureOpacity: false,
+      size: 8,
+      thinning: 0,
+      tool: 'brush',
+    });
+
+    for (let x = 0; x < 300; x += 1) {
+      session.addPoints([pointer(x, 50)]);
+    }
+    commitStroke(session);
+    expect(decimate).not.toHaveBeenCalled();
+    decimate.mockRestore();
   });
 });

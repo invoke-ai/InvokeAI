@@ -15,11 +15,12 @@ Before editing, read `AGENTS.md` along each target path; scoped rules supplement
 | API, services, invocations | [app/AGENTS.md](invokeai/app/AGENTS.md) |
 | Inference and model management | [backend/AGENTS.md](invokeai/backend/AGENTS.md) |
 | Python tests | [tests/AGENTS.md](tests/AGENTS.md); also read guidance for the production code under test |
-| Legacy frontend and generated API artifacts | [web/AGENTS.md](invokeai/frontend/web/AGENTS.md) |
+| Legacy frontend | [webv1/AGENTS.md](invokeai/frontend/webv1/AGENTS.md) |
+| Shared generated API contracts | [api/AGENTS.md](invokeai/frontend/api/AGENTS.md) |
 | CI and contribution tooling | [.github/AGENTS.md](.github/AGENTS.md) |
 | Documentation | `docs/README.md` and `docs/package.json`; keep documentation about the implemented product current |
 
-Ordinary frontend work targets **webv2**, served with `--webv2`; default launches select legacy web. Verify build/launch targets for UI investigations. Legacy web owns generated OpenAPI/type artifacts.
+Ordinary frontend work targets **webv2**, served by default; `--webv2` remains a compatibility alias and `--web-legacy` selects legacy web. Verify build/launch targets for UI investigations. The shared `frontend/api` package owns generated OpenAPI/type artifacts.
 
 ## Engineering standard
 

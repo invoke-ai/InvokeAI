@@ -2,6 +2,7 @@ import type { StrokeSamplePoint } from '@workbench/canvas-engine/freehand';
 import type { Vec2 } from '@workbench/canvas-engine/types';
 
 import {
+  createSampleDecimator,
   decimateSamples,
   MAX_SAMPLE_SPACING,
   outlineSmoothing,
@@ -167,6 +168,27 @@ describe('decimateSamples', () => {
       const partial = decimateSamples(points.slice(0, n), 4, false);
       expect(full.slice(0, partial.length)).toEqual(partial);
     }
+  });
+});
+
+describe('createSampleDecimator', () => {
+  it('matches decimateSamples for every prefix, live and completed', () => {
+    const jittery: StrokeSamplePoint[] = Array.from({ length: 120 }, (_, i) => ({
+      pressure: 0.3 + (i % 7) / 10,
+      x: i * 0.7 + Math.sin(i) * 0.9,
+      y: Math.cos(i / 3) * 6,
+    }));
+    const decimator = createSampleDecimator(4);
+    jittery.forEach((point, index) => {
+      decimator.push(point);
+      const prefix = jittery.slice(0, index + 1);
+      expect(decimator.samples(false)).toEqual(decimateSamples(prefix, 4, false));
+      expect(decimator.samples(true)).toEqual(decimateSamples(prefix, 4, true));
+    });
+  });
+
+  it('reports nothing before the first sample', () => {
+    expect(createSampleDecimator(4).samples(true)).toEqual([]);
   });
 });
 

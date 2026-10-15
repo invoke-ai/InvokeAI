@@ -3,6 +3,7 @@ state dict, exact-passthrough guarantees, forward-swap binding/restore,
 multi-adapter composition, and the conditioning image preprocessing helpers."""
 
 import os
+import re
 from pathlib import Path
 
 import pytest
@@ -762,3 +763,47 @@ def test_from_state_dict_real_file() -> None:
         assert not torch.equal(y, plain_linear(linear, x))
     finally:
         module.unbind()
+
+
+# ----------------------------------------------------------------------------
+# Depth-expanded finetunes
+# ----------------------------------------------------------------------------
+
+
+def _adapter_for_blocks(*indices: int) -> AnimaControlNetLLLite:
+    """The synthetic 2-block adapter, its blocks renamed to ``indices``."""
+    renamed = {}
+    for key, value in make_synthetic_state_dict().items():
+        match = re.match(r"^lllite_dit_blocks_(\d+)_", key)
+        if match:
+            key = f"lllite_dit_blocks_{indices[int(match.group(1))]}_{key[match.end() :]}"
+        renamed[key] = value
+    return AnimaControlNetLLLite.from_state_dict(renamed, None)
+
+
+def _is_wrapped(model: AnimaControlNetLLLite, linear: nn.Linear) -> bool:
+    x = torch.randn(1, 4, IN_DIM, generator=torch.Generator().manual_seed(5))
+    model.set_multiplier(1.0)
+    model.set_cond_image(matching_cond_image())
+    return not torch.equal(linear(x), plain_linear(linear, x))
+
+
+def test_a_base_adapter_binds_to_the_base_blocks_of_anima_2_9b() -> None:
+    """Anima base's block 27 is Anima-2.9B's block 39 (see ``invokeai.backend.anima.block_layout``)."""
+    model = _adapter_for_blocks(0, 27)
+    transformer = FakeTransformer(IN_DIM, 40)
+    model.apply_to(transformer)
+
+    assert _is_wrapped(model, transformer.blocks[39].self_attn.q_proj)
+    assert not _is_wrapped(model, transformer.blocks[27].self_attn.q_proj)
+    assert _is_wrapped(model, transformer.blocks[0].self_attn.q_proj)
+    model.restore()
+
+
+def test_a_base_adapter_binds_by_index_on_anima_base() -> None:
+    model = _adapter_for_blocks(0, 27)
+    transformer = FakeTransformer(IN_DIM, 28)
+    model.apply_to(transformer)
+
+    assert _is_wrapped(model, transformer.blocks[27].self_attn.q_proj)
+    model.restore()

@@ -11,7 +11,12 @@ export type {
   GeneratedImageContract,
   GeneratedVideoContract,
 } from './core/types';
-export { getGalleryBoardLabel, type GalleryBoardTranslate } from './core/boardLabels';
+export {
+  getGalleryBoardDestinationGroups,
+  getGalleryBoardLabel,
+  type GalleryBoardDestinationGroup,
+  type GalleryBoardTranslate,
+} from './core/boardLabels';
 export { normalizeGalleryImage } from './core/image';
 export {
   assertNeverGalleryItem,
@@ -50,16 +55,19 @@ export {
 } from './core/semanticImageQuery';
 export {
   DEFAULT_GALLERY_SETTINGS,
+  GALLERY_AUTO_ADD_FOLLOW,
   getGallerySettings,
   type GalleryPaginationMode,
   type GallerySettings,
   type GalleryThumbnailFit,
 } from './core/settings';
 export {
+  getGalleryAutoAddBoardId,
   getGalleryCompareImage,
   getGalleryDestinationBoardId,
   getGalleryPage,
   getGallerySelectedBoardId,
+  getGallerySelectionBoardId,
   getGallerySelectedImagePage,
   getGallerySelectedImageQuery,
   getGallerySemanticImageQuery,

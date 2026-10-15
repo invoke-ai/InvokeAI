@@ -12,6 +12,7 @@ import type { FloatingSelectionFrame } from './floatingSelectionFrame';
 import { createOverlayFrame, type CreateOverlayFrameDeps } from './overlayFrame';
 
 const VIEW = [1, 0, 0, 1, 0, 0] as unknown as Mat2d;
+const SCREEN = { dpr: 1, view: VIEW, viewportSize: { height: 64, width: 64 } };
 
 const layer = (id: string, overrides: Record<string, unknown> = {}) => ({
   id,
@@ -59,6 +60,7 @@ const makeHarness = (): Harness => {
     deps: {
       getActiveToolId: () => state.tool,
       getAntsPhase: () => state.phase,
+      getColorLoupe: () => null,
       getSamPulseTime: () => state.pulseTime,
       getFloatingSelection: () => float.value,
       getOverlayCursor: () => state.cursor,
@@ -78,7 +80,7 @@ const describeOverlay = (
   doc = documentOf(),
   floatFrame: FloatingSelectionFrame | null = null,
   sam: Parameters<ReturnType<typeof createOverlayFrame>['describe']>[3] = null
-) => createOverlayFrame(harness.deps).describe(doc, VIEW, floatFrame, sam);
+) => createOverlayFrame(harness.deps).describe(doc, SCREEN, floatFrame, sam);
 
 beforeEach(() => {
   harness = makeHarness();
@@ -129,6 +131,20 @@ describe('the move outline', () => {
     // 'a' is selected, but 'b' carries the live override, so the marquee tracks
     // 'b' rather than lagging on the selection.
     expect(dragged).not.toEqual(committed);
+  });
+
+  it('outlines the topmost of several dragged layers', () => {
+    harness.state.tool = 'move';
+    const doc = documentOf(['a', 'b', 'c']);
+    harness.overrides.set('c', { x: 100, y: 100 });
+    const onlyC = describeOverlay(doc)?.layerOutline;
+    harness.overrides.set('b', { x: 50, y: 50 });
+    const bAndC = describeOverlay(doc)?.layerOutline;
+    harness.overrides.delete('c');
+    const onlyB = describeOverlay(doc)?.layerOutline;
+
+    expect(bAndC).toEqual(onlyB);
+    expect(bAndC).not.toEqual(onlyC);
   });
 
   it('is absent when the selected layer is gone', () => {
@@ -231,7 +247,7 @@ describe('SAM', () => {
       data: { id: 'mask' },
       rect: { height: 4, width: 4, x: 1, y: 1 },
     } as unknown as SamPreviewState;
-    expect(createOverlayFrame(harness.deps).describe(documentOf(), VIEW, null, sam).samPreview).toEqual({
+    expect(createOverlayFrame(harness.deps).describe(documentOf(), SCREEN, null, sam).samPreview).toEqual({
       opacity: 0.45,
       outline: null,
       phase: 0,

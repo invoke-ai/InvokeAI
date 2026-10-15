@@ -11,19 +11,26 @@ import {
   MAX_DIMENSION,
   MIN_DIMENSION,
 } from '@features/generation/core/settings';
+import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Button, IconButton, Tooltip } from '@platform/ui';
 import { ScrubberField } from '@platform/ui/ScrubberField';
 import { ArrowLeftRightIcon, LockIcon } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useGenerationUi } from './GenerationUiContext';
+import { type GenerateDraft, pickGenerateSettings } from './generateDebounce';
+import {
+  type CanvasRenderSize,
+  type GenerationQueueInsights,
+  useGenerationQueueInsights,
+  useGenerationUi,
+} from './GenerationUiContext';
 import { AspectRatioLockButton, AspectRatioSelect } from './shared/AspectRatioSelect';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 import { GenerateFieldContextMenu } from './shared/GenerateFieldContextMenu';
 
 interface GenerateDimensionFieldsProps {
-  settings: GenerateSettings;
+  draft: GenerateDraft;
   projectId: string;
   selectedModel: GenerateModelConfig | undefined;
   onCommit: (patch: Partial<GenerateSettings>) => void;
@@ -79,22 +86,23 @@ const clampToRange = (value: number): number => Math.min(MAX_DIMENSION, Math.max
 /** Respect ratio lock during drag and snap to the grid on release; arrow keys move by one grid step. */
 const SizePreview = ({
   current,
+  ghost,
   grid,
   handleLabel,
   isRatioConstrained,
   onDraft,
   onCommitDims,
   ratio,
-  recommended,
 }: {
   current: Dimensions;
+  /** A dashed size to match the current rectangle against. */
+  ghost: Dimensions;
   grid: number;
   handleLabel: string;
   isRatioConstrained: boolean;
   onDraft: (dims: Dimensions) => void;
   onCommitDims: (dims: Dimensions) => void;
   ratio: number;
-  recommended: Dimensions;
 }) => {
   const dragRef = useRef<{
     scale: number;
@@ -104,7 +112,7 @@ const SizePreview = ({
     startY: number;
   } | null>(null);
   const inner = PREVIEW_STAGE_PX - PREVIEW_PAD_PX * 2;
-  const maxSide = Math.max(current.width, current.height, recommended.width, recommended.height, 1);
+  const maxSide = Math.max(current.width, current.height, ghost.width, ghost.height, 1);
   const scale = inner / maxSide;
 
   const snap = (dims: Dimensions): Dimensions => {
@@ -149,18 +157,17 @@ const SizePreview = ({
       rounded="sm"
       w={`${PREVIEW_STAGE_PX}px`}
     >
-      {/* The recommended size, as a ghost the current rectangle can be matched against. */}
       <Box
         borderColor="border.muted"
         borderStyle="dashed"
         borderWidth="1px"
-        h={`${recommended.height * scale}px`}
+        h={`${ghost.height * scale}px`}
         left="50%"
         pointerEvents="none"
         position="absolute"
         top="50%"
         transform="translate(-50%, -50%)"
-        w={`${recommended.width * scale}px`}
+        w={`${ghost.width * scale}px`}
       />
       <Box
         bg="bg.emphasized/40"
@@ -234,14 +241,26 @@ const SizePreview = ({
   );
 };
 
+const selectSecondsPerRun = (insights: GenerationQueueInsights) => insights.secondsPerRun;
+
+const selectDimensionSettings = pickGenerateSettings([
+  'aspectRatioId',
+  'aspectRatioIsLocked',
+  'aspectRatioValue',
+  'height',
+  'width',
+]);
+
 export const GenerateDimensionFields = ({
+  draft,
   onCommit,
   projectId,
   selectedModel,
-  settings,
 }: GenerateDimensionFieldsProps) => {
   const { t } = useTranslation();
-  const { secondsPerRun } = useGenerationUi().queueInsights;
+  const { CanvasRenderSize: CanvasRenderSizeSlot, project } = useGenerationUi();
+  const settings = useExternalStoreSelector(draft.subscribe, draft.getSnapshot, selectDimensionSettings);
+  const secondsPerRun = useGenerationQueueInsights(selectSecondsPerRun);
   const [draftDimensions, setDraftDimensions] = useState<Dimensions | null>(null);
   const modelDefaults = selectedModel ? getDefaultGenerateSettings(selectedModel) : null;
   const dimensions = getGenerationDimensions(selectedModel);
@@ -399,20 +418,7 @@ export const GenerateDimensionFields = ({
   const isAtRecommendedSize =
     displayDimensions.width === recommendedDimensions.width &&
     displayDimensions.height === recommendedDimensions.height;
-  const megapixels = (displayDimensions.width * displayDimensions.height) / 1_000_000;
-
-  const badges = (
-    <>
-      <Badge size="xs">
-        {displayDimensions.width}x{displayDimensions.height}
-      </Badge>
-      {isRatioConstrained && (
-        <Badge size="xs">
-          <Icon as={LockIcon} boxSize="3" />
-        </Badge>
-      )}
-    </>
-  );
+  const frameLabel = `${displayDimensions.width}x${displayDimensions.height}`;
 
   // The optimal-side stop is scalar; recommended dimensions preserve the live ratio.
   const dimensionField = (key: 'height' | 'width') => (
@@ -430,98 +436,143 @@ export const GenerateDimensionFields = ({
     />
   );
 
-  return (
-    <GenerateCollapsibleSection label={t('widgets.generate.size')} badges={badges} defaultOpen sectionId="dimensions">
-      <Stack gap="2" p="2">
-        <HStack alignItems="stretch" gap="2">
-          <Stack flex="1" gap="2" minW="0">
-            {/* The lock binds width to height, so it sits between the two values it couples. */}
-            <GenerateFieldContextMenu
-              copyValue={() => `${displayDimensions.width}x${displayDimensions.height}`}
-              isAtDefault={
-                modelDefaults !== null &&
-                displayDimensions.width === modelDefaults.width &&
-                displayDimensions.height === modelDefaults.height
-              }
-              onReset={
-                modelDefaults
-                  ? () => {
-                      setDraftDimensions(null);
-                      commitDimensions({ height: modelDefaults.height, width: modelDefaults.width });
-                    }
-                  : undefined
-              }
-            >
+  /** In canvas mode the frame is generated at the render size; elsewhere the two are the same. */
+  const renderSection = (canvas: CanvasRenderSize | null) => {
+    const renderSize = canvas?.size ?? displayDimensions;
+    const isResized = renderSize.width !== displayDimensions.width || renderSize.height !== displayDimensions.height;
+    const isAtRecommendedRenderSize =
+      renderSize.width === recommendedDimensions.width && renderSize.height === recommendedDimensions.height;
+    // In canvas mode, resizing the frame only adds something while it renders at its own size: Auto has not already
+    // grown it toward the optimum and Custom has not set a size of its own.
+    const offersOptimalSize = !isAtRecommendedSize && !isResized;
+
+    const footer = (
+      <HStack gap="2" justify="space-between" minH="5" mt="auto">
+        <Text color="fg.muted" fontSize="xs">
+          {isResized ? `${renderSize.width}×${renderSize.height} · ` : ''}
+          {t('widgets.generate.megapixelsValue', {
+            value: ((renderSize.width * renderSize.height) / 1_000_000).toFixed(2),
+          })}
+          {isAtRecommendedRenderSize ? ` · ${t('widgets.generate.sizeRecommended')}` : ''}
+          {/* Grounded in this project's recent completed runs, never a guess. */}
+          {secondsPerRun !== null
+            ? ` · ${t('widgets.generate.secondsPerRun', { value: Math.round(secondsPerRun) })}`
+            : ''}
+        </Text>
+        {offersOptimalSize ? (
+          <Tooltip content={t('widgets.generate.setOptimalSizeDescription')}>
+            <Button color="fg.muted" size="sm" variant="ghost" onClick={optimizeSize}>
+              {t('widgets.generate.setOptimalSize')}
+            </Button>
+          </Tooltip>
+        ) : null}
+      </HStack>
+    );
+
+    return (
+      <GenerateCollapsibleSection
+        label={t('widgets.generate.size')}
+        badges={
+          <>
+            <Badge>{isResized ? `${frameLabel} → ${renderSize.width}x${renderSize.height}` : frameLabel}</Badge>
+            {isRatioConstrained && (
+              <Badge>
+                <Icon as={LockIcon} boxSize="3" />
+              </Badge>
+            )}
+          </>
+        }
+        defaultOpen
+        sectionId="dimensions"
+      >
+        <Stack gap="2" p="2">
+          <HStack alignItems="stretch" gap="2">
+            <Stack flex="1" gap="2" minW="0">
+              {/* The lock binds width to height, so it sits between the two values it couples. */}
+              <GenerateFieldContextMenu
+                copyValue={() => frameLabel}
+                isAtDefault={
+                  modelDefaults !== null &&
+                  displayDimensions.width === modelDefaults.width &&
+                  displayDimensions.height === modelDefaults.height
+                }
+                onReset={
+                  modelDefaults
+                    ? () => {
+                        setDraftDimensions(null);
+                        commitDimensions({ height: modelDefaults.height, width: modelDefaults.width });
+                      }
+                    : undefined
+                }
+              >
+                <HStack alignItems="center" gap="1">
+                  <Stack flex="1" gap={DIMENSION_ROW_GAP} minW="0">
+                    {dimensionField('width')}
+                    {dimensionField('height')}
+                  </Stack>
+                  <Box css={LOCK_BRACKET_CSS} data-locked={isRatioConstrained ? '' : undefined}>
+                    <svg aria-hidden="true" data-part="bracket" viewBox="0 0 28 64">
+                      <path d={LOCK_BRACKET_PATH} />
+                    </svg>
+                    <AspectRatioLockButton isLocked={isRatioConstrained} size="sm" onToggle={toggleLock} />
+                  </Box>
+                </HStack>
+              </GenerateFieldContextMenu>
+
               <HStack alignItems="center" gap="1">
-                <Stack flex="1" gap={DIMENSION_ROW_GAP} minW="0">
-                  {dimensionField('width')}
-                  {dimensionField('height')}
-                </Stack>
-                <Box css={LOCK_BRACKET_CSS} data-locked={isRatioConstrained ? '' : undefined}>
-                  <svg aria-hidden="true" data-part="bracket" viewBox="0 0 28 64">
-                    <path d={LOCK_BRACKET_PATH} />
-                  </svg>
-                  <AspectRatioLockButton isLocked={isRatioConstrained} size="2xs" onToggle={toggleLock} />
+                <AspectRatioSelect
+                  fallbackRatio={dimensionRatio}
+                  value={settings.aspectRatioId}
+                  onChange={setAspectRatioId}
+                />
+                <Box css={SWAP_COLUMN_CSS}>
+                  <Tooltip content={t('widgets.generate.swapWidthAndHeight')}>
+                    <IconButton
+                      aria-label={t('widgets.generate.swapWidthAndHeight')}
+                      size="sm"
+                      variant="outline"
+                      onClick={swapDimensions}
+                    >
+                      <ArrowLeftRightIcon />
+                    </IconButton>
+                  </Tooltip>
                 </Box>
               </HStack>
-            </GenerateFieldContextMenu>
+              {canvas ? null : footer}
+            </Stack>
+            <SizePreview
+              current={displayDimensions}
+              ghost={canvas ? renderSize : recommendedDimensions}
+              grid={dimensionGrid}
+              handleLabel={t('widgets.generate.sizePreviewHandle')}
+              isRatioConstrained={isRatioConstrained}
+              ratio={
+                isRatioConstrained
+                  ? getActiveRatio({ aspectRatioValue: settings.aspectRatioValue, ...displayDimensions })
+                  : dimensionRatio
+              }
+              onCommitDims={(dims) => {
+                setDraftDimensions(dims);
+                commitDimensions(dims);
+              }}
+              onDraft={setDraftDimensions}
+            />
+          </HStack>
+          {canvas ? (
+            <>
+              {canvas.controls}
+              {footer}
+            </>
+          ) : null}
+        </Stack>
+      </GenerateCollapsibleSection>
+    );
+  };
 
-            <HStack alignItems="center" gap="1">
-              <AspectRatioSelect
-                fallbackRatio={dimensionRatio}
-                value={settings.aspectRatioId}
-                onChange={setAspectRatioId}
-              />
-              <Box css={SWAP_COLUMN_CSS}>
-                <Tooltip content={t('widgets.generate.swapWidthAndHeight')}>
-                  <IconButton
-                    aria-label={t('widgets.generate.swapWidthAndHeight')}
-                    size="2xs"
-                    variant="outline"
-                    onClick={swapDimensions}
-                  >
-                    <ArrowLeftRightIcon />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-            </HStack>
-            <HStack gap="2" justify="space-between" minH="5" mt="auto">
-              <Text color="fg.muted" fontSize="2xs">
-                {t('widgets.generate.megapixelsValue', { value: megapixels.toFixed(2) })}
-                {isAtRecommendedSize ? ` · ${t('widgets.generate.sizeRecommended')}` : ''}
-                {/* Grounded in this project's recent completed runs, never a guess. */}
-                {secondsPerRun !== null
-                  ? ` · ${t('widgets.generate.secondsPerRun', { value: Math.round(secondsPerRun) })}`
-                  : ''}
-              </Text>
-              {isAtRecommendedSize ? null : (
-                <Tooltip content={t('widgets.generate.setOptimalSizeDescription')}>
-                  <Button color="fg.muted" size="2xs" variant="ghost" onClick={optimizeSize}>
-                    {t('widgets.generate.setOptimalSize')}
-                  </Button>
-                </Tooltip>
-              )}
-            </HStack>
-          </Stack>
-          <SizePreview
-            current={displayDimensions}
-            grid={dimensionGrid}
-            handleLabel={t('widgets.generate.sizePreviewHandle')}
-            isRatioConstrained={isRatioConstrained}
-            ratio={
-              isRatioConstrained
-                ? getActiveRatio({ aspectRatioValue: settings.aspectRatioValue, ...displayDimensions })
-                : dimensionRatio
-            }
-            recommended={recommendedDimensions}
-            onCommitDims={(dims) => {
-              setDraftDimensions(dims);
-              commitDimensions(dims);
-            }}
-            onDraft={setDraftDimensions}
-          />
-        </HStack>
-      </Stack>
-    </GenerateCollapsibleSection>
+  // Switching source remounts the section's subtree; that is deliberate, as its state lives in this component.
+  return project.invocationSourceId === 'canvas' ? (
+    <CanvasRenderSizeSlot frame={displayDimensions}>{renderSection}</CanvasRenderSizeSlot>
+  ) : (
+    renderSection(null)
   );
 };

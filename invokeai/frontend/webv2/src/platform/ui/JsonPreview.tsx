@@ -77,7 +77,7 @@ export const JsonPreview = ({
         bg="bg.muted"
         position="absolute"
         right="1.5"
-        size="2xs"
+        size="sm"
         title={copyLabel}
         top="1.5"
         variant="ghost"
@@ -86,13 +86,13 @@ export const JsonPreview = ({
       >
         <Icon as={hasCopied ? CheckIcon : CopyIcon} boxSize="3" color={hasCopied ? 'green.solid' : undefined} />
       </IconButton>
-      <ScrollArea.Root flex="1" maxW="full" minH="0" minW="0" size="xs" variant="hover" w="full">
+      <ScrollArea.Root flex="1" maxW="full" minH="0" minW="0" variant="hover" w="full">
         <ScrollArea.Viewport ref={viewportRef} aria-label={label} h="full" maxH={maxH} minW="0" role="region" w="full">
           <ScrollArea.Content w="full">
             <Code
               bg="transparent"
               display="block"
-              fontSize="2xs"
+              fontSize="xs"
               minW="max-content"
               p="2"
               whiteSpace="pre"

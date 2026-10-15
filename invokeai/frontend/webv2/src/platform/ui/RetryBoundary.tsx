@@ -33,10 +33,10 @@ export class RetryBoundary extends Component<
     }
     return (
       <Stack role="alert" gap="2" aria-busy={this.state.retrying}>
-        <Text fontSize="xs" color="fg.error">
+        <Text fontSize="md" color="fg.error">
           {this.props.message}
         </Text>
-        <Button size="xs" loading={this.state.retrying} onClick={this.handleRetry}>
+        <Button loading={this.state.retrying} onClick={this.handleRetry}>
           {this.props.retryLabel}
         </Button>
       </Stack>

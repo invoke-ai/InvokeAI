@@ -1,5 +1,5 @@
 import type { LayerExportGuard } from '@workbench/canvas-engine/engine';
-import type { FilterOperationSessionState } from '@workbench/canvas-operations/filterOperationSession';
+import type { FilterOperationSessionState, FilterSessionErrorCode } from '@workbench/canvas-operations/api';
 import type { ComponentProps } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
@@ -15,6 +15,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   filterOperationForm,
   getFilterActionEligibility,
+  getFilterErrorTranslationKey,
   getFilterSaveTargetEligibility,
   getFilterStatusTranslationKey,
 } from './FilterOptions';
@@ -140,6 +141,37 @@ describe('getFilterStatusTranslationKey', () => {
     expect(getFilterStatusTranslationKey('committing')).toBe('widgets.layers.rasterFilter.statusCommitting');
     expect(getFilterStatusTranslationKey('error')).toBe('widgets.layers.rasterFilter.statusError');
     expect(getFilterStatusTranslationKey('ready')).toBe('widgets.layers.selectObject.statusReady');
+  });
+});
+
+describe('getFilterErrorTranslationKey', () => {
+  const codes: Record<FilterSessionErrorCode, true> = {
+    aborted: true,
+    'apply-failed': true,
+    busy: true,
+    disabled: true,
+    empty: true,
+    locked: true,
+    missing: true,
+    'not-ready': true,
+    'over-budget': true,
+    'process-failed': true,
+    'source-over-budget': true,
+    stale: true,
+    unsupported: true,
+  };
+
+  it.each(Object.keys(codes) as FilterSessionErrorCode[])('has distinct English copy for %s', (code) => {
+    const copy = testI18n.t(getFilterErrorTranslationKey(code));
+    expect(copy).not.toBe(getFilterErrorTranslationKey(code));
+    expect(copy).not.toMatch(/{{/);
+  });
+
+  it('gives every code its own message', () => {
+    const copies = (Object.keys(codes) as FilterSessionErrorCode[]).map((code) =>
+      testI18n.t(getFilterErrorTranslationKey(code))
+    );
+    expect(new Set(copies).size).toBe(copies.length);
   });
 });
 

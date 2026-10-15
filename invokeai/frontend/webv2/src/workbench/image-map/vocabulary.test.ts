@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as ImageMapStoreModule from './imageMapStore';
+
 const mocks = vi.hoisted(() => ({
   apiFetchJson: vi.fn(),
   refetchClusterLabels: vi.fn(),
@@ -9,7 +11,8 @@ vi.mock('@platform/transport/http', () => ({
   apiFetchJson: mocks.apiFetchJson,
 }));
 
-vi.mock('./imageMapStore', () => ({
+vi.mock('./imageMapStore', async (importOriginal) => ({
+  ...(await importOriginal<typeof ImageMapStoreModule>()),
   refetchClusterLabels: mocks.refetchClusterLabels,
 }));
 

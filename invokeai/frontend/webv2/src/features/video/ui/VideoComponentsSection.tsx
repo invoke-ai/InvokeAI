@@ -76,7 +76,6 @@ const ComponentSlotRow = memo(function ComponentSlotRow({
         isClearable
         modelTypes={slot.modelTypes}
         placeholder={t('widgets.video.selectComponent')}
-        size="xs"
         value={value?.key ?? null}
         onChange={handleChange}
       />
@@ -172,11 +171,11 @@ const WanExpertWiringNotice = memo(function WanExpertWiringNotice({
 
   return (
     <HStack bg="bg.subtle" borderColor="fg.warning" borderWidth="1px" gap="2" p="2" rounded="md">
-      <Text color="fg.warning" flex="1" fontSize="2xs" textWrap="pretty">
+      <Text color="fg.warning" flex="1" fontSize="xs" textWrap="pretty">
         {message}
       </Text>
       {swapResolves && modelsLoaded ? (
-        <Button flexShrink="0" size="2xs" variant="outline" onClick={swapExperts}>
+        <Button flexShrink="0" size="sm" variant="outline" onClick={swapExperts}>
           {t('widgets.video.expertWiring.swap')}
         </Button>
       ) : null}

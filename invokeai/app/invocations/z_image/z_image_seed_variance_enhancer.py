@@ -13,6 +13,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
     ZImageConditioningInfo,
 )
+from invokeai.backend.util.devices import TorchDevice
 
 
 @invocation(
@@ -82,8 +83,11 @@ class ZImageSeedVarianceEnhancerInvocation(BaseInvocation):
         generator = torch.Generator(device=prompt_embeds.device)
         generator.manual_seed(self.seed)
         noise = torch.rand(
-            prompt_embeds.shape, generator=generator, device=prompt_embeds.device, dtype=prompt_embeds.dtype
-        )
+            prompt_embeds.shape,
+            generator=generator,
+            device=prompt_embeds.device,
+            dtype=TorchDevice.choose_noise_dtype(prompt_embeds.dtype),
+        ).to(prompt_embeds.dtype)
         noise = noise * 2 - 1  # Scale to [-1, 1)
         noise = noise * actual_strength
 

@@ -1,9 +1,9 @@
 import type { CanvasDocumentContractV3, CanvasLayerContract, CanvasNodeContract } from '@workbench/canvas-engine/api';
-import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
+import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
 import { Stack, Switch, Text } from '@chakra-ui/react';
 import { getDocumentNode } from '@workbench/canvas-engine/api';
-import { useCanvasEngine } from '@workbench/widgets/canvas/useCanvasEngine';
+import { useCanvasEngine } from '@workbench/canvas-operations/react';
 import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { AdjustmentSettings } from '@workbench/widgets/layers/AdjustmentSettings';
 import { ControlLayerSettings } from '@workbench/widgets/layers/ControlLayerSettings';
@@ -204,13 +204,13 @@ const RasterLayerSettings = ({
 
   return (
     <Stack gap="2">
-      <Switch.Root checked={isLocked} size="sm" onCheckedChange={handleTransparencyLock}>
+      <Switch.Root checked={isLocked} onCheckedChange={handleTransparencyLock}>
         <Switch.HiddenInput />
         <Switch.Control>
           <Switch.Thumb />
         </Switch.Control>
         <Switch.Label>
-          <Text fontSize="xs">{t('widgets.layers.adjustments.transparencyLock')}</Text>
+          <Text fontSize="md">{t('widgets.layers.adjustments.transparencyLock')}</Text>
         </Switch.Label>
       </Switch.Root>
       <RasterLayerFilterSection engine={engine} layer={layer} onOperationStarted={noop} />

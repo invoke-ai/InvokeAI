@@ -1,123 +1,195 @@
+import type { CanvasLayerContract } from '@workbench/canvas-engine/contracts';
+import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 import type { StrokeCommittedEvent } from '@workbench/canvas-engine/tools/tool';
 
+import { createCanvasMutationContext } from '@workbench/canvas-engine/controllers/mutationContext';
+import { documentFrom, layerContract } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { getDocumentLayer } from '@workbench/canvas-engine/document/documentIndex';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
-import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
+import { createHistory, HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbench/canvas-engine/history/history';
+import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
+import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
+import { applyCanvasProjectMutation } from '@workbench/canvasProjectMutations';
+import { createInitialWorkbenchState } from '@workbench/workbenchState';
+import { describe, expect, it, vi } from 'vitest';
 
-import { createStrokeCommit, type CreateStrokeCommitDeps } from './strokeCommit';
+import { createStrokeEdits } from './strokeCommit';
 
-/** Dimensions must match the event's dirty rect — `createImagePatchEntry` asserts it. */
-const imageData = (bytes = 4): ImageData =>
-  ({ data: { byteLength: bytes }, height: 4, width: 4 }) as unknown as ImageData;
+const RECT = { height: 4, width: 4, x: 1, y: 2 };
+const pixels = (): ImageData => ({ data: new Uint8ClampedArray(64), height: 4, width: 4 }) as unknown as ImageData;
 
-const strokeEvent = (overrides: Partial<StrokeCommittedEvent> = {}): StrokeCommittedEvent =>
-  ({
-    afterImageData: imageData(),
-    beforeImageData: imageData(),
-    createdLayer: undefined,
-    dirtyRect: { height: 4, width: 4, x: 1, y: 2 },
-    layerId: 'layer-1',
-    tool: 'brush',
-    ...overrides,
-  }) as unknown as StrokeCommittedEvent;
-
-type TestDeps = {
-  -readonly [K in keyof CreateStrokeCommitDeps]: CreateStrokeCommitDeps[K];
-} & { history: { isApplying: ReturnType<typeof vi.fn>; push: ReturnType<typeof vi.fn> } };
-
-let deps: TestDeps;
-let listener: Mock<(event: StrokeCommittedEvent) => void>;
-
-beforeEach(() => {
-  listener = vi.fn<(event: StrokeCommittedEvent) => void>();
-  deps = {
-    applyImagePatch: vi.fn(),
-    commitPaintEdit: vi.fn(),
-    dispatchCanvasMutation: vi.fn(() => true),
-    endNudgeBurst: vi.fn(),
-    history: { isApplying: vi.fn(() => false), push: vi.fn() },
-    layerCache: { getOrCreateRect: vi.fn(() => ({ stale: true })) } as unknown as CreateStrokeCommitDeps['layerCache'],
-    markLayerDirty: vi.fn(),
-    notifyLayerPainted: vi.fn(),
-    strokeListeners: new Set<(event: StrokeCommittedEvent) => void>([listener]),
-  } as unknown as TestDeps;
+const strokeEvent = (overrides: Partial<StrokeCommittedEvent> = {}): StrokeCommittedEvent => ({
+  afterImageData: pixels(),
+  beforeImageData: pixels(),
+  dirtyRect: RECT,
+  layerId: 'paint',
+  tool: 'brush',
+  ...overrides,
 });
 
-describe('commitOrdinaryStroke', () => {
-  it('ends the nudge burst, repaints, and marks the layer dirty before recording history', () => {
-    createStrokeCommit(deps).commitOrdinaryStroke(strokeEvent());
-    expect(deps.endNudgeBurst).toHaveBeenCalled();
-    expect(deps.notifyLayerPainted).toHaveBeenCalledWith('layer-1');
-    expect(deps.markLayerDirty).toHaveBeenCalledWith('layer-1');
-    expect(deps.history.push).toHaveBeenCalledTimes(1);
+/** The stroke edits over a real reducer, mutation context and history. */
+const createHarness = (byteBudget?: number, gesture = { active: false }) => {
+  let project = applyCanvasProjectMutation(createInitialWorkbenchState().projects[0]!, {
+    document: documentFrom([layerContract('paint')]),
+    type: 'replaceCanvasDocument',
   });
-
-  it('labels the entry by the committing tool', () => {
-    createStrokeCommit(deps).commitOrdinaryStroke(strokeEvent({ tool: 'eraser' } as Partial<StrokeCommittedEvent>));
-    expect(deps.history.push.mock.calls[0]?.[0]).toMatchObject({ label: 'Eraser stroke' });
-
-    deps.history.push.mockClear();
-    createStrokeCommit(deps).commitOrdinaryStroke(strokeEvent());
-    expect(deps.history.push.mock.calls[0]?.[0]).toMatchObject({ label: 'Brush stroke' });
+  const history = createHistory({ byteBudget });
+  const layerCache = createLayerCacheStore(createTestStubRasterBackend());
+  const context = createCanvasMutationContext({
+    commitEdit: vi.fn(),
+    createLayerId: () => 'unused',
+    dispatch: (action: CanvasProjectMutation) => {
+      project = applyCanvasProjectMutation(project, action);
+      return true;
+    },
+    editOwner: Symbol('owner'),
+    editingLocked: { get: () => false, subscribe: () => () => undefined },
+    getDocument: () => project.canvas.document,
+    getReducerDocument: () => project.canvas.document,
+    history,
+    installPrepared: () => undefined,
+    isGestureActive: () => gesture.active,
+    isGuardCurrent: () => true,
+    preparePixels: () => {
+      throw new Error('unused');
+    },
+    projectId: project.id,
+    refreshMirror: () => undefined,
+    reserveRaster: () => ({ lease: { release: () => undefined }, status: 'ok' }),
+    subscribeReducer: () => () => undefined,
   });
+  const deps = {
+    applyImagePatch: vi.fn(() => Promise.resolve()),
+    commitPaintEdit: vi.fn(),
+    ctx: context,
+    layerCache,
+    markLayerDirty: vi.fn(),
+    notifyLayerPainted: vi.fn(),
+    reportRefusal: vi.fn(),
+    strokeListeners: new Set<(event: StrokeCommittedEvent) => void>(),
+  };
+  return {
+    deps,
+    document: () => project.canvas.document,
+    dispatch: (action: CanvasProjectMutation) => {
+      project = applyCanvasProjectMutation(project, action);
+    },
+    edits: createStrokeEdits(deps),
+    history,
+  };
+};
 
-  it('records no history while a replay is applying, but still repaints and notifies', () => {
-    deps.history.isApplying = vi.fn(() => true);
-    createStrokeCommit(deps).commitOrdinaryStroke(strokeEvent());
-    expect(deps.history.push).not.toHaveBeenCalled();
-    expect(deps.commitPaintEdit).not.toHaveBeenCalled();
-    expect(deps.notifyLayerPainted).toHaveBeenCalled();
-    expect(listener).toHaveBeenCalled();
-  });
+describe('stroke edits', () => {
+  it('records the painted pixels as one labelled step and publishes the paint afterwards', () => {
+    const h = createHarness();
+    const listener = vi.fn();
+    h.deps.strokeListeners.add(listener);
+    const event = strokeEvent({ tool: 'eraser' });
 
-  it('fans the event out to every subscriber', () => {
-    const second = vi.fn<(event: StrokeCommittedEvent) => void>();
-    deps.strokeListeners = new Set<(event: StrokeCommittedEvent) => void>([listener, second]);
-    const event = strokeEvent();
-    createStrokeCommit(deps).commitOrdinaryStroke(event);
+    const edit = h.edits.begin()!;
+    expect(edit.grow(128)).toBe(true);
+    expect(edit.commit(event)).toBe(true);
+
+    expect(h.history.entries().past).toEqual(['Eraser stroke']);
+    expect(h.history.byteSize()).toBe(128);
+    expect(h.deps.notifyLayerPainted).toHaveBeenCalledWith('paint');
+    expect(h.deps.markLayerDirty).toHaveBeenCalledWith('paint');
+    expect(h.deps.commitPaintEdit).toHaveBeenCalledOnce();
     expect(listener).toHaveBeenCalledWith(event);
-    expect(second).toHaveBeenCalledWith(event);
+  });
+
+  it('admits a stroke during its own gesture and records it once the gesture ends', () => {
+    const gesture = { active: true };
+    const h = createHarness(undefined, gesture);
+
+    const edit = h.edits.begin()!;
+    expect(edit).not.toBeNull();
+    edit.grow(128);
+    gesture.active = false;
+    expect(edit.commit(strokeEvent())).toBe(true);
+    expect(h.history.canUndo()).toBe(true);
+  });
+
+  it('refuses a stroke whose undo footprint could never be kept, before it paints', () => {
+    const h = createHarness(HISTORY_ENTRY_OVERHEAD_BYTES + 64);
+
+    expect(h.edits.begin(HISTORY_ENTRY_OVERHEAD_BYTES + 65)).toBeNull();
+    expect(h.deps.reportRefusal).toHaveBeenCalledWith('over-budget');
+
+    const edit = h.edits.begin()!;
+    expect(edit.grow(64)).toBe(true);
+    expect(edit.grow(1)).toBe(false);
+    expect(edit.grow(1)).toBe(false);
+    expect(h.deps.reportRefusal).toHaveBeenCalledTimes(2);
+    edit.cancel();
+    expect(h.history.canUndo()).toBe(false);
+  });
+
+  it('replays the before and after pixels through the engine bridge', async () => {
+    const h = createHarness();
+    const event = strokeEvent();
+    const edit = h.edits.begin()!;
+    edit.grow(128);
+    edit.commit(event);
+
+    await h.history.undo();
+    expect(h.deps.applyImagePatch).toHaveBeenLastCalledWith('paint', RECT, event.beforeImageData);
+    await h.history.redo();
+    expect(h.deps.applyImagePatch).toHaveBeenLastCalledWith('paint', RECT, event.afterImageData);
+  });
+
+  it('keeps a step in place when its pixels cannot be restored', async () => {
+    const h = createHarness();
+    const edit = h.edits.begin()!;
+    edit.grow(128);
+    edit.commit(strokeEvent());
+    h.deps.applyImagePatch.mockRejectedValueOnce(new Error('not ready'));
+
+    expect((await h.history.undo()).status).toBe('failed');
+    expect(h.history.entries()).toEqual({ future: [], past: ['Brush stroke'] });
   });
 });
 
 describe('a stroke that auto-created its layer', () => {
-  const created = { anchor: stackTopAnchor('p'), layer: { id: 'layer-1' } as never };
+  const createdStroke = (h: ReturnType<typeof createHarness>) => {
+    const anchor = stackTopAnchor(h.deps.ctx.projectId);
+    h.dispatch({ anchor, layer: layerContract('created') as CanvasLayerContract, type: 'addCanvasLayer' });
+    const created = getDocumentLayer(h.document(), 'created')!;
+    const edit = h.edits.begin()!;
+    edit.grow(128);
+    edit.commit(strokeEvent({ createdLayer: { anchor, layer: created }, layerId: 'created' }));
+    return created;
+  };
 
-  it('undoes by removing the layer, not just the pixels', () => {
-    createStrokeCommit(deps).commitOrdinaryStroke(strokeEvent({ createdLayer: created } as never));
-    const entry = deps.history.push.mock.calls[0]?.[0] as { undo(): void };
-    entry.undo();
-    expect(deps.dispatchCanvasMutation).toHaveBeenCalledWith({ ids: ['layer-1'], type: 'removeCanvasLayers' });
+  it('undoes by removing the layer and redoes by restoring it with its pixels', async () => {
+    const h = createHarness();
+    const created = createdStroke(h);
+
+    await h.history.undo();
+    expect(getDocumentLayer(h.document(), 'created')).toBeNull();
+
+    await h.history.redo();
+    expect(getDocumentLayer(h.document(), 'created')).toEqual(created);
+    expect(h.deps.layerCache.peek('created')?.stale).toBe(false);
+    expect(h.deps.applyImagePatch).toHaveBeenLastCalledWith('created', RECT, expect.anything());
   });
 
-  it('redoes by re-adding the layer at its anchor, then writing the pixels back', () => {
-    createStrokeCommit(deps).commitOrdinaryStroke(strokeEvent({ createdLayer: created } as never));
-    const entry = deps.history.push.mock.calls[0]?.[0] as { redo(): void };
-    entry.redo();
-    expect(deps.dispatchCanvasMutation).toHaveBeenCalledWith({
-      anchor: created.anchor,
-      layer: created.layer,
-      type: 'addCanvasLayer',
-    });
-    expect(deps.applyImagePatch).toHaveBeenCalledWith(
-      'layer-1',
-      { height: 4, width: 4, x: 1, y: 2 },
-      expect.anything()
-    );
+  it('takes the layer back out when a redo cannot restore its pixels, so the redo stays retryable', async () => {
+    const h = createHarness();
+    const created = createdStroke(h);
+    await h.history.undo();
+    h.deps.applyImagePatch.mockRejectedValueOnce(new Error('not ready'));
+
+    expect((await h.history.redo()).status).toBe('failed');
+    expect(getDocumentLayer(h.document(), 'created')).toBeNull();
+    expect(h.history.canRedo()).toBe(true);
+    expect((await h.history.redo()).status).toBe('applied');
+    expect(getDocumentLayer(h.document(), 'created')).toEqual(created);
   });
 
-  it('marks the re-created cache fresh so an async rasterize cannot clobber the restored stroke', () => {
-    const entry_ = { stale: true };
-    deps.layerCache = { getOrCreateRect: vi.fn(() => entry_) } as unknown as CreateStrokeCommitDeps['layerCache'];
-    createStrokeCommit(deps).commitOrdinaryStroke(strokeEvent({ createdLayer: created } as never));
-    const entry = deps.history.push.mock.calls[0]?.[0] as { redo(): void };
-    entry.redo();
-    expect(entry_.stale).toBe(false);
-  });
-
-  it('sizes the entry from both pixel buffers plus overhead', () => {
-    createStrokeCommit(deps).commitOrdinaryStroke(
-      strokeEvent({ afterImageData: imageData(10), beforeImageData: imageData(6), createdLayer: created } as never)
-    );
-    expect(deps.history.push.mock.calls[0]?.[0]).toMatchObject({ bytes: 6 + 10 + 256 });
+  it('accounts for both pixel buffers plus overhead', () => {
+    const h = createHarness();
+    createdStroke(h);
+    expect(h.history.byteSize()).toBe(64 + 64 + HISTORY_ENTRY_OVERHEAD_BYTES);
   });
 });

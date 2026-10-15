@@ -27,6 +27,7 @@ from invokeai.app.services.external_generation.external_generation_common import
 from invokeai.app.services.external_generation.startup import sync_configured_external_starter_models
 from invokeai.app.services.invocation_cache.invocation_cache_common import InvocationCacheStatus
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
+from invokeai.app.services.shared.database.startup import redacted_database_url
 from invokeai.backend.image_util.infill_methods.patchmatch import PatchMatch
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from invokeai.backend.util.devices import TorchDevice
@@ -52,6 +53,17 @@ class AppVersion(BaseModel):
     version: str = Field(description="App version")
 
 
+class FrontendConfig(BaseModel):
+    """Presentation settings any signed-in user may read; never include private runtime configuration here."""
+
+    show_donation_link: bool = Field(description="Whether to show the Donate to InvokeAI menu link")
+
+
+@app_router.get("/frontend_config", operation_id="get_frontend_config", response_model=FrontendConfig)
+def get_frontend_config(current_user: CurrentUserOrDefault) -> FrontendConfig:
+    return FrontendConfig(show_donation_link=get_config().show_donation_link)
+
+
 @app_router.get("/version", operation_id="app_version", status_code=200, response_model=AppVersion)
 def get_version() -> AppVersion:
     return AppVersion(version=__version__)
@@ -75,6 +87,23 @@ def get_app_deps(current_user: CurrentUserOrDefault) -> dict[str, str]:
 @app_router.get("/patchmatch_status", operation_id="get_patchmatch_status", status_code=200, response_model=bool)
 def get_patchmatch_status(current_user: CurrentUserOrDefault) -> bool:
     return PatchMatch.patchmatch_available()
+
+
+@app_router.post(
+    "/database/vacuum",
+    operation_id="vacuum_database",
+    status_code=204,
+    responses={
+        401: {"description": "Authentication required"},
+        403: {"description": "Admin privileges required"},
+        500: {"description": "Database vacuum failed"},
+    },
+)
+def vacuum_database(_: AdminUserOrDefault) -> None:
+    try:
+        ApiDependencies.invoker.services.database.clean()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Database vacuum failed") from e
 
 
 class InvokeAIAppConfigWithSetFields(BaseModel):
@@ -103,6 +132,7 @@ class ExternalProviderConfigModel(BaseModel):
 
 EXTERNAL_PROVIDER_FIELDS: dict[str, tuple[str, str]] = {
     "alibabacloud": ("external_alibabacloud_api_key", "external_alibabacloud_base_url"),
+    "atlascloud": ("external_atlascloud_api_key", "external_atlascloud_base_url"),
     "gemini": ("external_gemini_api_key", "external_gemini_base_url"),
     "openai": ("external_openai_api_key", "external_openai_base_url"),
     "seedream": ("external_seedream_api_key", "external_seedream_base_url"),
@@ -208,6 +238,9 @@ def _redact_config_secrets(config: InvokeAIAppConfig) -> InvokeAIAppConfig:
 
     if config.download_proxy and "@" in config.download_proxy:
         updates["download_proxy"] = REDACTED_SECRET
+
+    if config.db_url:
+        updates["db_url"] = redacted_database_url(config.db_url)
 
     return config.model_copy(update=updates) if updates else config
 

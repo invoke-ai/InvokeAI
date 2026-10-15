@@ -6,11 +6,9 @@ import type {
 
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import {
-  applyStructuralPreview,
-  type CanvasStructuralEngine,
   canConvertRasterControl,
   canMergeLayerDown,
   convertRasterToControl,
@@ -180,22 +178,6 @@ describe('canMergeLayerDown', () => {
   });
 });
 
-describe('applyStructuralPreview', () => {
-  const action = { id: 'layer', patch: { opacity: 0.5 }, type: 'updateCanvasLayer' } as const;
-
-  it('routes a live document edit through the engine guard', () => {
-    const applyPreview = vi.fn(() => false);
-    const engine = { layers: { applyStructuralPreview: applyPreview } } as unknown as CanvasStructuralEngine;
-
-    expect(applyStructuralPreview(engine, action)).toBe(false);
-    expect(applyPreview).toHaveBeenCalledWith(action);
-  });
-
-  it('refuses a live edit without an engine', () => {
-    expect(applyStructuralPreview(null, action)).toBe(false);
-  });
-});
-
 describe('createInpaintMaskLayer', () => {
   it('builds an empty inpaint mask with the legacy-default diagonal fill', () => {
     const layer = createInpaintMaskLayer('Inpaint Mask 1', 'm1');
@@ -288,6 +270,7 @@ describe('nextInpaintMaskName', () => {
 describe('createControlLayer', () => {
   it('centralizes legacy defaults for every adapter kind', () => {
     expect(CONTROL_ADAPTER_DEFAULTS).toEqual({
+      anima_lllite: { beginEndStepPct: [0, 1], controlMode: null, kind: 'anima_lllite', model: null, weight: 1 },
       control_lora: { beginEndStepPct: [0, 1], controlMode: null, kind: 'control_lora', model: null, weight: 0.75 },
       controlnet: {
         beginEndStepPct: [0, 0.75],
@@ -331,6 +314,13 @@ describe('createControlLayer', () => {
 
   it('uses Z-Image control defaults when created for a Z-Image main model', () => {
     expect(createControlLayer('Z Control', 'z1', 'z-image').adapter).toEqual(CONTROL_ADAPTER_DEFAULTS.z_image_control);
+  });
+
+  it('uses Anima ControlNet-LLLite defaults when created for an Anima main model', () => {
+    expect(createControlLayer('Anima Control', 'a1', 'anima', 'sketch').adapter).toEqual({
+      ...CONTROL_ADAPTER_DEFAULTS.anima_lllite,
+      model: 'sketch',
+    });
   });
 
   it('seeds the provided default control model and stays null without one', () => {

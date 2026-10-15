@@ -413,6 +413,33 @@ def test_a_first_frame_and_a_keyframe_compose_into_first_to_last_interpolation()
     assert torch.allclose(unpack_video_latents(video, *LATENT)[:, :, :1], image_latents, atol=1e-5)
 
 
+def test_first_and_last_frames_anchor_the_picture_generated_for_a_held_soundtrack() -> None:
+    """Frames and a soundtrack hold different streams, so all three compose: the appended keyframe
+    must not disturb the audio rows, nor the held audio the keyframe's."""
+    image_latents = torch.randn(1, LTX2_LATENT_CHANNELS, 1, LATENT[1], LATENT[2])
+    keyframe = _keyframe()
+    soundtrack = _soundtrack()
+    state = _state(
+        image_latents=image_latents,
+        keyframe_latents=keyframe,
+        keyframe_latent_index=LATENT[0] - 1,
+        frozen_audio_latents=soundtrack,
+    )
+    # An audio target the soundtrack is not at, so it drifts unless the mask holds it.
+    transformer = TransformerStub(
+        target=torch.randn(1, ROWS, LTX2_LATENT_CHANNELS), audio_target=torch.randn_like(soundtrack)
+    )
+
+    video, audio = _denoise(transformer, state, LTX2Guidance(**OFF))
+
+    for call in transformer.calls:
+        assert torch.allclose(call["hidden_states"].float()[:, ROWS:], pack_video_latents(keyframe), atol=1e-5)
+        assert torch.equal(call["timestep"][0, ROWS:], torch.zeros(state.keyframe_tokens))
+        assert torch.allclose(call["audio_hidden_states"].float(), soundtrack, atol=1e-5)
+    assert torch.allclose(unpack_video_latents(video, *LATENT)[:, :, :1], image_latents, atol=1e-5)
+    assert torch.allclose(audio, soundtrack, atol=1e-5)
+
+
 def test_a_partially_held_keyframe_is_noised_to_its_share_of_the_step() -> None:
     state = _state(keyframe_latents=_keyframe(), keyframe_latent_index=LATENT[0] - 1, keyframe_strength=0.5)
     transformer = TransformerStub()

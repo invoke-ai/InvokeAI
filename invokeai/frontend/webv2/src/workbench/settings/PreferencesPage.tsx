@@ -5,7 +5,7 @@ import { Box, Flex, HStack, Icon, Text } from '@chakra-ui/react';
 import { List } from '@platform/ui/list/List';
 import { ListItem } from '@platform/ui/list/ListItem';
 import { listRowsFromSections, type ListRow } from '@platform/ui/list/listRows';
-import { ManagerColumn, ManagerDetailHeader } from '@platform/ui/ManagerLayout';
+import { ManagerColumn, ManagerDetailHeader, ManagerLayout } from '@platform/ui/ManagerLayout';
 import { resolveSettingsText } from '@platform/ui/settings/contracts';
 import { Navigate, useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { SearchIcon } from 'lucide-react';
@@ -38,6 +38,8 @@ export const PreferencesPage = () => {
   const [searchSection, setSearchSection] = useState<string | null>(null);
   const [lastSectionId, setLastSectionId] = useState<string | null>(null);
   const [lastRequest, setLastRequest] = useState({ requestedId, revealEntryId });
+  // A search result opened from the list; sections open through the route.
+  const [isSearchResultOpen, setIsSearchResultOpen] = useState(false);
   const sections = useAvailableSettings();
   const isKnownRequest = requestedId !== null && sections.some((section) => section.id === requestedId);
 
@@ -48,6 +50,7 @@ export const PreferencesPage = () => {
   // A section or setting requested from elsewhere (an entry point, the palette) replaces a search left behind.
   if (lastRequest.requestedId !== requestedId || lastRequest.revealEntryId !== revealEntryId) {
     setLastRequest({ requestedId, revealEntryId });
+    setIsSearchResultOpen(false);
     if (
       (requestedId !== null && requestedId !== lastRequest.requestedId) ||
       (revealEntryId !== undefined && revealEntryId !== lastRequest.revealEntryId)
@@ -63,6 +66,10 @@ export const PreferencesPage = () => {
     t
   );
 
+  const showSearchSection = (sectionId: string | null) => {
+    setSearchSection(sectionId);
+    setIsSearchResultOpen(true);
+  };
   const changeQuery = (next: string) => {
     setQuery(next);
     setSearchSection(null);
@@ -78,6 +85,15 @@ export const PreferencesPage = () => {
   const reveal = (sectionId: string, entryId?: string) => {
     changeQuery('');
     openSection(sectionId, entryId);
+  };
+  // When only one pane fits, the route says which: a section shows its settings, the bare route the list. Back
+  // navigates, so the browser's Back and Forward move between the same two panes.
+  const isDetailOpen = requestedId !== null || isSearchResultOpen;
+  const backToList = () => {
+    setIsSearchResultOpen(false);
+    if (requestedId !== null) {
+      void navigate({ search: {}, to: '/preferences' });
+    }
   };
   const clearRevealedEntry = () => {
     void navigate({ params: { section: active.id }, replace: true, search: {}, to: '/preferences/$section' });
@@ -116,7 +132,7 @@ export const PreferencesPage = () => {
         title={t('settingsDialog.allResults')}
         titleTruncate="end"
         trailing={String(count)}
-        onPress={() => setSearchSection(null)}
+        onPress={() => showSearchSection(null)}
       />
     ) : (
       <ListItem
@@ -125,9 +141,11 @@ export const PreferencesPage = () => {
         title={resolveSettingsText(entry.section.label, t)}
         titleTruncate="end"
         trailing={searching ? String(entry.section.entries.length) : undefined}
-        onPress={() => (searching ? setSearchSection(entry.section.id) : openSection(entry.section.id))}
+        onPress={() => (searching ? showSearchSection(entry.section.id) : openSection(entry.section.id))}
       />
     );
+
+  const detailTitle = searching ? t('settingsDialog.results') : resolveSettingsText(active.label, t);
 
   if (requestedId !== null && !isKnownRequest) {
     return <Navigate params={{ section: active.id }} replace to="/preferences/$section" />;
@@ -142,39 +160,48 @@ export const PreferencesPage = () => {
       w="full"
       onKeyDown={focusSettingsSearchOnSlash}
     >
-      <ManagerColumn title={t('launchpad.sections.preferences')}>
-        <Box p="3">
-          <SettingsSearchField size="xs" value={query} onChange={changeQuery} />
-        </Box>
-        <List
-          activeKey={searching ? (searchSection ?? ALL_RESULTS_KEY) : active.id}
-          density="compact"
-          label={t('settingsDialog.section')}
-          renderItem={renderItem}
-          rows={rows}
-          status="ready"
-        />
-      </ManagerColumn>
-      <Flex direction="column" flex="1" minH="0" minW="0">
-        <ManagerDetailHeader>
-          <HStack alignSelf="stretch" gap="2" px="1">
-            <Icon as={searching ? SearchIcon : active.icon} boxSize="4" />
-            <Text as="h2" fontSize="sm" fontWeight="700">
-              {searching ? t('settingsDialog.results') : resolveSettingsText(active.label, t)}
-            </Text>
-          </HStack>
-        </ManagerDetailHeader>
-        <SettingsBrowseBody
-          count={count}
-          displayed={displayed}
-          revealEntryId={revealEntryId}
-          searching={searching}
-          viewKey={searching ? `search:${searchSection ?? ''}` : active.id}
-          onClearSearch={clearSearch}
-          onReveal={reveal}
-          onRevealed={clearRevealedEntry}
-        />
-      </Flex>
+      <ManagerLayout
+        backLabel={t('settingsDialog.backToList')}
+        detail={
+          <>
+            <ManagerDetailHeader>
+              <HStack alignSelf="stretch" gap="2" minW="0" px="1">
+                <Icon as={searching ? SearchIcon : active.icon} boxSize="4" flexShrink={0} />
+                <Text as="h2" fontSize="lg" fontWeight="700" truncate>
+                  {detailTitle}
+                </Text>
+              </HStack>
+            </ManagerDetailHeader>
+            <SettingsBrowseBody
+              count={count}
+              displayed={displayed}
+              revealEntryId={revealEntryId}
+              searching={searching}
+              viewKey={searching ? `search:${searchSection ?? ''}` : active.id}
+              onClearSearch={clearSearch}
+              onReveal={reveal}
+              onRevealed={clearRevealedEntry}
+            />
+          </>
+        }
+        isDetailOpen={isDetailOpen}
+        library={
+          <ManagerColumn title={t('launchpad.sections.preferences')}>
+            <Box p="3">
+              <SettingsSearchField size="md" value={query} onChange={changeQuery} />
+            </Box>
+            <List
+              activeKey={searching ? (searchSection ?? ALL_RESULTS_KEY) : active.id}
+              density="compact"
+              label={t('settingsDialog.section')}
+              renderItem={renderItem}
+              rows={rows}
+              status="ready"
+            />
+          </ManagerColumn>
+        }
+        onBack={backToList}
+      />
     </Flex>
   );
 };

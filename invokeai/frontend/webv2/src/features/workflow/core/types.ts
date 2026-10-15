@@ -118,6 +118,11 @@ export interface WorkflowInvocationNodeData {
   dynamicInputTemplates?: Record<string, FieldInputTemplate>;
   /** Runtime reconciliation state for the selected saved workflow. */
   callSavedWorkflowStatus?: 'loading' | 'ready' | 'error';
+  /**
+   * The saved workflow the dynamic inputs were built from, while that differs from the selection: set when another
+   * workflow is selected, gone once that workflow's signature replaces them. Absent means they belong to the selection.
+   */
+  callSavedWorkflowFieldsFrom?: string;
 }
 
 export interface WorkflowInvocationNode {
@@ -286,6 +291,7 @@ export interface ProjectWorkflowEntry {
 
 export interface InvocationTemplatesSnapshot {
   status: 'idle' | 'loading' | 'loaded' | 'error';
+  /** The server's or network's own message for a failed load; null when there is none to show. */
   error: string | null;
   templates: InvocationTemplates;
 }

@@ -38,20 +38,57 @@ export interface MiddleTruncateProps extends Omit<TextProps, 'children'> {
 }
 
 /**
+ * The split's flex items read as separate words to assistive technology ("S DXL Main"), so a split label hides
+ * them and exposes the whole string once through generated content, which stays out of text selection and copy.
+ */
+const SPLIT_LABEL_CSS = {
+  '&::before': {
+    clip: 'rect(0 0 0 0)',
+    content: 'attr(data-full-text)',
+    height: '1px',
+    overflow: 'hidden',
+    position: 'absolute',
+    whiteSpace: 'nowrap',
+    width: '1px',
+  },
+} as const;
+
+/**
  * For identifiers whose suffix matters. Keep white-space: pre across the head/tail boundary so the space there
  * survives; a head with no tail collapses newlines like any single-line label. Preserve full DOM text for copy and
  * accessibility.
  */
-export const MiddleTruncate = ({ tailGraphemes = DEFAULT_TAIL_GRAPHEMES, text, ...textProps }: MiddleTruncateProps) => {
+export const MiddleTruncate = ({
+  css,
+  tailGraphemes = DEFAULT_TAIL_GRAPHEMES,
+  text,
+  ...textProps
+}: MiddleTruncateProps) => {
   const { head, tail } = useMemo(() => splitTextForMiddleTruncation(text, tailGraphemes), [tailGraphemes, text]);
+  const labelCss = useMemo(() => (tail ? [SPLIT_LABEL_CSS, css] : css), [css, tail]);
 
   return (
-    <Text display="flex" minW="0" overflow="hidden" title={text} whiteSpace="nowrap" {...textProps}>
-      <chakra.span flex="0 1 auto" overflow="hidden" textOverflow="ellipsis" whiteSpace={tail ? 'pre' : 'nowrap'}>
+    <Text
+      css={labelCss}
+      data-full-text={tail ? text : undefined}
+      display="flex"
+      minW="0"
+      overflow="hidden"
+      title={text}
+      whiteSpace="nowrap"
+      {...textProps}
+    >
+      <chakra.span
+        aria-hidden={tail ? true : undefined}
+        flex="0 1 auto"
+        overflow="hidden"
+        textOverflow="ellipsis"
+        whiteSpace={tail ? 'pre' : 'nowrap'}
+      >
         {head}
       </chakra.span>
       {tail ? (
-        <chakra.span flexShrink="0" whiteSpace="pre">
+        <chakra.span aria-hidden flexShrink="0" whiteSpace="pre">
           {tail}
         </chakra.span>
       ) : null}

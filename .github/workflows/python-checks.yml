@@ -46,11 +46,11 @@ jobs:
     env:
       # uv requires a venv by default - but for this, we can simply use the system python
       UV_SYSTEM_PYTHON: 1
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5 # expected run time: <1 min
     steps:
       - name: checkout
-        uses: actions/checkout@v6
+        uses: useblacksmith/checkout@v1
 
       - name: check for changed python files
         if: ${{ inputs.always_run != true }}

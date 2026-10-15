@@ -12,6 +12,7 @@ import { FindInGalleryButton } from '@features/gallery/mediaSlot';
 import { getEffectiveReferenceImage } from '@features/generation/core/referenceImage';
 import { getReferenceImageUrls } from '@features/generation/data/referenceImageUrls';
 import { GenerationModelSelect as ModelSelect } from '@features/generation/ui/GenerationUiContext';
+import { useExitPresence } from '@platform/react/useExitRetainedValue';
 import { IconButton, ToggleDot, Tooltip } from '@platform/ui';
 import { ArrowDownIcon, ArrowUpIcon, ChevronDownIcon, CropIcon, ImageIcon, RulerIcon, Trash2Icon } from 'lucide-react';
 import { memo, useCallback, useRef, useState } from 'react';
@@ -135,7 +136,7 @@ const ReferenceImageCardBase = ({
         {isCollapsed ? (
           <HStack as="button" flex="1" gap="2" minW="0" textAlign="left" onClick={expand}>
             <MiniThumbnail image={config.image} />
-            <Text color="fg.muted" fontSize="xs" minW="0" truncate>
+            <Text color="fg.muted" fontSize="md" minW="0" truncate>
               <Text as="span" color={isEnabled ? 'fg' : 'fg.muted'} fontWeight="medium">
                 {title}
               </Text>
@@ -151,7 +152,7 @@ const ReferenceImageCardBase = ({
             </Text>
           </HStack>
         ) : (
-          <Text color={isEnabled ? 'fg' : 'fg.muted'} flex="1" fontSize="xs" fontWeight="medium" minW="0" truncate>
+          <Text color={isEnabled ? 'fg' : 'fg.muted'} flex="1" fontSize="md" fontWeight="medium" minW="0" truncate>
             {title}
           </Text>
         )}
@@ -164,7 +165,7 @@ const ReferenceImageCardBase = ({
               aria-label={t('widgets.generate.moveReferenceImageUp')}
               color="fg.muted"
               disabled={!canMoveUp}
-              size="2xs"
+              size="sm"
               variant="ghost"
               onClick={handleMoveUp}
             >
@@ -177,7 +178,7 @@ const ReferenceImageCardBase = ({
               aria-label={t('widgets.generate.moveReferenceImageDown')}
               color="fg.muted"
               disabled={!canMoveDown}
-              size="2xs"
+              size="sm"
               variant="ghost"
               onClick={handleMoveDown}
             >
@@ -189,7 +190,7 @@ const ReferenceImageCardBase = ({
               isCollapsed ? t('widgets.generate.expandReferenceImage') : t('widgets.generate.collapseReferenceImage')
             }
             color="fg.muted"
-            size="2xs"
+            size="sm"
             variant="ghost"
             onClick={toggleCollapsed}
           >
@@ -205,7 +206,7 @@ const ReferenceImageCardBase = ({
             <IconButton
               aria-label={t('widgets.generate.removeReferenceImage')}
               color="fg.muted"
-              size="2xs"
+              size="sm"
               variant="ghost"
               colorPalette="red"
               onClick={handleRemove}
@@ -323,7 +324,6 @@ const ReferenceModelSelector = ({
           filter={filterModel}
           modelTypes={modelTypes}
           placeholder={t('widgets.generate.selectModel')}
-          size="xs"
           value={config.model?.key ?? null}
           onChange={selectReferenceModel}
         />
@@ -372,6 +372,7 @@ const ReferenceImageThumbnail = ({
 }) => {
   const { t } = useTranslation();
   const [isCropOpen, setIsCropOpen] = useState(false);
+  const cropDialog = useExitPresence(isCropOpen);
   const effectiveImage = image ? getEffectiveReferenceImage(image) : null;
   const urls = image ? getReferenceImageUrls(image) : null;
 
@@ -432,7 +433,7 @@ const ReferenceImageThumbnail = ({
               <IconButton
                 aria-label={t('common.crop')}
                 disabled={disabled}
-                size="2xs"
+                size="sm"
                 variant="ghost"
                 onClick={openCrop}
               >
@@ -443,7 +444,7 @@ const ReferenceImageThumbnail = ({
               <IconButton
                 aria-label={t('widgets.generate.useSize')}
                 disabled={disabled}
-                size="2xs"
+                size="sm"
                 variant="ghost"
                 onClick={handleUseSize}
               >
@@ -453,8 +454,15 @@ const ReferenceImageThumbnail = ({
           </HStack>
         ) : null}
       </Box>
-      {image && isCropOpen ? (
-        <ReferenceImageCropDialog image={image} isOpen={isCropOpen} onApply={onCrop} onClose={closeCrop} />
+      {image && cropDialog.isMounted ? (
+        <ReferenceImageCropDialog
+          key={cropDialog.generation}
+          image={image}
+          isOpen={cropDialog.isOpen}
+          onApply={onCrop}
+          onClose={closeCrop}
+          onExitComplete={cropDialog.release}
+        />
       ) : null}
     </>
   );

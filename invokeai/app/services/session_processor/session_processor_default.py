@@ -1,7 +1,7 @@
 import gc
 import time
 import traceback
-from contextlib import contextmanager, suppress
+from contextlib import contextmanager, nullcontext, suppress
 from threading import BoundedSemaphore, Thread
 from threading import Event as ThreadEvent
 from typing import Iterator, Optional
@@ -21,6 +21,7 @@ from invokeai.app.services.events.events_common import (
 )
 from invokeai.app.services.invocation_stats.invocation_stats_common import GESStatsNotFoundError
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.session_processor.architecture_switch import ArchitectureSwitchOffload
 from invokeai.app.services.session_processor.session_processor_base import (
     InvocationServices,
     OnAfterRunNode,
@@ -50,6 +51,11 @@ from invokeai.backend.util.device_pool import (
     idle_device_borrowed,
 )
 from invokeai.backend.util.devices import TorchDevice, disable_conv_benchmark_empty_cache
+from invokeai.backend.util.wddm import paged_bytes
+
+# Paged-out VRAM worth a warning. Weight uploads page a few hundred MB for an instant (0.25-0.36 GiB measured on an
+# RX 9060 XT), so the threshold sits above that; a session that ends with more than this paged has lost real VRAM.
+_VRAM_PAGING_WARNING_BYTES = 512 * 2**20
 
 # A failed owner lookup is retried before the item is refused, so that a transient error
 # — a busy-timeout on the shared SQLite connection under multi-GPU write contention, say —
@@ -157,6 +163,8 @@ class DefaultSessionRunner(SessionRunnerBase):
         self._on_after_run_session_callbacks = on_after_run_session_callbacks or []
         self.workflow_call_coordinator = WorkflowCallCoordinator(self)
         self.workflow_call_queue_lifecycle = WorkflowCallQueueLifecycle(self)
+        # Per runner, hence per worker and device: each worker remembers the architecture it last ran.
+        self._architecture_switch = ArchitectureSwitchOffload()
 
     def start(self, services: InvocationServices, cancel_event: ThreadEvent, profiler: Optional[Profiler] = None):
         self._services = services
@@ -475,8 +483,24 @@ class DefaultSessionRunner(SessionRunnerBase):
         if self._profiler is not None:
             self._profiler.start(profile_id=queue_item.session_id)
 
+        self._offload_other_architectures(queue_item)
+
         for callback in self._on_before_run_session_callbacks:
             callback(queue_item=queue_item)
+
+    def _offload_other_architectures(self, queue_item: SessionQueueItem) -> None:
+        """Clear this worker's VRAM of models the session does not name when it switches architecture.
+
+        Best effort: a failure costs at most the VRAM the offload would have freed, never the session.
+        """
+        model_manager = getattr(self._services, "model_manager", None)
+        load = model_manager.load if model_manager is not None else None
+        if load is None or not self._services.configuration.offload_on_architecture_switch:
+            return
+        try:
+            self._architecture_switch.before_session(queue_item.session.graph, load.ram_cache)
+        except Exception:
+            self._services.logger.warning("Could not clear VRAM for an architecture switch", exc_info=True)
 
     def _on_after_run_session(self, queue_item: SessionQueueItem) -> None:
         """Called after a session is run.
@@ -659,6 +683,9 @@ class _SessionWorker:
         self.cancel_event = ThreadEvent()
         self.queue_item: Optional[SessionQueueItem] = None
         self.thread: Optional[Thread] = None
+        # Paged-out VRAM at the previous session's end and at the last warning; only this worker's thread uses them.
+        self.paging_last_bytes = 0
+        self.paging_warned_bytes = 0
 
     @property
     def label(self) -> str:
@@ -935,11 +962,20 @@ class DefaultSessionProcessor(SessionProcessorBase):
         released its own working memory along the way, so it only flushes a release a peer
         deferred onto it — a flag test when nothing is pending.
 
+        With `clear_vram_after_session`, every unlocked model on this worker's device also moves to
+        RAM first (it stays cached there), and the release is forced past a busy peer: deferred, it
+        would leave the freed memory with the allocator while this worker's next session budgets its
+        first load, which then loads at minimum residency. Once per session, and the user opted in.
+
         Both are best effort: the session's outcome is already recorded, and a free on a sick
         device context must not fail the worker.
         """
         try:
-            if worker.cancel_event.is_set():
+            services = self._invoker.services
+            if services.configuration.clear_vram_after_session and services.model_manager.load is not None:
+                services.model_manager.load.ram_cache.offload_models_from_vram_except(())
+                TorchDevice.empty_cache(force=True)
+            elif worker.cancel_event.is_set():
                 TorchDevice.empty_cache()
             else:
                 TorchDevice.flush_deferred_empty_cache()
@@ -947,6 +983,38 @@ class DefaultSessionProcessor(SessionProcessorBase):
             self._invoker.services.logger.warning(
                 f"Could not release cached VRAM after the session on {worker.label}", exc_info=True
             )
+
+    def _warn_if_vram_paged(self, worker: _SessionWorker) -> None:
+        """Say so when Windows keeps part of this worker's GPU memory in shared system memory across sessions.
+
+        On a ROCm build under Windows an allocation that does not fit the video-memory budget, or finds no contiguous
+        VRAM, is placed in system memory instead of failing -- and another program on the same GPU can push this
+        process's memory out the same way. Every generation that touches it slows down, with nothing else in the log to
+        explain why. Only what was paged at the end of two consecutive sessions counts: an overflow at the end of a
+        decode can return to VRAM within seconds. Warns once per episode: again only after that grew by the threshold,
+        re-armed once a reading drops below it. `paged_bytes` answers None everywhere else, which keeps this silent.
+        """
+        try:
+            paged = paged_bytes(worker.device or TorchDevice.choose_torch_device())
+        except Exception:
+            self._invoker.services.logger.debug(f"Could not read paged VRAM on {worker.label}", exc_info=True)
+            return
+        if paged is None:
+            return
+        sustained = min(paged, worker.paging_last_bytes)
+        worker.paging_last_bytes = paged
+        if paged < _VRAM_PAGING_WARNING_BYTES:
+            worker.paging_warned_bytes = 0
+            return
+        if sustained < worker.paging_warned_bytes + _VRAM_PAGING_WARNING_BYTES:
+            return
+        worker.paging_warned_bytes = sustained
+        self._invoker.services.logger.warning(
+            f"Windows kept {sustained / 2**30:.1f} GiB of Invoke's GPU memory on {worker.label} in shared system memory "
+            "after the last two generations, which makes them much slower. Close other programs that use this GPU. If "
+            "it keeps happening, lower the image size, set max_cache_vram_gb lower or device_working_mem_gb higher, "
+            "and restart Invoke to get the memory back into VRAM."
+        )
 
     def resume(self) -> SessionProcessorStatus:
         if not self._resume_event.is_set():
@@ -994,6 +1062,27 @@ class DefaultSessionProcessor(SessionProcessorBase):
     def _is_image_move_maintenance_active(self) -> bool:
         image_moves = getattr(self._invoker.services, "image_moves", None)
         return image_moves is not None and image_moves.is_maintenance_active()
+
+    def _dequeue_if_storage_maintenance_inactive(
+        self, device: Optional[str]
+    ) -> tuple[bool, Optional[SessionQueueItem]]:
+        """Atomically check storage maintenance state and claim the next queue item.
+
+        Gallery maintenance reserves its busy flag before taking the same mutation lock. If
+        this worker wins the lock first, the subsequent reservation sees the claimed item in
+        queue status; if maintenance wins, this worker leaves queued work pending.
+        """
+        image_moves = getattr(self._invoker.services, "image_moves", None)
+        mutation_lock = (
+            image_moves.image_mutation_lock(blocking=False) if image_moves is not None else nullcontext(True)
+        )
+        with mutation_lock as lock_acquired:
+            if not lock_acquired:
+                return False, None
+            if self._is_image_move_maintenance_active():
+                return False, None
+            item = self._invoker.services.session_queue.dequeue(device=device)
+            return True, item
 
     def _cancel_queue_item_if_owner_inactive(self, queue_item: SessionQueueItem) -> bool:
         """Cancel a dequeued item whose owner is deactivated, deleted, or unverifiable.
@@ -1056,11 +1145,6 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     if stop_event.is_set():
                         break
 
-                    if self._is_image_move_maintenance_active():
-                        self._invoker.services.logger.debug("Image storage maintenance is active")
-                        poll_now_event.wait(self._polling_interval)
-                        continue
-
                     # Clear any stale cancel signal from the previous item BEFORE claiming the next
                     # one. Clearing it after dequeue (as before) could wipe a cancel that arrived for
                     # the item we just claimed — e.g. during the gc.collect() below — silently losing
@@ -1077,9 +1161,14 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     # Get the next session to process. dequeue() atomically claims the item, so concurrent
                     # workers never receive the same item. Pass this worker's device so the item is
                     # tagged with the GPU that ran it (None in single-device/legacy mode).
-                    worker.queue_item = self._invoker.services.session_queue.dequeue(
+                    maintenance_inactive, worker.queue_item = self._dequeue_if_storage_maintenance_inactive(
                         device=str(worker.device) if worker.device is not None else None
                     )
+
+                    if not maintenance_inactive:
+                        self._invoker.services.logger.debug("Image storage maintenance is active")
+                        poll_now_event.wait(self._polling_interval)
+                        continue
 
                     if worker.queue_item is None:
                         # The queue was empty, wait for next polling interval or event to try again
@@ -1167,6 +1256,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     finally:
                         GENERATION_DEVICE_POOL.release_session(worker.device)
                     self._release_vram_after_session(worker)
+                    self._warn_if_vram_paged(worker)
 
                 except Exception as e:
                     error_type = e.__class__.__name__

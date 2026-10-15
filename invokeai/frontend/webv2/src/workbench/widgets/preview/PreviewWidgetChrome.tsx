@@ -20,7 +20,7 @@ export const PreviewWidgetLabel = ({ region }: WidgetLabelProps) => {
     }
 
     return (
-      <Text fontSize="xs" fontWeight="700">
+      <Text fontSize="md" fontWeight="700">
         {t('widgets.labels.preview')}
       </Text>
     );
@@ -29,13 +29,13 @@ export const PreviewWidgetLabel = ({ region }: WidgetLabelProps) => {
   // Pad the truncated label away from the first header action.
   return (
     <HStack flex="1" gap="1" minW="0" pe="2">
-      <Text flexShrink={0} fontSize="xs" fontWeight="700">
+      <Text flexShrink={0} fontSize="md" fontWeight="700">
         {boardName}
       </Text>
-      <Text color="fg.muted" flexShrink={0} fontSize="xs">
+      <Text color="fg.muted" flexShrink={0} fontSize="md">
         /
       </Text>
-      <MiddleTruncate color="fg.muted" fontSize="xs" minW="0" text={itemName} />
+      <MiddleTruncate color="fg.muted" fontSize="md" minW="0" text={itemName} />
     </HStack>
   );
 };

@@ -51,17 +51,10 @@ const STRUCTURAL_MUTATION_TYPES = [
 ];
 /** Explicitly allowlist structural-mutation owners to prevent bypassing the prepared-edit seam. */
 const STRUCTURAL_MUTATION_OWNER_PATHS = new Set([
-  'workbench/canvasProjectMutations.ts',
-  'workbench/canvas-engine/controllers/booleanMergeController.ts',
-  'workbench/canvas-engine/controllers/copyLayerController.ts',
-  'workbench/canvas-engine/controllers/cropLayerController.ts',
-  'workbench/canvas-engine/controllers/extractMaskedAreaController.ts',
-  'workbench/canvas-engine/controllers/filterResultController.ts',
-  'workbench/canvas-engine/controllers/generatedResultController.ts',
+  'workbench/canvas-engine/controllers/controlPixelController.ts',
+  'workbench/canvas-engine/controllers/editSteps.ts',
   'workbench/canvas-engine/controllers/layerMutationController.ts',
-  'workbench/canvas-engine/controllers/maskResultController.ts',
   'workbench/canvas-engine/controllers/mergeLayerController.ts',
-  'workbench/canvas-engine/controllers/newRasterLayerController.ts',
   'workbench/canvas-engine/controllers/rasterizeLayerController.ts',
   'workbench/canvas-engine/controllers/stagedResultController.ts',
   'workbench/canvas-engine/controllers/structuralLayerController.ts',
@@ -76,6 +69,7 @@ const STRUCTURAL_MUTATION_OWNER_PATHS = new Set([
   'workbench/canvas-engine/tools/paintTool.ts',
   'workbench/canvas-engine/tools/shapeTool.ts',
   'workbench/canvas-operations/importGalleryImages.ts',
+  'workbench/canvasProjectMutations.ts',
 ]);
 const structuralLiteral = new RegExp(`type: '(?:${STRUCTURAL_MUTATION_TYPES.join('|')})'`, 'g');
 
@@ -84,7 +78,6 @@ const SEAM_ONLY_SYMBOLS = ['repairSelectedLayerId', 'moveNodesWithinSiblings', '
 /** Production planners that consume the document model; dropping the import would reopen an ad-hoc path. */
 const MODEL_CONSUMERS = [
   'workbench/canvas-engine/render/compositor.ts',
-  'workbench/canvas-engine/render/frameDemand.ts',
   'workbench/canvas-engine/render/overlayFrame.ts',
   'workbench/canvas-engine/render/floatingSelectionFrame.ts',
   'workbench/canvas-engine/render/rasterComposite.ts',

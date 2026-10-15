@@ -1,4 +1,6 @@
 import weakref
+from contextlib import contextmanager
+from typing import Iterator
 
 import torch
 
@@ -183,12 +185,25 @@ class CachedModelWithPartialLoad:
         for module in self._model.modules():
             for name, buffer in module.named_buffers():
                 if name in module._non_persistent_buffers_set:
-                    module._buffers[name] = buffer.to(device, copy=True)
+                    if buffer.device.type != device.type or (
+                        device.index is not None and buffer.device.index != device.index
+                    ):
+                        module._buffers[name] = buffer.to(device, copy=True)
 
     def _set_autocast_enabled_in_all_modules(self, enabled: bool):
         """Set autocast_enabled flag in all modules that support device autocasting."""
         for module in self._modules_that_support_autocast.values():
             module.set_device_autocasting_enabled(enabled)
+
+    @contextmanager
+    def _transfer_operation(self) -> Iterator[None]:
+        """Invalidate derived residency state if a transfer leaves the model partially changed."""
+        try:
+            yield
+        except BaseException:
+            self._cur_vram_bytes = None
+            self._set_autocast_enabled_in_all_modules(True)
+            raise
 
     @property
     def model(self) -> torch.nn.Module:
@@ -268,12 +283,12 @@ class CachedModelWithPartialLoad:
                 # Tied names come along, but the count stays what the caller asked about: required tensors repaired.
                 self._select_with_aliases(keys_to_repair, key)
                 repaired_required_tensors += 1
-        if len(keys_to_repair) == 0:
-            return 0
-
-        self._load_state_dict_with_device_conversion(cur_state_dict, keys_to_repair, self._compute_device)
-        self._move_non_persistent_buffers_to_device(self._compute_device)
-        self._cur_vram_bytes = None
+        with self._transfer_operation():
+            if keys_to_repair:
+                self._load_state_dict_with_device_conversion(cur_state_dict, keys_to_repair, self._compute_device)
+            self._move_non_persistent_buffers_to_device(self._compute_device)
+            if keys_to_repair:
+                self._cur_vram_bytes = None
         return repaired_required_tensors
 
     def _load_state_dict_with_device_conversion(
@@ -380,9 +395,6 @@ class CachedModelWithPartialLoad:
             `max_bytes` was reached while more weights would otherwise have been selected — i.e.
             another call can make further progress toward the same `vram_bytes_to_load` budget.
         """
-        # TODO(ryand): Handle the case where an exception is thrown while loading or unloading weights. At the very
-        # least, we should reset self._cur_vram_bytes to None.
-
         if max_bytes is not None and max_bytes <= 0:
             # A non-positive cap would return (0, truncated=True) forever and spin any caller that
             # loops until settled.
@@ -443,25 +455,26 @@ class CachedModelWithPartialLoad:
 
             vram_bytes_loaded += self._select_with_aliases(keys_to_load, key)
 
-        if len(keys_to_load) > 0:
-            # We load the entire state dict, not just the parameters that changed, in case there are modules that
-            # override _load_from_state_dict() and do some funky stuff that requires the entire state dict.
-            # Alternatively, in the future, grouping parameters by module could probably solve this problem.
-            self._load_state_dict_with_device_conversion(cur_state_dict, keys_to_load, self._compute_device)
+        with self._transfer_operation():
+            if len(keys_to_load) > 0:
+                # We load the entire state dict, not just the parameters that changed, in case there are modules that
+                # override _load_from_state_dict() and do some funky stuff that requires the entire state dict.
+                # Alternatively, in the future, grouping parameters by module could probably solve this problem.
+                self._load_state_dict_with_device_conversion(cur_state_dict, keys_to_load, self._compute_device)
 
-        if self._cur_vram_bytes is not None:
-            self._cur_vram_bytes += vram_bytes_loaded
+            if self._cur_vram_bytes is not None:
+                self._cur_vram_bytes += vram_bytes_loaded
 
-        if fully_loaded and not truncated:
-            self._set_autocast_enabled_in_all_modules(False)
-        else:
-            # Not fully resident (or a truncated pass whose remaining keys are unknown): the
-            # autocast wrappers must stay enabled so the model stays runnable either way.
-            self._set_autocast_enabled_in_all_modules(True)
+            if fully_loaded and not truncated:
+                self._set_autocast_enabled_in_all_modules(False)
+            else:
+                # Not fully resident (or a truncated pass whose remaining keys are unknown): the
+                # autocast wrappers must stay enabled so the model stays runnable either way.
+                self._set_autocast_enabled_in_all_modules(True)
 
-        # Move all non-persistent buffers to the compute device. These are a weird edge case and do not participate in
-        # the vram_bytes_loaded tracking.
-        self._move_non_persistent_buffers_to_device(self._compute_device)
+            # Move all non-persistent buffers to the compute device. These are a weird edge case and do not participate
+            # in the vram_bytes_loaded tracking.
+            self._move_non_persistent_buffers_to_device(self._compute_device)
 
         return vram_bytes_loaded, truncated
 
@@ -503,13 +516,14 @@ class CachedModelWithPartialLoad:
 
             vram_bytes_freed += self._select_with_aliases(keys_to_offload, key)
 
-        if len(keys_to_offload) > 0:
-            self._load_state_dict_with_device_conversion(cur_state_dict, keys_to_offload, torch.device("cpu"))
+        with self._transfer_operation():
+            if len(keys_to_offload) > 0:
+                self._load_state_dict_with_device_conversion(cur_state_dict, keys_to_offload, torch.device("cpu"))
 
-        if self._cur_vram_bytes is not None:
-            self._cur_vram_bytes -= vram_bytes_freed
+            if self._cur_vram_bytes is not None:
+                self._cur_vram_bytes -= vram_bytes_freed
 
-        # We may have gone from a fully-loaded model to a partially-loaded model, so we need to reapply the custom
-        # layers.
-        self._set_autocast_enabled_in_all_modules(True)
+            # We may have gone from a fully-loaded model to a partially-loaded model, so we need to reapply the custom
+            # layers.
+            self._set_autocast_enabled_in_all_modules(True)
         return vram_bytes_freed

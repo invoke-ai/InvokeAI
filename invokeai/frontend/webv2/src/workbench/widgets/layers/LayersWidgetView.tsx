@@ -3,10 +3,10 @@ import type { WidgetViewProps } from '@workbench/widgetContracts';
 import { Flex, Icon, Stack, Text } from '@chakra-ui/react';
 import { SegmentTabs, segmentTabsPanelId, segmentTabsTabId } from '@platform/ui/SegmentTabs';
 import { getDocumentIndex } from '@workbench/canvas-engine/api';
+import { useCanvasEngine } from '@workbench/canvas-operations/react';
 import { setLayerPanelFilter, useLayerPanelState } from '@workbench/layerPanelState';
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { useCanvasDocumentEditingLocked } from '@workbench/widgets/canvas/engineStoreHooks';
-import { useCanvasEngine } from '@workbench/widgets/canvas/useCanvasEngine';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { LayersIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
@@ -156,7 +156,7 @@ export const LayersWidgetView = ({ runtime }: WidgetViewProps) => {
                 onContextMenu={handleEmptyAreaContextMenu}
               >
                 <Icon as={LayersIcon} boxSize="6" />
-                <Text fontSize="2xs" textAlign="center">
+                <Text fontSize="xs" textAlign="center">
                   {t('widgets.layers.empty')}
                 </Text>
               </Flex>

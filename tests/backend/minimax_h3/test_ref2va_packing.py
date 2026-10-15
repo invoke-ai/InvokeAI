@@ -69,9 +69,8 @@ class TestValidateReferenceKinds:
         with pytest.raises(ValueError, match="at least one reference"):
             validate_reference_kinds([])
 
-    def test_rejects_all_audio(self):
-        with pytest.raises(ValueError, match="cannot be used alone"):
-            validate_reference_kinds(["audio", "audio"])
+    def test_accepts_all_audio(self):
+        validate_reference_kinds(["audio", "audio"])
 
     def test_rejects_unknown_kind(self):
         with pytest.raises(ValueError, match="got 'movie'"):
@@ -302,9 +301,16 @@ class TestRef2VADenoiseState:
             # ...and visual reference rows at >= 0.999.
             assert torch.all(row_timesteps[state.video_indices[:6]] >= 0.999)
 
-    def test_rejects_all_audio(self):
-        with pytest.raises(ValueError, match="cannot be used alone"):
-            _build_ref_state(0, kinds=("audio",))
+    def test_audio_only_references(self):
+        state = _build_ref_state(0, kinds=("audio",))
+
+        # No visual condition rows: the video stream is the generated target alone.
+        assert state.layout.num_condition_video_rows == 0
+        assert state.video_rows.shape == (8, 96)
+        sequence_length = state.layout.sequence_length
+        assert state.video_indices.tolist() == list(range(sequence_length - 8, sequence_length))
+        assert state.layout.num_condition_audio_rows == 6
+        assert torch.equal(state.audio_rows[:6], torch.full((6, 32), 0.5))
 
     def test_rejects_row_shape_mismatch(self):
         refs = [MiniMaxH3EncodedReference(kind="image", video_rows=torch.zeros(5, 96), latent_shape=(1, 6, 2))]

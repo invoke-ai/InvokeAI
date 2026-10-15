@@ -30,6 +30,7 @@ import { Launchpad } from '@workbench/launchpad/Launchpad';
 import { ProjectFileOptionsProvider } from '@workbench/projects/components/ProjectFileOptionsProvider';
 import { peekOpenProjectIds, type WorkbenchSearch } from '@workbench/projects/session';
 import { loadWorkbenchSettings } from '@workbench/settings/store';
+import { loadAppVersion } from '@workbench/shell/whatsNewStore';
 import { Fragment } from 'react';
 
 import { SocketHubRuntime } from './SocketHubRuntime';
@@ -100,6 +101,8 @@ const authenticatedRoute = createRoute({
       }
     }
 
+    // What's New compares this with the account's last-seen version; it never holds up the route.
+    void loadAppVersion();
     await loadWorkbenchSettings();
   },
   component: AuthenticatedLayout,

@@ -89,9 +89,9 @@ export interface ExecuteCompositePlanDeps {
   };
   /**
    * Return the rasterized surface and its layer-local content rect; drawing applies rect.origin before the layer
-   * transform.
+   * transform, then releases it.
    */
-  getLayerSurface(layerId: string): Promise<{ surface: RasterSurface; rect: Rect }>;
+  getLayerSurface(layerId: string): Promise<{ surface: RasterSurface; rect: Rect; release(): void }>;
   /**
    * Upload the composite and return its server name and dimensions; the engine marks generation composites
    * intermediate.
@@ -415,8 +415,12 @@ const compositeMaskEntry = async (
     setTransform(tempCtx, { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
     tempCtx.clearRect(0, 0, width, height);
     const layerSurface = await deps.getLayerSurface(ref.id);
-    setTransform(tempCtx, multiply(view, maskLayerMatrix(ref)));
-    tempCtx.drawImage(layerSurface.surface.canvas, layerSurface.rect.x, layerSurface.rect.y);
+    try {
+      setTransform(tempCtx, multiply(view, maskLayerMatrix(ref)));
+      tempCtx.drawImage(layerSurface.surface.canvas, layerSurface.rect.x, layerSurface.rect.y);
+    } finally {
+      layerSurface.release();
+    }
 
     // Convert its alpha to grayscale by the layer's attribute value.
     const pixels = readImageData(temp, fullRect);

@@ -5,6 +5,7 @@ import type { WorkbenchCommands } from '@workbench/workbenchStore';
 import type { TFunction } from 'i18next';
 
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { createInstance } from 'i18next';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const galleryApi = vi.hoisted(() => ({
@@ -55,6 +56,47 @@ const image: GalleryImage = {
 
 const t = ((key: string) => key) as unknown as TFunction;
 
+const en = Object.values(
+  import.meta.glob('../../../public/locales/en.json', { eager: true, import: 'default' })
+)[0] as Record<string, unknown>;
+
+const createRecallTranslator = async (lng: 'en' | 'es') => {
+  const instance = createInstance();
+  await instance.init({
+    lng,
+    fallbackLng: 'en',
+    interpolation: { escapeValue: false },
+    resources: {
+      en: { translation: en },
+      es: {
+        translation: {
+          widgets: {
+            gallery: {
+              itemActions: {
+                recall: {
+                  conceptsNotRestored: 'Conceptos no restaurados: {{concepts}}.',
+                  nothingRecalled: 'No hay datos recuperables',
+                  partiallyRecalled: 'Algunos datos no se recuperaron',
+                  unnamedConcept: 'concepto sin nombre',
+                  skippedConcept: {
+                    ambiguous: '{{name}} (varios modelos coinciden)',
+                    duplicate: '{{name}} (duplicado)',
+                    incompatible: '{{name}} (incompatible con el modelo seleccionado)',
+                    invalid: '{{name}} (metadatos ilegibles)',
+                    modelUnavailable: '{{name}} (modelo de la imagen no disponible)',
+                    unresolved: '{{name}} (no instalado)',
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+  return instance.t;
+};
+
 const createCommands = () => {
   const add = vi.fn();
   const setSettings = vi.fn();
@@ -98,6 +140,150 @@ describe('executeImageRecall', () => {
       'project-1'
     );
     expect(add).toHaveBeenCalledWith(expect.objectContaining({ kind: 'success', title: 'Recalled remix settings' }));
+  });
+
+  it.each([
+    { label: 'restores every recorded concept', recorded: ['ink-lora'], skipNotice: false },
+    { label: 'reports concepts it could not restore', recorded: ['ink-lora', 'deleted-lora'], skipNotice: true },
+  ])('$label', async ({ recorded, skipNotice }) => {
+    const { add, commands, setSettings } = createCommands();
+    const inkLora = { base: 'sdxl', key: 'ink-lora', name: 'Ink', type: 'lora' } as ModelConfig;
+    const t = await createRecallTranslator('en');
+
+    galleryApi.galleryImages.metadata.mockResolvedValue({
+      loras: recorded.map((key) => ({ model: { base: 'sdxl', key, name: key, type: 'lora' }, weight: 0.6 })),
+      model: { key: model.key },
+    });
+
+    await expect(
+      executeImageRecall({
+        t,
+        commands,
+        generateValues: { modelKey: model.key },
+        image: { ...image, imageName: `concepts-${recorded.length}.png` },
+        kind: 'all',
+        models: [model, inkLora],
+        projectId: 'project-1',
+      })
+    ).resolves.toBe(true);
+
+    expect(setSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ loras: [{ isEnabled: true, model: inkLora, weight: 0.6 }] }),
+      'project-1'
+    );
+    expect(add).toHaveBeenCalledWith(expect.objectContaining({ kind: 'success', title: 'Recalled image metadata' }));
+    expect(add).toHaveBeenCalledTimes(skipNotice ? 2 : 1);
+    if (skipNotice) {
+      expect(add).toHaveBeenCalledWith({
+        kind: 'info',
+        message: 'Concepts not restored: deleted-lora (not installed).',
+        title: 'Some image data was not recalled',
+      });
+    }
+  });
+
+  it('explains why nothing was recalled when no recorded concept can be restored', async () => {
+    const { add, commands, setSettings } = createCommands();
+    const t = await createRecallTranslator('en');
+
+    galleryApi.galleryImages.metadata.mockResolvedValue({
+      loras: [{ model: { base: 'sdxl', key: 'deleted-lora', name: 'Deleted', type: 'lora' }, weight: 1 }],
+    });
+
+    await expect(
+      executeImageRecall({
+        t,
+        commands,
+        generateValues: { modelKey: model.key },
+        image: { ...image, imageName: 'unrestorable-concepts.png' },
+        kind: 'remix',
+        models: [model],
+        projectId: 'project-1',
+      })
+    ).resolves.toBe(false);
+
+    expect(setSettings).not.toHaveBeenCalled();
+    expect(add).toHaveBeenCalledWith({
+      kind: 'info',
+      message: 'Concepts not restored: Deleted (not installed).',
+      title: 'No recallable image data',
+    });
+  });
+
+  it('localizes partial recall reasons and unnamed concepts while preserving model names', async () => {
+    const { add, commands, setSettings } = createCommands();
+    const inkLora = { base: 'sdxl', key: 'ink-lora', name: 'Ink & <Wash>', type: 'lora' } as ModelConfig;
+    const sd1Lora = { base: 'sd-1', key: 'sd1-lora', name: 'SD1 Ink', type: 'lora' } as ModelConfig;
+    const t = await createRecallTranslator('es');
+
+    galleryApi.galleryImages.metadata.mockResolvedValue({
+      model: { key: model.key },
+      loras: [
+        { model: { key: inkLora.key }, weight: 0.6 },
+        { model: { key: inkLora.key }, weight: 1 },
+        { model: { key: 'missing', name: 'Lost & <Found>' }, weight: 1 },
+        { model: { key: sd1Lora.key }, weight: 1 },
+        { model: { hash: 'ambiguous-hash', name: 'Grain' }, weight: 1 },
+        null,
+      ],
+    });
+
+    await expect(
+      executeImageRecall({
+        t,
+        commands,
+        generateValues: { modelKey: model.key },
+        image,
+        kind: 'all',
+        models: [
+          model,
+          inkLora,
+          sd1Lora,
+          { ...inkLora, key: 'grain-1', hash: 'ambiguous-hash' },
+          { ...inkLora, key: 'grain-2', hash: 'ambiguous-hash' },
+        ],
+      })
+    ).resolves.toBe(true);
+
+    expect(setSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ loras: [{ isEnabled: true, model: inkLora, weight: 0.6 }] }),
+      undefined
+    );
+    expect(add).toHaveBeenCalledTimes(2);
+    expect(add).toHaveBeenLastCalledWith({
+      kind: 'info',
+      message:
+        'Conceptos no restaurados: Ink & <Wash> (duplicado); Lost & <Found> (no instalado); SD1 Ink (incompatible con el modelo seleccionado); Grain (varios modelos coinciden); concepto sin nombre (metadatos ilegibles).',
+      title: 'Algunos datos no se recuperaron',
+    });
+  });
+
+  it('localizes the notice when the recorded model is unavailable and nothing can be recalled', async () => {
+    const { add, commands, setSettings } = createCommands();
+    const t = await createRecallTranslator('es');
+
+    galleryApi.galleryImages.metadata.mockResolvedValue({
+      model: { key: 'missing-model' },
+      loras: [{ model: { key: 'missing-concept' }, weight: 1 }],
+    });
+
+    await expect(
+      executeImageRecall({
+        t,
+        commands,
+        generateValues: { modelKey: model.key },
+        image,
+        kind: 'remix',
+        models: [model],
+      })
+    ).resolves.toBe(false);
+
+    expect(setSettings).not.toHaveBeenCalled();
+    expect(add).toHaveBeenCalledExactlyOnceWith({
+      kind: 'info',
+      message: 'Conceptos no restaurados: concepto sin nombre (modelo de la imagen no disponible).',
+      title: 'No hay datos recuperables',
+    });
   });
 
   it('persists no remix until model capabilities load, and says why', async () => {

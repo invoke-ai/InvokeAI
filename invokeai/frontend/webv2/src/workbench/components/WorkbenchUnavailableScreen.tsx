@@ -99,26 +99,35 @@ export const WorkbenchUnavailableScreen = ({
 
   return (
     <Flex align="center" bg="bg" color="fg" h="100vh" justify="center" p="6" w="100vw">
-      <Box borderColor="border.subtle" borderRadius="xl" borderWidth="1px" maxW="2xl" p="6" shadow="sm" w="full">
+      <Box
+        borderColor="border.subtle"
+        borderRadius="xl"
+        borderWidth="1px"
+        maxW="2xl"
+        p="6"
+        shadow="sm"
+        textStyle="xl"
+        w="full"
+      >
         <Stack gap="5">
           <Stack gap="2">
-            <Heading size="xl">{t('shell.backendUnavailable.title')}</Heading>
+            <Heading size="3xl">{t('shell.backendUnavailable.title')}</Heading>
             <Text color="fg.muted">{t('shell.backendUnavailable.description')}</Text>
           </Stack>
-          <Alert.Root status="error" variant="surface">
+          <Alert.Root size="lg" status="error" variant="surface">
             <Alert.Indicator />
             <Alert.Content>
               <Alert.Title>{t('shell.backendUnavailable.connectionFailed')}</Alert.Title>
               <Alert.Description overflowWrap="anywhere">{message}</Alert.Description>
             </Alert.Content>
           </Alert.Root>
-          <Button alignSelf="start" onClick={onRetry}>
+          <Button alignSelf="start" size="lg" onClick={onRetry}>
             {t('shell.backendUnavailable.retry')}
           </Button>
           <Stack gap="3">
-            <Heading size="md">{t('shell.backendUnavailable.draftsTitle')}</Heading>
+            <Heading size="xl">{t('shell.backendUnavailable.draftsTitle')}</Heading>
             {draftError ? (
-              <Alert.Root status="error" variant="surface">
+              <Alert.Root size="lg" status="error" variant="surface">
                 <Alert.Indicator />
                 <Alert.Content>
                   <Alert.Description>{draftError}</Alert.Description>
@@ -127,7 +136,7 @@ export const WorkbenchUnavailableScreen = ({
             ) : null}
             {drafts === null ? (
               <HStack color="fg.muted">
-                <Spinner size="xs" />
+                <Spinner />
                 <Text>{t('shell.backendUnavailable.loadingDrafts')}</Text>
               </HStack>
             ) : drafts === 'unavailable' ? (
@@ -145,7 +154,7 @@ export const WorkbenchUnavailableScreen = ({
               ))
             )}
             {nextCursor ? (
-              <Button alignSelf="start" loading={isLoadingMore} onClick={handleLoadMore} size="sm" variant="ghost">
+              <Button alignSelf="start" loading={isLoadingMore} onClick={handleLoadMore} size="lg" variant="ghost">
                 {t('shell.backendUnavailable.loadMore')}
               </Button>
             ) : null}
@@ -174,11 +183,11 @@ const RecoverableDraftRow = ({
         <Text fontWeight="semibold" truncate>
           {draft.projectId}
         </Text>
-        <Text color="fg.muted" fontSize="xs">
+        <Text color="fg.muted" fontSize="md">
           {new Date(draft.updatedAt).toLocaleString()}
         </Text>
       </Stack>
-      <Button loading={isExporting} onClick={handleExport} size="sm" variant="outline">
+      <Button loading={isExporting} onClick={handleExport} size="lg" variant="outline">
         {t('shell.backendUnavailable.exportDraft')}
       </Button>
     </HStack>

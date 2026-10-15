@@ -40,7 +40,13 @@ export interface CanvasDocumentIndex {
   readonly derivedFrom?: { readonly previous: CanvasDocumentIndex; readonly changedIds: ReadonlySet<string> };
 }
 
-const diagnostics = { entriesVisited: 0, indexBuilds: 0, indexDerivations: 0, nodesMaterialized: 0 };
+const diagnostics = {
+  entriesVisited: 0,
+  forestNodesVisited: 0,
+  indexBuilds: 0,
+  indexDerivations: 0,
+  nodesMaterialized: 0,
+};
 
 export const getDocumentIndexBuildCount = (): number => diagnostics.indexBuilds;
 
@@ -53,8 +59,12 @@ export const getDocumentIndexVisitCount = (): number => diagnostics.entriesVisit
 /** Times a derived index had to materialize its full `nodes` array for a consumer. */
 export const getDocumentIndexMaterializationCount = (): number => diagnostics.nodesMaterialized;
 
+/** Forest nodes a value edit revisited: the edited nodes and their ancestors, never the whole forest. */
+export const getValueEditVisitCount = (): number => diagnostics.forestNodesVisited;
+
 export const resetDocumentIndexBuildCount = (): void => {
   diagnostics.entriesVisited = 0;
+  diagnostics.forestNodesVisited = 0;
   diagnostics.indexBuilds = 0;
   diagnostics.indexDerivations = 0;
   diagnostics.nodesMaterialized = 0;
@@ -279,7 +289,7 @@ const flagsChanged = (previous: CanvasNodeContract, next: CanvasNodeContract): b
  * flags. Unchanged entries read through. Returns null without a prior index or when structure changed, deferring a
  * full build.
  */
-export const deriveIndexForValueEdit = (
+const deriveIndexForValueEdit = (
   previousStacks: CanvasStackForests,
   nextStacks: CanvasStackForests,
   changed: ReadonlyMap<string, CanvasNodeContract>
@@ -309,9 +319,8 @@ export const deriveIndexForValueEdit = (
     const entry = previous.byId.get(id)!;
     let siblings: readonly CanvasNodeContract[] = nextStacks[entry.stack];
     for (const ancestorId of entry.path) {
-      const known = replacedNodes.get(ancestorId);
-      const ancestor = known ?? siblings.find((node) => node.id === ancestorId);
-      if (!ancestor || !isGroupNode(ancestor)) {
+      const ancestor = replacedNodes.get(ancestorId) ?? siblings[previous.byId.get(ancestorId)!.siblingIndex];
+      if (!ancestor || ancestor.id !== ancestorId || !isGroupNode(ancestor)) {
         return null;
       }
       replacedNodes.set(ancestorId, ancestor);
@@ -359,6 +368,148 @@ export const deriveIndexForValueEdit = (
   return registered;
 };
 
+/** One node a value edit replaced; ancestors rebuilt only for a new child array are not listed. */
+export interface CanvasNodeValueChange {
+  readonly before: CanvasNodeContract;
+  readonly after: CanvasNodeContract;
+}
+
+/** The nodes value edits replaced between two forests that share one structure. */
+export type CanvasValueEdit = ReadonlyMap<string, CanvasNodeValueChange>;
+
+interface ValueEditRecord {
+  /** Weak, so a chain of edits never retains every superseded forest. */
+  readonly from: WeakRef<CanvasStackForests>;
+  readonly changes: CanvasValueEdit;
+}
+
+const valueEdits = new WeakMap<CanvasStackForests, ValueEditRecord>();
+
+/** How many consecutive value edits a consumer that fell behind may still fold instead of diffing forests. */
+const MAX_FOLDED_VALUE_EDITS = 16;
+/** Folding up to this many replaced nodes always beats a forest diff, however small the document. */
+const MIN_FOLDED_ENTRIES = 64;
+
+/**
+ * The value edits that lead from `previous` to `next`, folded oldest first, or null when any step between them
+ * restructured the forests or was not recorded, or when folding would touch more than a quarter of the nodes (a
+ * forest diff is then cheaper).
+ */
+export const valueEditBetween = (previous: CanvasStackForests, next: CanvasStackForests): CanvasValueEdit | null => {
+  const steps: CanvasValueEdit[] = [];
+  let entries = 0;
+  let current = next;
+  while (current !== previous) {
+    const record = valueEdits.get(current);
+    const from = record?.from.deref();
+    if (!record || !from || steps.length === MAX_FOLDED_VALUE_EDITS) {
+      return null;
+    }
+    steps.push(record.changes);
+    entries += record.changes.size;
+    if (steps.length > 1 && entries > Math.max(MIN_FOLDED_ENTRIES, indexStacks(next).byId.size / 4)) {
+      return null;
+    }
+    current = from;
+  }
+  if (steps.length <= 1) {
+    return steps[0] ?? new Map();
+  }
+  const folded = new Map<string, CanvasNodeValueChange>();
+  for (let step = steps.length - 1; step >= 0; step -= 1) {
+    for (const [id, change] of steps[step]!) {
+      const earlier = folded.get(id);
+      folded.set(id, earlier ? { after: change.after, before: earlier.before } : change);
+    }
+  }
+  return folded;
+};
+
+const rootKey = (stack: CanvasLayerStackKind): string => `\0${stack}`;
+
+/**
+ * Rewrites named nodes in place of their old objects, locating them through the index. Only the sibling arrays on
+ * each edited path are copied, so cost is the edited paths' sibling counts, not the forest. The next forests inherit
+ * a derived index and record which nodes changed for incremental consumers. Returns `stacks` when nothing changed.
+ */
+export const updateNodeValues = (
+  stacks: CanvasStackForests,
+  updates: ReadonlyMap<string, (node: CanvasNodeContract) => CanvasNodeContract>
+): CanvasStackForests => {
+  if (updates.size === 0) {
+    return stacks;
+  }
+  const index = indexStacks(stacks);
+  // Sibling positions to revisit, keyed by parent group id or a stack's root key.
+  const touched = new Map<string, Set<number>>();
+  const mark = (entry: CanvasNodeEntry): boolean => {
+    const key = entry.parentId ?? rootKey(entry.stack);
+    const positions = touched.get(key) ?? new Set<number>();
+    const added = !positions.has(entry.siblingIndex);
+    positions.add(entry.siblingIndex);
+    touched.set(key, positions);
+    return added;
+  };
+  for (const id of updates.keys()) {
+    const entry = index.byId.get(id);
+    if (!entry || !mark(entry)) {
+      continue;
+    }
+    for (let depth = entry.path.length - 1; depth >= 0; depth -= 1) {
+      if (!mark(index.byId.get(entry.path[depth]!)!)) {
+        break;
+      }
+    }
+  }
+  const changes = new Map<string, CanvasNodeValueChange>();
+  const rebuild = (key: string, list: readonly CanvasNodeContract[]): readonly CanvasNodeContract[] => {
+    const positions = touched.get(key);
+    if (!positions) {
+      return list;
+    }
+    let next: CanvasNodeContract[] | null = null;
+    for (const position of positions) {
+      const node = list[position]!;
+      diagnostics.forestNodesVisited += 1;
+      let current = node;
+      if (isGroupNode(current)) {
+        const children = rebuild(current.id, current.children);
+        if (children !== current.children) {
+          current = { ...current, children: children as CanvasNodeContract[] };
+        }
+      }
+      const update = updates.get(node.id);
+      if (update) {
+        const updated = update(current);
+        if (updated !== current) {
+          changes.set(node.id, { after: updated, before: node });
+          current = updated;
+        }
+      }
+      if (current !== node) {
+        next ??= list.slice();
+        next[position] = current;
+      }
+    }
+    return next ?? list;
+  };
+  let result = stacks;
+  for (const stack of LAYER_STACKS_TOP_FIRST) {
+    const roots = rebuild(rootKey(stack), stacks[stack]);
+    if (roots !== stacks[stack]) {
+      result = result === stacks ? { ...stacks } : result;
+      result[stack] = roots as CanvasNodeContract[];
+    }
+  }
+  if (result !== stacks) {
+    const changed = new Map([...changes].map(([id, change]) => [id, change.after]));
+    if (deriveIndexForValueEdit(stacks, result, changed)) {
+      valueEdits.set(result, { changes, from: new WeakRef(stacks) });
+    }
+  }
+  return result;
+};
+
 export const indexStacks = (stacks: CanvasStackForests): CanvasDocumentIndex => {
   const existing = indexes.get(stacks);
   if (existing) {
@@ -396,16 +547,17 @@ export const isNodeAbsent = (document: DocumentView, id: string): boolean =>
 export const isSelfOrAncestor = (index: CanvasDocumentIndex, id: string, ancestorId: string): boolean =>
   id === ancestorId || (index.byId.get(id)?.path.includes(ancestorId) ?? false);
 
-/** Drops every id whose ancestor is also listed, keeping document order. */
+/** Drops every id whose ancestor is also listed, in document order; absent ids are skipped. */
 export const outermostNodes = (index: CanvasDocumentIndex, ids: Iterable<string>): CanvasNodeEntry[] => {
   const selected = new Set(ids);
   const outer: CanvasNodeEntry[] = [];
-  for (const entry of index.nodes) {
-    if (selected.has(entry.node.id) && !entry.path.some((ancestor) => selected.has(ancestor))) {
+  for (const id of selected) {
+    const entry = index.byId.get(id);
+    if (entry && !entry.path.some((ancestor) => selected.has(ancestor))) {
       outer.push(entry);
     }
   }
-  return outer;
+  return outer.sort((left, right) => left.order - right.order);
 };
 
 /** The child list `parentId` names, read through the index; `null` when the parent is not a group of `stack`. */

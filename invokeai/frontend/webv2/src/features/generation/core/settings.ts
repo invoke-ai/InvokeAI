@@ -77,12 +77,14 @@ export const getDynamicPromptsConfig = (
     GenerateSettings,
     | 'dynamicPromptsCombinatorial'
     | 'dynamicPromptsMaxPrompts'
+    | 'dynamicPromptsResample'
     | 'dynamicPromptsSampleSeed'
     | 'dynamicPromptsSeedBehaviour'
   >
 ): DynamicPromptsConfig => ({
   combinatorial: settings.dynamicPromptsCombinatorial,
   maxPrompts: settings.dynamicPromptsMaxPrompts,
+  resample: settings.dynamicPromptsResample,
   sampleSeed: settings.dynamicPromptsSampleSeed,
   seedBehaviour: settings.dynamicPromptsSeedBehaviour,
 });
@@ -469,6 +471,7 @@ export const cloneGenerateWidgetValues = (
   qwen3EncoderModel: values.qwen3EncoderModel ? { ...values.qwen3EncoderModel } : null,
   qwenVLEncoderModel: values.qwenVLEncoderModel ? { ...values.qwenVLEncoderModel } : null,
   qwen3VLEncoderModel: values.qwen3VLEncoderModel ? { ...values.qwen3VLEncoderModel } : null,
+  qwen35EncoderModel: values.qwen35EncoderModel ? { ...values.qwen35EncoderModel } : null,
   wanT5EncoderModel: values.wanT5EncoderModel ? { ...values.wanT5EncoderModel } : null,
   wanLowNoiseModel: values.wanLowNoiseModel ? { ...values.wanLowNoiseModel } : null,
   ideogram4UnconditionalModel: values.ideogram4UnconditionalModel ? { ...values.ideogram4UnconditionalModel } : null,
@@ -559,6 +562,7 @@ export const syncGenerateWidgetValuesWithModels = (
     mistralEncoderModel: syncModelIdentifierWithModels(values.mistralEncoderModel, modelsByKey),
     qwen3EncoderModel: syncModelIdentifierWithModels(values.qwen3EncoderModel, modelsByKey),
     qwenVLEncoderModel: syncModelIdentifierWithModels(values.qwenVLEncoderModel, modelsByKey),
+    qwen35EncoderModel: syncModelIdentifierWithModels(values.qwen35EncoderModel, modelsByKey),
     referenceImages: syncReferenceImagesWithModels(values.referenceImages, models),
     t5EncoderModel: syncModelIdentifierWithModels(values.t5EncoderModel, modelsByKey),
     vae: isVaeModelConfig(vae) ? vae : values.vae,
@@ -574,6 +578,7 @@ export const syncGenerateWidgetValuesWithModels = (
     nextValues.mistralEncoderModel === values.mistralEncoderModel &&
     nextValues.qwen3EncoderModel === values.qwen3EncoderModel &&
     nextValues.qwenVLEncoderModel === values.qwenVLEncoderModel &&
+    nextValues.qwen35EncoderModel === values.qwen35EncoderModel &&
     nextValues.referenceImages === values.referenceImages &&
     nextValues.componentSourceModel === values.componentSourceModel &&
     nextValues.modelKey === values.modelKey
@@ -704,6 +709,7 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
       typeof values.dynamicPromptsCombinatorial === 'boolean' ? values.dynamicPromptsCombinatorial : true,
     dynamicPromptsMaxPrompts: sanitizeMaxPrompts(values.dynamicPromptsMaxPrompts),
     dynamicPromptsSampleSeed: sanitizeSampleSeed(values.dynamicPromptsSampleSeed),
+    dynamicPromptsResample: typeof values.dynamicPromptsResample === 'boolean' ? values.dynamicPromptsResample : true,
     dynamicPromptsSeedBehaviour: isDynamicPromptsSeedBehaviour(values.dynamicPromptsSeedBehaviour)
       ? values.dynamicPromptsSeedBehaviour
       : 'per-iteration',
@@ -750,6 +756,7 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     qwen3EncoderModel: getModelIdentifierOrNull(values.qwen3EncoderModel),
     qwenVLEncoderModel: getModelIdentifierOrNull(values.qwenVLEncoderModel),
     qwen3VLEncoderModel: getModelIdentifierOrNull(values.qwen3VLEncoderModel),
+    qwen35EncoderModel: getModelIdentifierOrNull(values.qwen35EncoderModel),
     wanT5EncoderModel: getModelIdentifierOrNull(values.wanT5EncoderModel),
     wanLowNoiseModel: getMainModelOrNull(values.wanLowNoiseModel),
     ideogram4UnconditionalModel: getMainModelOrNull(values.ideogram4UnconditionalModel),

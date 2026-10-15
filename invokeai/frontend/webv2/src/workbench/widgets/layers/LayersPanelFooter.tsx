@@ -31,12 +31,11 @@ const LayersPanelFooterComponent = ({ commands, degraded, filter, onFilterChange
         flex="1"
         minW="0"
         placeholder={t('widgets.layers.footer.filter')}
-        size="2xs"
         value={filter}
         onChange={handleFilter}
       />
       {degraded ? (
-        <Text color="fg.muted" flexShrink={0} fontSize="2xs" whiteSpace="nowrap">
+        <Text color="fg.muted" flexShrink={0} fontSize="xs" whiteSpace="nowrap">
           {t('widgets.layers.footer.degraded')}
         </Text>
       ) : null}
@@ -83,7 +82,7 @@ const FooterAction = ({
       aria-label={label}
       colorPalette={colorPalette}
       disabled={disabled}
-      size="2xs"
+      size="sm"
       variant="ghost"
       onClick={onRun}
     >

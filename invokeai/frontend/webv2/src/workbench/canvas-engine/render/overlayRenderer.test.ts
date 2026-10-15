@@ -16,7 +16,9 @@ const findSet = (log: RasterCallLogEntry[], prop: string): unknown[] =>
 
 const baseState = (overrides: Partial<OverlayState> = {}): OverlayState => ({
   bbox: BBOX,
+  dpr: 1,
   view: identity(),
+  viewportSize: { height: 200, width: 200 },
   ...overrides,
 });
 

@@ -30,13 +30,14 @@ export type WorkflowPublicationIntent =
 export interface WorkflowUiSnapshot {
   addNodeConnection: AddNodeConnectionFilter | null;
   addNodePosition: XYPosition | null;
-  /** Nodes whose latest-output preview is folded away. Session-lived, like the previews themselves. */
-  collapsedPreviewNodeIds: ReadonlySet<string>;
   isAddNodeOpen: boolean;
   isLibraryOpen: boolean;
   /** Which view the library dialog shows; remembered for the session. */
   libraryTab: WorkflowLibraryTab;
-  /** The project workflow selected on the This-project view; only meaningful for the project it was made in. */
+  /**
+   * The project workflow selected on the This-project view; only meaningful for the project it was made in, and only
+   * for the opening it was made in. Null shows the active workflow.
+   */
   librarySelection: { projectId: string; workflowId: string } | null;
   /** Bumped to ask the dialog host to open the JSON file picker. */
   importRequestCount: number;
@@ -46,10 +47,30 @@ export interface WorkflowUiSnapshot {
   pendingWorkflowLoad: WorkflowLoadRequest | null;
   /** A publication the always-mounted host should start a dialog for. */
   publicationIntent: WorkflowPublicationIntent | null;
+  /** A template the project already holds copies of; the host asks whether to open, add, or replace a copy. */
+  libraryCopyChoice: LibraryCopyChoiceRequest | null;
 }
 
+/** The library template being opened; the name labels the dialog and the undo step. */
+export interface LibraryOpenItem {
+  name: string;
+  workflow_id: string;
+  /** The revision the library list showed; absent when the request named only an id. */
+  revision?: number;
+}
+
+export interface LibraryCopyChoiceRequest {
+  item: LibraryOpenItem;
+  /** The project whose copies the choice is about; another active project never sees it. */
+  projectId: string;
+  requestId: number;
+}
+
+let nextLibraryCopyChoiceRequestId = 0;
+
 export type WorkflowLoadSource =
-  | { kind: 'library'; workflowId: string }
+  /** `name` titles the copy question when the project already holds the template. */
+  | { kind: 'library'; name?: string; workflowId: string }
   /** An already-fetched workflow document (an image's embedded workflow); `label` names the undo step. */
   | { kind: 'document'; label: string; raw: unknown };
 
@@ -63,7 +84,6 @@ let nextWorkflowLoadRequestId = 0;
 const INITIAL_WORKFLOW_UI_SNAPSHOT: WorkflowUiSnapshot = {
   addNodeConnection: null,
   addNodePosition: null,
-  collapsedPreviewNodeIds: new Set(),
   importRequestCount: 0,
   isAddNodeOpen: false,
   renameRequest: null,
@@ -72,6 +92,7 @@ const INITIAL_WORKFLOW_UI_SNAPSHOT: WorkflowUiSnapshot = {
   libraryTab: 'project',
   pendingWorkflowLoad: null,
   publicationIntent: null,
+  libraryCopyChoice: null,
 };
 
 export const workflowUiStore = createExternalStore<WorkflowUiSnapshot>(INITIAL_WORKFLOW_UI_SNAPSHOT);
@@ -83,8 +104,17 @@ registerAccountOwnedResource({
   name: 'workflow-ui',
 });
 
+/**
+ * Opens or closes the library. An opening that names no workflow starts This project on the active workflow: a
+ * selection left from an earlier opening would point the rail's actions (Update library template among them) at a
+ * workflow the user has since moved away from.
+ */
 export const setWorkflowLibraryOpen = (isOpen: boolean): void => {
-  workflowUiStore.patchSnapshot({ isLibraryOpen: isOpen });
+  const wasOpen = workflowUiStore.getSnapshot().isLibraryOpen;
+
+  workflowUiStore.patchSnapshot(
+    isOpen && !wasOpen ? { isLibraryOpen: true, librarySelection: null } : { isLibraryOpen: isOpen }
+  );
 };
 
 export const setWorkflowLibraryTab = (libraryTab: WorkflowLibraryTab): void => {
@@ -104,6 +134,23 @@ export const openWorkflowLibraryAtProjectWorkflow = (projectId: string, workflow
     librarySelection: { projectId, workflowId },
     libraryTab: 'project',
   });
+};
+
+export const requestLibraryCopyChoice = (projectId: string, item: LibraryOpenItem): void => {
+  nextLibraryCopyChoiceRequestId += 1;
+  workflowUiStore.patchSnapshot({
+    libraryCopyChoice: {
+      item: { name: item.name, revision: item.revision, workflow_id: item.workflow_id },
+      projectId,
+      requestId: nextLibraryCopyChoiceRequestId,
+    },
+  });
+};
+
+export const clearLibraryCopyChoice = (requestId: number): void => {
+  if (workflowUiStore.getSnapshot().libraryCopyChoice?.requestId === requestId) {
+    workflowUiStore.patchSnapshot({ libraryCopyChoice: null });
+  }
 };
 
 export const requestWorkflowPublication = (intent: WorkflowPublicationIntent): void => {
@@ -133,8 +180,8 @@ const requestWorkflowLoad = (source: WorkflowLoadSource): void => {
   workflowUiStore.patchSnapshot({ pendingWorkflowLoad: { requestId: nextWorkflowLoadRequestId, source } });
 };
 
-export const requestLibraryWorkflowLoad = (workflowId: string): void =>
-  requestWorkflowLoad({ kind: 'library', workflowId });
+export const requestLibraryWorkflowLoad = (workflowId: string, name?: string): void =>
+  requestWorkflowLoad({ kind: 'library', workflowId, ...(name ? { name } : {}) });
 
 export const requestWorkflowDocumentLoad = (raw: unknown, label: string): void =>
   requestWorkflowLoad({ kind: 'document', label, raw });
@@ -143,18 +190,6 @@ export const clearPendingWorkflowLoad = (requestId: number): void => {
   if (workflowUiStore.getSnapshot().pendingWorkflowLoad?.requestId === requestId) {
     workflowUiStore.patchSnapshot({ pendingWorkflowLoad: null });
   }
-};
-
-export const setNodePreviewCollapsed = (nodeId: string, collapsed: boolean): void => {
-  const collapsedPreviewNodeIds = new Set(workflowUiStore.getSnapshot().collapsedPreviewNodeIds);
-
-  if (collapsed) {
-    collapsedPreviewNodeIds.add(nodeId);
-  } else {
-    collapsedPreviewNodeIds.delete(nodeId);
-  }
-
-  workflowUiStore.patchSnapshot({ collapsedPreviewNodeIds });
 };
 
 let nextRenameRequestId = 0;

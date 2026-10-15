@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
-import { firstPartyHotkeyCatalog, OPEN_COMMAND_PALETTE_HOTKEY } from './catalog';
+import {
+  firstPartyHotkeyCatalog,
+  getRegionFocusDefaultKey,
+  OPEN_COMMAND_PALETTE_HOTKEY,
+  regionFocusHotkeys,
+} from './catalog';
+import { IS_MAC_OS } from './keys';
+import { toPlatformHotkey } from './resolve';
 
 describe('firstPartyHotkeyCatalog', () => {
   it('keeps legacy default hotkey parity', () => {
-    expect(firstPartyHotkeyCatalog).toHaveLength(104);
+    expect(firstPartyHotkeyCatalog).toHaveLength(120);
     expect(firstPartyHotkeyCatalog.map((hotkey) => hotkey.id)).toContain('app.togglePreview');
     expect(firstPartyHotkeyCatalog.map((hotkey) => hotkey.id)).toContain('app.invoke');
     expect(firstPartyHotkeyCatalog.map((hotkey) => hotkey.id)).toContain('app.openCommandPalette');
@@ -46,5 +53,22 @@ describe('firstPartyHotkeyCatalog', () => {
     const saveLayout = firstPartyHotkeyCatalog.find((hotkey) => hotkey.id === 'app.saveLayoutPreset');
 
     expect(saveLayout).toMatchObject({ allowInEditable: false, defaultKeys: [] });
+  });
+
+  // On macOS, Option+Shift+Arrow selects text and Control+Option+Arrow is VoiceOver's navigation chord.
+  it('moves region focus with Control+Command+Arrow on macOS and Alt+Shift+Arrow elsewhere', () => {
+    expect(toPlatformHotkey(getRegionFocusDefaultKey('left', true), true)).toBe('ctrl+meta+arrowleft');
+    expect(getRegionFocusDefaultKey('down', false)).toBe('alt+shift+arrowdown');
+    expect(regionFocusHotkeys.map((hotkey) => hotkey.defaultKeys)).toEqual(
+      (['left', 'right', 'up', 'down'] as const).map((direction) => [getRegionFocusDefaultKey(direction, IS_MAC_OS)])
+    );
+    expect(regionFocusHotkeys.every((hotkey) => hotkey.allowInEditable)).toBe(true);
+  });
+
+  // Cmd+Space is Spotlight on macOS; a modified Space on the focused thumbnail toggles it without a hotkey.
+  it('ships the gallery focus toggle unbound but assignable', () => {
+    const toggle = firstPartyHotkeyCatalog.find((hotkey) => hotkey.id === 'gallery.toggleFocusedInSelection');
+
+    expect(toggle).toMatchObject({ defaultKeys: [], implemented: true });
   });
 });

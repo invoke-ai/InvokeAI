@@ -1,4 +1,5 @@
 import type { GalleryVideoItem } from '@features/gallery';
+import type { ImageWithDims } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
 import type {
   VideoConditioningRole,
@@ -18,9 +19,13 @@ import {
   createVideoSourceClip,
   getConditioningClipPatch,
   getDefaultReferenceConditioning,
+  getDefaultReferenceImageDetail,
+  getFrameImagePatch,
   getInitialVideoPatch,
   getReferencesPatch,
   getVideoModelPolicy,
+  isConditioningClipExcludingFrames,
+  isVideoConditioningClip,
   isVideoReferenceConditioning,
   normalizeVideoWidgetValues,
   syncVideoWidgetValuesWithModels,
@@ -248,18 +253,27 @@ export const applyVideoRecallMetadata = async ({
       const firstFrame = firstFrameName ? framesByName.get(firstFrameName) : undefined;
       const lastFrame = lastFrameName ? framesByName.get(lastFrameName) : undefined;
 
+      // Through the panel's own frame patch: a partial recall can land a frame beside a clip the panel holds for its
+      // picture, which the frame displaces exactly as setting it by hand would.
       if (firstFrame) {
         result.values = {
           ...result.values,
-          firstFrameImage: { height: firstFrame.height, image_name: firstFrame.imageName, width: firstFrame.width },
-          sourceVideo: null,
+          ...getFrameImagePatch(
+            'firstFrameImage',
+            { height: firstFrame.height, image_name: firstFrame.imageName, width: firstFrame.width },
+            result.values.conditioningClip
+          ),
         };
         recalledMedia = true;
       }
       if (lastFrame) {
         result.values = {
           ...result.values,
-          lastFrameImage: { height: lastFrame.height, image_name: lastFrame.imageName, width: lastFrame.width },
+          ...getFrameImagePatch(
+            'lastFrameImage',
+            { height: lastFrame.height, image_name: lastFrame.imageName, width: lastFrame.width },
+            result.values.conditioningClip
+          ),
         };
         recalledMedia = true;
       }
@@ -286,8 +300,10 @@ export const applyVideoRecallMetadata = async ({
                 }),
                 role: conditioningClip.role,
               },
-              firstFrameImage: null,
-              lastFrameImage: null,
+              // A soundtrack keeps the frames hydrated above: they anchored the picture made for it.
+              ...(isConditioningClipExcludingFrames(conditioningClip)
+                ? { firstFrameImage: null, lastFrameImage: null }
+                : {}),
               references: [],
               sourceVideo: null,
             };
@@ -601,6 +617,109 @@ export const appendReferenceVideo = ({
   };
 };
 
+export type VideoImagePlacement =
+  | {
+      /** Whether placing the image cleared media it can't be used with: a conditioning clip or an initial video. */
+      displaced: boolean;
+      patch: Partial<VideoWidgetValues>;
+      slot: 'firstFrame' | 'lastFrame' | 'reference';
+      status: 'placed';
+    }
+  /** `full`: an append found every image slot the model takes already in use. */
+  | { status: 'full' | 'unsupported' };
+
+/**
+ * Place a gallery image where the Video panel's model takes images. A model with reference images gets it as one:
+ * it replaces the reference images (reference videos stay), or with `append` joins them. A frame model gets it as
+ * the first frame, clearing the last, as if the frames were a two-image list; with `append` it fills the first free
+ * frame slot, and an initial video holds the first. The panel's model is never switched to make the image fit.
+ */
+export const placeVideoImage = ({
+  append,
+  image,
+  models,
+  videoValues,
+}: {
+  append: boolean;
+  image: ImageWithDims;
+  models: readonly ModelConfig[];
+  videoValues: Record<string, unknown>;
+}): VideoImagePlacement => {
+  const values = getCurrentVideoValues({ models, videoValues });
+  const policy = values.model ? getVideoModelPolicy(values.model, values) : null;
+
+  if (!policy) {
+    return { status: 'unsupported' };
+  }
+
+  if (policy.references && policy.modes.includes('reference')) {
+    const kept = append ? values.references : values.references.filter((entry) => entry.kind === 'video');
+
+    if (kept.filter((entry) => entry.kind === 'image').length >= policy.references.maxImages) {
+      return { status: 'full' };
+    }
+    const referenceExtend = Boolean(policy.references.extend);
+
+    return {
+      displaced: Boolean(values.conditioningClip || (values.sourceVideo && !referenceExtend)),
+      patch: getReferencesPatch({
+        referenceExtend,
+        references: [...kept, { detail: getDefaultReferenceImageDetail(kept), image, kind: 'image' }],
+      }),
+      slot: 'reference',
+      status: 'placed',
+    };
+  }
+
+  const takesFirstFrame = policy.modes.includes('first-frame') || policy.modes.includes('first-last');
+
+  if (!takesFirstFrame) {
+    return { status: 'unsupported' };
+  }
+
+  // Through the panel's own frame patch: a first frame displaces the initial video, and either frame displaces a
+  // clip that holds the picture, while a soundtrack stays to be anchored by it. The stored clip, not the normalized
+  // one, which hides a picture-role clip behind a first frame; only a visible clip is reported as displaced.
+  const storedClip = isVideoConditioningClip(videoValues.conditioningClip) ? videoValues.conditioningClip : null;
+  const clipDisplaced = isConditioningClipExcludingFrames(values.conditioningClip);
+
+  if (!append) {
+    return {
+      displaced: Boolean(clipDisplaced || values.sourceVideo),
+      patch: {
+        ...getFrameImagePatch('firstFrameImage', image, storedClip),
+        lastFrameImage: null,
+        references: [],
+      },
+      slot: 'firstFrame',
+      status: 'placed',
+    };
+  }
+  if (!values.firstFrameImage && !values.sourceVideo) {
+    return {
+      displaced: clipDisplaced,
+      // The visible last frame stays; one hidden behind stale references is cleared rather than resurfaced.
+      patch: {
+        ...getFrameImagePatch('firstFrameImage', image, storedClip),
+        lastFrameImage: values.lastFrameImage,
+        references: [],
+      },
+      slot: 'firstFrame',
+      status: 'placed',
+    };
+  }
+  if (!values.lastFrameImage && policy.modes.includes('first-last')) {
+    return {
+      displaced: clipDisplaced,
+      patch: { ...getFrameImagePatch('lastFrameImage', image, storedClip), references: [] },
+      slot: 'lastFrame',
+      status: 'placed',
+    };
+  }
+
+  return { status: 'full' };
+};
+
 /** The generation mode a conditioning clip in each role asks of the model. */
 const CONDITIONING_ROLE_MODE = {
   audio: 'audio-to-video',
@@ -609,7 +728,7 @@ const CONDITIONING_ROLE_MODE = {
 
 export type ConditioningClipPlacement =
   | {
-      /** Whether the clip cleared other conditioning media: frames, the initial video or references. */
+      /** Whether the clip cleared other conditioning media: the initial video, references, or frames for its picture. */
       displaced: boolean;
       patch: Partial<VideoWidgetValues>;
       status: 'placed';
@@ -621,9 +740,9 @@ const canConditionInRole = (policy: VideoModelPolicy | null, role: VideoConditio
   Boolean(policy?.modes.includes(CONDITIONING_ROLE_MODE[role]));
 
 /**
- * Set the video as the Video panel's conditioning clip in `role`. The panel's own field refuses a clip while other
- * conditioning media is set; this explicit action clears that media instead, as Extend in Video displaces a first
- * frame, and reports it. Unlike the Initial Video, a clip the panel's model cannot use is declined: it would clear
+ * Set the video as the Video panel's conditioning clip in `role`. The panel's own field refuses a clip while
+ * conflicting conditioning media is set; this explicit action clears that media instead, as Extend in Video displaces
+ * a first frame, and reports it. Frames conflict only with the picture role. Unlike the Initial Video, a clip the panel's model cannot use is declined: it would clear
  * the other media for nothing.
  */
 export const placeConditioningClip = ({
@@ -647,11 +766,15 @@ export const placeConditioningClip = ({
     return { status: 'unsupported' };
   }
 
+  const clip = { ...createVideoConditioningClip(video), role };
+
   return {
     displaced: Boolean(
-      values.firstFrameImage || values.lastFrameImage || values.sourceVideo || values.references.length > 0
+      values.sourceVideo ||
+      values.references.length > 0 ||
+      (isConditioningClipExcludingFrames(clip) && (values.firstFrameImage || values.lastFrameImage))
     ),
-    patch: getConditioningClipPatch({ ...createVideoConditioningClip(video), role }),
+    patch: getConditioningClipPatch(clip),
     status: 'placed',
   };
 };

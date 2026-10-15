@@ -44,6 +44,7 @@ from invokeai.backend.util.vae_decode_diagnostics import (
 )
 from invokeai.backend.util.vae_working_memory import (
     estimate_vae_working_memory_anima,
+    should_pretile_vae_decode,
 )
 
 # Tile geometry for tiled Wan VAE decode. 512px tiles with a 384px stride (128px blended
@@ -53,6 +54,13 @@ from invokeai.backend.util.vae_working_memory import (
 # working-memory constant was calibrated against this exact geometry.
 ANIMA_VAE_TILE_SIZE = 512
 ANIMA_VAE_TILE_STRIDE = 384
+
+# Lower than the other decodes' `VAE_PRETILE_VRAM_FRACTION`, on purpose. A full 1024x1024 Wan VAE decode reserves ~6GB
+# of working memory; on small-VRAM GPUs that evicts the (~4GB) Anima transformer from the model cache and thrashes the
+# allocator near the VRAM ceiling (decode times of 7s+ observed on 8GB, vs ~1s tiled with the transformer left
+# resident). Above this share of the device a tiled decode wins; below it a single pass is faster (~0.65s vs ~1.05s at
+# 1024x1024) and exact.
+ANIMA_PRETILE_VRAM_FRACTION = 0.7
 
 
 @invocation(
@@ -68,25 +76,6 @@ class AnimaLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     latents: LatentsField = InputField(description=FieldDescriptions.latents, input=Input.Connection)
     vae: VAEField = InputField(description=FieldDescriptions.vae, input=Input.Connection)
-
-    @staticmethod
-    def _use_tiled_decode(device: torch.device, full_decode_working_memory: int) -> bool:
-        """Decide whether to decode in tiles.
-
-        A full 1024x1024 Wan VAE decode reserves ~6GB of working memory. On small-VRAM
-        GPUs this evicts the (~4GB) Anima transformer from the model cache and thrashes
-        the allocator near the VRAM ceiling (decode times of 7s+ observed on 8GB, vs
-        ~1s tiled with the transformer left resident). Tile when the full-decode working
-        memory would consume most of the device, otherwise a single-pass decode is
-        faster (~0.65s vs ~1.05s at 1024x1024) and exact.
-        """
-        if device.type == "cuda":
-            total_vram = torch.cuda.get_device_properties(device).total_memory
-        elif device.type == "xpu":
-            total_vram = torch.xpu.get_device_properties(device).total_memory
-        else:
-            return False
-        return full_decode_working_memory > 0.7 * total_vram
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
@@ -117,7 +106,12 @@ class AnimaLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
             vae=vae_info.model,
             tile_size=None,
         )
-        use_tiling = self._use_tiled_decode(TorchDevice.choose_torch_device(), full_decode_working_memory)
+        # Not gated on `auto_tiled_decode`: this rule predates that setting and is a speed optimization, not a way
+        # around an out-of-memory error. Turning the setting off here would hand an 8GB card the 7s decode above
+        # instead of restoring anything.
+        use_tiling = should_pretile_vae_decode(
+            vae_info.compute_device, full_decode_working_memory, ANIMA_PRETILE_VRAM_FRACTION
+        )
         estimated_working_memory = estimate_vae_working_memory_anima(
             operation="decode",
             image_tensor=latents,

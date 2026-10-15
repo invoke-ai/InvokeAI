@@ -1,6 +1,6 @@
 import type { ToolId } from '@workbench/canvas-engine/api';
 import type { CanvasOperationState } from '@workbench/canvas-operations/api';
-import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
+import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import type { ComponentType } from 'react';
 
 export type CanvasToolOptionsEngine = Pick<

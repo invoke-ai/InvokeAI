@@ -126,16 +126,16 @@ export const ImageMapVocabularySettings = () => {
   };
 
   if (query.isPending) {
-    return <Spinner size="sm" />;
+    return <Spinner size="lg" />;
   }
 
   if (query.isError) {
     return (
       <Stack align="flex-start" gap="2">
-        <Text color="fg.error" fontSize="xs">
+        <Text color="fg.error" fontSize="md">
           {t('settings.imageMapVocabulary.loadFailed')}
         </Text>
-        <Button size="xs" variant="outline" onClick={() => void query.refetch()}>
+        <Button variant="outline" onClick={() => void query.refetch()}>
           {t('common.retry')}
         </Button>
       </Stack>
@@ -156,7 +156,6 @@ export const ImageMapVocabularySettings = () => {
             <Input
               aria-invalid={inputError || saveError ? true : undefined}
               placeholder={t('settings.imageMapVocabulary.addPlaceholder')}
-              size="xs"
               value={draft}
               onChange={(event) => {
                 setDraft(event.currentTarget.value);
@@ -196,7 +195,6 @@ export const ImageMapVocabularySettings = () => {
             <Button
               disabled={draft.trim().length === 0}
               loading={isSaving}
-              size="xs"
               variant="outline"
               onClick={() => {
                 void addTerms(vocab);
@@ -208,7 +206,7 @@ export const ImageMapVocabularySettings = () => {
           </HStack>
         </Field>
       ) : (
-        <Text color="fg.muted" fontSize="xs">
+        <Text color="fg.muted" fontSize="md">
           {t('settings.imageMapVocabulary.adminOnly')}
         </Text>
       )}
@@ -229,14 +227,14 @@ export const ImageMapVocabularySettings = () => {
                 {term}
               </RemovableTag>
             ) : (
-              <Tag.Root key={term} size="sm" variant="surface">
+              <Tag.Root key={term} variant="surface">
                 <Tag.Label>{term}</Tag.Label>
               </Tag.Root>
             )
           )}
         </Wrap>
       ) : (
-        <Text color="fg.muted" fontSize="2xs">
+        <Text color="fg.muted" fontSize="xs">
           {t('settings.imageMapVocabulary.noTermsYet')}
         </Text>
       )}
@@ -273,13 +271,13 @@ const VocabularyStatusLine = ({
 
   return (
     <Stack gap="1">
-      <Text color="fg.muted" fontSize="2xs">
+      <Text color="fg.muted" fontSize="xs">
         {t('settings.imageMapVocabulary.count', { count: vocab.terms.length, max: vocab.maxTerms })}
       </Text>
       {vocab.state === 'building' ? (
         <HStack gap="1.5">
-          <Spinner size="xs" />
-          <Text color="fg.muted" fontSize="2xs">
+          <Spinner />
+          <Text color="fg.muted" fontSize="xs">
             {progress
               ? t('settings.imageMapVocabulary.rebuildingQueued', { progress: progress.counts })
               : t('settings.imageMapVocabulary.rebuilding')}
@@ -288,18 +286,18 @@ const VocabularyStatusLine = ({
       ) : null}
       {vocab.state === 'error' && vocab.error ? (
         <HStack gap="2">
-          <Text color="fg.error" fontSize="2xs" role="alert">
+          <Text color="fg.error" fontSize="xs" role="alert">
             {t('settings.imageMapVocabulary.buildFailed', { message: vocab.error })}
           </Text>
           {onRetry ? (
-            <Button size="2xs" variant="outline" onClick={onRetry}>
+            <Button size="sm" variant="outline" onClick={onRetry}>
               {t('common.retry')}
             </Button>
           ) : null}
         </HStack>
       ) : null}
       {vocab.state === 'unavailable' ? (
-        <Text color="fg.muted" fontSize="2xs">
+        <Text color="fg.muted" fontSize="xs">
           {t('settings.imageMapVocabulary.indexOff')}
         </Text>
       ) : null}

@@ -4,7 +4,7 @@
  */
 
 import type { CanvasEngine as PublicCanvasEngine } from '@workbench/canvas-engine/api';
-import type { CanvasHeldMediaSources } from '@workbench/projects/projectAssets';
+import type { LiveCanvasEngines } from '@workbench/projects/projectAssets';
 
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import {
@@ -19,7 +19,7 @@ export type EngineDeps = Omit<CanvasEngineOptions, 'projectId'> & {
    * The mounted Workbench's held-media registry. It also identifies that Workbench: an engine is bound to the one
    * that created it, so a released engine is replaced rather than reused by the next Workbench.
    */
-  heldMedia?: CanvasHeldMediaSources;
+  liveEngines?: LiveCanvasEngines;
 };
 
 /** Default grace period before a released engine is disposed (30s). */
@@ -45,8 +45,8 @@ export interface EngineRegistry {
 
 interface RegistryEntry {
   engine: CanvasEngine;
-  heldMedia: CanvasHeldMediaSources | undefined;
-  releaseHeldMedia: () => void;
+  liveEngines: LiveCanvasEngines | undefined;
+  releaseLiveEngine: () => void;
   refCount: number;
   disposeHandle: number | null;
   generation: number;
@@ -89,7 +89,7 @@ export const createEngineRegistry = (
           return;
         }
         entries.delete(projectId);
-        entry.releaseHeldMedia();
+        entry.releaseLiveEngine();
         entry.engine.lifecycle.dispose();
       });
     }, gracePeriodMs);
@@ -103,7 +103,7 @@ export const createEngineRegistry = (
       entries.clear();
       for (const entry of ownedEntries) {
         cancelDisposal(entry);
-        entry.releaseHeldMedia();
+        entry.releaseLiveEngine();
         try {
           entry.engine.lifecycle.dispose();
         } catch (error) {
@@ -118,13 +118,13 @@ export const createEngineRegistry = (
       }
     },
     getEngine: (projectId) => entries.get(projectId)?.engine,
-    getOrCreateEngine: (projectId, { heldMedia, ...deps }) => {
+    getOrCreateEngine: (projectId, { liveEngines, ...deps }) => {
       const existing = entries.get(projectId);
-      if (existing && existing.heldMedia !== heldMedia && existing.refCount > 0) {
+      if (existing && existing.liveEngines !== liveEngines && existing.refCount > 0) {
         // Its edits and held media belong to the Workbench still using it; sharing it would cross that boundary.
         throw new Error(`The canvas engine for project ${projectId} is still in use by another Workbench.`);
       }
-      if (existing && existing.heldMedia === heldMedia) {
+      if (existing && existing.liveEngines === liveEngines) {
         cancelDisposal(existing);
         existing.generation += 1;
         existing.refCount += 1;
@@ -136,13 +136,15 @@ export const createEngineRegistry = (
         // A released engine still writes through the Workbench that created it; a new Workbench gets its own.
         entries.delete(projectId);
         cancelDisposal(existing);
-        existing.releaseHeldMedia();
+        existing.releaseLiveEngine();
         existing.engine.lifecycle.dispose();
       }
       const engine = createCanvasEngine({ projectId, ...deps });
-      const releaseHeldMedia =
-        heldMedia?.register(projectId, {
-          read: () => engine.history.getHeldAssetRefs(),
+      const releaseLiveEngine =
+        liveEngines?.register(projectId, {
+          // Document pushes cannot wait on an edit the user may never finish.
+          flushPendingPixels: () => engine.lifecycle.flushPendingUploads({ waitForHeldPixels: false }),
+          heldAssets: () => engine.history.getHeldAssetRefs(),
           subscribe: (listener) => engine.interaction.subscribe('historyEpoch', listener),
         }) ?? (() => undefined);
       entries.set(projectId, {
@@ -150,9 +152,9 @@ export const createEngineRegistry = (
         disposeHandle: null,
         engine,
         generation: 0,
-        heldMedia,
+        liveEngines,
         refCount: 1,
-        releaseHeldMedia,
+        releaseLiveEngine,
       });
       return engine;
     },

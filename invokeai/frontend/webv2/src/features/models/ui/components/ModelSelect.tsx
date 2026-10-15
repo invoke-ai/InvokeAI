@@ -2,7 +2,19 @@
 import type { ModelConfig, ModelTaxonomyType } from '@features/models/core/types';
 import type { PickerGroup, PickerOptionState } from '@platform/ui/Picker';
 
-import { Badge, Box, HStack, Icon, Image, Popover, Portal, Spacer, Stack, Text } from '@chakra-ui/react';
+import {
+  Badge,
+  Box,
+  HStack,
+  Icon,
+  Image,
+  Popover,
+  Portal,
+  Spacer,
+  Stack,
+  Text,
+  useFieldContext,
+} from '@chakra-ui/react';
 import { getModelBaseColorPalette, getModelBaseLabel, getModelBaseLongLabel } from '@features/models/core/baseIdentity';
 import { getModelPickerGroups, hasModelPickerCandidates } from '@features/models/core/library';
 import { getModelTypeLabel, getModelTypePluralLabel } from '@features/models/core/taxonomy';
@@ -14,6 +26,7 @@ import { formatBytes } from '@platform/i18n/languages';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { areArraysEqual } from '@platform/state/selectors';
 import { Button, CloseButton, IconButton, PopoverContent, Tooltip } from '@platform/ui';
+import { useFieldLabelId } from '@platform/ui/Field';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Picker } from '@platform/ui/Picker';
 import { Link } from '@tanstack/react-router';
@@ -28,7 +41,7 @@ import {
   RotateCcwIcon,
   XIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const EMPTY_BASES: ReadonlySet<string> = new Set();
@@ -91,8 +104,9 @@ export const ModelSelect = ({
   modelTypes,
   onChange,
   placeholder,
+  scopeLabel: scopeLabelOverride,
   showManagerButton = true,
-  size = 'sm',
+  size = 'md',
   value,
 }: {
   className?: string;
@@ -105,8 +119,10 @@ export const ModelSelect = ({
   modelTypes: readonly ModelTaxonomyType[];
   onChange: (model: ModelConfig | null) => void;
   placeholder?: string;
+  /** Plural noun for the offered models in empty/search copy; defaults to the model type's plural label. */
+  scopeLabel?: string;
   showManagerButton?: boolean;
-  size?: 'xs' | 'sm' | 'md';
+  size?: 'md' | 'lg' | 'xl';
   value: string | null;
 }) => {
   const { t } = useTranslation();
@@ -115,7 +131,17 @@ export const ModelSelect = ({
   const loadError = useModelsSelector((snapshot) => snapshot.error);
   const loadStatus = useModelsSelector((snapshot) => snapshot.status);
   const [isOpen, setIsOpen] = useState(false);
-  const [lastDisabled, setLastDisabled] = useState(Boolean(disabled));
+  // Like Select, an enclosing Field names the trigger and supplies its description, invalid and disabled states.
+  const field = useFieldContext();
+  const fieldControlProps = field?.getInputProps();
+  const fieldLabelId = useFieldLabelId();
+  const valueTextId = useId();
+  const isDisabled = Boolean(disabled || field?.disabled);
+  const isInvalid = Boolean(invalid || field?.invalid);
+  const describedBy =
+    [fieldControlProps?.['aria-describedby'], fieldControlProps?.['aria-errormessage']].filter(Boolean).join(' ') ||
+    undefined;
+  const [lastDisabled, setLastDisabled] = useState(isDisabled);
 
   const pickerId = id ?? `models:${modelTypes.join('+')}`;
   const isCompact = useModelsUiSelector((snapshot) => snapshot.pickerCompactViews[pickerId] ?? false);
@@ -141,7 +167,12 @@ export const ModelSelect = ({
     [excludeKeys, filter, loadStatus, modelTypes, models]
   );
   const isEmpty = !hasCandidates && !value;
-  const isInert = disabled || isEmpty;
+  // Every compatible model is already chosen elsewhere, which is not the same as none being installed.
+  const isAllExcluded = useMemo(
+    () => isEmpty && Boolean(excludeKeys?.size) && hasModelPickerCandidates(models, { filter, modelTypes }),
+    [excludeKeys, filter, isEmpty, modelTypes, models]
+  );
+  const isInert = isDisabled || isEmpty;
 
   if (isInert !== lastDisabled) {
     setLastDisabled(isInert);
@@ -168,7 +199,14 @@ export const ModelSelect = ({
   const selectedModel = useModelsSelector((snapshot) => (value ? (snapshot.modelsByKey.get(value) ?? null) : null));
   const hasMixedTypes = useMemo(() => new Set(candidates.map((model) => model.type)).size > 1, [candidates]);
   const scopeLabel =
-    modelTypes.length === 1 ? getModelTypePluralLabel(modelTypes[0] ?? 'main').toLowerCase() : t('models.scopeModels');
+    scopeLabelOverride ??
+    (modelTypes.length === 1
+      ? getModelTypePluralLabel(modelTypes[0] ?? 'main').toLowerCase()
+      : t('models.scopeModels'));
+  const listLabel = t('models.scopeAvailable', { scope: scopeLabel });
+  const emptyMessage = isAllExcluded
+    ? t('models.scopeAllAdded', { scope: scopeLabel })
+    : t('models.scopeNoCompatibleInstalled', { scope: scopeLabel });
 
   const pickerGroups = useMemo<PickerGroup<ModelConfig>[]>(
     () =>
@@ -217,6 +255,8 @@ export const ModelSelect = ({
     <Box className={className} minW="0" w="full">
       <Popover.Root
         ids={id ? { trigger: id } : undefined}
+        // Like Select: closed pickers hold no list, virtualizer or observers, and each open starts a fresh search.
+        lazyMount
         open={isOpen}
         positioning={{
           fitViewport: true,
@@ -227,6 +267,7 @@ export const ModelSelect = ({
           sameWidth: true,
           strategy: 'fixed',
         }}
+        unmountOnExit
         onOpenChange={(event) => {
           if (isInert) {
             setIsOpen(false);
@@ -239,11 +280,14 @@ export const ModelSelect = ({
         <Box minW="0" position="relative" w="full">
           <Popover.Trigger asChild>
             <Button
-              aria-invalid={invalid ? true : undefined}
+              aria-describedby={describedBy}
               aria-haspopup="listbox"
+              aria-invalid={isInvalid || undefined}
+              // As on Select's trigger: the field label names the control, and the current choice follows as its value.
+              aria-labelledby={fieldLabelId ? `${fieldLabelId} ${valueTextId}` : undefined}
               className={className}
-              borderColor={invalid ? undefined : isOpen ? 'accent.solid' : 'border'}
-              colorPalette={invalid ? 'red' : 'gray'}
+              borderColor={isInvalid ? undefined : isOpen ? 'accent.solid' : 'border'}
+              colorPalette={isInvalid ? 'red' : 'gray'}
               disabled={isInert}
               justifyContent="space-between"
               minW="0"
@@ -256,16 +300,14 @@ export const ModelSelect = ({
               w="full"
               _hover={{
                 bg: 'transparent',
-                borderColor: invalid ? undefined : isOpen ? 'accent.solid' : 'border.emphasized',
+                borderColor: isInvalid ? undefined : isOpen ? 'accent.solid' : 'border.emphasized',
               }}
             >
               {selectedModel ? (
-                <ModelButtonContent model={selectedModel} />
+                <ModelButtonContent id={valueTextId} model={selectedModel} />
               ) : (
-                <Text as="span" color="fg.muted" fontSize="xs" minW="0" truncate>
-                  {isEmpty
-                    ? t('models.scopeNoCompatibleInstalled', { scope: scopeLabel })
-                    : (placeholder ?? t('models.scopeSelect', { scope: scopeLabel }))}
+                <Text as="span" id={valueTextId} color="fg.muted" minW="0" truncate>
+                  {isEmpty ? emptyMessage : (placeholder ?? t('models.scopeSelect', { scope: scopeLabel }))}
                 </Text>
               )}
               {canClear || isEmpty ? null : <Icon as={ChevronDownIcon} boxSize="3" flexShrink={0} />}
@@ -274,10 +316,10 @@ export const ModelSelect = ({
           {canClear ? (
             <CloseButton
               aria-label={t('models.clearSelectedModel')}
-              disabled={disabled}
+              disabled={isDisabled}
               insetEnd="1"
               position="absolute"
-              size="2xs"
+              size="sm"
               top="50%"
               transform="translateY(-50%)"
               zIndex="1"
@@ -297,6 +339,7 @@ export const ModelSelect = ({
         <Portal>
           <Popover.Positioner>
             <PopoverContent
+              aria-label={listLabel}
               css={dropdownContent}
               maxH="min(24rem, var(--available-height))"
               maxW="min(26rem, calc(100vw - 1rem))"
@@ -306,12 +349,12 @@ export const ModelSelect = ({
               showArrow={false}
             >
               <Picker<ModelConfig>
-                emptyMessage={t('models.scopeNoCompatibleInstalled', { scope: scopeLabel })}
+                emptyMessage={emptyMessage}
                 getOptionId={getOptionId}
                 groups={pickerGroups}
                 isCompact={isCompact}
                 isMatch={matchesModel}
-                listLabel={t('models.scopeAvailable', { scope: scopeLabel })}
+                listLabel={listLabel}
                 noMatchesMessage={
                   selectedBases.size > 0
                     ? t('models.scopeNoMatchBases', { scope: scopeLabel })
@@ -326,25 +369,16 @@ export const ModelSelect = ({
                   </>
                 }
                 selectedId={value}
-                statusSlot={
-                  loadStatus === 'idle' || loadStatus === 'loading' ? (
-                    <Text color="fg.subtle" fontSize="2xs" p="2">
-                      {t('models.loadingModels')}
-                    </Text>
-                  ) : loadStatus === 'error' ? (
-                    <Stack alignItems="start" gap="1.5" p="2">
-                      <Text color="fg.error" fontSize="2xs">
-                        {loadError ?? t('models.failedToLoadModels')}
-                      </Text>
-                      <Button size="2xs" variant="outline" onClick={() => void ensureModelsLoaded()}>
-                        {t('common.retry')}
-                      </Button>
-                    </Stack>
-                  ) : candidates.length === 0 ? (
-                    <Text color="fg.subtle" fontSize="2xs" p="2">
-                      {t('models.scopeNoCompatibleInstalled', { scope: scopeLabel })}
-                    </Text>
-                  ) : undefined
+                status={
+                  loadStatus === 'idle' || loadStatus === 'loading'
+                    ? { message: t('models.loadingModels') }
+                    : loadStatus === 'error'
+                      ? {
+                          isError: true,
+                          message: loadError ?? t('models.failedToLoadModels'),
+                          onRetry: () => void ensureModelsLoaded(),
+                        }
+                      : undefined
                 }
                 toolbarSlot={
                   availableBases.length >= 2 ? (
@@ -358,7 +392,7 @@ export const ModelSelect = ({
                         flexShrink={0}
                         opacity={selectedBases.size === 0 ? 0.5 : undefined}
                         pointerEvents={selectedBases.size === 0 ? 'none' : undefined}
-                        size="2xs"
+                        size="sm"
                         variant="ghost"
                         onClick={() => setSelectedBases(EMPTY_BASES)}
                       >
@@ -391,14 +425,7 @@ const CompactViewToggle = ({ isCompact, pickerId }: { isCompact: boolean; picker
 
   return (
     <Tooltip content={label} showArrow>
-      <IconButton
-        aria-label={label}
-        aria-pressed={isCompact}
-        flexShrink={0}
-        size="xs"
-        variant="ghost"
-        onClick={handleClick}
-      >
+      <IconButton aria-label={label} aria-pressed={isCompact} flexShrink={0} variant="ghost" onClick={handleClick}>
         <Icon as={isCompact ? ChevronsUpDownIcon : ChevronsDownUpIcon} boxSize="3.5" />
       </IconButton>
     </Tooltip>
@@ -412,7 +439,7 @@ const ModelManagerLinkButton = () => {
 
   return (
     <Tooltip content={t('models.manageModels')} showArrow>
-      <IconButton aria-label={t('models.manageModels')} asChild flexShrink={0} size="xs" variant="ghost">
+      <IconButton aria-label={t('models.manageModels')} asChild flexShrink={0} variant="ghost">
         <Link search={search} to="/models">
           <BoxIcon />
         </Link>
@@ -433,9 +460,9 @@ const BaseChip = ({
   <Badge
     aria-pressed={isSelected}
     colorPalette={getModelBaseColorPalette(base)}
-    fontSize="2xs"
+    fontSize="xs"
     role="button"
-    size="sm"
+    size="lg"
     tabIndex={0}
     userSelect="none"
     variant={isSelected ? 'solid' : 'surface'}
@@ -456,16 +483,10 @@ const BaseChip = ({
   </Badge>
 );
 
-const ModelButtonContent = ({ model }: { model: ModelConfig }) => (
-  <HStack as="span" flex="1" gap="2" minW="0">
-    <MiddleTruncate as="span" fontSize="xs" minW="0" text={model.name} />
-    <Badge
-      colorPalette={getModelBaseColorPalette(model.base)}
-      flexShrink={0}
-      fontSize="2xs"
-      size="sm"
-      variant="surface"
-    >
+const ModelButtonContent = ({ id, model }: { id: string; model: ModelConfig }) => (
+  <HStack as="span" id={id} flex="1" gap="2" minW="0">
+    <MiddleTruncate as="span" minW="0" text={model.name} />
+    <Badge colorPalette={getModelBaseColorPalette(model.base)} flexShrink={0} fontSize="xs" size="lg" variant="surface">
       {getModelBaseLabel(model.base)}
     </Badge>
   </HStack>
@@ -513,20 +534,20 @@ const ModelOptionContent = ({
               />
             </Tooltip>
           ) : null}
-          <MiddleTruncate fontSize="xs" minW="0" text={model.name} />
+          <MiddleTruncate fontSize="md" minW="0" text={model.name} />
           {showType ? (
-            <Badge colorPalette="gray" flexShrink={0} fontSize="2xs" size="xs" variant="surface">
+            <Badge colorPalette="gray" flexShrink={0} fontSize="xs" variant="surface">
               {getModelTypeLabel(model.type)}
             </Badge>
           ) : null}
         </HStack>
         {showDetail && enableDescription && model.description ? (
-          <Text color="fg.subtle" fontSize="2xs" lineClamp={2}>
+          <Text color="fg.subtle" fontSize="xs" lineClamp={2}>
             {model.description}
           </Text>
         ) : null}
       </Stack>
-      <Text color="fg.subtle" flexShrink={0} fontSize="2xs" fontStyle="italic">
+      <Text color="fg.subtle" flexShrink={0} fontSize="xs" fontStyle="italic">
         {formatBytes(model.file_size)}
       </Text>
     </HStack>

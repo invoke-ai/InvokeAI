@@ -19,11 +19,17 @@ export type RasterMemoryReservationResult =
 export interface RasterMemorySnapshot {
   baseBytes: number;
   derivedBytes: number;
+  groupBytes: number;
   decodedBytes: number;
   detachedBytes: number;
   reservedBytes: number;
   totalBytes: number;
+  /** Bytes held above the budget because the working set requires them. */
+  overageBytes: number;
 }
+
+/** Allocation classes whose owners push their running totals at every allocation, resize and release. */
+export type RasterMemoryCategory = 'base' | 'derived' | 'group' | 'decoded';
 
 interface GenerationLease extends RasterMemoryLease {
   readonly generation: number;
@@ -31,14 +37,11 @@ interface GenerationLease extends RasterMemoryLease {
 
 const normalizedBytes = (bytes: number): number => Math.max(0, Math.ceil(bytes));
 
-/** Owns byte accounting and generation-scoped background allocation leases. */
+/** Owns byte accounting, reservations, and the pins that keep in-use caches resident. */
 export class RasterMemoryBudgetController {
   readonly budgetBytes: number;
-  private baseBytes = 0;
-  private derivedBytes = 0;
-  private decodedBytes = 0;
-  private reportedDetachedBytes = 0;
-  private leasedDetachedBytes = 0;
+  private readonly categoryBytes: Record<RasterMemoryCategory, number> = { base: 0, decoded: 0, derived: 0, group: 0 };
+  private detachedBytes = 0;
   private reservedBytes = 0;
   private readonly generationLeases = new Map<number, Set<GenerationLease>>();
   private readonly pins = new Map<string, Set<RasterMemoryLease>>();
@@ -48,40 +51,24 @@ export class RasterMemoryBudgetController {
     this.budgetBytes = normalizedBytes(options.budgetBytes ?? DEFAULT_CACHE_BUDGET_BYTES);
   }
 
-  setBaseBytes(bytes: number): void {
-    this.baseBytes = normalizedBytes(bytes);
+  /** Records an owner's current total for one allocation class. */
+  setCategoryBytes(category: RasterMemoryCategory, bytes: number): void {
+    this.categoryBytes[category] = normalizedBytes(bytes);
   }
 
-  setDerivedBytes(bytes: number): void {
-    this.derivedBytes = normalizedBytes(bytes);
-  }
-
-  setDecodedBytes(bytes: number): void {
-    this.decodedBytes = normalizedBytes(bytes);
-  }
-
-  setDetachedBytes(bytes: number): void {
-    this.reportedDetachedBytes = normalizedBytes(bytes);
-  }
-
-  trackDetached(bytes: number, _generation: number): RasterMemoryLease {
+  /** Accounts caller-owned detached pixels until the returned lease is released. */
+  trackDetached(bytes: number): RasterMemoryLease {
     if (this.disposed) {
       return { release: () => undefined };
     }
     const trackedBytes = normalizedBytes(bytes);
-    this.leasedDetachedBytes += trackedBytes;
-    let released = false;
-    return {
-      release: () => {
-        if (released) {
-          return;
-        }
-        released = true;
-        this.leasedDetachedBytes = Math.max(0, this.leasedDetachedBytes - trackedBytes);
-      },
-    };
+    this.detachedBytes += trackedBytes;
+    return this.createOwnedLease(() => {
+      this.detachedBytes = Math.max(0, this.detachedBytes - trackedBytes);
+    });
   }
 
+  /** Reserves bytes for cancellable background preparation; lifecycle transitions release the generation. */
   reserve(
     requestedBytes: number,
     options: { generation: number; purpose: RasterBackgroundPurpose }
@@ -121,25 +108,8 @@ export class RasterMemoryBudgetController {
     return Math.max(0, this.budgetBytes - this.snapshot().totalBytes);
   }
 
-  pin(layerId: string, generation: number): RasterMemoryLease {
-    if (this.disposed) {
-      return { release: () => undefined };
-    }
-    const lease = this.createGenerationLease(generation, () => {
-      const layerPins = this.pins.get(layerId);
-      layerPins?.delete(lease);
-      if (layerPins?.size === 0) {
-        this.pins.delete(layerId);
-      }
-    });
-    const layerPins = this.pins.get(layerId) ?? new Set<RasterMemoryLease>();
-    layerPins.add(lease);
-    this.pins.set(layerId, layerPins);
-    return lease;
-  }
-
-  /** Pins a cache for an in-flight operation independently of lifecycle generations. */
-  pinOperation(layerId: string): RasterMemoryLease {
+  /** Keeps a layer's cache resident (no eviction or trim) until the owning operation releases it. */
+  pin(layerId: string): RasterMemoryLease {
     if (this.disposed) {
       return { release: () => undefined };
     }
@@ -160,10 +130,6 @@ export class RasterMemoryBudgetController {
     return (this.pins.get(layerId)?.size ?? 0) > 0;
   }
 
-  pinnedLayerIds(): string[] {
-    return [...this.pins.keys()];
-  }
-
   releaseGeneration(generation: number): void {
     const leases = [...(this.generationLeases.get(generation) ?? [])];
     for (const lease of leases) {
@@ -172,14 +138,17 @@ export class RasterMemoryBudgetController {
   }
 
   snapshot(): RasterMemorySnapshot {
-    const detachedBytes = this.reportedDetachedBytes + this.leasedDetachedBytes;
+    const { base, decoded, derived, group } = this.categoryBytes;
+    const totalBytes = base + derived + group + decoded + this.detachedBytes + this.reservedBytes;
     return {
-      baseBytes: this.baseBytes,
-      decodedBytes: this.decodedBytes,
-      derivedBytes: this.derivedBytes,
-      detachedBytes,
+      baseBytes: base,
+      decodedBytes: decoded,
+      derivedBytes: derived,
+      detachedBytes: this.detachedBytes,
+      groupBytes: group,
+      overageBytes: Math.max(0, totalBytes - this.budgetBytes),
       reservedBytes: this.reservedBytes,
-      totalBytes: this.baseBytes + this.derivedBytes + this.decodedBytes + detachedBytes + this.reservedBytes,
+      totalBytes,
     };
   }
 
@@ -188,14 +157,12 @@ export class RasterMemoryBudgetController {
       return;
     }
     this.disposed = true;
-    while (this.generationLeases.size > 0) {
-      const generation = this.generationLeases.keys().next().value;
-      if (generation === undefined) {
-        break;
-      }
+    for (const generation of this.generationLeases.keys()) {
       this.releaseGeneration(generation);
     }
     this.pins.clear();
+    this.reservedBytes = 0;
+    this.detachedBytes = 0;
   }
 
   private createGenerationLease(generation: number, onRelease: () => void): GenerationLease {

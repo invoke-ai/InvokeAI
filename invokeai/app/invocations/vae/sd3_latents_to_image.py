@@ -48,7 +48,7 @@ class SD3LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         vae_info = context.models.load(self.vae.vae)
         assert isinstance(vae_info.model, (AutoencoderKL))
         estimated_working_memory = estimate_vae_working_memory_sd3(
-            operation="decode", image_tensor=latents, vae=vae_info.model
+            operation="decode", image_tensor=latents, vae=vae_info.model, device=vae_info.compute_device
         )
         with (
             SeamlessExt.static_patch_model(vae_info.model, self.vae.seamless_axes),

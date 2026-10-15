@@ -7,20 +7,22 @@ import { useQueueItemProgressImage } from '@features/queue/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { preloadCanvasInvocation } from '@workbench/activeInvocationSubmission';
 import { getCanvasImportNotice } from '@workbench/canvas-operations/api';
+import { useCanvasEngine, type CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import { getCanvasStagingSlots } from '@workbench/canvasStagingView';
+import { useRegisterShortcutHintSource } from '@workbench/hotkeys/hintSources';
 import { recordCanvasImportError } from '@workbench/image-actions/canvasImportError';
 import { readLayerPanelState } from '@workbench/layerPanelState';
 import { useWorkbenchSettingsSelector } from '@workbench/settings/store';
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { useNotify } from '@workbench/useNotify';
 import { CanvasLayerContextMenu } from '@workbench/widgets/layers/LayerContextMenu';
-import { clearLayerPropertiesRequest } from '@workbench/widgets/layers/layerPropertiesRequestStore';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import {
   useActiveProjectId,
   useActiveProjectSelector,
   useWorkbenchCommands,
   useWorkbenchQueries,
+  useWorkbenchSubscription,
 } from '@workbench/WorkbenchContext';
 import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -34,11 +36,12 @@ import {
   type CanvasContextMenuTarget,
 } from './canvasContextMenu';
 import { CanvasCreateFromBboxSubmenu } from './CanvasCreateFromBboxSubmenu';
+import { CanvasEditRefusalNotices } from './CanvasEditRefusalNotices';
 import { CanvasGlobalContextMenu } from './CanvasGlobalContextMenu';
 import { executeCanvasHotkeyCommand } from './canvasHotkeyCommands';
 import { resolveCanvasImageDrop } from './canvasImageDnd';
 import { CanvasImageDropOverlay } from './CanvasImageDropOverlay';
-import { getCanvasInteractionCapabilities } from './canvasInteractionLock';
+import { createCanvasInteractionLockReader, getCanvasInteractionCapabilities } from './canvasInteractionLock';
 import { CanvasSaveToGallerySubmenu } from './CanvasSaveToGallerySubmenu';
 import {
   CANVAS_SETTINGS,
@@ -53,24 +56,58 @@ import { CanvasColorFeed } from './color-system/CanvasColorFeed';
 import { useActiveColorCommands } from './color-system/useActiveColors';
 import { useCanvasOperation } from './engineStoreHooks';
 import { executeCanvasImageDropImport } from './executeCanvasImageDropImport';
+import { createCanvasShortcutHintSource } from './shortcutHints';
+import { acceptStagedCandidate } from './stagedAcceptance';
 import { StagingBar } from './StagingBar';
 import { selectStagedPreviewSource, stagedPreviewKey } from './stagingPreview';
 import { INLINE_EDIT_SELECTOR } from './surfaceFocus';
 import { ToolStrip } from './ToolStrip';
-import { useCanvasEngine } from './useCanvasEngine';
 import { useCanvasGallerySave } from './useCanvasGallerySave';
 import { useCreateFromBbox } from './useCreateFromBbox';
-import { reportPreparedCommit, reportStructuralCommit } from './useStructuralCommit';
+import { useStagedResultGallerySave } from './useStagedResultGallerySave';
+import { reportLayerOperation, reportPreparedCommit, reportStructuralCommit } from './useStructuralCommit';
 
 const MissingFontsDialog = lazy(() =>
   import('./MissingFontsDialog').then((module) => ({ default: module.MissingFontsDialog }))
 );
 
+/** The shared engine stays stable for this keyed project/instance lease; lock changes are source notifications. */
+const CanvasShortcutHintRegistration = ({
+  engine,
+  projectId,
+  instanceId,
+}: {
+  engine: CanvasEngineHandle;
+  projectId: string;
+  instanceId: string;
+}) => {
+  const queries = useWorkbenchQueries();
+  const subscribe = useWorkbenchSubscription();
+  const [source] = useState(() => {
+    const getLocked = createCanvasInteractionLockReader(() => queries.getProject(projectId));
+    return createCanvasShortcutHintSource(engine, projectId, instanceId, {
+      getSnapshot: getLocked,
+      subscribe: (listener) => {
+        let previous = getLocked();
+        return subscribe(() => {
+          const next = getLocked();
+          if (next !== previous) {
+            previous = next;
+            listener();
+          }
+        });
+      },
+    });
+  });
+  useRegisterShortcutHintSource(source);
+  return null;
+};
+
 /**
  * Wire reducer chrome, commands, settings, and staging around the pixel/input engine. Properties owns tool
  * settings; {@link CanvasHeaderActions} owns view controls.
  */
-export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
+export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   const { t } = useTranslation();
   const notify = useNotify();
   const { canvas: canvasCommands, notifications, queue } = useWorkbenchCommands();
@@ -85,12 +122,6 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   const fontReferences = useMemo(() => engine?.fonts.collectReferences(document) ?? [], [document, engine]);
   const operation = useCanvasOperation(engine);
   const operationKind = operation?.status === 'active' ? operation.identity.kind : null;
-  // An operation's panel supersedes any pending layer-properties request.
-  useEffect(() => {
-    if (operationKind) {
-      clearLayerPropertiesRequest();
-    }
-  }, [operationKind]);
   const { isSaving, save: saveToGallery } = useCanvasGallerySave(engine);
   const { createFromBbox, isCreating } = useCreateFromBbox(engine);
 
@@ -149,6 +180,9 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   const stagingSlots = getCanvasStagingSlots(canvas, queueItems);
   const selectedSlot = stagingSlots[stagingArea.selectedImageIndex];
   const selectedCandidate = selectedSlot?.kind === 'candidate' ? selectedSlot.candidate : undefined;
+  const { isSaving: isSavingStagedResult, save: saveStagedResult } = useStagedResultGallerySave(
+    selectedCandidate?.imageName ?? null
+  );
   const selectedPlaceholder = selectedSlot?.kind === 'placeholder' ? selectedSlot : null;
   const hasStagingSlots = stagingSlots.length > 0;
   const hasMultipleStagingSlots = stagingSlots.length > 1;
@@ -267,7 +301,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       }
       const result = mountedEngine.selection.pasteImage(pixels);
       if (result.status !== 'created') {
-        notifications.add({ kind: 'error', title: t('widgets.canvas.clipboard.pasteFailed') });
+        reportLayerOperation(result.status, notify.error, t);
       }
     })();
   });
@@ -282,15 +316,31 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   /* eslint-disable react/preserve-manual-memoization -- imperative engine payload is mutable by design */
   const commitSelectedStagedImage = useCallback(
     (continueStaging: boolean) => {
-      if (selectedSlot?.kind === 'candidate') {
-        engine?.layers.commitStagedImage({
+      if (selectedSlot?.kind !== 'candidate' || !engine) {
+        return;
+      }
+      const result = acceptStagedCandidate(
+        {
+          commit: (options) => engine.layers.commitStagedImage(options),
+          stopBatch: (queueItemId) =>
+            queue.cancel(projectId, queueItemId, {
+              message: t('widgets.canvas.staging.acceptStopMessage'),
+              title: t('widgets.canvas.staging.acceptStopTitle'),
+            }),
+        },
+        {
           candidate: selectedSlot.candidate,
           continueStaging,
+          queueItems,
           selectedImageIndex: stagingArea.selectedImageIndex,
-        });
+        }
+      );
+      if (result.status !== 'committed' && result.status !== 'busy') {
+        // A candidate that left staging is as stale as one that changed under the accept.
+        reportLayerOperation(result.status === 'missing' ? 'stale' : result.status, notify.error, t);
       }
     },
-    [engine, selectedSlot, stagingArea.selectedImageIndex]
+    [engine, notify, projectId, queue, queueItems, selectedSlot, stagingArea.selectedImageIndex, t]
   );
   /* eslint-enable react/preserve-manual-memoization */
   const acceptStagedImage = useCallback(() => commitSelectedStagedImage(false), [commitSelectedStagedImage]);
@@ -375,6 +425,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       notifyLayerDuplicateFailed: () =>
         notifications.add({ kind: 'error', title: t('widgets.layers.actions.copyFailed') }),
       pasteFromClipboard,
+      reportLayerOperation: (refusal) => reportLayerOperation(refusal, notify.error, t),
       reportPreparedCommit: (outcome) => reportPreparedCommit(outcome, notify.error, t),
       reportStructuralCommit: (result) => reportStructuralCommit(result, notify.error, t),
       resetActiveColors: colorCommands.resetPair,
@@ -487,7 +538,16 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       role="region"
       w="full"
     >
+      {engine ? (
+        <CanvasShortcutHintRegistration
+          key={`${projectId}:${instance.id}`}
+          engine={engine}
+          projectId={projectId}
+          instanceId={instance.id}
+        />
+      ) : null}
       <CanvasColorFeed engine={engine} />
+      {engine ? <CanvasEditRefusalNotices key={projectId} engine={engine} /> : null}
       {engine && fontReferences.length > 0 ? (
         <Suspense fallback={null}>
           <MissingFontsDialog key={projectId} engine={engine} groups={fontReferences} />
@@ -528,6 +588,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
                 canAccept={interactionCapabilities.canAcceptStagedImage}
                 hasMultipleSlots={hasMultipleStagingSlots}
                 isGenerating={isCanvasGenerationInFlight}
+                isSavingToGallery={isSavingStagedResult}
                 isVisible={stagingArea.isVisible}
                 selectedCandidate={selectedCandidate}
                 selectedImageIndex={stagingArea.selectedImageIndex}
@@ -540,6 +601,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
                 onDiscardSelected={discardSelectedStagedImage}
                 onPreloadCandidate={preloadStagedCandidate}
                 onSelectImage={selectStagedImage}
+                onSaveToGallery={saveStagedResult}
                 onSaveToLayerAndContinue={saveStagedImageAndContinue}
                 onSetAutoSwitch={setStagingAutoSwitch}
                 onToggleThumbnails={toggleStagingThumbnails}

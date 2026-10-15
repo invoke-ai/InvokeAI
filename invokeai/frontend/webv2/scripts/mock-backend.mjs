@@ -97,6 +97,8 @@ const STARTER_MODEL = {
   type: 'main',
 };
 
+const MOCK_APP_VERSION = 'fixture';
+
 const STARTER_MODELS_RESPONSE = {
   starter_bundles: {
     'sd-1': { models: [STARTER_MODEL], name: 'Stable Diffusion 1.5' },
@@ -113,8 +115,13 @@ const createState = (profile) => {
 
   return {
     boards: new Map(fixture.boards.map((board) => [board.board_id, clone(board)])),
-    // Dismiss the alpha notice so journeys start on the requested page.
-    clientState: new Map([['webv2:workbench-settings', JSON.stringify({ alphaNoticeAcknowledged: true })]]),
+    // Dismiss the alpha notice and What's New notes so journeys start on the requested page.
+    clientState: new Map([
+      [
+        'webv2:workbench-settings',
+        JSON.stringify({ alphaNoticeAcknowledged: true, whatsNewSeenVersion: MOCK_APP_VERSION }),
+      ],
+    ]),
     images: new Map(fixture.images.map((image) => [image.image_name, clone(image)])),
     models: new Map(fixture.models.map((model) => [model.key, clone(model)])),
     mutationClock: 0,
@@ -364,10 +371,18 @@ const toGalleryItem = (kind, value) =>
       };
 
 const getGalleryCandidates = (state) => [
-  ...[...state.images.values()].map((image) => ({ item: toGalleryItem('image', image), searchable: image.metadata })),
+  ...[...state.images.values()].map((image) => ({
+    item: toGalleryItem('image', image),
+    origin: image.image_origin ?? 'internal',
+    searchable: image.metadata,
+  })),
   ...[...state.videos.values()]
     .filter((video) => video.owner_user_id === MOCK_USER_ID)
-    .map((video) => ({ item: toGalleryItem('video', video), searchable: video.metadata })),
+    .map((video) => ({
+      item: toGalleryItem('video', video),
+      origin: video.video_origin ?? 'internal',
+      searchable: video.metadata,
+    })),
 ];
 
 const compareGalleryItems = (left, right, orderDir, starredFirst) => {
@@ -384,18 +399,22 @@ const compareGalleryItems = (left, right, orderDir, starredFirst) => {
   );
 };
 
-const filterGalleryItems = (state, url, { createdDate } = {}) => {
+const filterGalleryItems = (state, url, { createdDate, starredFirst } = {}) => {
   const boardId = url.searchParams.get('board_id');
   const categories = getRequestedCategories(url);
   const createdFrom = url.searchParams.get('created_from');
   const createdTo = url.searchParams.get('created_to');
   const intermediate = getOptionalBoolean(url, 'is_intermediate');
+  const origin = url.searchParams.get('origin');
   const starred = getOptionalBoolean(url, 'starred');
   const searchTerm = url.searchParams.get('search_term')?.trim().toLocaleLowerCase() ?? '';
 
   return getGalleryCandidates(state)
-    .filter(({ item, searchable }) => {
+    .filter(({ item, origin: itemOrigin, searchable }) => {
       if (boardId && (boardId === 'none' ? item.board_id !== null : item.board_id !== boardId)) {
+        return false;
+      }
+      if (origin && itemOrigin !== origin) {
         return false;
       }
       if (categories.length > 0 && !categories.includes(item.category)) {
@@ -432,9 +451,18 @@ const filterGalleryItems = (state, url, { createdDate } = {}) => {
         left,
         right,
         url.searchParams.get('order_dir')?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC',
-        url.searchParams.get('starred_first') !== 'false'
+        starredFirst ?? url.searchParams.get('starred_first') !== 'false'
       )
     );
+};
+
+const getGalleryItemLocation = (state, url) => {
+  const kind = url.searchParams.get('kind');
+  const name = url.searchParams.get('name');
+  const items = filterGalleryItems(state, url, { starredFirst: false });
+  const index = items.findIndex((item) => item.kind === kind && item.name === name);
+
+  return index === -1 ? null : { kind, name, index, total: items.length };
 };
 
 const listGalleryItems = (state, url) => {
@@ -517,8 +545,8 @@ const listVideos = (state, url) => {
   };
 };
 
-/** The project that owns this board, if any. Derived, exactly as the backend derives it. */
-const projectIdForBoard = (state, boardId) =>
+/** The project this board is the inbox of, if any. Derived from `projects.board_id`, as the backend derives it. */
+const inboxProjectIdForBoard = (state, boardId) =>
   [...state.projects.values()].find((project) => project.board_id === boardId)?.project_id ?? null;
 
 /** Match /board-snapshot visibility and ordering: exclude intermediate/other items, sort by kind then name. */
@@ -578,7 +606,7 @@ const boardDto = (state, board) => {
       right.name.localeCompare(left.name)
   )[0];
 
-  const projectId = projectIdForBoard(state, board.board_id);
+  const projectId = board.project_id ?? null;
 
   return {
     ...board,
@@ -586,8 +614,9 @@ const boardDto = (state, board) => {
     cover_image_name: cover?.kind === 'image' ? cover.name : null,
     cover_video_name: cover?.kind === 'video' ? cover.name : null,
     image_count: images.filter((image) => image.image_category === 'general').length,
-    // The backend's BoardRecord excludes nulls, so an unclaimed board omits the key entirely.
-    ...(projectId === null ? {} : { project_id: projectId }),
+    is_inbox: inboxProjectIdForBoard(state, board.board_id) !== null,
+    // Membership is stored on the board; the backend sends null for a Library board.
+    project_id: projectId,
     video_count: videos.length,
   };
 };
@@ -867,7 +896,11 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
       }
 
       if (method === 'GET' && path === '/api/v1/app/version') {
-        return json(200, { version: 'fixture' });
+        return json(200, { version: MOCK_APP_VERSION });
+      }
+
+      if (method === 'GET' && path === '/api/v1/app/frontend_config') {
+        return json(200, { show_donation_link: true });
       }
 
       if (method === 'GET' && path === '/api/v1/app/generation_device_options') {
@@ -898,6 +931,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           const name = requested.name ?? `Project Name #${projectNumber}`;
 
           // Adopting a prepopulated board makes project creation the import commit point.
+          const projectId = requested.project_id ?? `mock-project-${projectNumber}`;
           let boardId = requested.board_id ?? null;
           if (boardId === null) {
             boardId = `mock-project-board-${projectNumber}`;
@@ -909,6 +943,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
               created_at: now,
               deleted_at: null,
               owner_username: null,
+              project_id: projectId,
               updated_at: now,
               user_id: MOCK_USER_ID,
             });
@@ -917,10 +952,15 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             if (!board) {
               return json(404, { detail: 'Board not found' });
             }
-            if (board.board_visibility !== 'private' || projectIdForBoard(state, boardId) !== null) {
+            if (
+              board.board_visibility !== 'private' ||
+              inboxProjectIdForBoard(state, boardId) !== null ||
+              (board.project_id ?? null) !== null
+            ) {
               return json(409, { detail: 'Board is not available to be claimed by a project' });
             }
             board.board_name = name;
+            board.project_id = projectId;
             board.updated_at = now;
           }
 
@@ -936,7 +976,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             data: requested.data ?? {},
             minimum_canvas_schema_version: minimum,
             name,
-            project_id: requested.project_id ?? `mock-project-${projectNumber}`,
+            project_id: projectId,
             revision: 1,
             updated_at: now,
           };
@@ -1010,16 +1050,33 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         }
         if (method === 'DELETE') {
           if (project) {
+            const boardsMode = url.searchParams.get('boards') ?? 'release';
+            if (boardsMode !== 'release' && boardsMode !== 'delete') {
+              return json(422, { detail: 'boards must be release or delete' });
+            }
             state.projects.delete(projectId);
-            // The board goes with the project; its media survives as uncategorized.
-            state.boards.delete(project.board_id);
+            // The inbox goes with the project; the other boards are released or go too. Media survives as
+            // uncategorized either way.
+            const removedBoardIds = new Set([project.board_id]);
+            for (const board of state.boards.values()) {
+              if ((board.project_id ?? null) === projectId && board.board_id !== project.board_id) {
+                if (boardsMode === 'delete') {
+                  removedBoardIds.add(board.board_id);
+                } else {
+                  board.project_id = null;
+                }
+              }
+            }
+            for (const boardId of removedBoardIds) {
+              state.boards.delete(boardId);
+            }
             for (const image of state.images.values()) {
-              if (image.board_id === project.board_id) {
+              if (removedBoardIds.has(image.board_id)) {
                 image.board_id = null;
               }
             }
             for (const video of state.videos.values()) {
-              if (video.board_id === project.board_id) {
+              if (removedBoardIds.has(video.board_id)) {
                 video.board_id = null;
               }
             }
@@ -1032,9 +1089,28 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
       if (method === 'GET' && boardSnapshotMatch) {
         const project = state.projects.get(decodeURIComponent(boardSnapshotMatch[1]));
 
-        return project
-          ? json(200, { items: boardSnapshotItems(state, project.board_id) })
-          : json(404, { detail: 'Project not found' });
+        if (!project) {
+          return json(404, { detail: 'Project not found' });
+        }
+
+        // The inbox first, then the project's other boards in creation order — as the backend lists them.
+        const members = [...state.boards.values()]
+          .filter((board) => (board.project_id ?? null) === project.project_id && board.board_id !== project.board_id)
+          .sort(
+            (left, right) =>
+              left.created_at.localeCompare(right.created_at) || left.board_id.localeCompare(right.board_id)
+          );
+        const boards = [state.boards.get(project.board_id), ...members]
+          .filter((board) => board !== undefined)
+          .map((board) => ({
+            archived: board.archived,
+            board_id: board.board_id,
+            is_inbox: board.board_id === project.board_id,
+            items: boardSnapshotItems(state, board.board_id),
+            name: board.board_name,
+          }));
+
+        return json(200, { boards });
       }
 
       if (path.startsWith('/api/v1/client_state/')) {
@@ -1101,12 +1177,20 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         if (action === 'item_ids' || action === 'list') {
           const descending = url.searchParams.get('order_dir')?.toUpperCase() !== 'ASC';
           const itemIds = scopedItems.map((item) => item.item_id).sort((left, right) => left - right);
+          // Like the backend: an optional limit from 1 to MAX_QUEUE_ITEM_IDS_PER_REQUEST returns the head of the
+          // order, and total_count is then the number of ids returned.
+          const limit = action === 'item_ids' ? url.searchParams.get('limit') : null;
 
+          if (limit !== null && !(/^\d+$/.test(limit) && Number(limit) >= 1 && Number(limit) <= 1000)) {
+            return json(422, { detail: 'limit must be an integer from 1 to 1000' });
+          }
           if (descending) {
             itemIds.reverse();
           }
 
-          return json(200, { item_ids: itemIds, total_count: itemIds.length });
+          const returned = limit === null ? itemIds : itemIds.slice(0, Number(limit));
+
+          return json(200, { item_ids: returned, total_count: returned.length });
         }
         if (action === 'clear' && method === 'PUT') {
           state.queueItems.clear();
@@ -1454,6 +1538,10 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         if (method === 'POST') {
           const now = timestamp(state);
           const boardId = `mock-board-${state.nextBoardNumber}`;
+          const projectId = url.searchParams.get('project_id');
+          if (projectId !== null && !state.projects.has(projectId)) {
+            return json(404, { detail: 'Project not found' });
+          }
           const board = {
             archived: false,
             board_id: boardId,
@@ -1462,6 +1550,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             created_at: now,
             deleted_at: null,
             owner_username: null,
+            project_id: projectId,
             updated_at: now,
             user_id: MOCK_USER_ID,
           };
@@ -1486,15 +1575,25 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         }
         if (method === 'PATCH') {
           const changes = await readJsonBody(request);
+          const moves = Object.hasOwn(changes, 'project_id');
 
-          // A project's board takes its name, archived state and visibility from the project.
+          // An inbox takes its name, archived state and visibility from the project and cannot move.
           if (
-            projectIdForBoard(state, boardId) !== null &&
+            inboxProjectIdForBoard(state, boardId) !== null &&
             (changes.board_name !== undefined ||
               changes.archived !== undefined ||
-              changes.board_visibility !== undefined)
+              changes.board_visibility !== undefined ||
+              moves)
           ) {
-            return json(409, { detail: 'This board belongs to a project' });
+            return json(409, { detail: "This board is the project's inbox" });
+          }
+          const nextProjectId = moves ? changes.project_id : (board.project_id ?? null);
+          const nextVisibility = changes.board_visibility ?? board.board_visibility;
+          if (nextProjectId !== null && nextVisibility !== 'private') {
+            return json(409, { detail: 'Boards in a project must be private and unshared' });
+          }
+          if (nextProjectId !== null && !state.projects.has(nextProjectId)) {
+            return json(404, { detail: 'Project not found' });
           }
 
           for (const key of ['archived', 'board_name', 'board_visibility', 'cover_image_name']) {
@@ -1502,14 +1601,17 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
               board[key] = changes[key];
             }
           }
+          if (moves) {
+            board.project_id = nextProjectId;
+          }
           board.updated_at = timestamp(state);
 
           return json(201, boardDto(state, board));
         }
         if (method === 'DELETE') {
-          if (projectIdForBoard(state, boardId) !== null) {
+          if (inboxProjectIdForBoard(state, boardId) !== null) {
             // Refused before any media is touched — the whole point of the ordering.
-            return json(409, { detail: 'This board belongs to a project' });
+            return json(409, { detail: "This board is the project's inbox" });
           }
 
           const includeImages = url.searchParams.get('include_images') === 'true';
@@ -1736,6 +1838,12 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
 
       if (method === 'GET' && path === '/api/v1/gallery/items/') {
         return json(200, listGalleryItems(state, url));
+      }
+
+      if (method === 'GET' && path === '/api/v1/gallery/items/location') {
+        const location = getGalleryItemLocation(state, url);
+
+        return location ? json(200, location) : json(404, { detail: 'Gallery item not found' });
       }
 
       if (method === 'GET' && path === '/api/v1/gallery/items/names') {

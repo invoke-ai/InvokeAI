@@ -140,7 +140,7 @@ class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     ) -> torch.Tensor:
         # We always generate noise on the same device and dtype then cast to ensure consistency across devices/dtypes.
         rand_device = "cpu"
-        rand_dtype = torch.float16
+        rand_dtype = TorchDevice.choose_noise_dtype(torch.float16)
 
         return torch.randn(
             batch_size,

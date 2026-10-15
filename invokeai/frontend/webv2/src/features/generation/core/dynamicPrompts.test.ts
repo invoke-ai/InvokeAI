@@ -99,14 +99,22 @@ describe('sanitizeDynamicPromptsConfig', () => {
     expect(sanitizeDynamicPromptsConfig({})).toEqual({
       combinatorial: true,
       maxPrompts: 100,
+      resample: true,
       sampleSeed: 0,
       seedBehaviour: 'per-iteration',
     });
     expect(
-      sanitizeDynamicPromptsConfig({ combinatorial: false, maxPrompts: 7, sampleSeed: 42, seedBehaviour: 'per-image' })
+      sanitizeDynamicPromptsConfig({
+        combinatorial: false,
+        maxPrompts: 7,
+        resample: false,
+        sampleSeed: 42,
+        seedBehaviour: 'per-image',
+      })
     ).toEqual({
       combinatorial: false,
       maxPrompts: 7,
+      resample: false,
       sampleSeed: 42,
       seedBehaviour: 'per-image',
     });

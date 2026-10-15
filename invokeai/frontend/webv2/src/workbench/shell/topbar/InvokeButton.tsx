@@ -1,6 +1,6 @@
-import type { ComponentProps, FocusEvent } from 'react';
+import type { FocusEvent } from 'react';
 
-import { Box, HStack, Icon, Kbd, ProgressCircle, Separator, Stack, Text } from '@chakra-ui/react';
+import { Box, HStack, Icon, Kbd, ProgressCircle, Separator, Spinner, Stack, Text } from '@chakra-ui/react';
 import { getDeterminateProgressFraction } from '@features/queue/contracts';
 import { Button } from '@platform/ui/Button';
 import { Tooltip } from '@platform/ui/Tooltip';
@@ -18,12 +18,15 @@ import { TopbarShortcutKeys } from './TopbarShortcutKeys';
 import { useTopbarShortcutBinding } from './useTopbarShortcut';
 
 const TOOLTIP_CONTENT_PROPS = { p: '0' };
+
+/**
+ * Invoke sits on top of its attached neighbours with full control corners; the iterations field and routing button
+ * each run a tail of their frame under those corners so they read as a continuing border, not a notch.
+ * Doubled specificity outranks the attached Group's `!important` corner reset.
+ */
+const INVOKE_BUTTON_CSS = { '&&': { borderRadius: 'control !important' } } as const;
 /** The hint inherits the button's text color; its frame is that color, faded. */
 const SHORTCUT_BORDER = 'color-mix(in oklab, currentColor 40%, transparent)';
-
-type ProgressCircleRootProps = ComponentProps<typeof ProgressCircle.Root>;
-// Cast the repository's 3xs theme extension, which generated Chakra types do not yet include.
-const ICON_RING_SIZE = '3xs' as ProgressCircleRootProps['size'];
 
 const compactBlockingReason = (reason: string, noNodesLabel: string): string => {
   if (reason === 'The project graph has no nodes. Add nodes in the Workflow view.') {
@@ -89,10 +92,11 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
                 })
         }
         colorPalette="brand"
+        css={INVOKE_BUTTON_CSS}
         cursor={canInvoke ? undefined : 'not-allowed'}
         flexShrink={0}
         opacity={canInvoke ? undefined : 0.55}
-        size="sm"
+        size="lg"
         onBlur={handleBlur}
         onClick={canInvoke ? handleClick : undefined}
         onFocus={handleFocus}
@@ -101,20 +105,23 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
         zIndex="2"
       >
         <Box alignItems="center" boxSize="3.5" display="flex" justifyContent="center" position="relative">
-          {iconMode.mode === 'progress' ? (
-            <ProgressCircle.Root size={ICON_RING_SIZE} value={iconMode.value === null ? null : iconMode.value * 100}>
+          {iconMode.mode === 'play' ? (
+            <Icon as={PlayIcon} boxSize="3.5" />
+          ) : iconMode.value === null ? (
+            // The app-wide spinner, not the ring's indeterminate sweep, for unknown progress.
+            <Spinner borderWidth="1.5px" boxSize="3.5" color="bg" />
+          ) : (
+            <ProgressCircle.Root size="xs" value={iconMode.value * 100}>
               <ProgressCircle.Circle>
                 <ProgressCircle.Track stroke="bg/40" />
                 <ProgressCircle.Range stroke="bg" strokeLinecap="round" />
               </ProgressCircle.Circle>
             </ProgressCircle.Root>
-          ) : (
-            <Icon as={PlayIcon} boxSize="3.5" />
           )}
         </Box>
         {t('topbar.invoke.invoke')}
         {shortcutParts ? (
-          <Kbd css={HIDE_BELOW_HINT_WIDTH} variant="outline" borderColor={SHORTCUT_BORDER} color="inherit" size="sm">
+          <Kbd css={HIDE_BELOW_HINT_WIDTH} variant="outline" borderColor={SHORTCUT_BORDER} color="inherit">
             <TopbarShortcutKeys parts={shortcutParts} />
           </Kbd>
         ) : null}
@@ -142,7 +149,7 @@ const InvokeTooltipContent = ({ shortcutParts, state }: { shortcutParts: string[
   return (
     <Stack gap="1.5" minW="14rem" p="2">
       <HStack justify="space-between">
-        <Text fontSize="xs" fontWeight="800">
+        <Text fontSize="md" fontWeight="800">
           {isPreparing
             ? t('topbar.invoke.preparing')
             : isValid
@@ -150,34 +157,34 @@ const InvokeTooltipContent = ({ shortcutParts, state }: { shortcutParts: string[
               : t('topbar.invoke.unableToQueue')}
         </Text>
         {shortcutParts ? (
-          <Kbd size="sm" variant="subtle">
+          <Kbd variant="subtle">
             <TopbarShortcutKeys parts={shortcutParts} />
           </Kbd>
         ) : null}
       </HStack>
-      <Text color="fg.muted" fontSize="xs">
+      <Text color="fg.muted" fontSize="md">
         {summary}
       </Text>
       <Separator borderColor="border.subtle" />
       {isPreparing ? (
-        <Text color="fg.muted" fontSize="xs">
+        <Text color="fg.muted" fontSize="md">
           {t('topbar.invoke.preparing')}
         </Text>
       ) : blockingReasons.length > 0 ? (
         <Stack gap="1">
           {blockingReasons.map((reason) => (
             <HStack key={reason} align="start" gap="1.5">
-              <Text color="fg.subtle" fontSize="xs" lineHeight="1.35">
+              <Text color="fg.subtle" fontSize="md" lineHeight="1.35">
                 •
               </Text>
-              <Text color="fg.muted" fontSize="xs" lineHeight="1.35">
+              <Text color="fg.muted" fontSize="md" lineHeight="1.35">
                 {compactBlockingReason(reason, t('topbar.invoke.noNodes'))}
               </Text>
             </HStack>
           ))}
         </Stack>
       ) : (
-        <Text color="fg.muted" fontSize="xs">
+        <Text color="fg.muted" fontSize="md">
           {t('topbar.invoke.addingImagesTo', { destination })}
         </Text>
       )}

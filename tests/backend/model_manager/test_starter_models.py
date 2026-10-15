@@ -26,7 +26,7 @@ def _krea2_bundle_by_source() -> dict[str, StarterModel]:
 
 def test_krea2_bundle_is_registered() -> None:
     assert BaseModelType.Krea2 in STARTER_BUNDLES
-    assert STARTER_BUNDLES[BaseModelType.Krea2].name == "Krea-2"
+    assert STARTER_BUNDLES[BaseModelType.Krea2].name == "Krea 2"
 
 
 def test_krea2_bundle_contains_diffusers_gguf_and_standalone_components() -> None:

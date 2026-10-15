@@ -11,8 +11,8 @@ const DOC = { height: 100, width: 100 };
 const rectBounds = (x: number, y: number, w: number, h: number): Rect => ({ height: h, width: w, x, y });
 const fakePath = (id: string): Path2D => ({ id }) as unknown as Path2D;
 
-const createHarness = () => {
-  const history = createHistory();
+const createHarness = (options: Parameters<typeof createHistory>[0] = {}) => {
+  const history = createHistory(options);
   const onChange = vi.fn();
   const selection = withSelectionHistory(
     createSelectionState({
@@ -38,20 +38,20 @@ describe('withSelectionHistory', () => {
     expect(history.entries().past).toEqual(['Select all', 'Subtract from selection', 'Invert selection', 'Deselect']);
   });
 
-  it('undo and redo replay the captured selections without recording again', () => {
+  it('undo and redo replay the captured selections without recording again', async () => {
     const { history, selection } = createHarness();
     selection.commit({ bounds: rectBounds(10, 10, 20, 20), op: 'replace', path: fakePath('a') });
     selection.commit({ bounds: rectBounds(40, 40, 10, 10), op: 'add', path: fakePath('b') });
     expect(selection.bounds()).toEqual(rectBounds(10, 10, 40, 40));
 
-    history.undo();
+    await history.undo();
     expect(selection.bounds()).toEqual(rectBounds(10, 10, 20, 20));
     expect(selection.antsPaths()).toHaveLength(1);
-    history.undo();
+    await history.undo();
     expect(selection.hasSelection()).toBe(false);
     expect(selection.antsPaths()).toEqual([]);
-    history.redo();
-    history.redo();
+    await history.redo();
+    await history.redo();
     expect(selection.bounds()).toEqual(rectBounds(10, 10, 40, 40));
     expect(selection.antsPaths()).toHaveLength(2);
     expect(history.entries()).toEqual({ future: [], past: ['Select', 'Add to selection'] });
@@ -64,7 +64,7 @@ describe('withSelectionHistory', () => {
     expect(history.canUndo()).toBe(false);
   });
 
-  it('records a pixel-mask replacement as Select object and undoes it to the prior selection', () => {
+  it('records a pixel-mask replacement as Select object and undoes it to the prior selection', async () => {
     const { history, selection } = createHarness();
     const backend = createTestStubRasterBackend();
     const surface = backend.createSurface(2, 2);
@@ -80,7 +80,7 @@ describe('withSelectionHistory', () => {
 
     expect(history.entries().past).toEqual(['Select object']);
     expect(selection.bounds()).toEqual(rectBounds(7, -3, 2, 2));
-    history.undo();
+    await history.undo();
     expect(selection.hasSelection()).toBe(false);
   });
 
@@ -99,5 +99,36 @@ describe('withSelectionHistory', () => {
     selection.invert(rectBounds(0, 0, 100, 100));
     // The inverted plane is new; the select-all plane it started from was already charged.
     expect(history.byteSize()).toBe(2 * 100 * 100);
+  });
+
+  it('rolls a change back exactly when its step could never be kept', () => {
+    // A 100×100 selection plane alone exceeds the whole budget.
+    const { history, selection } = createHarness({ byteBudget: 100 });
+
+    selection.selectAll(rectBounds(0, 0, 100, 100));
+    expect(selection.hasSelection()).toBe(false);
+    expect(history.entries().past).toEqual([]);
+  });
+
+  it('refuses a change while another step replays', async () => {
+    const { history, selection } = createHarness();
+    let finish = (): void => undefined;
+    history.admit(0)!.publish({
+      bytes: 0,
+      heldAssetRefs: { images: [], videos: [] },
+      label: 'Slow step',
+      redo: () => undefined,
+      undo: () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    });
+    const replay = history.undo();
+
+    selection.selectAll(rectBounds(0, 0, 100, 100));
+    expect(selection.hasSelection()).toBe(false);
+    finish();
+    await replay;
+    expect(history.entries()).toEqual({ future: ['Slow step'], past: [] });
   });
 });

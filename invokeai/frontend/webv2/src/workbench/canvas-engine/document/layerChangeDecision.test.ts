@@ -25,7 +25,6 @@ const decide = (overrides: Partial<LayerChangeInput> = {}) =>
     hasTransformSession: false,
     isSelfEcho: () => false,
     layer: layerOf(),
-    previousImageName: undefined,
     sourceChanged: false,
     ...overrides,
   });
@@ -33,16 +32,6 @@ const decide = (overrides: Partial<LayerChangeInput> = {}) =>
 describe('a layer that is gone', () => {
   it('is reported removed', () => {
     expect(decide({ layer: undefined }).kind).toBe('removed');
-  });
-
-  it('releases the image it referenced', () => {
-    expect(decide({ layer: undefined, previousImageName: 'old.png' })).toMatchObject({
-      releaseImageName: 'old.png',
-    });
-  });
-
-  it('releases nothing when it referenced no image', () => {
-    expect(decide({ layer: undefined })).toMatchObject({ releaseImageName: null });
   });
 
   it.each([
@@ -126,15 +115,6 @@ describe('a genuine source swap', () => {
     const layer = layerOf({ source: { image: { height: 8, imageName: 'b.png', width: 8 }, type: 'image' } });
     const decision = decide({ layer, sourceChanged: true });
     expect(decision).toMatchObject({ thumbnailKey: getLayerThumbnailDisplayKey(layer) });
-  });
-
-  it('releases the image it previously referenced, echo or not', () => {
-    expect(decide({ previousImageName: 'old.png', sourceChanged: true })).toMatchObject({
-      releaseImageName: 'old.png',
-    });
-    expect(decide({ isSelfEcho: () => true, previousImageName: 'old.png', sourceChanged: true })).toMatchObject({
-      releaseImageName: 'old.png',
-    });
   });
 
   it('re-keys the thumbnail even for an echo it will not re-rasterize', () => {

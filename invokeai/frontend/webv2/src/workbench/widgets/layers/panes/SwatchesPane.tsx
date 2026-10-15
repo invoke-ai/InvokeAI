@@ -1,11 +1,12 @@
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from 'react';
 
-import { chakra, Flex, HStack, Stack, Text } from '@chakra-ui/react';
+import { chakra, Flex, HStack, Separator, Stack, Text } from '@chakra-ui/react';
 import { IconButton } from '@platform/ui/Button';
 import { formatHexColor, normalizeHex, parseHexColor } from '@platform/ui/color';
 import { DEFAULT_COLOR_SWATCHES, recordRecentColor, useRecentColors } from '@platform/ui/colorPickerStore';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { Tooltip } from '@platform/ui/Tooltip';
+import { useCanvasEngine } from '@workbench/canvas-operations/react';
 import { MAX_COLOR_PALETTE_SIZE } from '@workbench/widgets/canvas/color-system/colorPair';
 import {
   useActiveColorCommands,
@@ -14,10 +15,11 @@ import {
   useColorPalette,
 } from '@workbench/widgets/canvas/color-system/useActiveColors';
 import { useMaskTintEditor } from '@workbench/widgets/canvas/color-system/useMaskTintEditor';
-import { useCanvasEngine } from '@workbench/widgets/canvas/useCanvasEngine';
 import { PlusIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+
+const SHELF_SEPARATOR = <Separator borderColor="border.subtle" />;
 
 /** Share default, account-recent, and project swatches; picks update the same active pair as Color. */
 export const SwatchesPane = () => {
@@ -59,7 +61,7 @@ export const SwatchesPane = () => {
           aria-label={t('widgets.layers.colorPane.addToPalette')}
           color="fg.muted"
           disabled={!canAddToPalette}
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={addToPalette}
         >
@@ -72,7 +74,7 @@ export const SwatchesPane = () => {
 
   return (
     <Scrollable h="full">
-      <Stack gap="2.5" p="2">
+      <Stack gap="2.5" p="2" separator={SHELF_SEPARATOR}>
         <SwatchShelf
           activeHex={activeHex}
           colors={DEFAULT_COLOR_SWATCHES}
@@ -117,7 +119,7 @@ const SwatchShelf = ({
 }) => (
   <Stack gap="1.5">
     <HStack justify="space-between" minH="5">
-      <Text color="fg.muted" fontSize="2xs" fontWeight="600" textTransform="uppercase">
+      <Text color="fg.muted" fontSize="xs" fontWeight="600" textTransform="uppercase">
         {label}
       </Text>
       {trailing}

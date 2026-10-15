@@ -5,6 +5,9 @@ from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
 from pydantic_core import PydanticCustomError
 
+# The longest address SMTP carries (RFC 5321), and the longest email-validator accepts.
+MAX_EMAIL_LENGTH = 254
+
 
 def validate_email_with_special_domains(email: str) -> str:
     """Validate email address, allowing special-use domains like .local for testing.
@@ -53,6 +56,13 @@ def validate_email_with_special_domains(email: str) -> str:
                 raise PydanticCustomError(
                     "value_error",
                     "Email address must have both local and domain parts",
+                )
+
+            # email-validator stops before its length check when it refuses the domain.
+            if len(email) > MAX_EMAIL_LENGTH:
+                raise PydanticCustomError(
+                    "value_error",
+                    f"Email address must be at most {MAX_EMAIL_LENGTH} characters",
                 )
 
             # Allow localhost and domains with dots

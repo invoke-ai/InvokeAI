@@ -38,6 +38,11 @@ export interface WorkflowHistoryEntry {
   mergedAt?: string;
   /** Global order across the project's histories; the aggregate cap evicts the lowest first. */
   sequence: number;
+  /**
+   * The library source the copy had before the step, for steps that move it (a library replace); null means none.
+   * Undo restores it with the document, so the copy never claims a revision its graph is not based on.
+   */
+  source?: ProjectWorkflowSource | null;
 }
 
 export interface WorkflowEditHistory {
@@ -390,6 +395,40 @@ export const setProjectWorkflowSource = <Session extends ProjectWorkflowSession>
     return source ? { ...rest, source } : rest;
   });
 
+/**
+ * Puts a freshly loaded document in a copy's place as one undoable step. The copy keeps its id and name, and its
+ * source moves to the revision it now holds.
+ */
+export const replaceProjectWorkflowDocument = <Session extends ProjectWorkflowSession>(
+  project: Session,
+  workflowId: string,
+  document: ProjectGraphState,
+  { label, source }: { label: string; source: ProjectWorkflowSource },
+  timestamp = new Date().toISOString()
+): Session => {
+  const entry = findProjectWorkflow(project, workflowId);
+
+  if (!entry) {
+    return project;
+  }
+
+  const withHistory = pushHistory(
+    project,
+    workflowId,
+    entry.document,
+    label,
+    undefined,
+    timestamp,
+    entry.source ?? null
+  );
+
+  return replaceEntry(withHistory, workflowId, (current) => ({
+    ...current,
+    document: { ...document, id: workflowId, name: current.document.name },
+    source,
+  }));
+};
+
 /** Records a successful run's output. An older submission that finishes later never replaces a newer one. */
 export const recordProjectWorkflowRun = <Session extends ProjectWorkflowSession>(
   project: Session,
@@ -467,7 +506,8 @@ const pushHistory = <Session extends ProjectWorkflowSession>(
   previous: ProjectGraphState,
   label: string,
   mergeKey: string | undefined,
-  timestamp: string
+  timestamp: string,
+  previousSource?: ProjectWorkflowSource | null
 ): Session => {
   const history = getProjectWorkflowHistory(project, workflowId);
   const last = history.past.at(-1);
@@ -498,6 +538,7 @@ const pushHistory = <Session extends ProjectWorkflowSession>(
     label,
     ...(mergeKey ? { mergeKey } : {}),
     sequence: nextHistorySequence,
+    ...(previousSource !== undefined ? { source: previousSource } : {}),
   };
 
   return {
@@ -545,6 +586,17 @@ export const applyProjectWorkflowAction = <Session extends ProjectWorkflowSessio
   };
 };
 
+/** Puts a history entry's document back, and its source when the step moved it. */
+const restoreHistoryEntry = (current: ProjectWorkflowEntry, step: WorkflowHistoryEntry): ProjectWorkflowEntry => {
+  if (step.source === undefined) {
+    return { ...current, document: step.document };
+  }
+
+  const { source: _moved, ...rest } = current;
+
+  return step.source ? { ...rest, document: step.document, source: step.source } : { ...rest, document: step.document };
+};
+
 export const undoProjectWorkflow = <Session extends ProjectWorkflowSession>(
   project: Session,
   workflowId: string,
@@ -566,8 +618,9 @@ export const undoProjectWorkflow = <Session extends ProjectWorkflowSession>(
     id: `redo-${nextHistorySequence.toString(36)}`,
     label: undone.label,
     sequence: nextHistorySequence,
+    ...(undone.source !== undefined ? { source: entry.source ?? null } : {}),
   };
-  const restored = replaceEntry(project, workflowId, (current) => ({ ...current, document: undone.document }));
+  const restored = replaceEntry(project, workflowId, (current) => restoreHistoryEntry(current, undone));
 
   return {
     ...restored,
@@ -602,8 +655,9 @@ export const redoProjectWorkflow = <Session extends ProjectWorkflowSession>(
     id: `undo-${nextHistorySequence.toString(36)}`,
     label: redone.label,
     sequence: nextHistorySequence,
+    ...(redone.source !== undefined ? { source: entry.source ?? null } : {}),
   };
-  const restored = replaceEntry(project, workflowId, (current) => ({ ...current, document: redone.document }));
+  const restored = replaceEntry(project, workflowId, (current) => restoreHistoryEntry(current, redone));
 
   return {
     ...restored,

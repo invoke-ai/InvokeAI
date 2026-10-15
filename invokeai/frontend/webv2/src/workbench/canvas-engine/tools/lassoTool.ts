@@ -13,26 +13,26 @@ import { selectionOpFor } from '@workbench/canvas-engine/selection/selectionOpMo
 import type { Tool, ToolContext } from './tool';
 
 import {
+  extendFreehandTrace,
+  finishFreehandTrace,
   MIN_POLYLINE_POINTS,
   movePolyline,
   polylinePreview,
   pressPolyline,
+  startFreehandTrace,
   startPolyline,
+  type FreehandTrace,
   type PolylineSession,
 } from './polylineSession';
 
 /** Bit for the primary (usually left) mouse button in `PointerEvent.buttons`. */
 const PRIMARY_BUTTON = 1;
 
-/** Minimum document-space gap between stored polygon points (input decimation). */
-export const LASSO_MIN_POINT_DISTANCE = 2;
-
 const distance = (a: Vec2, b: Vec2): number => Math.hypot(a.x - b.x, a.y - b.y);
 
 /** A freehand drag in progress. */
-interface FreehandSession {
+interface FreehandSession extends FreehandTrace {
   kind: 'freehand';
-  points: Vec2[];
 }
 
 /** A polygon vertex-placing session spanning multiple clicks. */
@@ -48,14 +48,6 @@ export const createLassoTool = (): Tool => {
 
   const reset = (): void => {
     session = null;
-  };
-
-  /** Appends a point if it is far enough from the last stored one. */
-  const pushDecimated = (points: Vec2[], p: Vec2): void => {
-    const last = points[points.length - 1];
-    if (!last || distance(last, p) >= LASSO_MIN_POINT_DISTANCE) {
-      points.push({ x: p.x, y: p.y });
-    }
   };
 
   /** Publishes the in-progress outline for the overlay. */
@@ -144,7 +136,7 @@ export const createLassoTool = (): Tool => {
         if (session) {
           return;
         }
-        session = { kind: 'freehand', points: [{ x: input.documentPoint.x, y: input.documentPoint.y }] };
+        session = { ...startFreehandTrace(input), kind: 'freehand' };
         publishPreview(ctx);
         return;
       }
@@ -174,9 +166,7 @@ export const createLassoTool = (): Tool => {
           ctx.updateCursor();
         }
       } else {
-        for (const sample of batch) {
-          pushDecimated(session.points, sample.documentPoint);
-        }
+        extendFreehandTrace(session, batch);
       }
       publishPreview(ctx);
     },
@@ -186,8 +176,7 @@ export const createLassoTool = (): Tool => {
       if (!session || session.kind === 'polygon') {
         return;
       }
-      pushDecimated(session.points, input.documentPoint);
-      const polygon = session.points.slice();
+      const polygon = finishFreehandTrace(session, input);
       reset();
       clearPreview(ctx);
       commit(ctx, polygon, input.modifiers);

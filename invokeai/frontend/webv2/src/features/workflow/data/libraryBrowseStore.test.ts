@@ -15,6 +15,7 @@ const api = vi.hoisted(() => ({
 const libraryCache = vi.hoisted(() => ({
   getLibraryWorkflowCached: vi.fn(),
   onWorkflowLibraryCacheInvalidated: vi.fn(),
+  WorkflowLibraryChangedDuringReadError: class extends Error {},
 }));
 
 const templates = vi.hoisted(() => ({

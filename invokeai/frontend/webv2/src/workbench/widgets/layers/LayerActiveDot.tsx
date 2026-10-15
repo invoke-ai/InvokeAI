@@ -5,6 +5,24 @@ import { ToggleDot } from '@platform/ui';
 
 export const ROW_SELECTION_FOCUS = { outline: '2px solid', outlineColor: 'accent.solid', outlineOffset: '-2px' };
 
+/**
+ * Tree rows keep a gap below their surface (`pb="0.5"`); the ring frames the surface, not the gap, so the row's
+ * content stays centred inside it.
+ */
+export const TREE_ROW_FOCUS = {
+  _after: {
+    borderRadius: 'sm',
+    bottom: '0.5',
+    boxShadow: 'inset 0 0 0 2px {colors.accent.solid}',
+    content: '""',
+    insetInline: '0',
+    pointerEvents: 'none',
+    position: 'absolute',
+    top: '0',
+  },
+  outline: 'none',
+};
+
 const DOT_BASE = {
   borderRadius: 'full',
   borderWidth: '1px',

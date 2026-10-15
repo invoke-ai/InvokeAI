@@ -1,8 +1,8 @@
 import type { GalleryBoard } from '@features/gallery/core/types';
 
 import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
-import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
-import { parseGalleryItemKey, shouldStarSelection } from '@features/gallery/core/items';
+import { getGalleryBoardDestinationGroups, getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
+import { parseGalleryItemKey } from '@features/gallery/core/items';
 import { IconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
 import { Tooltip } from '@platform/ui/Tooltip';
@@ -12,13 +12,13 @@ import { useTranslation } from 'react-i18next';
 
 import { BoardCover } from './GalleryBoardCover';
 import { useMenuTriggerIds } from './galleryMenuIds';
-import { useGalleryWidget } from './GalleryWidgetContext';
+import { useGallerySelectionStarred, useGalleryWidget } from './GalleryWidgetContext';
 
 const MOVE_MENU_POSITIONING = { placement: 'top-end' } as const;
 
 export const GallerySelectionBar = () => {
   const { t } = useTranslation();
-  const { gallery, itemActions, loadedItems } = useGalleryWidget();
+  const { gallery, itemActions, loadedItems, projectId, projectName, projectNames } = useGalleryWidget();
   const moveTriggerIds = useMenuTriggerIds();
   const selectedItemKeys = gallery.selectedItemKeys;
   const selectionCount = selectedItemKeys.length;
@@ -27,7 +27,7 @@ export const GallerySelectionBar = () => {
 
   // Star acts on the whole selection: only "unstar all" when every selected
   // item is already starred, matching the `.` hotkey.
-  const shouldStar = useMemo(() => shouldStarSelection(loadedItems, selectedItemRefs), [loadedItems, selectedItemRefs]);
+  const shouldStar = useGallerySelectionStarred(selectedItemRefs, loadedItems);
 
   const moveTargets = useMemo(
     () =>
@@ -35,6 +35,10 @@ export const GallerySelectionBar = () => {
         (board) => board.kind !== 'date' && !board.archived && board.id !== gallery.selectedBoardId
       ),
     [gallery.boards, gallery.selectedBoardId]
+  );
+  const moveGroups = useMemo(
+    () => getGalleryBoardDestinationGroups({ boards: moveTargets, projectId, projectName, projectNames, t }),
+    [moveTargets, projectId, projectName, projectNames, t]
   );
 
   const handleToggleStarred = useCallback(
@@ -77,11 +81,11 @@ export const GallerySelectionBar = () => {
       aria-label={t('widgets.gallery.selectionActions')}
       w="full"
     >
-      <Text color="fg.muted" fontSize="xs" fontVariantNumeric="tabular-nums" me="auto">
+      <Text color="fg.muted" fontSize="md" fontVariantNumeric="tabular-nums" me="auto">
         {t('widgets.gallery.selectionCount', { count: selectionCount })}
       </Text>
       <Tooltip content={starLabel}>
-        <IconButton aria-label={starLabel} size="2xs" variant="ghost" onClick={handleToggleStarred}>
+        <IconButton aria-label={starLabel} size="sm" variant="ghost" onClick={handleToggleStarred}>
           <Icon as={StarIcon} boxSize="3.5" fill={shouldStar ? 'none' : 'currentColor'} />
         </IconButton>
       </Tooltip>
@@ -91,7 +95,7 @@ export const GallerySelectionBar = () => {
             <IconButton
               aria-label={t('widgets.gallery.moveSelectionToBoard')}
               disabled={moveTargets.length === 0}
-              size="2xs"
+              size="sm"
               variant="ghost"
             >
               <Icon as={FolderInputIcon} boxSize="3.5" />
@@ -101,8 +105,13 @@ export const GallerySelectionBar = () => {
         <Portal>
           <Menu.Positioner>
             <MenuContent maxH="18rem" minW="12rem" overflowY="auto">
-              {moveTargets.map((board) => (
-                <MoveTargetItem key={board.id} board={board} onSelect={handleMoveToBoard} />
+              {moveGroups.map((group) => (
+                <Menu.ItemGroup key={group.id}>
+                  <Menu.ItemGroupLabel>{group.label}</Menu.ItemGroupLabel>
+                  {group.boards.map((board) => (
+                    <MoveTargetItem key={board.id} board={board} onSelect={handleMoveToBoard} />
+                  ))}
+                </Menu.ItemGroup>
               ))}
             </MenuContent>
           </Menu.Positioner>
@@ -111,7 +120,7 @@ export const GallerySelectionBar = () => {
       <Tooltip content={t('widgets.gallery.downloadSelection')}>
         <IconButton
           aria-label={t('widgets.gallery.downloadSelection')}
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={handleDownload}
         >
@@ -122,7 +131,7 @@ export const GallerySelectionBar = () => {
         <IconButton
           aria-label={t('widgets.gallery.deleteSelection')}
           colorPalette="red"
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={handleDelete}
         >

@@ -102,6 +102,10 @@ class Config_Base(ABC, BaseModel):
     """Set of all non-abstract subclasses of Config_Base, for use during model probing. In other words, this is the set
     of all known model config types."""
 
+    DECODES_GGUF_Q8_CR: ClassVar[bool] = False
+    """Whether this config's loader decodes ComfyUI-GGUF ``Q8_CR`` (int8 convrot) layers. Off by default, so a GGUF
+    config refuses those files at install until its loader asks ``gguf_sd_loader`` to decode them."""
+
     model_config = ConfigDict(
         validate_assignment=True,
         json_schema_serialization_defaults_required=True,

@@ -1,12 +1,19 @@
 import type {
   CanvasDocumentContractV3,
+  CanvasGroupContract,
   CanvasLayerContract,
   CanvasStagingAreaContractV2,
   CanvasStateContractV3,
 } from '@workbench/canvas-engine/contracts';
 
-import { getDocumentIndex, type CanvasDocumentIndex, type CanvasNodeEntry } from './documentIndex';
-import { isGroupNode } from './documentTree';
+import {
+  getDocumentIndex,
+  valueEditBetween,
+  type CanvasDocumentIndex,
+  type CanvasNodeEntry,
+  type CanvasValueEdit,
+} from './documentIndex';
+import { collectSubtreeLeaves, isGroupNode } from './documentTree';
 
 /** The minimal store shape the mirror depends on (a superset of `WorkbenchStore`). */
 export interface DocumentMirrorStore {
@@ -18,11 +25,11 @@ export interface DocumentMirrorStore {
 /** Callbacks fired when the mirrored document changes. */
 export interface DocumentMirrorCallbacks {
   /**
-   * Reports leaf or ancestor-effective changes. `sourceChanged` contains added leaves and changed raster/control
-   * sources or mask bitmaps whose caches are stale. Property, transform and ancestor-flag changes retain cached
-   * pixels.
+   * Reports leaf or ancestor-effective changes in document order. `sourceChanged` contains added leaves and changed
+   * raster/control sources or mask bitmaps whose caches are stale. Property, transform and ancestor-flag changes
+   * retain cached pixels. `restructured` is false for value edits, which add, remove and move nothing.
    */
-  onLayersChanged(changed: string[], sourceChanged: string[]): void;
+  onLayersChanged(changed: string[], sourceChanged: string[], restructured: boolean): void;
   /**
    * Leaves changed ONLY by an ancestor group's adjustment stack: recomposite
    * without `onLayersChanged`'s destructive reactions (float and pixel-edit
@@ -42,6 +49,8 @@ export interface DocumentMirrorCallbacks {
    * session cleanup.
    */
   onSelectionChanged?(selectedLayerId: string | null): void;
+  /** Any change to the mirrored document, after the callbacks above have reacted to it (even when one threw). */
+  onDocumentChanged?(): void;
 }
 
 /** The imperative mirror handle. */
@@ -69,6 +78,15 @@ const rasterSourceRef = (layer: CanvasLayerContract): unknown =>
 const effectiveKey = (entry: CanvasNodeEntry): string =>
   `${entry.ancestorsEnabled ? 1 : 0}${entry.ancestorsLocked ? 1 : 0}${entry.ancestorsHidden ? 1 : 0}`;
 
+const diagnostics = { forestDiffs: 0 };
+
+/** Whole-forest diffs: structural edits and replacements; value edits never cost one. */
+export const getForestDiffCount = (): number => diagnostics.forestDiffs;
+
+export const resetForestDiffCount = (): void => {
+  diagnostics.forestDiffs = 0;
+};
+
 interface ForestDiff {
   changed: string[];
   sourceChanged: string[];
@@ -82,6 +100,7 @@ interface ForestDiff {
  * by ancestors.
  */
 const diffForests = (prev: CanvasDocumentIndex, next: CanvasDocumentIndex): ForestDiff => {
+  diagnostics.forestDiffs += 1;
   const changed = new Set<string>();
   const sourceChanged = new Set<string>();
   const recompositeOnly = new Set<string>();
@@ -140,6 +159,68 @@ const diffForests = (prev: CanvasDocumentIndex, next: CanvasDocumentIndex): Fore
   };
 };
 
+const groupFlagsChanged = (before: CanvasGroupContract, after: CanvasGroupContract): boolean =>
+  before.isEnabled !== after.isEnabled ||
+  before.isLocked !== after.isLocked ||
+  (before.isHidden === true) !== (after.isHidden === true);
+
+/**
+ * Diffs a value edit from its recorded node changes: changed leaves, the subtree leaves whose inherited flags
+ * moved, and the subtree leaves of groups whose adjustments, opacity or blend changed. Structure is unchanged.
+ */
+const diffValueEdit = (prev: CanvasDocumentIndex, next: CanvasDocumentIndex, edit: CanvasValueEdit): ForestDiff => {
+  const changed = new Set<string>();
+  const sourceChanged = new Set<string>();
+  const reflagged: string[] = [];
+  const adjusted: string[] = [];
+  for (const [id, { after, before }] of edit) {
+    // Folded steps can hand a node back unchanged.
+    if (before === after) {
+      continue;
+    }
+    if (isGroupNode(after) && isGroupNode(before)) {
+      if (groupFlagsChanged(before, after)) {
+        reflagged.push(id);
+      }
+      if (
+        before.adjustments !== after.adjustments ||
+        before.opacity !== after.opacity ||
+        before.blendMode !== after.blendMode
+      ) {
+        adjusted.push(id);
+      }
+    } else if (!isGroupNode(after) && !isGroupNode(before)) {
+      changed.add(id);
+      if (rasterSourceRef(before) !== rasterSourceRef(after)) {
+        sourceChanged.add(id);
+      }
+    }
+  }
+  for (const groupId of reflagged) {
+    for (const leaf of collectSubtreeLeaves(next.byId.get(groupId)!.node)) {
+      if (!changed.has(leaf.id) && effectiveKey(prev.byId.get(leaf.id)!) !== effectiveKey(next.byId.get(leaf.id)!)) {
+        changed.add(leaf.id);
+      }
+    }
+  }
+  const recompositeOnly = new Set<string>();
+  for (const groupId of adjusted) {
+    for (const leaf of collectSubtreeLeaves(next.byId.get(groupId)!.node)) {
+      if (!changed.has(leaf.id)) {
+        recompositeOnly.add(leaf.id);
+      }
+    }
+  }
+  const inDocumentOrder = (ids: Set<string>): string[] =>
+    [...ids].sort((left, right) => next.byId.get(left)!.order - next.byId.get(right)!.order);
+  return {
+    changed: inDocumentOrder(changed),
+    recompositeOnly: inDocumentOrder(recompositeOnly),
+    restructured: false,
+    sourceChanged: inDocumentOrder(sourceChanged),
+  };
+};
+
 /**
  * Creates a document mirror bound to `projectId`. Subscribes immediately and seeds the last-seen
  * references from the current state, so no spurious callback fires on creation.
@@ -176,36 +257,42 @@ export const createDocumentMirror = (
       const prevSelectedLayerId = prevDoc?.selectedLayerId ?? null;
       lastDoc = doc;
       lastRevision = revision;
-
-      if (!prevDoc || !doc) {
-        callbacks.onDocumentReplaced();
-      } else if (
-        revision !== prevRevision ||
-        prevDoc.width !== doc.width ||
-        prevDoc.height !== doc.height ||
-        prevDoc.background !== doc.background
-      ) {
-        callbacks.onDocumentReplaced();
-      } else {
-        if (prevDoc.stacks !== doc.stacks) {
-          const diff = diffForests(getDocumentIndex(prevDoc), getDocumentIndex(doc));
-          if (diff.changed.length > 0) {
-            callbacks.onLayersChanged(diff.changed, diff.sourceChanged);
-          } else if (diff.restructured) {
-            callbacks.onLayerOrderChanged();
+      try {
+        if (!prevDoc || !doc) {
+          callbacks.onDocumentReplaced();
+        } else if (
+          revision !== prevRevision ||
+          prevDoc.width !== doc.width ||
+          prevDoc.height !== doc.height ||
+          prevDoc.background !== doc.background
+        ) {
+          callbacks.onDocumentReplaced();
+        } else {
+          if (prevDoc.stacks !== doc.stacks) {
+            const edit = valueEditBetween(prevDoc.stacks, doc.stacks);
+            const prevIndex = getDocumentIndex(prevDoc);
+            const nextIndex = getDocumentIndex(doc);
+            const diff = edit ? diffValueEdit(prevIndex, nextIndex, edit) : diffForests(prevIndex, nextIndex);
+            if (diff.changed.length > 0) {
+              callbacks.onLayersChanged(diff.changed, diff.sourceChanged, diff.restructured);
+            } else if (diff.restructured) {
+              callbacks.onLayerOrderChanged();
+            }
+            if (diff.recompositeOnly.length > 0) {
+              callbacks.onLayersRecomposite?.(diff.recompositeOnly);
+            }
           }
-          if (diff.recompositeOnly.length > 0) {
-            callbacks.onLayersRecomposite?.(diff.recompositeOnly);
+          if (!bboxEqual(prevDoc.bbox, doc.bbox)) {
+            callbacks.onBboxChanged();
           }
         }
-        if (!bboxEqual(prevDoc.bbox, doc.bbox)) {
-          callbacks.onBboxChanged();
-        }
-      }
 
-      const selectedLayerId = doc?.selectedLayerId ?? null;
-      if (selectedLayerId !== prevSelectedLayerId) {
-        callbacks.onSelectionChanged?.(selectedLayerId);
+        const selectedLayerId = doc?.selectedLayerId ?? null;
+        if (selectedLayerId !== prevSelectedLayerId) {
+          callbacks.onSelectionChanged?.(selectedLayerId);
+        }
+      } finally {
+        callbacks.onDocumentChanged?.();
       }
     }
 

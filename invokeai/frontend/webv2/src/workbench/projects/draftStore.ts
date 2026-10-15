@@ -58,6 +58,17 @@ export interface ProjectDraftSummary {
 
 export type ProjectDraftKey = [projectId: string, editorSessionId: string];
 
+/**
+ * The lineage's writer has settled its unload journal through `generation`: the server or the lineage's draft holds a
+ * document at least that new, or the writer discarded it. Entries of that writer at or below it are obsolete even
+ * when they outlive their deletion. A mark of an earlier writer means nothing. Optional, so claims written before it
+ * existed read as having settled nothing.
+ */
+export interface ProjectUnloadJournalSettlement {
+  generation: number;
+  writerToken: string;
+}
+
 export type ProjectDraftWriterClaim =
   | {
       adoptedByEditorSessionId?: string;
@@ -68,6 +79,7 @@ export type ProjectDraftWriterClaim =
       retargetedToProjectId?: string;
       retargetedToRevision?: number;
       state: 'fenced';
+      unloadJournalSettled?: ProjectUnloadJournalSettlement;
       updatedAt: number;
       writerToken: string;
     }
@@ -76,6 +88,7 @@ export type ProjectDraftWriterClaim =
       metadataRevision: number;
       projectId: string;
       state: 'active';
+      unloadJournalSettled?: ProjectUnloadJournalSettlement;
       updatedAt: number;
       writerToken: string;
     };
@@ -143,6 +156,88 @@ export type ProjectDraftCopyReservationResult =
   | (ProjectDraftCopyReservation & { kind: 'reserved' })
   | { kind: 'corrupt' | 'fenced' | 'missing' | 'quota' | 'stale' | 'unavailable' };
 
+/**
+ * A document a writer had not staged when its page was hidden or unloaded. Staging takes fenced read-then-write
+ * transactions that cannot finish while a page unloads; this record is written blind instead, keyed by its writer and
+ * generation so it overwrites nothing else, and becomes a draft only through reconciliation.
+ */
+export interface ProjectUnloadJournalEntry {
+  /** The account whose lifetime wrote it; the database is already per account, so this is defence in depth. */
+  accountId: string;
+  baseMinimumCanvasSchemaVersion?: number;
+  baseRevision: number | null;
+  documentByteSize: number;
+  documentJson: string;
+  documentSchemaVersion: number;
+  /** The lineage it is written under, which the session blob may have handed on from another page's session. */
+  editorSessionId: string;
+  /**
+   * The draft generation the writer reserved for this document: above every generation it staged before and below
+   * every one it stages after (or that of a stage of the same document still in flight), so the lineage alone tells
+   * whether the journal is still the newest copy.
+   */
+  generation: number;
+  journaledAt: number;
+  /**
+   * The editor session of the page that wrote it, whose Web Lock tells whether that page still runs. Absent from
+   * entries written before it existed, which are treated as a gone page's.
+   */
+  ownerEditorSessionId?: string;
+  projectId: string;
+  recordType: 'unload-journal';
+  schemaVersion: typeof PROJECT_UNLOAD_JOURNAL_SCHEMA_VERSION;
+  writerToken: string;
+}
+export type ProjectUnloadJournalKey = [
+  projectId: string,
+  editorSessionId: string,
+  writerToken: string,
+  generation: number,
+];
+export interface ProjectUnloadJournalWrite {
+  entries: readonly ProjectUnloadJournalEntry[];
+  /** Each writer lineage's entries through the key's generation are deleted: what they held is in recovery now. */
+  retired: readonly ProjectUnloadJournalKey[];
+}
+export type ProjectUnloadJournalWriteResult =
+  /** `written` settles true once the write commits, false if it aborted. */
+  { kind: 'started'; written: Promise<boolean> } | { kind: 'unavailable' };
+export type ProjectUnloadJournalOutcome =
+  | 'applied'
+  | 'corrupt'
+  | 'expired'
+  | 'fenced'
+  | 'foreign-account'
+  | 'invalid'
+  | 'live'
+  | 'quota'
+  | 'settled'
+  | 'superseded';
+export interface ProjectUnloadJournalReconciliation {
+  editorSessionId: string;
+  outcome: ProjectUnloadJournalOutcome;
+  projectId: string;
+  /** For an applied entry, the draft it replaced: if the server holds that document, it holds this writer's save. */
+  replacedDraft?: { documentJson: string; generation: number };
+}
+export type ProjectUnloadJournalReconcileResult =
+  | { kind: 'available'; outcomes: ProjectUnloadJournalReconciliation[] }
+  | { kind: 'unavailable' };
+export interface ProjectUnloadJournalLivenessOptions {
+  /**
+   * True for an editor session a page other than this one still holds. The entries that page wrote (its
+   * `ownerEditorSessionId`) are its own to settle (its save acknowledges or retires them): reconciliation leaves them
+   * in place, outcome `'live'`, and the peek does not count them, until the page is gone.
+   */
+  isEditorSessionLive?: (editorSessionId: string) => Promise<boolean>;
+}
+export type ProjectUnloadJournalSettleResult = { kind: 'corrupt' | 'fenced' | 'quota' | 'settled' | 'unavailable' };
+export type ProjectUnloadJournalDecision =
+  | { draft: ProjectDraft; kind: 'apply' }
+  | { kind: 'discard'; reason: 'expired' | 'fenced' | 'foreign-account' | 'invalid' | 'settled' | 'superseded' }
+  /** The lineage is damaged; the entry waits for its cleanup, for at most the retention period. */
+  | { kind: 'retain'; reason: 'corrupt' };
+
 export interface RetargetAcknowledgedCopyOptions {
   acknowledgedRevision: number;
   copyProjectId: string;
@@ -173,15 +268,54 @@ export interface ProjectDraftStore {
     nextWriterToken: string
   ): Promise<ProjectDraftClaimResult>;
   close(): void;
-  delete(projectId: string, editorSessionId: string, writerToken: string): Promise<ProjectDraftDeleteResult>;
+  /** With `settledThroughGeneration`, also settles the writer's unload journal through it, in the same transaction. */
+  delete(
+    projectId: string,
+    editorSessionId: string,
+    writerToken: string,
+    settledThroughGeneration?: number
+  ): Promise<ProjectDraftDeleteResult>;
   deleteCorrupt(projectId: string, editorSessionId: string): Promise<ProjectDraftCorruptDeleteResult>;
+  /**
+   * Removes one writer's unload journal entries for a lineage, through `throughGeneration` (all when omitted). A blind
+   * range delete: it reads nothing, so it never holds up a journal write of a page that is unloading.
+   */
+  discardUnloadJournal(
+    projectId: string,
+    editorSessionId: string,
+    writerToken: string,
+    throughGeneration?: number
+  ): Promise<{ kind: 'deleted' | 'unavailable' }>;
   get(projectId: string, editorSessionId: string): Promise<ProjectDraftGetResult>;
+  /**
+   * Synchronously starts one blind, explicitly committed write: the only kind that outlives a page unload. Each entry
+   * replaces its writer's lower generations for the lineage; `retired` lineages lose theirs. It reads nothing, so it
+   * cannot check fencing; reconciliation does.
+   */
+  journalBeforeUnload(write: ProjectUnloadJournalWrite): ProjectUnloadJournalWriteResult;
   list(options?: { after?: ProjectDraftKey; limit?: number }): Promise<ProjectDraftPageResult>;
   listForProject(projectId: string, options?: { after?: string; limit?: number }): Promise<ProjectDraftListResult>;
   listRetargets(options?: {
     after?: ProjectDraftRetargetCursor;
     limit?: number;
   }): Promise<ProjectDraftRetargetListResult>;
+  /** The projects with unload journal entries (of pages that are gone, given liveness), for whether anything would open. */
+  peekUnloadJournalProjectIds(
+    limit: number,
+    options?: ProjectUnloadJournalLivenessOptions
+  ): Promise<{ kind: 'available'; projectIds: string[] } | { kind: 'unavailable' }>;
+  /**
+   * Turns each unload journal entry into its lineage's newest draft, or discards it, by `decideUnloadJournalEntry`:
+   * one fenced draft transaction per entry, then the entry's removal. An entry left behind by a crash in between is
+   * superseded by the draft it produced, so running again is safe. Run before any writer of this load claims a lineage.
+   * Entries written by a page that still runs elsewhere are skipped: a page that is merely hidden is still writing
+   * its lineages, and staging its journal would hand another tab an edit it may yet undo.
+   */
+  reconcileUnloadJournal(
+    accountId: string,
+    now: number,
+    options?: ProjectUnloadJournalLivenessOptions
+  ): Promise<ProjectUnloadJournalReconcileResult>;
   reserveCopyIdentity(
     projectId: string,
     editorSessionId: string,
@@ -196,6 +330,7 @@ export interface ProjectDraftStore {
     generation: number
   ): Promise<ProjectDraftSettlementResult>;
   retargetAcknowledgedCopy(options: RetargetAcknowledgedCopyOptions): Promise<ProjectDraftSettlementResult>;
+  /** Also settles the writer's unload journal through `sentGeneration`, in the same transaction. */
   settleAcknowledgement(
     projectId: string,
     editorSessionId: string,
@@ -218,6 +353,16 @@ export interface ProjectDraftStore {
     sentGeneration: number,
     refusal: ProjectSchemaRefusal
   ): Promise<ProjectDraftSettlementResult>;
+  /**
+   * Settles the writer's unload journal of a lineage through `throughGeneration` (claiming an unclaimed lineage for it),
+   * then deletes those entries. `settled` once the mark commits; the deletion is best effort, the mark makes it moot.
+   */
+  settleUnloadJournal(
+    projectId: string,
+    editorSessionId: string,
+    writerToken: string,
+    throughGeneration: number
+  ): Promise<ProjectUnloadJournalSettleResult>;
   stage(input: ProjectDraftInput): Promise<ProjectDraftStageResult>;
   startFreshWriter(
     projectId: string,
@@ -230,6 +375,27 @@ export interface ProjectDraftStore {
 export const PROJECT_DRAFT_MAX_BYTES = 32 * 1024 * 1024;
 export const PROJECT_DRAFT_PAGE_LIMIT = 100;
 export const PROJECT_DRAFT_PROJECT_LIMIT = 32;
+export const PROJECT_UNLOAD_JOURNAL_SCHEMA_VERSION = 1;
+/**
+ * The most document bytes one hidden-page journal writes. Serializing and cloning the documents is synchronous in the
+ * `pagehide` handler; above this a document is left to the ordinary autosave.
+ */
+export const PROJECT_UNLOAD_JOURNAL_MAX_BYTES = 8 * 1024 * 1024;
+/** How long an entry for a damaged lineage waits for that lineage's cleanup before it is discarded. */
+export const PROJECT_UNLOAD_JOURNAL_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** The claim with its writer's unload journal settled through `generation`; the mark never moves back. */
+export const withUnloadJournalSettled = <Claim extends ProjectDraftWriterClaim>(
+  claim: Claim,
+  generation: number
+): Claim => {
+  const settled =
+    claim.unloadJournalSettled?.writerToken === claim.writerToken ? claim.unloadJournalSettled.generation : 0;
+  return {
+    ...claim,
+    unloadJournalSettled: { generation: Math.max(settled, generation), writerToken: claim.writerToken },
+  };
+};
 
 export const getCopySourceProjectName = (copyProjectName: string): string =>
   copyProjectName.endsWith(' (copy)') ? copyProjectName.slice(0, -' (copy)'.length) : copyProjectName;
@@ -357,6 +523,7 @@ export const isProjectDraftWriterClaim = (value: unknown): value is ProjectDraft
     return false;
   }
   const claim = value as Partial<{
+    unloadJournalSettled: Partial<ProjectUnloadJournalSettlement>;
     adoptedByEditorSessionId: string;
     editorSessionId: string;
     fenceReason: 'corrupt-cleanup' | 'moved';
@@ -383,8 +550,15 @@ export const isProjectDraftWriterClaim = (value: unknown): value is ProjectDraft
           claim.adoptedByEditorSessionId === undefined &&
           claim.retargetedToProjectId === undefined &&
           claim.retargetedToRevision === undefined)));
+  const hasValidSettlement =
+    claim.unloadJournalSettled === undefined ||
+    (typeof claim.unloadJournalSettled === 'object' &&
+      claim.unloadJournalSettled !== null &&
+      isNonNegativeInteger(claim.unloadJournalSettled.generation) &&
+      isNonEmptyString(claim.unloadJournalSettled.writerToken));
   return (
     hasValidState &&
+    hasValidSettlement &&
     isNonEmptyString(claim.projectId) &&
     isNonEmptyString(claim.editorSessionId) &&
     isNonEmptyString(claim.writerToken) &&
@@ -514,6 +688,142 @@ export const toSchemaRefusedProjectDraft = (draft: ProjectDraft, refusal: Projec
   return next as unknown as ProjectDraft;
 };
 
+const isProjectUnloadJournalEntry = (
+  value: unknown,
+  maxDocumentBytes = PROJECT_DRAFT_MAX_BYTES
+): value is ProjectUnloadJournalEntry => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  const entry = value as Partial<ProjectUnloadJournalEntry>;
+  return (
+    entry.recordType === 'unload-journal' &&
+    entry.schemaVersion === PROJECT_UNLOAD_JOURNAL_SCHEMA_VERSION &&
+    isNonEmptyString(entry.accountId) &&
+    (entry.baseRevision === null || isPositiveInteger(entry.baseRevision)) &&
+    (entry.baseMinimumCanvasSchemaVersion === undefined || isPositiveInteger(entry.baseMinimumCanvasSchemaVersion)) &&
+    isPositiveInteger(entry.documentSchemaVersion) &&
+    isNonEmptyString(entry.editorSessionId) &&
+    (entry.ownerEditorSessionId === undefined || isNonEmptyString(entry.ownerEditorSessionId)) &&
+    isPositiveInteger(entry.generation) &&
+    typeof entry.journaledAt === 'number' &&
+    Number.isFinite(entry.journaledAt) &&
+    entry.journaledAt >= 0 &&
+    isNonEmptyString(entry.projectId) &&
+    isNonEmptyString(entry.writerToken) &&
+    typeof entry.documentJson === 'string' &&
+    isNonNegativeInteger(entry.documentByteSize) &&
+    entry.documentByteSize <= maxDocumentBytes &&
+    entry.documentByteSize === getUtf8ByteSize(entry.documentJson)
+  );
+};
+
+/** The page that wrote a stored entry, read before the entry is validated; `null` when it does not name one. */
+export const getUnloadJournalOwnerEditorSessionId = (entry: unknown): string | null => {
+  const owner =
+    entry && typeof entry === 'object' ? (entry as Partial<ProjectUnloadJournalEntry>).ownerEditorSessionId : undefined;
+  return isNonEmptyString(owner) ? owner : null;
+};
+
+/**
+ * Whether the page that wrote an entry still runs, by `isEditorSessionLive`, asked once per page. An entry that names
+ * no page, or without a probe, counts as a gone page's.
+ */
+export const createUnloadJournalLivenessCheck = (
+  isEditorSessionLive: ProjectUnloadJournalLivenessOptions['isEditorSessionLive']
+): ((entry: unknown) => Promise<boolean>) => {
+  const liveEditorSessions = new Map<string, boolean>();
+  return async (entry) => {
+    const owner = isEditorSessionLive ? getUnloadJournalOwnerEditorSessionId(entry) : null;
+    if (owner === null) {
+      return false;
+    }
+    let isLive = liveEditorSessions.get(owner);
+    if (isLive === undefined) {
+      isLive = await isEditorSessionLive!(owner);
+      liveEditorSessions.set(owner, isLive);
+    }
+    return isLive;
+  };
+};
+
+/**
+ * The reconciliation rules for one unload journal entry, given its lineage as the draft store holds it. The entry is
+ * staged exactly as its writer would have staged it, so it is only applied where that writer could still write: the
+ * lineage is unclaimed or claimed by the same writer, which has not settled its journal that far, and holds nothing at
+ * or above the entry's generation. Sticky conflict, schema refusal, copy reservation and base revision of an existing
+ * draft are kept, as staging keeps them.
+ */
+export const decideUnloadJournalEntry = ({
+  accountId,
+  claim,
+  current,
+  entry,
+  maxDocumentBytes = PROJECT_DRAFT_MAX_BYTES,
+  now,
+}: {
+  accountId: string;
+  /** `'corrupt'` for a stored claim that does not validate. */
+  claim: ProjectDraftWriterClaim | 'corrupt' | undefined;
+  /** The lineage's draft, `null` when it holds none, `'corrupt'` when its records do not agree with the claim. */
+  current: ProjectDraft | 'corrupt' | null;
+  entry: unknown;
+  maxDocumentBytes?: number;
+  now: number;
+}): ProjectUnloadJournalDecision => {
+  if (!isProjectUnloadJournalEntry(entry, maxDocumentBytes)) {
+    return { kind: 'discard', reason: 'invalid' };
+  }
+  if (entry.accountId !== accountId) {
+    return { kind: 'discard', reason: 'foreign-account' };
+  }
+  const retainForCleanup = (): ProjectUnloadJournalDecision =>
+    now - entry.journaledAt > PROJECT_UNLOAD_JOURNAL_RETENTION_MS
+      ? { kind: 'discard', reason: 'expired' }
+      : { kind: 'retain', reason: 'corrupt' };
+  if (claim === 'corrupt') {
+    return retainForCleanup();
+  }
+  // Another editor adopted, retargeted, or reclaimed the lineage after this writer lost it: never write over that.
+  if (claim && (claim.state === 'fenced' || claim.writerToken !== entry.writerToken)) {
+    return { kind: 'discard', reason: 'fenced' };
+  }
+  // Acknowledged, already in recovery, or discarded; after an acknowledgement the lineage may hold no draft at all.
+  if (
+    claim?.unloadJournalSettled?.writerToken === entry.writerToken &&
+    claim.unloadJournalSettled.generation >= entry.generation
+  ) {
+    return { kind: 'discard', reason: 'settled' };
+  }
+  if (current === 'corrupt') {
+    return retainForCleanup();
+  }
+  if (current && current.generation >= entry.generation) {
+    return { kind: 'discard', reason: 'superseded' };
+  }
+  const documentFields = {
+    documentByteSize: entry.documentByteSize,
+    documentJson: entry.documentJson,
+    documentSchemaVersion: entry.documentSchemaVersion,
+    generation: entry.generation,
+    updatedAt: entry.journaledAt,
+  };
+  const draft: ProjectDraft = current
+    ? ({ ...current, ...documentFields } as ProjectDraft)
+    : {
+        ...(entry.baseMinimumCanvasSchemaVersion === undefined
+          ? {}
+          : { baseMinimumCanvasSchemaVersion: entry.baseMinimumCanvasSchemaVersion }),
+        ...documentFields,
+        baseRevision: entry.baseRevision,
+        editorSessionId: entry.editorSessionId,
+        projectId: entry.projectId,
+        state: 'dirty',
+        writerToken: entry.writerToken,
+      };
+  return isProjectDraft(draft) ? { draft, kind: 'apply' } : { kind: 'discard', reason: 'invalid' };
+};
+
 export const createUnavailableProjectDraftStore = (): ProjectDraftStore => ({
   availability: 'unavailable',
   acknowledgeRetarget: () => Promise.resolve({ kind: 'unavailable' }),
@@ -522,10 +832,15 @@ export const createUnavailableProjectDraftStore = (): ProjectDraftStore => ({
   close: () => undefined,
   delete: () => Promise.resolve({ kind: 'unavailable' }),
   deleteCorrupt: () => Promise.resolve({ kind: 'unavailable' }),
+  discardUnloadJournal: () => Promise.resolve({ kind: 'unavailable' }),
   get: () => Promise.resolve({ kind: 'unavailable' }),
+  journalBeforeUnload: () => ({ kind: 'unavailable' }),
+  peekUnloadJournalProjectIds: () => Promise.resolve({ kind: 'unavailable' }),
   list: () => Promise.resolve({ kind: 'unavailable' }),
   listForProject: () => Promise.resolve({ kind: 'unavailable' }),
   listRetargets: () => Promise.resolve({ kind: 'unavailable' }),
+  reconcileUnloadJournal: () => Promise.resolve({ kind: 'unavailable' }),
+  settleUnloadJournal: () => Promise.resolve({ kind: 'unavailable' }),
   reserveCopyIdentity: () => Promise.resolve({ kind: 'unavailable' }),
   resumeSchemaRefused: () => Promise.resolve({ kind: 'unavailable' }),
   retargetAcknowledgedCopy: () => Promise.resolve({ kind: 'unavailable' }),
@@ -538,6 +853,8 @@ export const createUnavailableProjectDraftStore = (): ProjectDraftStore => ({
 
 const cloneDraft = (draft: ProjectDraft): ProjectDraft => structuredClone(draft);
 const draftKey = (projectId: string, editorSessionId: string): string => `${projectId}\u0000${editorSessionId}`;
+const journalWriterKey = (projectId: string, editorSessionId: string, writerToken: string): string =>
+  `${draftKey(projectId, editorSessionId)}\u0000${writerToken}`;
 const compareKeys = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0);
 
 export const createMemoryProjectDraftStore = ({
@@ -545,6 +862,7 @@ export const createMemoryProjectDraftStore = ({
 }: { maxDraftBytes?: number } = {}): ProjectDraftStore => {
   const records = new Map<string, ProjectDraft>();
   const writerClaims = new Map<string, ProjectDraftWriterClaim>();
+  const unloadJournal = new Map<string, ProjectUnloadJournalEntry>();
   let isClosed = false;
 
   const readRecord = (projectId: string, editorSessionId: string): ProjectDraft | undefined =>
@@ -564,6 +882,16 @@ export const createMemoryProjectDraftStore = ({
   const writeDraft = (draft: ProjectDraft): ProjectDraft => {
     records.set(draftKey(draft.projectId, draft.editorSessionId), cloneDraft(draft));
     return cloneDraft(draft);
+  };
+  const deleteJournalThrough = (writerKey: string, generation: number, inclusive: boolean): void => {
+    for (const [entryKey, entry] of unloadJournal) {
+      if (
+        journalWriterKey(entry.projectId, entry.editorSessionId, entry.writerToken) === writerKey &&
+        (inclusive ? entry.generation <= generation : entry.generation < generation)
+      ) {
+        unloadJournal.delete(entryKey);
+      }
+    }
   };
   const settle = (
     projectId: string,
@@ -682,7 +1010,7 @@ export const createMemoryProjectDraftStore = ({
     close() {
       isClosed = true;
     },
-    delete(projectId, editorSessionId, writerToken) {
+    delete(projectId, editorSessionId, writerToken, settledThroughGeneration) {
       if (isClosed) {
         return Promise.resolve({ kind: 'unavailable' });
       }
@@ -697,10 +1025,21 @@ export const createMemoryProjectDraftStore = ({
       }
       records.delete(key);
       bumpWriterClaim(key);
+      const bumped = writerClaims.get(key);
+      if (bumped && settledThroughGeneration !== undefined) {
+        writerClaims.set(key, withUnloadJournalSettled(bumped, settledThroughGeneration));
+      }
       return Promise.resolve({ kind: 'deleted' });
     },
     deleteCorrupt() {
       return Promise.resolve({ kind: isClosed ? 'unavailable' : 'not-corrupt' });
+    },
+    discardUnloadJournal(projectId, editorSessionId, writerToken, throughGeneration = Number.POSITIVE_INFINITY) {
+      if (isClosed) {
+        return Promise.resolve({ kind: 'unavailable' });
+      }
+      deleteJournalThrough(journalWriterKey(projectId, editorSessionId, writerToken), throughGeneration, true);
+      return Promise.resolve({ kind: 'deleted' });
     },
     get(projectId, editorSessionId) {
       if (isClosed) {
@@ -730,6 +1069,20 @@ export const createMemoryProjectDraftStore = ({
         return Promise.resolve({ kind: 'corrupt' });
       }
       return Promise.resolve({ draft: cloneDraft(record), kind: 'found' });
+    },
+    journalBeforeUnload({ entries, retired }) {
+      if (isClosed) {
+        return { kind: 'unavailable' };
+      }
+      for (const [projectId, editorSessionId, writerToken, generation] of retired) {
+        deleteJournalThrough(journalWriterKey(projectId, editorSessionId, writerToken), generation, true);
+      }
+      for (const entry of entries) {
+        const writerKey = journalWriterKey(entry.projectId, entry.editorSessionId, entry.writerToken);
+        deleteJournalThrough(writerKey, entry.generation, false);
+        unloadJournal.set(`${writerKey}\u0000${entry.generation}`, structuredClone(entry));
+      }
+      return { kind: 'started', written: Promise.resolve(true) };
     },
     list({ after, limit: requestedLimit } = {}) {
       if (isClosed) {
@@ -824,6 +1177,87 @@ export const createMemoryProjectDraftStore = ({
         kind: 'available',
         nextCursor: hasMore && last ? [last.projectId, last.editorSessionId, last.targetProjectId] : null,
       });
+    },
+    async peekUnloadJournalProjectIds(limit, { isEditorSessionLive } = {}) {
+      if (isClosed) {
+        return { kind: 'unavailable' };
+      }
+      const isLive = createUnloadJournalLivenessCheck(isEditorSessionLive);
+      const projectIds = new Set<string>();
+      for (const entry of unloadJournal.values()) {
+        if (projectIds.size === limit) {
+          break;
+        }
+        if (!(await isLive(entry))) {
+          projectIds.add(entry.projectId);
+        }
+      }
+      return { kind: 'available', projectIds: [...projectIds] };
+    },
+    async reconcileUnloadJournal(accountId, now, { isEditorSessionLive } = {}) {
+      if (isClosed) {
+        return { kind: 'unavailable' };
+      }
+      const outcomes: ProjectUnloadJournalReconciliation[] = [];
+      const ordered = [...unloadJournal].sort(
+        ([leftKey, left], [rightKey, right]) =>
+          compareKeys(
+            leftKey.slice(0, leftKey.lastIndexOf('\u0000')),
+            rightKey.slice(0, rightKey.lastIndexOf('\u0000'))
+          ) || left.generation - right.generation
+      );
+      const isLive = createUnloadJournalLivenessCheck(isEditorSessionLive);
+      for (const [entryKey, entry] of ordered) {
+        if (await isLive(entry)) {
+          outcomes.push({ editorSessionId: entry.editorSessionId, outcome: 'live', projectId: entry.projectId });
+          continue;
+        }
+        const key = draftKey(entry.projectId, entry.editorSessionId);
+        const claim = writerClaims.get(key);
+        const record = records.get(key);
+        const decision = decideUnloadJournalEntry({
+          accountId,
+          claim,
+          current:
+            record === undefined
+              ? null
+              : claim?.state === 'active' && claim.writerToken === record.writerToken
+                ? record
+                : 'corrupt',
+          entry,
+          maxDocumentBytes: maxDraftBytes,
+          now,
+        });
+        const outcome: ProjectUnloadJournalReconciliation = {
+          editorSessionId: entry.editorSessionId,
+          outcome: decision.kind === 'apply' ? 'applied' : decision.reason,
+          projectId: entry.projectId,
+        };
+        if (decision.kind === 'apply') {
+          writerClaims.set(
+            key,
+            claim
+              ? { ...claim, metadataRevision: claim.metadataRevision + 1, updatedAt: entry.journaledAt }
+              : {
+                  editorSessionId: entry.editorSessionId,
+                  metadataRevision: 1,
+                  projectId: entry.projectId,
+                  state: 'active',
+                  updatedAt: entry.journaledAt,
+                  writerToken: entry.writerToken,
+                }
+          );
+          writeDraft(decision.draft);
+          if (record) {
+            outcome.replacedDraft = { documentJson: record.documentJson, generation: record.generation };
+          }
+        }
+        if (decision.kind !== 'retain') {
+          unloadJournal.delete(entryKey);
+        }
+        outcomes.push(outcome);
+      }
+      return { kind: 'available', outcomes };
     },
     reserveCopyIdentity(projectId, editorSessionId, writerToken, proposed, replaceCopyProjectId) {
       if (isClosed) {
@@ -977,6 +1411,10 @@ export const createMemoryProjectDraftStore = ({
       if (isClosed) {
         return Promise.resolve({ kind: 'unavailable' });
       }
+      const ownClaim = readWriterClaim(projectId, editorSessionId);
+      if (ownClaim?.state === 'active' && ownClaim.writerToken === writerToken) {
+        writerClaims.set(draftKey(projectId, editorSessionId), withUnloadJournalSettled(ownClaim, sentGeneration));
+      }
       const record = readRecord(projectId, editorSessionId);
       if (record === undefined) {
         return Promise.resolve({ kind: 'missing' });
@@ -1020,6 +1458,35 @@ export const createMemoryProjectDraftStore = ({
           'marked'
         )
       );
+    },
+    settleUnloadJournal(projectId, editorSessionId, writerToken, throughGeneration) {
+      if (isClosed) {
+        return Promise.resolve({ kind: 'unavailable' });
+      }
+      const key = draftKey(projectId, editorSessionId);
+      const claim = writerClaims.get(key);
+      if (claim && (claim.state === 'fenced' || claim.writerToken !== writerToken)) {
+        return Promise.resolve({ kind: 'fenced' });
+      }
+      if (!claim && records.has(key)) {
+        return Promise.resolve({ kind: 'corrupt' });
+      }
+      writerClaims.set(
+        key,
+        withUnloadJournalSettled(
+          claim ?? {
+            editorSessionId,
+            metadataRevision: 1,
+            projectId,
+            state: 'active',
+            updatedAt: Date.now(),
+            writerToken,
+          },
+          throughGeneration
+        )
+      );
+      deleteJournalThrough(journalWriterKey(projectId, editorSessionId, writerToken), throughGeneration, true);
+      return Promise.resolve({ kind: 'settled' });
     },
     stage(input) {
       if (isClosed) {

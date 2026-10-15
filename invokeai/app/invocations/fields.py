@@ -163,6 +163,7 @@ class FieldDescriptions:
     glm_encoder = "GLM (THUDM) tokenizer and text encoder"
     qwen3_encoder = "Qwen3 tokenizer and text encoder"
     qwen3_vl_encoder = "Qwen3-VL tokenizer and text encoder"
+    qwen3_5_encoder = "Qwen3.5 tokenizer and text encoder"
     mistral_encoder = "Mistral tokenizer/processor and text encoder"
     clip_embed_model = "CLIP Embed loader"
     clip_g_model = "CLIP-G Embed loader"

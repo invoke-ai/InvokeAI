@@ -61,6 +61,7 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
             vae=vae_info.model,
             tile_size=self.tile_size if use_tiling else None,
             fp32=self.fp32,
+            device=vae_info.compute_device,
         )
         with (
             SeamlessExt.static_patch_model(vae_info.model, self.vae.seamless_axes),

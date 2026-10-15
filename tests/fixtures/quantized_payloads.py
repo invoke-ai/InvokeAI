@@ -201,3 +201,55 @@ def mxfp8_marker(*, block_size: int = MX_BLOCK_SIZE) -> dict[str, object]:
     writes, so a rename on our side has to be caught by a test, not mirrored by one.
     """
     return {"format": "mxfp8", "block_size": block_size}
+
+
+def q8_cr_marker(*, group_size: int = CONVROT_GROUP_SIZE, **overrides: Any) -> dict[str, Any]:
+    """The JSON ComfyUI-GGUF's converter stores per ``Q8_CR`` weight (``quantize_int8_convrot`` in
+    github.com/molbal/ComfyUI-GGUF ``tools/convert.py``). Unlike a safetensors ``.comfy_quant`` it says
+    ``weight_rotated`` explicitly; that converter's loader runs a ``convrot`` layer without it unrotated.
+    """
+    return {
+        "format": "int8_tensorwise",
+        "convrot": True,
+        "weight_rotated": True,
+        "per_row": True,
+        "convrot_groupsize": group_size,
+        **overrides,
+    }
+
+
+def write_gguf(
+    path: Any,
+    tensors: Mapping[str, torch.Tensor],
+    *,
+    quant: Mapping[str, Mapping[str, Any] | str] | None = None,
+    q8_0: Mapping[str, torch.Tensor] | None = None,
+    architecture: str = "krea2",
+) -> None:
+    """Write a GGUF the way ComfyUI-GGUF lays out a ``Q8_CR`` file.
+
+    ``tensors`` are stored by dtype: int8 as GGML ``I8`` (how the converter stores Q8_CR codes), float32
+    as ``F32``, float16 as ``F16``. ``quant`` maps a weight name to its JSON, written as the string
+    ``comfy.gguf.quant.<weight name>`` (a string is written as it is, for malformed metadata). ``q8_0`` tensors are GGML-quantized, which is what the converter's
+    target-size plans put beside Q8_CR layers in the same file.
+    """
+    import gguf
+
+    qtypes = {
+        torch.int8: gguf.GGMLQuantizationType.I8,
+        torch.float32: gguf.GGMLQuantizationType.F32,
+        torch.float16: gguf.GGMLQuantizationType.F16,
+    }
+    writer = gguf.GGUFWriter(str(path), architecture)
+    for name, marker in (quant or {}).items():
+        writer.add_string(f"comfy.gguf.quant.{name}", marker if isinstance(marker, str) else json.dumps(dict(marker)))
+    for name, tensor in tensors.items():
+        writer.add_tensor(name, tensor.numpy(), raw_dtype=qtypes[tensor.dtype])
+    for name, tensor in (q8_0 or {}).items():
+        data = tensor.to(torch.float32).numpy()
+        packed = gguf.quants.quantize(data, gguf.GGMLQuantizationType.Q8_0)
+        writer.add_tensor(name, packed, raw_dtype=gguf.GGMLQuantizationType.Q8_0)
+    writer.write_header_to_file()
+    writer.write_kv_data_to_file()
+    writer.write_tensors_to_file()
+    writer.close()

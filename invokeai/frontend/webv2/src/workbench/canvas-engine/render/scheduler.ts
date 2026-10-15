@@ -3,7 +3,9 @@
  * tests; default browser functions resolve lazily.
  */
 
-import type { LayerDamage, RenderFlags } from '@workbench/canvas-engine/types';
+import type { FrameDamage, LayerDamage, RenderFlags } from '@workbench/canvas-engine/types';
+
+import { FULL_DAMAGE, NO_DAMAGE } from '@workbench/canvas-engine/types';
 
 /** The partial invalidation payload accepted by {@link RenderScheduler.invalidate}. */
 export interface InvalidatePayload {
@@ -36,6 +38,11 @@ export interface RenderSchedulerDeps {
 export interface RenderScheduler {
   /** Merge a partial invalidation into the pending flags and schedule a frame. */
   invalidate(payload: InvalidatePayload): void;
+  /**
+   * Runs `task` at the start of the next frame, before that frame's flags are taken, so its invalidations render
+   * in the same frame. Returns an idempotent cancel.
+   */
+  beforeNextFrame(task: () => void): () => void;
   /** Suspend frame scheduling (e.g. widget detach); invalidations still accumulate. */
   pause(): void;
   /** Resume scheduling; flushes any invalidations accumulated while paused. */
@@ -48,11 +55,18 @@ export interface RenderScheduler {
 
 const createEmptyFlags = (): RenderFlags => ({
   all: false,
-  damage: [],
+  damage: NO_DAMAGE,
   layers: new Set<string>(),
   overlay: false,
   view: false,
 });
+
+const addDamage = (pending: FrameDamage, damage: LayerDamage | null): FrameDamage => {
+  if (!damage || pending.kind === 'full') {
+    return FULL_DAMAGE;
+  }
+  return { kind: 'regions', regions: pending.kind === 'regions' ? [...pending.regions, damage] : [damage] };
+};
 
 const hasPending = (flags: RenderFlags): boolean => flags.all || flags.view || flags.overlay || flags.layers.size > 0;
 
@@ -67,28 +81,46 @@ export const createRenderScheduler = (deps: RenderSchedulerDeps): RenderSchedule
   const cancelFrame = deps.cancelFrame ?? defaultCancelFrame;
 
   let pending = createEmptyFlags();
+  const frameTasks = new Set<() => void>();
   let frameHandle: number | null = null;
   let paused = false;
   let disposed = false;
 
   const runFrame = (): void => {
-    frameHandle = null;
     if (disposed) {
+      frameHandle = null;
       return;
     }
-    // Snapshot then reset before invoking render, so invalidations made from
-    // within the render callback accumulate into a fresh frame rather than
-    // being wiped by the post-render reset.
-    const flags = pending;
-    pending = createEmptyFlags();
-    deps.render(flags);
+    // The handle stays set while tasks run, so their invalidations join this frame instead of requesting another.
+    const tasks = [...frameTasks];
+    frameTasks.clear();
+    for (const task of tasks) {
+      try {
+        task();
+      } catch (error) {
+        // One failed task must not starve the frame or the tasks after it.
+        globalThis.reportError?.(error);
+      }
+    }
+    frameHandle = null;
+    if (!paused && !disposed && hasPending(pending)) {
+      // Snapshot then reset before invoking render, so invalidations made from
+      // within the render callback accumulate into a fresh frame rather than
+      // being wiped by the post-render reset.
+      const flags = pending;
+      pending = createEmptyFlags();
+      deps.render(flags);
+    }
+    if (frameTasks.size > 0) {
+      schedule();
+    }
   };
 
   const schedule = (): void => {
     if (disposed || paused || frameHandle !== null) {
       return;
     }
-    if (!hasPending(pending)) {
+    if (!hasPending(pending) && frameTasks.size === 0) {
       return;
     }
     try {
@@ -109,12 +141,12 @@ export const createRenderScheduler = (deps: RenderSchedulerDeps): RenderSchedule
     // performance for correctness.
     if (payload.all) {
       pending.all = true;
-      pending.damage = null;
+      pending.damage = FULL_DAMAGE;
     }
     if (payload.view) {
       // The whole viewport moves under a pan/zoom; no layer-local rect survives it.
       pending.view = true;
-      pending.damage = null;
+      pending.damage = FULL_DAMAGE;
     }
     if (payload.overlay) {
       // The overlay is its own canvas, redrawn whole every frame — it neither
@@ -129,13 +161,22 @@ export const createRenderScheduler = (deps: RenderSchedulerDeps): RenderSchedule
         payload.damage && payload.layers.length === 1 && payload.layers[0] === payload.damage.layerId
           ? payload.damage
           : null;
-      if (!damage) {
-        pending.damage = null;
-      } else if (pending.damage) {
-        pending.damage.push(damage);
-      }
+      pending.damage = addDamage(pending.damage, damage);
     }
     schedule();
+  };
+
+  const beforeNextFrame = (task: () => void): (() => void) => {
+    if (disposed) {
+      return () => undefined;
+    }
+    // A wrapper gives repeated registrations of one function separate identities.
+    const entry = (): void => task();
+    frameTasks.add(entry);
+    schedule();
+    return () => {
+      frameTasks.delete(entry);
+    };
   };
 
   const pause = (): void => {
@@ -162,6 +203,7 @@ export const createRenderScheduler = (deps: RenderSchedulerDeps): RenderSchedule
       return;
     }
     disposed = true;
+    frameTasks.clear();
     if (frameHandle !== null) {
       cancelFrame(frameHandle);
       frameHandle = null;
@@ -169,6 +211,7 @@ export const createRenderScheduler = (deps: RenderSchedulerDeps): RenderSchedule
   };
 
   return {
+    beforeNextFrame,
     dispose,
     invalidate,
     get isPaused() {

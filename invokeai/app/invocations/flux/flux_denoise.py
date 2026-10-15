@@ -298,7 +298,7 @@ class FluxDenoiseInvocation(BaseInvocation):
             shift=not is_schnell,
         )
 
-        # Create scheduler if not using default euler
+        # Create the selected Diffusers scheduler.
         scheduler = None
         if self.scheduler in FLUX_SCHEDULER_MAP:
             scheduler_class = FLUX_SCHEDULER_MAP[self.scheduler]
@@ -322,12 +322,9 @@ class FluxDenoiseInvocation(BaseInvocation):
                 # Noise the orig_latents by the appropriate amount for the first
                 # timestep in InvokeAI's clipped schedule.
                 #
-                # Known limitation: if the selected scheduler later replaces this
-                # schedule with its own first effective timestep/sigma (for example
-                # Heun internal expansion or LCM's scheduler-defined schedule), the
-                # img2img preblend below may not match that scheduler's true first
-                # step exactly. This is an existing pipeline limitation and affects
-                # both internally generated noise and externally supplied noise.
+                # Euler and Heun consume this InvokeAI schedule. LCM intentionally
+                # creates its own discrete schedule: clipping limits its step count,
+                # but its exact start and terminal sigmas can differ from this schedule.
                 t_0 = timesteps[0]
                 x = t_0 * noise + (1.0 - t_0) * init_latents
             else:
@@ -429,21 +426,22 @@ class FluxDenoiseInvocation(BaseInvocation):
 
             transformer_info = context.models.load(self.transformer.transformer)
 
-            # An `int8_tensorwise` build materializes each linear's dequantized, derotated weight
-            # inside `forward`, and that transient is not part of the model's resident size. Read
-            # from the unlocked model, before the VRAM lock the reservation applies to; zero for
-            # every other build.
+            # An `int8_tensorwise` or GGUF build materializes each linear's dequantized weight inside
+            # `forward`, and that transient is not part of the model's resident size. Read from the
+            # unlocked model, before the VRAM lock the reservation applies to; zero for every other
+            # build.
             #
             # Passed alone because this node has no activation estimate. The cache floors the
             # request at `device_working_mem_gb`, so at the 3 GiB default this changes nothing --
-            # FLUX.1's largest quantized layer needs 252 MiB. It binds only where that floor was
-            # lowered, and it is what keeps the term honest if this node ever grows a real estimate
+            # FLUX.1's largest quantized layer needs 252 MiB as int8 and under 1 GiB as GGUF. It binds
+            # only where that floor was lowered, and it is what keeps the term honest if this node ever
+            # grows a real estimate
             # (the transient is alive alongside the activations, as it is for FLUX.2 and Krea-2).
-            int8_dequant_bytes = peak_dequant_transient_bytes(transformer_info.model, inference_dtype)
+            dequant_bytes = peak_dequant_transient_bytes(transformer_info.model, inference_dtype)
 
             # Load the transformer model.
             (cached_weights, transformer) = exit_stack.enter_context(
-                transformer_info.model_on_device(working_mem_bytes=int8_dequant_bytes)
+                transformer_info.model_on_device(working_mem_bytes=dequant_bytes)
             )
             assert isinstance(transformer, Flux)
             config = transformer_config

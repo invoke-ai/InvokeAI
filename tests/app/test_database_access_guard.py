@@ -1,0 +1,155 @@
+"""Every SQL statement of the application lives in the database layer.
+
+Everything else reaches the database through `Database.queries`, so a backend port, a schema change or a
+query fix happens in one place (`invokeai/app/services/shared/database/`). This test fails when code
+outside the database layer imports a database driver, SQLAlchemy or Alembic, executes a statement,
+carries SQL text, or reaches into a database object's internals.
+"""
+
+import ast
+import re
+from dataclasses import dataclass
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SCANNED_ROOTS = ("invokeai", "scripts")
+DATABASE_LAYER = (
+    "invokeai/app/services/shared/database/",
+    # The 63 migrations up to the portable cutover are SQLite DDL and stay as written.
+    "invokeai/app/services/shared/sqlite_migrator/",
+)
+
+# Code these rules flag that touches no application database: path -> why. Each entry must still be flagged.
+NOT_THE_APPLICATION_DATABASE = {
+    "invokeai/app/services/gallery_maintenance/gallery_maintenance_default.py": (
+        "keeps its scan inventory in a SQLite file of its own, in a temporary directory, not in the app's database"
+    ),
+    "invokeai/app/api/routers/gallery_maintenance.py": "`service.execute()` runs a gallery maintenance operation",
+    "invokeai/app/services/image_files/image_files_disk.py": (
+        "walks the output folders with their pending directories in a SQLite file of its own, in a temporary directory"
+    ),
+}
+
+_DRIVER_MODULES = ("sqlite3", "sqlalchemy", "alembic", "pymysql")
+_EXECUTE_METHODS = {"execute", "executemany", "executescript", "exec_driver_sql"}
+# Internals of the database layer that only it may import.
+_LAYER_PACKAGE = "invokeai.app.services.shared.database"
+_LAYER_INTERNAL_MODULES = ("engines", "schema", "dialect")
+_LAYER_INTERNALS = tuple(f"{_LAYER_PACKAGE}.{module}" for module in _LAYER_INTERNAL_MODULES)
+_SQL_STATEMENT = re.compile(
+    r"^\s*(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|PRAGMA|WITH|REPLACE|VACUUM|BEGIN)\b[\s\S]*"
+    r"\b(FROM|INTO|SET|TABLE|INDEX|TRIGGER|AS|IMMEDIATE|TRANSACTION|WHERE|VALUES)\b"
+)
+
+
+@dataclass(frozen=True)
+class Violation:
+    path: str
+    line: int
+    rule: str
+    detail: str
+
+    def __str__(self) -> str:
+        return f"{self.path}:{self.line}: {self.rule}: {self.detail}"
+
+
+def _docstring_nodes(tree: ast.AST) -> set[int]:
+    docstrings: set[int] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+            body = node.body
+            if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant):
+                docstrings.add(id(body[0].value))
+    return docstrings
+
+
+def _is_driver_module(name: str) -> bool:
+    return any(name == module or name.startswith(f"{module}.") for module in _DRIVER_MODULES)
+
+
+def _looks_like_sql(text: str) -> bool:
+    return "--sql" in text or _SQL_STATEMENT.match(text) is not None
+
+
+def scan(path: Path, relative: str) -> list[Violation]:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=relative)
+    docstrings = _docstring_nodes(tree)
+    f_string_parts = {id(part) for node in ast.walk(tree) if isinstance(node, ast.JoinedStr) for part in node.values}
+    violations: list[Violation] = []
+
+    def add(node: ast.AST, rule: str, detail: str) -> None:
+        violations.append(Violation(relative, getattr(node, "lineno", 0), rule, detail))
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if _is_driver_module(alias.name):
+                    add(node, "imports a database driver", alias.name)
+                elif alias.name.startswith(_LAYER_INTERNALS):
+                    add(node, "imports database layer internals", alias.name)
+        elif isinstance(node, ast.ImportFrom) and node.module is not None and node.level == 0:
+            if _is_driver_module(node.module):
+                add(node, "imports a database driver", node.module)
+            elif node.module.startswith(_LAYER_INTERNALS) or (
+                node.module == _LAYER_PACKAGE and any(alias.name in _LAYER_INTERNAL_MODULES for alias in node.names)
+            ):
+                add(node, "imports database layer internals", node.module)
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            if node.func.attr in _EXECUTE_METHODS:
+                add(node, "executes SQL", f".{node.func.attr}()")
+        elif isinstance(node, ast.Attribute):
+            owner_is_self = isinstance(node.value, ast.Name) and node.value.id == "self"
+            if node.attr in ("_db", "_conn") and not owner_is_self:
+                add(node, "reaches into a database object", f".{node.attr}")
+            elif node.attr == "engine" and isinstance(node.ctx, ast.Load) and not owner_is_self:
+                add(node, "uses the SQLAlchemy engine", ".engine")
+        elif isinstance(node, ast.JoinedStr):
+            # An f-string's constant parts are checked together, with the interpolations as placeholders.
+            text = "".join(
+                part.value if isinstance(part, ast.Constant) and isinstance(part.value, str) else "{}"
+                for part in node.values
+            )
+            if _looks_like_sql(text):
+                add(node, "carries SQL text", " ".join(text.split())[:60])
+        elif (
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and id(node) not in docstrings
+            and id(node) not in f_string_parts
+            and _looks_like_sql(node.value)
+        ):
+            add(node, "carries SQL text", " ".join(node.value.split())[:60])
+    return violations
+
+
+def _scanned_files() -> list[tuple[Path, str]]:
+    files: list[tuple[Path, str]] = []
+    for root in SCANNED_ROOTS:
+        for path in sorted((REPO_ROOT / root).rglob("*.py")):
+            relative = path.relative_to(REPO_ROOT).as_posix()
+            if "node_modules/" in relative or "/__pycache__/" in relative:
+                continue
+            if relative.startswith(DATABASE_LAYER):
+                continue
+            files.append((path, relative))
+    return files
+
+
+def test_only_the_database_layer_touches_the_database() -> None:
+    offending: list[str] = []
+    for path, relative in _scanned_files():
+        if relative in NOT_THE_APPLICATION_DATABASE:
+            continue
+        violations = scan(path, relative)
+        if violations:
+            offending.append(f"{relative}: {len(violations)} violations")
+            offending.extend(f"  {violation}" for violation in violations)
+    assert not offending, "Database access outside the database layer; add a query module instead:\n" + "\n".join(
+        offending
+    )
+
+
+def test_every_exemption_is_still_needed() -> None:
+    scanned = {relative: path for path, relative in _scanned_files()}
+    stale = [relative for relative in NOT_THE_APPLICATION_DATABASE if not scan(scanned[relative], relative)]
+    assert not stale, f"Remove these from NOT_THE_APPLICATION_DATABASE, the rules no longer flag them: {stale}"

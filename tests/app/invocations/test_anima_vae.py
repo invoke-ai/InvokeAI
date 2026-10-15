@@ -1,7 +1,6 @@
 """Tests for the Anima VAE invocations: which VAEs they accept, working-memory estimation, the
 tiled-decode decision, and the tiled retry on out-of-memory."""
 
-import math
 from unittest.mock import MagicMock, patch
 
 import accelerate
@@ -13,6 +12,7 @@ from diffusers.models.autoencoders.autoencoder_kl_qwenimage import AutoencoderKL
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.vae.anima_image_to_latents import AnimaImageToLatentsInvocation
 from invokeai.app.invocations.vae.anima_latents_to_image import (
+    ANIMA_PRETILE_VRAM_FRACTION,
     ANIMA_VAE_TILE_SIZE,
     ANIMA_VAE_TILE_STRIDE,
     AnimaLatentsToImageInvocation,
@@ -24,6 +24,8 @@ from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory
 # The two classes the Wan 2.1 VAE loads as: the original-layout file as AutoencoderKLWan, the
 # diffusers-layout Qwen-Image export as AutoencoderKLQwenImage.
 WAN21_VAE_LAYOUTS = [AutoencoderKLWan, AutoencoderKLQwenImage]
+
+_L2I = "invokeai.app.invocations.vae.anima_latents_to_image"
 
 
 def _mock_vae(vae_class: type = AutoencoderKLWan, dtype: torch.dtype = torch.float16) -> MagicMock:
@@ -124,21 +126,6 @@ class TestTheTiledEncodeResidual:
             for edge in (1024, 4096)
         ]
         assert estimates[0] == estimates[1]
-
-
-class TestUseTiledDecode:
-    @pytest.mark.parametrize("device_type", ["cpu", "mps"])
-    def test_non_cuda_never_tiles(self, device_type):
-        assert AnimaLatentsToImageInvocation._use_tiled_decode(torch.device(device_type), 10**12) is False
-
-    def test_cuda_flips_at_70_percent_of_total_vram(self):
-        total_vram = 8 * 2**30
-        boundary = 0.7 * total_vram
-        device = torch.device("cuda")
-        with patch("torch.cuda.get_device_properties", return_value=MagicMock(total_memory=total_vram)) as mock_props:
-            assert AnimaLatentsToImageInvocation._use_tiled_decode(device, math.floor(boundary)) is False
-            assert AnimaLatentsToImageInvocation._use_tiled_decode(device, math.ceil(boundary) + 1) is True
-            mock_props.assert_called_with(device)
 
 
 def _build_decode_mocks(latents: torch.Tensor, decoded: torch.Tensor, vae_class: type = AutoencoderKLWan):
@@ -348,7 +335,7 @@ class TestAnimaLatentsToImageOomFallback:
 
         with (
             patch.object(TorchDevice, "choose_torch_device", return_value=torch.device("cpu")),
-            patch.object(AnimaLatentsToImageInvocation, "_use_tiled_decode", return_value=True),
+            patch("invokeai.app.invocations.vae.anima_latents_to_image.should_pretile_vae_decode", return_value=True),
         ):
             with pytest.raises(torch.cuda.OutOfMemoryError):
                 _build_l2i_invocation().invoke(context)
@@ -372,6 +359,29 @@ class TestAnimaLatentsToImageOomFallback:
         # Called once for the full-decode estimate (tiling decision) and once for the actual request.
         assert mock_estimate.call_count == 2
         vae_info.model_on_device.assert_called_once_with(working_mem_bytes=expected_memory)
+
+
+class TestAnimaPretiling:
+    @pytest.mark.parametrize("auto", [True, False], ids=["auto-tiled-decode-on", "auto-tiled-decode-off"])
+    def test_a_decode_too_large_for_its_gpu_is_tiled_up_front_either_way(self, auto):
+        """Anima asks with its own, lower fraction (measured on 8GB cards) about the VAE's own device, and does so
+        whatever `auto_tiled_decode` says: tiling here is what makes a decode that size fast (~1s against 7s+ with
+        the transformer evicted), not a way around an out-of-memory error."""
+        decoded = torch.zeros(1, 3, 1, 64, 64)
+        vae, vae_info, context = _build_decode_mocks(latents=torch.zeros(1, 16, 32, 32), decoded=decoded)
+        context.config.get.return_value.auto_tiled_decode = auto
+        full = estimate_vae_working_memory_anima(
+            operation="decode", image_tensor=torch.zeros(1, 16, 32, 32), vae=vae, tile_size=None
+        )
+
+        with (
+            patch.object(TorchDevice, "choose_torch_device", return_value=torch.device("cpu")),
+            patch(f"{_L2I}.should_pretile_vae_decode", return_value=True) as pretile,
+        ):
+            _build_l2i_invocation().invoke(context)
+
+        pretile.assert_called_once_with(vae_info.compute_device, full, ANIMA_PRETILE_VRAM_FRACTION)
+        vae.enable_tiling.assert_called_once()
 
 
 class TestAnimaImageToLatentsEncode:

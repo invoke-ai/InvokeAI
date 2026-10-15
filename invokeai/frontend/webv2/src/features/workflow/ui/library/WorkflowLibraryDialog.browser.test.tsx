@@ -22,6 +22,7 @@ import { GalleryHostProvider, type GalleryHost } from '@features/gallery/picker'
 import { WorkflowGraphPreviewProvider, WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
 import {
   openWorkflowLibraryAtProjectWorkflow,
+  setWorkflowLibraryOpen,
   setWorkflowLibraryTab,
   workflowUiStore,
 } from '@features/workflow/ui/workflowUiStore';
@@ -35,6 +36,7 @@ import { userEvent } from 'vitest/browser';
 // Warm the mocked lazy module to avoid first-compile timing variability in preview wiring tests.
 import '@features/workflow/ui/graph-preview/GraphPreviewDialog';
 
+import { LibraryCopyChoiceHost } from './LibraryCopyChoiceDialog';
 import { WorkflowLibraryDialog } from './WorkflowLibraryDialog';
 
 /** In the app the workbench derives this from its Gallery adapter; the library's thumbnail slot reads it. */
@@ -145,7 +147,7 @@ vi.mock('@features/workflow/data/libraryBrowseStore', async () => {
 
 // Test opener invocation and busy-state wiring here; load sequencing has separate coverage.
 const loader = vi.hoisted(() => ({
-  open: vi.fn((_item: unknown, _mode: 'resume-or-add' | 'add-copy') => Promise.resolve()),
+  open: vi.fn((_item: unknown, _mode: 'first-copy' | 'add-copy') => Promise.resolve()),
   phase: { current: 'idle' as 'applying' | 'fetching' | 'idle' },
   resume: vi.fn((_workflowId: string) => {}),
 }));
@@ -204,8 +206,7 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.notRunYet': 'Not run yet',
   'workflowLibrary.open': 'Open',
   'workflowLibrary.openHint': 'Adds a copy to this project',
-  'workflowLibrary.openProjectCopy': 'Open project copy',
-  'workflowLibrary.openProjectCopyHint': 'Switches to the copy this project already has',
+  'workflowLibrary.openWithEllipsis': 'Open…',
   'workflowLibrary.previewGraph': 'Preview graph',
   'workflowLibrary.projectWorkflowCount_one': '{{count}} workflow in this project',
   'workflowLibrary.projectWorkflowCount_other': '{{count}} workflows in this project',
@@ -410,6 +411,13 @@ const UI_ADAPTER = {
 } as unknown as WorkflowUiAdapter;
 const GRAPH_PREVIEW = { openDocumentInNewProject: vi.fn() } as unknown as WorkflowGraphPreviewPort;
 
+/** The library as the workflow dialog host mounts it: open while the UI store says so. */
+const StoreBoundLibraryDialog = () => {
+  const isOpen = workflowUiStore.useSelector((snapshot) => snapshot.isLibraryOpen);
+
+  return <WorkflowLibraryDialog isOpen={isOpen} onOpenChange={setWorkflowLibraryOpen} />;
+};
+
 describe('WorkflowLibraryDialog', () => {
   let host: HTMLDivElement;
   let root: Root;
@@ -430,6 +438,7 @@ describe('WorkflowLibraryDialog', () => {
               <GalleryHostProvider host={GALLERY_HOST}>
                 <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
                   <WorkflowLibraryDialog isOpen={isOpen} onOpenChange={onOpenChange} />
+                  <LibraryCopyChoiceHost />
                 </WorkflowGraphPreviewProvider>
               </GalleryHostProvider>
             </WorkflowUiProvider>
@@ -701,7 +710,7 @@ describe('WorkflowLibraryDialog', () => {
     });
 
     expect(loader.open).toHaveBeenCalledTimes(1);
-    expect(loader.open).toHaveBeenCalledWith(LANDSCAPE.item, 'resume-or-add');
+    expect(loader.open).toHaveBeenCalledWith(LANDSCAPE.item, 'first-copy');
   });
 
   it('dedupes entries that share a workflow id', async () => {
@@ -851,7 +860,31 @@ describe('WorkflowLibraryDialog', () => {
     await vi.waitFor(() => expect(open()).not.toBeNull());
     await act(() => open()?.click());
 
-    expect(loader.open).toHaveBeenCalledWith(LANDSCAPE.item, 'resume-or-add');
+    expect(loader.open).toHaveBeenCalledWith(LANDSCAPE.item, 'first-copy');
+  });
+
+  // The question mounts while the menu that asked it is still closing; the menu's teardown must not dismiss it.
+  it('keeps the copy question a card menu raised for a template the project already holds', async () => {
+    await openWith(LOADED_SNAPSHOT);
+
+    await act(() =>
+      card('wf-portrait')?.dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 120, clientY: 80 })
+      )
+    );
+
+    const open = () => document.querySelector<HTMLElement>('[data-workflow-context-menu] [data-menu-item="open"]');
+
+    await vi.waitFor(() => expect(open()).not.toBeNull());
+    await act(async () => {
+      open()?.click();
+      await settleFrame();
+      await settleFrame();
+    });
+
+    await vi.waitFor(() => expect(document.querySelector('[data-workflow-context-menu]')).toBeNull());
+    expect(document.querySelector('[data-library-copy-choice]')).not.toBeNull();
+    expect(loader.open).not.toHaveBeenCalled();
   });
 
   it('closes the card context menu on Escape and hands focus back to the card', async () => {
@@ -882,17 +915,17 @@ describe('WorkflowLibraryDialog', () => {
   it('opens the selected workflow from the rail, the keyboard-reachable path', async () => {
     await openWith(LOADED_SNAPSHOT);
 
-    // Portrait needs nothing installed, but the project already holds a copy of it: Open resumes that copy.
-    await clickText('Open project copy');
+    // Portrait needs nothing installed, but the project already holds a copy of it: Open asks what to do.
+    await clickText('Open…');
 
-    expect(loader.resume).toHaveBeenCalledWith('wf-user');
+    expect(workflowUiStore.getSnapshot().libraryCopyChoice?.item.workflow_id).toBe(PORTRAIT.item.workflow_id);
     expect(loader.open).not.toHaveBeenCalled();
 
     // Upscale has no copy yet (and nothing to install first), so Open adds one.
     await act(() => card('wf-upscale')?.click());
     await clickText('Open');
 
-    expect(loader.open).toHaveBeenCalledWith(UPSCALE.item, 'resume-or-add');
+    expect(loader.open).toHaveBeenCalledWith(UPSCALE.item, 'first-copy');
   });
 
   it('badges the cards with the models their workflows still need', async () => {
@@ -1081,7 +1114,8 @@ describe('WorkflowLibraryDialog — This project', () => {
       setTimeout(resolve, 0);
     });
 
-  const renderDialog = async () => {
+  /** `storeBound` opens and closes the dialog through the UI store, as the workflow dialog host does. */
+  const renderDialog = async ({ storeBound = false }: { storeBound?: boolean } = {}) => {
     await act(async () => {
       root.render(
         <StrictMode>
@@ -1089,7 +1123,11 @@ describe('WorkflowLibraryDialog — This project', () => {
             <WorkflowUiProvider adapter={UI_ADAPTER}>
               <GalleryHostProvider host={GALLERY_HOST}>
                 <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
-                  <WorkflowLibraryDialog isOpen onOpenChange={onOpenChange} />
+                  {storeBound ? (
+                    <StoreBoundLibraryDialog />
+                  ) : (
+                    <WorkflowLibraryDialog isOpen onOpenChange={onOpenChange} />
+                  )}
                 </WorkflowGraphPreviewProvider>
               </GalleryHostProvider>
             </WorkflowUiProvider>
@@ -1322,6 +1360,39 @@ describe('WorkflowLibraryDialog — This project', () => {
     await click(menuItem('update-template'));
 
     expect(workflowUiStore.getSnapshot().publicationIntent).toEqual({ kind: 'update-source', workflowId: 'wf-user' });
+  });
+
+  it('reopens on the active workflow, so its template update writes the workflow being edited', async () => {
+    const LANDSCAPE_COPY: ProjectWorkflowEntry = {
+      document: { ...createProjectGraph('wf-landscape'), name: 'Landscape copy' },
+      source: { libraryWorkflowId: 'wf-landscape-template', revision: 2 },
+    };
+    const workflows = [...PROJECT_WORKFLOWS, LANDSCAPE_COPY];
+
+    project.setSnapshot(projectSnapshot(workflows, 'wf-user'));
+    openWorkflowLibraryAtProjectWorkflow(PROJECT_ID, 'wf-user');
+    await renderDialog({ storeBound: true });
+    expect(rail()?.dataset.projectWorkflowDetail).toBe('wf-user');
+
+    // The library closes, another template's copy becomes the workflow being edited, and Library… opens it again.
+    await act(async () => {
+      setWorkflowLibraryOpen(false);
+      project.setSnapshot(projectSnapshot(workflows, 'wf-landscape'));
+      await settleFrame();
+    });
+    await act(async () => {
+      setWorkflowLibraryOpen(true);
+      await settleFrame();
+    });
+
+    expect(rail()?.dataset.projectWorkflowDetail).toBe('wf-landscape');
+
+    await clickRailMenuItem('update-template');
+
+    expect(workflowUiStore.getSnapshot().publicationIntent).toEqual({
+      kind: 'update-source',
+      workflowId: 'wf-landscape',
+    });
   });
 
   it('previews a project workflow from its own document', async () => {

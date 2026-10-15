@@ -6,7 +6,7 @@ const LazyFontsPage = lazy(() => import('./ui/FontsPage').then((module) => ({ de
 
 const FALLBACK = (
   <Center h="full">
-    <Spinner color="fg.muted" size="sm" />
+    <Spinner color="fg.muted" size="lg" />
   </Center>
 );
 

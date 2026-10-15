@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { Stack, type StackProps } from '@chakra-ui/react';
 import { Children } from 'react';
 
-import { ListDivider } from './ListDivider';
+import { IN_FLOW_DIVIDER_HIDING_CSS, ListDivider } from './ListDivider';
 import { LIST_ROW_GAP_PX } from './listLayout';
 
 export interface ListStackProps extends Omit<StackProps, 'children' | 'gap' | 'role'> {
@@ -20,7 +20,13 @@ export interface ListStackProps extends Omit<StackProps, 'children' | 'gap' | 'r
  * virtualizes. Rows keep the family's spacing either way.
  */
 export const ListStack = ({ children, dividers = false, label, ...stackProps }: ListStackProps) => (
-  <Stack aria-label={label} gap={dividers ? 0 : `${LIST_ROW_GAP_PX}px`} role="list" {...stackProps}>
+  <Stack
+    aria-label={label}
+    css={dividers ? IN_FLOW_DIVIDER_HIDING_CSS : undefined}
+    gap={dividers ? 0 : `${LIST_ROW_GAP_PX}px`}
+    role="list"
+    {...stackProps}
+  >
     {dividers
       ? Children.toArray(children).flatMap((row, index) =>
           // Dividers carry no state, so index keys are safe for them.

@@ -11,6 +11,7 @@ import type {
   CanvasStagingCandidateContract,
 } from '@workbench/canvas-engine/contracts';
 import type { GraphContract } from '@workbench/graphContracts';
+import type { ExpandedPositivePrompts } from '@workbench/invocationContracts';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
 import {
@@ -217,6 +218,7 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   dynamicPromptsCombinatorial: true,
   dynamicPromptsMaxPrompts: 100,
   dynamicPromptsSampleSeed: 0,
+  dynamicPromptsResample: true,
   dynamicPromptsSeedBehaviour: 'per-iteration',
   componentSourceModel: null,
   height: 1024,
@@ -236,6 +238,7 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   qwen3EncoderModel: null,
   qwenVLEncoderModel: null,
   qwen3VLEncoderModel: null,
+  qwen35EncoderModel: null,
   wanT5EncoderModel: null,
   wanLowNoiseModel: null,
   ideogram4UnconditionalModel: null,
@@ -509,6 +512,23 @@ describe('generation-device orchestration metadata', () => {
 });
 
 describe('workbench hydration invariants', () => {
+  it('preserves saved status placements and does not re-enable a removed shortcuts widget on hydration', () => {
+    const initial = createInitialWorkbenchState();
+    const project = getActiveProject(initial);
+    const bottom = {
+      ...project.widgetRegions.bottom,
+      instanceIds: ['autosave-status', 'server-status', 'notifications'],
+      alignEndInstanceIds: ['notifications'],
+    };
+    const stored = {
+      ...initial,
+      projects: [{ ...project, widgetRegions: { ...project.widgetRegions, bottom } }],
+    };
+    const hydrated = workbenchReducer(initial, { state: stored, type: 'hydrateWorkbench' });
+    expect(getActiveProject(hydrated).widgetRegions.bottom.instanceIds).toEqual(bottom.instanceIds);
+    expect(getActiveProject(hydrated).widgetRegions.bottom.alignEndInstanceIds).toEqual(['notifications']);
+  });
+
   it('seeds a draft when a projectless session hydrates', () => {
     const initial = createInitialWorkbenchState();
     // Model the projectless cache written after closing the last tab.
@@ -576,6 +596,7 @@ describe('workbench widget region defaults', () => {
       'server-status',
       'queue-status',
       'gallery:bottom',
+      'shortcuts',
       'notifications',
       'autosave-status',
     ]);
@@ -915,6 +936,91 @@ describe('workbench widget region opening', () => {
     expect(getActiveProject(state).widgetRegions.bottom.activeInstanceId).toBe('queue');
     expect(getActiveProject(state).widgetRegions.bottom.instanceIds).toEqual(['diagnostics', 'queue']);
     expect(getActiveProject(state).widgetRegions.bottom.isCollapsed).toBe(false);
+  });
+
+  describe('opening a side panel’s front instance in the center', () => {
+    // Edit shows Canvas in the center and keeps Preview a member of the right panel, behind Layers.
+    const editWithPreviewInRightPanel = (patch: (project: Project) => Project = (project) => project) => {
+      let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'edit', type: 'applyPreset' });
+      state = workbenchReducer(state, { region: 'right', type: 'selectRegionWidget', widgetId: 'preview' });
+
+      return {
+        ...state,
+        projects: state.projects.map((project) => (project.id === state.activeProjectId ? patch(project) : project)),
+      };
+    };
+    const openPreviewInCenter = (state: WorkbenchState) =>
+      getActiveProject(workbenchReducer(state, { region: 'center', type: 'openRegionWidget', widgetId: 'preview' }));
+
+    it('shows the one instance in the center while the panel fronts its neighbour', () => {
+      const before = editWithPreviewInRightPanel();
+      expect(getActiveProject(before).widgetRegions.right).toMatchObject({
+        activeInstanceId: 'preview',
+        instanceIds: ['layers', 'preview'],
+      });
+
+      const project = openPreviewInCenter(before);
+
+      expect(project.widgetRegions.center).toMatchObject({
+        activeInstanceId: 'preview',
+        instanceIds: ['canvas', 'preview'],
+      });
+      expect(project.widgetRegions.right).toMatchObject({
+        activeInstanceId: 'layers',
+        instanceIds: ['layers', 'preview'],
+        isCollapsed: false,
+      });
+      expect(Object.values(project.widgetInstances).filter((instance) => instance.typeId === 'preview')).toHaveLength(
+        1
+      );
+    });
+
+    it('moves only the pointer of a hidden panel, leaving it hidden', () => {
+      const project = openPreviewInCenter(
+        editWithPreviewInRightPanel((value) => ({
+          ...value,
+          layout: { ...value.layout, panels: { ...value.layout.panels, isRightOpen: false } },
+        }))
+      );
+
+      expect(project.layout.panels.isRightOpen).toBe(false);
+      expect(project.widgetRegions.right.activeInstanceId).toBe('layers');
+    });
+
+    it('collapses a panel holding nothing else', () => {
+      const project = openPreviewInCenter(
+        editWithPreviewInRightPanel((value) => ({
+          ...value,
+          widgetRegions: {
+            ...value.widgetRegions,
+            right: { ...value.widgetRegions.right, activeInstanceId: 'preview', instanceIds: ['preview'] },
+          },
+        }))
+      );
+
+      expect(project.widgetRegions.right).toMatchObject({ activeInstanceId: 'preview', isCollapsed: true });
+      expect(project.widgetRegions.center.activeInstanceId).toBe('preview');
+    });
+
+    it('leaves the bottom region alone, whose next member may be a status item with no panel', () => {
+      const before = editWithPreviewInRightPanel((value) => ({
+        ...value,
+        widgetRegions: {
+          ...value.widgetRegions,
+          bottom: {
+            ...value.widgetRegions.bottom,
+            activeInstanceId: 'preview',
+            instanceIds: ['server-status', 'preview'],
+            isCollapsed: false,
+          },
+        },
+      }));
+
+      const project = openPreviewInCenter(before);
+
+      expect(project.widgetRegions.bottom).toEqual(getActiveProject(before).widgetRegions.bottom);
+      expect(project.widgetRegions.right.activeInstanceId).toBe('layers');
+    });
   });
 });
 
@@ -1539,7 +1645,7 @@ describe('workbench layout presets', () => {
     });
     expect(project.widgetRegions.bottom).toMatchObject({
       activeInstanceId: 'gallery:bottom',
-      instanceIds: ['server-status', 'queue-status', 'gallery:bottom', 'notifications', 'autosave-status'],
+      instanceIds: ['server-status', 'queue-status', 'gallery:bottom', 'shortcuts', 'notifications', 'autosave-status'],
       isCollapsed: true,
       sizePx: 180,
     });
@@ -3406,6 +3512,65 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       return node?.type === 'invocation' ? node.data.inputs.seed?.value : undefined;
     };
 
+    it('compiles Auto boards to the auto-add board, leaves None unboarded, and keeps results off the selection', () => {
+      const boardTemplate = {
+        ...seedTemplate,
+        inputs: {
+          board: {
+            ...(seedTemplate.inputs.seed as NonNullable<(typeof seedTemplate.inputs)['seed']>),
+            maximum: null,
+            minimum: null,
+            name: 'board',
+            title: 'Board',
+            type: { batch: false, cardinality: 'SINGLE' as const, name: 'BoardField' },
+          },
+        },
+        outputType: 'image_output',
+        title: 'Save Image',
+        type: 'save_image',
+      };
+      const boardNode = (id: string, board: unknown) => ({
+        data: {
+          inputs: { board: { label: '', name: 'board', value: board } },
+          isIntermediate: false,
+          isOpen: true,
+          label: '',
+          nodePack: 'invokeai',
+          notes: '',
+          type: 'save_image',
+          useCache: true,
+          version: '1.0.0',
+        },
+        id,
+        position: { x: 0, y: 0 },
+        type: 'invocation' as const,
+      });
+      let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'automate', type: 'applyPreset' });
+
+      workflowTemplatesMock.snapshot = { error: null, status: 'loaded', templates: { save_image: boardTemplate } };
+      state = workbenchReducer(state, { boardId: 'selected-board', type: 'selectGalleryBoard' });
+      state = workbenchReducer(state, { settings: { autoAddBoardId: 'auto-board' }, type: 'updateGallerySettings' });
+
+      for (const [id, board] of [
+        ['auto-node', 'auto'],
+        ['none-node', 'none'],
+      ] as const) {
+        state = workbenchReducer(state, {
+          action: { node: boardNode(id, board), type: 'addNode' },
+          type: 'applyWorkflowAction',
+        });
+      }
+
+      state = submitWorkflow(state);
+
+      const graph = (readSubmission(state) as { graph: { nodes: Record<string, Record<string, unknown>> } }).graph;
+
+      expect(graph.nodes['auto-node']).toMatchObject({ board: { board_id: 'auto-board' } });
+      expect(graph.nodes['none-node']).not.toHaveProperty('board');
+      // Boards are settled in the graph, so nothing is re-filed onto the selected board afterwards.
+      expect(getActiveProject(state).queue.items[0]?.snapshot.galleryBoardId).toBeNull();
+    });
+
     it('carries batch-node groups on the submission and sizes the placeholders for every session', () => {
       const floatField = {
         ...(seedTemplate.inputs.seed as NonNullable<(typeof seedTemplate.inputs)['seed']>),
@@ -3812,12 +3977,25 @@ describe('workbenchReducer Phase 5 generation flow', () => {
   describe('seed modes on the compiled submission', () => {
     const SEED_MAX = 4_294_967_295;
     const readSeed = (state: WorkbenchState) => getProjectWidgetValues(getActiveProject(state), 'generate').seed;
+    const readSampleSeed = (state: WorkbenchState) =>
+      getProjectWidgetValues(getActiveProject(state), 'generate').dynamicPromptsSampleSeed;
     const readSubmission = (state: WorkbenchState) =>
       getActiveProject(state).queue.items[0]?.snapshot.backendSubmission;
-    const submitWithPrompts = (state: WorkbenchState, positivePrompts?: string[]) =>
+    const queuedSampleSeeds = (state: WorkbenchState) =>
+      getActiveProject(state).queue.items.map((item) => item.snapshot.recall?.generateValues?.dynamicPromptsSampleSeed);
+    // Stands in for the caller, which expands with the sample seed it read before dispatching.
+    const submitWithPrompts = (
+      state: WorkbenchState,
+      positivePrompts?: string[],
+      positivePromptsSampleSeed = getProjectWidgetValues(getActiveProject(state), 'generate')
+        .dynamicPromptsCombinatorial
+        ? null
+        : (readSampleSeed(state) as number)
+    ) =>
       workbenchReducer(state, {
         backendSupportsCancellation: true,
         positivePrompts,
+        positivePromptsSampleSeed,
         route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
         projectId: state.activeProjectId,
         type: 'submitResolvedInvocationSnapshot',
@@ -3898,6 +4076,98 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       expect(readSeed(next)).toBe(42);
     });
 
+    describe('dynamic prompts sample seed', () => {
+      const RANDOM_SAMPLE = {
+        dynamicPromptsCombinatorial: false,
+        dynamicPromptsResample: true,
+        dynamicPromptsSampleSeed: 7,
+        positivePrompt: 'a {red|green} cat',
+      } satisfies Partial<GenerateWidgetValues>;
+
+      it('draws a new sample after queueing the previewed one, alongside the image seed advance', () => {
+        const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+        try {
+          const state = submitWithPrompts(
+            primeGenerate(undefined, { ...RANDOM_SAMPLE, batchCount: 1, seed: 42, seedMode: 'increment' }),
+            ['a green cat']
+          );
+
+          expect(readSubmission(state)).toMatchObject({ positivePrompts: ['a green cat'], seed: 42 });
+          expect(readSampleSeed(state)).toBe(Math.floor(0.5 * SEED_MAX));
+          expect(readSeed(state)).toBe(43);
+        } finally {
+          random.mockRestore();
+        }
+      });
+
+      it('keeps the sample when resampling is off', () => {
+        const state = submitWithPrompts(primeGenerate(undefined, { ...RANDOM_SAMPLE, dynamicPromptsResample: false }), [
+          'a green cat',
+        ]);
+
+        expect(readSubmission(state)).toMatchObject({ positivePrompts: ['a green cat'] });
+        expect(readSampleSeed(state)).toBe(7);
+      });
+
+      it('keeps the sample in All combinations mode', () => {
+        const state = submitWithPrompts(
+          primeGenerate(undefined, { ...RANDOM_SAMPLE, dynamicPromptsCombinatorial: true }),
+          ['a red cat', 'a green cat']
+        );
+
+        expect(readSubmission(state)).toMatchObject({ positivePrompts: ['a red cat', 'a green cat'] });
+        expect(readSampleSeed(state)).toBe(7);
+      });
+
+      it('keeps the sample when the submission expanded nothing', () => {
+        const state = submitWithPrompts(primeGenerate(undefined, { ...RANDOM_SAMPLE, positivePrompt: 'a plain cat' }));
+
+        expect(getActiveProject(state).queue.items).toHaveLength(1);
+        expect(readSampleSeed(state)).toBe(7);
+      });
+
+      // A repeated invoke can expand before the first submission's rotation lands, so both carry the same draw.
+      it('rotates once for submissions that drew the same sample, and recalls the sample each one used', () => {
+        const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+        try {
+          const primed = primeGenerate(undefined, { ...RANDOM_SAMPLE, batchCount: 1 });
+          const first = submitWithPrompts(primed, ['a green cat'], 7);
+          const rotated = Math.floor(0.5 * SEED_MAX);
+
+          expect(readSampleSeed(first)).toBe(rotated);
+
+          random.mockReturnValue(0.25);
+          const second = submitWithPrompts(first, ['a green cat'], 7);
+
+          expect(getActiveProject(second).queue.items).toHaveLength(2);
+          expect(readSampleSeed(second)).toBe(rotated);
+          expect(queuedSampleSeeds(second)).toEqual([7, 7]);
+        } finally {
+          random.mockRestore();
+        }
+      });
+
+      it('rotates only while the project still holds the sample the expansion used', () => {
+        const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+        try {
+          // The user picked a new sample while the queued one was expanding.
+          const state = submitWithPrompts(
+            primeGenerate(undefined, { ...RANDOM_SAMPLE, dynamicPromptsSampleSeed: 9 }),
+            ['a green cat'],
+            7
+          );
+
+          expect(readSampleSeed(state)).toBe(9);
+          expect(queuedSampleSeeds(state)).toEqual([7]);
+        } finally {
+          random.mockRestore();
+        }
+      });
+    });
+
     it('advances Upscale and Video seeds through the same boundary', () => {
       const upscaleModels = [
         createUpscaleModel('main', 'main', 'sd-1'),
@@ -3965,7 +4235,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     });
 
     describe('from the canvas, which compiles outside the reducer', () => {
-      const submitCanvas = (state: WorkbenchState, values: GenerateWidgetValues) =>
+      const submitCanvas = (state: WorkbenchState, values: GenerateWidgetValues, expansion?: ExpandedPositivePrompts) =>
         workbenchReducer(state, {
           backendSupportsCancellation: true,
           canvas: structuredClone(getActiveProject(state).canvas),
@@ -3985,6 +4255,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
             updatedAt: '2026-06-09T00:00:00.000Z',
             version: 1,
           },
+          ...expansion,
           projectId: state.activeProjectId,
           type: 'submitCanvasInvocationSnapshot',
         });
@@ -4006,6 +4277,34 @@ describe('workbenchReducer Phase 5 generation flow', () => {
         expect(readSeed(seedEdited)).toBe(500);
         expect(readSubmission(modeEdited)).toMatchObject({ seed: 10, seedStep: 1 });
         expect(readSeed(modeEdited)).toBe(10);
+      });
+
+      it("rotates Generate's dynamic prompt sample once for the sample the snapshot was expanded with", () => {
+        const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+        try {
+          const compiled = createGenerateValues({
+            batchCount: 1,
+            dynamicPromptsCombinatorial: false,
+            dynamicPromptsResample: true,
+            dynamicPromptsSampleSeed: 7,
+            positivePrompt: 'a {red|green} cat',
+          });
+          // Canvas is told the sample its expansion drew, as Generate is.
+          const drawn = { positivePrompts: ['a green cat'], positivePromptsSampleSeed: 7 };
+          const first = submitCanvas(primeGenerate(undefined, compiled), compiled, drawn);
+          const rotated = Math.floor(0.5 * SEED_MAX);
+
+          expect(readSampleSeed(first)).toBe(rotated);
+
+          random.mockReturnValue(0.25);
+          const second = submitCanvas(first, compiled, drawn);
+
+          expect(readSampleSeed(second)).toBe(rotated);
+          expect(queuedSampleSeeds(second)).toEqual([7, 7]);
+        } finally {
+          random.mockRestore();
+        }
       });
     });
   });
@@ -4951,7 +5250,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(getProjectWidgetValues(getActiveProject(state), 'gallery').liveFollowPausedAt).toBeUndefined();
   });
 
-  it('stamps an explicit page into the navigation query already on a multi-selection', () => {
+  it('stamps a host page into the navigation query already on a multi-selection', () => {
     // Host navigation uses the selection's query and page, which may differ from the gallery's current
     // board/search.
     let state = createInitialWorkbenchState();
@@ -4967,6 +5266,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     state = workbenchReducer(state, { searchTerm: 'sunset', type: 'setGallerySearchTerm' });
     state = workbenchReducer(state, {
       itemKeys: ['image:failed.png', 'image:successor.png'],
+      preserveNavigationQuery: true,
       primaryItem: createGalleryImageItem('successor.png'),
       selectionPage: 30,
       type: 'setGalleryMultiSelection',
@@ -4980,6 +5280,165 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(query.boardId).toBe('board-deep');
     expect(query.searchTerm).toBe('');
     expect(values.galleryPage).toBe(0);
+  });
+
+  it('stamps a Gallery range with the listing the grid shows now', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, { item: createGalleryImageItem('anchor.png'), type: 'selectGalleryItem' });
+    state = workbenchReducer(state, { settings: { imageOrderDir: 'ASC' }, type: 'updateGallerySettings' });
+    state = workbenchReducer(state, { starredOnly: true, type: 'setGalleryStarredOnly' });
+    state = workbenchReducer(state, { searchTerm: 'sunset', type: 'setGallerySearchTerm' });
+    state = workbenchReducer(state, {
+      itemKeys: ['image:anchor.png', 'image:range-end.png'],
+      primaryItem: createGalleryImageItem('range-end.png'),
+      selectionPage: 2,
+      type: 'setGalleryMultiSelection',
+    });
+
+    const values = getProjectWidgetValues(getActiveProject(state), 'gallery');
+
+    expect(values.selectedImagePage).toBe(2);
+    expect(values.selectedImageQuery).toMatchObject({
+      imageOrderDir: 'ASC',
+      page: 2,
+      searchTerm: 'sunset',
+      starredOnly: true,
+    });
+  });
+
+  it('stamps a toggled selection with the page of the item that becomes primary', () => {
+    const stamp = () => {
+      const values = getProjectWidgetValues(getActiveProject(state), 'gallery');
+
+      return { page: values.selectedImagePage, query: values.selectedImageQuery };
+    };
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: { semanticImageQuery: { kind: 'text', query: 'sunset' } },
+      widgetId: 'gallery',
+    });
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('ranked-3.png'),
+      selectionPage: 0,
+      type: 'selectGalleryItem',
+    });
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('ranked-125.png'),
+      nextPrimaryItem: null,
+      selectionPage: 2,
+      type: 'toggleGalleryItemInSelection',
+    });
+    expect(stamp()).toMatchObject({ page: 2, query: { page: 2, semanticKey: 'text:sunset' } });
+
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('ranked-70.png'),
+      nextPrimaryItem: null,
+      selectionPage: 1,
+      type: 'toggleGalleryItemInSelection',
+    });
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('ranked-70.png'),
+      nextPrimaryItem: createGalleryImageItem('ranked-125.png'),
+      selectionPage: 2,
+      type: 'toggleGalleryItemInSelection',
+    });
+    expect(stamp()).toMatchObject({ page: 2, query: { page: 2, semanticKey: 'text:sunset' } });
+
+    // Without a known page the next primary keeps the previous stamp.
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('ranked-125.png'),
+      nextPrimaryItem: createGalleryImageItem('ranked-3.png'),
+      type: 'toggleGalleryItemInSelection',
+    });
+    expect(stamp()).toMatchObject({ page: 2, query: { page: 2 } });
+  });
+
+  it.each(['selectGalleryItem', 'setGalleryMultiSelection'] as const)(
+    'stamps a ranked %s step with the board the grid ranks within, its project board when none is saved',
+    (type) => {
+      let state = createInitialWorkbenchState();
+
+      state = workbenchReducer(state, {
+        type: 'patchWidgetValues',
+        values: { projectBoardId: 'board-project', selectedBoardId: undefined },
+        widgetId: 'gallery',
+      });
+      state = workbenchReducer(state, { item: createGalleryImageItem('first.png'), type: 'selectGalleryItem' });
+      state = workbenchReducer(state, {
+        type: 'patchWidgetValues',
+        values: { semanticImageQuery: { kind: 'text', query: 'sunset' } },
+        widgetId: 'gallery',
+      });
+      const ranked = createGalleryImageItem('ranked.png');
+      state = workbenchReducer(
+        state,
+        type === 'selectGalleryItem'
+          ? { item: ranked, preserveNavigationQuery: true, selectionPage: 1, type }
+          : {
+              itemKeys: ['image:ranked.png'],
+              preserveNavigationQuery: true,
+              primaryItem: ranked,
+              selectionPage: 1,
+              type,
+            }
+      );
+
+      expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageQuery).toMatchObject({
+        boardId: 'board-project',
+        page: 1,
+        semanticKey: 'text:sunset',
+      });
+    }
+  );
+
+  it('ties a selected semantic result page to the active ranking', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: { semanticImageQuery: { kind: 'text', query: 'sunset' } },
+      widgetId: 'gallery',
+    });
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('ranked.png'),
+      selectionPage: 3,
+      type: 'selectGalleryItem',
+    });
+
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageQuery).toMatchObject({
+      page: 3,
+      semanticKey: 'text:sunset',
+    });
+  });
+
+  it('retires a semantic page stamp when Preview resumes ordinary listing navigation', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: { semanticImageQuery: { kind: 'text', query: 'sunset' } },
+      widgetId: 'gallery',
+    });
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('ranked.png'),
+      selectionPage: 3,
+      type: 'selectGalleryItem',
+    });
+    state = workbenchReducer(state, { type: 'clearGallerySearch' });
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('ordinary.png'),
+      preserveNavigationQuery: true,
+      selectionPage: 1,
+      type: 'selectGalleryItem',
+    });
+
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageQuery).toMatchObject({
+      page: 1,
+      semanticKey: null,
+    });
   });
 
   it('pauses live-follow for saved Gallery multi-selection and comparison intents', () => {
@@ -5028,6 +5487,84 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     values = getProjectWidgetValues(getActiveProject(state), 'gallery');
     expect(values.galleryPage).toBe(0);
     expect(values.selectedImageQuery).toMatchObject({ starredOnly: false });
+  });
+
+  it('stamps a selection made outside the Gallery with the board the item belongs to, unfiltered', () => {
+    let state = createInitialWorkbenchState();
+
+    // The Gallery shows another board, searched, starred-only and paged.
+    state = workbenchReducer(state, { boardId: 'board-elsewhere', type: 'selectGalleryBoard' });
+    state = workbenchReducer(state, { searchTerm: 'sunset', type: 'setGallerySearchTerm' });
+    state = workbenchReducer(state, { starredOnly: true, type: 'setGalleryStarredOnly' });
+    state = workbenchReducer(state, { page: 4, type: 'setGalleryPage' });
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('found.png', 'board-found'),
+      navigateItemBoard: true,
+      type: 'selectGalleryItem',
+    });
+
+    const values = getProjectWidgetValues(getActiveProject(state), 'gallery');
+
+    expect(values.selectedImagePage).toBe(0);
+    expect(values.selectedImageQuery).toMatchObject({
+      boardId: 'board-found',
+      galleryView: 'images',
+      page: 0,
+      searchTerm: '',
+      starredOnly: false,
+    });
+  });
+
+  it('keeps an item-board stamp through a host step while the Gallery ranks', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('found.png', 'board-found'),
+      navigateItemBoard: true,
+      type: 'selectGalleryItem',
+    });
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: { semanticImageQuery: { kind: 'text', query: 'sunset' } },
+      widgetId: 'gallery',
+    });
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('next.png', 'board-found'),
+      preserveNavigationQuery: true,
+      selectionPage: 2,
+      type: 'selectGalleryItem',
+    });
+
+    const query = getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageQuery;
+
+    expect(query).toMatchObject({ boardId: 'board-found', itemBoard: true, page: 2 });
+    expect(query).not.toHaveProperty('semanticKey', 'text:sunset');
+  });
+
+  it('stamps a selection with the project board the grid shows when no board was chosen', () => {
+    let state = createInitialWorkbenchState();
+    const projectId = getActiveProject(state).id;
+    const stampedBoardId = () =>
+      (getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageQuery as { boardId: string }).boardId;
+
+    state = workbenchReducer(state, { boardId: 'project-board', projectId, type: 'setGalleryProjectBoardId' });
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('a.png', 'project-board'),
+      type: 'selectGalleryItem',
+    });
+    expect(stampedBoardId()).toBe('project-board');
+
+    state = workbenchReducer(state, {
+      itemKeys: ['image:a.png', 'image:b.png'],
+      primaryItem: createGalleryImageItem('b.png', 'project-board'),
+      type: 'setGalleryMultiSelection',
+    });
+    expect(stampedBoardId()).toBe('project-board');
+
+    // An explicit choice, Uncategorized included, still wins over the project board.
+    state = workbenchReducer(state, { boardId: 'none', type: 'selectGalleryBoard' });
+    state = workbenchReducer(state, { item: createGalleryImageItem('c.png'), type: 'selectGalleryItem' });
+    expect(stampedBoardId()).toBe('none');
   });
 
   it('stamps a landing generation against the unfiltered listing', () => {
@@ -5148,6 +5685,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     let state = createInitialWorkbenchState();
 
     state = workbenchReducer(state, { boardId: 'doomed-board', type: 'selectGalleryBoard' });
+    state = workbenchReducer(state, { settings: { autoAddBoardId: 'doomed-board' }, type: 'updateGallerySettings' });
     state = workbenchReducer(state, {
       type: 'patchWidgetValues',
       values: { semanticImageQuery: { kind: 'text', query: 'sunset' } },
@@ -5171,6 +5709,8 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
     expect(values.selectedBoardId).toBe('none');
     expect(values.semanticImageQuery).toBeNull();
+    // A deleted auto-add board hands results back to the selection.
+    expect(values.autoAddBoardId).toBe('follow');
   });
 
   it('stores selected backend board id for gallery submissions', () => {
@@ -5184,6 +5724,18 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     const queueItem = getActiveProject(state).queue.items[0];
 
     expect(queueItem.snapshot.galleryBoardId).toBe('backend-board-id');
+  });
+
+  it('sends gallery submissions to a fixed auto-add board rather than the selected one', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, { boardId: 'selected-board', type: 'selectGalleryBoard' });
+    state = workbenchReducer(state, { settings: { autoAddBoardId: 'auto-board' }, type: 'updateGallerySettings' });
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = primeGenerate(state);
+    state = submitGenerate(state);
+
+    expect(getActiveProject(state).queue.items[0]?.snapshot.galleryBoardId).toBe('auto-board');
   });
 
   it('sends gallery submissions to the project board until a board is picked', () => {
@@ -5833,7 +6385,21 @@ describe('workbench backend connection recovery', () => {
       state = workbenchReducer(state, {
         projectId: project.id,
         type: 'patchWidgetValues',
-        values: { compareImage: image, recentImages: [image], selectedImage: image },
+        values: {
+          compareImage: image,
+          recentImages: [image],
+          selectedImage: image,
+          selectedImagePage: 8,
+          selectedImageQuery: {
+            boardId: 'board-1',
+            galleryView: 'images',
+            imageOrderDir: 'DESC',
+            page: 8,
+            paginationMode: 'paginated',
+            searchTerm: 'sunset',
+            starredOnly: true,
+          },
+        },
         widgetId: 'gallery',
       });
     }
@@ -5850,6 +6416,16 @@ describe('workbench backend connection recovery', () => {
       expect(values.recentImages).toEqual([patchedImage]);
       expect(values.selectedImage).toEqual(legacyGeneratedImageToGalleryItem(patchedImage));
       expect(values.compareImage).toEqual(legacyGeneratedImageToGalleryItem(patchedImage));
+      expect(values.selectedImagePage).toBe(0);
+      expect(values.selectedImageQuery).toEqual({
+        boardId: 'board-2',
+        galleryView: 'images',
+        imageOrderDir: 'DESC',
+        page: 0,
+        paginationMode: 'infinite',
+        searchTerm: '',
+        starredOnly: true,
+      });
     }
   });
 
@@ -6092,6 +6668,81 @@ describe('workbenchReducer canvas v2 layer reducers', () => {
     const rolledBack = rollback(layer);
     expect(getLayerIds(rolledBack)).toEqual(['a', 'b']);
     expect(getCanvas(rolledBack).document.selectedLayerId).toBe('b');
+    expect(getCanvas(rolledBack).stagingArea).toBe(stagingArea);
+  });
+
+  it.each([
+    ['keeps an editable mask as the editing target', false, 'm'],
+    ['selects the result over a locked mask the next stroke would refuse', true, 'accepted'],
+  ])('%s through an accept and its rollback', (_label, isLocked, expectedSelection) => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [
+      { ...createInpaintMaskLayer('m'), isLocked },
+      createRasterLayer('a'),
+    ]);
+    state = workbenchReducer(state, { id: 'm', type: 'setCanvasSelectedLayer' });
+    const candidate: Project['canvas']['stagingArea']['pendingImages'][number] = {
+      height: 64,
+      imageName: 'eye.png',
+      imageUrl: 'url',
+      placement: { height: 64, opacity: 1, width: 64, x: 0, y: 0 },
+      queuedAt: 'now',
+      sourceQueueItemId: 'queue-1',
+      thumbnailUrl: 'thumb',
+      width: 64,
+    };
+    const stagingArea: Project['canvas']['stagingArea'] = {
+      ...getCanvas(state).stagingArea,
+      isVisible: true,
+      pendingImageIds: ['queue-1'],
+      pendingImages: [candidate],
+      selectedImageIndex: 0,
+    };
+    state = {
+      ...state,
+      projects: state.projects.map((project) =>
+        project.id === state.activeProjectId ? { ...project, canvas: { ...project.canvas, stagingArea } } : project
+      ),
+    };
+    const layer: CanvasRasterLayerContractV2 = { ...createRasterLayer('accepted', 'eye.png'), name: 'Accepted' };
+    const event = {
+      createdAt: '2026-07-16T00:00:00.000Z',
+      id: 'event-accepted',
+      summary: 'Accepted eye.png into a new raster layer',
+      type: 'canvas-layer-accepted' as const,
+    };
+
+    const committed = workbenchReducer(state, {
+      anchor: stackTopAnchor(state.activeProjectId),
+      candidateFingerprint: getCanvasStagingCandidateFingerprint(candidate),
+      continueStaging: false,
+      event,
+      layer,
+      selectedImageIndex: 0,
+      type: 'commitStagedImage',
+    });
+
+    expect(getCanvas(committed).document.stacks.raster.map((node) => node.id)).toEqual(['accepted', 'a']);
+    expect(getCanvas(committed).document.stacks.raster[0]).toMatchObject({ isEnabled: true });
+    expect(getCanvas(committed).document.selectedLayerId).toBe(expectedSelection);
+
+    const rollback = (from: WorkbenchState) =>
+      workbenchReducer(from, {
+        continueStaging: false,
+        event,
+        layer,
+        selectedLayerId: 'm',
+        stagingArea,
+        type: 'rollbackStagedImageCommit',
+      });
+    // A selection that moved after the accept is not the accept's own result, so the rollback refuses it.
+    const moved = workbenchReducer(committed, {
+      id: expectedSelection === 'm' ? 'accepted' : 'm',
+      type: 'setCanvasSelectedLayer',
+    });
+    expect(rollback(moved)).toBe(moved);
+    const rolledBack = rollback(committed);
+    expect(getCanvas(rolledBack).document.stacks.raster.map((node) => node.id)).toEqual(['a']);
+    expect(getCanvas(rolledBack).document.selectedLayerId).toBe('m');
     expect(getCanvas(rolledBack).stagingArea).toBe(stagingArea);
   });
 

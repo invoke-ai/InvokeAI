@@ -15,8 +15,16 @@ import { EMPTY_IMAGE_RECALL_CAPABILITIES } from './imageRecall';
 
 const NO_BOARDS: [] = [];
 
+const findGalleryItem = vi.fn();
+
+vi.mock('@workbench/image-actions/useFindGalleryItem', () => ({ useFindGalleryItem: () => findGalleryItem }));
 vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: () => vi.fn() }));
+vi.mock('@workbench/projects/library', () => ({
+  useProjectLibrarySelector: (selector: (snapshot: { summaries: [] }) => unknown) => selector({ summaries: [] }),
+}));
 vi.mock('@workbench/WorkbenchContext', () => ({
+  useActiveProjectId: () => 'project-1',
+  useActiveProjectName: () => 'Project',
   useWorkbenchCommands: () => ({
     generation: { setSource: vi.fn() },
     widgets: { patchValues: vi.fn() },
@@ -227,6 +235,32 @@ describe('ImageContextMenu deletion delegation', () => {
   });
 });
 
+describe('ImageContextMenu find in gallery', () => {
+  it('reveals a single image or video by its gallery reference', async () => {
+    findGalleryItem.mockClear();
+    await renderMenu(createActions(vi.fn()), [image('still.png')]);
+    await interact(() => getMenuItem('widgets.gallery.findInGallery').click());
+    expect(findGalleryItem).toHaveBeenCalledExactlyOnceWith({ kind: 'image', name: 'still.png' });
+
+    await interact(() => root?.unmount());
+    const video = item('video', 'clip.mp4');
+    await renderItemMenu(createActions(vi.fn()), {
+      itemRefs: [{ kind: 'video', name: video.name }],
+      items: [video],
+      x: 20,
+      y: 20,
+    });
+    await interact(() => getMenuItem('widgets.gallery.findInGallery').click());
+    expect(findGalleryItem).toHaveBeenLastCalledWith({ kind: 'video', name: 'clip.mp4' });
+  });
+
+  it('is absent from bulk menus, which have no single item to reveal', async () => {
+    await renderMenu(createActions(vi.fn()), [image('a.png'), image('b.png')]);
+
+    expect(document.body.textContent).not.toContain('widgets.gallery.findInGallery');
+  });
+});
+
 describe('ImageContextMenu load workflow', () => {
   it('enables Load Workflow once the image is known to embed one and hands the image to the action', async () => {
     const actions = createActions(vi.fn());
@@ -309,28 +343,82 @@ describe('ImageContextMenu starred state', () => {
   });
 });
 
-describe('ImageContextMenu new canvas from image', () => {
-  it.each([1, 3])('opens a new canvas from the %s targeted image(s)', async (count) => {
+describe('ImageContextMenu canvas destinations', () => {
+  const menuItemLabels = () =>
+    Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).map(
+      (candidate) => candidate.textContent?.trim() || candidate.getAttribute('aria-label')
+    );
+
+  /** Top-level menu entries in order, with separators as `—`, so a position within its group is observable. */
+  const menuSequence = () =>
+    Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"], [role="separator"]')).map((candidate) =>
+      candidate.getAttribute('role') === 'separator'
+        ? '—'
+        : candidate.textContent?.trim() || candidate.getAttribute('aria-label')
+    );
+  const ADD = 'widgets.canvas.import.addToCurrentCanvas';
+  const NEW_PROJECT = 'widgets.canvas.import.newProjectFromImage';
+
+  it('leads the single-image actions group, right after Recall Metadata, with the two canvas destinations', async () => {
+    await renderMenu(createActions(vi.fn()), [image('image-0.png')]);
+    const sequence = menuSequence();
+    const recallIndex = sequence.indexOf('Recall Metadata');
+
+    expect(sequence.slice(recallIndex, recallIndex + 5)).toEqual([
+      'Recall Metadata',
+      '—',
+      ADD,
+      NEW_PROJECT,
+      'Send to Upscale',
+    ]);
+  });
+
+  it('opens the multi-image menu, below its header, with the two canvas destinations in a group of their own', async () => {
+    await renderMenu(
+      createActions(vi.fn()),
+      Array.from({ length: 3 }, (_, index) => image(`image-${index}.png`))
+    );
+
+    expect(menuSequence().slice(0, 5)).toEqual(['—', ADD, NEW_PROJECT, '—', 'Star All']);
+  });
+
+  it.each([1, 3])('adds the %s targeted image(s) to the current canvas as the chosen layer', async (count) => {
     const actions = createActions(vi.fn());
     const images = Array.from({ length: count }, (_, index) => image(`image-${index}.png`));
     await renderMenu(actions, images);
 
     // A nested menu opens from a real hover on its trigger item, after zag's open delay, so the open is waited for
     // rather than slept through.
-    await hoverItem(getMenuItem('widgets.canvas.import.newFromImage'));
+    await hoverItem(getMenuItem('widgets.canvas.import.addToCurrentCanvas'));
     await settleUntil(
-      () =>
-        Array.from(document.querySelectorAll('[role="menuitem"]')).some(
-          (candidate) => candidate.textContent?.trim() === 'widgets.canvas.import.newCanvasFromImage'
-        ),
-      'the new-from-image submenu to open',
+      () => menuItemLabels().includes('widgets.canvas.import.inpaintMask'),
+      'the add-to-current-canvas submenu to open',
       5000
     );
-    await interact(() => getMenuItem('widgets.canvas.import.newCanvasFromImage').click());
+    // Raster leads the destinations, as the drop zones and Preview's Edit menu order them.
+    expect(menuItemLabels().indexOf('widgets.canvas.import.raster')).toBeLessThan(
+      menuItemLabels().indexOf('widgets.canvas.import.control')
+    );
+    await interact(() => getMenuItem('widgets.canvas.import.inpaintMask').click());
+
+    const calls = vi.mocked(actions.sendToCanvas).mock.calls;
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.[0].map((entry) => entry.imageName)).toEqual(images.map((entry) => entry.imageName));
+    expect(calls[0]?.[1]).toBe('inpaint-mask');
+    expect(actions.createCanvasFromImages).not.toHaveBeenCalled();
+  });
+
+  it.each([1, 3])('starts a new project from the %s targeted image(s) in one step', async (count) => {
+    const actions = createActions(vi.fn());
+    const images = Array.from({ length: count }, (_, index) => image(`image-${index}.png`));
+    await renderMenu(actions, images);
+
+    await interact(() => getMenuItem('widgets.canvas.import.newProjectFromImage').click());
 
     const calls = vi.mocked(actions.createCanvasFromImages).mock.calls;
     expect(calls).toHaveLength(1);
     expect(calls[0]?.[0].map((entry) => entry.imageName)).toEqual(images.map((entry) => entry.imageName));
+    expect(actions.sendToCanvas).not.toHaveBeenCalled();
   });
 });
 
@@ -425,7 +513,7 @@ describe('ImageContextMenu mixed-media action visibility', () => {
     expect(document.querySelector('[aria-label="Download video"]')).not.toBeNull();
     expect(document.querySelector('[aria-label="Open in preview"]')).not.toBeNull();
     expect(document.querySelector('[aria-label="Star video"]')).not.toBeNull();
-    expect(document.body.textContent).toContain('Change Board');
+    expect(document.body.textContent).toContain('widgets.gallery.changeBoard');
     expect(document.body.textContent).toContain('Delete Video');
     expect(document.body.textContent).not.toContain('Copy to clipboard');
     expect(document.body.textContent).not.toContain('widgets.preview.copyCurrentFrame');
@@ -433,7 +521,8 @@ describe('ImageContextMenu mixed-media action visibility', () => {
     expect(document.body.textContent).toContain('Recall Metadata');
     expect(document.body.textContent).not.toContain('Send to Upscale');
     expect(document.body.textContent).not.toContain('Select for Compare');
-    expect(document.body.textContent).not.toContain('widgets.canvas.import.newFromImage');
+    expect(document.body.textContent).not.toContain('widgets.canvas.import.addToCurrentCanvas');
+    expect(document.body.textContent).not.toContain('widgets.canvas.import.newProjectFromImage');
   });
 
   it('shows frame copy and Details only when a Preview host opts a single video into them', async () => {
@@ -517,7 +606,21 @@ describe('ImageContextMenu mixed-media action visibility', () => {
     expect(document.body.textContent).not.toContain('Copy to clipboard');
     expect(document.body.textContent).not.toContain('Recall Metadata');
     expect(document.body.textContent).not.toContain('Select for Compare');
-    expect(document.body.textContent).not.toContain('widgets.canvas.import.newFromImage');
+    expect(document.body.textContent).not.toContain('widgets.canvas.import.addToCurrentCanvas');
+    expect(document.body.textContent).not.toContain('widgets.canvas.import.newProjectFromImage');
+  });
+
+  it("offers Unstar All from the host's star answer for a selection with unloaded members", async () => {
+    const loadedImage = { ...item('image', 'starred-still.png'), starred: true };
+    const actions = createActions(vi.fn());
+    const refs = [
+      { kind: 'image' as const, name: loadedImage.name },
+      { kind: 'image' as const, name: 'starred-unloaded.png' },
+    ];
+    await renderItemMenu(actions, { allStarred: true, itemRefs: refs, items: [loadedImage], x: 20, y: 20 });
+
+    await interact(() => getMenuItem('Unstar All').click());
+    expect(actions.setItemsStarred).toHaveBeenCalledWith(refs, false);
   });
 
   it('keeps complete mixed refs for common bulk actions and hides image-only bulk actions when a ref is unresolved', async () => {
@@ -537,9 +640,10 @@ describe('ImageContextMenu mixed-media action visibility', () => {
     expect(document.body.textContent).toContain('2 items selected');
     expect(document.body.textContent).toContain('Star All');
     expect(document.body.textContent).toContain('Download Selection');
-    expect(document.body.textContent).toContain('Change Board');
+    expect(document.body.textContent).toContain('widgets.gallery.changeBoard');
     expect(document.body.textContent).toContain('Delete Selection');
-    expect(document.body.textContent).not.toContain('widgets.canvas.import.newFromImage');
+    expect(document.body.textContent).not.toContain('widgets.canvas.import.addToCurrentCanvas');
+    expect(document.body.textContent).not.toContain('widgets.canvas.import.newProjectFromImage');
     await pickQuickItem('Open in new tab');
     await interact(() => root?.unmount());
     host?.remove();

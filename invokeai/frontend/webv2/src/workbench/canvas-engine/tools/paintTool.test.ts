@@ -84,8 +84,9 @@ const controlImageLayer = (id: string): CanvasControlLayerContract => ({
 
 const controlTransaction = (layerId = 'control'): PixelEditTransaction => ({
   cancel: vi.fn(),
-  commitPatch: vi.fn(),
-  commitStroke: vi.fn(),
+  commit: vi.fn(() => true),
+  commitPatch: vi.fn(() => true),
+  grow: vi.fn(() => true),
   layerId,
 });
 
@@ -126,17 +127,21 @@ interface Harness {
   painted: string[];
   requestLayerRasterization: ReturnType<typeof vi.fn>;
   createdIds: string[];
+  /** Every admitted stroke edit, so a test can check each one ended. */
+  strokeEdits: { cancel: ReturnType<typeof vi.fn> }[];
 }
 
 const createHarness = (
   doc: CanvasDocumentContractV3,
-  transaction: PixelEditTransaction | null | undefined = undefined
+  transaction: PixelEditTransaction | null | undefined = undefined,
+  refuseStrokes = false
 ): Harness => {
   const backend = createTestStubRasterBackend();
   const layers = createLayerCacheStore(backend);
   const stores = createEngineStores();
   const dispatched: CanvasProjectMutation[] = [];
   const strokes: StrokeCommittedEvent[] = [];
+  const strokeEdits: Harness['strokeEdits'] = [];
   const painted: string[] = [];
   const createdIds: string[] = [];
   const beginPixelEdit = transaction === undefined ? null : vi.fn(() => transaction);
@@ -144,6 +149,10 @@ const createHarness = (
   let idCounter = 0;
 
   const ctx: ToolContext = {
+    scheduleFrame: (task) => {
+      task();
+      return () => undefined;
+    },
     backend,
     ...(beginPixelEdit ? { beginPixelEdit } : {}),
     captureInsertionAnchor: createTestInsertionAnchorCapture('p'),
@@ -158,9 +167,21 @@ const createHarness = (
       return path as unknown as Path2D;
     },
     dispatch: (action) => dispatched.push(action),
-    emitStrokeCommitted: (event) => {
-      painted.push(event.layerId);
-      strokes.push(event);
+    beginStrokeEdit: () => {
+      if (refuseStrokes) {
+        return null;
+      }
+      const edit = {
+        cancel: vi.fn(),
+        commit: (event: StrokeCommittedEvent) => {
+          painted.push(event.layerId);
+          strokes.push(event);
+          return true;
+        },
+        grow: () => true,
+      };
+      strokeEdits.push(edit);
+      return edit;
     },
     getDocument: () => doc,
     invalidate: vi.fn(),
@@ -174,7 +195,18 @@ const createHarness = (
     viewport: null as never,
   };
 
-  return { backend, beginPixelEdit, createdIds, ctx, dispatched, layers, painted, requestLayerRasterization, strokes };
+  return {
+    backend,
+    beginPixelEdit,
+    createdIds,
+    ctx,
+    dispatched,
+    layers,
+    painted,
+    requestLayerRasterization,
+    strokeEdits,
+    strokes,
+  };
 };
 
 const cacheOps = (surface: StubRasterSurface): string[] => surface.callLog.map((entry) => entry.op);
@@ -283,7 +315,7 @@ describe('eraser tool', () => {
     up(eraser, h.ctx, pointer(6, 6));
 
     expect(h.beginPixelEdit).toHaveBeenCalledWith('img1');
-    expect(transaction.commitStroke).toHaveBeenCalledOnce();
+    expect(transaction.commit).toHaveBeenCalledOnce();
     expect(h.dispatched).toHaveLength(0);
     expect(h.createdIds).toHaveLength(0);
   });
@@ -293,6 +325,7 @@ describe('brush tool: cancel', () => {
   it('restores pixels via putImageData and emits no event', () => {
     const doc = makeDoc([paintLayer('paint1')], 'paint1');
     const h = createHarness(doc);
+    h.layers.getOrCreateRect('paint1', { height: 100, width: 100, x: 0, y: 0 }).stale = false;
     const brush = createBrushTool();
 
     down(brush, h.ctx, pointer(20, 20));
@@ -302,6 +335,30 @@ describe('brush tool: cancel', () => {
     expect(h.strokes).toHaveLength(0);
     expect(h.painted).toHaveLength(0);
     expect(cacheOps(cacheSurface(h, 'paint1'))).toContain('putImageData');
+  });
+
+  it('removes a cache the cancelled stroke created', () => {
+    const h = createHarness(makeDoc([paintLayer('paint1')], 'paint1'));
+    const brush = createBrushTool();
+
+    down(brush, h.ctx, pointer(20, 20));
+    move(brush, h.ctx, pointer(40, 40), [pointer(40, 40)]);
+    cancel(brush, h.ctx);
+
+    expect(h.layers.peek('paint1')).toBeUndefined();
+  });
+
+  it('paints nothing and creates no layer when the stroke is refused admission', () => {
+    const h = createHarness(makeDoc([], null), undefined, true);
+    const brush = createBrushTool();
+
+    down(brush, h.ctx, pointer(20, 20));
+    move(brush, h.ctx, pointer(40, 40), [pointer(40, 40)]);
+    up(brush, h.ctx, pointer(40, 40, { buttons: 0 }));
+
+    expect(h.dispatched).toEqual([]);
+    expect(h.createdIds).toEqual([]);
+    expect(h.strokes).toEqual([]);
   });
 });
 
@@ -316,7 +373,7 @@ describe('paint tool: target resolution', () => {
     up(brush, h.ctx, pointer(20, 20, { buttons: 0 }));
 
     expect(h.beginPixelEdit).toHaveBeenCalledWith('control');
-    expect(transaction.commitStroke).toHaveBeenCalledOnce();
+    expect(transaction.commit).toHaveBeenCalledOnce();
     expect(transaction.cancel).not.toHaveBeenCalled();
     expect(h.dispatched).toHaveLength(0);
   });
@@ -332,7 +389,7 @@ describe('paint tool: target resolution', () => {
       brush.onDeactivate?.(h.ctx);
     }
     expect(transaction.cancel).toHaveBeenCalledOnce();
-    expect(transaction.commitStroke).not.toHaveBeenCalled();
+    expect(transaction.commit).not.toHaveBeenCalled();
   });
 
   it('aborts the control transaction and releases the gesture after pointer-move painting fails', () => {
@@ -347,7 +404,7 @@ describe('paint tool: target resolution', () => {
     expect(() => move(brush, h.ctx, pointer(20, 20), [pointer(20, 20)])).toThrow('move paint failed');
 
     expect(transaction.cancel).toHaveBeenCalledOnce();
-    expect(transaction.commitStroke).not.toHaveBeenCalled();
+    expect(transaction.commit).not.toHaveBeenCalled();
     expect(h.dispatched).toHaveLength(0);
     expect(h.painted).toHaveLength(0);
     expect(h.strokes).toHaveLength(0);
@@ -355,6 +412,29 @@ describe('paint tool: target resolution', () => {
     drawImage.mockRestore();
     down(brush, h.ctx, pointer(30, 30));
     expect(h.beginPixelEdit).toHaveBeenCalledTimes(2);
+  });
+
+  it('aborts the gesture when a deferred frame render fails', () => {
+    const transaction = controlTransaction();
+    const h = createHarness(makeDoc([controlPaintLayer('control')], 'control'), transaction);
+    const frames: (() => void)[] = [];
+    h.ctx.scheduleFrame = (task) => {
+      frames.push(task);
+      return () => frames.splice(frames.indexOf(task), 1);
+    };
+    const brush = createBrushTool();
+    down(brush, h.ctx, pointer(10, 10));
+    move(brush, h.ctx, pointer(20, 20), [pointer(20, 20)]);
+    vi.spyOn(h.layers, 'growToRect').mockImplementation(() => {
+      throw new Error('frame paint failed');
+    });
+
+    expect(() => frames.splice(0).forEach((task) => task())).toThrow('frame paint failed');
+
+    expect(transaction.cancel).toHaveBeenCalledOnce();
+    up(brush, h.ctx, pointer(30, 30));
+    expect(transaction.commit).not.toHaveBeenCalled();
+    expect(h.strokes).toHaveLength(0);
   });
 
   it('aborts the control transaction and releases the gesture after stroke finalization fails', () => {
@@ -369,7 +449,7 @@ describe('paint tool: target resolution', () => {
     expect(() => up(brush, h.ctx, pointer(10, 10, { buttons: 0 }))).toThrow('stroke finalization failed');
 
     expect(transaction.cancel).toHaveBeenCalledOnce();
-    expect(transaction.commitStroke).not.toHaveBeenCalled();
+    expect(transaction.commit).not.toHaveBeenCalled();
     expect(h.dispatched).toHaveLength(0);
     expect(h.painted).toHaveLength(0);
     expect(h.strokes).toHaveLength(0);
@@ -391,7 +471,7 @@ describe('paint tool: target resolution', () => {
     expect(() => cancel(brush, h.ctx)).toThrow('pixel restoration failed');
 
     expect(transaction.cancel).toHaveBeenCalledOnce();
-    expect(transaction.commitStroke).not.toHaveBeenCalled();
+    expect(transaction.commit).not.toHaveBeenCalled();
     expect(h.dispatched).toHaveLength(0);
     expect(h.painted).toHaveLength(0);
     expect(h.strokes).toHaveLength(0);
@@ -401,19 +481,19 @@ describe('paint tool: target resolution', () => {
     expect(h.beginPixelEdit).toHaveBeenCalledTimes(2);
   });
 
-  it('does not roll back an accepted stroke when transaction publication throws', () => {
+  it('abandons the stroke when its edit fails to publish, leaving the tool ready', () => {
     const transaction = controlTransaction();
-    vi.mocked(transaction.commitStroke).mockImplementation(() => {
-      throw new Error('listener publication failed');
+    vi.mocked(transaction.commit).mockImplementation(() => {
+      throw new Error('publication failed');
     });
     const h = createHarness(makeDoc([controlPaintLayer('control')], 'control'), transaction);
     const brush = createBrushTool();
     down(brush, h.ctx, pointer(10, 10));
 
-    expect(() => up(brush, h.ctx, pointer(10, 10, { buttons: 0 }))).toThrow('listener publication failed');
+    expect(() => up(brush, h.ctx, pointer(10, 10, { buttons: 0 }))).toThrow('publication failed');
 
-    expect(transaction.commitStroke).toHaveBeenCalledOnce();
-    expect(transaction.cancel).not.toHaveBeenCalled();
+    expect(transaction.commit).toHaveBeenCalledOnce();
+    expect(transaction.cancel).toHaveBeenCalledOnce();
     down(brush, h.ctx, pointer(30, 30));
     expect(h.beginPixelEdit).toHaveBeenCalledTimes(2);
   });
@@ -504,6 +584,30 @@ describe('transparency lock', () => {
 
     expect(h.strokes).toHaveLength(0);
     expect(h.painted).toEqual([]);
+    expect(h.strokeEdits.map((edit) => edit.cancel.mock.calls.length)).toEqual([1]);
+  });
+
+  it('ends the admitted edit and removes the layer it created when the stroke is cancelled', () => {
+    const h = createHarness(makeDoc([], null));
+    const brush = createBrushTool();
+
+    down(brush, h.ctx, pointer(20, 20));
+    cancel(brush, h.ctx);
+
+    expect(h.strokeEdits.map((edit) => edit.cancel.mock.calls.length)).toEqual([1]);
+    expect(h.dispatched).toContainEqual({ ids: [h.createdIds[0]], type: 'removeCanvasLayers' });
+  });
+
+  it('ends the admitted edit when a zero-scale layer leaves nothing to paint into', () => {
+    const flat = { ...paintLayer('paint1'), transform: { rotation: 0, scaleX: 0, scaleY: 1, x: 0, y: 0 } };
+    const h = createHarness(makeDoc([flat], 'paint1'));
+    const brush = createBrushTool();
+
+    down(brush, h.ctx, pointer(20, 20));
+    up(brush, h.ctx, pointer(20, 20));
+
+    expect(h.strokes).toHaveLength(0);
+    expect(h.strokeEdits.map((edit) => edit.cancel.mock.calls.length)).toEqual([1]);
   });
 
   it('brush is unaffected (source-over) when transparency is NOT locked', () => {

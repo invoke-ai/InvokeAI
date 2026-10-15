@@ -25,10 +25,19 @@ vi.mock('react-i18next', () => ({
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 const STALE_TARGET = { projectId: 'old-project' };
+const PICKED_BOARD_VALUES = { selectedBoardId: 'picked' };
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const Harness = ({ id, target }: { id: string; target?: SettingFieldProps['target'] }) => {
-  const [values, setValues] = useState<Record<string, unknown>>({ imageDensityPercent: 25 });
+const Harness = ({
+  id,
+  initialValues = { imageDensityPercent: 25 },
+  target,
+}: {
+  id: string;
+  initialValues?: Record<string, unknown>;
+  target?: SettingFieldProps['target'];
+}) => {
+  const [values, setValues] = useState<Record<string, unknown>>(initialValues);
   const updateSettings = useCallback(
     (patch: Record<string, unknown>) => setValues((current) => ({ ...current, ...patch })),
     []
@@ -94,6 +103,21 @@ describe('Gallery settings contribution bindings', () => {
 
     expect(dialog?.checked).toBe(false);
     expect(host?.querySelector('output')?.textContent).toContain('"showPendingItems":false');
+  });
+
+  it('pins the current destination when results stop following the selected board', async () => {
+    await act(() => root?.render(<Harness id="followSelectedBoard" initialValues={PICKED_BOARD_VALUES} />));
+    const toggle = host?.querySelector<HTMLInputElement>('[data-surface="quick"] input');
+
+    expect(toggle?.checked).toBe(true);
+    await act(() => toggle?.click());
+
+    expect(toggle?.checked).toBe(false);
+    expect(host?.querySelector('output')?.textContent).toContain('"autoAddBoardId":"picked"');
+
+    await act(() => toggle?.click());
+
+    expect(host?.querySelector('output')?.textContent).toContain('"autoAddBoardId":"follow"');
   });
 
   it('disables edits for a target belonging to another project', async () => {

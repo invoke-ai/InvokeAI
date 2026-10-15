@@ -10,8 +10,8 @@ import type {
   LayerStackMoveKind,
   RegionalGuidanceReferenceImage,
 } from '@workbench/canvas-engine/api';
+import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import type { LucideIcon } from 'lucide-react';
 import type { ComponentProps, Dispatch, ReactNode } from 'react';
 
@@ -32,17 +32,14 @@ import {
   renderableSourceOf,
 } from '@workbench/canvas-engine/api';
 import { getCanvasOperations } from '@workbench/canvas-operations/api';
-import { focusOpenedWidget } from '@workbench/focusRegions';
+import { useWorkbenchFocus } from '@workbench/focusRegions';
+import { ShortcutKeycaps } from '@workbench/hotkeys/keyGlyphs';
 import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
 import { publishLayerPanelSelection, readLayerPanelState, useLayerPanelState } from '@workbench/layerPanelState';
 import { useNotify } from '@workbench/useNotify';
 import { isCanvasInteractionLocked } from '@workbench/widgets/canvas/canvasInteractionLock';
-import {
-  useCanvasDocumentEditingLocked,
-  useCanvasRasterContentEpoch,
-  useLayerThumbnailVersion,
-} from '@workbench/widgets/canvas/engineStoreHooks';
-import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
+import { useCanvasDocumentEditingLocked, useCanvasEngineRead } from '@workbench/widgets/canvas/engineStoreHooks';
+import { reportLayerOperation, usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import {
   ArrowRightLeftIcon,
@@ -110,6 +107,7 @@ import {
   fitLayerTransformToBbox,
   getControlTransparencyEffectPatch,
   getRegionalGuidanceAutoNegativePatch,
+  MASK_MODIFIER_DEFAULTS,
 } from './layerOps';
 import { requestLayerProperties } from './layerPropertiesRequestStore';
 import { RunLayerWorkflowDialog, useLayerWorkflowAvailability } from './RunLayerWorkflowDialog';
@@ -147,6 +145,7 @@ type LayerActionErrorStatus =
   | 'busy'
   | 'disabled'
   | 'empty'
+  | 'failed'
   | 'locked'
   | 'missing'
   | 'not-ready'
@@ -158,10 +157,11 @@ const LAYER_ACTION_ERROR_KEYS: Record<LayerActionErrorStatus, string> = {
   busy: 'widgets.layers.actions.busy',
   disabled: 'widgets.layers.actions.disabled',
   empty: 'widgets.layers.actions.empty',
+  failed: 'widgets.layers.actions.operationFailed',
   locked: 'widgets.layers.actions.locked',
   missing: 'widgets.layers.actions.missing',
   'not-ready': 'widgets.layers.actions.notReady',
-  'over-budget': 'widgets.layers.actions.notReady',
+  'over-budget': 'widgets.layers.actions.overBudget',
   unsupported: 'widgets.layers.actions.unsupported',
 };
 
@@ -195,6 +195,8 @@ interface LayerMenuProps {
    */
   dialogKind?: LayerMenuDialogKind | null;
   onDialogKindChange?: (kind: LayerMenuDialogKind | null) => void;
+  /** After a sibling dialog's close animation; a controlling parent may stop retaining its target here. */
+  onDialogExitComplete?: () => void;
   /** Canvas-only items composed immediately before the terminal danger section. */
   beforeDangerItems?: ReactNode;
   /** Adds the legacy layer and Canvas group labels on the canvas surface. */
@@ -217,6 +219,7 @@ const LayerMenu = ({
   unmountOnExit,
   dialogKind: controlledDialogKind,
   onDialogKindChange,
+  onDialogExitComplete,
   beforeDangerItems,
   showGroupLabels,
 }: LayerMenuProps) => {
@@ -240,11 +243,11 @@ const LayerMenu = ({
   const documentEditingLocked = useCanvasDocumentEditingLocked(engine);
   const { selectedIds } = useLayerPanelState(projectId, document.selectedLayerId);
   const interactionLocked = isCanvasInteractionLocked(canvas, queueItems) || documentEditingLocked;
-  // Re-render when live, not-yet-persisted paint/mask pixels change.
-  useLayerThumbnailVersion(engine, layer.id);
-  const hasSupportedContent = engine
-    ? engine.exports.hasExportableLayerContent(layer.id)
-    : hasPureExportableLayerContent(layer, document);
+  const hasLiveContent = useCanvasEngineRead(
+    engine,
+    () => engine?.exports.hasExportableLayerContent(layer.id) ?? false
+  );
+  const hasSupportedContent = engine ? hasLiveContent : hasPureExportableLayerContent(layer, document);
   const [internalDialogKind, setInternalDialogKind] = useState<LayerMenuDialogKind | null>(null);
   const dialogKind = controlledDialogKind !== undefined ? controlledDialogKind : internalDialogKind;
   const setDialogKind = useCallback(
@@ -278,20 +281,23 @@ const LayerMenu = ({
     [commitPrepared, layer, selectedIds]
   );
 
-  const canGroup = canGroupSelection(engine?.document.model() ?? null, actionTargets({ layer, selectedIds }));
-  // Un-memoized on purpose, like `canGroup`: it reads live raster content
-  // (`hasExportableLayerContent`), which the content epoch re-renders for.
-  useCanvasRasterContentEpoch(engine);
-  const mergeModel = engine?.document.model() ?? null;
-  const mergeTargets = actionTargets({ layer, selectedIds });
-  const canMerge =
-    !!engine &&
-    !!mergeModel &&
-    mergeTargets.length > 1 &&
-    canMergeSelectedRasters(mergeModel.document, mergeModel.compileLeaves(), new Set(mergeTargets), (layerId) =>
-      engine.exports.hasExportableLayerContent(layerId)
+  const targets = actionTargets({ layer, selectedIds });
+  const canGroup = useCanvasEngineRead(engine, () => canGroupSelection(engine?.document.model() ?? null, targets));
+  const canMerge = useCanvasEngineRead(engine, () => {
+    const model = engine?.document.model() ?? null;
+    return (
+      !!engine &&
+      !!model &&
+      targets.length > 1 &&
+      canMergeSelectedRasters(model.document, model.compileLeaves(), new Set(targets), (layerId) =>
+        engine.exports.hasExportableLayerContent(layerId)
+      )
     );
-  const canDeleteSelection = !!mergeModel && mergeModel.refusalFor({ ids: mergeTargets, type: 'remove' }) === null;
+  });
+  const canDeleteSelection = useCanvasEngineRead(
+    engine,
+    () => engine?.document.model()?.refusalFor({ ids: targets, type: 'remove' }) === null
+  );
   const hiddenByAncestor =
     (lookupDocumentNodeState(document, layer.id)?.documentHidden ?? false) && !isNodeHidden(layer);
   const actionState = useMemo<LayerContextActionState>(
@@ -359,6 +365,10 @@ const LayerMenu = ({
         if (result.status === 'busy') {
           return;
         }
+        if (result.status !== 'nothing') {
+          reportLayerOperation(result.status, notify.error, t);
+          return;
+        }
       } catch {
         // Report rejected transactions in the menu; the document remains unchanged.
       }
@@ -392,19 +402,31 @@ const LayerMenu = ({
         notify.error(t('widgets.layers.actions.actionFailed'), t('widgets.layers.groupActions.mergeNotReady'));
       } else if (result === 'over-budget') {
         notify.error(t('widgets.layers.actions.actionFailed'), t('widgets.layers.groupActions.mergeOverBudget'));
+      } else if (result === 'failed') {
+        notify.error(t('widgets.layers.actions.actionFailed'), t('widgets.layers.actions.operationFailed'));
       }
     });
   }, [engine, layer, notify, selectedIds, t]);
 
   const handleMerge = useCallback(() => {
-    // Pixel work: engine-only, and not recorded on the undo history.
-    engine?.layers.mergeLayerDown(layer.id);
-  }, [engine, layer.id]);
+    if (!engine) {
+      throw makeStatusError('not-ready');
+    }
+    const result = engine.layers.mergeLayerDown(layer.id);
+    if (result !== 'merged') {
+      throw makeStatusError(result);
+    }
+  }, [engine, layer.id, makeStatusError]);
 
   const handleRasterize = useCallback(() => {
-    // Rasterization records one undoable entry restoring the original parametric source.
-    engine?.layers.rasterizeLayer(layer.id);
-  }, [engine, layer.id]);
+    if (!engine) {
+      throw makeStatusError('not-ready');
+    }
+    const result = engine.layers.rasterizeLayer(layer.id);
+    if (result !== 'rasterized') {
+      throw makeStatusError(result);
+    }
+  }, [engine, layer.id, makeStatusError]);
 
   const addCopy = useCallback(
     (copied: CanvasLayerContract | null, label: string) => {
@@ -515,6 +537,20 @@ const LayerMenu = ({
   const openRename = useCallback(() => setDialogKind('rename'), [setDialogKind]);
   const closeDialog = useCallback(() => setDialogKind(null), [setDialogKind]);
   const openRunWorkflow = useCallback(() => setDialogKind('run-workflow'), [setDialogKind]);
+  // Each close remounts the run dialog, closed, so the next open starts from a fresh form.
+  const [runWorkflowGeneration, setRunWorkflowGeneration] = useState(0);
+  const handleRunWorkflowExitComplete = useCallback(() => {
+    setRunWorkflowGeneration((generation) => generation + 1);
+    onDialogExitComplete?.();
+  }, [onDialogExitComplete]);
+  // Operations present their controls in the Properties pane, so starting one must bring that pane into view.
+  const revealProperties = useCallback(
+    (layerId: string) => {
+      widgets.open({ region: 'right', widgetId: 'layers' });
+      requestLayerProperties(layerId);
+    },
+    [widgets]
+  );
   const startSelectObject = useCallback(
     (layerId: string) => {
       if (!engine) {
@@ -524,8 +560,9 @@ const LayerMenu = ({
       if (result !== 'started') {
         throw makeStatusError(result);
       }
+      revealProperties(layerId);
     },
-    [engine, makeStatusError]
+    [engine, makeStatusError, revealProperties]
   );
   const startFilter = useCallback(
     (layerId: string) => {
@@ -536,8 +573,9 @@ const LayerMenu = ({
       if (result !== 'started') {
         throw makeStatusError(result);
       }
+      revealProperties(layerId);
     },
-    [engine, makeStatusError]
+    [engine, makeStatusError, revealProperties]
   );
   const submitRename = useCallback(
     (name: string) => {
@@ -619,11 +657,11 @@ const LayerMenu = ({
     }
   }, [engine, layer.id, makeStatusError]);
 
+  const { focusRegion } = useWorkbenchFocus();
   const handleOpenProperties = useCallback(() => {
-    widgets.open({ region: 'right', widgetId: 'layers' });
-    focusOpenedWidget('right', 'layers');
-    requestLayerProperties(layer.id);
-  }, [layer.id, widgets]);
+    revealProperties(layer.id);
+    focusRegion('right', 'layers');
+  }, [focusRegion, layer.id, revealProperties]);
 
   const handleBooleanRaster = useCallback(
     async (operation: BooleanRasterOperation) => {
@@ -646,10 +684,11 @@ const LayerMenu = ({
     if (!engine) {
       throw makeStatusError('not-ready');
     }
-    if ((await engine.layers.copyLayerToRaster(layer.id)) === null) {
-      throw new Error(t('widgets.layers.actions.copyFailed'));
+    const result = await engine.layers.copyLayerToRaster(layer.id);
+    if (result.status !== 'copied') {
+      throw makeStatusError(result.status);
     }
-  }, [addCopy, engine, getActionLabel, layer, makeStatusError, t]);
+  }, [addCopy, engine, getActionLabel, layer, makeStatusError]);
 
   const handleCopyToControl = useCallback(() => {
     if (layer.type === 'raster') {
@@ -722,8 +761,10 @@ const LayerMenu = ({
       if (layer[field] !== undefined) {
         return;
       }
-      // Legacy defaults: noise starts at 25%, the denoise limit at 80%.
-      const value = field === 'noise' ? { isEnabled: true, level: 0.25 } : { isEnabled: true, limit: 0.8 };
+      const value =
+        field === 'noise'
+          ? { isEnabled: true, level: MASK_MODIFIER_DEFAULTS.noise }
+          : { isEnabled: true, limit: MASK_MODIFIER_DEFAULTS.denoise };
       commitPrepared(
         t(field === 'noise' ? 'widgets.layers.actions.addNoise' : 'widgets.layers.actions.addDenoiseLimit'),
         (model) =>
@@ -896,7 +937,7 @@ const LayerMenu = ({
             <IconButton
               aria-label={t('widgets.layers.options')}
               color="fg.muted"
-              size="2xs"
+              size="sm"
               variant="ghost"
               onClick={stopPropagation}
             >
@@ -910,7 +951,7 @@ const LayerMenu = ({
               {groupLayout ? (
                 <>
                   <Menu.ItemGroup>
-                    <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                    <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
                       {t(getLayerContextMenuLayerLabelKey(layer.type))}
                     </Menu.ItemGroupLabel>
                     {renderLayerMenuEntries({ entries: groupLayout.layerEntries, runAction, t })}
@@ -919,7 +960,7 @@ const LayerMenu = ({
                     <>
                       <Menu.Separator borderColor="border.subtle" />
                       <Menu.ItemGroup>
-                        <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                        <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
                           {t('widgets.labels.canvas')}
                         </Menu.ItemGroupLabel>
                         {beforeDangerItems}
@@ -947,17 +988,20 @@ const LayerMenu = ({
         submitLabel={t('widgets.layers.actions.rename')}
         title={t('widgets.layers.actions.rename')}
         onClose={closeDialog}
+        onExitComplete={onDialogExitComplete}
         onSubmit={submitRename}
       />
-      {dialogKind === 'run-workflow' ? (
-        <RunLayerWorkflowDialog
-          availability={workflowAvailability}
-          engine={engine}
-          isOpen
-          layerId={layer.id}
-          onClose={closeDialog}
-        />
-      ) : null}
+      {/* Mounted before it opens, like the rename dialog: a dialog that mounts open while the menu is closing is
+          dismissed as nested above the menu's departing layer. */}
+      <RunLayerWorkflowDialog
+        key={runWorkflowGeneration}
+        availability={workflowAvailability}
+        engine={engine}
+        isOpen={dialogKind === 'run-workflow'}
+        layerId={layer.id}
+        onClose={closeDialog}
+        onExitComplete={handleRunWorkflowExitComplete}
+      />
     </>
   );
 };
@@ -999,9 +1043,14 @@ export const CanvasLayerContextMenu = ({
   showGroupLabels?: boolean;
   onClose: () => void;
 }) => {
-  // The layer a pending sibling dialog is anchored to. Captured while the live
-  // target still exists, then retained until the dialog closes.
-  const [dialogState, setDialogState] = useState<LayerMenuDialogState | null>(null);
+  // The layer a sibling dialog is anchored to. Captured while the live target
+  // still exists, then retained until the dialog has animated out.
+  const [dialogState, setDialogState] = useState<(LayerMenuDialogState & { isOpen: boolean }) | null>(null);
+  // A menu for another layer remounts LayerMenu, cutting the retained dialog short before it reports its exit.
+  // Drop that dialog, or it would resurface as a hidden menu for its layer once this one closes.
+  if (target && dialogState && target.layerId !== dialogState.target.layerId) {
+    setDialogState(null);
+  }
   const renderTarget = resolveMenuTargetForRender(target, dialogState);
 
   const layerId = renderTarget?.layerId ?? null;
@@ -1028,9 +1077,18 @@ export const CanvasLayerContextMenu = ({
   );
   const handleDialogKindChange = useCallback(
     (kind: LayerMenuDialogKind | null) => {
-      setDialogState(kind && target ? { kind, target } : null);
+      setDialogState((current) => {
+        if (kind) {
+          return target ? { isOpen: true, kind, target } : null;
+        }
+        return current ? { ...current, isOpen: false } : null;
+      });
     },
     [target]
+  );
+  const handleDialogExitComplete = useCallback(
+    () => setDialogState((current) => (current?.isOpen ? current : null)),
+    []
   );
 
   if (!renderTarget || !layer) {
@@ -1042,7 +1100,7 @@ export const CanvasLayerContextMenu = ({
       key={renderTarget.layerId}
       beforeDangerItems={beforeDangerItems}
       dispatch={dispatch}
-      dialogKind={dialogState?.kind ?? null}
+      dialogKind={dialogState?.isOpen ? dialogState.kind : null}
       engine={engine}
       layer={layer}
       lazyMount
@@ -1052,6 +1110,7 @@ export const CanvasLayerContextMenu = ({
       showGroupLabels={showGroupLabels}
       unmountOnExit
       onOpenChange={handleOpenChange}
+      onDialogExitComplete={handleDialogExitComplete}
       onDialogKindChange={handleDialogKindChange}
     />
   );
@@ -1073,7 +1132,7 @@ const SUBMENU_META: Record<LayerContextSubmenuId, { defaultLabel: string; icon: 
 };
 
 const SUBMENU_POSITIONING = { placement: 'right-start' } as const;
-const QUICK_MENU_TOOLTIP_CONTENT_PROPS = { fontSize: '2xs' } as const;
+const QUICK_MENU_TOOLTIP_CONTENT_PROPS = { fontSize: 'xs' } as const;
 const QUICK_MENU_TOOLTIP_POSITIONING_PROPS = { placement: 'top' } as const;
 
 const renderLayerMenuEntries = ({
@@ -1185,7 +1244,7 @@ const LayerMenuSubmenu = ({
         ) : (
           <HStack gap="2" minW="0" w="full">
             <Icon as={meta.icon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-            <Text flex="1" fontSize="xs">
+            <Text flex="1" fontSize="md">
               {label}
             </Text>
             <Icon as={ChevronRightIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
@@ -1272,15 +1331,22 @@ const LayerMenuItem = ({
   onSelect: () => void;
   tone?: 'danger';
   value: string;
-}) => (
-  <MenuActionItem
-    disabled={disabled}
-    hintParts={hint ? formatHotkeyForPlatform(hint) : undefined}
-    icon={icon}
-    iconColor={iconColor}
-    label={label}
-    tone={tone}
-    value={value}
-    onSelect={onSelect}
-  />
-);
+}) => {
+  const shortcut = useMemo(
+    () => (hint ? <ShortcutKeycaps parts={formatHotkeyForPlatform(hint)} /> : undefined),
+    [hint]
+  );
+
+  return (
+    <MenuActionItem
+      disabled={disabled}
+      icon={icon}
+      iconColor={iconColor}
+      label={label}
+      shortcut={shortcut}
+      tone={tone}
+      value={value}
+      onSelect={onSelect}
+    />
+  );
+};

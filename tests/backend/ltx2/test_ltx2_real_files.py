@@ -194,9 +194,9 @@ def _accelerator() -> torch.device:
     device = TorchDevice.choose_torch_device()
     if device.type == "cpu":
         pytest.skip("needs an accelerator")
-    from invokeai.backend.util.attention import install_rocm_sdpa_head_dim_guard
+    from invokeai.backend.util.attention import install_rocm_sdpa_guard
 
-    install_rocm_sdpa_head_dim_guard()
+    install_rocm_sdpa_guard()
     return device
 
 
@@ -231,7 +231,7 @@ def _encode_prompts(device: torch.device, prompts: list[str]):
 
     connectors = _loader(LTX2FolderModel, device)._load_model(_folder_config(), SubModelType.Connectors)
     connectors = connectors.to(device).eval()
-    conditionings = [apply_connectors(connectors, *state) for state in states]
+    conditionings = [apply_connectors(connectors, *state, device=device) for state in states]
     del connectors
     gc.collect()
     TorchDevice.empty_cache()

@@ -14,23 +14,20 @@ import {
   SlidersHorizontalIcon,
   type LucideIcon,
 } from 'lucide-react';
-import { useCallback, useMemo, type ChangeEvent, type KeyboardEvent, type Ref } from 'react';
+import { useCallback, useMemo, type ChangeEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useMenuTriggerIds } from './galleryMenuIds';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
-const SEARCH_START_ELEMENT = <Icon as={SearchIcon} size="xs" />;
+const SEARCH_START_ELEMENT = <Icon as={SearchIcon} size="md" />;
 const SORT_MENU_POSITIONING = { placement: 'bottom-end' } as const;
 
 export const GalleryBoardFilters = ({
-  ref,
   searchTerm,
   onSearchChange,
   onSubmitSearch,
 }: {
-  /** The panel focuses the field when "+" is pressed with nothing typed. */
-  ref?: Ref<HTMLInputElement>;
   searchTerm: string;
   onSearchChange: (searchTerm: string) => void;
   /** Enter on the field; the panel decides whether that means "create". */
@@ -93,7 +90,7 @@ export const GalleryBoardFilters = ({
   const clearSearchButton = useMemo(
     () =>
       searchTerm ? (
-        <CloseButton aria-label={t('common.clearSearch')} me="-2" size="2xs" onClick={handleClearSearch} />
+        <CloseButton aria-label={t('common.clearSearch')} me="-2" size="sm" onClick={handleClearSearch} />
       ) : null,
     [searchTerm, handleClearSearch, t]
   );
@@ -102,10 +99,8 @@ export const GalleryBoardFilters = ({
     <HStack gap="1">
       <InputGroup endElement={clearSearchButton} flex="1" minW="0" startElement={SEARCH_START_ELEMENT}>
         <Input
-          ref={ref}
           aria-label={t('widgets.gallery.searchOrCreateBoards')}
           placeholder={t('widgets.gallery.searchOrCreateBoards')}
-          size="xs"
           value={searchTerm}
           onChange={handleSearchChange}
           onKeyDown={handleSearchKeyDown}
@@ -117,7 +112,6 @@ export const GalleryBoardFilters = ({
             <IconButton
               aria-label={t('widgets.gallery.filterAndSortBoards')}
               color={isVisibilityFiltered ? 'fg' : 'fg.muted'}
-              size="xs"
               variant="ghost"
             >
               <Icon as={SlidersHorizontalIcon} boxSize="3.5" />
@@ -203,6 +197,6 @@ const BoardVisibilityItem = ({
   <Menu.Item aria-checked={isChecked} closeOnSelect={false} role="menuitemcheckbox" value={value} onClick={onSelect}>
     <Icon as={CheckIcon} boxSize="3" opacity={isChecked ? 1 : 0} />
     <Icon as={icon} boxSize="3.5" color="fg.subtle" />
-    <Menu.ItemText fontSize="xs">{label}</Menu.ItemText>
+    <Menu.ItemText>{label}</Menu.ItemText>
   </Menu.Item>
 );

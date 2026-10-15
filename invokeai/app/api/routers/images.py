@@ -49,8 +49,7 @@ from invokeai.app.services.images.images_common import (
     UnstarredImagesResult,
 )
 from invokeai.app.services.intermediates.intermediates_base import IntermediatesCaller
-from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults, SQLiteDirection
 from invokeai.app.util.controlnet_utils import heuristic_resize_fast
 from invokeai.backend.image_util.util import np_to_pil, pil_to_np
 

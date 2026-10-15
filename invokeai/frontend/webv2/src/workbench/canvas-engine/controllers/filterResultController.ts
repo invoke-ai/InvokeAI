@@ -1,23 +1,30 @@
 import type { CommitRasterFilterOptions, CommitRasterFilterResult } from '@workbench/canvas-engine/capabilities';
 import type {
   CanvasControlLayerContract,
-  CanvasDocumentContractV3,
   CanvasImageRef,
   CanvasLayerContract,
   CanvasRasterLayerContractV2,
 } from '@workbench/canvas-engine/contracts';
-import type { CapturedLayerCache } from '@workbench/canvas-engine/controllers/layerMutationController';
+import type { LayerMutationControllerOptions } from '@workbench/canvas-engine/controllers/layerMutationController';
 import type { DecodeImageResult } from '@workbench/canvas-engine/controllers/rasterController';
 import type { PreparedLayerCacheReplacement } from '@workbench/canvas-engine/render/layerCache';
-import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
-import type { Rect } from '@workbench/canvas-engine/types';
 
-import { getDocumentLayer, isNodeAbsent } from '@workbench/canvas-engine/document/documentIndex';
+import { getDocumentLayer } from '@workbench/canvas-engine/document/documentIndex';
 import { createControlLayer } from '@workbench/canvas-engine/document/layerFactories';
 import { LayerFilterOutputDimensionError } from '@workbench/canvas-engine/filterError';
-import { collectHistoryMediaRefs } from '@workbench/canvas-engine/history/history';
+import { collectHistoryMediaRefs, HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbench/canvas-engine/history/history';
 
 import type { CanvasMutationContext } from './mutationContext';
+
+import {
+  addLayerStep,
+  guardedResultRefusal,
+  layerEditRefusal,
+  removeLayerStep,
+  replaceLayerStep,
+  replayWithPixels,
+  rgbaBytes,
+} from './editSteps';
 
 export type {
   CommitRasterFilterOptions,
@@ -27,8 +34,22 @@ export type {
 } from '@workbench/canvas-engine/capabilities';
 
 export interface FilterResultControllerOptions {
-  readonly captureCache: (layer: CanvasLayerContract, document: CanvasDocumentContractV3) => CapturedLayerCache;
-  readonly ctx: CanvasMutationContext;
+  readonly captureCache: LayerMutationControllerOptions['captureCache'];
+  readonly ctx: Pick<
+    CanvasMutationContext,
+    | 'applyStep'
+    | 'begin'
+    | 'capturePermit'
+    | 'captureInsertionAnchor'
+    | 'createLayerId'
+    | 'getDocument'
+    | 'installPrepared'
+    | 'isGestureActive'
+    | 'isGuardCurrent'
+    | 'isPermitCurrent'
+    | 'preparePixels'
+    | 'reserveRaster'
+  >;
   readonly decodeImage: (
     image: CanvasImageRef,
     options: {
@@ -99,137 +120,129 @@ export class FilterResultController {
       if (options.signal?.aborted) {
         return { status: 'aborted' };
       }
-      o.ctx.endBurst();
       const image = structuredClone(options.image);
       const rect = { ...options.rect };
       const paintSource = { bitmap: image, offset: { x: rect.x, y: rect.y }, type: 'paint' } as const;
-      if (options.mode === 'replace') {
-        const beforePixels = o.captureCache(liveLayer, document);
-        if (!beforePixels || beforePixels === 'not-ready') {
-          return { status: 'stale' };
+      const afterPixels = { pixels, rect };
+      const txn = o.ctx.begin({ historyBytes: rgbaBytes(rect) + HISTORY_ENTRY_OVERHEAD_BYTES, owner });
+      if (!('publish' in txn)) {
+        return { status: layerEditRefusal(txn.status) };
+      }
+      try {
+        if (!txn.reserveRaster(rgbaBytes(rect))) {
+          return { status: 'over-budget' };
         }
-        const before = structuredClone(liveLayer);
-        const after: CanvasLayerContract =
-          liveLayer.type === 'raster'
-            ? (() => {
-                const { adjustments: _adjustments, ...base } = liveLayer;
-                return structuredClone({ ...base, filter: options.filter, source: paintSource });
-              })()
-            : structuredClone({ ...liveLayer, filter: options.filter, source: paintSource });
-        const afterPixels = { pixels, rect };
-        const publish = (
-          contract: CanvasLayerContract,
-          prepared: PreparedLayerCacheReplacement,
-          publishOptions: { discardPersistence: boolean; persist: boolean }
-        ): void => {
-          o.ctx.dispatchPrepared(
-            { layer: contract, layerId: liveLayer.id, type: 'replaceCanvasLayer' },
-            () => getDocumentLayer(o.ctx.getReducerDocument(), liveLayer.id) === contract,
-            () => getDocumentLayer(o.ctx.getDocument(), liveLayer.id) === contract
-          );
-          if (publishOptions.discardPersistence) {
-            try {
-              o.discardPersisted(liveLayer.id);
-            } catch {
-              /* Ancillary after commit. */
-            }
+        if (options.mode === 'replace') {
+          const beforePixels = o.captureCache(liveLayer, document, (rect) => txn.growHistory(rgbaBytes(rect)));
+          if (beforePixels === 'not-ready' || beforePixels === 'over-budget') {
+            return { status: beforePixels };
           }
-          o.ctx.installPrepared(prepared, publishOptions.persist);
-        };
-        const apply = (
-          contract: CanvasLayerContract,
-          snapshot: { pixels: RasterSurface; rect: Rect },
-          publishOptions: { discardPersistence: boolean; persist: boolean }
-        ): void => publish(contract, o.ctx.preparePixels(liveLayer.id, snapshot.rect, snapshot.pixels), publishOptions);
-        publish(after, o.ctx.preparePixels(liveLayer.id, rect, pixels), { discardPersistence: true, persist: false });
-        o.ctx.history.push({
-          bytes: beforePixels.rect.width * beforePixels.rect.height * 4 + rect.width * rect.height * 4 + 256,
-          heldAssetRefs: collectHistoryMediaRefs(before, after),
-          label: 'Replace layer with filter result',
-          redo: () => apply(after, afterPixels, { discardPersistence: true, persist: false }),
-          replayFailureAtomic: true,
-          undo: () =>
-            apply(before, beforePixels, { discardPersistence: false, persist: o.needsPixelPersistence(before) }),
-        });
-        return { layerId: liveLayer.id, status: 'committed' };
-      }
-      const selectedLayerId = document.selectedLayerId;
-      const layerId = o.ctx.createLayerId();
-      let copy: CanvasLayerContract;
-      if (options.target === 'control') {
-        const buildControlBase = (): CanvasControlLayerContract => {
-          const mainBase = o.getMainModelBase();
-          return createControlLayer(
-            `${liveLayer.name} filtered`,
-            layerId,
-            mainBase,
-            o.getDefaultControlModel(mainBase)
+          if (!beforePixels) {
+            return { status: 'stale' };
+          }
+          const before = structuredClone(liveLayer);
+          const after: CanvasLayerContract =
+            liveLayer.type === 'raster'
+              ? (() => {
+                  const { adjustments: _adjustments, ...base } = liveLayer;
+                  return structuredClone({ ...base, filter: options.filter, source: paintSource });
+                })()
+              : structuredClone({ ...liveLayer, filter: options.filter, source: paintSource });
+          const discard = (): void => o.discardPersisted(liveLayer.id);
+          const prepared = o.ctx.preparePixels(liveLayer.id, rect, pixels);
+          const interrupted = this.interrupted(options);
+          if (interrupted) {
+            return interrupted;
+          }
+          const result = txn.publish(
+            'Replace layer with filter result',
+            replaceLayerStep(o.ctx, after, prepared, { notify: discard, persist: false, restore: liveLayer }),
+            {
+              bytes: rgbaBytes(beforePixels.rect) + rgbaBytes(rect) + HISTORY_ENTRY_OVERHEAD_BYTES,
+              heldAssetRefs: collectHistoryMediaRefs(before, after),
+              redo: () =>
+                replayWithPixels(o.ctx, liveLayer.id, afterPixels, (prepared) =>
+                  replaceLayerStep(o.ctx, after, prepared, { notify: discard, persist: false, restore: before })
+                ),
+              undo: () =>
+                replayWithPixels(o.ctx, liveLayer.id, beforePixels, (prepared) =>
+                  replaceLayerStep(o.ctx, before, prepared, {
+                    persist: o.needsPixelPersistence(before),
+                    restore: after,
+                  })
+                ),
+            }
           );
-        };
-        const base = liveLayer.type === 'control' ? structuredClone(liveLayer) : buildControlBase();
-        copy = {
-          ...base,
-          filter: options.filter,
-          id: layerId,
-          name: `${liveLayer.name} filtered`,
-          source: paintSource,
-          transform: structuredClone(liveLayer.transform),
-        };
-      } else if (options.target === 'raster' && liveLayer.type === 'control') {
-        copy = {
-          blendMode: liveLayer.blendMode,
-          filter: options.filter,
-          id: layerId,
-          isEnabled: true,
-          isLocked: false,
-          name: `${liveLayer.name} filtered`,
-          opacity: liveLayer.opacity,
-          source: paintSource,
-          transform: structuredClone(liveLayer.transform),
-          type: 'raster',
-        };
-      } else {
-        const { adjustments: _adjustments, ...base } = structuredClone(liveLayer as CanvasRasterLayerContractV2);
-        copy = {
-          ...base,
-          filter: options.filter,
-          id: layerId,
-          name: `${liveLayer.name} filtered`,
-          source: paintSource,
-          type: 'raster',
-        };
-      }
-      const anchor = o.ctx.captureInsertionAnchor(copy.type, liveLayer.id);
-      const apply = (): void => {
+          return result.status === 'committed'
+            ? { layerId: liveLayer.id, status: 'committed' }
+            : { status: guardedResultRefusal(result) };
+        }
+        const selectedLayerId = document.selectedLayerId;
+        const layerId = o.ctx.createLayerId();
+        let copy: CanvasLayerContract;
+        if (options.target === 'control') {
+          const buildControlBase = (): CanvasControlLayerContract => {
+            const mainBase = o.getMainModelBase();
+            return createControlLayer(
+              `${liveLayer.name} filtered`,
+              layerId,
+              mainBase,
+              o.getDefaultControlModel(mainBase)
+            );
+          };
+          const base = liveLayer.type === 'control' ? structuredClone(liveLayer) : buildControlBase();
+          copy = {
+            ...base,
+            filter: options.filter,
+            id: layerId,
+            name: `${liveLayer.name} filtered`,
+            source: paintSource,
+            transform: structuredClone(liveLayer.transform),
+          };
+        } else if (options.target === 'raster' && liveLayer.type === 'control') {
+          copy = {
+            blendMode: liveLayer.blendMode,
+            filter: options.filter,
+            id: layerId,
+            isEnabled: true,
+            isLocked: false,
+            name: `${liveLayer.name} filtered`,
+            opacity: liveLayer.opacity,
+            source: paintSource,
+            transform: structuredClone(liveLayer.transform),
+            type: 'raster',
+          };
+        } else {
+          const { adjustments: _adjustments, ...base } = structuredClone(liveLayer as CanvasRasterLayerContractV2);
+          copy = {
+            ...base,
+            filter: options.filter,
+            id: layerId,
+            name: `${liveLayer.name} filtered`,
+            source: paintSource,
+            type: 'raster',
+          };
+        }
+        const anchor = o.ctx.captureInsertionAnchor(copy.type, liveLayer.id);
+        const added = (prepared: PreparedLayerCacheReplacement | null) =>
+          addLayerStep(o.ctx, copy, anchor, prepared, { persist: false, previousSelectedLayerId: selectedLayerId });
         const prepared = o.ctx.preparePixels(layerId, rect, pixels);
-        o.ctx.dispatchPrepared(
-          { anchor, layer: copy, type: 'addCanvasLayer' },
-          () => getDocumentLayer(o.ctx.getReducerDocument(), copy.id) === copy,
-          () => getDocumentLayer(o.ctx.getDocument(), copy.id) === copy
-        );
-        o.ctx.installPrepared(prepared, false);
-      };
-      apply();
-      o.ctx.history.push({
-        bytes: rect.width * rect.height * 4 + 256,
-        heldAssetRefs: collectHistoryMediaRefs(copy),
-        label: 'Copy layer filter result',
-        redo: apply,
-        replayFailureAtomic: true,
-        undo: () => {
-          o.ctx.dispatchPrepared(
-            { id: selectedLayerId, type: 'setCanvasSelectedLayer' },
-            () => o.ctx.getReducerDocument()?.selectedLayerId === selectedLayerId,
-            () => o.ctx.getDocument()?.selectedLayerId === selectedLayerId
-          );
-          o.ctx.dispatchPrepared(
-            { ids: [layerId], type: 'removeCanvasLayers' },
-            () => isNodeAbsent(o.ctx.getReducerDocument(), layerId),
-            () => isNodeAbsent(o.ctx.getDocument(), layerId)
-          );
-        },
-      });
-      return { layerId, status: 'committed' };
+        const interrupted = this.interrupted(options);
+        if (interrupted) {
+          return interrupted;
+        }
+        const result = txn.publish('Copy layer filter result', added(prepared), {
+          bytes: rgbaBytes(rect) + HISTORY_ENTRY_OVERHEAD_BYTES,
+          heldAssetRefs: collectHistoryMediaRefs(copy),
+          redo: () => replayWithPixels(o.ctx, layerId, afterPixels, added),
+          undo: () => o.ctx.applyStep(removeLayerStep(layerId, selectedLayerId)),
+        });
+        return result.status === 'committed'
+          ? { layerId, status: 'committed' }
+          : { status: guardedResultRefusal(result) };
+      } finally {
+        txn.end();
+      }
     } catch (error) {
       if (options.signal?.aborted || (error instanceof Error && error.name === 'AbortError')) {
         return { status: 'aborted' };
@@ -239,4 +252,12 @@ export class FilterResultController {
   }
 
   dispose(): void {}
+
+  /** Preparation may run long enough for the caller to abort or the source to change; check both last. */
+  private interrupted(options: CommitRasterFilterOptions): CommitRasterFilterResult | null {
+    if (options.signal?.aborted) {
+      return { status: 'aborted' };
+    }
+    return this.options.ctx.isGuardCurrent(options.guard) ? null : { status: 'stale' };
+  }
 }

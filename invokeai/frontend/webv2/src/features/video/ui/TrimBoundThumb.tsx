@@ -68,7 +68,7 @@ export const TrimBoundThumb = memo(function TrimBoundThumb({
       w="20"
     >
       <video key={src} ref={videoRef} muted preload="metadata" src={src} style={PREVIEW_VIDEO_STYLE} />
-      <Badge bottom="0.5" insetInlineStart="0.5" pointerEvents="none" position="absolute" size="xs" variant="solid">
+      <Badge bottom="0.5" insetInlineStart="0.5" pointerEvents="none" position="absolute" variant="solid">
         {label}
       </Badge>
       {onFindInGallery ? <FindInGalleryThumbnailButton name={name} onFind={onFindInGallery} /> : null}

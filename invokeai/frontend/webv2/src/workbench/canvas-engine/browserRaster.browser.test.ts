@@ -9,7 +9,7 @@ import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixt
 import { executePsdExport, planPsdExport } from '@workbench/canvas-engine/export/psdExport';
 import { createHistory } from '@workbench/canvas-engine/history/history';
 import { createImagePatchEntry } from '@workbench/canvas-engine/history/imagePatch';
-import { sampleDocumentColor } from '@workbench/canvas-engine/render/colorSample';
+import { createColorSampler } from '@workbench/canvas-engine/render/colorSample';
 import { compositeDocument } from '@workbench/canvas-engine/render/compositor';
 import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import { createDomRasterBackend, type RasterSurface } from '@workbench/canvas-engine/render/raster';
@@ -64,7 +64,7 @@ describe('real browser raster acceptance', () => {
     caches.getOrCreate('empty', 0, 0);
 
     expect(() =>
-      sampleDocumentColor(documentWith([rasterLayer('empty')]), caches, backend, { x: 1, y: 1 })
+      createColorSampler(backend).sample(documentWith([rasterLayer('empty')]), caches, { x: 1, y: 1 })
     ).not.toThrow();
   });
 
@@ -112,7 +112,7 @@ describe('real browser raster acceptance', () => {
       ]),
       caches,
       IDENTITY,
-      { clipRect: { height: 8, width: 4, x: 0, y: 0 } }
+      { backend, clipRect: { height: 8, width: 4, x: 0, y: 0 } }
     );
 
     expectPixel(target, 1, 1, [255, 0, 0, 255]);
@@ -168,27 +168,29 @@ describe('real browser raster acceptance', () => {
     bitmap.close();
   });
 
-  it('undoes and redoes a real pixel patch', () => {
+  it('undoes and redoes a real pixel patch', async () => {
     const backend = createDomRasterBackend();
     const surface = backend.createSurface(1, 1);
     const before = new ImageData(new Uint8ClampedArray([255, 0, 0, 255]), 1, 1);
     const after = new ImageData(new Uint8ClampedArray([0, 0, 255, 255]), 1, 1);
     const history = createHistory();
     surface.ctx.putImageData(after, 0, 0);
-    history.push(
-      createImagePatchEntry({
-        after,
-        apply: (_layerId, rect, pixels) => surface.ctx.putImageData(pixels, rect.x, rect.y),
-        before,
-        label: 'Browser pixel edit',
-        layerId: 'paint',
-        rect: { height: 1, width: 1, x: 0, y: 0 },
-      })
-    );
+    const entry = createImagePatchEntry({
+      after,
+      apply: (_layerId, rect, pixels) => {
+        surface.ctx.putImageData(pixels, rect.x, rect.y);
+        return Promise.resolve();
+      },
+      before,
+      label: 'Browser pixel edit',
+      layerId: 'paint',
+      rect: { height: 1, width: 1, x: 0, y: 0 },
+    });
+    history.admit(entry.bytes)!.publish(entry);
 
-    history.undo();
+    await history.undo();
     expectPixel(surface, 0, 0, [255, 0, 0, 255]);
-    history.redo();
+    await history.redo();
     expectPixel(surface, 0, 0, [0, 0, 255, 255]);
   });
 
