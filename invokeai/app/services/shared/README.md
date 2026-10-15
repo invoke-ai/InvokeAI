@@ -699,6 +699,11 @@ materialization.
   - Try to resolve any `If`-specific scheduling state.
   - If the node is ready and not deferred by an unresolved `If`, enqueue it into its class queue.
 
+Each planner preparation expansion is applied as a state transaction. If expansion raises, journaled execution-graph,
+prepared-mapping, frame, activation-token, gate, and scheduler mutations are rolled back; derived caches are reset and
+ready queues are rebuilt from the restored state before the exception propagates. A later `next()` can retry from the
+pre-expansion state without retaining partially materialized nodes or activation state.
+
 The execution-node builder retains a filtered iterator graph for the current source-graph identity. It builds this
 graph when compatibility preparation needs sibling-Collect relationships or iterator ancestry. The graph replaces
 Collect item inputs with its collection inputs for traversal; edge-scoped ancestry retains item axes needed for grouping.
