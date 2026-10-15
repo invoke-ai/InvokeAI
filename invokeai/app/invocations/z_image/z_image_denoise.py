@@ -627,6 +627,8 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 control_latents = ZImageImageToLatentsInvocation.vae_encode(
                     vae_info=vae_info,
                     image_tensor=control_image_tensor,
+                    tiled=self.control.tiled or context.config.get().force_tiled_decode,
+                    tile_size=self.control.tile_size,
                 )
 
                 # Move to inference device/dtype
