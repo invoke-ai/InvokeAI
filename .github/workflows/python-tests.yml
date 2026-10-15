@@ -51,6 +51,7 @@ jobs:
           - linux-cpu
           - macos-default
           - windows-cpu
+          - windows-arm64
         include:
           - platform: linux-cpu
             os: blacksmith-4vcpu-ubuntu-2404
@@ -78,6 +79,18 @@ jobs:
             # Roughly 1.5x the pytest step's four-worker wall time (~13.5 min), plus the job's
             # ~1.5 min of checkout and install, plus margin.
             timeout-minutes: 45
+          # Windows on ARM64 (NVIDIA RTX Spark). The lockfile's ARM64 fork is exercised nowhere else:
+          # torch 2.14.0+cu134 from NVIDIA's index (a 1.85 GB wheel, CPU-only on this runner), numpy 2,
+          # onnxruntime 1.31, sentencepiece 0.2.2 and the self-built opencv/blake3/tiktoken wheels. uv
+          # installs an x86_64 CPython on ARM64 Windows unless the request names the architecture.
+          - platform: windows-arm64
+            os: windows-11-arm
+            uv-python: cpython-3.12-windows-aarch64-none
+            github-env: $env:GITHUB_ENV
+            # Two workers for the same reason as windows-cpu. The job also downloads the NVIDIA torch
+            # wheel and builds imageio-ffmpeg from its sdist (~18 min at four workers).
+            pytest-workers: '2'
+            timeout-minutes: 60
     name: 'py${{ matrix.python-version }}: ${{ matrix.platform }}'
     runs-on: ${{ matrix.os }}
     # Per platform: expected run time is 8-14 min on linux and macos, longer on windows, which
@@ -143,14 +156,30 @@ jobs:
         uses: astral-sh/setup-uv@v8.1.0
         with:
           version: '0.11.28'  # When updating this, make sure the version in launcher's package.json gets updated too.
-          enable-cache: true
-          python-version: ${{ matrix.python-version }}
+          # The ARM64 lane's torch wheel unpacks to several GB of binaries; cached per lock hash it would crowd the
+          # other lanes out of the repository's cache, and re-downloading it costs a couple of minutes.
+          enable-cache: ${{ matrix.platform != 'windows-arm64' }}
+          python-version: ${{ matrix.uv-python || matrix.python-version }}
+
+      - name: prepare the ARM64 runner
+        if: ${{ matrix.platform == 'windows-arm64' && (steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true) }}
+        # The imageio-ffmpeg sdist bundles no ffmpeg binary; the video tests find one on PATH. Chocolatey's
+        # package is an x64 build, which Windows on ARM runs under emulation.
+        run: |
+          uv run --no-project python -c "import platform, sys; assert platform.machine() == 'ARM64', platform.machine(); print(sys.version)"
+          choco install ffmpeg -y --no-progress
+          ffmpeg -version | Select-Object -First 1
 
       - name: install dependencies
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
         env:
           UV_INDEX: ${{ matrix.extra-index-url }}
         run: uv sync --no-progress --locked --extra test
+
+      - name: import the self-built and platform-specific wheels
+        if: ${{ matrix.platform == 'windows-arm64' && (steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true) }}
+        # The suite never imports tiktoken, so a broken self-built wheel would otherwise pass unnoticed.
+        run: uv run --no-sync python -c "import blake3, cv2, onnxruntime, tiktoken, torch, torchvision; print(torch.__version__, torchvision.__version__, cv2.__version__, 'cuda available:', torch.cuda.is_available())"
 
       - name: run pytest
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}

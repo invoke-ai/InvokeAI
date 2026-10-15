@@ -114,9 +114,12 @@ class TestGuard:
         q, k, v = (torch.randn(1, 2, 8, NARROW) for _ in range(3))
         mask = torch.ones(8, 8, dtype=torch.bool)
 
-        F.scaled_dot_product_attention(q, k, v, mask, 0.0, True, scale=0.25)
+        # An explicit mask and is_causal=True are mutually exclusive from torch 2.14 on, so the two
+        # arguments are exercised in separate calls.
+        F.scaled_dot_product_attention(q, k, v, mask, 0.0, False, scale=0.25)
+        F.scaled_dot_product_attention(q, k, v, None, 0.0, True, scale=0.25)
 
-        assert calls == [(NARROW, mask, 0.0, True, 0.25, False)]
+        assert calls == [(NARROW, mask, 0.0, False, 0.25, False), (NARROW, None, 0.0, True, 0.25, False)]
 
     def test_wide_heads_refuse_arguments_the_math_call_cannot_forward(self, monkeypatch):
         _install_as_if_rocm(monkeypatch)
@@ -154,6 +157,9 @@ class TestGuard:
         # Pin both entry points apply_monkeypatches rebinds so monkeypatch restores them afterwards.
         monkeypatch.setattr(F, "scaled_dot_product_attention", original)
         monkeypatch.setattr(torch.cuda, "empty_cache", torch.cuda.empty_cache)
+        # And the stream-capture shim, which a CUDA build without a device (Linux CI) would otherwise keep for the
+        # rest of the worker.
+        monkeypatch.setattr(torch.cuda, "is_current_stream_capturing", torch.cuda.is_current_stream_capturing)
         monkeypatch.setattr(attention, "_IS_ROCM", True)
 
         apply_monkeypatches()

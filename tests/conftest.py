@@ -43,6 +43,8 @@ from invokeai.app.services.users.users_default import UserService
 from invokeai.app.services.video_records.video_records_default import VideoRecordStorage
 from invokeai.app.services.wildcard_records.wildcard_records_default import WildcardRecordsStorage
 from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
+from invokeai.backend.util.devices import install_cuda_stream_capture_shim
+from invokeai.backend.util.host_platform import is_windows_arm64
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa: F403
 from tests.fixtures.database import (  # noqa: F401
@@ -56,6 +58,13 @@ from tests.fixtures.database import (  # noqa: F401
 from tests.fixtures.races import lost_races  # noqa: F401
 from tests.fixtures.sqlite_database import create_mock_sqlite_database  # noqa: F401
 from tests.test_nodes import TestEventService
+
+# The app installs this from apply_monkeypatches(); the suite runs real transformers forwards on the CPU, so on a
+# CUDA torch build without a device (NVIDIA's Windows ARM64 build on a GPU-less runner) it needs the same shim.
+# Only there: every other CUDA build raises rather than crashes, and a process-wide patch would hide what the
+# rest of the suite runs against (Linux CI is a CUDA build without a GPU, too).
+if is_windows_arm64():
+    install_cuda_stream_capture_shim()
 
 # Fixtures that put a test on the backend under test, which `-m uses_database` selects.
 _DATABASE_FIXTURES = {"empty_database", "database"}

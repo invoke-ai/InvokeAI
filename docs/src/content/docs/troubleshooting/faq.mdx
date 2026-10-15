@@ -46,6 +46,14 @@ Follow the same steps to scan and import the missing models.
 
 This can be safely ignored. Invoke doesn't use Triton, but if you are on Linux and wish to dismiss the error, you can install Triton.
 
+## No ffmpeg exe could be found (Windows on ARM64)
+
+Video nodes and video thumbnails use `ffmpeg`. On every other platform the `imageio-ffmpeg` package bundles the binary; it has no Windows ARM64 build, so on ARM64 Invoke uses the `ffmpeg` on your `PATH`. Install one (an x64 build runs under Windows' emulation) or point the `IMAGEIO_FFMPEG_EXE` environment variable at an `ffmpeg.exe`, then restart Invoke.
+
+## Updating fails on Windows on ARM64 with a torch or `win_amd64` error
+
+Your install uses an x86_64 Python running under Windows' emulation, which is what the Invoke Launcher and `uv` set up on ARM64 Windows unless asked for the native interpreter. Python 3.12 reports the physical ARM64 CPU even when emulated, so the installer selects the ARM64 packages, which an x86_64 Python cannot install: the only torch build for Windows ARM64 is NVIDIA's native one. Reinstall with a native ARM64 Python as described in the [manual install](../../start-here/manual) guide (request `cpython-3.12-windows-aarch64-none`); your models, images and database stay where they are.
+
 ## Unable to Copy on Firefox
 
 Firefox does not allow Invoke to directly access the clipboard by default. As a result, you may be unable to use certain copy functions. You can fix this by configuring Firefox to allow access to write to the clipboard:

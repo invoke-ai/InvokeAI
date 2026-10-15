@@ -13,16 +13,78 @@ small gallery as all noise — and the clustering-strength control lets a user
 override it per map.
 """
 
+import functools
 import hashlib
 import json
+import logging
 import time
 import warnings
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional
 
 import numpy as np
 
 from invokeai.app.services.image_index.image_index_common import EMBEDDING_DTYPE, IndexedItem
+from invokeai.backend.util.host_platform import is_windows_arm64
+
+logger = logging.getLogger(__name__)
+
+
+@functools.cache
+def _umap_class() -> Optional[type[Any]]:
+    """umap-learn's UMAP, or None (logged once) on Windows ARM64, where it is not installed.
+
+    Anywhere else a failed import is a broken install (a numba/llvmlite mismatch, say), not a missing
+    platform wheel, so it propagates: compute_umap then fails like any other fit, and the caller's
+    failed-fit handling applies instead of a silently degraded map. functools.cache does not cache the
+    raise, so a repaired install is picked up by the next fit.
+    """
+    try:
+        from umap import UMAP
+    except ImportError:
+        if not is_windows_arm64():
+            raise
+        logger.warning("umap-learn is not installed; the image map falls back to a PCA projection.")
+        return None
+    return UMAP
+
+
+def projection_method(n_points: int) -> str:
+    """Which projection compute_umap gives a map of n_points: "umap" or "pca"."""
+    if n_points <= 3:
+        return "pca"
+    if is_windows_arm64():
+        try:
+            if _umap_class() is None:
+                return "pca"
+        except Exception:
+            # An installed umap that fails to import other than with ImportError (a native library, say):
+            # compute_umap will try UMAP and fail the fit, so that is the method a fit would use.
+            pass
+    return "umap"
+
+
+def projection_method_is_current(params: str, point_count: int) -> bool:
+    """Whether a cached map was projected the way a fit would project it now.
+
+    A PCA map drawn because umap-learn was missing is stale once it imports, though its scope is unchanged.
+    Maps of three points or fewer are always PCA, and a failed (empty) one is left to the retry budget.
+    """
+    return point_count <= 3 or stored_projection_method(params) == projection_method(point_count)
+
+
+def stored_projection_method(params: str) -> str:
+    """The method recorded in projection_params JSON.
+
+    Rows written before the method was recorded are UMAP: the PCA fallback for missing umap-learn
+    arrived together with the field.
+    """
+    try:
+        method = json.loads(params).get("method", "umap")
+    except (ValueError, AttributeError):
+        return "umap"
+    return method if isinstance(method, str) else "umap"
+
 
 DEFAULT_CLUSTER_EPS = 0.2
 DEFAULT_CLUSTER_MIN_SAMPLES = 10
@@ -33,6 +95,7 @@ def projection_params(seed: int = DEFAULT_UMAP_SEED, n_points: int = 0) -> str:
     """JSON description of the projection parameters, stored with the cache."""
     return json.dumps(
         {
+            "method": projection_method(n_points),
             "metric": "cosine",
             "min_dist": 0.05,
             "n_components": 2,
@@ -43,6 +106,38 @@ def projection_params(seed: int = DEFAULT_UMAP_SEED, n_points: int = 0) -> str:
     )
 
 
+# Rows per chunk when the PCA fallback streams the embedding matrix: it is converted to float64 a chunk at a
+# time, so the fallback never holds an N x D float64 copy (about 6 KB per 768-wide point, 1 GB at 170k images).
+_PCA_CHUNK_ROWS = 8192
+
+
+def _pca_projection(embeddings: np.ndarray) -> np.ndarray:
+    """Deterministic (N, 2) projection onto the two leading principal components.
+
+    Eigendecomposes the D x D scatter matrix rather than taking an SVD of the centered N x D matrix,
+    whose float64 copy and factors cost tens of KB per point on a large gallery.
+    """
+    n_points, dim = embeddings.shape
+    mean = embeddings.mean(axis=0, dtype=np.float64)
+    scatter = np.zeros((dim, dim), dtype=np.float64)
+    for start in range(0, n_points, _PCA_CHUNK_ROWS):
+        chunk = embeddings[start : start + _PCA_CHUNK_ROWS].astype(np.float64) - mean
+        scatter += chunk.T @ chunk
+
+    n_components = min(2, dim)
+    # eigh returns eigenvalues in ascending order.
+    components = np.linalg.eigh(scatter)[1][:, ::-1][:, :n_components]
+    # An eigenvector's sign is arbitrary; pin it so equal inputs never give mirrored maps.
+    largest = components[np.abs(components).argmax(axis=0), np.arange(n_components)]
+    components *= np.where(largest < 0, -1.0, 1.0)
+
+    coords = np.zeros((n_points, 2), dtype=EMBEDDING_DTYPE)
+    for start in range(0, n_points, _PCA_CHUNK_ROWS):
+        chunk = embeddings[start : start + _PCA_CHUNK_ROWS].astype(np.float64) - mean
+        coords[start : start + _PCA_CHUNK_ROWS, :n_components] = chunk @ components
+    return coords
+
+
 def compute_umap(embeddings: np.ndarray, seed: int = DEFAULT_UMAP_SEED) -> np.ndarray:
     """Project an (N, D) embedding matrix to (N, 2) with UMAP.
 
@@ -51,20 +146,22 @@ def compute_umap(embeddings: np.ndarray, seed: int = DEFAULT_UMAP_SEED) -> np.nd
     cannot fit them (n_neighbors must exceed 1, and spectral initialization
     needs fewer components than points). Raises on UMAP failure — the caller
     decides what a failed fit means for its cache.
+
+    On Windows ARM64, where umap-learn is not installed (numba ships no wheel
+    for its Python), every size takes the PCA projection instead, so the map
+    stays usable — less structured, but deterministic and dependency-free.
+    projection_method() names the method a map of a given size gets.
     """
     if embeddings.shape[0] == 0:
         return np.empty((0, 2), dtype=EMBEDDING_DTYPE)
     if embeddings.shape[0] == 1:
         return np.zeros((1, 2), dtype=EMBEDDING_DTYPE)
     if embeddings.shape[0] <= 3:
-        centered = embeddings.astype(np.float64) - embeddings.mean(axis=0)
-        _, _, vt = np.linalg.svd(centered, full_matrices=False)
-        coords = centered @ vt[:2].T
-        if coords.shape[1] < 2:
-            coords = np.pad(coords, ((0, 0), (0, 2 - coords.shape[1])))
-        return coords.astype(EMBEDDING_DTYPE)
+        return _pca_projection(embeddings)
 
-    from umap import UMAP
+    UMAP = _umap_class()
+    if UMAP is None:
+        return _pca_projection(embeddings)
 
     with warnings.catch_warnings():
         # UMAP warns about TBB versions and small-N spectral fallbacks; both

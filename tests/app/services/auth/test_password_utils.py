@@ -13,6 +13,12 @@ from invokeai.app.services.auth.password_utils import (
 class TestPasswordHashing:
     """Tests for password hashing functionality."""
 
+    def test_verifies_hash_produced_by_the_former_passlib_implementation(self):
+        """Stored hashes predate the move from passlib to bcrypt; they must keep working unchanged."""
+        legacy_hash = "$2b$12$J970vy.cTtGocHG43lQjHumLWqfH52APLnkUnexH2QkzsCynrn6X2"  # passlib, "TestPassword123"
+        assert verify_password("TestPassword123", legacy_hash)
+        assert not verify_password("testpassword123", legacy_hash)
+
     def test_hash_password_returns_different_hash_each_time(self):
         """Test that hashing the same password twice produces different hashes (due to salt)."""
         password = "TestPassword123"
