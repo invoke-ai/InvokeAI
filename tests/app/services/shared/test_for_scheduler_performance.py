@@ -453,6 +453,7 @@ def test_root_if_collect_activation_planning_timing_sample(force_compatibility_s
         )
 
 
+@pytest.mark.platform_independent
 @pytest.mark.parametrize(
     ("loop_type", "include_if", "external_condition"),
     [

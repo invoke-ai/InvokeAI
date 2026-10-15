@@ -9,6 +9,7 @@ from invokeai.app.invocations.primitives import IntegerOutput
 from invokeai.app.services.shared import graph as graph_facade
 
 
+@pytest.mark.platform_independent
 def test_materializer_import_is_leaf_and_keeps_networkx_lazy() -> None:
     script = textwrap.dedent(
         """
