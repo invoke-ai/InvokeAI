@@ -206,7 +206,7 @@ Caller-owned `CanvasRasterSnapshot` objects are not reconstructible lifecycle ca
 
 ## Browser acceptance
 
-Node and browser suites split by filename and config. `vitest.config.mts` excludes `*.browser.test.ts(x)`; `vitest.browser.config.mts` runs those files through `@vitest/browser-playwright` 4.1.9 in headless Chromium. `test:browser` runs browser suite; `test:all` runs Node, then browser tests. CI installs Chromium with `pnpm exec playwright install chromium` before browser job.
+Node and browser suites split by filename and config. `vitest.config.mts` excludes `*.browser.test.ts(x)`; `vitest.browser.config.mts` runs those files through `@vitest/browser-playwright` in headless Chromium. `test:browser` runs browser suite; `test:all` runs Node, then browser tests. CI installs Chromium with `pnpm exec playwright install chromium` before browser job.
 
 Real-Canvas2D suite verifies transformed composition, clipping, alpha and blend modes, browser text metrics, PNG blob encoding, `createImageBitmap` decoding, pixel undo/redo, small PSD write/read round trip. React `StrictMode` harness verifies surface attachment, `ResizeObserver` sizing, detachment, registry cooldown/reacquisition, grace-period safety, project switching.
 
