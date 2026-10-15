@@ -682,6 +682,13 @@ materialization.
   `Collect` may feed both branch ports of that same `If`; if it would serve different `If` owners, materialization
   raises `UnsupportedSharedIfCollectBranchesError` before invocation rather than dropping frames.
 
+- For a root-conditioned `If` whose selected branch input is a completed direct `Collect`, compatibility
+  materialization preserves each non-root `Collect` iteration path through ordinary descendants. It runs one `If`
+  execution per preserved group, with a matching activation frame; the already-resolved root activation gate and
+  token are aligned to the first group. Ordinary descendants of `If.value` use those same frames, and a downstream
+  `Collect` gathers every completed group through the standard grouping behavior. This bounded case does not imply
+  propagation through further nested controls or loops.
+
 - For each new exec node:
 
   - Deep-copy the source node; assign a fresh ID (and `index` for iterators).

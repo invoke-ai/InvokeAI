@@ -414,12 +414,17 @@ def _is_empty_if_condition(state: "GraphExecutionState", dependency: ActivationD
 
 
 def _activation_gate(state: "GraphExecutionState", exec_node_id: str) -> ActivationGate:
-    return state._generic_runtime().register_gate(
+    runtime = state._generic_runtime()
+    is_new_gate = exec_node_id not in runtime.gates
+    gate = runtime.register_gate(
         gate_id=exec_node_id,
         owner_id=exec_node_id,
         frame=state._engine_frame(state._get_iteration_path(exec_node_id)),
         branches=("true_input", "false_input"),
     )
+    if is_new_gate:
+        state._tx_record(lambda runtime=runtime, gate_id=exec_node_id: runtime.remove_gate(gate_id))
+    return gate
 
 
 def _record_compatibility_activation_token(

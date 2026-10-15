@@ -861,6 +861,22 @@ def test_graph_state_shallow_copy_reset_does_not_clear_original_runtime_state(co
     assert not copied._ready_queues
 
 
+@pytest.mark.parametrize(
+    "copy_state",
+    [pytest.param(lambda state: state.model_copy(), id="model_copy"), pytest.param(copy.copy, id="copy")],
+)
+def test_graph_state_shallow_copy_selected_if_preparation_cache_isolated(copy_state):
+    state = GraphExecutionState(graph=Graph())
+    cache_key = ("if", "true_input")
+    state._selected_if_frames_for_preparation[cache_key] = (((0,),), frozenset({(0,)}))
+
+    copied = copy_state(state)
+    copied._invalidate_selected_if_frames_for_preparation("if")
+
+    assert state._selected_if_frames_for_preparation == {cache_key: (((0,),), frozenset({(0,)}))}
+    assert not copied._selected_if_frames_for_preparation
+
+
 @pytest.mark.parametrize("port", ["type", "output_meta", "loop_linkage"])
 @pytest.mark.parametrize("effect_kind, token_kind", [("emit", "data"), ("close_stream", "stream_end")])
 def test_graph_state_apply_rejects_reserved_effect_ports(port: str, effect_kind: str, token_kind: str):

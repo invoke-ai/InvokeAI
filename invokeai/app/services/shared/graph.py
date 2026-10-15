@@ -229,6 +229,7 @@ class _GraphExecutionStateRuntime:
         "prepared_if_exec_ids_by_source_and_frame",
         "prepared_if_exec_frames_by_source",
         "prepared_if_exec_indexed_sources",
+        "selected_if_frames_for_preparation",
         "prepared_exec_metadata",
         "prepared_exec_registry",
         "if_activation_controller_instance",
@@ -276,6 +277,9 @@ class _GraphExecutionStateRuntime:
         self.prepared_if_exec_ids_by_source_and_frame: dict[tuple[str, tuple[int, ...]], tuple[str, ...]] = {}
         self.prepared_if_exec_frames_by_source: dict[str, tuple[tuple[int, ...], ...]] = {}
         self.prepared_if_exec_indexed_sources: set[str] = set()
+        self.selected_if_frames_for_preparation: dict[
+            tuple[str, Optional[str]], tuple[tuple[tuple[int, ...], ...], frozenset[tuple[int, ...]]]
+        ] = {}
         self.prepared_exec_metadata: dict[str, _PreparedExecNodeMetadata] = {}
         self.prepared_exec_registry: Optional[_PreparedExecRegistry] = None
         self.if_activation_controller_instance: Optional[_IfActivationController] = None
@@ -414,6 +418,7 @@ class GraphExecutionState(BaseModel):
             runtime_state.engine_frames = {
                 key: frame for key, frame in runtime_state.engine_frames.items() if key[0] == copied.id
             }
+            runtime_state.selected_if_frames_for_preparation = runtime_state.selected_if_frames_for_preparation.copy()
             copied.__pydantic_private__["_runtime_state"] = runtime_state
         if update is not None and "graph" in update:
             copied._invalidate_source_graph_cache()
@@ -425,6 +430,7 @@ class GraphExecutionState(BaseModel):
         runtime_state.engine_frames = {
             key: frame for key, frame in runtime_state.engine_frames.items() if key[0] == copied.id
         }
+        runtime_state.selected_if_frames_for_preparation = runtime_state.selected_if_frames_for_preparation.copy()
         copied.__pydantic_private__["_runtime_state"] = runtime_state
         return copied
 
@@ -437,6 +443,27 @@ class GraphExecutionState(BaseModel):
         transaction = self.__pydantic_private__["_runtime_state"].apply_transaction
         if transaction is not None:
             transaction.record(undo)
+
+    def _run_materialization_transaction(self, operation: Callable[[], Any]) -> Any:
+        """Run one preparation expansion atomically using the scheduler mutation journal."""
+        if self._apply_transaction is not None:
+            return operation()
+
+        transaction = _ApplyTransaction()
+        object.__setattr__(self, "_apply_transaction", transaction)
+        try:
+            return operation()
+        except Exception:
+            try:
+                transaction.rollback()
+            finally:
+                object.__setattr__(self, "_apply_transaction", None)
+                self._reset_apply_derived_caches()
+                self._rehydrate_ready_queues()
+            raise
+        finally:
+            if self._apply_transaction is transaction:
+                object.__setattr__(self, "_apply_transaction", None)
 
     def _tx_set_mapping(self, mapping: dict[Any, Any], key: Any, value: Any) -> None:
         transaction = self.__pydantic_private__["_runtime_state"].apply_transaction
@@ -604,12 +631,13 @@ class GraphExecutionState(BaseModel):
 
     def _invalidate_selected_if_frames_for_preparation(self, source_node_id: Optional[str] = None) -> None:
         """Clear selected-frame results after prepared If executions or branch choices change."""
+        selected_frames = self._selected_if_frames_for_preparation
         if source_node_id is None:
-            self._selected_if_frames_for_preparation.clear()
+            self._selected_if_frames_for_preparation = {}
             return
-        for key in tuple(self._selected_if_frames_for_preparation):
-            if key[0] == source_node_id:
-                self._selected_if_frames_for_preparation.pop(key, None)
+        remaining = {key: value for key, value in selected_frames.items() if key[0] != source_node_id}
+        if len(remaining) != len(selected_frames):
+            self._selected_if_frames_for_preparation = remaining
 
     def _if_activation_controller(self) -> _IfActivationController:
         if self._if_activation_controller_instance is None:
@@ -1551,7 +1579,7 @@ class GraphExecutionState(BaseModel):
                 iteration_path=iteration_path,
                 workflow_call_depth=len(self.workflow_call_stack),
             )
-            runtime_state.engine_frames[key] = frame
+            self._tx_set_mapping(runtime_state.engine_frames, key, frame)
         return frame
 
     def _activation_gate(self, exec_node_id: str) -> ActivationGate:
@@ -3454,10 +3482,10 @@ class GraphExecutionState(BaseModel):
             if isinstance(self._scheduler(), _GenericGraphSchedulerAdapter) and self._can_use_generic_for_scheduler()
             else self._materializer()
         )
-        prepared_id = planner.prepare(base_graph)
+        prepared_id = self._run_materialization_transaction(lambda: planner.prepare(base_graph))
 
         while prepared_id is not None:
-            prepared_id = planner.prepare(base_graph)
+            prepared_id = self._run_materialization_transaction(lambda: planner.prepare(base_graph))
             if next_node is None:
                 next_node = self._get_next_node()
 
@@ -4276,6 +4304,7 @@ _GRAPH_RUNTIME_ATTRIBUTE_NAMES = (
     "prepared_if_exec_ids_by_source_and_frame",
     "prepared_if_exec_frames_by_source",
     "prepared_if_exec_indexed_sources",
+    "selected_if_frames_for_preparation",
     "prepared_exec_metadata",
     "prepared_exec_registry",
     "if_activation_controller_instance",

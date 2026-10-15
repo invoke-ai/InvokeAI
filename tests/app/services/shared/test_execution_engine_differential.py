@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import inspect
 import json
 import random
@@ -9873,6 +9874,400 @@ def _sibling_collect_if_graph(
 
 def _collect_output(state: GraphExecutionState, source_id: str = "collect") -> list[Any]:
     return state.results[next(iter(state.source_prepared_mapping[source_id]))].collection
+
+
+def _zip_collect_branch_with_root_condition_graph(condition_value: int) -> Graph:
+    graph = Graph()
+    for node in (
+        CollectionConcatInvocation(id="left_source", first=[1, 2]),
+        CollectionConcatInvocation(id="right_source", first=[10, 20]),
+        IterateInvocation(id="left"),
+        IterateInvocation(id="right"),
+        AddInvocation(id="body"),
+        CollectInvocation(id="branch_collect"),
+        FixedCollectionTestInvocation(id="condition", value=condition_value),
+        AnyTypeTestInvocation(id="fallback", value="fallback"),
+        IfInvocation(id="if"),
+        AnyTypeTestInvocation(id="after"),
+    ):
+        graph.add_node(node)
+    for source, source_field, destination, destination_field in (
+        ("left_source", "collection", "left", "collection"),
+        ("right_source", "collection", "right", "collection"),
+        ("left", "item", "body", "a"),
+        ("right", "item", "body", "b"),
+        ("body", "value", "branch_collect", "item"),
+        ("condition", "condition", "if", "condition"),
+        ("branch_collect", "collection", "if", "true_input"),
+        ("fallback", "value", "if", "false_input"),
+        ("if", "value", "after", "value"),
+    ):
+        graph.add_edge(create_edge(source, source_field, destination, destination_field))
+    return graph
+
+
+def _zip_collect_then_after_graph() -> Graph:
+    graph = _zip_collect_branch_with_root_condition_graph(1)
+    graph.delete_node("if")
+    graph.delete_node("fallback")
+    graph.add_edge(create_edge("branch_collect", "collection", "after", "value"))
+    return graph
+
+
+def _zip_collect_branch_with_after2_graph() -> Graph:
+    graph = _zip_collect_branch_with_root_condition_graph(condition_value=1)
+    graph.add_node(AnyTypeTestInvocation(id="after2"))
+    graph.add_edge(create_edge("after", "value", "after2", "value"))
+    return graph
+
+
+def _zip_collect_branch_with_after_collect_graph() -> Graph:
+    graph = _zip_collect_branch_with_root_condition_graph(condition_value=1)
+    graph.add_node(CollectInvocation(id="after_collect"))
+    graph.add_edge(create_edge("after", "value", "after_collect", "item"))
+    return graph
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+def test_zip_collect_then_after_completes_without_if(force_compatibility_scheduler: bool) -> None:
+    state = GraphExecutionState(graph=_zip_collect_then_after_graph())
+    state._execution_scheduler = (
+        _ExecutionScheduler(state) if force_compatibility_scheduler else _GenericGraphSchedulerAdapter(state)
+    )
+
+    trace, state = _run_graph(state, force_compatibility_scheduler=force_compatibility_scheduler)
+
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert not state.has_error()
+    after_ids = sorted(state.source_prepared_mapping["after"], key=state._get_iteration_path)
+    assert [state._get_iteration_path(node_id) for node_id in after_ids] == [(0,), (1,)]
+    assert [state.results[node_id].value for node_id in after_ids] == [[11, 21], [12, 22]]
+    assert trace.count("body") == 4
+    assert trace.count("branch_collect") == 2
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+def test_zip_collect_then_after_with_empty_right_completes_without_if(
+    force_compatibility_scheduler: bool,
+) -> None:
+    graph = _zip_collect_then_after_graph()
+    graph.update_node("right_source", CollectionConcatInvocation(id="right_source", first=[]))
+    state = GraphExecutionState(graph=graph)
+    state._execution_scheduler = (
+        _ExecutionScheduler(state) if force_compatibility_scheduler else _GenericGraphSchedulerAdapter(state)
+    )
+
+    trace, state = _run_graph(state, force_compatibility_scheduler=force_compatibility_scheduler)
+
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert not state.has_error()
+    after_ids = sorted(state.source_prepared_mapping["after"], key=state._get_iteration_path)
+    assert [state._get_iteration_path(node_id) for node_id in after_ids] == [(0,), (1,)]
+    assert [state.results[node_id].value for node_id in after_ids] == [[], []]
+    assert trace.count("body") == 0
+    assert trace.count("branch_collect") == 2
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+@pytest.mark.parametrize(
+    ("condition_value", "expected"), [(1, [[11, 21], [12, 22]]), (0, "fallback")], ids=["true", "false"]
+)
+def test_zip_collect_branch_with_root_condition_completes(
+    force_compatibility_scheduler: bool, condition_value: int, expected: Any
+) -> None:
+    state = GraphExecutionState(graph=_zip_collect_branch_with_root_condition_graph(condition_value))
+    state._execution_scheduler = (
+        _ExecutionScheduler(state) if force_compatibility_scheduler else _GenericGraphSchedulerAdapter(state)
+    )
+
+    trace, state = _run_graph(state, force_compatibility_scheduler=force_compatibility_scheduler)
+
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert not state.has_error()
+    after_ids = sorted(state.source_prepared_mapping["after"], key=state._get_iteration_path)
+    if_ids = set(state.source_prepared_mapping["if"])
+    activation_tokens = sorted(
+        (
+            token
+            for token in state.execution_tokens.values()
+            if token.token_kind == "activation" and token.owner_node_id in if_ids
+        ),
+        key=lambda token: token.frame.iteration_path,
+    )
+    if condition_value:
+        assert [state._get_iteration_path(node_id) for node_id in after_ids] == [(0,), (1,)]
+        assert [state.results[node_id].value for node_id in after_ids] == expected
+        assert trace.count("body") == 4
+        assert trace.count("branch_collect") == 2
+        assert trace.count("if") == 2
+        assert [(token.port, token.frame.iteration_path) for token in activation_tokens] == [
+            ("true_input", (0,)),
+            ("true_input", (1,)),
+        ]
+        restored = load_execution_state(dump_execution_state(state))
+        assert restored.is_complete()
+        assert not restored.has_error()
+        restored_after_ids = sorted(restored.source_prepared_mapping["after"], key=restored._get_iteration_path)
+        assert [restored.results[node_id].value for node_id in restored_after_ids] == expected
+    else:
+        assert [state._get_iteration_path(node_id) for node_id in after_ids] == [()]
+        assert [state.results[node_id].value for node_id in after_ids] == [expected]
+        assert trace.count("body") == 0
+        assert trace.count("branch_collect") == 0
+        assert trace.count("if") == 1
+        assert [(token.port, token.frame.iteration_path) for token in activation_tokens] == [("false_input", ())]
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+def test_zip_collect_root_condition_preserves_frames_through_ordinary_descendants(
+    force_compatibility_scheduler: bool,
+) -> None:
+    state = GraphExecutionState(graph=_zip_collect_branch_with_after2_graph())
+    state._execution_scheduler = (
+        _ExecutionScheduler(state) if force_compatibility_scheduler else _GenericGraphSchedulerAdapter(state)
+    )
+
+    trace, state = _run_graph(state, force_compatibility_scheduler=force_compatibility_scheduler)
+
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert not state.has_error()
+    after2_ids = sorted(state.source_prepared_mapping["after2"], key=state._get_iteration_path)
+    assert [state._get_iteration_path(node_id) for node_id in after2_ids] == [(0,), (1,)]
+    assert [state.results[node_id].value for node_id in after2_ids] == [[11, 21], [12, 22]]
+    assert trace.count("after2") == 2
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+def test_zip_collect_root_condition_preserves_groups_in_downstream_collect(
+    force_compatibility_scheduler: bool,
+) -> None:
+    state = GraphExecutionState(graph=_zip_collect_branch_with_after_collect_graph())
+    state._execution_scheduler = (
+        _ExecutionScheduler(state) if force_compatibility_scheduler else _GenericGraphSchedulerAdapter(state)
+    )
+
+    trace, state = _run_graph(state, force_compatibility_scheduler=force_compatibility_scheduler)
+
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert not state.has_error()
+    collect_ids = sorted(state.source_prepared_mapping["after_collect"], key=state._get_iteration_path)
+    assert len(collect_ids) == 1
+    assert state._get_iteration_path(collect_ids[0]) == ()
+    assert state.results[collect_ids[0]].collection == [[11, 21], [12, 22]]
+    assert trace.count("after_collect") == 1
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+def test_zip_collect_root_condition_expansion_rolls_back_after_if_initialization_failure(
+    monkeypatch: pytest.MonkeyPatch, force_compatibility_scheduler: bool
+) -> None:
+    state = GraphExecutionState(graph=_zip_collect_branch_with_root_condition_graph(condition_value=1))
+    state._execution_scheduler = (
+        _ExecutionScheduler(state) if force_compatibility_scheduler else _GenericGraphSchedulerAdapter(state)
+    )
+
+    while (
+        len(
+            [exec_id for exec_id in state.source_prepared_mapping.get("branch_collect", ()) if exec_id in state.results]
+        )
+        < 2
+    ):
+        node = state.next()
+        assert node is not None
+        state.complete(node.id, node.invoke(Mock()))
+
+    root_if_ids = [
+        exec_id for exec_id in state.source_prepared_mapping["if"] if state._get_iteration_path(exec_id) == ()
+    ]
+    assert len(root_if_ids) == 1
+    root_if_id = root_if_ids[0]
+    assert root_if_id not in state.executed
+
+    before_nodes = set(state.execution_graph.nodes)
+    before_edges = tuple(state.execution_graph.edges)
+    before_prepared_sources = dict(state.prepared_source_mapping)
+    before_source_prepared = {source_id: set(exec_ids) for source_id, exec_ids in state.source_prepared_mapping.items()}
+    before_paths = dict(state.prepared_iteration_paths)
+    before_indegree = dict(state.indegree)
+    before_tokens = state.execution_tokens.copy()
+    before_gates = copy.deepcopy(state._generic_runtime().gates)
+    materializer = state._materializer()
+    initialize_execution_node = materializer._initialize_execution_node
+
+    def fail_after_if_initialization(exec_node_id: str, input_edges: Any = None) -> None:
+        initialize_execution_node(exec_node_id, input_edges)
+        if state.prepared_source_mapping.get(exec_node_id) == "if" and state._get_iteration_path(exec_node_id) == (1,):
+            raise RuntimeError("injected If-copy initialization failure")
+
+    monkeypatch.setattr(materializer, "_initialize_execution_node", fail_after_if_initialization)
+    with pytest.raises(RuntimeError, match="injected If-copy initialization failure"):
+        while (node := state.next()) is not None:
+            state.complete(node.id, node.invoke(Mock()))
+
+    assert set(state.execution_graph.nodes) == before_nodes
+    assert tuple(state.execution_graph.edges) == before_edges
+    assert state.prepared_source_mapping == before_prepared_sources
+    assert state.source_prepared_mapping == before_source_prepared
+    assert state.prepared_iteration_paths == before_paths
+    assert state.indegree == before_indegree
+    assert state.execution_tokens == before_tokens
+    assert state._generic_runtime().gates == before_gates
+    assert state._get_iteration_path(root_if_id) == ()
+
+    monkeypatch.undo()
+    trace, state = _run_graph(state, force_compatibility_scheduler=force_compatibility_scheduler)
+    assert state.is_complete(), f"graph stalled after retry: {trace}"
+    assert not state.has_error()
+    after_ids = sorted(state.source_prepared_mapping["after"], key=state._get_iteration_path)
+    assert [state.results[node_id].value for node_id in after_ids] == [[11, 21], [12, 22]]
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+def test_zip_collect_root_condition_deferred_consumer_failure_rolls_back_and_retries(
+    monkeypatch: pytest.MonkeyPatch, force_compatibility_scheduler: bool
+) -> None:
+    state = GraphExecutionState(graph=_zip_collect_branch_with_root_condition_graph(condition_value=1))
+    state._execution_scheduler = (
+        _ExecutionScheduler(state) if force_compatibility_scheduler else _GenericGraphSchedulerAdapter(state)
+    )
+
+    while (
+        len(
+            [exec_id for exec_id in state.source_prepared_mapping.get("branch_collect", ()) if exec_id in state.results]
+        )
+        < 2
+    ):
+        node = state.next()
+        assert node is not None
+        state.complete(node.id, node.invoke(Mock()))
+
+    before_after_ids = set(state.source_prepared_mapping.get("after", ()))
+    before_after_edges = tuple(
+        edge
+        for edge in state.execution_graph.edges
+        if state.prepared_source_mapping.get(edge.destination.node_id) == "after"
+    )
+    materializer = state._materializer()
+    initialize_execution_node = materializer._initialize_execution_node
+
+    def fail_after_second_frame(exec_node_id: str, input_edges: Any = None) -> None:
+        initialize_execution_node(exec_node_id, input_edges)
+        if state.prepared_source_mapping.get(exec_node_id) == "after" and state._get_iteration_path(exec_node_id) == (
+            1,
+        ):
+            raise RuntimeError("injected deferred consumer initialization failure")
+
+    monkeypatch.setattr(materializer, "_initialize_execution_node", fail_after_second_frame)
+    with pytest.raises(RuntimeError, match="injected deferred consumer initialization failure"):
+        while (node := state.next()) is not None:
+            state.complete(node.id, node.invoke(Mock()))
+
+    assert state.source_prepared_mapping.get("after", set()) == before_after_ids
+    assert (
+        tuple(
+            edge
+            for edge in state.execution_graph.edges
+            if state.prepared_source_mapping.get(edge.destination.node_id) == "after"
+        )
+        == before_after_edges
+    )
+
+    monkeypatch.undo()
+    trace, state = _run_graph(state, force_compatibility_scheduler=force_compatibility_scheduler)
+    assert state.is_complete(), f"graph stalled after retry: {trace}"
+    assert not state.has_error()
+    after_ids = sorted(state.source_prepared_mapping["after"], key=state._get_iteration_path)
+    assert [state.results[node_id].value for node_id in after_ids] == [[11, 21], [12, 22]]
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+def test_zip_collect_branch_with_empty_selected_collect_completes(force_compatibility_scheduler: bool) -> None:
+    graph = _zip_collect_branch_with_root_condition_graph(condition_value=1)
+    graph.update_node("left_source", CollectionConcatInvocation(id="left_source", first=[]))
+    state = GraphExecutionState(graph=graph)
+    state._execution_scheduler = (
+        _ExecutionScheduler(state) if force_compatibility_scheduler else _GenericGraphSchedulerAdapter(state)
+    )
+
+    trace, state = _run_graph(state, force_compatibility_scheduler=force_compatibility_scheduler)
+
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert not state.has_error()
+    after_ids = sorted(state.source_prepared_mapping["after"], key=state._get_iteration_path)
+    collect_ids = sorted(state.source_prepared_mapping["branch_collect"], key=state._get_iteration_path)
+    assert len(after_ids) == 1
+    assert state._get_iteration_path(after_ids[0]) == ()
+    assert state.results[after_ids[0]].value == []
+    assert len(collect_ids) == 1
+    assert state.results[collect_ids[0]].collection == []
+    assert trace.count("right") == 2
+    assert trace.count("body") == 0
+    assert trace.count("branch_collect") == 1
+    assert trace.count("if") == 1
+    activation_tokens = [token for token in state.execution_tokens.values() if token.token_kind == "activation"]
+    assert [(token.port, token.frame.iteration_path) for token in activation_tokens] == [("true_input", ())]
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+def test_zip_collect_branch_with_empty_right_preserves_left_frames(force_compatibility_scheduler: bool) -> None:
+    graph = _zip_collect_branch_with_root_condition_graph(condition_value=1)
+    graph.update_node("right_source", CollectionConcatInvocation(id="right_source", first=[]))
+    state = GraphExecutionState(graph=graph)
+    state._execution_scheduler = (
+        _ExecutionScheduler(state) if force_compatibility_scheduler else _GenericGraphSchedulerAdapter(state)
+    )
+
+    trace, state = _run_graph(state, force_compatibility_scheduler=force_compatibility_scheduler)
+
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert not state.has_error()
+    after_ids = sorted(state.source_prepared_mapping["after"], key=state._get_iteration_path)
+    assert [state._get_iteration_path(node_id) for node_id in after_ids] == [(0,), (1,)]
+    assert [state.results[node_id].value for node_id in after_ids] == [[], []]
+    assert trace.count("body") == 0
+    assert trace.count("branch_collect") == 2
+    assert trace.count("if") == 2
+    tokens = sorted(
+        (token for token in state.execution_tokens.values() if token.token_kind == "activation"),
+        key=lambda token: token.frame.iteration_path,
+    )
+    assert [(token.port, token.frame.iteration_path) for token in tokens] == [
+        ("true_input", (0,)),
+        ("true_input", (1,)),
+    ]
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+def test_zip_collect_branch_activation_frames_resume_after_round_trip(force_compatibility_scheduler: bool) -> None:
+    state = GraphExecutionState(graph=_zip_collect_branch_with_root_condition_graph(condition_value=1))
+    if force_compatibility_scheduler:
+        state._execution_scheduler = _ExecutionScheduler(state)
+
+    partial_trace, state = _run_graph(
+        state,
+        force_compatibility_scheduler=force_compatibility_scheduler,
+        stop_after=14,
+    )
+    assert partial_trace[-1] == "if"
+    assert partial_trace.count("if") == 1
+    assert not state.is_complete()
+    assert not state.has_error()
+    partial_if_ids = sorted(state.source_prepared_mapping["if"], key=state._get_iteration_path)
+    assert [state._get_iteration_path(node_id) for node_id in partial_if_ids] == [(0,), (1,)]
+    assert sum(node_id in state.results for node_id in partial_if_ids) == 1
+    assert sum(node_id not in state.results for node_id in partial_if_ids) == 1
+
+    state = load_execution_state(dump_execution_state(state))
+    if force_compatibility_scheduler:
+        _restore_compatibility_scheduler(state)
+    remaining_trace, state = _run_graph(state)
+
+    assert state.is_complete(), f"resume stalled after {remaining_trace}"
+    assert not state.has_error()
+    assert not state._pending_if_exec_nodes
+    assert not state._has_pending_lifecycle_execution()
+    after_ids = sorted(state.source_prepared_mapping["after"], key=state._get_iteration_path)
+    assert [state.results[node_id].value for node_id in after_ids] == [[11, 21], [12, 22]]
 
 
 @pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
