@@ -65,9 +65,15 @@ Required independent review unavailable: self-review the matching focuses and te
 
 ## Delegated implementation
 
-Delegate when work is independently verifiable, clearly owned, and needs little coordination. Keep small or tightly coupled changes local. Brief each implementer: objective, owned files, applicable `AGENTS.md`, agreed interfaces, acceptance criteria, focused checks. One writer per file at a time. Implementers own meaningful tests for their changes; by default never split production code from its tests. Primary agent owns shared contracts, integration, final validation, completion.
+Main agent never edits repository files: every edit goes to an implementation subagent, so the main conversation keeps its context for planning, coordination, and review. Harness without subagents: edit locally.
 
-Primary agent also owns machine-wide resources: dependency installs, generated API contracts, full suites and release gates, GPU/generation work, fixed-port servers, shared browser sessions. Implementers run focused checks only, use spare ports, clean up temporary output, and never stash, reset, or check out in shared worktrees. Pre-commit hook stashes unstaged changes while it runs: commit only when no other agent writes to the same worktree. One webv2 performance gate per machine: it measures timing and binds fixed ports.
+- Main agent investigates, plans, briefs, integrates, validates, reports. It owns shared contracts and completion.
+- Brief each implementer: objective, owned files, applicable `AGENTS.md`, agreed interfaces, acceptance criteria, focused checks. Implementer returns a short report: files changed, checks run, open issues.
+- One writer per file at a time. Tightly coupled changes go to one implementer; split only independently verifiable work.
+- Implementers own meaningful tests for their changes; by default never split production code from its tests.
+- Follow-up fixes from review findings or failing checks go back to an implementer, preferably the original one.
+
+Main agent also owns machine-wide resources: dependency installs, generated API contracts, full suites and release gates, GPU/generation work, fixed-port servers, shared browser sessions. Implementers run focused checks only, use spare ports, clean up temporary output, and never stash, reset, or check out in shared worktrees. Pre-commit hook stashes unstaged changes while it runs: commit only when no other agent writes to the same worktree. One webv2 performance gate per machine: it measures timing and binds fixed ports.
 
 ## Commands and environments
 
