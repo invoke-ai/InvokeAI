@@ -1,19 +1,24 @@
 # Webv2 module architecture
 
-Webv2 uses four top-level module groups:
+Four top-level module groups:
 
-- `app/` owns providers, routing, boot, and composition roots.
-- `platform/` owns application infrastructure with no workbench or feature dependency.
-- `workbench/` owns the atomic project aggregate, layout, shell, widget runtime, and extension runtime.
-- `features/<domain>/` owns domain behavior behind a small set of public top-level entry modules (`features/<domain>/index.ts` first among them).
+- `app/`: providers, routing, boot, composition roots.
+- `platform/`: application infrastructure. No workbench or feature dependency.
+- `workbench/`: atomic project aggregate, layout, shell, widget runtime, extension runtime.
+- `features/<domain>/`: domain behavior behind a few public top-level entry modules (`features/<domain>/index.ts` first).
 
-Paths are relative to `src/` unless they start with `src/`, `scripts/`, `performance/`, or `artifacts/`, which are relative to this package. Workbench ownership tables use paths relative to `src/workbench/`.
+Paths are relative to `src/`, except paths starting with `src/`, `scripts/`, `performance/`, or `artifacts/`: those are relative to this package. Workbench ownership tables use paths relative to `src/workbench/`.
 
-Dependency direction is `app -> workbench/features -> platform`. Feature callers import only a feature's public entry modules — the top-level modules each feature registers in `src/architecture/featureInterfaces.ts` (`index` is implicitly public; an unregistered feature or module is private, fail-closed); everything under `core/`, `data/`, `ui/`, and runtime implementation is private. A feature may group substantial behavior under `core/`, `data/`, and `ui/`; pure cores do not import transport, Data, React, or UI modules, including through type-only imports. Production canvas callers use `workbench/canvas-engine/api.ts`, not the engine implementation root.
+Dependency direction: `app -> workbench/features -> platform`.
+
+- Feature callers import only a feature's public entry modules: the top-level modules registered in `src/architecture/featureInterfaces.ts`. `index` is implicitly public. Unregistered feature or module is private (fail-closed).
+- Everything under `core/`, `data/`, `ui/`, and runtime implementation is private.
+- Features may group substantial behavior under `core/`, `data/`, `ui/`. Pure cores never import transport, Data, React, or UI modules, type-only imports included.
+- Production canvas callers use `workbench/canvas-engine/api.ts`, not the engine implementation root.
 
 ## App and Platform ownership
 
-Ownership is based on invariants, not the first caller:
+Ownership follows invariants, not the first caller:
 
 | Module                 | Owned implementation                                                                                                                                  | Must not own                                                    |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
@@ -27,17 +32,18 @@ Ownership is based on invariants, not the first caller:
 | `platform/runtime`     | Domain-neutral build/runtime metadata                                                                                                                 | Route or feature policy                                         |
 | `workbench/components` | Workbench hydration and Queue progress presentation                                                                                                   | Reusable control or theme implementation                        |
 
-The root of `src/` contains declaration files only. Runtime boot files live in App, the old root entry paths do not exist, and `index.html` names `src/app/main.tsx` directly. `@theme` resolves to Platform UI theme implementation; all other Platform callers use `@platform/*`. No compatibility path exists for moved App, HTTP, socket, external-store, selector, theme, i18n, or reusable-UI modules.
+- `src/` root holds declaration files only. Runtime boot files live in App. Old root entry paths are gone; `index.html` names `src/app/main.tsx` directly.
+- `@theme` resolves to Platform UI theme implementation. Every other Platform caller uses `@platform/*`. Moved App, HTTP, socket, external-store, selector, theme, i18n, reusable-UI modules have no compatibility path.
+- Authentication: `app/main.tsx` hands it to Platform transport before React mounts. Identity owns the credential and every policy about it. Platform captures it once per request and reports that request's outcome.
+- Platform socket publishes raw events and connection transitions. Queue and other domains interpret them.
+- Lifecycle-specific production composition stays explicit at its natural root: authenticated socket in `app/router.tsx`, editor runtimes in `app/WorkbenchApp.tsx`, feature UI providers in `app/workbenchPorts.tsx`, lazy editor bridges beside their lazy entry modules. App builds the production Queue runtime from Queue, Workbench, Gallery, Workflow adapters.
+- Platform State owns reusable projections of broad external stores into referentially stable read-only stores. App may build them for a feature port. Listener, caching, equality mechanics stay domain-neutral Platform code.
 
-Platform transport receives authentication through `app/main.tsx`, before React mounts: Identity owns the credential and every policy about it, while Platform captures it once per request and reports that request's outcome. The Platform socket publishes raw events and connection transitions; Queue and other domains interpret those events. Lifecycle-specific production composition remains explicit at its natural root: the authenticated socket in `app/router.tsx`, editor runtimes in `app/WorkbenchApp.tsx`, feature UI providers in `app/workbenchPorts.tsx`, and lazy editor bridges beside their lazy entry modules. App constructs the production Queue runtime from Queue, Workbench, Gallery, and Workflow adapters.
-
-Platform State also owns reusable projections of broad external stores into referentially stable read-only stores. App may construct those projections for a feature port, but the listener, caching, and equality mechanics remain domain-neutral Platform code.
-
-`pnpm architecture:check` is the executable source of truth for these dependency directions. It uses the TypeScript parser to classify static imports, type imports, dynamic imports, re-exports, and inline imported types after resolving aliases and relative paths. Temporary violations must be recorded in `src/architecture/migrationExceptions.ts` with an owner and a removal ticket; architecture completion requires that registry to be empty.
+`pnpm architecture:check` is the executable source of truth for dependency direction. It parses TypeScript and classifies static imports, type imports, dynamic imports, re-exports, inline imported types, after resolving aliases and relative paths. Temporary violations go in `src/architecture/migrationExceptions.ts` with owner and removal ticket. Architecture is complete only when that registry is empty.
 
 ## Owner documents
 
-Behavior specifications live beside the code that owns them. Read the affected owner's document before changing its behavior.
+Behavior specs live beside their owning code. Read the owner's document before changing its behavior.
 
 | Topic                                                         | Document                                                                               |
 | ------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
@@ -56,19 +62,19 @@ Behavior specifications live beside the code that owns them. Read the affected o
 
 ## Contract ownership
 
-Contracts live with the module that owns their invariants. The retired `workbench/types.ts` path is an architecture violation; Workbench aggregate, widget, Canvas, persistence, settings, and feature contracts each have an owner-local canonical path. Persisted schemas and backend DTOs remain private versioned/wire values and cross seams only through explicit serializers, hydrators, or mappers.
-
-`platform/core/outputImages.ts` is the explicit shared adapter for backend invocation-output image names. It is platform-owned because Queue and Nodes both need the projection and cannot import each other's private implementations. The adapter recognizes only the backend's direct image, image-collection, and workflow-return output contracts; it must not become a recursive walker for arbitrary metadata or input fields.
-
-Feature callers import a feature's public entry modules; imports of another feature's `core/`, `data/`, `ui/`, or runtime implementation are rejected outside a ticketed migration exception. Wildcard exports may aggregate files inside one owner, but may not cross an ownership seam. The contract caller matrix and development-invalidation budgets are generated by `pnpm architecture:check` and `pnpm test:performance:build` respectively.
-
-Compatibility exports under `workbench/` are temporary. New behavior belongs behind the target module interface and compatibility files must not acquire new implementation logic.
+- Contracts live with the module owning their invariants. Retired `workbench/types.ts` path is an architecture violation. Workbench aggregate, widget, Canvas, persistence, settings, feature contracts each have an owner-local canonical path.
+- Persisted schemas and backend DTOs stay private versioned/wire values. They cross seams only through explicit serializers, hydrators, mappers.
+- `platform/core/outputImages.ts` is the explicit shared adapter for backend invocation-output image names. Platform owns it because Queue and Nodes both need the projection and cannot import each other's private code. It recognizes only direct image, image-collection, workflow-return output contracts. Never grow it into a recursive walker of arbitrary metadata or input fields.
+- Imports of another feature's `core/`, `data/`, `ui/`, or runtime implementation fail outside a ticketed migration exception.
+- Wildcard exports may aggregate files inside one owner. Never across an ownership seam.
+- `pnpm architecture:check` generates the contract caller matrix; `pnpm test:performance:build` generates development-invalidation budgets.
+- Compatibility exports under `workbench/` are temporary. New behavior goes behind the target module interface. Compatibility files gain no new implementation logic.
 
 ## Workbench ownership destinations
 
-`src/architecture/workbenchOwnershipManifest.json` is the executable current-to-target ownership manifest. `pnpm architecture:check` proves that every production Workbench module has exactly one target owner and writes the detailed import/export inventory to `artifacts/architecture/workbench-ownership-inventory.json`. The generated inventory is regenerated as modules change; tests and type-test fixtures are intentionally excluded.
+`src/architecture/workbenchOwnershipManifest.json` is the executable current-to-target ownership manifest. `pnpm architecture:check` proves every production Workbench module has exactly one target owner. It writes the import/export inventory to `artifacts/architecture/workbench-ownership-inventory.json`, regenerated as modules change; tests and type-test fixtures excluded on purpose.
 
-Every directory rule in the manifest targets Workbench. One override remains: `workbench/components/QueueProgressIndicator.tsx` targets Queue and is due to move to `features/queue/ui/`. Identity, Models, Nodes, Queue, Gallery, Generation, Workflow, and Upscale code lives under `features/`; the domain-neutral React adapters `useMountEffect` and `useModifierHeld` live in `platform/react/` and have no Workbench import.
+Every manifest directory rule targets Workbench. One override left: `workbench/components/QueueProgressIndicator.tsx` targets Queue, due to move to `features/queue/ui/`. Identity, Models, Nodes, Queue, Gallery, Generation, Workflow, Upscale code lives under `features/`. Domain-neutral React adapters `useMountEffect` and `useModifierHeld` live in `platform/react/`, with no Workbench import.
 
 | Workbench path                                                                                       | Locality decision                                                                                                                                                                                     |
 | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -78,11 +84,18 @@ Every directory rule in the manifest targets Workbench. One override remains: `w
 | `canvas-engine`, `canvas-operations`, Canvas/layers widgets, root Canvas modules                     | Canvas is a deep internal Workbench module behind `canvas-engine/api.ts`, not another top-level Feature.                                                                                              |
 | `image-actions`                                                                                      | Cross-surface image orchestration and transient display stay internal until a second independent implementation justifies a seam.                                                                     |
 
-Overrides are longest-prefix rules, so a mixed folder's split is explicit rather than inferred from imports. Compatibility re-exports keep the target owner of the implementation they forward and are deletion work, never a fifth owner.
+- Overrides are longest-prefix rules: a mixed folder's split is explicit, not inferred from imports.
+- Compatibility re-exports keep the target owner of what they forward. They are deletion work, never a fifth owner.
+- Owner dependency graph is acyclic. Only direction: `app -> workbench/features -> platform`. Cross-owner access only through public module interfaces or composition-root adapters. `src/architecture/workbenchOwnership.test.ts` fails on any strongly connected component among owners. `src/architecture/migrationExceptions.ts` is empty.
 
-The owner dependency graph is acyclic: the only direction is `app -> workbench/features -> platform`, with cross-owner access through public module interfaces or composition-root adapters. `src/architecture/workbenchOwnership.test.ts` fails on any strongly connected component among owners, and `src/architecture/migrationExceptions.ts` is empty.
+Feature interfaces stay ordinary module interfaces unless two adapters add leverage.
 
-Feature interfaces remain ordinary module interfaces unless two adapters add leverage. Queue's backend port has production transport/realtime and test adapters; Identity's token/session port has browser-session and test adapters; Models and Nodes use production event/transport adapters; their sinks (model-load activity, node execution) are injected into Queue's runtime at the App composition root, with test doubles in Queue's runtime tests. Gallery, Generation, Workflow, and Upscale keep their compilation and UI seams internal until their feature tickets demonstrate another independent adapter. Workbench image actions likewise remain internal rather than becoming a shallow Image Feature. Gallery's picker and media slots read a narrow `GalleryHost` (gallery scope, notifications, an optional Gallery-widget reveal): the workbench derives it from the Gallery UI adapter, and the Launchpad's model manager, which has no workbench, supplies one itself. Media slots accept dragged gallery items only inside `GalleryDragScope`, which the workbench shell provides with its drag context; widget dialog hosts and the Launchpad sit outside it.
+- Queue backend port: production transport/realtime adapter plus test adapter.
+- Identity token/session port: browser-session adapter plus test adapter.
+- Models and Nodes: production event/transport adapters. Their sinks (model-load activity, node execution) are injected into Queue's runtime at the App composition root; Queue runtime tests use doubles.
+- Gallery, Generation, Workflow, Upscale keep compilation and UI seams internal until a feature ticket shows another independent adapter. Workbench image actions also stay internal, not a shallow Image Feature.
+- Gallery picker and media slots read a narrow `GalleryHost`: gallery scope, notifications, optional Gallery-widget reveal. Workbench derives it from the Gallery UI adapter. Launchpad's model manager has no workbench and supplies its own.
+- Media slots accept dragged gallery items only inside `GalleryDragScope`, provided by the workbench shell with its drag context. Widget dialog hosts and the Launchpad sit outside it.
 
 | Feature       | Responsibility and representative callers                                                                                                                                | Allowed dependencies and candidate public interface                                                                                                                                                    |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
