@@ -3102,28 +3102,34 @@ const reconcileDeletedGalleryBoard = (
   return didChangeQueue ? { ...withBoardReferencesCleared, projects } : withBoardReferencesCleared;
 };
 
-/** A deliberate selection pauses live-follow; only generations submitted after that selection may take the preview. */
+const getLiveFollowPausedAt = (project: Project): string | null => {
+  const pausedAt = getWidgetValues(project, 'gallery').liveFollowPausedAt;
+
+  return typeof pausedAt === 'string' ? pausedAt : null;
+};
+
+/**
+ * A deliberate selection pauses live-follow; only generations submitted after that selection may take the preview.
+ * With live-follow explicitly off there is nothing to pause, and a pause recorded then would let the next submission
+ * turn it back on.
+ */
 const updateGalleryValuesAndPauseLiveFollow = (
   state: WorkbenchState,
   getValues: (values: Record<string, unknown>) => Record<string, unknown>,
   projectId = state.activeProjectId
 ): WorkbenchState =>
   updateProjectById(state, projectId, (project) =>
-    updateProjectWidgetValues(
-      {
-        ...project,
-        settings: { ...project.settings, showProgressImagesInViewer: false },
-      },
-      'gallery',
-      (values) => ({ ...getValues(values), liveFollowPausedAt: now() })
-    )
+    !project.settings.showProgressImagesInViewer && getLiveFollowPausedAt(project) === null
+      ? updateProjectWidgetValues(project, 'gallery', getValues)
+      : updateProjectWidgetValues(
+          {
+            ...project,
+            settings: { ...project.settings, showProgressImagesInViewer: false },
+          },
+          'gallery',
+          (values) => ({ ...getValues(values), liveFollowPausedAt: now() })
+        )
   );
-
-const getLiveFollowPausedAt = (project: Project): string | null => {
-  const pausedAt = getWidgetValues(project, 'gallery').liveFollowPausedAt;
-
-  return typeof pausedAt === 'string' ? pausedAt : null;
-};
 
 /** Submission resumes selection-paused live-follow, but preserves an explicit opt-out. */
 const shouldResumeLiveFollowOnSubmit = (project: Project): boolean =>
