@@ -61,6 +61,10 @@ def test_live_activation_frame_mismatch(state: GraphExecutionState, field: str, 
 def test_unresolved_dependency_is_deferred_but_rejected_is_not(state: GraphExecutionState) -> None:
     dependency = ActivationDependency(owner_id="if", branch="false_input", frame=(2,))
     state._if_activation_dependencies_by_exec["consumer"] = (dependency,)
+    state._index_activation_dependencies("consumer", (dependency,))
+    assert state._if_activation_dependents_by_dependency[dependency] == ("consumer",)
+    assert "consumer" not in state._if_activation_active_dependents_by_dependency.get(dependency, {})
+
     assert state._is_deferred_by_unresolved_if("consumer")
     assert not state._has_rejected_activation_dependency("consumer")
 

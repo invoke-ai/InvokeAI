@@ -699,10 +699,17 @@ materialization.
   - Try to resolve any `If`-specific scheduling state.
   - If the node is ready and not deferred by an unresolved `If`, enqueue it into its class queue.
 
-Each planner preparation expansion is applied as a state transaction. If expansion raises, journaled execution-graph,
-prepared-mapping, frame, activation-token, gate, and scheduler mutations are rolled back; derived caches are reset and
-ready queues are rebuilt from the restored state before the exception propagates. A later `next()` can retry from the
-pre-expansion state without retaining partially materialized nodes or activation state.
+`next()` applies `_GenericForPlanner.prepare()` and If-bearing `_ExecutionMaterializer.prepare()` calls as state
+transactions. If one of those expansions raises, journaled execution-graph, prepared-mapping, frame,
+activation-token, gate, and scheduler mutations are rolled back; derived caches are reset and ready queues are rebuilt
+from the restored state before the exception propagates. A later `next()` can retry from the pre-expansion state
+without retaining partially materialized nodes or activation state. If-free `_ExecutionMaterializer.prepare()` runs
+without this transaction wrapper to avoid overhead on ordinary graphs; root-If completed-Collect expansion retains
+its own transaction.
+
+This transaction boundary does not cover pending-If attachment (`_attach_pending_if_inputs`),
+`prepare_nested_iterate_sequence()`, or direct Iterate/Collect preparation. Those operations run outside the wrapper
+and must be considered separately when reasoning about rollback behavior.
 
 The execution-node builder retains a filtered iterator graph for the current source-graph identity. It builds this
 graph when compatibility preparation needs sibling-Collect relationships or iterator ancestry. The graph replaces

@@ -33,6 +33,16 @@ def validate_if_iteration_axes(state: "GraphExecutionState") -> None:
         if not condition_edges:
             continue
         condition_iterators = iterator_ancestry.get_iterator_ancestors_for_edge(condition_edges[0])
+        branch_edges = {
+            branch_field: state.graph._get_input_edges(node_id, branch_field)
+            for branch_field in ("true_input", "false_input")
+        }
+        broadcast_axes = None
+        if all(len(edges) == 1 for edges in branch_edges.values()):
+            true_axes = iterator_ancestry.get_iterator_ancestors_for_edge(branch_edges["true_input"][0])
+            false_axes = iterator_ancestry.get_iterator_ancestors_for_edge(branch_edges["false_input"][0])
+            if true_axes == false_axes and condition_iterators < true_axes:
+                broadcast_axes = true_axes
         for branch_field in ("true_input", "false_input"):
             for edge in state.graph._get_input_edges(node_id, branch_field):
                 branch_iterators = iterator_ancestry.get_iterator_ancestors_for_edge(edge)
@@ -40,6 +50,7 @@ def validate_if_iteration_axes(state: "GraphExecutionState") -> None:
                 if (
                     condition_iterators
                     and condition_iterators < branch_iterators
+                    and branch_iterators != broadcast_axes
                     and not isinstance(branch_source, CollectInvocation)
                 ):
                     raise UnsupportedIfIterationAxesError(

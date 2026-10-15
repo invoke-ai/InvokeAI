@@ -10550,6 +10550,75 @@ def test_if_branch_deeper_than_its_condition_completes_or_is_rejected(
     assert state.executed_history == []
 
 
+def _broadcast_deeper_if_graph(*, selected: bool) -> Graph:
+    """An outer condition selects one of two complete inner-Iterate branches."""
+    graph = Graph()
+    for node in (
+        CollectionConcatInvocation(id="outer_source", first=[2, 0] if selected else [0, 2]),
+        IterateInvocation(id="outer"),
+        AddInvocation(id="range_stop", b=1),
+        RangeInvocation(id="range", start=0, step=1),
+        IterateInvocation(id="inner"),
+        FixedCollectionTestInvocation(id="condition"),
+        AddInvocation(id="true_value", b=10),
+        AddInvocation(id="false_value", b=100),
+        IfInvocation(id="if"),
+        CollectInvocation(id="collect"),
+    ):
+        graph.add_node(node)
+    for source, source_field, destination, destination_field in (
+        ("outer_source", "collection", "outer", "collection"),
+        ("outer", "item", "condition", "value"),
+        ("condition", "condition", "if", "condition"),
+        ("outer", "item", "range_stop", "a"),
+        ("range_stop", "value", "range", "stop"),
+        ("range", "collection", "inner", "collection"),
+        ("inner", "item", "true_value", "a"),
+        ("inner", "item", "false_value", "a"),
+        ("true_value", "value", "if", "true_input"),
+        ("false_value", "value", "if", "false_input"),
+        ("if", "value", "collect", "item"),
+    ):
+        graph.add_edge(create_edge(source, source_field, destination, destination_field))
+    return graph
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+@pytest.mark.parametrize("selected", [True, False], ids=["true-branch", "false-branch"])
+def test_if_broadcasts_a_deeper_iterate_branch_across_each_outer_condition_frame(
+    force_compatibility_scheduler: bool, selected: bool
+) -> None:
+    state = GraphExecutionState(graph=_broadcast_deeper_if_graph(selected=selected))
+
+    trace, state = _run_graph(state, force_compatibility_scheduler=force_compatibility_scheduler)
+
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert not state.has_error()
+    expected = [[10, 11, 12], [100]] if selected else [[100], [10, 11, 12]]
+    collect_nodes = sorted(state.source_prepared_mapping["collect"], key=state._get_iteration_path)
+    collected = [state.results[node_id].collection for node_id in collect_nodes]
+    assert collected == expected, f"{trace=}"
+    assert trace.count("if") == 4
+    assert trace.count("true_value") == 3
+    assert trace.count("false_value") == 1
+    assert len(collect_nodes) == 2
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+def test_if_broadcast_deeper_iterate_frames_resume_after_dump_load(
+    force_compatibility_scheduler: bool,
+) -> None:
+    state = GraphExecutionState(graph=_broadcast_deeper_if_graph(selected=True))
+    _, partial = _run_graph(state, force_compatibility_scheduler=force_compatibility_scheduler, stop_after=7)
+    restored = load_execution_state(dump_execution_state(partial))
+
+    trace, restored = _run_graph(restored, force_compatibility_scheduler=force_compatibility_scheduler)
+
+    assert restored.is_complete(), f"graph stalled after resume: {trace}"
+    collect_nodes = sorted(restored.source_prepared_mapping["collect"], key=restored._get_iteration_path)
+    assert [restored.results[node_id].collection for node_id in collect_nodes] == [[10, 11, 12], [100]]
+
+
 @pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
 @pytest.mark.parametrize(
     ("condition", "per_item_field", "root_field", "expected_value"),

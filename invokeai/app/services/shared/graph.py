@@ -224,6 +224,7 @@ class _GraphExecutionStateRuntime:
         "if_activation_dependencies_by_source",
         "if_activation_dependencies_by_exec",
         "if_activation_dependents_by_dependency",
+        "if_activation_active_dependents_by_dependency",
         "if_activation_dependents_indexed_exec_ids",
         "if_activation_dependents_index_complete",
         "prepared_if_exec_ids_by_source_and_frame",
@@ -272,6 +273,7 @@ class _GraphExecutionStateRuntime:
         ] = {}
         self.if_activation_dependencies_by_exec: dict[str, tuple[ActivationDependency, ...]] = {}
         self.if_activation_dependents_by_dependency: dict[ActivationDependency, tuple[str, ...]] = {}
+        self.if_activation_active_dependents_by_dependency: dict[ActivationDependency, dict[str, None]] = {}
         self.if_activation_dependents_indexed_exec_ids: set[str] = set()
         self.if_activation_dependents_index_complete = False
         self.prepared_if_exec_ids_by_source_and_frame: dict[tuple[str, tuple[int, ...]], tuple[str, ...]] = {}
@@ -561,6 +563,7 @@ class GraphExecutionState(BaseModel):
         self._if_activation_dependencies_by_source = {}
         self._if_activation_dependencies_by_exec = {}
         self._if_activation_dependents_by_dependency = {}
+        self._if_activation_active_dependents_by_dependency = {}
         self._if_activation_dependents_indexed_exec_ids = set()
         self._if_activation_dependents_index_complete = False
         self._prepared_if_exec_ids_by_source_and_frame = {}
@@ -684,7 +687,27 @@ class GraphExecutionState(BaseModel):
                     dependency,
                     (*dependents, exec_node_id),
                 )
+            if exec_node_id in self.prepared_source_mapping:
+                metadata = self._get_prepared_exec_metadata(exec_node_id)
+            else:
+                metadata = None
+            if metadata is not None and metadata.state not in ("executed", "skipped"):
+                active_dependents = self._if_activation_active_dependents_by_dependency.get(dependency)
+                if active_dependents is None:
+                    active_dependents = {}
+                    self._tx_set_mapping(
+                        self._if_activation_active_dependents_by_dependency, dependency, active_dependents
+                    )
+                self._tx_set_mapping(active_dependents, exec_node_id, None)
         self._tx_add_set(self._if_activation_dependents_indexed_exec_ids, exec_node_id)
+
+    def _deactivate_if_activation_dependent(self, exec_node_id: str) -> None:
+        """Remove a terminal execution node from the ordered active-candidate view."""
+        dependencies = self._if_activation_dependencies_by_exec.get(exec_node_id, ())
+        for dependency in dependencies:
+            active_dependents = self._if_activation_active_dependents_by_dependency.get(dependency)
+            if active_dependents is not None:
+                self._tx_pop_mapping(active_dependents, exec_node_id)
 
     def _get_activation_dependents_for_if(self, source_if_id: str, iteration_path: tuple[int, ...]) -> tuple[str, ...]:
         if not self._if_activation_dependents_index_complete:
@@ -693,21 +716,20 @@ class GraphExecutionState(BaseModel):
                     self._record_activation_dependencies(exec_node_id)
             self._tx_set_attr(self, "_if_activation_dependents_index_complete", True)
 
-        candidates = {
-            exec_node_id
-            for branch in ("true_input", "false_input")
-            for exec_node_id in self._if_activation_dependents_by_dependency.get(
-                ActivationDependency(owner_id=source_if_id, branch=branch, frame=iteration_path), ()
-            )
-        }
-        if iteration_path:
+        candidates: dict[str, None] = {}
+        for branch in ("true_input", "false_input"):
             candidates.update(
-                exec_node_id
-                for branch in ("true_input", "false_input")
-                for exec_node_id in self._if_activation_dependents_by_dependency.get(
-                    ActivationDependency(owner_id=source_if_id, branch=branch, frame=()), ()
+                self._if_activation_active_dependents_by_dependency.get(
+                    ActivationDependency(owner_id=source_if_id, branch=branch, frame=iteration_path), {}
                 )
             )
+        if iteration_path:
+            for branch in ("true_input", "false_input"):
+                candidates.update(
+                    self._if_activation_active_dependents_by_dependency.get(
+                        ActivationDependency(owner_id=source_if_id, branch=branch, frame=()), {}
+                    )
+                )
         if not candidates:
             return ()
         execution_graph = self._get_execution_graph_flat()
@@ -834,6 +856,7 @@ class GraphExecutionState(BaseModel):
         runtime.if_activation_dependencies_by_source = {}
         runtime.if_activation_dependencies_by_exec = {}
         runtime.if_activation_dependents_by_dependency = {}
+        runtime.if_activation_active_dependents_by_dependency = {}
         runtime.if_activation_dependents_indexed_exec_ids = set()
         runtime.if_activation_dependents_index_complete = False
         runtime.if_activation_controller_instance = None
@@ -3265,6 +3288,8 @@ class GraphExecutionState(BaseModel):
 
     def _set_prepared_exec_state(self, exec_node_id: str, state: PreparedExecState) -> None:
         self._prepared_registry().set_state(exec_node_id, state)
+        if state in ("executed", "skipped"):
+            self._deactivate_if_activation_dependent(exec_node_id)
 
     def _get_iteration_path(self, exec_node_id: str) -> tuple[int, ...]:
         return self._runtime().get_iteration_path(exec_node_id)
@@ -3482,10 +3507,16 @@ class GraphExecutionState(BaseModel):
             if isinstance(self._scheduler(), _GenericGraphSchedulerAdapter) and self._can_use_generic_for_scheduler()
             else self._materializer()
         )
-        prepared_id = self._run_materialization_transaction(lambda: planner.prepare(base_graph))
+
+        def prepare_next() -> Optional[str]:
+            if getattr(planner, "_has_if_nodes", True) is False:
+                return planner.prepare(base_graph)
+            return self._run_materialization_transaction(lambda: planner.prepare(base_graph))
+
+        prepared_id = prepare_next()
 
         while prepared_id is not None:
-            prepared_id = self._run_materialization_transaction(lambda: planner.prepare(base_graph))
+            prepared_id = prepare_next()
             if next_node is None:
                 next_node = self._get_next_node()
 
@@ -3555,6 +3586,7 @@ class GraphExecutionState(BaseModel):
         self._if_activation_dependencies_by_source = {}
         self._if_activation_dependencies_by_exec = {}
         self._if_activation_dependents_by_dependency = {}
+        self._if_activation_active_dependents_by_dependency = {}
         self._if_activation_dependents_indexed_exec_ids = set()
         self._if_activation_dependents_index_complete = False
         self._prepared_if_exec_ids_by_source_and_frame = {}
@@ -4299,6 +4331,7 @@ _GRAPH_RUNTIME_ATTRIBUTE_NAMES = (
     "if_activation_dependencies_by_source",
     "if_activation_dependencies_by_exec",
     "if_activation_dependents_by_dependency",
+    "if_activation_active_dependents_by_dependency",
     "if_activation_dependents_indexed_exec_ids",
     "if_activation_dependents_index_complete",
     "prepared_if_exec_ids_by_source_and_frame",
