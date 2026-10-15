@@ -13,6 +13,7 @@
     "check:release": "pnpm run check:architecture && pnpm run test:accessibility:browser",
     "dev": "vite dev",
     "dev:host": "vite dev --host",
+    "dev:mock": "node scripts/dev-mock.mjs",
     "fix": "pnpm run lint:oxc:fix && pnpm run format:write",
     "format:check": "oxfmt --check .",
     "format:write": "oxfmt --write .",
