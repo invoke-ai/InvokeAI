@@ -327,7 +327,7 @@ describe('Generate widget value snapshots', () => {
   const lora: LoraModelConfig = { base: 'flux2', key: 'lora', name: 'Old LoRA', type: 'lora' };
   const values: GenerateWidgetValues = {
     ...(normalizeGenerateSettings(legacyStoredValues) as NonNullable<ReturnType<typeof normalizeGenerateSettings>>),
-    clipEmbedModel: { base: 'any', key: 'clip', name: 'CLIP', type: 'clip_embed' },
+    clipEmbedModel: { base: 'any', key: 'clip', name: 'CLIP', type: 'clip_embed', variant: 'large' },
     componentSourceModel: model,
     loras: [{ isEnabled: true, model: lora, weight: 0.5 }],
     mistralEncoderModel: mistral,

@@ -548,6 +548,7 @@ version = { attr = "invokeai.version.__version__" }
 # absent from a wheel install and that loader raises FileNotFoundError.
 "invokeai.backend.minimax_h3" = ["*.json"]
 "invokeai.backend.t5" = ["tokenizer/*.json"]
+"invokeai.backend.clip" = ["*.json", "tokenizer/*.json", "tokenizer/*.gz"]
 "invokeai.app.services.image_index" = ["*.txt"]
 "invokeai.app.services.workflow_records.default_workflows" = ["*.json"]
 "invokeai.backend.hidiffusion" = ["sd_module_key/*.txt"]

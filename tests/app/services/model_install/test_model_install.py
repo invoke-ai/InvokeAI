@@ -3755,3 +3755,27 @@ def test_restore_skips_a_marker_with_an_invalid_status_without_claiming_it_or_ab
         for tmpdir in (bad_tmpdir, good_tmpdir):
             active_install_sentinel_path(tmpdir).unlink(missing_ok=True)
             shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_installed_pipeline_components_resolve_inside_the_installed_model(
+    mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    """Pipelines are identified where they are staged (a `tmpinstall_*` folder for downloads) and
+    then moved into the models dir; the stored record must lead loading to the moved components."""
+    from invokeai.backend.model_manager.load.load_default import resolve_submodel_path
+    from invokeai.backend.model_manager.taxonomy import SubModelType
+    from tests.backend.model_manager.configs.test_sdnq_flux1_submodel_discovery import _make_flux1_pipeline
+
+    staging = mm2_app_config.models_path / "tmpinstall_test" / "pipeline"
+    _make_flux1_pipeline(staging, component_keys={"text_encoder": "clip_encoder"})
+
+    record = mm2_installer.record_store.get_model(mm2_installer.install_path(staging))
+    # Stored relative to the model, so nothing in the record points back at the staging folder.
+    assert record.submodels is not None
+    assert record.submodels[SubModelType.TextEncoder].path_or_prefix == "clip_encoder"
+
+    # The loader makes `path` absolute against the models dir before resolving components.
+    record.path = (mm2_app_config.models_path / record.path).resolve().as_posix()
+    text_encoder = resolve_submodel_path(record, SubModelType.TextEncoder, Path(record.path) / "text_encoder")
+    assert text_encoder.parent == Path(record.path)
+    assert (text_encoder / "config.json").is_file()
