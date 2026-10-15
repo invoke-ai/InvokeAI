@@ -34,16 +34,25 @@ on:
         type: boolean
         default: true
 
+# One run per pull request: a new push cancels the superseded run. The PR number is used rather
+# than the head branch, which two forks can share. Pushes to main and merge groups fall back to
+# the run id and never cancel each other. The group names the workflow literally
+# because `github.workflow` is the caller's name inside a reusable workflow, and release.yml calls
+# several of these at once.
+concurrency:
+  group: uv-lock-checks-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   uv-lock-checks:
     env:
       # uv requires a venv by default - but for this, we can simply use the system python
       UV_SYSTEM_PYTHON: 1
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5 # expected run time: <1 min
     steps:
       - name: checkout
-        uses: actions/checkout@v6
+        uses: useblacksmith/checkout@v1
 
       - name: check for changed python files
         if: ${{ inputs.always_run != true }}

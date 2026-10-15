@@ -31,6 +31,7 @@ logger = InvokeAILogger.get_logger()
 # — deleting by tag alone is unsafe because users can edit tags on their own workflows.
 PACK_MANIFEST_FILENAME = ".invokeai_pack_manifest.json"
 PACK_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+GIT_CLONE_TIMEOUT_SECONDS = 120
 
 # Install, uninstall and reload all mutate the same three pieces of global state: the custom-nodes
 # directory, `sys.modules`, and the invocation registry. As `async def` bodies containing no
@@ -227,7 +228,7 @@ def _install_pack(source: str, pack_name: str, target_dir: Path, owner_user_id: 
             ["git", "clone", source, str(target_dir)],
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=GIT_CLONE_TIMEOUT_SECONDS,
         )
 
         if result.returncode != 0:

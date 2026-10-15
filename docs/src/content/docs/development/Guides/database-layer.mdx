@@ -1,0 +1,186 @@
+---
+title: Database Layer
+lastUpdated: 2026-10-04
+---
+
+Every SQL statement of the application belongs in `invokeai/app/services/shared/database/`. Services reach the database through `Database.queries`, never through a connection, a cursor or SQL text of their own. `tests/app/test_database_access_guard.py` fails when code elsewhere imports a database driver or SQLAlchemy, executes a statement or carries SQL. Code that keeps a SQLite file of its own, as a scratch store in a temporary directory, is not the application's database: it is listed in the test's `NOT_THE_APPLICATION_DATABASE`, with the reason.
+
+Queries are written with SQLAlchemy Core, which compiles each statement for the backend in use. SQLite is the default backend. The layer and its tests also run on MySQL 8.4 and MariaDB 10.11; configuring InvokeAI itself to use one of them is not available yet.
+
+## Query modules
+
+Each domain gets a query module as it is ported: a `QueryModule` subclass in `queries/`, attached to `Queries` as a cached property, whose methods take the connection right after `self` and are decorated with `@read` or `@write`. The decorators supply the connection, so callers never see one.
+
+```py
+from sqlalchemy import Connection, bindparam, select
+
+from invokeai.app.services.shared.database.queries.base import QueryModule, read
+from invokeai.app.services.shared.database.schema.app_settings import app_settings
+
+_GET = select(app_settings.c.value).where(app_settings.c.key == bindparam("key"))
+
+
+class AppSettingQueries(QueryModule):
+    @read
+    def get(self, conn: Connection, key: str) -> str | None:
+        return conn.execute(_GET, {"key": key}).scalar_one_or_none()
+```
+
+Build each statement once, at module level, with `bindparam()` for its values. SQLAlchemy compiles a statement once, but a statement object built per call costs several times what executing a prebuilt one does: on SQLite, about 60 µs against 18 µs for a point read. Build per call only what varies in shape, such as an update of the fields a caller gives, and keep it off hot paths; a statement that takes one of a few shapes comes from a builder cached with `functools.cache`, keyed by values whose equality means the same statement (the API's enums are also strings, so compare them with `==`, never `is`, and normalize flags with `bool()`, since `1 == True`). SQLAlchemy keeps every statement it compiled, so a client must not choose how many shapes there are: normalize what it sends (a list of categories becomes a sorted set), round a length it chooses up to one of a few sizes with the spare values bound to `NULL`, and build anything larger for its call alone, executed with `execution_options={"compiled_cache": None}`. In an `UPDATE`, a bound parameter cannot share its name with a column, since those names are reserved for the values it sets. Read result rows by position, by unpacking them: looking a value up by name costs about ten times as much, which adds up over a page of rows. Fetch a result whole with `all()` (or `scalars().all()`) even to loop over it: iterating the result itself fetches row by row, about 10 % slower over thousands of rows on SQLite. A fixed list of values in an `IN` is bound value by value (`in_([literal(value) for value in values])`): a plain list becomes an expanding parameter, whose SQL is rendered anew on every execution; that suits a list the caller passes, as `bindparam(name, expanding=True)`.
+
+A query method returns plain values, or its rows read completely (`first()`, `all()`), which `@mapped(...)` above `@read` turns into DTOs once the call's own transaction has ended. On SQLite a transaction holds the process-wide lock, and validating a DTO costs more than reading its row. A query method does not call other query modules and has no effects outside the database, because a call that loses a race is run again from the start. It passes execution options per statement, never to the connection: on SQLite every transaction shares one connection object.
+
+What backends spell differently comes from `dialect.py`:
+
+- `upsert()` builds an `INSERT` that updates the existing row instead when one with the same primary key exists. Every unique key of the table must be on the primary key's columns, since MySQL and MariaDB would update a row any unique key matched. A column's `onupdate` default does not apply to the update, so an upsert sets `updated_at` itself.
+- `insert_ignore()` builds an `INSERT` that leaves an existing row with the same primary key as it is. It skips only that conflict: a NULL, a failed CHECK and a missing foreign key still raise, where SQLite's `INSERT OR IGNORE` would skip the first two and MySQL's `INSERT IGNORE` all three. Its row count does not tell whether a row was inserted: a skipped one counts 0 on SQLite and 1 on a server. The same rule on unique keys as for `upsert()` applies.
+- `CaseInsensitiveLike(column, pattern)` matches as SQLite's `LIKE` always has, ignoring case, with `\` escaping `%` and `_`. On SQLite it is that `LIKE`, on a server `LOWER()` on both sides, which also folds letters beyond ASCII. `like_prefix(text)` and `like_contains(text)` build the patterns of the values that start with, or contain, a text taken as it is.
+- `CaseInsensitiveOrder(column)` is an ORDER BY key that ignores case: `COLLATE NOCASE` on SQLite, which folds ASCII letters as SQLite's `LOWER()` does but without a function call per row, and `LOWER()` on a server.
+- `fixed_limit(n)` is a LIMIT written into the statement, for a count that never changes, such as the 1 of a lookup. SQLite runs a statement whose LIMIT is a bound parameter 10–20 µs slower on every execution, with the same plan. A count the caller chooses, such as a page size, stays a bound parameter.
+- `InBoundSet(column, bindparam(name))` is `column IN` a set of strings, or of integers for an integer column, bound as one parameter, which `bound_set(values)` builds: a JSON array, read with `json_each()` on SQLite and `JSON_TABLE()` on a server, strings in the tables' binary collation. A set of any size is one statement, where an `IN` list binds every value and is a statement per length. For sets held in process memory, such as the media names of active queue items, and for long lists a caller passes, such as the thousands of items whose embeddings the image map reads: there it is faster than `IN` lists of at most `IN_CHUNK` values, while at a hundred values it costs about 30 µs more on SQLite. SQLite cannot tell how many values a bound set holds, so beside another indexed condition it may prefer that condition's index: for a filter of a few values that should find their rows through its own index, such as the batch ids a cancel names, use an `IN` list. Keep it out of `UPDATE` and `DELETE`: MariaDB before 11.1 runs one with an `IN` subquery as a scan of the table that reads the set again for every row, so change rows by id in `IN` lists of at most `IN_CHUNK` values. Strings are at most 255 characters long.
+- `KeysetAfter(first, second, first_value, second_value)` is the condition of the rows after a keyset position, `(first, second) > (first_value, second_value)`: a row value on SQLite, whose planner starts an index range at it, and spelled out on a server, since MariaDB does not start a range at a row value. For paging by a keyset, such as the intermediates cleanup's (creation time, name).
+- `sql_true()` is TRUE as SQLite's partial indexes spell their predicates (`WHERE is_intermediate = TRUE`). SQLAlchemy renders `true()` as 1 there, and SQLite uses a partial index only for a query term that matches its predicate as written, so `is_intermediate = 1` leaves the index unused.
+- `JsonString(column, path)` is the string at a member path of the JSON document in a text column, and NULL when the document is not valid JSON or the member is missing or holds anything else. SQLite's `json_extract()` alone would give 1 for a member holding true, where a server gives 'true', and raise on a document that is not JSON.
+- `OrderedJoin(left, right, onclause)` is an inner join, and only that, whose left side SQLite plans as the outer loop: it renders as `CROSS JOIN ... ON` there, which SQLite's planner never reorders, and as a plain `JOIN` elsewhere. For a join that must stay proportional to its left side, such as a board's membership rather than every image an index offers first.
+
+## Schema
+
+The tables are SQLAlchemy `Table`s in `schema/`, one module per domain, all in `schema.metadata`. They are the one definition of the schema: query modules build their statements from them, and a server database is created from them.
+
+The metadata is the schema the SQLite migrations build. `tests/app/services/shared/database/test_schema_parity.py` migrates one database, creates another from the metadata and compares them column by column: declared type, NOT NULL, default, collation and generation expression. It compares every constraint and index the same way. A schema change is therefore a migration together with the same change to the metadata.
+
+Column types come from `types.py`. Each one renders the migrations' declared type on SQLite and its equivalent on a server:
+
+| Type | SQLite | MySQL / MariaDB |
+|---|---|---|
+| `Key(n)` | TEXT | VARCHAR(n) |
+| `NoCaseKey(n)` | TEXT COLLATE NOCASE | VARCHAR(n), case-insensitive (`utf8mb4_0900_as_ci` / `utf8mb4_uca1400_nopad_as_ci`) |
+| `LongText` | TEXT | LONGTEXT |
+| `Timestamp` | DATETIME, or TEXT where a migration declared that | VARCHAR(32) |
+| `BigInt` | INTEGER | BIGINT |
+| `Real` | REAL | DOUBLE |
+| `Blob` | BLOB | LONGBLOB |
+
+A server indexes the whole value of a primary key, a unique constraint or a foreign key, and one index holds at most 768 characters there. Such text, and text in indexes on identifiers, is a `Key`; a server refuses a longer value. All other text is `LongText`. An index on free text, such as a name, covers only a prefix of it on a server. `test_schema.py` holds the columns to this rule.
+
+A timestamp is UTC text that sorts and compares as text. Ported queries write it as `YYYY-MM-DD HH:MM:SS.fff` with `now_text()`. Rows also hold whole seconds and ISO 8601 text, at most 32 characters, written before the layer and its last migration. Columns made with `inserted_at()` and `updated_at()` get `now_text()` on insert; `updated_at()` columns also get it in an `update()` statement. An upsert must set `updated_at` in its own update values, because SQLAlchemy does not apply it to `ON CONFLICT DO UPDATE` or `ON DUPLICATE KEY UPDATE`. The SQL defaults of these columns exist only on SQLite, because the migrated schema has them.
+
+No database has triggers: queries set `updated_at` and the queue's `started_at`, `completed_at` and `session_revision` themselves. (The SQLite migrations created triggers for these; `2026_10_07_drop_sqlite_triggers` drops them.)
+
+Some DDL differs between backends:
+
+- A partial index is partial only on SQLite, because a server has none. A server's variant of the index leads with the condition's columns instead, so a query with the same condition still reads only the matching rows. The fonts' partial unique index is a plain unique index there, which the table's CHECK makes the same constraint.
+- An index that a key or a longer index already covers exists only on SQLite, where a migration created it.
+- MariaDB does not allow NOT NULL on a generated column. A CHECK constraint enforces it there instead, so a missing value raises `CheckViolation` there rather than `NotNullViolation`.
+- Server tables are InnoDB, use the DYNAMIC row format and compare text byte for byte, whatever the server's defaults.
+- `orphaned_projects_2026_08_06`, which holds projects a migration could not keep, always exists on a server. On SQLite it exists only where that migration had such projects.
+- A MariaDB server must be reached through a `mariadb+pymysql://` URL. The dialect the URL names decides the collations and column definitions of the tables, and a `mysql+` URL to MariaDB is refused.
+
+## Migrations
+
+Migrations live in `shared/sqlite_migrator/migrations/`. The `Migrator` runs the ones a database has not had, in dependency order, and records each in `applied_migrations`. How to write one: [Database Migrations](/development/guides/sqlite-migrations/).
+
+- The migrations up to `PORTABLE_CUTOVER` (in `migration_loader.py`) run on SQLite only and get a cursor. They stay as written: they are the upgrade path of existing SQLite databases. `test_portable_migrations.py` fails when another one appears.
+- Every later migration is a `PortableMigration`: it changes the schema with Alembic's operations (`context.op`), and creates tables with `context.create_table()`, which applies the schema's rules for each backend as the metadata does. The same commit makes the same change to the schema metadata.
+- A portable migration is idempotent. On SQLite it runs in a transaction that a failure rolls back, DDL included. On MySQL and MariaDB every DDL statement commits as it runs, so a migration that failed halfway runs again from the start and finds part of its work done; it checks what is there before it changes it (`inspect(context.conn)`). Its id is recorded once it succeeds.
+- On SQLite a portable migration runs with foreign keys off, so that rebuilding a table (Alembic's batch mode) does not cascade into the tables that reference it. The foreign keys are checked before it commits: a migration that deletes rows others reference deletes those itself.
+
+A MySQL or MariaDB database starts at the newest schema. On an empty database the migrator creates the tables from the metadata, and copies in the rows the migrations seed: the system account, the token secret, the system prompts and the lock rows. Those come from a reference database that it builds in memory with the migration chain, in a temporary root and with no settings from the environment or a config file, so the migrations' clean-ups of old files touch nothing real. The migrator's own records go in last. An interrupted creation therefore leaves a database the next start refuses, rather than one that looks complete; start again from an empty database.
+
+Only one process at a time serves a server database: at startup it takes the database's instance lock (`InstanceLock` in `session_lock.py`, a `GET_LOCK` on a connection of its own) before it migrates, and a second process refuses to start. A thread checks the lock every minute and takes it again should the server end its session. The migrator takes a lock of its own as well, verified before each migration, for whatever runs it without the instance lock. It is per server, so Galera clusters and other setups with several writing servers are not supported. The migrator makes no backups of a server database; they are the operator's. `test_portable_migrations.py` takes a server database as it was at the cutover (`server_schema_at_cutover/`) through every portable migration, and compares the result with a database created from the metadata.
+
+`copy.py` copies rows between databases, in foreign key order. The target computes generated columns itself. An AUTOINCREMENT table's ids continue after the highest one the source ever issued, which a SQLite source records in `sqlite_sequence` and a server in its tables' `AUTO_INCREMENT`, so an id deleted before the copy is not issued again after it. (SQLite's rowid tables reuse the highest id after a delete, with or without a copy.) `invoke-db-copy` uses it in both directions: an install's SQLite file into a new server database, and with `--to-sqlite` a server database back into a new SQLite file.
+
+## Transactions
+
+A call on `db.queries` runs in a transaction of its own:
+
+```py
+user = db.queries.users.get(user_id)
+```
+
+Work that must succeed or fail as a whole runs in one transaction, which commits when the block exits and rolls back when it raises:
+
+```py
+with db.queries.transaction() as q:
+    q.client_state.set(user_id, key, value)
+    q.media_references.replace(owner_kind="client_state", user_id=user_id, owner_id=key, references=references)
+```
+
+- A thread has at most one transaction open per database. Opening another one, including a call on `db.queries` inside a transaction, raises `NestedTransactionError`. Pass `q` to helpers instead.
+- `transaction(read_only=True)` reads one consistent snapshot and refuses writes.
+- A single call that loses a race (`ConflictError`: a deadlock) is run again from the start, three attempts in all. A `transaction()` block is not retried. Work that has no effects outside the database runs as `db.queries.run(work)` instead, which passes `work` the queries of one transaction and retries it the same way: on a server, transactions that write the same rows deadlock now and then. A lock held too long elsewhere (`LockTimeoutError`) is never retried, because the call has already waited for it.
+
+Errors are raised as backend-neutral types from `invokeai.app.services.shared.database.errors`, so code that catches them works on every backend. They are classified by the driver's error code; the one exception is a code SQLite uses for two causes, which its fixed message tells apart. The types:
+
+- `UniqueViolation`, `ForeignKeyViolation`, `CheckViolation` and `NotNullViolation`, all `IntegrityViolation`s. Inside a transaction they can be caught where they happen, to raise a domain error instead.
+- `ConflictError` and `LockTimeoutError`, both `TransientDatabaseError`s. The transaction is rolled back and may be run again.
+
+A transaction does not continue past a failed statement, because backends disagree on what such a statement leaves behind. Further calls on it raise `TransactionFailedError`, and if the block is left without raising, it rolls back and raises `TransactionFailedError` instead of committing.
+
+## Backends
+
+| | SQLite | MySQL 8.4 / MariaDB 10.11 |
+|---|---|---|
+| Connections | One, behind a process-wide lock held for each transaction | A pool |
+| Readers | `BEGIN`, one snapshot | `REPEATABLE READ`, one snapshot |
+| Writers | `BEGIN IMMEDIATE`: the write lock is taken up front, so a transaction cannot fail to upgrade when another process wrote meanwhile | `READ COMMITTED`: no gap locks, and guards see current rows |
+| Session | Foreign keys on, WAL, 5 s busy timeout | Strict SQL mode with `ONLY_FULL_GROUP_BY`, UTC, 10 s row-lock timeout |
+| Text comparison | Byte for byte (`BINARY`) | Byte for byte, trailing spaces significant: tables and connections use `utf8mb4_0900_bin` (MySQL) / `utf8mb4_nopad_bin` (MariaDB), whatever the server's defaults |
+
+On SQLite the lock serialises all database work, so correctness can lean on it; on MySQL and MariaDB it cannot. Write invariants such as "only if still pending" into the statement itself (a conditional `UPDATE` whose row count is checked), not into a read followed by a write.
+
+An invariant that spans rows, such as "at least one active administrator remains", cannot be one statement. It gets a named lock: a member of `DatabaseLock` (`queries/locks.py`) with a row in `db_locks`, which a migration adds. Every transaction that changes what the check reads takes the lock first:
+
+```py
+with db.queries.transaction() as q:
+    q.locks.acquire(DatabaseLock.ADMIN_ACCOUNTS)  # SELECT ... FOR UPDATE on a server
+    if q.users.count_active_admins() <= 1:  # deleting an active administrator
+        raise LastAdministratorError(LAST_ADMIN_DETAIL)
+    q.users.delete(admin_id)
+```
+
+A second transaction waits at `acquire()` until the first ends, and then reads what it committed. `acquire()` must be the first call of its transaction, taking all the transaction's locks at once, in name order: so they guard everything the transaction reads, and two transactions cannot deadlock on them. On SQLite the transaction already excludes every other, but the lock rows are read there too: a lock whose row is missing raises on every backend instead of locking nothing.
+
+`acquire(..., shared=True)` takes a lock that other shared holders take as well, and that waits only for, and holds off, an exclusive holder. `MEDIA_PROTECTION` works this way: every write that makes media protected from the intermediates cleanup (a project, workflow or client-state save with its media references, a browser lease, a cached output a session reuses) shares it, and the cleanup's final check and delete take it exclusively, so no such write lands between the check and the delete. The session queue makes media active too, by enqueueing, retrying or rewriting an item's session, and shares it for each of these. `acquire(*exclusive, also_shared=(...))` takes exclusive and shared locks in one call, still in name order: an enqueue takes `SESSION_QUEUE_ADMISSION` exclusively, so that two enqueues neither both fit into the queue's last free places nor both write one enqueue receipt, and `MEDIA_PROTECTION` shared.
+
+The queue's status changes need no lock: each is one conditional `UPDATE` (a claim applies only to a pending item, any other change only to an unfinished one), and its row count tells whether this call made it. Several workers may choose the same item to run; the claim gives it to one, and the others choose again. A bulk cancel or delete reads the ids it applies to with `SELECT ... FOR UPDATE` and changes exactly those, so its events name the rows it changed; one that spares the running workflow-call chains reads them after taking its row locks, so no item starts running, and no running item enqueues children, between that read and the change. A session save shares `MEDIA_PROTECTION` too, so on a server it waits while the intermediates cleanup checks and deletes.
+
+Image moves take no database lock. Their jobs are created, worked and committed under the move service's process lock (`image_mutation_lock`), which image deletes take too, and one InvokeAI process serves a database (a server database's instance lock refuses a second); so "at most one unfinished move job" is a read followed by an insert. A job's commit repoints each moved image only while its record still names the old subfolder, and checks every moved item in the same transaction, which rolls back if one is not where the move put it.
+
+The font catalog takes none either, for the same reason. An upload checks for the same content and for the quota, writes its file and inserts its row under the font service's managed-storage lock, which the sweep for orphaned files takes too; the file is written outside any transaction. Directory scans run one at a time under a lock of their own, so two cannot insert the same new font.
+
+A decision about one row needs no named lock: the row is the lock. The transaction locks the row before it reads what it decides on, with a query method marked `@locking` that selects it `FOR UPDATE` (`q.boards.lock(board_id)`, `q.projects.lock(user_id, project_id)`). Every transaction that changes what the decision reads writes or locks the same row, so it waits until the decision has committed, and the decision sees what such a transaction committed before. A project save works this way, so its revision and compatibility checks apply to the row it writes, and so does a project claiming a board: a board made public, deleted or claimed by another project meanwhile is either seen by the claim or finds the board claimed. Row locks, too, are held only inside a `transaction()`; called on its own, a lock method raises.
+
+Rows are locked in one order, a project's before its board's, so two transactions that lock both cannot deadlock on them. A single statement that locks a board and then reads its project, like the boards service's guarded update and delete, cannot keep that order; the rare deadlock it causes with a project write is retried by `run()`.
+
+## Testing
+
+Tests that need a database use a fixture from `tests/fixtures/database.py`, and are marked `uses_database` for it:
+
+- `database`: a database at the newest schema, holding the rows a new install starts with (the system account, the JWT secret, the lock rows). For tests of ported services.
+- `empty_database`: a database without tables, for tests of the layer itself and of migrations.
+
+On a server the ids a table generates go on counting from test to test: assert on the ids a test got back, not on literal ones.
+
+`capture_statements(database)` collects the SQL and parameters a block of code sends, to assert on how many statements it takes or on their shape. `explain_query_plan(database, sql, parameters)` gives SQLite's plan for one of them, for tests (marked `sqlite_only`) that a query keeps using its index.
+
+Both are in-memory SQLite databases by default. When `INVOKEAI_TEST_DB_URL` names a MySQL or MariaDB server, they are instead schemas on that server of their own per test run and worker; the `database` schema is migrated once per run and reset to those rows before each test. Mark a test that depends on SQLite internals (query plans, PRAGMAs, the single connection) `sqlite_only`.
+
+To run the tests against a server, start one and point the variable at it. The account needs the privilege to create and drop databases:
+
+```sh
+docker run -d --name invokeai-test-mysql -e MYSQL_ROOT_PASSWORD=invokeai -p 127.0.0.1:33084:3306 mysql:8.4.11
+docker run -d --name invokeai-test-mariadb -e MARIADB_ROOT_PASSWORD=invokeai -p 127.0.0.1:33011:3306 mariadb:10.11.19
+
+# Your usual sync with the `mysql` extra added; keep your accelerator extra (here `cuda`).
+uv sync --extra cuda --extra test --extra mysql
+INVOKEAI_TEST_DB_URL=mysql+pymysql://root:invokeai@127.0.0.1:33084 \
+  uv run --no-sync pytest -m "uses_database and not sqlite_only and not slow"
+INVOKEAI_TEST_DB_URL=mariadb+pymysql://root:invokeai@127.0.0.1:33011 \
+  uv run --no-sync pytest -m "uses_database and not sqlite_only and not slow"
+```
+
+CI runs the same selection against both servers in the `external-database` job of the python tests workflow.
+
+`scripts/benchmark_database.py` times representative operations through the services on a seeded SQLite file. Run it for the base and the head of a change and compare the results with `--compare`.

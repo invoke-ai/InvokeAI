@@ -30,16 +30,22 @@ on:
         type: boolean
         default: true
 
+# One run per pull request: a new push cancels the superseded run. The PR number is used rather
+# than the head branch, which two forks can share. Pushes to main and merge groups fall back to
+# the run id and never cancel each other. The group names the workflow literally
+# because `github.workflow` is the caller's name inside a reusable workflow, and release.yml calls
+# several of these at once.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  group: python-tests-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 jobs:
   matrix:
     strategy:
+      # Let the other platforms finish when one runner fails, so a rerun repeats only the failed job.
+      fail-fast: false
       matrix:
         python-version:
-          - '3.11'
           - '3.12'
         platform:
           - linux-cpu
@@ -47,20 +53,40 @@ jobs:
           - windows-cpu
         include:
           - platform: linux-cpu
-            os: ubuntu-24.04
+            os: blacksmith-4vcpu-ubuntu-2404
             extra-index-url: 'https://download.pytorch.org/whl/cpu'
             github-env: $GITHUB_ENV
+            pytest-workers: logical
+            timeout-minutes: 30
           - platform: macos-default
             os: macOS-14
             github-env: $GITHUB_ENV
+            pytest-workers: logical
+            timeout-minutes: 30
           - platform: windows-cpu
             os: windows-2022
             github-env: $env:GITHUB_ENV
+            # Half the vCPUs, not one worker each. The tests that spawn helper processes --
+            # ffmpeg decoders, installer subprocesses -- bring their own threads, which the
+            # per-worker `OMP_NUM_THREADS=1` below does not cap, so a full-width run leaves this
+            # runner with no spare core and the deadline-sensitive tests miss their budgets
+            # non-deterministically. Two workers keep that headroom.
+            pytest-workers: '2'
+            # Roughly 1.5x the pytest step's four-worker wall time (~13.5 min), plus the job's
+            # ~1.5 min of checkout and install, plus margin.
+            timeout-minutes: 45
     name: 'py${{ matrix.python-version }}: ${{ matrix.platform }}'
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30 # expected run time: 10-16 min, depending on platform
+    # Per platform: expected run time is 8-14 min on linux and macos, longer on windows, which
+    # runs fewer workers. See the matrix.
+    timeout-minutes: ${{ matrix.timeout-minutes }}
     env:
       PIP_USE_PEP517: '1'
+      # One compute thread per worker. Torch otherwise sizes its thread pools to the whole
+      # machine, so one worker per vCPU puts vCPUs^2 threads on a runner that fight for the same
+      # cores. This caps torch only; helper processes the tests spawn thread themselves.
+      OMP_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
 
     steps:
       - name: checkout
@@ -80,8 +106,30 @@ jobs:
           files_yaml: |
             python:
               - 'pyproject.toml'
+              # The lockfile pins pytest-xdist, which this workflow's pytest command depends on.
+              - 'uv.lock'
+              - '.github/workflows/python-tests.yml'
               - 'invokeai/**'
-              - '!invokeai/frontend/web/**'
+              - '!invokeai/frontend/webv1/**'
+              - '!invokeai/frontend/webv2/**'
+              # Re-includes must follow the exclusions above.
+              # test_imports.py walks every package, including the frontend ones.
+              - 'invokeai/frontend/webv1/**/*.py'
+              - 'invokeai/frontend/webv2/**/*.py'
+              # test_workflow_graph_builder.py validates these editor fixtures against the backend.
+              - 'invokeai/frontend/webv2/src/features/workflow/core/fixtures/**'
+              # Cross-stack generation contracts: the frontend writes these, Python validates them
+              # against the invocation and architecture registries. A frontend-only change that
+              # regenerates one would otherwise pass vitest while skipping the backend half.
+              # `__fixtures__/` does not exist yet -- it arrives with the graph-builder fixtures.
+              # A pattern matching nothing costs nothing here, and listing it now means the branch
+              # that adds the directory does not also have to remember to add this line.
+              - 'invokeai/frontend/webv2/src/features/generation/core/__snapshots__/**'
+              - 'invokeai/frontend/webv2/src/features/generation/core/__fixtures__/**'
+              - 'invokeai/frontend/webv2/src/features/video/core/__snapshots__/**'
+              - 'invokeai/frontend/webv2/src/features/upscale/core/__snapshots__/**'
+              # test_ideogram4_frontend_bounds.py reads the Ideogram 4 control bounds from here.
+              - 'invokeai/frontend/webv2/src/features/generation/core/settings.ts'
               - 'tests/**'
               # tests/ covers a few of these (e.g. test_check_pins.py, test_docs_json_export.py)
               - 'scripts/**'
@@ -103,4 +151,101 @@ jobs:
 
       - name: run pytest
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
-        run: uv run --no-sync pytest
+        # `logical`, not `auto`: xdist's `auto` asks psutil for *physical* cores, which is half
+        # the vCPUs a standard runner exposes. Much of the suite waits on timers and polls, so
+        # one worker per vCPU is the right level where the runner has the headroom for it. The
+        # matrix carries the count, because windows needs a lower one.
+        run: uv run --no-sync pytest -n ${{ matrix.pytest-workers }} --max-worker-restart=0
+
+  # Decides whether the external-database job runs. That job's service containers start before any of its
+  # steps, so the decision has to come from a job of its own: otherwise every pull request, frontend-only ones
+  # included, would pull both server images and wait for them to become healthy.
+  external-database-changes:
+    name: 'external database: change detection'
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 10
+    outputs:
+      run: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
+    steps:
+      - name: checkout
+        if: ${{ inputs.always_run != true }}
+        uses: nschloe/action-cached-lfs-checkout@385a8ecc719e50b8c71af6ab01a624b486b7c3bc
+
+      - name: check for changed python files
+        if: ${{ inputs.always_run != true }}
+        id: changed-files
+        # Pinned to the _hash_ for v45.0.9, see the matrix job above.
+        uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96
+        with:
+          files_yaml: |
+            python:
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - '.github/workflows/python-tests.yml'
+              - 'invokeai/**/*.py'
+              # The library's tests store the bundled workflows and style presets.
+              - 'invokeai/app/services/workflow_records/default_workflows/**'
+              - 'invokeai/app/services/style_preset_records/default_style_presets.json'
+              - 'tests/**'
+
+  # The database layer against MySQL and MariaDB, at the oldest release of each that InvokeAI supports.
+  # Only the tests on the database fixtures (marked `uses_database`) target the server; the matrix above
+  # runs the whole suite, those tests included, on SQLite.
+  external-database:
+    needs: external-database-changes
+    if: ${{ needs.external-database-changes.outputs.run == 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - server: mysql
+            image: 'mysql:8.4.11'
+            health-cmd: 'mysqladmin ping -h 127.0.0.1 --silent'
+            url: 'mysql+pymysql://root:invokeai@127.0.0.1:3306'
+          - server: mariadb
+            image: 'mariadb:10.11.19'
+            health-cmd: 'mariadb-admin ping -h 127.0.0.1 --silent'
+            url: 'mariadb+pymysql://root:invokeai@127.0.0.1:3306'
+    name: 'py3.12: linux-${{ matrix.server }}'
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 30
+    services:
+      database:
+        image: ${{ matrix.image }}
+        env:
+          MYSQL_ROOT_PASSWORD: invokeai
+          MARIADB_ROOT_PASSWORD: invokeai
+        ports:
+          - '3306:3306'
+        options: >-
+          --health-cmd="${{ matrix.health-cmd }}"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    env:
+      OMP_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+      INVOKEAI_TEST_DB_URL: ${{ matrix.url }}
+
+    steps:
+      - name: checkout
+        uses: nschloe/action-cached-lfs-checkout@385a8ecc719e50b8c71af6ab01a624b486b7c3bc
+
+      - name: setup uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: '0.11.28'  # When updating this, make sure the version in launcher's package.json gets updated too.
+          enable-cache: true
+          python-version: '3.12'
+
+      - name: install dependencies
+        env:
+          UV_INDEX: 'https://download.pytorch.org/whl/cpu'
+        run: uv sync --no-progress --locked --extra test --extra mysql
+
+      - name: run pytest
+        run: uv run --no-sync pytest -n logical --max-worker-restart=0 -m "uses_database and not sqlite_only and not slow"
+
+      - name: server log
+        if: ${{ failure() }}
+        run: docker logs "${{ job.services.database.id }}"

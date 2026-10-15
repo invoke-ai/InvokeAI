@@ -20,6 +20,7 @@ from invokeai.backend.model_manager.load.model_loaders.wan import (
     _build_wan_transformer_config,
 )
 from invokeai.backend.model_manager.taxonomy import SubModelType, WanVariantType
+from tests.fixtures.quantized_payloads import comfy_quant_marker, nvfp4_signed_tensors, quantize_convrot
 
 # A structurally faithful but tiny Wan transformer. attention_head_dim must stay
 # at 128 — the loader derives num_attention_heads as inner_dim // 128, matching
@@ -63,6 +64,24 @@ def _to_native_layout(sd: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         new_key = new_key.replace("norm__placeholder", "norm3")
         native_sd[new_key] = value
     return native_sd
+
+
+def _recording_model() -> tuple[MagicMock, dict[str, torch.Tensor]]:
+    """A stand-in transformer that snapshots the state dict it is handed.
+
+    Reading `call_args.args[0]` afterwards is not enough any more: the loader drops its own references
+    to that dict before the FP8 cast (so the bf16 originals are not held alive beside their fp8 copies),
+    and the assertion would then run against an emptied dict.
+    """
+    model = MagicMock()
+    handed_over: dict[str, torch.Tensor] = {}
+
+    def record(state_dict, *args, **kwargs):
+        handed_over.update(state_dict)
+        return SimpleNamespace(missing_keys=[], unexpected_keys=[])
+
+    model.load_state_dict.side_effect = record
+    return model, handed_over
 
 
 def _make_loader() -> WanCheckpointModel:
@@ -179,6 +198,52 @@ class TestEndToEnd:
         assert loaded[target].dtype == torch.bfloat16
         assert torch.allclose(loaded[target].float(), torch.full_like(loaded[target].float(), 2.0))
 
+    def test_an_int8_convrot_checkpoint_is_refused_rather_than_folded_unrotated(self, tmp_path: Path) -> None:
+        """Wan has no int8 branch, and `int8_tensorwise` shares the fp8 key layout, so the fold used
+        to apply the scale and skip the inverse rotation. That produces a weight of the right shape,
+        dtype and magnitude bearing no relation to the stored one -- a model that loads and
+        generates noise. `test_int8_through_the_fp8_fold.py` measures how little relation; how
+        little depends on the rotation width, so the number is kept where the geometry is fixed.
+        Pinned at the loader as well, because Wan is one of the two that reach the shared fold.
+        """
+        reference = _tiny_model()
+        sd = {k: v.clone() for k, v in reference.state_dict().items()}
+
+        target = "blocks.0.attn1.to_q.weight"
+        payload = quantize_convrot(sd[target].float(), group_size=64)
+        sd[target] = payload.codes
+        sd["blocks.0.attn1.to_q.weight_scale"] = payload.scale
+        sd["blocks.0.attn1.to_q.comfy_quant"] = comfy_quant_marker(
+            {"format": "int8_tensorwise", "convrot": True, "convrot_groupsize": 64}
+        )
+        path = tmp_path / "Wan2.2-A14B-HighNoise-int8_convrot.safetensors"
+        save_file(sd, path)
+
+        message = r"Wan checkpoint Wan2\.2-A14B-HighNoise-int8_convrot\.safetensors.*quantized with convrot"
+        with pytest.raises(ValueError, match=message):
+            _load(path)
+
+    def test_an_nvfp4_checkpoint_is_refused_rather_than_folded_over_its_packed_codes(self, tmp_path: Path) -> None:
+        """Wan reads scaled fp8 but never calls `pop_nvfp4_layers`, and the shared fold has no dtype
+        gate, so an nvfp4 layer was multiplied by its block-scale grid and logged as dequantized.
+        The load then died on the width -- "size mismatch [128, 64] vs [128, 128]" -- which names
+        neither the scheme nor the remedy, after a line claiming success. Pinned at the loader
+        because that is where the misleading sequence was visible.
+        """
+        reference = _tiny_model()
+        sd = {k: v.clone() for k, v in reference.state_dict().items()}
+
+        target = "blocks.0.attn1.to_q"
+        rows, columns = sd[f"{target}.weight"].shape
+        packed, _ = nvfp4_signed_tensors(target, torch.randint(0, 2, (rows, columns), dtype=torch.bool))
+        sd.update(packed)
+        path = tmp_path / "Wan2.2-A14B-HighNoise-nvfp4.safetensors"
+        save_file(sd, path)
+
+        message = r"Wan checkpoint Wan2\.2-A14B-HighNoise-nvfp4\.safetensors.*does not support nvfp4"
+        with pytest.raises(ValueError, match=message):
+            _load(path)
+
     def test_scale_bookkeeping_never_reaches_the_model(self, tmp_path: Path) -> None:
         """``load_state_dict(strict=False)`` silently ignores unexpected keys, so
         assert on what the loader actually hands over rather than on the result."""
@@ -192,12 +257,10 @@ class TestEndToEnd:
         path = tmp_path / "Wan2.2-A14B-HighNoise-fp8_scaled.safetensors"
         save_file(sd, path)
 
-        model = MagicMock()
-        model.load_state_dict.return_value = SimpleNamespace(missing_keys=[], unexpected_keys=[])
+        model, handed_over = _recording_model()
         with patch("diffusers.WanTransformer3DModel", return_value=model):
             _load(path)
 
-        handed_over = model.load_state_dict.call_args.args[0]
         assert not [k for k in handed_over if k.endswith((".scale_weight", ".scale_input")) or k == "scaled_fp8"]
         # ...without eating scale_shift_table, which is a real Wan parameter.
         assert "scale_shift_table" in handed_over
@@ -245,8 +308,7 @@ class TestEndToEnd:
         path = tmp_path / "wan2.2-t2v-rapid-aio-v10-high_noise.safetensors"
         save_file(sd, path)
 
-        model = MagicMock()
-        model.load_state_dict.return_value = SimpleNamespace(missing_keys=[], unexpected_keys=[])
+        model, handed_over = _recording_model()
         with patch("diffusers.WanTransformer3DModel", return_value=model):
             _load(path)
 
@@ -254,7 +316,6 @@ class TestEndToEnd:
         # tautology — a freshly built WanTransformer3DModel has no such attribute either
         # way — and it would not catch the bundled weights being cast and RAM-reserved
         # before load_state_dict discarded them, which is the cost this avoids.
-        handed_over = model.load_state_dict.call_args.args[0]
         assert [k for k in handed_over if k.startswith(("vae.", "text_encoders.", "model_ema."))] == []
         assert "patch_embedding.weight" in handed_over
 

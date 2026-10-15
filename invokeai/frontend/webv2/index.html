@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en" class="dark" style="color-scheme: dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#16181d" />
+    <title>Invoke V7 Workbench</title>
+    <link rel="icon" href="./invoke-icon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <script>
+      // Apply account-independent appearance hints before paint; use the legacy snapshot only as fallback.
+      (function () {
+        try {
+          var themeColorSchemes = {
+            classic: 'dark',
+            forest: 'dark',
+            light: 'light',
+            mono: 'dark',
+            osakaJade: 'dark',
+            ultradark: 'dark',
+            catppuccinMocha: 'dark',
+          };
+          var id = localStorage.getItem('invokeai:v7:webv2:theme');
+          if (!id) {
+            var raw = localStorage.getItem('invokeai:v7:webv2:workbench');
+            id = raw && JSON.parse(raw).state.account.preferences.themeId;
+          }
+          var colorScheme = themeColorSchemes[id];
+          var root = document.documentElement;
+          if (colorScheme) {
+            var isLight = colorScheme === 'light';
+            root.setAttribute('data-theme', id);
+            root.style.colorScheme = colorScheme;
+            root.classList.toggle('dark', !isLight);
+            root.classList.toggle('light', isLight);
+          }
+          if (localStorage.getItem('invokeai:v7:webv2:reduce-motion') === 'true') {
+            root.setAttribute('data-reduce-motion', 'true');
+          }
+          if (localStorage.getItem('invokeai:v7:webv2:high-contrast') === 'true') {
+            root.setAttribute('data-high-contrast', 'true');
+          }
+          var language = localStorage.getItem('invokeai:v7:webv2:language');
+          if (language) {
+            root.setAttribute('lang', language);
+            var direction = language === 'ar' || language === 'he' ? 'rtl' : 'ltr';
+            root.setAttribute('dir', direction);
+          }
+        } catch (error) {
+          /* ignore malformed storage */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/app/main.tsx"></script>
+  </body>
+</html>

@@ -2,6 +2,8 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { generateDocsId } from '../src/lib/sort-prefix.mjs';
+
 const docsRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const contentRoot = join(docsRoot, 'src', 'content', 'docs');
 const redirectsFile = join(docsRoot, 'src', 'config', 'redirects.ts');
@@ -31,8 +33,8 @@ const collectDocsRoutes = (dir, routes = new Set()) => {
       continue;
     }
 
-    const relativePath = relative(contentRoot, entryPath).replace(/\\/g, '/').replace(/\.mdx?$/, '');
-    const route = relativePath.endsWith('/index') ? relativePath.slice(0, -'/index'.length) : relativePath;
+    // Frontmatter slugs are not read, as before.
+    const route = generateDocsId({ entry: relative(contentRoot, entryPath).replace(/\\/g, '/'), data: {} });
     routes.add(normalizeRoute(route));
 
     const segments = route.split('/').filter(Boolean);

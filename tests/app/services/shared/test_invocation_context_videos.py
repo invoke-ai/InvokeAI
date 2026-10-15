@@ -16,6 +16,7 @@ def _make_interface(visibility: BoardVisibility, owner_id: str = "owner") -> tup
     data.queue_item.workflow = None
     data.queue_item.session.graph = None
     data.queue_item.session_id = "session"
+    data.queue_item.project_id = "project-1"
     data.invocation.is_intermediate = False
     return VideosInterface(services, data, MagicMock()), services
 
@@ -97,3 +98,11 @@ def test_video_save_allows_active_queue_user_without_board() -> None:
     videos.save(Path("output.mp4"), width=64, height=64, duration=1.0)
 
     services.videos.create.assert_called_once()
+
+
+def test_videos_save_attributes_the_output_to_the_queue_items_project() -> None:
+    videos, services = _make_interface(BoardVisibility.Private, owner_id="queue-user")
+
+    videos.save(Path("output.mp4"), width=64, height=64, duration=1.0)
+
+    assert services.videos.create.call_args.kwargs["project_id"] == "project-1"

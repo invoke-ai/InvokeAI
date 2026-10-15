@@ -28,6 +28,18 @@ _MISTRAL_24B_NUM_LAYERS = 40
 _COW_NUM_LAYERS = 30
 _ACCEPTED_NUM_LAYERS = (_COW_NUM_LAYERS, _MISTRAL_24B_NUM_LAYERS)
 
+# ERNIE-Image's encoder is Ministral 3B — a different member of the Mistral family, not a
+# smaller Mistral Small 3. It is half as wide (3072) over 26 layers and uses YaRN RoPE, so the
+# loader builds it as ``Ministral3Model``; see ``MistralVariantType.Ministral3B``. Geometry is
+# what separates the families, which is why the width is part of the match rather than assumed.
+_MINISTRAL_3B_HIDDEN_SIZE = 3072
+_MINISTRAL_3B_NUM_LAYERS = 26
+
+_ACCEPTED_GEOMETRIES = (
+    f"hidden_size={_MISTRAL_3_HIDDEN_SIZE} with num_hidden_layers in {_ACCEPTED_NUM_LAYERS}, "
+    f"or hidden_size={_MINISTRAL_3B_HIDDEN_SIZE} with num_hidden_layers={_MINISTRAL_3B_NUM_LAYERS}"
+)
+
 # Minimum vocab size to accept as a FLUX.2 Mistral encoder. Mistral Small 3's
 # Tekken vocab is 131072 (shared by the 30-layer cow distillation). This gates out
 # unrelated causal LMs that happen to share the 5120-hidden / 40-layer geometry —
@@ -85,16 +97,24 @@ def _has_ggml_tensors(state_dict: dict[str | int, Any]) -> bool:
 
 
 def _count_mistral_layers(state_dict: dict[str | int, Any]) -> int:
-    """Count transformer layers in a Mistral state dict.
+    """Count *language* transformer layers in a Mistral state dict.
 
     Supports both transformers' ``model.layers.N.*`` layout and llama.cpp's
     ``blk.N.*`` layout. Returns 0 if no per-layer keys are present.
+
+    The Mistral3 stack nests a second transformer under ``vision_tower.``, whose layers are
+    counted by the same ``.layers.N.`` spelling. Today the vision tower is the shorter of the two
+    (Pixtral's 24 against the language tower's 26), so a plain maximum happens to land on the
+    right one -- but the count decides the variant, so it should not rest on which tower is
+    deeper.
     """
     indices: set[int] = set()
     for key in state_dict.keys():
         if not isinstance(key, str):
             continue
         normalized = _normalize_probe_key(key)
+        if normalized.startswith(_MISTRAL3_STACK_PREFIXES):
+            continue
         # transformers / diffusers: model.layers.N.* or language_model.model.layers.N.*
         if ".layers." in normalized:
             parts = normalized.split(".layers.", 1)[1].split(".", 1)
@@ -144,28 +164,82 @@ def _embed_vocab_size(state_dict: dict[str | int, Any]) -> int | None:
     return shape[0] if shape is not None else None
 
 
-def _get_mistral_variant_from_state_dict(state_dict: dict[str | int, Any]) -> MistralVariantType | None:
-    """Return the Mistral variant for a state dict, or ``None`` if unrecognized.
+def _variant_for_geometry(hidden_size: int | None, num_layers: int | None) -> MistralVariantType | None:
+    """Map a ``(hidden_size, num_layers)`` pair onto a variant, or ``None`` if unrecognized.
 
     Recognized variants:
     - 30-layer + hidden_size=5120 → ``MistralVariantType.Cow`` (BFL distillation)
     - 40-layer + hidden_size=5120 → ``MistralVariantType.Mistral24B`` (BFL canonical / upstream Mistral Small 3.x)
+    - 26-layer + hidden_size=3072 → ``MistralVariantType.Ministral3B`` (ERNIE-Image)
+
+    Shared by the state-dict and ``config.json`` probes so the two can never recognize
+    different sets of encoders.
+    """
+    if hidden_size == _MISTRAL_3_HIDDEN_SIZE:
+        if num_layers == _COW_NUM_LAYERS:
+            return MistralVariantType.Cow
+        if num_layers == _MISTRAL_24B_NUM_LAYERS:
+            return MistralVariantType.Mistral24B
+        return None
+    if hidden_size == _MINISTRAL_3B_HIDDEN_SIZE and num_layers == _MINISTRAL_3B_NUM_LAYERS:
+        return MistralVariantType.Ministral3B
+    return None
+
+
+# ERNIE-Image ships two files of identical Ministral 3B geometry in one folder: the text encoder
+# and the prompt enhancer (`Ministral3ForCausalLM`), which rewrites prompts and conditions nothing.
+# Both carry the embedded Tekken vocab and the same 236 `model.*` tensors, so neither the vocab
+# floor nor the geometry separates them. What does: the encoder is the full Mistral3 multimodal
+# stack and ships the Pixtral vision tower the loader later drops, while the enhancer is a bare
+# language model. Requiring the tower is what keeps the enhancer from installing as an encoder and
+# then conditioning every prompt with the wrong weights. The cost is that a vision-stripped
+# repackaging is not recognized -- a visible failure, where the alternative is a silent one.
+_MISTRAL3_STACK_PREFIXES = ("vision_tower.", "multi_modal_projector.")
+
+
+def _has_mistral3_vision_stack(state_dict: dict[str | int, Any]) -> bool:
+    """Whether the file carries the Mistral3 multimodal stack around its language tower."""
+    return any(
+        isinstance(key, str) and _normalize_probe_key(key).startswith(_MISTRAL3_STACK_PREFIXES) for key in state_dict
+    )
+
+
+PROMPT_ENHANCER_REFUSAL = (
+    "this is ERNIE-Image's prompt enhancer, not its text encoder: the same Ministral 3B geometry, "
+    "but without the vision tower the encoder ships. The enhancer only runs as part of an "
+    "ERNIE-Image diffusers pipeline; for a single-file transformer install "
+    "text_encoders/ministral-3-3b.safetensors instead."
+)
+"""Named so the refusal can be asserted, and because the generic geometry message is actively
+misleading here: it would list Ministral's 3072/26 among the *expected* geometries, which is
+exactly what this file has."""
+
+
+def _is_ministral_language_model_only(state_dict: dict[str | int, Any]) -> bool:
+    """Ministral 3B geometry with no multimodal stack -- ERNIE-Image's prompt enhancer."""
+    vocab_size = _embed_vocab_size(state_dict)
+    if vocab_size is None or vocab_size < _MISTRAL_3_MIN_VOCAB_SIZE:
+        return False
+    geometry = _variant_for_geometry(_embed_hidden_size(state_dict), _count_mistral_layers(state_dict))
+    return geometry is MistralVariantType.Ministral3B and not _has_mistral3_vision_stack(state_dict)
+
+
+def _get_mistral_variant_from_state_dict(state_dict: dict[str | int, Any]) -> MistralVariantType | None:
+    """Return the Mistral variant for a state dict, or ``None`` if unrecognized.
 
     The vocab-size floor rejects unrelated causal LMs (e.g. Llama-2-13B) that share
     the 5120-hidden / 40-layer geometry and llama.cpp key names but are not Mistral
-    Small 3 encoders — without it they would install and emit garbage embeddings.
+    Small 3 encoders — without it they would install and emit garbage embeddings. Both
+    accepted families share the 131072-entry Tekken vocab, so one floor covers them.
     """
-    if _embed_hidden_size(state_dict) != _MISTRAL_3_HIDDEN_SIZE:
-        return None
     vocab_size = _embed_vocab_size(state_dict)
     if vocab_size is None or vocab_size < _MISTRAL_3_MIN_VOCAB_SIZE:
         return None
-    num_layers = _count_mistral_layers(state_dict)
-    if num_layers == _COW_NUM_LAYERS:
-        return MistralVariantType.Cow
-    if num_layers == _MISTRAL_24B_NUM_LAYERS:
-        return MistralVariantType.Mistral24B
-    return None
+    variant = _variant_for_geometry(_embed_hidden_size(state_dict), _count_mistral_layers(state_dict))
+    if variant is MistralVariantType.Ministral3B and not _has_mistral3_vision_stack(state_dict):
+        # ERNIE-Image's prompt enhancer has this exact geometry; only the tower tells them apart.
+        return None
+    return variant
 
 
 def _get_mistral_variant_from_config(config_path) -> MistralVariantType | None:
@@ -186,13 +260,7 @@ def _get_mistral_variant_from_config(config_path) -> MistralVariantType | None:
         if num_layers is None:
             num_layers = text_config.get("num_hidden_layers")
 
-    if hidden_size != _MISTRAL_3_HIDDEN_SIZE:
-        return None
-    if num_layers == _COW_NUM_LAYERS:
-        return MistralVariantType.Cow
-    if num_layers == _MISTRAL_24B_NUM_LAYERS:
-        return MistralVariantType.Mistral24B
-    return None
+    return _variant_for_geometry(hidden_size, num_layers)
 
 
 class MistralEncoder_Diffusers_Config(Config_Base):
@@ -250,14 +318,19 @@ class MistralEncoder_Diffusers_Config(Config_Base):
                 "Mistral3ForConditionalGeneration",
                 "MistralModel",
                 "MistralForCausalLM",
+                # ERNIE-Image's released `text_encoder/` declares this one. Without it the folder a
+                # user can download straight from `baidu/ERNIE-Image` installs as Unknown, and the
+                # Ministral branch of the geometry probe below is unreachable.
+                # `Ministral3ForCausalLM` is deliberately absent: that is the prompt enhancer, a
+                # different model that happens to share the encoder's geometry.
+                "Mistral3Model",
             },
         )
 
         variant = _get_mistral_variant_from_config(expected_config_path)
         if variant is None:
             raise NotAMatchError(
-                f"config.json does not describe a recognized Mistral variant "
-                f"(expected hidden_size={_MISTRAL_3_HIDDEN_SIZE} and num_hidden_layers in {_ACCEPTED_NUM_LAYERS})."
+                f"config.json does not describe a recognized Mistral variant (expected {_ACCEPTED_GEOMETRIES})."
             )
 
         return cls(variant=variant, **override_fields)
@@ -292,12 +365,13 @@ class MistralEncoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
             raise NotAMatchError("state dict looks like GGUF quantized")
 
         variant = _get_mistral_variant_from_state_dict(state_dict)
+        if variant is None and _is_ministral_language_model_only(state_dict):
+            raise NotAMatchError(PROMPT_ENHANCER_REFUSAL)
         if variant is None:
             raise NotAMatchError(
                 f"unrecognized Mistral geometry (got hidden_size={_embed_hidden_size(state_dict)}, "
                 f"vocab_size={_embed_vocab_size(state_dict)}, layers={_count_mistral_layers(state_dict)}). "
-                f"Expected hidden_size={_MISTRAL_3_HIDDEN_SIZE}, vocab_size>={_MISTRAL_3_MIN_VOCAB_SIZE} "
-                f"and num_hidden_layers in {_ACCEPTED_NUM_LAYERS}."
+                f"Expected vocab_size>={_MISTRAL_3_MIN_VOCAB_SIZE} and {_ACCEPTED_GEOMETRIES}."
             )
 
         return cls(variant=variant, **override_fields)
@@ -331,12 +405,16 @@ class MistralEncoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
             raise NotAMatchError("state dict does not look like GGUF quantized")
 
         variant = _get_mistral_variant_from_state_dict(state_dict)
+        if variant is MistralVariantType.Ministral3B:
+            # The GGUF loader builds a `MistralModel` with RoPE read from GGUF metadata. Ministral
+            # 3B needs `Ministral3Model` -- YaRN scaling plus a position-dependent attention scale --
+            # so accepting one here would install a model that loads cleanly and encodes garbage.
+            raise NotAMatchError("Ministral 3B GGUF encoders are not supported")
         if variant is None:
             raise NotAMatchError(
                 f"unrecognized Mistral geometry (got hidden_size={_embed_hidden_size(state_dict)}, "
                 f"vocab_size={_embed_vocab_size(state_dict)}, layers={_count_mistral_layers(state_dict)}). "
-                f"Expected hidden_size={_MISTRAL_3_HIDDEN_SIZE}, vocab_size>={_MISTRAL_3_MIN_VOCAB_SIZE} "
-                f"and num_hidden_layers in {_ACCEPTED_NUM_LAYERS}."
+                f"Expected vocab_size>={_MISTRAL_3_MIN_VOCAB_SIZE} and {_ACCEPTED_GEOMETRIES}."
             )
 
         return cls(variant=variant, **override_fields)

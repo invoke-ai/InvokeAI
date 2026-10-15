@@ -8,7 +8,7 @@ model must reject such boxes up front.
 import pytest
 from pydantic import ValidationError
 
-from invokeai.app.invocations.ideogram4_caption import Ideogram4Region
+from invokeai.app.invocations.ideogram4.ideogram4_caption import Ideogram4Region
 
 
 def test_valid_bbox_is_accepted():

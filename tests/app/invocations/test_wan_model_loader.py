@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from invokeai.app.invocations.model import ModelIdentifierField
-from invokeai.app.invocations.wan_model_loader import WanModelLoaderInvocation
+from invokeai.app.invocations.wan.wan_model_loader import WanModelLoaderInvocation
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, WanVariantType
 
 
@@ -92,18 +92,31 @@ def _warnings(context: MagicMock) -> list[str]:
 
 
 @pytest.mark.parametrize("variant", [WanVariantType.T2V_A14B, WanVariantType.I2V_A14B])
-@pytest.mark.parametrize("main_expert,low_expert", [("high", "low"), ("low", "high")])
-def test_gguf_loader_accepts_valid_expert_pair_in_either_order(
+@pytest.mark.parametrize(
+    "main_expert,low_expert",
+    [("high", "low"), ("low", "high"), ("none", "none")],
+)
+def test_gguf_loader_preserves_explicit_slot_wiring_regardless_of_filename_tags(
     variant: WanVariantType, main_expert: str, low_expert: str
 ) -> None:
+    """Filename-derived expert tags are advisory; explicit graph wiring defines the roles."""
     output = _invoke(
         _config("main", variant, main_expert),
         _config("low", variant, low_expert),
     )
 
-    assert output.transformer.transformer.key == ("main" if main_expert == "high" else "low")
+    assert output.transformer.transformer.key == "main"
     assert output.transformer.transformer_low_noise is not None
-    assert output.transformer.transformer_low_noise.key == ("low" if low_expert == "low" else "main")
+    assert output.transformer.transformer_low_noise.key == "low"
+
+
+@pytest.mark.parametrize("expert", ["high", "low"])
+def test_gguf_loader_rejects_same_phase_expert_pairs(expert: str) -> None:
+    with pytest.raises(ValueError, match="one high and one low"):
+        _invoke(
+            _config("main", WanVariantType.T2V_A14B, expert),
+            _config("low", WanVariantType.T2V_A14B, expert),
+        )
 
 
 @pytest.mark.parametrize(
@@ -113,46 +126,37 @@ def test_gguf_loader_accepts_valid_expert_pair_in_either_order(
             _config("main", WanVariantType.T2V_A14B, "high"),
             _config("low", WanVariantType.I2V_A14B, "low"),
         ),
-        (
-            _config("main", WanVariantType.T2V_A14B, "high"),
-            _config("low", WanVariantType.T2V_A14B, "high"),
-        ),
-        (
-            _config("main", WanVariantType.T2V_A14B, "low"),
-            _config("low", WanVariantType.T2V_A14B, "low"),
-        ),
     ],
 )
-def test_gguf_loader_rejects_invalid_expert_pair(main_config: SimpleNamespace, low_config: SimpleNamespace) -> None:
-    with pytest.raises(ValueError, match="expert|variant"):
+def test_gguf_loader_rejects_mismatched_expert_variants(
+    main_config: SimpleNamespace, low_config: SimpleNamespace
+) -> None:
+    with pytest.raises(ValueError, match="variant"):
         _invoke(main_config, low_config)
 
 
 @pytest.mark.parametrize(
-    "main_expert,low_expert,expected_high_key",
+    "main_expert,low_expert",
     [
         # The expert tag comes from a filename heuristic, so untagged community
-        # finetunes are common. The wiring is explicit intent: take the untagged
-        # file at its wired position, or as the complement of a tagged partner.
-        ("none", "none", "main"),
-        ("high", "none", "main"),
-        ("none", "low", "main"),
-        ("none", "high", "low"),
-        ("low", "none", "low"),
+        # finetunes are common. The explicit slot wiring remains authoritative
+        # whether one, both, or neither filename supplies an expert hint.
+        ("none", "none"),
+        ("high", "none"),
+        ("none", "low"),
+        ("none", "high"),
+        ("low", "none"),
     ],
 )
-def test_gguf_loader_falls_back_to_wiring_for_untagged_experts(
-    main_expert: str, low_expert: str, expected_high_key: str
-) -> None:
+def test_gguf_loader_uses_wiring_for_untagged_experts(main_expert: str, low_expert: str) -> None:
     output = _invoke(
         _config("main", WanVariantType.I2V_A14B, main_expert),
         _config("low", WanVariantType.I2V_A14B, low_expert),
     )
 
-    expected_low_key = "low" if expected_high_key == "main" else "main"
-    assert output.transformer.transformer.key == expected_high_key
+    assert output.transformer.transformer.key == "main"
     assert output.transformer.transformer_low_noise is not None
-    assert output.transformer.transformer_low_noise.key == expected_low_key
+    assert output.transformer.transformer_low_noise.key == "low"
 
 
 @pytest.mark.parametrize("low_variant", [WanVariantType.TI2V_5B, WanVariantType.T2V_A14B])
@@ -196,17 +200,18 @@ def test_gguf_loader_rejects_the_same_model_in_both_transformer_slots() -> None:
 
 
 @pytest.mark.parametrize("main_expert,low_expert", [("low", "high"), ("low", "none"), ("none", "high")])
-def test_gguf_loader_warns_when_it_swaps_the_wired_experts(main_expert: str, low_expert: str) -> None:
-    """The swap overrides explicit wiring on the strength of a filename tag, so a mistagged
-    file must not invert the two experts silently."""
+def test_gguf_loader_warns_when_filename_tags_disagree_with_wiring(main_expert: str, low_expert: str) -> None:
+    """A suspicious filename can produce a warning, but must not override explicit wiring."""
     invocation, context = _prepare(
         _config("main", WanVariantType.I2V_A14B, main_expert),
         _config("low", WanVariantType.I2V_A14B, low_expert),
     )
     output = invocation.invoke(context)
 
-    assert output.transformer.transformer.key == "low"
-    assert any("swapped" in warning for warning in _warnings(context))
+    assert output.transformer.transformer.key == "main"
+    assert output.transformer.transformer_low_noise is not None
+    assert output.transformer.transformer_low_noise.key == "low"
+    assert any("wiring" in warning.lower() for warning in _warnings(context))
 
 
 @pytest.mark.parametrize("main_expert,low_expert", [("high", "low"), ("high", "none"), ("none", "low")])
@@ -382,6 +387,16 @@ def test_loader_rejects_forged_non_wan_vae_identifier() -> None:
                 base=BaseModelType.StableDiffusionXL,
                 type=ModelType.Main,
             ),
+        )
+
+
+@pytest.mark.parametrize("vae_base", [BaseModelType.Flux, BaseModelType.StableDiffusion3])
+def test_loader_rejects_a_standalone_vae_of_another_family(vae_base: BaseModelType) -> None:
+    """A 16-channel VAE record that is not Wan's must not pass on its channel count alone."""
+    with pytest.raises(ValueError, match="16-channel Wan 2.1 VAE"):
+        _invoke(
+            _config("main", WanVariantType.T2V_A14B, "high"),
+            vae_config=SimpleNamespace(name="other", latent_channels=16, base=vae_base, type=ModelType.VAE),
         )
 
 

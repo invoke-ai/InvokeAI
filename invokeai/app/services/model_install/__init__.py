@@ -3,6 +3,7 @@
 from invokeai.app.services.model_install.model_install_base import ModelInstallServiceBase
 from invokeai.app.services.model_install.model_install_common import (
     HFModelSource,
+    InstallRecoveryRequiredError,
     InstallStatus,
     LocalModelSource,
     ModelInstallJob,
@@ -16,6 +17,7 @@ __all__ = [
     "ModelInstallServiceBase",
     "ModelInstallService",
     "InstallStatus",
+    "InstallRecoveryRequiredError",
     "ModelInstallJob",
     "UnknownInstallJobException",
     "ModelSource",

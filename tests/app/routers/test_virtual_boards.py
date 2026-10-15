@@ -9,7 +9,11 @@ from typing import Any
 from fastapi import status
 from fastapi.testclient import TestClient
 
-from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.services.image_records.image_records_common import (
+    ImageCategory,
+    ImageRecordChanges,
+    ResourceOrigin,
+)
 from invokeai.app.services.invoker import Invoker
 
 
@@ -145,3 +149,30 @@ def test_item_names_by_date_returns_video_refs(client: TestClient, user1_token: 
     refs = {(item["kind"], item["name"]) for item in body["items"]}
     assert refs == {("image", "u1-mixed.png"), ("video", "u1-mixed.mp4")}
     assert body["total_count"] == 2
+
+
+def test_item_names_by_date_forwards_starred_filter(client: TestClient, user1_token: str, mock_invoker: Invoker):
+    """`starred` narrows a date board to starred or unstarred items and reports the narrowed total."""
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert user1 is not None
+
+    _save_image(mock_invoker, "u1-starred.png", user1.user_id)
+    _save_image(mock_invoker, "u1-plain.png", user1.user_id)
+    mock_invoker.services.image_records.update("u1-starred.png", ImageRecordChanges(starred=True))
+
+    headers = {"Authorization": f"Bearer {user1_token}"}
+    date = client.get("/api/v1/virtual_boards/by_date", headers=headers).json()[0]["date"]
+
+    starred = client.get(
+        f"/api/v1/virtual_boards/by_date/{date}/item_names", params={"starred": "true"}, headers=headers
+    )
+    unstarred = client.get(
+        f"/api/v1/virtual_boards/by_date/{date}/item_names", params={"starred": "false"}, headers=headers
+    )
+
+    assert starred.status_code == status.HTTP_200_OK
+    assert [item["name"] for item in starred.json()["items"]] == ["u1-starred.png"]
+    assert starred.json()["total_count"] == 1
+    assert unstarred.status_code == status.HTTP_200_OK
+    assert [item["name"] for item in unstarred.json()["items"]] == ["u1-plain.png"]
+    assert unstarred.json()["total_count"] == 1

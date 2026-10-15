@@ -135,9 +135,21 @@ from invokeai.backend.model_manager.taxonomy import (
 )
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
+    AnimaConditioningInfo,
     BasicConditioningInfo,
+    CogView4ConditioningInfo,
     ConditioningFieldData,
+    ErnieImageConditioningInfo,
+    FLUXConditioningInfo,
+    Ideogram4ConditioningInfo,
+    Krea2ConditioningInfo,
+    LTX2ConditioningInfo,
+    MiniMaxH3ConditioningInfo,
+    QwenImageConditioningInfo,
+    SD3ConditioningInfo,
     SDXLConditioningInfo,
+    WanConditioningInfo,
+    ZImageConditioningInfo,
 )
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 from invokeai.backend.util.devices import CPU_DEVICE, CUDA_DEVICE, MPS_DEVICE, choose_precision, choose_torch_device
@@ -221,9 +233,23 @@ __all__ = [
     # invokeai.app.services.boards.boards_common
     "BoardDTO",
     # invokeai.backend.stable_diffusion.diffusion.conditioning_data
+    # Every architecture's conditioning type, kept in step with the registry by
+    # tests/backend/architectures/test_conditioning.py.
+    "AnimaConditioningInfo",
     "BasicConditioningInfo",
+    "CogView4ConditioningInfo",
     "ConditioningFieldData",
+    "ErnieImageConditioningInfo",
+    "FLUXConditioningInfo",
+    "Ideogram4ConditioningInfo",
+    "Krea2ConditioningInfo",
+    "LTX2ConditioningInfo",
+    "MiniMaxH3ConditioningInfo",
+    "QwenImageConditioningInfo",
+    "SD3ConditioningInfo",
     "SDXLConditioningInfo",
+    "WanConditioningInfo",
+    "ZImageConditioningInfo",
     # invokeai.backend.stable_diffusion.diffusers_pipeline
     "PipelineIntermediateState",
     # invokeai.app.services.workflow_records.workflow_records_common

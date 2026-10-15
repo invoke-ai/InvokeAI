@@ -1,4 +1,3 @@
-# Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Development Team
 """Model download service."""
 
 from abc import ABC, abstractmethod

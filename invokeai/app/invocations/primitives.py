@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
-
 from typing import Optional
 
 import torch
@@ -26,7 +24,9 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     Krea2ConditioningField,
+    Krea2StyleReferenceField,
     LatentsField,
+    MiniMaxH3ConditioningField,
     OutputField,
     QwenImageConditioningField,
     SD3ConditioningField,
@@ -561,6 +561,17 @@ class WanConditioningOutput(BaseInvocationOutput):
         return cls(conditioning=WanConditioningField(conditioning_name=conditioning_name))
 
 
+@invocation_output("minimax_h3_conditioning_output")
+class MiniMaxH3ConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output a MiniMax H3 conditioning tensor."""
+
+    conditioning: MiniMaxH3ConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "MiniMaxH3ConditioningOutput":
+        return cls(conditioning=MiniMaxH3ConditioningField(conditioning_name=conditioning_name))
+
+
 @invocation_output("wan_ref_image_output")
 class WanRefImageOutput(BaseInvocationOutput):
     """Output of a Wan 2.2 reference-image VAE-encoder."""
@@ -586,6 +597,20 @@ class WanRefImageOutput(BaseInvocationOutput):
                 num_frames=num_frames,
             )
         )
+
+
+@invocation_output("krea2_style_reference_output")
+class Krea2StyleReferenceOutput(BaseInvocationOutput):
+    """Output of a Krea-2 style-reference encoder."""
+
+    style_reference: Krea2StyleReferenceField = OutputField(
+        description="Style-reference conditioning for Krea-2.",
+        title="Style Reference",
+    )
+
+    @classmethod
+    def build(cls, style_reference: Krea2StyleReferenceField) -> "Krea2StyleReferenceOutput":
+        return cls(style_reference=style_reference)
 
 
 @invocation_output("conditioning_output")

@@ -1,5 +1,3 @@
-# Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
-
 import asyncio
 from collections.abc import Collection
 from typing import Any
@@ -11,6 +9,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.types import Message, Receive, Scope, Send
 
 from invokeai.app.services.auth.token_service import verify_token
+from invokeai.app.services.board_records.board_records_common import BoardVisibility
 from invokeai.app.services.config.config_default import get_config
 from invokeai.app.services.events.events_common import (
     BatchEnqueuedEvent,
@@ -25,6 +24,13 @@ from invokeai.app.services.events.events_common import (
     DownloadProgressEvent,
     DownloadStartedEvent,
     FastAPIEvent,
+    ImageIndexEventBase,
+    ImageIndexStatusEvent,
+    ImageIndexUpdatedEvent,
+    ImageMapProjectionReadyEvent,
+    ImageUploadedEvent,
+    IntermediatesEventBase,
+    IntermediatesOperationChangedEvent,
     InvocationCompleteEvent,
     InvocationErrorEvent,
     InvocationProgressEvent,
@@ -33,11 +39,13 @@ from invokeai.app.services.events.events_common import (
     LLMTaskErrorEvent,
     LLMTaskEventBase,
     LLMTaskProgressEvent,
+    MediaUploadedEventBase,
     ModelEventBase,
     ModelInstallCancelledEvent,
     ModelInstallCompleteEvent,
     ModelInstallDownloadProgressEvent,
     ModelInstallDownloadsCompleteEvent,
+    ModelInstallDownloadStartedEvent,
     ModelInstallErrorEvent,
     ModelInstallStartedEvent,
     ModelLoadCompleteEvent,
@@ -49,6 +57,8 @@ from invokeai.app.services.events.events_common import (
     QueueItemStatusChangedEvent,
     RecallParametersUpdatedEvent,
     UserAccessChangedEvent,
+    VideoRecallRequestedEvent,
+    VideoUploadedEvent,
     WorkflowAccessRevokedEvent,
     WorkflowCreatedEvent,
     WorkflowDeletedEvent,
@@ -103,6 +113,7 @@ QUEUE_EVENTS = {
     QueueItemsCanceledEvent,
     QueueClearedEvent,
     RecallParametersUpdatedEvent,
+    VideoRecallRequestedEvent,
 }
 
 MODEL_EVENTS = {
@@ -113,6 +124,7 @@ MODEL_EVENTS = {
     DownloadStartedEvent,
     ModelLoadStartedEvent,
     ModelLoadCompleteEvent,
+    ModelInstallDownloadStartedEvent,
     ModelInstallDownloadProgressEvent,
     ModelInstallDownloadsCompleteEvent,
     ModelInstallStartedEvent,
@@ -124,6 +136,20 @@ MODEL_EVENTS = {
 BULK_DOWNLOAD_EVENTS = {BulkDownloadStartedEvent, BulkDownloadCompleteEvent, BulkDownloadErrorEvent}
 WORKFLOW_EVENTS = {WorkflowCreatedEvent, WorkflowUpdatedEvent, WorkflowDeletedEvent}
 USER_EVENTS = {UserAccessChangedEvent}
+
+IMAGE_INDEX_EVENTS = {ImageIndexStatusEvent, ImageIndexUpdatedEvent, ImageMapProjectionReadyEvent}
+INTERMEDIATES_EVENTS = {IntermediatesOperationChangedEvent}
+MEDIA_EVENTS = {ImageUploadedEvent, VideoUploadedEvent}
+
+MODEL_INSTALL_EVENTS = (
+    ModelInstallDownloadStartedEvent,
+    ModelInstallDownloadProgressEvent,
+    ModelInstallDownloadsCompleteEvent,
+    ModelInstallStartedEvent,
+    ModelInstallCompleteEvent,
+    ModelInstallCancelledEvent,
+    ModelInstallErrorEvent,
+)
 
 LLM_TASK_EVENTS = {LLMTaskProgressEvent, LLMTaskCompleteEvent, LLMTaskErrorEvent}
 
@@ -221,6 +247,9 @@ class SocketIO:
         register_events(BULK_DOWNLOAD_EVENTS, self._handle_bulk_image_download_event)
         register_events(LLM_TASK_EVENTS, self._handle_llm_task_event)
         register_events(WORKFLOW_EVENTS, self._handle_workflow_event)
+        register_events(IMAGE_INDEX_EVENTS, self._handle_image_index_event)
+        register_events(INTERMEDIATES_EVENTS, self._handle_intermediates_event)
+        register_events(MEDIA_EVENTS, self._handle_media_event)
         register_events(USER_EVENTS, self._handle_user_access_changed)
 
     async def _handle_connect(self, sid: str, environ: dict, auth: dict | None) -> bool:
@@ -812,6 +841,26 @@ class SocketIO:
             f"Socket {sid} (user_id: {user_id}, is_admin: {is_admin}) subscribed to queue {queue_id} and user room {user_room}"
         )
 
+        await self._replay_progress_previews(sid, user_id, queue_id)
+
+    async def _replay_progress_previews(self, sid: str, user_id: str, queue_id: str) -> None:
+        """Send this socket the latest preview frame of each running queue item the user owns.
+
+        A reconnecting tab otherwise shows nothing until the next denoising step. The frames carry
+        their original revisions, so a socket that never lost them drops the duplicates. Sent to
+        this socket only: the user's other sockets already have them.
+        """
+        from invokeai.app.api.dependencies import ApiDependencies
+
+        invoker = getattr(ApiDependencies, "invoker", None)
+        if invoker is None:
+            return
+
+        for event in invoker.services.progress_previews.list_for_user(user_id, queue_id):
+            await self._sio.emit(
+                event=InvocationProgressEvent.__event_name__, data=event.model_dump(mode="json"), to=sid
+            )
+
     async def _handle_unsub_queue(self, sid: str, data: Any) -> None:
         await self._sio.leave_room(sid, QueueSubscriptionEvent(**data).queue_id)
 
@@ -918,7 +967,7 @@ class SocketIO:
            per-session side effects.
 
         InvocationEventBase events stay private (owner + admins only). RecallParametersUpdatedEvent
-        is also private. QueueClearedEvent is broadcast to the queue room when unscoped (an admin or
+        is also private, and VideoRecallRequestedEvent goes to the owner alone. QueueClearedEvent is broadcast to the queue room when unscoped (an admin or
         single-user clear that deleted every user's items); a user-scoped clear goes full to
         owner + admins with a sanitized companion to the rest of the queue room, so other users
         refresh their queue lists without treating the clear as their own.
@@ -1032,6 +1081,15 @@ class SocketIO:
                 )
                 logger.debug(f"Emitted private recall_parameters_updated event to user room {user_room} and admin room")
 
+            # VideoRecallRequestedEvent goes to the owner only. Unlike image recall no admin UI
+            # consumes it, and its payload names the owner's media. One room also means one
+            # delivery, which matters: a reference-video recall appends.
+            elif isinstance(event_data, VideoRecallRequestedEvent):
+                await self._sio.emit(
+                    event=event_name, data=event_data.model_dump(mode="json"), room=f"user:{event_data.user_id}"
+                )
+                logger.debug(f"Emitted private video_recall_requested event to user room user:{event_data.user_id}")
+
             # BatchEnqueuedEvent: full to owner+admin, sanitized to everyone else in the queue
             # room so their badge total and queue list pick up the new items.
             elif isinstance(event_data, BatchEnqueuedEvent):
@@ -1143,7 +1201,9 @@ class SocketIO:
 
         # Model install and download events contain signed source URLs and server filesystem
         # paths. They feed the admin-only model manager UI and must not be broadcast to users.
-        if isinstance(event_data, (DownloadEventBase, ModelEventBase)):
+        # Keep the explicit install tuple alongside the base classes: it documents the install
+        # family registered by this server while the bases cover every download/model subtype.
+        if isinstance(event_data, MODEL_INSTALL_EVENTS + (DownloadEventBase, ModelEventBase)):
             await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
             return
 
@@ -1158,8 +1218,66 @@ class SocketIO:
         event_name, event_data = event
         user_room = f"user:{event_data.user_id}"
         payload = event_data.model_dump(mode="json")
-        await self._sio.emit(event=event_name, data=payload, room=user_room)
-        await self._sio.emit(event=event_name, data=payload, room="admin")
+        await self._sio.emit(event=event_name, data=payload, room=[user_room, "admin"])
+
+    async def _handle_image_index_event(self, event: FastAPIEvent[ImageIndexEventBase]) -> None:
+        event_name, event_data = event
+        # The counts-free per-user poke goes to the owning user's room only —
+        # admins learn the same thing from the status event below.
+        if isinstance(event_data, ImageIndexUpdatedEvent):
+            await self._sio.emit(
+                event=event_name, data=event_data.model_dump(mode="json"), room=f"user:{event_data.user_id}"
+            )
+            return
+        # Projection-ready events go to the owning user's room plus admins.
+        if isinstance(event_data, ImageMapProjectionReadyEvent):
+            # Single emit with a room list: python-socketio dedupes, so an
+            # admin viewing their own map gets exactly one event.
+            rooms = [f"user:{event_data.user_id}", "admin"]
+            await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room=rooms)
+            return
+        # Index counts aggregate over ALL users' images; watching them tick is
+        # a side channel on other users' generation activity, so they go to
+        # admins only (single-user mode's sole user is an admin).
+        await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
+
+    async def _handle_intermediates_event(self, event: FastAPIEvent[IntermediatesEventBase]) -> None:
+        event_name, event_data = event
+        payload = event_data.model_dump(mode="json")
+        if not self._is_multiuser_enabled():
+            await self._sio.emit(event=event_name, data=payload, room="admin")
+            return
+        # One emit with a room list: python-socketio dedupes, so an admin confirming their own
+        # cleanup receives each update once.
+        rooms = [f"user:{event_data.user_id}", "admin"]
+        await self._sio.emit(event=event_name, data=payload, room=rooms)
+
+    async def _handle_media_event(self, event: FastAPIEvent[MediaUploadedEventBase]) -> None:
+        """Route an upload to the clients whose gallery can show it.
+
+        Shared and Public boards are visible to every user, so those uploads go to everyone.
+        Anything else — a private board or no board at all — goes to the uploader, the board's
+        owner (an admin may upload into someone else's private board), the users that board is
+        explicitly shared with, and admins, who see every board. The route resolves the share
+        list, so routing an event stays free of storage access.
+        """
+        event_name, event_data = event
+        payload = event_data.model_dump(mode="json")
+
+        if not self._is_multiuser_enabled():
+            await self._sio.emit(event=event_name, data=payload, room="admin")
+            return
+
+        if event_data.board_visibility in (BoardVisibility.Shared, BoardVisibility.Public):
+            await self._sio.emit(event=event_name, data=payload)
+            return
+
+        rooms = [f"user:{event_data.user_id}", "admin"]
+        if event_data.board_owner_id is not None and event_data.board_owner_id != event_data.user_id:
+            rooms.append(f"user:{event_data.board_owner_id}")
+        # A room the socket is already in costs nothing: python-socketio unions a room list by sid.
+        rooms.extend(f"user:{user_id}" for user_id in event_data.shared_user_ids)
+        await self._sio.emit(event=event_name, data=payload, room=rooms)
 
     async def _handle_bulk_image_download_event(self, event: FastAPIEvent[BulkDownloadEventBase]) -> None:
         event_name, event_data = event

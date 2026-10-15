@@ -1,11 +1,32 @@
 # Initially pulled from https://github.com/black-forest-labs/flux
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 from invokeai.backend.flux.model import FluxParams
-from invokeai.backend.flux.modules.autoencoder import AutoEncoderParams
 from invokeai.backend.model_manager.taxonomy import AnyVariant, Flux2VariantType, FluxVariantType
+
+
+@dataclass
+class AutoEncoderParams:
+    """The BFL description of the FLUX.1 autoencoder.
+
+    Kept after the hand-written `AutoEncoder` module was replaced by diffusers' `AutoencoderKL`,
+    because it is still the single source of truth for this VAE: `get_flux_vae_diffusers_config`
+    derives the diffusers keyword arguments from these fields, and the PiD nodes read
+    `scale_factor`/`shift_factor` off it to undo the FLUX latent scaling.
+    """
+
+    resolution: int
+    in_channels: int
+    ch: int
+    out_ch: int
+    ch_mult: list[int]
+    num_res_blocks: int
+    z_channels: int
+    scale_factor: float
+    shift_factor: float
 
 
 @dataclass
@@ -73,6 +94,85 @@ _flux_ae_params = AutoEncoderParams(
 
 def get_flux_ae_params() -> AutoEncoderParams:
     return _flux_ae_params
+
+
+# The two values the BFL parameters do not carry, taken from the published diffusers config
+# (`black-forest-labs/FLUX.1-{dev,schnell}::vae/config.json`, 774 bytes, identical in both):
+#
+#   sample_size        seeds `AutoencoderKL.tile_sample_min_size`. `AutoEncoderParams.resolution` is
+#                      256, the training crop, and is a different quantity -- using it would make the
+#                      default tile four times too small. Every call site that tiles sets the size
+#                      explicitly through `scoped_vae_tiling`, so this is the value used only when
+#                      nobody asks.
+#   use_(post_)quant_conv
+#                      False. The FLUX autoencoder has no quant convolutions at all; diffusers
+#                      defaults to True, which would add two 1x1 convolutions the checkpoint cannot
+#                      fill.
+_FLUX_VAE_SAMPLE_SIZE = 1024
+
+
+def is_flux_family_vae(vae: Any) -> bool:
+    """Whether this VAE encodes into the FLUX.1 latent space.
+
+    `isinstance(vae, AutoencoderKL)` used to answer this, because InvokeAI's own port of the BFL
+    autoencoder was a distinct class. It no longer is: the FLUX.1 VAE *is* an `AutoencoderKL`, and so
+    are SD 1.5, SDXL, SD 3.5, CogView 4 and Z-Image's. Three of those even share the 16-channel
+    latent width, so the channel count alone does not separate them either.
+
+    What does separate them is the normalisation, and that is also exactly what a caller of this
+    depends on: `pid_upscale` undoes `scale * (raw - shift)` with the constants from
+    `get_flux_ae_params()`, and a VAE that used different ones hands it a latent that means something
+    else. So the test is on the constants themselves -- Z-Image passes, because it is the same
+    autoencoder (`_name_or_path: "flux-dev"` in its published config); SD 3.5 does not, because its
+    `scaling_factor` is 1.5305.
+    """
+    config = getattr(vae, "config", None)
+    return config is not None and is_flux_family_vae_config(config)
+
+
+def is_flux_family_vae_config(config: Mapping[str, Any]) -> bool:
+    """`is_flux_family_vae` on the config alone, which is what identification has of a `vae/` folder.
+
+    Identification and the nodes share this test so that a folder installed under `flux` is always
+    one `flux_vae_encode` and `pid_upscale` accept.
+    """
+    params = get_flux_ae_params()
+    return (
+        config.get("latent_channels") == params.z_channels
+        and config.get("scaling_factor") == params.scale_factor
+        and config.get("shift_factor") == params.shift_factor
+    )
+
+
+def get_flux_vae_diffusers_config() -> dict[str, Any]:
+    """The FLUX.1 autoencoder as `AutoencoderKL.__init__` keyword arguments.
+
+    Derived from `_flux_ae_params` rather than transcribed from the published `vae/config.json`, so
+    the two descriptions of this autoencoder cannot drift apart -- `AutoEncoderParams` is still the
+    single source of truth, and is what the PiD nodes read for `scale_factor`/`shift_factor`.
+
+    Fields left to diffusers' own defaults (`act_fn`, `norm_num_groups`, `force_upcast`,
+    `mid_block_add_attention`, `latents_mean`, `latents_std`) match the published config today;
+    `tests/backend/model_manager/load/test_flux_vae_loader.py::TestTheConstructedConfig` pins the
+    fully constructed config against the published values, so a changed default in a future
+    diffusers breaks a test rather than the model.
+    """
+    params = get_flux_ae_params()
+    num_blocks = len(params.ch_mult)
+    return {
+        "in_channels": params.in_channels,
+        "out_channels": params.out_ch,
+        "down_block_types": ("DownEncoderBlock2D",) * num_blocks,
+        "up_block_types": ("UpDecoderBlock2D",) * num_blocks,
+        "block_out_channels": tuple(params.ch * mult for mult in params.ch_mult),
+        "layers_per_block": params.num_res_blocks,
+        "latent_channels": params.z_channels,
+        "sample_size": _FLUX_VAE_SAMPLE_SIZE,
+        "scaling_factor": params.scale_factor,
+        "shift_factor": params.shift_factor,
+        "use_quant_conv": False,
+        "use_post_quant_conv": False,
+    }
 
 
 _flux_transformer_params: dict[AnyVariant, FluxParams] = {

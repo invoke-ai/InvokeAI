@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional, Set, Tuple
 
 from PIL import Image
 
+from invokeai.app.util.path_safety import is_plain_filename
 from invokeai.app.util.thumbnails import make_thumbnail
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.taxonomy import ModelType
@@ -42,6 +43,13 @@ def extract_lora_metadata(
 
 def _process_preview_image(model_stem: str, model_dir: Path, model_key: str, model_images_path: Path) -> bool:
     """Find and process a preview image for the model, saving it to the model images store."""
+    # An install request may name its own key (`ModelRecordChanges.key`), and this writes a file named after it.
+    # `ModelImageFileStorageDisk` is not in play here - the path is built by hand - so the check has to happen
+    # here too, or a key like `../../foo` would write the thumbnail outside the model images folder.
+    if not is_plain_filename(model_key):
+        logger.warning(f"Refusing to write a preview image for invalid model key {model_key!r}")
+        return False
+
     image_extensions = [".png", ".jpg", ".jpeg", ".webp"]
 
     for ext in image_extensions:

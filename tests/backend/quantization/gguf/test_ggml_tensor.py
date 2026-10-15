@@ -152,3 +152,41 @@ def test_ggml_tensor_numpy_fallback_dequantize_uses_logical_shape():
     )
 
     assert t.get_dequantized_tensor().shape == logical_shape
+
+
+def _gguf_linear(in_features: int, out_features: int) -> torch.nn.Linear:
+    linear = torch.nn.Linear(in_features, out_features, bias=False)
+    linear.weight = torch.nn.Parameter(
+        quantize_tensor(torch.zeros(out_features, in_features), gguf.GGMLQuantizationType.Q8_0), requires_grad=False
+    )
+    return linear
+
+
+def test_the_shared_dequant_transient_counts_gguf_linears():
+    """Every denoise and encoder node sizes its reservation with `peak_dequant_transient_bytes`, so a GGUF
+    Linear -- dequantized into a full copy on every forward -- has to count there, as an int8 one does.
+    It is the largest layer that counts, whichever scheme it uses, since the layers run one at a time."""
+    from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
+    from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
+
+    gguf_model = torch.nn.Sequential(_gguf_linear(64, 128), _gguf_linear(64, 32))
+    largest = gguf_model[0].weight
+    gguf_peak = peak_dequant_transient_bytes(gguf_model, torch.float32)
+
+    # At least the copy of the larger layer, in the weight's own compute dtype, plus its packed bytes;
+    # never the sum of both layers.
+    assert gguf_peak > largest.tensor_shape.numel() * largest.compute_dtype.itemsize + largest.quantized_data.nbytes
+    assert gguf_peak == peak_dequant_transient_bytes(torch.nn.Sequential(gguf_model[0]), torch.float32)
+
+    # Whichever scheme holds the largest layer decides, in either order.
+    larger_int8 = Int8ConvrotLinear(
+        weight=torch.zeros(4096, 4096, dtype=torch.int8), weight_scale=torch.ones(4096, 1), convrot=False
+    )
+    mixed = torch.nn.Sequential(gguf_model[0], larger_int8)
+    assert peak_dequant_transient_bytes(mixed, torch.float32) == larger_int8.dequant_transient_bytes(torch.float32)
+    smaller_int8 = Int8ConvrotLinear(
+        weight=torch.zeros(8, 64, dtype=torch.int8), weight_scale=torch.ones(8, 1), convrot=False
+    )
+    assert smaller_int8.dequant_transient_bytes(torch.float32) < gguf_peak
+    assert peak_dequant_transient_bytes(torch.nn.Sequential(smaller_int8, gguf_model[0]), torch.float32) == gguf_peak
+    assert peak_dequant_transient_bytes(torch.nn.Sequential(torch.nn.Linear(64, 64)), torch.float32) == 0

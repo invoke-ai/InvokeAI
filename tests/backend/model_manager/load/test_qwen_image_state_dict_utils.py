@@ -3,7 +3,7 @@
 These freeze the checkpoint key-surgery that the loaders perform before instantiating a model,
 so a regression like the transformers-5.x one (where `_checkpoint_conversion_mapping` became
 `{}` and the `visual.* -> model.visual.*` remap was silently skipped) fails here instead of at
-the user's first load.
+the user's first load. The mapping now lives in the loader, since transformers 5.10 removed it.
 """
 
 import torch
@@ -12,7 +12,6 @@ from invokeai.backend.model_manager.load.model_loaders.qwen_image import (
     _build_qwen_image_transformer_config,
     _dequantize_comfyui_fp8,
     _remap_qwen_vl_checkpoint_keys,
-    _strip_comfyui_prefix,
     _strip_quantization_metadata,
 )
 from tests.backend.model_manager.load.state_dicts.qwen_vl_encoder_comfyui_keys import (
@@ -68,26 +67,6 @@ class TestRemapQwenVlCheckpointKeys:
 
         assert set(once.keys()) == set(twice.keys())
 
-    def test_fallback_when_transformers_mapping_is_empty(self, monkeypatch):
-        """Even if transformers stops providing `_checkpoint_conversion_mapping`, the remap fires.
-
-        transformers 5.x returns `{}` here; forcing that value pins the fallback that fixes the
-        original bug.
-        """
-        from transformers import Qwen2_5_VLForConditionalGeneration
-
-        monkeypatch.setattr(Qwen2_5_VLForConditionalGeneration, "_checkpoint_conversion_mapping", {})
-
-        remapped = _remap_qwen_vl_checkpoint_keys(
-            {
-                "visual.blocks.0.norm1.weight": torch.empty(1),
-                "model.layers.0.input_layernorm.weight": torch.empty(1),
-            }
-        )
-
-        assert "model.visual.blocks.0.norm1.weight" in remapped
-        assert "model.language_model.layers.0.input_layernorm.weight" in remapped
-
 
 class TestStripQuantizationMetadata:
     def test_drops_fp8_metadata_keeps_weights(self):
@@ -130,20 +109,6 @@ class TestDequantizeComfyuiFp8:
         assert count == 1
         expected = torch.tensor([[10.0, 10.0], [10.0, 10.0], [20.0, 20.0], [20.0, 20.0]])
         assert torch.allclose(sd["l.weight"], expected)
-
-
-class TestStripComfyuiPrefix:
-    def test_strips_diffusion_model_prefix(self):
-        sd = {
-            "model.diffusion_model.transformer_blocks.0.img_mod.1.weight": torch.empty(1),
-            "model.diffusion_model.img_in.weight": torch.empty(1),
-        }
-        out = _strip_comfyui_prefix(sd)
-        assert set(out.keys()) == {"transformer_blocks.0.img_mod.1.weight", "img_in.weight"}
-
-    def test_no_prefix_is_a_noop(self):
-        sd = {"transformer_blocks.0.x": torch.empty(1)}
-        assert _strip_comfyui_prefix(sd) is sd
 
 
 class TestBuildQwenImageTransformerConfig:

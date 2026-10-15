@@ -1,5 +1,7 @@
 """Unit tests for password utilities."""
 
+import pytest
+
 from invokeai.app.services.auth.password_utils import (
     get_password_strength,
     hash_password,
@@ -283,10 +285,14 @@ class TestGetPasswordStrength:
 class TestPasswordSecurityProperties:
     """Tests for security properties of password handling."""
 
+    @pytest.mark.slow
     def test_timing_attack_resistance_same_length(self):
         """Test that password verification takes similar time for correct and incorrect passwords.
 
         Note: This is a basic check. Real timing attack resistance requires more sophisticated testing.
+
+        Marked `slow`: 200 bcrypt verifications cost ~34s, and the ratio it asserts measures the
+        machine as much as the code, so it cannot hold on xdist workers sharing a CI runner.
         """
         import time
 
@@ -327,3 +333,15 @@ class TestPasswordSecurityProperties:
         assert hashed.startswith("$2")
         # Bcrypt hashes are 60 characters long
         assert len(hashed) == 60
+
+    def test_hashing_cost_stays_at_a_defensible_work_factor(self):
+        """The cost factor is what makes a stolen hash expensive to attack.
+
+        Read from the hash rather than timed: a passlib default drift or an explicit
+        `bcrypt__rounds` low enough to make hashing trivial is invisible to every other assertion
+        here -- the `$2`, length and round-trip checks all hold at cost factor 4 -- and a timing
+        threshold could not run alongside the rest of the suite on a shared CI core anyway.
+        """
+        rounds = int(hash_password("TestPassword123").split("$")[2])
+
+        assert rounds >= 12, f"bcrypt cost factor dropped to {rounds}"

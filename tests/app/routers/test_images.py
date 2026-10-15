@@ -1,6 +1,4 @@
 import os
-import sqlite3
-from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -15,9 +13,11 @@ from invokeai.app.api.routers.images import MAX_IMAGE_BATCH_SIZE
 from invokeai.app.api_app import app
 from invokeai.app.services.auth.token_service import TokenData
 from invokeai.app.services.board_records.board_records_common import BoardRecord
-from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
+from invokeai.app.services.image_records.image_records_common import ImageNamesResult, ImageRecordNotFoundException
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.errors import LockTimeoutError
 from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults
 
 
@@ -48,9 +48,16 @@ def test_download_images_from_board_id_empty_image_name_list(
 ) -> None:
     expected_board_name = "test"
 
-    def mock_get(*args, **kwargs):
-        return BoardRecord(board_id="12345", board_name=expected_board_name, created_at="None", updated_at="None")
-
+    mock_get = MagicMock(
+        return_value=BoardRecord(
+            board_id="12345",
+            board_name=expected_board_name,
+            user_id="system",
+            created_at="None",
+            updated_at="None",
+            archived=False,
+        )
+    )
     monkeypatch.setattr(mock_invoker.services.board_records, "get", mock_get)
     prepare_download_images_test(monkeypatch, mock_invoker)
 
@@ -58,11 +65,13 @@ def test_download_images_from_board_id_empty_image_name_list(
     json_response = response.json()
     assert response.status_code == 202
     assert json_response["bulk_download_item_name"] == "test.zip"
+    mock_get.assert_called_once_with("test")
 
 
 def prepare_download_images_test(monkeypatch: Any, mock_invoker: Invoker) -> None:
     mock_deps = MockApiDependencies(mock_invoker)
     monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers._access.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
     monkeypatch.setattr(
         "invokeai.app.api.routers.images.ApiDependencies.invoker.services.bulk_download.generate_item_id",
@@ -79,6 +88,7 @@ def prepare_image_maintenance_test(monkeypatch: Any, mock_invoker: Invoker) -> N
     mock_deps = MockApiDependencies(mock_invoker)
     mock_invoker.services.image_moves = MagicMock()
     mock_invoker.services.image_moves.is_maintenance_active.return_value = True
+    monkeypatch.setattr(mock_invoker.services.image_records, "exists", MagicMock(return_value=True))
     monkeypatch.setattr(mock_invoker.services.image_records, "get_user_id", MagicMock(return_value="system"))
     monkeypatch.setattr(mock_invoker.services.board_image_records, "get_board_for_image", MagicMock(return_value=None))
     monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", mock_deps)
@@ -210,6 +220,116 @@ def test_get_bulk_download_image_not_found(monkeypatch: Any, mock_invoker: Invok
     response = client.get("/api/v1/images/download/test.zip")
 
     assert response.status_code == 404
+
+
+def prepare_created_range_test(monkeypatch: Any, mock_invoker: Invoker) -> tuple[MagicMock, MagicMock]:
+    """Patches list endpoints' service calls with capturing mocks; returns (get_many, get_image_names)."""
+    mock_deps = MockApiDependencies(mock_invoker)
+    monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
+
+    mock_get_many = MagicMock(return_value=OffsetPaginatedResults(items=[], offset=0, limit=10, total=0))
+    mock_get_image_names = MagicMock(return_value=ImageNamesResult(image_names=[], starred_count=0, total_count=0))
+    monkeypatch.setattr(mock_invoker.services.images, "get_many", mock_get_many)
+    monkeypatch.setattr(mock_invoker.services.images, "get_image_names", mock_get_image_names)
+    return mock_get_many, mock_get_image_names
+
+
+@pytest.mark.parametrize("path", ["/api/v1/images/", "/api/v1/images/names"])
+@pytest.mark.parametrize("bad_value", ["next-tuesday", "2026-02-31"])
+@pytest.mark.parametrize("param", ["created_from", "created_to"])
+def test_list_endpoints_reject_invalid_created_range_dates(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient, path: str, bad_value: str, param: str
+) -> None:
+    """Malformed shapes and impossible calendar dates are both rejected with 422."""
+    prepare_created_range_test(monkeypatch, mock_invoker)
+
+    response = client.get(path, params={param: bad_value})
+
+    assert response.status_code == 422
+
+
+def test_list_image_dtos_forwards_created_range(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+    mock_get_many, _ = prepare_created_range_test(monkeypatch, mock_invoker)
+
+    response = client.get("/api/v1/images/", params={"created_from": "2026-07-01", "created_to": "2026-07-15"})
+
+    assert response.status_code == 200
+    kwargs = mock_get_many.call_args.kwargs
+    assert kwargs["created_from"] == "2026-07-01"
+    assert kwargs["created_to"] == "2026-07-15"
+
+
+def test_list_image_dtos_omits_created_range_by_default(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    mock_get_many, _ = prepare_created_range_test(monkeypatch, mock_invoker)
+
+    response = client.get("/api/v1/images/")
+
+    assert response.status_code == 200
+    kwargs = mock_get_many.call_args.kwargs
+    assert kwargs["created_from"] is None
+    assert kwargs["created_to"] is None
+
+
+def test_get_image_names_forwards_created_range(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+    _, mock_get_image_names = prepare_created_range_test(monkeypatch, mock_invoker)
+
+    response = client.get("/api/v1/images/names", params={"created_from": "2026-07-01", "created_to": "2026-07-15"})
+
+    assert response.status_code == 200
+    kwargs = mock_get_image_names.call_args.kwargs
+    assert kwargs["created_from"] == "2026-07-01"
+    assert kwargs["created_to"] == "2026-07-15"
+
+
+@pytest.mark.parametrize("path", ["/api/v1/images/", "/api/v1/images/names"])
+@pytest.mark.parametrize("board_id", ["all", "none"])
+def test_list_image_sentinel_scopes_skip_concrete_board_access_check(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient, path: str, board_id: str
+) -> None:
+    prepare_created_range_test(monkeypatch, mock_invoker)
+    access_check = MagicMock()
+    monkeypatch.setattr("invokeai.app.api.routers.images._assert_board_read_access", access_check)
+
+    response = client.get(path, params={"board_id": board_id})
+
+    assert response.status_code == 200
+    access_check.assert_not_called()
+
+
+@pytest.mark.parametrize("path", ["/api/v1/images/", "/api/v1/images/names"])
+def test_list_image_concrete_board_requires_read_access(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient, path: str
+) -> None:
+    prepare_created_range_test(monkeypatch, mock_invoker)
+    access_check = MagicMock()
+    monkeypatch.setattr("invokeai.app.api.routers.images._assert_board_read_access", access_check)
+
+    response = client.get(path, params={"board_id": "board-123"})
+
+    assert response.status_code == 200
+    access_check.assert_called_once()
+    assert access_check.call_args.args[0] == "board-123"
+
+
+@pytest.mark.parametrize("path", ["/api/v1/images/", "/api/v1/images/names"])
+def test_list_image_all_scope_combines_with_created_range(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient, path: str
+) -> None:
+    mock_get_many, mock_get_image_names = prepare_created_range_test(monkeypatch, mock_invoker)
+
+    response = client.get(
+        path,
+        params={"board_id": "all", "created_from": "2026-07-01", "created_to": "2026-07-15"},
+    )
+
+    assert response.status_code == 200
+    service_call = mock_get_image_names if path.endswith("/names") else mock_get_many
+    assert service_call.call_args.kwargs["board_id"] == "all"
+    assert service_call.call_args.kwargs["created_from"] == "2026-07-01"
+    assert service_call.call_args.kwargs["created_to"] == "2026-07-15"
 
 
 def test_get_bulk_download_image_image_deleted_after_response(
@@ -351,7 +471,7 @@ def test_delete_image_lookup_failure_returns_500_not_404(
 
 
 def test_delete_image_db_fault_during_lookup_returns_500_not_404(
-    monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
+    monkeypatch: Any, mock_invoker: Invoker, mock_sqlite_database: Database, tmp_path: Path, client: TestClient
 ) -> None:
     """A database fault while reading the record is a 500, driven through the real record store.
 
@@ -363,13 +483,13 @@ def test_delete_image_db_fault_during_lookup_returns_500_not_404(
     storage = prepare_delete_image_test(monkeypatch, mock_invoker, tmp_path)
     _save_deletable_image(mock_invoker, storage, "del.png")
 
-    # Break the table out from under the query. Any sqlite3.Error would do; this one is deterministic.
+    # Break the table out from under the query. Any database error would do; this one is deterministic.
     records = mock_invoker.services.image_records
-    records._db._conn.execute("ALTER TABLE images RENAME TO images_moved;")
+    mock_sqlite_database.sqlite.conn.execute("ALTER TABLE images RENAME TO images_moved;")
     try:
         response = client.delete("/api/v1/images/i/del.png")
     finally:
-        records._db._conn.execute("ALTER TABLE images_moved RENAME TO images;")
+        mock_sqlite_database.sqlite.conn.execute("ALTER TABLE images_moved RENAME TO images;")
 
     assert response.status_code == 500
     assert response.json()["detail"] == "Failed to delete image"
@@ -378,24 +498,35 @@ def test_delete_image_db_fault_during_lookup_returns_500_not_404(
     assert storage.get_path("del.png").exists()
 
 
-def test_delete_image_db_failure_returns_500_and_restores_files(
-    monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
+@pytest.mark.parametrize(
+    ("failure", "status", "detail"),
+    [
+        (LockTimeoutError("database is locked"), 503, "The database is busy; try again"),
+        (RuntimeError("disk I/O error"), 500, "Failed to delete image"),
+    ],
+)
+def test_delete_image_db_failure_is_reported_and_restores_files(
+    monkeypatch: Any,
+    mock_invoker: Invoker,
+    tmp_path: Path,
+    client: TestClient,
+    failure: Exception,
+    status: int,
+    detail: str,
 ) -> None:
-    from invokeai.app.services.image_records.image_records_common import ImageRecordDeleteException
-
     storage = prepare_delete_image_test(monkeypatch, mock_invoker, tmp_path)
     _save_deletable_image(mock_invoker, storage, "del.png")
 
     def failing_delete(image_name: str) -> None:
-        raise ImageRecordDeleteException()
+        raise failure
 
     monkeypatch.setattr(mock_invoker.services.image_records, "delete", failing_delete)
 
     response = client.delete("/api/v1/images/i/del.png")
 
-    # The route must report the failure, not a success-shaped empty payload.
-    assert response.status_code == 500
-    assert response.json()["detail"] == "Failed to delete image"
+    # The route must report the failure, not a success-shaped empty payload; a busy database as such.
+    assert response.status_code == status
+    assert response.json()["detail"] == detail
     # The staged files must be rolled back: image and thumbnail restored, record intact.
     assert storage.get_path("del.png").exists()
     assert storage.get_path("del.png", thumbnail=True).exists()
@@ -412,6 +543,7 @@ def prepare_image_batch_test(monkeypatch: Any, mock_invoker: Invoker) -> MagicMo
     monkeypatch.setattr(mock_invoker.services, "images", images_service)
     mock_invoker.services.image_moves = MagicMock()
     mock_invoker.services.image_moves.is_maintenance_active.return_value = False
+    monkeypatch.setattr(mock_invoker.services.image_records, "exists", MagicMock(return_value=True))
     monkeypatch.setattr(mock_invoker.services.board_image_records, "get_board_for_image", MagicMock(return_value=None))
 
     mock_deps = MockApiDependencies(mock_invoker)
@@ -589,27 +721,6 @@ def test_delete_does_not_report_a_name_that_never_existed(
     assert body["failed_images"] == []
 
 
-def test_image_records_get_does_not_disguise_a_storage_error_as_not_found(monkeypatch: Any) -> None:
-    """The narrowing itself: a sqlite3.Error out of the SELECT must stay a sqlite3.Error."""
-    from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
-
-    storage = SqliteImageRecordStorage.__new__(SqliteImageRecordStorage)
-
-    class _Cursor:
-        def execute(self, *args: Any, **kwargs: Any) -> None:
-            raise sqlite3.OperationalError("database disk image is malformed")
-
-    class _Db:
-        @contextmanager
-        def transaction(self):
-            yield _Cursor()
-
-    storage._db = _Db()  # pyright: ignore[reportAttributeAccessIssue]
-
-    with pytest.raises(sqlite3.OperationalError):
-        storage.get("a.png")
-
-
 def test_delete_still_reports_a_genuine_storage_failure(
     monkeypatch: Any, mock_invoker: Invoker, client: TestClient
 ) -> None:
@@ -664,6 +775,7 @@ def test_star_unstar_dedupes_repeated_names(
         "/api/v1/images/unstar",
         "/api/v1/images/images_by_names",
         "/api/v1/images/download",
+        "/api/v1/images/copy",
         "/api/v1/board_images/batch",
         "/api/v1/board_images/batch/delete",
     ],
@@ -739,6 +851,7 @@ def test_every_image_names_body_is_bounded(client: TestClient) -> None:
     assert sorted(checked) == [
         "/api/v1/board_images/batch",
         "/api/v1/board_images/batch/delete",
+        "/api/v1/images/copy",
         "/api/v1/images/delete",
         "/api/v1/images/download",
         "/api/v1/images/images_by_names",
