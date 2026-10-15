@@ -458,9 +458,9 @@ describe('schedulers per architecture', () => {
     const offered = (base: string) =>
       upscaleSchedulerOptions(model(base, 'main', base) as never).map((option) => option.value);
 
-    // A single scheduler hides the field.
-    expect(offered('flux')).toEqual(['euler']);
-    expect(offered('z-image')).toEqual(['euler']);
+    // LCM builds its own schedule from pure noise, so it would ignore Creativity.
+    expect(offered('flux')).toEqual(['euler', 'heun']);
+    expect(offered('z-image')).toEqual(['euler', 'heun']);
     expect(offered('anima')).toEqual(['euler', 'dpmpp_2m', 'dpmpp_2m_sde', 'er_sde']);
     // SD's pass adds noise with the scheduler itself, so every one of its schedulers starts there.
     expect(offered('sdxl')).toEqual(

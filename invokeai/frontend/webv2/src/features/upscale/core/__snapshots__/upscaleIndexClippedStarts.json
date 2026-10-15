@@ -490,7 +490,8 @@
       "er_sde"
     ],
     "z-image": [
-      "euler"
+      "euler",
+      "heun"
     ]
   }
 }
