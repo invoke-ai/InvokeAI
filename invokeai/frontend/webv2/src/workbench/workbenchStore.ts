@@ -651,6 +651,7 @@ const createPersistenceAdapter = (dispatch: WorkbenchDispatch, getState: () => W
       return { ok: true };
     },
     saveFailed: command('autosaveFailed', (error: string) => ({ error })),
+    saveNeedsAttention: command('autosaveNeedsAttention', (savedAt: string) => ({ savedAt })),
     savePending: command('autosavePending', (error: string) => ({ error })),
     saveScheduled: command('autosaveScheduled'),
     saveStarted: command('autosaveStarted'),
@@ -859,7 +860,18 @@ const recordDiagnosticForAction = (
       recordLogEvent(
         'warn',
         { area: 'autosave', namespace: 'persistence', projectId: nextState.activeProjectId },
-        { context: { reason: action.error }, message: 'Autosave needs attention', name: 'persistence.autosave-pending' }
+        { context: { reason: action.error }, message: 'Autosave will retry', name: 'persistence.autosave-pending' }
+      );
+      break;
+    }
+    case 'autosaveNeedsAttention': {
+      recordLogEvent(
+        'warn',
+        { area: 'autosave', namespace: 'persistence', projectId: nextState.activeProjectId },
+        {
+          message: 'Autosave needs attention: an open project has a sync conflict or an unsupported schema',
+          name: 'persistence.autosave-needs-attention',
+        }
       );
       break;
     }

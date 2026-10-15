@@ -198,6 +198,8 @@ const awaitDatabaseDeletion = async (
 };
 
 export interface DurableWorkbenchSaveResult {
+  /** An open project holds a conflict or schema refusal that only the user can resolve; it does not retry. */
+  awaitsDecision: boolean;
   conflicts: ProjectConflictInfo[];
   error: string | null;
   hasPendingChanges: boolean;
@@ -1476,8 +1478,13 @@ export const createDurableSyncedWorkbenchPersistence = (
         await api.saveSession(state, editorSessionId, draftLineages, owner.signal);
         assertOwner();
         lastSessionJson = sessionJson;
-      } catch {
+      } catch (error) {
         assertOwner();
+        logger.warn({
+          error,
+          message: 'The workbench session could not be saved; autosave will retry.',
+          name: 'persistence.session-save-failed',
+        });
         sessionSavePending = true;
         hasPending = true;
         return false;
@@ -3306,6 +3313,7 @@ export const createDurableSyncedWorkbenchPersistence = (
         const projectBoardAssignments = [...pendingBoardAssignments.values()];
         pendingBoardAssignments.clear();
         return {
+          awaitsDecision: conflicts.size > 0 || schemaRefusals.size > 0,
           conflicts: [...conflicts.values()],
           error:
             firstPushError instanceof Error

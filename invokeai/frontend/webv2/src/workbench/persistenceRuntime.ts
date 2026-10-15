@@ -21,6 +21,9 @@ export interface PersistenceAggregatePort {
   /** Persisted projects the canvas version gate refused; they are absent from the hydrated state. */
   reportRefusedProjects(refused: readonly RefusedWorkbenchProject[]): void;
   saveFailed(error: string): void;
+  /** The save finished, but an open project awaits a user decision before it can sync. */
+  saveNeedsAttention(savedAt: string): void;
+  /** The save could not finish and will retry on its own. */
   savePending(error: string): void;
   /** Persisted content changed and its save is scheduled: the workbench is dirty until that save is acknowledged. */
   saveScheduled(): void;
@@ -253,7 +256,8 @@ export const createWorkbenchPersistenceRuntime = ({
       }
       return;
     }
-    if (result.shouldRetry) {
+    // Pending work that awaits no decision (a draft staged while its push was in flight) is pushed by a retry.
+    if (result.shouldRetry || (result.hasPendingChanges && !result.awaitsDecision)) {
       const message = 'Autosave is pending and will retry.';
       aggregate.savePending(message);
       publish({ error: message, phase: 'idle' });
@@ -264,8 +268,8 @@ export const createWorkbenchPersistenceRuntime = ({
     failedRevision = null;
     scheduledRevision = null;
     retryAttempt = 0;
-    if (result.hasPendingChanges) {
-      aggregate.savePending('Autosave requires your attention.');
+    if (result.awaitsDecision) {
+      aggregate.saveNeedsAttention(result.snapshot.savedAt);
     } else {
       aggregate.saveSucceeded(result.snapshot.savedAt);
     }

@@ -538,6 +538,7 @@ type WorkbenchReducerAction =
   | { type: 'autosaveScheduled' }
   | { type: 'autosaveStarted' }
   | { type: 'autosavePending'; error: string }
+  | { type: 'autosaveNeedsAttention'; savedAt: string }
   | { type: 'autosaveSucceeded'; savedAt: string }
   | { type: 'autosaveFailed'; error: string }
   | { type: 'markAllNotificationsRead' }
@@ -5645,7 +5646,17 @@ export const __workbenchReducerInternal = (
       return { ...state, autosave: { status: 'saving' } };
     }
     case 'autosavePending': {
-      return { ...state, autosave: { error: action.error, status: 'error' } };
+      return {
+        ...state,
+        autosave: {
+          ...(state.autosave.lastSavedAt ? { lastSavedAt: state.autosave.lastSavedAt } : {}),
+          error: action.error,
+          status: 'pending',
+        },
+      };
+    }
+    case 'autosaveNeedsAttention': {
+      return { ...state, autosave: { lastSavedAt: action.savedAt, status: 'attention' } };
     }
     case 'autosaveSucceeded': {
       return { ...state, autosave: { lastSavedAt: action.savedAt, status: 'saved' } };
