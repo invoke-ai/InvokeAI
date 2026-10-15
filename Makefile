@@ -92,7 +92,7 @@ frontend-legacy-dev:
 
 # Install the shared contract generation tools
 frontend-api-install:
-	pnpm -C invokeai/frontend/api install --frozen-lockfile
+	cd invokeai/frontend/api && pnpm install --frozen-lockfile
 
 # Generate the OpenAPI Schema for the app
 frontend-openapi:
@@ -104,7 +104,7 @@ frontend-typegen:
 	set -o pipefail; cd invokeai/frontend/api && python ../../../scripts/generate_openapi_schema.py | pnpm typegen
 
 frontend-lint:
-	pnpm -C invokeai/frontend/webv2 lint
+	cd invokeai/frontend/webv2 && pnpm lint
 
 # Tag the release
 wheel:
