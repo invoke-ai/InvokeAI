@@ -5,6 +5,7 @@ import sys
 import textwrap
 
 import invokeai
+from invokeai.backend.util.host_platform import is_windows_arm64
 
 KNOWN_IMPORT_ERRORS = {
     "invokeai.backend.image_util.normal_bae.nets.submodules.efficientnet_repo.setup",
@@ -21,9 +22,11 @@ KNOWN_IMPORT_ERRORS = {
     "invokeai.backend.image_util.normal_bae.nets.submodules.efficientnet_repo.hubconf",
     "invokeai.backend.quantization.bnb_nf4",
     "invokeai.backend.quantization.bnb_llm_int8",
-    # mediapipe has no Windows ARM64 build; this module is imported lazily by the face nodes.
-    "invokeai.backend.image_util.mediapipe_face.mediapipe_face_common",
 }
+if is_windows_arm64():
+    # mediapipe has no Windows ARM64 build; this module is imported lazily by the face nodes. Everywhere
+    # else mediapipe is installed, so this module failing to import is a real regression.
+    KNOWN_IMPORT_ERRORS.add("invokeai.backend.image_util.mediapipe_face.mediapipe_face_common")
 
 
 def test_invokeai_imports():

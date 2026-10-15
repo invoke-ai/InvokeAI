@@ -20,6 +20,7 @@ from fontTools.ttLib import TTFont
 
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.invoker import Invoker
+from invokeai.backend.util.host_platform import is_windows_arm64
 
 
 def _save_image(mock_invoker: Invoker, image_name: str, user_id: str) -> None:
@@ -245,8 +246,9 @@ def test_list_user_fonts_reads_real_woff2_file(
     fonts_dir = mock_invoker.services.configuration.fonts_path
     fonts_dir.mkdir(parents=True, exist_ok=True)
     source_font = Path(__file__).parents[3] / "invokeai" / "assets" / "fonts" / "inter" / "Inter-Regular.ttf"
-    # fontTools encodes woff2 through brotli, which has no Windows ARM64 wheel (the `woff` extra is dropped there).
-    pytest.importorskip("brotli", reason="woff2 encoding needs brotli, absent on this platform")
+    if is_windows_arm64():
+        # fontTools encodes woff2 through brotli, which has no Windows ARM64 wheel (the `woff` extra is dropped there).
+        pytest.importorskip("brotli", reason="woff2 encoding needs brotli, which has no Windows ARM64 wheel")
     font = TTFont(source_font)
     try:
         font.flavor = "woff2"

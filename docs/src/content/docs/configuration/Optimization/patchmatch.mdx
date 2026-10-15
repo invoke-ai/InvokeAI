@@ -29,7 +29,7 @@ Unfortunately, installation can be somewhat challenging, as it requires some thi
 
       <Tabs syncKey="operatingSystem">
         <TabItem label="Windows" icon="seti:windows">
-          You're in luck! On Windows x64 PyPatchMatch will install automatically with no extra intervention. There is no prebuilt library for Windows on ARM64, where the `patchmatch` infill method is unavailable.
+          You're in luck! On Windows x64 PyPatchMatch will install automatically with no extra intervention. There is no prebuilt library for Windows on ARM64, where the `patchmatch` infill method is unavailable. Every startup there logs `ERROR patchmatch failed to load or compile`; that message is expected on ARM64 and can be ignored.
         </TabItem>
         <TabItem label="MacOS" icon="apple">
           You need to have opencv installed so that pypatchmatch can be built:
