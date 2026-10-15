@@ -11,6 +11,10 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+import pytest
+
+pytestmark = pytest.mark.platform_independent
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCANNED_ROOTS = ("invokeai", "scripts")
 DATABASE_LAYER = (
