@@ -762,7 +762,10 @@ class GraphExecutionState(BaseModel):
     def _mark_source_executed(self, source_node_id: str) -> None:
         was_executed = source_node_id in self.executed
         self._tx_add_set(self.executed, source_node_id)
-        self.__pydantic_private__["_runtime_state"].completed_source_ids_cache = None
+        source_node = self.graph.nodes.get(source_node_id)
+        if not was_executed and isinstance(source_node, (ForInvocation, IterateInvocation)):
+            # Axis completion can change whether sources under an unresolved If are inactive.
+            self.__pydantic_private__["_runtime_state"].completed_source_ids_cache = None
         self._tx_add_set(self._get_completed_source_ids_cache(), source_node_id)
         if source_node_id not in self.executed_history:
             self._tx_append_list(self.executed_history, source_node_id)
@@ -862,6 +865,7 @@ class GraphExecutionState(BaseModel):
         runtime.if_activation_controller_instance = None
         runtime.execution_materializer = None
         runtime.execution_runtime = None
+        runtime.completed_source_ids_cache = None
 
     def _materializer(self) -> _ExecutionMaterializer:
         runtime = self.__pydantic_private__["_runtime_state"]
@@ -2235,6 +2239,10 @@ class GraphExecutionState(BaseModel):
         self._prepared_if_exec_frames_by_source.pop(source_node_id, None)
         is_new = exec_node_id not in self.source_prepared_mapping.get(source_node_id, ())
         self._prepared_registry().register(exec_node_id, source_node_id)
+        if is_new and isinstance(
+            self.graph.nodes.get(source_node_id), (ForInvocation, IfInvocation, IterateInvocation)
+        ):
+            self.__pydantic_private__["_runtime_state"].completed_source_ids_cache = None
         if is_new and self._unexecuted_prepared_counts is not None and exec_node_id not in self.executed:
             counts = self._unexecuted_prepared_counts
             old_count = counts.get(source_node_id, 0)
@@ -2244,7 +2252,7 @@ class GraphExecutionState(BaseModel):
             )
             counts[source_node_id] = old_count + 1
         self._tx_discard_set(self.executed, source_node_id)
-        if self._completed_source_ids_cache is not None:
+        if is_new and self._completed_source_ids_cache is not None:
             self._tx_discard_set(self._completed_source_ids_cache, source_node_id)
         self._invalidate_loop_caches_for_source(source_node_id)
         if (

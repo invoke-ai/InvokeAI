@@ -734,8 +734,12 @@ Inactive branch-source retirement uses an event queue owned by one materializer.
 activation-dependent source IDs when the corresponding `If` resolves; an empty condition `Iterate` queues both branch
 source sets. Each preparation pass checks the queued sources in topological order rather than rescanning every
 unprepared source. The index is tied to source-graph identity, rebuilt from durable activation state after graph changes
-or state restore, and is not serialized. Queue mutations participate in execution-state rollback. This narrows
-retirement work; it does not bound other preparation or branch-context costs.
+or state restore, and is not serialized. Queue mutations participate in execution-state rollback. A process-local
+completed-source ID cache avoids rescanning the full `executed` set for every inactivity check; For/Iterate completion
+invalidates it because axis completion can change branch activity. Registering a new prepared execution evicts its
+source ID from the cached set; re-registering an existing execution does not. Graph edits or transaction rollback clear
+the derived cache. This bounds source-inactivity checks for serial If chains, but does not bound other preparation or
+branch-context costs.
 
 Literal-condition If fallback path inference uses the same ancestry context, including nested selected branches.
 

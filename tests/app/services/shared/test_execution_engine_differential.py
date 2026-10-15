@@ -10141,36 +10141,60 @@ def test_zip_collect_root_condition_deferred_consumer_failure_rolls_back_and_ret
         assert node is not None
         state.complete(node.id, node.invoke(Mock()))
 
-    before_after_ids = set(state.source_prepared_mapping.get("after", ()))
-    before_after_edges = tuple(
-        edge
-        for edge in state.execution_graph.edges
-        if state.prepared_source_mapping.get(edge.destination.node_id) == "after"
-    )
-    materializer = state._materializer()
-    initialize_execution_node = materializer._initialize_execution_node
+    root_if_exec_ids = [
+        exec_id for exec_id in state.source_prepared_mapping["if"] if state._get_iteration_path(exec_id) == ()
+    ]
+    assert len(root_if_exec_ids) == 1
+    state._materializer().create_execution_node("after", [("if", root_if_exec_ids[0])], iteration_path=())
+    assert len(state.source_prepared_mapping["after"]) == 1
 
-    def fail_after_second_frame(exec_node_id: str, input_edges: Any = None) -> None:
-        initialize_execution_node(exec_node_id, input_edges)
-        if state.prepared_source_mapping.get(exec_node_id) == "after" and state._get_iteration_path(exec_node_id) == (
-            1,
+    materializer_type = graph_module._ExecutionMaterializer
+    initialize_execution_node = materializer_type._initialize_execution_node
+    run_materialization_transaction = state._run_materialization_transaction
+    failed_transaction_snapshot: dict[str, Any] | None = None
+
+    def snapshot_state() -> dict[str, Any]:
+        return {
+            "nodes": {
+                node_id: copy.deepcopy(state.execution_graph.get_node(node_id))
+                for node_id in state.execution_graph.nodes
+            },
+            "edges": copy.deepcopy(tuple(state.execution_graph.edges)),
+            "prepared_source_mapping": copy.deepcopy(state.prepared_source_mapping),
+            "source_prepared_mapping": copy.deepcopy(state.source_prepared_mapping),
+            "prepared_iteration_paths": copy.deepcopy(state.prepared_iteration_paths),
+            "indegree": copy.deepcopy(state.indegree),
+            "execution_tokens": copy.deepcopy(state.execution_tokens),
+            "gates": copy.deepcopy(state._generic_runtime().gates),
+        }
+
+    def capture_failed_transaction(operation: Any) -> Any:
+        nonlocal failed_transaction_snapshot
+        transaction_snapshot = snapshot_state() if state._apply_transaction is None else None
+        try:
+            return run_materialization_transaction(operation)
+        except RuntimeError as error:
+            if transaction_snapshot is not None and str(error) == "injected deferred consumer initialization failure":
+                failed_transaction_snapshot = transaction_snapshot
+            raise
+
+    def fail_after_second_frame(materializer: Any, exec_node_id: str, input_edges: Any = None) -> None:
+        initialize_execution_node(materializer, exec_node_id, input_edges)
+        if (
+            materializer._state is state
+            and state.prepared_source_mapping.get(exec_node_id) == "after"
+            and state._get_iteration_path(exec_node_id) == (1,)
         ):
             raise RuntimeError("injected deferred consumer initialization failure")
 
-    monkeypatch.setattr(materializer, "_initialize_execution_node", fail_after_second_frame)
+    monkeypatch.setattr(materializer_type, "_initialize_execution_node", fail_after_second_frame)
+    monkeypatch.setattr(state, "_run_materialization_transaction", capture_failed_transaction)
     with pytest.raises(RuntimeError, match="injected deferred consumer initialization failure"):
         while (node := state.next()) is not None:
             state.complete(node.id, node.invoke(Mock()))
 
-    assert state.source_prepared_mapping.get("after", set()) == before_after_ids
-    assert (
-        tuple(
-            edge
-            for edge in state.execution_graph.edges
-            if state.prepared_source_mapping.get(edge.destination.node_id) == "after"
-        )
-        == before_after_edges
-    )
+    assert failed_transaction_snapshot is not None, "injected failure did not occur in a materialization transaction"
+    assert snapshot_state() == failed_transaction_snapshot
 
     monkeypatch.undo()
     trace, state = _run_graph(state, force_compatibility_scheduler=force_compatibility_scheduler)
