@@ -36,7 +36,13 @@ import { Trans } from 'react-i18next';
 import type { ApiTagDescription } from 'services/api';
 import { api, LIST_TAG } from 'services/api';
 import { imagesApi } from 'services/api/endpoints/images';
-import { modelsApi } from 'services/api/endpoints/models';
+import {
+  clearModelInstallPause,
+  clearModelInstallPauseEvents,
+  isModelInstallPaused,
+  modelsApi,
+  recordModelInstallPaused,
+} from 'services/api/endpoints/models';
 import { queueApi } from 'services/api/endpoints/queue';
 import { getEventScope } from 'services/events/eventScope';
 import { buildOnForeignInvocationComplete, buildOnInvocationComplete } from 'services/events/onInvocationComplete';
@@ -325,6 +331,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.debug({ data }, 'Model install started');
 
     const { id } = data;
+    clearModelInstallPause(id);
     const installs = selectModelInstalls(getState()).data;
 
     if (!installs?.find((install) => install.id === id)) {
@@ -346,6 +353,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.debug({ data }, 'Model install download started');
 
     const { id } = data;
+    clearModelInstallPause(id);
     const installs = selectModelInstalls(getState()).data;
 
     if (!installs?.find((install) => install.id === id)) {
@@ -378,7 +386,9 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
           if (modelImport) {
             modelImport.bytes = bytes;
             modelImport.total_bytes = total_bytes;
-            modelImport.status = 'downloading';
+            if (!isModelInstallPaused(id)) {
+              modelImport.status = 'downloading';
+            }
           }
           return draft;
         })
@@ -390,6 +400,29 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.debug({ data }, 'Model install downloads complete');
 
     const { id } = data;
+    clearModelInstallPause(id);
+    const installs = selectModelInstalls(getState()).data;
+
+    if (!installs?.find((install) => install.id === id)) {
+      dispatch(api.util.invalidateTags([{ type: 'ModelInstalls' }]));
+    } else {
+      dispatch(
+        modelsApi.util.updateQueryData('listModelInstalls', undefined, (draft) => {
+          const modelImport = draft.find((m) => m.id === id);
+          if (modelImport && !isModelInstallPaused(id)) {
+            modelImport.status = 'downloads_done';
+          }
+          return draft;
+        })
+      );
+    }
+  });
+
+  socket.on('model_install_paused', (data) => {
+    log.debug({ data }, 'Model install paused');
+
+    const { id } = data;
+    recordModelInstallPaused(id);
     const installs = selectModelInstalls(getState()).data;
 
     if (!installs?.find((install) => install.id === id)) {
@@ -399,7 +432,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
         modelsApi.util.updateQueryData('listModelInstalls', undefined, (draft) => {
           const modelImport = draft.find((m) => m.id === id);
           if (modelImport) {
-            modelImport.status = 'downloads_done';
+            modelImport.status = 'paused';
           }
           return draft;
         })
@@ -411,6 +444,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.debug({ data }, 'Model install complete');
 
     const { id, config } = data;
+    clearModelInstallPause(id);
 
     if (config.type === 'unknown') {
       toast({
@@ -456,12 +490,16 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   const onModelInstallError = buildOnModelInstallError(getState, dispatch);
-  socket.on('model_install_error', onModelInstallError);
+  socket.on('model_install_error', (data) => {
+    clearModelInstallPause(data.id);
+    onModelInstallError(data);
+  });
 
   socket.on('model_install_cancelled', (data) => {
     log.warn({ data }, 'Model install cancelled');
 
     const { id } = data;
+    clearModelInstallPause(id);
     const installs = selectModelInstalls(getState()).data;
 
     if (!installs?.find((install) => install.id === id)) {
@@ -1050,6 +1088,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     // Ends this socket's session for the completion handler: its queued refetches are dropped, and
     // anything it already has in flight is barred from dispatching into whatever session replaces
     // this one.
+    clearModelInstallPauseEvents();
     onInvocationComplete.dispose();
   };
 };

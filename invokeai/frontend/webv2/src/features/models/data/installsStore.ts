@@ -90,6 +90,8 @@ let nextOutcomeId = 1;
 
 const progressByJobId = createKeyedTransientStore<number, InstallDownloadProgress>();
 const rateSamplesByJobId = new Map<number, { bytes: number; at: number }>();
+const pauseEventSequenceByJobId = new Map<number, number>();
+let nextPauseEventSequence = 1;
 
 const refreshFlight = createTrailingSingleFlight();
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
@@ -111,6 +113,8 @@ registerAccountOwnedResource({
     nextOutcomeId = 1;
     progressByJobId.clear();
     rateSamplesByJobId.clear();
+    pauseEventSequenceByJobId.clear();
+    nextPauseEventSequence = 1;
     outcomesStore.setSnapshot(EMPTY_INSTALL_OUTCOMES);
     store.setSnapshot(EMPTY_INSTALLS_SNAPSHOT);
   },
@@ -119,6 +123,7 @@ registerAccountOwnedResource({
 
 export const refreshInstalls = (owner: AccountScope = captureAccountScope()): Promise<void> =>
   refreshFlight.run(() => {
+    const pauseEventSequenceAtStart = new Map(pauseEventSequenceByJobId);
     store.patchSnapshot({ status: store.getSnapshot().status === 'loaded' ? 'loaded' : 'loading' });
 
     return listModelInstalls(owner.signal)
@@ -128,6 +133,44 @@ export const refreshInstalls = (owner: AccountScope = captureAccountScope()): Pr
         }
 
         const activeJobIds = new Set(jobs.map((job) => job.id));
+        const reconciledJobs = jobs.map((job) => {
+          const pauseEventSequence = pauseEventSequenceByJobId.get(job.id);
+
+          if (pauseEventSequence === undefined) {
+            return job;
+          }
+
+          if (job.status === 'paused') {
+            pauseEventSequenceByJobId.delete(job.id);
+            return job;
+          }
+
+          if (pauseEventSequence > (pauseEventSequenceAtStart.get(job.id) ?? 0)) {
+            // This request predates the pause event; its active status is stale.
+            return { ...job, status: 'paused' as const };
+          }
+
+          // A request started after the event, so its non-paused status is authoritative.
+          pauseEventSequenceByJobId.delete(job.id);
+          return job;
+        });
+
+        for (const [jobId, pauseEventSequence] of pauseEventSequenceByJobId) {
+          if (activeJobIds.has(jobId)) {
+            continue;
+          }
+
+          if (pauseEventSequence > (pauseEventSequenceAtStart.get(jobId) ?? 0)) {
+            const locallyKnownJob = store.getSnapshot().jobs.find((job) => job.id === jobId);
+
+            if (locallyKnownJob) {
+              reconciledJobs.push({ ...locallyKnownJob, status: 'paused' });
+              activeJobIds.add(jobId);
+            }
+          } else {
+            pauseEventSequenceByJobId.delete(jobId);
+          }
+        }
 
         for (const [jobId] of progressByJobId.entries()) {
           if (!activeJobIds.has(jobId)) {
@@ -143,7 +186,7 @@ export const refreshInstalls = (owner: AccountScope = captureAccountScope()): Pr
           dismissedJobIds:
             retainedDismissed.length === dismissedJobIds.size ? dismissedJobIds : new Set(retainedDismissed),
           error: null,
-          jobs,
+          jobs: reconciledJobs,
           status: 'loaded',
         });
       })
@@ -199,6 +242,10 @@ const scheduleCatalogRefresh = (): void => {
 
 /** Optimistically replace one job (e.g. after pause/resume API calls). */
 export const replaceInstallJob = (job: ModelInstallJob): void => {
+  if (job.status !== 'paused') {
+    pauseEventSequenceByJobId.delete(job.id);
+  }
+
   store.patchSnapshot({
     jobs: store.getSnapshot().jobs.map((existing) => (existing.id === job.id ? job : existing)),
   });
@@ -290,6 +337,7 @@ export const MODEL_INSTALL_SOCKET_EVENTS = [
   'model_install_download_started',
   'model_install_download_progress',
   'model_install_downloads_complete',
+  'model_install_paused',
   'model_install_complete',
   'model_install_error',
   'model_install_cancelled',
@@ -313,6 +361,17 @@ export const handleModelInstallSocketEvent = (
     return;
   }
 
+  if (
+    event === 'model_install_started' ||
+    event === 'model_install_download_started' ||
+    event === 'model_install_downloads_complete' ||
+    event === 'model_install_complete' ||
+    event === 'model_install_error' ||
+    event === 'model_install_cancelled'
+  ) {
+    pauseEventSequenceByJobId.delete(data.id);
+  }
+
   if (event === 'model_install_download_progress') {
     const bytes = data.bytes ?? 0;
 
@@ -332,6 +391,23 @@ export const handleModelInstallSocketEvent = (
       // Bytes are flowing, so the REST snapshot's `waiting` is stale. Patch
       // locally so download controls (pause/cancel) appear immediately.
       replaceInstallJob({ ...job, status: 'downloading' });
+    }
+
+    return;
+  }
+
+  if (event === 'model_install_paused') {
+    const job = store.getSnapshot().jobs.find((candidate) => candidate.id === data.id);
+    pauseEventSequenceByJobId.set(data.id, nextPauseEventSequence++);
+
+    if (job) {
+      replaceInstallJob({ ...job, status: 'paused' });
+      // A list request started before this event may still return the stale active status.
+      if (refreshFlight.inflight()) {
+        void refreshInstalls(owner);
+      }
+    } else {
+      scheduleRefresh();
     }
 
     return;

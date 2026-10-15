@@ -73,6 +73,24 @@ type InstallModelResponse = paths['/api/v2/models/install']['post']['responses']
 type ListModelInstallsResponse =
   paths['/api/v2/models/install']['get']['responses']['200']['content']['application/json'];
 
+let modelInstallPauseEventSequence = 0;
+const modelInstallPauseSequencesById = new Map<number, number>();
+const modelInstallListRequestSequences = new Map<string, number>();
+
+export const recordModelInstallPaused = (id: number) => {
+  modelInstallPauseSequencesById.set(id, ++modelInstallPauseEventSequence);
+};
+
+export const clearModelInstallPause = (id: number) => {
+  modelInstallPauseSequencesById.delete(id);
+};
+
+export const clearModelInstallPauseEvents = () => {
+  modelInstallPauseSequencesById.clear();
+};
+
+export const isModelInstallPaused = (id: number) => modelInstallPauseSequencesById.has(id);
+
 type CancelModelInstallResponse =
   paths['/api/v2/models/install/{id}']['delete']['responses']['201']['content']['application/json'];
 type PauseModelInstallResponse = ModelInstallJob;
@@ -284,6 +302,52 @@ export const modelsApi = api.injectEndpoints({
         return {
           url: buildModelsUrl('install'),
         };
+      },
+      async onQueryStarted(_, { dispatch, requestId, queryFulfilled }) {
+        const requestSequence = modelInstallPauseEventSequence;
+        modelInstallListRequestSequences.set(requestId, requestSequence);
+
+        try {
+          const { data } = await queryFulfilled;
+          const pauseEventsDuringRequest = [...modelInstallPauseSequencesById].filter(
+            ([, pauseSequence]) => pauseSequence > requestSequence
+          );
+
+          if (pauseEventsDuringRequest.length > 0) {
+            dispatch(api.util.invalidateTags([{ type: 'ModelInstalls' }]));
+          }
+
+          for (const [id, pauseSequence] of modelInstallPauseSequencesById) {
+            const install = data.find((candidate) => candidate.id === id);
+            if (pauseSequence <= requestSequence && install?.status !== 'paused') {
+              modelInstallPauseSequencesById.delete(id);
+            }
+          }
+        } catch {
+          // A failed request is not authoritative and must not clear pause state.
+        } finally {
+          modelInstallListRequestSequences.delete(requestId);
+        }
+      },
+      merge(currentCache, incoming, { requestId }) {
+        const requestSequence = modelInstallListRequestSequences.get(requestId) ?? modelInstallPauseEventSequence;
+        const pausedSinceRequestStarted = new Set(
+          [...modelInstallPauseSequencesById]
+            .filter(([, pauseSequence]) => pauseSequence > requestSequence)
+            .map(([id]) => id)
+        );
+        const incomingIds = new Set(incoming.map((install) => install.id));
+        const merged = incoming.map((install) =>
+          pausedSinceRequestStarted.has(install.id) ? { ...install, status: 'paused' as const } : install
+        );
+
+        for (const currentInstall of currentCache) {
+          if (pausedSinceRequestStarted.has(currentInstall.id) && !incomingIds.has(currentInstall.id)) {
+            merged.push({ ...currentInstall, status: 'paused' });
+          }
+        }
+
+        return merged;
       },
       providesTags: ['ModelInstalls'],
     }),
