@@ -25,6 +25,8 @@ const model = (key: string, type: string, base: string, name = key): ModelConfig
   source: key,
   source_type: 'path',
   type,
+  // Every installed CLIP Embed carries its variant; FLUX.1 takes only CLIP-L.
+  ...(type === 'clip_embed' ? { variant: 'large' } : {}),
 });
 
 const createValues = (base: 'sd-1' | 'sdxl') => {
