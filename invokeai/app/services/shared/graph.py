@@ -256,6 +256,7 @@ class _GraphExecutionStateRuntime:
         "legacy_execution_snapshot",
         "legacy_snapshot_loaded",
         "fresh_flat_if_activation",
+        "if_iteration_axes_validated",
     )
 
     def __init__(self) -> None:
@@ -302,6 +303,7 @@ class _GraphExecutionStateRuntime:
         self.legacy_execution_snapshot = True
         self.legacy_snapshot_loaded = False
         self.fresh_flat_if_activation: Optional[bool] = None
+        self.if_iteration_axes_validated = False
 
 
 class GraphExecutionState(BaseModel):
@@ -537,6 +539,7 @@ class GraphExecutionState(BaseModel):
         self._prepared_if_exec_ids_by_source_and_frame = {}
         self._prepared_if_exec_frames_by_source = {}
         self._prepared_if_exec_indexed_sources = set()
+        self._selected_if_frames_for_preparation = {}
         self._execution_runtime = None
         self._source_graph_flat = None
         self._execution_graph_flat = None
@@ -598,6 +601,15 @@ class GraphExecutionState(BaseModel):
         """Return indexed If frames for one source."""
         self._prepared_if_exec_ids(source_node_id, ())
         return self._prepared_if_exec_frames_by_source.get(source_node_id, ())
+
+    def _invalidate_selected_if_frames_for_preparation(self, source_node_id: Optional[str] = None) -> None:
+        """Clear selected-frame results after prepared If executions or branch choices change."""
+        if source_node_id is None:
+            self._selected_if_frames_for_preparation.clear()
+            return
+        for key in tuple(self._selected_if_frames_for_preparation):
+            if key[0] == source_node_id:
+                self._selected_if_frames_for_preparation.pop(key, None)
 
     def _if_activation_controller(self) -> _IfActivationController:
         if self._if_activation_controller_instance is None:
@@ -698,11 +710,15 @@ class GraphExecutionState(BaseModel):
             )
 
     def _mark_source_executed(self, source_node_id: str) -> None:
+        was_executed = source_node_id in self.executed
         self._tx_add_set(self.executed, source_node_id)
         self.__pydantic_private__["_runtime_state"].completed_source_ids_cache = None
         self._tx_add_set(self._get_completed_source_ids_cache(), source_node_id)
         if source_node_id not in self.executed_history:
             self._tx_append_list(self.executed_history, source_node_id)
+        materializer = self.__pydantic_private__["_runtime_state"].execution_materializer
+        if not was_executed and materializer is not None:
+            materializer._queue_empty_condition_retirements(source_node_id)
 
     def _discard_source_executed(self, source_node_id: str) -> None:
         self._tx_discard_set(self.executed, source_node_id)
@@ -781,8 +797,10 @@ class GraphExecutionState(BaseModel):
 
     def _invalidate_source_graph_cache(self) -> None:
         runtime = self.__pydantic_private__["_runtime_state"]
+        self._invalidate_selected_if_frames_for_preparation()
         runtime.source_graph_flat = None
         runtime.fresh_flat_if_activation = None
+        runtime.if_iteration_axes_validated = False
         runtime.for_source_by_return_id = None
         runtime.if_branch_sources_cache = {}
         runtime.if_activation_dependencies_by_source = {}
@@ -2158,6 +2176,7 @@ class GraphExecutionState(BaseModel):
         return dependency.cancel_child(str(child_item_id), error_message)
 
     def _register_prepared_exec_node(self, exec_node_id: str, source_node_id: str) -> None:
+        self._invalidate_selected_if_frames_for_preparation(source_node_id)
         self._prepared_if_exec_indexed_sources.discard(source_node_id)
         for key in tuple(self._prepared_if_exec_ids_by_source_and_frame):
             if key[0] == source_node_id:
@@ -3198,6 +3217,7 @@ class GraphExecutionState(BaseModel):
     def _invalidate_loop_caches_for_exec_node(self, exec_node_id: str) -> None:
         source_node_id = self.prepared_source_mapping.get(exec_node_id)
         if source_node_id is not None:
+            self._invalidate_selected_if_frames_for_preparation(source_node_id)
             self._prepared_if_exec_indexed_sources.discard(source_node_id)
             for key in tuple(self._prepared_if_exec_ids_by_source_and_frame):
                 if key[0] == source_node_id:
@@ -3374,6 +3394,7 @@ class GraphExecutionState(BaseModel):
         self._record_compatibility_activation_token(exec_node_id, selected_field)
         assert isinstance(scheduler, _ExecutionScheduler)
         source_if_id = self._prepared_registry().get_source_node_id(exec_node_id)
+        self._invalidate_selected_if_frames_for_preparation(source_if_id)
         iteration_path = self._get_iteration_path(exec_node_id)
         activation_dependents = self._get_activation_dependents_for_if(source_if_id, iteration_path)
         scheduler._discard_rejected_activation_nodes(activation_dependents)
@@ -3510,6 +3531,7 @@ class GraphExecutionState(BaseModel):
         self._if_activation_dependents_index_complete = False
         self._prepared_if_exec_ids_by_source_and_frame = {}
         self._prepared_if_exec_indexed_sources = set()
+        self._selected_if_frames_for_preparation = {}
         self._source_graph_flat = None
         self._execution_graph_flat = None
         self._completed_source_ids_cache = None
@@ -3874,6 +3896,11 @@ class GraphExecutionState(BaseModel):
 
     def next(self) -> Optional[BaseInvocation]:
         """Gets the next node ready to execute."""
+
+        runtime = self.__pydantic_private__["_runtime_state"]
+        if not runtime.if_iteration_axes_validated:
+            graph_if_runtime.validate_if_iteration_axes(self)
+            runtime.if_iteration_axes_validated = True
 
         # TODO: enable multiple nodes to execute simultaneously by tracking currently executing nodes
         #       possibly with a timeout?

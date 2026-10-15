@@ -23,7 +23,6 @@ class _IteratorAncestry:
         self._source_graph = source_graph
         self._iterator_graph = iterator_graph
         self._has_iterator_ancestor: dict[str, bool] | None = None
-        self._iterator_ancestors: dict[str, frozenset[str]] = {}
         self._ordered_iterator_ancestors: dict[str, tuple[str, ...]] = {}
         self.effective_iteration_paths_by_edge: dict[tuple[str, str], set[tuple[int, ...]]] = {}
 
@@ -52,20 +51,6 @@ class _IteratorAncestry:
         if node_id not in self._has_iterator_ancestor:
             raise nx.NetworkXError(f"The node {node_id} is not in the digraph.")
         return self._has_iterator_ancestor[node_id]
-
-    def get_iterator_ancestors(self, node_id: str) -> frozenset[str]:
-        self.has_iterator_ancestor(node_id)
-        if node_id not in self._iterator_ancestors:
-            assert self._iterator_graph is not None
-            ancestors = {
-                ancestor_id
-                for ancestor_id in nx.ancestors(self._iterator_graph, node_id)
-                if isinstance(self._state.graph.get_node(ancestor_id), (ForInvocation, IterateInvocation))
-            }
-            if isinstance(self._state.graph.get_node(node_id), (ForInvocation, IterateInvocation)):
-                ancestors.add(node_id)
-            self._iterator_ancestors[node_id] = frozenset(ancestors)
-        return self._iterator_ancestors[node_id]
 
     def get_ordered_iterator_ancestors(self, node_id: str) -> list[str]:
         """Return open iterator axes in outer-to-inner, input-port order."""

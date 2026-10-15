@@ -430,6 +430,7 @@ class _GenericGraphSchedulerAdapter:
         self._state._tx_set_mapping(runtime.resolved_if_exec_branches, exec_node_id, selected_field)
         self._state._record_compatibility_activation_token(exec_node_id, selected_field)
         source_if_id = self._state._prepared_registry().get_source_node_id(exec_node_id)
+        self._state._invalidate_selected_if_frames_for_preparation(source_if_id)
         iteration_path = self._state._get_iteration_path(exec_node_id)
         self._discard_rejected_nodes(self._state._get_activation_dependents_for_if(source_if_id, iteration_path))
         self._sync_indegree()

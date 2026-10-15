@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
 
 class UnsupportedSharedIfCollectBranchesError(ValueError):
-    """Raised when one sibling Collect-backed Iterate must serve multiple If frames."""
+    """Raised when one sibling Collect-backed Iterate must serve multiple If owners."""
 
 
 class _ExecutionNodeBuilder:
@@ -48,8 +48,15 @@ class _ExecutionNodeBuilder:
     def __init__(self, state: "GraphExecutionState") -> None:
         self._state = state
         self._has_if_nodes = any(isinstance(node, IfInvocation) for node in state.graph.nodes.values())
+        self._activation_candidate_graph: Optional[nx.DiGraph] = None
+        self._activation_candidate_topological_order: tuple[str, ...] = ()
+        self._activation_candidate_topological_index: dict[str, int] = {}
+        self._activation_sources_by_dependency: dict[tuple[str, str], set[str]] = {}
+        self._empty_condition_if_sources: dict[str, tuple[str, ...]] = {}
+        self._pending_activation_retirement_candidates: set[str] = set()
+        self._activation_retirement_rebuild_required = False
         self._iteration_axes_by_source: dict[str, tuple[str, ...]] = {}
-        self._sibling_iterate_if_collect_branches: Optional[dict[str, tuple[str, str]]] = None
+        self._sibling_iterate_if_collect_branches: Optional[dict[str, tuple[str, Optional[str]]]] = None
         self._iteration_relationship_graph: Optional[nx.DiGraph] = None
         self._iteration_relationship_topological_index: Optional[dict[str, int]] = None
         # Keyed by the identity of the cached flat source graph, which every graph edit replaces.
@@ -237,6 +244,99 @@ class _ExecutionNodeBuilder:
                     )
                 )
         return new_edges
+
+    def _ensure_activation_candidate_index(self, graph: "nx.DiGraph") -> None:
+        if self._activation_candidate_graph is graph:
+            return
+
+        self._activation_candidate_graph = graph
+        self._has_if_nodes = any(isinstance(node, IfInvocation) for node in self._state.graph.nodes.values())
+        self._activation_candidate_topological_order = ()
+        self._activation_candidate_topological_index = {}
+        self._activation_sources_by_dependency = {}
+        self._empty_condition_if_sources = {}
+        self._pending_activation_retirement_candidates.clear()
+        if not self._has_if_nodes:
+            self._activation_retirement_rebuild_required = False
+            return
+
+        self._activation_candidate_topological_order = tuple(nx.topological_sort(graph))
+        self._activation_candidate_topological_index = {
+            source_node_id: index for index, source_node_id in enumerate(self._activation_candidate_topological_order)
+        }
+        self._activation_sources_by_dependency = {}
+        self._empty_condition_if_sources = {}
+        self._pending_activation_retirement_candidates.clear()
+        for source_node_id in self._activation_candidate_topological_order:
+            for dependency in self._state._get_source_activation_dependencies(source_node_id):
+                self._activation_sources_by_dependency.setdefault((dependency.owner_id, dependency.branch), set()).add(
+                    source_node_id
+                )
+        for if_node_id in graph.nodes:
+            if not isinstance(self._state.graph.get_node(if_node_id), IfInvocation):
+                continue
+            condition_edges = self._state.graph._get_input_edges(if_node_id, "condition")
+            if len(condition_edges) != 1:
+                continue
+            condition_source_id = condition_edges[0].source.node_id
+            if isinstance(self._state.graph.get_node(condition_source_id), IterateInvocation):
+                self._empty_condition_if_sources.setdefault(condition_source_id, ())
+                self._empty_condition_if_sources[condition_source_id] += (if_node_id,)
+
+        self._activation_retirement_rebuild_required = True
+        self._rebuild_activation_retirement_candidates()
+
+    def _rebuild_activation_retirement_candidates(self) -> None:
+        self._pending_activation_retirement_candidates.clear()
+        registry = self._state._prepared_registry()
+        opposite_branch = {"true_input": "false_input", "false_input": "true_input"}
+        for exec_node_id, selected_branch in self._state._resolved_if_exec_branches.items():
+            if selected_branch not in opposite_branch:
+                continue
+            owner_id = registry.get_source_node_id(exec_node_id)
+            self._pending_activation_retirement_candidates.update(
+                self._activation_sources_by_dependency.get((owner_id, opposite_branch[selected_branch]), ())
+            )
+        for condition_source_id, if_node_ids in self._empty_condition_if_sources.items():
+            if condition_source_id not in self._state.executed or self._state.source_prepared_mapping.get(
+                condition_source_id
+            ):
+                continue
+            for if_node_id in if_node_ids:
+                self._pending_activation_retirement_candidates.update(
+                    self._activation_sources_by_dependency.get((if_node_id, "true_input"), ())
+                )
+                self._pending_activation_retirement_candidates.update(
+                    self._activation_sources_by_dependency.get((if_node_id, "false_input"), ())
+                )
+        self._activation_retirement_rebuild_required = False
+
+    def _queue_rejected_activation_branch(self, if_node_id: str, selected_branch: str) -> None:
+        opposite_branch = {"true_input": "false_input", "false_input": "true_input"}.get(selected_branch)
+        if opposite_branch is None:
+            return
+        self._ensure_activation_candidate_index(self._state._get_source_graph_flat())
+        for source_node_id in self._activation_sources_by_dependency.get((if_node_id, opposite_branch), ()):
+            self._state._tx_add_set(self._pending_activation_retirement_candidates, source_node_id)
+
+    def _queue_empty_condition_retirements(self, condition_source_id: str) -> None:
+        self._ensure_activation_candidate_index(self._state._get_source_graph_flat())
+        for if_node_id in self._empty_condition_if_sources.get(condition_source_id, ()):
+            for branch in ("true_input", "false_input"):
+                for source_node_id in self._activation_sources_by_dependency.get((if_node_id, branch), ()):
+                    self._state._tx_add_set(self._pending_activation_retirement_candidates, source_node_id)
+
+    def _get_activation_candidate_source_ids(self, graph: "nx.DiGraph") -> tuple[str, ...]:
+        """Return queued retirement candidates in source-graph order."""
+        self._ensure_activation_candidate_index(graph)
+        if self._activation_retirement_rebuild_required:
+            self._rebuild_activation_retirement_candidates()
+        return tuple(
+            sorted(
+                self._pending_activation_retirement_candidates,
+                key=self._activation_candidate_topological_index.__getitem__,
+            )
+        )
 
     def _has_unmaterializable_for_final_input(self, node_id: str) -> bool:
         final_for_source_ids = set()
@@ -1428,15 +1528,16 @@ class _ExecutionNodeBuilder:
             if collapsed_branch is None:
                 continue
             if_node_id, branch_field = collapsed_branch
-            selected_frames = graph_if_runtime._get_selected_if_frames_for_preparation(
-                self._state, if_node_id, branch_field
-            )
             branch_path = self._state._get_iteration_path(prepared_iterators[index])
-            matching_frames = [
-                frame
-                for frame in selected_frames
-                if len(branch_path) == len(frame) + 1 and branch_path[: len(frame)] == frame
-            ]
+            matching_frame = branch_path[:-1] if branch_path else ()
+            matching_frames = (
+                (matching_frame,)
+                if len(branch_path) > 0
+                and graph_if_runtime._has_selected_if_frame_for_preparation(
+                    self._state, if_node_id, branch_field, matching_frame
+                )
+                else ()
+            )
             condition_edges = self._state.graph._get_input_edges(if_node_id, "condition")
             condition_iterator_ids = set(
                 self._get_ordered_iterator_axes_for_edges(condition_edges, self.iterator_graph())
@@ -1581,7 +1682,7 @@ class _ExecutionNodeBuilder:
     def _has_admitted_source_mapping(
         self, node_id: str, graph: "nx.DiGraph", iterator_ancestry: _IteratorAncestry
     ) -> bool:
-        if not any(isinstance(node, IfInvocation) for node in self._state.graph.nodes.values()):
+        if not self._has_if_nodes:
             return True
         if isinstance(self._state.graph.get_node(node_id), IfInvocation):
             condition_edges = self._state.graph._get_input_edges(node_id, "condition")
@@ -1710,12 +1811,12 @@ class _ExecutionNodeBuilder:
             ancestors.add(condition_source_id)
         return ancestors
 
-    def _get_sibling_iterate_if_collect_branches(self) -> dict[str, tuple[str, str]]:
+    def _get_sibling_iterate_if_collect_branches(self) -> dict[str, tuple[str, Optional[str]]]:
         """Find Iterate axes collapsed by branch Collects under an If."""
         if self._sibling_iterate_if_collect_branches is not None:
             return self._sibling_iterate_if_collect_branches
 
-        branches: dict[str, tuple[str, str]] = {}
+        branches: dict[str, tuple[str, Optional[str]]] = {}
         if not any(isinstance(node, CollectInvocation) for node in self._state.graph.nodes.values()):
             self._sibling_iterate_if_collect_branches = branches
             return branches
@@ -1776,13 +1877,16 @@ class _ExecutionNodeBuilder:
                         continue
                     branch = (destination.id, output_edge.destination.field)
                     existing_branch = branches.get(iterate_node_id)
-                    if existing_branch is not None and existing_branch != branch:
+                    if existing_branch is not None and existing_branch[0] != branch[0]:
                         raise UnsupportedSharedIfCollectBranchesError(
                             f"Sibling Iterate '{iterate_node_id}' cannot supply Collect-backed inputs to multiple "
-                            f"If branches: '{existing_branch[0]}.{existing_branch[1]}' and "
+                            f"If nodes: '{existing_branch[0]}' and "
                             f"'{branch[0]}.{branch[1]}'"
                         )
-                    branches[iterate_node_id] = branch
+                    branches[iterate_node_id] = (
+                        branch[0],
+                        None if existing_branch is not None and existing_branch[1] != branch[1] else branch[1],
+                    )
 
         self._iteration_relationship_graph = relationship_graph
         # Cached axes may have been queried before this graph established sibling order.
@@ -1794,13 +1898,16 @@ class _ExecutionNodeBuilder:
         self._sibling_iterate_if_collect_branches = branches
         return branches
 
-    def _get_sibling_iterate_if_collect_branch(self, iterate_node_id: str) -> Optional[tuple[str, str]]:
+    def _get_sibling_iterate_if_collect_branch(self, iterate_node_id: str) -> Optional[tuple[str, Optional[str]]]:
         return self._get_sibling_iterate_if_collect_branches().get(iterate_node_id)
 
     def _attach_pending_if_inputs(self, *, enqueue: bool = True) -> None:
         """Attach only the selected branch edge to condition-ready If executions."""
 
         source_graph = self._state._get_source_graph_flat()
+        # Prepared branch sources do not change during this sweep. Index them by frame once per source edge;
+        # keeping the index local means graph edits, rollback, and restore rebuild it on the next call.
+        prepared_exec_by_edge_path: dict[tuple[str, str], dict[tuple[int, ...], str]] = {}
         source_order = {node_id: index for index, node_id in enumerate(nx.topological_sort(source_graph))}
         pending_exec_nodes = sorted(
             self._state._pending_if_exec_nodes,
@@ -1831,14 +1938,25 @@ class _ExecutionNodeBuilder:
             for source_edge in selected_edges:
                 if source_edge.source.node_id not in self._state.source_prepared_mapping:
                     continue
-                candidates = [
-                    (prepared_id, self._get_prepared_edge_iteration_path(source_edge, prepared_id))
-                    for prepared_id in self._get_ordered_prepared_nodes_for_edge(source_edge)
-                ]
-                candidates = [candidate for candidate in candidates if target_path[: len(candidate[1])] == candidate[1]]
-                if not candidates:
+                edge_key = (source_edge.source.node_id, source_edge.source.field)
+                if edge_key not in prepared_exec_by_edge_path:
+                    prepared_exec_by_path: dict[tuple[int, ...], str] = {}
+                    for prepared_id in self._get_ordered_prepared_nodes_for_edge(source_edge):
+                        prepared_path = self._get_prepared_edge_iteration_path(source_edge, prepared_id)
+                        prepared_exec_by_path.setdefault(prepared_path, prepared_id)
+                    prepared_exec_by_edge_path[edge_key] = prepared_exec_by_path
+
+                prepared_exec_by_path = prepared_exec_by_edge_path[edge_key]
+                selected_exec_id = next(
+                    (
+                        prepared_exec_by_path[target_path[:path_depth]]
+                        for path_depth in range(len(target_path), -1, -1)
+                        if target_path[:path_depth] in prepared_exec_by_path
+                    ),
+                    None,
+                )
+                if selected_exec_id is None:
                     continue
-                selected_exec_id, _ = min(candidates, key=lambda candidate: (-len(candidate[1]), candidate[0]))
                 selected_exec_ids.append(selected_exec_id)
                 attached_edges.append(
                     Edge(
@@ -2025,16 +2143,22 @@ class _ExecutionNodeBuilder:
         iterator_ancestry = self._get_iterator_ancestry(self.iterator_graph(g))
         iterator_ancestry.clear_effective_iteration_paths()
         self._attach_pending_if_inputs()
+        self._ensure_activation_candidate_index(g)
         if self._has_if_nodes:
-            for node_id in nx.topological_sort(g):
-                if (
-                    node_id not in self._state.source_prepared_mapping
-                    and node_id not in self._state.executed
-                    and self._state._is_source_inactive(node_id)
-                ):
-                    self._mark_source_node_empty(node_id)
-                    self._state._invalidate_loop_caches_for_source(node_id)
-                    return node_id
+            try:
+                for node_id in self._get_activation_candidate_source_ids(g):
+                    self._state._tx_discard_set(self._pending_activation_retirement_candidates, node_id)
+                    if (
+                        node_id not in self._state.source_prepared_mapping
+                        and node_id not in self._state.executed
+                        and self._state._is_source_inactive(node_id)
+                    ):
+                        self._mark_source_node_empty(node_id)
+                        self._state._invalidate_loop_caches_for_source(node_id)
+                        return node_id
+            except Exception:
+                self._activation_retirement_rebuild_required = True
+                raise
         next_node_id = next(
             (
                 node_id

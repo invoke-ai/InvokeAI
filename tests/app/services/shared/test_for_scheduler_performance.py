@@ -1,8 +1,7 @@
-"""Scheduler behavior and overhead for trivial loop bodies.
+"""Measure scheduler mapping work and optional overhead for trivial loop bodies.
 
-The scheduler-scaling regression tests count visits to growing scheduler ledgers, so
-they remain stable under shared CI load. Optional absolute-time benchmarks remain marked `slow`.
-The completion-state tests are not benchmarks.
+The deterministic scaling regression counts mapping visits during end-to-end execution.
+Optional absolute-time benchmarks remain marked `slow`.
 """
 
 import time
@@ -33,27 +32,6 @@ class _MappingTraversalCounter:
     def record(self, mapping_name: str) -> None:
         self.entries_visited += 1
         self.visits_by_mapping[mapping_name] = self.visits_by_mapping.get(mapping_name, 0) + 1
-
-
-class _ActivationDependencyScanCounter:
-    def __init__(self) -> None:
-        self.active = False
-        self.entries_visited = 0
-        self.resolutions = 0
-        self.prepared_node_count = 0
-        self.states_by_id: dict[int, _ActivationDependencyScanCounter] = {}
-
-
-class _PreparedSourceCountingMapping(dict[str, str]):
-    def __init__(self, values: dict[str, str], counter: _ActivationDependencyScanCounter) -> None:
-        super().__init__(values)
-        self._counter = counter
-
-    def __iter__(self):  # type: ignore[override]
-        for key in super().__iter__():
-            if self._counter.active:
-                self._counter.entries_visited += 1
-            yield key
 
 
 class _CountingMapping(dict[str, object]):
@@ -98,20 +76,6 @@ class _CountingMapping(dict[str, object]):
         return super().get(key, default)
 
 
-class _CountingSet(set[str]):
-    """Count visits to prepared execution IDs without constraining set operations."""
-
-    def __init__(self, values: set[str], counter: _MappingTraversalCounter, mapping_name: str) -> None:
-        super().__init__(values)
-        self._counter = counter
-        self._mapping_name = mapping_name
-
-    def __iter__(self):  # type: ignore[override]
-        for value in super().__iter__():
-            self._counter.record(self._mapping_name)
-            yield value
-
-
 def _run_trivial_loop(
     loop_type: str,
     count: int,
@@ -121,7 +85,6 @@ def _run_trivial_loop(
     include_if: bool = False,
     external_condition: bool = False,
     condition_value: bool = True,
-    activation_scan_counter: _ActivationDependencyScanCounter | None = None,
 ) -> float:
     graph = Graph()
     graph.add_node(RangeInvocation(id="range", start=0, stop=count))
@@ -153,12 +116,6 @@ def _run_trivial_loop(
         graph.add_node(CollectInvocation(id="collect"))
         graph.add_edge(create_edge(output_source, "value", "collect", "item"))
     state = GraphExecutionState(graph=graph)
-    if activation_scan_counter is not None:
-        state.prepared_source_mapping = _PreparedSourceCountingMapping(
-            state.prepared_source_mapping, activation_scan_counter
-        )  # type: ignore[assignment]
-        state._prepared_registry()._prepared_source_mapping = state.prepared_source_mapping
-        activation_scan_counter.states_by_id[id(state)] = activation_scan_counter
     if mapping_counter is not None:
         scheduler = state._scheduler()
         state.execution_refs = _CountingMapping(state.execution_refs, mapping_counter, "execution_refs")  # type: ignore[assignment]
@@ -174,101 +131,7 @@ def _run_trivial_loop(
     while (node := state.next()) is not None:
         state.complete(node.id, node.invoke(context))
     assert state.is_complete()
-    if activation_scan_counter is not None:
-        activation_scan_counter.prepared_node_count = len(state.prepared_source_mapping)
     return clock() - started
-
-
-@pytest.mark.parametrize("loop_type", ["iterate", "for"])
-@pytest.mark.parametrize("condition_value", [True, False])
-def test_repeated_if_resolution_indexes_activation_dependencies_once(
-    monkeypatch: pytest.MonkeyPatch, loop_type: str, condition_value: bool
-) -> None:
-    counter = _ActivationDependencyScanCounter()
-    get_dependents = GraphExecutionState._get_activation_dependents_for_if
-
-    def count_lookup_scans(
-        state: GraphExecutionState, source_if_id: str, iteration_path: tuple[int, ...]
-    ) -> tuple[str, ...]:
-        state_counter = counter.states_by_id.get(id(state))
-        if state_counter is None:
-            return get_dependents(state, source_if_id, iteration_path)
-        state_counter.active = True
-        try:
-            return get_dependents(state, source_if_id, iteration_path)
-        finally:
-            state_counter.active = False
-            state_counter.resolutions += 1
-
-    monkeypatch.setattr(GraphExecutionState, "_get_activation_dependents_for_if", count_lookup_scans)
-    _run_trivial_loop(
-        loop_type,
-        300,
-        include_if=True,
-        external_condition=True,
-        condition_value=condition_value,
-        activation_scan_counter=counter,
-    )
-
-    assert counter.resolutions >= 300
-    assert counter.entries_visited <= counter.prepared_node_count, (
-        f"If resolution scanned {counter.entries_visited} prepared nodes across {counter.resolutions} resolutions; "
-        f"session contains {counter.prepared_node_count} prepared nodes"
-    )
-
-
-@pytest.mark.slow
-def test_if_activation_dependency_scan_performance_comparison(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Compare 1,200 If resolutions with the former repeated scan and the indexed lookup."""
-
-    original_get_dependents = GraphExecutionState._get_activation_dependents_for_if
-    measurements: dict[str, tuple[float, _ActivationDependencyScanCounter]] = {}
-    for legacy_scan in (True, False):
-        counter = _ActivationDependencyScanCounter()
-
-        def measure_lookup(
-            state: GraphExecutionState,
-            source_if_id: str,
-            iteration_path: tuple[int, ...],
-            active_counter: _ActivationDependencyScanCounter = counter,
-            use_legacy_scan: bool = legacy_scan,
-        ) -> tuple[str, ...]:
-            state_counter = active_counter.states_by_id.get(id(state))
-            if state_counter is not None:
-                if use_legacy_scan:
-                    state._if_activation_dependents_index_complete = False
-                state_counter.active = True
-            try:
-                return original_get_dependents(state, source_if_id, iteration_path)
-            finally:
-                if state_counter is not None:
-                    state_counter.active = False
-                    state_counter.resolutions += 1
-
-        monkeypatch.setattr(GraphExecutionState, "_get_activation_dependents_for_if", measure_lookup)
-        started = time.perf_counter()
-        _run_trivial_loop(
-            "iterate",
-            1200,
-            include_if=True,
-            external_condition=True,
-            condition_value=True,
-            activation_scan_counter=counter,
-        )
-        measurements["legacy repeated scan" if legacy_scan else "indexed"] = (time.perf_counter() - started, counter)
-
-    legacy_seconds, legacy_counter = measurements["legacy repeated scan"]
-    indexed_seconds, indexed_counter = measurements["indexed"]
-    print(
-        "\n1,200-item Iterate/If comparison: "
-        f"legacy={legacy_seconds:.3f}s/{legacy_counter.entries_visited} prepared-node visits; "
-        f"indexed={indexed_seconds:.3f}s/{indexed_counter.entries_visited} prepared-node visits; "
-        f"prepared_nodes={indexed_counter.prepared_node_count}"
-    )
-    assert legacy_counter.resolutions >= 1200
-    assert indexed_counter.resolutions >= 1200
-    assert indexed_counter.entries_visited <= indexed_counter.prepared_node_count
-    assert legacy_counter.entries_visited > indexed_counter.entries_visited
 
 
 @pytest.mark.parametrize(
@@ -285,6 +148,7 @@ def test_if_activation_dependency_scan_performance_comparison(monkeypatch: pytes
 def test_loop_scheduler_mapping_visits_scale_linearly(
     loop_type: str, include_if: bool, external_condition: bool
 ) -> None:
+    """Bound wrapped scheduler-state mapping visits, not preparation retirement or If-frame lookup."""
     visits: dict[int, int] = {}
     visits_by_mapping: dict[int, dict[str, int]] = {}
     for count in (300, 1200):
@@ -321,28 +185,110 @@ def test_loop_scheduler_mapping_visits_scale_linearly(
         )
 
 
-def test_prepared_execution_count_scans_each_source_once() -> None:
-    counter = _MappingTraversalCounter()
-    state = GraphExecutionState(graph=Graph())
-    state.source_prepared_mapping = _CountingMapping(
-        {
-            "source": _CountingSet({"exec-1", "exec-2", "exec-3"}, counter, "prepared_node_ids"),
-        },
-        counter,
-        "source_prepared_mapping",
-    )  # type: ignore[assignment]
-
-    assert state._count_unexecuted_prepared("source") == 3
-    assert state._count_unexecuted_prepared("source") == 3
-    assert counter.visits_by_mapping == {"source_prepared_mapping": 1, "prepared_node_ids": 3}
-
-
 @pytest.mark.slow
 @pytest.mark.parametrize("loop_type", ["for", "iterate"])
 def test_trivial_loop_scheduler_overhead(loop_type: str) -> None:
     elapsed = _run_trivial_loop(loop_type, 600)
-    # Generous headroom for shared CI hosts; the reported quadratic For regression took six seconds.
+    # Broad quiet-machine guard for catastrophic slowdowns; this is not a historical baseline comparison.
     assert elapsed < 4, f"{loop_type}: {elapsed:.3f}s for 600 items"
+
+
+class _PendingIfScanCounter(set[str]):
+    def __init__(self, values: set[str]) -> None:
+        super().__init__(values)
+        self.items_scanned = 0
+
+    def __iter__(self):
+        for value in super().__iter__():
+            self.items_scanned += 1
+            yield value
+
+
+def _measure_pending_if_attachment(count: int) -> tuple[int, int, int, float, float]:
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="range", start=0, stop=count))
+    graph.add_node(IterateInvocation(id="loop"))
+    graph.add_node(AnyTypeTestInvocation(id="true_body"))
+    graph.add_node(AnyTypeTestInvocation(id="false_body"))
+    graph.add_node(BooleanInvocation(id="condition", value=True))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_edge(create_edge("range", "collection", "loop", "collection"))
+    graph.add_edge(create_edge("loop", "item", "true_body", "value"))
+    graph.add_edge(create_edge("loop", "item", "false_body", "value"))
+    graph.add_edge(create_edge("condition", "value", "if", "condition"))
+    graph.add_edge(create_edge("true_body", "value", "if", "true_input"))
+    graph.add_edge(create_edge("false_body", "value", "if", "false_input"))
+    graph.add_edge(create_edge("if", "value", "collect", "item"))
+    state = GraphExecutionState(graph=graph)
+    state._pending_if_exec_nodes = _PendingIfScanCounter(state._pending_if_exec_nodes)
+    materializer = state._materializer()
+    original_attach = materializer._attach_pending_if_inputs
+    original_prepared_source = materializer._get_ordered_prepared_nodes_for_source
+    attach_calls = 0
+    attach_seconds = 0.0
+    prepared_candidates_scanned = 0
+    measuring_attachment = False
+
+    def counted_prepared_source(source_node_id: str) -> list[str]:
+        nonlocal prepared_candidates_scanned
+        prepared_nodes = original_prepared_source(source_node_id)
+        if measuring_attachment:
+            prepared_candidates_scanned += len(prepared_nodes)
+        return prepared_nodes
+
+    materializer._get_ordered_prepared_nodes_for_source = counted_prepared_source  # type: ignore[method-assign]
+
+    def measured_attach(*, enqueue: bool = True) -> None:
+        nonlocal attach_calls, attach_seconds, measuring_attachment
+        attach_calls += 1
+        started = time.perf_counter()
+        measuring_attachment = True
+        try:
+            original_attach(enqueue=enqueue)
+        finally:
+            measuring_attachment = False
+        attach_seconds += time.perf_counter() - started
+
+    materializer._attach_pending_if_inputs = measured_attach  # type: ignore[method-assign]
+    trace: list[str] = []
+    started = time.perf_counter()
+    while (node := state.next()) is not None:
+        trace.append(state.prepared_source_mapping[node.id])
+        state.complete(node.id, node.invoke(Mock()))
+    total_seconds = time.perf_counter() - started
+
+    assert state.is_complete()
+    assert not state.has_error()
+    assert trace.count("true_body") == count
+    assert "false_body" not in trace
+    assert trace.count("if") == count
+    collect_exec_ids = state.source_prepared_mapping["collect"]
+    assert len(collect_exec_ids) == 1
+    assert state.results[next(iter(collect_exec_ids))].collection == list(range(count))
+    return (
+        attach_calls,
+        state._pending_if_exec_nodes.items_scanned,
+        prepared_candidates_scanned,
+        total_seconds,
+        attach_seconds,
+    )
+
+
+@pytest.mark.slow
+def test_pending_if_attachment_sweep_scaling() -> None:
+    """Measure the reviewed per-item If graph, separating attachment sweeps from total execution."""
+    for count in (300, 1200):
+        attach_calls, scanned, candidates_scanned, total_seconds, attach_seconds = _measure_pending_if_attachment(count)
+        assert candidates_scanned <= count * 32, (
+            f"pending-If attachment revisited {candidates_scanned} prepared candidates "
+            f"for {count} items across {attach_calls} sweeps"
+        )
+        print(
+            f"pending-If n={count} calls={attach_calls} pending_scanned={scanned} "
+            f"prepared_candidates_scanned={candidates_scanned} total={total_seconds:.3f}s "
+            f"attach={attach_seconds:.3f}s"
+        )
 
 
 def test_completion_predicate_preserves_durable_state() -> None:
@@ -382,3 +328,112 @@ def test_completion_cache_preserves_completed_sources_after_restore() -> None:
     restored_state.complete(second.id, second.invoke(Mock()))
 
     assert restored_state.is_complete()
+
+
+def test_prepare_retirement_checks_only_activation_dependent_sources() -> None:
+    graph = Graph()
+    graph.add_node(BooleanInvocation(id="condition", value=True))
+    graph.add_node(AnyTypeTestInvocation(id="selected", value=1))
+    graph.add_node(AnyTypeTestInvocation(id="unselected", value=2))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_edge(create_edge("condition", "value", "if", "condition"))
+    graph.add_edge(create_edge("selected", "value", "if", "true_input"))
+    graph.add_edge(create_edge("unselected", "value", "if", "false_input"))
+    unrelated_source_ids = {f"independent_{index}" for index in range(120)}
+    for source_id in unrelated_source_ids:
+        graph.add_node(AnyTypeTestInvocation(id=source_id, value=source_id))
+
+    state = GraphExecutionState(graph=graph)
+    materializer = state._materializer()
+    original_candidates = materializer._get_activation_candidate_source_ids
+    candidate_sources: set[str] = set()
+    candidate_visits = 0
+    prepare_scans = 0
+
+    def counted_candidates(source_graph: object) -> tuple[str, ...]:
+        nonlocal candidate_visits, prepare_scans
+        candidates = original_candidates(source_graph)  # type: ignore[arg-type]
+        candidate_sources.update(candidates)
+        candidate_visits += len(candidates)
+        prepare_scans += 1
+        return candidates
+
+    materializer._get_activation_candidate_source_ids = counted_candidates  # type: ignore[method-assign]
+    context = Mock()
+    while (node := state.next()) is not None:
+        state.complete(node.id, node.invoke(context))
+
+    assert state.is_complete()
+    assert not state.has_error()
+    assert state.results[next(iter(state.source_prepared_mapping["if"]))].value == 1
+    assert "unselected" in state.executed
+    assert not unrelated_source_ids.intersection(candidate_sources), (
+        f"retirement candidates included unrelated sources: {unrelated_source_ids.intersection(candidate_sources)}"
+    )
+    assert candidate_sources == {"unselected"}
+    assert candidate_visits <= 2 * prepare_scans
+
+
+def _measure_if_chain_retirement_candidates(length: int) -> tuple[int, int, int, list[str]]:
+    graph = Graph()
+    graph.add_node(BooleanInvocation(id="condition", value=True))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(AnyTypeTestInvocation(id="fallback", value="fallback"))
+    graph.add_node(AnyTypeTestInvocation(id="sink"))
+    previous_node_id: str | None = None
+    for index in range(length):
+        node_id = f"branch_{index:03d}"
+        graph.add_node(AnyTypeTestInvocation(id=node_id, value=True if index == 0 else None))
+        if previous_node_id is not None:
+            graph.add_edge(create_edge(previous_node_id, "value", node_id, "value"))
+        previous_node_id = node_id
+    assert previous_node_id is not None
+    for source, source_field, destination, destination_field in (
+        ("condition", "value", "if", "condition"),
+        ("fallback", "value", "if", "false_input"),
+        (previous_node_id, "value", "if", "true_input"),
+        ("if", "value", "sink", "value"),
+    ):
+        graph.add_edge(create_edge(source, source_field, destination, destination_field))
+
+    state = GraphExecutionState(graph=graph)
+    materializer = state._materializer()
+    original_candidates = materializer._get_activation_candidate_source_ids
+    candidate_visits = 0
+    prepare_scans = 0
+
+    def counted_candidates(source_graph: object) -> tuple[str, ...]:
+        nonlocal candidate_visits, prepare_scans
+        candidates = original_candidates(source_graph)  # type: ignore[arg-type]
+        candidate_visits += len(candidates)
+        prepare_scans += 1
+        return candidates
+
+    materializer._get_activation_candidate_source_ids = counted_candidates  # type: ignore[method-assign]
+    trace: list[str] = []
+    while (node := state.next()) is not None:
+        trace.append(state.prepared_source_mapping[node.id])
+        state.complete(node.id, node.invoke(Mock()))
+
+    assert state.is_complete()
+    assert not state.has_error()
+    assert "fallback" not in trace
+    assert trace.count("if") == 1
+    assert trace.count("sink") == 1
+    sink_exec_id = next(iter(state.source_prepared_mapping["sink"]))
+    assert state.results[sink_exec_id].value is True
+    return candidate_visits, prepare_scans, len(trace), trace
+
+
+def test_if_chain_retirement_candidate_work_scales_linearly() -> None:
+    measurements = {length: _measure_if_chain_retirement_candidates(length) for length in (150, 300)}
+    for length, (candidate_visits, prepare_scans, _, _) in measurements.items():
+        assert candidate_visits <= prepare_scans * 2, (
+            f"if-chain length {length}: {candidate_visits} retirement candidates across {prepare_scans} prepare calls"
+        )
+
+    small_work = measurements[150][0]
+    large_work = measurements[300][0]
+    assert large_work <= small_work * 2.25, (
+        f"if-chain retirement candidate work grew faster than graph length: 150={small_work}, 300={large_work}"
+    )

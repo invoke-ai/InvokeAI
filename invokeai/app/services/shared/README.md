@@ -24,10 +24,12 @@ fan-out. Five or more nested `If`s, other fan-out, mixed graphs outside the boun
 topology, loop-containing, saved-workflow, legacy, and five-or-more sibling shapes remain on the compatibility
 fallback. Legacy snapshots retain their generic compatibility projection and legacy skipped-state metadata. Legacy
 skipped-state projection remains only for old snapshots. Fresh `If` materialization prepares the condition boundary
-first, resolves the activation token, and attaches only the selected branch input. Unselected branch nodes are never
-prepared, skipped, or added to fresh execution history. Both scheduler adapters consume these dependency decisions
-without pruning execution edges or calling a type-specific branch scheduler. Legacy skipped-state metadata remains only
-for snapshots that already contain the old projection. Branch-membership analysis remains an internal author-graph
+first, resolves the activation token, and attaches only the selected branch input. Nodes exclusive to the unselected
+branch are not materialized or invoked. `executed_history` records source-level completion and retirement: a branch
+source retired as empty can appear there without an invocation or an execution result. It is bookkeeping, not an
+invocation trace. Both scheduler adapters consume the same dependency decisions without pruning execution edges or
+calling a type-specific branch scheduler. Legacy skipped-state metadata remains only for snapshots that already contain
+the old projection. Branch-membership analysis remains an internal author-graph
 admission decision. The focused fresh-shape ownership matrix also verifies that supported flat, nested, bounded
 fan-out, and four-sibling graphs do not instantiate the compatibility controller or project fresh skipped nodes in
 either scheduler route. This proves the current ownership boundary; it does not remove the controller, which remains
@@ -673,10 +675,12 @@ materialization.
 - A branch `Collect` whose `item` source combines exactly two sibling `Iterate` axes can close the axis beside the
   `If` condition axis. The compatibility materializer expands that sibling `Iterate` beneath each resolved `If` frame
   selecting the `Collect` branch, pairs only the matching condition frame, and closes the branch interval empty when no
-  frame selects it. The condition and branch axes must be nested; divergent inner axes are rejected even when they share
-  an outer axis. One sibling `Iterate` can belong to only one `If` branch context. If one shared `Collect` would need to
-  serve multiple `If` branches, materialization raises `UnsupportedSharedIfCollectBranchesError` before invocation
-  rather than dropping frames.
+  frame selects it. Independent iterator axes follow destination input-port order; node insertion order and node IDs do
+  not reorder distinct ports. The condition and branch axes must be nested; divergent inner axes are rejected even when
+  they share an outer axis. An uncollected deeper branch axis that cannot be selected from the condition frame raises
+  `UnsupportedIfIterationAxesError` before invocation. One sibling `Iterate` can belong to only one `If` owner. A
+  `Collect` may feed both branch ports of that same `If`; if it would serve different `If` owners, materialization
+  raises `UnsupportedSharedIfCollectBranchesError` before invocation rather than dropping frames.
 
 - For each new exec node:
 
@@ -696,8 +700,23 @@ Final For outputs do not carry an open iteration axis.
 Iterator ancestry owns ordered ancestor and edge-axis analysis plus effective-path memoization for one graph traversal.
 The builder shares that object across candidate admission and materialization. Its separate per-source axis cache adds
 sibling-Collect relationship ordering and is cleared when that relationship graph is established; it does not repeat
-the ancestor-list cache. Independent parent paths merge in destination-port order. A standalone path lookup owns a
-separate context. These caches are process-local and rebuilt when graph identity changes; they are not serialized.
+the ancestor-list cache. Independent parent paths merge in destination input-port order, with source node ID used only
+to break ties on the same input port. A standalone path lookup owns a separate context. These caches are process-local
+and rebuilt when graph identity changes; they are not serialized.
+
+Each pending-If attachment sweep also builds a local index from source edge and prepared iteration path to execution
+node ID. It enumerates each prepared source edge once per sweep, then resolves the deepest matching path prefix for each
+condition-ready If frame. This preserves deterministic attachment while avoiding a repeated full prepared-source scan
+for every If frame. The index is discarded at the end of the call; a later sweep rebuilds it from the current prepared
+mapping, so it is not retained across graph edits, rollback, or state restore. This optimization bounds candidate lookup
+for attachment; other preparation and branch-context work has separate costs.
+
+Inactive branch-source retirement uses an event queue owned by one materializer. A rejected branch queues only its
+activation-dependent source IDs when the corresponding `If` resolves; an empty condition `Iterate` queues both branch
+source sets. Each preparation pass checks the queued sources in topological order rather than rescanning every
+unprepared source. The index is tied to source-graph identity, rebuilt from durable activation state after graph changes
+or state restore, and is not serialized. Queue mutations participate in execution-state rollback. This narrows
+retirement work; it does not bound other preparation or branch-context costs.
 
 Literal-condition If fallback path inference uses the same ancestry context, including nested selected branches.
 
@@ -754,12 +773,17 @@ Run `C` -> `D:0` -> enqueue `D`. Run `D` -> done.
 - Nodes that are exclusive to the true or false branch remain unmaterialized until their branch is admitted, even when
   their indegree would otherwise be zero.
 - Once the condition resolves, graph-state activation logic records the selected activation token and attaches only the
-  selected branch input to the pending `If` execution. Branch-exclusive ancestors of the unselected branch are never
-  prepared, executed, or added to fresh execution history. Unsupported fresh shapes and legacy snapshots use the
+  selected branch input to the pending `If` execution. Branch-exclusive ancestors of the unselected branch are not
+  invoked or materialized into execution results. Their source IDs can appear in `executed_history` after empty
+  retirement; the history is not an invocation trace. Unsupported fresh shapes and legacy snapshots use the
   compatibility controller. Both scheduler adapters use append-only execution edges; no type-specific branch scheduler
   performs pruning or skip propagation.
 - Legacy snapshots that already contain skipped prepared nodes retain their compatibility metadata and scheduler
   projection. Fresh execution does not create that projection.
+- If an `Iterate.item` stream feeding `If.condition` closes empty, no `If` execution is created. The branch sources are
+  retired empty, the downstream `Collect` produces an empty collection, and the state completes without an error.
+  Retirement may add the branch source IDs to `executed_history`; neither branch invocation runs and no branch result
+  is created.
 - The SQLite queue/processor path has evidence for cancellation before and after `If` resolution and retry from each
   boundary for both condition polarities. A canceled attempt keeps its activation ledger and cannot resume; retry
   starts a fresh state and must emit a fresh matching activation token before selected-only completion.
