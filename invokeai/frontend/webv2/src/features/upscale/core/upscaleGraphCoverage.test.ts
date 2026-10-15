@@ -32,7 +32,7 @@ const model = (key: string, type: string, base: string, extra: Record<string, un
 const INSTALLED = [
   model('spandrel', 'spandrel_image_to_image', 'any'),
   model('t5', 't5_encoder', 'any'),
-  model('clip', 'clip_embed', 'any'),
+  model('clip', 'clip_embed', 'any', { variant: 'large' }),
   model('qwen3-4b', 'qwen3_encoder', 'any', { variant: 'qwen3_4b' }),
   model('qwen3-06b', 'qwen3_encoder', 'any', { variant: 'qwen3_06b' }),
   model('qwen35', 'qwen3_5_encoder', 'any', { variant: 'qwen3_5_4b' }),

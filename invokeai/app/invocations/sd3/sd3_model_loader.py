@@ -93,8 +93,10 @@ class Sd3ModelLoaderInvocation(BaseInvocation):
             else self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
         )
         tokenizer_g = self.model.model_copy(update={"submodel_type": SubModelType.Tokenizer2})
+        # A separately selected CLIP-G is a model of its own, whose encoder is its `TextEncoder`; `TextEncoder2`
+        # names CLIP-G only inside the SD 3 pipeline.
         clip_encoder_g = (
-            self.clip_g_model.model_copy(update={"submodel_type": SubModelType.TextEncoder2})
+            self.clip_g_model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
             if self.clip_g_model
             else self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder2})
         )

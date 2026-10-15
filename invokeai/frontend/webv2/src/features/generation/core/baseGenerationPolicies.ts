@@ -615,7 +615,8 @@ const clipEmbedSlot = (helpText: string): ComponentSlotPolicy =>
     modelTypes: TYPE_CLIP_EMBED,
     valueKind: 'component',
     helpText,
-    filter: (candidate) => candidate.type === 'clip_embed',
+    // FLUX.1 encodes with CLIP-L; a CLIP-G fails its text encoder.
+    filter: wrapFilter(isClipVariant('large')),
   });
 
 const qwenVlEncoderSlot = (helpText: string): ComponentSlotPolicy =>
