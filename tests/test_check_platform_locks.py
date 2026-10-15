@@ -23,6 +23,7 @@ spec.loader.exec_module(check_platform_locks)
 NVIDIA = check_platform_locks.NVIDIA_WIN_ARM64_REGISTRY
 PYPI = "https://pypi.org/simple"
 CU128 = "https://download.pytorch.org/whl/cu128"
+SELF_BUILT = "https://github.com/invoke-ai/InvokeAI/releases/download/win-arm64-wheels-v1/index.html"
 WIN_ARM = "platform_machine == 'ARM64' and sys_platform == 'win32'"
 NOT_WIN_ARM = "(platform_machine != 'ARM64' or sys_platform != 'win32')"
 AARCH64 = "platform_machine == 'aarch64' and sys_platform == 'linux'"
@@ -94,6 +95,7 @@ def make_lock(
     transitive_tag: str = "cp312-cp312-win_arm64",
     extra_dep_tag: str = "cp312-cp312-win_arm64",
     sdist_only: str | None = None,
+    cpu_extra_aarch64_torch: bool = True,
 ) -> str:
     base_torch = [
         dep("torch", "2.7.1", PYPI, f"({AARCH64}) or ({NOT_WIN_ARM} and {NO_CUDA})"),
@@ -103,6 +105,8 @@ def make_lock(
         dep("torchvision", "0.22.1+cu128", CU128, f"{NOT_AARCH64} and {NOT_WIN_ARM} and {CUDA}"),
         dep("torchvision", "0.29.0+cu134", win_arm_torch_registry, WIN_ARM),
     ]
+    # The aarch64 fallback pins are the PyPI edges; without them the extra leans on the base's torch alone.
+    cpu_torch = base_torch if cpu_extra_aarch64_torch else [d for d in base_torch if PYPI not in d]
     return f"""
 version = 1
 requires-python = ">=3.12, <3.13"
@@ -119,12 +123,12 @@ name = "invokeai"
 source = {{ editable = "." }}
 dependencies = [
     {dep("numpy")},
-    {dep("python-jose")},
+    {dep("transformers")},
     {dep("imageio", extra=["ffmpeg"])},
     {dep("imageio")},
 {("    " + dep(sdist_only) + ",") if sdist_only else ""}
-    {dep("cryptography", "46.0.3", PYPI, WIN_ARM)},
-    {dep("cryptography", "49.0.0", PYPI, NOT_WIN_ARM)},
+    {dep("blake3", "1.0.9", SELF_BUILT, WIN_ARM)},
+    {dep("blake3", "1.0.9", PYPI, NOT_WIN_ARM)},
 {chr(10).join("    " + d + "," for d in base_torch)}
 ]
 
@@ -133,7 +137,7 @@ cuda = [
 {chr(10).join("    " + d + "," for d in base_torch)}
 ]
 cpu = [
-{chr(10).join("    " + d + "," for d in base_torch)}
+{chr(10).join("    " + d + "," for d in cpu_torch)}
 ]
 test = [
     {dep("pytest-timeout")},
@@ -141,15 +145,15 @@ test = [
 ]
 {package("pytest-timeout", "2.4.0", PYPI, [wheel("pytest_timeout", "2.4.0", test_extra_tag, PYPI)])}
 {package("numpy", "2.3.5", PYPI, [wheel("numpy", "2.3.5", "cp312-cp312-win_arm64", PYPI), wheel("numpy", "2.3.5", "cp312-cp312-manylinux_2_28_aarch64", PYPI)])}
-{package("python-jose", "3.5.0", PYPI, [wheel("python_jose", "3.5.0", "py3-none-any", PYPI)], deps=[dep("rsa")])}
-{package("rsa", "4.9", PYPI, [wheel("rsa", "4.9", transitive_tag, PYPI)])}
+{package("transformers", "5.6.0", PYPI, [wheel("transformers", "5.6.0", "py3-none-any", PYPI)], deps=[dep("tokenizers")])}
+{package("tokenizers", "0.22.2", PYPI, [wheel("tokenizers", "0.22.2", transitive_tag, PYPI)])}
 {package("imageio", "2.37.4", PYPI, [wheel("imageio", "2.37.4", "py3-none-any", PYPI)], deps=[dep("pillow")], extras={"ffmpeg": [dep("imageio-ffmpeg"), dep("av")]})}
 {package("pillow", "12.2.0", PYPI, [wheel("pillow", "12.2.0", "cp312-cp312-win_arm64", PYPI)])}
 {package("av", "18.1.0", PYPI, [wheel("av", "18.1.0", extra_dep_tag, PYPI)])}
 {package("imageio-ffmpeg", "0.6.0", PYPI, [], sdist=True)}
 {package(sdist_only, "1.0", PYPI, [], sdist=True) if sdist_only else ""}
-{package("cryptography", "46.0.3", PYPI, [wheel("cryptography", "46.0.3", closure_tag, PYPI)])}
-{package("cryptography", "49.0.0", PYPI, [wheel("cryptography", "49.0.0", "cp312-abi3-win_amd64", PYPI)])}
+{package("blake3", "1.0.9", SELF_BUILT, [wheel("blake3", "1.0.9", closure_tag, SELF_BUILT)])}
+{package("blake3", "1.0.9", PYPI, [wheel("blake3", "1.0.9", "cp312-cp312-win_amd64", PYPI)])}
 {package("torch", "2.7.1", PYPI, [wheel("torch", "2.7.1", "cp312-cp312-manylinux_2_28_aarch64", PYPI)])}
 {package("torch", "2.7.1+cu128", CU128, [wheel("torch", "2.7.1+cu128", "cp312-cp312-win_amd64", CU128)])}
 {package("torch", "2.14.0+cu134", win_arm_torch_registry, [wheel("torch", "2.14.0+cu134", win_arm_torch_tag, win_arm_torch_registry)])}
@@ -219,6 +223,22 @@ def test_win_arm64_sdist_only_package_fails_unless_allow_listed(tmp_path: Path):
 
 def test_aarch64_torchvision_without_aarch64_wheel_fails(tmp_path: Path):
     assert run(tmp_path, make_lock(aarch64_torchvision_tag="cp312-cp312-manylinux_2_28_x86_64"), "aarch64") == 1
+
+
+def test_aarch64_extra_without_its_own_fallback_pin_fails(tmp_path: Path):
+    """The base dependencies resolve a torch on aarch64 too; that must not stand in for the extra's own pin."""
+    assert run(tmp_path, make_lock(cpu_extra_aarch64_torch=False), "aarch64") == 1
+    # win_arm64 takes its torch from the base and the extra alike, so the same lock is fine there.
+    assert run(tmp_path, make_lock(cpu_extra_aarch64_torch=False), "win_arm64") == 0
+
+
+@pytest.mark.parametrize("platform", ["aarch64", "win_arm64"])
+def test_each_torch_package_is_reported_once_per_extra(tmp_path: Path, capsys, platform: str):
+    """The base and the extra both carry an edge to the same torch; that is one package, reported once."""
+    assert run(tmp_path, make_lock(), platform) == 0
+    lines = [line for line in capsys.readouterr().out.splitlines() if " from " in line]
+    assert lines, "the check must report the torch it found"
+    assert len(lines) == len(set(lines)), lines
 
 
 def test_lock_excluding_a_platform_fails(tmp_path: Path):

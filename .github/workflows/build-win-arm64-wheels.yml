@@ -7,11 +7,16 @@
 # once it is on the default branch, and a change to the recipe is exactly when a build should be proven) but
 # never publish them: the builds are not byte-reproducible, and the lockfile pins the published assets by hash,
 # so re-uploading over a tag would break every ARM64 install and `uv lock --locked` until the next re-lock.
-# Publishing is a deliberate act: dispatch the workflow with a NEW release tag, then bump the tag in
-# pyproject.toml's `invoke-win-arm64-wheels` index together with the matching `; sys_platform == 'win32' and
-# platform_machine == 'ARM64'` pins and re-lock. Tags are immutable in practice: every tagged Invoke release
-# locks the assets of the tag its pyproject named, so overwriting a tag breaks those releases' installs.
-# `--clobber` below only lets an interrupted upload of the same build be completed.
+# Publishing is a deliberate act: dispatch the workflow with a NEW release tag (the input has no default), then
+# bump the tag in pyproject.toml's `invoke-win-arm64-wheels` index together with the matching `; sys_platform ==
+# 'win32' and platform_machine == 'ARM64'` pins and re-lock. Tags are immutable: every tagged Invoke release
+# locks the assets of the tag its pyproject named, so replacing an asset breaks those releases' installs. The
+# publish job never replaces one (scripts/win_arm64_wheels/plan_release_upload.py): it uploads only assets the
+# release lacks, skips ones already published with identical contents (so "Re-run failed jobs", which reuses this
+# run's build artifacts, can finish an interrupted upload), and fails on any other difference -- which a new
+# dispatch against a published tag always is, because the builds differ.
+# The publish job runs in the `win-arm64-wheels` environment; maintainers should give that environment required
+# reviewers in the repository settings so a dispatch cannot publish without approval.
 name: build-win-arm64-wheels
 
 on:
@@ -22,9 +27,9 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Release tag that receives the wheels and index.html (created if missing)
+        description: NEW release tag that receives the wheels and index.html (a published tag is never overwritten)
         type: string
-        default: win-arm64-wheels-v1
+        required: true
       opencv_python_ref:
         description: opencv-python git tag to build (the tag number is the last component of the version, e.g. 86 -> 4.11.0.86)
         type: string
@@ -38,6 +43,9 @@ on:
         type: string
         default: 0.13.0
 
+permissions:
+  contents: read
+
 # Two runs must not race on the same release tag.
 concurrency:
   group: build-win-arm64-wheels-${{ inputs.release_tag || github.event.pull_request.number || github.run_id }}
@@ -46,8 +54,9 @@ concurrency:
 env:
   # Keep in step with python-tests.yml and uv-lock-checks.yml.
   UV_VERSION: '0.11.28'
-  # Dispatch inputs, with the same defaults for pull_request runs.
-  RELEASE_TAG: ${{ inputs.release_tag || 'win-arm64-wheels-v1' }}
+  # Dispatch inputs, with the same defaults for pull_request runs. The tag is only a placeholder there: pull
+  # request runs never publish.
+  RELEASE_TAG: ${{ inputs.release_tag || 'pull-request-build' }}
   OPENCV_PYTHON_REF: ${{ inputs.opencv_python_ref || '86' }}
   # uv installs an x86_64 CPython on Windows ARM64 unless the request names the architecture. The
   # wheels must be built by, and are smoke-tested with, the native interpreter.
@@ -175,6 +184,7 @@ jobs:
     needs: [opencv, rust-wheels]
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    environment: win-arm64-wheels
     permissions:
       contents: write
     env:
@@ -215,13 +225,26 @@ jobs:
             --find-links dist/
 
       - name: upload release assets
+        # Never --clobber: see the header. The plan fails the job before anything is uploaded if the release
+        # already holds different contents under any of these names.
         run: |
-          if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            release_exists=true
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > release.json
+          else
+            release_exists=false
+            echo '{"assets": []}' > release.json
+          fi
+          python3 scripts/win_arm64_wheels/plan_release_upload.py release.json dist/*.whl dist/index.html > upload.txt
+          if [ "$release_exists" = false ]; then
             gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --latest=false \
               --title "Windows ARM64 wheels ($RELEASE_TAG)" \
               --notes "Self-built win_arm64 wheels consumed by pyproject.toml's invoke-win-arm64-wheels index. Built by the build-win-arm64-wheels workflow; not a release of Invoke itself."
           fi
-          gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --clobber dist/*.whl dist/index.html
+          if [ -s upload.txt ]; then
+            mapfile -t files < upload.txt
+            gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" "${files[@]}"
+          fi
 
       - name: verify the page resolves like the lock and the docs use it
         # Cross-platform resolution against the published page, exactly as `uv lock` (flat index) and

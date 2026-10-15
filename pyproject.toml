@@ -320,7 +320,8 @@ dependencies = [
 # Driver for running the application database on MySQL or MariaDB instead of SQLite.
 "mysql" = ["pymysql>=1.2.3,<2"]
 "onnx" = ["onnxruntime"]
-# Neither GPU build of onnxruntime has win_arm64 wheels; `required-environments` below rejects the extras there.
+# Neither GPU build of onnxruntime has win_arm64 wheels; the markers drop the package there, so on Windows ARM64
+# these extras install nothing.
 "onnx-cuda" = ["onnxruntime-gpu; (sys_platform != 'win32' or platform_machine != 'ARM64')"]
 "onnx-directml" = ["onnxruntime-directml; (sys_platform != 'win32' or platform_machine != 'ARM64')"]
 "dist" = ["pip-tools", "pipdeptree", "twine"]
@@ -570,7 +571,7 @@ explicit = true
 # ARM64 pins of the packages it serves.
 [[tool.uv.index]]
 name = "invoke-win-arm64-wheels"
-url = "https://github.com/invoke-ai/InvokeAI-7/releases/download/win-arm64-wheels-v1/index.html"
+url = "https://github.com/invoke-ai/InvokeAI/releases/download/win-arm64-wheels-v1/index.html"
 format = "flat"
 explicit = true
 

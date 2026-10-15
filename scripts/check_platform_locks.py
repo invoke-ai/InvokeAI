@@ -1,4 +1,4 @@
-"""Assert that `uv.lock` gives the platforms no test job installs on an installable torch stack.
+"""Assert that `uv.lock` gives the platforms the x64 test jobs cannot vouch for an installable torch stack.
 
 Two platforms are covered:
 
@@ -7,13 +7,17 @@ Two platforms are covered:
   `tool.uv.environments`, the `[tool.uv.sources]` platform markers, and the aarch64 fallback pins in each
   torch extra. Break the sources markers and `uv lock` fails loudly, but break either of the other two and
   the lockfile simply stops mentioning torch on aarch64 while `uv lock --locked` stays green -- which is how
-  aarch64 support was silently lost once before, when a ROCm bump narrowed `tool.uv.environments`.
+  aarch64 support was silently lost once before, when a ROCm bump narrowed `tool.uv.environments`. No CI job
+  installs on aarch64, so this check is its only coverage. Each extra must carry its own aarch64 torch edge:
+  the base dependencies also resolve a torch there today, but that is incidental to how uv forks the
+  resolution, so it must not be what keeps an extra installable.
 - win32/ARM64 (Windows on ARM, NVIDIA RTX Spark). torch and torchvision must come from NVIDIA's
   out-of-tree index with `win_arm64` wheels whichever extra is selected, and -- because most of the
   platform's wheel gaps are papered over with version forks in `pyproject.toml` rather than enforced by
   uv -- every package in the platform's dependency closure must ship a `win_arm64` (or pure) wheel. uv's
   `required-environments` only enforces that for packages without an sdist; a package with an sdist and
-  no ARM64 wheel (cryptography 49, say) locks fine and fails at install time on the user's machine.
+  no ARM64 wheel locks fine and fails at install time on the user's machine. The windows-arm64 test job
+  installs only the `test` extra; this check covers every torch extra and the install with none.
 
 So assert against the lockfile itself, which is the artifact users actually install from.
 
@@ -52,6 +56,8 @@ class Platform:
     torch_registry: str | None = None
     # Also check torch/torchvision with no extra selected (platforms whose torch does not come from an extra).
     check_no_extra: bool = False
+    # Count the base dependencies' torch edges toward each extra's torch (False: the extra must carry its own).
+    torch_from_base: bool = True
     # Walk the whole closure for wheel availability.
     check_closure: bool = False
     # Non-conflicting extras whose closure is walked too (what the platform's CI lane installs).
@@ -74,6 +80,7 @@ PLATFORMS: dict[str, Platform] = {
         },
         # Only linux aarch64 counts -- macOS arm64 wheels (`macosx_11_0_arm64`) are a different platform.
         accepts_tag=lambda tag: "aarch64" in tag.platform,
+        torch_from_base=False,
     ),
     "win_arm64": Platform(
         name="win32/ARM64",
@@ -174,14 +181,20 @@ class Lock:
 
 
 def universes(
-    root: dict[str, Any], keys: dict[str, str], include_no_extra: bool
+    root: dict[str, Any], keys: dict[str, str], include_no_extra: bool, include_base: bool = True
 ) -> list[tuple[str, str | None, list[dict[str, Any]]]]:
-    """(label, uv extra marker token, dependency edges) for each resolution universe to check."""
+    """(label, uv extra marker token, dependency edges) for each resolution universe to check.
+
+    With `include_base` False, an extra's universe holds only the extra's own edges.
+    """
     base = root.get("dependencies", [])
+    extra_base = base if include_base else []
     result: list[tuple[str, str | None, list[dict[str, Any]]]] = []
     if include_no_extra:
         result.append(("no extra", None, base))
-    result += [(extra, keys[extra], base + root.get("optional-dependencies", {}).get(extra, [])) for extra in keys]
+    result += [
+        (extra, keys[extra], extra_base + root.get("optional-dependencies", {}).get(extra, [])) for extra in keys
+    ]
     return result
 
 
@@ -190,7 +203,8 @@ def check_torch(
 ) -> list[str]:
     """torch/torchvision resolve, per extra (and with no extra where the platform asks), from acceptable wheels."""
     problems: list[str] = []
-    for label, key, deps in universes(root, keys, include_no_extra=platform.check_no_extra):
+    checked = universes(root, keys, include_no_extra=platform.check_no_extra, include_base=platform.torch_from_base)
+    for label, key, deps in checked:
         for name in REQUIRED:
             for python_version in python_versions:
                 env = env_for(platform, python_version, extra=key)
@@ -198,7 +212,10 @@ def check_torch(
                 if not resolved:
                     problems.append(f"  [{label}] py{python_version}: no {name} resolves on {platform.name}")
                     continue
-                # uv shouldn't emit overlapping markers, but if it ever does, check every match.
+                # The base and the extra each carry an edge to the same package wherever the extra pins what the
+                # base already resolves, so the matches are checked per package, not per edge. Distinct packages
+                # (overlapping markers, which uv shouldn't emit) are each checked.
+                reported: set[tuple[str, Any, str]] = set()
                 for dep in resolved:
                     packages = lock.resolve(dep)
                     version = dep.get("version") or (packages[0].get("version") if packages else "?")
@@ -206,6 +223,10 @@ def check_torch(
                         problems.append(f"  [{label}] py{python_version}: {name}=={version} not in uv.lock")
                         continue
                     for package in packages:
+                        ident = (package["name"], package.get("version"), str(package.get("source")))
+                        if ident in reported:
+                            continue
+                        reported.add(ident)
                         registry = (package.get("source") or {}).get("registry", "?")
                         where = f"{name}=={package.get('version')} from {registry}"
                         if platform.torch_registry is not None and registry != platform.torch_registry:
@@ -327,7 +348,7 @@ def check_platform(lock: Lock, key: str) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Check uv.lock for platforms no test job installs on.")
+    parser = argparse.ArgumentParser(description="Check uv.lock for platforms the x64 test jobs cannot vouch for.")
     parser.add_argument("lock", nargs="?", default="uv.lock", type=Path)
     parser.add_argument("--platform", choices=sorted(PLATFORMS), action="append", help="default: all")
     args = parser.parse_args(argv)

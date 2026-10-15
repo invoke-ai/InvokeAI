@@ -131,7 +131,7 @@ The following commands vary depending on the version of Invoke being installed a
             <TabItem label="Windows on ARM64 (RTX Spark)">
               Do not use a torch backend. torch comes from NVIDIA's own index, and three packages that have no ARM64 build on PyPI (OpenCV, blake3, tiktoken) come from wheels Invoke publishes. Use these two options instead of `--torch-backend`:
               ```sh
-              --index https://pypi.nvidia.com/nvtorch_oot/ --find-links https://github.com/invoke-ai/InvokeAI-7/releases/download/win-arm64-wheels-v1/index.html
+              --index https://pypi.nvidia.com/nvtorch_oot/ --find-links https://github.com/invoke-ai/InvokeAI/releases/download/win-arm64-wheels-v1/index.html
               ```
               With or without an NVIDIA GPU: this is the only torch build for Windows ARM64. See the [system requirements](../system-requirements#windows-on-arm64-rtx-spark) for the platform's feature differences.
             </TabItem>
@@ -204,7 +204,7 @@ The following commands vary depending on the version of Invoke being installed a
         </TabItem>
         <TabItem label="Windows on ARM64">
           ```sh
-          uv pip install <PACKAGE_SPECIFIER>==<VERSION> --python cpython-3.12-windows-aarch64-none --python-preference only-managed --index https://pypi.nvidia.com/nvtorch_oot/ --find-links https://github.com/invoke-ai/InvokeAI-7/releases/download/win-arm64-wheels-v1/index.html --force-reinstall
+          uv pip install <PACKAGE_SPECIFIER>==<VERSION> --python cpython-3.12-windows-aarch64-none --python-preference only-managed --index https://pypi.nvidia.com/nvtorch_oot/ --find-links https://github.com/invoke-ai/InvokeAI/releases/download/win-arm64-wheels-v1/index.html --force-reinstall
           ```
         </TabItem>
 
