@@ -4,6 +4,7 @@ The face preprocessor and the Face Tools nodes must still import at startup -- e
 imported by `load_all_modules()` -- and fail with a message that names the platform when used.
 """
 
+import platform
 import sys
 
 import numpy as np
@@ -28,10 +29,8 @@ def _image() -> Image.Image:
 
 
 def _as_windows_arm64(monkeypatch) -> None:
-    from invokeai.backend.image_util import mediapipe_face
-
-    monkeypatch.setattr(mediapipe_face.sys, "platform", "win32")
-    monkeypatch.setattr(mediapipe_face.platform, "machine", lambda: "ARM64")
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(platform, "machine", lambda: "ARM64")
 
 
 def test_detect_faces_names_the_platform_on_windows_arm64(no_mediapipe, monkeypatch):
@@ -51,9 +50,7 @@ def test_face_box_mask_names_the_platform_on_windows_arm64(no_mediapipe, monkeyp
 def test_import_failure_elsewhere_carries_the_original_error(no_mediapipe, monkeypatch):
     # On platforms that do have mediapipe, an import failure is a broken install, not the platform: the
     # user must see the real cause rather than the Windows ARM64 explanation.
-    from invokeai.backend.image_util import mediapipe_face
-
-    monkeypatch.setattr(mediapipe_face.platform, "machine", lambda: "AMD64")
+    monkeypatch.setattr(platform, "machine", lambda: "AMD64")
     with pytest.raises(RuntimeError, match=r"MediaPipe failed to import.*mediapipe") as excinfo:
         detect_faces(_image())
     assert "Windows ARM64" not in str(excinfo.value)

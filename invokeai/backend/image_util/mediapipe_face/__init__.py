@@ -1,11 +1,9 @@
 # Adapted from https://github.com/huggingface/controlnet_aux
 
-import platform
-import sys
-
 from PIL import Image
 
 from invokeai.backend.image_util.util import np_to_pil, pil_to_np
+from invokeai.backend.util.host_platform import is_windows_arm64
 
 # mediapipe is imported lazily: the package is absent on Windows ARM64, where its only wheel is the
 # Tasks-API build without the legacy `solutions` API these modules use, and every node module is
@@ -22,7 +20,7 @@ def mediapipe_import_error(error: ImportError) -> RuntimeError:
     Names the platform only where the platform is the cause; elsewhere an import failure is a broken
     install (a protobuf mismatch, say) and the message must carry the original error.
     """
-    if sys.platform == "win32" and platform.machine() == "ARM64":
+    if is_windows_arm64():
         return RuntimeError(MEDIAPIPE_UNAVAILABLE_MESSAGE)
     return RuntimeError(f"MediaPipe failed to import, so the MediaPipe face nodes cannot run: {error}")
 

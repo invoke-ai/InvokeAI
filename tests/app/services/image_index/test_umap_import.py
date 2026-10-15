@@ -11,9 +11,15 @@ default selection can absorb.
 import numpy as np
 import pytest
 
-# Windows ARM64 has no numba wheel for its Python, so pyproject excludes the umap/numba stack there and
-# the image map takes compute_umap's PCA fallback; that path is covered by test_projection.py.
-numba = pytest.importorskip("numba", reason="umap-learn/numba are not installed on this platform")
+from invokeai.backend.util.host_platform import is_windows_arm64
+
+if is_windows_arm64():
+    # No numba wheel for this Python, so pyproject excludes the umap/numba stack here and the image map
+    # takes compute_umap's PCA fallback; that path is covered by test_projection.py. Only here: anywhere
+    # else a missing numba is exactly the broken resolution this module exists to catch.
+    pytest.skip("umap-learn/numba are not installed on Windows ARM64", allow_module_level=True)
+
+import numba  # noqa: E402
 
 
 def test_numba_jit_is_active() -> None:

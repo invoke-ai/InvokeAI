@@ -40,6 +40,7 @@ from invokeai.app.services.image_index.projection import (
     ClusterDiagnostics,
     cluster_with_diagnostics,
     compute_clusters,
+    projection_method_is_current,
     scope_hash,
 )
 from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
@@ -456,7 +457,10 @@ async def get_image_map_points(
         )
 
     current_hash = scope_hash(model_id, current_items)
-    stale = record.scope_hash != current_hash
+    # Off the event loop: on Windows ARM64 the method check may import umap-learn the first time.
+    stale = record.scope_hash != current_hash or not await asyncio.to_thread(
+        projection_method_is_current, record.params, record.point_count
+    )
 
     if stale:
         services.image_index.request_projection(user_id, all_images=is_admin)
