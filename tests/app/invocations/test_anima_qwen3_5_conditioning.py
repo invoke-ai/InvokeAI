@@ -75,6 +75,7 @@ def test_qwen3_5_is_read_at_the_trained_layers_with_an_attention_only_last_layer
     assert mask.tolist() == [True, True, True]
 
 
+@pytest.mark.platform_independent
 def test_the_prompt_node_does_not_import_transformers_qwen3_5_at_startup() -> None:
     """Every app start imports every node module; transformers' qwen3_5 modeling costs ~0.25 s of it."""
     program = (

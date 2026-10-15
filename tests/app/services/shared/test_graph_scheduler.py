@@ -1,6 +1,8 @@
 import subprocess
 import sys
 
+import pytest
+
 from invokeai.app.services.shared import graph as graph_module
 from invokeai.app.services.shared import graph_scheduler
 
@@ -10,6 +12,7 @@ def test_graph_facade_reexports_scheduler_classes() -> None:
     assert graph_module._GenericGraphSchedulerAdapter is graph_scheduler._GenericGraphSchedulerAdapter
 
 
+@pytest.mark.platform_independent
 def test_graph_scheduler_import_does_not_import_graph_facade() -> None:
     result = subprocess.run(
         [

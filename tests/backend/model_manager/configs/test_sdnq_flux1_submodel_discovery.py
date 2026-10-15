@@ -9,6 +9,7 @@ must still load from the folder that exists.
 """
 
 import json
+import shutil
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -17,6 +18,7 @@ import torch
 from safetensors.torch import save_file
 
 from invokeai.backend.model_manager.configs.main import Main_SDNQ_Diffusers_FLUX_Config
+from invokeai.backend.model_manager.load.load_default import resolve_submodel_path
 from invokeai.backend.model_manager.taxonomy import SubModelType
 
 _REQUIRED_FIELDS = {
@@ -183,11 +185,43 @@ def test_nonstandard_index_keys_are_recorded_at_the_path_they_actually_live_at(t
 
     assert config.submodels is not None
     assert set(config.submodels) == _ALL_SLOTS
-    assert config.submodels[SubModelType.TextEncoder].path_or_prefix.endswith("clip_encoder")
-    assert config.submodels[SubModelType.VAE].path_or_prefix.endswith("autoencoder")
+    assert config.submodels[SubModelType.TextEncoder].path_or_prefix == "clip_encoder"
+    assert config.submodels[SubModelType.VAE].path_or_prefix == "autoencoder"
     # And the conventional folders genuinely do not exist, so a reconstructing loader would miss.
     assert not (root / "text_encoder").exists()
     assert not (root / "vae").exists()
+
+
+def test_an_index_key_that_escapes_the_pipeline_is_not_recorded(tmp_path: Path) -> None:
+    """The record keeps the key and loading joins it onto wherever the model now lives, so a key such
+    as `../vae` would be validated beside the staging folder and then loaded beside the installed one."""
+    root = _make_flux1_pipeline(tmp_path / "pipeline", component_keys={"vae": "../vae"})
+    assert (tmp_path / "vae" / "config.json").is_file()
+
+    config = _discover(root)
+
+    assert config.submodels is not None
+    assert SubModelType.VAE not in config.submodels
+
+
+def test_recorded_components_are_found_after_the_install_moves_the_pipeline(tmp_path: Path) -> None:
+    """Downloads are identified in a `tmpinstall_*` staging folder and then moved into the models
+    dir; the record must lead the loader to the components in their final location, not to wherever
+    identification happened to look (which here is left behind, as a relocated models dir can be)."""
+    keys = {"text_encoder": "clip_encoder"}
+    staging = _make_flux1_pipeline(tmp_path / "tmpinstall_abc" / "pipeline", component_keys=keys)
+    config = _discover(staging)
+
+    installed = tmp_path / "models" / "test-key"
+    # Copied, not moved, so the staging copy survives and only the record can say which one is ours.
+    shutil.copytree(staging, installed)
+    config.path = installed.as_posix()
+
+    assert config.submodels is not None
+    assert config.submodels[SubModelType.TextEncoder].path_or_prefix == "clip_encoder"
+    te_dir = resolve_submodel_path(config, SubModelType.TextEncoder, installed / "text_encoder")
+    assert te_dir == installed / "clip_encoder"
+    assert (te_dir / "config.json").is_file()
 
 
 def test_a_serialized_submodel_map_does_not_survive_a_deleted_component(tmp_path: Path) -> None:
