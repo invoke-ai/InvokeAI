@@ -96,5 +96,5 @@ Main agent also owns machine-wide resources: dependency installs, generated API 
 
 - Readiness does not authorize commits or pushes. Follow the user's existing authorization. No automatic per-subtask commits.
 - Conventional Commits. Subject: short, outcome first, scoped by feature area (`fix(queue)`). Never write the frontend package name `webv2` anywhere in the message. Body: one to three factual lines of material changes; no repetition, no process narration.
-- Configured Git author. No agent attribution, no co-author trailers.
+- Use the configured Git author.
 - Follow `.github/pull_request_template.md`: headings in order, every applicable section and its inline guidance. Omit only conditional sections. Tick only true checklist items.
