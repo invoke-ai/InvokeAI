@@ -32,7 +32,10 @@ const compileForShape = (
 ): { filled: GenerateComponentValueKey[]; graph: BackendGraphContract } => {
   const { filled, model, projectSettings, settings } = tuned
     ? tunedSettingsFor(base, shape)
-    : { ...satisfiedSettingsFor(base, shape), projectSettings: { useCpuNoise: true } };
+    : {
+        ...satisfiedSettingsFor(base, shape),
+        projectSettings: { useCpuNoise: true, useNsfwChecker: false, useWatermark: false },
+      };
 
   // Assert every requirement before compilation for complete diagnostics.
   expect(getGenerationValidationReasons(model, settings), `${base}/${shape.label} is not satisfiable`).toEqual([]);
@@ -99,6 +102,8 @@ describe('generate graph coverage', () => {
       for (const vae of offered.values()) {
         const { backendGraph } = compileGenerateGraph({ ...settings, vae: vae as VaeModelConfig }, model, 'gallery', {
           useCpuNoise: true,
+          useNsfwChecker: false,
+          useWatermark: false,
         });
         // Metadata records the selection whether or not the builder used it, so it does not count.
         const sent = Object.values(backendGraph.nodes).some(
@@ -138,7 +143,7 @@ describe('generate graph coverage', () => {
       },
       model,
       'gallery',
-      { useCpuNoise: true }
+      { useCpuNoise: true, useNsfwChecker: false, useWatermark: false }
     );
     const nodes = Object.values(backendGraph.nodes);
     const loaded = nodes

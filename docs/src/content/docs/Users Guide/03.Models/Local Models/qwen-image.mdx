@@ -144,4 +144,6 @@ Decoder Qwen-Image (2K to 4K)* decoders (including an int8 build of the latter) 
 
 The **Prompt - Qwen Image** node also has a **Quantization** option (`none`, `int8`, `nf4`) that
 quantizes the Qwen2.5-VL encoder on load to reduce its VRAM use. The Generate panel offers the same choice
-as **Encoder quantization** under **Advanced**, applied to both prompt encoders.
+as **Encoder quantization** under **Advanced**, applied to both prompt encoders. The saving has a cost: a
+quantized encoder cannot stay in the model cache, so it is loaded from disk for every prompt it encodes, twice
+per generation when CFG is above 1. Leave it at `none` if the bf16 encoder fits.

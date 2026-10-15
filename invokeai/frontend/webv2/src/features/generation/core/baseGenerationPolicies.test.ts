@@ -971,7 +971,7 @@ describe('component policies', () => {
     expect(getDefaultReferenceImageConfig(krea2, [sdxlIpAdapter], referenceImage)).toEqual({
       image: referenceImage,
       styleStrength: 1,
-      type: 'krea2_style_reference_image',
+      type: 'krea2_reference_image',
     });
 
     const fromSdxl = getGenerateModelSelectionResult({
@@ -1000,7 +1000,7 @@ describe('component policies', () => {
       {
         id: 'ref-1',
         isEnabled: true,
-        config: { image: referenceImage, styleStrength: 1, type: 'krea2_style_reference_image' },
+        config: { image: referenceImage, styleStrength: 1, type: 'krea2_reference_image' },
       },
     ]);
 
@@ -1009,7 +1009,7 @@ describe('component policies', () => {
         {
           id: 'style',
           isEnabled: true,
-          config: { image: referenceImage, styleStrength: 1, type: 'krea2_style_reference_image' },
+          config: { image: referenceImage, styleStrength: 1, type: 'krea2_reference_image' },
         },
       ],
     });
@@ -1018,6 +1018,58 @@ describe('component policies', () => {
     expect(getGenerationValidationReasons(createModel('sd-3'), styleSettings)).toEqual([
       'Reference Image #1 is not supported by sd-3 model.',
     ]);
+  });
+
+  it('switches off the enabled references a newly selected model has no room for, keeping every reference', () => {
+    const krea2 = createModel('krea-2', { format: 'diffusers' });
+    const ipAdapter = (id: string, isEnabled: boolean) => ({
+      id,
+      isEnabled,
+      config: {
+        beginEndStepPct: [0, 1] as [number, number],
+        clipVisionModel: 'ViT-H' as const,
+        image: {
+          ...referenceImage,
+          original: { image: { ...referenceImage.original.image, image_name: `${id}.png` } },
+        },
+        method: 'style' as const,
+        model: sdxlIpAdapter,
+        type: 'ip_adapter' as const,
+        weight: 1,
+      },
+    });
+
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sdxl'), {
+        referenceImages: [ipAdapter('bypassed', false), ipAdapter('used', true), ipAdapter('extra', true)],
+      }),
+      model: krea2,
+      models: [sdxlIpAdapter],
+    });
+
+    // The first enabled reference is the one that keeps running, not the first in the list.
+    expect(
+      result.settings.referenceImages.map(({ config, id, isEnabled }) => ({ id, isEnabled, type: config.type }))
+    ).toEqual([
+      { id: 'bypassed', isEnabled: false, type: 'krea2_reference_image' },
+      { id: 'used', isEnabled: true, type: 'krea2_reference_image' },
+      { id: 'extra', isEnabled: false, type: 'krea2_reference_image' },
+    ]);
+    expect(result.clearedLabels).toContain('Reference Images');
+    expect(getGenerationValidationReasons(krea2, result.settings)).toEqual([]);
+  });
+
+  it('names a limit of one reference in the singular', () => {
+    const krea2 = createModel('krea-2', { format: 'diffusers' });
+    const style = (id: string) => ({
+      id,
+      isEnabled: true,
+      config: { image: referenceImage, styleStrength: 1, type: 'krea2_reference_image' as const },
+    });
+
+    expect(
+      getGenerationValidationReasons(krea2, createSettings(krea2, { referenceImages: [style('a'), style('b')] }))
+    ).toContain(`Generate supports at most 1 reference image for ${krea2.name}.`);
   });
 
   it('reports reference image support per model', () => {

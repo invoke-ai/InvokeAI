@@ -218,8 +218,12 @@ export const DEFAULT_FLUX_DYPE_SCALE = 2;
 export const MAX_FLUX_DYPE_SCALE = 8;
 export const DEFAULT_FLUX_DYPE_EXPONENT = 2;
 export const MAX_FLUX_DYPE_EXPONENT = 1000;
-/** Z-Image and Qwen-Image `shift` are `ge=0`; 3 is the Lightning value and the auto-derived one at one megapixel. */
+/**
+ * 3 is the Lightning value and the auto-derived one at one megapixel. The nodes accept 0, but Qwen-Image takes its log
+ * and fails the queue item, and Z-Image's schedule collapses, so the override starts above it.
+ */
 export const DEFAULT_TIMESTEP_SHIFT = 3;
+export const MIN_TIMESTEP_SHIFT = 0.1;
 export const MAX_TIMESTEP_SHIFT = 10;
 /** `z_image_seed_variance_enhancer`: strength `le=2`, randomize percent `ge=1, le=100`. */
 export const DEFAULT_ZIMAGE_SEED_VARIANCE_STRENGTH = 0.1;
@@ -243,7 +247,9 @@ export const isQwenImageEncoderQuantization = (value: unknown): value is QwenIma
  * fixed ones.
  */
 const getTimestepShift = (value: unknown): number | null =>
-  typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= MAX_TIMESTEP_SHIFT ? value : null;
+  typeof value === 'number' && Number.isFinite(value) && value >= MIN_TIMESTEP_SHIFT && value <= MAX_TIMESTEP_SHIFT
+    ? value
+    : null;
 
 const getOptionalNumber = (value: unknown): number | null =>
   typeof value === 'number' && Number.isFinite(value) ? value : null;
@@ -272,7 +278,7 @@ const REFERENCE_IMAGE_CONFIG_TYPES = new Set([
   'flux_kontext_reference_image',
   'flux_redux',
   'ip_adapter',
-  'krea2_style_reference_image',
+  'krea2_reference_image',
   'qwen_image_reference_image',
 ]);
 
@@ -312,7 +318,7 @@ const normalizeReferenceImageConfig = (value: unknown): GenerateReferenceImageCo
       return { image, type: value.type };
     case 'flux_kontext_reference_image':
       return { image, model: getMainModelOrNull(value.model), type: value.type };
-    case 'krea2_style_reference_image':
+    case 'krea2_reference_image':
       return {
         image,
         styleStrength: getClampedNumber(
@@ -379,7 +385,7 @@ const cloneReferenceImageConfig = (config: GenerateReferenceImageConfig): Genera
   switch (config.type) {
     case 'external_reference_image':
     case 'flux2_reference_image':
-    case 'krea2_style_reference_image':
+    case 'krea2_reference_image':
     case 'qwen_image_reference_image':
       return { ...config, image: config.image ? cloneCroppableImage(config.image) : null };
     case 'flux_kontext_reference_image':
@@ -547,7 +553,7 @@ const syncReferenceImageConfigWithModels = (
     }
     case 'external_reference_image':
     case 'flux2_reference_image':
-    case 'krea2_style_reference_image':
+    case 'krea2_reference_image':
     case 'qwen_image_reference_image':
       return config;
   }

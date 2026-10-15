@@ -383,7 +383,7 @@ export const FluxReduxControls = <T extends { imageInfluence: FluxReduxImageInfl
 const STYLE_STRENGTH_MARKS = [DEFAULT_KREA2_STYLE_STRENGTH];
 
 /** Krea-2 style transfer has one knob; 0 bypasses the reference entirely. */
-export const Krea2StyleReferenceControls = <T extends { styleStrength: number; type: 'krea2_style_reference_image' }>({
+export const Krea2StyleReferenceControls = <T extends { styleStrength: number; type: 'krea2_reference_image' }>({
   config,
   disabled,
   onChange,

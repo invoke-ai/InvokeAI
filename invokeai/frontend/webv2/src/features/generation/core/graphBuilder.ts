@@ -42,7 +42,7 @@ export const addEdge = (
 };
 
 /** Rename every matching node ID and edge reference. */
-export const renameNode = (graph: BackendGraphContract, oldId: string, newId: string): BackendInvocationContract => {
+const renameNode = (graph: BackendGraphContract, oldId: string, newId: string): BackendInvocationContract => {
   const node = graph.nodes[oldId];
   if (!node) {
     throw new Error(`Could not find the "${oldId}" node to rename.`);
@@ -62,9 +62,32 @@ export const renameNode = (graph: BackendGraphContract, oldId: string, newId: st
 };
 
 /**
- * Chains the project's optional output filters after the image the graph ends on. The last filter takes over
- * `canvas_output` with its durability flag and metadata edge, so result hydration and the saved record stay on the
- * node that actually emits the final image; the decode behind it becomes intermediate.
+ * Makes `output` the graph's `canvas_output`, the node result hydration follows. The node that held the id is renamed
+ * to `retiredId` and made intermediate, and its metadata edge moves to `output` so the saved record stays on the node
+ * that emits the final image. Edges into `output` are the caller's; the retired node keeps its edges under its new id.
+ */
+export const replaceCanvasOutput = (
+  graph: BackendGraphContract,
+  retiredId: string,
+  output: { type: string; [key: string]: unknown }
+): { output: BackendInvocationContract; retired: BackendInvocationContract } => {
+  const retired = renameNode(graph, 'canvas_output', retiredId);
+  retired.is_intermediate = true;
+
+  const next = addNode(graph, { ...output, id: 'canvas_output' });
+  const metadataEdge = graph.edges.find(
+    (edge) => edge.destination.node_id === retiredId && edge.destination.field === 'metadata'
+  );
+  if (metadataEdge) {
+    metadataEdge.destination.node_id = next.id;
+  }
+
+  return { output: next, retired };
+};
+
+/**
+ * Chains the project's optional output filters after the image the graph ends on. Each filter in turn takes over
+ * `canvas_output`, so the last one is the durable result and the unfiltered image becomes intermediate.
  */
 export const addOutputPostprocessors = (
   graph: BackendGraphContract,
@@ -75,33 +98,17 @@ export const addOutputPostprocessors = (
     ...(projectSettings.useNsfwChecker ? ['img_nsfw'] : []),
     ...(projectSettings.useWatermark ? ['img_watermark'] : []),
   ];
+  let retiredId = 'canvas_unfiltered_output';
 
-  if (filters.length === 0) {
-    return;
-  }
-
-  const decode = renameNode(graph, 'canvas_output', 'canvas_decode');
-  decode.is_intermediate = true;
-  let source = decode;
-
-  filters.forEach((type, index) => {
-    const isLast = index === filters.length - 1;
-    const filter = addNode(graph, {
-      id: isLast ? 'canvas_output' : `canvas_${type}`,
-      is_intermediate: isLast ? outputIsIntermediate : true,
+  for (const type of filters) {
+    const { output, retired } = replaceCanvasOutput(graph, retiredId, {
+      is_intermediate: outputIsIntermediate,
       type,
       use_cache: false,
     });
 
-    addEdge(graph, source, 'image', filter, 'image');
-    source = filter;
-  });
-
-  const metadataEdge = graph.edges.find(
-    (edge) => edge.destination.node_id === decode.id && edge.destination.field === 'metadata'
-  );
-  if (metadataEdge) {
-    metadataEdge.destination.node_id = source.id;
+    addEdge(graph, retired, 'image', output, 'image');
+    retiredId = `canvas_${type}`;
   }
 };
 

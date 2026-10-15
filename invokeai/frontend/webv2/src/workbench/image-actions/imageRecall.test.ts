@@ -1081,7 +1081,11 @@ describe('image recall', () => {
         Object.values(backendGraph.nodes)
           .filter((node) => node.type === 'lora_selector')
           .map((node) => [(node.lora as { key: string }).key, node.weight]);
-      const generated = compileGenerateGraph(generatedWith, model, 'gallery', { useCpuNoise: true }).backendGraph;
+      const generated = compileGenerateGraph(generatedWith, model, 'gallery', {
+        useCpuNoise: true,
+        useNsfwChecker: false,
+        useWatermark: false,
+      }).backendGraph;
       const result = buildImageRecallSettings({
         currentValues: createValues({ loras: [{ isEnabled: true, model: staleLora, weight: 0.9 }], model: sd1Model }),
         image,
@@ -1091,7 +1095,11 @@ describe('image recall', () => {
         supportedModels: [model],
         vaeModels: [],
       });
-      const recalled = compileGenerateGraph(result!.values, result!.values.model, 'gallery', { useCpuNoise: true });
+      const recalled = compileGenerateGraph(result!.values, result!.values.model, 'gallery', {
+        useCpuNoise: true,
+        useNsfwChecker: false,
+        useWatermark: false,
+      });
 
       expect(loraWeights(recalled.backendGraph)).toEqual([
         [grainLora.key, -0.4],
@@ -1193,9 +1201,14 @@ describe('model-family tuning recall', () => {
   const fluxModel: MainModelConfig = { base: 'flux', key: 'flux-model', name: 'FLUX', type: 'main' };
   const zImageModel: MainModelConfig = { base: 'z-image', key: 'z-model', name: 'Z-Image', type: 'main' };
   const qwenModel: MainModelConfig = { base: 'qwen-image', key: 'qwen-model', name: 'Qwen', type: 'main' };
-  const recall = (metadata: Record<string, unknown>, model: MainModelConfig, kind: ImageRecallKind = 'all') =>
+  const recall = (
+    metadata: Record<string, unknown>,
+    model: MainModelConfig,
+    kind: ImageRecallKind = 'all',
+    current: Partial<GenerateWidgetValues> = {}
+  ) =>
     buildImageRecallSettings({
-      currentValues: createValues(),
+      currentValues: createValues(current),
       image,
       kind,
       metadata: { model: { key: model.key }, ...metadata },
@@ -1221,7 +1234,7 @@ describe('model-family tuning recall', () => {
       },
       zImageModel
     );
-    const auto = recall({ z_image_shift: 'auto' }, zImageModel);
+    const auto = recall({ z_image_shift: 'auto' }, zImageModel, 'all', { zImageShift: 4 });
 
     expect(fixed?.values).toMatchObject({
       zImageSeedVarianceEnabled: true,
@@ -1231,6 +1244,13 @@ describe('model-family tuning recall', () => {
     });
     expect(auto?.values.zImageShift).toBeNull();
     expect(auto?.fields).toContain('modelTuning');
+  });
+
+  it('does not count tuning the recall leaves as it was', () => {
+    const unchanged = recall({ dype_preset: 'off', generation_mode: 'flux_txt2img', seed: 7 }, fluxModel);
+
+    expect(unchanged?.values.fluxDypePreset).toBe('off');
+    expect(unchanged?.fields).not.toContain('modelTuning');
   });
 
   it('restores the Qwen-Image shift and encoder quantization', () => {
@@ -1247,6 +1267,108 @@ describe('model-family tuning recall', () => {
     expect(wrongFamily?.values.zImageShift).toBeNull();
     expect(wrongFamily?.fields ?? []).not.toContain('modelTuning');
     expect(outOfRange?.values).toMatchObject({ fluxDypePreset: 'off', fluxDypeScale: 2 });
+  });
+
+  describe('over tuning the panel has since changed', () => {
+    const changedTuning = {
+      fluxDypePreset: '4k',
+      qwenImageEncoderQuantization: 'nf4',
+      qwenImageShift: 5,
+      zImageSeedVarianceEnabled: true,
+      zImageShift: 5,
+    } as const;
+    const recallOverChanged = (metadata: Record<string, unknown>, model: MainModelConfig) =>
+      buildImageRecallSettings({
+        currentValues: createValues(changedTuning),
+        image,
+        kind: 'all',
+        metadata,
+        models: [],
+        supportedModels: [model],
+        vaeModels: [],
+      })?.values;
+    const record = (model: MainModelConfig, extra: Record<string, unknown> = {}) => ({
+      generation_mode: `${model.base}_txt2img`,
+      model: { base: model.base, key: model.key, name: model.name, type: 'main' },
+      ...extra,
+    });
+
+    it('restores the defaults a record of the same family leaves out', () => {
+      expect(recallOverChanged(record(fluxModel), fluxModel)?.fluxDypePreset).toBe('off');
+      expect(recallOverChanged(record(zImageModel), zImageModel)).toMatchObject({
+        zImageSeedVarianceEnabled: false,
+        zImageShift: null,
+      });
+      expect(recallOverChanged(record(qwenModel), qwenModel)).toMatchObject({
+        qwenImageEncoderQuantization: 'none',
+        qwenImageShift: null,
+      });
+    });
+
+    it('reads the legacy null shift as auto', () => {
+      expect(recallOverChanged(record(qwenModel, { qwen_image_shift: null }), qwenModel)?.qwenImageShift).toBeNull();
+    });
+
+    it('keeps the current tuning when the record is not a generation of that family', () => {
+      const { generation_mode: _mode, ...withoutMode } = record(fluxModel);
+      const otherFamily = record(fluxModel, {
+        model: { base: 'sdxl', key: fluxModel.key, name: 'SDXL', type: 'main' },
+      });
+
+      expect(recallOverChanged(withoutMode, fluxModel)?.fluxDypePreset).toBe('4k');
+      expect(recallOverChanged(otherFamily, fluxModel)?.fluxDypePreset).toBe('4k');
+    });
+
+    // What a graph records must bring the panel back to that recipe from either direction. A switch the graph stops
+    // recording still passes here, since recall reads a missing key as the default; graph.test.ts pins that FLUX
+    // records DyPE off.
+    const tunedBases = generateGraphCases.filter(({ base }) => ['flux', 'qwen-image', 'z-image'].includes(base));
+    const defaultTuning = {
+      fluxDypePreset: 'off',
+      qwenImageEncoderQuantization: 'none',
+      qwenImageShift: null,
+      zImageSeedVarianceEnabled: false,
+      zImageShift: null,
+    } as const;
+    const roundTrip = ({ base, shape }: (typeof generateGraphCases)[number], recorded: object, current: object) => {
+      const { model, settings } = fullyFilledSettingsFor(base, shape);
+      const graph = compileGenerateGraph({ ...settings, ...recorded }, model, 'gallery', {
+        useCpuNoise: true,
+        useNsfwChecker: false,
+        useWatermark: false,
+      }).backendGraph;
+      const values = buildImageRecallSettings({
+        currentValues: createValues({ ...current, model }),
+        image,
+        kind: 'all',
+        metadata: Object.values(graph.nodes).find((node) => node.type === 'core_metadata'),
+        models: [],
+        supportedModels: [model],
+        vaeModels: [],
+      })?.values;
+      const keys = {
+        flux: ['fluxDypePreset'],
+        'qwen-image': ['qwenImageEncoderQuantization', 'qwenImageShift'],
+        'z-image': ['zImageSeedVarianceEnabled', 'zImageShift'],
+      }[base as 'flux' | 'qwen-image' | 'z-image'] as (keyof typeof defaultTuning)[];
+
+      return {
+        expected: Object.fromEntries(keys.map((key) => [key, (recorded as typeof defaultTuning)[key]])),
+        restored: Object.fromEntries(keys.map((key) => [key, values?.[key]])),
+      };
+    };
+
+    it.each(tunedBases)('$label restores its default tuning over changed settings', (graphCase) => {
+      const { expected, restored } = roundTrip(graphCase, defaultTuning, changedTuning);
+
+      expect(restored).toEqual(expected);
+    });
+
+    it.each(tunedBases)('$label restores its changed tuning over the defaults', (graphCase) => {
+      const { expected, restored } = roundTrip(graphCase, changedTuning, defaultTuning);
+
+      expect(restored).toEqual(expected);
+    });
   });
 
   it('offers recall for an image whose only recallable delta is its tuning', () => {
@@ -1276,7 +1398,7 @@ describe('model-family tuning recall', () => {
             config: {
               image: { original: { image: { height: 512, image_name: 'style.png', width: 512 } } },
               styleStrength: 1.4,
-              type: 'krea2_style_reference_image',
+              type: 'krea2_reference_image',
             },
             id: 'style',
             isEnabled: true,
@@ -1293,7 +1415,7 @@ describe('model-family tuning recall', () => {
         config: {
           image: { original: { image: { height: 512, image_name: 'style.png', width: 512 } } },
           styleStrength: 1.4,
-          type: 'krea2_style_reference_image',
+          type: 'krea2_reference_image',
         },
         id: 'style',
         isEnabled: true,
@@ -1314,7 +1436,7 @@ describe('Krea-2 style reference without an image', () => {
         model: { key: krea2Model.key },
         ref_images: [
           {
-            config: { image: null, styleStrength: 1.4, type: 'krea2_style_reference_image' },
+            config: { image: null, styleStrength: 1.4, type: 'krea2_reference_image' },
             id: 'style',
             isEnabled: true,
           },
@@ -1335,7 +1457,11 @@ describe('Krea-2 style reference without an image', () => {
 /** Remix from the metadata a fully filled graph records, starting from SDXL defaults. */
 const remixRoundTrip = ({ base, shape }: (typeof generateGraphCases)[number]) => {
   const { filled, model, settings } = fullyFilledSettingsFor(base, shape);
-  const graph = compileGenerateGraph(settings, model, 'gallery', { useCpuNoise: true }).backendGraph;
+  const graph = compileGenerateGraph(settings, model, 'gallery', {
+    useCpuNoise: true,
+    useNsfwChecker: false,
+    useWatermark: false,
+  }).backendGraph;
   const recordedMetadata = Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
   const serializedMetadata = JSON.stringify(recordedMetadata);
   // A slot the graph leaves unused (e.g. a bundled model's) is not recorded, so there is nothing to restore.

@@ -12,6 +12,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import type { CanvasDenoisingStrengthProps } from './GenerationUiContext';
 
@@ -83,13 +84,14 @@ void i18n.use(initReactI18next).init({
             dypePresetManual: 'Manual',
             dypePresetOff: 'Off',
             dypeScale: 'DyPE scale (λs)',
-            krea2SeedVariance: 'Seed variance',
-            krea2SeedVarianceHelp: 'Perturbs conditioning so nearby seeds diverge more.',
-            krea2SeedVarianceRandomize: 'Randomized channels',
-            krea2SeedVarianceStrength: 'Variance strength',
+            seedVariance: 'Seed variance',
+            seedVarianceHelp: 'Perturbs conditioning so nearby seeds diverge more.',
+            seedVarianceRandomize: 'Randomized channels',
+            seedVarianceStrength: 'Variance strength',
             override: 'Override',
             timestepShift: 'Shift',
-            timestepShiftHelp: 'Auto derives the schedule shift from the image size; Lightning LoRAs expect 3.',
+            qwenImageShiftHelp: 'Auto derives the schedule shift from the image size; Lightning LoRAs expect 3.',
+            timestepShiftHelp: 'Auto derives the schedule shift from the image size.',
             recentSeeds: 'Recent seeds',
             render: 'Render',
             scheduler: 'Scheduler',
@@ -512,5 +514,43 @@ describe('GenerateRenderSection model-family tuning', () => {
     await settle(() => root?.unmount());
     await render(sd1Model);
     expect(switchNamed('Override')).toBeNull();
+  });
+
+  it('keeps the shift override while a typed value passes outside its bounds', async () => {
+    const onCommit = await render(zImageModel, { zImageShift: 3 });
+    const input = () => host?.querySelector<HTMLInputElement>('input[aria-label="Shift"]');
+
+    await settle(() => input()?.select());
+    await act(() => userEvent.keyboard('0.5'));
+
+    // "0" and "0." on the way to 0.5 are below the minimum, and committing them would read as auto.
+    expect(onCommit.mock.calls.map(([patch]) => patch.zImageShift)).not.toContain(0);
+    expect(onCommit).toHaveBeenLastCalledWith({ zImageShift: 0.5 });
+
+    onCommit.mockClear();
+    await settle(() => input()?.select());
+    await act(() => userEvent.keyboard('12'));
+
+    // "1" is in bounds; "12" is above the maximum and would read as auto too.
+    expect(onCommit.mock.calls.map(([patch]) => patch.zImageShift)).toEqual([1]);
+  });
+
+  it('commits Z-Image seed variance to the Z-Image settings', async () => {
+    const onCommit = await render(zImageModel);
+
+    await settle(() => switchNamed('Seed variance')?.querySelector<HTMLElement>('[data-part="control"]')?.click());
+    expect(onCommit).toHaveBeenCalledWith({ zImageSeedVarianceEnabled: true });
+
+    await settle(() => root?.unmount());
+    const onEnabledCommit = await render(zImageModel, {
+      zImageSeedVarianceEnabled: true,
+      zImageSeedVarianceRandomizePercent: 50,
+      zImageSeedVarianceStrength: 0.1,
+    });
+    await pressOnSlider('Variance strength', 'ArrowRight');
+    await pressOnSlider('Randomized channels', 'ArrowRight');
+
+    expect(onEnabledCommit).toHaveBeenCalledWith({ zImageSeedVarianceStrength: expect.closeTo(0.15) });
+    expect(onEnabledCommit).toHaveBeenCalledWith({ zImageSeedVarianceRandomizePercent: 51 });
   });
 });

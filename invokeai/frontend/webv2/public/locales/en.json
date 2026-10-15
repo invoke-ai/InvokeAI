@@ -869,7 +869,8 @@
     "encoderQuantization": {
       "heading": "Encoder Quantization",
       "paragraphs": [
-        "Quantizes the Qwen2.5-VL text encoder on load to reduce VRAM use. 4-bit (nf4) saves the most memory; 8-bit (int8) is a middle ground. None keeps the bf16 weights."
+        "Quantizes the Qwen2.5-VL text encoder on load to reduce VRAM use. 4-bit (nf4) saves the most memory; 8-bit (int8) is a middle ground. None keeps the bf16 weights.",
+        "A quantized encoder cannot stay in the model cache, so it is loaded from disk on every generation, twice when CFG is above 1. None keeps the cached encoder and loads it once."
       ]
     },
     "styleStrength": {
@@ -882,7 +883,7 @@
       "heading": "Timestep Shift",
       "paragraphs": [
         "Overrides the sigma-schedule shift. Left on auto the model derives it from the image size, which is recommended.",
-        "Lightning LoRAs are trained for a fixed shift of 3. Lower values spend more steps at low noise; higher values at high noise."
+        "Qwen Image Lightning LoRAs are trained for a fixed shift of 3. Lower values spend more steps at low noise; higher values at high noise."
       ]
     },
     "imageInfluence": {
@@ -1965,11 +1966,11 @@
       },
       "useNsfwChecker": {
         "label": "NSFW checker",
-        "description": "Blur generated images the checker flags as explicit before they are saved."
+        "description": "Blur Generate and Canvas results the checker flags as explicit before they are saved."
       },
       "useWatermark": {
         "label": "Invisible watermark",
-        "description": "Stamp an invisible watermark into every generated image."
+        "description": "Stamp an invisible watermark into every Generate and Canvas result."
       },
       "confirmImageDeletion": {
         "label": "Confirm image deletion",
@@ -2496,10 +2497,6 @@
       "krea2RebalanceWeights": "Per-tap weights",
       "krea2RebalanceWeightsHelp": "{{count}} comma-separated numbers, one per tap.",
       "krea2RebalanceWeightsInvalid": "Enter exactly {{count}} comma-separated numbers.",
-      "krea2SeedVariance": "Seed variance",
-      "krea2SeedVarianceHelp": "Perturbs conditioning so nearby seeds diverge more.",
-      "krea2SeedVarianceRandomize": "Randomized channels",
-      "krea2SeedVarianceStrength": "Variance strength",
       "dypePreset": "DyPE",
       "dypePresetOff": "Off",
       "dypePresetManual": "Manual",
@@ -2509,13 +2506,18 @@
       "dypeScale": "DyPE scale (λs)",
       "dypeExponent": "DyPE exponent (λt)",
       "encoderQuantization": "Encoder quantization",
-      "encoderQuantizationHelp": "Quantizes the Qwen VL encoder on load to save VRAM.",
+      "encoderQuantizationHelp": "Quantizes the Qwen VL encoder on load to save VRAM, but reloads it from disk for every generation.",
       "encoderQuantizationNone": "None (bf16)",
       "encoderQuantizationInt8": "8-bit (int8)",
       "encoderQuantizationNf4": "4-bit (nf4)",
       "styleStrength": "Style strength",
       "timestepShift": "Shift",
-      "timestepShiftHelp": "Auto derives the schedule shift from the image size; Lightning LoRAs expect 3.",
+      "timestepShiftHelp": "Auto derives the schedule shift from the image size.",
+      "qwenImageShiftHelp": "Auto derives the schedule shift from the image size; Lightning LoRAs expect 3.",
+      "seedVariance": "Seed variance",
+      "seedVarianceHelp": "Perturbs conditioning so nearby seeds diverge more.",
+      "seedVarianceRandomize": "Randomized channels",
+      "seedVarianceStrength": "Variance strength",
       "llmTaskGenerating": "Generating",
       "llmTaskLoadingModel": "Loading model",
       "llmTaskProgress": "LLM task progress",

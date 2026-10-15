@@ -4,10 +4,12 @@ export type ResultDestination = 'canvas' | 'gallery';
 
 export interface GenerationProjectSettings {
   useCpuNoise: boolean;
-  /** Blur images the NSFW checker flags before they are saved. Omitted means off. */
-  useNsfwChecker?: boolean;
-  /** Stamp an invisible watermark into every saved image. Omitted means off. */
-  useWatermark?: boolean;
+  // The Generate and Canvas output filters are required so that a caller passing its settings structurally breaks
+  // the build when it renames one, instead of silently turning a safety filter off.
+  /** Blur images the NSFW checker flags before they are saved. */
+  useNsfwChecker: boolean;
+  /** Stamp an invisible watermark into every saved image. */
+  useWatermark: boolean;
 }
 
 export interface PromptHistoryItem {

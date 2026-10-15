@@ -50,9 +50,10 @@ The **Seed** sets the starting noise for the image. The same model, prompt, seed
 Some families add their own controls to the Render section:
 
 * **DyPE** (FLUX.1) — position extrapolation for sizes above the 1024px training resolution. **Auto** turns it on above 1536px, **Area** by image area and **4K optimized** is a fixed tuning; **Manual** exposes the **scale (λs)** and **exponent (λt)**.
-* **Shift** (Z-Image, Qwen Image) — an override for the sampling schedule's timestep shift. Left on auto, the model derives it from the image size; Lightning LoRAs are trained for `3`.
+* **Shift** (Z-Image, Qwen Image) — an override for the sampling schedule's timestep shift, from 0.1 to 10. Left on auto, the model derives it from the image size; Qwen Image's Lightning LoRAs are trained for `3`.
 * **Seed variance** (Krea-2, Z-Image) — perturbs the prompt conditioning so nearby seeds give more varied images; **Variance strength** and **Randomized channels** set how much.
-* **Conditioning rebalance** (Krea-2) and **CFG (Low)** (Wan) — see the model's page under Local Models.
+* **Conditioning rebalance** (Krea-2) — see [Krea-2](/users-guide/models/local-models/krea-2/).
+* **Low-noise guidance** (Wan) — guidance for the low-noise expert; left unset, it reuses the main guidance.
 
 ### Negative prompt
 
@@ -69,10 +70,10 @@ The **Advanced** section appears for models with extra options, and its header c
 * **HiDiffusion** — improves structure at large sizes for SD 1.5 and SDXL; see [HiDiffusion](/users-guide/image-generation/advanced-topics/hidiffusion/).
 * **Color compensation** — SDXL only.
 * **PiD Decode** — decodes the image at up to four times its size; see [PiD Super-Resolution Decode](/users-guide/image-generation/advanced-topics/pid-decode/).
-* **Encoder quantization** — Qwen Image only; quantizes the Qwen VL text encoder to 8-bit or 4-bit on load to save VRAM.
+* **Encoder quantization** — Qwen Image only; quantizes the Qwen VL text encoder to 8-bit or 4-bit on load to save VRAM. A quantized encoder cannot stay in the model cache, so it is loaded from disk on every generation, twice when CFG is above 1.
 * **Seamless tiling** — makes the image tile along the X axis, the Y axis, or both.
 
-Two output filters live in **Settings** under **Project** rather than in the panel, because they apply to every image the project generates: the **NSFW checker** blurs images it flags as explicit, and the **Invisible watermark** stamps every saved image. Both are off by default.
+Two output filters live in **Settings** under **Project** rather than in the panel, because they apply to every image the project's Generate panel and Canvas produce: the **NSFW checker** blurs images it flags as explicit, and the **Invisible watermark** stamps every saved image. Both are off by default. Upscale results, workflow runs and images from external models are not filtered.
 
 ### Resetting to defaults
 

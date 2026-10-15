@@ -91,11 +91,14 @@ export const getZImageTileControlValues = (structure: number) => ({
   endStepPercent: 0.75 + structure * 0.025,
 });
 
+/** Upscale runs no output filters, so only the noise device reaches its graph. */
+type UpscaleProjectSettings = Pick<GenerationProjectSettings, 'useCpuNoise'>;
+
 const addUpscaleMetadata = (
   graph: BackendGraphContract,
   { frame, output }: UpscalePathResult,
   settings: UpscaleWidgetValues,
-  projectSettings: GenerationProjectSettings,
+  projectSettings: UpscaleProjectSettings,
   randDevice: string
 ): void => {
   if (!settings.model || !settings.upscaleModel || !settings.inputImage) {
@@ -159,7 +162,7 @@ interface UpscalePathContext {
   /** The encoders this main model reads. A field it has no slot for is null here, whatever the widget holds. */
   components: ReturnType<typeof activeUpscaleComponents>;
   destination: ResultDestination;
-  projectSettings: GenerationProjectSettings;
+  projectSettings: UpscaleProjectSettings;
   positivePrompt: BackendInvocationContract;
   negativePrompt: BackendInvocationContract;
   seed: BackendInvocationContract;
@@ -677,7 +680,7 @@ const UPSCALE_PATH_BUILDERS = {
 export const compileUpscaleGraph = (
   settings: UpscaleWidgetValues,
   destination: ResultDestination,
-  projectSettings: GenerationProjectSettings,
+  projectSettings: UpscaleProjectSettings,
   randDevice = projectSettings.useCpuNoise ? 'cpu' : 'cuda'
 ): CompiledUpscaleGraph => {
   const reasons = getUpscaleValidationReasons(settings);

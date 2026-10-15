@@ -323,14 +323,14 @@ describe('normalizeGenerateSettings', () => {
     const normalized = normalizeGenerateSettings({
       ...legacyStoredValues,
       referenceImages: [
-        { config: { image, type: 'krea2_style_reference_image' }, id: 'defaulted', isEnabled: true },
-        { config: { image, styleStrength: 7, type: 'krea2_style_reference_image' }, id: 'bounded', isEnabled: true },
+        { config: { image, type: 'krea2_reference_image' }, id: 'defaulted', isEnabled: true },
+        { config: { image, styleStrength: 7, type: 'krea2_reference_image' }, id: 'bounded', isEnabled: true },
       ],
     });
 
     expect(normalized?.referenceImages.map((referenceImage) => referenceImage.config)).toEqual([
-      { image, styleStrength: 1, type: 'krea2_style_reference_image' },
-      { image, styleStrength: 2, type: 'krea2_style_reference_image' },
+      { image, styleStrength: 1, type: 'krea2_reference_image' },
+      { image, styleStrength: 2, type: 'krea2_reference_image' },
     ]);
     expect(normalized && isGenerateSettings(normalized)).toBe(true);
   });

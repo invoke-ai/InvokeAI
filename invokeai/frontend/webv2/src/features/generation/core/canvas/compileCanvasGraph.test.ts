@@ -80,7 +80,7 @@ const qwen3Encoder: ComponentModelConfig = {
   variant: 'qwen3_06b',
 };
 
-const PROJECT_SETTINGS: GenerationProjectSettings = { useCpuNoise: true };
+const PROJECT_SETTINGS: GenerationProjectSettings = { useCpuNoise: true, useNsfwChecker: false, useWatermark: false };
 
 const settingsFor = (model: GenerateModelConfig, overrides: Partial<GenerateSettings> = {}): GenerateSettings => ({
   ...getDefaultGenerateSettings(model),
@@ -1127,7 +1127,7 @@ describe('compileCanvasGraph — output filters', () => {
       projectSettings: { useNsfwChecker: true, useWatermark: true },
     });
 
-    expect(backendGraph.nodes.canvas_decode).toMatchObject({ is_intermediate: true, type: 'img_resize' });
+    expect(backendGraph.nodes.canvas_unfiltered_output).toMatchObject({ is_intermediate: true, type: 'img_resize' });
     expect(backendGraph.nodes.canvas_img_nsfw?.type).toBe('img_nsfw');
     expect(backendGraph.nodes.canvas_output).toMatchObject({ is_intermediate: false, type: 'img_watermark' });
     expect(metadataTarget(backendGraph)).toBe('canvas_output');
@@ -1136,13 +1136,13 @@ describe('compileCanvasGraph — output filters', () => {
   it('filters the composited inpaint result rather than the decode behind it', () => {
     const { backendGraph } = compile(sd1Model, 'inpaint', { projectSettings: { useNsfwChecker: true } });
 
-    expect(backendGraph.nodes.canvas_decode?.type).toBe('invokeai_img_blend');
+    expect(backendGraph.nodes.canvas_unfiltered_output?.type).toBe('invokeai_img_blend');
     expect(backendGraph.nodes.canvas_output).toMatchObject({ is_intermediate: true, type: 'img_nsfw' });
     expect(
       backendGraph.edges.find(
         (edge) => edge.destination.node_id === 'canvas_output' && edge.destination.field === 'image'
       )?.source.node_id
-    ).toBe('canvas_decode');
+    ).toBe('canvas_unfiltered_output');
     expect(metadataTarget(backendGraph)).toBe('canvas_output');
   });
 
@@ -1152,14 +1152,14 @@ describe('compileCanvasGraph — output filters', () => {
       projectSettings: { useWatermark: true },
     });
 
-    expect(backendGraph.nodes.canvas_decode?.type).toBe('invokeai_img_blend');
+    expect(backendGraph.nodes.canvas_unfiltered_output?.type).toBe('invokeai_img_blend');
     expect(backendGraph.nodes.canvas_img_nsfw).toBeUndefined();
     expect(backendGraph.nodes.canvas_output).toMatchObject({ is_intermediate: true, type: 'img_watermark' });
     expect(
       backendGraph.edges.find(
         (edge) => edge.destination.node_id === 'canvas_output' && edge.destination.field === 'image'
       )?.source.node_id
-    ).toBe('canvas_decode');
+    ).toBe('canvas_unfiltered_output');
     expect(metadataTarget(backendGraph)).toBe('canvas_output');
   });
 
@@ -1169,7 +1169,7 @@ describe('compileCanvasGraph — output filters', () => {
         projectSettings: { useNsfwChecker: false, useWatermark: false },
       });
 
-      expect(backendGraph.nodes.canvas_decode).toBeUndefined();
+      expect(backendGraph.nodes.canvas_unfiltered_output).toBeUndefined();
       expect(getNodeByType(backendGraph, 'img_nsfw')).toBeUndefined();
       expect(getNodeByType(backendGraph, 'img_watermark')).toBeUndefined();
     }
@@ -1187,7 +1187,7 @@ describe('compileCanvasGraph — Krea-2 style reference', () => {
             config: {
               image: { original: { image: { height: 512, image_name: 'style.png', width: 512 } } },
               styleStrength: 1.2,
-              type: 'krea2_style_reference_image',
+              type: 'krea2_reference_image',
             },
             id: 'style',
             isEnabled: true,

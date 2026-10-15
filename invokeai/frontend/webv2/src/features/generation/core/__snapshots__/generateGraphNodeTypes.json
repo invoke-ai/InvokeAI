@@ -562,7 +562,8 @@
           1
         ],
         "dype_preset": [
-          "manual"
+          "manual",
+          "off"
         ],
         "dype_scale": [
           3

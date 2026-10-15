@@ -13,7 +13,6 @@ import type {
 import { getDefaultGenerateSettings, isSupportedGenerateModel } from './baseGenerationPolicies';
 import { compileGenerateGraph, resolveGenerateSeed } from './graph';
 import { generateGraphCases, satisfiedSettingsFor } from './graphCoverage.testing';
-import { stabilizeBackendGraphIds } from './previewGraph';
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
 const sd2Model: MainModelConfig = { base: 'sd-2', key: 'sd2-model', name: 'SD 2', type: 'main' };
@@ -156,7 +155,11 @@ const refImage = {
 };
 
 const compile = (model: GenerateModelConfig, overrides: Partial<GenerateSettings> = {}) =>
-  compileGenerateGraph(createSettings(model, overrides), model, 'gallery', { useCpuNoise: true }).backendGraph;
+  compileGenerateGraph(createSettings(model, overrides), model, 'gallery', {
+    useCpuNoise: true,
+    useNsfwChecker: false,
+    useWatermark: false,
+  }).backendGraph;
 
 const getEdge = (graph: ReturnType<typeof compile>, targetNodeId: string, targetField: string) =>
   graph.edges.find((edge) => edge.destination.node_id === targetNodeId && edge.destination.field === targetField);
@@ -204,7 +207,7 @@ describe('compileGenerateGraph', () => {
       createSettings(sd1Model),
       sd1Model,
       'gallery',
-      { useCpuNoise: false },
+      { useCpuNoise: false, useNsfwChecker: false, useWatermark: false },
       'xpu'
     ).backendGraph;
 
@@ -1300,17 +1303,19 @@ describe('model-family tuning', () => {
     variant: 'krea2_turbo',
   };
   const styleReference = (styleStrength: number, isEnabled = true, id = 'style-ref') => ({
-    config: { image: refImage, styleStrength, type: 'krea2_style_reference_image' as const },
+    config: { image: refImage, styleStrength, type: 'krea2_reference_image' as const },
     id,
     isEnabled,
   });
 
-  it('sends no DyPE fields while the preset is off, so the FLUX denoise node stays as it was', () => {
+  it('sends no DyPE fields while the preset is off, but records off so recall can restore it', () => {
     const graph = compile(fluxModel, fluxComponents);
+    const metadata = getNodeByType(graph, 'core_metadata');
 
     expect(graph.nodes.denoise_latents).not.toHaveProperty('dype_preset');
     expect(graph.nodes.denoise_latents).not.toHaveProperty('dype_scale');
-    expect(getNodeByType(graph, 'core_metadata')).not.toHaveProperty('dype_preset');
+    expect(metadata).toMatchObject({ dype_preset: 'off' });
+    expect(metadata).not.toHaveProperty('dype_scale');
   });
 
   it('sends only the DyPE preset for the derived presets, and scale and exponent under manual', () => {
@@ -1427,7 +1432,7 @@ describe('model-family tuning', () => {
     };
     const graph = compile(krea2Model, {
       referenceImages: [
-        { config: { image: cropped, styleStrength: 1, type: 'krea2_style_reference_image' }, id: 'r', isEnabled: true },
+        { config: { image: cropped, styleStrength: 1, type: 'krea2_reference_image' }, id: 'r', isEnabled: true },
       ],
     });
 
@@ -1444,60 +1449,46 @@ describe('model-family tuning', () => {
 });
 
 describe('output filters', () => {
-  /** The graph without its minted ids, so two compilations of one recipe compare equal. */
-  const structure = (graph: ReturnType<typeof compile>) => stabilizeBackendGraphIds(graph);
-
-  // The committed node-type contract (`__snapshots__/generateGraphNodeTypes.json`, checked against the backend
-  // registry) is the guard on what a default recipe emits; this only pins that the filter switches themselves are
-  // inert at their defaults. Metadata does record the new tuning keys at defaults (`z_image_shift: 'auto'` etc.),
-  // as legacy did.
-  it.each(generateGraphCases)(
-    '$label emits no filter nodes and the same structure whether the filter settings are omitted or off',
-    ({ base, shape }) => {
-      const { model, settings } = satisfiedSettingsFor(base, shape);
-      const plain = compileGenerateGraph(settings, model, 'gallery', { useCpuNoise: true }).backendGraph;
-      const explicit = compileGenerateGraph(settings, model, 'gallery', {
-        useCpuNoise: true,
-        useNsfwChecker: false,
-        useWatermark: false,
-      }).backendGraph;
-
-      expect(structure(explicit)).toEqual(structure(plain));
-      expect(Object.values(plain.nodes).some((node) => node.type === 'img_nsfw' || node.type === 'img_watermark')).toBe(
-        false
-      );
-    }
-  );
-
   it.each(generateGraphCases)('$label chains the checker and watermark after its decode', ({ base, shape }) => {
     const { model, settings } = satisfiedSettingsFor(base, shape);
-    const plain = compileGenerateGraph(settings, model, 'gallery', { useCpuNoise: true }).backendGraph;
+    const plain = compileGenerateGraph(settings, model, 'gallery', {
+      useCpuNoise: true,
+      useNsfwChecker: false,
+      useWatermark: false,
+    }).backendGraph;
     const graph = compileGenerateGraph(settings, model, 'canvas', {
       useCpuNoise: true,
       useNsfwChecker: true,
       useWatermark: true,
     }).backendGraph;
 
-    // The decode that used to be the output now feeds the checker, and only the watermark is the result.
-    expect(graph.nodes.canvas_decode?.type).toBe(plain.nodes.canvas_output?.type);
-    expect(graph.nodes.canvas_decode?.is_intermediate).toBe(true);
+    expect(Object.values(plain.nodes).some((node) => node.type === 'img_nsfw' || node.type === 'img_watermark')).toBe(
+      false
+    );
+    // The image that used to be the output now feeds the checker, and only the watermark is the result.
+    expect(graph.nodes.canvas_unfiltered_output?.type).toBe(plain.nodes.canvas_output?.type);
+    expect(graph.nodes.canvas_unfiltered_output?.is_intermediate).toBe(true);
     expect(graph.nodes.canvas_img_nsfw).toMatchObject({ is_intermediate: true, type: 'img_nsfw', use_cache: false });
     expect(graph.nodes.canvas_output).toMatchObject({ is_intermediate: true, type: 'img_watermark', use_cache: false });
-    expect(getEdge(graph, 'canvas_img_nsfw', 'image')?.source).toEqual({ field: 'image', node_id: 'canvas_decode' });
+    expect(getEdge(graph, 'canvas_img_nsfw', 'image')?.source).toEqual({
+      field: 'image',
+      node_id: 'canvas_unfiltered_output',
+    });
     expect(getEdge(graph, 'canvas_output', 'image')?.source).toEqual({ field: 'image', node_id: 'canvas_img_nsfw' });
     expect(getEdge(graph, 'canvas_output', 'metadata')?.source.node_id).toBe(getNodeByType(graph, 'core_metadata')?.id);
-    expect(getEdge(graph, 'canvas_decode', 'metadata')).toBeUndefined();
+    expect(getEdge(graph, 'canvas_unfiltered_output', 'metadata')).toBeUndefined();
   });
 
   it('runs a single filter as the durable output itself', () => {
     const graph = compileGenerateGraph(createSettings(sd1Model), sd1Model, 'gallery', {
       useCpuNoise: true,
+      useNsfwChecker: false,
       useWatermark: true,
     }).backendGraph;
 
     expect(graph.nodes.canvas_img_nsfw).toBeUndefined();
     expect(graph.nodes.canvas_output).toMatchObject({ is_intermediate: false, type: 'img_watermark' });
-    expect(getEdge(graph, 'canvas_output', 'image')?.source.node_id).toBe('canvas_decode');
+    expect(getEdge(graph, 'canvas_output', 'image')?.source.node_id).toBe('canvas_unfiltered_output');
   });
 
   it('keeps the filters after a PiD decode, which already ends on the output node', () => {
@@ -1510,10 +1501,10 @@ describe('output filters', () => {
       }),
       sdxlModel,
       'gallery',
-      { useCpuNoise: true, useNsfwChecker: true }
+      { useCpuNoise: true, useNsfwChecker: true, useWatermark: false }
     ).backendGraph;
 
-    expect(graph.nodes.canvas_decode?.type).toBe('sdxl_pid_decode');
+    expect(graph.nodes.canvas_unfiltered_output?.type).toBe('sdxl_pid_decode');
     expect(graph.nodes.canvas_output?.type).toBe('img_nsfw');
   });
 

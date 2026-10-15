@@ -1287,7 +1287,7 @@ export const getDefaultReferenceImageConfig = (
   }
 
   if (modelBase === 'krea-2') {
-    return { image, styleStrength: DEFAULT_KREA2_STYLE_STRENGTH, type: 'krea2_style_reference_image' };
+    return { image, styleStrength: DEFAULT_KREA2_STYLE_STRENGTH, type: 'krea2_reference_image' };
   }
 
   if (isFluxKontextModel(model)) {
@@ -1319,7 +1319,7 @@ const getReferenceImageConfigSupported = (
       return model.type !== 'external_image_generator' && model.base === 'flux2';
     case 'qwen_image_reference_image':
       return model.type !== 'external_image_generator' && model.base === 'qwen-image' && model.variant === 'edit';
-    case 'krea2_style_reference_image':
+    case 'krea2_reference_image':
       return model.type !== 'external_image_generator' && model.base === 'krea-2';
     case 'flux_kontext_reference_image':
       return isFluxKontextModel(model);
@@ -1406,7 +1406,22 @@ const getSettingsWithCompatibleModelSelections = (
     addClearedLabel(clearedLabels, 'LoRAs');
   }
 
-  const compatibleReferenceImages = getCompatibleReferenceImages(settings.referenceImages, model, models);
+  // Enabled references beyond the new family's limit are switched off rather than deleted: Invoke is not left
+  // blocked, the first enabled ones keep running, and switching back can turn the rest on again.
+  const retargetedReferenceImages = getCompatibleReferenceImages(settings.referenceImages, model, models);
+  const maxReferenceImages = getMaxReferenceImages(model);
+  let enabledKept = 0;
+  const compatibleReferenceImages =
+    retargetedReferenceImages.filter((referenceImage) => referenceImage.isEnabled).length > maxReferenceImages
+      ? retargetedReferenceImages.map((referenceImage) => {
+          if (!referenceImage.isEnabled) {
+            return referenceImage;
+          }
+
+          enabledKept += 1;
+          return enabledKept > maxReferenceImages ? { ...referenceImage, isEnabled: false } : referenceImage;
+        })
+      : retargetedReferenceImages;
 
   if (compatibleReferenceImages !== settings.referenceImages) {
     nextSettings.referenceImages = compatibleReferenceImages;
@@ -1597,7 +1612,9 @@ const getReferenceImageValidationReasons = (model: GenerateModelConfig, settings
   const maxReferenceImages = getMaxReferenceImages(model);
 
   if (isReferenceImageSupported(model) && enabled.length > maxReferenceImages) {
-    reasons.push(`Generate supports at most ${maxReferenceImages} reference images for ${model.name}.`);
+    reasons.push(
+      `Generate supports at most ${maxReferenceImages} reference image${maxReferenceImages === 1 ? '' : 's'} for ${model.name}.`
+    );
   }
 
   enabled.forEach((referenceImage, index) => {

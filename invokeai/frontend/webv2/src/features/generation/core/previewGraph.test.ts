@@ -49,7 +49,12 @@ afterEach(resetArchitectureCapabilities);
 
 describe('compileGeneratePreviewGraph', () => {
   it('compiles a ready graph with deterministic node ids across repeated compiles', () => {
-    const input = { destination: 'gallery' as const, models, storedValues, projectSettings: { useCpuNoise: false } };
+    const input = {
+      destination: 'gallery' as const,
+      models,
+      storedValues,
+      projectSettings: { useCpuNoise: false, useNsfwChecker: false, useWatermark: false },
+    };
     const first = compileGeneratePreviewGraph(input);
     const second = compileGeneratePreviewGraph(input);
 
@@ -75,7 +80,7 @@ describe('compileGeneratePreviewGraph', () => {
       destination: 'gallery',
       models,
       storedValues,
-      projectSettings: { useCpuNoise: false },
+      projectSettings: { useCpuNoise: false, useNsfwChecker: false, useWatermark: false },
     });
 
     if (result.status !== 'ready') {
@@ -92,7 +97,7 @@ describe('compileGeneratePreviewGraph', () => {
       destination: 'gallery',
       models,
       storedValues,
-      projectSettings: { useCpuNoise: false },
+      projectSettings: { useCpuNoise: false, useNsfwChecker: false, useWatermark: false },
     });
 
     if (result.status !== 'ready') {
@@ -114,7 +119,7 @@ describe('compileGeneratePreviewGraph', () => {
       destination: 'gallery',
       models,
       storedValues: badValues,
-      projectSettings: { useCpuNoise: false },
+      projectSettings: { useCpuNoise: false, useNsfwChecker: false, useWatermark: false },
     });
 
     expect(result.status).toBe('invalid');
@@ -129,7 +134,7 @@ describe('compileGeneratePreviewGraph', () => {
       destination: 'gallery',
       models: [],
       storedValues,
-      projectSettings: { useCpuNoise: false },
+      projectSettings: { useCpuNoise: false, useNsfwChecker: false, useWatermark: false },
     });
 
     expect(result.status).toBe('invalid');
@@ -140,7 +145,7 @@ describe('compileGeneratePreviewGraph', () => {
       destination: 'gallery' as const,
       models,
       storedValues: undefined,
-      projectSettings: { useCpuNoise: false },
+      projectSettings: { useCpuNoise: false, useNsfwChecker: false, useWatermark: false },
     };
     const first = compileGeneratePreviewGraph(input);
     const second = compileGeneratePreviewGraph(input);

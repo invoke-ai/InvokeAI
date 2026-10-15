@@ -697,6 +697,8 @@ const buildFluxGraph = (
     clip_embed_model: clipEmbedModel ?? undefined,
     guidance: settings.cfgScale,
     ...dype,
+    // Recorded even when off, so recall can restore it over a preset the panel has since turned on.
+    dype_preset: settings.fluxDypePreset,
     scheduler,
     t5_encoder: t5EncoderModel ?? undefined,
     vae: vaeModel ?? undefined,
@@ -1324,7 +1326,7 @@ const buildKrea2Graph = (
   addEdge(graph, seed, 'value', denoise, 'seed');
   addEdge(graph, denoise, 'latents', output, 'latents');
   // Shared-KV reference attention takes exactly one reference; zero strength is a full bypass, so it is not run.
-  const styleReference = getEnabledReferenceImages(settings, 'krea2_style_reference_image').find(
+  const styleReference = getEnabledReferenceImages(settings, 'krea2_reference_image').find(
     (referenceImage) => referenceImage.config.styleStrength > 0
   );
   if (styleReference?.config.image) {

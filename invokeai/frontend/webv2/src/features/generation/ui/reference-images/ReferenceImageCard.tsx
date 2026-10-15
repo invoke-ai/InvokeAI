@@ -154,7 +154,7 @@ const ReferenceImageCardBase = ({
                     {formatWeight(config.weight)}
                   </Text>
                 </>
-              ) : config.type === 'krea2_style_reference_image' ? (
+              ) : config.type === 'krea2_reference_image' ? (
                 <>
                   {' · '}
                   {t('widgets.generate.styleStrength')}{' '}
@@ -272,7 +272,7 @@ const ReferenceImageCardBase = ({
                 selectedBase={selectedBase}
                 onConfigChange={changeConfig}
               />
-            ) : config.type === 'krea2_style_reference_image' ? (
+            ) : config.type === 'krea2_reference_image' ? (
               <Krea2StyleReferenceControls config={config} disabled={!isEnabled} onChange={changeConfig} />
             ) : null}
           </Stack>

@@ -34,6 +34,7 @@ import {
   MAX_KREA2_SEED_VARIANCE_STRENGTH,
   MAX_TIMESTEP_SHIFT,
   MAX_ZIMAGE_SEED_VARIANCE_STRENGTH,
+  MIN_TIMESTEP_SHIFT,
   MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
 } from '@features/generation/core/settings';
 import { useExternalStoreSelector } from '@platform/state/selectors';
@@ -282,12 +283,12 @@ const SeedVarianceFields = ({
   return (
     <>
       <Field
-        helpText={t('widgets.generate.krea2SeedVarianceHelp')}
-        label={t('widgets.generate.krea2SeedVariance')}
+        helpText={t('widgets.generate.seedVarianceHelp')}
+        label={t('widgets.generate.seedVariance')}
         labelEnd={
           <GenerateToggleSwitch
             checked={enabled}
-            label={t('widgets.generate.krea2SeedVariance')}
+            label={t('widgets.generate.seedVariance')}
             onCheckedChange={(checked) => onChange({ enabled: checked })}
           />
         }
@@ -297,7 +298,7 @@ const SeedVarianceFields = ({
       {enabled ? (
         <>
           <ScrubberField
-            label={t('widgets.generate.krea2SeedVarianceStrength')}
+            label={t('widgets.generate.seedVarianceStrength')}
             max={maxStrength}
             min={0}
             step={0.05}
@@ -306,7 +307,7 @@ const SeedVarianceFields = ({
           />
           <ScrubberField
             formatValue={formatPercent}
-            label={t('widgets.generate.krea2SeedVarianceRandomize')}
+            label={t('widgets.generate.seedVarianceRandomize')}
             max={100}
             min={minRandomizePercent}
             step={1}
@@ -420,20 +421,18 @@ const FluxDypeFields = ({ onCommit, settings }: RenderFieldsProps) => {
 
 /** Null lets the denoise node derive the shift from the image size; the override starts at the Lightning value. */
 const TimestepShiftField = ({
+  helpText,
   onChange,
   shift,
 }: {
+  helpText: string;
   shift: number | null;
   onChange: (shift: number | null) => void;
 }) => {
   const { t } = useTranslation();
 
   return (
-    <Field
-      helpText={t('widgets.generate.timestepShiftHelp')}
-      hint="timestepShift"
-      label={t('widgets.generate.timestepShift')}
-    >
+    <Field helpText={helpText} hint="timestepShift" label={t('widgets.generate.timestepShift')}>
       <GenerateToggleSwitch
         checked={shift !== null}
         label={t('widgets.generate.override')}
@@ -447,10 +446,16 @@ const TimestepShiftField = ({
           max={TIMESTEP_SHIFT_SLIDER_MAX}
           min={TIMESTEP_SHIFT_SLIDER_MIN}
           numberInputMax={MAX_TIMESTEP_SHIFT}
-          numberInputMin={0}
+          numberInputMin={MIN_TIMESTEP_SHIFT}
           step={0.1}
           value={shift}
-          onChange={onChange}
+          // The input reports each keystroke, so typing 0.5 passes through 0. Settings read a shift outside its
+          // bounds as auto, which would drop the override mid-edit; the input clamps it on blur instead.
+          onChange={(next) => {
+            if (next >= MIN_TIMESTEP_SHIFT && next <= MAX_TIMESTEP_SHIFT) {
+              onChange(next);
+            }
+          }}
         />
       ) : null}
     </Field>
@@ -600,10 +605,15 @@ export const GenerateRenderSection = ({
       ) : null}
       {familyBase === 'wan' ? <WanLowNoiseGuidanceField settings={settings} onCommit={onCommit} /> : null}
       {familyBase === 'z-image' ? (
-        <TimestepShiftField shift={settings.zImageShift} onChange={(zImageShift) => onCommit({ zImageShift })} />
+        <TimestepShiftField
+          helpText={t('widgets.generate.timestepShiftHelp')}
+          shift={settings.zImageShift}
+          onChange={(zImageShift) => onCommit({ zImageShift })}
+        />
       ) : null}
       {familyBase === 'qwen-image' ? (
         <TimestepShiftField
+          helpText={t('widgets.generate.qwenImageShiftHelp')}
           shift={settings.qwenImageShift}
           onChange={(qwenImageShift) => onCommit({ qwenImageShift })}
         />

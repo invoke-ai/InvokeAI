@@ -233,7 +233,7 @@ export const tunedSettingsFor = (base: SupportedGenerateBase, shape: ModelShape)
         base === 'krea-2'
           ? [
               {
-                config: { image, styleStrength: 1, type: 'krea2_style_reference_image' as const },
+                config: { image, styleStrength: 1, type: 'krea2_reference_image' as const },
                 id: 'style',
                 isEnabled: true,
               },
