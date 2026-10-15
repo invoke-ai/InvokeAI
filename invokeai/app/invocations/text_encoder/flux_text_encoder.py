@@ -149,12 +149,17 @@ class FluxTextEncoderInvocation(BaseInvocation):
             context.models.load(self.clip.tokenizer) as clip_tokenizer,
             ExitStack() as exit_stack,
         ):
-            assert isinstance(clip_text_encoder, CLIPTextModel)
+            if not isinstance(clip_text_encoder, CLIPTextModel):
+                # A CLIP-G loads with its projection; FLUX.1 conditions on CLIP-L alone.
+                raise ValueError(
+                    f"FLUX.1 needs a CLIP-L text encoder; '{clip_text_encoder_config.name}' is not one. "
+                    "Select a CLIP-L encoder such as clip_l or clip-vit-large-patch14."
+                )
             assert isinstance(clip_tokenizer, CLIPTokenizer)
 
             # Apply LoRA models to the CLIP encoder.
             # Note: We apply the LoRA after the transformer has been moved to its target device for faster patching.
-            if clip_text_encoder_config.format in [ModelFormat.Diffusers]:
+            if clip_text_encoder_config.format in [ModelFormat.Diffusers, ModelFormat.Checkpoint]:
                 # The model is non-quantized, so we can apply the LoRA weights directly into the model.
                 exit_stack.enter_context(
                     LayerPatcher.apply_smart_model_patches(

@@ -25,9 +25,7 @@ import subprocess
 import tempfile
 from collections.abc import Collection, Iterator, Mapping
 from pathlib import Path
-from typing import BinaryIO, Optional
-
-import imageio_ffmpeg
+from typing import BinaryIO, Callable, Optional
 
 # A single tag is a JSON string the app itself produced; a graph JSON is the largest and
 # runs to a few hundred KiB. The cap exists only so a hostile file cannot make the reader
@@ -40,6 +38,8 @@ _MAX_KEY_NAME_BYTES = 1024
 # fragmented file, so a raw upload padded with tiny top-level boxes is given up on rather than
 # walked. Children of ``moov`` are bounded by ``moov``'s own size.
 _MAX_TOP_LEVEL_BOXES = 1024
+# Movie headers are near the start of ``moov``; bound this walk for uploaded files.
+_MAX_MOVIE_HEADER_CHILDREN = 64
 # Same wall-clock bound as the audio mux: a stream copy of a 1 GB upload is disk-bound and
 # finishes in seconds, so this only stops a wedged child from holding the save forever.
 REMUX_TIMEOUT_SECONDS = 600
@@ -52,13 +52,7 @@ class Mp4MetadataError(RuntimeError):
     """The MP4 could not be rewritten with the requested tags."""
 
 
-def _ffmpeg_exe() -> str:
-    return imageio_ffmpeg.get_ffmpeg_exe()
-
-
-def _iter_boxes(
-    fh: BinaryIO, start: int, end: int, max_boxes: Optional[int] = None
-) -> Iterator[tuple[bytes, int, int]]:
+def iter_boxes(fh: BinaryIO, start: int, end: int, max_boxes: Optional[int] = None) -> Iterator[tuple[bytes, int, int]]:
     """Yield ``(type, payload_start, payload_end)`` for each box in ``[start, end)``.
 
     Stops silently at the first structurally impossible box (size smaller than its own
@@ -91,13 +85,50 @@ def _iter_boxes(
         position += size
 
 
-def _find_box(
+def find_box(
     fh: BinaryIO, start: int, end: int, box_type: bytes, max_boxes: Optional[int] = None
 ) -> Optional[tuple[int, int]]:
-    for found_type, payload_start, payload_end in _iter_boxes(fh, start, end, max_boxes):
+    for found_type, payload_start, payload_end in iter_boxes(fh, start, end, max_boxes):
         if found_type == box_type:
             return payload_start, payload_end
     return None
+
+
+def read_mp4_movie_duration(path: Path) -> Optional[float]:
+    """Return the MP4 movie-header duration in seconds, or None if it is unavailable or invalid.
+
+    Unlike OpenCV's video-only fallback probe, ``mvhd`` covers the movie timeline across tracks.
+    The bounded box walks and fixed-size reads keep this safe for uploaded containers.
+    """
+    with open(path, "rb") as fh:
+        fh.seek(0, 2)
+        moov = find_box(fh, 0, fh.tell(), b"moov", max_boxes=_MAX_TOP_LEVEL_BOXES)
+        if moov is None:
+            return None
+        mvhd = find_box(fh, *moov, b"mvhd", max_boxes=_MAX_MOVIE_HEADER_CHILDREN)
+        if mvhd is None or mvhd[0] >= mvhd[1]:
+            return None
+        fh.seek(mvhd[0])
+        version = fh.read(1)
+        if not version or version[0] not in (0, 1):
+            return None
+        if version[0] == 0:
+            timescale_offset, duration_offset, duration_size = 12, 16, 4
+        else:
+            timescale_offset, duration_offset, duration_size = 20, 24, 8
+        if mvhd[0] + duration_offset + duration_size > mvhd[1]:
+            return None
+        fh.seek(mvhd[0] + timescale_offset)
+        timescale_raw = fh.read(4)
+        fh.seek(mvhd[0] + duration_offset)
+        duration_raw = fh.read(duration_size)
+        if len(timescale_raw) != 4 or len(duration_raw) != duration_size:
+            return None
+        timescale = struct.unpack(">I", timescale_raw)[0]
+        duration = int.from_bytes(duration_raw, "big")
+        if timescale == 0 or duration == (1 << (duration_size * 8)) - 1:
+            return None
+        return duration / timescale
 
 
 def _meta_payload_start(fh: BinaryIO, start: int, end: int) -> int:
@@ -141,7 +172,7 @@ def _read_keys(fh: BinaryIO, start: int, end: int) -> dict[int, str]:
 
 def _read_utf8_data(fh: BinaryIO, start: int, end: int) -> Optional[str]:
     """The first UTF-8 ``data`` atom of an ``ilst`` item, or None."""
-    for box_type, payload_start, payload_end in _iter_boxes(fh, start, end):
+    for box_type, payload_start, payload_end in iter_boxes(fh, start, end):
         if box_type != b"data" or payload_end - payload_start < 8:
             continue
         fh.seek(payload_start)
@@ -169,22 +200,22 @@ def read_mp4_tags(path: Path, keys: Optional[Collection[str]] = None) -> dict[st
     with open(path, "rb") as fh:
         fh.seek(0, 2)
         file_size = fh.tell()
-        moov = _find_box(fh, 0, file_size, b"moov", max_boxes=_MAX_TOP_LEVEL_BOXES)
+        moov = find_box(fh, 0, file_size, b"moov", max_boxes=_MAX_TOP_LEVEL_BOXES)
         if moov is None:
             return result
-        udta = _find_box(fh, *moov, b"udta")
+        udta = find_box(fh, *moov, b"udta")
         if udta is None:
             return result
-        meta = _find_box(fh, *udta, b"meta")
+        meta = find_box(fh, *udta, b"meta")
         if meta is None:
             return result
         meta_start = _meta_payload_start(fh, *meta)
-        keys_box = _find_box(fh, meta_start, meta[1], b"keys")
-        ilst = _find_box(fh, meta_start, meta[1], b"ilst")
+        keys_box = find_box(fh, meta_start, meta[1], b"keys")
+        ilst = find_box(fh, meta_start, meta[1], b"ilst")
         if keys_box is None or ilst is None:
             return result
         names = _read_keys(fh, *keys_box)
-        for item_type, item_start, item_end in _iter_boxes(fh, *ilst):
+        for item_type, item_start, item_end in iter_boxes(fh, *ilst):
             name = names.get(int.from_bytes(item_type, "big"))
             if name is None or (wanted is not None and name not in wanted):
                 continue
@@ -200,7 +231,7 @@ def read_ftyp_major_brand(path: Path, search_limit: int = 64 * 1024) -> Optional
     with open(path, "rb") as fh:
         fh.seek(0, 2)
         end = min(fh.tell(), search_limit)
-        for box_type, payload_start, payload_end in _iter_boxes(fh, 0, end):
+        for box_type, payload_start, payload_end in iter_boxes(fh, 0, end):
             if box_type == b"ftyp":
                 if payload_end - payload_start < 4:
                     return None
@@ -222,10 +253,18 @@ def _escape_ffmetadata(value: str) -> str:
     )
 
 
-def write_mp4_tags(src: Path, dst: Path, tags: Mapping[str, str]) -> None:
-    """Write ``dst`` = ``src``'s first video stream and every audio stream, stream-copied, with
-    ``tags`` as the file's keyed metadata (replacing any global tags ``src`` had). An empty
-    mapping therefore strips ``src``'s global tags.
+def write_mp4_tags(
+    src: Path,
+    dst: Path,
+    tags: Mapping[str, str],
+    is_canceled: Optional[Callable[[], bool]] = None,
+    *,
+    first_audio_only: bool = False,
+) -> None:
+    """Write ``dst`` = ``src``'s first video stream and every audio stream (or only the first,
+    with ``first_audio_only``), stream-copied, with ``tags`` as the file's keyed metadata
+    (replacing any global tags ``src`` had). An empty mapping therefore strips ``src``'s
+    global tags.
 
     Subtitle, data and further video tracks are not carried: InvokeAI stores only what it
     serves, and the ingest path already narrows uploads the same way. ``dst`` is written with
@@ -245,12 +284,11 @@ def write_mp4_tags(src: Path, dst: Path, tags: Mapping[str, str]) -> None:
         ffmeta_path = Path(ffmeta.name)
     try:
         try:
-            proc = subprocess.run(
+            # Imported here: video_audio is a heavier module than this one's other callers need.
+            from invokeai.app.util.video_audio import run_ffmpeg_process
+
+            proc = run_ffmpeg_process(
                 [
-                    _ffmpeg_exe(),
-                    "-y",
-                    "-loglevel",
-                    "error",
                     "-i",
                     str(src),
                     "-i",
@@ -258,7 +296,7 @@ def write_mp4_tags(src: Path, dst: Path, tags: Mapping[str, str]) -> None:
                     "-map",
                     "0:v:0",
                     "-map",
-                    "0:a?",
+                    "0:a:0?" if first_audio_only else "0:a?",
                     "-map_metadata",
                     "1",
                     "-c",
@@ -269,8 +307,8 @@ def write_mp4_tags(src: Path, dst: Path, tags: Mapping[str, str]) -> None:
                     "mp4",
                     str(dst),
                 ],
-                capture_output=True,
-                timeout=REMUX_TIMEOUT_SECONDS,
+                REMUX_TIMEOUT_SECONDS,
+                is_canceled,
             )
         except subprocess.TimeoutExpired as e:
             raise Mp4MetadataError(f"ffmpeg timed out writing metadata into {dst.name}") from e

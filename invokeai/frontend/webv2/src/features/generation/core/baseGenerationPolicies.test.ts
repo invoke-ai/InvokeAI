@@ -53,7 +53,13 @@ const createSettings = (model: GenerateModelConfig, overrides: Partial<GenerateS
 });
 
 const t5Encoder: ComponentModelConfig = { base: 'any', key: 't5', name: 'T5 Encoder', type: 't5_encoder' };
-const clipEmbed: ComponentModelConfig = { base: 'any', key: 'clip', name: 'CLIP Embed', type: 'clip_embed' };
+const clipEmbed: ComponentModelConfig = {
+  base: 'any',
+  key: 'clip',
+  name: 'CLIP Embed',
+  type: 'clip_embed',
+  variant: 'large',
+};
 const mistralEncoder: ComponentModelConfig = {
   base: 'any',
   key: 'mistral',
@@ -509,6 +515,19 @@ describe('component policies', () => {
     expect(
       getGenerationValidationReasons(model, createSettings(model, { qwen3EncoderModel: qwen3Encoder, vae: fluxVae }))
     ).toEqual([]);
+  });
+
+  it('offers FLUX.1 only CLIP-L encoders, the one its text encoder runs', () => {
+    const model = createModel('flux');
+    const settings = createSettings(model);
+    const clipFilter = getComponentSectionPolicy(model, settings).slots.find(
+      (slot) => slot.key === 'clipEmbedModel'
+    )?.filter;
+    const ctx = { model, selectedComponents: { ...settings }, settings };
+    const clipG = { ...clipEmbed, key: 'clip-g', variant: 'gigantic' };
+
+    expect(clipFilter?.(clipEmbed as GenerateModelConfig, ctx)).toBe(true);
+    expect(clipFilter?.(clipG as GenerateModelConfig, ctx)).toBe(false);
   });
 
   it('offers complete SDNQ Z-Image pipelines as component sources but rejects partial folders', () => {
