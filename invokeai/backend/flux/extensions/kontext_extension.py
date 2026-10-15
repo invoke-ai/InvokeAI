@@ -1,14 +1,17 @@
 import torch
 import torch.nn.functional as F
 import torchvision.transforms as T
+from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 from einops import repeat
 
 from invokeai.app.invocations.fields import FluxKontextConditioningField
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.flux.modules.autoencoder import AutoEncoder
 from invokeai.backend.flux.sampling_utils import pack
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.oom import is_oom_error
+from invokeai.backend.util.vae_tiling_scope import scoped_vae_tiling
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux
 
 
 def generate_img_ids_with_offset(
@@ -131,19 +134,43 @@ class KontextExtension:
 
             # Continue with VAE encoding
             # Don't sample from the distribution for reference images - use the mean (matching ComfyUI)
-            # Estimate working memory for encode operation (50% of decode memory requirements)
-            img_h = image_tensor.shape[-2]
-            img_w = image_tensor.shape[-1]
-            element_size = next(vae_info.model.parameters()).element_size()
-            scaling_constant = 1100  # 50% of decode scaling constant (2200)
-            estimated_working_memory = int(img_h * img_w * element_size * scaling_constant)
+            estimated_working_memory = estimate_vae_working_memory_flux(
+                operation="encode", image_tensor=image_tensor, vae=vae_info.model
+            )
 
             with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
-                assert isinstance(vae, AutoEncoder)
+                assert isinstance(vae, AutoencoderKL)
                 vae_dtype = next(iter(vae.parameters())).dtype
                 image_tensor = image_tensor.to(device=TorchDevice.choose_torch_device(), dtype=vae_dtype)
-                # Use sample=False to get the distribution mean without noise
-                kontext_latents_unpacked = vae.encode(image_tensor, sample=False)
+
+                def encode_reference(x: torch.Tensor = image_tensor) -> torch.Tensor:
+                    # `.mode()` is the distribution mean without noise -- `sample=False` on the
+                    # class this used to be written for. `x` is bound as a default rather than
+                    # closed over: this runs inside a loop over the reference images.
+                    return vae.encode(x).latent_dist.mode()
+
+                # Nothing on this path resizes: the reference is encoded at whatever resolution the
+                # user supplied, so a large one reserves in proportion -- 19.3 GiB at 3072px, which
+                # no consumer card has spare beside a resident transformer. Untiled first, because
+                # tiling changes the reference latents and with them the generation; tiled only when
+                # the untiled attempt has already failed, which turns a dead generation into a
+                # slower one. The FLUX.2 sibling forces a tile unconditionally
+                # (`flux2/ref_image_extension.py`); whether that trade is right here is a question
+                # about reference fidelity, not about memory, and is left open deliberately.
+                try:
+                    moments = encode_reference()
+                except RuntimeError as e:
+                    if not is_oom_error(e):
+                        raise
+                    e.__traceback__ = None
+                    TorchDevice.empty_cache()
+                    with scoped_vae_tiling(vae, 0):
+                        moments = encode_reference()
+
+                shift_factor = getattr(vae.config, "shift_factor", None)
+                if shift_factor is not None:
+                    moments = moments - shift_factor
+                kontext_latents_unpacked = moments * vae.config.scaling_factor
                 TorchDevice.empty_cache()
 
             # Extract tensor dimensions

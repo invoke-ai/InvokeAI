@@ -20,8 +20,22 @@ class BoardDTO(BoardRecord):
     """The number of videos in the board."""
     asset_count: int = Field(description="The number of assets in the board.")
     """The number of assets in the board."""
+    asset_video_count: int = Field(
+        default=0, description="The number of asset-category (non-'general') videos in the board."
+    )
+    """Uploaded videos are assets ('user' category) while generated videos are 'general', mirroring
+    images. `video_count` stays the total so "delete board with N videos" copy remains honest; this
+    field lets clients split the total across the Media/Assets views."""
     owner_username: Optional[str] = Field(default=None, description="The username of the board owner (for admin view).")
     """The username of the board owner (for admin view)."""
+    is_inbox: bool = Field(
+        default=False, description="Whether this board is its project's inbox, which only the project APIs may change."
+    )
+    """The inbox is the one board every project has: it takes the project's name, cannot be moved,
+    renamed, archived or deleted through the generic board routes, and goes with the project when
+    the project is deleted. Derived by joining `projects.board_id`, never stored on `boards`; the
+    board's membership (`project_id`) is the stored fact, and an inbox is always a member of its
+    own project."""
 
 
 def board_record_to_dto(
@@ -32,6 +46,8 @@ def board_record_to_dto(
     owner_username: Optional[str] = None,
     cover_video_name: Optional[str] = None,
     video_count: int = 0,
+    asset_video_count: int = 0,
+    is_inbox: bool = False,
 ) -> BoardDTO:
     """Converts a board record to a board DTO."""
     return BoardDTO(
@@ -41,5 +57,7 @@ def board_record_to_dto(
         image_count=image_count,
         video_count=video_count,
         asset_count=asset_count,
+        asset_video_count=asset_video_count,
         owner_username=owner_username,
+        is_inbox=is_inbox,
     )

@@ -9,9 +9,48 @@ from fastapi import HTTPException
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.board_records.board_records_common import (
+    BoardRecord,
     BoardRecordNotFoundException,
     BoardVisibility,
 )
+from invokeai.app.services.project_records.project_records_common import ProjectRecordNotFoundError
+
+
+def _get_board_record(board_id: str) -> BoardRecord:
+    """Get a board record, translating only a confirmed missing board to 404."""
+    try:
+        return ApiDependencies.invoker.services.board_records.get(board_id)
+    except BoardRecordNotFoundException:
+        raise HTTPException(status_code=404, detail="Board not found")
+
+
+def _board_grants_contribution(board_id: str, current_user: CurrentUserOrDefault) -> bool:
+    """Whether this user may put media on the board: they own it, or it is Public.
+
+    Shared boards are deliberately excluded — `Shared` grants visibility, not contribution.
+    Storage errors propagate so a batch cannot silently turn an undecidable permission check into
+    an ordinary denial.
+    """
+    try:
+        board = ApiDependencies.invoker.services.board_records.get(board_id)
+    except BoardRecordNotFoundException:
+        return False
+
+    return board.user_id == current_user.user_id or board.board_visibility == BoardVisibility.Public
+
+
+def _board_grants_read_access(board_id: str, current_user: CurrentUserOrDefault) -> bool:
+    """Whether the user may read a board, returning False only when it is confirmed missing or denied."""
+    try:
+        board = ApiDependencies.invoker.services.board_records.get(board_id)
+    except BoardRecordNotFoundException:
+        return False
+
+    if board.user_id == current_user.user_id:
+        return True
+    if board.board_visibility in (BoardVisibility.Shared, BoardVisibility.Public):
+        return True
+    return ApiDependencies.invoker.services.board_records.is_board_shared_with_user(board_id, current_user.user_id)
 
 
 def assert_image_owner(image_name: str, current_user: CurrentUserOrDefault) -> None:
@@ -25,31 +64,15 @@ def assert_image_owner(image_name: str, current_user: CurrentUserOrDefault) -> N
     """
     if current_user.is_admin:
         return
+    if not ApiDependencies.invoker.services.image_records.exists(image_name):
+        raise HTTPException(status_code=404, detail="Image not found")
     owner = ApiDependencies.invoker.services.image_records.get_user_id(image_name)
     if owner is not None and owner == current_user.user_id:
         return
 
     board_id = ApiDependencies.invoker.services.board_image_records.get_board_for_image(image_name)
-    if board_id is not None:
-        # The board *record*, not its DTO: the decision needs only the owner and the
-        # visibility, and the DTO would drag in cover-image resolution plus three COUNT
-        # aggregates — five extra queries and five extra ways to fail per name.
-        #
-        # Only a board positively known to be gone falls through to the 403. A storage error
-        # propagates instead of being caught here: `board_records.get` deliberately does not
-        # translate sqlite errors into not-found, and a caller that cannot decide ownership
-        # must not report the name as an ordinary permission denial — the batch loops treat a
-        # 403 as a silent auth skip, which turned a locked database into images dropped from
-        # the response with no failure reported at all.
-        try:
-            board = ApiDependencies.invoker.services.board_records.get(board_id)
-        except BoardRecordNotFoundException:
-            pass
-        else:
-            if board.user_id == current_user.user_id:
-                return
-            if board.board_visibility == BoardVisibility.Public:
-                return
+    if board_id is not None and _board_grants_contribution(board_id, current_user):
+        return
 
     raise HTTPException(status_code=403, detail="Not authorized to modify this image")
 
@@ -87,29 +110,113 @@ def assert_image_read_access(image_name: str, current_user: CurrentUserOrDefault
     Access is granted when ANY of these hold:
     - The user is an admin.
     - The user owns the image.
+    - The user owns the board the image sits on.
     - The image sits on a shared or public board.
+    - The image sits on a board explicitly shared with the user.
+
+    Board-backed images defer to `assert_board_read_access` so individual image
+    reads stay consistent with board listings (including board_id="all").
     """
     if current_user.is_admin:
         return
+    if not ApiDependencies.invoker.services.image_records.exists(image_name):
+        raise HTTPException(status_code=404, detail="Image not found")
 
     owner = ApiDependencies.invoker.services.image_records.get_user_id(image_name)
     if owner is not None and owner == current_user.user_id:
         return
 
     board_id = ApiDependencies.invoker.services.board_image_records.get_board_for_image(image_name)
-    if board_id is not None:
-        # See `assert_image_owner` for why this reads the board record and catches only
-        # not-found: a lookup that cannot be decided must not present as a permission decision.
-        try:
-            board = ApiDependencies.invoker.services.board_records.get(board_id)
-        except BoardRecordNotFoundException:
-            pass
-        else:
-            if board.board_visibility in (BoardVisibility.Shared, BoardVisibility.Public):
-                return
+    if board_id is not None and _board_grants_read_access(board_id, current_user):
+        return
 
     _assert_image_record_exists(image_name)
     raise HTTPException(status_code=403, detail="Not authorized to access this image")
+
+
+def assert_board_write_access(board_id: str | None, current_user: CurrentUserOrDefault) -> BoardRecord | None:
+    """Raise if the current user may not put media on this board.
+
+    `None` means "no board" — always allowed, so upload routes can pass their optional board
+    straight through. Otherwise access is granted when the user is an admin, owns the board, or
+    the board is Public (public boards accept contributions from any user).
+
+    Shared boards are deliberately read-only here: `Shared` grants visibility, not contribution.
+
+    Returns the board record it checked (None for no board) so callers that need the board — the
+    upload routes announce the upload with its visibility — do not look it up a second time.
+    """
+    if board_id is None:
+        return None
+
+    board = _get_board_record(board_id)
+
+    if current_user.is_admin:
+        return board
+    if board.user_id == current_user.user_id:
+        return board
+    if board.board_visibility == BoardVisibility.Public:
+        return board
+
+    raise HTTPException(status_code=403, detail="Not authorized to modify this board")
+
+
+def board_share_recipients(board: BoardRecord | None) -> list[str]:
+    """The users who can see a private board through an explicit share.
+
+    Empty for no board and for Shared/Public boards, whose uploads are announced to everyone
+    rather than enumerated. This is how an upload route tells the socket layer which extra
+    users to notify without the socket layer reaching into storage per event.
+    """
+    if board is None or board.board_visibility is not BoardVisibility.Private:
+        return []
+
+    return ApiDependencies.invoker.services.board_records.get_shared_user_ids(board.board_id)
+
+
+def assert_video_read_access(video_name: str, current_user: CurrentUserOrDefault) -> None:
+    """Raise 403 if the current user may not view the video.
+
+    Deliberately identical in shape to `assert_image_read_access`, and delegating to
+    `assert_board_read_access` for the same reason: the video twin used to inline a narrower rule
+    that recognized only Shared and Public visibility, so a video on a board explicitly shared with
+    you was unreadable while the image beside it was fine. Two media kinds on one board should not
+    disagree about who can see them.
+    """
+    if current_user.is_admin:
+        return
+
+    owner = ApiDependencies.invoker.services.video_records.get_user_id(video_name)
+    if owner is not None and owner == current_user.user_id:
+        return
+
+    board_id = ApiDependencies.invoker.services.board_video_records.get_board_for_video(video_name)
+    if board_id is not None and _board_grants_read_access(board_id, current_user):
+        return
+
+    if not ApiDependencies.invoker.services.video_records.exists(video_name):
+        raise HTTPException(status_code=404, detail="Video not found")
+    raise HTTPException(status_code=403, detail="Not authorized to access this video")
+
+
+def assert_video_owner(video_name: str, current_user: CurrentUserOrDefault) -> None:
+    """Raise 403 if the current user may not mutate the video.
+
+    The mutation twin of `assert_image_owner`: the direct owner, the owner of the board it sits on,
+    or a Public board, which grants contribution rights.
+    """
+    if current_user.is_admin:
+        return
+
+    owner = ApiDependencies.invoker.services.video_records.get_user_id(video_name)
+    if owner is not None and owner == current_user.user_id:
+        return
+
+    board_id = ApiDependencies.invoker.services.board_video_records.get_board_for_video(video_name)
+    if board_id is not None and _board_grants_contribution(board_id, current_user):
+        return
+
+    raise HTTPException(status_code=403, detail="Not authorized to modify this video")
 
 
 def assert_board_read_access(board_id: str, current_user: CurrentUserOrDefault) -> None:
@@ -119,14 +226,12 @@ def assert_board_read_access(board_id: str, current_user: CurrentUserOrDefault) 
     - The user is an admin.
     - The user owns the board.
     - The board visibility is Shared or Public.
+    - The board is explicitly shared with the user.
     """
+    board = _get_board_record(board_id)
+
     if current_user.is_admin:
         return
-
-    try:
-        board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
-    except Exception:
-        raise HTTPException(status_code=404, detail="Board not found")
 
     if board.user_id == current_user.user_id:
         return
@@ -134,4 +239,22 @@ def assert_board_read_access(board_id: str, current_user: CurrentUserOrDefault) 
     if board.board_visibility in (BoardVisibility.Shared, BoardVisibility.Public):
         return
 
+    if ApiDependencies.invoker.services.board_records.is_board_shared_with_user(board_id, current_user.user_id):
+        return
+
     raise HTTPException(status_code=403, detail="Not authorized to access this board")
+
+
+def assert_project_owned(project_id: str | None, current_user: CurrentUserOrDefault) -> None:
+    """Raise 404 unless `project_id` names one of the caller's own projects.
+
+    Provenance is recorded only from a validated identity: an admin cannot attribute media to
+    someone else's project, and a project id nobody owns reads as absent rather than as a
+    permission decision, matching how the queue treats `Batch.project_id`.
+    """
+    if project_id is None:
+        return
+    try:
+        ApiDependencies.invoker.services.project_records.get_board_id(current_user.user_id, project_id)
+    except ProjectRecordNotFoundError:
+        raise HTTPException(status_code=404, detail="Project not found")

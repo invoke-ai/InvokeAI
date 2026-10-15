@@ -1,26 +1,30 @@
 import asyncio
 import inspect
 import logging
+import re
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Optional
 
 from fastapi import FastAPI, Request
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.security.utils import get_authorization_scheme_param
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.middleware import EventHandlerASGIMiddleware
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import Headers
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.middleware.gzip import GZipMiddleware, GZipResponder, IdentityResponder
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-import invokeai.frontend.web as web_dir
+import invokeai.frontend.webv2 as webv2_dir
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
+from invokeai.app.api.frontend import mount_frontend
 from invokeai.app.api.routers import (
     app_info,
     auth,
@@ -28,24 +32,33 @@ from invokeai.app.api.routers import (
     boards,
     client_state,
     custom_nodes,
+    fonts,
     gallery,
+    gallery_maintenance,
+    image_map,
     image_moves,
     images,
+    intermediates,
     model_manager,
     model_relationships,
+    projects,
     recall_parameters,
     session_queue,
     style_presets,
     system_prompts,
     utilities,
+    video_recall,
     videos,
     virtual_boards,
+    wildcards,
     workflows,
 )
 from invokeai.app.api.sockets import SocketIO
 from invokeai.app.services.config.config_default import get_config
+from invokeai.app.services.shared.database.errors import TransientDatabaseError
 from invokeai.app.util.custom_openapi import get_openapi_func
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.frontend.cli.arg_parser import InvokeAIArgs
 
 app_config = get_config()
 logger = InvokeAILogger.get_logger(config=app_config)
@@ -99,6 +112,42 @@ app = FastAPI(
     separate_input_output_schemas=False,
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(TransientDatabaseError)
+async def database_busy(request: Request, error: TransientDatabaseError) -> JSONResponse:
+    return _database_busy(request, error)
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_error(request: Request, error: StarletteHTTPException) -> Response:
+    # Many routes answer every exception with an error of their own ("not found", "unexpected error"); one raised
+    # while handling a busy database still means the database is busy.
+    transient = _transient_cause(error)
+    if transient is not None:
+        return _database_busy(request, transient)
+    return await http_exception_handler(request, error)
+
+
+def _database_busy(request: Request, error: TransientDatabaseError) -> JSONResponse:
+    # A lock held too long elsewhere, a race the call lost on every attempt, a server out of reach: the same
+    # request can succeed in a moment, so it is a busy server rather than a failed request.
+    logger.warning(f"{request.method} {request.url.path}: the database is busy: {error}")
+    return JSONResponse(
+        status_code=503, content={"detail": "The database is busy; try again"}, headers={"Retry-After": "1"}
+    )
+
+
+def _transient_cause(error: BaseException) -> Optional[TransientDatabaseError]:
+    """The busy database an exception was raised while handling, if any."""
+    seen: set[int] = set()
+    cause: Optional[BaseException] = error.__cause__ or error.__context__
+    while cause is not None and id(cause) not in seen:
+        if isinstance(cause, TransientDatabaseError):
+            return cause
+        seen.add(id(cause))
+        cause = cause.__cause__ or cause.__context__
+    return None
 
 
 class SlidingWindowTokenMiddleware(BaseHTTPMiddleware):
@@ -268,13 +317,14 @@ GZIP_MINIMUM_SIZE = 1000
 def configure_gzip(app: FastAPI, compresslevel: int) -> None:
     """Install response compression, unless it is turned off.
 
-    Compression runs on the event loop, so its cost is not paid by the requesting client alone —
-    it stalls every other request and every socket.io event for its duration. That makes the
-    level a real trade-off rather than a free win.
+    Body chunks under 128 KiB are compressed on the event loop (Starlette moves larger ones to a
+    worker thread), so the cost is not paid by the requesting client alone — it stalls every other
+    request and every socket.io event for its duration, and offloaded chunks still compete for CPU.
+    That makes the level a real trade-off rather than a free win.
 
     Measured on the flat name list of a 200k-image library (8.48 MB of JSON): level 1 takes
     16.4ms and returns 6.1% of the input, level 9 takes 90.2ms and returns 5.7%. Level 9 costs
-    5.5x the event-loop time for 0.4 percentage points of bandwidth, which is a poor deal for a
+    5.5x the compression time for 0.4 percentage points of bandwidth, which is a poor deal for a
     locally-served app. The default stays at 9 so behavior is unchanged for existing installs;
     users who feel the stall on a large library can lower it.
 
@@ -339,36 +389,32 @@ async def _identify_video_upload_user_async(scope: Scope) -> tuple[bool, str | N
     return await run_in_threadpool(_identify_video_upload_user, scope)
 
 
-class VideoUploadLimitASGIMiddleware:
-    """Bound video-upload ingress *before* FastAPI's multipart parser runs.
+class RequestBodyLimitASGIMiddleware:
+    """Bound selected request bodies before framework parsing and buffering.
 
-    The upload route's own MAX_UPLOAD_SIZE check only fires after the multipart body has
-    been fully parsed (and spooled to temp storage), so oversized, chunked, or many
-    concurrent uploads could exhaust temp space before ever being rejected. This
-    middleware rejects oversized requests from the Content-Length header, aborts
-    chunked bodies that exceed the cap mid-stream, and bounds concurrent uploads
-    both globally and per user (so one tenant's slow uploads cannot starve the
-    others into 429s).
+    Rejects oversized requests from the Content-Length header, aborts chunked bodies that
+    exceed the cap mid-stream, and bounds concurrent requests both globally and per user
+    (so one tenant's slow uploads cannot starve the others into 429s).
 
     It also asks the server to close the connection on any response sent before the request
     body has been read to completion. The leases below are released as soon as the app
-    returns, and the route answers plenty of requests without reading the body (a forbidden
-    board, a filename that isn't .mp4) — FastAPI's own query-param validation answers 422
+    returns, and routes answer plenty of requests without reading the body (a forbidden
+    board, an unsupported filename) — FastAPI's own query-param validation answers 422
     before the route body runs at all. A client that kept streaming after such a response
     would hold ingress with no slot charged against it, outside the 429 bound, the idle
     timeout and the duration cap; closing ends that upload along with the response.
 
     Whether the body was read is the only thing that can be known here, so any early answer
     closes — including when the client had in fact already finished sending. That costs a
-    fresh connection per rejected upload, which is the conservative side to err on and is
+    fresh connection per rejected request, which is the conservative side to err on and is
     what servers generally do when a response is sent without consuming the body.
 
     Two limits worth knowing. Draining the body instead would also close the hole, but it
-    would pin one of the very few upload slots for the whole duration cap per rejection,
-    which is a cheaper denial of service than the hole it closes. And behind a reverse proxy
-    that buffers request bodies (nginx's default, per the multi-user admin guide) `Connection`
+    would pin one of the very few slots for the whole duration cap per rejection, which is a
+    cheaper denial of service than the hole it closes. And behind a reverse proxy that
+    buffers request bodies (nginx's default, per the multi-user admin guide) `Connection`
     is hop-by-hop, so this only closes the proxy-to-app hop — there the proxy has already
-    absorbed the whole upload before the app is invoked, so the hole does not arise. Responses
+    absorbed the whole body before the app is invoked, so the hole does not arise. Responses
     generated above this middleware (Starlette's ServerErrorMiddleware 500) do not pass
     through it; uvicorn closes the transport on those itself.
     """
@@ -376,20 +422,28 @@ class VideoUploadLimitASGIMiddleware:
     def __init__(
         self,
         app: ASGIApp,
+        matches_request: Callable[[str, str], bool],
+        too_large_detail: Callable[[int, int], str | dict[str, object]],
+        capacity_refusal_detail: Callable[[bool], str | dict[str, object]],
         max_body_bytes: int,
         max_concurrent: int,
         max_concurrent_per_user: int | None = None,
         identify_user: Callable[[Scope], tuple[bool, str | None] | Awaitable[tuple[bool, str | None]]] | None = None,
         idle_timeout_seconds: float = 120.0,
         max_upload_duration_seconds: float = 30 * 60,
+        retry_after_seconds: int = 5,
     ) -> None:
         self.app = app
+        self.matches_request = matches_request
+        self.too_large_detail = too_large_detail
+        self.capacity_refusal_detail = capacity_refusal_detail
         self.max_body_bytes = max_body_bytes
         self.max_concurrent = max_concurrent
         self.max_concurrent_per_user = max_concurrent_per_user
         self.identify_user = identify_user
         self.idle_timeout_seconds = idle_timeout_seconds
         self.max_upload_duration_seconds = max_upload_duration_seconds
+        self.retry_after_seconds = retry_after_seconds
         self._active = 0
         self._active_by_user: dict[str, int] = {}
 
@@ -398,7 +452,14 @@ class VideoUploadLimitASGIMiddleware:
             return await self.app(scope, receive, send)
         # Behind a sub-path proxy the public path carries the prefix (see SubPathASGIMiddleware).
         route_path: str = scope.get("path", "").removeprefix(scope.get("root_path", ""))
-        if not (scope.get("method") == "POST" and route_path == "/api/v1/videos/upload"):
+        # Starlette matches routes with `^...$`, and `$` also matches before a final newline, so a
+        # request for `/upload%0A` reaches the `/upload` route. Test both spellings: the newline may
+        # be the route's terminator (`/upload\n`) or a path parameter's only character
+        # (`/projects/\n`), and either way the request must not reach the route unbounded.
+        method = scope.get("method", "")
+        if not (
+            self.matches_request(method, route_path) or self.matches_request(method, route_path.removesuffix("\n"))
+        ):
             return await self.app(scope, receive, send)
 
         # `connection` is a hop-by-hop header and illegal in HTTP/2+, so every use below is
@@ -421,37 +482,39 @@ class VideoUploadLimitASGIMiddleware:
                 return await response(scope, receive, send)
 
         content_length = Headers(scope=scope).get("content-length")
-        if content_length is not None and content_length.isdigit() and int(content_length) > self.max_body_bytes:
+        content_length_bytes = int(content_length) if content_length is not None and content_length.isdigit() else None
+        if content_length_bytes is not None and content_length_bytes > self.max_body_bytes:
             response = JSONResponse(
-                {"detail": f"Video upload exceeds maximum request size ({self.max_body_bytes} bytes)"},
+                {"detail": self.too_large_detail(content_length_bytes, self.max_body_bytes)},
                 status_code=413,
                 headers=close_header,
             )
             return await response(scope, receive, send)
 
+        def has_capacity() -> bool:
+            return self._active < self.max_concurrent and (
+                per_user_key is None
+                or self.max_concurrent_per_user is None
+                or self._active_by_user.get(per_user_key, 0) < self.max_concurrent_per_user
+            )
+
         if self._active >= self.max_concurrent:
             response = JSONResponse(
-                {"detail": "Too many concurrent video uploads; try again shortly"},
+                {"detail": self.capacity_refusal_detail(False)},
                 status_code=429,
-                headers={"Retry-After": "5", **close_header},
+                headers={"Retry-After": str(self.retry_after_seconds), **close_header},
             )
             return await response(scope, receive, send)
 
-        if (
-            per_user_key is not None
-            and self.max_concurrent_per_user is not None
-            and self._active_by_user.get(per_user_key, 0) >= self.max_concurrent_per_user
-        ):
+        if not has_capacity():
             response = JSONResponse(
-                {"detail": "Too many concurrent video uploads for this user; try again shortly"},
+                {"detail": self.capacity_refusal_detail(True)},
                 status_code=429,
-                headers={"Retry-After": "5", **close_header},
+                headers={"Retry-After": str(self.retry_after_seconds), **close_header},
             )
             return await response(scope, receive, send)
 
-        self._active += 1
-        if per_user_key is not None:
-            self._active_by_user[per_user_key] = self._active_by_user.get(per_user_key, 0) + 1
+        self._claim_capacity(per_user_key)
         received = 0
         # Only reading the body to its end proves the client has finished sending. This must
         # NOT be seeded from Content-Length: h11 accepts `Content-Length: 0` alongside
@@ -503,13 +566,115 @@ class VideoUploadLimitASGIMiddleware:
         try:
             await self.app(scope, limited_receive, close_if_answered_early)
         finally:
-            self._active -= 1
-            if per_user_key is not None:
-                remaining = self._active_by_user.get(per_user_key, 0) - 1
-                if remaining > 0:
-                    self._active_by_user[per_user_key] = remaining
-                else:
-                    self._active_by_user.pop(per_user_key, None)
+            self._release_capacity(per_user_key)
+
+    def _claim_capacity(self, per_user_key: str | None) -> None:
+        self._active += 1
+        if per_user_key is not None:
+            self._active_by_user[per_user_key] = self._active_by_user.get(per_user_key, 0) + 1
+
+    def _release_capacity(self, per_user_key: str | None) -> None:
+        self._active -= 1
+        if per_user_key is None:
+            return
+        remaining = self._active_by_user.get(per_user_key, 0) - 1
+        if remaining > 0:
+            self._active_by_user[per_user_key] = remaining
+        else:
+            self._active_by_user.pop(per_user_key, None)
+
+
+# The video-recall routes that take an upload ingest it exactly as /videos/upload does, so they
+# share its ingress cap and concurrency slots. Their name-only siblings take no body and stay
+# outside the limiter, so a caller mid-upload is never refused a slot for a bodyless request.
+_VIDEO_RECALL_UPLOAD_PATH = re.compile(
+    r"/api/v1/recall/video/[^/]+/(?:initial-video|reference-video|conditioning-video)/upload"
+)
+
+
+def _is_video_upload(method: str, path: str) -> bool:
+    return method == "POST" and (
+        path == "/api/v1/videos/upload" or _VIDEO_RECALL_UPLOAD_PATH.fullmatch(path) is not None
+    )
+
+
+class VideoUploadLimitASGIMiddleware(RequestBodyLimitASGIMiddleware):
+    """Bound video-upload ingress before FastAPI's multipart parser runs."""
+
+    def __init__(
+        self,
+        app: ASGIApp,
+        max_body_bytes: int,
+        max_concurrent: int,
+        max_concurrent_per_user: int | None = None,
+        identify_user: Callable[[Scope], tuple[bool, str | None] | Awaitable[tuple[bool, str | None]]] | None = None,
+        idle_timeout_seconds: float = 120.0,
+        max_upload_duration_seconds: float = 30 * 60,
+    ) -> None:
+        super().__init__(
+            app=app,
+            matches_request=_is_video_upload,
+            too_large_detail=lambda _actual, limit: f"Video upload exceeds maximum request size ({limit} bytes)",
+            capacity_refusal_detail=lambda per_user: (
+                "Too many concurrent video uploads for this user; try again shortly"
+                if per_user
+                else "Too many concurrent video uploads; try again shortly"
+            ),
+            max_body_bytes=max_body_bytes,
+            max_concurrent=max_concurrent,
+            max_concurrent_per_user=max_concurrent_per_user,
+            identify_user=identify_user,
+            idle_timeout_seconds=idle_timeout_seconds,
+            max_upload_duration_seconds=max_upload_duration_seconds,
+        )
+
+
+def _is_project_write(method: str, path: str) -> bool:
+    if method == "POST":
+        return path == "/api/v1/projects/"
+    if method != "PUT" or not path.startswith("/api/v1/projects/"):
+        return False
+    project_id = path.removeprefix("/api/v1/projects/")
+    return bool(project_id) and "/" not in project_id
+
+
+def _is_font_upload(method: str, path: str) -> bool:
+    return method == "POST" and path in ("/api/v1/fonts", "/api/v1/fonts/validate")
+
+
+class ProjectWriteLimitASGIMiddleware(RequestBodyLimitASGIMiddleware):
+    """Bound project writes before FastAPI parses their JSON documents."""
+
+    def __init__(
+        self,
+        app: ASGIApp,
+        max_body_bytes: int,
+        max_concurrent: int,
+        max_concurrent_per_user: int | None = None,
+        identify_user: Callable[[Scope], tuple[bool, str | None] | Awaitable[tuple[bool, str | None]]] | None = None,
+        idle_timeout_seconds: float = 30.0,
+        max_upload_duration_seconds: float = 120.0,
+    ) -> None:
+        super().__init__(
+            app=app,
+            matches_request=_is_project_write,
+            too_large_detail=lambda actual, limit: {
+                "actual_bytes": actual,
+                "code": "project_request_too_large",
+                "max_bytes": limit,
+            },
+            capacity_refusal_detail=lambda _per_user: {
+                "code": "project_write_busy",
+                "message": "Too many project saves are in progress; retry shortly",
+            },
+            max_body_bytes=max_body_bytes,
+            max_concurrent=max_concurrent,
+            max_concurrent_per_user=max_concurrent_per_user,
+            identify_user=identify_user,
+            idle_timeout_seconds=idle_timeout_seconds,
+            max_upload_duration_seconds=max_upload_duration_seconds,
+            retry_after_seconds=1,
+        )
 
 
 class SubPathASGIMiddleware:
@@ -562,6 +727,32 @@ app.add_middleware(
     max_concurrent_per_user=videos.MAX_CONCURRENT_VIDEO_UPLOADS_PER_USER,
     identify_user=_identify_video_upload_user_async,
 )
+app.add_middleware(
+    RequestBodyLimitASGIMiddleware,
+    matches_request=_is_font_upload,
+    too_large_detail=lambda _actual, limit: f"Font upload exceeds maximum request size ({limit} bytes)",
+    capacity_refusal_detail=lambda per_user: (
+        "Too many concurrent font uploads for this user; try again shortly"
+        if per_user
+        else "Too many concurrent font uploads; try again shortly"
+    ),
+    max_body_bytes=app_config.max_font_upload_bytes + fonts.FONT_UPLOAD_MULTIPART_OVERHEAD,
+    max_concurrent=fonts.MAX_CONCURRENT_FONT_UPLOADS,
+    max_concurrent_per_user=fonts.MAX_CONCURRENT_FONT_UPLOADS_PER_USER,
+    identify_user=_identify_video_upload_user_async,
+    idle_timeout_seconds=fonts.FONT_UPLOAD_IDLE_TIMEOUT_SECONDS,
+    max_upload_duration_seconds=fonts.FONT_UPLOAD_MAX_DURATION_SECONDS,
+    retry_after_seconds=1,
+)
+app.add_middleware(
+    ProjectWriteLimitASGIMiddleware,
+    max_body_bytes=projects.PROJECT_WRITE_REQUEST_MAX_BYTES,
+    max_concurrent=projects.MAX_CONCURRENT_PROJECT_WRITES,
+    max_concurrent_per_user=projects.MAX_CONCURRENT_PROJECT_WRITES_PER_USER,
+    identify_user=_identify_video_upload_user_async,
+    idle_timeout_seconds=projects.PROJECT_WRITE_IDLE_TIMEOUT_SECONDS,
+    max_upload_duration_seconds=projects.PROJECT_WRITE_MAX_DURATION_SECONDS,
+)
 
 
 # Add event handler
@@ -590,11 +781,15 @@ configure_gzip(app, app_config.http_compression_level)
 # Authentication router should be first so it's registered before protected routes
 app.include_router(auth.auth_router, prefix="/api")
 app.include_router(utilities.utilities_router, prefix="/api")
+app.include_router(fonts.fonts_router, prefix="/api")
 app.include_router(model_manager.model_manager_router, prefix="/api")
 app.include_router(image_moves.image_moves_router, prefix="/api")
 app.include_router(images.images_router, prefix="/api")
+app.include_router(image_map.image_map_router, prefix="/api")
+app.include_router(intermediates.intermediates_router, prefix="/api")
 app.include_router(videos.videos_router, prefix="/api")
 app.include_router(gallery.gallery_router, prefix="/api")
+app.include_router(gallery_maintenance.gallery_maintenance_router, prefix="/api")
 app.include_router(boards.boards_router, prefix="/api")
 app.include_router(board_images.board_images_router, prefix="/api")
 app.include_router(virtual_boards.virtual_boards_router, prefix="/api")
@@ -603,9 +798,12 @@ app.include_router(app_info.app_router, prefix="/api")
 app.include_router(session_queue.session_queue_router, prefix="/api")
 app.include_router(workflows.workflows_router, prefix="/api")
 app.include_router(style_presets.style_presets_router, prefix="/api")
+app.include_router(wildcards.wildcards_router, prefix="/api")
 app.include_router(system_prompts.system_prompts_router, prefix="/api")
 app.include_router(client_state.client_state_router, prefix="/api")
+app.include_router(projects.projects_router, prefix="/api")
 app.include_router(recall_parameters.recall_parameters_router, prefix="/api")
+app.include_router(video_recall.video_recall_router, prefix="/api")
 app.include_router(custom_nodes.custom_nodes_router, prefix="/api")
 
 app.openapi = get_openapi_func(app)
@@ -633,7 +831,7 @@ def overridden_redoc(request: Request) -> HTMLResponse:
     )
 
 
-web_root_path = Path(list(web_dir.__path__)[0])
+web_root_path = Path(list(webv2_dir.__path__)[0])
 
 if app_config.unsafe_disable_picklescan:
     logger.warning(
@@ -642,9 +840,6 @@ if app_config.unsafe_disable_picklescan:
     )
 
 try:
-    app.mount("/", NoCacheStaticFiles(directory=Path(web_root_path, "dist"), html=True), name="ui")
-except RuntimeError:
-    logger.warning(f"No UI found at {web_root_path}/dist, skipping UI mount")
-app.mount(
-    "/static", NoCacheStaticFiles(directory=Path(web_root_path, "static/")), name="static"
-)  # docs favicon is in here
+    mount_frontend(app, web_root_path, legacy=getattr(InvokeAIArgs.args, "web_legacy", False))
+except RuntimeError as error:
+    logger.warning(f"No UI found, skipping UI mount: {error}")

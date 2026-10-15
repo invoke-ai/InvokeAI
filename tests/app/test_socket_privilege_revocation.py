@@ -18,6 +18,7 @@ from fastapi import FastAPI
 
 from invokeai.app.api.sockets import SOCKET_REVALIDATION_FAILURE_LIMIT, SocketIO
 from invokeai.app.services.events.events_common import UserAccessChangedEvent
+from invokeai.app.services.progress_previews.progress_previews_default import MemoryProgressPreviews
 
 
 @pytest.fixture
@@ -40,6 +41,7 @@ def _patch_multiuser_context(
     invoker = SimpleNamespace(
         services=SimpleNamespace(
             configuration=SimpleNamespace(multiuser=True),
+            progress_previews=MemoryProgressPreviews(),
             users=SimpleNamespace(get=lambda candidate_user_id: user if candidate_user_id == user_id else None),
         )
     )
@@ -156,6 +158,7 @@ class TestUserAccessChangedHandler:
         invoker = SimpleNamespace(
             services=SimpleNamespace(
                 configuration=SimpleNamespace(multiuser=True),
+                progress_previews=MemoryProgressPreviews(),
                 users=SimpleNamespace(get=lambda user_id: record),
             )
         )
@@ -389,6 +392,7 @@ class _SweepHarness:
         invoker = SimpleNamespace(
             services=SimpleNamespace(
                 configuration=SimpleNamespace(multiuser=multiuser),
+                progress_previews=MemoryProgressPreviews(),
                 users=SimpleNamespace(get=get),
                 events=SimpleNamespace(emit_user_access_changed=lambda **kwargs: emitted.append(kwargs)),
                 session_processor=SimpleNamespace(
@@ -622,6 +626,7 @@ class TestRevalidationSweep(_SweepHarness):
         invoker = SimpleNamespace(
             services=SimpleNamespace(
                 configuration=SimpleNamespace(multiuser=True),
+                progress_previews=MemoryProgressPreviews(),
                 users=SimpleNamespace(get=get),
                 events=SimpleNamespace(emit_user_access_changed=lambda **kwargs: None),
             )
@@ -942,6 +947,7 @@ class TestRoomChangesAndCacheStayInStep:
         invoker = SimpleNamespace(
             services=SimpleNamespace(
                 configuration=SimpleNamespace(multiuser=True),
+                progress_previews=MemoryProgressPreviews(),
                 users=SimpleNamespace(get=lambda user_id: user),
             )
         )
@@ -973,6 +979,7 @@ class TestRoomChangesAndCacheStayInStep:
         invoker = SimpleNamespace(
             services=SimpleNamespace(
                 configuration=SimpleNamespace(multiuser=True),
+                progress_previews=MemoryProgressPreviews(),
                 users=SimpleNamespace(
                     get=lambda user_id: SimpleNamespace(user_id="user-1", is_admin=False, is_active=True, token_epoch=0)
                 ),
@@ -1081,6 +1088,7 @@ class TestHandlerRereadsAtThePointOfDecision:
         invoker = SimpleNamespace(
             services=SimpleNamespace(
                 configuration=SimpleNamespace(multiuser=True),
+                progress_previews=MemoryProgressPreviews(),
                 users=SimpleNamespace(get=lambda user_id: user),
             )
         )
@@ -1136,6 +1144,7 @@ class TestHandlerRereadsAtThePointOfDecision:
         invoker = SimpleNamespace(
             services=SimpleNamespace(
                 configuration=SimpleNamespace(multiuser=True),
+                progress_previews=MemoryProgressPreviews(),
                 users=SimpleNamespace(get=explode),
             )
         )
@@ -1193,6 +1202,7 @@ class TestHandlerRereadsAtThePointOfDecision:
         invoker = SimpleNamespace(
             services=SimpleNamespace(
                 configuration=SimpleNamespace(multiuser=True),
+                progress_previews=MemoryProgressPreviews(),
                 users=SimpleNamespace(get=lambda user_id: deactivated),
                 events=SimpleNamespace(emit_user_access_changed=lambda **kwargs: emitted.append(kwargs)),
                 session_processor=SimpleNamespace(get_running_queue_item_owners=lambda: set()),

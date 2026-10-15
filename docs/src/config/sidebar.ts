@@ -16,23 +16,16 @@ const sidebar: SidebarConfig = [
     label: 'Configuration',
     items: [
       {
-        autogenerate: { directory: 'configuration' },
+        autogenerate: { directory: 'configuration', collapsed: true },
       },
     ],
+    collapsed: true,
   },
   {
-    label: 'Concepts',
+    label: 'Users Guide',
     items: [
       {
-        autogenerate: { directory: 'concepts' },
-      },
-    ],
-  },
-  {
-    label: 'Features',
-    items: [
-      {
-        autogenerate: { directory: 'features' },
+        autogenerate: { directory: 'Users Guide', collapsed: true },
       },
     ],
   },

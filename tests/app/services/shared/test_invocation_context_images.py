@@ -16,6 +16,7 @@ def _make_interface(visibility: BoardVisibility, owner_id: str = "owner") -> tup
     data.queue_item.workflow = None
     data.queue_item.session.graph = None
     data.queue_item.session_id = "session"
+    data.queue_item.project_id = "project-1"
     data.invocation.is_intermediate = False
     return ImagesInterface(services, data, MagicMock()), services
 
@@ -135,3 +136,11 @@ def test_image_save_allows_active_queue_user_without_board() -> None:
     images.save(MagicMock())
 
     services.images.create.assert_called_once()
+
+
+def test_images_save_attributes_the_output_to_the_queue_items_project() -> None:
+    images, services = _make_interface(BoardVisibility.Private, owner_id="queue-user")
+
+    images.save(MagicMock())
+
+    assert services.images.create.call_args.kwargs["project_id"] == "project-1"

@@ -16,6 +16,7 @@ from typing import Any, Optional
 
 import torch
 
+from invokeai.backend.model_manager.checkpoint_prefix import CheckpointPrefix
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Diffusers_Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.main import (
@@ -27,7 +28,6 @@ from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.comfyui_state_dict_utils import (
     _dequantize_comfyui_fp8,
-    _strip_comfyui_prefix,
     _strip_quantization_metadata,
 )
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
@@ -100,7 +100,12 @@ class WanDiffusersModel(GenericDiffusersLoader):
             # Older diffusers releases use torch_dtype instead of dtype.
             result = _load_with_variant_fallback({"torch_dtype": torch.bfloat16})
 
-        return result
+        # This override exists to force bfloat16, and in doing so it replaced the parent's whole
+        # `_load_model` -- including the cast at `GenericDiffusersLoader._load_model`, which every
+        # other subclass either keeps or reapplies. So FP8 Storage was offered for Wan diffusers folders
+        # and silently did nothing. The weights here are the same `WanTransformer3DModel` the
+        # single-file path casts.
+        return self._apply_fp8_layerwise_casting(result, config, submodel_type)
 
 
 # Native (upstream) -> Diffusers key rename rules.
@@ -427,12 +432,7 @@ class WanGGUFCheckpointModel(ModelLoader):
         sd = gguf_sd_loader(model_path, compute_dtype=compute_dtype)
 
         # Strip ComfyUI-style prefixes if present.
-        for prefix in ("model.diffusion_model.", "diffusion_model."):
-            if any(isinstance(k, str) and k.startswith(prefix) for k in sd.keys()):
-                sd = {
-                    (k[len(prefix) :] if isinstance(k, str) and k.startswith(prefix) else k): v for k, v in sd.items()
-                }
-                break
+        sd = CheckpointPrefix.detect(sd).strip(sd)
 
         _drop_benign_extra_keys(sd, "GGUF state dict", InvokeAILogger.get_logger(self.__class__.__name__))
 
@@ -505,10 +505,10 @@ class WanCheckpointModel(ModelLoader):
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
         sd = load_file(str(model_path))
-        sd = _strip_comfyui_prefix(sd)
+        sd = CheckpointPrefix.detect(sd).strip(sd)
         _drop_benign_extra_keys(sd, "Wan checkpoint", logger)
 
-        dequantized = _dequantize_comfyui_fp8(sd, model_dtype)
+        dequantized = _dequantize_comfyui_fp8(sd, model_dtype, f"Wan checkpoint {model_path.name}")
         if dequantized > 0:
             logger.info(f"Dequantized {dequantized} ComfyUI-quantized weights")
         # Drop the scale tensors themselves — they've been folded into the weights
@@ -541,7 +541,35 @@ class WanCheckpointModel(ModelLoader):
 
         incompatible_keys = model.load_state_dict(sd, strict=False, assign=True)
         _raise_for_incompatible_keys(incompatible_keys, source="Wan checkpoint")
-        return model
+
+        # A checkpoint that shipped per-tensor scales must not take the cast. The fold above consumed
+        # those scales and `_strip_quantization_metadata` dropped them, so re-encoding the result as
+        # *unscaled* fp8 would flush the low end of every tensor to zero -- 3.4% of the weights on
+        # `flux-2-klein-4b-fp8`, for the byte count the file already had. `configs/factory.py` enables
+        # FP8 Storage by itself for a float8 denoiser, on the stated grounds that the loaders keep such
+        # a file in its own scaled form; this loader does not do that yet (the scaled-fp8 treatment the
+        # FLUX and Krea-2 paths received never reached here), so it declines rather than quietly
+        # trading quality the user did not offer. A plain fp8 checkpoint with no scales is unaffected:
+        # its round trip through the compute dtype and back is exact.
+        if dequantized > 0:
+            if self._should_use_fp8(config, SubModelType.Transformer):
+                logger.info(
+                    f"FP8 Storage not applied to {model_path.name}: its {dequantized} scaled weight(s) were folded "
+                    "with the per-tensor scales the file shipped, and re-encoding them as unscaled fp8 would lose "
+                    "the low end of every tensor. Keeping them packed instead is the fix, and this loader does not "
+                    "implement it yet."
+                )
+            return model
+
+        # `assign=True` aliases every param to its `sd` tensor; drop the dict's references before the
+        # FP8 cast or each original stays reachable while its fp8 copy is allocated (see `ltx2.py`,
+        # which learned this the same way).
+        sd.clear()
+
+        # FP8 Storage, which this path ignored until now although the control was offered for it and
+        # identification switched it on by itself for any float8 denoiser -- a 14B transformer loaded
+        # at bf16 size while the record said it was halved.
+        return self._apply_fp8_layerwise_casting(model, config, SubModelType.Transformer)
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.WanT5Encoder, format=ModelFormat.WanT5Encoder)

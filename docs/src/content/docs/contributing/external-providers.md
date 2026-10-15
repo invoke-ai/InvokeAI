@@ -118,7 +118,7 @@ If your model uses a provider that is not already integrated:
    `ExternalGenerationService`.
 5. Add starter model entries using `source="external://<provider>/<model-id>"`.
 6. Optional UI ordering tweak:
-   `invokeai/frontend/web/src/features/modelManagerV2/subpanels/AddModelPanel/ExternalProviders/ExternalProvidersForm.tsx`
+   `invokeai/frontend/webv1/src/features/modelManagerV2/subpanels/AddModelPanel/ExternalProviders/ExternalProvidersForm.tsx`
    (`PROVIDER_SORT_ORDER`).
 
 ## 4) Optional Manual Installation

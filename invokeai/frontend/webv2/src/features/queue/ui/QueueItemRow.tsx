@@ -1,0 +1,125 @@
+/* eslint-disable react-perf/jsx-no-jsx-as-prop */
+import type { QueueItemReadModel } from '@features/queue/core/types';
+
+import { Box, HStack, Icon, Text } from '@chakra-ui/react';
+import { extractGenerationMeta, getResultImageName } from '@features/queue/core/generationMeta';
+import { useItemProgress } from '@features/queue/data/itemProgressStore';
+import { ListItem } from '@platform/ui/list/ListItem';
+import { ChevronRightIcon } from 'lucide-react';
+import { memo, useCallback, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import { CancelQueueItemButton } from './CancelQueueItemButton';
+import { formatCompactAge, formatDuration } from './formatDuration';
+import { QueueItemDetails } from './QueueItemDetails';
+import { QueueItemThumbnail } from './QueueItemThumbnail';
+import { QueueStatusDot } from './QueueStatusDot';
+import { QueueStepProgress } from './QueueStepProgress';
+import { useQueueUi } from './QueueUiContext';
+import { clearPendingQueueItemReveal, type QueueItemRevealRequest } from './queueUiStore';
+import { getStatusMeta } from './statusMeta';
+import { useDeviceLabel } from './useDeviceLabel';
+
+const CHEVRON_OPEN = { transform: 'rotate(90deg)' } as const;
+
+export const QueueItemRow = memo(
+  ({ item, revealRequest }: { item: QueueItemReadModel; revealRequest?: QueueItemRevealRequest | null }) => {
+    const { t } = useTranslation();
+    const { canManageItem, canViewItemDetails, preloadItemActions } = useQueueUi();
+    const [expanded, setExpanded] = useState(false);
+    const toggle = useCallback(() => setExpanded((open) => !open), []);
+    // Warm the actions chunk on intent so the first expand has nothing to wait for.
+    const preload = useCallback(() => preloadItemActions?.(), [preloadItemActions]);
+    const consumedRevealRequestIdRef = useRef<number | null>(null);
+    const meta = extractGenerationMeta(item);
+    const duration = formatDuration(item.startedAt, item.completedAt);
+    const age = formatCompactAge(item.completedAt ?? item.createdAt);
+    const ageLabel = [duration, age].filter(Boolean).join(' · ');
+    const isFailed = item.status === 'failed';
+    const isCancellable = (item.status === 'pending' || item.status === 'in_progress') && canManageItem(item);
+    const canExpand = canViewItemDetails(item);
+
+    const consumeReveal = useCallback(
+      (node: HTMLDivElement | null) => {
+        if (!node || !revealRequest || consumedRevealRequestIdRef.current === revealRequest.requestId) {
+          return;
+        }
+
+        consumedRevealRequestIdRef.current = revealRequest.requestId;
+        if (canExpand) {
+          setExpanded(true);
+        }
+        node.scrollIntoView({ block: 'nearest' });
+        clearPendingQueueItemReveal(revealRequest.requestId);
+      },
+      [canExpand, revealRequest]
+    );
+
+    const progress = useItemProgress(item.id);
+    const liveImage = progress?.image ?? null;
+    const resultImageName = getResultImageName(item);
+    const statusLabel = t(getStatusMeta(item.status).labelKey);
+    // A running item's device arrives on the progress event before the row's DTO is
+    // refetched, so prefer the live value and fall back to the persisted one.
+    const deviceLabel = useDeviceLabel(progress?.device ?? item.device);
+
+    const showBorder = expanded || isFailed;
+    const borderColor = showBorder ? (isFailed ? 'fg.error' : 'border') : 'transparent';
+
+    // The card is the list item: progress and details belong to the row, not to the list.
+    return (
+      <Box ref={consumeReveal} borderColor={borderColor} borderWidth={1} overflow="hidden" role="listitem" rounded="md">
+        <ListItem
+          actions={isCancellable ? <CancelQueueItemButton itemId={item.id} /> : undefined}
+          description={
+            <HStack gap="1.5" minW="0">
+              <QueueStatusDot status={item.status} />
+              <Text
+                fontVariantNumeric="tabular-nums"
+                title={deviceLabel ? t('widgets.queue.device.tooltip', { name: deviceLabel.name }) : undefined}
+                truncate
+              >
+                {[
+                  statusLabel,
+                  ageLabel,
+                  deviceLabel ? t('widgets.queue.device.shortLabel', { index: deviceLabel.index }) : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </Text>
+            </HStack>
+          }
+          isExpanded={canExpand ? expanded : undefined}
+          leading={<QueueItemThumbnail boxSize="8" imageName={resultImageName} liveImage={liveImage} />}
+          role="presentation"
+          title={meta.positivePrompt?.trim() || t('widgets.queue.noPrompt')}
+          titleTruncate="end"
+          trailing={
+            canExpand ? (
+              <Icon
+                as={ChevronRightIcon}
+                boxSize="4"
+                transition="transform var(--wb-motion-duration-fast) ease"
+                css={expanded ? CHEVRON_OPEN : undefined}
+              />
+            ) : undefined
+          }
+          onIntent={canExpand ? preload : undefined}
+          onPress={canExpand ? toggle : undefined}
+        />
+
+        {item.status === 'in_progress' ? (
+          <Box px="2.5" pb="2">
+            <QueueStepProgress message={progress?.message ?? ''} percentage={progress?.percentage ?? null} />
+          </Box>
+        ) : null}
+
+        {expanded ? (
+          <Box pb="2.5" pt="1" px="2.5">
+            <QueueItemDetails item={item} />
+          </Box>
+        ) : null}
+      </Box>
+    );
+  }
+);

@@ -62,9 +62,9 @@ def test_a14b_kwargs_instantiate_with_expected_shapes() -> None:
 
 
 def test_wan_vae_checkpoint_loads_bfloat16_even_when_loader_dtype_is_fp16() -> None:
-    """fp16 is unstable on the Wan VAE (NaN/garbled frames), so the checkpoint path must
-    force bfloat16 like ``_load_wan_vae_diffusers`` and ``WanDiffusersModel`` do — even
-    though ``precision: auto`` resolves the loader's default dtype to float16 on CUDA."""
+    """fp16 is unstable on the Wan VAE (NaN/garbled frames), so the checkpoint path raises a
+    float16 request to bfloat16 like ``_load_wan_vae_diffusers`` does — ``precision: auto``
+    resolves the loader's default dtype to float16 on CUDA."""
     loader = VAELoader.__new__(VAELoader)
     loader._ram_cache = MagicMock()
     loader._torch_dtype = torch.float16  # what `precision: auto` yields on CUDA
@@ -74,6 +74,8 @@ def test_wan_vae_checkpoint_loads_bfloat16_even_when_loader_dtype_is_fp16() -> N
         "step_counter": torch.zeros(1, dtype=torch.int64),
     }
     config = MagicMock()
+    # The loader picks its reader from the suffix, so the (mocked) safetensors reader is the one used.
+    config.path = "wan-vae.safetensors"
     config.latent_channels = 16
 
     fake_model = MagicMock()

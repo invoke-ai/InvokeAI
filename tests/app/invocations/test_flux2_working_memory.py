@@ -10,6 +10,7 @@ The `MEASURED_*` tables below are peak *reserved* memory measured on CUDA in bf1
 quantity, including allocator overhead). Every estimate must stay an upper bound on them.
 """
 
+from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -17,23 +18,25 @@ import torch
 import torch.nn.functional as F
 from diffusers.models.autoencoders.autoencoder_kl_flux2 import AutoencoderKLFlux2
 
-from invokeai.app.invocations.flux2_denoise import (
+from invokeai.app.invocations.flux2.flux2_denoise import (
     FLUX2_ATTENTION_HEAD_DIM,
     FLUX2_BYTES_PER_TOKEN_AT_REFERENCE_WIDTH,
     FLUX2_MAX_HIDDEN_SIZE,
     FLUX2_REFERENCE_HIDDEN_SIZE,
     Flux2DenoiseInvocation,
 )
-from invokeai.app.invocations.flux2_vae_decode import Flux2VaeDecodeInvocation
-from invokeai.app.invocations.flux2_vae_encode import Flux2VaeEncodeInvocation
+from invokeai.app.invocations.vae.flux2_vae_decode import Flux2VaeDecodeInvocation
+from invokeai.app.invocations.vae.flux2_vae_encode import Flux2VaeEncodeInvocation
+from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.util.attention import (
     SDPA_MATH_BYTES_PER_SCORE_ELEMENT,
     _diffusers_attention_dispatch,
     _torch_sdpa_materializes_score_matrix,
+    rocm_sdpa_uses_math_kernel,
     sdpa_score_matrix_bytes,
 )
 from invokeai.backend.util.vae_working_memory import (
-    _FLUX2_VAE_SCALING_CONSTANTS,
+    _FLUX_VAE_SCALING_CONSTANTS,
     estimate_vae_working_memory_flux2,
 )
 
@@ -367,7 +370,7 @@ class TestVaeConstantsFollowTheConvBackend:
     def test_the_constant_upper_bounds_its_own_backend(self, backend, operation, px, measured_gib):
         """Each column has to bound the hardware it was fitted on. Before this the cuDNN column was
         used everywhere, leaving a 2.3 GiB shortfall on a 1024px MIOpen decode."""
-        constant = _FLUX2_VAE_SCALING_CONSTANTS[backend][operation]
+        constant = _FLUX_VAE_SCALING_CONSTANTS[backend][operation]
         estimate = px * px * 2 * constant  # bf16 element size
         assert estimate >= measured_gib * GB
         assert estimate <= 1.3 * measured_gib * GB
@@ -375,14 +378,14 @@ class TestVaeConstantsFollowTheConvBackend:
     def test_the_cudnn_constant_would_not_cover_miopen(self):
         """The regression this guards: a 1024px MIOpen decode needs 6.58 GiB and the cuDNN constant
         reserves 4.30. That is the same class of shortfall #9500 reports, one backend over."""
-        cudnn = _FLUX2_VAE_SCALING_CONSTANTS["cudnn"]["decode"]
+        cudnn = _FLUX_VAE_SCALING_CONSTANTS["cudnn"]["decode"]
         assert 1024 * 1024 * 2 * cudnn < 6.578 * GB
 
     def test_the_encode_ratio_is_not_architectural(self):
         """cuDNN's encode is half its decode; MIOpen's is four fifths. A shared ratio cannot express
         both, which is why the table carries the two operations separately."""
         ratios = {
-            backend: consts["encode"] / consts["decode"] for backend, consts in _FLUX2_VAE_SCALING_CONSTANTS.items()
+            backend: consts["encode"] / consts["decode"] for backend, consts in _FLUX_VAE_SCALING_CONSTANTS.items()
         }
         assert ratios["cudnn"] == pytest.approx(0.50, abs=0.02)
         assert ratios["miopen"] == pytest.approx(0.76, abs=0.03)
@@ -400,12 +403,18 @@ class TestVaeConstantsFollowTheConvBackend:
                 operation="decode", image_tensor=latents, vae=v, device=torch.device("cuda")
             )
 
+        # `_IS_ROCM` is pinned because it is bound at import: on a real HIP build the head-dim
+        # guard short-circuits ahead of the probe patched here and charges a score matrix to both
+        # legs, leaving the ratio correct only while the cuDNN linear term still exceeds it -- 1%
+        # at this size. The column is this test's subject; the guard is the next test's.
         with (
+            patch("invokeai.backend.util.attention._IS_ROCM", False),
             patch("torch.version.hip", "7.1.25424"),
             patch("invokeai.backend.util.attention._torch_sdpa_materializes_score_matrix", return_value=False),
         ):
             rocm = estimate()
         with (
+            patch("invokeai.backend.util.attention._IS_ROCM", False),
             patch("torch.version.hip", None),
             patch("invokeai.backend.util.attention._torch_sdpa_materializes_score_matrix", return_value=False),
         ):
@@ -413,6 +422,45 @@ class TestVaeConstantsFollowTheConvBackend:
 
         assert rocm > cuda
         assert rocm / cuda == pytest.approx(3600 / 2200, rel=1e-3)
+
+    def test_a_rocm_build_composes_the_miopen_column_with_the_guard_score_matrix(self):
+        """The state every ROCm rig is actually in, driven through the estimator.
+
+        A HIP build takes the MIOpen column *and* the head-dim guard's score matrix -- the guard is
+        unconditional for this VAE's 512-wide head -- so `max` has to pick between two terms that
+        are both larger than the cuDNN pair. `TestVaeTermsDoNotAdd` checks the same two terms
+        against the constants table, which cannot see an estimator that stops combining them: a
+        plausible "the score matrix covers it anyway" refactor that drops back to the cuDNN column
+        whenever SDPA materializes under-reserves a 1024px decode by 1.6x and passes every other
+        test in this module.
+        """
+
+        def estimate(px):
+            vae = MagicMock(spec=AutoencoderKLFlux2)
+            vae.parameters.return_value = iter([torch.zeros(1, dtype=torch.bfloat16)])
+            return estimate_vae_working_memory_flux2(
+                operation="decode",
+                image_tensor=torch.zeros(1, 32, px // 8, px // 8),
+                vae=vae,
+                device=torch.device("cuda"),
+            )
+
+        with (
+            patch("torch.version.hip", "7.1.25424"),
+            patch("invokeai.backend.util.attention._IS_ROCM", True),
+            # Pinned against `INVOKE_ROCM_FUSED_SDPA_MAX_HEAD_DIM`, which a user can set high
+            # enough to disarm the guard; any threshold between the denoise's 128-wide head and
+            # this VAE's 512-wide one gives the shipped behavior.
+            patch("invokeai.backend.util.attention.ROCM_FUSED_SDPA_MAX_HEAD_DIM", 256),
+        ):
+            at_1024 = estimate(1024)
+            at_1536 = estimate(1536)
+
+        miopen = _FLUX_VAE_SCALING_CONSTANTS["miopen"]["decode"]
+        assert at_1024 == 1024 * 1024 * 2 * miopen, "at 1024px the MIOpen linear term is the larger"
+        assert at_1024 >= 6.703 * GB, "and it still covers the measured W7900 peak it was fitted to"
+        assert at_1536 == 36864 * 36864 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT, "at 1536px the score matrix is"
+        assert at_1536 > 1536 * 1536 * 2 * miopen
 
 
 class TestFlux2VaeBatchIsBudgeted:
@@ -469,13 +517,20 @@ class TestFlux2VaeBatchIsBudgeted:
     def test_the_score_matrix_scales_with_the_batch(self):
         """It is shaped (batch, heads, S, S), so where it is materialized at all it scales with the
         batch just as the linear term does -- and since both scale together, the larger of the two
-        stays the larger at every batch size."""
-        tokens = 128 * 128
+        stays the larger at every batch size.
+
+        Sized at 1536px deliberately. At 1024px the cuDNN linear term beats the score matrix by 1%,
+        so `max` returns the linear term at every batch size and the assertion holds even if the
+        score matrix stops scaling with the batch entirely -- which is a 35GB under-reservation for
+        a batched 1536px decode, the exact OOM this term exists to prevent.
+        """
+        tokens = 192 * 192
         score = tokens * tokens * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
-        linear = self._decode_estimate(1)  # fused: the spatial term on its own
+        linear = self._decode_estimate(1, px=1536)  # fused: the spatial term on its own
+        assert score > linear, "the size is load-bearing: `max` must be returning the score matrix"
         with _materializing():
-            assert self._decode_estimate(1, device=MATERIALIZING) == max(linear, score)
-            assert self._decode_estimate(3, device=MATERIALIZING) == 3 * max(linear, score)
+            assert self._decode_estimate(1, px=1536, device=MATERIALIZING) == score
+            assert self._decode_estimate(3, px=1536, device=MATERIALIZING) == 3 * score
 
 
 class TestFlux2VaeInvocationsRequestWorkingMemory:
@@ -502,7 +557,7 @@ class TestFlux2VaeInvocationsRequestWorkingMemory:
 
         expected = 10 * GB
         with patch(
-            "invokeai.app.invocations.flux2_vae_decode.estimate_vae_working_memory_flux2", return_value=expected
+            "invokeai.app.invocations.vae.flux2_vae_decode.estimate_vae_working_memory_flux2", return_value=expected
         ) as estimate:
             invocation = Flux2VaeDecodeInvocation.model_construct(
                 latents=MagicMock(latents_name="latents"), vae=MagicMock(vae=MagicMock())
@@ -526,10 +581,10 @@ class TestFlux2VaeInvocationsRequestWorkingMemory:
         expected = 4 * GB
         with (
             patch(
-                "invokeai.app.invocations.flux2_vae_encode.estimate_vae_working_memory_flux2", return_value=expected
+                "invokeai.app.invocations.vae.flux2_vae_encode.estimate_vae_working_memory_flux2", return_value=expected
             ) as estimate,
             patch(
-                "invokeai.app.invocations.flux2_vae_encode.image_resized_to_grid_as_tensor",
+                "invokeai.app.invocations.vae.flux2_vae_encode.image_resized_to_grid_as_tensor",
                 return_value=torch.zeros(3, 1024, 1024),
             ),
         ):
@@ -554,8 +609,21 @@ class TestFlux2DenoiseRequestsWorkingMemory:
     """The denoise node must hand its estimate to the cache, and that estimate must grow with the
     attached reference images -- the combination that #9500 was missing."""
 
-    def _run(self, num_ref_tokens: int, batch: int = 1, init_batch: int | None = None, variant="klein_9b"):
-        """Drive `_run_diffusion` up to the transformer load and return the requested working memory."""
+    def _run(
+        self,
+        num_ref_tokens: int,
+        batch: int = 1,
+        init_batch: int | None = None,
+        variant="klein_9b",
+        transformer: torch.nn.Module | None = None,
+        on_device=None,
+    ):
+        """Drive `_run_diffusion` up to the transformer load and return the requested working memory.
+
+        `transformer` replaces the mocked model the node reads before locking. It has to be a real
+        module for anything that walks the module tree: a `MagicMock` iterates empty, so an int8
+        build looks exactly like a dense one.
+        """
         from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
         from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
             ConditioningFieldData,
@@ -563,7 +631,9 @@ class TestFlux2DenoiseRequestsWorkingMemory:
         )
 
         transformer_info = MagicMock()
-        transformer_info.model_on_device = MagicMock(side_effect=_StopBeforeLoad)
+        transformer_info.model_on_device = MagicMock(side_effect=on_device or _StopBeforeLoad)
+        if transformer is not None:
+            transformer_info.model = transformer
 
         context = MagicMock()
         context.models.load.return_value = transformer_info
@@ -610,7 +680,7 @@ class TestFlux2DenoiseRequestsWorkingMemory:
         with (
             patch.object(Flux2DenoiseInvocation, "_get_bn_stats", return_value=None),
             patch("invokeai.backend.util.devices.TorchDevice.choose_torch_device", return_value=torch.device("cpu")),
-            patch("invokeai.app.invocations.flux2_denoise.Flux2RefImageExtension", return_value=ref_extension),
+            patch("invokeai.app.invocations.flux2.flux2_denoise.Flux2RefImageExtension", return_value=ref_extension),
             patch.object(
                 Flux2DenoiseInvocation, "_prepare_noise_tensor", return_value=torch.zeros(batch, 32, 128, 128)
             ),
@@ -620,6 +690,9 @@ class TestFlux2DenoiseRequestsWorkingMemory:
 
         transformer_info.model_on_device.assert_called_once()
         return transformer_info.model_on_device.call_args.kwargs["working_mem_bytes"]
+
+    # `on_device` lets a caller get past the load instead of stopping at it, for the wires that sit
+    # further down the node.
 
     def test_estimate_reaches_the_model_cache(self):
         """Without this the cache reserves only the default `device_working_mem_gb`."""
@@ -701,18 +774,45 @@ def _materializing_probe(device_type, device_index, dtype, head_dim, has_attn_ma
     return head_dim > 128 or has_attn_mask
 
 
-class _null:
-    def __enter__(self):
-        return self
+@contextmanager
+def _pinned_build():
+    """Hold the two build-dependent inputs the estimators read at their non-HIP values.
 
-    def __exit__(self, *args):
-        return False
+    `MATERIALIZING` below is a `cuda` device object used purely as a token for "SDPA builds the
+    score matrix here", but on a HIP build that same token carries two more decisions with it, and
+    both would make this module's verdict depend on the runner:
+
+    * `_flux2_vae_scaling_constant` selects the MIOpen convolution column, 1.6-2.5x the cuDNN one
+      every expectation guarded by this helper is written against -- so the VAE assertions would
+      pass on a CUDA runner and fail on a ROCm one.
+    * `rocm_sdpa_uses_math_kernel` short-circuits ahead of the probe below, on a threshold a user
+      can move with `INVOKE_ROCM_FUSED_SDPA_MAX_HEAD_DIM`. At the default it happens to agree with
+      `_materializing_probe`; at a lower one it charges a score matrix for the denoise's 128-wide
+      head that a CUDA runner never sees. `attention._IS_ROCM` is bound at import, so pinning
+      `torch.version.hip` alone does not reach it.
+
+    Both regimes below pin these, so they differ in the score-matrix term alone -- which is what
+    they are here to isolate. Which column a device really selects, and what the guard really does
+    on top of it, is `TestVaeConstantsFollowTheConvBackend`'s subject.
+    """
+    with (
+        patch("torch.version.hip", None),
+        patch("invokeai.backend.util.attention._IS_ROCM", False),
+    ):
+        yield
 
 
+@contextmanager
 def _materializing():
-    return patch(
-        "invokeai.backend.util.attention._torch_sdpa_materializes_score_matrix", side_effect=_materializing_probe
-    )
+    """`_pinned_build()` plus a synthetic probe, so SDPA reports that it materializes."""
+    with (
+        _pinned_build(),
+        patch(
+            "invokeai.backend.util.attention._torch_sdpa_materializes_score_matrix",
+            side_effect=_materializing_probe,
+        ),
+    ):
+        yield
 
 
 # Any CUDA device object works here: the probe is patched out, so nothing is allocated on it.
@@ -826,7 +926,7 @@ class TestVaeTermsDoNotAdd:
     def _estimate(self, px, device, materializing):
         vae = MagicMock(spec=AutoencoderKLFlux2)
         vae.parameters.return_value = iter([torch.zeros(1, dtype=torch.bfloat16)])
-        with _materializing() if materializing else _null():
+        with _materializing() if materializing else _pinned_build():
             return estimate_vae_working_memory_flux2(
                 operation="decode", image_tensor=torch.zeros(1, 32, px // 8, px // 8), vae=vae, device=device
             )
@@ -837,7 +937,7 @@ class TestVaeTermsDoNotAdd:
 
     @pytest.mark.parametrize("px, measured_gib", MEASURED_W7900_DECODE)
     def test_the_max_model_bounds_the_measured_miopen_peak(self, px, measured_gib):
-        linear = px * px * 2 * _FLUX2_VAE_SCALING_CONSTANTS["miopen"]["decode"]
+        linear = px * px * 2 * _FLUX_VAE_SCALING_CONSTANTS["miopen"]["decode"]
         score = (px // 8) ** 4 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
         assert max(linear, score) >= measured_gib * GB
         assert max(linear, score) <= 1.15 * measured_gib * GB
@@ -845,7 +945,7 @@ class TestVaeTermsDoNotAdd:
     def test_the_sum_model_would_have_over_reserved_by_two_thirds(self):
         """At 1024px the sum reserves 11.1GiB for a decode that measures 6.7 -- on a 16GB card that
         is the difference between the transformer staying resident and being evicted."""
-        linear = 1024 * 1024 * 2 * _FLUX2_VAE_SCALING_CONSTANTS["miopen"]["decode"]
+        linear = 1024 * 1024 * 2 * _FLUX_VAE_SCALING_CONSTANTS["miopen"]["decode"]
         score = 16384 * 16384 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
         assert (linear + score) / (6.703 * GB) > 1.6
         assert max(linear, score) / (6.703 * GB) < 1.15
@@ -853,7 +953,7 @@ class TestVaeTermsDoNotAdd:
     def test_the_estimate_is_the_larger_term_not_the_sum(self):
         """At 1024px the two are within 2% of each other on the cuDNN column, which makes this the
         sharpest place to tell the models apart."""
-        linear = 1024 * 1024 * 2 * _FLUX2_VAE_SCALING_CONSTANTS["cudnn"]["decode"]
+        linear = 1024 * 1024 * 2 * _FLUX_VAE_SCALING_CONSTANTS["cudnn"]["decode"]
         score = 16384 * 16384 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
         assert self._estimate(1024, MATERIALIZING, materializing=True) == max(linear, score)
         assert self._estimate(1024, MATERIALIZING, materializing=True) < linear + score
@@ -876,7 +976,7 @@ class TestVaeTermsDoNotAdd:
         because the cache floors every reservation at `device_working_mem_gb` and the whole crossover
         region sits below that floor. Reproducible to three decimals across runs, so this is the
         model's real shape, not noise -- which is why it is pinned rather than rounded away."""
-        constant = _FLUX2_VAE_SCALING_CONSTANTS["cudnn"][operation]
+        constant = _FLUX_VAE_SCALING_CONSTANTS["cudnn"][operation]
         area = px * px if operation == "decode" else px * px
         linear = area * 2 * constant
         score = (px // 8) ** 4 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
@@ -886,7 +986,7 @@ class TestVaeTermsDoNotAdd:
     def test_a_fused_build_is_unaffected(self):
         """The max only ever removes reservation, never adds it: with no score matrix the estimate is
         the linear term, exactly as before."""
-        linear = 1024 * 1024 * 2 * _FLUX2_VAE_SCALING_CONSTANTS["cudnn"]["decode"]
+        linear = 1024 * 1024 * 2 * _FLUX_VAE_SCALING_CONSTANTS["cudnn"]["decode"]
         assert self._estimate(1024, FUSED, materializing=False) == linear
 
     def test_regional_prompting_adds_the_score_matrix(self):
@@ -1006,9 +1106,12 @@ class TestSdpaBackendProbe:
         from torch.nn.attention import SDPBackend, sdpa_kernel
 
         def estimate():
-            return sdpa_score_matrix_bytes(
-                device=torch.device("cuda"), dtype=torch.bfloat16, num_heads=1, head_dim=128, seq_len=4096
-            )
+            # `_IS_ROCM` pinned off: torch's dispatch order is the subject here, and a user-lowered
+            # `INVOKE_ROCM_FUSED_SDPA_MAX_HEAD_DIM` would otherwise decide this before torch does.
+            with patch("invokeai.backend.util.attention._IS_ROCM", False):
+                return sdpa_score_matrix_bytes(
+                    device=torch.device("cuda"), dtype=torch.bfloat16, num_heads=1, head_dim=128, seq_len=4096
+                )
 
         assert estimate() == 0
         with sdpa_kernel(
@@ -1046,22 +1149,31 @@ class TestSdpaBackendProbe:
     @pytest.mark.skipif(not torch.cuda.is_available(), reason="asks the real CUDA/ROCm dispatcher")
     def test_this_build_reports_its_own_dispatch(self):
         """The head dim is the discriminator that actually holds: CUDA's memory-efficient kernel
-        takes the VAE's 512-wide head, ROCm caps at 128 and reports `math` for it. Masks are not a
-        discriminator -- gfx1100 reports the memory-efficient kernel for a masked 128-wide head just
-        as CUDA does -- so the masked case only has to agree with whatever torch says, which is the
-        whole point of asking it."""
+        takes the VAE's 512-wide head, and on ROCm the head-dim guard sends it to `math` by policy
+        (its fused kernels return wrong output there). Masks are not a discriminator -- gfx1100
+        reports the memory-efficient kernel for a masked 128-wide head just as CUDA does -- so the
+        masked case only has to agree with whatever torch says, which is the whole point of asking
+        it."""
         vae_bytes = sdpa_score_matrix_bytes(
             device=torch.device("cuda"), dtype=torch.bfloat16, num_heads=1, head_dim=512, seq_len=16384
         )
-        masked_bytes = sdpa_score_matrix_bytes(
-            device=torch.device("cuda"),
-            dtype=torch.bfloat16,
-            num_heads=48,
-            head_dim=128,
-            seq_len=4608,
-            has_attn_mask=True,
-        )
-        assert vae_bytes == (0 if torch.version.hip is None else 16384 * 16384 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT)
+        # The masked case is torch's own answer, so the guard is pinned out of the way rather than
+        # folded into the expectation below -- at the default threshold it does not reach a
+        # 128-wide head anyway, but the threshold is user-settable.
+        with patch("invokeai.backend.util.attention._IS_ROCM", False):
+            masked_bytes = sdpa_score_matrix_bytes(
+                device=torch.device("cuda"),
+                dtype=torch.bfloat16,
+                num_heads=48,
+                head_dim=128,
+                seq_len=4608,
+                has_attn_mask=True,
+            )
+        # Asked of the guard's own rule rather than of `torch.version.hip`: the threshold is
+        # user-settable, and a HIP build with the guard turned off is back to whatever its fused
+        # kernel does. `rocm_sdpa_uses_math_kernel` is the single rule the estimators share.
+        guard_forces_math = rocm_sdpa_uses_math_kernel("cuda", 512)
+        assert vae_bytes == (16384 * 16384 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT if guard_forces_math else 0)
         materializes = _torch_sdpa_materializes_score_matrix(
             "cuda", torch.device("cuda").index, torch.bfloat16, 128, True
         )
@@ -1222,3 +1334,104 @@ class TestDiffusersAttentionDispatchIsConsulted:
             side_effect=AttributeError("moved"),
         ):
             assert _diffusers_attention_dispatch() == "math"
+
+
+class TestTheInt8DequantTransientReachesTheReservation:
+    """A helper existing is not the same as it being called.
+
+    An `int8_tensorwise` build materializes each linear's dequantized weight inside `forward`, and
+    that peak is not part of the model's resident size. Deleting `+ int8_dequant_bytes` from the
+    node leaves every other test in this file green, because they drive it with a `MagicMock` whose
+    module tree is empty -- so this is the only place the wire is pinned. For Klein 9B the term is
+    576 MiB, against a card this build exists to fit into.
+    """
+
+    @staticmethod
+    def _int8_transformer() -> torch.nn.Module:
+        from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
+
+        model = torch.nn.Module()
+        model.dense = torch.nn.Linear(64, 64, bias=False).to(torch.bfloat16)
+        model.quantized = Int8ConvrotLinear(
+            weight=torch.zeros(128, 64, dtype=torch.int8),
+            weight_scale=torch.ones(()),
+            convrot=False,
+        )
+        return model
+
+    def test_an_int8_build_adds_its_transient_on_top_of_the_activation_estimate(self):
+        harness = TestFlux2DenoiseRequestsWorkingMemory()
+        model = self._int8_transformer()
+
+        dense = harness._run(num_ref_tokens=0)
+        with_int8 = harness._run(num_ref_tokens=0, transformer=model)
+
+        # Two weight-sized tensors in the compute dtype, over the largest quantized layer.
+        assert with_int8 - dense == 2 * 128 * 64 * torch.bfloat16.itemsize
+
+    def test_a_dense_build_adds_nothing(self):
+        # The other half: a bf16 or fp8 checkpoint must not be charged for a dequantization it
+        # never performs.
+        harness = TestFlux2DenoiseRequestsWorkingMemory()
+        dense_model = torch.nn.Linear(64, 64).to(torch.bfloat16)
+
+        assert harness._run(num_ref_tokens=0, transformer=dense_model) == harness._run(num_ref_tokens=0)
+
+
+class TestTheSidecarDecisionReachesThePatcher:
+    """An int8 checkpoint carries `ModelFormat.Checkpoint` like any other single file.
+
+    Asking the format alone therefore answers "not quantized", and `LayerPatcher` picks direct
+    patching -- which calls `get_parameter("weight")` on an `Int8ConvrotLinear` that owns only
+    buffers. Verified consequence: `RuntimeError: generator raised StopIteration`, i.e. every LoRA
+    on an int8 Klein 9B dies with an error that names nothing. So the question has to be put to the
+    loaded module tree.
+    """
+
+    @staticmethod
+    def _sidecar_flag_for(transformer: torch.nn.Module, model_format) -> bool:
+        from invokeai.backend.quantization.dequantizing_linear import requires_sidecar_patching
+
+        return requires_sidecar_patching(transformer, model_format)
+
+    def test_an_int8_checkpoint_is_patched_as_a_sidecar(self):
+        from invokeai.backend.model_manager.taxonomy import ModelFormat
+
+        model = TestTheInt8DequantTransientReachesTheReservation._int8_transformer()
+
+        assert self._sidecar_flag_for(model, ModelFormat.Checkpoint) is True
+
+    def test_a_dense_checkpoint_is_not(self):
+        from invokeai.backend.model_manager.taxonomy import ModelFormat
+
+        assert self._sidecar_flag_for(torch.nn.Linear(4, 4), ModelFormat.Checkpoint) is False
+
+    @staticmethod
+    def _flag_at_the_node(transformer: torch.nn.Module) -> bool:
+        """What the node actually hands `LayerPatcher`, driven through `_run_diffusion`.
+
+        The wire, not the helper: the node used to key on a hardcoded format list, and a list
+        cannot see an int8 build at all.
+        """
+        from contextlib import contextmanager
+
+        captured: dict = {}
+
+        @contextmanager
+        def on_device(**_kwargs):
+            yield (None, transformer)
+
+        def apply_patches(**kwargs):
+            captured["force_sidecar_patching"] = kwargs["force_sidecar_patching"]
+            raise _StopBeforeLoad
+
+        harness = TestFlux2DenoiseRequestsWorkingMemory()
+        with patch.object(LayerPatcher, "apply_smart_model_patches", staticmethod(apply_patches)):
+            harness._run(num_ref_tokens=0, transformer=transformer, on_device=on_device)
+        return captured["force_sidecar_patching"]
+
+    def test_the_node_asks_the_model_and_not_only_the_format(self):
+        int8 = TestTheInt8DequantTransientReachesTheReservation._int8_transformer()
+
+        assert self._flag_at_the_node(int8) is True
+        assert self._flag_at_the_node(torch.nn.Linear(4, 4).to(torch.bfloat16)) is False

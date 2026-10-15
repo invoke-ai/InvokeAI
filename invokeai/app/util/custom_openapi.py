@@ -17,6 +17,17 @@ from invokeai.backend.util.logging import InvokeAILogger
 
 logger = InvokeAILogger.get_logger()
 
+_INTERNAL_EXECUTION_SCHEMA_NAMES = frozenset(
+    {
+        "ChildCompletion",
+        "ChildDependencyRecord",
+        "ChildExecutionRecord",
+        "ExecutionFrame",
+        "ExecutionReference",
+        "ExecutionToken",
+    }
+)
+
 
 def move_defs_to_top_level(openapi_schema: dict[str, Any], component_schema: dict[str, Any]) -> None:
     """Moves a component schema's $defs to the top level of the openapi schema. Useful when generating a schema
@@ -45,6 +56,50 @@ def normalize_path_defaults(node: Any) -> None:
     elif isinstance(node, list):
         for v in node:
             normalize_path_defaults(v)
+
+
+def remove_unreferenced_internal_execution_schemas(openapi_schema: dict[str, Any]) -> None:
+    """Remove internal execution definitions when no public schema references them.
+
+    Pydantic can leave definitions for fields annotated with ``SkipJsonSchema`` in
+    the OpenAPI component map. Keep an internal definition if a public schema
+    references it, including through another internal definition; otherwise it
+    must not appear in the client-facing schema.
+    """
+
+    schemas = openapi_schema.get("components", {}).get("schemas", {})
+    if not schemas:
+        return
+
+    def collect_refs(value: Any, refs: set[str]) -> None:
+        if isinstance(value, dict):
+            ref = value.get("$ref")
+            if isinstance(ref, str) and ref.startswith("#/components/schemas/"):
+                refs.add(ref.removeprefix("#/components/schemas/"))
+            for child in value.values():
+                collect_refs(child, refs)
+        elif isinstance(value, list):
+            for child in value:
+                collect_refs(child, refs)
+
+    refs: set[str] = set()
+    for schema_name, schema in schemas.items():
+        if schema_name not in _INTERNAL_EXECUTION_SCHEMA_NAMES:
+            collect_refs(schema, refs)
+    collect_refs(openapi_schema.get("paths", {}), refs)
+
+    required_internal = refs & _INTERNAL_EXECUTION_SCHEMA_NAMES
+    while required_internal:
+        nested_refs: set[str] = set()
+        for schema_name in required_internal:
+            collect_refs(schemas.get(schema_name), nested_refs)
+        new_required = nested_refs & _INTERNAL_EXECUTION_SCHEMA_NAMES - required_internal
+        if not new_required:
+            break
+        required_internal.update(new_required)
+
+    for schema_name in _INTERNAL_EXECUTION_SCHEMA_NAMES - required_internal:
+        schemas.pop(schema_name, None)
 
 
 def get_openapi_func(
@@ -143,6 +198,7 @@ def get_openapi_func(
         if post_transform is not None:
             openapi_schema = post_transform(openapi_schema)
 
+        remove_unreferenced_internal_execution_schemas(openapi_schema)
         normalize_path_defaults(openapi_schema)
 
         openapi_schema["components"]["schemas"] = dict(sorted(openapi_schema["components"]["schemas"].items()))

@@ -13,7 +13,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from invokeai.app.invocations.ernie_image_model_loader import ErnieImageModelLoaderInvocation
+from invokeai.app.invocations.ernie_image.ernie_image_model_loader import ErnieImageModelLoaderInvocation
 
 _FULL_INDEX = {
     "_class_name": "ErnieImagePipeline",
