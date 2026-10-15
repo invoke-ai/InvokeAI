@@ -50,18 +50,16 @@ class TestResolveSubmodelPath:
     def _config(self, submodels: dict | None) -> SimpleNamespace:
         return SimpleNamespace(path="/models/pipeline", submodels=submodels)
 
-    def test_it_prefers_the_path_discovery_recorded(self) -> None:
-        """`model_index.json` may name a component anything; discovery records the folder it found."""
-        config = self._config(
-            {SubModelType.TextEncoder: SimpleNamespace(path_or_prefix="/models/pipeline/clip_encoder")}
-        )
+    def test_a_relative_record_follows_the_model_folder(self) -> None:
+        """Components are recorded relative to the model, so moving the model moves them too."""
+        config = self._config({SubModelType.TextEncoder: SimpleNamespace(path_or_prefix="clip_encoder")})
 
         resolved = resolve_submodel_path(config, SubModelType.TextEncoder, Path("/models/pipeline/text_encoder"))
 
         assert resolved == Path("/models/pipeline/clip_encoder")
 
-    def test_it_rebases_a_discovered_path_after_the_pipeline_is_moved(self, tmp_path: Path) -> None:
-        """Remote installs identify a pipeline in a staging dir before moving it into models/."""
+    def test_it_rebases_a_legacy_absolute_record_after_the_pipeline_is_moved(self, tmp_path: Path) -> None:
+        """Older records hold the identification-time path: the download's `tmpinstall_*` staging dir."""
         staging_root = tmp_path / "tmpinstall_pipeline"
         discovered_component = staging_root / "clip_encoder"
         discovered_component.mkdir(parents=True)
@@ -70,9 +68,8 @@ class TestResolveSubmodelPath:
         installed_root.parent.mkdir()
         staging_root.rename(installed_root)
         config = SimpleNamespace(
-            # Managed model records store paths relative to the models directory. The loader's
-            # fallback carries the resolved absolute model root.
-            path=installed_root.name,
+            # The loader makes `config.path` absolute before any component is resolved.
+            path=installed_root.as_posix(),
             submodels={SubModelType.TextEncoder: SimpleNamespace(path_or_prefix=discovered_component.as_posix())},
         )
 
@@ -80,24 +77,51 @@ class TestResolveSubmodelPath:
 
         assert resolved == installed_root / "clip_encoder"
 
-    def test_it_keeps_an_existing_discovered_path_outside_the_pipeline(self, tmp_path: Path) -> None:
-        """A valid external component must not be replaced merely because the pipeline has a namesake."""
-        external_component = tmp_path / "shared" / "clip_encoder"
-        external_component.mkdir(parents=True)
-        installed_component = tmp_path / "pipeline" / "clip_encoder"
-        installed_component.mkdir(parents=True)
+    def test_a_legacy_absolute_record_loses_to_the_models_own_component(self, tmp_path: Path) -> None:
+        """A copy left at the recorded location (an install source, a copied models dir) may have
+        been replaced since; the model's own folder is the one that belongs to this record."""
+        elsewhere = tmp_path / "Downloads" / "pipeline" / "text_encoder"
+        own = tmp_path / "models" / "key" / "text_encoder"
+        elsewhere.mkdir(parents=True)
+        own.mkdir(parents=True)
         config = SimpleNamespace(
-            path=installed_component.parent.as_posix(),
-            submodels={SubModelType.TextEncoder: SimpleNamespace(path_or_prefix=external_component.as_posix())},
+            path=str(tmp_path / "models" / "key"),
+            submodels={SubModelType.TextEncoder: SimpleNamespace(path_or_prefix=elsewhere.as_posix())},
         )
 
-        resolved = resolve_submodel_path(config, SubModelType.TextEncoder, installed_component.parent / "text_encoder")
+        assert resolve_submodel_path(config, SubModelType.TextEncoder, Path("/unused")) == own
 
-        assert resolved == external_component
+    def test_a_legacy_record_of_a_symlinked_component_keeps_its_target(self, tmp_path: Path) -> None:
+        """Identification resolved symlinks, so the record names the target, which the model folder lacks."""
+        target = tmp_path / "shared" / "te_weights"
+        target.mkdir(parents=True)
+        model = tmp_path / "pipeline"
+        model.mkdir()
+        (model / "text_encoder").symlink_to(target)
+        config = SimpleNamespace(
+            path=str(model),
+            submodels={SubModelType.TextEncoder: SimpleNamespace(path_or_prefix=target.as_posix())},
+        )
 
-    def test_it_keeps_a_missing_discovered_path_when_no_relocated_component_exists(self, tmp_path: Path) -> None:
-        """Do not hide a genuinely missing component behind an invented path under the model root."""
-        missing_component = tmp_path / "staging" / "clip_encoder"
+        assert resolve_submodel_path(config, SubModelType.TextEncoder, Path("/unused")) == target
+
+    def test_the_model_folder_is_the_root_whatever_the_fallback(self, tmp_path: Path) -> None:
+        """The transformer loaders fall back to the model folder itself when it has no `transformer/`,
+        so the fallback's parent is the models dir; the root must come from the config instead."""
+        (tmp_path / "models" / "key" / "dit").mkdir(parents=True)
+        (tmp_path / "models" / "dit").mkdir()  # a namesake beside the model must not be picked up
+        model = tmp_path / "models" / "key"
+        stale = (tmp_path / "models" / "tmpinstall_x" / "pipeline" / "dit").as_posix()
+        config = SimpleNamespace(
+            path=str(model), submodels={SubModelType.Transformer: SimpleNamespace(path_or_prefix=stale)}
+        )
+
+        assert resolve_submodel_path(config, SubModelType.Transformer, model) == model / "dit"
+
+    def test_a_missing_component_is_reported_inside_the_model_folder(self, tmp_path: Path) -> None:
+        """When neither location exists, the failure names the installed model's folder rather than a
+        long-gone staging path, which Transformers would misreport as an invalid Hub repo id."""
+        missing_component = tmp_path / "tmpinstall_x" / "clip_encoder"
         installed_root = tmp_path / "pipeline"
         installed_root.mkdir()
         config = SimpleNamespace(
@@ -107,7 +131,7 @@ class TestResolveSubmodelPath:
 
         resolved = resolve_submodel_path(config, SubModelType.TextEncoder, installed_root / "text_encoder")
 
-        assert resolved == missing_component
+        assert resolved == installed_root / "clip_encoder"
 
     def test_it_falls_back_when_the_slot_was_not_discovered(self) -> None:
         """Configs persisted before submodel discovery existed carry no map."""
@@ -154,9 +178,7 @@ class TestGetSizeFs:
         config = SimpleNamespace(
             path=str(tmp_path),
             repo_variant=None,
-            submodels={
-                SubModelType.TextEncoder: SimpleNamespace(path_or_prefix=(tmp_path / "clip_encoder").as_posix())
-            },
+            submodels={SubModelType.TextEncoder: SimpleNamespace(path_or_prefix="clip_encoder")},
         )
 
         size = self._loader().get_size_fs(config, tmp_path, SubModelType.TextEncoder)

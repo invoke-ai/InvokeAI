@@ -99,25 +99,23 @@ def resolve_submodel_path(config: AnyModelConfig, submodel_type: SubModelType, f
     instead assumes the key always equals the slot name, so a pipeline that calls its CLIP encoder
     something else passes discovery and is then loaded from a directory that does not exist.
 
-    Remote installs discover components inside a ``tmpinstall_*`` directory before moving the
-    pipeline into its permanent model directory. Existing records may therefore carry a discovered
-    path whose root no longer exists. Discovery only records direct children of the pipeline, so in
-    that case rebase the recorded component name onto the current model root. Use the resolved
-    fallback's parent for that root because managed model records persist ``config.path`` relative
-    to the models directory.
-
     `fallback` is used when the config carries no such entry — configs persisted before submodel
     discovery existed, and the layouts where the component folder *is* the model path.
+
+    The recorded path is relative to the model folder (`config.path`, absolute by load time).
+    Records written before that convention hold the absolute path seen at identification — for an
+    installed model, the staging or source folder it was moved out of. Its last component is the
+    component key, so the model's own folder of that name wins; the recorded path is kept only when
+    the model has no such folder (a component that was a symlink was recorded by its target).
     """
     discovered = (getattr(config, "submodels", None) or {}).get(submodel_type)
     if not discovered:
         return fallback
-
-    discovered_path = Path(discovered.path_or_prefix)
-    relocated_path = fallback.parent / discovered_path.name
-    if not discovered_path.exists() and relocated_path.exists():
-        return relocated_path
-    return discovered_path
+    recorded = Path(discovered.path_or_prefix)
+    rebased = Path(config.path) / (recorded.name if recorded.is_absolute() else recorded)
+    if recorded.is_absolute() and recorded.exists() and not rebased.exists():
+        return recorded
+    return rebased
 
 
 def _device_supports_fp8_storage(device: torch.device, logger: Optional[Logger] = None) -> bool:
