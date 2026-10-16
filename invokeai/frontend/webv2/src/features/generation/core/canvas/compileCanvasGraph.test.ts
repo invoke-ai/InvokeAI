@@ -35,6 +35,14 @@ const flux2DevModel: MainModelConfig = {
   name: 'FLUX.2 [dev]',
   variant: 'dev',
 };
+const flux3Model: MainModelConfig = {
+  base: 'flux3',
+  format: 'diffusers',
+  key: 'flux3-model',
+  name: 'FLUX.3 Klein',
+  type: 'main',
+  variant: 'flux3_klein',
+};
 const cogView4Model: MainModelConfig = { base: 'cogview4', key: 'cog-model', name: 'CogView4', type: 'main' };
 const qwenImageModel: MainModelConfig = {
   base: 'qwen-image',
@@ -233,6 +241,15 @@ const BASE_CASES: BaseCase[] = [
     denoiseType: 'flux2_denoise',
     txt2imgMode: 'flux2_txt2img',
     img2imgMode: 'flux2_img2img',
+    optimizedDenoising: true,
+  },
+  {
+    model: flux3Model,
+    encodeType: 'flux2_vae_encode',
+    outputType: 'flux2_vae_decode',
+    denoiseType: 'flux3_denoise',
+    txt2imgMode: 'flux3_txt2img',
+    img2imgMode: 'flux3_img2img',
     optimizedDenoising: true,
   },
   {

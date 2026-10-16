@@ -29,6 +29,7 @@ from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fraction
 from invokeai.backend.flux.schedulers import FLUX_SCHEDULER_LABELS, FLUX_SCHEDULER_MAP, FLUX_SCHEDULER_NAME_VALUES
 from invokeai.backend.flux2.denoise import denoise
 from invokeai.backend.flux2.extensions.regional_prompting_extension import Flux2RegionalPromptingExtension
+from invokeai.backend.flux2.latent_norm import bn_denormalize, bn_normalize, read_vae_bn_stats
 from invokeai.backend.flux2.ref_image_extension import Flux2RefImageExtension
 from invokeai.backend.flux2.sampling_utils import (
     FLUX2_TXT2IMG_SCHEDULER_KWARGS,
@@ -187,78 +188,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
             Tuple of (bn_mean, bn_std) tensors of shape (128,), or None if BN layer not found.
         """
         with context.models.load(self.vae.vae).model_on_device() as (_, vae):
-            # Ensure VAE is in eval mode to prevent BN stats from being updated
-            vae.eval()
-
-            # Try to find the BN layer - it may be at different locations depending on model format
-            bn_layer = None
-            if hasattr(vae, "bn"):
-                bn_layer = vae.bn
-            elif hasattr(vae, "batch_norm"):
-                bn_layer = vae.batch_norm
-            elif hasattr(vae, "encoder") and hasattr(vae.encoder, "bn"):
-                bn_layer = vae.encoder.bn
-
-            if bn_layer is None:
-                return None
-
-            # Verify running statistics are initialized
-            if bn_layer.running_mean is None or bn_layer.running_var is None:
-                return None
-
-            # Get BN running statistics from VAE
-            bn_mean = bn_layer.running_mean.clone()  # Shape: (128,)
-            bn_var = bn_layer.running_var.clone()  # Shape: (128,)
-            bn_eps = bn_layer.eps if hasattr(bn_layer, "eps") else 1e-4  # BFL uses 1e-4
-            bn_std = torch.sqrt(bn_var + bn_eps)
-
-        return bn_mean, bn_std
-
-    def _bn_normalize(
-        self,
-        x: torch.Tensor,
-        bn_mean: torch.Tensor,
-        bn_std: torch.Tensor,
-    ) -> torch.Tensor:
-        """Apply BN normalization to packed latents.
-
-        BN formula (affine=False): y = (x - mean) / std
-
-        Args:
-            x: Packed latents of shape (B, seq, 128).
-            bn_mean: BN running mean of shape (128,).
-            bn_std: BN running std of shape (128,).
-
-        Returns:
-            Normalized latents of same shape.
-        """
-        # x: (B, seq, 128), params: (128,) -> broadcast over batch and sequence dims
-        bn_mean = bn_mean.to(x.device, x.dtype)
-        bn_std = bn_std.to(x.device, x.dtype)
-        return (x - bn_mean) / bn_std
-
-    def _bn_denormalize(
-        self,
-        x: torch.Tensor,
-        bn_mean: torch.Tensor,
-        bn_std: torch.Tensor,
-    ) -> torch.Tensor:
-        """Apply BN denormalization to packed latents (inverse of normalization).
-
-        Inverse BN (affine=False): x = y * std + mean
-
-        Args:
-            x: Packed latents of shape (B, seq, 128).
-            bn_mean: BN running mean of shape (128,).
-            bn_std: BN running std of shape (128,).
-
-        Returns:
-            Denormalized latents of same shape.
-        """
-        # x: (B, seq, 128), params: (128,) -> broadcast over batch and sequence dims
-        bn_mean = bn_mean.to(x.device, x.dtype)
-        bn_std = bn_std.to(x.device, x.dtype)
-        return x * bn_std + bn_mean
+            return read_vae_bn_stats(vae)
 
     def _prepare_normalized_start_latents(
         self,
@@ -290,7 +220,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
             Tuple of (start latents, normalized init latents), both of shape (B, seq, 128).
         """
         if bn_mean is not None and bn_std is not None:
-            init_latents_packed = self._bn_normalize(init_latents_packed, bn_mean, bn_std)
+            init_latents_packed = bn_normalize(init_latents_packed, bn_mean, bn_std)
 
         if self.add_noise:
             assert noise_packed is not None
@@ -477,7 +407,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
         # this output would divide it by bn_std a second time.
         if len(timesteps) <= 1:
             if bn_mean is not None and bn_std is not None:
-                x = self._bn_denormalize(x, bn_mean, bn_std)
+                x = bn_denormalize(x, bn_mean, bn_std)
             return unpack_flux2(x.float(), self.height, self.width)
 
         # Prepare inpaint extension
@@ -649,7 +579,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
         # The diffusers Flux2KleinPipeline applies: latents = latents * bn_std + bn_mean
         # This transforms latents from normalized space to VAE's expected input space
         if bn_mean is not None and bn_std is not None:
-            x = self._bn_denormalize(x, bn_mean, bn_std)
+            x = bn_denormalize(x, bn_mean, bn_std)
 
         x = unpack_flux2(x.float(), self.height, self.width)
         return x

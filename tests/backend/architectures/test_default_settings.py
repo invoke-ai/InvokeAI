@@ -15,6 +15,7 @@ from invokeai.backend.model_manager.taxonomy import (
     AnyVariant,
     BaseModelType,
     Flux2VariantType,
+    Flux3VariantType,
     FluxVariantType,
     Krea2VariantType,
     LTX2VariantType,
@@ -213,6 +214,20 @@ DEFAULT_SETTINGS_MATRIX: list[tuple[str, BaseModelType, AnyVariant | None, str |
         None,
         None,
         {"scheduler": "euler", "steps": 48, "cfg_scale": 1.0, **_SQUARE_1024},
+    ),
+    (
+        "flux3-klein-base",
+        BaseModelType.Flux3,
+        Flux3VariantType.KleinBase,
+        None,
+        {"steps": 50, "cfg_scale": 3.5, **_SQUARE_1024},
+    ),
+    (
+        "flux3-klein",
+        BaseModelType.Flux3,
+        None,
+        None,
+        {"steps": 16, "cfg_scale": 1.0, **_SQUARE_1024},
     ),
     (
         "krea-2-base",

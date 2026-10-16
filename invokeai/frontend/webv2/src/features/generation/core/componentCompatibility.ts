@@ -90,8 +90,8 @@ export const isFlux2MistralEncoder: GenerateComponentFilter = (model) =>
 export const isErnieImageMistralEncoder: GenerateComponentFilter = (model) =>
   model.type === 'mistral_encoder' && model.variant === MINISTRAL_3B_VARIANT;
 
-/** Krea's 4B encoder is incompatible with Ideogram's 8B encoder. */
-export const isKrea2Qwen3VlEncoder: GenerateComponentFilter = (model) =>
+/** The 4B encoder Krea-2 and FLUX.3 condition on; Ideogram 4's 8B one is not interchangeable. */
+export const isQwen3Vl4bEncoder: GenerateComponentFilter = (model) =>
   model.type === 'qwen3_vl_encoder' && model.variant === 'qwen3_vl_4b';
 
 export const isIdeogram4Qwen3VlEncoder: GenerateComponentFilter = (model) =>

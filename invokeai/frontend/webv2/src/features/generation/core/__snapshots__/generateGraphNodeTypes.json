@@ -118,6 +118,25 @@
         "string"
       ]
     },
+    "flux3": {
+      "componentsFilled": {
+        "klein-diffusers": [],
+        "klein-standalone": [
+          "qwen3VLEncoderModel",
+          "vae"
+        ],
+        "klein-base-diffusers": []
+      },
+      "nodeTypes": [
+        "core_metadata",
+        "flux2_vae_decode",
+        "flux3_denoise",
+        "flux3_model_loader",
+        "flux3_text_encoder",
+        "integer",
+        "string"
+      ]
+    },
     "cogview4": {
       "componentsFilled": {
         "diffusers": [],
@@ -528,6 +547,7 @@
           "ernie_image_txt2img",
           "flux_txt2img",
           "flux2_txt2img",
+          "flux3_txt2img",
           "ideogram4_txt2img",
           "krea2_txt2img",
           "qwen_image_txt2img",
@@ -608,6 +628,7 @@
           false
         ],
         "steps": [
+          16,
           28,
           30,
           35,
@@ -1009,6 +1030,82 @@
         ]
       },
       "outputs": []
+    },
+    "flux3_denoise": {
+      "inputs": [
+        "negative_conditioning",
+        "positive_conditioning",
+        "seed",
+        "transformer",
+        "vae"
+      ],
+      "literalInputs": {
+        "cfg_scale": [
+          1,
+          3.5
+        ],
+        "denoising_end": [
+          1
+        ],
+        "denoising_start": [
+          0
+        ],
+        "height": [
+          1024
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "steps": [
+          16,
+          50
+        ],
+        "use_cache": [
+          true
+        ],
+        "width": [
+          1024
+        ]
+      },
+      "outputs": [
+        "latents"
+      ]
+    },
+    "flux3_model_loader": {
+      "inputs": [],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "model": [],
+        "qwen3_vl_encoder_model": [],
+        "use_cache": [
+          true
+        ],
+        "vae_model": []
+      },
+      "outputs": [
+        "qwen3_vl_encoder",
+        "transformer",
+        "vae"
+      ]
+    },
+    "flux3_text_encoder": {
+      "inputs": [
+        "prompt",
+        "qwen3_vl_encoder"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "conditioning"
+      ]
     },
     "ideogram4_caption_builder": {
       "inputs": [

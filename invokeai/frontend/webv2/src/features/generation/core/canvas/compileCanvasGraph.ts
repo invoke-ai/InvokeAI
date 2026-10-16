@@ -32,6 +32,8 @@ const CANVAS_I2L_NODE_TYPES: Partial<Record<SupportedGenerateBase, string>> = {
   'sd-3': 'sd3_i2l',
   flux: 'flux_vae_encode',
   flux2: 'flux2_vae_encode',
+  // FLUX.3 encodes with the FLUX.2 VAE.
+  flux3: 'flux2_vae_encode',
   cogview4: 'cogview4_i2l',
   'qwen-image': 'qwen_image_i2l',
   'z-image': 'z_image_i2l',
@@ -42,12 +44,13 @@ const CANVAS_I2L_NODE_TYPES: Partial<Record<SupportedGenerateBase, string>> = {
   // Ideogram lacks an encode node; reject these modes with an actionable error.
 };
 
-/** SD-3, FLUX, and FLUX.2 use start = 1 - strength^0.2. FLUX Fill always starts at 0; other bases use 1 - strength. */
+/** SD-3, FLUX, FLUX.2 and FLUX.3 use start = 1 - strength^0.2. FLUX Fill always starts at 0; other bases use 1 - strength. */
 const canvasDenoisingStart = (model: GenerateModelConfig, strength: number): number => {
   if (model.base === 'flux' && model.variant === 'dev_fill') {
     return 0;
   }
-  const usesOptimizedCurve = model.base === 'sd-3' || model.base === 'flux' || model.base === 'flux2';
+  const usesOptimizedCurve =
+    model.base === 'sd-3' || model.base === 'flux' || model.base === 'flux2' || model.base === 'flux3';
   return 1 - strength ** (usesOptimizedCurve ? 0.2 : 1);
 };
 
