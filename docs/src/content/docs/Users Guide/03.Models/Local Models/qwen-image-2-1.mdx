@@ -79,7 +79,7 @@ Qwen-Image-2.1 LoRAs install like any other and appear under **Concepts** in the
 - LoRAs for [Qwen Image](/users-guide/models/local-models/qwen-image/) (2512, Edit 2511) do not fit Qwen-Image-2.1 and are not offered for it, nor its LoRAs for them.
 - They work on every format. On GGUF, int8 and fp8 transformers the LoRA runs alongside the packed weights rather than being merged into them. Full weight differences on the attention and text norms, which ComfyUI's Turbo LoRA carries, are merged on every format.
 - A LoRA trained on the base model also applies to Turbo; how well it holds up at Turbo's 8 steps depends on the LoRA.
-- Low-rank LoRAs (`lora_A`/`lora_B` or `lora_down`/`lora_up`) are recognized, DoRA ones included. LoKR and LoHA files are not: they install as an unknown model and do not appear under **Concepts**.
+- Low-rank LoRAs (`lora_A`/`lora_B` or `lora_down`/`lora_up`) are recognized, DoRA ones included — except a LyCORIS DoRA on ComfyUI's fused `gate_up`, whose magnitude spans both halves and cannot be split. LoKR and LoHA files are not: they install as an unknown model and do not appear under **Concepts**.
 - A LoRA is recognized only if every layer it targets exists in Qwen-Image-2.1, so none applies only in part. One case cannot be told apart: a FLUX.2 Klein 9B LoRA trained on nothing but the image attention of its first blocks has exactly the layers of a Qwen-Image-2.1 one, and installs as one.
 
 ### Generation settings
