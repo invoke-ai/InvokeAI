@@ -864,7 +864,14 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             },
         )
 
-        if has_qwen_ie_keys and has_lora_suffix and not has_z_image_keys and not has_krea2_keys and not has_flux_keys:
+        if (
+            has_qwen_ie_keys
+            and has_lora_suffix
+            and not has_z_image_keys
+            and not has_krea2_keys
+            and not has_flux_keys
+            and not _has_qwen_image21_lora_keys(state_dict)
+        ):
             return
 
         raise NotAMatchError("model does not match Qwen Image LoRA heuristics")
@@ -891,9 +898,42 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             },
         )
 
-        if has_qwen_ie_keys and not has_z_image_keys and not has_krea2_keys and not has_flux_keys:
+        if (
+            has_qwen_ie_keys
+            and not has_z_image_keys
+            and not has_krea2_keys
+            and not has_flux_keys
+            and not _has_qwen_image21_lora_keys(state_dict)
+        ):
             return BaseModelType.QwenImage
         raise NotAMatchError("model does not look like a Qwen Image Edit LoRA")
+
+
+_QWEN_IMAGE21_HIDDEN_SIZE = 4096
+_QWEN_IMAGE21_MLP_MARKERS = ("img_mlp.gate_up.", "img_mlp.gate_layer.", "img_mlp_gate_up", "img_mlp_gate_layer")
+_ATTENTION_PROJECTIONS = ("attn.to_q.", "attn.to_k.", "attn.to_v.", "attn_to_q.", "attn_to_k.", "attn_to_v.")
+
+
+def _has_qwen_image21_lora_keys(state_dict: dict[str | int, Any]) -> bool:
+    """True if the state dict is a Qwen-Image-2.1 LoRA, whose module names otherwise overlap Qwen-Image's.
+
+    Its gated MLP (`gate_layer` in diffusers/PEFT, ComfyUI's fused `gate_up`, and their Kohya spellings) is
+    Qwen-Image-2.1's alone. An attention-only LoRA -- PEFT's usual `to_q/to_k/to_v` targets -- names nothing
+    Qwen-Image lacks, so its width decides: the projections read 4096 features here and 3072 in Qwen-Image.
+    """
+    for key, value in state_dict.items():
+        if not isinstance(key, str):
+            continue
+        if any(marker in key for marker in _QWEN_IMAGE21_MLP_MARKERS):
+            return True
+        if (
+            key.endswith((".lora_A.weight", ".lora_down.weight"))
+            and any(projection in key for projection in _ATTENTION_PROJECTIONS)
+            and len(getattr(value, "shape", ())) == 2
+            and value.shape[1] == _QWEN_IMAGE21_HIDDEN_SIZE
+        ):
+            return True
+    return False
 
 
 def _has_krea2_lora_keys(state_dict: dict[str | int, Any]) -> bool:
