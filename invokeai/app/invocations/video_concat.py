@@ -11,6 +11,16 @@ at a time, buffering only the transition windows, so peak memory stays
 O(transition_frames) even when the inputs are long uploads (the upload cap
 admits files whose decoded frames would run to tens of gigabytes).
 
+The first clip is not re-encoded when it can be avoided: if it was written by this
+app's own encoder at the output canvas and frame rate, everything before its last
+usable keyframe is stream-copied, and only the remainder — its tail, the transitions
+and the later clips — is encoded and joined on (see ``h264_splice``). Repeatedly
+extending a video therefore stops degrading its earlier segments, which otherwise go
+through one more lossy generation per extension. Any other first clip is re-encoded
+in full, as before. The soundtrack is treated the same way: the first clip's own AAC
+packets are kept up to its outgoing transition and only the rest is encoded (see
+``aac_splice``).
+
 The AUDIO path is a deliberate exception to that bound: soundtracks buffer in
 full (float32 stereo PCM of the emitted timeline, roughly 23 MB per minute at
 48 kHz). Audio is ~3 orders of magnitude smaller per second than decoded
@@ -23,6 +33,7 @@ success is the exact bug this path exists to fix.
 import math
 import tempfile
 from collections import deque
+from itertools import islice
 from pathlib import Path
 from typing import Callable, Iterable, Iterator, Literal, Optional
 
@@ -39,8 +50,28 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.primitives import VideoOutput
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.app.util.video_audio import extract_audio_pcm, mux_audio_into_video, resample_linear
-from invokeai.app.util.video_encoding import make_mp4_writer, write_stereo_wav
+from invokeai.app.util.aac_splice import (
+    AAC_FRAME_SAMPLES,
+    EDGE_FRAMES,
+    PREROLL_FRAMES,
+    splice_soundtrack,
+    spliceable_aac_layout,
+)
+from invokeai.app.util.h264_splice import (
+    MIN_ENCODED_FRAMES,
+    H264Layout,
+    SpliceError,
+    concat_stream_copy,
+    copy_frames,
+    probes_as,
+    read_h264_layout,
+)
+from invokeai.app.util.video_audio import (
+    extract_audio_pcm,
+    mux_audio_into_video,
+    resample_linear,
+)
+from invokeai.app.util.video_encoding import make_mp4_writer, write_stereo_wav, writer_sample_entry
 from invokeai.app.util.video_thumbnails import iter_video_frames, probe_video
 
 TransitionMode = Literal["cut", "crossfade", "fade_through_black"]
@@ -195,84 +226,275 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         context.util.signal_progress(f"Joining {len(self.videos)} clip(s) ({self.transition}) @ {output_fps:.2f} fps")
 
-        tmp = tempfile.NamedTemporaryFile(prefix="invokeai_video_concat_", suffix=".mp4", delete=False)
-        tmp.close()
-        tmp_path = Path(tmp.name)
-        wav_path: Path | None = None
-        muxed_path: Path | None = None
-        try:
-            # Frames stream from the decoders straight into the encoder; only the
-            # transition windows are buffered. See _iter_joined_frames.
-            writer = make_mp4_writer(tmp_path, output_fps)
-            num_frames = 0
-            frame_counts: list[int] = []
-            try:
-                # Every clip goes through the canvas guard, including the first: frames already
-                # on it pass straight through, so nothing can reach the writer at a size the
-                # file is not being encoded at.
-                clip_iters = [
-                    _iter_frames_on_canvas(iter_video_frames(p, is_canceled=context.util.is_canceled), (width, height))
-                    for p in paths
-                ]
-                for frame in self._iter_joined_frames(
-                    clip_iters, is_canceled=context.util.is_canceled, frame_counts=frame_counts
+        with tempfile.TemporaryDirectory(prefix="invokeai_video_concat_") as work:
+            work_dir = Path(work)
+            tmp_path = work_dir / "joined.mp4"
+            joined = None
+            splice = self._plan_splice(paths[0], probes[0][3], (width, height), output_fps)
+            if splice is not None:
+                keyframe, layout = splice
+                rest_path = work_dir / "rest.mp4"
+                rest = self._encode_joined(context, paths, (width, height), output_fps, rest_path, skip=keyframe)
+                if self._splice(
+                    context, paths[0], keyframe, layout, rest_path, rest[0][0], output_fps, work_dir, tmp_path
                 ):
-                    writer.append_data(frame)
-                    num_frames += 1
-            finally:
-                writer.close()
+                    joined = rest
+            if joined is None:
+                joined = self._encode_joined(context, paths, (width, height), output_fps, tmp_path, skip=0)
+            frame_counts, num_frames = joined
+            return self._save_joined(context, paths, probes, tmp_path, work_dir, frame_counts, num_frames, output_fps)
 
-            if num_frames == 0:
-                raise ValueError("Concatenation produced zero output frames.")
+    def _save_joined(
+        self,
+        context: InvocationContext,
+        paths: list[Path],
+        probes: list[tuple[int, int, Optional[float], Optional[float]]],
+        tmp_path: Path,
+        work_dir: Path,
+        frame_counts: list[int],
+        num_frames: int,
+        output_fps: float,
+    ) -> VideoOutput:
+        width, height = probes[0][0], probes[0][1]
+        if num_frames == 0:
+            raise ValueError("Concatenation produced zero output frames.")
 
-            # Rebuild the soundtrack on the emitted timeline. Inputs without an audio
-            # track (e.g. Wan clips) contribute silence; if none carries audio, the
-            # output has no audio stream, as before.
-            source_path = tmp_path
-            audio = self._build_audio_track(
-                context=context,
-                paths=paths,
-                frame_counts=frame_counts,
-                native_rates=[probe[3] for probe in probes],
-                native_durations=[probe[2] for probe in probes],
-                output_fps=output_fps,
-                num_output_frames=num_frames,
-            )
-            if audio is not None:
-                pcm, rate = audio
-                context.util.signal_progress("Muxing audio")
-                wav_tmp = tempfile.NamedTemporaryFile(prefix="invokeai_video_concat_", suffix=".wav", delete=False)
-                wav_tmp.close()
-                wav_path = Path(wav_tmp.name)
+        # Rebuild the soundtrack on the emitted timeline. Inputs without an audio
+        # track (e.g. Wan clips) contribute silence; if none carries audio, the
+        # output has no audio stream, as before.
+        source_path = tmp_path
+        audio = self._build_audio_track(
+            context=context,
+            paths=paths,
+            frame_counts=frame_counts,
+            native_rates=[probe[3] for probe in probes],
+            native_durations=[probe[2] for probe in probes],
+            output_fps=output_fps,
+            num_output_frames=num_frames,
+        )
+        if audio is not None:
+            pcm, rate = audio
+            context.util.signal_progress("Muxing audio")
+            muxed_path = work_dir / "muxed.mp4"
+            if not self._mux_spliced_audio(
+                context, paths[0], probes[0][3], frame_counts[0], pcm, rate, output_fps, tmp_path, muxed_path
+            ):
+                wav_path = work_dir / "audio.wav"
                 write_stereo_wav(wav_path, pcm, rate)
-                mux_tmp = tempfile.NamedTemporaryFile(prefix="invokeai_video_concat_", suffix=".mp4", delete=False)
-                mux_tmp.close()
-                muxed_path = Path(mux_tmp.name)
-                mux_audio_into_video(tmp_path, wav_path, muxed_path)
-                source_path = muxed_path
+                mux_audio_into_video(tmp_path, wav_path, muxed_path, context.util.is_canceled)
+            source_path = muxed_path
 
-            duration = num_frames / output_fps
-            context.logger.info(
-                f"Encoded concatenated MP4: {num_frames} frames @ {output_fps:.2f} fps "
-                f"({duration:.2f}s) at {width}x{height}" + (", with AAC audio" if audio is not None else ", silent")
-            )
-            video_dto = context.videos.save(
-                source_path=source_path,
-                width=width,
-                height=height,
-                duration=duration,
-                fps=output_fps,
-            )
-            context.logger.info(f"Saved concatenated video: {video_dto.video_name}")
-            return VideoOutput.build(video_dto)
+        duration = num_frames / output_fps
+        context.logger.info(
+            f"Encoded concatenated MP4: {num_frames} frames @ {output_fps:.2f} fps "
+            f"({duration:.2f}s) at {width}x{height}" + (", with AAC audio" if audio is not None else ", silent")
+        )
+        # Splice stages run uninterrupted; a cancellation that arrived meanwhile must not be saved.
+        if context.util.is_canceled():
+            raise CanceledException
+        video_dto = context.videos.save(
+            source_path=source_path,
+            width=width,
+            height=height,
+            duration=duration,
+            fps=output_fps,
+        )
+        context.logger.info(f"Saved concatenated video: {video_dto.video_name}")
+        return VideoOutput.build(video_dto)
+
+    def _transition_windows(self) -> tuple[int, int]:
+        """``(tail_need, head_need)``: frames each boundary takes from the outgoing clip's
+        tail and the incoming clip's head. The class docstring describes the layout."""
+        if self.transition == "crossfade" and self.transition_frames > 0:
+            return self.transition_frames, self.transition_frames
+        if self.transition == "fade_through_black" and self.transition_frames > 0:
+            tail_need = self.transition_frames // 2
+            return tail_need, self.transition_frames - tail_need
+        return 0, 0
+
+    def _plan_splice(
+        self, first_path: Path, first_fps: Optional[float], canvas: tuple[int, int], output_fps: float
+    ) -> Optional[tuple[int, H264Layout]]:
+        """Pick the keyframe of the first clip up to which it can be stream-copied, or None.
+
+        The keyframe must leave the clip's transition tail, and at least ``MIN_ENCODED_FRAMES``
+        so the re-encoded remainder keeps the copied head's timeline, after it. The clip must
+        have a constant frame duration and already play at the
+        output rate — a stream copy cannot retime — and carry the decoder configuration this
+        node's encoder writes, or the re-encoded remainder could not share its track.
+        """
+        if first_fps is None or not math.isclose(first_fps, output_fps, rel_tol=1e-6):
+            return None
+        layout = read_h264_layout(first_path)
+        if (
+            layout is None
+            or layout.frame_duration is None
+            or layout.sample_entry != writer_sample_entry(*canvas, output_fps)
+        ):
+            return None
+        tail_need, _ = self._transition_windows()
+        last_usable = layout.sample_count - max(tail_need, MIN_ENCODED_FRAMES)
+        keyframes = [k for k in layout.sync_samples if 0 < k <= last_usable]
+        return (keyframes[-1], layout) if keyframes else None
+
+    def _encode_joined(
+        self,
+        context: InvocationContext,
+        paths: list[Path],
+        canvas: tuple[int, int],
+        output_fps: float,
+        out_path: Path,
+        skip: int,
+    ) -> tuple[list[int], int]:
+        """Encode the joined timeline, minus the first clip's first ``skip`` frames, to ``out_path``.
+
+        Returns ``(frame_counts, num_frames)`` for the WHOLE timeline — the skipped frames
+        are counted as part of the first clip and of the output — so the audio is laid out
+        the same whether or not the head was stream-copied.
+        """
+        # Frames stream from the decoders straight into the encoder; only the
+        # transition windows are buffered. See _iter_joined_frames.
+        writer = make_mp4_writer(out_path, output_fps)
+        num_frames = 0
+        frame_counts: list[int] = []
+        decoders = [iter_video_frames(p, is_canceled=context.util.is_canceled) for p in paths]
+        try:
+            # Every clip goes through the canvas guard, including the first: frames already
+            # on it pass straight through, so nothing can reach the writer at a size the
+            # file is not being encoded at.
+            clip_iters = [
+                _iter_frames_on_canvas(islice(frames, skip, None) if i == 0 else frames, canvas)
+                for i, frames in enumerate(decoders)
+            ]
+            for frame in self._iter_joined_frames(
+                clip_iters, is_canceled=context.util.is_canceled, frame_counts=frame_counts
+            ):
+                writer.append_data(frame)
+                num_frames += 1
         finally:
-            for cleanup in (tmp_path, wav_path, muxed_path):
-                if cleanup is None:
-                    continue
-                try:
-                    cleanup.unlink(missing_ok=True)
-                except Exception:
-                    pass
+            writer.close()
+            # An unfinished decoder holds the process-wide stream slot that the splice, or a
+            # fallback re-encode, would otherwise wait behind.
+            for frames in decoders:
+                frames.close()
+        frame_counts[0] += skip
+        return frame_counts, num_frames + skip
+
+    def _splice(
+        self,
+        context: InvocationContext,
+        first_path: Path,
+        keyframe: int,
+        layout: H264Layout,
+        rest_path: Path,
+        first_clip_frames: int,
+        output_fps: float,
+        work_dir: Path,
+        out_path: Path,
+    ) -> bool:
+        """Join the first clip's frames before ``keyframe``, stream-copied, onto ``rest_path``.
+
+        Returns False, leaving the caller to re-encode everything, when the two cannot be
+        joined losslessly: the remainder was encoded with a different decoder configuration
+        than the first clip carries (an upload, or a file from an older encoder setting), or
+        the first clip decoded to a different frame count than its sample table lists, which
+        would put the copied head and the skipped frames out of step.
+        """
+        rest = read_h264_layout(rest_path)
+        if first_clip_frames != layout.sample_count:
+            reason = f"it decoded to {first_clip_frames} frames but lists {layout.sample_count}"
+        elif rest is None or rest.sample_entry != layout.sample_entry or rest.sync_samples[:1] != (0,):
+            reason = "its encoding differs from this node's"
+        else:
+            reason = None
+        if reason is None:
+            head_path = work_dir / "head.mp4"
+            try:
+                copy_frames(first_path, 0, keyframe, layout.sample_count, head_path, context.util.is_canceled)
+                head = read_h264_layout(head_path)
+                # ffmpeg can derive presentation boxes (e.g. a pasp from a tkhd display size) while
+                # copying, so the copied head must keep the source's own sample entry.
+                if head is None or head.sample_count != keyframe or head.sample_entry != layout.sample_entry:
+                    reason = "copying its head did not yield the expected frames"
+                else:
+                    concat_stream_copy([head_path, rest_path], out_path, context.util.is_canceled)
+                    joined = read_h264_layout(out_path)
+                    if (
+                        joined is None
+                        or joined.sample_entry != layout.sample_entry
+                        or joined.sample_count != keyframe + rest.sample_count
+                        or joined.frame_duration != layout.frame_duration
+                        or not probes_as(out_path, output_fps, joined.sample_count)
+                    ):
+                        reason = "the joined file does not hold the expected frames on one timeline"
+            except SpliceError as e:
+                reason = str(e)
+        if reason is not None:
+            context.logger.info(f"Re-encoding the first clip in full: it cannot be stream-copied ({reason})")
+            return False
+        context.logger.info(f"Stream-copied the first {keyframe} frames of the first clip without re-encoding")
+        return True
+
+    def _mux_spliced_audio(
+        self,
+        context: InvocationContext,
+        first_path: Path,
+        first_fps: Optional[float],
+        first_frames: int,
+        pcm: np.ndarray,
+        rate: int,
+        output_fps: float,
+        video_path: Path,
+        out_path: Path,
+    ) -> bool:
+        """Mux ``pcm`` onto ``video_path``, stream-copying the first clip's own AAC packets
+        for as much of the soundtrack's head as they already hold (see ``aac_splice``).
+
+        The rebuilt soundtrack equals the first clip's decoded audio up to its outgoing
+        transition — provided that clip plays at the output rate, so its audio is not
+        retimed, and sets the soundtrack's sample rate. Returns False, leaving the caller to
+        encode the whole soundtrack, when the clip's track is not one this app's encoder
+        writes, too little precedes the transition, or the splice does not verify.
+        """
+        if first_fps is None or first_fps != output_fps:
+            return False
+        layout = spliceable_aac_layout(first_path, rate)
+        if layout is None:
+            return False
+        # The soundtrack holds the clip's own decoded samples only where its audio was mapped
+        # one-to-one: the clip's span at its native rate must be exactly its span on the timeline.
+        if round(first_frames / first_fps * rate) != round(first_frames * rate / output_fps):
+            return False
+        tail_need, _ = self._transition_windows()
+        unchanged = min(
+            round((first_frames - tail_need) * rate / output_fps),
+            layout.packet_count * AAC_FRAME_SAMPLES - layout.priming,
+            pcm.shape[1],
+        )
+        # Keep the cut PREROLL_FRAMES clear of the first changed sample, and a full encoded tail
+        # after it (see aac_splice).
+        head_packets = min(
+            (unchanged + layout.priming) // AAC_FRAME_SAMPLES - PREROLL_FRAMES,
+            (pcm.shape[1] - EDGE_FRAMES * AAC_FRAME_SAMPLES + layout.priming) // AAC_FRAME_SAMPLES,
+        )
+        reason = splice_soundtrack(
+            video_path,
+            first_path,
+            layout.priming,
+            0,
+            head_packets,
+            -layout.priming,
+            pcm,
+            rate,
+            out_path,
+            context.util.is_canceled,
+        )
+        if reason is not None:
+            context.logger.info(f"Re-encoding the whole soundtrack: {reason}")
+            return False
+        cut = head_packets * AAC_FRAME_SAMPLES - layout.priming
+        context.logger.info(f"Stream-copied the first {cut} audio samples of the first clip without re-encoding")
+        return True
 
     def _estimate_transition_memory(self, width: int, height: int) -> int:
         if self.transition == "cut" or self.transition_frames == 0:
@@ -335,7 +557,7 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
         for path in paths:
             if context.util.is_canceled():
                 raise CanceledException
-            extracted.append(extract_audio_pcm(path))
+            extracted.append(extract_audio_pcm(path, is_canceled=context.util.is_canceled))
         if all(item is None for item in extracted):
             return None
         if context.util.is_canceled():
@@ -346,14 +568,7 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
             """Frame count -> sample count on the emitted timeline."""
             return round(frames * rate / output_fps)
 
-        # Boundary bookkeeping — must mirror _iter_joined_frames.
-        if self.transition == "crossfade" and self.transition_frames > 0:
-            tail_need = head_need = self.transition_frames
-        elif self.transition == "fade_through_black" and self.transition_frames > 0:
-            tail_need = self.transition_frames // 2
-            head_need = self.transition_frames - tail_need
-        else:
-            tail_need = head_need = 0
+        tail_need, head_need = self._transition_windows()
 
         clips: list[np.ndarray] = []
         for i, (item, n_frames, native_fps) in enumerate(zip(extracted, frame_counts, native_rates, strict=True)):
@@ -444,16 +659,10 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
         transition windows. Because frames stream straight into the encoder, that error can
         surface mid-encode; the caller discards the partial output file.
         """
-        if self.transition == "crossfade" and self.transition_frames > 0:
-            tail_need = head_need = self.transition_frames
-            blend = _crossfade
-        elif self.transition == "fade_through_black" and self.transition_frames > 0:
-            tail_need = self.transition_frames // 2
-            head_need = self.transition_frames - tail_need
-            blend = _fade_through_black
-        else:
+        tail_need, head_need = self._transition_windows()
+        blend = {"crossfade": _crossfade, "fade_through_black": _fade_through_black}.get(self.transition)
+        if head_need + tail_need == 0:
             # "cut", or a zero-length transition: plain concatenation.
-            tail_need = head_need = 0
             blend = None
 
         a_tail: list[np.ndarray] = []

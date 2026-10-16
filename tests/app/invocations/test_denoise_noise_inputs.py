@@ -1,4 +1,5 @@
 import inspect
+from contextlib import nullcontext
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -19,9 +20,14 @@ from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.sd3.sd3_denoise import SD3DenoiseInvocation
 from invokeai.app.invocations.z_image.z_image_denoise import ZImageDenoiseInvocation
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional, get_schedule
-from invokeai.backend.flux.schedulers import ANIMA_SCHEDULER_MAP, FLUX_SCHEDULER_MAP, ZIMAGE_SCHEDULER_MAP
+from invokeai.backend.flux.schedulers import (
+    ANIMA_SCHEDULER_MAP,
+    FLUX_SCHEDULER_MAP,
+    ZIMAGE_SCHEDULER_MAP,
+    set_heun_timesteps_from_sigmas,
+)
 from invokeai.backend.flux2.sampling_utils import get_schedule_flux2
-from invokeai.backend.model_manager.taxonomy import BaseModelType, FluxVariantType, ModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, FluxVariantType, ModelFormat, ModelType
 
 
 def test_flux_prepare_noise_uses_external_noise():
@@ -93,6 +99,69 @@ def test_flux_add_noise_false_ignores_connected_noise():
     ):
         result = invocation._run_diffusion(mock_context)
 
+    assert torch.equal(result, init_latents)
+
+
+def test_flux_add_noise_false_denoises_incoming_latents_without_noise():
+    """A second stage that continues from latents with add_noise=False runs its remaining steps."""
+    invocation = FluxDenoiseInvocation.model_construct(
+        latents=MagicMock(latents_name="latents"),
+        add_noise=False,
+        width=64,
+        height=64,
+        num_steps=4,
+        denoising_start=0.5,
+        denoising_end=1.0,
+        positive_text_conditioning=MagicMock(conditioning_name="positive"),
+        transformer=MagicMock(transformer="transformer"),
+        seed=123,
+    )
+    init_latents = (torch.arange(16 * 8 * 8) % 8).float().reshape(1, 16, 8, 8)
+    dummy_conditioning = SimpleNamespace(
+        t5_embeds=torch.zeros(1, 4, 16),
+        clip_embeds=torch.zeros(1, 768),
+        to=lambda **_: dummy_conditioning,
+    )
+    mock_context = MagicMock()
+    mock_context.tensors.load.return_value = init_latents
+    mock_context.conditioning.load.return_value = SimpleNamespace(conditionings=[dummy_conditioning])
+    mock_context.models.get_config.return_value = SimpleNamespace(
+        base=BaseModelType.Flux, type=ModelType.Main, variant=FluxVariantType.Dev, format=ModelFormat.GGUFQuantized
+    )
+    mock_context.models.load.return_value.model_on_device.return_value = nullcontext((None, MagicMock()))
+    denoise_calls: list[dict[str, object]] = []
+
+    def fake_denoise(**kwargs):
+        denoise_calls.append(kwargs)
+        return kwargs["img"]
+
+    with (
+        patch(
+            "invokeai.app.invocations.flux.flux_denoise.TorchDevice.choose_torch_device",
+            return_value=torch.device("cpu"),
+        ),
+        patch("invokeai.app.invocations.flux.flux_denoise.FLUXConditioningInfo", object),
+        patch("invokeai.app.invocations.flux.flux_denoise.Flux", object),
+        patch(
+            "invokeai.app.invocations.flux.flux_denoise.RegionalPromptingExtension.from_text_conditioning",
+            return_value=MagicMock(),
+        ),
+        patch.object(invocation, "_prepare_noise_tensor", side_effect=AssertionError("noise should be ignored")),
+        patch.object(invocation, "_load_redux_conditioning", return_value=[]),
+        patch.object(invocation, "_prep_controlnet_extensions", return_value=[]),
+        patch.object(invocation, "_prep_ip_adapter_extensions", return_value=([], [])),
+        patch("invokeai.app.invocations.flux.flux_denoise.peak_dequant_transient_bytes", return_value=0),
+        patch(
+            "invokeai.app.invocations.flux.flux_denoise.LayerPatcher.apply_smart_model_patches",
+            return_value=nullcontext(),
+        ),
+        patch("invokeai.app.invocations.flux.flux_denoise.denoise", side_effect=fake_denoise),
+    ):
+        result = invocation._run_diffusion(mock_context)
+
+    assert len(denoise_calls) == 1
+    assert len(denoise_calls[0]["timesteps"]) > 1
+    assert denoise_calls[0]["inpaint_extension"] is None
     assert torch.equal(result, init_latents)
 
 
@@ -591,8 +660,17 @@ def test_denoise_metadata_persists_hidiffusion_fields_when_disabled():
 
 
 def _get_first_scheduler_sigma(
-    scheduler, *, scheduler_name: str, sigmas: list[float], mu: float | None = None
+    scheduler,
+    *,
+    scheduler_name: str,
+    sigmas: list[float],
+    mu: float | None = None,
+    use_flux_heun_schedule: bool = False,
 ) -> float:
+    if scheduler_name == "heun" and use_flux_heun_schedule:
+        set_heun_timesteps_from_sigmas(scheduler, sigmas[:-1], sigmas[-1], "cpu")
+        return float(scheduler.sigmas[0])
+
     set_timesteps_signature = inspect.signature(scheduler.set_timesteps)
     if scheduler_name != "lcm" and "sigmas" in set_timesteps_signature.parameters:
         kwargs: dict[str, object] = {"sigmas": sigmas, "device": "cpu"}
@@ -611,13 +689,7 @@ def _get_first_scheduler_sigma(
     "scheduler_name",
     [
         "euler",
-        pytest.param(
-            "heun",
-            marks=pytest.mark.xfail(
-                reason="Known img2img preblend mismatch for FLUX with scheduler-defined first step.",
-                strict=True,
-            ),
-        ),
+        "heun",
         pytest.param(
             "lcm",
             marks=pytest.mark.xfail(
@@ -633,7 +705,12 @@ def test_flux_img2img_preblend_matches_scheduler_first_sigma(scheduler_name: str
     scheduler = scheduler_class(num_train_timesteps=1000)
 
     assert sigmas[0] == pytest.approx(
-        _get_first_scheduler_sigma(scheduler, scheduler_name=scheduler_name, sigmas=sigmas)
+        _get_first_scheduler_sigma(
+            scheduler,
+            scheduler_name=scheduler_name,
+            sigmas=sigmas,
+            use_flux_heun_schedule=True,
+        )
     )
 
 

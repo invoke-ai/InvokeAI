@@ -311,5 +311,11 @@
         "disable": "Wyłącz",
         "maxCacheSize": "Maksymalny rozmiar cache",
         "cacheSize": "Rozmiar Cache"
+    },
+    "controlLayers": {
+        "text": {
+            "px": "px"
+        },
+        "copyToClipboard": "Skopiuj do schowka"
     }
 }
