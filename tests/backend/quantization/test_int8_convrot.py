@@ -318,7 +318,7 @@ class TestThePerForwardDequantTransient:
     not part of the model's resident size and the calling node has to reserve for it."""
 
     @staticmethod
-    def _model(*shapes: tuple[int, int]) -> torch.nn.Module:
+    def _model(*shapes: tuple[int, int], convrot: bool) -> torch.nn.Module:
         model = torch.nn.Module()
         for index, (out_features, in_features) in enumerate(shapes):
             model.add_module(
@@ -326,15 +326,14 @@ class TestThePerForwardDequantTransient:
                 Int8ConvrotLinear(
                     torch.zeros(out_features, in_features, dtype=torch.int8),
                     torch.ones(out_features, 1),
-                    convrot=False,
+                    convrot=convrot,
                 ),
             )
         return model
 
     def test_it_is_two_weights_of_the_largest_layer_in_the_compute_dtype(self) -> None:
-        """Two, not one: the dtype cast of the int8 weight is alive alongside the product it is
-        multiplied into, and that product is alive alongside the derotation matmul's output."""
-        model = self._model((4, CONVROT_GROUP_SIZE), (16, CONVROT_GROUP_SIZE))
+        """The widened weight is scaled in place, so the peak is the derotation's input beside its output."""
+        model = self._model((4, CONVROT_GROUP_SIZE), (16, CONVROT_GROUP_SIZE), convrot=True)
 
         assert peak_dequant_transient_bytes(model, torch.bfloat16) == 2 * 16 * CONVROT_GROUP_SIZE * 2
 
@@ -343,3 +342,30 @@ class TestThePerForwardDequantTransient:
         model.dense = torch.nn.Linear(8, 8)
 
         assert peak_dequant_transient_bytes(model, torch.bfloat16) == 0
+
+
+@pytest.mark.slow
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="measures GPU allocations")
+@pytest.mark.parametrize("convrot", [True, False])
+@pytest.mark.parametrize("dtype", [torch.bfloat16, torch.float32])
+def test_the_transient_estimate_covers_what_the_per_forward_decode_allocates(convrot: bool, dtype: torch.dtype) -> None:
+    """What the node reserves for the per-forward decode against what it allocates, in requested bytes (see the
+    int4 counterpart). Runs on ROCm too, where `torch.cuda` is the HIP device."""
+    device = torch.device("cuda")
+    torch.manual_seed(3)
+    q, scale = _quantize_reference(torch.randn(1024, 4096), convrot=convrot)
+    model = torch.nn.Module()
+    model.proj = Int8ConvrotLinear(q.to(device), scale.to(device), convrot=convrot)
+    model.proj._dequantized_weight(device, dtype)  # Mints the shared Hadamard matrix.
+    torch.cuda.synchronize()
+    torch.cuda.reset_peak_memory_stats()
+    baseline = torch.cuda.memory_stats()["requested_bytes.all.current"]
+
+    weight = model.proj._dequantized_weight(device, dtype)
+    torch.cuda.synchronize()
+
+    measured = torch.cuda.memory_stats()["requested_bytes.all.peak"] - baseline
+    estimate = peak_dequant_transient_bytes(model, dtype)
+    assert weight.dtype is dtype
+    # Without convrot one weight is the peak and the estimate keeps a second as margin.
+    assert (0.9 * estimate if convrot else 0.45 * estimate) <= measured <= estimate

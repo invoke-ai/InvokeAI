@@ -11,7 +11,11 @@ from transformers import AutoConfig, AutoTokenizer
 from invokeai.backend.model_manager.checkpoint_prefix import CheckpointPrefix
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Diffusers_Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
-from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Krea2_Config, Main_GGUF_Krea2_Config
+from invokeai.backend.model_manager.configs.main import (
+    KREA2_DISCARDED_NATIVE_FINAL_LAYERS,
+    Main_Checkpoint_Krea2_Config,
+    Main_GGUF_Krea2_Config,
+)
 from invokeai.backend.model_manager.configs.qwen3_vl_encoder import (
     Qwen3VLEncoder_Checkpoint_Config,
     Qwen3VLEncoder_GGUF_Config,
@@ -61,6 +65,7 @@ from invokeai.backend.quantization.int8_convrot import (
     drop_unconsumed_quantization_sidecars,
     extract_int8_convrot_markers,
     install_int8_convrot_layers,
+    marker_layout,
     reject_unmarked_int8_weights,
     resolve_quantized_module_paths,
     split_int8_convrot_layers,
@@ -114,6 +119,12 @@ def _put_unique_key(
     source_of[key] = source
 
 
+def _int4_int8_split(markers: dict[str, dict[str, Any]]) -> str:
+    """How the kept quantized layers divide into packed int4 and int8, for the load log."""
+    int4 = sum(marker_layout(marker).packed_int4 for marker in markers.values())
+    return f"{int4} int4, {len(markers) - int4} int8"
+
+
 def _is_native_krea2_format(sd: dict[str, Any]) -> bool:
     """Detect the native/ComfyUI Krea-2 key naming (e.g. GGUF) vs. the diffusers naming."""
     return any(
@@ -149,13 +160,6 @@ def _remap_native_layer_paths(layer_names: Any) -> dict[str, str]:
     return mapping
 
 
-# The original final-block up/down projections have no counterpart in the diffusers
-# ``Krea2FinalLayer`` (a clean AdaLN + linear). Named once because two steps act on them: the
-# converter drops them, and the single-file loader drops them *before* dequantizing so it never
-# spends work - or trips over an exotic scale layout - on tensors that are about to be discarded.
-DISCARDED_NATIVE_FINAL_KEYS = ("last.down", "last.up")
-
-
 def _drop_discarded_native_final_layers(sd: dict[str, Any]) -> dict[str, Any]:
     """Remove the dropped final-block projections together with their quantization metadata.
 
@@ -164,7 +168,7 @@ def _drop_discarded_native_final_layers(sd: dict[str, Any]) -> dict[str, Any]:
     """
     doomed = {
         f"{path}{suffix}"
-        for path in DISCARDED_NATIVE_FINAL_KEYS
+        for path in KREA2_DISCARDED_NATIVE_FINAL_LAYERS
         for suffix in (".weight", ".weight_scale", WEIGHT_SCALE_2_SUFFIX, ".comfy_quant", *INPUT_SCALE_SUFFIXES)
     }
     if not doomed & set(sd):
@@ -204,7 +208,7 @@ def _convert_krea2_native_to_diffusers(sd: dict[str, Any], *, key_map: dict[str,
             _put_unique_key(new_sd, key, value, source=key, source_of=source_of, what="Krea-2 checkpoint")
             continue
         # Drop original-only final-block projections (no diffusers equivalent).
-        if key in tuple(f"{p}.weight" for p in DISCARDED_NATIVE_FINAL_KEYS):
+        if key in tuple(f"{p}.weight" for p in KREA2_DISCARDED_NATIVE_FINAL_LAYERS):
             continue
 
         k = key
@@ -381,8 +385,10 @@ class Krea2CheckpointModel(ModelLoader):
     The int8 build stays int8-resident: `swap_in_int8_linears` installs `Int8ConvrotLinear`, which
     holds the stored codes and dequantizes per forward, so a 12.0 GiB checkpoint stays 12.0 GiB.
     What it does not get is int8 *compute* -- that needs a kernel InvokeAI does not have yet -- so
-    the saving here is resident memory, not speed. ComfyUI's 'nvfp4' build, whose layers the
-    safetensors header names, stays packed the same way as `NVFP4Linear`.
+    the saving here is resident memory, not speed. The packed int4 builds (`convrot_w4a4`,
+    `int4_tensorwise`), usually mixed with int8 layers, stay packed the same way as
+    `Int4ConvrotLinear`; some name their layers only in the safetensors header. ComfyUI's 'nvfp4'
+    build, whose layers the header names too, stays packed as `NVFP4Linear`.
     """
 
     def _load_model(
@@ -437,12 +443,14 @@ class Krea2CheckpointModel(ModelLoader):
         # from the marker that says it is rotated. Taken down the fp8 path instead, such a weight
         # would be scaled but never un-rotated -- a state dict that loads cleanly and generates
         # noise.
-        int8_markers = extract_int8_convrot_markers(sd)
+        # The packed int4 layouts are recognised here too, and from the header as well as per tensor: the
+        # Starnodes converter writes its int4 and int8 builds with the header entries alone.
+        int8_markers = extract_int8_convrot_markers(sd, accept_int4=True, header_layers=header_layers)
 
         # Outside the branch on purpose -- see the helper, which explains why. Z-Image has always
         # had this; Krea-2 did not, so an int8 weight whose marker was missing or unparseable was
         # cast to the compute dtype as raw codes and loaded silently.
-        reject_unmarked_int8_weights(sd, int8_markers, "Krea-2")
+        reject_unmarked_int8_weights(sd, int8_markers, "Krea-2", header_layers=header_layers)
 
         if int8_markers:
             sd = drop_unconsumed_quantization_sidecars(sd)
@@ -526,8 +534,8 @@ class Krea2CheckpointModel(ModelLoader):
                 extra_reserved_bytes=nvfp4_bytes,
             )
             self._logger.info(
-                f"Krea-2: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
-                "(int8_tensorwise checkpoint, dequantized per forward)"
+                f"Krea-2: kept {len(quantized)} of {len(int8_markers)} layer(s) quantized "
+                f"({_int4_int8_split(quantized)}; dequantized per forward)"
             )
             # The fp8 reporting below is keyed on these; an int8 checkpoint keeps neither.
             fp8_layers = {}
@@ -645,8 +653,9 @@ class Krea2GGUFCheckpointModel(ModelLoader):
     GGUF ships only the transformer; the VAE (Qwen-Image), Qwen3-VL encoder, tokenizer and scheduler
     are sourced separately by the Krea-2 model-loader invocation (mix-and-match, like Z-Image/FLUX).
     The GGML tensors stay quantized and are dequantized on-the-fly during inference. ComfyUI-GGUF's
-    ``Q8_CR`` layers arrive from `gguf_sd_loader` as an ``int8_tensorwise`` export and stay int8 as
-    `Int8ConvrotLinear`, beside whatever GGML-quantized layers the same file mixes in.
+    ``Q8_CR`` and ``Q4_CR`` layers arrive from `gguf_sd_loader` as an ``int8_tensorwise`` or
+    ``int4_tensorwise`` export and stay quantized as `Int8ConvrotLinear` or `Int4ConvrotLinear`, beside
+    whatever GGML-quantized layers the same file mixes in.
     """
 
     def _load_model(
@@ -673,16 +682,17 @@ class Krea2GGUFCheckpointModel(ModelLoader):
         compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
         # GGMLTensor wrappers (kept on CPU; dequantized on-the-fly by the cache during inference).
-        sd = gguf_sd_loader(model_path, compute_dtype=compute_dtype, q8_cr="decode")
+        sd = gguf_sd_loader(model_path, compute_dtype=compute_dtype, convrot="decode")
         sd = CheckpointPrefix.detect(sd).strip(sd)
         # As in the single-file loader: the key conversion drops these weights but not their markers.
         sd = _drop_discarded_native_final_layers(sd)
         # Before the key conversion, which carries `.weight_scale` along with its weight but not
         # `.comfy_quant` -- see the single-file loader above.
-        int8_markers = extract_int8_convrot_markers(sd)
+        int8_markers = extract_int8_convrot_markers(sd, accept_int4=True)
         # An `I8` tensor the metadata does not claim is still a GGMLTensor of dtype int8, and `gguf` has
         # no dequantizer for it: without this it fails on the first denoise step instead of here.
-        reject_unmarked_int8_weights(sd, int8_markers, "Krea-2 GGUF")
+        # GGUF has no safetensors header: its quantization metadata already arrived as per-tensor markers.
+        reject_unmarked_int8_weights(sd, int8_markers, "Krea-2 GGUF", header_layers={})
         # GGUF conversions use the native/ComfyUI compact key naming; remap to diffusers keys.
         key_map: dict[str, str] = {}
         if _is_native_krea2_format(sd):
@@ -704,8 +714,8 @@ class Krea2GGUFCheckpointModel(ModelLoader):
             )
             swap_in_int8_linears(model, sd, quantized)
             self._logger.info(
-                f"Krea-2: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
-                "(ComfyUI-GGUF Q8_CR, dequantized per forward)"
+                f"Krea-2: kept {len(quantized)} of {len(int8_markers)} layer(s) quantized "
+                f"(ComfyUI-GGUF Q8_CR/Q4_CR, {_int4_int8_split(quantized)}; dequantized per forward)"
             )
 
         load_state_dict_ignoring_extras(model, sd, source="Krea-2 GGUF checkpoint", assign=True, allow_missing=True)

@@ -61,8 +61,13 @@ from invokeai.backend.model_manager.taxonomy import (
     WanVariantType,
     ZImageVariantType,
 )
+from invokeai.backend.quantization.fp8_scaled import parse_quantization_metadata
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
-from invokeai.backend.quantization.int8_convrot import INT8_TENSORWISE_FORMAT, read_comfy_quant_markers
+from invokeai.backend.quantization.int8_convrot import (
+    accepted_convrot_formats,
+    int8_weights_without_a_decodable_marker,
+    read_comfy_quant_markers,
+)
 from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
 from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
 
@@ -1529,6 +1534,59 @@ def _ideogram4_branch_or_raise(mod: ModelOnDisk) -> Ideogram4Branch:
     return branch
 
 
+def _raise_for_undecodable_int8_weights(
+    mod: ModelOnDisk,
+    state_dict: dict[str | int, Any],
+    formats: frozenset[str],
+    *,
+    read_header: bool,
+    what: str,
+    supported: str,
+    discarded: tuple[str, ...] = (),
+) -> None:
+    """Refuse at install the int8 weights a checkpoint loader decoding ``formats`` would refuse at load.
+
+    `InvalidMatchError`, not `NotAMatchError`: the file *is* this model, so the installer shows the reason
+    instead of registering an unknown model -- or a model that installs, pulls in its starter dependencies and
+    fails at the first render. Identification has every dtype but no tensor bytes, so the markers are read from
+    the file: one header parse plus a seek per marker, and only for a file with int8 weights to explain.
+    ``read_header`` mirrors whether the loader also reads ``_quantization_metadata``, and ``discarded`` the
+    layers it drops before reading any marker.
+    """
+    if not any(
+        isinstance(key, str) and key.endswith(".weight") and getattr(value, "dtype", None) is torch.int8
+        for key, value in state_dict.items()
+    ):
+        return
+    try:
+        markers = read_comfy_quant_markers(mod.path)
+    except Exception:
+        # Not readable safetensors, so there are no markers to find and nothing explains the int8 weights. The
+        # refusal below is the right answer for that file too.
+        markers = {}
+    header_layers = parse_quantization_metadata(mod.metadata()) if read_header else {}
+    try:
+        undecodable = int8_weights_without_a_decodable_marker(
+            state_dict, markers, header_layers, formats, discarded=discarded
+        )
+    except ValueError as e:
+        raise InvalidMatchError(str(e)) from None
+    if not undecodable:
+        return
+    example = sorted(undecodable)[0]
+    declared = sorted({fmt for fmt in undecodable.values() if fmt is not None})
+    if declared:
+        raise InvalidMatchError(
+            f"{len(undecodable)} int8 weight(s) in this {what} are marked {', '.join(map(repr, declared))} (e.g. "
+            f"'{example}'), which InvokeAI cannot load for this model. {supported}"
+        )
+    raise InvalidMatchError(
+        f"{len(undecodable)} int8 weight(s) in this {what} carry no readable marker of a format it loads "
+        f"({', '.join(map(repr, sorted(formats)))}; e.g. '{example}'), so the quantization scheme cannot be "
+        f"identified. {supported}"
+    )
+
+
 class Main_Checkpoint_Ideogram4_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
     """Model config for Ideogram 4 single-file transformer checkpoints (safetensors).
 
@@ -1599,31 +1657,15 @@ class Main_Checkpoint_Ideogram4_Config(Checkpoint_Config_Base, Main_Config_Base,
                 "Install the fp8_scaled or int8_convrot build instead."
             )
 
-        int8_weights = sorted(
-            key
-            for key, value in state_dict.items()
-            if isinstance(key, str) and key.endswith(".weight") and getattr(value, "dtype", None) is torch.int8
+        # Per-tensor markers only: the Ideogram 4 loader does not read the header for them.
+        _raise_for_undecodable_int8_weights(
+            mod,
+            state_dict,
+            accepted_convrot_formats(accept_int4=False),
+            read_header=False,
+            what="Ideogram 4 transformer",
+            supported="Only Comfy-Org's int8_convrot build is supported.",
         )
-        if not int8_weights:
-            return
-
-        try:
-            markers = read_comfy_quant_markers(mod.path)
-        except Exception:
-            # Not readable safetensors, so there are no markers to find and nothing explains the
-            # int8 weights. The refusal below is the right answer for that file too.
-            markers = {}
-        unmarked = [
-            key
-            for key in int8_weights
-            if markers.get(key[: -len(".weight")], {}).get("format") != INT8_TENSORWISE_FORMAT
-        ]
-        if unmarked:
-            raise InvalidMatchError(
-                f"{len(unmarked)} int8 weight(s) in this Ideogram 4 transformer carry no readable "
-                f"'{INT8_TENSORWISE_FORMAT}' marker (e.g. '{unmarked[0]}'), so the quantization scheme "
-                "cannot be identified. Only Comfy-Org's int8_convrot build is supported."
-            )
 
 
 class Main_GGUF_Ideogram4_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
@@ -2041,6 +2083,12 @@ class Main_Checkpoint_LTX2_Config(Checkpoint_Config_Base, Main_Config_Base, Conf
         return cls(**override_fields, variant=LTX2VariantType(variant), generation=generation)
 
 
+# The original final-block up/down projections have no counterpart in the diffusers ``Krea2FinalLayer`` (a
+# clean AdaLN + linear). The Krea-2 loaders drop them before reading any quantization marker, so identification
+# leaves them out of its quantization check too.
+KREA2_DISCARDED_NATIVE_FINAL_LAYERS = ("last.down", "last.up")
+
+
 class Main_Checkpoint_Krea2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
     """Model config for Krea-2 single-file checkpoint models (safetensors, etc)."""
 
@@ -2061,6 +2109,20 @@ class Main_Checkpoint_Krea2_Config(Checkpoint_Config_Base, Main_Config_Base, Con
 
         cls._validate_does_not_look_like_gguf_quantized(mod)
 
+        # What `Krea2CheckpointModel` would refuse at load, refused here: an int8 layer the file does not mark as
+        # int8 or int4 convrot -- Starnodes' w4a8, w6a8, SVDQuant or AWQ builds, a torchao repack -- or marks
+        # only ambiguously in its header. The loader reads both the per-tensor markers and the header, and drops
+        # the final-block projections before it reads either.
+        _raise_for_undecodable_int8_weights(
+            mod,
+            mod.load_state_dict(),
+            accepted_convrot_formats(accept_int4=True),
+            read_header=True,
+            discarded=KREA2_DISCARDED_NATIVE_FINAL_LAYERS,
+            what="Krea-2 transformer",
+            supported="The int8 and int4 convrot builds (int8_tensorwise, convrot_w4a4, int4_tensorwise) are supported.",
+        )
+
         variant = override_fields.pop("variant", None) or _get_krea2_variant_from_name(mod.path.name)
 
         return cls(**override_fields, variant=variant)
@@ -2079,7 +2141,7 @@ class Main_Checkpoint_Krea2_Config(Checkpoint_Config_Base, Main_Config_Base, Con
 class Main_GGUF_Krea2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
     """Model config for GGUF-quantized Krea-2 transformer models (single-file)."""
 
-    DECODES_GGUF_Q8_CR: ClassVar[bool] = True
+    DECODES_GGUF_CONVROT: ClassVar[frozenset[str]] = accepted_convrot_formats(accept_int4=True)
 
     base: Literal[BaseModelType.Krea2] = Field(default=BaseModelType.Krea2)
     format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
