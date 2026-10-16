@@ -25,10 +25,11 @@ Hover over a board and click its **⋮** button, or right-click it, to open its 
 * **Auto-add to this board** — makes this the board that receives new results, marked **Auto**, whichever board is selected. On the auto-add board, the item is **Stop auto-adding here**, which goes back to sending results to the selected board. Not offered for date boards or archived boards. See [Choosing where new media goes](/users-guide/gallery/introduction/#choosing-where-new-media-goes).
 * **Download Board** — downloads the board (see [below](#downloading-a-board)).
 * **Rename board** — opens a dialog to change the name.
+* **Move to…** — moves the board to the **Library**, into the open project, or into one of your other projects. A board in a project is private to you, so this is offered only for your own private boards: a shared or public board stays in the **Library**, and an administrator cannot move another person's boards. You can also drag the board onto another group: the open project's, the **Library**, or one of your projects under **Other projects**. When the board's new project is hidden because **Other projects' boards** is off: if it was the selected board, the Gallery selects **Uncategorized**; if it was the auto-add board, results follow the selected board again.
 * **Archive Board** / **Unarchive Board** — see [below](#archiving-a-board).
 * **Delete Board** — see [below](#deleting-a-board).
 
-Project boards are managed through their project: their menu has **Export project (.invk)**, **Auto-add to this board** and **Download Board** instead, and renaming the project renames its board. **Uncategorized** offers only **Auto-add to this board** and **Download Board**, and date boards have no menu. If the auto-add board is deleted, results go back to following the selected board.
+A project's **Inbox** is managed through its project: its menu has **Export project (.invk)**, **Auto-add to this board** and **Download Board** instead, and renaming the project renames it. **Uncategorized** offers only **Auto-add to this board** and **Download Board**, and date boards have no menu. If the auto-add board is deleted, results go back to following the selected board. The same happens when you open a project after a board it used was deleted elsewhere — in another tab, or together with a project deleted from the Launchpad: the project stops selecting it, auto-adding to it and sending queued results to it.
 
 ### Archiving a board
 
@@ -53,7 +54,7 @@ Choose **Delete Board** from the board's menu. The confirmation dialog shows how
 **Delete Board and Media** cannot be undone.
 :::
 
-Queued or running jobs that were sending results to the deleted board send them to **Uncategorized** instead. Project boards cannot be deleted from the Gallery; delete the project instead.
+Queued or running jobs that were sending results to the deleted board send them to **Uncategorized** instead. A project's Inbox cannot be deleted from the Gallery; delete the project instead, which also asks what to do with the project's other boards.
 
 On a multi-user installation, only a board's owner or an administrator can delete it. When an owner deletes a shared board with its media, only their own media is deleted and other people's items move to Uncategorized; an administrator's deletion removes everything. If some files cannot be removed, those items are kept in Uncategorized and a warning says how many.
 
