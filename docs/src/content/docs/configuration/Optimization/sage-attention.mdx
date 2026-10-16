@@ -28,6 +28,7 @@ compared with PyTorch's default attention there:
 | --- | --- | --- | --- |
 | FLUX.1 dev (FP8) | 16.1 s → 14.0 s (−13 %) | 84.2 s → 54.8 s (−35 %) | Also serves ControlNets inside the denoising loop. |
 | FLUX.2 Klein 9B (FP8) | 15.6 s → 15.1 s (−3 %) | 27.1 s → 23.1 s (−15 %) | |
+| Z-Image (FP8) | 10.4 s → 10.0 s (−5 %) | 33.7 s → 25.9 s (−23 %) | Z-Image Control masks its attention and keeps PyTorch's. |
 
 At 1024×1024 most of a step is spent outside attention, so the gain is small; at high resolutions and for video,
 attention dominates. GGUF models spend much of each step dequantizing weights, which SageAttention does not touch.
