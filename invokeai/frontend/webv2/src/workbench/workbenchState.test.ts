@@ -16,6 +16,7 @@ import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
 import {
   GALLERY_RECENT_IMAGE_LIMIT,
+  getGallerySelectedImageQuery,
   legacyGeneratedImageToGalleryItem,
   registerImageCluster,
 } from '@features/gallery/contracts';
@@ -4621,6 +4622,31 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(galleryValues.selectedImageName).toBe('image:gallery-image.png');
   });
 
+  it('stamps a routed result with the media kind the grid shows, or both kinds when the filter hides it', () => {
+    const routeImageUnder = (mediaFilter: 'image' | 'video') => {
+      let state = primeGenerate();
+
+      state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+      state = workbenchReducer(state, { settings: { mediaFilter }, type: 'updateGallerySettings' });
+      state = submitGenerate(state);
+
+      const project = getActiveProject(state);
+      const queueItem = project.queue.items[0];
+
+      state = workbenchReducer(state, {
+        images: [createImage('result.png', queueItem.id)],
+        projectId: project.id,
+        queueItemId: queueItem.id,
+        type: 'routeQueueItemResults',
+      });
+
+      return getGallerySelectedImageQuery(getProjectWidgetValues(getActiveProject(state), 'gallery')).mediaKind;
+    };
+
+    expect(routeImageUnder('image')).toBe('image');
+    expect(routeImageUnder('video')).toBeNull();
+  });
+
   it('normalizes the gallery page to a non-negative integer', () => {
     let state = primeGenerate();
 
@@ -5307,6 +5333,46 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     });
   });
 
+  it('restarts the listing at its first page when the media filter changes', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, { page: 3, type: 'setGalleryPage' });
+    state = workbenchReducer(state, { settings: { mediaFilter: 'video' }, type: 'updateGallerySettings' });
+
+    const values = getProjectWidgetValues(getActiveProject(state), 'gallery');
+
+    expect(values.mediaFilter).toBe('video');
+    expect(values.galleryPage).toBe(0);
+  });
+
+  it('stamps a Gallery selection with the media kind the grid lists, and an item-board selection with none', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, { settings: { mediaFilter: 'image' }, type: 'updateGallerySettings' });
+    state = workbenchReducer(state, { item: createGalleryImageItem('listed.png'), type: 'selectGalleryItem' });
+
+    expect(getGallerySelectedImageQuery(getProjectWidgetValues(getActiveProject(state), 'gallery')).mediaKind).toBe(
+      'image'
+    );
+
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('searched.png'),
+      navigateItemBoard: true,
+      type: 'selectGalleryItem',
+    });
+
+    expect(getGallerySelectedImageQuery(getProjectWidgetValues(getActiveProject(state), 'gallery')).mediaKind).toBe(
+      null
+    );
+
+    state = workbenchReducer(state, { settings: { mediaFilter: 'all' }, type: 'updateGallerySettings' });
+    state = workbenchReducer(state, { item: createGalleryImageItem('both.png'), type: 'selectGalleryItem' });
+
+    expect(getGallerySelectedImageQuery(getProjectWidgetValues(getActiveProject(state), 'gallery')).mediaKind).toBe(
+      null
+    );
+  });
+
   it('stamps a toggled selection with the page of the item that becomes primary', () => {
     const stamp = () => {
       const values = getProjectWidgetValues(getActiveProject(state), 'gallery');
@@ -5410,6 +5476,60 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
     expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageQuery).toMatchObject({
       page: 3,
+      semanticKey: 'text:sunset',
+    });
+  });
+
+  it('keeps the stamped media kind on an ordinary host step, whatever the filter is now', () => {
+    let state = createInitialWorkbenchState();
+
+    // Selected under both kinds; the filter then hides videos, and Preview steps onto one in the listing it walks.
+    state = workbenchReducer(state, { item: createGalleryImageItem('anchor.png'), type: 'selectGalleryItem' });
+    state = workbenchReducer(state, { settings: { mediaFilter: 'image' }, type: 'updateGallerySettings' });
+    state = workbenchReducer(state, {
+      item: createGalleryVideoItem('stepped.mp4'),
+      preserveNavigationQuery: true,
+      selectionPage: 4,
+      type: 'selectGalleryItem',
+    });
+
+    const query = getGallerySelectedImageQuery(getProjectWidgetValues(getActiveProject(state), 'gallery'));
+
+    expect(query.mediaKind).toBeNull();
+    expect(query.page).toBe(4);
+
+    state = workbenchReducer(state, {
+      itemKeys: ['video:stepped.mp4', 'image:range.png'],
+      preserveNavigationQuery: true,
+      primaryItem: createGalleryImageItem('range.png'),
+      selectionPage: 5,
+      type: 'setGalleryMultiSelection',
+    });
+
+    expect(getGallerySelectedImageQuery(getProjectWidgetValues(getActiveProject(state), 'gallery')).mediaKind).toBe(
+      null
+    );
+  });
+
+  it('stamps the live media kind on a ranked host step, with the live ranking it navigated', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, { item: createGalleryImageItem('anchor.png'), type: 'selectGalleryItem' });
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: { mediaFilter: 'image', semanticImageQuery: { kind: 'text', query: 'sunset' } },
+      widgetId: 'gallery',
+    });
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('ranked.png'),
+      preserveNavigationQuery: true,
+      selectionPage: 1,
+      type: 'selectGalleryItem',
+    });
+
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageQuery).toMatchObject({
+      mediaKind: 'image',
+      page: 1,
       semanticKey: 'text:sunset',
     });
   });

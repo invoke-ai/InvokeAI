@@ -416,6 +416,52 @@ test('starred filter narrows gallery items, names, and date boards consistently'
   });
 });
 
+test('media_kind narrows gallery items, names, location, date boards, and the image map consistently', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const query = 'categories=general&is_intermediate=false&starred_first=false&limit=1000&offset=0';
+    const all = await getJson(backend, `/api/v1/gallery/items/?${query}`);
+    const videos = await getJson(backend, `/api/v1/gallery/items/?${query}&media_kind=video`);
+    const images = await getJson(backend, `/api/v1/gallery/items/?${query}&media_kind=image`);
+
+    assert.ok(videos.total > 0, 'the fixture listing should contain videos');
+    assert.ok(videos.items.every((item) => item.kind === 'video'));
+    assert.ok(images.items.every((item) => item.kind === 'image'));
+    assert.equal(videos.total + images.total, all.total);
+
+    const names = await getJson(
+      backend,
+      '/api/v1/gallery/items/names?categories=general&is_intermediate=false&starred_first=false&media_kind=video'
+    );
+    assert.equal(names.total_count, videos.total);
+
+    const video = videos.items[0];
+    const locationQuery = `categories=general&is_intermediate=false&starred_first=false&kind=video&name=${encodeURIComponent(video.name)}`;
+    const location = await getJson(backend, `/api/v1/gallery/items/location?${locationQuery}&media_kind=video`);
+    assert.deepEqual(location, { index: 0, kind: 'video', name: video.name, total: videos.total });
+    const excluded = await fetch(`${backend.origin}/api/v1/gallery/items/location?${locationQuery}&media_kind=image`);
+    assert.equal(excluded.status, 404);
+    await excluded.body?.cancel();
+
+    const dated = await getJson(
+      backend,
+      '/api/v1/virtual_boards/by_date/2026-01-15/item_names?categories=general&is_intermediate=false&media_kind=video'
+    );
+    assert.ok(dated.total_count > 0);
+    assert.ok(dated.items.every((item) => item.kind === 'video'));
+
+    const points = await getJson(backend, '/api/v1/image_map/points?include_videos=true&media_kind=video');
+    const labels = await getJson(backend, '/api/v1/image_map/cluster_labels?include_videos=true&media_kind=video');
+    const bothPoints = await getJson(backend, '/api/v1/image_map/points?include_videos=true');
+    const status = await getJson(backend, '/api/v1/image_map/status?include_videos=true&media_kind=video');
+
+    assert.ok(points.points.length > 0);
+    assert.ok(points.points.every((point) => point.kind === 'video'));
+    assert.equal(labels.visible_hash, points.visible_hash);
+    assert.notEqual(points.visible_hash, bothPoints.visible_hash);
+    assert.equal(status.projection.point_count, points.points.length);
+  });
+});
+
 test('video DTO, Details, poster, full media, HEAD, and Range routes use the checked-in assets', async () => {
   await withRepresentativeBackend(async (backend) => {
     const name = 'fixture-video-001.mp4';

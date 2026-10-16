@@ -12,6 +12,7 @@ describe('getPreviewSelectedPage', () => {
     galleryView: 'images' as const,
     imageOrderDir: 'DESC' as const,
     itemBoard: false,
+    mediaKind: null,
     page: 3,
     paginationMode: 'infinite' as const,
     searchTerm: '',

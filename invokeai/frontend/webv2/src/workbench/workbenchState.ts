@@ -65,6 +65,7 @@ import {
   GALLERY_AUTO_ADD_FOLLOW,
   gallerySemanticReferenceKey,
   getGallerySettings,
+  toGalleryMediaKind,
   parseGallerySemanticReference,
   toGallerySemanticTextReference,
   getGalleryAutoAddBoardId,
@@ -3215,6 +3216,8 @@ const getGalleryResultSelectionValues = (
 ): Record<string, unknown> => {
   const itemKey = toGalleryItemKey(item);
   const gallerySettings = getGallerySettings(galleryValues);
+  // Navigate the kind the grid shows when it shows the result; a filter that hides it leaves both kinds.
+  const mediaKind = toGalleryMediaKind(gallerySettings.mediaFilter);
 
   return {
     ...(item.kind === 'video' ? { compareImage: null } : {}),
@@ -3226,6 +3229,7 @@ const getGalleryResultSelectionValues = (
       boardId: item.boardId,
       galleryView: item.category === 'general' ? 'images' : 'assets',
       imageOrderDir: gallerySettings.imageOrderDir,
+      ...(mediaKind === item.kind ? { mediaKind } : {}),
       page: 0,
       paginationMode: gallerySettings.paginationMode,
       searchTerm: '',
@@ -3728,28 +3732,40 @@ const getGallerySelectionPage = (values: Record<string, unknown>, selectionPage:
 
 /**
  * A host step keeps the selection's query but follows the Gallery's active ranking, except for a selection that
- * navigates its item's own board.
+ * navigates its item's own board. Media kind follows the same rule as Preview's navigation: a ranked step navigated
+ * the Gallery's live kind and stamps it; an ordinary step navigated the stamp's kind, which it keeps.
  */
 const getRankingStampFields = (
   values: Record<string, unknown>,
   existingNavigationQuery: Record<string, unknown>,
   semanticKey: string
-): Record<string, unknown> =>
-  existingNavigationQuery.itemBoard === true
-    ? {}
-    : semanticKey
-      ? { boardId: getGallerySelectionBoardId(values), semanticKey }
-      : { semanticKey: null };
+): Record<string, unknown> => {
+  if (existingNavigationQuery.itemBoard === true) {
+    return {};
+  }
+
+  return semanticKey
+    ? {
+        boardId: getGallerySelectionBoardId(values),
+        mediaKind: toGalleryMediaKind(getGallerySettings(values).mediaFilter) ?? null,
+        semanticKey,
+      }
+    : { semanticKey: null };
+};
 
 /** The listing the Gallery shows now, which a selection made in it navigates within. */
 const getCurrentGallerySelectionQuery = (values: Record<string, unknown>, page: number): Record<string, unknown> => {
   const settings = getGallerySettings(values);
   const semanticKey = gallerySemanticReferenceKey(parseGallerySemanticReference(values.semanticImageQuery));
+  const mediaKind = toGalleryMediaKind(settings.mediaFilter);
 
   return {
     boardId: getGallerySelectionBoardId(values),
     galleryView: values.galleryView === 'assets' ? 'assets' : 'images',
     imageOrderDir: settings.imageOrderDir,
+    // Absent reads as both kinds. Item-board stamps omit it, and result stamps omit it when the filter hides the result:
+    // both navigate a listing of both kinds.
+    ...(mediaKind ? { mediaKind } : {}),
     page,
     paginationMode: settings.paginationMode,
     searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
@@ -5284,7 +5300,10 @@ export const __workbenchReducerInternal = (
       );
     }
     case 'updateGallerySettings': {
-      const resetsQuery = action.settings.imageOrderDir !== undefined || action.settings.paginationMode !== undefined;
+      const resetsQuery =
+        action.settings.imageOrderDir !== undefined ||
+        action.settings.mediaFilter !== undefined ||
+        action.settings.paginationMode !== undefined;
 
       return updateGalleryValues(
         state,

@@ -3,6 +3,7 @@ import type {
   GalleryImageItem,
   GalleryItem,
   GalleryItemCategory,
+  GalleryItemKind,
   GalleryItemRef,
   GalleryItemsPage,
   GalleryVideoItem,
@@ -535,6 +536,7 @@ const listPaletteDateBoardImageNames = async ({
     createdFrom,
     createdTo,
     galleryView,
+    mediaKind: 'image',
     orderDir,
     searchTerm,
     signal,
@@ -559,6 +561,8 @@ interface GalleryItemNamesRequest {
   createdFrom?: string;
   createdTo?: string;
   galleryView: GalleryView;
+  /** Only this media kind; absent lists both. */
+  mediaKind?: GalleryItemKind;
   orderDir: GalleryOrderDir;
   searchTerm: string;
   signal?: AbortSignal;
@@ -576,6 +580,7 @@ export const listGalleryItemNames = async ({
   createdFrom,
   createdTo,
   galleryView,
+  mediaKind,
   orderDir,
   searchTerm,
   signal,
@@ -587,6 +592,7 @@ export const listGalleryItemNames = async ({
     created_from: createdFrom,
     created_to: createdTo,
     is_intermediate: false,
+    media_kind: mediaKind,
     order_dir: orderDir,
     search_term: searchTerm.trim() || undefined,
     starred,
@@ -609,6 +615,7 @@ export const getGalleryItemLocation = ({
   createdTo,
   galleryView,
   kind,
+  mediaKind,
   name,
   orderDir,
   searchTerm,
@@ -622,6 +629,7 @@ export const getGalleryItemLocation = ({
     created_to: createdTo,
     is_intermediate: false,
     kind,
+    media_kind: mediaKind,
     order_dir: orderDir,
     name,
     search_term: searchTerm.trim() || undefined,
@@ -638,6 +646,7 @@ export const listGalleryDateBoardItemNames = async ({
   createdFrom,
   createdTo,
   galleryView,
+  mediaKind,
   orderDir,
   searchTerm,
   signal,
@@ -652,6 +661,7 @@ export const listGalleryDateBoardItemNames = async ({
 
   const query = toSearchParams({
     categories: galleryView === 'assets' ? assetCategories : imageCategories,
+    media_kind: mediaKind,
     order_dir: orderDir,
     search_term: searchTerm.trim() || undefined,
     starred,
@@ -751,6 +761,8 @@ interface GalleryListRequest {
   createdTo?: string;
   galleryView: GalleryView;
   limit?: number;
+  /** Only this media kind; absent lists both. Ignored by the image-only palette listing. */
+  mediaKind?: GalleryItemKind;
   offset?: number;
   orderDir?: GalleryOrderDir;
   searchTerm: string;
@@ -770,6 +782,7 @@ export const listGalleryItems = async ({
   galleryView,
   isIntermediate = false,
   limit = 100,
+  mediaKind,
   offset = 0,
   orderDir = 'DESC',
   searchTerm,
@@ -783,6 +796,7 @@ export const listGalleryItems = async ({
     created_to: createdTo,
     is_intermediate: isIntermediate,
     limit,
+    media_kind: mediaKind,
     offset,
     order_dir: orderDir,
     search_term: searchTerm.trim() || undefined,
@@ -832,7 +846,8 @@ const toSemanticScopeParams = (boardId: string | undefined): { board_id?: string
 
 /**
  * Text and gallery-image searches use GET; URLs and registered files use POST. include_videos opts into kind-aware
- * result hydration. The server ranks within `boardId` before applying the limit.
+ * result hydration; a set `mediaKind` overrides it server-side and ranks only that kind. The server ranks within
+ * `boardId` before applying the limit.
  */
 export const searchGallerySemantic = async (
   query: Exclude<GallerySemanticQuery, { kind: 'cluster' }>,
@@ -840,10 +855,17 @@ export const searchGallerySemantic = async (
     boardId,
     includeVideos = true,
     limit = SEMANTIC_SEARCH_MAX_RESULTS,
+    mediaKind,
     signal,
-  }: { boardId?: string; includeVideos?: boolean; limit?: number; signal?: AbortSignal } = {}
+  }: {
+    boardId?: string;
+    includeVideos?: boolean;
+    limit?: number;
+    mediaKind?: GalleryItemKind;
+    signal?: AbortSignal;
+  } = {}
 ): Promise<GallerySemanticResult[]> => {
-  const scope = { ...toSemanticScopeParams(boardId), include_videos: includeVideos, limit };
+  const scope = { ...toSemanticScopeParams(boardId), include_videos: includeVideos, limit, media_kind: mediaKind };
 
   if (query.kind === 'url') {
     const params = toSearchParams({ image_url: query.url, ...scope });
@@ -916,25 +938,26 @@ export const fetchImageIndexAvailability = async (signal: AbortSignal): Promise<
 /** Kind-qualified refs retain relevance order for page hydration, range selection, and deletion neighbors. */
 export const listSemanticGalleryItemNames = async ({
   boardId,
+  mediaKind,
   query,
   signal,
 }: {
   boardId?: string;
+  mediaKind?: GalleryItemKind;
   query: GallerySemanticQuery;
   signal?: AbortSignal;
 }): Promise<GalleryItemNames> => {
   // A cluster query is an explicit member list held client-side (in proximity
   // order from the clicked map point); there is nothing to ask the server.
   if (query.kind === 'cluster') {
-    const itemKeys = getImageCluster(query.clusterId)?.itemKeys ?? [];
+    const items = (getImageCluster(query.clusterId)?.itemKeys ?? [])
+      .map(parseGalleryItemKey)
+      .filter((ref) => mediaKind === undefined || ref.kind === mediaKind);
 
-    return {
-      items: itemKeys.map(parseGalleryItemKey),
-      total: itemKeys.length,
-    };
+    return { items, total: items.length };
   }
 
-  const results = await searchGallerySemantic(query, { boardId, signal });
+  const results = await searchGallerySemantic(query, { boardId, mediaKind, signal });
 
   return {
     items: results.map((result) => result.ref),
