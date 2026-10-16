@@ -39,8 +39,10 @@ import { useTranslation } from 'react-i18next';
 /** Matches the legacy cropper's minimum crop dimension, in image pixels. */
 const MIN_CROP_DIMENSION_PX = 64;
 
-/** Zoom is relative to the fitted image; the legacy cropper's wheel and button steps apply. */
+/** Zoom is relative to the fitted image; wheel deltas are normalized to CSS pixels. */
+const ZOOM_WHEEL_PIXELS_PER_STEP = 100;
 const ZOOM_WHEEL_FACTOR = 1.1;
+const PAN_VISIBLE_PX = 48;
 const ZOOM_BUTTON_FACTOR = 1.2;
 const ZOOM_MIN = 0.25;
 const ZOOM_MAX = 16;
@@ -60,7 +62,7 @@ const THIRDS_OFFSETS = ['33.333%', '66.667%'];
 
 const ASPECT_RATIO_TRIGGER_PROPS = { minW: '7rem' } as const;
 
-const CONTAIN_IMG_STYLE: CSSProperties = { height: '100%', objectFit: 'contain', width: '100%' };
+const CONTAIN_IMG_STYLE: CSSProperties = { display: 'block', height: '100%', objectFit: 'contain', width: '100%' };
 
 /** Fit: the image fills the viewport; pan is in viewport pixels. */
 interface CropView {
@@ -70,6 +72,19 @@ interface CropView {
 }
 
 const FIT_VIEW: CropView = { panX: 0, panY: 0, zoom: 1 };
+
+/** Keep a reachable part of the image visible, including when zoomed smaller than the viewport. */
+const constrainViewPan = (view: CropView, viewport: { width: number; height: number }): CropView => {
+  const width = viewport.width * view.zoom;
+  const height = viewport.height * view.zoom;
+  const visibleX = Math.min(PAN_VISIBLE_PX, width, viewport.width);
+  const visibleY = Math.min(PAN_VISIBLE_PX, height, viewport.height);
+  return {
+    ...view,
+    panX: Math.min(viewport.width - visibleX, Math.max(visibleX - width, view.panX)),
+    panY: Math.min(viewport.height - visibleY, Math.max(visibleY - height, view.panY)),
+  };
+};
 
 type PanState = 'idle' | 'ready' | 'panning';
 
@@ -121,7 +136,8 @@ const capturePointer = (element: HTMLElement, pointerId: number): void => {
 
 /** Zooms by `factor` about a viewport point, so the pixel under the cursor stays put. */
 const zoomViewAt = (view: CropView, factor: number, point: { x: number; y: number }): CropView => {
-  const zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, view.zoom * factor));
+  // Actual size can sit beyond the normal range; controls may move back toward it without reversing direction.
+  const zoom = Math.min(Math.max(ZOOM_MAX, view.zoom), Math.max(Math.min(ZOOM_MIN, view.zoom), view.zoom * factor));
   const scale = zoom / view.zoom;
 
   return {
@@ -219,7 +235,7 @@ export const ReferenceImageCropDialog = ({
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<ReferenceCropDrag | null>(null);
-  const panRef = useRef<{ panX: number; panY: number; x: number; y: number } | null>(null);
+  const panRef = useRef<{ x: number; y: number } | null>(null);
   const spaceHeldRef = useRef(false);
   const imageUrl = getReferenceImageUrls({ original: image.original }).imageUrl;
   const ratio = original.height > 0 ? original.width / original.height : 1;
@@ -284,10 +300,19 @@ export const ReferenceImageCropDialog = ({
       return;
     }
     const onWheel = (event: WheelEvent) => {
+      if (event.deltaY === 0) {
+        return;
+      }
       event.preventDefault();
       const rect = element.getBoundingClientRect();
-      const factor = event.deltaY < 0 ? ZOOM_WHEEL_FACTOR : 1 / ZOOM_WHEEL_FACTOR;
-      setView((current) => zoomViewAt(current, factor, { x: event.clientX - rect.left, y: event.clientY - rect.top }));
+      const deltaPx = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? rect.height : 1);
+      const factor = ZOOM_WHEEL_FACTOR ** (-deltaPx / ZOOM_WHEEL_PIXELS_PER_STEP);
+      setView((current) =>
+        constrainViewPan(
+          zoomViewAt(current, factor, { x: event.clientX - rect.left, y: event.clientY - rect.top }),
+          rect
+        )
+      );
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.code === 'Space' && !consumesSpace(event.target)) {
@@ -319,7 +344,10 @@ export const ReferenceImageCropDialog = ({
   const zoomAboutCenter = useCallback((factor: number) => {
     const viewport = viewportRef.current;
     if (viewport) {
-      setView((current) => zoomViewAt(current, factor, { x: viewport.clientWidth / 2, y: viewport.clientHeight / 2 }));
+      const rect = viewport.getBoundingClientRect();
+      setView((current) =>
+        constrainViewPan(zoomViewAt(current, factor, { x: rect.width / 2, y: rect.height / 2 }), rect)
+      );
     }
   }, []);
   const zoomIn = useCallback(() => zoomAboutCenter(ZOOM_BUTTON_FACTOR), [zoomAboutCenter]);
@@ -331,10 +359,11 @@ export const ReferenceImageCropDialog = ({
     if (!viewport || viewport.clientWidth === 0) {
       return;
     }
-    const zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, original.width / viewport.clientWidth));
+    const rect = viewport.getBoundingClientRect();
+    const zoom = original.width / rect.width;
     setView({
-      panX: (viewport.clientWidth * (1 - zoom)) / 2,
-      panY: (viewport.clientHeight * (1 - zoom)) / 2,
+      panX: (rect.width * (1 - zoom)) / 2,
+      panY: (rect.height * (1 - zoom)) / 2,
       zoom,
     });
   }, [original.width]);
@@ -359,15 +388,15 @@ export const ReferenceImageCropDialog = ({
   const beginPan = useCallback(
     (event: PointerEvent<HTMLDivElement>) => {
       const viewport = viewportRef.current;
-      if (!viewport || dragRef.current || (panState !== 'ready' && event.button !== 1)) {
+      if (!viewport || dragRef.current || (event.button !== 1 && !(event.button === 0 && panState === 'ready'))) {
         return;
       }
       event.preventDefault();
       capturePointer(viewport, event.pointerId);
-      panRef.current = { panX: view.panX, panY: view.panY, x: event.clientX, y: event.clientY };
+      panRef.current = { x: event.clientX, y: event.clientY };
       setPanState('panning');
     },
-    [panState, view.panX, view.panY]
+    [panState]
   );
 
   const beginDrag = useCallback(
@@ -392,12 +421,13 @@ export const ReferenceImageCropDialog = ({
   const movePointer = useCallback(
     (event: PointerEvent<HTMLDivElement>) => {
       const pan = panRef.current;
-      if (pan) {
-        setView((current) => ({
-          ...current,
-          panX: pan.panX + event.clientX - pan.x,
-          panY: pan.panY + event.clientY - pan.y,
-        }));
+      const viewport = viewportRef.current;
+      if (pan && viewport) {
+        const dx = event.clientX - pan.x;
+        const dy = event.clientY - pan.y;
+        panRef.current = { x: event.clientX, y: event.clientY };
+        const rect = viewport.getBoundingClientRect();
+        setView((current) => constrainViewPan({ ...current, panX: current.panX + dx, panY: current.panY + dy }, rect));
         return;
       }
       const stage = stageRef.current;
@@ -545,13 +575,13 @@ export const ReferenceImageCropDialog = ({
                   bg="bg.muted"
                   cursor={panState === 'panning' ? 'grabbing' : panState === 'ready' ? 'grab' : undefined}
                   data-pan-state={panState}
-                  maxH="60vh"
+                  alignSelf="center"
                   overflow="hidden"
                   position="relative"
                   rounded="md"
                   touchAction="none"
                   userSelect="none"
-                  w="full"
+                  w={`min(100%, ${60 * ratio}vh)`}
                   onPointerCancel={endPointer}
                   onPointerDown={beginPan}
                   onPointerMove={movePointer}

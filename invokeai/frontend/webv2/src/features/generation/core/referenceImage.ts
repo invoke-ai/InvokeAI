@@ -319,8 +319,8 @@ const resolveFreeDrag = (
 };
 
 /**
- * A ratio-locked handle drag. Corners anchor the opposite corner and follow whichever free dimension grew most;
- * edges anchor the opposite edge and grow the other dimension around the box's center line.
+ * A ratio-locked handle drag. Corners anchor the opposite corner and follow the larger ratio-normalized displacement;
+ * edges anchor the opposite edge, centering the other dimension until an image edge requires it to slide.
  */
 const resolveRatioDrag = (
   drag: ReferenceCropDrag,
@@ -348,14 +348,17 @@ const resolveRatioDrag = (
   } else if (horizontal) {
     width = free.width;
   } else {
-    width = Math.max(free.width, free.height * pctRatio);
+    width =
+      Math.abs(free.width - box.width) >= Math.abs(free.height - box.height) * pctRatio
+        ? free.width
+        : free.height * pctRatio;
   }
   let size = fitRatioBox(width, pctRatio, constraints);
-  // Edges grow the other dimension around a center line, which caps it at twice the nearer image edge.
+  // Side handles may use the full orthogonal image dimension; placement below slides their center if needed.
   const maxWidth = horizontal
-    ? Math.min(roomWidth, 2 * Math.min(cy, 100 - cy) * pctRatio)
+    ? Math.min(roomWidth, 100 * pctRatio)
     : vertical
-      ? Math.min(roomHeight * pctRatio, 2 * Math.min(cx, 100 - cx))
+      ? Math.min(roomHeight * pctRatio, 100)
       : Math.min(roomWidth, roomHeight * pctRatio);
   if (size.width > maxWidth) {
     size = fitRatioBox(maxWidth, pctRatio, constraints);

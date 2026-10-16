@@ -10,20 +10,24 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 import { ReferenceImageCard } from './ReferenceImageCard';
 
 const mocks = vi.hoisted(() => {
   // A real decodable image, so the crop export's <img> loads without a backend.
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 512;
-  const context = canvas.getContext('2d')!;
-  context.fillStyle = '#4080c0';
-  context.fillRect(0, 0, 512, 512);
+  const createImage = (width: number, height: number) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d')!;
+    context.fillStyle = '#4080c0';
+    context.fillRect(0, 0, width, height);
+    return canvas.toDataURL('image/png');
+  };
   return {
-    imageDataUrl: canvas.toDataURL('image/png'),
+    createImage,
+    imageDataUrl: createImage(512, 512),
     upload: vi.fn(),
   };
 });
@@ -71,8 +75,10 @@ const SQUARE_CROPPED_REFERENCE: GenerateReferenceImage = {
   },
 };
 
-const renderCard = (referenceImage: GenerateReferenceImage) =>
-  act(() =>
+const renderCard = (referenceImage: GenerateReferenceImage) => {
+  const original = referenceImage.config.image!.original.image;
+  mocks.imageDataUrl = mocks.createImage(original.width, original.height);
+  return act(() =>
     root?.render(
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
@@ -93,6 +99,7 @@ const renderCard = (referenceImage: GenerateReferenceImage) =>
       </I18nextProvider>
     )
   );
+};
 
 beforeEach(async () => {
   host = document.createElement('div');
@@ -104,13 +111,18 @@ beforeEach(async () => {
 afterEach(async () => {
   await act(() => root?.unmount());
   host?.remove();
+  await page.viewport(1280, 720);
   vi.clearAllMocks();
 });
 
 const openCropDialog = async (): Promise<HTMLElement> => {
   await act(() => userEvent.click(document.querySelector<HTMLElement>('button[aria-label="common.crop"]')!));
   await expect.poll(() => document.querySelector('[role="dialog"]')?.getAttribute('data-state')).toBe('open');
-  return document.querySelector<HTMLElement>('[role="dialog"]')!;
+  const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!;
+  await expect
+    .poll(() => dialog.getAnimations().filter((animation) => animation.playState === 'running').length)
+    .toBe(0);
+  return dialog;
 };
 
 /** The crop box as percentages of the image, read back from its inline style. */
@@ -188,11 +200,10 @@ describe('reference image crop dialog', () => {
       pointer('pointerup', viewport, startX + rect.width * 0.1, startY + rect.height * 0.3);
     });
 
-    // The pointer shrank the width by 10% and the height by 30%; the ratio follows the larger candidate (the width),
-    // as the legacy cropper did, so the box always reaches the pointer. The opposite corner stays anchored.
+    // The 30% vertical shrink dominates after accounting for the ratio; the opposite corner stays anchored.
     const resized = readCropBox(dialog);
     expect(resized.width / resized.height).toBeCloseTo(9 / 16, 3);
-    expect(resized.width).toBeCloseTo(portrait.width - 10, 1);
+    expect(resized.height).toBeCloseTo(portrait.height - 30, 1);
     expect(resized.x + resized.width).toBeCloseTo(portrait.x + portrait.width, 1);
     expect(resized.y + resized.height).toBeCloseTo(100, 1);
     expect(dialog.textContent).toContain(
@@ -277,6 +288,148 @@ describe('reference image crop dialog', () => {
       )
     );
     expect(readView(dialog)).toEqual({ x: 0, y: 0, zoom: 1 });
+  });
+
+  it.each([
+    { width: 1200, height: 600, viewportHeight: 720 },
+    { width: 600, height: 1200, viewportHeight: 720 },
+    { width: 800, height: 600, viewportHeight: 400 },
+  ])('fits the stage and overlay to $width × $height at a $viewportHeight px viewport', async (size) => {
+    await page.viewport(1280, size.viewportHeight);
+    await renderCard({
+      ...REFERENCE,
+      config: {
+        type: 'external_reference_image',
+        image: { original: { image: { width: size.width, height: size.height, image_name: 'original.png' } } },
+      },
+    });
+    const dialog = await openCropDialog();
+    const stage = dialog.querySelector<HTMLElement>('[data-crop-stage]')!;
+    const overlay = dialog.querySelector<HTMLElement>('[data-crop-box]')!;
+    const img = stage.querySelector('img')!;
+    await expect.poll(() => img.naturalWidth).toBe(size.width);
+    const fitted = stage.getBoundingClientRect();
+    expect(fitted.width / fitted.height).toBeCloseTo(size.width / size.height, 2);
+    expect(fitted.height).toBeLessThanOrEqual(size.viewportHeight * 0.6 + 1);
+    expect(overlay.getBoundingClientRect().width).toBeCloseTo(fitted.width, 1);
+    expect(overlay.getBoundingClientRect().height).toBeCloseTo(fitted.height, 1);
+
+    await act(() =>
+      userEvent.click(dialog.querySelector<HTMLElement>('[aria-label="widgets.generate.cropActualSize"]')!)
+    );
+    expect(stage.getBoundingClientRect().width).toBeCloseTo(size.width, 1);
+    expect(stage.getBoundingClientRect().height).toBeCloseTo(size.height, 1);
+    await act(() => userEvent.click(dialog.querySelector<HTMLElement>('[aria-label="widgets.generate.cropZoomIn"]')!));
+    expect(stage.getBoundingClientRect().width).toBeCloseTo(size.width * 1.2, 1);
+    await act(() => userEvent.click(dialog.querySelector<HTMLElement>('[aria-label="widgets.generate.cropZoomOut"]')!));
+    expect(stage.getBoundingClientRect().width).toBeCloseTo(size.width, 1);
+    await act(() => userEvent.click(dialog.querySelector<HTMLElement>('[aria-label="widgets.generate.cropFitView"]')!));
+    expect(stage.getBoundingClientRect().width).toBeCloseTo(fitted.width, 1);
+    expect(readCropBox(dialog)).toEqual({ height: 100, width: 100, x: 0, y: 0 });
+  });
+
+  it.each([
+    { width: 64, height: 64, limitedControl: 'cropZoomOut', movingControl: 'cropZoomIn', factor: 1.2 },
+    { width: 256, height: 8000, limitedControl: 'cropZoomIn', movingControl: 'cropZoomOut', factor: 1 / 1.2 },
+  ])('keeps zoom controls monotonic after Actual size for a $width × $height image', async (size) => {
+    await renderCard({
+      ...REFERENCE,
+      config: {
+        type: 'external_reference_image',
+        image: { original: { image: { width: size.width, height: size.height, image_name: 'original.png' } } },
+      },
+    });
+    const dialog = await openCropDialog();
+    const clickControl = (name: string) =>
+      act(() => userEvent.click(dialog.querySelector<HTMLElement>(`[aria-label="widgets.generate.${name}"]`)!));
+    const stage = dialog.querySelector<HTMLElement>('[data-crop-stage]')!;
+    await clickControl('cropActualSize');
+    expect(stage.getBoundingClientRect().height).toBeCloseTo(size.height, 1);
+    await clickControl(size.limitedControl);
+    expect(stage.getBoundingClientRect().height).toBeCloseTo(size.height, 1);
+    await clickControl(size.movingControl);
+    expect(stage.getBoundingClientRect().height).toBeCloseTo(size.height * size.factor, 1);
+  });
+
+  it('ignores horizontal wheels and normalizes proportional pixel, line and page zoom', async () => {
+    const dialog = await openCropDialog();
+    const viewport = viewportOf(dialog);
+    const rect = viewport.getBoundingClientRect();
+    const wheel = (deltaY: number, deltaMode = 0) =>
+      act(() => {
+        viewport.dispatchEvent(
+          new WheelEvent('wheel', {
+            bubbles: true,
+            cancelable: true,
+            clientX: rect.left + rect.width / 2,
+            clientY: rect.top + rect.height / 2,
+            deltaX: 50,
+            deltaY,
+            deltaMode,
+          })
+        );
+      });
+    await wheel(0);
+    expect(readView(dialog)).toEqual({ x: 0, y: 0, zoom: 1 });
+    await wheel(-1);
+    expect(readView(dialog).zoom).toBeCloseTo(1.1 ** 0.01, 5);
+    await wheel(1);
+    expect(readView(dialog).zoom).toBeCloseTo(1, 6);
+    await wheel(-6.25, 1);
+    expect(readView(dialog).zoom).toBeCloseTo(1.1, 6);
+    await wheel(100 / rect.height, 2);
+    expect(readView(dialog).zoom).toBeCloseTo(1, 6);
+  });
+
+  it('keeps panning continuous across wheel zoom, bounds the view, and ignores Space plus right click', async () => {
+    const dialog = await openCropDialog();
+    const viewport = viewportOf(dialog);
+    const rect = viewport.getBoundingClientRect();
+    await act(() => {
+      spaceKey('keydown');
+    });
+    await act(() => {
+      pointer('pointerdown', viewport, rect.left + 100, rect.top + 100, 2);
+      pointer('pointermove', viewport, rect.left + 150, rect.top + 150, 2);
+      pointer('pointerup', viewport, rect.left + 150, rect.top + 150, 2);
+    });
+    expect(readView(dialog)).toEqual({ x: 0, y: 0, zoom: 1 });
+    await act(() => {
+      pointer('pointerdown', viewport, rect.left + 100, rect.top + 100);
+      pointer('pointermove', viewport, rect.left + 120, rect.top + 120);
+    });
+    await act(() => {
+      viewport.dispatchEvent(
+        new WheelEvent('wheel', {
+          bubbles: true,
+          cancelable: true,
+          clientX: rect.left + 120,
+          clientY: rect.top + 120,
+          deltaY: -100,
+        })
+      );
+    });
+    const zoomed = readView(dialog);
+    await act(() => {
+      pointer('pointermove', viewport, rect.left + 121, rect.top + 121);
+    });
+    expect(readView(dialog).x).toBeCloseTo(zoomed.x + 1, 5);
+    expect(readView(dialog).y).toBeCloseTo(zoomed.y + 1, 5);
+    await act(() => {
+      pointer('pointermove', viewport, rect.left + 10000, rect.top + 10000);
+    });
+    expect(readView(dialog).x).toBeCloseTo(rect.width - 48, 2);
+    expect(readView(dialog).y).toBeCloseTo(rect.height - 48, 2);
+    await act(() => {
+      pointer('pointermove', viewport, rect.left - 10000, rect.top - 10000);
+    });
+    const stage = dialog.querySelector<HTMLElement>('[data-crop-stage]')!.getBoundingClientRect();
+    expect(stage.right - rect.left).toBeCloseTo(48, 2);
+    expect(stage.bottom - rect.top).toBeCloseTo(48, 2);
+    await act(() => {
+      pointer('pointerup', viewport, rect.left - 10000, rect.top - 10000);
+      spaceKey('keyup');
+    });
   });
 
   it('leaves Space to a focused button, so Apply still activates from the keyboard', async () => {

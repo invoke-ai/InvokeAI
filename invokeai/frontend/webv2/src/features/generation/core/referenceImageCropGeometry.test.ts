@@ -91,6 +91,34 @@ describe('resolveReferenceCropDrag', () => {
     expect(wider.y + wider.height / 2).toBeCloseTo(50);
   });
 
+  it.each([
+    ['e', { height: 40, width: 40, x: 0, y: 0 }, { x: 40, y: 20 }, { x: 100, y: 20 }],
+    ['w', { height: 40, width: 40, x: 60, y: 60 }, { x: 60, y: 80 }, { x: 0, y: 80 }],
+    ['s', { height: 40, width: 40, x: 0, y: 0 }, { x: 20, y: 40 }, { x: 20, y: 100 }],
+    ['n', { height: 40, width: 40, x: 60, y: 60 }, { x: 80, y: 60 }, { x: 80, y: 0 }],
+  ] as const)('lets the %s side grow to the full image by sliding the other axis', (mode, box, from, to) => {
+    const grown = resolveReferenceCropDrag({ box, mode, ...from }, to, constraints(1, { width: 800, height: 800 }));
+    expect(grown).toEqual({ x: 0, y: 0, width: 100, height: 100 });
+  });
+
+  it.each(['nw', 'ne', 'sw', 'se'] as const)('shrinks the %s corner with either single-axis gesture', (mode) => {
+    const image = { width: 600, height: 800 };
+    // A 240px square on a portrait source.
+    const box = { x: 30, y: 30, width: 40, height: 30 };
+    const from = { x: mode.includes('w') ? 30 : 70, y: mode.includes('n') ? 30 : 60 };
+    for (const to of [
+      { ...from, x: from.x + (mode.includes('w') ? 10 : -10) },
+      { ...from, y: from.y + (mode.includes('n') ? 7.5 : -7.5) },
+    ]) {
+      const shrunk = resolveReferenceCropDrag({ box, mode, ...from }, to, constraints(1, image));
+      expect(shrunk.width).toBeCloseTo(30);
+      expect(shrunk.height).toBeCloseTo(22.5);
+      expect(shrunk.x + (mode.includes('w') ? shrunk.width : 0)).toBeCloseTo(mode.includes('w') ? 70 : 30);
+      expect(shrunk.y + (mode.includes('n') ? shrunk.height : 0)).toBeCloseTo(mode.includes('n') ? 60 : 30);
+      expectInside(shrunk);
+    }
+  });
+
   it('stops a ratio-locked drag at the image edge instead of breaking the ratio', () => {
     const pinned = drag('se', box, { x: 70, y: 70 }, { x: 100, y: 100 }, 16 / 9);
 

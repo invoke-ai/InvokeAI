@@ -59,7 +59,7 @@ export interface EraserOptions {
 export interface LayerQuickSwitchState {
   /** Set from the layer menu; a stale id (the layer was removed) is ignored by readers. */
   bookmarkedLayerId: string | null;
-  /** Engine-maintained: the previous non-null selection, once the selection has changed. */
+  /** Engine-maintained: the layer left by the last explicit switch; internal edits and deselection preserve it. */
   previousLayerId: string | null;
 }
 

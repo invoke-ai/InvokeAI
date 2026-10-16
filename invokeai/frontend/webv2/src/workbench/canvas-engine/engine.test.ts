@@ -44,6 +44,7 @@ import {
 } from '@workbench/canvas-operations/createCanvasEngine';
 import { FILTER_AUTO_PROCESS_DEBOUNCE_MS } from '@workbench/canvas-operations/filterOperationSession';
 import { getCanvasOperationImplementation as getCanvasOperations } from '@workbench/canvas-operations/operationAccess';
+import { executeCanvasHotkeyCommand } from '@workbench/widgets/canvas/canvasHotkeyCommands';
 import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState.testing';
 import { afterEach, describe, expect, it, type Mock, vi } from 'vitest';
 
@@ -16660,6 +16661,23 @@ describe('text edit session', () => {
     engine.lifecycle.dispose();
   });
 
+  it('does not replace quick-switch memory when text editing selects its target', () => {
+    const document = textDoc();
+    const withRaster = {
+      ...document,
+      stacks: stacksFrom([...getDocumentLeaves(document), rasterLayer('a'), rasterLayer('b')]),
+      selectedLayerId: 'a',
+    };
+    const { engine, setDocument } = makeEngine(withRaster);
+    setDocument({ ...withRaster, selectedLayerId: 'b' });
+    engine.layers.openTextEdit('txt1');
+    expect(engine.document.getDocument()?.selectedLayerId).toBe('txt1');
+    expect(engine.interaction.get('layerQuickSwitch').previousLayerId).toBe('a');
+    setDocument({ ...withRaster, selectedLayerId: 'a' });
+    expect(engine.interaction.get('layerQuickSwitch').previousLayerId).toBe('txt1');
+    engine.lifecycle.dispose();
+  });
+
   it('opening an edit on the selected text layer dispatches nothing', () => {
     const { dispatch, engine } = makeEngine(textDoc());
     engine.tools.setTool('text');
@@ -17332,7 +17350,10 @@ describe('Select Object canvas engine integration', () => {
     expect(getCanvasOperations(h.engine).startSelectObject('first')).toBe('started');
     expect(h.store.dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'setCanvasSelectedLayer' }));
 
+    const memory = { bookmarkedLayerId: 'first', previousLayerId: 'second' };
+    h.engine.interaction.set('layerQuickSwitch', memory);
     expect(getCanvasOperations(h.engine).startSelectObject('second')).toBe('started');
+    expect(h.engine.interaction.get('layerQuickSwitch')).toEqual(memory);
     expect(h.store.dispatch).toHaveBeenCalledWith({ id: 'second', type: 'setCanvasSelectedLayer' });
     h.engine.lifecycle.dispose();
   });
@@ -18930,6 +18951,127 @@ describe('floating selection lifecycle', () => {
 });
 
 describe('layer quick-switch memory', () => {
+  const pressQuickSwitch = (engine: CanvasEngine, mutationPort: CanvasProjectMutationPort): void => {
+    const document = engine.document.getDocument()!;
+    executeCanvasHotkeyCommand('canvas.quickSwitch', {
+      document,
+      engine,
+      dispatch: (mutation) => mutationPort.dispatch(mutation, 'user'),
+      selectedLayerIds: document.selectedLayerId ? [document.selectedLayerId] : [],
+      hasStagingSlots: false,
+      hasSelectedStagedCandidate: false,
+      isInteractionLocked: false,
+      copySelection: vi.fn(),
+      swapActiveColors: vi.fn(),
+      resetActiveColors: vi.fn(),
+      pasteFromClipboard: vi.fn(),
+      notifyLayerDuplicateFailed: vi.fn(),
+      reportStructuralCommit: vi.fn(),
+      reportPreparedCommit: vi.fn(),
+      reportLayerOperation: vi.fn(),
+      t: (key) => key,
+    });
+  };
+  it.each(['external repair', 'engine removal'] as const)('keeps a surviving previous layer after %s', (removal) => {
+    const document = {
+      ...makeDoc(),
+      stacks: stacksFrom([rasterLayer('a'), rasterLayer('b'), rasterLayer('c')]),
+      selectedLayerId: 'a',
+    };
+    const { setDocument, store } = createReactiveStore(document);
+    const mutationPort = createTestMutationPort(store, 'p1');
+    const engine = createCanvasEngine({
+      mutationPort,
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    setDocument({ ...document, selectedLayerId: 'b' });
+    if (removal === 'external repair') {
+      setDocument({ ...document, stacks: stacksFrom([rasterLayer('a'), rasterLayer('c')]), selectedLayerId: 'c' });
+    } else {
+      const edit = engine.document.model()!.prepare({ type: 'remove', ids: ['b'] });
+      if (edit.status !== 'prepared') {
+        throw new Error('Expected prepared removal');
+      }
+      expect(engine.layers.commitPrepared('Delete layer', edit.edit).status).toBe('committed');
+    }
+    expect(engine.interaction.get('layerQuickSwitch').previousLayerId).toBe('a');
+    expect(engine.document.getDocument()?.selectedLayerId).toBe('c');
+    const history = engine.history.getEntries();
+    pressQuickSwitch(engine, mutationPort);
+    expect(engine.document.getDocument()?.selectedLayerId).toBe('a');
+    expect(engine.interaction.get('layerQuickSwitch').previousLayerId).toBe('c');
+    pressQuickSwitch(engine, mutationPort);
+    expect(engine.document.getDocument()?.selectedLayerId).toBe('c');
+    expect(engine.history.getEntries()).toEqual(history);
+    engine.lifecycle.dispose();
+  });
+
+  it('returns from a bookmark to the automatically selected new text layer', () => {
+    const document = { ...makeDoc(), stacks: stacksFrom([rasterLayer('a'), rasterLayer('b')]), selectedLayerId: 'a' };
+    const { setDocument, store } = createReactiveStore(document);
+    const mutationPort = createTestMutationPort(store, 'p1');
+    const engine = createCanvasEngine({
+      mutationPort,
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    setDocument({ ...document, selectedLayerId: 'b' });
+    engine.layers.openTextCreate({ x: 10, y: 20 });
+    engine.layers.commitTextEdit('Text');
+    const textId = engine.document.getDocument()!.selectedLayerId!;
+    expect(textId).not.toBe('a');
+    expect(textId).not.toBe('b');
+    expect(engine.interaction.get('layerQuickSwitch').previousLayerId).toBe('a');
+    engine.interaction.set('layerQuickSwitch', {
+      ...engine.interaction.get('layerQuickSwitch'),
+      bookmarkedLayerId: 'a',
+    });
+    const history = engine.history.getEntries();
+    pressQuickSwitch(engine, mutationPort);
+    expect(engine.document.getDocument()?.selectedLayerId).toBe('a');
+    expect(engine.interaction.get('layerQuickSwitch').previousLayerId).toBe(textId);
+    pressQuickSwitch(engine, mutationPort);
+    expect(engine.document.getDocument()?.selectedLayerId).toBe(textId);
+    expect(engine.history.getEntries()).toEqual(history);
+    engine.lifecycle.dispose();
+  });
+
+  it('ignores the temporary paint layer and its cancellation rollback', () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    const document = {
+      ...makeDoc(),
+      stacks: stacksFrom([rasterLayer('a'), rasterLayer('b'), rasterLayer('c')]),
+      selectedLayerId: 'a',
+    };
+    const { setDocument, store } = createReactiveStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    setDocument({ ...document, selectedLayerId: 'b' });
+    const overlay = createInputCanvas();
+    engine.surface.attach(createInputCanvas().element, overlay.element);
+    engine.tools.setTool('brush');
+    overlay.fire('pointerdown', pointerAt(20, 20));
+    expect(engine.document.getDocument()?.selectedLayerId).not.toBe('b');
+    engine.tools.setTool('move');
+    expect(engine.document.getDocument()?.selectedLayerId).toBe('b');
+    expect(engine.interaction.get('layerQuickSwitch').previousLayerId).toBe('a');
+    expect(engine.history.getEntries().past).toEqual([]);
+    engine.lifecycle.dispose();
+  });
+
   it('remembers the previously selected layer across selection changes, keeping it through a deselect', () => {
     const document = { ...makeDoc(), stacks: stacksFrom([rasterLayer('a'), rasterLayer('b')]), selectedLayerId: 'a' };
     const { setDocument, store } = createReactiveStore(document);
@@ -18944,8 +19086,11 @@ describe('layer quick-switch memory', () => {
     setDocument({ ...document, selectedLayerId: 'b' });
     expect(engine.interaction.get('layerQuickSwitch').previousLayerId).toBe('a');
     setDocument({ ...document, selectedLayerId: null });
-    expect(engine.interaction.get('layerQuickSwitch').previousLayerId).toBe('b');
-    // Reselecting after a deselect records nothing new: there was no layer to return to.
+    expect(engine.interaction.get('layerQuickSwitch').previousLayerId).toBe('a');
+    setDocument({ ...document, selectedLayerId: 'b' });
+    expect(engine.interaction.get('layerQuickSwitch').previousLayerId).toBe('a');
+    // A different explicit choice after deselect still returns to the last non-null selection.
+    setDocument({ ...document, selectedLayerId: null });
     setDocument({ ...document, selectedLayerId: 'a' });
     expect(engine.interaction.get('layerQuickSwitch').previousLayerId).toBe('b');
 
@@ -18956,6 +19101,7 @@ describe('layer quick-switch memory', () => {
     });
     setDocument({ ...document, selectedLayerId: 'b' });
     expect(engine.interaction.get('layerQuickSwitch')).toEqual({ bookmarkedLayerId: 'b', previousLayerId: 'a' });
+    expect(engine.history.getEntries().past).toEqual([]);
     engine.lifecycle.dispose();
   });
 });
