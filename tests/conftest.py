@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from invokeai.app.services.auth import password_utils
 from invokeai.app.services.board_image_records.board_image_records_default import BoardImageRecordStorage
 from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
 from invokeai.app.services.board_video_records.board_video_records_default import BoardVideoRecordStorage
@@ -18,8 +19,10 @@ from invokeai.app.services.boards.boards_default import BoardService
 from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
 from invokeai.app.services.client_state_persistence.client_state_persistence_default import ClientStatePersistence
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.download import download_default
 from invokeai.app.services.external_generation.external_generation_default import ExternalGenerationService
 from invokeai.app.services.gallery.gallery_default import GalleryService
+from invokeai.app.services.image_index import image_index_default
 from invokeai.app.services.image_index.image_index_default import ImageIndexService
 from invokeai.app.services.image_index.image_index_records_default import ImageIndexRecords
 from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
@@ -30,6 +33,7 @@ from invokeai.app.services.invocation_cache.invocation_cache_memory import Memor
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.model_install import model_install_default
 from invokeai.app.services.project_records.project_records_default import ProjectRecordsStorage
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.system_prompt_records.system_prompt_records_default import (
@@ -77,6 +81,33 @@ def _clear_deferred_empty_cache():
     TorchDevice._empty_cache_deferred.clear()
     yield
     TorchDevice._empty_cache_deferred.clear()
+
+
+_PRODUCTION_PASSWORD_CONTEXT = password_utils.pwd_context
+_TEST_PASSWORD_CONTEXT = _PRODUCTION_PASSWORD_CONTEXT.copy(bcrypt__rounds=4)
+
+
+@pytest.fixture(autouse=True)
+def _cheap_password_hashing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """At the production cost factor every user a test creates or logs in costs a fifth of a second, which
+    was most of the multiuser router tests' run time. Cost-4 hashes still round-trip, and stored cost-12
+    hashes still verify. Tests about the cost itself request `production_password_hashing`."""
+    monkeypatch.setattr(password_utils, "pwd_context", _TEST_PASSWORD_CONTEXT)
+
+
+@pytest.fixture
+def production_password_hashing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Hash at the production cost factor, for tests that assert or measure it."""
+    monkeypatch.setattr(password_utils, "pwd_context", _PRODUCTION_PASSWORD_CONTEXT)
+
+
+@pytest.fixture(autouse=True)
+def _fast_service_polling(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Idle service workers poll their queues once a second, so every stop() in a fixture teardown waited up to
+    that long. Shortening the intervals keeps the same loops and orderings; it only removes the idle wait."""
+    monkeypatch.setattr(download_default, "_QUEUE_POLL_SECONDS", 0.02)
+    monkeypatch.setattr(model_install_default, "_INSTALL_QUEUE_POLL_SECONDS", 0.02)
+    monkeypatch.setattr(image_index_default, "_POLL_SECONDS", 0.02)
 
 
 @pytest.fixture
