@@ -33,8 +33,9 @@ If you make backend changes, it's important to regenerate the frontend types:
 
 ```sh
 set -o pipefail
-pnpm -C invokeai/frontend/api install --frozen-lockfile
-cd invokeai/frontend/api && python ../../../scripts/generate_openapi_schema.py | pnpm typegen
+cd invokeai/frontend/api
+pnpm install --frozen-lockfile
+python ../../../scripts/generate_openapi_schema.py | pnpm typegen
 ```
 
 On macOS and Linux, you can run `make frontend-typegen` as a shortcut for the above snippet.
