@@ -571,7 +571,7 @@ const getNumberInRange = (metadata: unknown, key: string, min: number, max: numb
 
 interface RefinerRecall {
   patch: RefinerPatch;
-  /** The recorded refiner could not be restored; the slot keeps its current pick, like an uninstalled VAE. */
+  /** The recorded refiner could not be restored; its current model and tuning stay together. */
   skipped: ImageRecallSkip | null;
 }
 
@@ -586,26 +586,40 @@ const isInstalledRefiner = (model: ComponentModelConfig): model is MainModelConf
 const getRefinerRecall = (
   metadata: unknown,
   model: GenerateModelConfig,
-  models: readonly ComponentModelConfig[]
+  models: readonly ComponentModelConfig[],
+  sourceModel: GenerateModelConfig | null
 ): RefinerRecall => {
   if (!getGenerationUiPolicy(model).refinerVisible || !isRecord(metadata)) {
     return { patch: {}, skipped: null };
   }
 
   const patch: RefinerPatch = {};
-  let skipped: ImageRecallSkip | null = null;
+  const ref = toRecordedModelRef(metadata.refiner_model);
+
+  // Refiner presence and tuning describe the recorded main model, including records that ran without a refiner.
+  if (getRecord(metadata, 'model') && sourceModel?.key !== model.key) {
+    return {
+      patch: {},
+      skipped:
+        isGenerationRecord(metadata) || Object.keys(metadata).some((key) => key.startsWith('refiner_'))
+          ? { name: ref?.name ?? ref?.key ?? null, reason: 'modelUnavailable', subject: 'refiner' }
+          : null,
+    };
+  }
 
   if ('refiner_model' in metadata) {
-    const ref = toRecordedModelRef(metadata.refiner_model);
     const refiner = ref ? resolveRecordedModel(ref, models.filter(isInstalledRefiner)) : null;
 
     if (metadata.refiner_model === null) {
       patch.refinerModel = null;
     } else if (refiner === null || refiner === 'ambiguous') {
-      skipped = {
-        name: ref?.name ?? ref?.key ?? null,
-        reason: refiner === 'ambiguous' ? 'ambiguous' : 'unresolved',
-        subject: 'refiner',
+      return {
+        patch: {},
+        skipped: {
+          name: ref?.name ?? ref?.key ?? null,
+          reason: !ref ? 'invalid' : refiner === 'ambiguous' ? 'ambiguous' : 'unresolved',
+          subject: 'refiner',
+        },
       };
     } else {
       patch.refinerModel = refiner;
@@ -641,7 +655,7 @@ const getRefinerRecall = (
       ...(positiveScore !== null ? { refinerPositiveAestheticScore: positiveScore } : {}),
       ...(negativeScore !== null ? { refinerNegativeAestheticScore: negativeScore } : {}),
     },
-    skipped,
+    skipped: null,
   };
 };
 
@@ -815,7 +829,8 @@ export const getImageRecallCapabilities = ({
   const hasReferenceImages = getMetadataReferenceImages(metadata).length > 0;
   const hasModel = supportedMetadataModel !== null;
   const hasRebalance = hasKrea2Rebalance(metadata, clipSkipModel);
-  const hasRefiner = Object.keys(getRefinerRecall(metadata, clipSkipModel, models).patch).length > 0;
+  const hasRefiner =
+    Object.keys(getRefinerRecall(metadata, clipSkipModel, models, supportedMetadataModel).patch).length > 0;
   const hasConcepts =
     (getMetadataConcepts(metadata, models, clipSkipModel, supportedMetadataModel).loras?.length ?? 0) > 0;
   const hasAnyMetadata =
@@ -1032,7 +1047,12 @@ export const buildImageRecallSettings = ({
     }
 
     // Judged against the model the recall settled on: a non-SDXL main has no refiner to restore.
-    const refinerRecall = getRefinerRecall(metadata, values.model, models);
+    const refinerRecall = getRefinerRecall(
+      metadata,
+      values.model,
+      models,
+      getSupportedMetadataModel(metadata, supportedModels)
+    );
     const refinerPatch = refinerRecall.patch;
     const refinerChanged = (Object.keys(refinerPatch) as (keyof RefinerPatch)[]).some((key) =>
       key === 'refinerModel'

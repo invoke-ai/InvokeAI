@@ -39,9 +39,16 @@ import {
 const getSkippedRefinerMessage = ({ name, reason }: ImageRecallSkip, t: TFunction): string => {
   const values = { name: name ?? t('widgets.gallery.itemActions.recall.unnamedRefiner') };
 
-  return reason === 'ambiguous'
-    ? t('widgets.gallery.itemActions.recall.skippedRefiner.ambiguous', values)
-    : t('widgets.gallery.itemActions.recall.skippedRefiner.unresolved', values);
+  switch (reason) {
+    case 'ambiguous':
+      return t('widgets.gallery.itemActions.recall.skippedRefiner.ambiguous', values);
+    case 'invalid':
+      return t('widgets.gallery.itemActions.recall.skippedRefiner.invalid', values);
+    case 'modelUnavailable':
+      return t('widgets.gallery.itemActions.recall.skippedRefiner.modelUnavailable', values);
+    default:
+      return t('widgets.gallery.itemActions.recall.skippedRefiner.unresolved', values);
+  }
 };
 
 const getSkippedConceptMessage = ({ name, reason }: ImageRecallSkip, t: TFunction): string => {

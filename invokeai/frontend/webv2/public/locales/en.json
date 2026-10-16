@@ -2689,6 +2689,8 @@
       "pidHelp": "Replaces the VAE decode with a 4x super-resolution decode.",
       "pidFitHelp": "Generates at the requested size, then decodes 4x and scales back down.",
       "pidNativeHelp": "The requested size is the 4x target; generation runs at a quarter of it.",
+      "presetSettingsCleared": "Settings cleared by preset",
+      "presetSettingsClearedDescription": "Cleared: {{labels}}.",
       "refiner": "Refiner",
       "refinerModel": "Refiner model",
       "refinerNone": "None",
@@ -4181,8 +4183,10 @@
             "unresolved": "{{name}} (not installed)"
           },
           "skippedRefiner": {
-            "ambiguous": "Refiner not restored: {{name}} matches more than one installed model; the current refiner was kept.",
-            "unresolved": "Refiner not restored: {{name}} is not installed; the current refiner was kept."
+            "ambiguous": "Refiner not restored: {{name}} matches more than one installed model; the current refiner settings were kept.",
+            "invalid": "Refiner not restored: unreadable metadata; the current refiner settings were kept.",
+            "modelUnavailable": "Refiner not restored: the image's model is not available; the current refiner settings were kept.",
+            "unresolved": "Refiner not restored: {{name}} is not installed; the current refiner settings were kept."
           }
         },
         "star": {

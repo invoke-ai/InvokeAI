@@ -76,7 +76,7 @@ export const getRefinerValidationReasons = (
   model: GenerateModelConfig,
   settings: RefinerSettings & Pick<GenerateSettings, 'pidMode'>
 ): string[] => {
-  if (!settings.refinerModel || !isRefinerSupported(model)) {
+  if (!settings.refinerModel || !isRefinerSupported(model) || settings.refinerStart === MAX_REFINER_START) {
     return [];
   }
 

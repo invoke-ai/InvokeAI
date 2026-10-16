@@ -13,7 +13,6 @@ import { addEdge, addNode, toGraphContract } from '@features/generation/core/gra
 import { addKrea2ConditioningEnhancers } from '@features/generation/core/krea2Conditioning';
 import { getIsPidSupportedBase } from '@features/generation/core/pid';
 import { getBaseDenoisingRange } from '@features/generation/core/sdxlRefiner';
-import { REFINER_DENOISE_NODE_ID } from '@features/generation/core/sdxlRefinerGraph';
 
 import type {
   CanvasCompositingSettings,
@@ -372,11 +371,6 @@ const graftMaskTail = (
     addEdge(graph, unetSource.node, unetSource.field, gradientMask, 'unet');
   }
   addEdge(graph, gradientMask, 'denoise_mask', denoise, 'denoise_mask');
-  // The refiner pass must respect the same region, or its unmasked latents would bleed past the coherence edge.
-  const refinerDenoise = graph.nodes[REFINER_DENOISE_NODE_ID];
-  if (refinerDenoise) {
-    addEdge(graph, gradientMask, 'denoise_mask', refinerDenoise, 'denoise_mask');
-  }
 
   const expandMask = addNode(graph, {
     fade_size_px: compositing.maskBlur,

@@ -889,6 +889,7 @@ describe('image recall', () => {
       expect(result?.skipped).toEqual([
         { name: 'Grain', reason: 'modelUnavailable', subject: 'concept' },
         { name: 'Ink', reason: 'modelUnavailable', subject: 'concept' },
+        { name: null, reason: 'modelUnavailable', subject: 'refiner' },
       ]);
     });
 
@@ -1258,9 +1259,23 @@ describe('SDXL Refiner recall', () => {
     refiner_start: 0.7,
     refiner_steps: 12,
   };
-  const recall = (metadata: Record<string, unknown>, models: ComponentModelConfig[], kind: ImageRecallKind = 'all') =>
+  const currentRefinerSettings = {
+    refinerCfgScale: 8,
+    refinerModel: refiner,
+    refinerNegativeAestheticScore: 3,
+    refinerPositiveAestheticScore: 9,
+    refinerScheduler: 'euler',
+    refinerStart: 0.9,
+    refinerSteps: 25,
+  };
+  const recall = (
+    metadata: Record<string, unknown>,
+    models: ComponentModelConfig[],
+    kind: ImageRecallKind = 'all',
+    currentValues = createValues()
+  ) =>
     buildImageRecallSettings({
-      currentValues: createValues(),
+      currentValues,
       image,
       kind,
       metadata: { model: { key: sdxlModel.key }, ...metadata },
@@ -1295,31 +1310,82 @@ describe('SDXL Refiner recall', () => {
     expect(recall(unhashed, [refiner])?.skipped).toEqual([]);
   });
 
-  it('reports an uninstalled refiner, keeps the current one and still restores the tuning', () => {
-    const current = createValues({ refinerModel: refiner });
-    const result = buildImageRecallSettings({
-      currentValues: current,
-      image,
-      kind: 'all',
-      metadata: { model: { key: sdxlModel.key }, ...recordedRefiner },
-      models: [{ ...refiner, key: 'another-refiner', hash: 'blake3:another', name: 'Other Refiner' }],
-      supportedModels: [sdxlModel],
-      vaeModels: [],
-    });
+  it.each([
+    { metadata: recordedRefiner, models: [], name: 'SDXL Refiner', reason: 'unresolved' },
+    {
+      metadata: { ...recordedRefiner, refiner_model: { base: 'sdxl-refiner', name: 'SDXL Refiner' } },
+      models: [refiner, { ...refiner, key: 'refiner-twin' }],
+      name: 'SDXL Refiner',
+      reason: 'ambiguous',
+    },
+    ...[{}, 'refiner', { key: 42 }, []].map((refiner_model) => ({
+      metadata: { ...recordedRefiner, refiner_model },
+      models: [refiner],
+      name: null,
+      reason: 'invalid',
+    })),
+  ])('keeps the model and all tuning together for a $reason refiner', ({ metadata, models, name, reason }) => {
+    for (const refinerModel of [refiner, null]) {
+      const current = { ...currentRefinerSettings, refinerModel };
+      const result = recall(metadata, models, 'all', createValues(current));
 
-    expect(result?.values.refinerModel).toEqual(refiner);
-    expect(result?.values.refinerStart).toBe(0.7);
-    expect(result?.skipped).toEqual([{ name: 'SDXL Refiner', reason: 'unresolved', subject: 'refiner' }]);
+      expect(result?.values).toMatchObject(current);
+      expect(result?.fields).not.toContain('refiner');
+      expect(result?.skipped).toEqual([{ name, reason, subject: 'refiner' }]);
+    }
+    expect(
+      getImageRecallCapabilities({
+        currentValues: createValues(),
+        image,
+        metadata,
+        models,
+        supportedModels: [sdxlModel],
+        vaeModels: [],
+      })
+    ).toMatchObject({ all: false, remix: false });
   });
 
-  it('reports an ambiguous refiner instead of guessing between same-named installs', () => {
-    const unhashed = { ...recordedRefiner, refiner_model: { base: 'sdxl-refiner', name: 'SDXL Refiner' } };
-    const twin = { ...refiner, key: 'refiner-twin' };
-    const result = recall(unhashed, [refiner, twin]);
+  it.each(['all', 'remix'] as const)(
+    'keeps refiner settings during %s when the recorded main model is unavailable',
+    (kind) => {
+      // A persisted selection may still name the deleted main model's key.
+      for (const key of ['deleted-main', sdxlModel.key]) {
+        for (const refinerMetadata of [recordedRefiner, {}, { refiner_model: null }]) {
+          const metadata = { generation_mode: 'sdxl_txt2img', model: { key }, ...refinerMetadata };
+          const currentValues = createValues(currentRefinerSettings);
+          const result = buildImageRecallSettings({
+            currentValues,
+            image,
+            kind,
+            metadata,
+            models: [refiner],
+            supportedModels: [],
+            vaeModels: [],
+          });
 
-    expect(result?.values.refinerModel).toBeNull();
-    expect(result?.skipped).toEqual([{ name: 'SDXL Refiner', reason: 'ambiguous', subject: 'refiner' }]);
-  });
+          expect(result?.values).toMatchObject(currentRefinerSettings);
+          expect(result?.fields).not.toContain('refiner');
+          expect(result?.skipped).toEqual([
+            {
+              name: 'refiner_model' in refinerMetadata && refinerMetadata.refiner_model ? 'SDXL Refiner' : null,
+              reason: 'modelUnavailable',
+              subject: 'refiner',
+            },
+          ]);
+          expect(
+            getImageRecallCapabilities({
+              currentValues,
+              image,
+              metadata,
+              models: [refiner],
+              supportedModels: [],
+              vaeModels: [],
+            })
+          ).toMatchObject({ all: false, remix: false });
+        }
+      }
+    }
+  );
 
   it('does not treat a non-refiner model named by the record as the refiner', () => {
     const result = recall({ ...recordedRefiner, refiner_model: { key: sdxlModel.key } }, [sdxlModel, refiner]);

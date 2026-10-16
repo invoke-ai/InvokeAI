@@ -1597,6 +1597,28 @@ describe('SDXL Refiner policy', () => {
     ).toEqual([]);
   });
 
+  it('ignores unavailable models and invalid tuning while the refiner is off, then validates reactivation', () => {
+    const sdxl = createModel('sdxl');
+    const settings = createSettings(sdxl, {
+      refinerModel: refiner,
+      refinerStart: 1,
+      refinerSteps: 0,
+      refinerCfgScale: Number.NaN,
+      refinerPositiveAestheticScore: 0,
+      refinerNegativeAestheticScore: 20,
+    });
+
+    expect(getGenerationValidationReasons(sdxl, settings)).toEqual([]);
+    expect(getGenerationModelAvailabilityReasons(sdxl, settings, [sdxl as never])).toEqual([]);
+    const reactivated = { ...settings, refinerStart: 0.8 };
+    expect(getGenerationValidationReasons(sdxl, reactivated)).toContain(
+      'Refiner steps must be a whole number of at least 1.'
+    );
+    expect(getGenerationModelAvailabilityReasons(sdxl, reactivated, [sdxl as never])).toEqual([
+      'Refiner "SDXL Refiner" is no longer installed.',
+    ]);
+  });
+
   it('reports an uninstalled refiner', () => {
     const sdxl = createModel('sdxl');
     const settings = createSettings(sdxl, { refinerModel: refiner });

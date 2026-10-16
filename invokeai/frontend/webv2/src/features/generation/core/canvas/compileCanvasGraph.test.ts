@@ -1156,16 +1156,20 @@ describe('compileCanvasGraph — SDXL Refiner', () => {
   });
 
   it.each(['inpaint', 'outpaint'] as const)(
-    'feeds the same gradient mask to both passes and decodes the refiner for %s',
+    'masks the base pass and constrains the decoded refiner with pasteback for %s',
     (mode) => {
       const { backendGraph } = compile(sdxlModel, mode, { settings: refinerSettings, strength: 0.5 });
 
       expect(backendGraph.nodes.denoise_latents).toMatchObject({ denoising_end: 0.8, denoising_start: 0.5 });
       expect(getEdge(backendGraph, 'denoise_latents', 'denoise_mask')?.source.node_id).toBe('create_gradient_mask');
-      // The refiner respects the same region, or its unmasked latents would bleed past the coherence edge.
-      expect(getEdge(backendGraph, 'refiner_denoise_latents', 'denoise_mask')?.source.node_id).toBe(
-        'create_gradient_mask'
-      );
+      expect(getEdge(backendGraph, 'refiner_denoise_latents', 'denoise_mask')).toBeUndefined();
+      expect(backendGraph.nodes.canvas_output).toMatchObject({ type: 'invokeai_img_blend' });
+      expect(getEdge(backendGraph, 'canvas_output', 'layer_upper')?.source.node_id).toBe('canvas_l2i');
+      expect(getEdge(backendGraph, 'canvas_output', 'mask')?.source.node_id).toBe('expand_mask');
+      expect(getEdge(backendGraph, 'expand_mask', 'mask')?.source).toEqual({
+        field: 'expanded_mask_area',
+        node_id: 'create_gradient_mask',
+      });
       expect(getEdge(backendGraph, 'refiner_denoise_latents', 'latents')?.source.node_id).toBe('denoise_latents');
       expect(getEdge(backendGraph, 'canvas_l2i', 'latents')?.source.node_id).toBe('refiner_denoise_latents');
       expect(getNodeByType(backendGraph, 'core_metadata')?.generation_mode).toBe(`sdxl_${mode}`);

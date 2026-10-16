@@ -11,6 +11,7 @@ import {
   DEFAULT_REFINER_SCHEDULER,
   DEFAULT_REFINER_START,
   DEFAULT_REFINER_STEPS,
+  getActiveRefiner,
   isRefinerModel,
   MAX_REFINER_AESTHETIC_SCORE,
   MAX_REFINER_START,
@@ -85,7 +86,7 @@ export const GenerateRefinerSection = ({
   }
 
   const refiner = settings.refinerModel;
-  const isActive = refiner !== null;
+  const isActive = getActiveRefiner(settings, selectedModel) !== null;
 
   const commitNumber = (key: RefinerNumberKey, min: number, max: number) => (value: number) => {
     if (!Number.isFinite(value)) {
@@ -116,12 +117,12 @@ export const GenerateRefinerSection = ({
   }) => (
     <GenerateFieldContextMenu
       copyValue={() => String(settings[key])}
-      isAtDefault={!isActive || settings[key] === defaultValue}
+      isAtDefault={(key === 'refinerStart' ? !refiner : !isActive) || settings[key] === defaultValue}
       onReset={() => onCommit({ [key]: defaultValue })}
     >
       <ScrubberField
         defaultValue={defaultValue}
-        disabled={!isActive}
+        disabled={key === 'refinerStart' ? !refiner : !isActive}
         hint={hint}
         inputMax={inputMax}
         label={label}
@@ -138,7 +139,7 @@ export const GenerateRefinerSection = ({
     <GenerateCollapsibleSection
       label={t('widgets.generate.refiner')}
       defaultOpen={false}
-      badges={isActive ? <Badge>{refiner.name}</Badge> : null}
+      badges={refiner ? <Badge>{isActive ? refiner.name : t('commandPalette.settings.off')}</Badge> : null}
       sectionId="refiner"
     >
       <Stack gap="2" p="2">

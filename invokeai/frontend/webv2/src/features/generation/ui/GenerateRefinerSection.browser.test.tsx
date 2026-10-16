@@ -1,6 +1,6 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-array-as-prop */
 import type { GenerationModelCatalogItem } from '@features/generation/contracts';
-import type { MainModelConfig } from '@features/generation/core/types';
+import type { GenerateSettings, MainModelConfig } from '@features/generation/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
@@ -45,6 +45,7 @@ void i18n.use(initReactI18next).init({
   resources: {
     en: {
       translation: {
+        commandPalette: { settings: { off: 'Off' } },
         widgets: {
           generate: {
             refiner: 'Refiner',
@@ -76,20 +77,21 @@ const settle = (action: () => void): Promise<void> =>
     });
   });
 
-const render = async (model: MainModelConfig, options: { refinerModel?: MainModelConfig | null } = {}) => {
+const render = async (model: MainModelConfig, options: Partial<GenerateSettings> = {}) => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
-  const settings = { ...getDefaultGenerateSettings(model), refinerModel: options.refinerModel ?? null };
-  const onCommit = vi.fn();
-  const onCommitImmediate = vi.fn();
+  const settings = { ...getDefaultGenerateSettings(model), ...options };
+  const draft = createExternalStoreCore(settings);
+  const onCommit = vi.fn((patch: Partial<GenerateSettings>) => draft.patchSnapshot(patch));
+  const onCommitImmediate = vi.fn((patch: Partial<GenerateSettings>) => draft.patchSnapshot(patch));
 
   await settle(() => {
     root?.render(
       <ChakraProvider value={system}>
         <I18nextProvider i18n={i18n}>
           <GenerateRefinerSection
-            draft={createExternalStoreCore(settings)}
+            draft={draft}
             selectedModel={model}
             onCommit={onCommit}
             onCommitImmediate={onCommitImmediate}
@@ -165,6 +167,31 @@ describe('GenerateRefinerSection', () => {
     expect(schedulerInput()?.disabled).toBe(false);
     expect(sliderByLabel('Positive aesthetic score')?.getAttribute('aria-valuenow')).toBe('6');
     expect(sliderByLabel('Negative aesthetic score')?.getAttribute('aria-valuenow')).toBe('2.5');
+  });
+
+  it('shows Off at start 1, disables tuning, and lets the start control reactivate the refiner', async () => {
+    const { onCommit } = await render(sdxlModel, { refinerModel, refinerStart: 1 });
+
+    expect(host?.querySelector('button[data-scope="collapsible"]')?.textContent).toContain('Off');
+    expect(sliderByLabel('Refiner start')?.getAttribute('aria-disabled')).not.toBe('true');
+    expect(pickerButton('SDXL Refiner')?.disabled).toBe(false);
+    expect(sliderByLabel('Refiner steps')?.getAttribute('aria-disabled')).toBe('true');
+    expect(sliderByLabel('Refiner CFG')?.getAttribute('aria-disabled')).toBe('true');
+    expect(sliderByLabel('Positive aesthetic score')?.getAttribute('aria-disabled')).toBe('true');
+    expect(sliderByLabel('Negative aesthetic score')?.getAttribute('aria-disabled')).toBe('true');
+    expect(schedulerInput()?.disabled).toBe(true);
+
+    await settle(() => {
+      const start = sliderByLabel('Refiner start');
+      start?.focus();
+      start?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+      start?.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowLeft', bubbles: true }));
+    });
+
+    expect(onCommit).toHaveBeenCalledWith({ refinerStart: 0.99 });
+    expect(sliderByLabel('Refiner steps')?.getAttribute('aria-disabled')).not.toBe('true');
+    expect(schedulerInput()?.disabled).toBe(false);
+    expect(host?.querySelector('button[data-scope="collapsible"]')?.textContent).toContain('SDXL Refiner');
   });
 
   it('leaves the empty and loading states to the picker, scoped to refiner models', async () => {

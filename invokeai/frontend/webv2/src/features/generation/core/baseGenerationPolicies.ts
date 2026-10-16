@@ -63,6 +63,7 @@ import {
   DEFAULT_REFINER_START,
   DEFAULT_REFINER_STEPS,
   getRefinerValidationReasons,
+  getActiveRefiner,
   isRefinerSupported,
 } from './sdxlRefiner';
 import {
@@ -1531,8 +1532,9 @@ export const getGenerationModelAvailabilityReasons = (
     }
   }
 
-  if (settings.refinerModel && isRefinerSupported(model) && !hasModelKey(models, settings.refinerModel.key, 'main')) {
-    reasons.push(`Refiner "${settings.refinerModel.name}" is no longer installed.`);
+  const refiner = getActiveRefiner(settings, model);
+  if (refiner && !hasModelKey(models, refiner.key, 'main')) {
+    reasons.push(`Refiner "${refiner.name}" is no longer installed.`);
   }
 
   for (const lora of settings.loras) {

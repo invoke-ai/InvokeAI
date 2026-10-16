@@ -204,10 +204,54 @@ describe('executeImageRecall', () => {
       })
     ).resolves.toBe(true);
 
-    expect(setSettings).toHaveBeenCalledWith(expect.objectContaining({ refinerStart: 0.6 }), 'project-1');
+    expect(setSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ refinerModel: null, refinerStart: 0.8 }),
+      'project-1'
+    );
     expect(add).toHaveBeenCalledWith({
       kind: 'info',
-      message: 'Refiner not restored: Gone Refiner is not installed; the current refiner was kept.',
+      message: 'Refiner not restored: Gone Refiner is not installed; the current refiner settings were kept.',
+      title: 'Some image data was not recalled',
+    });
+  });
+
+  it.each([
+    {
+      metadata: { model: { key: model.key }, refiner_model: {} },
+      message: 'Refiner not restored: unreadable metadata; the current refiner settings were kept.',
+    },
+    {
+      metadata: { generation_mode: 'sdxl_txt2img', model: { key: 'deleted-main' } },
+      message: "Refiner not restored: the image's model is not available; the current refiner settings were kept.",
+    },
+  ])('explains retained refiner settings when none is selected', async ({ metadata, message }) => {
+    const { add, commands, setSettings } = createCommands();
+    const t = await createRecallTranslator('en');
+    galleryApi.galleryImages.metadata.mockResolvedValue({
+      ...metadata,
+      positive_prompt: 'recalled',
+      refiner_start: 0.6,
+    });
+
+    await expect(
+      executeImageRecall({
+        t,
+        commands,
+        generateValues: { modelKey: model.key, refinerModel: null, refinerStart: 0.9 },
+        image,
+        kind: 'all',
+        models: [model],
+        projectId: 'project-1',
+      })
+    ).resolves.toBe(true);
+
+    expect(setSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ positivePrompt: 'recalled', refinerModel: null, refinerStart: 0.9 }),
+      'project-1'
+    );
+    expect(add).toHaveBeenCalledWith({
+      kind: 'info',
+      message,
       title: 'Some image data was not recalled',
     });
   });
