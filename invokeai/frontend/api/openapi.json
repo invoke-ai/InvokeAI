@@ -25451,8 +25451,8 @@
             "description": "Strength of the clarity adjustment",
             "field_kind": "input",
             "input": "any",
-            "maximum": 100,
-            "minimum": -100,
+            "maximum": 200,
+            "minimum": -200,
             "orig_default": 0,
             "orig_required": false,
             "title": "Amount",
@@ -25482,7 +25482,7 @@
         "tags": ["image", "detail", "clarity", "enhance"],
         "title": "Clarity",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
@@ -27460,8 +27460,8 @@
             "description": "Strength of the contrast and dehaze adjustment",
             "field_kind": "input",
             "input": "any",
-            "maximum": 100,
-            "minimum": -100,
+            "maximum": 200,
+            "minimum": -200,
             "orig_default": 0,
             "orig_required": false,
             "title": "Amount",
@@ -27479,7 +27479,7 @@
         "tags": ["image", "contrast", "dehaze", "enhance"],
         "title": "Contrast Dehaze (approximation)",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
@@ -109046,8 +109046,8 @@
             "description": "Strength of the texture adjustment",
             "field_kind": "input",
             "input": "any",
-            "maximum": 100,
-            "minimum": -100,
+            "maximum": 200,
+            "minimum": -200,
             "orig_default": 0,
             "orig_required": false,
             "title": "Amount",
@@ -109077,7 +109077,7 @@
         "tags": ["image", "detail", "texture", "enhance"],
         "title": "Texture",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }

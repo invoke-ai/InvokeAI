@@ -115,6 +115,33 @@ def test_amount_sign_enhances_or_softens_the_same_fine_detail() -> None:
     assert negative_contrast < original_contrast - 1.0
 
 
+def test_extended_amounts_produce_stronger_texture_adjustments() -> None:
+    source = _gray_image(_gray_sinusoid(wavelength=24, amplitude=20))
+
+    source_amplitude = _sinusoid_amplitude(np.asarray(source), wavelength=24)
+    positive_100 = texture(source, amount=100, size=8)
+    positive_200 = texture(source, amount=200, size=8)
+    negative_100 = texture(source, amount=-100, size=8)
+    negative_200 = texture(source, amount=-200, size=8)
+
+    assert (
+        _sinusoid_amplitude(np.asarray(positive_200), wavelength=24)
+        > _sinusoid_amplitude(np.asarray(positive_100), wavelength=24)
+        > source_amplitude
+    )
+    assert (
+        _sinusoid_amplitude(np.asarray(negative_200), wavelength=24)
+        < _sinusoid_amplitude(np.asarray(negative_100), wavelength=24)
+        < source_amplitude
+    )
+
+
+@pytest.mark.parametrize("amount", [float("nan"), float("inf"), float("-inf"), -200.01, 200.01, True])
+def test_invalid_amount_is_rejected(amount: float) -> None:
+    with pytest.raises(ValueError):
+        texture(Image.new("RGB", (3, 2), (120, 130, 140)), amount=amount)
+
+
 def test_texture_has_a_measurable_response_to_reproducible_sinusoidal_detail() -> None:
     source = _gray_image(_gray_sinusoid(wavelength=24, amplitude=20))
 

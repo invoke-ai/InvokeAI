@@ -12,8 +12,8 @@ from PIL import Image
 from invokeai.backend.image_util.color import prepare_lightness, restore_lightness
 from invokeai.backend.image_util.multiscale import edge_aware_band
 
-_MIN_AMOUNT = -100
-_MAX_AMOUNT = 100
+_MIN_AMOUNT = -200
+_MAX_AMOUNT = 200
 _GUIDED_FILTER_EPSILON = 0.002
 
 
@@ -25,10 +25,10 @@ def contrast_dehaze(source: Image.Image, amount: float = 0) -> Image.Image:
     estimation or scene recovery.
     """
     if isinstance(amount, bool) or not isinstance(amount, Real) or not isfinite(amount):
-        raise ValueError("amount must be a finite number between -100 and 100")
+        raise ValueError("amount must be a finite number between -200 and 200")
     amount_value = float(amount)
     if not _MIN_AMOUNT <= amount_value <= _MAX_AMOUNT:
-        raise ValueError("amount must be between -100 and 100")
+        raise ValueError("amount must be between -200 and 200")
 
     if amount_value == 0:
         return source.copy()
