@@ -364,7 +364,7 @@ class FluxDenoiseInvocation(BaseInvocation):
         # Pack all latent tensors.
         init_latents = pack(init_latents) if init_latents is not None else None
         inpaint_mask = pack(inpaint_mask) if inpaint_mask is not None else None
-        noise = pack(noise)
+        noise = pack(noise) if noise is not None else None
         x = pack(x)
 
         # Now that we have 'packed' the latent tensors, verify that we calculated the image_seq_len, packed_h, and
