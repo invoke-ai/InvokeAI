@@ -24,6 +24,12 @@ from invokeai.backend.util.devices import TorchDevice
 GPU0 = torch.device("cuda:0")
 GPU1 = torch.device("cuda:1")
 
+# A woken worker still runs a full gc.collect() before it takes its item, which late in an xdist
+# session can take seconds. The poll interval stays far above this deadline, so a pass still
+# needs the release listener rather than the poll.
+_POLLING_INTERVAL_S = 60
+_WAKE_DEADLINE_S = 10
+
 
 @pytest.fixture(autouse=True)
 def pool() -> Iterator[None]:
@@ -65,7 +71,7 @@ def _start_worker(device: torch.device) -> tuple[threading.Thread, Event, list[s
             configuration=SimpleNamespace(multiuser=False, clear_vram_after_session=False),
         )
     )
-    processor._polling_interval = 5  # long enough that only the release listener can wake it in time
+    processor._polling_interval = _POLLING_INTERVAL_S
     processor._thread_semaphore = BoundedSemaphore(1)
     processor._poll_now_event = Event()
     GENERATION_DEVICE_POOL.set_release_listener(processor._poll_now_event.set)
@@ -93,8 +99,8 @@ def test_worker_leaves_items_alone_while_its_gpu_is_lent_and_resumes_on_release(
         assert claims == []  # nothing claimed onto the lent GPU
 
         GENERATION_DEVICE_POOL.release_borrow(GPU0)
-        # The release wakes the worker at once; its 5 s poll interval would fail this join.
-        thread.join(timeout=2)
+        # The release wakes the worker at once; waiting for its poll interval would fail this join.
+        thread.join(timeout=_WAKE_DEADLINE_S)
         assert not thread.is_alive()
         assert claims == ["cuda:0"]
     finally:
@@ -108,7 +114,7 @@ def test_worker_on_a_free_gpu_claims_while_another_is_lent() -> None:
 
     thread, stop_event, claims, processor = _start_worker(GPU1)
     try:
-        thread.join(timeout=2)
+        thread.join(timeout=_WAKE_DEADLINE_S)
         assert not thread.is_alive()
         assert claims == ["cuda:1"]
     finally:
