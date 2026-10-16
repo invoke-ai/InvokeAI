@@ -1058,6 +1058,7 @@
           "source:src/workbench/widgets/canvas/bboxGrid.ts",
           "source:src/workbench/widgets/canvas/canvasSettings.ts",
           "source:src/workbench/widgets/canvas/invoke/canvasCompositing.ts",
+          "source:src/workbench/widgets/canvas/invoke/canvasScaling.ts",
           "source:src/workbench/widgets/canvas/invoke/canvasStrength.ts",
           "source:src/workbench/widgets/canvas/manifest.ts",
           "source:src/workbench/widgets/canvas/settingsContribution.ts",

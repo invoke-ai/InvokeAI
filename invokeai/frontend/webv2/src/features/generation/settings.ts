@@ -12,6 +12,7 @@ export {
   getDefaultLoraWeight,
   getModelDefaultVae,
   hasModelDefaultVae,
+  isAspectRatioLocked,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
   isMainModelConfig,
