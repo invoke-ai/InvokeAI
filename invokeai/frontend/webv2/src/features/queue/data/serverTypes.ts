@@ -20,6 +20,8 @@ export interface QueueServerItemDTO {
   field_values?: QueueNodeFieldValueDTO[] | null;
   item_id: number;
   origin?: string | null;
+  /** Set on a workflow-call child; its outputs reach the user through the parent's results. */
+  parent_item_id?: number | null;
   retried_from_item_id?: number | null;
   session?: {
     prepared_source_mapping?: Record<string, string>;

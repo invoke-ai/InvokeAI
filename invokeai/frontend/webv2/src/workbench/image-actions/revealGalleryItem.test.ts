@@ -130,6 +130,24 @@ describe('revealGalleryItem', () => {
     expect(mocks.requestReveal).toHaveBeenCalledWith('image:target.png', revealTicket.accountScope.signal, 127);
   });
 
+  it("stands down before any Gallery change when the ticket's own condition fails once the page is verified", async () => {
+    let allowed = true;
+    mocks.fetchVerifiedPage.mockImplementation(() => {
+      allowed = false;
+      return Promise.resolve({ index: 127, offset: 120, page: { items: [item], total: 200 }, total: 200 });
+    });
+    mocks.galleryValues = { searchTerm: 'sunset' };
+    const { commands, context } = createContext();
+
+    await revealGalleryItem(context, { kind: 'image', name: item.name }, { ...ticket(), mayApply: () => allowed });
+
+    expect(mocks.fetchVerifiedPage).toHaveBeenCalledOnce();
+    expect(commands.widgets.patchValues).not.toHaveBeenCalled();
+    expect(commands.gallery.selectBoard).not.toHaveBeenCalled();
+    expect(commands.gallery.selectItem).not.toHaveBeenCalled();
+    expect(mocks.requestReveal).not.toHaveBeenCalled();
+  });
+
   it('keeps selection, filters, board, and scroll unchanged when the one locator retry cannot verify a page', async () => {
     mocks.fetchVerifiedPage.mockResolvedValue(null);
     mocks.galleryValues = { searchTerm: 'sunset', semanticImageQuery: { kind: 'text', query: 'sunset' } };
