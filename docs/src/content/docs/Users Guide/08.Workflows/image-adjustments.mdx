@@ -1,0 +1,30 @@
+---
+title: Image Detail and Contrast Nodes
+description: Use Clarity, Texture, and Contrast Dehaze in workflows, with their controls and image-format limits.
+sidebar:
+  order: 6
+---
+
+Clarity, Texture, and Contrast Dehaze are image nodes for making local detail or broad contrast adjustments in a workflow. Add one from the node picker and connect an image; each node outputs a processed image.
+
+## Choose a node
+
+| Node | What it adjusts | Controls |
+| --- | --- | --- |
+| **Clarity** | Midtone detail at a broader scale. Positive amounts emphasize local detail; negative amounts soften it. | **Amount:** −100 to 100, default 0. **Size:** 4 to 1000, default 40. |
+| **Texture** | Fine-scale detail. Positive amounts emphasize texture; negative amounts reduce it. | **Amount:** −100 to 100, default 0. **Size:** 1 to 100, default 8. |
+| **Contrast Dehaze (approximation)** | Broad luminance separation and color intensity. Positive amounts increase both; negative amounts reduce both. | **Amount:** −100 to 100, default 0. |
+
+For Clarity and Texture, **Size** is a scale in pixels of the input image. It controls the size of detail structures affected, not the output dimensions. Larger values affect broader structures; smaller values target finer detail. The amount is a signed strength control, not a percentage guarantee of a particular visual change. Results depend on the image.
+
+## Image formats and alpha
+
+These nodes accept 8-bit RGB, RGBA, grayscale (`L`), and grayscale with alpha (`LA`) images. They preserve the input dimensions and mode. When an image has alpha, the alpha channel is preserved. Fully transparent pixels retain their original hidden color values; nearby visible colors are used while processing so hidden colors do not introduce filtering edges.
+
+An **Amount** of `0` returns an unchanged copy of the input. This is useful when wiring a node into a workflow before tuning it.
+
+## Contrast Dehaze limits
+
+Contrast Dehaze is an aesthetic contrast and chroma adjustment. It does not estimate atmospheric haze, recover scene depth or lost detail, or model the physical causes of haze. It is not Dark Channel Prior (DCP) and does not claim parity with proprietary dehazing tools. Strong settings can clip tonal or color detail, so compare the output with the input and use a lower amount if needed.
+
+The implementation is first-party and built from documented image-processing equations and standard operations. No patent search or qualified patent clearance has been performed; see the [implementation provenance and licensing record](/development/guides/image-manipulation-provenance/) for details.
