@@ -279,6 +279,25 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
+    def get_root_queue_item_ids(
+        self, queue_id: str, user_id: str, statuses: tuple[QUEUE_ITEM_STATUS, ...]
+    ) -> list[int]:
+        """List user-owned root items eligible for additional queue execution lanes."""
+        pass
+
+    @abstractmethod
+    def transition_queue_item_if_status(
+        self,
+        item_id: int,
+        status: QUEUE_ITEM_STATUS,
+        expected_statuses: tuple[QUEUE_ITEM_STATUS, ...],
+        device: Optional[str] = None,
+        queue_item: Optional[SessionQueueItem] = None,
+    ) -> Optional[SessionQueueItem]:
+        """Atomically transition from an allowed source status; None if another lane won."""
+        pass
+
+    @abstractmethod
     def get_queue_item_summaries_by_ids(self, queue_id: str, item_ids: list[int]) -> list[SessionQueueItemSummary]:
         """Gets lightweight queue item summaries in the requested item ID order."""
         pass

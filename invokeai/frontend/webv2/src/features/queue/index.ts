@@ -67,3 +67,17 @@ export {
 } from './publicApi';
 export type { QueueRunLockPort } from './runtime';
 export { hasPendingWorkflowQueueItem } from './ui/queueViewModel';
+
+export {
+  getRemoteWorkerUrls,
+  remoteWorkersStore,
+  setRemoteWorkerEnabled,
+  setRemoteWorkerName,
+  setRemoteWorkersSettings,
+} from './data/remoteWorkersStore';
+export {
+  invalidateRemoteWorkerHealth,
+  refreshRemoteWorkerHealth,
+  remoteWorkersHealthStore,
+} from './data/remoteWorkersHealth';
+export type { RemoteDispatchMode } from './data/remoteWorkersStore';

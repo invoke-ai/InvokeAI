@@ -55,7 +55,10 @@ const RouterError = ({ error }: ErrorComponentProps) => {
   );
 };
 
-const rootRoute = createRootRoute({ component: Outlet, errorComponent: RouterError });
+const rootRoute = createRootRoute({
+  component: Outlet,
+  errorComponent: RouterError,
+});
 
 /**
  * Keep socket and install progress alive across authenticated routes; mount heavier feature listeners only where

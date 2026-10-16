@@ -10,6 +10,7 @@ from invokeai.app.api.auth_dependencies import AdminUserOrDefault, CurrentUserOr
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.invocations.fields import ImageField, VideoField
+from invokeai.app.invocations.remote_worker.early_dispatch import schedule_automatic_remote_dispatches
 from invokeai.app.services.progress_previews.progress_previews_common import ProgressPreviewDTO
 from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
 from invokeai.app.services.session_queue.session_queue_common import (
@@ -257,9 +258,23 @@ async def enqueue_batch(
     await asyncio.to_thread(assert_image_move_maintenance_inactive)
 
     try:
-        return await ApiDependencies.invoker.services.session_queue.enqueue_batch(
+        result = await ApiDependencies.invoker.services.session_queue.enqueue_batch(
             queue_id=queue_id, batch=batch, prepend=prepend, user_id=current_user.user_id
         )
+        # The Remote Worker hook is a no-op for normal batches. It only
+        # schedules the CPU/network fast lane; remote work still runs off-thread.
+        try:
+            schedule_automatic_remote_dispatches(
+                batch=batch,
+                item_ids=result.item_ids,
+                services=ApiDependencies.invoker.services,
+            )
+        except Exception as exc:
+            # No enqueue failure: the normal queued invocation remains the fallback.
+            ApiDependencies.invoker.services.logger.warning(
+                f"IRW early remote dispatch unavailable; using normal queue: {exc}"
+            )
+        return result
     except EnqueueIdempotencyConflictError as e:
         raise HTTPException(status_code=409, detail=str(e))
     except EnqueueProjectNotFoundError as e:

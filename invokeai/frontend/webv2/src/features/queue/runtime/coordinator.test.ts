@@ -18,7 +18,12 @@ import {
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { createSocketHub, type BackendSocket } from '@platform/transport/socketHub';
+import { toaster } from '@platform/ui/toaster';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('@platform/ui/toaster', () => ({
+  toaster: { create: vi.fn(), dismiss: vi.fn(), update: vi.fn() },
+}));
 
 import {
   createQueueCoordinator,
@@ -291,6 +296,7 @@ const createHarness = (options: { galleryRefreshCoalesceMs?: number } = {}): Har
     nodeExecution,
     progress,
     progressImage,
+    remoteModelTransferToaster: toaster,
   });
 
   return {
@@ -567,6 +573,38 @@ describe('queueCoordinator', () => {
     await vi.advanceTimersByTimeAsync(500);
 
     expect(harness.callbacks.onGalleryRefresh).not.toHaveBeenCalled();
+  });
+
+  it('ignores model-transfer progress from another account', () => {
+    harness.coordinator.dispose();
+    harness.hub.disconnect();
+
+    accountLifecycle.invalidate();
+    accountLifecycle.activate('user-1');
+    harness = createHarness();
+    harness.coordinator.connect();
+
+    vi.mocked(toaster.create).mockClear();
+
+    const message = `[[IRW_MODEL_TRANSFER]]${JSON.stringify({
+      backend_item_id: 10,
+      remote_index: 2,
+      model_hash: 'hash',
+      name: 'Example',
+      directory: true,
+      phase: 'downloading',
+      bytes: 40,
+      total_bytes: 100,
+    })}`;
+
+    harness.socket.fire('invocation_progress', { message, user_id: 'user-2' });
+    expect(toaster.create).not.toHaveBeenCalled();
+
+    harness.socket.fire('invocation_progress', { message, user_id: 'user-1' });
+    expect(toaster.create).toHaveBeenCalledTimes(1);
+
+    accountLifecycle.invalidate();
+    accountLifecycle.activate('single-user');
   });
 
   it('routes progress events to the tracked item and clears them on completion', async () => {

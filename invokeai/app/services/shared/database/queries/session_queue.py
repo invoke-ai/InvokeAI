@@ -97,6 +97,17 @@ _NEXT_WAITING_CHILD = (
     .limit(fixed_limit(1))
 )
 _COUNT = select(func.count()).where(_IN_QUEUE)
+# Root queue candidates for optional external execution. Never return workflow-call children.
+_ROOT_IDS_BY_STATUS = (
+    select(_Q.item_id)
+    .where(
+        _IN_QUEUE_UNINDEXED,
+        _Q.user_id == bindparam("user_id"),
+        _Q.parent_item_id.is_(None),
+        _Q.status.in_(bindparam("statuses", expanding=True)),
+    )
+    .order_by(_Q.priority.desc(), _Q.item_id)
+)
 _SUMMARIES = (
     select(*_SUMMARY).select_from(_ITEMS).where(_IN_QUEUE_UNINDEXED, InBoundSet(_Q.item_id, bindparam("item_ids")))
 )
@@ -427,6 +438,13 @@ def _transition(stamp: Optional[str]) -> Update:
     return update(session_queue).where(_THE_ITEM, _NOT_FINISHED).values(values)
 
 
+@functools.cache
+def _guarded_transition(stamp: Optional[str]) -> Update:
+    # Reuse normal queue status stamping, but require the caller's expected source status.
+    # A concurrent local or remote claim, cancel or completion makes the update a no-op.
+    return _transition(stamp).where(_Q.status.in_(bindparam("expected_statuses", expanding=True)))
+
+
 def _stamp(status: str) -> Optional[str]:
     if status == "in_progress":
         return "started_at"
@@ -733,6 +751,18 @@ class SessionQueueQueries(QueryModule):
         return conn.execute(_all_items(destination is not None), parameters).all()
 
     @read
+    def root_ids_by_status(self, conn: Connection, queue_id: str, user_id: str, statuses: tuple[str, ...]) -> list[int]:
+        """Root queue item ids owned by one user, highest priority then enqueue order."""
+        if not statuses:
+            return []
+        return [
+            int(item_id)
+            for item_id in conn.execute(
+                _ROOT_IDS_BY_STATUS, {"queue_id": queue_id, "user_id": user_id, "statuses": statuses}
+            ).scalars()
+        ]
+
+    @read
     def count(self, conn: Connection, queue_id: str) -> int:
         """How many items the queue holds, of every status."""
         return int(conn.execute(_COUNT, {"queue_id": queue_id}).scalar_one())
@@ -891,6 +921,33 @@ class SessionQueueQueries(QueryModule):
         return conn.execute(_STATUS_ROW, {"item_id": item_id}).first()
 
     # --- Status changes ---------------------------------------------------------------------------------------------
+
+    @mapped(_status_row)
+    @write
+    def guarded_transition(
+        self,
+        conn: Connection,
+        item_id: int,
+        status: str,
+        expected_statuses: tuple[str, ...],
+        device: Optional[str] = None,
+    ) -> Optional[Row[Any]]:
+        """Atomic status compare-and-swap; return changed columns only on success."""
+        if not expected_statuses:
+            return None
+        parameters = {
+            "target_item_id": item_id,
+            "expected_statuses": expected_statuses,
+            "new_status": status,
+            "new_error_type": None,
+            "new_error_message": None,
+            "new_error_traceback": None,
+            "new_device": device,
+            "now": now_text(),
+        }
+        if conn.execute(_guarded_transition(_stamp(status)), parameters).rowcount == 0:
+            return None
+        return conn.execute(_STATUS_ROW, {"item_id": item_id}).first()
 
     @write
     def transition(

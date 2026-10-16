@@ -35,6 +35,10 @@ import { mapWithConcurrency } from '@platform/core/concurrency';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { ApiError, getApiErrorMessage } from '@platform/transport/http';
 
+import type { RemoteModelTransferToastPort } from './runtime/remoteModelTransferToasts';
+
+import { applyRemoteWorkersToGraph } from './data/remoteWorkersGraph';
+
 export interface QueueResultDestinationPort {
   addImagesToGalleryBoard(boardId: string, imageNames: string[]): Promise<void>;
   addVideosToGalleryBoard(boardId: string, videoNames: string[]): Promise<void>;
@@ -261,6 +265,14 @@ export const createQueueItemBackendSubmission = (
     return { error: 'Queue item backend submission has an invalid batch count.', kind: 'invalid' };
   }
 
+  // Only the submitted graph is modified: never write automatic nodes into
+  // the user's saved workflow document or change a recovered queue snapshot.
+  const graph = applyRemoteWorkersToGraph(
+    submission.graph,
+    queueItem.snapshot.galleryBoardId,
+    queueItem.snapshot.destination
+  );
+
   if (submission.kind === 'generate') {
     const seedStep = readSubmissionSeedStep(submission);
 
@@ -289,6 +301,7 @@ export const createQueueItemBackendSubmission = (
       kind: 'generate',
       request: {
         ...compiled,
+        graph,
         destination: queueItem.snapshot.destination,
         ...(isQueueSeedStep(submission.seedStep) ? {} : { legacySeedPlan: true as const }),
         projectId: project.id,
@@ -323,6 +336,7 @@ export const createQueueItemBackendSubmission = (
     kind: 'workflow',
     request: {
       ...compiled,
+      graph,
       destination: queueItem.snapshot.destination,
       projectId: project.id,
       sourceQueueItemId: queueItem.id,
@@ -380,6 +394,7 @@ export const createQueueRuntime = ({
   locks,
   modelLoads,
   nodeExecution,
+  remoteModelTransferToaster,
 }: {
   backend: QueueBackendPort;
   destinations: QueueResultDestinationPort;
@@ -390,6 +405,7 @@ export const createQueueRuntime = ({
   locks?: QueueRunLockPort;
   modelLoads: QueueModelLoadPort;
   nodeExecution: QueueNodeExecutionPort;
+  remoteModelTransferToaster?: RemoteModelTransferToastPort;
 }): QueueRuntime => {
   const owner = captureAccountScope();
   const commands = history.commands;
@@ -1245,7 +1261,7 @@ export const createQueueRuntime = ({
         }
       },
     },
-    { backend: coordinatorBackend, modelLoads, nodeExecution }
+    { backend: coordinatorBackend, modelLoads, nodeExecution, remoteModelTransferToaster }
   );
 
   const submitQueueItem = async (
