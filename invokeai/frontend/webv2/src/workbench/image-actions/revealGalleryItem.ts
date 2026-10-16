@@ -1,5 +1,5 @@
 import type { GalleryView } from '@features/gallery';
-import type { GalleryItemRef } from '@features/gallery/contracts';
+import type { GalleryItemRef, GalleryRevealAnnouncement } from '@features/gallery/contracts';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { QueryClient } from '@tanstack/react-query';
 import type { WorkbenchCommands, WorkbenchQueries } from '@workbench/workbenchStore';
@@ -25,8 +25,15 @@ export interface GalleryRevealContext {
 export interface GalleryRevealTicket {
   /** Account identity lifetime at the original gesture, before any lazy import or media fetch. */
   accountScope: AccountScope;
+  /** Announced in the Gallery's live region once the item is revealed; reveals the user asked for set none. */
+  announcement?: GalleryRevealAnnouncement;
   /** Canceled when a later Gallery navigation supersedes this locator. */
   locatorSignal?: AbortSignal;
+  /**
+   * A further condition checked wherever the ticket is, last immediately before the first Gallery change; false
+   * stands the reveal down. For reveals nobody on screen asked for.
+   */
+  mayApply?: () => boolean;
   /** The project the press belongs to; its writes may not land in another. */
   projectId: string;
   /** This navigation's place in the global ordering; see `claimGalleryNavigationSequence`. */
@@ -41,11 +48,14 @@ export interface GalleryRevealTicket {
 export const revealGalleryItem = (
   { commands, queries, queryClient }: GalleryRevealContext,
   ref: GalleryItemRef,
-  { accountScope, locatorSignal, projectId, sequence }: GalleryRevealTicket
+  { accountScope, announcement, locatorSignal, mayApply, projectId, sequence }: GalleryRevealTicket
 ): Promise<void> => {
   // Fence the network result to the gesture's project before clearing filters or selecting.
   const isCurrent = () =>
-    !accountScope.signal.aborted && isGalleryNavigationCurrent(sequence) && queries.isActiveProject(projectId);
+    !accountScope.signal.aborted &&
+    isGalleryNavigationCurrent(sequence) &&
+    queries.isActiveProject(projectId) &&
+    (mayApply?.() ?? true);
 
   if (!isCurrent()) {
     return Promise.resolve();
@@ -147,7 +157,9 @@ export const revealGalleryItem = (
     }
 
     commands.gallery.selectItem(image, projectId, page ?? undefined);
-    if (boardIndex === null) {
+    if (announcement !== undefined) {
+      requestGalleryItemReveal(toGalleryItemKey(ref), accountScope.signal, boardIndex ?? undefined, announcement);
+    } else if (boardIndex === null) {
       requestGalleryItemReveal(toGalleryItemKey(ref), accountScope.signal);
     } else {
       requestGalleryItemReveal(toGalleryItemKey(ref), accountScope.signal, boardIndex);
