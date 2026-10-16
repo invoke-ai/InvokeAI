@@ -11,7 +11,7 @@ import {
   useRecipe,
   type StackProps,
 } from '@chakra-ui/react';
-import { FeatureHint } from '@platform/ui/hints';
+import { FEATURE_HINT_FIELD_PROPS, FeatureHint } from '@platform/ui/hints';
 import { fieldLabelRecipe } from '@theme/recipes';
 import { createContext, useContext, useMemo } from 'react';
 
@@ -81,6 +81,7 @@ export const Field = ({
   const recipe = useRecipe({ recipe: fieldLabelRecipe });
   const isHorizontal = orientation === 'horizontal';
   const isInvalid = invalid ?? Boolean(error);
+  const hintFieldProps = hint ? FEATURE_HINT_FIELD_PROPS : undefined;
   const ids = useMemo(
     () =>
       id
@@ -127,7 +128,7 @@ export const Field = ({
         required={required}
         unstyled
       >
-        <Stack flex="1" gap="1.5" minW="0" {...rest}>
+        <Stack flex="1" gap="1.5" minW="0" {...hintFieldProps} {...rest}>
           <HStack align="center" justify="space-between" minW="0">
             {labelContent}
             {labelEnd}
@@ -150,7 +151,7 @@ export const Field = ({
       required={required}
       unstyled
     >
-      <Stack align="flex-start" direction="row" flex="1" gap="1.5" minW="0" {...rest}>
+      <Stack align="flex-start" direction="row" flex="1" gap="1.5" minW="0" {...hintFieldProps} {...rest}>
         <HStack align="center" flexShrink="0" justify="space-between" minH="8" minW="0">
           {labelContent}
           {labelEnd}

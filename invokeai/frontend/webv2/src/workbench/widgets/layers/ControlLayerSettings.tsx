@@ -369,6 +369,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
         defaultValue={CONTROL_ADAPTER_DEFAULTS[adapter.kind].weight}
         disabled={editingLocked}
         formatValue={formatWeight}
+        hint="controlLayerWeight"
         inputMax={CONTROL_WEIGHT_BOUNDS.inputMax}
         inputMin={weightInputMin}
         label={t('widgets.layers.control.weight')}
@@ -379,7 +380,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
         onChange={handleWeightChange}
         onChangeEnd={handleWeightChangeEnd}
       />
-      <Field label={t('widgets.layers.control.stepRange')}>
+      <Field hint="stepRange" label={t('widgets.layers.control.stepRange')}>
         <Slider
           aria-label={rangeAria}
           disabled={editingLocked}

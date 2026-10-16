@@ -269,7 +269,7 @@ export const IPAdapterControls = ({
               </Stack>
             ) : null}
             <Stack gap="1">
-              <FieldHeader label={t('widgets.generate.activeSteps')}>
+              <FieldHeader hint="stepRange" label={t('widgets.generate.activeSteps')}>
                 <Text color="fg.subtle" fontFamily="mono" fontSize="xs">
                   {formatPct(beginEndStepPct[0])} – {formatPct(beginEndStepPct[1])}
                 </Text>
@@ -366,7 +366,7 @@ export const FluxReduxControls = <T extends { imageInfluence: FluxReduxImageInfl
   );
 
   return (
-    <Field disabled={disabled} hint="imageInfluence" label={t('widgets.generate.imageInfluence')}>
+    <Field disabled={disabled} label={t('widgets.generate.imageInfluence')}>
       <Select
         collection={FLUX_REDUX_IMAGE_INFLUENCE_COLLECTION}
         deselectable={false}

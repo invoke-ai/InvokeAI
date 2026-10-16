@@ -236,6 +236,7 @@ const Krea2SeedVarianceFields = ({ onCommit, settings }: RenderFieldsProps) => {
     <>
       <Field
         helpText={t('widgets.generate.krea2SeedVarianceHelp')}
+        hint="krea2SeedVariance"
         label={t('widgets.generate.krea2SeedVariance')}
         labelEnd={
           <GenerateToggleSwitch
@@ -250,6 +251,7 @@ const Krea2SeedVarianceFields = ({ onCommit, settings }: RenderFieldsProps) => {
       {settings.krea2SeedVarianceEnabled ? (
         <>
           <ScrubberField
+            hint="krea2SeedVarianceStrength"
             label={t('widgets.generate.krea2SeedVarianceStrength')}
             max={MAX_KREA2_SEED_VARIANCE_STRENGTH}
             min={0}
@@ -259,6 +261,7 @@ const Krea2SeedVarianceFields = ({ onCommit, settings }: RenderFieldsProps) => {
           />
           <ScrubberField
             formatValue={formatPercent}
+            hint="krea2SeedVarianceRandomize"
             label={t('widgets.generate.krea2SeedVarianceRandomize')}
             max={100}
             min={0}
