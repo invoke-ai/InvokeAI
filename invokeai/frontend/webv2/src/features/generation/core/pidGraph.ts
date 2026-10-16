@@ -19,13 +19,11 @@ export const PID_DECODE_NODE_TYPES = {
 
 export type PidDecodeNodeType = (typeof PID_DECODE_NODE_TYPES)[keyof typeof PID_DECODE_NODE_TYPES];
 
-/** Retain VAE edges for runtime scaling constants even though PiD replaces decode. */
-const PID_DECODE_NODES_WITH_VAE_INPUT: ReadonlySet<string> = new Set([
-  'flux2_pid_decode',
-  'qwen_image_pid_decode',
-  'sdxl_pid_decode',
-  'z_image_pid_decode',
-]);
+/**
+ * PiD takes the latent in the VAE's normalized space. Only FLUX.2 stores it denormalized, so its
+ * decode needs the VAE's BatchNorm statistics; every other decode takes the stored latent as is.
+ */
+const PID_DECODE_NODES_NEEDING_VAE: ReadonlySet<string> = new Set(['flux2_pid_decode']);
 
 export const getPidDecodeNodeType = (base: string | null | undefined): PidDecodeNodeType | null =>
   base && base in PID_DECODE_NODE_TYPES ? PID_DECODE_NODE_TYPES[base as keyof typeof PID_DECODE_NODE_TYPES] : null;
@@ -62,7 +60,7 @@ interface AddPidDecodeArg {
   positivePrompt: BackendInvocationContract;
   /** The seed node, reused for PiD's internal decode noise so results reproduce. */
   seed: BackendInvocationContract;
-  /** VAE source, wired only for decode nodes that read its constants. */
+  /** VAE source, wired only for decode nodes that need its latent statistics (FLUX.2). */
   vaeSource?: BackendInvocationContract;
   /** The VAE output field on `vaeSource` (model loaders expose `vae`). */
   vaeField?: string;
@@ -113,7 +111,7 @@ export const addPidDecode = ({
   addEdge(graph, pidLoader, 'pid_decoder', pidDecode, 'pid_decoder');
   addEdge(graph, seed, 'value', pidDecode, 'seed');
 
-  if (vaeSource && PID_DECODE_NODES_WITH_VAE_INPUT.has(decodeNodeType)) {
+  if (vaeSource && PID_DECODE_NODES_NEEDING_VAE.has(decodeNodeType)) {
     addEdge(graph, vaeSource, vaeField, pidDecode, 'vae');
   }
 
