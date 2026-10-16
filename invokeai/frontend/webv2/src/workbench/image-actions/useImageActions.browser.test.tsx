@@ -11,6 +11,7 @@ import {
   seedArchitectureCapabilities,
 } from '@features/generation/core/architectureCapabilities.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { ApiError, getApiErrorMessage } from '@platform/transport/http';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, createRef, type Ref, useImperativeHandle } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -690,7 +691,13 @@ describe('generate PBR maps', () => {
   });
 
   it('reports an enqueue failure as an error notice and a failed run through the error channel', async () => {
-    mocks.submitUtilityGraph.mockRejectedValueOnce(new Error('queue paused'));
+    const { UtilityQueueError } = await import('@features/queue/utility');
+    // The runtime wraps the backend's JSON refusal as an ApiError cause and derives the readable message the way
+    // `submitUtilityGraph` does; the toast must show that detail, never the JSON.
+    const cause = new ApiError(JSON.stringify({ detail: 'queue paused' }), 409);
+    mocks.submitUtilityGraph.mockRejectedValueOnce(
+      new UtilityQueueError('enqueue', getApiErrorMessage(cause, 'Failed to enqueue utility graph.'), cause)
+    );
 
     await act(async () => {
       await actionsRef.current?.generatePbrMaps(image);
@@ -718,7 +725,7 @@ describe('generate PBR maps', () => {
     expect(mocks.invalidateGallery).not.toHaveBeenCalled();
   });
 
-  it('turns a canceled item into an info notice, and says nothing once the watch is aborted', async () => {
+  it('turns a canceled or removed item into an info notice, and says nothing once the watch is aborted', async () => {
     const { UtilityQueueError } = await import('@features/queue/utility');
     const canceled = createSettlement();
     mocks.submitUtilityGraph.mockResolvedValueOnce({ itemIds: [44], origin: 'utility:4', settled: canceled.settled });
@@ -733,6 +740,26 @@ describe('generate PBR maps', () => {
     expect(mocks.notificationsAdd).toHaveBeenLastCalledWith(
       expect.objectContaining({ kind: 'info', title: 'widgets.gallery.itemActions.pbrMaps.canceled' })
     );
+    expect(mocks.reportError).not.toHaveBeenCalled();
+
+    // A queue clear deletes a pending item without a terminal event; the watch reports it as removed.
+    const removed = createSettlement();
+    mocks.submitUtilityGraph.mockResolvedValueOnce({ itemIds: [47], origin: 'utility:7', settled: removed.settled });
+    await act(async () => {
+      await actionsRef.current?.generatePbrMaps(image);
+    });
+    await act(async () => {
+      removed.reject(new UtilityQueueError('removed', 'The utility graph item was removed from the queue.'));
+      await removed.settled.catch(() => {});
+    });
+
+    expect(mocks.notificationsAdd).toHaveBeenLastCalledWith({
+      kind: 'info',
+      message: 'widgets.gallery.itemActions.pbrMaps.removedMessage',
+      title: 'widgets.gallery.itemActions.pbrMaps.removed',
+    });
+    // The maps may already be in the gallery if the item completed before it was pruned.
+    expect(mocks.invalidateGallery).toHaveBeenCalledTimes(1);
     expect(mocks.reportError).not.toHaveBeenCalled();
 
     const aborted = createSettlement();

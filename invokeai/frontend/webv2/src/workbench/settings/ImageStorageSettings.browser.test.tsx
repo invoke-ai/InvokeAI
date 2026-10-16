@@ -112,6 +112,13 @@ const confirmIn = (label: string) =>
   );
 const trigger = () => host.querySelector<HTMLButtonElement>('[data-scope="select"][data-part="trigger"]');
 const refetchStatus = () => act(() => queryClient.refetchQueries({ queryKey: ['gallery', 'image-storage'] }));
+const createDeferred = <T,>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -280,6 +287,95 @@ describe('image storage settings', () => {
       host.querySelector('[role="alert"]')?.id
     );
     expect(mocks.invalidateGallery).not.toHaveBeenCalled();
+  });
+
+  it('re-reads the status after a refused start and locks the controls on the move it reveals', async () => {
+    let status: unknown = idleStatus(12);
+    installRoutes({
+      [`GET ${CONFIG_ROUTE}`]: () => ({ config: { image_subfolder_strategy: 'date' } }),
+      [`GET ${STATUS_ROUTE}`]: () => status,
+      [`POST /api/v1/image_moves/start`]: () => {
+        // Another admin started a move after this editor last read the status.
+        status = runningStatus('move_all');
+        return new ApiError(JSON.stringify({ detail: 'An image move job is already running' }), 409);
+      },
+    });
+    await render();
+    await expect.poll(() => button('settings.imageStorage.startMove')?.disabled).toBe(false);
+    expect(calls('GET', STATUS_ROUTE)).toHaveLength(1);
+
+    await act(() => userEvent.click(button('settings.imageStorage.startMove')!));
+    await expect.poll(() => dialog()).not.toBeNull();
+    await act(() => userEvent.click(confirmIn('settings.imageStorage.startMove')!));
+
+    await expect
+      .poll(() => host.querySelector('[role="alert"]')?.textContent)
+      .toBe('An image move job is already running');
+    await expect.poll(() => text()).toContain('settings.imageStorage.statusMoving');
+    expect(calls('GET', STATUS_ROUTE)).toHaveLength(2);
+    expect(button('settings.imageStorage.startMove')?.disabled).toBe(true);
+    expect(button('settings.imageStorage.recover')?.disabled).toBe(true);
+    expect(trigger()?.disabled).toBe(true);
+    // Its opener is disabled now; the closed dialog hands focus to the section reporting the refusal.
+    await expect.poll(() => dialog()).toBeNull();
+    await expect.poll(() => host.contains(document.activeElement)).toBe(true);
+  });
+
+  it('shows the start in flight and locks the layout until the server has answered', async () => {
+    const accepted = createDeferred<unknown>();
+    let status: unknown = idleStatus(12);
+    installRoutes({
+      [`GET ${CONFIG_ROUTE}`]: () => ({ config: { image_subfolder_strategy: 'date' } }),
+      [`GET ${STATUS_ROUTE}`]: () => status,
+      // The real route scans the whole library before it answers.
+      [`POST /api/v1/image_moves/start`]: () => accepted.promise,
+    });
+    await render();
+    await expect.poll(() => button('settings.imageStorage.startMove')?.disabled).toBe(false);
+    expect(trigger()?.disabled).toBe(false);
+
+    await act(() => userEvent.click(button('settings.imageStorage.startMove')!));
+    await expect.poll(() => dialog()).not.toBeNull();
+    await act(() => userEvent.click(confirmIn('settings.imageStorage.startMove')!));
+    await expect.poll(() => calls('POST', '/api/v1/image_moves/start').length).toBe(1);
+
+    // The dialog stays open with its confirm button busy; behind it the layout cannot be changed any more.
+    expect(dialog()).not.toBeNull();
+    await expect.poll(() => confirmIn('settings.imageStorage.startMove')?.hasAttribute('data-loading')).toBe(true);
+    expect(trigger()?.disabled).toBe(true);
+    expect(button('settings.imageStorage.startMove')?.disabled).toBe(true);
+
+    status = runningStatus('move_all');
+    await act(() => {
+      accepted.resolve(status);
+    });
+
+    await expect.poll(() => dialog()).toBeNull();
+    await expect.poll(() => text()).toContain('settings.imageStorage.statusMoving');
+    expect(trigger()?.disabled).toBe(true);
+    await expect.poll(() => host.contains(document.activeElement)).toBe(true);
+  });
+
+  it('keeps the layout locked until the move status has loaded', async () => {
+    const statusRead = createDeferred<unknown>();
+    installRoutes({
+      [`GET ${CONFIG_ROUTE}`]: () => ({ config: { image_subfolder_strategy: 'flat' } }),
+      [`GET ${STATUS_ROUTE}`]: () => statusRead.promise,
+    });
+    await render();
+
+    await expect.poll(() => trigger()?.textContent).toContain('settings.imageStorage.layouts.flat');
+    // The layout is known, but whether a move is running is not.
+    expect(trigger()?.disabled).toBe(true);
+    expect(button('settings.imageStorage.startMove')?.disabled).toBe(true);
+
+    await act(() => {
+      statusRead.resolve(idleStatus(0));
+    });
+
+    await expect.poll(() => text()).toContain('settings.imageStorage.statusIdle 0');
+    expect(trigger()?.disabled).toBe(false);
+    expect(button('settings.imageStorage.startMove')?.disabled).toBe(false);
   });
 
   it('shows a load failure for the status with a retry', async () => {

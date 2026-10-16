@@ -5,19 +5,31 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   apiFetchJson: vi.fn(),
   invalidateGallery: vi.fn(() => Promise.resolve()),
+  refreshGalleryThumbnails: vi.fn(),
 }));
 
 vi.mock('@platform/transport/http', () => ({ apiFetchJson: mocks.apiFetchJson }));
-vi.mock('./queryCache', () => ({ invalidateGallery: mocks.invalidateGallery }));
+vi.mock('./queryCache', () => ({
+  invalidateGallery: mocks.invalidateGallery,
+  refreshGalleryThumbnails: mocks.refreshGalleryThumbnails,
+}));
 
 import {
-  getImageMoveStatus,
   imageMoveStatusQueryOptions,
   imageStorageKeys,
   imageStorageLayoutQueryOptions,
   startImageMove,
+  startImageMoveRecovery,
   updateImageStorageLayout,
 } from './imageStorage';
+
+const createDeferred = <T>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+};
 
 const runningStatus = {
   active_job_id: 3,
@@ -76,7 +88,7 @@ describe('image move status', () => {
   it('maps the wire status to the read model', async () => {
     mocks.apiFetchJson.mockResolvedValueOnce(runningStatus);
 
-    await expect(getImageMoveStatus()).resolves.toEqual({
+    await expect(new QueryClient().fetchQuery(imageMoveStatusQueryOptions())).resolves.toEqual({
       activeJobId: 3,
       isRunning: true,
       lastError: null,
@@ -104,6 +116,8 @@ describe('image move status', () => {
     expect(committed.isRunning).toBe(false);
     expect(interval({ state: { data: committed } })).toBe(false);
     expect(mocks.invalidateGallery).toHaveBeenCalledExactlyOnceWith(client, owner);
+    // Thumbnails the move answered with 409 are asked for again as well.
+    expect(mocks.refreshGalleryThumbnails).toHaveBeenCalledExactlyOnceWith(owner);
 
     // An idle read after an idle read is not a job ending.
     mocks.apiFetchJson.mockResolvedValueOnce(committedStatus);
@@ -123,6 +137,59 @@ describe('image move status', () => {
       expect.objectContaining({ method: 'POST' })
     );
     expect(client.getQueryData(imageStorageKeys.moveStatus(owner))).toMatchObject({ activeJobId: 3, isRunning: true });
+    expect(mocks.invalidateGallery).not.toHaveBeenCalled();
+  });
+
+  it('keeps the accepted status when a stale status read lands after the POST', async () => {
+    const client = new QueryClient();
+    const owner = accountLifecycle.capture();
+    const options = imageMoveStatusQueryOptions(owner);
+    const staleRead = createDeferred<unknown>();
+    mocks.apiFetchJson.mockImplementation((path: string, init?: RequestInit) =>
+      init?.method === 'POST' ? Promise.resolve(runningStatus) : staleRead.promise
+    );
+
+    // A poll started before the POST is still in flight when the POST is accepted.
+    const pendingRead = client.fetchQuery(options).catch((error: unknown) => error);
+    await expect(startImageMove(client, owner)).resolves.toMatchObject({ isRunning: true });
+    expect(client.getQueryData(imageStorageKeys.moveStatus(owner))).toMatchObject({ isRunning: true });
+
+    staleRead.resolve(committedStatus);
+    await pendingRead;
+    await Promise.resolve();
+
+    // The idle answer the server gave before the job existed must not stop the polling or free the controls.
+    expect(client.getQueryData(imageStorageKeys.moveStatus(owner))).toMatchObject({ activeJobId: 3, isRunning: true });
+    expect(client.getQueryState(imageStorageKeys.moveStatus(owner))?.fetchStatus).toBe('idle');
+  });
+
+  it('refreshes the gallery at once when the accepted job already finished', async () => {
+    const client = new QueryClient();
+    const owner = accountLifecycle.capture();
+    mocks.apiFetchJson.mockResolvedValueOnce(committedStatus);
+
+    await expect(startImageMoveRecovery(client, owner)).resolves.toMatchObject({ isRunning: false });
+
+    expect(mocks.apiFetchJson).toHaveBeenCalledExactlyOnceWith(
+      '/api/v1/image_moves/recover',
+      expect.objectContaining({ method: 'POST' })
+    );
+    expect(client.getQueryData(imageStorageKeys.moveStatus(owner))).toMatchObject({ isRunning: false });
+    expect(mocks.invalidateGallery).toHaveBeenCalledExactlyOnceWith(client, owner);
+    expect(mocks.refreshGalleryThumbnails).toHaveBeenCalledExactlyOnceWith(owner);
+  });
+
+  it('re-reads the status when the server refuses to start, since the cached status is what misled the caller', async () => {
+    const client = new QueryClient();
+    const owner = accountLifecycle.capture();
+    client.setQueryData(imageStorageKeys.moveStatus(owner), { isRunning: false });
+    const refusal = new Error('{"detail":"An image move job is already running"}');
+    mocks.apiFetchJson.mockRejectedValueOnce(refusal);
+
+    await expect(startImageMove(client, owner)).rejects.toBe(refusal);
+
+    expect(client.getQueryState(imageStorageKeys.moveStatus(owner))?.isInvalidated).toBe(true);
+    expect(mocks.invalidateGallery).not.toHaveBeenCalled();
   });
 
   it('drops a response that lands after the account changed', async () => {

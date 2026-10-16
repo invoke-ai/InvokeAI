@@ -4155,7 +4155,9 @@
           "completedMessage": "Normal, roughness and displacement maps for {{name}} were added to the gallery.",
           "failed": "Could not generate PBR maps",
           "queued": "Generating PBR maps",
-          "queuedMessage": "Normal, roughness and displacement maps for {{name}} are queued."
+          "queuedMessage": "Normal, roughness and displacement maps for {{name}} are queued.",
+          "removed": "PBR maps removed from the queue",
+          "removedMessage": "The queue item generating maps for {{name}} was removed from the queue."
         },
         "delete": {
           "failure_one": "Could not delete {{count}} item.",

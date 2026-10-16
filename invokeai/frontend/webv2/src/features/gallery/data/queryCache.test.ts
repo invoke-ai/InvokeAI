@@ -6,7 +6,7 @@ import type { AccountScope } from '@platform/state/accountLifecycle';
 import { getImageCluster, registerImageCluster } from '@features/gallery/core/semanticImageQuery';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { InfiniteQueryObserver, QueryClient, type InfiniteData } from '@tanstack/react-query';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   ALL_READABLE_BOARDS_ID,
@@ -21,6 +21,7 @@ import {
   type GalleryItemsFilter,
 } from './queries';
 import {
+  createGalleryThumbnailRetryController,
   getGalleryItemBoardIdsFromCaches,
   getGalleryItemStarredFromCaches,
   invalidateGallery,
@@ -977,5 +978,111 @@ describe('Gallery cache invalidation', () => {
     expect(client.getQueryCache().getAll()).toHaveLength(initialCardinality);
     expect(client.getQueryState(currentBoardsKey)?.isInvalidated).toBe(true);
     expect(client.getQueryState(oldBoardsKey)?.isInvalidated).toBe(false);
+  });
+});
+
+describe('Gallery thumbnail retry', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('retries on the given backoff, ignores errors while a retry is pending, and gives up once the delays are spent', () => {
+    const controller = createGalleryThumbnailRetryController([3_000, 6_000, 30_000]);
+    const listener = vi.fn();
+    controller.subscribe(listener);
+
+    controller.onError('/thumb/a');
+    vi.advanceTimersByTime(2_999);
+    expect(controller.getNonce()).toBe(0);
+    vi.advanceTimersByTime(1);
+    expect(controller.getNonce()).toBe(1);
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    // The reloaded image fails again; a second error report while the retry is pending does not add one.
+    controller.onError('/thumb/a');
+    controller.onError('/thumb/a');
+    vi.advanceTimersByTime(5_999);
+    expect(controller.getNonce()).toBe(1);
+    vi.advanceTimersByTime(1);
+    expect(controller.getNonce()).toBe(2);
+
+    controller.onError('/thumb/a');
+    vi.advanceTimersByTime(30_000);
+    expect(controller.getNonce()).toBe(3);
+
+    // The attempts are spent: the tile stops asking until something loads.
+    controller.onError('/thumb/a');
+    vi.advanceTimersByTime(120_000);
+    expect(controller.getNonce()).toBe(3);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(listener).toHaveBeenCalledTimes(3);
+  });
+
+  it('a load resets the backoff but keeps the nonce, and stop drops only the pending retry', () => {
+    const controller = createGalleryThumbnailRetryController([3_000, 6_000, 12_000]);
+
+    controller.onError('/thumb/a');
+    vi.advanceTimersByTime(3_000);
+    expect(controller.getNonce()).toBe(1);
+
+    controller.onError('/thumb/a');
+    controller.onLoad();
+    vi.advanceTimersByTime(60_000);
+    // No reload of the image that just loaded, and no pending retry.
+    expect(controller.getNonce()).toBe(1);
+    expect(vi.getTimerCount()).toBe(0);
+
+    // A later failure starts the backoff over from the first delay.
+    controller.onError('/thumb/a');
+    vi.advanceTimersByTime(3_000);
+    expect(controller.getNonce()).toBe(2);
+
+    controller.onError('/thumb/a');
+    controller.stop();
+    vi.advanceTimersByTime(60_000);
+    expect(controller.getNonce()).toBe(2);
+    expect(vi.getTimerCount()).toBe(0);
+
+    // Stopping is not disposal: the controller still works, as StrictMode's rehearsal unmount requires. The dropped
+    // retry still counted as an attempt, so the next one waits the third delay.
+    controller.onError('/thumb/a');
+    vi.advanceTimersByTime(11_999);
+    expect(controller.getNonce()).toBe(2);
+    vi.advanceTimersByTime(1);
+    expect(controller.getNonce()).toBe(3);
+  });
+
+  it('starts the attempts over when the tile shows another item', () => {
+    const controller = createGalleryThumbnailRetryController([3_000, 6_000]);
+
+    controller.onError('/thumb/a');
+    vi.advanceTimersByTime(3_000);
+    controller.onError('/thumb/a');
+    vi.advanceTimersByTime(6_000);
+    expect(controller.getNonce()).toBe(2);
+    // Item a has spent its attempts.
+    controller.onError('/thumb/a');
+    vi.advanceTimersByTime(60_000);
+    expect(controller.getNonce()).toBe(2);
+
+    // An index-keyed slot now shows item b: its failure gets the first delay again.
+    controller.onError('/thumb/b');
+    vi.advanceTimersByTime(2_999);
+    expect(controller.getNonce()).toBe(2);
+    vi.advanceTimersByTime(1);
+    expect(controller.getNonce()).toBe(3);
+
+    // A new item while b's retry is pending drops that retry and restarts the backoff for the new one.
+    controller.onError('/thumb/b');
+    controller.onError('/thumb/c');
+    vi.advanceTimersByTime(2_999);
+    expect(controller.getNonce()).toBe(3);
+    expect(vi.getTimerCount()).toBe(1);
+    vi.advanceTimersByTime(1);
+    expect(controller.getNonce()).toBe(4);
   });
 });

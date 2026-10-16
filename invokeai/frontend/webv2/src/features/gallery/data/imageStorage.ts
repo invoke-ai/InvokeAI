@@ -1,11 +1,15 @@
 import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { QueryClient } from '@tanstack/react-query';
 
-import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { apiFetchJson } from '@platform/transport/http';
 import { queryOptions } from '@tanstack/react-query';
 
-import { invalidateGallery } from './queryCache';
+import { invalidateGallery, refreshGalleryThumbnails } from './queryCache';
 
 /**
  * Server image storage: the subfolder layout new images are written to, and the admin-only move/recovery job
@@ -19,15 +23,9 @@ export type ImageStorageLayout = (typeof IMAGE_STORAGE_LAYOUTS)[number];
 export const isImageStorageLayout = (value: unknown): value is ImageStorageLayout =>
   IMAGE_STORAGE_LAYOUTS.includes(value as ImageStorageLayout);
 
-export type ImageMoveOperation = 'move_all' | 'recovery';
+type ImageMoveOperation = 'move_all' | 'recovery';
 
 export type ImageMoveJobState = 'planned' | 'moving' | 'moved' | 'committed' | 'error';
-
-export interface ImageMoveJob {
-  id: number;
-  state: ImageMoveJobState;
-  errorMessage: string | null;
-}
 
 export interface ImageMoveStatus {
   /** Whether a move or recovery is running right now. */
@@ -35,39 +33,29 @@ export interface ImageMoveStatus {
   operation: ImageMoveOperation | null;
   /** A journaled job that has not committed; with `isRunning` false it needs recovery. */
   activeJobId: number | null;
-  latestJob: ImageMoveJob | null;
+  latestJob: { id: number; state: ImageMoveJobState; errorMessage: string | null } | null;
   /** The last background worker error. */
   lastError: string | null;
   /** Images still stored under a layout other than the configured one. */
   needsMoveCount: number;
 }
 
-/** The job finished, one way or the other; its outcome is what `latestJob` reports. */
-export const isTerminalImageMoveJobState = (state: ImageMoveJobState | null | undefined): boolean =>
-  state === 'committed' || state === 'error';
-
 /** `GET/PATCH /app/runtime_config` nest the settings under `config`; only the layout field is read here. */
 interface RuntimeConfigDTO {
   config?: { image_subfolder_strategy?: unknown } | null;
-}
-
-interface ImageMoveJobDTO {
-  id: number;
-  state: ImageMoveJobState;
-  error_message?: string | null;
 }
 
 interface ImageMoveStatusDTO {
   is_running: boolean;
   operation?: ImageMoveOperation | null;
   active_job_id?: number | null;
-  latest_job?: ImageMoveJobDTO | null;
+  latest_job?: { id: number; state: ImageMoveJobState; error_message?: string | null } | null;
   last_error?: string | null;
   needs_move_count: number;
 }
 
 /** An unrecognised server value is kept, not coerced: the editor shows it as unknown instead of lying. */
-export const readImageStorageLayout = (dto: RuntimeConfigDTO | null): string =>
+const readImageStorageLayout = (dto: RuntimeConfigDTO | null): string =>
   typeof dto?.config?.image_subfolder_strategy === 'string' ? dto.config.image_subfolder_strategy : 'flat';
 
 const toImageMoveStatus = (dto: ImageMoveStatusDTO): ImageMoveStatus => ({
@@ -95,7 +83,7 @@ const fenced = <T>(owner: AccountScope, request: (signal: AbortSignal) => Promis
     return result;
   });
 
-export const getImageStorageLayout = (signal?: AbortSignal): Promise<string> =>
+const getImageStorageLayout = (signal?: AbortSignal): Promise<string> =>
   apiFetchJson<RuntimeConfigDTO>('/api/v1/app/runtime_config', { signal }).then(readImageStorageLayout);
 
 export const imageStorageLayoutQueryOptions = (owner = captureAccountScope()) =>
@@ -123,8 +111,17 @@ export const updateImageStorageLayout = async (
   await client.invalidateQueries({ queryKey: imageStorageKeys.moveStatus(owner) });
 };
 
-export const getImageMoveStatus = (signal?: AbortSignal): Promise<ImageMoveStatus> =>
+const getImageMoveStatus = (signal?: AbortSignal): Promise<ImageMoveStatus> =>
   apiFetchJson<ImageMoveStatusDTO>('/api/v1/image_moves/status', { signal }).then(toImageMoveStatus);
+
+/**
+ * The move relocated the files and answered thumbnail reads with 409 while it ran, so a gallery that saw it needs
+ * its listings and its mounted thumbnails read again.
+ */
+const refreshGalleryAfterMove = (client: QueryClient, owner: AccountScope): void => {
+  void invalidateGallery(client, owner);
+  refreshGalleryThumbnails(owner);
+};
 
 /**
  * Polls while a job runs. The read that first sees a job stop refreshes the gallery, since the move changed
@@ -137,7 +134,7 @@ export const imageMoveStatusQueryOptions = (owner = captureAccountScope()) =>
       const status = await fenced(owner, getImageMoveStatus, signal);
 
       if (previous?.isRunning && !status.isRunning) {
-        void invalidateGallery(client, owner);
+        refreshGalleryAfterMove(client, owner);
       }
 
       return status;
@@ -154,14 +151,33 @@ const postImageMove = async (
   route: 'start' | 'recover',
   owner: AccountScope
 ): Promise<ImageMoveStatus> => {
-  const status = await apiFetchJson<ImageMoveStatusDTO>(`/api/v1/image_moves/${route}`, {
-    method: 'POST',
-    signal: owner.signal,
-  }).then(toImageMoveStatus);
+  const queryKey = imageStorageKeys.moveStatus(owner);
+  let status: ImageMoveStatus;
+
+  try {
+    status = await apiFetchJson<ImageMoveStatusDTO>(`/api/v1/image_moves/${route}`, {
+      method: 'POST',
+      signal: owner.signal,
+    }).then(toImageMoveStatus);
+  } catch (error) {
+    // A refusal usually means the cached status is stale (another admin's job, finished queue work): re-read it so
+    // the editor locks or frees its controls from what the server says now.
+    if (isAccountScopeCurrent(owner)) {
+      void client.invalidateQueries({ queryKey });
+    }
+    throw error;
+  }
 
   assertAccountScopeCurrent(owner);
+  // A status read already in flight could answer "idle" after this POST and stop the polling mid-move.
+  await client.cancelQueries({ queryKey });
   // The accepted status says the job is running, which starts the status query polling.
-  client.setQueryData(imageStorageKeys.moveStatus(owner), status);
+  client.setQueryData(queryKey, status);
+
+  if (!status.isRunning) {
+    // A tiny move can finish before the 202 goes out; nothing will poll, so the gallery refresh happens here.
+    refreshGalleryAfterMove(client, owner);
+  }
 
   return status;
 };

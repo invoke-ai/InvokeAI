@@ -47,6 +47,8 @@ vi.mock('@platform/transport/http', async (importOriginal) => ({
 vi.mock('@features/gallery/queries', async (importOriginal) => ({
   ...((actual) => ({
     ...actual,
+    // The tile's own retry must not add a request while this test counts the maintenance refresh.
+    createGalleryThumbnailRetryController: () => actual.createGalleryThumbnailRetryController([600_000]),
     invalidateGallery: (...args: unknown[]) => mocks.invalidateGallery(...args),
     refreshGalleryThumbnails: (...args: Parameters<typeof actual.refreshGalleryThumbnails>) => {
       mocks.refreshGalleryThumbnails(...args);

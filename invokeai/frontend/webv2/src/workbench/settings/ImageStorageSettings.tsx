@@ -18,7 +18,7 @@ import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { Field } from '@platform/ui/Field';
 import { Select } from '@platform/ui/Select';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useId, useMemo, useState } from 'react';
+import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const tKey = (key: string): string => `settings.imageStorage.${key}`;
@@ -51,6 +51,10 @@ const ImageStorageEditor = () => {
   // Polling lives with this editor: the gallery refresh at the end of a move needs it open until the job stops.
   const statusQuery = useQuery(imageMoveStatusQueryOptions());
   const actionErrorId = useId();
+  // After an accepted start, or a refusal that reveals another admin's move, every control is disabled; the
+  // closing confirmation returns focus to the section that now reports the outcome instead of the document body.
+  const maintenanceRef = useRef<HTMLDivElement>(null);
+  const getMaintenanceEl = useCallback(() => maintenanceRef.current, []);
   const { isBusy: isSavingLayout, run: runLayoutSave } = useScopedAction();
   const { isBusy: isActing, run: runAction } = useScopedAction();
   const [layoutError, setLayoutError] = useState<string | null>(null);
@@ -90,7 +94,8 @@ const ImageStorageEditor = () => {
   const requestStart = useCallback(() => setPendingAction('start'), []);
   const requestRecover = useCallback(() => setPendingAction('recover'), []);
   const closeConfirmation = useCallback(() => setPendingAction(null), []);
-  const confirmAction = useCallback(() => {
+  // Returns the request so the dialog shows it in flight; the dialog closes when it settles, either way.
+  const confirmAction = useCallback(async () => {
     const action = pendingAction;
 
     if (action === null) {
@@ -98,7 +103,7 @@ const ImageStorageEditor = () => {
     }
 
     setActionError(null);
-    void runAction(
+    await runAction(
       async (owner) => {
         await (action === 'start' ? startImageMove(queryClient, owner) : startImageMoveRecovery(queryClient, owner));
       },
@@ -114,11 +119,14 @@ const ImageStorageEditor = () => {
   const hasActiveJob = status !== null && status.activeJobId !== null;
   const isStatusUsable = status !== null && !statusQuery.isError;
   const isBusy = isRunning || isActing || !isStatusUsable;
+  // The move reads the layout per batch, so changing it while a job runs (or may be running: status unknown, or a
+  // start still being accepted) would leave the images split between two layouts.
+  const isLayoutLocked = layoutQuery.isPending || isSavingLayout || isBusy;
 
   return (
     <Stack gap="4">
       <Field
-        disabled={layoutQuery.isPending || isSavingLayout || isRunning}
+        disabled={isLayoutLocked}
         error={layoutError}
         helpText={t(tKey('layoutHelp'))}
         label={t(tKey('layoutLabel'))}
@@ -135,7 +143,7 @@ const ImageStorageEditor = () => {
         ) : (
           <Select
             collection={layoutCollection}
-            disabled={layoutQuery.isPending || isSavingLayout || isRunning}
+            disabled={isLayoutLocked}
             portalled={false}
             positioning={SELECT_POSITIONING}
             size="lg"
@@ -145,7 +153,7 @@ const ImageStorageEditor = () => {
           />
         )}
       </Field>
-      <Stack gap="2">
+      <Stack ref={maintenanceRef} gap="2" tabIndex={-1}>
         <Text color="fg" fontSize="lg" fontWeight="500">
           {t(tKey('maintenanceHeading'))}
         </Text>
@@ -189,6 +197,7 @@ const ImageStorageEditor = () => {
       <ConfirmDialog
         body={t(tKey(pendingAction === 'recover' ? 'recoverConfirmBody' : 'startConfirmBody'))}
         confirmLabel={t(tKey(pendingAction === 'recover' ? 'recover' : 'startMove'))}
+        finalFocusEl={getMaintenanceEl}
         isDestructive={false}
         isOpen={pendingAction !== null}
         title={t(tKey(pendingAction === 'recover' ? 'recoverConfirmTitle' : 'startConfirmTitle'))}

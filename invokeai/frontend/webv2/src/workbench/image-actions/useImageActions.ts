@@ -937,8 +937,19 @@ export const useImageActions = ({
               });
               return;
             }
-            // A timeout or abort only ends the watch; the backend item keeps running.
-            if (!(error instanceof UtilityQueueError && (error.reason === 'timeout' || error.reason === 'aborted'))) {
+            // The item is gone without a terminal event: cleared while pending, or pruned after completing while
+            // the socket was down. Either way the gallery may hold its maps.
+            if (error instanceof UtilityQueueError && error.reason === 'removed') {
+              void invalidateGallery(queryClient, owner);
+              notifications.add({
+                kind: 'info',
+                message: t('widgets.gallery.itemActions.pbrMaps.removedMessage', { name: image.imageName }),
+                title: t('widgets.gallery.itemActions.pbrMaps.removed'),
+              });
+              return;
+            }
+            // An abort only ends the watch; the backend item keeps running.
+            if (!(error instanceof UtilityQueueError && error.reason === 'aborted')) {
               recordError(error);
             }
           }

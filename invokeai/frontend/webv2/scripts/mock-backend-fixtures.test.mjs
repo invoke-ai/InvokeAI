@@ -1004,6 +1004,27 @@ test('image storage: a move runs across status polls, commits, and refuses to ov
     assert.equal(inProgress.is_running, true);
     assert.equal(inProgress.operation, 'move_all');
 
+    // Like the real maintenance guard: image files and media mutations refuse while the move runs, listings do not.
+    const listed = await getJson(backend, '/api/v1/images/?limit=1&offset=0');
+    const imageName = listed.items[0].image_name;
+    const thumbnail = await fetch(`${backend.origin}/api/v1/images/i/${imageName}/thumbnail`);
+
+    assert.equal(thumbnail.status, 409);
+    assert.deepEqual(await thumbnail.json(), { detail: 'Image storage maintenance is active' });
+    assert.equal((await fetch(`${backend.origin}/api/v1/images/i/${imageName}`)).status, 200);
+    assert.equal(
+      (
+        await fetch(`${backend.origin}/api/v1/images/star`, {
+          body: JSON.stringify({ image_names: [imageName] }),
+          headers: { 'content-type': 'application/json' },
+          method: 'POST',
+        })
+      ).status,
+      409
+    );
+    assert.equal((await fetch(`${backend.origin}/api/v1/board_images/`)).status, 409);
+    assert.equal((await fetch(`${backend.origin}/api/v1/boards/?all=true`)).status, 200);
+
     assert.deepEqual(await getJson(backend, '/api/v1/image_moves/status'), {
       active_job_id: null,
       is_running: false,
@@ -1012,6 +1033,42 @@ test('image storage: a move runs across status polls, commits, and refuses to ov
       needs_move_count: 0,
       operation: null,
     });
+    assert.equal((await fetch(`${backend.origin}/api/v1/images/i/${imageName}/thumbnail`)).status, 200);
+  });
+});
+
+test('image storage: an instant move commits inside the POST, and a failed job counts as finished', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    await getJson(backend, '/api/v1/app/runtime_config', {
+      body: JSON.stringify({ image_subfolder_strategy: 'type' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH',
+    });
+    await getJson(backend, '/__faults?imageMoves=instant', { method: 'POST' });
+
+    const accepted = await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' });
+
+    assert.equal(accepted.status, 202);
+    assert.deepEqual(await accepted.json(), {
+      active_job_id: null,
+      is_running: false,
+      last_error: null,
+      latest_job: { error_message: null, id: 1, state: 'committed' },
+      needs_move_count: 0,
+      operation: null,
+    });
+
+    await getJson(backend, '/__faults?imageMoves=failed', { method: 'POST' });
+
+    const failed = await getJson(backend, '/api/v1/image_moves/status');
+
+    assert.equal(failed.active_job_id, null);
+    assert.equal(failed.is_running, false);
+    assert.equal(failed.latest_job.state, 'error');
+    assert.equal(failed.latest_job.error_message, 'Disk full while moving images');
+    assert.equal(failed.last_error, 'Disk full while moving images');
+    // A finished job needs no recovery, so another move may start.
+    assert.equal((await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' })).status, 202);
   });
 });
 

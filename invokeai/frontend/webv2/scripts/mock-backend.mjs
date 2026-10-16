@@ -50,12 +50,17 @@ const ARCHITECTURE_CAPABILITIES = JSON.parse(
  * /__reset; independent of workload profile. `user` also turns on multi-user auth with a non-admin session: sign in
  * with any email and password (or reload a page that already holds the token) to reach the non-admin UI. It also
  * makes the admin-only image storage routes answer 403. `imageMoves` seeds the image move journal: `idle` (the
- * default), `needs-recovery` (an interrupted job that only Recover can finish) or `queue-active` (Start Move is
- * refused with 409 while recovery still works).
+ * default), `needs-recovery` (an interrupted job that only Recover can finish), `failed` (a job that ended in error,
+ * which counts as finished), `queue-active` (Start Move is refused with 409 while recovery still works) or `instant`
+ * (a move so small it commits before the POST answers, so `is_running` is already false). While a move or recovery
+ * runs, image files and media mutations answer 409 like the real maintenance guard; listings stay readable.
  */
 const CAPABILITY_FAULTS = new Set(['ok', 'error', 'empty']);
 const INTERMEDIATES_CALLERS = new Set(['admin', 'user']);
-const IMAGE_MOVE_FAULTS = new Set(['idle', 'needs-recovery', 'queue-active']);
+const IMAGE_MOVE_FAULTS = new Set(['idle', 'needs-recovery', 'failed', 'queue-active', 'instant']);
+const IMAGE_MOVE_MAINTENANCE_DETAIL = 'Image storage maintenance is active';
+/** The job states the real service counts as finished; any other journaled job still needs recovery. */
+const FINISHED_IMAGE_MOVE_JOB_STATES = new Set(['committed', 'error']);
 const IMAGE_STORAGE_LAYOUTS = new Set(['flat', 'date', 'type', 'hash']);
 /** Status reads a running move or recovery takes to finish, so polling clients observe it in progress. */
 const IMAGE_MOVE_TICKS = 2;
@@ -79,7 +84,8 @@ const imageMoveStatus = (state) => {
   const storage = state.imageStorage;
 
   return {
-    active_job_id: storage.job !== null && storage.job.state !== 'committed' ? storage.job.id : null,
+    active_job_id:
+      storage.job !== null && !FINISHED_IMAGE_MOVE_JOB_STATES.has(storage.job.state) ? storage.job.id : null,
     is_running: storage.running !== null,
     last_error: storage.lastError,
     latest_job: storage.job === null ? null : { ...storage.job },
@@ -96,7 +102,28 @@ const seedInterruptedImageMove = (state) => {
   storage.lastError = 'Server stopped during an image move';
 };
 
-const startImageMoveOperation = (state, operation) => {
+const seedFailedImageMove = (state) => {
+  const storage = state.imageStorage;
+
+  storage.job = { error_message: 'Disk full while moving images', id: storage.nextJobId, state: 'error' };
+  storage.nextJobId += 1;
+  storage.lastError = 'Disk full while moving images';
+};
+
+const commitImageMove = (state) => {
+  const storage = state.imageStorage;
+
+  if (storage.running.operation === 'move_all') {
+    storage.storedLayout = storage.layout;
+  }
+  if (storage.job !== null) {
+    storage.job = { ...storage.job, state: 'committed' };
+  }
+  storage.running = null;
+};
+
+/** An `instant` move commits before the POST answers, as a tiny library does on the real server. */
+const startImageMoveOperation = (state, operation, { instant = false } = {}) => {
   const storage = state.imageStorage;
 
   if (operation === 'move_all') {
@@ -105,6 +132,9 @@ const startImageMoveOperation = (state, operation) => {
   }
   storage.lastError = null;
   storage.running = { operation, ticks: IMAGE_MOVE_TICKS };
+  if (instant) {
+    commitImageMove(state);
+  }
 };
 
 /** Each status read advances a running operation; it commits on the last tick. */
@@ -115,16 +145,23 @@ const tickImageMove = (state) => {
     return;
   }
   storage.running.ticks -= 1;
-  if (storage.running.ticks > 0) {
-    return;
+  if (storage.running.ticks === 0) {
+    commitImageMove(state);
   }
-  if (storage.running.operation === 'move_all') {
-    storage.storedLayout = storage.layout;
+};
+
+/**
+ * The real maintenance guard covers image uploads, deletions, edits, star changes, copies, downloads, image files
+ * and board-image membership, plus deleting a board with its images; listings and DTO reads stay open.
+ */
+const isImageMoveMaintenanceRoute = (method, path, url) => {
+  if (path.startsWith('/api/v1/board_images')) {
+    return true;
   }
-  if (storage.job !== null) {
-    storage.job = { ...storage.job, state: 'committed' };
+  if (path.startsWith('/api/v1/images')) {
+    return method !== 'GET' || /^\/api\/v1\/images\/i\/[^/]+\/(full|thumbnail|workflow)$/.test(path);
   }
-  storage.running = null;
+  return method === 'DELETE' && path.startsWith('/api/v1/boards/') && url.searchParams.get('include_images') === 'true';
 };
 
 const MOCK_USER_ID = 'fixture-user';
@@ -897,6 +934,9 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             if (imageMoves === 'needs-recovery') {
               seedInterruptedImageMove(state);
             }
+            if (imageMoves === 'failed') {
+              seedFailedImageMove(state);
+            }
           }
         }
 
@@ -1043,7 +1083,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             return json(409, { detail: 'Cannot move images while the queue has active work' });
           }
 
-          startImageMoveOperation(state, 'move_all');
+          startImageMoveOperation(state, 'move_all', { instant: faults.imageMoves === 'instant' });
           return json(202, imageMoveStatus(state));
         }
         if (method === 'POST' && path === '/api/v1/image_moves/recover') {
@@ -1051,9 +1091,13 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             return json(409, { detail: 'An image move job is already running' });
           }
 
-          startImageMoveOperation(state, 'recovery');
+          startImageMoveOperation(state, 'recovery', { instant: faults.imageMoves === 'instant' });
           return json(202, imageMoveStatus(state));
         }
+      }
+
+      if (state.imageStorage.running !== null && isImageMoveMaintenanceRoute(method, path, url)) {
+        return json(409, { detail: IMAGE_MOVE_MAINTENANCE_DETAIL });
       }
 
       if (path.startsWith('/api/v1/app/external_providers')) {

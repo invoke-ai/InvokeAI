@@ -62,6 +62,77 @@ export const getRefreshedGalleryThumbnailUrl = (url: string, currentRevision: nu
   return refreshedUrl.toString();
 };
 
+/** The waits before each retry of a tile image that failed to load; once they are spent the tile gives up. */
+export const GALLERY_THUMBNAIL_RETRY_DELAYS_MS: readonly number[] = [3_000, 6_000, 12_000, 24_000, 30_000];
+
+export interface GalleryThumbnailRetryController {
+  /** How many retries have fired; each one changes the tile's URL through the thumbnail revision parameter. */
+  getNonce: () => number;
+  subscribe: (listener: () => void) => () => void;
+  /**
+   * The image at `url` failed to load: schedule the next retry unless one is pending or the attempts are spent. A
+   * different `url` from the last failure starts the attempts over, since index-keyed slots hand a mounted tile
+   * another item.
+   */
+  onError: (url: string) => void;
+  /** The image loaded: forget the failures, keeping the nonce so the image just shown is not reloaded. */
+  onLoad: () => void;
+  /** Drops a scheduled retry, for a tile that left the screen; the controller stays usable. */
+  stop: () => void;
+}
+
+/**
+ * An image move answers thumbnail reads with 409 for everyone and nothing tells a non-admin tab when it ends, so a
+ * tile asks again by itself on a bounded backoff. The attempts are capped rather than timed: a thumbnail that is
+ * really gone costs a handful of requests per mount, not one every 30 s for minutes.
+ */
+export const createGalleryThumbnailRetryController = (
+  delaysMs: readonly number[] = GALLERY_THUMBNAIL_RETRY_DELAYS_MS
+): GalleryThumbnailRetryController => {
+  const listeners = new Set<() => void>();
+  let nonce = 0;
+  let failures = 0;
+  let failingUrl: string | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  const stop = (): void => {
+    if (timer !== null) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  };
+
+  return {
+    getNonce: () => nonce,
+    onError: (url) => {
+      if (url !== failingUrl) {
+        failingUrl = url;
+        failures = 0;
+        stop();
+      }
+      if (timer !== null || failures >= delaysMs.length) {
+        return;
+      }
+      const delayMs = delaysMs[failures] ?? 0;
+      failures += 1;
+      timer = setTimeout(() => {
+        timer = null;
+        nonce += 1;
+        listeners.forEach((listener) => listener());
+      }, delayMs);
+    },
+    onLoad: () => {
+      stop();
+      failures = 0;
+    },
+    stop,
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  };
+};
+
 /** A list window's pages, or one sparse/strip page. */
 type GalleryItemsCacheData = InfiniteData<GalleryItemsPage, number> | GalleryItemsPage;
 
