@@ -79,6 +79,27 @@ def test_positive_and_negative_amount_separate_midtone_detail_in_opposite_direct
     assert negative_contrast < source_contrast - 1.0
 
 
+def test_extended_amounts_produce_stronger_clarity_adjustments() -> None:
+    source = _gray_image(_gray_sinusoid(level=128, amplitude=16, wavelength=16))
+    center = (slice(32, -32), slice(32, -32))
+
+    original = np.asarray(source, dtype=np.float32)
+    source_contrast = float(original[center].std())
+    positive_100 = np.asarray(clarity(source, amount=100, size=12), dtype=np.float32)
+    positive_200 = np.asarray(clarity(source, amount=200, size=12), dtype=np.float32)
+    negative_100 = np.asarray(clarity(source, amount=-100, size=12), dtype=np.float32)
+    negative_200 = np.asarray(clarity(source, amount=-200, size=12), dtype=np.float32)
+
+    assert float(positive_200[center].std()) > float(positive_100[center].std()) > source_contrast
+    assert float(negative_200[center].std()) < float(negative_100[center].std()) < source_contrast
+
+
+@pytest.mark.parametrize("amount", [float("nan"), float("inf"), float("-inf"), -200.01, 200.01, True])
+def test_invalid_amount_is_rejected(amount: float) -> None:
+    with pytest.raises(ValueError):
+        clarity(Image.new("RGB", (3, 2), (120, 130, 140)), amount=amount)
+
+
 def test_tone_gate_reduces_effect_near_black_and_white() -> None:
     regions = np.concatenate(
         [

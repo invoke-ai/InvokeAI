@@ -53,7 +53,7 @@ def test_node_is_registered_with_stable_identity_and_defaults(
     assert node_class.UIConfig.title == title
     assert node_class.UIConfig.tags
     assert node_class.UIConfig.category == "image"
-    assert node_class.UIConfig.version == "1.0.0"
+    assert node_class.UIConfig.version == "1.0.1"
     assert node_class.UIConfig.node_pack == "invokeai"
     assert "image" in node_class.model_fields
     assert node_class.model_fields["amount"].default == 0
@@ -88,9 +88,9 @@ def test_amount_bounds_and_non_finite_values_are_rejected(
 ) -> None:
     del title, effect, size_default, size_bounds, metadata
     node_class = nodes[node_id]
-    for amount in (-100, 0, 100):
+    for amount in (-200, -100, 0, 100, 200):
         node_class.model_validate({"image": {"image_name": "input"}, "amount": amount})
-    for amount in (-100.01, 100.01, float("nan"), float("inf"), -float("inf")):
+    for amount in (-200.01, 200.01, float("nan"), float("inf"), -float("inf")):
         with pytest.raises(ValidationError):
             node_class.model_validate({"image": {"image_name": "input"}, "amount": amount})
 
