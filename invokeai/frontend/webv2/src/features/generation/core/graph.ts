@@ -1291,15 +1291,10 @@ const buildQwenImage21Graph = (
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
 ): BackendGraphContract => {
-  // A Diffusers pipeline brings its VAE and encoder; single-file and GGUF transformers need both supplied.
-  const isDiffusers = model.format === 'diffusers';
+  // A Diffusers pipeline brings its VAE and encoder; for single-file and GGUF transformers the generation policy
+  // requires both before this runs.
   const vaeModel = getCompatibleVae(settings, model);
   const qwen3VlEncoderModel = getCompatibleComponent(settings.qwen3VLEncoderModel, isQwen3Vl8bEncoder);
-
-  if (!isDiffusers) {
-    requireComponent(vaeModel, 'Qwen-Image-2.1 VAE');
-    requireComponent(qwen3VlEncoderModel, 'Qwen3-VL Encoder');
-  }
 
   const graph: BackendGraphContract = { edges: [], id: createId('qwen_image_2_1_graph'), nodes: {} };
   const { negativePrompt, positivePrompt, seed } = addPromptAndSeedNodes(graph);

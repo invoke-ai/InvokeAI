@@ -1084,7 +1084,10 @@ describe('Qwen-Image-2.1 graphs', () => {
     expect(withCfg.nodes.neg_cond?.type).toBe('qwen_image_2_1_text_encoder');
     expect(getEdge(withCfg, 'denoise_latents', 'negative_conditioning')?.source.node_id).toBe('neg_cond');
     expect(getEdge(withCfg, 'neg_cond', 'prompt')?.source.node_id).toBe('negative_prompt');
-    expect(getEdge(withCfg, 'neg_cond', 'qwen3_vl_encoder')?.source.node_id).toBe('model_loader');
+    expect(getEdge(withCfg, 'neg_cond', 'qwen3_vl_encoder')?.source).toEqual({
+      field: 'qwen3_vl_encoder',
+      node_id: 'model_loader',
+    });
     expect(withCfg.nodes.denoise_latents).toMatchObject({ cfg_scale: 4 });
   });
 
