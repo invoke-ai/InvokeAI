@@ -44,6 +44,7 @@ export {
   getGenerationValidationReasons,
   getMaxReferenceImages,
   getPromptHistoryRecallPatch,
+  getSchedulerOptions,
   getSettingsWithModelDefaults,
   isArchitectureDescribed,
   isGenerateModelSelectable,
@@ -61,7 +62,11 @@ export {
 } from './core/resolveGenerateWidgetValues';
 export {
   getCompatibleDiffusersComponentSource,
+  isAnimaQwen35Encoder,
+  isAnimaQwen3Encoder,
+  isBundledMainForBase,
   isDiffusersMainForBase,
+  isNonAnimaQwen3Encoder,
   isVaeAcceptedByBase,
   isVaeCompatibleWithGenerateModel,
 } from './core/componentCompatibility';
