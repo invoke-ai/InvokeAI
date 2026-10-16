@@ -1,7 +1,7 @@
 ---
 title: Model Format Support
 description: Which file formats and quantizations InvokeAI loads for every model family, text encoder, VAE and adapter.
-lastUpdated: 2026-10-10
+lastUpdated: 2026-10-11
 sidebar:
   order: 3
 ---
@@ -55,7 +55,7 @@ Ministral 3B encoder. Others are recognized by their layer names and fail, or mi
 | Encoder | Used by | Folder | Single file (bf16) | fp8 scaled | int8 | nvfp4 | GGUF | SDNQ |
 |---|---|---|---|---|---|---|---|---|
 | T5-XXL | FLUX.1, SD 3 | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ (and bitsandbytes int8) |
-| CLIP-L / CLIP-G | SD, SDXL, FLUX.1, SD 3 | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | CLIP-L inside a FLUX.1 SDNQ pipeline |
+| CLIP-L / CLIP-G | SD, SDXL, FLUX.1, SD 3 | ✓ | ✓ | R | R | – | ✗ | CLIP-L inside a FLUX.1 SDNQ pipeline |
 | Qwen3 0.6B / 4B / 8B | Z-Image, FLUX.2 Klein, Anima | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Qwen3-VL 4B / 8B | Krea-2, Ideogram 4 | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ |
 | Qwen3-VL 32B (truncated) | MiniMax H3 | in the Diffusers folder | ✓ | L | ✓ | L | ✗ | ✗ |
@@ -66,6 +66,11 @@ Ministral 3B encoder. Others are recognized by their layer names and fail, or mi
 | Gemma-2 2B | PiD decoders | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ |
 | Gemma-4 12B | LTX-2 | ✓ (bf16 or int8) | ✗ | L | in the folder | L | ✗ | ✗ |
 | UMT5 | Wan 2.2 | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+
+The single-file CLIP builds are ComfyUI's `clip_l` and `clip_g`, as used by FLUX.1 and SD 3. SD and SDXL take their
+CLIP encoders from the main model only, so a separate CLIP file does not change them. A CLIP-G file needs its
+`text_projection` for SD 3 and is refused without it, as are extended-context CLIP-L variants such as Long-CLIP.
+FLUX.1 takes CLIP-L only.
 
 The Qwen3-VL GGUF encoder is the language model only; a separate `mmproj` vision file is refused, and split
 multi-part GGUFs have to be joined before installing. The Gemma-4 encoder installs only as a folder: its
