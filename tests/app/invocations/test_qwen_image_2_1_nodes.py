@@ -18,6 +18,7 @@ from invokeai.app.invocations.qwen_image_2_1.qwen_image_2_1_denoise import (
     KV_BYTES_PER_PREFIX_TOKEN,
     LATENT_CHANNELS,
     QwenImage21DenoiseInvocation,
+    clip_sigmas,
     pack_latents,
     prefix_cache_fits,
     prefix_length,
@@ -186,11 +187,54 @@ def test_image_to_image_on_turbo_starts_at_the_noise_level_of_its_strength() -> 
     assert sum(prompt == "neg" for prompt, *_ in transformer.calls) == 2
 
 
+def test_image_to_image_on_base_starts_at_the_step_its_strength_names() -> None:
+    # Base picks by step index, as Qwen-Image and diffusers' image-to-image pipelines do: a strength of 0.5 skips
+    # the first half of the steps. Its shifted schedule is still well above 0.5 there.
+    from invokeai.backend.qwen_image_2_1.sampling import build_sigmas
+
+    schedule = build_sigmas(QwenImage21VariantType.Base, 8, (64 // 16) * (64 // 16)).tolist()
+    transformer = _Transformer()
+    _denoise(steps=8, denoising_start=0.5, latents=LatentsField(latents_name="init"))._run_diffusion(
+        _context(transformer, QwenImage21VariantType.Base, init_latents=torch.zeros(1, LATENT_CHANNELS, 4, 4))
+    )
+
+    starts = [t for prompt, _cache, _mode, t in transformer.calls if prompt == "pos"]
+    assert starts == pytest.approx(schedule[4:8], abs=1e-3)
+    assert starts[0] > 0.5
+
+
+@pytest.mark.parametrize(
+    ("start", "end", "expected"),
+    [(0.0, 1.0, (0, 8)), (0.5, 1.0, (4, 4)), (0.99, 1.0, (7, 1)), (0.0, 0.01, (0, 1)), (0.25, 0.75, (2, 4))],
+)
+def test_a_strength_on_base_names_whole_steps_and_always_runs_one(
+    start: float, end: float, expected: tuple[int, int]
+) -> None:
+    sigmas = [1.0 - i / 8 for i in range(9)]
+    clipped, first_step = clip_sigmas(sigmas, start, end, by_noise_level=False)
+    assert (first_step, len(clipped) - 1) == expected
+    assert clipped == sigmas[first_step : first_step + len(clipped)]
+
+
 def test_a_float32_fallback_reserves_twice_the_bfloat16_activations() -> None:
     estimate = QwenImage21DenoiseInvocation._estimate_working_memory
     base = 1024**3
     bf16 = estimate(4096, 300, 300, True, True, 2) - base
     assert estimate(4096, 300, 300, True, True, 4) - base == 2 * bf16
+
+
+def test_the_estimate_is_priced_at_the_compute_dtypes_width(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The CPU fixture computes in float32; a hard-coded bf16 width at the call site would halve the estimate.
+    widths: list[int] = []
+    estimate = QwenImage21DenoiseInvocation._estimate_working_memory
+
+    def spy(*args):
+        widths.append(args[-1])
+        return estimate(*args)
+
+    monkeypatch.setattr(QwenImage21DenoiseInvocation, "_estimate_working_memory", staticmethod(spy))
+    _denoise()._run_diffusion(_context(_Transformer(), QwenImage21VariantType.Base))
+    assert widths == [torch.float32.itemsize]
 
 
 class _DecodingVAE:

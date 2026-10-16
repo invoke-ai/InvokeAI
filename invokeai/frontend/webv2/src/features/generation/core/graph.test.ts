@@ -121,7 +121,13 @@ const fluxVae: VaeModelConfig = { base: 'flux', key: 'flux-vae', name: 'FLUX VAE
 const flux2Vae: VaeModelConfig = { base: 'flux2', key: 'flux2-vae', name: 'FLUX.2 VAE', type: 'vae' };
 const qwenImageVae: VaeModelConfig = { base: 'qwen-image', key: 'qwen-vae', name: 'Qwen VAE', type: 'vae' };
 const t5Encoder: ComponentModelConfig = { base: 'any', key: 't5', name: 'T5 Encoder', type: 't5_encoder' };
-const clipEmbed: ComponentModelConfig = { base: 'any', key: 'clip', name: 'CLIP Embed', type: 'clip_embed' };
+const clipEmbed: ComponentModelConfig = {
+  base: 'any',
+  key: 'clip',
+  name: 'CLIP Embed',
+  type: 'clip_embed',
+  variant: 'large',
+};
 const mistralEncoder: ComponentModelConfig = {
   base: 'any',
   key: 'mistral',
@@ -1138,7 +1144,10 @@ describe('Qwen-Image-2.1 graphs', () => {
     expect(withCfg.nodes.neg_cond?.type).toBe('qwen_image_2_1_text_encoder');
     expect(getEdge(withCfg, 'denoise_latents', 'negative_conditioning')?.source.node_id).toBe('neg_cond');
     expect(getEdge(withCfg, 'neg_cond', 'prompt')?.source.node_id).toBe('negative_prompt');
-    expect(getEdge(withCfg, 'neg_cond', 'qwen3_vl_encoder')?.source.node_id).toBe('model_loader');
+    expect(getEdge(withCfg, 'neg_cond', 'qwen3_vl_encoder')?.source).toEqual({
+      field: 'qwen3_vl_encoder',
+      node_id: 'model_loader',
+    });
     expect(withCfg.nodes.denoise_latents).toMatchObject({ cfg_scale: 4 });
   });
 

@@ -103,7 +103,8 @@ shift. Leave it blank to have it calculated from the image size, which is the re
 Two Z-Image ControlNets are available as starters (both are part of the bundle):
 
 - **Z-Image ControlNet Union** handles Canny, HED, Depth, Pose and MLSD control images.
-- **Z-Image ControlNet Tile** is useful for upscaling and adding detail.
+- **Z-Image ControlNet Tile** is useful for upscaling and adding detail. The **Upscale** tool can use it as an
+  optional anchor; see [Upscaling](/users-guide/image-generation/upscale/).
 
 On the Canvas, add a **Control Layer** while a Z-Image model is selected. The layer uses a Z-Image
 ControlNet with a default weight of `0.75`. The weight ranges from `0` to `2`, and `0.65` to `0.80` is the

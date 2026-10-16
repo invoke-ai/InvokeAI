@@ -24,7 +24,7 @@ from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.startup_utils import log_attention_backends
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
-from invokeai.backend.model_manager.taxonomy import BaseModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, QwenImage21VariantType
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.qwen_image_2_1.sampling import build_sigmas
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
@@ -42,18 +42,26 @@ TOKENS_PER_SLOT = 4
 logger = InvokeAILogger.get_logger(__name__)
 
 
-def clip_sigmas(sigmas: list[float], denoising_start: float, denoising_end: float) -> tuple[list[float], int]:
-    """The part of the schedule from noise level `1 - denoising_start` to `1 - denoising_end`, and the index of the
-    configured step it starts in.
+def clip_sigmas(
+    sigmas: list[float], denoising_start: float, denoising_end: float, *, by_noise_level: bool
+) -> tuple[list[float], int]:
+    """The part of the schedule `denoising_start` to `denoising_end` covers, and the index of the configured step
+    it starts in. A range shorter than a step still runs one step.
 
-    Picked by noise level, not by step index: Turbo's distilled table sits above 0.84 for six of its eight steps, so a
-    start picked by index would begin a moderate-strength image-to-image almost from pure noise. By level, a strength
-    means the same noise for both variants, and a range shorter than a step still runs one step.
+    Base picks by step index, as Qwen-Image, Z-Image and diffusers' image-to-image pipelines do, so a strength changes
+    the image as much as it does on those models: its shifted schedule stays at high noise for most of its steps.
+    Turbo picks by noise level (`1 - denoising_start` to `1 - denoising_end`): its distilled table sits above 0.84 for
+    six of its eight steps, so by index any strength from 0.5 to 0.85 would begin almost from pure noise.
     """
-    clipped = clip_timestep_schedule_fractional(list(sigmas), denoising_start, denoising_end)
-    # The configured step `clipped[0]` falls in: the last one starting at or above the start level.
-    first_step = sum(1 for sigma in sigmas if sigma >= 1.0 - denoising_start - 1e-6) - 1
-    return clipped, first_step
+    if by_noise_level:
+        clipped = clip_timestep_schedule_fractional(list(sigmas), denoising_start, denoising_end)
+        # The configured step `clipped[0]` falls in: the last one starting at or above the start level.
+        first_step = sum(1 for sigma in sigmas if sigma >= 1.0 - denoising_start - 1e-6) - 1
+        return clipped, first_step
+    steps = len(sigmas) - 1
+    first_step = min(int(round(denoising_start * steps)), steps - 1)
+    last_step = max(int(round(denoising_end * steps)), first_step + 1)
+    return list(sigmas[first_step : last_step + 1]), first_step
 
 
 def slot_runs(image_pad_mask: torch.Tensor | None) -> list[int]:
@@ -252,8 +260,14 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         latent_height, latent_width = self.height // VAE_SCALE_FACTOR, self.width // VAE_SCALE_FACTOR
         image_seq_len = latent_height * latent_width
 
-        full_sigmas = build_sigmas(getattr(transformer_config, "variant", None), self.steps, image_seq_len)
-        sigmas, first_step = clip_sigmas(full_sigmas.tolist(), self.denoising_start, self.denoising_end)
+        variant = getattr(transformer_config, "variant", None)
+        full_sigmas = build_sigmas(variant, self.steps, image_seq_len)
+        sigmas, first_step = clip_sigmas(
+            full_sigmas.tolist(),
+            self.denoising_start,
+            self.denoising_end,
+            by_noise_level=variant is QwenImage21VariantType.Turbo,
+        )
         sigmas = torch.tensor(sigmas, dtype=torch.float32, device=device)
         cfg_scale = self._prepare_cfg_scale(len(full_sigmas) - 1)[first_step : first_step + len(sigmas) - 1]
 
