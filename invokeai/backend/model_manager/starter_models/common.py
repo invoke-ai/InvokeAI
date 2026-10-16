@@ -370,8 +370,8 @@ qwen3_vl_encoder_4b = StarterModel(
     name="Qwen3-VL 4B Encoder (Diffusers)",
     base=BaseModelType.Any,
     source="Qwen/Qwen3-VL-4B-Instruct",
-    description="Qwen3-VL 4B text encoder (Qwen3VLModel) used by Krea-2, in HuggingFace folder layout "
-    "(includes tokenizer). Use with single-file / GGUF Krea-2 transformers. (~8GB)",
+    description="Qwen3-VL 4B text encoder (Qwen3VLModel) used by Krea-2 and FLUX.3, in HuggingFace folder "
+    "layout (includes tokenizer). Use with single-file / GGUF Krea-2 and FLUX.3 transformers. (~8GB)",
     type=ModelType.Qwen3VLEncoder,
     format=ModelFormat.Qwen3VLEncoder,
 )

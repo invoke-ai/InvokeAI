@@ -41,7 +41,7 @@ import {
   isFlux2Qwen3EncoderForModel,
   isQwen3Vl8bEncoder,
   isIdeogram4UnconditionalBranch,
-  isKrea2Qwen3VlEncoder,
+  isQwen3Vl4bEncoder,
   isNonAnimaQwen3Encoder,
   isSelfContainedSDNQFlux1Pipeline,
   isSelfContainedSDNQPipeline,
@@ -982,6 +982,26 @@ const getBaseComponentSectionPolicy = (
           missingMessage: 'Generate needs a VAE for Z-Image models.',
         },
       ]);
+    case 'flux3':
+      // A Diffusers FLUX.3 model bundles its VAE and encoder; single-file and GGUF models need both picked.
+      return createPolicy(model.format !== 'diffusers', [
+        {
+          ...vaeSlot(
+            'FLUX.3 decodes with the FLUX.2 VAE. Required for non-Diffusers FLUX.3 models; otherwise an optional override.',
+            isAcceptedVae
+          ),
+          required: (ctx) => ctx.model.format !== 'diffusers',
+          missingMessage: 'Generate needs a VAE for non-Diffusers FLUX.3 models.',
+        },
+        {
+          ...qwen3VlEncoderSlot(
+            'The Qwen3-VL 4B encoder. Required for non-Diffusers FLUX.3 models; otherwise an optional override.',
+            isQwen3Vl4bEncoder
+          ),
+          required: (ctx) => ctx.model.format !== 'diffusers',
+          missingMessage: 'Generate needs a Qwen3-VL Encoder for non-Diffusers FLUX.3 models.',
+        },
+      ]);
     case 'krea-2':
       // Bundled Krea models supply components; standalone models need a separate encoder and VAE.
       return createPolicy(model.format !== 'diffusers', [
@@ -994,7 +1014,7 @@ const getBaseComponentSectionPolicy = (
           missingMessage: 'Generate needs a VAE for non-Diffusers Krea-2 models.',
         },
         {
-          ...qwen3VlEncoderSlot('Required for non-Diffusers Krea-2 models.', isKrea2Qwen3VlEncoder),
+          ...qwen3VlEncoderSlot('Required for non-Diffusers Krea-2 models.', isQwen3Vl4bEncoder),
           required: (ctx) => ctx.model.format !== 'diffusers',
           missingMessage: 'Generate needs a Qwen3-VL Encoder for non-Diffusers Krea-2 models.',
         },
@@ -1305,7 +1325,8 @@ export const getDefaultReferenceImageConfig = (
     return { image, type: 'external_reference_image' };
   }
 
-  if (modelBase === 'flux2') {
+  // FLUX.3 takes its references exactly as FLUX.2 does: plain images, VAE-encoded by the denoiser.
+  if (modelBase === 'flux2' || modelBase === 'flux3') {
     return { image, type: 'flux2_reference_image' };
   }
 
@@ -1339,7 +1360,7 @@ const getReferenceImageConfigSupported = (
     case 'external_reference_image':
       return model.type === 'external_image_generator' && model.capabilities?.supports_reference_images === true;
     case 'flux2_reference_image':
-      return model.type !== 'external_image_generator' && model.base === 'flux2';
+      return model.type !== 'external_image_generator' && (model.base === 'flux2' || model.base === 'flux3');
     case 'qwen_image_reference_image':
       return model.type !== 'external_image_generator' && model.base === 'qwen-image' && model.variant === 'edit';
     case 'flux_kontext_reference_image':
@@ -1684,6 +1705,11 @@ const getModelFamilyValidationReasons = (model: MainModelConfig, settings: Gener
     !isValidKrea2RebalanceWeights(settings.krea2RebalanceWeights)
   ) {
     reasons.push(`Krea-2 rebalance weights must be ${KREA2_REBALANCE_WEIGHT_COUNT} comma-separated numbers.`);
+  }
+
+  // FLUX.3 Klein is a step-distilled flow map: it samples without CFG, and its denoise node refuses a scale above 1.
+  if (model.base === 'flux3' && model.variant === 'flux3_klein' && settings.cfgScale > 1) {
+    reasons.push('FLUX.3 Klein samples without CFG. Set CFG Scale to 1, or use FLUX.3 Klein Base for CFG.');
   }
 
   // Finite persisted Ideogram overrides still need range validation.

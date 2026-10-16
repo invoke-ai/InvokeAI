@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type {
   ComponentModelConfig,
   GenerateModelConfig,
+  GenerateReferenceImage,
   GenerateSettings,
   LoraModelConfig,
   MainModelConfig,
@@ -12,6 +13,7 @@ import type {
 
 import { getDefaultGenerateSettings, isSupportedGenerateModel } from './baseGenerationPolicies';
 import { compileGenerateGraph, resolveGenerateSeed } from './graph';
+import { getReferenceImagePromptTags } from './referenceImage';
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
 const sd2Model: MainModelConfig = { base: 'sd-2', key: 'sd2-model', name: 'SD 2', type: 'main' };
@@ -1102,6 +1104,66 @@ describe('Qwen-Image-2.1 graphs', () => {
     const graph = compile(qwen21Gguf, { qwen3VLEncoderModel: qwen3Vl8bEncoder, vae: qwen21Vae });
 
     expect(graph.nodes.model_loader).toMatchObject({ qwen3_vl_encoder_model: qwen3Vl8bEncoder, vae_model: qwen21Vae });
+  });
+});
+
+describe('FLUX.3 graphs', () => {
+  const kleinModel: MainModelConfig = {
+    base: 'flux3',
+    format: 'diffusers',
+    key: 'flux3-klein',
+    name: 'FLUX.3 Klein',
+    type: 'main',
+    variant: 'flux3_klein',
+  };
+  const kleinBaseModel: MainModelConfig = {
+    ...kleinModel,
+    key: 'flux3-klein-base',
+    name: 'FLUX.3 Klein Base',
+    variant: 'flux3_klein_base',
+  };
+  const reference = (id: string, isEnabled = true): GenerateReferenceImage => ({
+    config: {
+      image: { original: { image: { height: 512, image_name: `${id}.png`, width: 512 } } },
+      type: 'flux2_reference_image',
+    },
+    id,
+    isEnabled,
+  });
+
+  /** The reference images in the order the denoiser receives them, walking the collect chain back from it. */
+  const denoiserReferenceOrder = (graph: ReturnType<typeof compile>): string[] => {
+    const names: string[] = [];
+    let collect = getEdge(graph, 'denoise_latents', 'kontext_conditioning')?.source.node_id;
+    while (collect) {
+      const kontextId = getEdge(graph, collect, 'item')?.source.node_id;
+      const kontext = kontextId ? graph.nodes[kontextId] : undefined;
+      names.unshift((kontext as { image?: { image_name: string } } | undefined)?.image?.image_name ?? '?');
+      collect = getEdge(graph, collect, 'collection')?.source.node_id;
+    }
+    return names;
+  };
+
+  it('hands the denoiser the references in the order their prompt tags number them', () => {
+    const referenceImages = [reference('a'), reference('off', false), reference('b')];
+
+    const graph = compile(kleinModel, { referenceImages });
+
+    expect(denoiserReferenceOrder(graph)).toEqual(['a.png', 'b.png']);
+    expect([...getReferenceImagePromptTags('flux3', referenceImages)]).toEqual([
+      ['a', '<ref_image_0>'],
+      ['b', '<ref_image_1>'],
+    ]);
+  });
+
+  it('compiles the negative branch only for Klein Base at its CFG default', () => {
+    const klein = compile(kleinModel);
+    const kleinBase = compile(kleinBaseModel);
+
+    expect(getEdge(klein, 'denoise_latents', 'negative_conditioning')).toBeUndefined();
+    expect(getNodeByType(klein, 'flux3_denoise')).toMatchObject({ cfg_scale: 1, steps: 16 });
+    expect(getEdge(kleinBase, 'denoise_latents', 'negative_conditioning')?.source.node_id).toBe('neg_cond');
+    expect(getNodeByType(kleinBase, 'flux3_denoise')).toMatchObject({ cfg_scale: 3.5, steps: 50 });
   });
 });
 
