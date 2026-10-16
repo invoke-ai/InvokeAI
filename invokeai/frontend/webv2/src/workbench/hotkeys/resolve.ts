@@ -27,7 +27,7 @@ const getScopePriority = (hotkey: RegisteredHotkey, context: HotkeyContext): num
   }
 
   if (scope.kind === 'widget') {
-    return scope.typeId === context.activeWidgetTypeId ? 300 : -1;
+    return context.activeWidgetTypeId && scope.typeIds.includes(context.activeWidgetTypeId) ? 300 : -1;
   }
 
   if (scope.kind === 'focused-region') {

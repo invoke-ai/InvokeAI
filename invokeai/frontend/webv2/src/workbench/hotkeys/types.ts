@@ -10,7 +10,8 @@ export type HotkeyScope =
    * floating widget, whose window is no region others share — that one floating instance.
    */
   | { kind: 'focused-region'; region?: WidgetRegion; floatingInstanceId?: WidgetInstanceId }
-  | { kind: 'widget'; typeId: WidgetTypeId }
+  /** Matches while the key press is aimed at a widget of one of these types. */
+  | { kind: 'widget'; typeIds: readonly WidgetTypeId[] }
   | { kind: 'instance'; instanceId: WidgetInstanceId };
 
 export interface HotkeyDefinition {

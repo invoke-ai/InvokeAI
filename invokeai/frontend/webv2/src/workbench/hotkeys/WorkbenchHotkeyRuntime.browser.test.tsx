@@ -225,3 +225,52 @@ describe('WorkbenchHotkeyRuntime and toast buttons', () => {
     expect(ran).toEqual(['map.apply']);
   });
 });
+
+describe('WorkbenchHotkeyRuntime and selected-image shortcuts', () => {
+  /** A docked widget's DOM as the widget frame marks it for key targeting. */
+  const mountWidget = (typeId: string, region: string) => {
+    const element = document.createElement('div');
+    element.dataset.hotkeyWidgetInstanceId = typeId;
+    element.dataset.hotkeyWidgetRegion = region;
+    element.dataset.hotkeyWidgetTypeId = typeId;
+    host!.append(element);
+    return element;
+  };
+
+  beforeEach(() => {
+    // First-party commands are registered without a source, as `useRegisterFirstPartyCommands` does.
+    for (const id of [
+      'viewer.recallAll',
+      'viewer.recallSeed',
+      'viewer.recallPrompts',
+      'viewer.remix',
+      'gallery.remix',
+    ]) {
+      runtimeMocks.extensions.commands.register({ handler: () => ran.push(id), id, title: id });
+    }
+  });
+
+  // Recall acts on the gallery selection, so its keys answer where the user selects it as well as in Preview.
+  it('recalls from the gallery selection with focus in Gallery or Preview', async () => {
+    const gallery = mountWidget('gallery', 'right');
+    const preview = mountWidget('preview', 'center');
+
+    await pressKey('a', gallery);
+    await pressKey('s', gallery);
+    await pressKey('p', gallery);
+    await pressKey('s', preview);
+
+    expect(ran).toEqual(['viewer.recallAll', 'viewer.recallSeed', 'viewer.recallPrompts', 'viewer.recallSeed']);
+  });
+
+  it('keeps remix on each widget’s own binding and recall out of other widgets', async () => {
+    const gallery = mountWidget('gallery', 'right');
+    const preview = mountWidget('preview', 'center');
+
+    await pressKey('r', gallery);
+    await pressKey('r', preview);
+    await pressKey('s', host!.querySelector('[data-testid="window"]')!);
+
+    expect(ran).toEqual(['gallery.remix', 'viewer.remix']);
+  });
+});

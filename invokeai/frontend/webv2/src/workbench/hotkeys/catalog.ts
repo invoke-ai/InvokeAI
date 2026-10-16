@@ -1,4 +1,4 @@
-import type { HotkeyCategory, HotkeyDefinition } from './types';
+import type { HotkeyCategory, HotkeyDefinition, HotkeyScope } from './types';
 
 import { IS_MAC_OS } from './keys';
 
@@ -11,11 +11,17 @@ import { IS_MAC_OS } from './keys';
 
 const categoryScopes = {
   app: { kind: 'global' },
-  canvas: { kind: 'widget', typeId: 'canvas' },
-  gallery: { kind: 'widget', typeId: 'gallery' },
-  viewer: { kind: 'widget', typeId: 'preview' },
-  workflows: { kind: 'widget', typeId: 'workflow' },
-} as const;
+  canvas: { kind: 'widget', typeIds: ['canvas'] },
+  gallery: { kind: 'widget', typeIds: ['gallery'] },
+  viewer: { kind: 'widget', typeIds: ['preview'] },
+  workflows: { kind: 'widget', typeIds: ['workflow'] },
+} as const satisfies Record<HotkeyCategory, HotkeyScope>;
+
+/**
+ * Recall and workflow loading act on the gallery selection, which Preview shows, so they answer wherever the user
+ * selects or views it: Gallery or Preview. Remix stays per widget because Gallery binds its own.
+ */
+const selectedImageScope: HotkeyScope = { kind: 'widget', typeIds: ['preview', 'gallery'] };
 
 const implemented = new Set([
   'app.cancelQueueItem',
@@ -129,7 +135,12 @@ const formatHotkeyTitle = (id: string): string =>
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
 
-const hotkey = (category: HotkeyCategory, id: string, defaultKeys: string[]): HotkeyDefinition => {
+const hotkey = (
+  category: HotkeyCategory,
+  id: string,
+  defaultKeys: string[],
+  scope: HotkeyScope = categoryScopes[category]
+): HotkeyDefinition => {
   const commandId = `${category}.${id}`;
 
   return {
@@ -140,7 +151,7 @@ const hotkey = (category: HotkeyCategory, id: string, defaultKeys: string[]): Ho
     id: commandId,
     implemented: implemented.has(commandId),
     preventDefault: true,
-    scope: categoryScopes[category],
+    scope,
     title: formatHotkeyTitle(id),
   };
 };
@@ -284,12 +295,12 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('viewer', 'swapImages', ['c']),
   hotkey('viewer', 'nextComparisonMode', ['m']),
   hotkey('viewer', 'deleteImage', ['delete', 'backspace']),
-  hotkey('viewer', 'loadWorkflow', ['w']),
-  hotkey('viewer', 'recallAll', ['a']),
-  hotkey('viewer', 'recallSeed', ['s']),
-  hotkey('viewer', 'recallPrompts', ['p']),
+  hotkey('viewer', 'loadWorkflow', ['w'], selectedImageScope),
+  hotkey('viewer', 'recallAll', ['a'], selectedImageScope),
+  hotkey('viewer', 'recallSeed', ['s'], selectedImageScope),
+  hotkey('viewer', 'recallPrompts', ['p'], selectedImageScope),
   hotkey('viewer', 'remix', ['r']),
-  hotkey('viewer', 'useSize', ['d']),
+  hotkey('viewer', 'useSize', ['d'], selectedImageScope),
   hotkey('viewer', 'toggleMetadata', ['i']),
   hotkey('gallery', 'selectAllOnPage', ['mod+a']),
   hotkey('gallery', 'clearSelection', ['esc']),
