@@ -80,8 +80,10 @@ const T5_ENCODER_SLOT: UpscaleComponentSlot = {
   field: 't5EncoderModel',
   label: 'T5 encoder',
 };
+// FLUX.1 encodes with CLIP-L; a CLIP-G, which an installed ComfyUI text_encoders folder brings along, fails
+// its text encoder.
 const CLIP_EMBED_SLOT: UpscaleComponentSlot = {
-  accepts: (candidate) => candidate.type === 'clip_embed',
+  accepts: (candidate) => candidate.type === 'clip_embed' && candidate.variant === 'large',
   field: 'clipEmbedModel',
   label: 'CLIP Embed model',
 };

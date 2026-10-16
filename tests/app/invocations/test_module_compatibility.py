@@ -8,6 +8,8 @@ import pytest
 
 from invokeai.app.invocations._legacy_module_compatibility import LEGACY_MODULE_MAP
 
+pytestmark = pytest.mark.platform_independent
+
 
 def _run(program: str) -> dict[str, object]:
     result = subprocess.run([sys.executable, "-c", program], capture_output=True, text=True, timeout=300)
@@ -20,7 +22,29 @@ def test_compatibility_map_covers_all_moved_modules() -> None:
     assert len(set(LEGACY_MODULE_MAP.values())) == 106
 
 
+# A public symbol of each of these must be reachable through the legacy path, and be the canonical object.
+_REPRESENTATIVE_SYMBOLS = [
+    ("anima_denoise", "loglinear_timestep_shift"),
+    ("cogview4_denoise", "CogView4DenoiseInvocation"),
+    ("ernie_image_denoise", "ErnieImageDenoiseInvocation"),
+    ("flux_denoise", "FluxDenoiseInvocation"),
+    ("flux2_denoise", "Flux2DenoiseInvocation"),
+    ("ideogram4_caption", "Ideogram4Region"),
+    ("krea2_denoise", "Krea2DenoiseInvocation"),
+    ("minimax_h3_denoise", "MiniMaxH3DenoiseOutput"),
+    ("flux2_pid_decode", "Flux2PiDDecodeInvocation"),
+    ("qwen_image_denoise", "QwenImageDenoiseInvocation"),
+    ("controlnet", "ControlField"),
+    ("sd3_denoise", "SD3DenoiseInvocation"),
+    ("anima_text_encoder", "AnimaTextEncoderInvocation"),
+    ("anima_image_to_latents", "AnimaImageToLatentsInvocation"),
+    ("wan_denoise", "WanDenoiseInvocation"),
+    ("z_image_denoise", "ZImageDenoiseInvocation"),
+]
+
+
 def test_every_legacy_module_imports_and_aliases_canonical() -> None:
+    symbols = {f"invokeai.app.invocations.{legacy}": symbol for legacy, symbol in _REPRESENTATIVE_SYMBOLS}
     result = _run(
         f"""
 import importlib
@@ -35,20 +59,27 @@ logger = logging.getLogger("InvokeAI")
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 mapping = {dict(LEGACY_MODULE_MAP)!r}
+symbols = {symbols!r}
 with warnings.catch_warnings(record=True) as caught:
     warnings.simplefilter("always")
     aliases = {{}}
+    broken_symbols = []
     for legacy, canonical in mapping.items():
         old = importlib.import_module(legacy)
         repeat = importlib.import_module(legacy)
-        aliases[legacy] = [old is importlib.import_module(canonical), repeat is old]
-print(json.dumps({{"aliases": aliases, "records": records, "deprecations": [
+        new = importlib.import_module(canonical)
+        aliases[legacy] = [old is new, repeat is old]
+        symbol = symbols.get(legacy)
+        if symbol is not None and getattr(old, symbol, None) is not getattr(new, symbol, object()):
+            broken_symbols.append(legacy + "." + symbol)
+print(json.dumps({{"aliases": aliases, "broken_symbols": broken_symbols, "records": records, "deprecations": [
     {{"message": str(w.message), "filename": str(w.filename)}}
     for w in caught if issubclass(w.category, DeprecationWarning)
 ]}}))
 """
     )
     assert result["aliases"] == {legacy: [True, True] for legacy in LEGACY_MODULE_MAP}
+    assert result["broken_symbols"] == []
     assert len(result["records"]) == len(LEGACY_MODULE_MAP)
     for legacy, canonical in LEGACY_MODULE_MAP.items():
         assert sum(legacy in record and canonical in record for record in result["records"]) == 1
@@ -79,36 +110,6 @@ print(json.dumps({"missing": missing, "records": records}))
 """
     )
     assert result == {"missing": True, "records": []}
-
-
-@pytest.mark.parametrize(
-    ("legacy", "symbol"),
-    [
-        ("anima_denoise", "loglinear_timestep_shift"),
-        ("cogview4_denoise", "CogView4DenoiseInvocation"),
-        ("ernie_image_denoise", "ErnieImageDenoiseInvocation"),
-        ("flux_denoise", "FluxDenoiseInvocation"),
-        ("flux2_denoise", "Flux2DenoiseInvocation"),
-        ("ideogram4_caption", "Ideogram4Region"),
-        ("krea2_denoise", "Krea2DenoiseInvocation"),
-        ("minimax_h3_denoise", "MiniMaxH3DenoiseOutput"),
-        ("flux2_pid_decode", "Flux2PiDDecodeInvocation"),
-        ("qwen_image_denoise", "QwenImageDenoiseInvocation"),
-        ("controlnet", "ControlField"),
-        ("sd3_denoise", "SD3DenoiseInvocation"),
-        ("anima_text_encoder", "AnimaTextEncoderInvocation"),
-        ("anima_image_to_latents", "AnimaImageToLatentsInvocation"),
-        ("wan_denoise", "WanDenoiseInvocation"),
-        ("z_image_denoise", "ZImageDenoiseInvocation"),
-    ],
-)
-def test_representative_public_symbols_keep_identity(legacy: str, symbol: str) -> None:
-    old = f"invokeai.app.invocations.{legacy}"
-    canonical = LEGACY_MODULE_MAP[old]
-    result = _run(
-        f"import importlib, json; old = importlib.import_module({old!r}); new = importlib.import_module({canonical!r}); assert getattr(old, {symbol!r}) is getattr(new, {symbol!r}); print(json.dumps({{}}))"
-    )
-    assert result == {}
 
 
 def test_flux2_klein_text_encoder_legacy_import_explicitly_works() -> None:
