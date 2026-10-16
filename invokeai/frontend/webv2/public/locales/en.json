@@ -4202,6 +4202,7 @@
       "boardVisibility": "Board visibility",
       "boardsLoadFailed": "Could not load boards.",
       "boardsRefreshFailed": "Could not refresh boards.",
+      "externalGenerationRevealed": "Showing an image from another app",
       "destination": "Destination",
       "followSelectedBoard": "Send new results to the selected board",
       "commands": {
