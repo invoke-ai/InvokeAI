@@ -15,7 +15,12 @@ from invokeai.app.util.misc import uuid_string
 from invokeai.backend.architectures import resolve_default_settings
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS
 from invokeai.backend.model_manager.configs.base import Config_Base
-from invokeai.backend.model_manager.configs.clip_embed import CLIPEmbed_Diffusers_G_Config, CLIPEmbed_Diffusers_L_Config
+from invokeai.backend.model_manager.configs.clip_embed import (
+    CLIPEmbed_Checkpoint_G_Config,
+    CLIPEmbed_Checkpoint_L_Config,
+    CLIPEmbed_Diffusers_G_Config,
+    CLIPEmbed_Diffusers_L_Config,
+)
 from invokeai.backend.model_manager.configs.clip_vision import CLIPVision_Diffusers_Config
 from invokeai.backend.model_manager.configs.controlnet import (
     ControlAdapterDefaultSettings,
@@ -587,6 +592,8 @@ AnyModelConfig = Annotated[
         Annotated[Spandrel_Checkpoint_Config, Spandrel_Checkpoint_Config.get_tag()],
         Annotated[CLIPEmbed_Diffusers_G_Config, CLIPEmbed_Diffusers_G_Config.get_tag()],
         Annotated[CLIPEmbed_Diffusers_L_Config, CLIPEmbed_Diffusers_L_Config.get_tag()],
+        Annotated[CLIPEmbed_Checkpoint_G_Config, CLIPEmbed_Checkpoint_G_Config.get_tag()],
+        Annotated[CLIPEmbed_Checkpoint_L_Config, CLIPEmbed_Checkpoint_L_Config.get_tag()],
         Annotated[CLIPVision_Diffusers_Config, CLIPVision_Diffusers_Config.get_tag()],
         Annotated[SigLIP_Diffusers_Config, SigLIP_Diffusers_Config.get_tag()],
         Annotated[FLUXRedux_Checkpoint_Config, FLUXRedux_Checkpoint_Config.get_tag()],
