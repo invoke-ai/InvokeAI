@@ -150,6 +150,10 @@ export const buildQueueItemOrigin = (localQueueItemId: string, projectId?: strin
 export const buildUtilityQueueItemOrigin = (utilityId: string): string =>
   `${UTILITY_QUEUE_ITEM_ORIGIN_PREFIX}${utilityId}`;
 
+/** True for every origin this client builds: local, project and utility queue items. */
+export const isWebv2QueueItemOrigin = (origin: string | null | undefined): boolean =>
+  origin?.startsWith(QUEUE_ITEM_ORIGIN_PREFIX) ?? false;
+
 /** True when `origin` belongs to the utility queue (never a project/local queue item). */
 export const isUtilityQueueItemOrigin = (origin: string | null | undefined): boolean =>
   origin?.startsWith(UTILITY_QUEUE_ITEM_ORIGIN_PREFIX) ?? false;
