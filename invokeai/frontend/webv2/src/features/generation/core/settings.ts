@@ -103,6 +103,10 @@ export const DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT = 1;
 export const MIN_ANIMA_INPAINT_ADAPTER_WEIGHT = -10;
 export const MAX_ANIMA_INPAINT_ADAPTER_WEIGHT = 10;
 
+/** Persisted and recalled weights share this clamp, so an out-of-range value never blocks canvas validation. */
+export const clampAnimaInpaintAdapterWeight = (weight: number): number =>
+  Math.min(Math.max(weight, MIN_ANIMA_INPAINT_ADAPTER_WEIGHT), MAX_ANIMA_INPAINT_ADAPTER_WEIGHT);
+
 export const DEFAULT_LORA_WEIGHT_CONFIG = {
   coarseStep: 0.05,
   initial: 0.75,
@@ -765,12 +769,10 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     qwen3VLEncoderModel: getModelIdentifierOrNull(values.qwen3VLEncoderModel),
     qwen35EncoderModel: getModelIdentifierOrNull(values.qwen35EncoderModel),
     animaInpaintAdapterModel: getModelIdentifierOrNull(values.animaInpaintAdapterModel),
-    animaInpaintAdapterWeight: getClampedNumber(
-      values,
-      'animaInpaintAdapterWeight',
-      MIN_ANIMA_INPAINT_ADAPTER_WEIGHT,
-      MAX_ANIMA_INPAINT_ADAPTER_WEIGHT,
-      DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT
+    animaInpaintAdapterWeight: clampAnimaInpaintAdapterWeight(
+      hasFiniteNumber(values, 'animaInpaintAdapterWeight')
+        ? (values.animaInpaintAdapterWeight as number)
+        : DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT
     ),
     wanT5EncoderModel: getModelIdentifierOrNull(values.wanT5EncoderModel),
     wanLowNoiseModel: getMainModelOrNull(values.wanLowNoiseModel),

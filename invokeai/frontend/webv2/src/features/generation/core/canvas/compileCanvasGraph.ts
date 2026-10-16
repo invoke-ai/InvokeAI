@@ -12,6 +12,7 @@ import { findVaeSource, GRAPH_BUILDERS } from '@features/generation/core/graph';
 import { addEdge, addNode, toGraphContract } from '@features/generation/core/graphBuilder';
 import { addKrea2ConditioningEnhancers } from '@features/generation/core/krea2Conditioning';
 import { getIsPidActive } from '@features/generation/core/pid';
+import { shouldUsePidDecode } from '@features/generation/core/pidGraph';
 import { MAX_ANIMA_INPAINT_ADAPTER_WEIGHT, MIN_ANIMA_INPAINT_ADAPTER_WEIGHT } from '@features/generation/core/settings';
 
 import type {
@@ -210,9 +211,20 @@ const resizeCanvasOutputToBbox = (
   graph: BackendGraphContract,
   bbox: CompileCanvasGraphInput['bbox'],
   processingSize: CanvasSize,
-  destination: CompileCanvasGraphInput['destination']
+  destination: CompileCanvasGraphInput['destination'],
+  /** PiD Fit ends in an `img_resize` of the 4x decode to the processing size (`addPidDecode`). */
+  isPidFit: boolean
 ): void => {
   if (sizesMatch(bbox, processingSize)) {
+    return;
+  }
+
+  // Retarget PiD Fit's resize so the output is resampled once, straight to the bbox (legacy parity), rather
+  // than through the processing size.
+  const terminalResize = graph.nodes.canvas_output;
+  if (isPidFit && terminalResize?.type === 'img_resize') {
+    terminalResize.width = bbox.width;
+    terminalResize.height = bbox.height;
     return;
   }
 
@@ -807,7 +819,13 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
   }
 
   if (mode === 'txt2img' || mode === 'img2img') {
-    resizeCanvasOutputToBbox(backendGraph, bbox, processingSize, destination);
+    resizeCanvasOutputToBbox(
+      backendGraph,
+      bbox,
+      processingSize,
+      destination,
+      shouldUsePidDecode(settings, model.base) && settings.pidMode === 'fit'
+    );
   }
   setCanvasMetadataDimensions(backendGraph, bbox);
 

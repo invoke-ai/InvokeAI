@@ -10,6 +10,7 @@ import type {
 } from '@features/generation/contracts';
 
 import {
+  clampAnimaInpaintAdapterWeight,
   clampDimension,
   cloneGenerateWidgetValues,
   deriveAspectRatioId,
@@ -420,7 +421,10 @@ const getMetadataKrea2Rebalance = (
 const hasKrea2Rebalance = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
   Object.keys(getMetadataKrea2Rebalance(metadata, model)).length > 0;
 
-/** The canvas records the adapter's weight beside the adapter; only an Anima image can carry it. */
+/**
+ * The canvas records the adapter's weight beside the adapter; only an Anima image can carry it. An out-of-range
+ * weight is clamped rather than applied, which would block every inpaint until the user edits it.
+ */
 const getMetadataAnimaInpaintAdapterWeight = (
   metadata: unknown,
   model: GenerateModelConfig | undefined
@@ -431,7 +435,7 @@ const getMetadataAnimaInpaintAdapterWeight = (
 
   const weight = getNumber(metadata, 'anima_inpaint_adapter_weight');
 
-  return weight === null ? {} : { animaInpaintAdapterWeight: weight };
+  return weight === null ? {} : { animaInpaintAdapterWeight: clampAnimaInpaintAdapterWeight(weight) };
 };
 
 const hasAnimaInpaintAdapterWeight = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
@@ -460,6 +464,12 @@ interface RecalledComponent {
   setting: RecalledComponentSetting;
   /** The setting holds a main model (a component source or second transformer), not an encoder. */
   isMainModel?: true;
+  /**
+   * The `generation_mode` values whose graphs record the key whenever the component ran. `core_metadata` drops
+   * `null` on write, so on these records an absent key means "none" and clears the slot; elsewhere it means
+   * "unknown" and keeps the current pick.
+   */
+  absentMeansNoneIn?: readonly string[];
 }
 
 /**
@@ -472,7 +482,11 @@ const RECALLED_COMPONENTS: readonly RecalledComponent[] = [
   { isMainModel: true, metadataKey: 'wan_component_source', setting: 'componentSourceModel' },
   { isMainModel: true, metadataKey: 'ideogram4_unconditional_model', setting: 'ideogram4UnconditionalModel' },
   { isMainModel: true, metadataKey: 'wan_transformer_low_noise', setting: 'wanLowNoiseModel' },
-  { metadataKey: 'anima_inpaint_adapter', setting: 'animaInpaintAdapterModel' },
+  {
+    absentMeansNoneIn: ['anima_inpaint', 'anima_outpaint'],
+    metadataKey: 'anima_inpaint_adapter',
+    setting: 'animaInpaintAdapterModel',
+  },
   { metadataKey: 'clip_embed_model', setting: 'clipEmbedModel' },
   { metadataKey: 'gemma2_encoder', setting: 'gemma2EncoderModel' },
   { metadataKey: 'mistral_encoder', setting: 'mistralEncoderModel' },
@@ -489,10 +503,17 @@ const getRecalledComponent = (
   metadata: unknown,
   component: RecalledComponent,
   models: readonly ComponentModelConfig[]
-): ComponentModelConfig | null | undefined =>
-  component.isMainModel
+): ComponentModelConfig | null | undefined => {
+  if (isRecord(metadata) && !(component.metadataKey in metadata) && component.absentMeansNoneIn) {
+    const mode = getString(metadata, 'generation_mode');
+
+    return mode !== null && component.absentMeansNoneIn.includes(mode) ? null : undefined;
+  }
+
+  return component.isMainModel
     ? getMetadataMainModel(metadata, component.metadataKey, models)
     : getMetadataComponent(metadata, component.metadataKey, models);
+};
 
 /** Recorded components that resolve to installed models; `null` clears a slot the image left empty. */
 const getComponentPatch = (

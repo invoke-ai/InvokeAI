@@ -1260,6 +1260,68 @@ describe('anima inpaint adapter', () => {
     expect(result?.fields).toContain('animaInpaintAdapterWeight');
   });
 
+  it('clears a stale adapter from an Anima inpaint record that lacks the key, which the backend persists for none', () => {
+    const currentValues = createValues({ animaInpaintAdapterModel: inpaintAdapter, animaInpaintAdapterWeight: 0.5 });
+    const {
+      anima_inpaint_adapter: _adapter,
+      anima_inpaint_adapter_weight: _weight,
+      ...withoutAdapter
+    } = canvasInpaintMetadata;
+    const recall = (metadata: Record<string, unknown>, supportedModels = [animaModel]) =>
+      buildImageRecallSettings({
+        currentValues,
+        image,
+        kind: 'all',
+        metadata,
+        models: [...models, sd1Model],
+        supportedModels,
+        vaeModels: [qwenImageVae],
+      });
+
+    for (const generation_mode of ['anima_inpaint', 'anima_outpaint']) {
+      const cleared = recall({ ...withoutAdapter, generation_mode });
+      expect(cleared?.values.animaInpaintAdapterModel).toBeNull();
+      expect(cleared?.values.animaInpaintAdapterWeight).toBe(0.5);
+      expect(cleared?.fields).toContain('components');
+      expect(cleared?.fields).not.toContain('animaInpaintAdapterWeight');
+    }
+
+    // A record from a mode that never writes the key, or none at all, says nothing about the adapter.
+    expect(recall(withoutAdapter)?.values.animaInpaintAdapterModel).toEqual(inpaintAdapter);
+    expect(recall({ ...withoutAdapter, generation_mode: 'anima_img2img' })?.values.animaInpaintAdapterModel).toEqual(
+      inpaintAdapter
+    );
+    const notAnima = recall({ generation_mode: 'inpaint', model: { key: sd1Model.key } }, [sd1Model, animaModel]);
+    expect(notAnima?.values.model).toBe(sd1Model);
+    expect(notAnima?.fields).not.toContain('components');
+
+    // The key present on such a record still sets the adapter.
+    const restored = recall({ ...canvasInpaintMetadata, generation_mode: 'anima_inpaint' });
+    expect(restored?.values.animaInpaintAdapterModel).toBe(inpaintAdapter);
+    expect(restored?.values.animaInpaintAdapterWeight).toBe(0.7);
+  });
+
+  it.each([
+    [25, 10],
+    [-25, -10],
+  ])(
+    'clamps a recorded weight of %s to %s instead of applying a value canvas validation rejects',
+    (recorded, applied) => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues(),
+        image,
+        kind: 'all',
+        metadata: { ...canvasInpaintMetadata, anima_inpaint_adapter_weight: recorded },
+        models,
+        supportedModels: [animaModel],
+        vaeModels: [qwenImageVae],
+      });
+
+      expect(result?.values.animaInpaintAdapterWeight).toBe(applied);
+      expect(result?.fields).toContain('animaInpaintAdapterWeight');
+    }
+  );
+
   it('skips the adapter and weight when the image is not an Anima image or the adapter is a control adapter', () => {
     const notAnima = buildImageRecallSettings({
       currentValues: createValues({ animaInpaintAdapterWeight: 1 }),
