@@ -239,6 +239,7 @@ const REFERENCE_IMAGE_CONFIG_TYPES = new Set([
   'flux_redux',
   'ip_adapter',
   'qwen_image_reference_image',
+  'qwen_image_2_1_reference_image',
 ]);
 
 const isClipVisionModel = (value: unknown): value is 'ViT-H' | 'ViT-G' | 'ViT-L' =>
@@ -274,6 +275,7 @@ const normalizeReferenceImageConfig = (value: unknown): GenerateReferenceImageCo
     case 'external_reference_image':
     case 'flux2_reference_image':
     case 'qwen_image_reference_image':
+    case 'qwen_image_2_1_reference_image':
       return { image, type: value.type };
     case 'flux_kontext_reference_image':
       return { image, model: getMainModelOrNull(value.model), type: value.type };
@@ -333,6 +335,7 @@ const cloneReferenceImageConfig = (config: GenerateReferenceImageConfig): Genera
     case 'external_reference_image':
     case 'flux2_reference_image':
     case 'qwen_image_reference_image':
+    case 'qwen_image_2_1_reference_image':
       return { ...config, image: config.image ? cloneCroppableImage(config.image) : null };
     case 'flux_kontext_reference_image':
       return {
@@ -500,6 +503,7 @@ const syncReferenceImageConfigWithModels = (
     case 'external_reference_image':
     case 'flux2_reference_image':
     case 'qwen_image_reference_image':
+    case 'qwen_image_2_1_reference_image':
       return config;
   }
 };

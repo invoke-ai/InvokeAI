@@ -140,6 +140,7 @@ export type GenerateReferenceImageConfig =
     }
   | { type: 'flux2_reference_image'; image: GenerateReferenceImageAsset | null }
   | { type: 'qwen_image_reference_image'; image: GenerateReferenceImageAsset | null }
+  | { type: 'qwen_image_2_1_reference_image'; image: GenerateReferenceImageAsset | null }
   | { type: 'external_reference_image'; image: GenerateReferenceImageAsset | null };
 
 export interface GenerateReferenceImage {
