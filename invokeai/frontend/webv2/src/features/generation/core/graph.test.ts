@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type {
   ComponentModelConfig,
   GenerateModelConfig,
+  GenerateReferenceImage,
   GenerateSettings,
   LoraModelConfig,
   MainModelConfig,
@@ -739,6 +740,75 @@ describe('compileGenerateGraph', () => {
     expect(getEdge(graph, 'pos_cond', 'reference_images')).toBeDefined();
     expect(getEdge(graph, 'denoise_latents', 'reference_latents')).toBeDefined();
   });
+
+  describe('Qwen-Image-2.1 reference images', () => {
+    const qwenImage21Model: MainModelConfig = {
+      base: 'qwen-image-2-1',
+      format: 'diffusers',
+      key: 'qwen21',
+      name: 'Qwen-Image-2.1',
+      type: 'main',
+    };
+    const references = (...names: string[]): GenerateReferenceImage[] =>
+      names.map((name) => ({
+        config: {
+          image: { original: { image: { height: 768, image_name: name, width: 512 } } },
+          type: 'qwen_image_2_1_reference_image',
+        },
+        id: name,
+        isEnabled: true,
+      }));
+
+    it('reads each reference in both prompts and, in the same order, as latents in denoise', () => {
+      const graph = compile(qwenImage21Model, { cfgScale: 4, referenceImages: references('a.png', 'b.png') });
+
+      const nameOf = (imageNode: string) =>
+        (graph.nodes[imageNode]?.image as { image_name: string } | undefined)?.image_name;
+      // Each chain is followed back from its end: the last collect holds b, the one before it a.
+      const chain = (lastCollect: string) => [
+        getEdge(graph, lastCollect, 'collection')?.source.node_id ?? '',
+        lastCollect,
+      ];
+
+      const imagesInto = getEdge(graph, 'pos_cond', 'reference_images')?.source.node_id ?? '';
+      expect(getEdge(graph, 'neg_cond', 'reference_images')?.source.node_id).toBe(imagesInto);
+      expect(chain(imagesInto).map((collect) => nameOf(getEdge(graph, collect, 'item')?.source.node_id ?? ''))).toEqual(
+        ['a.png', 'b.png']
+      );
+
+      const latentsInto = getEdge(graph, 'denoise_latents', 'reference_latents')?.source.node_id ?? '';
+      const latentImages = chain(latentsInto).map((collect) => {
+        const i2l = getEdge(graph, collect, 'item')?.source.node_id ?? '';
+        expect(graph.nodes[i2l]).toMatchObject({ reference: true, type: 'qwen_image_2_1_i2l' });
+        return nameOf(getEdge(graph, i2l, 'image')?.source.node_id ?? '');
+      });
+      expect(latentImages).toEqual(['a.png', 'b.png']);
+    });
+
+    it('applies LoRAs to the transformer through its own collection loader', () => {
+      const lora: LoraModelConfig = { base: 'qwen-image-2-1', key: 'qwen21-lora', name: 'A LoRA', type: 'lora' };
+      const graph = compile(qwenImage21Model, { loras: [{ isEnabled: true, model: lora, weight: 0.7 }] });
+
+      const loader = getNodeByType(graph, 'qwen_image_2_1_lora_collection_loader');
+      expect(loader).toBeDefined();
+      expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loader?.id);
+      expect(getEdge(graph, loader?.id ?? '', 'transformer')?.source.node_id).toBe('model_loader');
+    });
+
+    it('refuses references with a standalone encoder, which has no vision tower', () => {
+      const encoder: ComponentModelConfig = {
+        base: 'any',
+        key: 'qwen3-vl-8b',
+        name: 'Qwen3-VL 8B',
+        type: 'qwen3_vl_encoder',
+        variant: 'qwen3_vl_8b',
+      };
+
+      expect(() =>
+        compile(qwenImage21Model, { qwen3VLEncoderModel: encoder, referenceImages: references('a.png') })
+      ).toThrow(/vision tower/);
+    });
+  });
 });
 
 describe('generate seeds', () => {
@@ -1038,6 +1108,70 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
     expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loader?.id);
     // The Wan encoder is fed straight from the model loader — Wan LoRAs do not touch it.
     expect(getEdge(graph, 'pos_cond', 'wan_t5_encoder')?.source.node_id).toBe('model_loader');
+  });
+});
+
+describe('Qwen-Image-2.1 graphs', () => {
+  const qwen21Diffusers: MainModelConfig = {
+    base: 'qwen-image-2-1',
+    format: 'diffusers',
+    key: 'qwen21-diffusers',
+    name: 'Qwen-Image-2.1',
+    type: 'main',
+    variant: 'qwen_image_21_base',
+  };
+  const qwen21Gguf: MainModelConfig = {
+    base: 'qwen-image-2-1',
+    format: 'gguf_quantized',
+    key: 'qwen21-gguf',
+    name: 'Qwen-Image-2.1 Q4_K_M',
+    type: 'main',
+    variant: 'qwen_image_21_base',
+  };
+  const qwen21Vae: VaeModelConfig = {
+    base: 'qwen-image-2-1',
+    key: 'qwen21-vae',
+    name: 'Qwen-Image-2.1 VAE',
+    type: 'vae',
+  };
+  const qwen3Vl8bEncoder: ComponentModelConfig = {
+    base: 'any',
+    key: 'qwen3-vl-8b',
+    name: 'Qwen3-VL 8B',
+    type: 'qwen3_vl_encoder',
+    variant: 'qwen3_vl_8b',
+  };
+
+  it('runs the negative prompt only with CFG above 1, wired through its own encoder', () => {
+    // Qwen-Image-2.1 is sampled without guidance by default; there the model takes no negative input.
+    const withoutCfg = compile(qwen21Diffusers, { cfgScale: 1 });
+
+    expect(withoutCfg.nodes.neg_cond).toBeUndefined();
+    expect(getEdge(withoutCfg, 'denoise_latents', 'negative_conditioning')).toBeUndefined();
+
+    const withCfg = compile(qwen21Diffusers, { cfgScale: 4 });
+
+    expect(withCfg.nodes.neg_cond?.type).toBe('qwen_image_2_1_text_encoder');
+    expect(getEdge(withCfg, 'denoise_latents', 'negative_conditioning')?.source.node_id).toBe('neg_cond');
+    expect(getEdge(withCfg, 'neg_cond', 'prompt')?.source.node_id).toBe('negative_prompt');
+    expect(getEdge(withCfg, 'neg_cond', 'qwen3_vl_encoder')?.source).toEqual({
+      field: 'qwen3_vl_encoder',
+      node_id: 'model_loader',
+    });
+    expect(withCfg.nodes.denoise_latents).toMatchObject({ cfg_scale: 4 });
+  });
+
+  it('requires the VAE and the encoder for a GGUF transformer, and passes them to the loader', () => {
+    expect(() => compile(qwen21Gguf, { qwen3VLEncoderModel: qwen3Vl8bEncoder })).toThrow(
+      'Generate needs a VAE for non-Diffusers Qwen-Image-2.1 models.'
+    );
+    expect(() => compile(qwen21Gguf, { vae: qwen21Vae })).toThrow(
+      'Generate needs a Qwen3-VL 8B Encoder for non-Diffusers Qwen-Image-2.1 models.'
+    );
+
+    const graph = compile(qwen21Gguf, { qwen3VLEncoderModel: qwen3Vl8bEncoder, vae: qwen21Vae });
+
+    expect(graph.nodes.model_loader).toMatchObject({ qwen3_vl_encoder_model: qwen3Vl8bEncoder, vae_model: qwen21Vae });
   });
 });
 

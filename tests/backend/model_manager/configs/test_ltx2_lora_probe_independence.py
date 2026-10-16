@@ -27,6 +27,7 @@ from invokeai.backend.model_manager.configs.lora import (
     LoRA_LyCORIS_Krea2_Config,
     LoRA_LyCORIS_LTX2_Config,
     LoRA_LyCORIS_MiniMaxH3_Config,
+    LoRA_LyCORIS_QwenImage21_Config,
     LoRA_LyCORIS_QwenImage_Config,
     LoRA_LyCORIS_Wan_Config,
     LoRA_LyCORIS_ZImage_Config,
@@ -172,6 +173,8 @@ def test_an_ltx2_lora_identifies_as_ltx2(prefix: str) -> None:
         LoRA_LyCORIS_Flux2_Config,
         LoRA_LyCORIS_QwenImage_Config,
         LoRA_LyCORIS_ZImage_Config,
+        # As wide (4096) and also named transformer_blocks.N.attn.*, but attn1 and audio towers are LTX-2's.
+        LoRA_LyCORIS_QwenImage21_Config,
     ],
     ids=lambda cls: cls.__name__,
 )
