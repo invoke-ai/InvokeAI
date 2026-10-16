@@ -110,9 +110,37 @@ const createHarness = (
   };
 };
 
+/** A fresh listing of every readable board, as `ensureGalleryBoardDestinations` leaves it: the boards named are destinations. */
+const listGalleryBoardsInCache = (...boardIds: string[]) =>
+  queryClient.setQueryData(
+    galleryKeys.boards(captureAccountScope(), {
+      includeArchived: true,
+      includeDateBoards: false,
+      orderBy: 'created_at',
+      orderDir: 'DESC',
+    }),
+    boardIds.map((id) => ({
+      archived: false,
+      assetCount: 0,
+      assetVideoCount: 0,
+      id,
+      imageCount: 0,
+      isInbox: false,
+      kind: 'board' as const,
+      name: id,
+      projectId: null,
+      videoCount: 0,
+    }))
+  );
+
 describe('saveCanvasToGallery', () => {
+  afterEach(() => {
+    queryClient.clear();
+  });
+
   beforeEach(() => {
     accountLifecycle.activate('save-canvas-test');
+    listGalleryBoardsInCache('board-1', 'board-physical', 'project-board');
   });
 
   afterEach(() => {

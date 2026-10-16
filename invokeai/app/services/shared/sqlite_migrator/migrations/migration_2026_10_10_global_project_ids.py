@@ -17,6 +17,7 @@ runs only while `projects` is still keyed per account, so a resumed run never re
 """
 
 import json
+from functools import partial
 from typing import Any
 from uuid import uuid4
 
@@ -44,6 +45,9 @@ from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import 
 
 _PER_ACCOUNT_TABLE = "projects_per_account"
 _ORIGIN_PREFIX = "webv2:p:"
+# As the application and the web client serialize these documents: compact, with non-ASCII text as itself. A
+# document near the size limit, serialized any wider, would come out over it.
+_dumps = partial(json.dumps, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
 
 _projects = table("projects", column("project_id"), column("user_id"), column("created_at"), column("data"))
 _boards = table("boards", column("board_id"), column("user_id"), column("project_id"))
@@ -76,7 +80,7 @@ def _rekey(context: PortableMigrationContext, user_id: str, old_id: str, new_id:
         select(_projects.c.data).where(_projects.c.user_id == user_id, _projects.c.project_id == old_id)
     ).scalar_one()
     try:
-        rewritten_document = json.dumps(_replace_id(json.loads(document), old_id, new_id))
+        rewritten_document = _dumps(_replace_id(json.loads(document), old_id, new_id))
     except ValueError:
         rewritten_document = document
     conn.execute(
@@ -116,14 +120,15 @@ def _rekey(context: PortableMigrationContext, user_id: str, old_id: str, new_id:
     ).all():
         try:
             document = json.loads(value)
+            rewritten = _replace_id(document, old_id, new_id)
+            rewritten_value = _dumps(rewritten)
         except ValueError:
             continue
-        rewritten = _replace_id(document, old_id, new_id)
         if rewritten != document:
             conn.execute(
                 _client_state.update()
                 .where(_client_state.c.user_id == user_id, _client_state.c.key == key)
-                .values(value=json.dumps(rewritten))
+                .values(value=rewritten_value)
             )
 
 

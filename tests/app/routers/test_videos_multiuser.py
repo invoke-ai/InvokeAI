@@ -38,9 +38,12 @@ from invokeai.app.api.routers.videos import (
 )
 from invokeai.app.api_app import app
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.videos.videos_common import VideoDTO
 from invokeai.app.util.video_ingest import MediaProbe
+from tests.fixtures.sqlite_database import sqlite_cursor
 
 
 class MockApiDependencies(ApiDependencies):
@@ -94,7 +97,7 @@ def enable_multiuser_for_videos(monkeypatch: Any, mock_invoker: Invoker):
     # the payloads here — only whether the route runs the board-access guard *before* the
     # service call. A return value of "any non-error response" is enough.
     mock_videos = MagicMock()
-    mock_videos.get_many.return_value = {"items": [], "offset": 0, "limit": 10, "total": 0}
+    mock_videos.get_many.return_value = OffsetPaginatedResults[VideoDTO](items=[], offset=0, limit=10, total=0)
     mock_videos.get_video_names.return_value = {"video_names": [], "starred_count": 0, "total_count": 0}
     mock_invoker.services.videos = mock_videos
 
@@ -179,7 +182,7 @@ def test_list_video_dtos_forbidden_for_other_users_private_board(
         f"/api/v1/videos/?board_id={user1_private_board}",
         headers={"Authorization": f"Bearer {user2_token}"},
     )
-    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 def test_get_video_names_forbidden_for_other_users_private_board(
@@ -189,7 +192,62 @@ def test_get_video_names_forbidden_for_other_users_private_board(
         f"/api/v1/videos/names?board_id={user1_private_board}",
         headers={"Authorization": f"Bearer {user2_token}"},
     )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_list_video_dtos_on_a_missing_board_is_a_404_for_a_non_admin(client: TestClient, user2_token: str):
+    """Absence still reads as absence: only a board that exists but is closed to the caller answers 403."""
+    response = client.get("/api/v1/videos/?board_id=no-such-board", headers={"Authorization": f"Bearer {user2_token}"})
     assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.json()["detail"] == "Board not found"
+
+
+def test_a_videos_project_is_shown_only_to_its_uploader_and_admins(
+    client: TestClient,
+    mock_invoker: Invoker,
+    mock_sqlite_database: Database,
+    user1_token: str,
+    user2_token: str,
+    admin_token: str,
+):
+    """A member of a shared board learns nothing about the project a video was made in, whether they read it or star
+    it: `project_id` is theirs to see only when it names one of their own projects."""
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+    assert user1 is not None and user2 is not None
+    project_id = mock_invoker.services.project_records.create(user_id=user1.user_id, name="Mine", data={}).project_id
+    shared = client.post("/api/v1/boards/?board_name=Shared", headers={"Authorization": f"Bearer {user1_token}"})
+    client.patch(
+        f"/api/v1/boards/{shared.json()['board_id']}",
+        json={"general_access": "viewer"},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    # An editor: starring another member's video is a board role's to do, and answers with the video's DTO.
+    with sqlite_cursor(mock_sqlite_database) as cursor:
+        cursor.execute(
+            "INSERT INTO board_members (board_id, user_id, role) VALUES (?, ?, 'editor')",
+            (shared.json()["board_id"], user2.user_id),
+        )
+    mock_invoker.services.video_records.get_user_id.return_value = user1.user_id
+    mock_invoker.services.board_video_records.get_board_for_video.return_value = shared.json()["board_id"]
+    # A fresh DTO per answer: the routes redact in place.
+    mock_invoker.services.videos.get_dto.side_effect = lambda name: _uploaded_video_dto().model_copy(
+        update={"project_id": project_id}
+    )
+    mock_invoker.services.videos.update.side_effect = lambda name, changes: _uploaded_video_dto().model_copy(
+        update={"project_id": project_id, "starred": True}
+    )
+
+    def shown_to(token: str) -> tuple[str | None, str | None]:
+        headers = {"Authorization": f"Bearer {token}"}
+        read = client.get("/api/v1/videos/i/uploaded.mp4", headers=headers)
+        starred = client.patch("/api/v1/videos/i/uploaded.mp4", json={"starred": True}, headers=headers)
+        assert (read.status_code, starred.status_code) == (status.HTTP_200_OK, status.HTTP_200_OK)
+        return read.json().get("project_id"), starred.json().get("project_id")
+
+    assert shown_to(user1_token) == (project_id, project_id)
+    assert shown_to(admin_token) == (project_id, project_id)
+    assert shown_to(user2_token) == (None, None)
 
 
 def test_owner_can_list_videos_on_their_private_board(client: TestClient, user1_private_board: str, user1_token: str):

@@ -224,6 +224,9 @@ const GALLERY_STATE_MODULES = [
   '/features/gallery/core/selection.ts',
   '/features/gallery/core/semanticImageQuery.ts',
   '/features/gallery/core/settings.ts',
+  // The React entry is reached from eager owners (App adapters) and lazy ones (workflow fields, Preview); alone it
+  // costs a request.
+  '/features/gallery/react.ts',
   '/features/gallery/ui/GalleryUiContext.tsx',
   '/features/gallery/ui/galleryStateView.ts',
   '/features/queue/contracts.ts',

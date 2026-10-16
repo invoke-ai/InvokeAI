@@ -7,6 +7,7 @@ from invokeai.app.services.project_records.project_records_common import (
     ProjectBoardSnapshotDTO,
     ProjectRecordDTO,
     ProjectSummaryDTO,
+    ProjectUpdateWorkspaceRequest,
     ProjectWithWorkspaceDTO,
     ProjectWorkspaceDTO,
 )
@@ -107,14 +108,21 @@ class ProjectRecordsStorageBase(ABC):
         max_canvas_schema_version: int = DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
         minimum_document_schema_version: int | None = None,
         max_document_schema_version: int = DEFAULT_PROJECT_DOCUMENT_SCHEMA_VERSION,
-    ) -> ProjectRecordDTO:
-        """Save a project's content if the caller's revision is current, renaming its inbox to match.
+        workspace: Optional[ProjectUpdateWorkspaceRequest] = None,
+    ) -> ProjectWithWorkspaceDTO:
+        """Save a project's content if the caller's revision is current, renaming its inbox to match, and with it,
+        when `workspace` is given, the caller's workspace in the project, in the same transaction.
 
-        A save that loses the revision race renames nothing.
+        A save that loses either revision race writes nothing. The workspace is checked as `save_workspace` checks
+        it, except that the content's `max_canvas_schema_version` covers it. The result carries the workspace this
+        save stored, or None when it carried none.
 
         Raises:
             ProjectRecordNotFoundError: No such project for this user.
             ProjectRecordConflictError: The stored revision differs from expected_revision.
+            ProjectWorkspaceConflictError: The stored workspace revision (or its absence) differs from the expected.
+            ProjectWorkspaceBeforeSplitError: `workspace` is given, but the save leaves the document floor below the
+                split schema.
             ProjectCanvasSchemaUnsupportedError: The caller cannot safely edit the stored or requested schema.
             ProjectCanvasSchemaDowngradeError: The save tries to lower the stored compatibility floor.
             ProjectDocumentSchemaUnsupportedError: The caller does not understand the stored or requested document
@@ -133,14 +141,17 @@ class ProjectRecordsStorageBase(ABC):
         expected_revision: Optional[int],
         data: dict[str, Any],
         max_document_schema_version: int,
+        max_canvas_schema_version: int = DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
     ) -> ProjectWorkspaceDTO:
         """Save the user's workspace in one of their projects if `expected_revision` is its current revision, or
         None and they have none yet. Independent of the content's revision: neither half's save conflicts with the
-        other's.
+        other's. The workspace holds canvas state (the staging area, the selection), so the project's canvas floor
+        applies to it as to the content.
 
         Raises:
             ProjectRecordNotFoundError: No such project for this user.
             ProjectWorkspaceConflictError: The stored workspace revision (or its absence) differs from the expected.
+            ProjectCanvasSchemaUnsupportedError: The caller cannot safely edit the project's canvas schema.
             ProjectDocumentSchemaUnsupportedError: The caller does not understand the project's document schema.
             ProjectDocumentInvalidError: The workspace is not standards-compliant UTF-8 JSON.
             ProjectDocumentTooLargeError: The workspace exceeds the storage limit.

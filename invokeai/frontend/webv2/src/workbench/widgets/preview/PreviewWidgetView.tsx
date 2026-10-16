@@ -30,6 +30,7 @@ import {
   toGalleryItemRef,
 } from '@features/gallery/contracts';
 import { galleryBoardsOptions, getGalleryListingBoardsQuery } from '@features/gallery/queries';
+import { useHostGalleryBoards } from '@features/gallery/react';
 import { createGenerateFormValuesSelector } from '@features/generation/react';
 import {
   consumeQueueItemSwapProgressImage,
@@ -236,7 +237,8 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     enabled: gallerySemanticQuery !== null,
   });
   const galleryBoardId = getGallerySelectedBoardId(galleryValues, galleryBoardsQuery.data ?? EMPTY_BOARDS);
-  const boards = boardsQuery.data ?? fallbackBoards;
+  const hostBoards = useHostGalleryBoards(boardsQuery.data);
+  const boards = boardsQuery.data === undefined ? fallbackBoards : hostBoards;
   const boardName = getBoardName(
     boards,
     displayBoardId,

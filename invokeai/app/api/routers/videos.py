@@ -30,6 +30,7 @@ from invokeai.app.api.routers._access import (
 from invokeai.app.api.routers._access import (
     assert_project_owned,
     item_action_for_changes,
+    redact_project_ids,
 )
 from invokeai.app.api.routers._access import (
     assert_video_action as _assert_video_action,
@@ -726,9 +727,11 @@ def update_video(
 ) -> VideoDTO:
     _assert_video_action(video_name, current_user, item_action_for_changes(video_changes))
     try:
-        return ApiDependencies.invoker.services.videos.update(video_name, video_changes)
+        video_dto = ApiDependencies.invoker.services.videos.update(video_name, video_changes)
     except Exception:
         raise HTTPException(status_code=400, detail="Failed to update video")
+    redact_project_ids([video_dto], current_user)
+    return video_dto
 
 
 @videos_router.get("/i/{video_name}", operation_id="get_video_dto", response_model=VideoDTO)
@@ -738,11 +741,13 @@ def get_video_dto(
 ) -> VideoDTO:
     _assert_video_read_access(video_name, current_user)
     try:
-        return ApiDependencies.invoker.services.videos.get_dto(video_name)
+        video_dto = ApiDependencies.invoker.services.videos.get_dto(video_name)
     except VideoRecordNotFoundException:
         # See get_image_dto: this is the 404 a workflow's video field drops its reference on,
         # so only a genuinely missing record may produce it.
         raise HTTPException(status_code=404)
+    redact_project_ids([video_dto], current_user)
+    return video_dto
 
 
 @videos_router.get(
@@ -999,7 +1004,7 @@ def list_video_dtos(
     if board_id is not None and board_id != "none":
         _assert_board_read_access(board_id, current_user)
 
-    return ApiDependencies.invoker.services.videos.get_many(
+    video_dtos = ApiDependencies.invoker.services.videos.get_many(
         offset,
         limit,
         starred_first,
@@ -1012,6 +1017,8 @@ def list_video_dtos(
         current_user.user_id,
         current_user.is_admin,
     )
+    redact_project_ids(video_dtos.items, current_user)
+    return video_dtos
 
 
 @videos_router.get("/names", operation_id="get_video_names", deprecated=True)

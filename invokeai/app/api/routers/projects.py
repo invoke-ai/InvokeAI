@@ -25,7 +25,9 @@ from invokeai.app.services.project_records.project_records_common import (
     ProjectRecordExistsError,
     ProjectRecordNotFoundError,
     ProjectSummaryDTO,
+    ProjectUpdateWorkspaceRequest,
     ProjectWithWorkspaceDTO,
+    ProjectWorkspaceBeforeSplitError,
     ProjectWorkspaceConflictError,
     ProjectWorkspaceDTO,
 )
@@ -107,6 +109,18 @@ class ProjectUpdateRequest(BaseModel):
         ge=1,
         description="Newest project document schema understood by this client",
     )
+    workspace: ProjectUpdateWorkspaceRequest | None = Field(
+        default=None,
+        description=(
+            "The caller's workspace, to store in the same transaction as the content. For the save that splits a"
+            " whole project (document schema 3 or older) into content and workspace while raising the document"
+            " floor: the floor, the content and the first workspace row then land together, never by half. Its"
+            " revision is checked as on the workspace route, and a mismatch refuses the whole save with 409. The"
+            " save must leave the document floor at 4 or above, or it is refused whole with 400"
+            " (workspace_needs_split_document). Omit it on every other save; the workspace saves apart, on its own"
+            " route."
+        ),
+    )
 
 
 class ProjectWorkspaceSaveRequest(BaseModel):
@@ -119,6 +133,11 @@ class ProjectWorkspaceSaveRequest(BaseModel):
     )
     max_document_schema_version: int = Field(
         ge=1, description="Newest project document schema understood by this client"
+    )
+    max_canvas_schema_version: int = Field(
+        default=DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
+        ge=1,
+        description="Newest canvas schema understood by this client; the workspace holds canvas state",
     )
 
 
@@ -248,13 +267,15 @@ def get_project(
         raise _document_schema_precondition_failed(e)
 
 
-@projects_router.put("/{project_id}", operation_id="update_project", response_model=ProjectRecordDTO)
+@projects_router.put("/{project_id}", operation_id="update_project", response_model=ProjectWithWorkspaceDTO)
 def update_project(
     current_user: CurrentUserOrDefault,
     project_id: str = Path(description="The id of the project to save"),
     request: ProjectUpdateRequest = Body(description="The project document and the revision it is based on"),
-) -> ProjectRecordDTO:
-    """Saves a project. Returns 409 with the current revision when the save is based on a stale revision."""
+) -> ProjectWithWorkspaceDTO:
+    """Saves a project's content and, when the request carries `workspace`, the caller's workspace in it, in one
+    transaction. Returns the record with the workspace this save stored (null when it carried none). Returns 409
+    with the current revision when the save is based on a stale revision of either."""
     try:
         return ApiDependencies.invoker.services.project_records.update(
             user_id=current_user.user_id,
@@ -266,10 +287,11 @@ def update_project(
             max_canvas_schema_version=request.max_canvas_schema_version,
             minimum_document_schema_version=request.minimum_document_schema_version,
             max_document_schema_version=request.max_document_schema_version,
+            workspace=request.workspace,
         )
     except ProjectRecordNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except ProjectRecordConflictError as e:
+    except (ProjectRecordConflictError, ProjectWorkspaceConflictError) as e:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={"message": str(e), "current_revision": e.current_revision},
@@ -286,6 +308,15 @@ def update_project(
         )
     except ProjectDocumentSchemaDowngradeError as e:
         raise _document_schema_downgrade(e)
+    except ProjectWorkspaceBeforeSplitError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "workspace_needs_split_document",
+                "message": str(e),
+                "minimum_document_schema_version": e.document_floor,
+            },
+        )
     except ProjectCanvasSchemaUnsupportedError as e:
         raise _schema_precondition_failed(e)
     except ProjectDocumentSchemaUnsupportedError as e:
@@ -314,6 +345,7 @@ def save_project_workspace(
             expected_revision=request.expected_revision,
             data=request.data,
             max_document_schema_version=request.max_document_schema_version,
+            max_canvas_schema_version=request.max_canvas_schema_version,
         )
     except ProjectRecordNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -322,6 +354,8 @@ def save_project_workspace(
             status_code=status.HTTP_409_CONFLICT,
             detail={"message": str(e), "current_revision": e.current_revision},
         )
+    except ProjectCanvasSchemaUnsupportedError as e:
+        raise _schema_precondition_failed(e)
     except ProjectDocumentSchemaUnsupportedError as e:
         raise _document_schema_precondition_failed(e)
     except ProjectDocumentTooLargeError as e:

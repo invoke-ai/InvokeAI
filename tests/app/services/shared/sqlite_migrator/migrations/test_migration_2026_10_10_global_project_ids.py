@@ -2,166 +2,275 @@
 
 import json
 import logging
+from functools import partial
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
+from sqlalchemy import column, insert, inspect, select, table, update
 
-from invokeai.app.services.config.config_default import DefaultInvokeAIAppConfig
 from invokeai.app.services.shared.database.database import Database
-from invokeai.app.services.shared.sqlite_migrator.migration_loader import MigrationBuildContext, build_migrations
+from invokeai.app.services.shared.database.schema.users import users
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import MigrationBase
-from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import Migrator
+from tests.fixtures.migration_state import (
+    alembic_operations,
+    build_application_migrations,
+    migrate_to_before,
+    run_migrations,
+)
 
 MIGRATION_ID = "2026_10_10_global_project_ids"
-LOGGER = "test_global_project_ids"
+AT = "2026-01-02 03:04:05.000"
 
+# As the application and the web client write these documents: compact, with non-ASCII text as itself.
+_dumps = partial(json.dumps, ensure_ascii=False, separators=(",", ":"))
 
-def _run(db: Database, migrations: list[MigrationBase]) -> bool:
-    migrator = Migrator(db)
-    for migration in migrations:
-        migrator.register_migration(migration)
-    return migrator.run_migrations()
+ALICE_DOCUMENT = {"id": "dup", "name": "Été ☕", "canvas": {"layers": [1]}}
+BOB_DOCUMENT = {"id": "dup", "name": "dup"}
 
-
-def _previous_state(migrations: list[MigrationBase]) -> list[MigrationBase]:
-    """Every migration except this one and those that depend on it, directly or not."""
-    by_id = {migration.id: migration for migration in migrations}
-
-    def depends_on_this(migration: MigrationBase) -> bool:
-        current: str | None = migration.id
-        while current is not None:
-            if current == MIGRATION_ID:
-                return True
-            current = by_id[current].depends_on
-        return False
-
-    return [migration for migration in migrations if not depends_on_this(migration)]
+# The tables as they were before the migration, as far as the rows need.
+_boards = table(
+    "boards",
+    column("board_id"),
+    column("board_name"),
+    column("user_id"),
+    column("project_id"),
+    column("created_at"),
+    column("updated_at"),
+)
+_projects = table(
+    "projects",
+    column("project_id"),
+    column("user_id"),
+    column("name"),
+    column("data"),
+    column("board_id"),
+    column("revision"),
+    column("created_at"),
+    column("updated_at"),
+    column("minimum_canvas_schema_version"),
+)
+_images = table(
+    "images",
+    column("image_name"),
+    column("image_origin"),
+    column("image_category"),
+    column("width"),
+    column("height"),
+    column("user_id"),
+    column("project_id"),
+    column("created_at"),
+    column("updated_at"),
+)
+_videos = table(
+    "videos",
+    column("video_name"),
+    column("video_origin"),
+    column("video_category"),
+    column("width"),
+    column("height"),
+    column("user_id"),
+    column("project_id"),
+    column("created_at"),
+    column("updated_at"),
+)
+_session_queue = table(
+    "session_queue",
+    column("batch_id"),
+    column("queue_id"),
+    column("session_id"),
+    column("session"),
+    column("user_id"),
+    column("project_id"),
+    column("origin"),
+    column("created_at"),
+    column("updated_at"),
+)
+_media_references = table(
+    "media_references",
+    column("owner_kind"),
+    column("user_id"),
+    column("owner_id"),
+    column("media_kind"),
+    column("media_name"),
+)
+_client_state = table("client_state", column("user_id"), column("key"), column("value"), column("updated_at"))
 
 
 @pytest.fixture
 def migrations(tmp_path: Path) -> list[MigrationBase]:
-    config = DefaultInvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
-    config._root = tmp_path
-    return build_migrations(
-        MigrationBuildContext(app_config=config, logger=logging.getLogger(LOGGER), image_files=MagicMock())
-    )
+    return build_application_migrations(tmp_path)
 
 
 @pytest.fixture
-def before(migrations: list[MigrationBase]) -> Database:
+def before(empty_database: Database, migrations: list[MigrationBase]) -> Database:
     """Alice and Bob each hold a project called `dup`. Bob's is the older one although Alice sorts first and her row
     was written first; a board of Alice's names a project that went with a deleted account."""
-    db = Database.open_sqlite(None, logging.getLogger(LOGGER))
-    assert _run(db, _previous_state(migrations))
-    with db.begin(write=True) as conn:
-        execute = conn.exec_driver_sql
-        execute(
-            "INSERT INTO users (user_id, email, display_name, password_hash) VALUES (?, ?, ?, 'x');",
-            [("alice", "alice@example.com", "Alice"), ("bob", "bob@example.com", "Bob")],
-        )
-        execute(
-            "INSERT INTO boards (board_id, board_name, user_id, project_id) VALUES (?, ?, ?, ?);",
+    migrate_to_before(empty_database, migrations, MIGRATION_ID)
+    with empty_database.begin(write=True) as conn:
+        conn.execute(
+            insert(users),
             [
-                ("alice-inbox", "Dup", "alice", "dup"),
-                ("bob-inbox", "Dup", "bob", "dup"),
-                ("bob-member", "Refs", "bob", "dup"),
-                ("alice-stray", "Stray", "alice", "gone"),
+                {"user_id": "alice", "email": "alice@example.com", "display_name": "Alice", "password_hash": "x"},
+                {"user_id": "bob", "email": "bob@example.com", "display_name": "Bob", "password_hash": "x"},
             ],
         )
-        execute(
-            "INSERT INTO projects (project_id, user_id, name, data, board_id, revision, created_at, updated_at, "
-            "minimum_canvas_schema_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);",
+        conn.execute(
+            insert(_boards),
             [
-                (
-                    "dup",
-                    "alice",
-                    "Alice's dup",
-                    json.dumps({"id": "dup", "canvas": {"layers": [1]}}),
-                    "alice-inbox",
-                    7,
-                    "2026-02-01 00:00:00.000",
-                    "2026-03-01 00:00:00.000",
-                    3,
-                ),
-                (
-                    "dup",
-                    "bob",
-                    "Bob's dup",
-                    json.dumps({"id": "dup", "name": "dup"}),
-                    "bob-inbox",
-                    4,
-                    "2026-01-01 00:00:00.000",
-                    "2026-01-02 00:00:00.000",
-                    2,
-                ),
+                {
+                    "board_id": board_id,
+                    "board_name": name,
+                    "user_id": owner,
+                    "project_id": project_id,
+                    "created_at": AT,
+                    "updated_at": AT,
+                }
+                for board_id, name, owner, project_id in (
+                    ("alice-inbox", "Dup", "alice", "dup"),
+                    ("bob-inbox", "Dup", "bob", "dup"),
+                    ("bob-member", "Refs", "bob", "dup"),
+                    ("alice-stray", "Stray", "alice", "gone"),
+                )
+            ],
+        )
+        conn.execute(
+            insert(_projects),
+            [
+                {
+                    "project_id": "dup",
+                    "user_id": "alice",
+                    "name": "Alice's dup",
+                    "data": _dumps(ALICE_DOCUMENT),
+                    "board_id": "alice-inbox",
+                    "revision": 7,
+                    "created_at": "2026-02-01 00:00:00.000",
+                    "updated_at": "2026-03-01 00:00:00.000",
+                    "minimum_canvas_schema_version": 3,
+                },
+                {
+                    "project_id": "dup",
+                    "user_id": "bob",
+                    "name": "Bob's dup",
+                    "data": _dumps(BOB_DOCUMENT),
+                    "board_id": "bob-inbox",
+                    "revision": 4,
+                    "created_at": "2026-01-01 00:00:00.000",
+                    "updated_at": "2026-01-02 00:00:00.000",
+                    "minimum_canvas_schema_version": 2,
+                },
             ],
         )
         for user_id in ("alice", "bob"):
-            execute(
-                "INSERT INTO images (image_name, image_origin, image_category, width, height, user_id, project_id) "
-                "VALUES (?, 'internal', 'general', 1, 1, ?, 'dup');",
-                (f"{user_id}.png", user_id),
+            media = {
+                "width": 1,
+                "height": 1,
+                "user_id": user_id,
+                "project_id": "dup",
+                "created_at": AT,
+                "updated_at": AT,
+            }
+            conn.execute(
+                insert(_images).values(
+                    image_name=f"{user_id}.png", image_origin="internal", image_category="general", **media
+                )
             )
-            execute(
-                "INSERT INTO videos (video_name, video_origin, video_category, width, height, user_id, project_id) "
-                "VALUES (?, 'internal', 'general', 1, 1, ?, 'dup');",
-                (f"{user_id}.mp4", user_id),
+            conn.execute(
+                insert(_videos).values(
+                    video_name=f"{user_id}.mp4", video_origin="internal", video_category="general", **media
+                )
             )
-            execute(
-                "INSERT INTO session_queue (batch_id, queue_id, session_id, session, user_id, project_id, origin) "
-                "VALUES ('b', 'default', ?, '{}', ?, 'dup', 'webv2:p:dup:q:1');",
-                (f"{user_id}-session", user_id),
+            conn.execute(
+                insert(_session_queue).values(
+                    batch_id="b",
+                    queue_id="default",
+                    session_id=f"{user_id}-session",
+                    session="{}",
+                    user_id=user_id,
+                    project_id="dup",
+                    origin="webv2:p:dup:q:1",
+                    created_at=AT,
+                    updated_at=AT,
+                )
             )
-            execute(
-                "INSERT INTO media_references (owner_kind, user_id, owner_id, media_kind, media_name) "
-                "VALUES ('project', ?, 'dup', 'image', ?);",
-                (user_id, f"{user_id}.png"),
+            conn.execute(
+                insert(_media_references).values(
+                    owner_kind="project",
+                    user_id=user_id,
+                    owner_id="dup",
+                    media_kind="image",
+                    media_name=f"{user_id}.png",
+                )
             )
-            execute(
-                "INSERT INTO client_state (user_id, key, value) VALUES (?, 'webv2:workbench-account', ?);",
-                (user_id, json.dumps({"activeProjectId": "dup", "openProjectIds": ["dup", "other"]})),
+            conn.execute(
+                insert(_client_state),
+                [
+                    {
+                        "user_id": user_id,
+                        "key": "webv2:workbench-account",
+                        "value": _dumps({"activeProjectId": "dup", "openProjectIds": ["dup", "other"]}),
+                        "updated_at": AT,
+                    },
+                    {
+                        "user_id": user_id,
+                        "key": "webv2:project-covers",
+                        "value": _dumps({"coverImageNames": {"dup": f"{user_id}.png"}}),
+                        "updated_at": AT,
+                    },
+                ],
             )
-            execute(
-                "INSERT INTO client_state (user_id, key, value) VALUES (?, 'webv2:project-covers', ?);",
-                (user_id, json.dumps({"coverImageNames": {"dup": f"{user_id}.png"}})),
-            )
-    return db
+    return empty_database
 
 
-def _scalar(db: Database, sql: str, *parameters: str) -> object:
-    return db.sqlite.conn.execute(sql, parameters).fetchone()[0]
-
-
-def _projects(db: Database) -> dict[str, tuple[object, ...]]:
-    rows = db.sqlite.conn.execute(
-        "SELECT user_id, project_id, name, data, board_id, revision, created_at, updated_at, "
-        "minimum_canvas_schema_version FROM projects;"
-    ).fetchall()
+def _projects_by_owner(db: Database) -> dict[str, tuple[object, ...]]:
+    with db.begin(write=False) as conn:
+        rows = conn.execute(
+            select(
+                _projects.c.user_id,
+                _projects.c.project_id,
+                _projects.c.name,
+                _projects.c.data,
+                _projects.c.board_id,
+                _projects.c.revision,
+                _projects.c.created_at,
+                _projects.c.updated_at,
+                _projects.c.minimum_canvas_schema_version,
+            )
+        ).all()
     return {row[0]: tuple(row[1:]) for row in rows}
 
 
-def _client_state(db: Database, user_id: str) -> dict[str, object]:
-    rows = db.sqlite.conn.execute("SELECT key, value FROM client_state WHERE user_id = ?;", (user_id,)).fetchall()
-    return {row[0]: json.loads(row[1]) for row in rows}
+def _client_state_of(db: Database, user_id: str) -> dict[str, str]:
+    with db.begin(write=False) as conn:
+        return dict(
+            conn.execute(
+                select(_client_state.c.key, _client_state.c.value).where(_client_state.c.user_id == user_id)
+            ).all()
+        )
+
+
+def _primary_key(db: Database) -> list[str]:
+    with db.begin(write=False) as conn:
+        return inspect(conn).get_pk_constraint("projects")["constrained_columns"]
 
 
 def test_a_shared_id_stays_with_the_oldest_project_and_the_other_is_rekeyed_everywhere(
     before: Database, migrations: list[MigrationBase], caplog: pytest.LogCaptureFixture
 ) -> None:
-    with caplog.at_level(logging.WARNING, logger=LOGGER):
-        assert _run(before, migrations)
+    with caplog.at_level(logging.WARNING):
+        assert run_migrations(before, migrations)
 
-    projects = _projects(before)
+    projects = _projects_by_owner(before)
     alice_id = projects["alice"][0]
     assert projects["bob"][0] == "dup"
     assert isinstance(alice_id, str) and alice_id.startswith("project-")
-    # Every value survives the rebuild; the re-keyed document names its new id.
+    # Every value survives the rebuild; the re-keyed document names its new id and is written as the application
+    # writes documents: compact, its non-ASCII text as itself, so it grows by the new id's length and no more.
+    alice_document = _dumps({**ALICE_DOCUMENT, "id": alice_id})
     assert projects == {
         "alice": (
             alice_id,
             "Alice's dup",
-            json.dumps({"id": alice_id, "canvas": {"layers": [1]}}),
+            alice_document,
             "alice-inbox",
             7,
             "2026-02-01 00:00:00.000",
@@ -171,7 +280,7 @@ def test_a_shared_id_stays_with_the_oldest_project_and_the_other_is_rekeyed_ever
         "bob": (
             "dup",
             "Bob's dup",
-            json.dumps({"id": "dup", "name": "dup"}),
+            _dumps(BOB_DOCUMENT),
             "bob-inbox",
             4,
             "2026-01-01 00:00:00.000",
@@ -179,27 +288,34 @@ def test_a_shared_id_stays_with_the_oldest_project_and_the_other_is_rekeyed_ever
             2,
         ),
     }
+    assert len(alice_document.encode("utf-8")) == len(_dumps(ALICE_DOCUMENT).encode("utf-8")) + len(alice_id) - len(
+        "dup"
+    )
 
+    with before.begin(write=False) as conn:
+        for user_id, expected in (("alice", alice_id), ("bob", "dup")):
+            for statement in (
+                select(_images.c.project_id).where(_images.c.user_id == user_id),
+                select(_videos.c.project_id).where(_videos.c.user_id == user_id),
+                select(_session_queue.c.project_id).where(_session_queue.c.user_id == user_id),
+                select(_media_references.c.owner_id).where(_media_references.c.user_id == user_id),
+            ):
+                assert conn.execute(statement).scalar_one() == expected, str(statement)
+            origin = conn.execute(
+                select(_session_queue.c.origin).where(_session_queue.c.user_id == user_id)
+            ).scalar_one()
+            assert origin == f"webv2:p:{expected}:q:1"
+        boards = dict(conn.execute(select(_boards.c.board_id, _boards.c.project_id)).all())
     for user_id, expected in (("alice", alice_id), ("bob", "dup")):
-        for sql in (
-            "SELECT project_id FROM images WHERE user_id = ?;",
-            "SELECT project_id FROM videos WHERE user_id = ?;",
-            "SELECT project_id FROM session_queue WHERE user_id = ?;",
-            "SELECT owner_id FROM media_references WHERE user_id = ?;",
-        ):
-            assert _scalar(before, sql, user_id) == expected, sql
-        assert _scalar(before, "SELECT origin FROM session_queue WHERE user_id = ?;", user_id) == (
-            f"webv2:p:{expected}:q:1"
-        )
-        assert _client_state(before, user_id) == {
-            "webv2:workbench-account": {"activeProjectId": expected, "openProjectIds": [expected, "other"]},
-            "webv2:project-covers": {"coverImageNames": {expected: f"{user_id}.png"}},
+        assert _client_state_of(before, user_id) == {
+            "webv2:workbench-account": _dumps({"activeProjectId": expected, "openProjectIds": [expected, "other"]}),
+            "webv2:project-covers": _dumps({"coverImageNames": {expected: f"{user_id}.png"}}),
         }
-    boards = dict(before.sqlite.conn.execute("SELECT board_id, project_id FROM boards;").fetchall())
     assert boards == {"alice-inbox": alice_id, "bob-inbox": "dup", "bob-member": "dup", "alice-stray": None}
+    assert _primary_key(before) == ["project_id"]
     assert f"the copy owned by alice is now {alice_id}" in caplog.text
     assert "1 boards named a project that no longer exists" in caplog.text
-    before.dispose()
+    assert not run_migrations(before, migrations)
 
 
 def test_a_run_that_stopped_after_the_data_changes_finishes_the_work(
@@ -208,13 +324,14 @@ def test_a_run_that_stopped_after_the_data_changes_finishes_the_work(
     """On a server the data changes commit with the first DDL: a failed run can leave the owner index created and
     the per-account key still in place, with no duplicate left to re-key."""
     with before.begin(write=True) as conn:
-        conn.exec_driver_sql("UPDATE projects SET project_id = 'renamed' WHERE user_id = 'alice';")
-        conn.exec_driver_sql("UPDATE boards SET project_id = 'renamed' WHERE board_id = 'alice-inbox';")
-        conn.exec_driver_sql("CREATE INDEX idx_projects_user_id ON projects (user_id);")
+        conn.execute(update(_projects).where(_projects.c.user_id == "alice").values(project_id="renamed"))
+        conn.execute(update(_boards).where(_boards.c.board_id == "alice-inbox").values(project_id="renamed"))
+        alembic_operations(conn).create_index("idx_projects_user_id", "projects", ["user_id"])
 
-    assert _run(before, migrations)
+    assert run_migrations(before, migrations)
 
-    assert {user_id: values[0] for user_id, values in _projects(before).items()} == {"alice": "renamed", "bob": "dup"}
-    key = [row[1] for row in before.sqlite.conn.execute("PRAGMA table_info(projects);").fetchall() if row[5]]
-    assert key == ["project_id"]
-    before.dispose()
+    assert {owner: values[0] for owner, values in _projects_by_owner(before).items()} == {
+        "alice": "renamed",
+        "bob": "dup",
+    }
+    assert _primary_key(before) == ["project_id"]

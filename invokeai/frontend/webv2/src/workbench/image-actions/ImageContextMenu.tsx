@@ -167,6 +167,7 @@ export const ImageContextMenu = ({
   onClose,
 }: {
   actions: ImageActions;
+  /** The host's board listing as it shows it: folded through `useHostGalleryBoards` where boards cannot be shared. */
   boards: GalleryBoard[];
   previewVideoActions?: PreviewVideoContextActions;
   target: ImageContextMenuTarget | null;

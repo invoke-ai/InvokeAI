@@ -157,14 +157,33 @@ const boardAccessFor = (state, faults, board, { ignoreInbox = false } = {}) => {
   };
 };
 
-/** 404 for a board the caller cannot read, 403 for an action their role does not allow, else null. */
+/** The server's answer for a board that exists but the caller may not read; only a missing board answers 404. */
+const BOARD_UNREADABLE = [403, { detail: 'Not authorized to access this board' }];
+
+/** The server's answer for a readable board whose action the caller's role forbids. */
+const BOARD_ACTION_FORBIDDEN = [403, { detail: 'Not authorized to change this board' }];
+
+/** 403 for a board the caller cannot read or an action their role does not allow, else null. */
 const boardRefusal = (state, faults, board, action) => {
   const access = boardAccessFor(state, faults, board);
   if (!access.readable) {
-    return [404, { detail: 'Board not found' }];
+    return BOARD_UNREADABLE;
   }
-  return access.allows(action) ? null : [403, { detail: `Not allowed to ${action} on board ${board.board_id}` }];
+  return access.allows(action) ? null : BOARD_ACTION_FORBIDDEN;
 };
+
+/**
+ * Mirrors the server's claim rule: an import commits by adopting a staging board, which must be the caller's own,
+ * unshared (restricted, with no members), in no project, and nobody's inbox.
+ */
+const boardClaimRefusal = (state, board) =>
+  (board.user_id ?? MOCK_USER_ID) !== MOCK_USER_ID ||
+  (board.general_access ?? 'restricted') !== 'restricted' ||
+  (state.boardMembers.get(board.board_id)?.size ?? 0) > 0 ||
+  inboxProjectIdForBoard(state, board.board_id) !== null ||
+  (board.project_id ?? null) !== null
+    ? [409, { detail: 'Board is not available to be claimed by a project' }]
+    : null;
 
 const MOCK_USER_ID = 'fixture-user';
 
@@ -1091,7 +1110,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
               archived: false,
               board_id: boardId,
               board_name: name,
-              board_visibility: 'private',
+              general_access: 'restricted',
               created_at: now,
               deleted_at: null,
               owner_username: null,
@@ -1104,12 +1123,9 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             if (!board) {
               return json(404, { detail: 'Board not found' });
             }
-            if (
-              board.board_visibility !== 'private' ||
-              inboxProjectIdForBoard(state, boardId) !== null ||
-              (board.project_id ?? null) !== null
-            ) {
-              return json(409, { detail: 'Board is not available to be claimed by a project' });
+            const claimRefusal = boardClaimRefusal(state, board);
+            if (claimRefusal) {
+              return json(...claimRefusal);
             }
             board.board_name = name;
             board.project_id = projectId;
@@ -1177,7 +1193,15 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           const requested = await readJsonBody(request);
 
           if (requested.expected_revision !== undefined && requested.expected_revision !== project.revision) {
-            return json(409, { detail: 'Revision conflict' });
+            return json(409, { detail: { current_revision: project.revision, message: 'Revision conflict' } });
+          }
+          // The caller's workspace, saved in the same write as the content: a revision mismatch refuses both.
+          const workspaceRequest = requested.workspace ?? null;
+          const currentWorkspaceRevision = project.workspace?.revision ?? null;
+          if (workspaceRequest && currentWorkspaceRevision !== (workspaceRequest.expected_revision ?? null)) {
+            return json(409, {
+              detail: { current_revision: currentWorkspaceRevision, message: 'Workspace revision conflict' },
+            });
           }
           const maximum = clientMaximum(requested.max_canvas_schema_version);
           if (project.minimum_canvas_schema_version > maximum) {
@@ -1224,6 +1248,13 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           project.minimum_document_schema_version = documentFloor;
           project.revision += 1;
           project.updated_at = timestamp(state);
+          if (workspaceRequest) {
+            project.workspace = {
+              data: workspaceRequest.data ?? {},
+              revision: (currentWorkspaceRevision ?? 0) + 1,
+              updated_at: project.updated_at,
+            };
+          }
 
           // The board's name tracks the project's; the two commit together.
           const board = state.boards.get(project.board_id);
@@ -1232,7 +1263,8 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             board.updated_at = project.updated_at;
           }
 
-          return json(200, writtenRecordOf(project));
+          // The answer carries the workspace this write saved, null when it carried none.
+          return json(200, { ...writtenRecordOf(project), workspace: workspaceRequest ? project.workspace : null });
         }
         if (method === 'DELETE') {
           if (project) {
@@ -1278,6 +1310,11 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           return json(404, { detail: 'Project not found' });
         }
         const requested = await readJsonBody(request);
+        // The workspace holds canvas state, so it answers the canvas floor as the content routes do.
+        const canvasMaximum = clientMaximum(requested.max_canvas_schema_version);
+        if (project.minimum_canvas_schema_version > canvasMaximum) {
+          return json(...schemaUnsupported(project.minimum_canvas_schema_version, canvasMaximum));
+        }
         const documentFloor = project.minimum_document_schema_version ?? DEFAULT_DOCUMENT_SCHEMA_VERSION;
         if (documentFloor > documentMaximum(requested.max_document_schema_version)) {
           return json(
@@ -1759,7 +1796,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             archived: false,
             board_id: boardId,
             board_name: url.searchParams.get('board_name') ?? `Board ${state.nextBoardNumber}`,
-            board_visibility: 'private',
+            general_access: 'restricted',
             created_at: now,
             deleted_at: null,
             owner_username: null,
@@ -1780,8 +1817,11 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         const boardId = decodeURIComponent(boardMatch[1]);
         const board = state.boards.get(boardId);
 
-        if (!board || !boardAccessFor(state, faults, board).readable) {
+        if (!board) {
           return json(404, { detail: 'Board not found' });
+        }
+        if (!boardAccessFor(state, faults, board).readable) {
+          return json(...BOARD_UNREADABLE);
         }
         if (method === 'GET') {
           return json(200, boardDto(state, board, faults));
@@ -1799,11 +1839,8 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           // As the router does: the caller's role first, as if the board were not an inbox; then the inbox, which takes
           // its name, archived state and access from the project and cannot move, refuses what its project owns.
           for (const action of requiredActions) {
-            if (!boardAccessFor(state, faults, board).readable) {
-              return json(404, { detail: 'Board not found' });
-            }
             if (!boardAccessFor(state, faults, board, { ignoreInbox: true }).allows(action)) {
-              return json(403, { detail: `Not allowed to ${action} on board ${board.board_id}` });
+              return json(...BOARD_ACTION_FORBIDDEN);
             }
           }
           if (
@@ -1834,7 +1871,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         }
         if (method === 'DELETE') {
           if (!boardAccessFor(state, faults, board, { ignoreInbox: true }).allows('delete')) {
-            return json(403, { detail: `Not allowed to delete on board ${board.board_id}` });
+            return json(...BOARD_ACTION_FORBIDDEN);
           }
           if (inboxProjectIdForBoard(state, boardId) !== null) {
             // Refused before any media is touched — the whole point of the ordering.
@@ -1989,6 +2026,11 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         if (boardId !== null && !state.boards.has(boardId)) {
           return json(404, { detail: 'Board not found' });
         }
+        const copyRefusal =
+          boardId === null ? null : boardRefusal(state, faults, state.boards.get(boardId), 'add_media');
+        if (copyRefusal) {
+          return json(...copyRefusal);
+        }
 
         const copied = [];
         const failed = [];
@@ -2031,6 +2073,11 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
 
         if (boardId !== null && !state.boards.has(boardId)) {
           return json(404, { detail: 'Board not found' });
+        }
+        const copyRefusal =
+          boardId === null ? null : boardRefusal(state, faults, state.boards.get(boardId), 'add_media');
+        if (copyRefusal) {
+          return json(...copyRefusal);
         }
 
         const copied = [];
@@ -2214,6 +2261,10 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         if (method === 'POST') {
           if (!body.board_id || !state.boards.has(body.board_id)) {
             return json(404, { detail: 'Board not found' });
+          }
+          const attachRefusal = boardRefusal(state, faults, state.boards.get(body.board_id), 'add_media');
+          if (attachRefusal) {
+            return json(...attachRefusal);
           }
           video.board_id = body.board_id;
           return json(200, {

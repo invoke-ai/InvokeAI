@@ -2678,6 +2678,8 @@ const compileInvocationSnapshot = (
       autoBoardId: getGalleryAutoAddBoardId(widgetStates.gallery?.values ?? {}, canAddToCachedGalleryBoard),
       batchCount: sanitizeBatchCount(widgetStates.workflow?.values.batchCount),
       generators: workflowGenerators,
+      // An explicit board a node names is judged like the auto-add board: one the caller may add to now.
+      isBoardDestination: (boardId) => canAddToCachedGalleryBoard(boardId),
     });
 
     // Null means a generator is still unresolved or was edited during its round trip; nothing is queued.

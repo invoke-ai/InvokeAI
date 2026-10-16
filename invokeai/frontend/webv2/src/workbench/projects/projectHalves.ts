@@ -73,10 +73,10 @@ export interface ProjectHalves {
 /** Splits a whole document into the two halves the server saves apart. */
 export const splitProjectDocument = (document: ProjectDocumentV3): ProjectHalves => {
   const { stagingArea, ...canvas } = document.canvas;
-  const lastRuns: Record<string, ProjectWorkflowRunPreview> = {};
+  const lastRuns = new Map<string, ProjectWorkflowRunPreview>();
   const entries = document.workflows.entries.map(({ lastRun, ...entry }) => {
     if (lastRun) {
-      lastRuns[entry.document.id] = lastRun;
+      lastRuns.set(entry.document.id, lastRun);
     }
     return entry;
   });
@@ -100,7 +100,8 @@ export const splitProjectDocument = (document: ProjectDocumentV3): ProjectHalves
     widgetGraphs: document.widgetGraphs,
     widgetInstances: document.widgetInstances,
     widgetRegions: document.widgetRegions,
-    workflows: { activeWorkflowId: document.workflows.activeWorkflowId, lastRuns },
+    // Keyed by workflow id as own properties, whatever the id (`__proto__` through an object literal would not be).
+    workflows: { activeWorkflowId: document.workflows.activeWorkflowId, lastRuns: Object.fromEntries(lastRuns) },
   };
 
   let contentJson: string | undefined;
@@ -199,7 +200,9 @@ export const joinProjectDocument = (
       workflows: {
         activeWorkflowId,
         entries: entries.map((entry, index) => {
-          const run = lastRuns[entryIds[index] as string];
+          const id = entryIds[index] as string;
+          // Own properties only: a workflow id such as `constructor` must not read Object.prototype's.
+          const run = Object.hasOwn(lastRuns, id) ? lastRuns[id] : undefined;
           return isRecord(entry) && isRecord(run) ? { ...entry, lastRun: run } : entry;
         }),
       },

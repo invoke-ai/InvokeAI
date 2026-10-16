@@ -100,6 +100,20 @@ describe('splitting a project into content and workspace', () => {
     expect(workspace.canvas.stagingArea.selectedImageIndex).toBe(2);
   });
 
+  it.each(['__proto__', 'constructor', 'toString'])('round-trips the last run of a workflow with id %s', (id) => {
+    const project = createInitialWorkbenchState().projects[0]!;
+    const workflow = { ...createBlankWorkflowDocument(), id };
+    const ran = recordProjectWorkflowRun(addProjectWorkflow(project, workflow), id, RUN);
+    const halves = splitProjectDocument(serializeProjectDocumentV3(ran));
+
+    const joined = join({ content: JSON.parse(halves.contentJson), workspace: JSON.parse(halves.workspaceJson) });
+
+    expect(Object.hasOwn(halves.workspace.workflows.lastRuns, id)).toBe(true);
+    const rejoined = load((joined as { document: Record<string, unknown> }).document);
+    expect(rejoined.workflows.entries.find((entry) => entry.document.id === id)?.lastRun).toEqual(RUN);
+    expect(rejoined.workflows.entries.filter((entry) => entry.lastRun)).toHaveLength(1);
+  });
+
   it('changes only the half an edit belongs to', () => {
     const project = workedOnProject();
     const before = splitProjectDocument(serializeProjectDocumentV3(project));

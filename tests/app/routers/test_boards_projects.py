@@ -7,16 +7,25 @@ what these pin is which failure is a 404 and which a 409, and that members and i
 apart on the wire.
 """
 
+import inspect
+import typing
+from collections.abc import Iterator
 from typing import Any
 
 import pytest
 from fastapi import status
+from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 from sqlalchemy import insert
 
+from invokeai.app.api_app import app
+from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.schema.boards import board_members
+from invokeai.app.services.urls.urls_default import LocalUrlService
+from invokeai.app.services.videos.videos_common import VideoDTO
 from tests.app.routers.conftest import _auth, _create_board
 
 
@@ -275,3 +284,112 @@ def test_the_listing_tells_inboxes_and_members_apart(client: TestClient, user1_t
     assert listed[member["board_id"]]["project_id"] == project["project_id"]
     assert listed[loose]["is_inbox"] is False
     assert listed[loose].get("project_id") is None
+
+
+def test_an_images_project_is_shown_only_to_its_uploader_and_admins(
+    client: TestClient,
+    mock_invoker: Invoker,
+    mock_sqlite_database: Database,
+    user1_token: str,
+    user2_token: str,
+    admin_token: str,
+):
+    """A member of a shared board learns nothing about the project an image was made in, on the single, listed,
+    by-names and starring reads alike: `project_id` is theirs to see only when it names one of their own projects.
+    Confirming a foreign id here, with the 409 on creating a project under an existing id, would tell them the
+    project exists."""
+    mock_invoker.services.urls = LocalUrlService()
+    mock_invoker.services.images.start(mock_invoker)
+    project = _create_project(client, user1_token, "Mine")
+    board = _create_board(client, user1_token, "Shared")
+    client.patch(f"/api/v1/boards/{board}", json={"general_access": "viewer"}, headers=_auth(user1_token))
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert user1 is not None
+    # An editor: starring another member's item is a board role's to do, and answers with the item's DTO.
+    user2_id = client.get("/api/v1/auth/me", headers=_auth(user2_token)).json()["user_id"]
+    with mock_sqlite_database.begin(write=True) as conn:
+        conn.execute(insert(board_members).values(board_id=board, user_id=user2_id, role="editor"))
+    mock_invoker.services.image_records.save(
+        image_name="made-in-a-project.png",
+        image_origin=ResourceOrigin.INTERNAL,
+        image_category=ImageCategory.GENERAL,
+        width=8,
+        height=8,
+        has_workflow=False,
+        user_id=user1.user_id,
+        project_id=project["project_id"],
+    )
+    mock_invoker.services.board_image_records.add_image_to_board(board, "made-in-a-project.png")
+
+    def shown_to(token: str) -> tuple[str | None, ...]:
+        single = client.get("/api/v1/images/i/made-in-a-project.png", headers=_auth(token))
+        listed = client.get(f"/api/v1/images/?board_id={board}&offset=0&limit=10", headers=_auth(token))
+        by_names = client.post(
+            "/api/v1/images/images_by_names", json={"image_names": ["made-in-a-project.png"]}, headers=_auth(token)
+        )
+        starred = client.patch("/api/v1/images/i/made-in-a-project.png", json={"starred": True}, headers=_auth(token))
+        assert (single.status_code, listed.status_code, by_names.status_code, starred.status_code) == (200,) * 4
+        return (
+            single.json().get("project_id"),
+            listed.json()["items"][0].get("project_id"),
+            by_names.json()[0].get("project_id"),
+            starred.json().get("project_id"),
+        )
+
+    assert shown_to(user1_token) == (project["project_id"],) * 4
+    assert shown_to(admin_token) == (project["project_id"],) * 4
+    assert shown_to(user2_token) == (None,) * 4
+
+
+# Routes that answer with a media DTO but need no redaction, and why. A new entry needs the same kind of reason.
+_MEDIA_ROUTES_WITHOUT_REDACTION = {
+    "upload_image": "the project is the caller's own: assert_project_owned refuses any other before the upload",
+    "upload_video": "the project is the caller's own: assert_project_owned refuses any other before the upload",
+}
+
+
+def _media_dto_in(model: Any) -> bool:
+    """Whether a route's response model is an image or video DTO, alone, in a list or in a page. A parametrized
+    pydantic generic (`OffsetPaginatedResults[ImageDTO]`) is a concrete class, so its arguments come from pydantic."""
+    if model in (ImageDTO, VideoDTO):
+        return True
+    arguments = typing.get_args(model) or getattr(model, "__pydantic_generic_metadata__", {}).get("args", ())
+    return any(_media_dto_in(argument) for argument in arguments)
+
+
+def _api_routes(routes: Any) -> Iterator[APIRoute]:
+    """Every API route of the app. Included routers are mounted lazily and keep their routes on `original_router`."""
+    for route in routes:
+        if isinstance(route, APIRoute):
+            yield route
+        else:
+            inner = getattr(route, "original_router", None) or getattr(route, "routes", None)
+            if inner is not None:
+                yield from _api_routes(getattr(inner, "routes", inner))
+
+
+@pytest.mark.platform_independent
+def test_every_route_answering_a_media_dto_redacts_its_project() -> None:
+    """The next route that returns an image or video DTO must redact `project_id` too, or say here why not."""
+    media_routes = {
+        route.endpoint.__name__: route.endpoint
+        for route in _api_routes(app.routes)
+        if _media_dto_in(route.response_model)
+    }
+    assert set(media_routes) >= {
+        "get_image_dto",
+        "update_image",
+        "list_image_dtos",
+        "get_images_by_names",
+        "get_video_dto",
+        "update_video",
+        "list_video_dtos",
+    }, "the route enumeration lost routes it is meant to guard"
+
+    unredacted = sorted(
+        name
+        for name, endpoint in media_routes.items()
+        if name not in _MEDIA_ROUTES_WITHOUT_REDACTION and "redact_project_ids(" not in inspect.getsource(endpoint)
+    )
+    assert unredacted == []
+    assert set(_MEDIA_ROUTES_WITHOUT_REDACTION) <= set(media_routes), "an exemption names a route that is gone"

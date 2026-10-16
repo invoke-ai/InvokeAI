@@ -1065,8 +1065,10 @@ export const getGalleryImageMetadata = async (
 };
 
 /**
- * Whether a board a project names still exists for this account: false only when the server answers that it does
- * not. A virtual board (Uncategorized, a date, every board) always exists; any other failure is thrown, unanswered.
+ * Whether a board a project names still exists: false only when the server answers 404, that there is no such board.
+ * A board the caller may no longer read answers 403: it exists, so the project keeps naming it, and access granted
+ * again brings it back. A virtual board (Uncategorized, a date, every board) always exists; any other failure is
+ * thrown, unanswered.
  */
 export const galleryBoardExists = async (boardId: string, signal?: AbortSignal): Promise<boolean> => {
   if (getUploadBoardId(boardId) === undefined) {
@@ -1078,8 +1080,8 @@ export const galleryBoardExists = async (boardId: string, signal?: AbortSignal):
 
     return true;
   } catch (error) {
-    if (error instanceof ApiError && error.status === 404) {
-      return false;
+    if (error instanceof ApiError && (error.status === 404 || error.status === 403)) {
+      return error.status === 403;
     }
 
     throw error;

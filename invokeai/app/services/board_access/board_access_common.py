@@ -2,7 +2,10 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from invokeai.app.services.users.users_base import UserServiceBase
 
 
 class BoardRole(str, Enum):
@@ -141,6 +144,22 @@ class BoardViewer:
     is_admin: bool
 
 
+def queue_viewer(user_id: str, *, multiuser: bool, users: "UserServiceBase") -> Optional[BoardViewer]:
+    """The queue user as the boards API sees a caller, or None when the account may do nothing at queue time.
+
+    In single-user mode the queue runs as an admin and the account is not looked up. In multiuser mode a deleted or
+    deactivated account keeps no queue-time privileges, however its item got past the processor's owner checks, and
+    an active one brings its own admin flag. Graph execution and workflow-call expansion both resolve the queue
+    user through here, so a refusal at queue time is the same refusal everywhere.
+    """
+    if not multiuser:
+        return BoardViewer(user_id=user_id, is_admin=True)
+    user = users.get(user_id)
+    if user is None or not user.is_active:
+        return None
+    return BoardViewer(user_id=user_id, is_admin=user.is_admin)
+
+
 @dataclass(frozen=True)
 class BoardAudience:
     """Who sees what lands on a board: everyone, or its owner and members (admins see every board)."""
@@ -150,14 +169,12 @@ class BoardAudience:
 
 
 class BoardAccessDeniedError(Exception):
-    """The caller may not do the action. `readable` tells a board they cannot see (answered as missing) from one
-    they can see but not change."""
+    """The caller may not do the action to the board."""
 
-    def __init__(self, board_id: str, action: BoardAction, readable: bool) -> None:
+    def __init__(self, board_id: str, action: BoardAction) -> None:
         super().__init__(f"Not allowed to {action.value} on board {board_id}")
         self.board_id = board_id
         self.action = action
-        self.readable = readable
 
 
 class ItemAccessDeniedError(Exception):

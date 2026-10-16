@@ -3,7 +3,6 @@ import type { GallerySemanticReference } from '@features/gallery/core/semanticIm
 import type { GallerySettings } from '@features/gallery/core/settings';
 import type { GalleryBoard, GalleryView, GeneratedImageContract } from '@features/gallery/core/types';
 
-import { asSingleAccountBoards } from '@features/gallery/core/boardAccess';
 import { compareGalleryItems, legacyGeneratedImageToGalleryItem, toGalleryItemKey } from '@features/gallery/core/items';
 import { GALLERY_RECENT_IMAGE_LIMIT } from '@features/gallery/core/recentImages';
 import { ALL_READABLE_BOARDS_ID, isDateBoardId } from '@features/gallery/data/backend';
@@ -36,7 +35,7 @@ import {
   resolveGallerySelectedBoardId,
   type GalleryReadState,
 } from './galleryStateView';
-import { useOptionalGalleryUi } from './GalleryUiContext';
+import { useHostGalleryBoards } from './GalleryUiContext';
 
 /** The listing's read state, plus whether a further page is on its way. */
 export interface GalleryListingState extends GalleryReadState {
@@ -128,18 +127,11 @@ export const mapGalleryItemPageSlots = ({
   return slots;
 };
 
-const EMPTY_BOARDS: GalleryBoard[] = [];
-
 const useGalleryBoards = ({ settings }: { settings: GallerySettings }) => {
   const { data, error, errorUpdateCount, isError, isFetching, refetch } = useQuery(
     galleryBoardsOptions(getGalleryListingBoardsQuery(settings))
   );
-  // Only a host that says boards cannot be shared (a server with one account) folds them into the caller's own.
-  const isSingleAccount = useOptionalGalleryUi()?.boardSharing === false;
-  const boards = useMemo(
-    () => (data === undefined ? EMPTY_BOARDS : isSingleAccount ? asSingleAccountBoards(data) : data),
-    [data, isSingleAccount]
-  );
+  const boards = useHostGalleryBoards(data);
   const status = getGalleryReadStatus({ errorUpdateCount, hasData: data !== undefined, isError }, boards.length);
   const isFailed = status === 'error' || status === 'stale-error';
   const retry = useCallback(async () => {

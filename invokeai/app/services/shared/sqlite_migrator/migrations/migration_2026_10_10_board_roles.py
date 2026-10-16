@@ -6,7 +6,8 @@ owner is never a member. `boards.general_access` is the role every other account
 `shared_boards`, which no code ever wrote and whose `can_edit` nothing ever read.
 
 Visibility maps to general access: private to restricted, shared to viewer, public to contributor. Each
-`shared_boards` row becomes a viewer member, whatever its `can_edit`, unless it names the board's own owner.
+`shared_boards` row becomes a viewer member, whatever its `can_edit`, unless it names the board's own owner. A
+board without an owner (`user_id` NULL, as some left by a deleted account are) keeps every share.
 """
 
 from sqlalchemy import (
@@ -20,6 +21,7 @@ from sqlalchemy import (
     inspect,
     literal,
     null,
+    or_,
     select,
     table,
 )
@@ -65,7 +67,8 @@ def _copy_shared_boards(context: PortableMigrationContext) -> None:
             _shared_boards.c.board_id, _shared_boards.c.user_id, literal("viewer"), null(), _shared_boards.c.shared_at
         )
         .select_from(_shared_boards.join(_boards, _boards.c.board_id == _shared_boards.c.board_id))
-        .where(_shared_boards.c.user_id != _boards.c.user_id, ~already_member)
+        # `!=` alone is NULL, and so false, for a board without an owner.
+        .where(or_(_boards.c.user_id.is_(None), _shared_boards.c.user_id != _boards.c.user_id), ~already_member)
     )
     context.conn.execute(
         _board_members.insert().from_select(["board_id", "user_id", "role", "granted_by", "granted_at"], shares)

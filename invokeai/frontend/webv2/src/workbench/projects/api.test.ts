@@ -499,13 +499,46 @@ describe('deleteProject', () => {
 });
 
 describe('project workspaces', () => {
-  it('saves the caller’s workspace at its own route, declaring the document schema it understands', async () => {
+  it('saves the caller’s workspace at its own route, declaring the schemas it understands', async () => {
     transport.apiFetchJson.mockResolvedValueOnce({ data: {}, revision: 2, updated_at: '' });
 
     await saveProjectWorkspace('project/one', { data: { layout: {} }, expected_revision: 1 });
 
     expect(transport.apiFetchJson).toHaveBeenCalledWith('/api/v1/projects/project%2Fone/workspace', {
-      body: JSON.stringify({ data: { layout: {} }, expected_revision: 1, max_document_schema_version: 4 }),
+      body: JSON.stringify({
+        data: { layout: {} },
+        expected_revision: 1,
+        max_canvas_schema_version: 4,
+        max_document_schema_version: 4,
+      }),
+      method: 'PUT',
+      signal: undefined,
+    });
+  });
+
+  it('sends a workspace to store with the content in the same update', async () => {
+    const workspace = { data: { layout: {} }, expected_revision: null };
+    transport.apiFetchJson.mockResolvedValueOnce({ project_id: 'project-1', workspace: { ...workspace, revision: 1 } });
+
+    const updated = await updateProject('project-1', {
+      data: { id: 'project-1' },
+      expected_revision: 1,
+      minimum_document_schema_version: 4,
+      name: 'Project',
+      workspace,
+    });
+
+    expect(updated.workspace).toMatchObject({ revision: 1 });
+    expect(transport.apiFetchJson).toHaveBeenCalledWith('/api/v1/projects/project-1', {
+      body: JSON.stringify({
+        data: { id: 'project-1' },
+        expected_revision: 1,
+        minimum_document_schema_version: 4,
+        name: 'Project',
+        workspace,
+        max_canvas_schema_version: 4,
+        max_document_schema_version: 4,
+      }),
       method: 'PUT',
       signal: undefined,
     });

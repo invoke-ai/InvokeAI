@@ -10,6 +10,7 @@ from invokeai.app.services.project_records.project_records_common import (
     DEFAULT_PROJECT_DOCUMENT_SCHEMA_VERSION,
     PROJECT_BOARD_SNAPSHOT_MAX_ITEMS,
     PROJECT_DOCUMENT_MAX_BYTES,
+    SPLIT_PROJECT_DOCUMENT_SCHEMA_VERSION,
     ProjectBoardNotFoundError,
     ProjectBoardSnapshotDTO,
     ProjectBoardTooLargeError,
@@ -25,7 +26,9 @@ from invokeai.app.services.project_records.project_records_common import (
     ProjectRecordExistsError,
     ProjectRecordNotFoundError,
     ProjectSummaryDTO,
+    ProjectUpdateWorkspaceRequest,
     ProjectWithWorkspaceDTO,
+    ProjectWorkspaceBeforeSplitError,
     ProjectWorkspaceConflictError,
     ProjectWorkspaceDTO,
 )
@@ -33,7 +36,7 @@ from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.errors import UniqueViolation
 from invokeai.app.services.shared.database.queries import Queries
 from invokeai.app.services.shared.database.queries.locks import DatabaseLock
-from invokeai.app.services.shared.media_references import extract_media_references
+from invokeai.app.services.shared.media_references import MediaReferences, extract_media_references
 from invokeai.app.util.misc import uuid_string
 
 
@@ -77,6 +80,37 @@ def _next_document_floor(project_id: str, current: int, requested: Optional[int]
             project_id=project_id, current_version=current, requested_version=requested
         )
     return requested
+
+
+def _write_workspace(
+    q: Queries,
+    *,
+    user_id: str,
+    project_id: str,
+    expected_revision: Optional[int],
+    document_json: str,
+    references: MediaReferences,
+) -> tuple[int, str]:
+    """Writes the account's workspace in a project whose row the caller has locked: its first row when
+    `expected_revision` is None, else its next revision. Returns the stamp (revision, saved at) it leaves.
+
+    The project's row is the lock for its workspaces too: every workspace write takes it first, so the revision
+    read here is the one this write replaces, and a deletion of the project waits for it.
+    """
+    current = q.projects.workspace_stamp(user_id, project_id)
+    current_revision = current[0] if current is not None else None
+    if current_revision != expected_revision:
+        raise ProjectWorkspaceConflictError(project_id, expected_revision, current_revision)
+    if current_revision is None:
+        q.projects.insert_workspace(user_id=user_id, project_id=project_id, data=document_json)
+    else:
+        q.projects.save_workspace(user_id=user_id, project_id=project_id, data=document_json)
+    q.media_references.replace(
+        owner_kind="project_workspace", user_id=user_id, owner_id=project_id, references=references
+    )
+    stamp = q.projects.workspace_stamp(user_id, project_id)
+    assert stamp is not None, "the workspace was written in this transaction"
+    return stamp
 
 
 def _record(summary: Optional[ProjectSummaryDTO], project_id: str, data: dict[str, Any]) -> ProjectRecordDTO:
@@ -247,11 +281,14 @@ class ProjectRecordsStorage(ProjectRecordsStorageBase):
         max_canvas_schema_version: int = DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
         minimum_document_schema_version: int | None = None,
         max_document_schema_version: int = DEFAULT_PROJECT_DOCUMENT_SCHEMA_VERSION,
-    ) -> ProjectRecordDTO:
+        workspace: Optional[ProjectUpdateWorkspaceRequest] = None,
+    ) -> ProjectWithWorkspaceDTO:
         document_json, document_bytes = _serialize_project_document(data)
         references = extract_media_references(data)
+        workspace_json, workspace_bytes = ("", 0) if workspace is None else _serialize_project_document(workspace.data)
+        workspace_references = MediaReferences() if workspace is None else extract_media_references(workspace.data)
 
-        def save(q: Queries) -> Optional[ProjectSummaryDTO]:
+        def save(q: Queries) -> tuple[Optional[ProjectSummaryDTO], Optional[tuple[int, str]]]:
             q.locks.acquire(DatabaseLock.MEDIA_PROTECTION, shared=True)
             # Locked before anything is checked, so the checks and the write apply to the same row, whatever other
             # transactions save, delete or create under this id meanwhile.
@@ -293,7 +330,10 @@ class ProjectRecordsStorage(ProjectRecordsStorageBase):
                 minimum_version=next_document_floor,
                 client_maximum_version=max_document_schema_version,
             )
+            if workspace is not None and next_document_floor < SPLIT_PROJECT_DOCUMENT_SCHEMA_VERSION:
+                raise ProjectWorkspaceBeforeSplitError(project_id, next_document_floor)
             _require_project_document_size(document_bytes)
+            _require_project_document_size(workspace_bytes)
 
             q.projects.save(
                 user_id=user_id,
@@ -307,9 +347,27 @@ class ProjectRecordsStorage(ProjectRecordsStorageBase):
             q.media_references.replace(
                 owner_kind="project", user_id=user_id, owner_id=project_id, references=references
             )
-            return q.projects.summary(user_id, project_id)
+            stamp = None
+            if workspace is not None:
+                # In the content's transaction: a workspace conflict rolls the content back with it, so a split
+                # never lands by half.
+                stamp = _write_workspace(
+                    q,
+                    user_id=user_id,
+                    project_id=project_id,
+                    expected_revision=workspace.expected_revision,
+                    document_json=workspace_json,
+                    references=workspace_references,
+                )
+            return q.projects.summary(user_id, project_id), stamp
 
-        return _record(self._queries.run(save), project_id, data)
+        summary, stamp = self._queries.run(save)
+        record = _record(summary, project_id, data)
+        saved_workspace = None
+        if workspace is not None and stamp is not None:
+            saved_workspace = ProjectWorkspaceDTO(data=workspace.data, revision=stamp[0], updated_at=stamp[1])
+        # Shallow, like `get`: `model_dump` would copy the whole content.
+        return ProjectWithWorkspaceDTO(**dict(record), workspace=saved_workspace)
 
     def save_workspace(
         self,
@@ -318,38 +376,37 @@ class ProjectRecordsStorage(ProjectRecordsStorageBase):
         expected_revision: Optional[int],
         data: dict[str, Any],
         max_document_schema_version: int,
+        max_canvas_schema_version: int = DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
     ) -> ProjectWorkspaceDTO:
         document_json, document_bytes = _serialize_project_document(data)
         _require_project_document_size(document_bytes)
         references = extract_media_references(data)
 
-        def save(q: Queries) -> Optional[tuple[int, str]]:
+        def save(q: Queries) -> tuple[int, str]:
             q.locks.acquire(DatabaseLock.MEDIA_PROTECTION, shared=True)
-            # The project's row is the lock for its workspaces too: every workspace write takes it first, so the
-            # revision read below is the one this write replaces, and a deletion of the project waits for it.
             project = q.projects.lock(user_id, project_id)
             if project is None:
                 raise ProjectRecordNotFoundError(project_id)
+            _require_supported_schema(
+                project_id=project_id,
+                minimum_version=project.minimum_canvas_schema_version,
+                client_maximum_version=max_canvas_schema_version,
+            )
             _require_supported_document_schema(
                 project_id=project_id,
                 minimum_version=project.minimum_document_schema_version,
                 client_maximum_version=max_document_schema_version,
             )
-            current = q.projects.workspace_stamp(user_id, project_id)
-            current_revision = current[0] if current is not None else None
-            if current_revision != expected_revision:
-                raise ProjectWorkspaceConflictError(project_id, expected_revision, current_revision)
-            if current_revision is None:
-                q.projects.insert_workspace(user_id=user_id, project_id=project_id, data=document_json)
-            else:
-                q.projects.save_workspace(user_id=user_id, project_id=project_id, data=document_json)
-            q.media_references.replace(
-                owner_kind="project_workspace", user_id=user_id, owner_id=project_id, references=references
+            return _write_workspace(
+                q,
+                user_id=user_id,
+                project_id=project_id,
+                expected_revision=expected_revision,
+                document_json=document_json,
+                references=references,
             )
-            return q.projects.workspace_stamp(user_id, project_id)
 
         stamp = self._queries.run(save)
-        assert stamp is not None, "the workspace was written in this transaction"
         # The document the client sent, not a decode of the stored one: the same JSON, and the larger part.
         return ProjectWorkspaceDTO(data=data, revision=stamp[0], updated_at=stamp[1])
 

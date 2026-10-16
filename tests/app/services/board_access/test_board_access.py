@@ -113,18 +113,17 @@ def test_a_caller_gets_the_higher_of_their_membership_and_general_access(
     assert mock_invoker.services.board_access.get(board_id, OWNER, False).role == BoardRole.Owner
 
 
-def test_a_refusal_says_whether_the_caller_can_see_the_board(
+def test_require_refuses_what_the_role_does_not_allow_and_tells_a_missing_board_apart(
     mock_invoker: Invoker, mock_sqlite_database: Database, board_id: str
 ) -> None:
     access = mock_invoker.services.board_access
 
-    with pytest.raises(BoardAccessDeniedError) as unseen:
+    with pytest.raises(BoardAccessDeniedError):
         access.require(board_id, OTHER, False, BoardAction.Read)
     _grant(mock_sqlite_database, board_id, BoardRole.Viewer)
-    with pytest.raises(BoardAccessDeniedError) as seen:
+    assert access.require(board_id, OTHER, False, BoardAction.Read).role is BoardRole.Viewer
+    with pytest.raises(BoardAccessDeniedError):
         access.require(board_id, OTHER, False, BoardAction.AddMedia)
-
-    assert (unseen.value.readable, seen.value.readable) == (False, True)
     with pytest.raises(BoardRecordNotFoundException):
         access.require("missing", OTHER, False, BoardAction.Read)
 
@@ -263,9 +262,8 @@ def test_a_membership_gives_its_role_to_its_member_alone(
 
     assert access.get(board_id, OTHER, False).role is BoardRole.Editor
     assert access.get(board_id, third, False).role is None
-    with pytest.raises(BoardAccessDeniedError) as refused:
+    with pytest.raises(BoardAccessDeniedError):
         access.require(board_id, third, False, BoardAction.Read)
-    assert not refused.value.readable
 
     with mock_sqlite_database.begin(write=True) as conn:
         conn.execute(insert(board_members).values(board_id=board_id, user_id=third, role=BoardRole.Viewer.value))
@@ -277,3 +275,23 @@ def test_a_membership_gives_its_role_to_its_member_alone(
 
 def _listing(invoker: Invoker, user_id: str) -> list:
     return invoker.services.boards.get_all(user_id, False, BoardRecordOrderBy.CreatedAt, SQLiteDirection.Descending)
+
+
+def test_a_caller_sees_only_their_own_projects_among_media_provenance(
+    mock_invoker: Invoker, mock_sqlite_database: Database, board_id: str
+) -> None:
+    """Media carry the project they were made in; a viewer learns it only for their own projects, an admin for all."""
+    others_inbox = mock_invoker.services.board_records.save("Their inbox", OTHER).board_id
+    with mock_sqlite_database.begin(write=True) as conn:
+        conn.execute(insert(projects).values(project_id="mine", user_id=OWNER, name="M", data="{}", board_id=board_id))
+        conn.execute(
+            insert(projects).values(project_id="theirs", user_id=OTHER, name="T", data="{}", board_id=others_inbox)
+        )
+    access = mock_invoker.services.board_access
+    seen = ["mine", "theirs", "gone"]
+
+    assert access.visible_project_ids(seen, OWNER, False) == {"mine"}
+    assert access.visible_project_ids(seen, OTHER, False) == {"theirs"}
+    assert access.visible_project_ids(seen, "third", False) == set()
+    assert access.visible_project_ids(seen, "third", True) == set(seen)
+    assert access.visible_project_ids([], OWNER, False) == set()

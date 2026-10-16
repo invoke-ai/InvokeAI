@@ -42,7 +42,6 @@ def test_get_all_runs_as_admin_in_single_user_mode() -> None:
     [
         (MagicMock(is_admin=True, is_active=True), True),
         (MagicMock(is_admin=False, is_active=True), False),
-        (None, False),
     ],
 )
 def test_get_all_uses_queue_user_role_in_multiuser_mode(user: MagicMock | None, expected_is_admin: bool) -> None:
@@ -56,9 +55,12 @@ def test_get_all_uses_queue_user_role_in_multiuser_mode(user: MagicMock | None, 
     )
 
 
-@pytest.mark.parametrize("is_admin", [True, False])
-def test_get_all_rejects_deactivated_queue_user_in_multiuser_mode(is_admin: bool) -> None:
-    boards, services = _make_interface(multiuser=True, user=MagicMock(is_admin=is_admin, is_active=False))
+@pytest.mark.parametrize(
+    "user", [MagicMock(is_admin=True, is_active=False), MagicMock(is_admin=False, is_active=False), None]
+)
+def test_get_all_rejects_a_deactivated_or_deleted_queue_user_in_multiuser_mode(user: MagicMock | None) -> None:
+    """An account that no longer exists keeps no queue-time privileges, exactly as a deactivated one."""
+    boards, services = _make_interface(multiuser=True, user=user)
 
     with pytest.raises(PermissionError):
         boards.get_all()
@@ -82,7 +84,7 @@ def test_a_board_a_node_reads_is_checked_and_described_to_the_queue_user() -> No
 @pytest.mark.parametrize("read", ["get_dto", "get_all_image_names_for_board"])
 def test_a_node_cannot_read_a_board_its_user_cannot(read: str) -> None:
     boards, services = _make_interface(multiuser=True, user=ACTIVE_USER)
-    services.board_access.require.side_effect = BoardAccessDeniedError("board", BoardAction.Read, readable=False)
+    services.board_access.require.side_effect = BoardAccessDeniedError("board", BoardAction.Read)
 
     with pytest.raises(PermissionError, match="not authorized"):
         getattr(boards, read)("board")

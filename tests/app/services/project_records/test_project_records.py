@@ -213,9 +213,7 @@ def test_update_increments_revision(project_records: ProjectRecordsStorage) -> N
     assert updated.revision == 2
     assert updated.name == "Renamed"
     assert updated.data == {"v": 2}
-    assert project_records.get(SYSTEM_USER_ID, created.project_id) == ProjectWithWorkspaceDTO(
-        **updated.model_dump(), workspace=None
-    )
+    assert project_records.get(SYSTEM_USER_ID, created.project_id) == updated
 
 
 def test_a_save_renews_when_the_project_was_updated(project_records: ProjectRecordsStorage, database: Database) -> None:

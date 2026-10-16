@@ -21,6 +21,7 @@ import { ALL_READABLE_BOARDS_ID, isDateBoardId } from './backend';
 import {
   fetchGalleryItemsRange,
   GALLERY_PAGE_SIZE,
+  galleryBoardsOptions,
   galleryKeys,
   getGalleryItemListingKey,
   getGalleryItemListQueries,
@@ -453,11 +454,12 @@ export const getGalleryProjectBoardsFromCaches = (client: QueryClient, projectId
 };
 
 /**
- * Whether the account may add media to a board, as its board listings say, newest first: a board listed with
- * `add_media`. A board a listing no longer holds was deleted or stopped being readable: not a destination either, so
- * results are redirected rather than run and then refused. Absence counts only from a listing that would have held
- * the board: one of archived boards too, or a newer listing of live boards than one that held it live. With no
- * listing yet, the server decides.
+ * Whether the account may add media to a board, as its cached board listings say, newest first. A board listed with
+ * `add_media` is a destination, archived or not: archiving hides a board from the panel, not from results sent to it
+ * on purpose. A board no listing holds is not one: it was deleted, stopped being readable, or was never asked about.
+ * Absence counts only from a listing that would have held the board: one of archived boards too, or a newer listing
+ * of live boards than one that held it live. The caller decides from a listing it ensured with
+ * `ensureGalleryBoardDestinations`: nothing is guessed, so a run never fails on its board after generating.
  */
 export const canAddToCachedGalleryBoard = (boardId: string, client: QueryClient = queryClient): boolean => {
   const owner = captureAccountScope();
@@ -478,15 +480,57 @@ export const canAddToCachedGalleryBoard = (boardId: string, client: QueryClient 
     }
     isMissingFromNewerLiveListing = true;
   }
-  return listings.length === 0;
+  return false;
+};
+
+const GALLERY_BOARD_DESTINATIONS_STALE_MS = 60_000;
+
+/**
+ * Has a listing for `canAddToCachedGalleryBoard` to decide from before a submission or upload resolves its
+ * destination: every board the account can read, archived ones included, so an archived board chosen on purpose
+ * is found and a board missing from it is known to be gone. Returns null, without a tick, while such a listing
+ * read within the last minute and not invalidated since is cached, so a caller that must dispatch synchronously
+ * can; otherwise the read to await. After a run or upload fails on its board, the listing is invalidated and the next
+ * resolution reads it again. A listing that cannot be read leaves the decision to what is cached: with nothing
+ * cached, no board is a destination and results go to the inbox rather than to a board that may refuse them.
+ */
+export const ensureGalleryBoardDestinations = (client: QueryClient = queryClient): Promise<void> | null => {
+  const options = galleryBoardsOptions({ includeArchived: true });
+  // Any listing of archived boards too will do, whatever its order: an open panel showing archived boards keeps one
+  // fresh, and then an invoke reads nothing.
+  const now = Date.now();
+  const hasFreshListing = client
+    .getQueryCache()
+    .findAll({ queryKey: galleryKeys.boardsForAccount(captureAccountScope()) })
+    .some(
+      (query) =>
+        (query.queryKey.at(-1) as { includeArchived?: boolean } | undefined)?.includeArchived === true &&
+        query.state.status === 'success' &&
+        !query.state.isInvalidated &&
+        now - query.state.dataUpdatedAt < GALLERY_BOARD_DESTINATIONS_STALE_MS
+    );
+
+  if (hasFreshListing) {
+    return null;
+  }
+
+  return client
+    .fetchQuery({ ...options, staleTime: GALLERY_BOARD_DESTINATIONS_STALE_MS })
+    .then(() => undefined)
+    .catch(() => {
+      // Unanswered: the cached listings, if any, decide.
+    });
 };
 
 /**
  * Lists a board the account just created in every cached board listing of the account's, ahead of the refetch that
- * orders it properly: a board selected as it is created is already where new results go.
+ * orders it properly: a board selected as it is created is already where new results go. A listing read still in
+ * flight was asked before the board existed and would list it away again as it landed, so those reads are cancelled
+ * first; the refetch that follows the creation reads them again.
  */
-export const addGalleryBoardToCaches = (client: QueryClient, board: GalleryBoard): void => {
+export const addGalleryBoardToCaches = async (client: QueryClient, board: GalleryBoard): Promise<void> => {
   const owner = captureAccountScope();
+  await client.cancelQueries({ queryKey: galleryKeys.boardsForAccount(owner) });
   for (const query of client.getQueryCache().findAll({ queryKey: galleryKeys.boardsForAccount(owner) })) {
     const boards = query.state.data;
     if (isGalleryBoardsData(boards) && !boards.some((candidate) => candidate.id === board.id)) {

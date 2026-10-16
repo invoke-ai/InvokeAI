@@ -158,6 +158,10 @@ export const useGalleryUploadAction = ({
           });
         }
 
+        // What landed is listed; a board that refused a file leaves the listing's view of it stale. Either way the
+        // gallery, boards included, reads again.
+        void invalidateGallery(queryClient);
+
         if (uploadedItems.length === 0) {
           const fallback = t('widgets.gallery.uploadFailed', { failed: failedCount });
 
@@ -188,8 +192,6 @@ export const useGalleryUploadAction = ({
         if (newestVisibleUpload) {
           gallery?.selectItem(newestVisibleUpload);
         }
-
-        void invalidateGallery(queryClient);
 
         const summary = t('widgets.gallery.uploadSummary', {
           board: targetBoardName,

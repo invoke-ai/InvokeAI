@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import TYPE_CHECKING, Optional
 
 from invokeai.app.services.board_access.board_access_common import (
@@ -63,7 +64,7 @@ class BoardAccessService:
         `BoardRecordNotFoundException` when there is no such board."""
         access = self.get(board_id, user_id, is_admin)
         if not access.allows(action):
-            raise BoardAccessDeniedError(board_id, action, readable=access.allows(BoardAction.Read))
+            raise BoardAccessDeniedError(board_id, action)
         return access
 
     def member_roles(self, board_ids: list[str], user_id: str) -> dict[str, BoardRole]:
@@ -108,6 +109,14 @@ class BoardAccessService:
                 board = None
         if not item_allows(is_item_owner=is_owner, is_admin=is_admin, board=board, action=action):
             raise ItemAccessDeniedError(item_name, action)
+
+    def visible_project_ids(self, project_ids: Iterable[str], user_id: str, is_admin: bool) -> set[str]:
+        """The project ids among these the caller may learn from the media made in them: all of them for an admin,
+        otherwise those naming the caller's own projects. One query, however many ids."""
+        ids = set(project_ids)
+        if is_admin or not ids:
+            return ids
+        return self._queries.projects.owned_ids(user_id, sorted(ids))
 
     def audience(self, board_id: str) -> Optional[BoardAudience]:
         """Who sees what lands on the board, or None when there is no such board."""

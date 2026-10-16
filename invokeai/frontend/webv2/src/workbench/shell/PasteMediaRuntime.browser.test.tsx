@@ -33,7 +33,8 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(mocks.project),
   useWidgetValuesSelector: () => ({}),
 }));
-vi.mock('@features/gallery/react', () => ({
+vi.mock('@features/gallery/picker', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useGalleryUploadAction: (options: { selectedBoardId: string }) => {
     mocks.uploadOptions = options;
     return mocks.uploadFiles;

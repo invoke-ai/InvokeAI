@@ -5,12 +5,14 @@ specifics so any route can call them after resolving `current_user`.
 """
 
 from collections.abc import Iterable
+from typing import Optional, Protocol
 
 from fastapi import HTTPException
 
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.board_access.board_access_common import (
+    BoardAccess,
     BoardAction,
     ItemAccessDeniedError,
     ItemAction,
@@ -21,9 +23,17 @@ from invokeai.app.services.project_records.project_records_common import Project
 
 def _require(
     board_id: str, current_user: CurrentUserOrDefault, actions: Iterable[BoardAction], inbox_left_to_storage: bool
-) -> None:
-    """Raise unless the caller may take every action on the board. A board the caller cannot read answers 404, as
-    a missing one does, so board ids reveal nothing; one they can read but not change answers 403."""
+) -> BoardAccess:
+    """The caller's access to the board, when it allows every action; raises otherwise.
+
+    Only a missing board answers 404. A board the caller may not read answers 403, like an image or a video they
+    may not read (see `_assert_image_record_exists`), because the two refusals mean opposite things to a client:
+    gone is permanent, and the client drops its selection, auto-add target and cached items for the board; denied
+    is a permission decision an owner can reverse by flipping the board back to shared or re-granting membership,
+    and nothing would restore what the client dropped over it. Board ids are generated UUIDs, so learning that
+    one exists buys an attacker nothing they could enumerate. A board the caller can read but not change
+    answers 403 too, worded as the change refused.
+    """
     try:
         access = ApiDependencies.invoker.services.board_access.get(
             board_id, current_user.user_id, current_user.is_admin
@@ -31,16 +41,20 @@ def _require(
     except BoardRecordNotFoundException:
         raise HTTPException(status_code=404, detail="Board not found")
     if not access.allows(BoardAction.Read):
-        raise HTTPException(status_code=404, detail="Board not found")
+        raise HTTPException(status_code=403, detail="Not authorized to access this board")
     allows = access.role_allows if inbox_left_to_storage else access.allows
     if not all(allows(action) for action in actions):
         raise HTTPException(status_code=403, detail="Not authorized to change this board")
+    return access
 
 
-def assert_board_changes(board_id: str, current_user: CurrentUserOrDefault, actions: Iterable[BoardAction]) -> None:
-    """Raise unless the caller's role allows every change. What a project's inbox refuses to everyone is left to
-    the storage, which answers it with a 409 naming the project as the place to make the change."""
-    _require(board_id, current_user, actions, inbox_left_to_storage=True)
+def assert_board_changes(
+    board_id: str, current_user: CurrentUserOrDefault, actions: Iterable[BoardAction]
+) -> BoardAccess:
+    """The caller's access, when their role allows every change; raises otherwise. What a project's inbox refuses
+    to everyone is left to the storage, which answers it with a 409 naming the project as the place to make the
+    change. The access is returned so a route can tell an owner acting as one from an admin overriding."""
+    return _require(board_id, current_user, actions, inbox_left_to_storage=True)
 
 
 def assert_board_read_access(board_id: str, current_user: CurrentUserOrDefault) -> None:
@@ -143,3 +157,30 @@ def assert_project_owned(project_id: str | None, current_user: CurrentUserOrDefa
         ApiDependencies.invoker.services.project_records.get_board_id(current_user.user_id, project_id)
     except ProjectRecordNotFoundError:
         raise HTTPException(status_code=404, detail="Project not found")
+
+
+class _MediaDTO(Protocol):
+    """What the redaction needs of an image or video DTO."""
+
+    project_id: Optional[str]
+
+
+def redact_project_ids(dtos: Iterable[_MediaDTO], current_user: CurrentUserOrDefault) -> None:
+    """Blank `project_id` on every DTO whose project is not the caller's own, in place and in one query.
+
+    Provenance is only ever recorded from the uploader's own project (`assert_project_owned`), so a viewer of a
+    shared board has no business learning it: a project id confirmed here, combined with the 409 on creating a
+    project with an existing id, would tell them the project exists. Who sees which project is the access
+    service's decision (`visible_project_ids`); this only applies it to the response.
+    """
+    attributed = [dto for dto in dtos if dto.project_id is not None]
+    if not attributed:
+        return
+    visible = ApiDependencies.invoker.services.board_access.visible_project_ids(
+        {dto.project_id for dto in attributed if dto.project_id is not None},
+        current_user.user_id,
+        current_user.is_admin,
+    )
+    for dto in attributed:
+        if dto.project_id not in visible:
+            dto.project_id = None

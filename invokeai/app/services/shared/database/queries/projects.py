@@ -1,5 +1,6 @@
 """Canvas projects: their documents, revisions, and the board each one claims."""
 
+import itertools
 import json
 from collections.abc import Sequence
 from typing import Any, NamedTuple, Optional
@@ -31,7 +32,7 @@ from invokeai.app.services.project_records.project_records_common import (
     ProjectWorkspaceDTO,
 )
 from invokeai.app.services.shared.database.dialect import OrderedJoin
-from invokeai.app.services.shared.database.queries.base import QueryModule, locking, mapped, read, write
+from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, locking, mapped, read, write
 from invokeai.app.services.shared.database.schema.boards import board_images, board_videos, boards
 from invokeai.app.services.shared.database.schema.images import images
 from invokeai.app.services.shared.database.schema.projects import project_workspaces, projects
@@ -76,6 +77,9 @@ _SUMMARIES = (
     .order_by(projects.c.created_at, projects.c.project_id)
 )
 _BOARD_ID = select(projects.c.board_id).where(*_THE_PROJECT)
+_OWNED_IDS = select(projects.c.project_id).where(
+    projects.c.user_id == bindparam("user_id"), projects.c.project_id.in_(bindparam("project_ids", expanding=True))
+)
 _LOCK = (
     select(
         projects.c.revision,
@@ -254,6 +258,14 @@ class ProjectQueries(QueryModule):
     @read
     def board_id(self, conn: Connection, user_id: str, project_id: str) -> Optional[str]:
         return conn.execute(_BOARD_ID, {"user_id": user_id, "project_id": project_id}).scalar_one_or_none()
+
+    @read
+    def owned_ids(self, conn: Connection, user_id: str, project_ids: Sequence[str]) -> set[str]:
+        """Those of these project ids that name one of the account's projects."""
+        owned: set[str] = set()
+        for chunk in itertools.batched(project_ids, IN_CHUNK):
+            owned.update(conn.execute(_OWNED_IDS, {"user_id": user_id, "project_ids": list(chunk)}).scalars().all())
+        return owned
 
     @locking
     def lock(self, conn: Connection, user_id: str, project_id: str) -> Optional[LockedProject]:

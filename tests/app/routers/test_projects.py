@@ -561,4 +561,123 @@ def test_no_one_else_can_save_a_workspace_in_a_project(client: TestClient, user1
     assert _put_workspace(client, user2_token, project_id, None, {}).status_code == status.HTTP_404_NOT_FOUND
 
 
+def test_a_workspace_save_below_the_canvas_floor_is_a_412(client: TestClient, user1_token: str):
+    created = _create_project(
+        client,
+        user1_token,
+        data={"canvas": {"version": 3}},
+        minimum_canvas_schema_version=3,
+        max_canvas_schema_version=3,
+        minimum_document_schema_version=4,
+        max_document_schema_version=4,
+    ).json()
+
+    # `_put_workspace` names no canvas schema, so the client is taken for a v2 one.
+    refused = _put_workspace(client, user1_token, created["project_id"], None, {"stagingArea": {}})
+    assert refused.status_code == status.HTTP_412_PRECONDITION_FAILED
+    assert refused.json()["detail"]["code"] == "canvas_schema_unsupported"
+
+    saved = client.put(
+        f"/api/v1/projects/{created['project_id']}/workspace",
+        json={
+            "data": {"stagingArea": {}},
+            "expected_revision": None,
+            "max_document_schema_version": 4,
+            "max_canvas_schema_version": 3,
+        },
+        headers=_auth(user1_token),
+    )
+    assert saved.status_code == status.HTTP_200_OK
+    assert saved.json()["revision"] == 1
+
+
+def _split_whole_project(client: TestClient, token: str, project_id: str, workspace: dict[str, Any]):
+    """The save that splits a whole project: content, raised floor and the caller's workspace in one request."""
+    return client.put(
+        f"/api/v1/projects/{project_id}",
+        json={
+            "name": "Project",
+            "data": {"canvas": {}},
+            "expected_revision": 1,
+            "minimum_document_schema_version": 4,
+            "max_document_schema_version": 4,
+            "workspace": workspace,
+        },
+        headers=_auth(token),
+    )
+
+
+def test_the_split_saves_content_floor_and_workspace_in_one_request(client: TestClient, user1_token: str):
+    created = _create_project(client, user1_token, data={"whole": True}).json()
+
+    saved = _split_whole_project(
+        client, user1_token, created["project_id"], {"data": {"layout": "mine"}, "expected_revision": None}
+    )
+
+    assert saved.status_code == status.HTTP_200_OK
+    assert (saved.json()["revision"], saved.json()["minimum_document_schema_version"]) == (2, 4)
+    assert (saved.json()["workspace"]["revision"], saved.json()["workspace"]["data"]) == (1, {"layout": "mine"})
+    fetched = client.get(
+        f"/api/v1/projects/{created['project_id']}?max_document_schema_version=4", headers=_auth(user1_token)
+    ).json()
+    assert fetched["data"] == {"canvas": {}}
+    assert fetched["workspace"] == saved.json()["workspace"]
+
+
+def test_a_stale_workspace_revision_in_the_split_is_a_409_that_saves_nothing(client: TestClient, user1_token: str):
+    created = _create_project(client, user1_token, data={"whole": True}).json()
+    assert _put_workspace(client, user1_token, created["project_id"], None, {"v": 1}).status_code == 200
+
+    refused = _split_whole_project(
+        client, user1_token, created["project_id"], {"data": {"v": "lost"}, "expected_revision": None}
+    )
+
+    assert refused.status_code == status.HTTP_409_CONFLICT
+    assert refused.json()["detail"]["current_revision"] == 1
+    fetched = client.get(
+        f"/api/v1/projects/{created['project_id']}?max_document_schema_version=4", headers=_auth(user1_token)
+    ).json()
+    assert (fetched["revision"], fetched["minimum_document_schema_version"], fetched["data"]) == (
+        1,
+        3,
+        {"whole": True},
+    )
+    assert fetched["workspace"]["data"] == {"v": 1}
+
+
+def test_a_workspace_beside_a_whole_document_is_a_400(client: TestClient, user1_token: str):
+    created = _create_project(client, user1_token, data={"whole": True}).json()
+
+    refused = client.put(
+        f"/api/v1/projects/{created['project_id']}",
+        json={
+            "name": "Project",
+            "data": {"whole": True},
+            "expected_revision": 1,
+            "max_document_schema_version": 4,
+            "workspace": {"data": {"layout": "mine"}, "expected_revision": None},
+        },
+        headers=_auth(user1_token),
+    )
+
+    assert refused.status_code == status.HTTP_400_BAD_REQUEST
+    assert refused.json()["detail"]["code"] == "workspace_needs_split_document"
+    assert refused.json()["detail"]["minimum_document_schema_version"] == 3
+    fetched = client.get(f"/api/v1/projects/{created['project_id']}", headers=_auth(user1_token)).json()
+    assert (fetched["revision"], fetched["workspace"]) == (1, None)
+
+
+def test_a_save_without_a_workspace_answers_workspace_null(client: TestClient, user1_token: str):
+    created = _create_project(client, user1_token).json()
+
+    saved = client.put(
+        f"/api/v1/projects/{created['project_id']}",
+        json={"name": "Project", "data": {}, "expected_revision": 1},
+        headers=_auth(user1_token),
+    )
+
+    assert saved.status_code == status.HTTP_200_OK
+    assert saved.json()["workspace"] is None
+
+
 # endregion

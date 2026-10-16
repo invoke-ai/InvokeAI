@@ -1,138 +1,167 @@
 """Board visibility and shares become general access and members, from 6.13 and alpha.1 data."""
 
-from logging import Logger
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
+from sqlalchemy import Column, column, insert, inspect, select, table, update
 
-from invokeai.app.services.config.config_default import DefaultInvokeAIAppConfig
 from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.errors import CheckViolation
 from invokeai.app.services.shared.database.schema.boards import board_members
-from invokeai.app.services.shared.sqlite_migrator.migration_loader import MigrationBuildContext, build_migrations
+from invokeai.app.services.shared.database.schema.metadata import default
+from invokeai.app.services.shared.database.schema.users import users
+from invokeai.app.services.shared.database.types import LongText
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import MigrationBase
-from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import Migrator
+from tests.fixtures.migration_state import (
+    alembic_operations,
+    build_application_migrations,
+    migrate_to_before,
+    run_migrations,
+)
 
 MIGRATION_ID = "2026_10_10_board_roles"
+SHARED_AT = "2026-01-02 03:04:05.000"
 
-
-def _run(db: Database, migrations: list[MigrationBase]) -> bool:
-    migrator = Migrator(db)
-    for migration in migrations:
-        migrator.register_migration(migration)
-    return migrator.run_migrations()
-
-
-def _previous_state(migrations: list[MigrationBase]) -> list[MigrationBase]:
-    """Every migration except this one and those that depend on it, directly or not."""
-    by_id = {migration.id: migration for migration in migrations}
-
-    def depends_on_this(migration: MigrationBase) -> bool:
-        current: str | None = migration.id
-        while current is not None:
-            if current == MIGRATION_ID:
-                return True
-            current = by_id[current].depends_on
-        return False
-
-    return [migration for migration in migrations if not depends_on_this(migration)]
+# The tables as 6.13 and the alpha left them; the schema metadata no longer has these columns.
+_boards = table(
+    "boards",
+    column("board_id"),
+    column("board_name"),
+    column("user_id"),
+    column("is_public"),
+    column("board_visibility"),
+    column("general_access"),
+    column("created_at"),
+    column("updated_at"),
+)
+_shared_boards = table("shared_boards", column("board_id"), column("user_id"), column("can_edit"), column("shared_at"))
 
 
 @pytest.fixture
 def migrations(tmp_path: Path) -> list[MigrationBase]:
-    config = DefaultInvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
-    config._root = tmp_path
-    return build_migrations(MigrationBuildContext(app_config=config, logger=Logger("test"), image_files=MagicMock()))
+    return build_application_migrations(tmp_path)
 
 
 @pytest.fixture
-def before(migrations: list[MigrationBase]) -> Database:
+def before(empty_database: Database, migrations: list[MigrationBase]) -> Database:
     """A database just before this migration, holding boards as 6.13 and the alpha left them."""
-    db = Database.open_sqlite(None, Logger("test"))
-    assert _run(db, _previous_state(migrations))
-    with db.begin(write=True) as conn:
-        conn.exec_driver_sql(
-            "INSERT INTO users (user_id, email, display_name, password_hash) VALUES (?, ?, ?, 'x');",
-            [("alice", "alice@example.com", "Alice"), ("bob", "bob@example.com", "Bob")],
-        )
-        conn.exec_driver_sql(
-            "INSERT INTO boards (board_id, board_name, user_id, is_public, board_visibility) VALUES (?, ?, ?, ?, ?);",
+    migrate_to_before(empty_database, migrations, MIGRATION_ID)
+    with empty_database.begin(write=True) as conn:
+        conn.execute(
+            insert(users),
             [
-                ("private", "Private", "alice", 0, "private"),
-                ("shared", "Shared", "alice", 0, "shared"),
-                ("public", "Public", "alice", 1, "public"),
-                ("lent", "Lent", "alice", 0, "private"),
+                {"user_id": "alice", "email": "alice@example.com", "display_name": "Alice", "password_hash": "x"},
+                {"user_id": "bob", "email": "bob@example.com", "display_name": "Bob", "password_hash": "x"},
             ],
         )
-        conn.exec_driver_sql(
-            "INSERT INTO shared_boards (board_id, user_id, can_edit, shared_at) VALUES (?, ?, ?, ?);",
+        conn.execute(
+            insert(_boards),
             [
-                ("lent", "bob", 1, "2026-01-02 03:04:05.000"),
+                {
+                    "board_id": board_id,
+                    "board_name": board_id.capitalize(),
+                    "user_id": owner,
+                    "is_public": is_public,
+                    "board_visibility": visibility,
+                    "created_at": SHARED_AT,
+                    "updated_at": SHARED_AT,
+                }
+                for board_id, owner, is_public, visibility in (
+                    ("private", "alice", False, "private"),
+                    ("shared", "alice", False, "shared"),
+                    ("public", "alice", True, "public"),
+                    ("lent", "alice", False, "private"),
+                    # Left by a deleted account: boards keep no foreign key to their owner.
+                    ("orphan", None, False, "private"),
+                )
+            ],
+        )
+        conn.execute(
+            insert(_shared_boards),
+            [
+                {"board_id": "lent", "user_id": "bob", "can_edit": True, "shared_at": SHARED_AT},
                 # A share naming the board's own owner grants nothing.
-                ("lent", "alice", 0, "2026-01-02 03:04:05.000"),
+                {"board_id": "lent", "user_id": "alice", "can_edit": False, "shared_at": SHARED_AT},
+                {"board_id": "orphan", "user_id": "bob", "can_edit": False, "shared_at": SHARED_AT},
             ],
         )
-    return db
+    return empty_database
 
 
 def _general_access(db: Database) -> dict[str, str]:
-    return {row[0]: row[1] for row in db.sqlite.conn.execute("SELECT board_id, general_access FROM boards;")}
+    with db.begin(write=False) as conn:
+        return dict(conn.execute(select(_boards.c.board_id, _boards.c.general_access)).all())
 
 
 def _members(db: Database) -> list[tuple[str, str, str, str | None, str]]:
-    rows = db.sqlite.conn.execute(
-        "SELECT board_id, user_id, role, granted_by, granted_at FROM board_members ORDER BY board_id, user_id;"
-    ).fetchall()
+    columns = board_members.c
+    with db.begin(write=False) as conn:
+        rows = conn.execute(
+            select(columns.board_id, columns.user_id, columns.role, columns.granted_by, columns.granted_at).order_by(
+                columns.board_id, columns.user_id
+            )
+        ).all()
     return [tuple(row) for row in rows]
 
 
 def _columns(db: Database) -> set[str]:
-    return {row[1] for row in db.sqlite.conn.execute("PRAGMA table_info(boards);").fetchall()}
+    with db.begin(write=False) as conn:
+        return {entry["name"] for entry in inspect(conn).get_columns("boards")}
+
+
+def _tables(db: Database) -> set[str]:
+    with db.begin(write=False) as conn:
+        return set(inspect(conn).get_table_names())
+
+
+EXPECTED_MEMBERS = [
+    ("lent", "bob", "viewer", None, SHARED_AT),
+    ("orphan", "bob", "viewer", None, SHARED_AT),
+]
 
 
 def test_visibility_becomes_general_access_and_shares_become_viewer_members(
     before: Database, migrations: list[MigrationBase]
 ) -> None:
-    assert _run(before, migrations)
+    assert run_migrations(before, migrations)
 
     assert _general_access(before) == {
         "private": "restricted",
         "shared": "viewer",
         "public": "contributor",
         "lent": "restricted",
+        "orphan": "restricted",
     }
-    assert _members(before) == [("lent", "bob", "viewer", None, "2026-01-02 03:04:05.000")]
+    assert _members(before) == EXPECTED_MEMBERS
     assert not {"board_visibility", "is_public"} & _columns(before)
-    tables = {row[0] for row in before.sqlite.conn.execute("SELECT name FROM sqlite_master WHERE type='table';")}
-    assert "shared_boards" not in tables
-    assert not _run(before, migrations)
-    before.dispose()
+    assert "shared_boards" not in _tables(before)
+    assert not run_migrations(before, migrations)
 
 
 def test_general_access_and_roles_are_checked(before: Database, migrations: list[MigrationBase]) -> None:
-    assert _run(before, migrations)
+    assert run_migrations(before, migrations)
 
-    with pytest.raises(Exception, match="CHECK"):
-        before.sqlite.conn.execute("UPDATE boards SET general_access = 'editor' WHERE board_id = 'private';")
-    with pytest.raises(Exception, match="CHECK"):
-        before.sqlite.conn.execute(
-            "INSERT INTO board_members (board_id, user_id, role) VALUES ('private', 'bob', 'owner');"
-        )
-    before.dispose()
+    with pytest.raises(CheckViolation):
+        with before.begin(write=True) as conn:
+            conn.execute(update(_boards).where(_boards.c.board_id == "private").values(general_access="editor"))
+    with pytest.raises(CheckViolation):
+        with before.begin(write=True) as conn:
+            conn.execute(insert(board_members).values(board_id="private", user_id="bob", role="owner"))
 
 
 def test_a_run_that_stopped_halfway_finishes_the_work(before: Database, migrations: list[MigrationBase]) -> None:
     """On a server each DDL statement commits on its own: a failed run can leave the new column behind, still at
     its default, with everything else left to do."""
     with before.begin(write=True) as conn:
-        conn.exec_driver_sql("ALTER TABLE boards ADD COLUMN general_access VARCHAR(32) NOT NULL DEFAULT 'restricted';")
+        alembic_operations(conn).add_column(
+            "boards", Column("general_access", LongText(), nullable=False, server_default=default("restricted"))
+        )
 
-    assert _run(before, migrations)
+    assert run_migrations(before, migrations)
 
     assert _general_access(before)["public"] == "contributor"
-    assert _members(before) == [("lent", "bob", "viewer", None, "2026-01-02 03:04:05.000")]
+    assert _members(before) == EXPECTED_MEMBERS
     assert not {"board_visibility", "is_public"} & _columns(before)
-    before.dispose()
 
 
 def test_a_run_that_stopped_after_copying_members_does_not_copy_them_twice(
@@ -142,12 +171,8 @@ def test_a_run_that_stopped_after_copying_members_does_not_copy_them_twice(
     it and `shared_boards` still there."""
     with before.begin(write=True) as conn:
         board_members.create(conn)
-        conn.exec_driver_sql(
-            "INSERT INTO board_members (board_id, user_id, role, granted_at) "
-            "VALUES ('lent', 'bob', 'viewer', '2026-01-02 03:04:05.000');"
-        )
+        conn.execute(insert(board_members).values(board_id="lent", user_id="bob", role="viewer", granted_at=SHARED_AT))
 
-    assert _run(before, migrations)
+    assert run_migrations(before, migrations)
 
-    assert _members(before) == [("lent", "bob", "viewer", None, "2026-01-02 03:04:05.000")]
-    before.dispose()
+    assert _members(before) == EXPECTED_MEMBERS

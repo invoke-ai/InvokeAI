@@ -1224,7 +1224,13 @@ class TestImageReadAuth:
         board_id = _create_board(client, user1_token, "Private Enum Board")
 
         r = client.get(f"/api/v1/images/?board_id={board_id}", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_list_images_on_a_missing_board_is_a_404_for_a_non_admin(self, client: TestClient, user2_token: str):
+        """Absence still reads as absence: only a board that exists but is closed to the caller answers 403."""
+        r = client.get("/api/v1/images/?board_id=no-such-board", headers=_auth(user2_token))
         assert r.status_code == status.HTTP_404_NOT_FOUND
+        assert r.json()["detail"] == "Board not found"
 
     def test_list_images_shared_board_allowed_for_non_owner(
         self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
@@ -1266,15 +1272,15 @@ class TestImageReadAuth:
         user2_token: str,
     ):
         """User2 should be able to fetch the board DTO and board image_names of a private
-        board explicitly shared with them; to a non-member it answers as missing (404)."""
+        board explicitly shared with them; to a non-member it is a refusal (403), not missing."""
         user2 = mock_invoker.services.users.get_by_email("user2@test.com")
         assert user2 is not None
         board_id = _create_board(client, user1_token, "Explicit Share DTO Board")
 
         r = client.get(f"/api/v1/boards/{board_id}", headers=_auth(user2_token))
-        assert r.status_code == status.HTTP_404_NOT_FOUND
+        assert r.status_code == status.HTTP_403_FORBIDDEN
         r = client.get(f"/api/v1/boards/{board_id}/image_names", headers=_auth(user2_token))
-        assert r.status_code == status.HTTP_404_NOT_FOUND
+        assert r.status_code == status.HTTP_403_FORBIDDEN
 
         _share_board_with_user(mock_sqlite_database, board_id, user2.user_id)
 
@@ -1291,7 +1297,7 @@ class TestImageReadAuth:
         board_id = _create_board(client, user1_token, "Private Names Board")
 
         r = client.get(f"/api/v1/images/names?board_id={board_id}", headers=_auth(user2_token))
-        assert r.status_code == status.HTTP_404_NOT_FOUND
+        assert r.status_code == status.HTTP_403_FORBIDDEN
 
     def test_get_image_names_shared_board_allowed_for_non_owner(
         self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
@@ -2606,7 +2612,7 @@ class TestBulkDownloadAccessControl:
             json={"board_id": board_id},
             headers=_auth(user2_token),
         )
-        assert r.status_code == status.HTTP_404_NOT_FOUND
+        assert r.status_code == status.HTTP_403_FORBIDDEN
 
     def test_bulk_download_by_shared_board_allowed(
         self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
@@ -3633,7 +3639,7 @@ class TestImageListOwnershipIsolation:
         r = client.get(
             "/api/v1/images/", params={"board_id": seeded_boards["private_board_id"]}, headers=_auth(user2_token)
         )
-        assert r.status_code == status.HTTP_404_NOT_FOUND
+        assert r.status_code == status.HTTP_403_FORBIDDEN
 
     def test_list_shared_board_readable_by_non_owner(
         self, client: TestClient, seeded_boards: dict[str, str], user2_token: str
@@ -3668,4 +3674,4 @@ class TestImageListOwnershipIsolation:
             params={"board_id": seeded_boards["private_board_id"]},
             headers=_auth(user2_token),
         )
-        assert r.status_code == status.HTTP_404_NOT_FOUND
+        assert r.status_code == status.HTTP_403_FORBIDDEN

@@ -9,6 +9,7 @@ import type {
 } from '@features/gallery/core/types';
 import type { QueueProgressSession } from '@features/queue/contracts';
 
+import { asSingleAccountBoards } from '@features/gallery/core/boardAccess';
 import { createContext, use, useMemo, type ComponentType, type ReactNode } from 'react';
 
 export interface GalleryItemActions {
@@ -180,6 +181,29 @@ export const useGalleryUi = (): GalleryUiAdapter => {
 
 /** For hooks shared with hosts that have no workbench; they use it only for Gallery widget side effects. */
 export const useOptionalGalleryUi = (): GalleryUiAdapter | null => use(GalleryUiContext);
+
+const NO_BOARDS: GalleryBoard[] = [];
+
+/**
+ * A board listing as this host shows it. Only a host that says boards cannot be shared (a server with one account)
+ * folds them into the caller's own; every surface that names boards (the panel, board menus, workflow board fields)
+ * reads the listing through here, so one board never reads as the caller's in one place and as someone else's in
+ * another. Undefined (a listing not loaded yet) reads as no boards, with a stable identity.
+ */
+export const useHostGalleryBoards = (boards: readonly GalleryBoard[] | undefined): GalleryBoard[] => {
+  const isSingleAccount = useOptionalGalleryUi()?.boardSharing === false;
+
+  return useMemo(
+    () =>
+      boards === undefined
+        ? NO_BOARDS
+        : isSingleAccount
+          ? asSingleAccountBoards(boards)
+          : // The listing's own identity: a folded list is a new one only when folding changes a board.
+            (boards as GalleryBoard[]),
+    [boards, isSingleAccount]
+  );
+};
 
 /**
  * What gallery surfaces outside the Gallery widget (the picker, media slots) need from their host. The workbench

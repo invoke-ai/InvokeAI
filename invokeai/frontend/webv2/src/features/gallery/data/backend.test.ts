@@ -8,7 +8,8 @@ const mocks = vi.hoisted(() => ({
   sleep: vi.fn(),
 }));
 
-vi.mock('@platform/transport/http', () => ({
+vi.mock('@platform/transport/http', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   absolutizeApiUrl: (url: string) => `https://api.test${url}`,
   apiFetch: vi.fn(),
   apiFetchJson: mocks.apiFetchJson,
@@ -16,9 +17,12 @@ vi.mock('@platform/transport/http', () => ({
   sleep: mocks.sleep,
 }));
 
+import { ApiError } from '@platform/transport/http';
+
 import {
   addImagesToGalleryBoard,
   createGalleryBoard,
+  galleryBoardExists,
   deleteGalleryBoard,
   deleteGalleryImages,
   downloadGalleryArchive,
@@ -1039,5 +1043,34 @@ describe('board membership transport', () => {
       ownerName: 'Ana',
     });
     expect(unreported.access).toBeUndefined();
+  });
+});
+
+describe('galleryBoardExists', () => {
+  beforeEach(() => {
+    mocks.apiFetchJson.mockReset();
+  });
+
+  it('answers true for a board the server returns, and for one it refuses to show (403): it exists either way', async () => {
+    mocks.apiFetchJson.mockResolvedValueOnce({ board_id: 'b1' });
+    mocks.apiFetchJson.mockRejectedValueOnce(new ApiError('{"detail":"Not authorized to access this board"}', 403));
+
+    await expect(galleryBoardExists('b1')).resolves.toBe(true);
+    await expect(galleryBoardExists('restricted')).resolves.toBe(true);
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
+  });
+
+  it('answers false only for a board the server says there is none of (404), and rethrows anything else', async () => {
+    mocks.apiFetchJson.mockRejectedValueOnce(new ApiError('{"detail":"Board not found"}', 404));
+    mocks.apiFetchJson.mockRejectedValueOnce(new ApiError('{"detail":"Server error"}', 500));
+
+    await expect(galleryBoardExists('gone')).resolves.toBe(false);
+    await expect(galleryBoardExists('b1')).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it('takes virtual boards as existing without asking the server', async () => {
+    await expect(galleryBoardExists('none')).resolves.toBe(true);
+    await expect(galleryBoardExists('by_date:2026-07-30')).resolves.toBe(true);
+    expect(mocks.apiFetchJson).not.toHaveBeenCalled();
   });
 });

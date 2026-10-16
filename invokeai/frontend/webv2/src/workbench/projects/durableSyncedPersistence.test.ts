@@ -171,6 +171,17 @@ const createApi = () => {
       if (current.revision !== request.expected_revision) {
         return Promise.reject(Object.assign(new Error('conflict'), { status: 409 }));
       }
+      // A workspace sent with the content is stored in the same step, or refuses the content with it.
+      if (request.workspace && (current.workspace?.revision ?? null) !== request.workspace.expected_revision) {
+        return Promise.reject(Object.assign(new Error('conflict'), { status: 409 }));
+      }
+      const workspace = request.workspace
+        ? {
+            data: structuredClone(request.workspace.data),
+            revision: (current.workspace?.revision ?? 0) + 1,
+            updated_at: now,
+          }
+        : null;
       const record: ProjectWithWorkspaceDTO = {
         ...current,
         data: structuredClone(request.data),
@@ -185,10 +196,11 @@ const createApi = () => {
         name: request.name,
         revision: current.revision + 1,
         updated_at: now,
+        ...(workspace ? { workspace, workspace_updated_at: now } : {}),
       };
       records.set(projectId, record);
-      const { workspace: _workspace, ...written } = structuredClone(record);
-      return Promise.resolve(written);
+      // The answer names only the workspace this write stored.
+      return Promise.resolve({ ...structuredClone(record), workspace: structuredClone(workspace) });
     }),
   };
   return api;
@@ -1741,21 +1753,25 @@ describe('durable project persistence', () => {
     await service.saveWorkbench(loaded.state);
     await service.saveWorkbench(loaded.state);
 
-    // Split once: the content raises the document floor, and the workspace is saved beside it for the first time.
+    // Split once, by one request: the content raises the document floor, and the caller's first workspace is stored
+    // with it, so the server never holds the content alone.
     expect(api.updateProject).toHaveBeenCalledOnce();
     expect(vi.mocked(api.updateProject).mock.calls[0]![1]).toMatchObject({
       data: { documentSchemaVersion: 4 },
       minimum_document_schema_version: 4,
+      workspace: { data: { documentSchemaVersion: 4 }, expected_revision: null },
     });
-    expect(api.saveProjectWorkspace).toHaveBeenCalledOnce();
-    expect(vi.mocked(api.saveProjectWorkspace).mock.calls[0]![1]).toMatchObject({
-      data: { documentSchemaVersion: 4 },
-      expected_revision: null,
-    });
+    expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
     expect(api.records.get(project.id)).toMatchObject({
       minimum_document_schema_version: 4,
       workspace: { revision: 1 },
     });
+    // Both halves acknowledged: a later edit to the workspace alone builds on the stored one.
+    const edited = { ...loaded.state.projects[0]!, promptHistory: [{ negativePrompt: null, positivePrompt: 'later' }] };
+    await service.saveWorkbench(stateWith([edited]));
+    expect(api.updateProject).toHaveBeenCalledOnce();
+    expect(vi.mocked(api.saveProjectWorkspace).mock.calls.map(([, request]) => request.expected_revision)).toEqual([1]);
+    expect(api.records.get(project.id)).toMatchObject({ revision: 2, workspace: { revision: 2 } });
   });
 
   it.each([
@@ -3823,10 +3839,107 @@ describe('a save the server answers with a revision conflict', () => {
     const saved = await service.saveWorkbench(stateWith([{ ...loaded, name: 'Renamed' }]));
 
     expect(saved.conflicts).toEqual([]);
+    // Refused once, read back as still whole, then split again by one request: never the content on its own.
+    expect(vi.mocked(api.updateProject).mock.calls.map(([, request]) => request.expected_revision)).toEqual([1, 2]);
+    expect(vi.mocked(api.updateProject).mock.calls.every(([, request]) => request.workspace)).toBe(true);
+    expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
     expect(api.records.get(project.id)).toMatchObject({
       minimum_document_schema_version: 4,
       name: 'Renamed',
       revision: 3,
+      workspace: { revision: 1 },
+    });
+  });
+
+  it('reports a workspace another tab stored under the whole project as a conflict of the workspace', async () => {
+    const project = createDraftProject([]);
+    const { api, project: loaded, service } = await open(toRecord(project));
+    // A split by another tab of this account landed meanwhile, with its own workspace.
+    api.records.set(project.id, toSplitRecord(prompted(project, 'another tab'), 2, 1));
+
+    const saved = await service.saveWorkbench(stateWith([prompted(loaded, 'this tab')]));
+
+    expect(saved.conflicts).toMatchObject([{ half: 'workspace', kind: 'revision' }]);
+    expect(api.updateProject).toHaveBeenCalledOnce();
+    expect(api.records.get(project.id)).toMatchObject({ revision: 2, workspace: { revision: 1 } });
+  });
+});
+
+describe('splitting a project the server holds whole', () => {
+  const open = async (record: ProjectWithWorkspaceDTO) => {
+    const api = createApi();
+    api.records.set(record.project_id, record);
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: record.project_id,
+      openProjectIds: [record.project_id],
+    });
+    const service = createService(captureAccountScope(), api);
+    const project = (await service.loadWorkbench()).state.projects[0]!;
+    return { api, project, service };
+  };
+
+  it('leaves the server with both halves, never the content alone, when the account ends as the split lands', async () => {
+    const project = createDraftProject([]);
+    const { api, project: loaded, service } = await open(toRecord(project));
+    const store = vi.mocked(api.updateProject).getMockImplementation()!;
+    vi.mocked(api.updateProject).mockImplementationOnce(async (projectId, request, signal) => {
+      const answer = await store(projectId, request, signal);
+      // Signed out as the answer arrives: the account's drafts are deleted, and nothing more may be sent for it.
+      accountLifecycle.activate('another-account');
+      return answer;
+    });
+
+    const saved = await service.saveWorkbench(stateWith([{ ...loaded, name: 'Renamed' }]));
+
+    expect(saved.error).toMatch(/account scope/);
+    expect(api.updateProject).toHaveBeenCalledOnce();
+    expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
+    expect(api.records.get(project.id)).toMatchObject({
+      minimum_document_schema_version: 4,
+      name: 'Renamed',
+      workspace: { data: { documentSchemaVersion: 4, settings: loaded.settings }, revision: 1 },
+    });
+  });
+
+  it('keeps the whole document when the account ends before the split is sent', async () => {
+    const project = createDraftProject([]);
+    const { api, project: loaded, service } = await open(toRecord(project));
+    const before = structuredClone(api.records.get(project.id));
+    vi.mocked(api.updateProject).mockImplementationOnce(() => {
+      accountLifecycle.activate('another-account');
+      return Promise.reject(new DOMException('Aborted', 'AbortError'));
+    });
+
+    const saved = await service.saveWorkbench(stateWith([{ ...loaded, name: 'Renamed' }]));
+
+    expect(saved.error).toMatch(/account scope/);
+    expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
+    expect(api.records.get(project.id)).toEqual(before);
+  });
+
+  it('sends the workspace on its own when the split’s answer names none', async () => {
+    const project = createDraftProject([]);
+    const { api, project: loaded, service } = await open(toRecord(project));
+    // A server that stored the content and ignored the workspace sent with it.
+    const store = vi.mocked(api.updateProject).getMockImplementation()!;
+    vi.mocked(api.updateProject).mockImplementationOnce((projectId, request, signal) => {
+      const { workspace: _workspace, ...content } = request;
+      return store(projectId, content, signal);
+    });
+
+    const saved = await service.saveWorkbench(stateWith([{ ...loaded, name: 'Renamed' }]));
+
+    expect(saved.conflicts).toEqual([]);
+    expect(saved.hasPendingChanges).toBe(false);
+    expect(api.updateProject).toHaveBeenCalledOnce();
+    expect(vi.mocked(api.saveProjectWorkspace).mock.calls.map(([, request]) => request.expected_revision)).toEqual([
+      null,
+    ]);
+    expect(api.records.get(project.id)).toMatchObject({
+      minimum_document_schema_version: 4,
+      name: 'Renamed',
+      revision: 2,
       workspace: { revision: 1 },
     });
   });

@@ -88,8 +88,8 @@ def get_board(
 
     _assert_board_read_access(board_id, current_user)
 
-    # Only a board that is not there, or that the caller cannot open, is a 404: clients take it as the board being gone
-    # for them, and clear what names it.
+    # Only a board that is not there is a 404: clients take it as the board being gone and clear what names it. One
+    # the caller cannot open answered 403 above, a refusal its owner can reverse.
     try:
         return ApiDependencies.invoker.services.boards.get_dto(board_id=board_id, viewer=_viewer(current_user))
     except BoardRecordNotFoundException:
@@ -166,12 +166,14 @@ def delete_board(
     ),
 ) -> DeleteBoardResult:
     """Deletes a board: its owner's, or an admin's, to do"""
-    _assert_board_changes(board_id, current_user, [BoardAction.Delete])
+    access = _assert_board_changes(board_id, current_user, [BoardAction.Delete])
 
-    # Admins delete everything on the board; regular owners only delete their own
-    # contributions so that contributions from other users to a public/shared board
-    # are preserved (they cascade to "uncategorized" via FK on board_videos / board_images).
-    cascade_user_id: Optional[str] = None if current_user.is_admin else current_user.user_id
+    # An owner deleting their board, admin or not, only deletes their own contributions, so what
+    # other users put on a shared board is preserved (it cascades to "uncategorized" via the FK on
+    # board_videos / board_images). Only an admin overriding, deleting someone else's board,
+    # deletes everything on it; that is the case the DTO reports as `admin_override`, so the client
+    # can warn before it.
+    cascade_user_id: Optional[str] = None if access.admin_override else current_user.user_id
     deleted_images: list[str] = []
     deleted_videos: list[str] = []
     board_deleted = False

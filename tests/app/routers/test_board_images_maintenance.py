@@ -78,8 +78,8 @@ def test_board_image_mutation_checks_access_before_image_move_maintenance(
     try:
         response = client.post("/api/v1/board_images/", json={"board_id": board_id, "image_name": "image.png"})
 
-        # Another account's restricted board: unreadable, so it answers as missing.
-        assert response.status_code == 404
+        # Another account's restricted board: refused before maintenance is even consulted.
+        assert response.status_code == 403
         mock_invoker.services.image_moves.is_maintenance_active.assert_not_called()
     finally:
         app.dependency_overrides.pop(get_current_user_or_default, None)

@@ -214,7 +214,7 @@ def test_copying_into_a_board_you_cannot_write_is_refused(
     refused = _copy_images(client, user1_token, image_names=[source.image_name], board_id=theirs)
     missing = _copy_images(client, user1_token, image_names=[source.image_name], board_id="no-such-board")
 
-    assert refused.status_code == status.HTTP_404_NOT_FOUND
+    assert refused.status_code == status.HTTP_403_FORBIDDEN
     assert missing.status_code == status.HTTP_404_NOT_FOUND
     # The refusal lands before anything is copied.
     assert set(mock_invoker.services.image_records.get_image_names().image_names) == before

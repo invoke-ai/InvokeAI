@@ -10,7 +10,7 @@ from typing import Any
 from dynamicprompts.generators import CombinatorialPromptGenerator, RandomPromptGenerator
 
 from invokeai.app.invocations.fields import ImageField
-from invokeai.app.services.board_access.board_access_common import BoardAccessDeniedError, BoardAction
+from invokeai.app.services.board_access.board_access_common import BoardAccessDeniedError, BoardAction, queue_viewer
 from invokeai.app.services.image_records.image_records_common import ASSETS_CATEGORIES, IMAGE_CATEGORIES
 from invokeai.app.services.session_queue.session_queue_common import (
     Batch,
@@ -312,16 +312,15 @@ def _assert_user_can_access_board(board_id: str, services: Any, user_id: str | N
     if not user_id:
         return
 
-    users = getattr(services, "users", None)
-    user = users.get(user_id) if users is not None and hasattr(users, "get") else None
-    # A deactivated account keeps no queue-time privileges, an admin's included.
-    if user is not None and getattr(user, "is_active", True) is False:
+    # The expansion reads the board as the queue user would at execution time: a deleted or deactivated account is
+    # refused, an active one brings its own admin flag, and single-user mode runs as an admin.
+    viewer = queue_viewer(user_id, multiuser=services.configuration.multiuser, users=services.users)
+    if viewer is None:
         raise UnsupportedWorkflowNodeError(
             f"call_saved_workflow caller does not have access to board '{board_id}' for image generator expansion"
         )
-    is_admin = bool(user and getattr(user, "is_admin", False))
     try:
-        services.board_access.require(board_id, user_id, is_admin, BoardAction.Read)
+        services.board_access.require(board_id, viewer.user_id, viewer.is_admin, BoardAction.Read)
     except BoardAccessDeniedError as e:
         raise UnsupportedWorkflowNodeError(
             f"call_saved_workflow caller does not have access to board '{board_id}' for image generator expansion"

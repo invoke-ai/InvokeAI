@@ -4066,7 +4066,9 @@ export type paths = {
         get: operations["get_project"];
         /**
          * Update Project
-         * @description Saves a project. Returns 409 with the current revision when the save is based on a stale revision.
+         * @description Saves a project's content and, when the request carries `workspace`, the caller's workspace in it, in one
+         *     transaction. Returns the record with the workspace this save stored (null when it carried none). Returns 409
+         *     with the current revision when the save is based on a stale revision of either.
          */
         put: operations["update_project"];
         post?: never;
@@ -39353,6 +39355,32 @@ export type components = {
              * @default 3
              */
             max_document_schema_version?: number;
+            /** @description The caller's workspace, to store in the same transaction as the content. For the save that splits a whole project (document schema 3 or older) into content and workspace while raising the document floor: the floor, the content and the first workspace row then land together, never by half. Its revision is checked as on the workspace route, and a mismatch refuses the whole save with 409. The save must leave the document floor at 4 or above, or it is refused whole with 400 (workspace_needs_split_document). Omit it on every other save; the workspace saves apart, on its own route. */
+            workspace?: components["schemas"]["ProjectUpdateWorkspaceRequest"] | null;
+        };
+        /**
+         * ProjectUpdateWorkspaceRequest
+         * @description The caller's workspace, saved in the same transaction as the project content it accompanies.
+         *
+         *     Only one client needs it: one that splits a whole project (document schema 3 or older) into content and
+         *     workspace. The raised floor, the content and the member's first workspace row then land together or not at all.
+         *     The save must leave the document floor at the split schema or above, or it is refused whole.
+         *     Landed by half -- the content stored, the workspace not -- the project would join every later load with a
+         *     default workspace, and the member's layout, settings, history and staging would be gone for good.
+         */
+        ProjectUpdateWorkspaceRequest: {
+            /**
+             * Data
+             * @description The opaque client-owned workspace document
+             */
+            data: {
+                [key: string]: unknown;
+            };
+            /**
+             * Expected Revision
+             * @description The workspace revision this save is based on, or null when the caller has no workspace in the project yet; a mismatch refuses the whole save, content included
+             */
+            expected_revision: number | null;
         };
         /**
          * ProjectWithWorkspaceDTO
@@ -39411,7 +39439,7 @@ export type components = {
             data: {
                 [key: string]: unknown;
             };
-            /** @description The caller's workspace; null until they save one, when the client builds a default */
+            /** @description The caller's workspace. On a read, null until they save one, when the client builds a default; on a save, the workspace the save carried and stored, or null when it carried none */
             workspace: components["schemas"]["ProjectWorkspaceDTO"] | null;
         };
         /**
@@ -39459,6 +39487,12 @@ export type components = {
              * @description Newest project document schema understood by this client
              */
             max_document_schema_version: number;
+            /**
+             * Max Canvas Schema Version
+             * @description Newest canvas schema understood by this client; the workspace holds canvas state
+             * @default 2
+             */
+            max_canvas_schema_version?: number;
         };
         /**
          * PromptEnhancerField
@@ -60832,7 +60866,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProjectRecordDTO"];
+                    "application/json": components["schemas"]["ProjectWithWorkspaceDTO"];
                 };
             };
             /** @description Validation Error */

@@ -45,7 +45,10 @@ export interface ProjectRecordDTO extends ProjectSummaryDTO {
   data: Record<string, unknown>;
 }
 
-/** What a read answers: the content and the caller's workspace beside it, null until their first save. */
+/**
+ * What a read answers: the content and the caller's workspace beside it, null until their first save. An update
+ * answers the same shape, with the workspace it saved beside the content, or null when the request carried none.
+ */
 export interface ProjectWithWorkspaceDTO extends ProjectRecordDTO {
   workspace: ProjectWorkspaceDTO | null;
 }
@@ -93,6 +96,11 @@ export interface ProjectUpdateRequest {
   minimum_canvas_schema_version?: number;
   /** 4 when `data` is project content, which splits a project saved whole; omission preserves the stored floor. */
   minimum_document_schema_version?: number;
+  /**
+   * The caller's workspace, stored in the same transaction as the content: how a project the server holds whole is
+   * split without a moment in which it holds the content alone. A workspace revision mismatch refuses the content too.
+   */
+  workspace?: ProjectWorkspaceSaveRequest | null;
 }
 
 export interface ProjectWorkspaceSaveRequest {
@@ -221,7 +229,7 @@ export const updateProject = (
   projectId: string,
   request: ProjectUpdateRequest,
   signal?: AbortSignal
-): Promise<ProjectRecordDTO> => {
+): Promise<ProjectWithWorkspaceDTO> => {
   const body = JSON.stringify({
     ...request,
     max_canvas_schema_version: MAX_SUPPORTED_CANVAS_SCHEMA_VERSION,
@@ -230,7 +238,7 @@ export const updateProject = (
 
   return requestProjectWrite(
     () =>
-      apiFetchJson<ProjectRecordDTO>(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}`, {
+      apiFetchJson<ProjectWithWorkspaceDTO>(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}`, {
         body,
         method: 'PUT',
         signal,
@@ -257,13 +265,21 @@ export const saveFirstProjectWorkspace = async (
   };
 };
 
-/** Saves the caller's workspace in a project; its revision is its own, apart from the content's. */
+/**
+ * Saves the caller's workspace in a project; its revision is its own, apart from the content's. Declares the schemas
+ * this build reads, as every project write does: a project whose canvas floor is above them is refused, not written
+ * beside a canvas this build could not have loaded.
+ */
 export const saveProjectWorkspace = (
   projectId: string,
   request: ProjectWorkspaceSaveRequest,
   signal?: AbortSignal
 ): Promise<ProjectWorkspaceDTO> => {
-  const body = JSON.stringify({ ...request, max_document_schema_version: PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION });
+  const body = JSON.stringify({
+    ...request,
+    max_canvas_schema_version: MAX_SUPPORTED_CANVAS_SCHEMA_VERSION,
+    max_document_schema_version: PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION,
+  });
 
   return requestProjectWrite(
     () =>

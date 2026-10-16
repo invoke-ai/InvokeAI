@@ -283,7 +283,11 @@ export interface DurableProjectPersistenceApi {
     draftEditorSessionIds: Record<string, string>,
     signal?: AbortSignal
   ): Promise<void>;
-  updateProject(projectId: string, request: ProjectUpdateRequest, signal?: AbortSignal): Promise<ProjectRecordDTO>;
+  updateProject(
+    projectId: string,
+    request: ProjectUpdateRequest,
+    signal?: AbortSignal
+  ): Promise<ProjectWithWorkspaceDTO>;
 }
 
 const productionApi: DurableProjectPersistenceApi = {
@@ -1413,9 +1417,11 @@ export const createDurableSyncedWorkbenchPersistence = (
     };
 
     /**
-     * Content first, then the workspace, one after the other: the server takes one write per account at a time, and
-     * the content's save is what raises the document floor, so a workspace never sits beside a project an older page
-     * could still save whole.
+     * A project the server holds whole is split by one request, which stores the content and the caller's workspace
+     * together: between two requests the server would hold the content alone, and a page gone at that moment (sign-out
+     * deletes its drafts) would leave the member's workspace lost for good. Once split, the halves go one after the
+     * other, content first: the server takes one write per account at a time, and the content's save is what raises
+     * the document floor, so a workspace never sits beside a project an older page could still save whole.
      */
     const pushHalves = async (base: SyncEntry | undefined): Promise<Omit<SyncEntry, 'pushedDoc'> | 'conflicted'> => {
       if (keepsWhole && !base) {
@@ -1507,6 +1513,42 @@ export const createDurableSyncedWorkbenchPersistence = (
           baseMinimumCanvasSchemaVersion: created.minimum_canvas_schema_version,
           baseRevision: created.revision,
         });
+      } else if (base.pushedContent === null) {
+        // The server holds the project whole: the split, in one request.
+        const raisedFloor = getRaisedCanvasSchemaFloor(document, base.minimumCanvasSchemaVersion);
+        noteSent('content', halves.contentJson);
+        noteSent('workspace', halves.workspaceJson);
+        const updated = await api.updateProject(
+          project.id,
+          {
+            data: halves.content as unknown as Record<string, unknown>,
+            expected_revision: base.revision,
+            ...(raisedFloor === undefined ? {} : { minimum_canvas_schema_version: raisedFloor }),
+            minimum_document_schema_version: PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION,
+            name: project.name,
+            workspace: {
+              data: halves.workspace as unknown as Record<string, unknown>,
+              expected_revision: base.workspaceRevision,
+            },
+          },
+          owner.signal
+        );
+        assertOwner();
+        projectsRequiringDocumentUpgrade.delete(project.id);
+        // The answer names the workspace it stored; a server that stored none leaves it owed, and it is sent next.
+        acknowledged = record({
+          minimumCanvasSchemaVersion: updated.minimum_canvas_schema_version,
+          pushedContent: halves.contentJson,
+          pushedWorkspace: updated.workspace ? halves.workspaceJson : null,
+          revision: updated.revision,
+          workspaceRevision: updated.workspace?.revision ?? null,
+        });
+        if (!updated.workspace) {
+          await rebaseLineage({
+            baseMinimumCanvasSchemaVersion: updated.minimum_canvas_schema_version,
+            baseRevision: updated.revision,
+          });
+        }
       } else if (projectsRequiringDocumentUpgrade.has(project.id) || base.pushedContent !== halves.contentJson) {
         const raisedFloor = getRaisedCanvasSchemaFloor(document, base.minimumCanvasSchemaVersion);
         noteSent('content', halves.contentJson);
@@ -1516,7 +1558,7 @@ export const createDurableSyncedWorkbenchPersistence = (
             data: halves.content as unknown as Record<string, unknown>,
             expected_revision: base.revision,
             ...(raisedFloor === undefined ? {} : { minimum_canvas_schema_version: raisedFloor }),
-            // Idempotent on a split project; splits one the server holds whole.
+            // Idempotent on a split project.
             minimum_document_schema_version: PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION,
             name: project.name,
           },

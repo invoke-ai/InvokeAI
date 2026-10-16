@@ -16054,7 +16054,7 @@
       "put": {
         "tags": ["projects"],
         "summary": "Update Project",
-        "description": "Saves a project. Returns 409 with the current revision when the save is based on a stale revision.",
+        "description": "Saves a project's content and, when the request carries `workspace`, the caller's workspace in it, in one\ntransaction. Returns the record with the workspace this save stored (null when it carried none). Returns 409\nwith the current revision when the save is based on a stale revision of either.",
         "operationId": "update_project",
         "security": [
           {
@@ -16091,7 +16091,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProjectRecordDTO"
+                  "$ref": "#/components/schemas/ProjectWithWorkspaceDTO"
                 }
               }
             }
@@ -91843,12 +91843,49 @@
             "title": "Max Document Schema Version",
             "description": "Newest project document schema understood by this client",
             "default": 3
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProjectUpdateWorkspaceRequest"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The caller's workspace, to store in the same transaction as the content. For the save that splits a whole project (document schema 3 or older) into content and workspace while raising the document floor: the floor, the content and the first workspace row then land together, never by half. Its revision is checked as on the workspace route, and a mismatch refuses the whole save with 409. The save must leave the document floor at 4 or above, or it is refused whole with 400 (workspace_needs_split_document). Omit it on every other save; the workspace saves apart, on its own route."
           }
         },
         "type": "object",
         "required": ["name", "data", "expected_revision"],
         "title": "ProjectUpdateRequest",
         "description": "Request body for saving a project with optimistic concurrency."
+      },
+      "ProjectUpdateWorkspaceRequest": {
+        "properties": {
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data",
+            "description": "The opaque client-owned workspace document"
+          },
+          "expected_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Revision",
+            "description": "The workspace revision this save is based on, or null when the caller has no workspace in the project yet; a mismatch refuses the whole save, content included"
+          }
+        },
+        "type": "object",
+        "required": ["data", "expected_revision"],
+        "title": "ProjectUpdateWorkspaceRequest",
+        "description": "The caller's workspace, saved in the same transaction as the project content it accompanies.\n\nOnly one client needs it: one that splits a whole project (document schema 3 or older) into content and\nworkspace. The raised floor, the content and the member's first workspace row then land together or not at all.\nThe save must leave the document floor at the split schema or above, or it is refused whole.\nLanded by half -- the content stored, the workspace not -- the project would join every later load with a\ndefault workspace, and the member's layout, settings, history and staging would be gone for good."
       },
       "ProjectWithWorkspaceDTO": {
         "properties": {
@@ -91921,7 +91958,7 @@
                 "type": "null"
               }
             ],
-            "description": "The caller's workspace; null until they save one, when the client builds a default"
+            "description": "The caller's workspace. On a read, null until they save one, when the client builds a default; on a save, the workspace the save carried and stored, or null when it carried none"
           }
         },
         "type": "object",
@@ -91989,6 +92026,13 @@
             "minimum": 1.0,
             "title": "Max Document Schema Version",
             "description": "Newest project document schema understood by this client"
+          },
+          "max_canvas_schema_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Max Canvas Schema Version",
+            "description": "Newest canvas schema understood by this client; the workspace holds canvas state",
+            "default": 2
           }
         },
         "type": "object",

@@ -17,7 +17,7 @@ def _make_interface(allowed: bool) -> tuple[VideosInterface, MagicMock]:
     services = MagicMock()
     services.users.get.return_value = MagicMock(is_admin=False)
     if not allowed:
-        services.board_access.require.side_effect = BoardAccessDeniedError("board", BoardAction.AddMedia, True)
+        services.board_access.require.side_effect = BoardAccessDeniedError("board", BoardAction.AddMedia)
         services.board_access.require_image.side_effect = ItemAccessDeniedError("item", ItemAction.Read)
         services.board_access.require_video.side_effect = ItemAccessDeniedError("item", ItemAction.Read)
     data = MagicMock()

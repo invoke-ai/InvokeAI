@@ -114,19 +114,51 @@ def _call_frame() -> WorkflowCallFrame:
     )
 
 
-def test_a_deactivated_callers_expansion_reads_no_board() -> None:
+@pytest.mark.parametrize(
+    "account", [SimpleNamespace(is_admin=True, is_active=False), None], ids=["deactivated", "deleted"]
+)
+def test_a_deactivated_or_deleted_callers_expansion_reads_no_board(account: Any) -> None:
+    """The expansion resolves the queue user as execution will: an account that is deactivated, or no longer there,
+    is refused before the board is even asked about."""
     from invokeai.app.services.session_processor.workflow_call_batch import (
         UnsupportedWorkflowNodeError,
         _assert_user_can_access_board,
     )
 
+    asked: list[str] = []
     services = SimpleNamespace(
-        users=SimpleNamespace(get=lambda user_id: SimpleNamespace(is_admin=True, is_active=False)),
-        board_access=_board_access(allows_read=True),
+        configuration=SimpleNamespace(multiuser=True),
+        users=SimpleNamespace(get=lambda user_id: account),
+        board_access=SimpleNamespace(require=lambda *args: asked.append(args[0])),
     )
 
     with pytest.raises(UnsupportedWorkflowNodeError, match="does not have access"):
         _assert_user_can_access_board("board", services, "caller-1")
+    assert asked == []
+
+
+def test_in_single_user_mode_the_expansion_reads_boards_as_an_admin_without_an_account() -> None:
+    """Single-user mode has no accounts to consult: the queue user is an admin viewer, as at execution time."""
+    from invokeai.app.services.session_processor.workflow_call_batch import _assert_user_can_access_board
+
+    asked: list[tuple[Any, ...]] = []
+    services = SimpleNamespace(
+        configuration=SimpleNamespace(multiuser=False),
+        users=SimpleNamespace(get=lambda user_id: pytest.fail("single-user mode must not look the account up")),
+        board_access=SimpleNamespace(require=lambda *args: asked.append(args)),
+    )
+
+    _assert_user_can_access_board("board", services, "caller-1")
+
+    assert asked == [("board", "caller-1", True, BoardAction.Read)]
+
+
+def _multiuser_account_services() -> dict[str, Any]:
+    """Multiuser mode with an ordinary, active caller: what an expansion's board read is decided against."""
+    return {
+        "configuration": SimpleNamespace(multiuser=True),
+        "users": SimpleNamespace(get=lambda user_id: SimpleNamespace(is_admin=False, is_active=True)),
+    }
 
 
 def _board_access(allows_read: bool) -> Any:
@@ -136,7 +168,7 @@ def _board_access(allows_read: bool) -> Any:
         # The callers in these tests are ordinary accounts; an expansion must ask as one, for a read.
         assert (is_admin, action) == (False, BoardAction.Read)
         if not allows_read:
-            raise BoardAccessDeniedError(board_id, action, readable=False)
+            raise BoardAccessDeniedError(board_id, action)
 
     return SimpleNamespace(require=require)
 
@@ -335,11 +367,7 @@ def test_build_child_workflow_sessions_rejects_inaccessible_image_generator_boar
                 },
             )(),
             "board_access": _board_access(allows_read=False),
-            "users": type(
-                "Users",
-                (),
-                {"get": staticmethod(lambda user_id: type("User", (), {"is_admin": False})())},
-            )(),
+            **_multiuser_account_services(),
         },
     )()
 
@@ -421,11 +449,7 @@ def test_build_child_workflow_sessions_allows_shared_image_generator_board() -> 
                 },
             )(),
             "board_access": _board_access(allows_read=True),
-            "users": type(
-                "Users",
-                (),
-                {"get": staticmethod(lambda user_id: type("User", (), {"is_admin": False})())},
-            )(),
+            **_multiuser_account_services(),
         },
     )()
 
@@ -1409,6 +1433,7 @@ def test_build_child_workflow_sessions_supports_image_generator_from_board() -> 
                 },
             )(),
             "board_access": _board_access(allows_read=True),
+            **_multiuser_account_services(),
         },
     )()
 

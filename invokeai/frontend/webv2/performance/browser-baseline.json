@@ -524,6 +524,7 @@
       "source:src/features/gallery/data/imageUrls.ts",
       "source:src/features/gallery/data/videoUrls.ts",
       "source:src/features/gallery/launchpad.ts",
+      "source:src/features/gallery/react.ts",
       "source:src/features/gallery/ui/GalleryUiContext.tsx",
       "source:src/features/gallery/ui/galleryStateView.ts",
       "source:src/features/gallery/ui/launchpad/RecentOutputs.tsx",

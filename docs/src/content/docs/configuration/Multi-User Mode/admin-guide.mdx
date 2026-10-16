@@ -175,8 +175,9 @@ had to change beyond that:
 - **A project id held by more than one account.** Project ids are now unique across accounts. The
   oldest project keeps its id; each other one gets a new id, and the log names the account's id and
   the new project id. The project's document, boards, media, queue items and the account's open
-  projects follow it. Unsaved changes a browser was still holding for that project under its old id
-  are lost.
+  projects follow it. A browser tab that was open on the project still knows it by its old id, so
+  the edits it had not yet synced come back as a project-deleted conflict: export them first if they
+  are wanted, then open the project again from the Launchpad.
 - **Boards in a project that no longer exists.** A board can name a project its owner no longer has,
   for example a board of an account deleted before the upgrade. The upgrade moves such boards out of
   the project and logs how many there were.

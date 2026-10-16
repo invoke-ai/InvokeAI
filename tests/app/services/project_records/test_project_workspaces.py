@@ -6,11 +6,16 @@ from typing import Optional
 import pytest
 from sqlalchemy import insert, select
 
+from invokeai.app.services.project_records import project_records_default
 from invokeai.app.services.project_records.project_records_common import (
+    ProjectCanvasSchemaUnsupportedError,
     ProjectDocumentSchemaDowngradeError,
     ProjectDocumentSchemaUnsupportedError,
     ProjectDocumentTooLargeError,
     ProjectRecordNotFoundError,
+    ProjectUpdateWorkspaceRequest,
+    ProjectWithWorkspaceDTO,
+    ProjectWorkspaceBeforeSplitError,
     ProjectWorkspaceConflictError,
     ProjectWorkspaceDTO,
 )
@@ -189,11 +194,31 @@ def test_only_the_owner_has_a_workspace_in_a_project(
         project_records.save_workspace("other", project_id, None, {}, max_document_schema_version=SPLIT)
 
 
+def test_a_workspace_save_needs_the_projects_canvas_schema(project_records: ProjectRecordsStorage) -> None:
+    """The workspace holds canvas state -- the staging area, the selection -- so the canvas floor applies to it."""
+    project_id = project_records.create(
+        OWNER,
+        "Canvas 3",
+        {},
+        minimum_canvas_schema_version=3,
+        max_canvas_schema_version=3,
+        minimum_document_schema_version=SPLIT,
+        max_document_schema_version=SPLIT,
+    ).project_id
+
+    with pytest.raises(ProjectCanvasSchemaUnsupportedError):
+        _save(project_records, project_id, None, {"stagingArea": {}})
+
+    saved = project_records.save_workspace(
+        OWNER, project_id, None, {"stagingArea": {}}, max_document_schema_version=SPLIT, max_canvas_schema_version=3
+    )
+    fetched = project_records.get(OWNER, project_id, max_canvas_schema_version=3, max_document_schema_version=SPLIT)
+    assert (saved.revision, fetched.workspace) == (1, saved)
+
+
 def test_a_workspace_has_the_same_size_limit_as_the_content(
     project_records: ProjectRecordsStorage, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from invokeai.app.services.project_records import project_records_default
-
     project_id = _split_project(project_records)
     monkeypatch.setattr(project_records_default, "PROJECT_DOCUMENT_MAX_BYTES", 16)
 
@@ -310,6 +335,141 @@ def test_deleting_the_project_drops_its_workspace_references_by_key(
     for sql, args in deletes:
         plan = " ".join(explain_query_plan(database, sql, args))
         assert "owner_kind=? AND user_id=? AND owner_id=?" in plan, plan
+
+
+# endregion
+
+
+# region the split: content and workspace in one save
+
+
+def _split(
+    project_records: ProjectRecordsStorage,
+    project_id: str,
+    content: dict,
+    workspace: dict,
+    expected_workspace_revision: Optional[int] = None,
+) -> ProjectWithWorkspaceDTO:
+    """The save that splits a whole project: the content, the raised floor and the member's workspace in one."""
+    return project_records.update(
+        OWNER,
+        project_id,
+        expected_revision=1,
+        name="Split",
+        data=content,
+        minimum_document_schema_version=SPLIT,
+        max_document_schema_version=SPLIT,
+        workspace=ProjectUpdateWorkspaceRequest(data=workspace, expected_revision=expected_workspace_revision),
+    )
+
+
+def test_the_split_stores_the_content_the_floor_and_the_first_workspace_together(
+    project_records: ProjectRecordsStorage,
+) -> None:
+    project_id = project_records.create(OWNER, "Whole", {"whole": True, "layout": "a"}).project_id
+
+    saved = _split(project_records, project_id, {"canvas": {"v": 1}}, {"layout": "a"})
+
+    assert (saved.revision, saved.minimum_document_schema_version, saved.data) == (2, SPLIT, {"canvas": {"v": 1}})
+    assert saved.workspace is not None
+    assert (saved.workspace.revision, saved.workspace.data) == (1, {"layout": "a"})
+    assert project_records.get(OWNER, project_id, max_document_schema_version=SPLIT) == saved
+
+
+def test_a_stale_workspace_revision_refuses_the_whole_split(
+    project_records: ProjectRecordsStorage, database: Database
+) -> None:
+    """Content, floor and references stay as they were: a split never lands by half."""
+    project_id = project_records.create(OWNER, "Whole", {"imageName": "whole.png"}).project_id
+    # Another tab saved a workspace in the project first.
+    _save(project_records, project_id, None, {"imageName": "mine.png"})
+
+    with pytest.raises(ProjectWorkspaceConflictError) as conflict:
+        _split(project_records, project_id, {"imageName": "split.png"}, {"imageName": "lost.png"})
+
+    assert conflict.value.current_revision == 1
+    fetched = project_records.get(OWNER, project_id, max_document_schema_version=SPLIT)
+    assert (fetched.revision, fetched.minimum_document_schema_version, fetched.data) == (
+        1,
+        3,
+        {"imageName": "whole.png"},
+    )
+    assert fetched.workspace is not None
+    assert (fetched.workspace.revision, fetched.workspace.data) == (1, {"imageName": "mine.png"})
+    assert _references(database, "project") == {"whole.png"}
+    assert _references(database, "project_workspace") == {"mine.png"}
+
+
+def test_the_split_indexes_the_media_of_both_halves(project_records: ProjectRecordsStorage, database: Database) -> None:
+    project_id = project_records.create(OWNER, "Whole", {"imageName": "whole.png"}).project_id
+
+    _split(project_records, project_id, {"imageName": "layer.png"}, {"imageName": "staged.png"})
+
+    assert _references(database, "project") == {"layer.png"}
+    assert _references(database, "project_workspace") == {"staged.png"}
+
+
+def test_each_half_of_the_split_has_its_own_size_limit(
+    project_records: ProjectRecordsStorage, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project_id = project_records.create(OWNER, "Whole", {"v": 1}).project_id
+    monkeypatch.setattr(project_records_default, "PROJECT_DOCUMENT_MAX_BYTES", 16)
+
+    with pytest.raises(ProjectDocumentTooLargeError):
+        _split(project_records, project_id, {"v": 2}, {"layout": "x" * 32})
+
+    fetched = project_records.get(OWNER, project_id)
+    assert (fetched.revision, fetched.minimum_document_schema_version, fetched.data, fetched.workspace) == (
+        1,
+        3,
+        {"v": 1},
+        None,
+    )
+
+
+@pytest.mark.parametrize("requested_floor", [None, 3])
+def test_a_workspace_is_refused_beside_a_whole_document(
+    project_records: ProjectRecordsStorage, database: Database, requested_floor: Optional[int]
+) -> None:
+    """A build from before the split could still save the whole project over it, and nothing would read it."""
+    project_id = project_records.create(OWNER, "Whole", {"imageName": "whole.png"}).project_id
+
+    with pytest.raises(ProjectWorkspaceBeforeSplitError) as refused:
+        project_records.update(
+            OWNER,
+            project_id,
+            expected_revision=1,
+            name="Still whole",
+            data={"imageName": "edited.png"},
+            minimum_document_schema_version=requested_floor,
+            max_document_schema_version=SPLIT,
+            workspace=ProjectUpdateWorkspaceRequest(data={"imageName": "staged.png"}, expected_revision=None),
+        )
+
+    assert refused.value.document_floor == 3
+    fetched = project_records.get(OWNER, project_id)
+    assert (fetched.revision, fetched.name, fetched.data, fetched.workspace) == (
+        1,
+        "Whole",
+        {"imageName": "whole.png"},
+        None,
+    )
+    assert _references(database, "project") == {"whole.png"}
+    assert _references(database, "project_workspace") == set()
+
+
+def test_a_save_without_a_workspace_carries_none_and_leaves_the_stored_one(
+    project_records: ProjectRecordsStorage,
+) -> None:
+    project_id = _split_project(project_records)
+    mine = _save(project_records, project_id, None, {"layout": "a"})
+
+    saved = project_records.update(
+        OWNER, project_id, expected_revision=1, name="Project", data={"v": 2}, max_document_schema_version=SPLIT
+    )
+
+    assert (saved.revision, saved.workspace) == (2, None)
+    assert project_records.get(OWNER, project_id, max_document_schema_version=SPLIT).workspace == mine
 
 
 # endregion

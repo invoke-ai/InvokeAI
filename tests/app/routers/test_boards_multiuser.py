@@ -263,7 +263,8 @@ def test_get_board_owner_succeeds(client: TestClient, user1_token: str):
 
 
 def test_get_board_other_user_forbidden(client: TestClient, user1_token: str, user2_token: str):
-    """Test that a non-owner cannot retrieve another user's board."""
+    """A non-owner cannot retrieve another user's restricted board. The refusal is a 403, not the 404 a missing
+    board answers: clients drop their selection and cached items on a 404, and this refusal can be reversed."""
     create = client.post(
         "/api/v1/boards/?board_name=User1+Private+Board",
         headers={"Authorization": f"Bearer {user1_token}"},
@@ -275,7 +276,8 @@ def test_get_board_other_user_forbidden(client: TestClient, user1_token: str, us
         f"/api/v1/boards/{board_id}",
         headers={"Authorization": f"Bearer {user2_token}"},
     )
-    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.json()["detail"] == "Not authorized to access this board"
 
 
 def test_get_board_admin_can_access_any_board(client: TestClient, admin_token: str, user1_token: str):
@@ -331,7 +333,7 @@ def test_update_board_other_user_forbidden(client: TestClient, user1_token: str,
         json={"board_name": "Hijacked Name"},
         headers={"Authorization": f"Bearer {user2_token}"},
     )
-    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 def test_update_board_admin_can_update_any_board(client: TestClient, admin_token: str, user1_token: str):
@@ -387,7 +389,7 @@ def test_delete_board_other_user_forbidden(client: TestClient, user1_token: str,
         f"/api/v1/boards/{board_id}",
         headers={"Authorization": f"Bearer {user2_token}"},
     )
-    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 def test_delete_board_admin_can_delete_any_board(client: TestClient, admin_token: str, user1_token: str):
@@ -441,7 +443,7 @@ def test_list_board_image_names_other_user_forbidden(client: TestClient, user1_t
         f"/api/v1/boards/{board_id}/image_names",
         headers={"Authorization": f"Bearer {user2_token}"},
     )
-    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 def test_list_board_image_names_admin_can_access_any_board(client: TestClient, admin_token: str, user1_token: str):
@@ -656,7 +658,7 @@ def test_private_board_not_visible_after_privacy_change(client: TestClient, user
         f"/api/v1/boards/{board_id}",
         headers={"Authorization": f"Bearer {user2_token}"},
     )
-    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 def test_non_owner_cannot_change_board_visibility(client: TestClient, user1_token: str, user2_token: str):
@@ -675,7 +677,7 @@ def test_non_owner_cannot_change_board_visibility(client: TestClient, user1_toke
         json={"board_visibility": "public"},
         headers={"Authorization": f"Bearer {user2_token}"},
     )
-    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 def test_shared_board_image_names_visible_to_other_users(client: TestClient, user1_token: str, user2_token: str):
@@ -875,16 +877,15 @@ def test_delete_board_with_include_images_filters_cascade_by_user(
     assert videos_call.kwargs.get("user_id") == requester_id
 
 
-def test_delete_board_with_include_images_admin_skips_user_filter(
-    client: TestClient, mock_invoker: Invoker, admin_token: str
+def test_an_admin_deleting_someone_elses_board_with_its_media_deletes_everyones(
+    client: TestClient, mock_invoker: Invoker, admin_token: str, user1_token: str
 ):
-    """Admins keep the legacy behavior: cascade deletes everything on the board regardless of
-    uploader. The filter is bypassed by passing ``user_id=None`` so the SQL ``WHERE`` clause
-    has no per-user restriction.
-    """
+    """Only the admin override deletes other users' media: an admin deleting another user's board, the case the
+    board DTO reports as `admin_override` so the client can warn first. The enumeration is unfiltered
+    (``user_id=None``), so the names it captures and later destroys are everyone's."""
     create = client.post(
-        "/api/v1/boards/?board_name=Admin+Cascade+Board",
-        headers={"Authorization": f"Bearer {admin_token}"},
+        "/api/v1/boards/?board_name=User1+Cascade+Board",
+        headers={"Authorization": f"Bearer {user1_token}"},
     )
     assert create.status_code == status.HTTP_201_CREATED
     board_id = create.json()["board_id"]
@@ -899,6 +900,42 @@ def test_delete_board_with_include_images_admin_skips_user_filter(
     videos_call = mock_invoker.services.board_video_records.get_all_board_video_names_for_board.call_args
     assert images_call.kwargs.get("user_id") is None
     assert videos_call.kwargs.get("user_id") is None
+
+
+def test_an_admin_deleting_their_own_board_with_its_media_deletes_only_their_own(
+    client: TestClient, mock_invoker: Invoker, admin_token: str
+):
+    """An admin deleting their own shared board is an owner like any other: only their own uploads are destroyed,
+    and other members' items fall back to Uncategorized, reported neither as deleted nor as failed."""
+    admin = mock_invoker.services.users.get_by_email("admin@test.com")
+    assert admin is not None
+    create = client.post(
+        "/api/v1/boards/?board_name=Admin+Cascade+Board",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert create.status_code == status.HTTP_201_CREATED
+    board_id = create.json()["board_id"]
+    # What the admin's own enumeration finds: a member's "theirs.png" is not among it.
+    mock_invoker.services.board_images.get_all_board_image_names_for_board.return_value = ["mine.png"]
+    mock_invoker.services.board_video_records.get_all_board_video_names_for_board.return_value = ["mine.mp4"]
+    mock_invoker.services.images.delete_images_by_names.return_value = (["mine.png"], [])
+    mock_invoker.services.videos.delete_videos_by_names.return_value = (["mine.mp4"], [])
+
+    response = client.delete(
+        f"/api/v1/boards/{board_id}?include_images=true",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    images_call = mock_invoker.services.board_images.get_all_board_image_names_for_board.call_args
+    videos_call = mock_invoker.services.board_video_records.get_all_board_video_names_for_board.call_args
+    assert images_call.kwargs.get("user_id") == admin.user_id
+    assert videos_call.kwargs.get("user_id") == admin.user_id
+    mock_invoker.services.images.delete_images_by_names.assert_called_once_with(["mine.png"])
+    mock_invoker.services.videos.delete_videos_by_names.assert_called_once_with(["mine.mp4"])
+    body = response.json()
+    assert (body["deleted_images"], body["failed_images"]) == (["mine.png"], [])
+    assert (body["deleted_videos"], body["failed_videos"]) == (["mine.mp4"], [])
 
 
 def test_delete_board_without_include_images_lists_uncategorized_videos(
@@ -1267,10 +1304,10 @@ def test_a_board_shared_with_someone_else_stays_closed_to_everyone_else(
         )
 
     assert client.get(f"/api/v1/boards/{board['board_id']}", headers=_auth(user2_token)).status_code == 200
-    assert client.get(f"/api/v1/boards/{board['board_id']}", headers=_auth(user3_token)).status_code == 404
+    assert client.get(f"/api/v1/boards/{board['board_id']}", headers=_auth(user3_token)).status_code == 403
     assert (
         client.patch(
             f"/api/v1/boards/{board['board_id']}", json={"board_name": "Taken"}, headers=_auth(user3_token)
         ).status_code
-        == 404
+        == 403
     )

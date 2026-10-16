@@ -29,6 +29,7 @@ from invokeai.app.api.routers._access import (
 from invokeai.app.api.routers._access import (
     assert_project_owned,
     item_action_for_changes,
+    redact_project_ids,
 )
 from invokeai.app.api.routers._limits import MAX_COPY_BATCH_SIZE
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
@@ -324,9 +325,12 @@ def update_image(
     assert_image_move_maintenance_inactive()
 
     try:
-        return ApiDependencies.invoker.services.images.update(image_name, image_changes)
+        image_dto = ApiDependencies.invoker.services.images.update(image_name, image_changes)
     except Exception:
         raise HTTPException(status_code=400, detail="Failed to update image")
+    # Starring is a board role's to do, so the caller may be a member reading another member's item.
+    redact_project_ids([image_dto], current_user)
+    return image_dto
 
 
 @images_router.get(
@@ -342,7 +346,7 @@ def get_image_dto(
     _assert_image_read_access(image_name, current_user)
 
     try:
-        return ApiDependencies.invoker.services.images.get_dto(image_name)
+        image_dto = ApiDependencies.invoker.services.images.get_dto(image_name)
     except ImageRecordNotFoundException:
         # Only a genuinely missing record answers 404. This route is what a workflow's image
         # field and a canvas reference image read, and they drop the user's reference when it
@@ -351,6 +355,8 @@ def get_image_dto(
         # workflows using it. Narrowed here rather than everywhere, because this is the 404
         # that is acted on destructively — the media, metadata and workflow routes keep theirs.
         raise HTTPException(status_code=404)
+    redact_project_ids([image_dto], current_user)
+    return image_dto
 
 
 @images_router.get(
@@ -556,6 +562,7 @@ def list_image_dtos(
         user_id=current_user.user_id,
         is_admin=current_user.is_admin,
     )
+    redact_project_ids(image_dtos.items, current_user)
 
     return image_dtos
 
@@ -1030,6 +1037,7 @@ def get_images_by_names(
                 # Skip missing images - they may have been deleted between name fetch and DTO fetch
                 continue
 
+        redact_project_ids(image_dtos, current_user)
         return image_dtos
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to get image DTOs")

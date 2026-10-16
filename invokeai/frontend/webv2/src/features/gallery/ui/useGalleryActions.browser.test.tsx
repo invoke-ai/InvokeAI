@@ -543,22 +543,33 @@ describe('board access', () => {
   });
 
   it.each([
-    ['board-1', 403, 'widgets.gallery.boardAccess.stale', 'Board 1'],
-    // The caller's own board missing was deleted elsewhere; someone else's stopped being readable.
-    ['board-1', 404, 'widgets.gallery.boardAccess.gone', 'Board 1'],
-    ['shared-viewer', 404, 'widgets.gallery.boardAccess.lost', 'Client references'],
-  ])('rolls back a refusal of %s answered %i, says why, and refetches', async (boardId, status, title, name) => {
-    mocks.updateGalleryBoard.mockRejectedValueOnce(new ApiError(JSON.stringify({ detail: 'Not allowed' }), status));
+    // The role no longer allows the action; the board still exists and is readable.
+    ['board-1', 403, 'Not authorized to change this board', 'widgets.gallery.boardAccess.stale', 'Board 1'],
+    // The board exists but stopped being readable: an owner restricted it, or a membership was revoked.
+    [
+      'shared-viewer',
+      403,
+      'Not authorized to access this board',
+      'widgets.gallery.boardAccess.lost',
+      'Client references',
+    ],
+    // Only a board that is gone answers 404.
+    ['board-1', 404, 'Board not found', 'widgets.gallery.boardAccess.gone', 'Board 1'],
+  ])(
+    'rolls back a refusal of %s answered %i %s, says why, and refetches',
+    async (boardId, status, detail, title, name) => {
+      mocks.updateGalleryBoard.mockRejectedValueOnce(new ApiError(JSON.stringify({ detail }), status));
 
-    await act(async () => {
-      await actionsRef.current?.renameBoard(boardId, 'Renamed');
-    });
+      await act(async () => {
+        await actionsRef.current?.renameBoard(boardId, 'Renamed');
+      });
 
-    expect(mocks.patchGalleryBoardCaches.mock.results[0]?.value).toHaveBeenCalledOnce();
-    expect(mocks.notificationsAdd).toHaveBeenCalledWith({ kind: 'info', message: name, title });
-    expect(mocks.notificationsReportError).not.toHaveBeenCalled();
-    expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
-  });
+      expect(mocks.patchGalleryBoardCaches.mock.results[0]?.value).toHaveBeenCalledOnce();
+      expect(mocks.notificationsAdd).toHaveBeenCalledWith({ kind: 'info', message: name, title });
+      expect(mocks.notificationsReportError).not.toHaveBeenCalled();
+      expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
+    }
+  );
 
   it.each([
     [

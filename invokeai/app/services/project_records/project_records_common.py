@@ -23,6 +23,11 @@ Schema 4 split the document into the project content, in `projects.data`, and ea
 refused a split project rather than handed half of one.
 """
 
+SPLIT_PROJECT_DOCUMENT_SCHEMA_VERSION = 4
+"""The first document schema in which a project is content and workspaces. A workspace is stored only beside content
+at this floor or above: beside a whole document, a build from before the split could still save the whole project
+over it, and nothing would read the workspace."""
+
 
 class ProjectRecordNotFoundError(Exception):
     """Raised when a project record is not found for the requesting user."""
@@ -119,6 +124,17 @@ class ProjectWorkspaceConflictError(Exception):
         )
 
 
+class ProjectWorkspaceBeforeSplitError(Exception):
+    """Raised when a save carries a workspace while leaving the project's document floor below the split."""
+
+    def __init__(self, project_id: str, document_floor: int) -> None:
+        self.document_floor = document_floor
+        super().__init__(
+            f"Project {project_id} would stay at document schema {document_floor}; a workspace is saved only with"
+            f" content at schema {SPLIT_PROJECT_DOCUMENT_SCHEMA_VERSION} or newer"
+        )
+
+
 class ProjectCanvasSchemaDowngradeError(Exception):
     """Raised when a save tries to lower a project's compatibility floor."""
 
@@ -211,7 +227,27 @@ class ProjectWithWorkspaceDTO(ProjectRecordDTO):
     """A project's content together with the caller's workspace in it."""
 
     workspace: Optional[ProjectWorkspaceDTO] = Field(
-        description="The caller's workspace; null until they save one, when the client builds a default"
+        description=(
+            "The caller's workspace. On a read, null until they save one, when the client builds a default; on a"
+            " save, the workspace the save carried and stored, or null when it carried none"
+        )
+    )
+
+
+class ProjectUpdateWorkspaceRequest(BaseModel):
+    """The caller's workspace, saved in the same transaction as the project content it accompanies.
+
+    Only one client needs it: one that splits a whole project (document schema 3 or older) into content and
+    workspace. The raised floor, the content and the member's first workspace row then land together or not at all.
+    The save must leave the document floor at the split schema or above, or it is refused whole.
+    Landed by half -- the content stored, the workspace not -- the project would join every later load with a
+    default workspace, and the member's layout, settings, history and staging would be gone for good.
+    """
+
+    data: dict[str, Any] = Field(description="The opaque client-owned workspace document")
+    expected_revision: Optional[int] = Field(
+        description="The workspace revision this save is based on, or null when the caller has no workspace in the"
+        " project yet; a mismatch refuses the whole save, content included"
     )
 
 

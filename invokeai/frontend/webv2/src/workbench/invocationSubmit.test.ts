@@ -16,6 +16,14 @@ const templatesMock = vi.hoisted(() => ({
   },
 }));
 const generatorsMock = vi.hoisted(() => ({ resolveWorkflowGenerators: vi.fn() }));
+// A fresh listing is cached unless a test says otherwise: nothing to await, so dispatches stay synchronous.
+const galleryQueriesMock = vi.hoisted(() => ({
+  ensureGalleryBoardDestinations: vi.fn((): Promise<void> | null => null),
+}));
+vi.mock('@features/gallery/queries', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  ensureGalleryBoardDestinations: galleryQueriesMock.ensureGalleryBoardDestinations,
+}));
 
 vi.mock('@features/workflow/react', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -188,6 +196,63 @@ describe('submitResolvedInvocation with a workflow generator', () => {
 
     return { notify, submitResolved };
   };
+
+  it('reads the board listing alongside generator resolution and dispatches only once both have answered', async () => {
+    galleryQueriesMock.ensureGalleryBoardDestinations.mockClear();
+    let settleBoards!: () => void;
+    galleryQueriesMock.ensureGalleryBoardDestinations.mockReturnValue(
+      new Promise<void>((resolve) => {
+        settleBoards = resolve;
+      })
+    );
+    let settleGenerators!: () => void;
+    const generators = new Promise<void>((resolve) => {
+      settleGenerators = resolve;
+    });
+    generatorsMock.resolveWorkflowGenerators.mockImplementation(
+      async (_client: unknown, pending: Array<{ key: string; nodeId: string }>) => {
+        await generators;
+        return {
+          errors: [],
+          resolutions: Object.fromEntries(pending.map((item) => [item.nodeId, { items: ['a cat'], key: item.key }])),
+        };
+      }
+    );
+    const project = buildProject();
+    const commands = createWorkbenchStore().commands;
+    const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
+    const settle = () =>
+      new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+
+    try {
+      const submission = submitResolvedInvocation({
+        commands,
+        formatControlLayerError,
+        models: undefined,
+        owner: captureAccountScope(),
+        prepareCanvasInvocation: vi.fn(),
+        project,
+        route: resolveInvocationRoute(project, 'global', workflowRoute),
+      });
+
+      // The listing read did not hold generator resolution back: both started at once.
+      expect(galleryQueriesMock.ensureGalleryBoardDestinations).toHaveBeenCalledTimes(1);
+      await vi.waitFor(() => expect(generatorsMock.resolveWorkflowGenerators).toHaveBeenCalledTimes(1));
+
+      // Generators answered; the dispatch still waits for the listing the destination is judged from.
+      settleGenerators();
+      await settle();
+      expect(submitResolved).not.toHaveBeenCalled();
+
+      settleBoards();
+      await submission;
+      expect(submitResolved).toHaveBeenCalledTimes(1);
+    } finally {
+      galleryQueriesMock.ensureGalleryBoardDestinations.mockReturnValue(null);
+    }
+  });
 
   it('resolves the pending generator and dispatches its output with the snapshot', async () => {
     generatorsMock.resolveWorkflowGenerators.mockImplementation(

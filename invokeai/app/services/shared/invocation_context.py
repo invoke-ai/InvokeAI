@@ -16,6 +16,7 @@ from invokeai.app.services.board_access.board_access_common import (
     BoardViewer,
     ItemAccessDeniedError,
     ItemAction,
+    queue_viewer,
 )
 from invokeai.app.services.board_records.board_records_common import BoardRecordNotFoundException, BoardRecordOrderBy
 from invokeai.app.services.boards.boards_common import BoardDTO
@@ -123,15 +124,16 @@ def _build_execution_effects(data: InvocationContextData) -> ExecutionEffectsRec
 
 class BoardsInterface(InvocationContextInterface):
     def _viewer(self, refusal: str) -> BoardViewer:
-        """The queue user, as the boards API sees a caller: an admin in single-user mode, their own role in
-        multiuser mode. A deactivated account keeps no queue-time privileges (see ImagesInterface._assert_read_access)."""
-        user_id = self._data.queue_item.user_id
-        if not self._services.configuration.multiuser:
-            return BoardViewer(user_id=user_id, is_admin=True)
-        user = self._services.users.get(user_id)
-        if user is not None and not user.is_active:
+        """The queue user, as the boards API sees a caller (see `queue_viewer`); a deleted or deactivated account is
+        refused."""
+        viewer = queue_viewer(
+            self._data.queue_item.user_id,
+            multiuser=self._services.configuration.multiuser,
+            users=self._services.users,
+        )
+        if viewer is None:
             raise PermissionError(refusal)
-        return BoardViewer(user_id=user_id, is_admin=user is not None and user.is_admin)
+        return viewer
 
     def _require(self, board_id: str, viewer: BoardViewer, action: BoardAction, refusal: str) -> None:
         try:

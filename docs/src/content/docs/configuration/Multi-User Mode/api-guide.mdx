@@ -841,6 +841,10 @@ On an error, it returns `422 Unprocessable Content` and  the following JSON:
 }
 ```
 
+### Board Endpoints
+
+Boards are available to every authenticated user; what each caller may do to one is decided by their role on it.
+
 #### List Image Boards
 
 **Endpoint:** `GET /api/v1/boards/`
@@ -883,9 +887,9 @@ Each board describes the caller's access to it:
 - `allowed_actions` -- the board actions the caller may take. Clients should decide what to offer from this list rather than from `my_role`.
 - `admin_override` -- `true` when administrator rights give the caller more than `my_role` does.
 - `owner_username` -- the owner's display name. Administrators see the email of an owner without one; other users see `Unknown user`.
-- `project_id` -- shown only to the board's owner and administrators.
+- `project_id` -- shown only to the board's owner and administrators. An image or video DTO's `project_id` likewise names the project it was made in only to that project's owner and to administrators; everyone else reads `null`.
 
-A board the caller cannot open answers `404`, the same as one that does not exist; an action the caller's role does not allow answers `403`. A project's inbox refuses renaming, archiving, moving, deleting and a change of general access with `409`; those follow its project.
+Only a board that does not exist answers `404`. A board the caller cannot open answers `403` with `Not authorized to access this board`, and an action the caller's role does not allow answers `403` too: a refusal can be reversed by the board's owner, so clients must not treat it as the board being gone. A project's inbox refuses renaming, archiving, moving, deleting and a change of general access with `409`; those follow its project.
 
 :::caution[Deprecated]
 `board_visibility` is `general_access` under its pre-7.0 name (`private` = `restricted`, `shared` = `viewer`, `public` = `contributor`). It is still returned and accepted on update, but sending it together with `general_access` is refused with `422`. It will be removed in 8.0.
@@ -917,6 +921,18 @@ A board the caller cannot open answers `404`, the same as one that does not exis
   "owner_username": "Sam"
 }
 ```
+
+### Project Endpoints
+
+Projects are private to the account that created them. The full save protocol, including the content and workspace halves and the schema floors, is described in [Project Files (.invk)](/development/front-end/project-files/).
+
+#### Save a Project
+
+**Endpoint:** `PUT /api/v1/projects/{project_id}`
+
+Saves the project's content and answers with the record and `workspace`. The optional `workspace` field (`{data, expected_revision}`) stores the caller's workspace in the same transaction and is for the save that splits a whole project (document schema 3 or older) into content and workspace: the raised document floor, the content and the first workspace row then land together or not at all. Its revision is checked as on `PUT /api/v1/projects/{project_id}/workspace`, and a mismatch refuses the whole save with `409` and the workspace's `current_revision`. Omit it on every other save: a `workspace` sent with a save that leaves the document floor below 4 is refused with `400` and the code `workspace_needs_split_document`.
+
+Workspace saves declare `max_canvas_schema_version` (default 2) as well as `max_document_schema_version`; a client below the project's canvas floor gets `412` with the code `canvas_schema_unsupported`.
 
 
 ## Best Practices

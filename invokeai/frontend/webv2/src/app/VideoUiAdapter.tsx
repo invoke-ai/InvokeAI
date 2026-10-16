@@ -2,9 +2,9 @@ import type { VideoUiAdapter } from '@features/video';
 import type { ReactNode } from 'react';
 
 import { getGalleryAutoAddBoardId, toGalleryItemKey } from '@features/gallery/contracts';
-import { canAddToCachedGalleryBoard, invalidateGallery } from '@features/gallery/queries';
+import { canAddToCachedGalleryBoard, galleryBoardsOptions, invalidateGallery } from '@features/gallery/queries';
 import { createDefaultVideoWidgetValues, normalizeVideoWidgetValues, VideoUiProvider } from '@features/video';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
@@ -97,6 +97,9 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
     },
     [commands, openWorkbenchWidget, projectId]
   );
+  // Uploads are judged against the listing of every readable board, observed while the Video widget is up so an
+  // archived or revoked board is decided from a listing, not for want of one; the read itself stays synchronous.
+  useQuery(galleryBoardsOptions({ includeArchived: true }));
   const getUploadBoardId = useCallback(
     () => getGalleryAutoAddBoardId(galleryValuesRef.current, canAddToCachedGalleryBoard) ?? 'none',
     []

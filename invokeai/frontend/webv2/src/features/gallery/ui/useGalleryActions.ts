@@ -1,6 +1,5 @@
 import type { GalleryBoard, GalleryView } from '@features/gallery/core/types';
 
-import { isOwnGalleryBoard } from '@features/gallery/core/boardAccess';
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { toGalleryItemKey } from '@features/gallery/core/items';
 import { GALLERY_AUTO_ADD_FOLLOW, getGallerySettings } from '@features/gallery/core/settings';
@@ -30,6 +29,9 @@ import { useGalleryUploadAction } from './useGalleryUploadAction';
 const toErrorMessage = (error: unknown): string =>
   getApiErrorMessage(error, error instanceof Error ? error.message : String(error));
 
+/** The server's 403 detail for a board that exists but the caller may not read; other 403s refuse an action. */
+const BOARD_UNREADABLE_DETAIL = 'Not authorized to access this board';
+
 export const useGalleryActions = ({
   boards,
   getCurrentGalleryLocation,
@@ -53,25 +55,23 @@ export const useGalleryActions = ({
     const recordError = (error: unknown) =>
       notifications.reportError({ area: 'gallery-actions', message: toErrorMessage(error), namespace: 'gallery' });
     /**
-     * A board action the server refuses for access (403), or answers as missing (404: no longer readable, or gone),
-     * means the listing's view of the caller's access is stale: say so plainly and refetch, so the board's menu and
-     * place in the list follow what the server allows now. `missingIsBoard` is false where a 404 can name something
-     * else, such as a move's destination project.
+     * A board action the server refuses (403: the board exists but the caller may no longer read it, or their role no
+     * longer allows the action) or answers as missing (404: deleted) means the listing's view of the board is stale:
+     * say so plainly and refetch, so the board's menu and place in the list follow what the server says now.
+     * `missingIsBoard` is false where a 404 can name something else, such as a move's destination project.
      */
     const recordBoardError = (boardId: string, error: unknown, { missingIsBoard = true } = {}) => {
       const status = error instanceof ApiError ? error.status : null;
       if (status === 403 || (status === 404 && missingIsBoard)) {
-        const board = getBoard(boardId);
         notifications.add({
           kind: 'info',
           message: getBoardName(boardId),
-          // The caller's own board missing was deleted elsewhere; someone else's stopped being readable.
           title: t(
-            status === 403
-              ? 'widgets.gallery.boardAccess.stale'
-              : board && isOwnGalleryBoard(board)
-                ? 'widgets.gallery.boardAccess.gone'
-                : 'widgets.gallery.boardAccess.lost'
+            status === 404
+              ? 'widgets.gallery.boardAccess.gone'
+              : getApiErrorMessage(error, '') === BOARD_UNREADABLE_DETAIL
+                ? 'widgets.gallery.boardAccess.lost'
+                : 'widgets.gallery.boardAccess.stale'
           ),
         });
         refresh();
@@ -151,7 +151,8 @@ export const useGalleryActions = ({
           const board = await createGalleryBoard(boardName, projectId, owner.signal);
 
           assertAccountScopeCurrent(owner);
-          addGalleryBoardToCaches(queryClient, board);
+          await addGalleryBoardToCaches(queryClient, board);
+          assertAccountScopeCurrent(owner);
           gallery.selectBoard(board.id);
           recordSuccess(t('widgets.gallery.boardCreated', { name: board.name }));
           refresh();

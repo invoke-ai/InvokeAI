@@ -110,7 +110,18 @@ export const createUnloadJournalServer = () => {
       if (current.revision !== request.expected_revision) {
         throw Object.assign(new Error('conflict'), { status: 409 });
       }
-      const record = {
+      // A workspace sent with the content is stored in the same step, or refuses the content with it.
+      if (request.workspace && (current.workspace?.revision ?? null) !== request.workspace.expected_revision) {
+        throw Object.assign(new Error('conflict'), { status: 409 });
+      }
+      const workspace = request.workspace
+        ? {
+            data: structuredClone(request.workspace.data),
+            revision: (current.workspace?.revision ?? 0) + 1,
+            updated_at: now,
+          }
+        : null;
+      const record: ProjectWithWorkspaceDTO = {
         ...current,
         data: structuredClone(request.data),
         minimum_document_schema_version: Math.max(
@@ -119,13 +130,14 @@ export const createUnloadJournalServer = () => {
         ),
         name: request.name,
         revision: current.revision + 1,
+        ...(workspace ? { workspace, workspace_updated_at: now } : {}),
       };
       records.set(projectId, record);
       if (server.dropNextUpdateResponse) {
         server.dropNextUpdateResponse = false;
         throw new TypeError('Failed to fetch');
       }
-      return structuredClone(record);
+      return { ...structuredClone(record), workspace: structuredClone(workspace) };
     },
   };
   return { api, server };
