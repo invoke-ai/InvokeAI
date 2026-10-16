@@ -4,6 +4,7 @@ import type { GalleryBoard } from '@features/gallery/core/types';
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext, KeyboardSensor, MouseSensor, pointerWithin, useSensor, useSensors } from '@dnd-kit/core';
 import { DEFAULT_GALLERY_SETTINGS, type GallerySettings } from '@features/gallery/core/settings';
+import { dragWithMouse } from '@platform/browser/mouseDrag.testing';
 import { system } from '@theme/system';
 import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -393,44 +394,17 @@ describe('GalleryBoardsPanel', () => {
       [...(host?.querySelectorAll<HTMLElement>('[data-part="trigger"], [role="heading"]') ?? [])].find((element) =>
         element.textContent?.startsWith(label)
       )!;
-    const settle = () =>
-      new Promise<void>((resolve) => {
-        globalThis.setTimeout(resolve, 30);
-      });
-    /**
-     * A pointer that travels, as a hand does: the tiers start taking boards once the drag has begun, and are measured
-     * on the moves after it. Outside act, as in the shell: dnd-kit settles the drop in effects act would hold back.
-     */
-    const drag = async (source: HTMLElement, target: HTMLElement) => {
-      const center = (element: HTMLElement) => {
-        const rect = element.getBoundingClientRect();
-
-        return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-      };
-      const from = center(source);
-      const to = center(target);
-      const mouse = (type: string, at: { x: number; y: number }, element: EventTarget = document) =>
-        element.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0, clientX: at.x, clientY: at.y }));
-
-      mouse('mousedown', from, source);
-      for (const progress of [0.25, 0.5, 0.75, 1, 1]) {
-        mouse('mousemove', { x: from.x + (to.x - from.x) * progress, y: from.y + (to.y - from.y) * progress });
-        await settle();
-      }
-      mouse('mouseup', to);
-      await settle();
-    };
 
     it('moves it to the project or Library it is dropped on, anywhere on that tier', async () => {
       await renderPanel(createGallery({ showOtherProjectBoards: true }), { withDrag: true });
 
-      await drag(row('dogs'), heading('Harbor Tower'));
+      await dragWithMouse(row('dogs'), heading('Harbor Tower'));
       expect(actions.moveBoard).toHaveBeenLastCalledWith('dogs', 'p2', 'Harbor Tower');
 
-      await drag(row('Stripes'), row('Façades'));
+      await dragWithMouse(row('Stripes'), row('Façades'));
       expect(actions.moveBoard).toHaveBeenLastCalledWith('theirs-member', 'p1', 'Mahogany House');
 
-      await drag(row('Façades'), heading('Library'));
+      await dragWithMouse(row('Façades'), heading('Library'));
       expect(actions.moveBoard).toHaveBeenLastCalledWith('mine-member', null, 'Library');
       expect(actions.moveBoard).toHaveBeenCalledTimes(3);
     });
@@ -438,10 +412,10 @@ describe('GalleryBoardsPanel', () => {
     it('moves nothing dropped on its own tier, and never drags an inbox, which moves with its project', async () => {
       await renderPanel(createGallery({ showOtherProjectBoards: true }), { withDrag: true });
 
-      await drag(row('dogs'), row('Cats'));
-      await drag(row('Inbox'), heading('Library'));
+      await dragWithMouse(row('dogs'), row('Cats'));
+      await dragWithMouse(row('Inbox'), heading('Library'));
       // Pressing the row's menu button and moving away is no drag either.
-      await drag(row('Façades').querySelector<HTMLElement>('.board-row-actions')!, heading('Library'));
+      await dragWithMouse(row('Façades').querySelector<HTMLElement>('.board-row-actions')!, heading('Library'));
 
       expect(actions.moveBoard).not.toHaveBeenCalled();
     });
@@ -462,19 +436,19 @@ describe('GalleryBoardsPanel', () => {
         { currentUserId: 'me', withDrag: true }
       );
 
-      await drag(row('Cats'), heading('Mahogany House'));
-      await drag(row('dogs'), heading('Mahogany House'));
-      await drag(row('Façades'), heading('Harbor Tower'));
+      await dragWithMouse(row('Cats'), heading('Mahogany House'));
+      await dragWithMouse(row('dogs'), heading('Mahogany House'));
+      await dragWithMouse(row('Façades'), heading('Harbor Tower'));
       expect(actions.moveBoard).not.toHaveBeenCalled();
 
-      await drag(row('Façades'), heading('Library'));
+      await dragWithMouse(row('Façades'), heading('Library'));
       expect(actions.moveBoard).toHaveBeenCalledExactlyOnceWith('mine-member', null, 'Library');
     });
 
     it('takes a drop on a collapsed tier, by its heading', async () => {
       await renderPanel(createGallery({ collapsedBoardSections: ['library'] }), { withDrag: true });
 
-      await drag(row('Façades'), heading('Library'));
+      await dragWithMouse(row('Façades'), heading('Library'));
 
       expect(actions.moveBoard).toHaveBeenCalledExactlyOnceWith('mine-member', null, 'Library');
     });

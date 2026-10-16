@@ -41,6 +41,8 @@ const model = (key: string, type: string, base: string, name = key): ModelConfig
   source: key,
   source_type: 'path',
   type,
+  // Every installed CLIP Embed carries its variant; FLUX.1 takes only CLIP-L.
+  ...(type === 'clip_embed' ? { variant: 'large' } : {}),
 });
 
 const MODELS = [
@@ -155,6 +157,25 @@ describe('architecture-driven validation', () => {
 
     expect(getUpscaleValidationReasons(values)).toEqual([]);
     expect(values.tileControlnetModel).toBeNull();
+  });
+
+  it('gives FLUX.1 a CLIP-L and never a CLIP-G, which its text encoder cannot run', () => {
+    // A ComfyUI text_encoders folder installs both; whichever sorts first must not decide.
+    const clipG = { ...model('clip-g', 'clip_embed', 'any'), variant: 'gigantic' } as ModelConfig;
+    const installed = [
+      clipG,
+      model('main', 'main', 'flux'),
+      model('spandrel', 'spandrel_image_to_image', 'any'),
+      model('t5', 't5_encoder', 'any'),
+      model('clip', 'clip_embed', 'any'),
+      model('fluxvae', 'vae', 'flux'),
+    ];
+
+    const values = upscaleReady(installed);
+    const restored = syncUpscaleWidgetValuesWithModels({ ...values, clipEmbedModel: clipG }, installed);
+
+    expect(values.clipEmbedModel?.key).toBe('clip');
+    expect(restored.clipEmbedModel?.key).toBe('clip');
   });
 
   it('still demands one where the architecture uses it', () => {

@@ -286,6 +286,7 @@ class TestPasswordSecurityProperties:
     """Tests for security properties of password handling."""
 
     @pytest.mark.slow
+    @pytest.mark.usefixtures("production_password_hashing")
     def test_timing_attack_resistance_same_length(self):
         """Test that password verification takes similar time for correct and incorrect passwords.
 
@@ -334,6 +335,7 @@ class TestPasswordSecurityProperties:
         # Bcrypt hashes are 60 characters long
         assert len(hashed) == 60
 
+    @pytest.mark.usefixtures("production_password_hashing")
     def test_hashing_cost_stays_at_a_defensible_work_factor(self):
         """The cost factor is what makes a stolen hash expensive to attack.
 
