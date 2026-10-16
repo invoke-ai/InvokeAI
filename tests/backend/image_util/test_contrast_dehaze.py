@@ -57,6 +57,19 @@ def test_negative_amount_reduces_broad_scale_separation_like_a_veil() -> None:
     assert _broad_luminance_spread(result) < _broad_luminance_spread(source) - 2.0
 
 
+def test_extended_amounts_produce_stronger_contrast_dehaze_adjustments() -> None:
+    source = _veiled_gray_bands()
+    source_spread = _broad_luminance_spread(source)
+
+    positive_100 = _broad_luminance_spread(contrast_dehaze(source, amount=100))
+    positive_200 = _broad_luminance_spread(contrast_dehaze(source, amount=200))
+    negative_100 = _broad_luminance_spread(contrast_dehaze(source, amount=-100))
+    negative_200 = _broad_luminance_spread(contrast_dehaze(source, amount=-200))
+
+    assert positive_200 > positive_100 > source_spread
+    assert negative_200 < negative_100 < source_spread
+
+
 def test_amount_moves_chroma_in_the_same_direction_on_a_safe_color_patch() -> None:
     source = Image.new("RGB", (24, 24), (130, 90, 70))
     source_chroma = _mean_oklab_chroma(source)
@@ -107,7 +120,7 @@ def test_transparent_pixels_keep_their_hidden_color() -> None:
     np.testing.assert_array_equal(result[pixels[..., 3] == 0], pixels[pixels[..., 3] == 0])
 
 
-@pytest.mark.parametrize("amount", [float("nan"), float("inf"), float("-inf"), -100.1, 100.1, True])
+@pytest.mark.parametrize("amount", [float("nan"), float("inf"), float("-inf"), -200.01, 200.01, True])
 def test_invalid_amount_is_rejected(amount: float) -> None:
     with pytest.raises(ValueError):
         contrast_dehaze(Image.new("RGB", (3, 2), (120, 130, 140)), amount=amount)

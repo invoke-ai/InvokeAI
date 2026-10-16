@@ -12,8 +12,8 @@ from PIL import Image
 from invokeai.backend.image_util.color import prepare_lightness, restore_lightness
 from invokeai.backend.image_util.multiscale import edge_aware_band
 
-_MIN_AMOUNT = -100
-_MAX_AMOUNT = 100
+_MIN_AMOUNT = -200
+_MAX_AMOUNT = 200
 _MIN_SIZE = 4
 _MAX_SIZE = 1000
 _GUIDED_FILTER_EPSILON = 0.002
@@ -22,10 +22,10 @@ _GUIDED_FILTER_EPSILON = 0.002
 def clarity(source: Image.Image, amount: float = 0, size: float = 40) -> Image.Image:
     """Adjust local midtone detail while preserving the source image's color and alpha."""
     if isinstance(amount, bool) or not isinstance(amount, Real) or not isfinite(amount):
-        raise ValueError("amount must be a finite number between -100 and 100")
+        raise ValueError("amount must be a finite number between -200 and 200")
     amount_value = float(amount)
     if not _MIN_AMOUNT <= amount_value <= _MAX_AMOUNT:
-        raise ValueError("amount must be between -100 and 100")
+        raise ValueError("amount must be between -200 and 200")
 
     if isinstance(size, bool) or not isinstance(size, Real) or not isfinite(size):
         raise ValueError("size must be a finite number between 4 and 1000")

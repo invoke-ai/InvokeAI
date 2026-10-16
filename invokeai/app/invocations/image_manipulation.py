@@ -15,13 +15,13 @@ from invokeai.backend.image_util.texture import texture
     title="Clarity",
     tags=["image", "detail", "clarity", "enhance"],
     category="image",
-    version="1.0.0",
+    version="1.0.1",
 )
 class ClarityInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Adjust local midtone detail in an image."""
 
     image: ImageField = InputField(description="The image to process")
-    amount: float = InputField(default=0, ge=-100, le=100, description="Strength of the clarity adjustment")
+    amount: float = InputField(default=0, ge=-200, le=200, description="Strength of the clarity adjustment")
     size: float = InputField(default=40, ge=4, le=1000, description="Scale of the detail adjustment")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
@@ -36,13 +36,13 @@ class ClarityInvocation(BaseInvocation, WithMetadata, WithBoard):
     title="Texture",
     tags=["image", "detail", "texture", "enhance"],
     category="image",
-    version="1.0.0",
+    version="1.0.1",
 )
 class TextureInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Adjust fine-scale texture detail in an image."""
 
     image: ImageField = InputField(description="The image to process")
-    amount: float = InputField(default=0, ge=-100, le=100, description="Strength of the texture adjustment")
+    amount: float = InputField(default=0, ge=-200, le=200, description="Strength of the texture adjustment")
     size: float = InputField(default=8, ge=1, le=100, description="Scale of the texture detail")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
@@ -57,13 +57,13 @@ class TextureInvocation(BaseInvocation, WithMetadata, WithBoard):
     title="Contrast Dehaze (approximation)",
     tags=["image", "contrast", "dehaze", "enhance"],
     category="image",
-    version="1.0.0",
+    version="1.0.1",
 )
 class ContrastDehazeInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Adjust broad-scale contrast and chroma as an aesthetic dehazing approximation."""
 
     image: ImageField = InputField(description="The image to process")
-    amount: float = InputField(default=0, ge=-100, le=100, description="Strength of the contrast and dehaze adjustment")
+    amount: float = InputField(default=0, ge=-200, le=200, description="Strength of the contrast and dehaze adjustment")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name)

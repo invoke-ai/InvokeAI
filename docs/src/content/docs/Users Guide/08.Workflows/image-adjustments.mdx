@@ -11,9 +11,9 @@ Clarity, Texture, and Contrast Dehaze are image nodes for making local detail or
 
 | Node | What it adjusts | Controls |
 | --- | --- | --- |
-| **Clarity** | Midtone detail at a broader scale. Positive amounts emphasize local detail; negative amounts soften it. | **Amount:** −100 to 100, default 0. **Size:** 4 to 1000, default 40. |
-| **Texture** | Fine-scale detail. Positive amounts emphasize texture; negative amounts reduce it. | **Amount:** −100 to 100, default 0. **Size:** 1 to 100, default 8. |
-| **Contrast Dehaze (approximation)** | Broad luminance separation and color intensity. Positive amounts increase both; negative amounts reduce both. | **Amount:** −100 to 100, default 0. |
+| **Clarity** | Midtone detail at a broader scale. Positive amounts emphasize local detail; negative amounts soften it. | **Amount:** −200 to 200, default 0. **Size:** 4 to 1000, default 40. |
+| **Texture** | Fine-scale detail. Positive amounts emphasize texture; negative amounts reduce it. | **Amount:** −200 to 200, default 0. **Size:** 1 to 100, default 8. |
+| **Contrast Dehaze (approximation)** | Broad luminance separation and color intensity. Positive amounts increase both; negative amounts reduce both. | **Amount:** −200 to 200, default 0. |
 
 For Clarity and Texture, **Size** is a scale in pixels of the input image. It controls the size of detail structures affected, not the output dimensions. Larger values affect broader structures; smaller values target finer detail. The amount is a signed strength control, not a percentage guarantee of a particular visual change. Results depend on the image.
 
