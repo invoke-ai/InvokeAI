@@ -5,13 +5,15 @@ import type { WidgetContributionSource } from '@workbench/widgetContracts';
 import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { PromptTextarea } from '@features/generation/components';
+import { adjustFocusedPromptAttention } from '@features/generation/react';
 import { AppToaster, createActionToast, toaster } from '@platform/ui/toaster';
 import { system } from '@theme/system';
 import { createExtensionRegistry } from '@workbench/extensions/extensionRegistry';
 import { useFloatingWindowFocus, useFocusRegionProps } from '@workbench/focusRegions';
 import { WorkbenchFocusProvider } from '@workbench/WorkbenchRuntime';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
-import { act, useCallback } from 'react';
+import { act, useCallback, useState, type ChangeEvent } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
@@ -272,5 +274,91 @@ describe('WorkbenchHotkeyRuntime and selected-image shortcuts', () => {
     await pressKey('s', host!.querySelector('[data-testid="window"]')!);
 
     expect(ran).toEqual(['gallery.remix', 'viewer.remix']);
+  });
+});
+
+describe('WorkbenchHotkeyRuntime and prompt weighting', () => {
+  let promptRoot: Root | null = null;
+
+  beforeEach(() => {
+    // Registered without a source, as `useRegisterFirstPartyCommands` does.
+    runtimeMocks.extensions.commands.register({
+      handler: () => adjustFocusedPromptAttention('increment', false),
+      id: 'app.promptWeightUp',
+      title: 'app.promptWeightUp',
+    });
+  });
+
+  afterEach(async () => {
+    await act(() => promptRoot?.unmount());
+    promptRoot = null;
+  });
+
+  const PromptHarness = ({ attentionSyntax }: { attentionSyntax: 'edit' | 'none' }) => {
+    const [value, setValue] = useState('a cat');
+    const handleChange = useCallback(
+      (event: ChangeEvent<HTMLTextAreaElement>) => setValue(event.currentTarget.value),
+      []
+    );
+
+    return (
+      <PromptTextarea
+        aria-label="Prompt"
+        attentionSyntax={attentionSyntax}
+        defaultHeightPx={96}
+        minHeightPx={56}
+        resizeHandleAriaLabel="Resize prompt"
+        showSyntaxHighlighting
+        value={value}
+        onChange={handleChange}
+      />
+    );
+  };
+
+  /** Select "cat" and press Ctrl+Up; report whether the runtime took the key from the text field. */
+  const pressWeightUp = async (attentionSyntax: 'edit' | 'none') => {
+    const promptHost = document.createElement('div');
+    host!.append(promptHost);
+    promptRoot = createRoot(promptHost);
+    await act(() => {
+      promptRoot?.render(
+        <ChakraProvider value={system}>
+          <PromptHarness attentionSyntax={attentionSyntax} />
+        </ChakraProvider>
+      );
+    });
+    const textarea = promptHost.querySelector('textarea')!;
+    textarea.focus();
+    textarea.setSelectionRange(2, 5);
+
+    let claimed = false;
+    await act(async () => {
+      claimed = !textarea.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          bubbles: true,
+          cancelable: true,
+          code: 'ArrowUp',
+          ctrlKey: true,
+          key: 'ArrowUp',
+        })
+      );
+      await Promise.resolve();
+    });
+
+    return { claimed, textarea };
+  };
+
+  it('weights the selection in a prompt whose model reads attention syntax', async () => {
+    const { claimed, textarea } = await pressWeightUp('edit');
+
+    expect(claimed).toBe(true);
+    await expect.poll(() => textarea.value).toBe('a cat+');
+  });
+
+  it('leaves Ctrl+Up to the text field when the model reads the prompt as plain text', async () => {
+    const { claimed, textarea } = await pressWeightUp('none');
+
+    expect(claimed).toBe(false);
+    expect(textarea.value).toBe('a cat');
   });
 });

@@ -11,6 +11,7 @@ import {
   addEdge,
   addNode,
   addTransformerLoraCollectionLoader,
+  getCompelPromptNodeType,
   getActiveCompatibleLoras,
   getLoadedLoras,
   toGraphContract,
@@ -267,7 +268,7 @@ const buildSdUpscalePath: UpscalePathBuilder = ({
     model: toModelIdentifier(model),
     type: model.base === 'sdxl' ? 'sdxl_model_loader' : 'main_model_loader',
   });
-  const compelType = model.base === 'sdxl' ? 'sdxl_compel_prompt' : 'compel';
+  const compelType = getCompelPromptNodeType(model.base);
   const posCond = addNode(graph, { id: 'pos_cond', type: compelType });
   const negCond = addNode(graph, { id: 'neg_cond', type: compelType });
   const activeLoras = settings.loras.filter(

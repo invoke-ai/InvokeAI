@@ -25,6 +25,8 @@ export interface HotkeyDefinition {
   preventDefault?: boolean;
   allowInEditable?: boolean;
   allowInModal?: boolean;
+  /** Claim the key only while the press targets an element matching this selector; elsewhere it keeps its meaning. */
+  targetSelector?: string;
   unavailableReason?: string;
   implemented?: boolean;
   source?: WidgetContributionSource;

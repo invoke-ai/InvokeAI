@@ -171,6 +171,12 @@ export const OPEN_COMMAND_PALETTE_HOTKEY: HotkeyDefinition = {
   title: 'Open Command Palette',
 };
 
+/**
+ * Generation's `PromptTextarea` marks an editable prompt this way only while the selected model reads attention
+ * syntax. Anywhere else Ctrl+Up/Down keeps its text-field meaning.
+ */
+const PROMPT_ATTENTION_TARGET_SELECTOR = 'textarea[data-prompt-attention-target="true"]:not([readonly])';
+
 export type RegionFocusDirection = 'down' | 'left' | 'right' | 'up';
 
 /**
@@ -231,8 +237,8 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('app', 'selectQueueTab', ['6']),
   hotkey('app', 'promptHistoryPrev', ['alt+arrowup']),
   hotkey('app', 'promptHistoryNext', ['alt+arrowdown']),
-  hotkey('app', 'promptWeightUp', ['ctrl+arrowup']),
-  hotkey('app', 'promptWeightDown', ['ctrl+arrowdown']),
+  { ...hotkey('app', 'promptWeightUp', ['ctrl+arrowup']), targetSelector: PROMPT_ATTENTION_TARGET_SELECTOR },
+  { ...hotkey('app', 'promptWeightDown', ['ctrl+arrowdown']), targetSelector: PROMPT_ATTENTION_TARGET_SELECTOR },
   hotkey('app', 'focusPrompt', ['alt+a']),
   hotkey('app', 'toggleLeftPanel', ['t', 'o']),
   hotkey('app', 'toggleRightPanel', ['g']),

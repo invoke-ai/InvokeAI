@@ -53,6 +53,7 @@ import {
 } from './graphBuilder';
 import { addKrea2ConditioningEnhancers } from './krea2Conditioning';
 import { addPidDecode, getPidDenoiseSize, getPidMetadata, shouldUsePidDecode } from './pidGraph';
+import { getCompelPromptNodeType } from './prompt/compel';
 import { getEffectiveReferenceImage } from './referenceImage';
 
 const getCompatibleComponentSource = (
@@ -315,7 +316,7 @@ const buildSDGraph = (
 ): BackendGraphContract => {
   const graph: BackendGraphContract = { edges: [], id: createId(`${model.base}_graph`), nodes: {} };
   const modelLoaderType = model.base === 'sdxl' ? 'sdxl_model_loader' : 'main_model_loader';
-  const compelType = model.base === 'sdxl' ? 'sdxl_compel_prompt' : 'compel';
+  const compelType = getCompelPromptNodeType(model.base);
   const activeLoras = getActiveCompatibleLoras(settings, model);
   const scheduler = coerceSchedulerForGraph(model, settings.scheduler);
   const colorCompensation = settings.colorCompensation ? 'SDXL' : 'None';
