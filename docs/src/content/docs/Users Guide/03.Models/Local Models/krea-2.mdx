@@ -1,7 +1,7 @@
 ---
 title: Krea-2
 description: Generate images with the Krea-2 text-to-image models (Turbo and Raw), including the GGUF / single-file workflow, the conditioning enhancers and training-free style reference.
-lastUpdated: 2026-09-30
+lastUpdated: 2026-10-16
 sidebar:
   order: 7
 ---
@@ -17,6 +17,13 @@ published checkpoints:
 
 The variant is detected automatically on install, and selecting a Krea-2 model sets sensible defaults
 (steps, CFG, 1024×1024) for that variant.
+
+:::note[Image size and the noise schedule]
+Raw puts more of its steps at high noise the larger the image, up to the area of 1280×1280 (about 1.6
+megapixels). Larger images keep that schedule, which is also the one Turbo always uses. Without the limit, a
+2048×2048 Raw image would spend about half of its steps above 90% noise, and a 4096×4096 one all of them.
+To sample with a different schedule, set **Shift** on the **Denoise - Krea-2** node in a workflow.
+:::
 
 ## License
 
