@@ -66,6 +66,7 @@ export {
   isAnimaQwen3Encoder,
   isBundledMainForBase,
   isDiffusersMainForBase,
+  isKrea2Qwen3VlEncoder,
   isNonAnimaQwen3Encoder,
   isVaeAcceptedByBase,
   isVaeCompatibleWithGenerateModel,
