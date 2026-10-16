@@ -3,17 +3,27 @@ import type { MouseEvent, ReactNode } from 'react';
 
 import { Menu, Portal } from '@chakra-ui/react';
 import { INTERMEDIATES_SETTING_ID, requestIntermediatesFocus } from '@features/intermediates';
-import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
+import { Dialog } from '@platform/ui/Dialog';
 import { RenameDialog } from '@platform/ui/RenameDialog';
 import { useNavigate } from '@tanstack/react-router';
 import { isProjectSummaryCompatible } from '@workbench/projects/library';
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
+import { createContext, lazy, Suspense, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { ProjectCardActions } from './useProjectCardActions';
 
 import { ProjectActionsMenuBody } from './ProjectActionsMenu';
 import { useProjectCardActions } from './useProjectCardActions';
+
+// The dialog reads the gallery's board query, and this host sits in a boot graph the performance gates pin by source
+// file, so even a shared three-line wrapper module would register as growth. Loaded the first time a delete is asked for.
+const LazyDeleteProjectDialog = lazy(() =>
+  import('@workbench/projects/components/DeleteProjectDialog').then((module) => ({
+    default: module.DeleteProjectDialog,
+  }))
+);
+// Modal from the request onward: while the dialog's module is still on its way, shortcuts must already be off.
+const PENDING_DIALOG = <Dialog.Pending />;
 
 /**
  * Use one menu host so switching cards cannot race Zag's nested-layer teardown. Keep dialogs beside the menu so
@@ -44,6 +54,7 @@ interface DialogRequest {
   actions: ProjectCardActions;
   kind: 'delete' | 'rename';
   name: string;
+  projectId: string;
 }
 
 interface ProjectActionsMenuControl {
@@ -69,10 +80,18 @@ export const ProjectActionsMenuProvider = ({ children }: { children: ReactNode }
   const { t } = useTranslation();
   const [menuRequest, setMenuRequest] = useState<MenuRequest | null>(null);
   const [dialogRequest, setDialogRequest] = useState<DialogRequest | null>(null);
+  // Once mounted the dialog stays, so its close animation and the lazy chunk are paid for once.
+  const [hasRequestedDelete, setHasRequestedDelete] = useState(false);
   const ticketRef = useRef(0);
 
   const closeMenu = useCallback(() => setMenuRequest(null), []);
   const closeDialog = useCallback(() => setDialogRequest(null), []);
+  const requestDialog = useCallback((dialog: DialogRequest) => {
+    if (dialog.kind === 'delete') {
+      setHasRequestedDelete(true);
+    }
+    setDialogRequest(dialog);
+  }, []);
   const openAtPointer = useCallback((event: MouseEvent, target: ProjectMenuTarget) => {
     event.preventDefault();
     ticketRef.current += 1;
@@ -110,7 +129,7 @@ export const ProjectActionsMenuProvider = ({ children }: { children: ReactNode }
           key={menuKey}
           request={menuRequest}
           onClose={closeMenu}
-          onRequestDialog={setDialogRequest}
+          onRequestDialog={requestDialog}
         />
       ) : null}
 
@@ -124,14 +143,17 @@ export const ProjectActionsMenuProvider = ({ children }: { children: ReactNode }
         onSubmit={dialogRequest?.actions.rename ?? NOOP_SUBMIT}
       />
 
-      <ConfirmDialog
-        body={`${t('projects.deleteProjectCardBody', { name: dialogRequest?.name ?? '' })} ${t('projects.deleteProjectBoardNote')}`}
-        confirmLabel={t('projects.deleteProject')}
-        isOpen={dialogRequest?.kind === 'delete'}
-        title={t('projects.deleteProjectQuestion')}
-        onClose={closeDialog}
-        onConfirm={dialogRequest?.actions.delete ?? NOOP_SUBMIT}
-      />
+      {hasRequestedDelete ? (
+        <Suspense fallback={dialogRequest?.kind === 'delete' ? PENDING_DIALOG : null}>
+          <LazyDeleteProjectDialog
+            body={t('projects.deleteProjectCardBody', { name: dialogRequest?.name ?? '' })}
+            isOpen={dialogRequest?.kind === 'delete'}
+            projectId={dialogRequest?.kind === 'delete' ? dialogRequest.projectId : null}
+            onClose={closeDialog}
+            onConfirm={dialogRequest?.actions.delete ?? NOOP_SUBMIT}
+          />
+        </Suspense>
+      ) : null}
     </ProjectActionsMenuContext.Provider>
   );
 };
@@ -207,8 +229,8 @@ const HostedProjectActionsMenu = ({
     [onClose, request.returnFocus]
   );
   const handleRename = useCallback(
-    () => onRequestDialog({ actions, kind: 'rename', name: request.summary.name }),
-    [actions, onRequestDialog, request.summary.name]
+    () => onRequestDialog({ actions, kind: 'rename', name: request.summary.name, projectId: request.summary.id }),
+    [actions, onRequestDialog, request.summary.id, request.summary.name]
   );
   const handleDeleteIntermediates = useCallback(() => {
     // The manager lives in Preferences; it reads this intent when it starts.
@@ -221,8 +243,8 @@ const HostedProjectActionsMenu = ({
     });
   }, [navigate, onClose, request.summary.id]);
   const handleDelete = useCallback(
-    () => onRequestDialog({ actions, kind: 'delete', name: request.summary.name }),
-    [actions, onRequestDialog, request.summary.name]
+    () => onRequestDialog({ actions, kind: 'delete', name: request.summary.name, projectId: request.summary.id }),
+    [actions, onRequestDialog, request.summary.id, request.summary.name]
   );
   const handleDuplicate = useCallback(() => void actions.duplicate(), [actions]);
   const handleExport = useCallback(() => void actions.export(), [actions]);

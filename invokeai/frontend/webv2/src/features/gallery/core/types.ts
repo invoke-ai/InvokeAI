@@ -35,6 +35,12 @@ export interface GeneratedVideoContract {
 
 export type GalleryView = 'images' | 'assets';
 
+/** What the gallery needs to know about a project to group its boards: the id boards carry, and a name. */
+export interface GalleryProjectRef {
+  id: string;
+  name: string;
+}
+
 export type GalleryOrderDir = 'ASC' | 'DESC';
 
 export type GalleryBoardOrderBy = 'created_at' | 'board_name';
@@ -58,12 +64,18 @@ export interface GalleryBoard {
   coverThumbnailUrl?: string;
   /** ISO creation timestamp; absent for uncategorized and date virtual boards. */
   createdAt?: string | null;
+  /** The owner's user id; a project only ever holds its owner's boards. */
+  ownerId?: string;
   ownerName?: string | null;
   /**
-   * Project ownership controls naming and deletion; generic board actions must exclude all project-owned boards.
-   * Null denotes an ordinary board.
+   * The project this board belongs to; null is the Library. Members are ordinary boards; only the inbox is
+   * managed through its project.
    */
   projectId: string | null;
+  /** Its project's inbox: named after the project and only renamed, archived, moved or deleted through it. */
+  isInbox: boolean;
+  /** Who besides its owner can see it; only a private board can join a project. Absent reads as private. */
+  visibility?: 'private' | 'shared' | 'public';
 }
 
 export interface GalleryImage extends GeneratedImageContract {

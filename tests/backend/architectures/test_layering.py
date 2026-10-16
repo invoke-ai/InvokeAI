@@ -18,6 +18,10 @@ import ast
 from collections.abc import Iterable
 from pathlib import Path
 
+import pytest
+
+pytestmark = pytest.mark.platform_independent
+
 REPO_ROOT = Path(__file__).parents[3]
 ARCH = "invokeai.backend.architectures"
 ARCH_DIR = "invokeai/backend/architectures"

@@ -6,6 +6,7 @@ import textwrap
 import pytest
 
 
+@pytest.mark.platform_independent
 @pytest.mark.parametrize("planner_first", [True, False])
 def test_planner_import_boundary(planner_first: bool) -> None:
     script = textwrap.dedent(

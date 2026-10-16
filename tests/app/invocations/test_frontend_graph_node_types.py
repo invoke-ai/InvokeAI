@@ -6,11 +6,12 @@ schema, so a node type or field that moves, is renamed, or loses its module impo
 suite sees that on its own: the frontend only knows the strings it emits, and the backend only knows
 the invocations it has.
 
-The contracts in between are `generateGraphNodeTypes.json` and `videoGraphNodeTypes.json`, written
-by `graphCoverage.test.ts` and `videoGraphCoverage.test.ts` (regenerate with `vitest -u`). Each
-records every node type, every edge field, and every *literal* input value — the ones webv2 writes
-straight onto a node, with no edge to record them — that its compiler produces for every supported
-architecture. This module checks both against the real registry.
+The contracts in between are `generateGraphNodeTypes.json`, `videoGraphNodeTypes.json` and
+`upscaleGraphNodeTypes.json`, written by `graphCoverage.test.ts`, `videoGraphCoverage.test.ts` and
+`upscaleGraphCoverage.test.ts` (regenerate with `vitest -u`). Each records every node type, every
+edge field, and every *literal* input value — the ones webv2 writes straight onto a node, with no
+edge to record them — that its compiler produces for every supported architecture. This module
+checks all of them against the real registry.
 
 The literal values are checked against the field's own annotation, not merely against its name. That
 is where the frontend is blindest: it picks a scheduler from its own `FLOW_SCHEDULER_OPTIONS` while
@@ -34,14 +35,15 @@ _WEBV2 = Path(__file__).parents[3] / "invokeai" / "frontend" / "webv2" / "src" /
 CONTRACT_PATHS = {
     "generate": _WEBV2 / "generation" / "core" / "__snapshots__" / "generateGraphNodeTypes.json",
     "video": _WEBV2 / "video" / "core" / "__snapshots__" / "videoGraphNodeTypes.json",
+    "upscale": _WEBV2 / "upscale" / "core" / "__snapshots__" / "upscaleGraphNodeTypes.json",
 }
 
 CONTRACTS: dict[str, dict[str, Any]] = {
     name: json.loads(path.read_text(encoding="utf-8")) for name, path in CONTRACT_PATHS.items()
 }
 
-# The two panels compile different graphs from different tables, so each contract is checked on its
-# own; every assertion below is parameterized over both.
+# The panels compile different graphs from different tables, so each contract is checked on its
+# own; every assertion below is parameterized over all of them.
 BASE_CASES = [(name, base) for name, contract in CONTRACTS.items() for base in sorted(contract["byBase"])]
 NODE_CASES = [
     (name, node_type) for name, contract in CONTRACTS.items() for node_type in sorted(contract["fieldsByNodeType"])
@@ -101,14 +103,15 @@ def test_every_connection_the_panel_compiles_is_one_the_queue_will_accept(contra
 # The number of architectures each panel supports. A contract that silently stopped being
 # regenerated would make every assertion below vacuous, so the count is pinned: a new architecture
 # updates this number and the fixture in the same commit.
-SUPPORTED_BASE_COUNTS = {"generate": 15, "video": 3}
+SUPPORTED_BASE_COUNTS = {"generate": 15, "video": 3, "upscale": 5}
 
 # Floors separating "the fixture records literals" from "it records a fraction of them". Set just
 # under the current numbers (generate: 58 node types carrying 252 scalar values; video: 25 carrying
-# 142) rather than far below them: a recording bug that dropped most of the values while keeping the
-# names would otherwise leave every annotation check below passing over a short list. They are not
-# per-architecture expectations, so removing an architecture means lowering them deliberately.
-LITERAL_FLOORS = {"generate": (55, 240), "video": (23, 135)}
+# 142; upscale: 39 carrying 164) rather than far below them: a recording bug that dropped most of the
+# values while keeping the names would otherwise leave every annotation check below passing over a
+# short list. They are not per-architecture expectations, so removing an architecture means lowering
+# them deliberately.
+LITERAL_FLOORS = {"generate": (55, 240), "video": (23, 135), "upscale": (37, 155)}
 
 
 @pytest.mark.parametrize("contract", sorted(CONTRACTS), ids=lambda contract: contract)
@@ -175,15 +178,18 @@ def _annotation(cls: type[BaseInvocation], field_name: str) -> Any:
     return Annotated[(field.annotation, *field.metadata)] if field.metadata else field.annotation
 
 
-SILENTLY_IGNORED: dict[str, set[str]] = {
-    # `color_compensation` is a field of `i2l`, the *encode* node — legacy web sets it only there,
-    # on the img2img/inpaint/outpaint paths. webv2 writes it onto the `l2i` decode node instead
-    # (`graph.ts`, `l2iProps`), where no such field exists, so the Generate tab's SDXL colour
-    # -compensation toggle changes nothing about the generated image. Invocations ignore extra
-    # fields rather than rejecting them, which is why this never surfaced as an enqueue error.
-    "l2i": {"color_compensation"},
+SILENTLY_IGNORED: dict[str, dict[str, set[str]]] = {
+    "generate": {
+        # `color_compensation` is a field of `i2l`, the *encode* node — legacy web sets it only
+        # there, on the img2img/inpaint/outpaint paths. webv2 writes it onto the `l2i` decode node
+        # instead (`graph.ts`, `l2iProps`), where no such field exists, so the Generate tab's SDXL
+        # colour-compensation toggle changes nothing about the generated image. Invocations ignore
+        # extra fields rather than rejecting them, which is why this never surfaced as an enqueue
+        # error.
+        "l2i": {"color_compensation"},
+    },
 }
-"""Inputs webv2 writes that the invocation does not declare.
+"""Inputs webv2 writes that the invocation does not declare, per contract.
 
 Not an exemption list: the assertion below is an equality, so a new mismatch fails here and so does
 fixing one of these — the entry has to be deleted with the fix. Each is a silent no-op today,
@@ -201,7 +207,7 @@ def test_literal_inputs_are_real_invocation_fields(contract: str, node_type: str
         pytest.skip(f"'{node_type}' accepts extra fields by design")
 
     unknown = sorted(set(_fields(contract, node_type)["literalInputs"]) - set(cls.model_fields))
-    assert unknown == sorted(SILENTLY_IGNORED.get(node_type, set())), (
+    assert unknown == sorted(SILENTLY_IGNORED.get(contract, {}).get(node_type, set())), (
         f"webv2 sets inputs '{node_type}' does not declare: {unknown}. They are ignored rather than "
         f"rejected, so whatever they were meant to do silently does not happen."
     )

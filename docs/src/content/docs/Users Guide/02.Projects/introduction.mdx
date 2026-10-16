@@ -1,23 +1,23 @@
 ---
 title: Working with Projects
-description: Keep each piece of work in its own project, with its canvas, workflows, layout and board, and switch between them without losing your place.
-lastUpdated: 2026-09-29
+description: Keep each piece of work in its own project, with its canvas, workflows, layout and boards, and switch between them without losing your place.
+lastUpdated: 2026-10-08
 sidebar:
   order: 0
 ---
 import { Image } from 'astro:assets';
 import projectSwitcher from '../assets/project-switcher.webp';
 
-A **project** is a self-contained workspace. Everything you arrange while working on one idea stays together in it: the canvas and its layers, the workflows you have open, the panel layout, your prompt history, and a gallery board that collects the project's images and videos. Open the project again later, on the same computer or another one, and it comes back exactly as you left it.
+A **project** is a self-contained workspace. Everything you arrange while working on one idea stays together in it: the canvas and its layers, the workflows you have open, the panel layout, your prompt history, and the gallery boards that collect the project's images and videos. Open the project again later, on the same computer or another one, and it comes back exactly as you left it.
 
 Invoke saves projects automatically on the server, so there is no Save button to remember. You can keep several projects open at once and switch between them in a keystroke.
 
 ## Why use projects
 
 - **Pick up where you left off.** Closing the browser, reloading the page or moving to another computer does not lose your arrangement. The Home page offers your most recent project with a single **Resume** button.
-- **Keep unrelated work apart.** A character study, a product shoot and a video experiment can each have their own canvas, workflows, layout and board, instead of competing for one workspace.
-- **Switch without waiting.** Generations keep running when you switch to another project. Their results still land on the board of the project that started them.
-- **Find results easily.** Each project's images and videos collect on its own board, named after the project, rather than piling up in one long gallery.
+- **Keep unrelated work apart.** A character study, a product shoot and a video experiment can each have their own canvas, workflows, layout and boards, instead of competing for one workspace.
+- **Switch without waiting.** Generations keep running when you switch to another project. Their results still land in the project that started them.
+- **Find results easily.** Each project's images and videos collect in its own boards — an **Inbox** for new results, plus any boards you create inside it — rather than piling up in one long gallery.
 - **Back up and share work.** A project can be exported as a single `.invk` file that includes its images and videos, and imported on any Invoke installation.
 
 ## What a project keeps
@@ -28,9 +28,9 @@ Invoke saves projects automatically on the server, so there is no Save button to
 | Open workflows, and which one is active | Your workflow library |
 | Panel layout and floating widgets | Saved layout presets |
 | Prompt history, and the Invoke routing (source and destination) | Preferences, theme and hotkeys |
-| Widget settings, such as gallery filters | Boards other than the project's own |
+| Widget settings, such as gallery filters | Boards in the Library |
 | Project settings: **Use CPU noise**, **Antialias progress images** and the Preview's progress image toggle | Generate recipes |
-| The project's board and the images and videos on it | |
+| The project's boards and the images and videos on them | |
 
 In **Settings**, a badge next to each option says where it is stored: **Saved with this project**, **Saved with this widget in this project**, or **Saved in your preferences** for options that follow you across projects.
 
@@ -52,7 +52,7 @@ To create a project, click **New project**. The arrow beside it (**Choose how to
 
 The starting point only chooses the initial layout. Every tool remains available, and you can [rearrange the workspace](/users-guide/workbench/introduction/) at any time.
 
-New projects are called **Project Name #1**, **Project Name #2** and so on. Give yours a meaningful name early (see [Renaming](#renaming-duplicating-and-deleting)), because the name also labels the project's board in the gallery.
+New projects are called **Project Name #1**, **Project Name #2** and so on. Give yours a meaningful name early (see [Renaming](#renaming-duplicating-and-deleting)), because the name also heads the project's boards in the gallery.
 
 ## Switching between projects
 
@@ -74,15 +74,17 @@ The shortcut works even while you are typing in a prompt box. You can rebind it 
 
 ## Where your images go
 
-Every project owns a private board, created with the project and named after it. In the gallery it appears near the top, after **Uncategorized**, and always shows the current project name.
+Boards belong to projects. Every project has an **Inbox**, created with it, where new results land; you can add more boards to a project to sort its work, and they belong to that project alone. Boards that should be available from every project — reference photos, control images, style tests — live in the **Library**, which the gallery shows beneath the open project's boards.
 
-New results go to whichever board is selected in the gallery, so you can send a batch somewhere else when you want to. To send them to one board while you browse others, choose **Auto-add to this board** from that board's menu; see [Choosing where new media goes](/users-guide/gallery/introduction/#choosing-where-new-media-goes). When a project is first created, imported or duplicated, its own board is selected. If you choose a date view instead of a specific board, results still go to the project board. After that, the project remembers your choice of destination.
+The gallery's board list is grouped by this: first the open project's boards, headed by the project's name, with **Inbox** pinned at the top; then **Library**, with **Uncategorized** pinned at the top for media that is on no board. Each group has its own **+** button, so where a new board goes is decided by which one you press.
+
+New results go to whichever board is selected in the gallery, so you can send a batch somewhere else when you want to. To send them to one board while you browse others, choose **Auto-add to this board** from that board's menu; see [Choosing where new media goes](/users-guide/gallery/introduction/#choosing-where-new-media-goes). When a project is first created, imported or duplicated, its Inbox is selected. If you choose a date view instead of a specific board, results still go to the Inbox. After that, the project remembers your choice of destination.
 
 The destination is fixed when you press **Invoke**. Switching to a different project or board while a job runs does not redirect its results.
 
-Boards belonging to your other projects are hidden from the gallery to keep it focused. To see them, turn on **Other projects' boards** in the gallery's board filters. The setting is remembered separately for each project.
+Boards belonging to your other projects are hidden from the gallery to keep it focused. To see them, turn on **Other projects' boards** in the gallery's board filters: they appear under **Other projects**, grouped by project. The setting is remembered separately for each project.
 
-A project board is managed through its project: renaming the project renames the board, and the board has no rename, archive or delete commands of its own. Its menu offers **Export project (.invk)** instead.
+A project's Inbox is managed through its project: renaming the project renames it, and it cannot be renamed, moved, archived or deleted on its own. Its menu offers **Export project (.invk)** instead. The project's other boards are ordinary boards: rename, archive or delete them, or choose **Move to…** from their menu to move them to the Library or into another project.
 
 See [the gallery](/users-guide/gallery/introduction/) for more about boards.
 
@@ -117,14 +119,15 @@ Right-click a project, or use its **Actions** button, for **Open**, **Pin**, **R
 
 ### Renaming, duplicating and deleting
 
-**Rename…** changes the project name and the name of its board.
+**Rename…** changes the project name; its Inbox and the heading of its boards in the gallery follow.
 
-**Duplicate** creates a complete copy called "*name* copy", including copies of every image and video on the project's board. Use it to try a different direction without disturbing the original.
+**Duplicate** creates a complete copy called "*name* copy", including copies of every image and video on each of the project's boards. Use it to try a different direction without disturbing the original.
 
 **Delete…** removes the project permanently. There is no trash to recover it from.
 
 - The project's canvas, workflows, layout and settings are deleted.
-- Its board is deleted too, but **the images and videos on it are kept**: they move to **Uncategorized** in the gallery. Deleting a project never empties your gallery.
+- Its Inbox is deleted too, but **the images and videos on it are kept**: they move to **Uncategorized** in the gallery.
+- If the project has other boards, the dialog asks what to do with them: **keep them in the Library**, with everything on them, or **delete them too**, in which case their media also moves to Uncategorized. Deleting a project never empties your gallery.
 - A project that is still generating cannot be deleted until its runs finish.
 
 If you only want to tidy the switcher, **Close** the project instead of deleting it.
@@ -133,7 +136,7 @@ Generation also leaves temporary files behind in each project. **Delete intermed
 
 ## Exporting and importing
 
-**Export** packages a project into a single `.invk` file named after it. The file contains the project itself, every image and video on its board, and any other media the project uses, such as reference images, so it opens complete on another installation. Temporary intermediates are left out.
+**Export** packages a project into a single `.invk` file named after it. The file contains the project itself, every image and video on each of its boards, and any other media the project uses, such as reference images, so it opens complete on another installation, boards and all. Temporary intermediates are left out. If a board cannot be placed in the imported project, Invoke says so and leaves that board, with everything on it, in the Library, where you can move it in from its menu.
 
 Before exporting, Invoke asks whether to **Include font files** used by text layers. It is off by default. Leave it off unless you have permission to redistribute the fonts; recipients can install or replace missing fonts themselves.
 
@@ -151,11 +154,11 @@ In the Workflow Library dialog, **This project** lists the project's own workflo
 
 ## Making the most of projects
 
-- **One project per piece of work.** Create a project for each client job, series or experiment, rather than doing everything in one. Each keeps its own layout and board, so switching tasks means switching projects.
-- **Name projects as you create them.** Names make the Projects page searchable and label the boards in your gallery.
+- **One project per piece of work.** Create a project for each client job, series or experiment, rather than doing everything in one. Each keeps its own layout and boards, so switching tasks means switching projects.
+- **Name projects as you create them.** Names make the Projects page searchable and head the boards in your gallery.
 - **Pin what you're actively working on.** Pinned projects stay at the top of the Projects page no matter how many others you create.
 - **Duplicate before a big change.** A duplicate is cheap insurance when you want to explore a different direction.
-- **Queue work, then switch.** Start a long render or a batch, switch to another project with <kbd>Ctrl</kbd>+<kbd>P</kbd>, and keep working. The progress ring in the switcher shows when it is done, and the results wait on the original project's board. To see only the active project's jobs in the Queue widget, set **Show jobs from** to **Active project** in Settings.
+- **Queue work, then switch.** Start a long render or a batch, switch to another project with <kbd>Ctrl</kbd>+<kbd>P</kbd>, and keep working. The progress ring in the switcher shows when it is done, and the results wait in the original project's Inbox. To see only the active project's jobs in the Queue widget, set **Show jobs from** to **Active project** in Settings.
 - **Close projects you're not using.** It keeps the switcher short and costs nothing: the project stays in your library.
 - **Export milestones.** Exporting a `.invk` file gives you a self-contained snapshot to archive or share.
 - **Clean up occasionally.** Long-running projects accumulate temporary files; run **Delete intermediates…** from the project's menu to reclaim disk space.
