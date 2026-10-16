@@ -157,6 +157,23 @@ class Krea2ConditioningInfo:
 
 
 @dataclass
+class Flux3ConditioningInfo:
+    """FLUX.3 text conditioning from the Qwen3-VL 4B encoder.
+
+    Eight decoder hidden-state layers are stacked per token along the channel axis. There is no mask: the
+    prompt is right-padded to a multiple of 80 tokens and the FLUX.3 transformer attends to the padding,
+    so the padded window is part of the conditioning.
+    """
+
+    prompt_embeds: torch.Tensor
+    """Stacked Qwen3-VL hidden states. Shape: (batch_size, seq_len, 8 * hidden=20480)."""
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.prompt_embeds = self.prompt_embeds.to(device=device, dtype=dtype)
+        return self
+
+
+@dataclass
 class AnimaConditioningInfo:
     """Anima text conditioning information from Qwen3 0.6B encoder + T5-XXL tokenizer.
 
@@ -298,6 +315,7 @@ class ConditioningFieldData:
         | List[Ideogram4ConditioningInfo]
         | List[QwenImageConditioningInfo]
         | List[Krea2ConditioningInfo]
+        | List[Flux3ConditioningInfo]
         | List[AnimaConditioningInfo]
         | List[WanConditioningInfo]
         | List[MiniMaxH3ConditioningInfo]

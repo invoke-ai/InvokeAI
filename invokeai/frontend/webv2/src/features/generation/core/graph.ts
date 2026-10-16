@@ -12,9 +12,7 @@ import type {
   ComponentModelConfig,
   GenerateLora,
   GenerateModelConfig,
-  GenerateReferenceImage,
   GenerateReferenceImageAsset,
-  GenerateReferenceImageConfig,
   GenerateSettings,
   MainModelConfig,
 } from './types';
@@ -36,7 +34,7 @@ import {
   isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
   isIdeogram4Qwen3VlEncoder,
-  isKrea2Qwen3VlEncoder,
+  isQwen3Vl4bEncoder,
   isNonAnimaQwen3Encoder,
   isSelfContainedSDNQFlux1Pipeline,
   isVaeCompatibleWithGenerateModel,
@@ -53,7 +51,7 @@ import {
 } from './graphBuilder';
 import { addKrea2ConditioningEnhancers } from './krea2Conditioning';
 import { addPidDecode, getPidDenoiseSize, getPidMetadata, shouldUsePidDecode } from './pidGraph';
-import { getEffectiveReferenceImage } from './referenceImage';
+import { getEffectiveReferenceImage, getEnabledReferenceImages } from './referenceImage';
 
 const getCompatibleComponentSource = (
   settings: GenerateSettings,
@@ -73,17 +71,6 @@ const getCompatibleComponent = (
 const toImageField = (image: GenerateReferenceImageAsset) => ({
   image_name: getEffectiveReferenceImage(image).image_name,
 });
-
-const getEnabledReferenceImages = <T extends GenerateReferenceImageConfig['type']>(
-  settings: GenerateSettings,
-  type: T
-): Array<GenerateReferenceImage & { config: Extract<GenerateReferenceImageConfig, { type: T }> }> =>
-  settings.referenceImages.filter(
-    (
-      referenceImage
-    ): referenceImage is GenerateReferenceImage & { config: Extract<GenerateReferenceImageConfig, { type: T }> } =>
-      referenceImage.isEnabled && referenceImage.config.type === type && referenceImage.config.image !== null
-  );
 
 const addReferenceImageMetadata = (
   graph: BackendGraphContract,
@@ -114,7 +101,9 @@ const addIPAdapterReferenceImages = (
   model: MainModelConfig,
   denoise: BackendInvocationContract
 ) => {
-  const refs = getEnabledReferenceImages(settings, 'ip_adapter').filter((ref) => ref.config.model?.base === model.base);
+  const refs = getEnabledReferenceImages(settings.referenceImages, 'ip_adapter').filter(
+    (ref) => ref.config.model?.base === model.base
+  );
 
   if (refs.length === 0) {
     return;
@@ -161,7 +150,9 @@ const addFluxReduxReferenceImages = (
   model: MainModelConfig,
   denoise: BackendInvocationContract
 ) => {
-  const refs = getEnabledReferenceImages(settings, 'flux_redux').filter((ref) => ref.config.model?.base === model.base);
+  const refs = getEnabledReferenceImages(settings.referenceImages, 'flux_redux').filter(
+    (ref) => ref.config.model?.base === model.base
+  );
 
   if (refs.length === 0) {
     return;
@@ -196,7 +187,7 @@ const addFluxKontextReferenceImages = (
   denoise: BackendInvocationContract,
   type: 'flux2_reference_image' | 'flux_kontext_reference_image'
 ) => {
-  const refs = getEnabledReferenceImages(settings, type);
+  const refs = getEnabledReferenceImages(settings.referenceImages, type);
 
   if (refs.length === 0) {
     return;
@@ -971,7 +962,7 @@ const buildQwenImageGraph = (
 
   addEdge(graph, seed, 'value', denoise, 'seed');
   const qwenReferenceImages =
-    model.variant === 'edit' ? getEnabledReferenceImages(settings, 'qwen_image_reference_image') : [];
+    model.variant === 'edit' ? getEnabledReferenceImages(settings.referenceImages, 'qwen_image_reference_image') : [];
 
   if (qwenReferenceImages.length > 0) {
     let prevCollect: BackendInvocationContract | null = null;
@@ -1209,7 +1200,7 @@ const buildKrea2Graph = (
   // Standalone Krea needs a separate VAE/encoder without a component source.
   const isDiffusers = model.format === 'diffusers';
   const vaeModel = getCompatibleVae(settings, model);
-  const qwen3VlEncoderModel = getCompatibleComponent(settings.qwen3VLEncoderModel, isKrea2Qwen3VlEncoder);
+  const qwen3VlEncoderModel = getCompatibleComponent(settings.qwen3VLEncoderModel, isQwen3Vl4bEncoder);
 
   if (!isDiffusers) {
     requireComponent(vaeModel, 'Krea-2 VAE');
@@ -1281,6 +1272,85 @@ const buildKrea2Graph = (
     qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
     vae: vaeModel ?? undefined,
   });
+
+  return graph;
+};
+
+const buildFlux3Graph = (
+  settings: GenerateSettings,
+  model: MainModelConfig,
+  outputIsIntermediate: boolean,
+  projectSettings: GenerationProjectSettings
+): BackendGraphContract => {
+  // A single-file or GGUF FLUX.3 model is the transformer alone; a Diffusers one bundles the VAE and encoder.
+  const isDiffusers = model.format === 'diffusers';
+  const vaeModel = getCompatibleVae(settings, model);
+  const qwen3VlEncoderModel = getCompatibleComponent(settings.qwen3VLEncoderModel, isQwen3Vl4bEncoder);
+
+  if (!isDiffusers) {
+    requireComponent(vaeModel, 'FLUX.3 VAE');
+    requireComponent(qwen3VlEncoderModel, 'Qwen3-VL Encoder');
+  }
+
+  const graph: BackendGraphContract = { edges: [], id: createId('flux3_graph'), nodes: {} };
+  const { negativePrompt, positivePrompt, seed } = addPromptAndSeedNodes(graph);
+  // Klein Base takes CFG with a negative prompt; Klein (the flow map) samples at CFG 1 and takes neither.
+  const useCfg = settings.cfgScale > 1;
+  const modelLoader = addNode(graph, {
+    id: 'model_loader',
+    model,
+    qwen3_vl_encoder_model: qwen3VlEncoderModel ?? undefined,
+    type: 'flux3_model_loader',
+    vae_model: vaeModel ?? undefined,
+  });
+  const posCond = addNode(graph, { id: 'pos_cond', type: 'flux3_text_encoder' });
+  const negCond = useCfg ? addNode(graph, { id: 'neg_cond', type: 'flux3_text_encoder' }) : null;
+  const denoiseSize = getDenoiseSize(settings, model);
+  const denoise = addNode(graph, {
+    cfg_scale: settings.cfgScale,
+    denoising_end: 1,
+    denoising_start: 0,
+    height: denoiseSize.height,
+    id: 'denoise_latents',
+    steps: settings.steps,
+    type: 'flux3_denoise',
+    width: denoiseSize.width,
+  });
+  // FLUX.3 decodes with the FLUX.2 VAE, so it reuses FLUX.2's decode node and PiD decoders.
+  const output = addDecodeOutput({
+    denoise,
+    graph,
+    l2iType: 'flux2_vae_decode',
+    model,
+    outputIsIntermediate,
+    positivePrompt,
+    seed,
+    settings,
+    vaeSource: modelLoader,
+  });
+
+  addEdge(graph, modelLoader, 'transformer', denoise, 'transformer');
+  addEdge(graph, modelLoader, 'qwen3_vl_encoder', posCond, 'qwen3_vl_encoder');
+  addEdge(graph, modelLoader, 'vae', denoise, 'vae');
+  addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
+  addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
+
+  if (negCond) {
+    addEdge(graph, modelLoader, 'qwen3_vl_encoder', negCond, 'qwen3_vl_encoder');
+    addEdge(graph, negativePrompt, 'value', negCond, 'prompt');
+    addEdge(graph, negCond, 'conditioning', denoise, 'negative_conditioning');
+  }
+
+  addEdge(graph, seed, 'value', denoise, 'seed');
+  addFluxKontextReferenceImages(graph, settings, denoise, 'flux2_reference_image');
+  addMetadata(graph, output, settings, model, 'flux3_txt2img', projectSettings, {
+    // FLUX.3 offers no scheduler: its denoise node always runs the reference Euler sampler.
+    scheduler: 'euler',
+    qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
+    vae: vaeModel ?? undefined,
+    ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
+  });
+  addReferenceImageMetadata(graph, output, settings);
 
   return graph;
 };
@@ -1475,7 +1545,7 @@ const buildExternalGraph = (
     addEdge(graph, seed, 'value', output, 'seed');
   }
   if (model.capabilities?.supports_reference_images === true) {
-    const referenceImages = getEnabledReferenceImages(settings, 'external_reference_image')
+    const referenceImages = getEnabledReferenceImages(settings.referenceImages, 'external_reference_image')
       .map((referenceImage) => referenceImage.config.image)
       .filter((image): image is GenerateReferenceImageAsset => image !== null)
       .map(toImageField);
@@ -1510,6 +1580,7 @@ export const GRAPH_BUILDERS = {
   'z-image': buildZImageGraph,
   'ideogram-4': buildIdeogram4Graph,
   'krea-2': buildKrea2Graph,
+  flux3: buildFlux3Graph,
   anima: buildAnimaGraph,
   wan: buildWanGraph,
 } satisfies Record<SupportedGenerateBase, GenerateGraphBuilder>;

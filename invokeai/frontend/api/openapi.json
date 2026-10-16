@@ -1422,6 +1422,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_Flux3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
                     },
                     {
@@ -1464,6 +1467,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_Krea2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Flux3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
                     },
                     {
@@ -1492,6 +1498,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Flux3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
@@ -1904,6 +1913,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_Flux3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
                     },
                     {
@@ -1946,6 +1958,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_Krea2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Flux3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
                     },
                     {
@@ -1974,6 +1989,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Flux3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
@@ -2386,6 +2404,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_Flux3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
                     },
                     {
@@ -2428,6 +2449,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_Krea2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Flux3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
                     },
                     {
@@ -2456,6 +2480,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Flux3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
@@ -2913,6 +2940,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_Flux3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
                     },
                     {
@@ -2955,6 +2985,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_Krea2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Flux3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
                     },
                     {
@@ -2983,6 +3016,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Flux3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
@@ -3467,6 +3503,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_Flux3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
                     },
                     {
@@ -3509,6 +3548,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_Krea2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Flux3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
                     },
                     {
@@ -3537,6 +3579,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Flux3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
@@ -4893,6 +4938,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_Flux3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
                     },
                     {
@@ -4935,6 +4983,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_Krea2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Flux3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
                     },
                     {
@@ -4963,6 +5014,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Flux3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
@@ -19493,6 +19547,9 @@
             "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
           },
           {
+            "$ref": "#/components/schemas/Main_Diffusers_Flux3_Config"
+          },
+          {
             "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
           },
           {
@@ -19535,6 +19592,9 @@
             "$ref": "#/components/schemas/Main_Checkpoint_Krea2_Config"
           },
           {
+            "$ref": "#/components/schemas/Main_Checkpoint_Flux3_Config"
+          },
+          {
             "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
           },
           {
@@ -19563,6 +19623,9 @@
           },
           {
             "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Main_GGUF_Flux3_Config"
           },
           {
             "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
@@ -20601,6 +20664,7 @@
           "sdxl-refiner",
           "flux",
           "flux2",
+          "flux3",
           "cogview4",
           "z-image",
           "ernie-image",
@@ -28819,6 +28883,10 @@
                   "krea2_img2img",
                   "krea2_inpaint",
                   "krea2_outpaint",
+                  "flux3_txt2img",
+                  "flux3_img2img",
+                  "flux3_inpaint",
+                  "flux3_outpaint",
                   "wan_txt2img",
                   "wan_img2img",
                   "wan_inpaint",
@@ -37519,6 +37587,516 @@
         "title": "Flux2VariantType",
         "description": "FLUX.2 model variants."
       },
+      "Flux3ConditioningField": {
+        "description": "A FLUX.3 conditioning tensor primitive value",
+        "properties": {
+          "conditioning_name": {
+            "description": "The name of conditioning tensor",
+            "title": "Conditioning Name",
+            "type": "string"
+          }
+        },
+        "required": ["conditioning_name"],
+        "title": "Flux3ConditioningField",
+        "type": "object"
+      },
+      "Flux3ConditioningOutput": {
+        "class": "output",
+        "description": "Base class for nodes that output a FLUX.3 conditioning tensor.",
+        "properties": {
+          "conditioning": {
+            "$ref": "#/components/schemas/Flux3ConditioningField",
+            "description": "Conditioning tensor",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "flux3_conditioning_output",
+            "default": "flux3_conditioning_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "conditioning", "type", "type"],
+        "title": "Flux3ConditioningOutput",
+        "type": "object"
+      },
+      "Flux3DenoiseInvocation": {
+        "category": "latents",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Run the denoising process with a FLUX.3 Image transformer (Klein or Klein Base).\n\nKlein is step-distilled (a flow map) and samples without CFG; Klein Base takes CFG with a negative\nconditioning. Reference images condition an edit: describe the result in the prompt and refer to them as\n<ref_image_0>, <ref_image_1>, ... in the order they are connected.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "denoise_mask": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DenoiseMaskField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A mask of the region to apply the denoising process to. Values of 0.0 represent the regions to be fully denoised, and 1.0 represent the regions to be preserved.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "denoising_start": {
+            "default": 0.0,
+            "description": "When to start denoising, expressed a percentage of total steps",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1,
+            "minimum": 0,
+            "orig_default": 0.0,
+            "orig_required": false,
+            "title": "Denoising Start",
+            "type": "number"
+          },
+          "denoising_end": {
+            "default": 1.0,
+            "description": "When to stop denoising, expressed a percentage of total steps",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1,
+            "minimum": 0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "Denoising End",
+            "type": "number"
+          },
+          "add_noise": {
+            "default": true,
+            "description": "Add noise based on denoising start.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": true,
+            "orig_required": false,
+            "title": "Add Noise",
+            "type": "boolean"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "FLUX.3 model (Transformer) to load",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Transformer"
+          },
+          "positive_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Flux3ConditioningField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Positive conditioning tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "negative_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Flux3ConditioningField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Negative conditioning. Used by Klein Base when CFG Scale is above 1.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "cfg_scale": {
+            "default": 1.0,
+            "description": "Classifier-free guidance scale for Klein Base (3.5 recommended); 1 disables it. Klein takes no CFG.",
+            "field_kind": "input",
+            "input": "any",
+            "minimum": 1.0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "CFG Scale",
+            "type": "number"
+          },
+          "width": {
+            "default": 1024,
+            "description": "Width of the generated image.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "default": 1024,
+            "description": "Height of the generated image.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Height",
+            "type": "integer"
+          },
+          "steps": {
+            "default": 16,
+            "description": "Number of denoising steps: 16 for Klein (4-16 work), 50 for Klein Base.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 16,
+            "orig_required": false,
+            "title": "Steps",
+            "type": "integer"
+          },
+          "seed": {
+            "default": 0,
+            "description": "Randomness seed for reproducibility.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The FLUX.2 VAE: its latent statistics, and the encoder for reference images.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "kontext_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FluxKontextConditioningField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FluxKontextConditioningField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Reference images to edit or combine (up to 10).",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Reference Images"
+          },
+          "type": {
+            "const": "flux3_denoise",
+            "default": "flux3_denoise",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["image", "flux3", "flux", "denoise"],
+        "title": "Denoise - FLUX.3",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/LatentsOutput"
+        }
+      },
+      "Flux3ModelLoaderInvocation": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Loads a FLUX.3 Image model (Klein or Klein Base), outputting its submodels.\n\nA Diffusers model brings its own VAE (the FLUX.2 VAE) and Qwen3-VL 4B text encoder; a single-file or GGUF\nmodel is only the transformer and needs both picked separately. A standalone pick overrides the bundled\ncomponent.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "model": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "FLUX.3 model (Transformer) to load",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Transformer",
+            "ui_model_base": ["flux3"],
+            "ui_model_type": ["main"]
+          },
+          "vae_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone VAE (the FLUX.2 VAE, which FLUX.3 shares). Required when Model is a single file; otherwise an override for the bundled VAE.",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "VAE",
+            "ui_model_base": ["flux2"],
+            "ui_model_type": ["vae"]
+          },
+          "qwen3_vl_encoder_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone Qwen3-VL 4B encoder. Required when Model is a single file; otherwise an override for the encoder bundled in the Diffusers model.",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Qwen3-VL Encoder",
+            "ui_model_base": ["any"],
+            "ui_model_type": ["qwen3_vl_encoder"]
+          },
+          "type": {
+            "const": "flux3_model_loader",
+            "default": "flux3_model_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["model", "type", "id"],
+        "tags": ["model", "flux3", "flux"],
+        "title": "Main Model - FLUX.3",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/Flux3ModelLoaderOutput"
+        }
+      },
+      "Flux3ModelLoaderOutput": {
+        "class": "output",
+        "description": "FLUX.3 model loader output.",
+        "properties": {
+          "transformer": {
+            "$ref": "#/components/schemas/TransformerField",
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "Transformer",
+            "ui_hidden": false
+          },
+          "qwen3_vl_encoder": {
+            "$ref": "#/components/schemas/Qwen3VLEncoderField",
+            "description": "Qwen3-VL tokenizer and text encoder",
+            "field_kind": "output",
+            "title": "Qwen3-VL Encoder",
+            "ui_hidden": false
+          },
+          "vae": {
+            "$ref": "#/components/schemas/VAEField",
+            "description": "VAE",
+            "field_kind": "output",
+            "title": "VAE",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "flux3_model_loader_output",
+            "default": "flux3_model_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "qwen3_vl_encoder", "vae", "type", "type"],
+        "title": "Flux3ModelLoaderOutput",
+        "type": "object"
+      },
+      "Flux3TextEncoderInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Encodes a prompt for FLUX.3 with the Qwen3-VL 4B text encoder.\n\nEight decoder layers are stacked per token. Write the prompt as a full description of the image; when\nediting, describe the result and refer to reference images as <ref_image_0>, <ref_image_1>, ... in the\norder they are connected.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Text prompt describing the desired image.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Prompt",
+            "ui_component": "textarea"
+          },
+          "qwen3_vl_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Qwen3VLEncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen3-VL tokenizer and text encoder",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Qwen3-VL Encoder"
+          },
+          "type": {
+            "const": "flux3_text_encoder",
+            "default": "flux3_text_encoder",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["prompt", "conditioning", "flux3", "flux"],
+        "title": "Prompt - FLUX.3",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/Flux3ConditioningOutput"
+        }
+      },
+      "Flux3VariantType": {
+        "type": "string",
+        "enum": ["flux3_klein", "flux3_klein_base"],
+        "title": "Flux3VariantType",
+        "description": "FLUX.3 Image variants, by how the transformer is sampled.\n\nThe values carry a ``flux3_`` prefix: variant strings are resolved without their base, and ``klein_*``\nalready belongs to FLUX.2."
+      },
       "FluxConditioningCollectionOutput": {
         "class": "output",
         "description": "Base class for nodes that output a collection of conditioning tensors",
@@ -42957,6 +43535,15 @@
                   "$ref": "#/components/schemas/Flux2VaeEncodeInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/Flux3DenoiseInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/Flux3ModelLoaderInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/Flux3TextEncoderInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/FluxControlLoRALoaderInvocation"
                 },
                 {
@@ -43873,6 +44460,12 @@
                 },
                 {
                   "$ref": "#/components/schemas/Flux2KleinModelLoaderOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/Flux3ConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/Flux3ModelLoaderOutput"
                 },
                 {
                   "$ref": "#/components/schemas/FluxConditioningCollectionOutput"
@@ -53236,6 +53829,15 @@
                 "$ref": "#/components/schemas/Flux2VaeEncodeInvocation"
               },
               {
+                "$ref": "#/components/schemas/Flux3DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3TextEncoderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/FluxControlLoRALoaderInvocation"
               },
               {
@@ -54150,6 +54752,12 @@
                 "$ref": "#/components/schemas/Flux2KleinModelLoaderOutput"
               },
               {
+                "$ref": "#/components/schemas/Flux3ConditioningOutput"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3ModelLoaderOutput"
+              },
+              {
                 "$ref": "#/components/schemas/FluxConditioningCollectionOutput"
               },
               {
@@ -54828,6 +55436,15 @@
               },
               {
                 "$ref": "#/components/schemas/Flux2VaeEncodeInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3TextEncoderInvocation"
               },
               {
                 "$ref": "#/components/schemas/FluxControlLoRALoaderInvocation"
@@ -55942,6 +56559,15 @@
           "flux2_vae_encode": {
             "$ref": "#/components/schemas/LatentsOutput"
           },
+          "flux3_denoise": {
+            "$ref": "#/components/schemas/LatentsOutput"
+          },
+          "flux3_model_loader": {
+            "$ref": "#/components/schemas/Flux3ModelLoaderOutput"
+          },
+          "flux3_text_encoder": {
+            "$ref": "#/components/schemas/Flux3ConditioningOutput"
+          },
           "flux_control_lora_loader": {
             "$ref": "#/components/schemas/FluxControlLoRALoaderOutput"
           },
@@ -56804,6 +57430,9 @@
           "flux2_pid_decode",
           "flux2_vae_decode",
           "flux2_vae_encode",
+          "flux3_denoise",
+          "flux3_model_loader",
+          "flux3_text_encoder",
           "flux_control_lora_loader",
           "flux_controlnet",
           "flux_denoise",
@@ -57404,6 +58033,15 @@
               },
               {
                 "$ref": "#/components/schemas/Flux2VaeEncodeInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3TextEncoderInvocation"
               },
               {
                 "$ref": "#/components/schemas/FluxControlLoRALoaderInvocation"
@@ -58634,6 +59272,15 @@
               },
               {
                 "$ref": "#/components/schemas/Flux2VaeEncodeInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3TextEncoderInvocation"
               },
               {
                 "$ref": "#/components/schemas/FluxControlLoRALoaderInvocation"
@@ -71823,6 +72470,175 @@
         "title": "Main_Checkpoint_Flux2_Config",
         "description": "Model config for FLUX.2 checkpoint models (e.g. Klein)."
       },
+      "Main_Checkpoint_Flux3_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "flux3",
+            "title": "Base",
+            "default": "flux3"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/Flux3VariantType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format",
+          "variant"
+        ],
+        "title": "Main_Checkpoint_Flux3_Config",
+        "description": "Model config for FLUX.3 Image single-file transformers (BFL `model.safetensors`, ComfyUI bf16)."
+      },
       "Main_Checkpoint_Ideogram4_Config": {
         "properties": {
           "key": {
@@ -74359,6 +75175,167 @@
         "title": "Main_Diffusers_Flux2_Config",
         "description": "Model config for FLUX.2 models in diffusers format (FLUX.2 Klein and FLUX.2 [dev])."
       },
+      "Main_Diffusers_Flux3_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "diffusers",
+            "title": "Format",
+            "default": "diffusers"
+          },
+          "repo_variant": {
+            "$ref": "#/components/schemas/ModelRepoVariant",
+            "default": ""
+          },
+          "base": {
+            "type": "string",
+            "const": "flux3",
+            "title": "Base",
+            "default": "flux3"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/Flux3VariantType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "repo_variant",
+          "base",
+          "variant"
+        ],
+        "title": "Main_Diffusers_Flux3_Config",
+        "description": "Model config for FLUX.3 Image diffusers models (Klein and Klein Base).\n\nFLUX.3 ships as a Modular Diffusers pipeline: the root config is `modular_model_index.json`. The Hub\nrepositories also hold BFL's own single-file package at the root (`model.safetensors`, a BFL-format\n`config.json`, `ae.safetensors`) and quantized `variants/`; none of them is read here."
+      },
       "Main_Diffusers_Ideogram4_Config": {
         "properties": {
           "key": {
@@ -76871,6 +77848,175 @@
         ],
         "title": "Main_GGUF_Flux2_Config",
         "description": "Model config for GGUF-quantized FLUX.2 checkpoint models (e.g. Klein)."
+      },
+      "Main_GGUF_Flux3_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "flux3",
+            "title": "Base",
+            "default": "flux3"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/Flux3VariantType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format",
+          "variant"
+        ],
+        "title": "Main_GGUF_Flux3_Config",
+        "description": "Model config for GGUF-quantized FLUX.3 Image transformers (single-file)."
       },
       "Main_GGUF_Ideogram4_Config": {
         "properties": {
@@ -85404,6 +86550,9 @@
                 "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_Flux3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
               },
               {
@@ -85446,6 +86595,9 @@
                 "$ref": "#/components/schemas/Main_Checkpoint_Krea2_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Checkpoint_Flux3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
               },
               {
@@ -85474,6 +86626,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_GGUF_Flux3_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
@@ -86132,6 +87287,9 @@
                     "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_Diffusers_Flux3_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
                   },
                   {
@@ -86174,6 +87332,9 @@
                     "$ref": "#/components/schemas/Main_Checkpoint_Krea2_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_Checkpoint_Flux3_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
                   },
                   {
@@ -86202,6 +87363,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_GGUF_Flux3_Config"
                   },
                   {
                     "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
@@ -86745,6 +87909,9 @@
                 "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_Flux3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
               },
               {
@@ -86787,6 +87954,9 @@
                 "$ref": "#/components/schemas/Main_Checkpoint_Krea2_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Checkpoint_Flux3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
               },
               {
@@ -86815,6 +87985,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_GGUF_Flux3_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
@@ -87214,6 +88387,9 @@
                 "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_Flux3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
               },
               {
@@ -87256,6 +88432,9 @@
                 "$ref": "#/components/schemas/Main_Checkpoint_Krea2_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Checkpoint_Flux3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
               },
               {
@@ -87284,6 +88463,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_GGUF_Flux3_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
@@ -87920,6 +89102,9 @@
                 "$ref": "#/components/schemas/Flux2VariantType"
               },
               {
+                "$ref": "#/components/schemas/Flux3VariantType"
+              },
+              {
                 "$ref": "#/components/schemas/ZImageVariantType"
               },
               {
@@ -88173,6 +89358,9 @@
                   "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/Main_Diffusers_Flux3_Config"
+                },
+                {
                   "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
                 },
                 {
@@ -88215,6 +89403,9 @@
                   "$ref": "#/components/schemas/Main_Checkpoint_Krea2_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/Main_Checkpoint_Flux3_Config"
+                },
+                {
                   "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
                 },
                 {
@@ -88243,6 +89434,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Main_GGUF_Krea2_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Main_GGUF_Flux3_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Main_GGUF_Ideogram4_Config"
@@ -101214,6 +102408,9 @@
                 "$ref": "#/components/schemas/Flux2VariantType"
               },
               {
+                "$ref": "#/components/schemas/Flux3VariantType"
+              },
+              {
                 "$ref": "#/components/schemas/ZImageVariantType"
               },
               {
@@ -101402,6 +102599,9 @@
               },
               {
                 "$ref": "#/components/schemas/Flux2VariantType"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3VariantType"
               },
               {
                 "$ref": "#/components/schemas/ZImageVariantType"
@@ -102676,6 +103876,9 @@
               },
               {
                 "$ref": "#/components/schemas/Flux2VariantType"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3VariantType"
               },
               {
                 "$ref": "#/components/schemas/ZImageVariantType"

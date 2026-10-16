@@ -13,7 +13,7 @@ remote repo.
 """
 
 from pathlib import Path
-from typing import List, Literal, Optional, Union
+from typing import Any, List, Literal, Optional, Union
 
 from huggingface_hub import hf_hub_url
 from pydantic import BaseModel, Field, TypeAdapter
@@ -136,8 +136,32 @@ class HuggingFaceMetadata(ModelMetadataWithFiles):
             submodels = resp.json()
             paths = [Path(subfolder or "", x) for x in paths if Path(x).parent.as_posix() in submodels]
             paths.insert(0, Path(f"{prefix}model_index.json"))
+        elif not prefix and Path("modular_model_index.json") in paths:
+            # A Modular Diffusers repo names its components in modular_model_index.json instead. Each one
+            # says which folder it loads from -- FLUX.3's tokenizer lives in `text_encoder/` -- and anything
+            # else in the repo (FLUX.3 also ships BFL's own single-file package at the root) is not part of it.
+            url = hf_hub_url(self.id, filename="modular_model_index.json")
+            try:
+                resp = session.get(url, timeout=HF_METADATA_REQUEST_TIMEOUT_SECONDS)
+            except RequestException as e:
+                raise ModelMetadataUnavailableError(f"Could not fetch modular model index for '{self.id}'") from e
+            resp.raise_for_status()
+            component_folders = _modular_component_folders(resp.json())
+            paths = [x for x in paths if Path(x).parent.as_posix() in component_folders]
+            paths.insert(0, Path("modular_model_index.json"))
 
         return [x for x in self.files if x.path in paths]
+
+
+def _modular_component_folders(index: dict[str, Any]) -> set[str]:
+    """The folders the components of a ``modular_model_index.json`` load from."""
+    folders: set[str] = set()
+    for name, spec in index.items():
+        if name.startswith("_"):
+            continue
+        load_spec = spec[2] if isinstance(spec, list) and len(spec) > 2 and isinstance(spec[2], dict) else {}
+        folders.add(str(load_spec.get("subfolder") or name))
+    return folders
 
 
 AnyModelRepoMetadata = Annotated[Union[BaseMetadata, HuggingFaceMetadata], Field(discriminator="type")]

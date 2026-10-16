@@ -57,6 +57,8 @@ DECLARED_LATENT_SPACES: dict[BaseModelType, tuple[LatentSpace, ...]] = {
     BaseModelType.ErnieImage: (FLUX2_32,),
     BaseModelType.Flux: (FLUX_16,),
     BaseModelType.Flux2: (FLUX2_32,),
+    # The FLUX.3 VAE is byte-identical to FLUX.2's.
+    BaseModelType.Flux3: (FLUX2_32,),
     # The one row the `if/elif` chain cannot corroborate: it had no Ideogram 4 branch and would
     # have raised "Unsupported base model" here. The second, divergent copy of the projection is
     # the source instead -- `ideogram4_denoise.py` at the same revision built its own preview from

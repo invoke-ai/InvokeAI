@@ -9,6 +9,7 @@ which requires a separate Kontext model).
 """
 
 import math
+from typing import Literal
 
 import torch
 import torch.nn.functional as F
@@ -19,9 +20,14 @@ from PIL import Image
 from invokeai.app.invocations.fields import FluxKontextConditioningField
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.flux2.latent_norm import bn_normalize
 from invokeai.backend.flux2.sampling_utils import pack_flux2
+from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux2
+from invokeai.backend.util.vae_working_memory import (
+    estimate_vae_working_memory_flux2,
+    flux2_vae_attention_materializes,
+)
 
 # Maximum pixel counts for reference images (matches BFL FLUX.2 sampling.py)
 # Single reference image: 2024² pixels, Multiple: 1024² pixels
@@ -30,6 +36,11 @@ MAX_PIXELS_MULTI_REF = 1024**2  # ~1M pixels
 
 # Tile size (in pixels) forced on the VAE for reference-image encoding, see _prepare_ref_images().
 REF_ENCODE_TILE_SIZE = 512
+# An untiled reference encode is taken only while its estimated peak stays within this share of the device's
+# memory. The rest is for what the cache cannot evict for it: the VAE itself, models locked by the running
+# graph, the CUDA context and allocator slack. A 1 MP reference (estimated 2.2 GB, measured 2.1 on an RTX 4090)
+# stays untiled on an 8 GB card; a 4 MP one (8.6 GB, measured 8.3) is tiled there and untiled on a 24 GB card.
+UNTILED_REF_ENCODE_MAX_VRAM_FRACTION = 0.5
 
 
 def resize_image_to_max_pixels(image: Image.Image, max_pixels: int) -> Image.Image:
@@ -60,6 +71,99 @@ def resize_image_to_max_pixels(image: Image.Image, max_pixels: int) -> Image.Ima
     new_height = max(1, new_height)
 
     return image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+
+def reference_encode_tile_size(
+    image_tensor: torch.Tensor,
+    vae: torch.nn.Module,
+    device: torch.device,
+    tiling: Literal["always", "if_attention_materializes"],
+) -> int | None:
+    """The tile size a reference encode runs at, or None for an untiled encode.
+
+    ``"if_attention_materializes"`` encodes untiled unless the mid-block attention would materialize its score
+    matrix (ROCm, MPS) or the untiled peak would not fit the device (see UNTILED_REF_ENCODE_MAX_VRAM_FRACTION).
+    """
+    if tiling == "always" or flux2_vae_attention_materializes(image_tensor, vae, device):
+        return REF_ENCODE_TILE_SIZE
+    if device.type == "cuda":
+        total_memory = torch.cuda.get_device_properties(device).total_memory
+    elif device.type == "xpu":
+        total_memory = int(torch.xpu.get_device_properties(device).total_memory)
+    else:
+        return None  # CPU encodes in system RAM.
+    untiled_estimate = estimate_vae_working_memory_flux2(
+        operation="encode", image_tensor=image_tensor, vae=vae, tile_size=None, device=device
+    )
+    return None if untiled_estimate <= total_memory * UNTILED_REF_ENCODE_MAX_VRAM_FRACTION else REF_ENCODE_TILE_SIZE
+
+
+def encode_reference_image(
+    vae_info: LoadedModel,
+    image: Image.Image,
+    tiling: Literal["always", "if_attention_materializes"] = "always",
+) -> torch.Tensor:
+    """Encode one RGB reference image with the FLUX.2 VAE into unpacked ``(1, 32, H/8, W/8)`` latents.
+
+    Shared by FLUX.2 and FLUX.3, which encode with the same autoencoder. The encode uses the latent
+    distribution's mode, so it is deterministic.
+
+    A tiled encode is not the untiled one: each tile's mid-block attention sees only that tile, which moves
+    every token, not just the seams (measured on a 1024 px image: RMS error 0.21 against a token RMS of 0.97).
+    ``"if_attention_materializes"`` encodes untiled where SDPA runs the attention fused (CUDA), as the
+    reference pipelines do, and tiles where it would materialize the score matrix (ROCm, MPS) or where the
+    untiled peak would not fit the device (see `reference_encode_tile_size`).
+    """
+    # Convert from [0, 1] to the [-1, 1] range the VAE expects, and add a batch dimension.
+    image_tensor = T.ToTensor()(image) * 2.0 - 1.0
+    image_tensor = image_tensor.unsqueeze(0)
+
+    device = TorchDevice.choose_torch_device()
+    tile_size = reference_encode_tile_size(image_tensor, vae_info.model, device, tiling)
+
+    # A tiled encode peaks at one tile; tell the cache up front so it frees the room instead of hitting the
+    # shortfall as an OOM.
+    estimated_working_memory = estimate_vae_working_memory_flux2(
+        operation="encode",
+        image_tensor=image_tensor,
+        vae=vae_info.model,
+        tile_size=tile_size,
+        device=device,
+    )
+
+    with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
+        vae_dtype = next(iter(vae.parameters())).dtype
+        image_tensor = image_tensor.to(device=device, dtype=vae_dtype)
+
+        # Where SDPA materializes the encoder mid-block's attention matrix (ROCm, MPS), an untiled
+        # encode grows quadratically -- ~15GB at 1024px, hundreds of GB at the 2024px reference cap;
+        # on CUDA it stays linear but can still outgrow a small card (see reference_encode_tile_size).
+        # A tiled encode is bounded by one tile. The VAE's default tile size equals its sample_size
+        # (1024), which still OOMs per tile where the matrix materializes, so force a 512px tile.
+        # Save/restore the tiling config because this VAE is a shared, cached instance (e.g.
+        # the final image decode must not inherit these settings).
+        downsample = 2 ** (len(vae.config.block_out_channels) - 1)
+        prev_tiling = (vae.use_tiling, vae.tile_sample_min_size, vae.tile_latent_min_size)
+        vae.use_tiling = tile_size is not None
+        if tile_size is not None:
+            vae.tile_sample_min_size = tile_size
+            vae.tile_latent_min_size = tile_size // downsample
+        try:
+            latent_dist = vae.encode(image_tensor, return_dict=False)[0]
+
+            # Use mode() for deterministic encoding (no sampling)
+            if hasattr(latent_dist, "mode"):
+                latents = latent_dist.mode()
+            elif hasattr(latent_dist, "sample"):
+                latents = latent_dist.sample()
+            else:
+                latents = latent_dist
+        finally:
+            vae.use_tiling, vae.tile_sample_min_size, vae.tile_latent_min_size = prev_tiling
+
+        TorchDevice.empty_cache()
+
+    return latents
 
 
 def generate_img_ids_flux2_with_offset(
@@ -162,22 +266,6 @@ class Flux2RefImageExtension:
         # Pre-process and cache the reference image latents and ids upon initialization
         self.ref_image_latents, self.ref_image_ids = self._prepare_ref_images()
 
-    def _bn_normalize(self, x: torch.Tensor) -> torch.Tensor:
-        """Apply BN normalization to packed latents.
-
-        BN formula (affine=False): y = (x - mean) / std
-
-        Args:
-            x: Packed latents of shape (B, seq, 128).
-
-        Returns:
-            Normalized latents of same shape.
-        """
-        assert self._bn_mean is not None and self._bn_std is not None
-        bn_mean = self._bn_mean.to(x.device, x.dtype)
-        bn_std = self._bn_std.to(x.device, x.dtype)
-        return (x - bn_mean) / bn_std
-
     def _prepare_ref_images(self) -> tuple[torch.Tensor, torch.Tensor]:
         """Encode reference images and prepare their concatenated latents and IDs with spatial tiling."""
         all_latents = []
@@ -200,56 +288,7 @@ class Flux2RefImageExtension:
             # Resize large images to max pixel count (matches BFL FLUX.2 sampling.py)
             image = resize_image_to_max_pixels(image, max_pixels)
 
-            # Convert to tensor using torchvision transforms
-            transformation = T.Compose([T.ToTensor()])
-            image_tensor = transformation(image)
-            # Convert from [0, 1] to [-1, 1] range expected by VAE
-            image_tensor = image_tensor * 2.0 - 1.0
-            image_tensor = image_tensor.unsqueeze(0)  # Add batch dimension
-
-            # Encode using FLUX.2 VAE. The encode below forces REF_ENCODE_TILE_SIZE tiling, so the
-            # peak is bounded by one tile; tell the cache that up front so it frees the room instead
-            # of hitting the shortfall as an OOM.
-            estimated_working_memory = estimate_vae_working_memory_flux2(
-                operation="encode",
-                image_tensor=image_tensor,
-                vae=vae_info.model,
-                tile_size=REF_ENCODE_TILE_SIZE,
-                device=TorchDevice.choose_torch_device(),
-            )
-
-            with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
-                vae_dtype = next(iter(vae.parameters())).dtype
-                image_tensor = image_tensor.to(device=TorchDevice.choose_torch_device(), dtype=vae_dtype)
-
-                # The FLUX.2 VAE encoder's mid-block self-attention scales quadratically with the
-                # input's spatial size (and on ROCm, SDPA falls back to a *materialized* attention
-                # matrix), so encoding a reference image at full size OOMs VRAM — ~15GB at 1024px,
-                # hundreds of GB at the 2024px reference cap. Tile the encode to bound peak memory
-                # regardless of reference resolution. The VAE's default tile size equals its
-                # sample_size (1024), which still OOMs per tile, so force a smaller 512px tile.
-                # Save/restore the tiling config because this VAE is a shared, cached instance (e.g.
-                # the final image decode must not inherit these settings).
-                downsample = 2 ** (len(vae.config.block_out_channels) - 1)
-                prev_tiling = (vae.use_tiling, vae.tile_sample_min_size, vae.tile_latent_min_size)
-                vae.use_tiling = True
-                vae.tile_sample_min_size = REF_ENCODE_TILE_SIZE
-                vae.tile_latent_min_size = REF_ENCODE_TILE_SIZE // downsample
-                try:
-                    # FLUX.2 VAE uses diffusers API
-                    latent_dist = vae.encode(image_tensor, return_dict=False)[0]
-
-                    # Use mode() for deterministic encoding (no sampling)
-                    if hasattr(latent_dist, "mode"):
-                        ref_image_latents_unpacked = latent_dist.mode()
-                    elif hasattr(latent_dist, "sample"):
-                        ref_image_latents_unpacked = latent_dist.sample()
-                    else:
-                        ref_image_latents_unpacked = latent_dist
-                finally:
-                    vae.use_tiling, vae.tile_sample_min_size, vae.tile_latent_min_size = prev_tiling
-
-                TorchDevice.empty_cache()
+            ref_image_latents_unpacked = encode_reference_image(vae_info, image)
 
             # Extract tensor dimensions (B, 32, H, W for FLUX.2)
             batch_size, _, latent_height, latent_width = ref_image_latents_unpacked.shape
@@ -267,7 +306,7 @@ class Flux2RefImageExtension:
             # Apply BN normalization to match the input latents scale
             # This is critical - the transformer expects normalized latents
             if self._bn_mean is not None and self._bn_std is not None:
-                ref_image_latents_packed = self._bn_normalize(ref_image_latents_packed)
+                ref_image_latents_packed = bn_normalize(ref_image_latents_packed, self._bn_mean, self._bn_std)
 
             # Determine spatial offsets for this reference image
             h_offset = 0

@@ -18,6 +18,7 @@ from invokeai.app.invocations.fields import (
     DenoiseMaskField,
     ErnieImageConditioningField,
     FieldDescriptions,
+    Flux3ConditioningField,
     FluxConditioningField,
     Ideogram4ConditioningField,
     ImageField,
@@ -537,6 +538,17 @@ class Krea2ConditioningOutput(BaseInvocationOutput):
     @classmethod
     def build(cls, conditioning_name: str, mask: TensorField | None = None) -> "Krea2ConditioningOutput":
         return cls(conditioning=Krea2ConditioningField(conditioning_name=conditioning_name, mask=mask))
+
+
+@invocation_output("flux3_conditioning_output")
+class Flux3ConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output a FLUX.3 conditioning tensor."""
+
+    conditioning: Flux3ConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "Flux3ConditioningOutput":
+        return cls(conditioning=Flux3ConditioningField(conditioning_name=conditioning_name))
 
 
 @invocation_output("anima_conditioning_output")
