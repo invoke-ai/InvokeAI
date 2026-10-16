@@ -1,7 +1,7 @@
 ---
 title: Qwen-Image-2.1
 description: Generate images with Qwen-Image-2.1 and its 8-step Turbo variant, from the Diffusers folders or a GGUF transformer, including transparent (RGBA) output.
-lastUpdated: 2026-10-10
+lastUpdated: 2026-10-16
 sidebar:
   order: 8
 ---
@@ -87,4 +87,4 @@ Qwen-Image-2.1 LoRAs install like any other and appear under **Concepts** in the
 - **Steps** — 40 for the base model and 8 for Turbo. Turbo's schedule is tuned for 8 steps; other step counts are spread over the same curve and work, but 8 is what it was distilled for.
 - **CFG** — 1 by default, which runs one prompt per step. Above 1, the negative prompt is used and each step costs about twice as long.
 - There is no scheduler setting: both variants use the schedule they were trained with.
-- **Denoising strength** (image-to-image, inpainting) — on the base model a strength changes the image about as much as on Qwen-Image or Z-Image. Turbo's 8-step schedule spends most of its steps at high noise, so there a strength sets the starting noise level directly (0.5 starts half-way): the same value changes the image less on Turbo than on the base model.
+- **Denoising strength** (image-to-image, inpainting) — on the base model a strength changes the image about as much as on Qwen-Image or Z-Image. Turbo's 8-step schedule spends most of its steps at high noise, so there a strength sets the starting noise level directly (0.5 starts at noise level 0.5): the same value changes the image less on Turbo than on the base model.

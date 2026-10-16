@@ -181,22 +181,27 @@ def test_without_guidance_the_negative_prompt_is_never_run() -> None:
     assert {prompt for prompt, *_ in transformer.calls} == {"pos"}
 
 
-def test_image_to_image_on_turbo_starts_at_the_noise_level_of_its_strength() -> None:
+@pytest.mark.parametrize(
+    ("cfg_scale", "negative_calls"),
+    # One value per configured step; only the last two are reached from 0.5. Guidance on just those two runs the
+    # negative prompt twice; guidance on just the skipped ones, never -- a slice off by one would run it once.
+    [([1.0] * 6 + [4.0, 4.0], 2), ([4.0] * 6 + [1.0, 1.0], 0)],
+    ids=["guided-tail", "guided-head"],
+)
+def test_image_to_image_on_turbo_starts_at_the_noise_level_of_its_strength(
+    cfg_scale: list[float], negative_calls: int
+) -> None:
     # Turbo's table is front-loaded (six of eight steps above 0.84). A strength of 0.5 must start at 0.5, not at
     # the table's fifth entry (0.895), which would all but discard the input image.
     transformer = _Transformer()
     init = torch.zeros(1, LATENT_CHANNELS, 4, 4)
     _denoise(
-        steps=8,
-        denoising_start=0.5,
-        latents=LatentsField(latents_name="init"),
-        # One value per configured step; only the last two are reached from 0.5.
-        cfg_scale=[1.0] * 6 + [4.0, 4.0],
+        steps=8, denoising_start=0.5, latents=LatentsField(latents_name="init"), cfg_scale=cfg_scale
     )._run_diffusion(_context(transformer, QwenImage21VariantType.Turbo, init_latents=init))
 
     positive = [(mode, t) for prompt, _cache, mode, t in transformer.calls if prompt == "pos"]
     assert positive == [("extract", 0.5), ("cached", 0.415)]
-    assert sum(prompt == "neg" for prompt, *_ in transformer.calls) == 2
+    assert sum(prompt == "neg" for prompt, *_ in transformer.calls) == negative_calls
 
 
 def test_image_to_image_on_base_starts_at_the_step_its_strength_names() -> None:
@@ -217,7 +222,16 @@ def test_image_to_image_on_base_starts_at_the_step_its_strength_names() -> None:
 
 @pytest.mark.parametrize(
     ("start", "end", "expected"),
-    [(0.0, 1.0, (0, 8)), (0.5, 1.0, (4, 4)), (0.99, 1.0, (7, 1)), (0.0, 0.01, (0, 1)), (0.25, 0.75, (2, 4))],
+    [
+        (0.0, 1.0, (0, 8)),
+        (0.5, 1.0, (4, 4)),
+        # Rounded to the nearest step, as Qwen-Image's own denoise rounds: 5.6 -> 6, 4.8 -> 5.
+        (0.7, 1.0, (6, 2)),
+        (0.0, 0.6, (0, 5)),
+        (0.99, 1.0, (7, 1)),
+        (0.0, 0.01, (0, 1)),
+        (0.25, 0.75, (2, 4)),
+    ],
 )
 def test_a_strength_on_base_names_whole_steps_and_always_runs_one(
     start: float, end: float, expected: tuple[int, int]
@@ -235,8 +249,12 @@ def test_a_float32_fallback_reserves_twice_the_bfloat16_activations() -> None:
     assert estimate(4096, 300, 300, True, True, 4) - base == 2 * bf16
 
 
-def test_the_estimate_is_priced_at_the_compute_dtypes_width(monkeypatch: pytest.MonkeyPatch) -> None:
-    # The CPU fixture computes in float32; a hard-coded bf16 width at the call site would halve the estimate.
+@pytest.mark.parametrize("dtype", [torch.float32, torch.bfloat16])
+def test_the_estimate_is_priced_at_the_compute_dtypes_width(
+    dtype: torch.dtype, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A hard-coded width at the call site would halve the float32 estimate, or double the bf16 one CUDA runs.
+    monkeypatch.setattr(f"{DENOISE}.TorchDevice.choose_bfloat16_safe_dtype", lambda _device: dtype)
     widths: list[int] = []
     estimate = QwenImage21DenoiseInvocation._estimate_working_memory
 
@@ -246,7 +264,7 @@ def test_the_estimate_is_priced_at_the_compute_dtypes_width(monkeypatch: pytest.
 
     monkeypatch.setattr(QwenImage21DenoiseInvocation, "_estimate_working_memory", staticmethod(spy))
     _denoise()._run_diffusion(_context(_Transformer(), QwenImage21VariantType.Base))
-    assert widths == [torch.float32.itemsize]
+    assert widths == [dtype.itemsize]
 
 
 class _DecodingVAE:
