@@ -120,7 +120,13 @@ const fluxVae: VaeModelConfig = { base: 'flux', key: 'flux-vae', name: 'FLUX VAE
 const flux2Vae: VaeModelConfig = { base: 'flux2', key: 'flux2-vae', name: 'FLUX.2 VAE', type: 'vae' };
 const qwenImageVae: VaeModelConfig = { base: 'qwen-image', key: 'qwen-vae', name: 'Qwen VAE', type: 'vae' };
 const t5Encoder: ComponentModelConfig = { base: 'any', key: 't5', name: 'T5 Encoder', type: 't5_encoder' };
-const clipEmbed: ComponentModelConfig = { base: 'any', key: 'clip', name: 'CLIP Embed', type: 'clip_embed' };
+const clipEmbed: ComponentModelConfig = {
+  base: 'any',
+  key: 'clip',
+  name: 'CLIP Embed',
+  type: 'clip_embed',
+  variant: 'large',
+};
 const mistralEncoder: ComponentModelConfig = {
   base: 'any',
   key: 'mistral',

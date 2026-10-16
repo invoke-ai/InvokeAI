@@ -6,6 +6,7 @@ from typing import Any, ClassVar, Literal, Self
 import torch
 from pydantic import BaseModel, Field
 
+from invokeai.app.util.path_safety import is_plain_filename
 from invokeai.backend.flux.controlnet.state_dict_utils import (
     is_state_dict_xlabs_controlnet,
 )
@@ -1189,7 +1190,7 @@ class Main_Diffusers_SD3_Config(Diffusers_Config_Base, Main_Config_Base, Config_
             match class_name:
                 case "CLIPTextModelWithProjection":
                     model_type = ModelType.CLIPEmbed
-                    path_or_prefix = (mod.path / key).resolve().as_posix()
+                    path_or_prefix = key
 
                     # We need to read the config to determine the variant of the CLIP model.
                     clip_embed_config = get_config_dict_or_raise(
@@ -1206,7 +1207,7 @@ class Main_Diffusers_SD3_Config(Diffusers_Config_Base, Main_Config_Base, Config_
                     )
                 case "SD3Transformer2DModel":
                     model_type = ModelType.Main
-                    path_or_prefix = (mod.path / key).resolve().as_posix()
+                    path_or_prefix = key
                     variant = None
                     submodels[SubModelType(key)] = SubmodelDefinition(
                         path_or_prefix=path_or_prefix,
@@ -3458,6 +3459,10 @@ class Main_SDNQ_Diffusers_Flux2_Config(Main_Config_Base, Config_Base):
             # its loader needs, otherwise a partial pipeline is treated as self-contained
             # (is_self_contained_sdnq_pipeline) and the loaders later request fixed vae/ text_encoder/
             # tokenizer/ subfolders that have nothing to load.
+            # The record stores the key and loading joins it onto wherever the model ends up, so only a
+            # bare folder name keeps the folder validated here the same one that is loaded later.
+            if not is_plain_filename(key):
+                continue
             component_path = mod.path / key
             if not _sdnq_component_dir_is_populated(component_path, submodel_type, _SDNQ_PIPELINE_ALWAYS_SDNQ_LOADED):
                 continue
@@ -3472,7 +3477,7 @@ class Main_SDNQ_Diffusers_Flux2_Config(Main_Config_Base, Config_Base):
                 continue
 
             submodels[submodel_type] = SubmodelDefinition(
-                path_or_prefix=component_path.resolve().as_posix(),
+                path_or_prefix=key,
                 model_type=model_type,
                 variant=None,
             )
@@ -3605,6 +3610,10 @@ class Main_SDNQ_Diffusers_ZImage_Config(Main_Config_Base, Config_Base):
             # See the FLUX.2 _get_submodels note: only record a component whose folder actually holds
             # the files its loader needs, so a partial download with a complete model_index.json isn't
             # mis-classified as a self-contained SDNQ pipeline.
+            # The record stores the key and loading joins it onto wherever the model ends up, so only a
+            # bare folder name keeps the folder validated here the same one that is loaded later.
+            if not is_plain_filename(key):
+                continue
             component_path = mod.path / key
             if not _sdnq_component_dir_is_populated(component_path, submodel_type, _SDNQ_PIPELINE_ALWAYS_SDNQ_LOADED):
                 continue
@@ -3618,7 +3627,7 @@ class Main_SDNQ_Diffusers_ZImage_Config(Main_Config_Base, Config_Base):
                 continue
 
             submodels[submodel_type] = SubmodelDefinition(
-                path_or_prefix=component_path.resolve().as_posix(),
+                path_or_prefix=key,
                 model_type=model_type,
                 variant=None,
             )
@@ -3759,6 +3768,10 @@ class Main_SDNQ_Diffusers_FLUX_Config(Main_Config_Base, Config_Base):
             # *should* have, so a partial download keeps a complete index over missing or empty
             # folders, and the advertised class is a claim about the folder rather than a fact.
             # Without these, a half-downloaded pipeline looks complete until generation time.
+            # The record stores the key and loading joins it onto wherever the model ends up, so only a
+            # bare folder name keeps the folder validated here the same one that is loaded later.
+            if not is_plain_filename(key):
+                continue
             component_path = mod.path / key
             if not _sdnq_component_dir_is_populated(component_path, submodel_type, _SDNQ_FLUX1_ALWAYS_SDNQ_LOADED):
                 continue
@@ -3770,7 +3783,7 @@ class Main_SDNQ_Diffusers_FLUX_Config(Main_Config_Base, Config_Base):
                 continue
 
             submodels[submodel_type] = SubmodelDefinition(
-                path_or_prefix=component_path.resolve().as_posix(),
+                path_or_prefix=key,
                 model_type=model_type,
                 variant=None,
             )
