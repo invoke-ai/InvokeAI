@@ -20,6 +20,7 @@ def state() -> GraphExecutionState:
     return state
 
 
+@pytest.mark.platform_independent
 def test_runtime_import_without_graph() -> None:
     assert_module_imports_without_graph("invokeai.app.services.shared.graph_if_runtime")
 

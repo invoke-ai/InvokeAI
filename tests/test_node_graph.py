@@ -2743,6 +2743,7 @@ def test_nodes_must_return_invocation_output():
                 return "foo"
 
 
+@pytest.mark.platform_independent
 def test_nodes_must_return_invocation_output_under_optimized_python():
     result = subprocess.run(
         [

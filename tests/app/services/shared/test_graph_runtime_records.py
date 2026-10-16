@@ -2,10 +2,13 @@ import subprocess
 import sys
 import textwrap
 
+import pytest
+
 from invokeai.app.services.shared import graph as graph_facade
 from invokeai.app.services.shared import graph_runtime_records
 
 
+@pytest.mark.platform_independent
 def test_runtime_records_import_without_graph_cycle() -> None:
     script = textwrap.dedent(
         """

@@ -109,6 +109,13 @@ class _InstallCancelledBeforeTransfer(Exception):
 # created; the combined name is only a label, so it is shortened past this point with a count.
 _MAX_COMBINED_SUBFOLDER_NAME = 96
 
+# How long the idle install thread blocks on its queue before rechecking the stop event, which bounds how long
+# stop() waits.
+_INSTALL_QUEUE_POLL_SECONDS = 1.0
+
+# First wait before retrying a move that hit a locked file; each further retry doubles it.
+_MOVE_RETRY_DELAY_SECONDS = 0.5
+
 
 def _combined_subfolder_name(subfolder_names: List[str]) -> str:
     combined = "_".join(subfolder_names)
@@ -810,8 +817,9 @@ class ModelInstallService(ModelInstallServiceBase):
     # TODO: Replace this with a proper fix for underlying problem of Windows holding open
     # the file when it needs to be moved.
     @staticmethod
-    def _move_with_retries(src: Path, dst: Path, attempts: int = 5, delay: float = 0.5) -> None:
+    def _move_with_retries(src: Path, dst: Path, attempts: int = 5) -> None:
         """Workaround for Windows file-handle issues when moving files."""
+        delay = _MOVE_RETRY_DELAY_SECONDS
         for tries_left in range(attempts, 0, -1):
             try:
                 move(src, dst)
@@ -1604,7 +1612,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 break
             self._logger.debug(f"Installer thread {threading.get_ident()} polling")
             try:
-                job = self._install_queue.get(timeout=1)
+                job = self._install_queue.get(timeout=_INSTALL_QUEUE_POLL_SECONDS)
             except Empty:
                 continue
             assert job.local_path is not None
