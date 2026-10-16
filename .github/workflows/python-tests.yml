@@ -127,9 +127,8 @@ jobs:
               # Cross-stack generation contracts: the frontend writes these, Python validates them
               # against the invocation and architecture registries. A frontend-only change that
               # regenerates one would otherwise pass vitest while skipping the backend half.
-              # `__fixtures__/` does not exist yet -- it arrives with the graph-builder fixtures.
-              # A pattern matching nothing costs nothing here, and listing it now means the branch
-              # that adds the directory does not also have to remember to add this line.
+              # Shared Generation numerical fixtures are read by Python tests, so fixture-only changes
+              # must trigger this suite.
               - 'invokeai/frontend/webv2/src/features/generation/core/__snapshots__/**'
               - 'invokeai/frontend/webv2/src/features/generation/core/__fixtures__/**'
               - 'invokeai/frontend/webv2/src/features/video/core/__snapshots__/**'
