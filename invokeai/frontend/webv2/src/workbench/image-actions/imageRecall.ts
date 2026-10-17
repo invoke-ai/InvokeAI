@@ -3,6 +3,7 @@ import type {
   ComponentModelConfig,
   GenerateLora,
   GenerateModelConfig,
+  GenerateReferenceImage,
   GenerateWidgetValues,
   MainModelConfig,
   VaeModelConfig,
@@ -29,15 +30,24 @@ import {
   isModelIdentifierConfig,
   isVaeCompatibleWithGenerateModel,
   isRefinerModel,
+  isFluxDypePreset,
+  isQwenImageEncoderQuantization,
   isValidKrea2RebalanceWeights,
+  MAX_FLUX_DYPE_EXPONENT,
+  MAX_FLUX_DYPE_SCALE,
   MAX_HIDIFFUSION_RATIO,
+  MAX_KREA2_SEED_VARIANCE_STRENGTH,
   MAX_REFINER_AESTHETIC_SCORE,
   MAX_REFINER_START,
+  MAX_TIMESTEP_SHIFT,
+  MAX_ZIMAGE_SEED_VARIANCE_STRENGTH,
   MIN_HIDIFFUSION_T1_RATIO,
   MIN_REFINER_AESTHETIC_SCORE,
   MIN_REFINER_CFG_SCALE,
   MIN_REFINER_START,
   MIN_REFINER_STEPS,
+  MIN_TIMESTEP_SHIFT,
+  MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
   normalizeReferenceImages,
 } from '@features/generation/settings';
 import { SEED_MAX } from '@platform/core/seed';
@@ -82,6 +92,8 @@ type RecalledField =
   | 'referenceImages'
   | 'krea2Rebalance'
   | 'refiner'
+  | 'krea2SeedVariance'
+  | 'modelTuning'
   | 'animaInpaintAdapterWeight';
 
 export type ImageRecallSkipReason =
@@ -192,10 +204,18 @@ export const getSteps = (metadata: unknown): number | null => {
   return steps !== null && steps >= 1 ? steps : null;
 };
 
-export const getCfgScale = (metadata: unknown): number | null => {
-  const cfgScale = getNumber(metadata, 'cfg_scale');
+/**
+ * The value the model's single guidance slider holds. Distilled-guidance families record it as `guidance` and
+ * their older records carry no `cfg_scale` at all, so for them the dedicated key wins.
+ */
+export const getCfgScale = (metadata: unknown, model?: GenerateModelConfig): number | null => {
+  const { guidanceLabel, guidanceMin } = getGenerationUiPolicy(model);
+  const cfgScale =
+    guidanceLabel === 'Guidance'
+      ? (getNumber(metadata, 'guidance') ?? getNumber(metadata, 'cfg_scale'))
+      : getNumber(metadata, 'cfg_scale');
 
-  return cfgScale !== null && cfgScale >= 1 ? cfgScale : null;
+  return cfgScale !== null && cfgScale >= guidanceMin ? cfgScale : null;
 };
 
 export const getCfgRescaleMultiplier = (metadata: unknown): number | null => {
@@ -292,20 +312,18 @@ export const getMetadataSize = (
   };
 };
 
-const getMetadataModelKey = (metadata: unknown, key: 'model' | 'vae'): string | null => {
-  const model = getRecord(metadata, key);
+/** The installed model a recorded reference names, or null when none (or more than one) does. */
+const resolveMetadataModel = <T extends ComponentModelConfig>(value: unknown, models: readonly T[]): T | null => {
+  const ref = toRecordedModelRef(value);
+  const resolved = ref ? resolveRecordedModel(ref, models) : null;
 
-  return typeof model?.key === 'string' ? model.key : null;
+  return resolved === 'ambiguous' ? null : resolved;
 };
 
 const getSupportedMetadataModel = (
   metadata: unknown,
   supportedModels: GenerateModelConfig[]
-): GenerateModelConfig | null => {
-  const modelKey = getMetadataModelKey(metadata, 'model');
-
-  return modelKey ? (supportedModels.find((model) => model.key === modelKey) ?? null) : null;
-};
+): GenerateModelConfig | null => resolveMetadataModel(getRecord(metadata, 'model'), supportedModels);
 
 const getModelFromMetadata = <T extends ComponentModelConfig>(
   metadata: unknown,
@@ -321,13 +339,7 @@ const getModelFromMetadata = <T extends ComponentModelConfig>(
     return null;
   }
 
-  const modelKey = getMetadataModelKey(metadata, key as 'model' | 'vae');
-
-  if (!modelKey) {
-    return undefined;
-  }
-
-  const model = models.find((candidate) => candidate.key === modelKey);
+  const model = resolveMetadataModel(metadata[key], models);
 
   return guard(model) ? model : undefined;
 };
@@ -357,13 +369,7 @@ const getMetadataVae = (
     return null;
   }
 
-  const vaeKey = getMetadataModelKey(metadata, 'vae');
-
-  if (!vaeKey) {
-    return undefined;
-  }
-
-  const vae = vaeModels.find((vae) => vae.key === vaeKey);
+  const vae = resolveMetadataModel(metadata.vae, vaeModels);
 
   return vae && isVaeCompatibleWithGenerateModel(model, vae) ? vae : undefined;
 };
@@ -398,9 +404,9 @@ export const getMetadataPrompts = (metadata: unknown): { negativePrompt: string;
 const hasMetadataSize = (metadata: unknown, model: GenerateModelConfig): boolean =>
   Object.keys(getMetadataSize(metadata, model)).length > 0;
 
-const hasGenerationSettings = (metadata: unknown): boolean =>
+const hasGenerationSettings = (metadata: unknown, model: GenerateModelConfig): boolean =>
   getSteps(metadata) !== null ||
-  getCfgScale(metadata) !== null ||
+  getCfgScale(metadata, model) !== null ||
   getCfgRescaleMultiplier(metadata) !== null ||
   getScheduler(metadata) !== null ||
   getBoolean(metadata, 'seamless_x') !== null ||
@@ -428,6 +434,140 @@ const getMetadataKrea2Rebalance = (
 
 const hasKrea2Rebalance = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
   Object.keys(getMetadataKrea2Rebalance(metadata, model)).length > 0;
+
+/** Bounds match the enhancer's own controls; a value outside them keeps the current setting. */
+const getMetadataKrea2SeedVariance = (
+  metadata: unknown,
+  model: GenerateModelConfig | undefined
+): Partial<GenerateWidgetValues> => {
+  if (model?.base !== 'krea-2') {
+    return {};
+  }
+
+  const enabled = getBoolean(metadata, 'krea2_seed_variance_enabled');
+  const strength = getNumber(metadata, 'krea2_seed_variance_strength');
+  const randomizePercent = getNumber(metadata, 'krea2_seed_variance_randomize_percent');
+
+  return {
+    ...(enabled === null ? {} : { krea2SeedVarianceEnabled: enabled }),
+    ...(strength !== null && strength >= 0 && strength <= MAX_KREA2_SEED_VARIANCE_STRENGTH
+      ? { krea2SeedVarianceStrength: strength }
+      : {}),
+    ...(randomizePercent !== null && randomizePercent >= 0 && randomizePercent <= 100
+      ? { krea2SeedVarianceRandomizePercent: randomizePercent }
+      : {}),
+  };
+};
+
+const hasKrea2SeedVariance = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
+  Object.keys(getMetadataKrea2SeedVariance(metadata, model)).length > 0;
+
+/**
+ * Generation graphs stamp `generation_mode` and record what ran, so on such a record a missing list or switch means
+ * none or the node default. Other records that name a model, such as canvas saves, never record concepts or tuning.
+ */
+const isGenerationRecord = (metadata: unknown): boolean => getString(metadata, 'generation_mode') !== null;
+
+const getBoundedNumber = (metadata: unknown, key: string, min: number, max: number): number | null => {
+  const value = getNumber(metadata, key);
+
+  return value !== null && value >= min && value <= max ? value : null;
+};
+
+/**
+ * A recorded shift: `'auto'` (webv2) or `null` (legacy) for one the node derived, a number for an override.
+ * Undefined when the key is missing or holds something else.
+ */
+const getRecordedTimestepShift = (metadata: unknown, key: string): number | null | undefined => {
+  if (!isRecord(metadata) || !(key in metadata)) {
+    return undefined;
+  }
+
+  if (metadata[key] === null || metadata[key] === 'auto') {
+    return null;
+  }
+
+  return getBoundedNumber(metadata, key, MIN_TIMESTEP_SHIFT, MAX_TIMESTEP_SHIFT) ?? undefined;
+};
+
+/**
+ * Per-family tuning the graphs record under their own keys. Gated on the model recall settles on, since each
+ * setting only reaches that family's denoise or encoder nodes.
+ *
+ * A generation record of that same family that leaves a switch out ran the node's default: webv2 recorded no tuning
+ * before the panel offered it. Restoring the default there means a preset turned on since does not survive recall.
+ * Values that only matter while a switch is on (DyPE scale, variance strength) stay as they are when missing.
+ */
+const getMetadataModelTuning = (
+  metadata: unknown,
+  model: GenerateModelConfig | undefined
+): Partial<GenerateWidgetValues> => {
+  if (!model || model.type !== 'main' || !isRecord(metadata)) {
+    return {};
+  }
+
+  const recordsFamily = isGenerationRecord(metadata) && getRecord(metadata, 'model')?.base === model.base;
+  const recordedOrDefault = <T>(key: string, recorded: T | undefined, fallback: T): T | undefined =>
+    recorded !== undefined ? recorded : recordsFamily && !(key in metadata) ? fallback : undefined;
+
+  if (model.base === 'flux') {
+    const preset = recordedOrDefault(
+      'dype_preset',
+      isFluxDypePreset(metadata.dype_preset) ? metadata.dype_preset : undefined,
+      'off'
+    );
+    const scale = getBoundedNumber(metadata, 'dype_scale', 0, MAX_FLUX_DYPE_SCALE);
+    const exponent = getBoundedNumber(metadata, 'dype_exponent', 0, MAX_FLUX_DYPE_EXPONENT);
+
+    return {
+      ...(preset === undefined ? {} : { fluxDypePreset: preset }),
+      ...(scale === null ? {} : { fluxDypeScale: scale }),
+      ...(exponent === null ? {} : { fluxDypeExponent: exponent }),
+    };
+  }
+
+  if (model.base === 'z-image') {
+    const shift = recordedOrDefault('z_image_shift', getRecordedTimestepShift(metadata, 'z_image_shift'), null);
+    const enabled = recordedOrDefault(
+      'z_image_seed_variance_enabled',
+      getBoolean(metadata, 'z_image_seed_variance_enabled') ?? undefined,
+      false
+    );
+    const strength = getBoundedNumber(metadata, 'z_image_seed_variance_strength', 0, MAX_ZIMAGE_SEED_VARIANCE_STRENGTH);
+    const randomizePercent = getBoundedNumber(
+      metadata,
+      'z_image_seed_variance_randomize_percent',
+      MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
+      100
+    );
+
+    return {
+      ...(shift === undefined ? {} : { zImageShift: shift }),
+      ...(enabled === undefined ? {} : { zImageSeedVarianceEnabled: enabled }),
+      ...(strength === null ? {} : { zImageSeedVarianceStrength: strength }),
+      ...(randomizePercent === null ? {} : { zImageSeedVarianceRandomizePercent: randomizePercent }),
+    };
+  }
+
+  if (model.base === 'qwen-image') {
+    const shift = recordedOrDefault('qwen_image_shift', getRecordedTimestepShift(metadata, 'qwen_image_shift'), null);
+    const quantization = recordedOrDefault(
+      'qwen_image_quantization',
+      isQwenImageEncoderQuantization(metadata.qwen_image_quantization) ? metadata.qwen_image_quantization : undefined,
+      'none'
+    );
+
+    return {
+      ...(shift === undefined ? {} : { qwenImageShift: shift }),
+      ...(quantization === undefined ? {} : { qwenImageEncoderQuantization: quantization }),
+    };
+  }
+
+  return {};
+};
+
+const hasModelTuning = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
+  Object.keys(getMetadataModelTuning(metadata, model)).length > 0;
 
 /**
  * The canvas records the adapter's weight beside the adapter; only an Anima image can carry it. An out-of-range
@@ -544,12 +684,16 @@ const getComponentPatch = (
 const hasComponentModels = (metadata: unknown, models: readonly ComponentModelConfig[]): boolean =>
   Object.keys(getComponentPatch(metadata, models)).length > 0;
 
-/** A recorded `ModelIdentifierField` — `{ key, hash, name, base }` — with every field optional on read. */
+/**
+ * A recorded `ModelIdentifierField` — `{ key, hash, name, base, type }` — with every field optional on read. Records
+ * from before identifier fields named the model as `{ model_name, base_model, model_type }`.
+ */
 interface RecordedModelRef {
   base: string | null;
   hash: string | null;
   key: string | null;
   name: string | null;
+  type: string | null;
 }
 
 const toRecordedModelRef = (value: unknown): RecordedModelRef | null => {
@@ -558,10 +702,11 @@ const toRecordedModelRef = (value: unknown): RecordedModelRef | null => {
   }
 
   const ref = {
-    base: getString(value, 'base'),
+    base: getString(value, 'base') ?? getString(value, 'base_model'),
     hash: getString(value, 'hash'),
     key: getString(value, 'key'),
-    name: getString(value, 'name'),
+    name: getString(value, 'name') ?? getString(value, 'model_name'),
+    type: getString(value, 'type') ?? getString(value, 'model_type'),
   };
 
   return ref.key || ref.hash || (ref.name && ref.base) ? ref : null;
@@ -569,24 +714,33 @@ const toRecordedModelRef = (value: unknown): RecordedModelRef | null => {
 
 /**
  * Resolve the install-local key first, then a portable identifier: the content hash when one was recorded, otherwise
- * name and base. A recorded hash never falls back to a same-named file, and a portable identifier counts only when
- * exactly one candidate matches it.
+ * name and base (and type, when recorded). A portable identifier counts only when exactly one installed model matches
+ * it.
+ *
+ * By default a recorded hash never falls back to a same-named file, so the main model, VAE, components and concepts
+ * restore only the exact weights that ran. `hashMiss: 'matchName'` lets a hash that matches nothing fall through to
+ * name and base, as legacy web does for reference-image adapters after a reinstall changes their hash.
  */
-const resolveRecordedModel = <T extends { base: string; hash?: string; key: string; name: string }>(
+const resolveRecordedModel = <T extends ComponentModelConfig>(
   ref: RecordedModelRef,
-  candidates: readonly T[]
+  models: readonly T[],
+  hashMiss: 'refuse' | 'matchName' = 'refuse'
 ): T | 'ambiguous' | null => {
-  const byKey = ref.key ? candidates.find((model) => model.key === ref.key) : undefined;
+  const byKey = ref.key ? models.find((model) => model.key === ref.key) : undefined;
 
   if (byKey) {
     return byKey;
   }
 
-  const matches = ref.hash
-    ? candidates.filter((model) => model.hash === ref.hash)
-    : ref.name && ref.base
-      ? candidates.filter((model) => model.name === ref.name && model.base === ref.base)
-      : [];
+  const byHash = ref.hash ? models.filter((model) => model.hash === ref.hash) : [];
+  const matches =
+    byHash.length > 0 || (ref.hash && hashMiss === 'refuse')
+      ? byHash
+      : ref.name && ref.base
+        ? models.filter(
+            (model) => model.name === ref.name && model.base === ref.base && (!ref.type || model.type === ref.type)
+          )
+        : [];
 
   return matches.length > 1 ? 'ambiguous' : (matches[0] ?? null);
 };
@@ -704,12 +858,6 @@ const getRefinerRecall = (
   };
 };
 
-/**
- * Generation graphs stamp `generation_mode` and omit `loras` when no concept was active, so on such a record a
- * missing list means "none". Other records that name a model, such as canvas saves, never record concepts.
- */
-const isGenerationRecord = (metadata: unknown): boolean => getString(metadata, 'generation_mode') !== null;
-
 interface ConceptRecall {
   /** The concept list to apply, or null when the metadata says nothing reliable about concepts. */
   loras: GenerateLora[] | null;
@@ -789,8 +937,16 @@ const getMetadataConcepts = (
   return { loras, skipped };
 };
 
-export const getMetadataReferenceImages = (metadata: unknown) => {
+/**
+ * The references the image was generated with, or null when the record says nothing about them. An explicitly
+ * empty modern list means it used none; only a list with no usable entry falls back to the pre-v6 canvas slot.
+ */
+export const getMetadataReferenceImages = (metadata: unknown): GenerateReferenceImage[] | null => {
   if (!isRecord(metadata)) {
+    return null;
+  }
+
+  if (Array.isArray(metadata.ref_images) && metadata.ref_images.length === 0) {
     return [];
   }
 
@@ -805,17 +961,47 @@ export const getMetadataReferenceImages = (metadata: unknown) => {
   const referenceImages = getRecord(canvasMetadata, 'referenceImages');
   const legacyEntities = referenceImages?.entities;
   if (!Array.isArray(legacyEntities)) {
-    return [];
+    return null;
   }
 
-  return normalizeReferenceImages(
+  const legacy = normalizeReferenceImages(
     legacyEntities.map((entry) =>
       isRecord(entry) && isRecord(entry.ipAdapter)
         ? { config: entry.ipAdapter, id: entry.id, isEnabled: entry.isEnabled }
         : entry
     )
   ).filter((referenceImage) => referenceImage.config.image !== null);
+
+  return legacy.length > 0 ? legacy : null;
 };
+
+/**
+ * Point each recorded adapter at the installed model it names, or clear it so Generate asks for one: a reinstall gives
+ * the adapter a new key, and a stale key would pass validation and fail only on the server.
+ */
+const resolveReferenceImageModels = (
+  referenceImages: GenerateReferenceImage[],
+  models: readonly ComponentModelConfig[]
+): GenerateReferenceImage[] =>
+  referenceImages.map((referenceImage) => {
+    const { config } = referenceImage;
+
+    if ((config.type !== 'ip_adapter' && config.type !== 'flux_redux') || !config.model) {
+      return referenceImage;
+    }
+
+    const recordedType = config.model.type;
+    const ref = toRecordedModelRef(config.model);
+    const installed = ref
+      ? resolveRecordedModel(
+          ref,
+          models.filter((model) => model.type === recordedType),
+          'matchName'
+        )
+      : null;
+
+    return { ...referenceImage, config: { ...config, model: installed === 'ambiguous' ? null : installed } };
+  });
 
 export const withDimensions = (
   values: GenerateWidgetValues,
@@ -869,11 +1055,15 @@ export const getImageRecallCapabilities = ({
   const hasSeed = getSeed(metadata) !== null;
   const hasPrompts = hasPrompt(metadata);
   const hasSize = hasMetadataSize(metadata, currentValues.model);
-  const hasSettings = hasGenerationSettings(metadata);
+  const hasSettings = hasGenerationSettings(metadata, clipSkipModel);
   const hasComponents = hasComponentModels(metadata, models);
-  const hasReferenceImages = getMetadataReferenceImages(metadata).length > 0;
+  const recordedReferenceImages = getMetadataReferenceImages(metadata);
+  const hasReferenceImages =
+    recordedReferenceImages !== null &&
+    (recordedReferenceImages.length > 0 || currentValues.referenceImages.length > 0);
   const hasModel = supportedMetadataModel !== null;
-  const hasRebalance = hasKrea2Rebalance(metadata, clipSkipModel);
+  const hasRebalance = hasKrea2Rebalance(metadata, clipSkipModel) || hasKrea2SeedVariance(metadata, clipSkipModel);
+  const hasTuning = hasModelTuning(metadata, clipSkipModel);
   const hasRefiner =
     Object.keys(getRefinerRecall(metadata, clipSkipModel, models, supportedMetadataModel).patch).length > 0;
   const hasAdapterWeight = hasAnimaInpaintAdapterWeight(metadata, clipSkipModel);
@@ -893,6 +1083,7 @@ export const getImageRecallCapabilities = ({
     hasConcepts ||
     hasRebalance ||
     hasRefiner ||
+    hasTuning ||
     hasAdapterWeight;
   const hasNonSeedMetadata =
     hasModel ||
@@ -907,6 +1098,7 @@ export const getImageRecallCapabilities = ({
     hasConcepts ||
     hasRebalance ||
     hasRefiner ||
+    hasTuning ||
     hasAdapterWeight;
 
   return {
@@ -977,6 +1169,21 @@ export const buildImageRecallSettings = ({
       fields.push('krea2Rebalance');
     }
 
+    const seedVariancePatch = getMetadataKrea2SeedVariance(metadata, values.model);
+
+    if (Object.keys(seedVariancePatch).length > 0) {
+      values = { ...values, ...seedVariancePatch };
+      fields.push('krea2SeedVariance');
+    }
+
+    const tuningPatch = getMetadataModelTuning(metadata, values.model);
+
+    // A same-family record always restores its switches, so only count the field when one actually changes.
+    if (Object.entries(tuningPatch).some(([key, value]) => values[key as keyof GenerateWidgetValues] !== value)) {
+      values = { ...values, ...tuningPatch };
+      fields.push('modelTuning');
+    }
+
     const adapterWeightPatch = getMetadataAnimaInpaintAdapterWeight(metadata, values.model);
 
     if (Object.keys(adapterWeightPatch).length > 0) {
@@ -1016,9 +1223,15 @@ export const buildImageRecallSettings = ({
     // Recalled reference images must fit the effective model — when the
     // metadata model was not recalled (e.g. uninstalled), `values.model` is
     // still the current one and incompatible configs are re-targeted or dropped.
-    const referenceImages = getCompatibleReferenceImages(getMetadataReferenceImages(metadata), values.model, models);
+    const recordedReferenceImages = getMetadataReferenceImages(metadata);
+    const referenceImages = getCompatibleReferenceImages(
+      resolveReferenceImageModels(recordedReferenceImages ?? [], models),
+      values.model,
+      models
+    );
 
-    if (referenceImages.length > 0) {
+    // A record of no references clears the current ones; a record whose references do not fit leaves them.
+    if (referenceImages.length > 0 || (recordedReferenceImages?.length === 0 && values.referenceImages.length > 0)) {
       values = { ...values, referenceImages };
       fields.push('referenceImages');
     }
@@ -1060,7 +1273,7 @@ export const buildImageRecallSettings = ({
 
   if (kind === 'all' || kind === 'remix') {
     const steps = getSteps(metadata);
-    const cfgScale = getCfgScale(metadata);
+    const cfgScale = getCfgScale(metadata, values.model);
     const cfgRescaleMultiplier = getCfgRescaleMultiplier(metadata);
     const scheduler = getScheduler(metadata);
     const seamlessXAxis = getBoolean(metadata, 'seamless_x');

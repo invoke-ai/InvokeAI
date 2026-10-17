@@ -95,7 +95,7 @@ const qwen3Encoder: ComponentModelConfig = {
   variant: 'qwen3_06b',
 };
 
-const PROJECT_SETTINGS: GenerationProjectSettings = { useCpuNoise: true };
+const PROJECT_SETTINGS: GenerationProjectSettings = { useCpuNoise: true, useNsfwChecker: false, useWatermark: false };
 
 const settingsFor = (model: GenerateModelConfig, overrides: Partial<GenerateSettings> = {}): GenerateSettings => ({
   ...getDefaultGenerateSettings(model),
@@ -140,6 +140,7 @@ const compile = (
     outputOnlyMaskedRegions?: boolean;
     controlLayers?: readonly ControlLayerGraphInput[];
     regionalGuidance?: readonly RegionalGuidanceInput[];
+    projectSettings?: Partial<GenerationProjectSettings>;
   } = {}
 ) =>
   compileCanvasGraph({
@@ -160,7 +161,7 @@ const compile = (
     mode,
     model,
     noiseMaskImageName: overrides.noiseMaskImageName ?? null,
-    projectSettings: PROJECT_SETTINGS,
+    projectSettings: { ...PROJECT_SETTINGS, ...overrides.projectSettings },
     settings: settingsFor(model, {
       ...COMPONENT_OVERRIDES[model.base],
       ...overrides.settings,
@@ -1646,5 +1647,99 @@ describe('compileCanvasGraph — SDXL Refiner', () => {
         },
       })
     ).toThrow('PiD decode is not compatible with the SDXL Refiner. Turn PiD off or clear the refiner model.');
+  });
+});
+
+describe('compileCanvasGraph — output filters', () => {
+  const metadataTarget = (graph: BackendGraphContract) =>
+    graph.edges.find((edge) => edge.destination.field === 'metadata')?.destination.node_id;
+
+  it('filters the resized txt2img output, keeping the resize intermediate and the metadata on the result', () => {
+    const { backendGraph } = compile(sd1Model, 'txt2img', {
+      // Off the model grid, so the base decode is resized back to the bbox before the filters run.
+      bbox: { height: 1000, width: 700, x: 0, y: 0 },
+      destination: 'gallery',
+      projectSettings: { useNsfwChecker: true, useWatermark: true },
+    });
+
+    expect(backendGraph.nodes.canvas_unfiltered_output).toMatchObject({ is_intermediate: true, type: 'img_resize' });
+    expect(backendGraph.nodes.canvas_img_nsfw?.type).toBe('img_nsfw');
+    expect(backendGraph.nodes.canvas_output).toMatchObject({ is_intermediate: false, type: 'img_watermark' });
+    expect(metadataTarget(backendGraph)).toBe('canvas_output');
+  });
+
+  it('filters the composited inpaint result rather than the decode behind it', () => {
+    const { backendGraph } = compile(sd1Model, 'inpaint', { projectSettings: { useNsfwChecker: true } });
+
+    expect(backendGraph.nodes.canvas_unfiltered_output?.type).toBe('invokeai_img_blend');
+    expect(backendGraph.nodes.canvas_output).toMatchObject({ is_intermediate: true, type: 'img_nsfw' });
+    expect(
+      backendGraph.edges.find(
+        (edge) => edge.destination.node_id === 'canvas_output' && edge.destination.field === 'image'
+      )?.source.node_id
+    ).toBe('canvas_unfiltered_output');
+    expect(metadataTarget(backendGraph)).toBe('canvas_output');
+  });
+
+  it('runs a lone watermark as the staged outpaint result', () => {
+    const { backendGraph } = compile(sd1Model, 'outpaint', {
+      destination: 'canvas',
+      projectSettings: { useWatermark: true },
+    });
+
+    expect(backendGraph.nodes.canvas_unfiltered_output?.type).toBe('invokeai_img_blend');
+    expect(backendGraph.nodes.canvas_img_nsfw).toBeUndefined();
+    expect(backendGraph.nodes.canvas_output).toMatchObject({ is_intermediate: true, type: 'img_watermark' });
+    expect(
+      backendGraph.edges.find(
+        (edge) => edge.destination.node_id === 'canvas_output' && edge.destination.field === 'image'
+      )?.source.node_id
+    ).toBe('canvas_unfiltered_output');
+    expect(metadataTarget(backendGraph)).toBe('canvas_output');
+  });
+
+  it('leaves every mode untouched while both filters are off', () => {
+    for (const mode of ['txt2img', 'img2img', 'inpaint', 'outpaint'] as const) {
+      const { backendGraph } = compile(sd1Model, mode, {
+        projectSettings: { useNsfwChecker: false, useWatermark: false },
+      });
+
+      expect(backendGraph.nodes.canvas_unfiltered_output).toBeUndefined();
+      expect(getNodeByType(backendGraph, 'img_nsfw')).toBeUndefined();
+      expect(getNodeByType(backendGraph, 'img_watermark')).toBeUndefined();
+    }
+  });
+});
+
+describe('compileCanvasGraph — Krea-2 style reference', () => {
+  it('encodes the reference at the processing size, not the bbox', () => {
+    const { backendGraph } = compile(krea2Model, 'img2img', {
+      // 700x1000 is off the 16px grid, so processing rounds it and resizes back.
+      bbox: { height: 1000, width: 700, x: 0, y: 0 },
+      settings: {
+        referenceImages: [
+          {
+            config: {
+              image: { original: { image: { height: 512, image_name: 'style.png', width: 512 } } },
+              styleStrength: 1.2,
+              type: 'krea2_reference_image',
+            },
+            id: 'style',
+            isEnabled: true,
+          },
+        ],
+      },
+      strength: 0.5,
+    });
+    const styleReference = getNodeByType(backendGraph, 'krea2_style_reference');
+    const denoise = backendGraph.nodes.denoise_latents;
+
+    expect(styleReference).toMatchObject({ image: { image_name: 'style.png' }, style_strength: 1.2 });
+    expect(styleReference?.width).toBe(denoise?.width);
+    expect(styleReference?.height).toBe(denoise?.height);
+    expect(denoise?.width).not.toBe(700);
+    expect(backendGraph.edges.find((edge) => edge.destination.field === 'style_reference')?.source.node_id).toBe(
+      styleReference?.id
+    );
   });
 });

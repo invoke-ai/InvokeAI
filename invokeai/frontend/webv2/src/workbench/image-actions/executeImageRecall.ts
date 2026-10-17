@@ -9,8 +9,9 @@ import type { ModelConfig } from '@features/models';
 import type { WorkbenchCommands } from '@workbench/workbenchStore';
 import type { TFunction } from 'i18next';
 
-import { galleryImages } from '@features/gallery';
+import { galleryImages, galleryVideos } from '@features/gallery';
 import {
+  getCompatibleReferenceImages,
   getDefaultGenerateSettings,
   getEffectiveReferenceImage,
   hasArchitectureCapabilities,
@@ -70,33 +71,54 @@ const getSkippedConceptMessage = ({ name, reason }: ImageRecallSkip, t: TFunctio
   }
 };
 
+const imageMetadataRequests = new Map<string, { owner: AccountScope; promise: Promise<unknown> }>();
+
+registerAccountOwnedResource({
+  clear: () => {
+    imageMetadataRequests.clear();
+  },
+  name: 'image-recall-metadata',
+});
+
+const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+
+export interface WorkflowMediaRef {
+  kind: 'image' | 'video';
+  /** The image or video name the backend stores the embedded workflow under. */
+  name: string;
+}
+
+const fetchEmbeddedWorkflow = (media: WorkflowMediaRef, signal: AbortSignal) =>
+  media.kind === 'image' ? galleryImages.workflow(media.name, signal) : galleryVideos.workflow(media.name, signal);
+
 /**
- * Open the workflow editor before requesting replacement with the image's embedded graph; false means no editor
- * can consume it.
+ * Open the workflow editor before requesting replacement with the workflow embedded in an image or video; false
+ * from `openWorkflowEditor` means no editor can consume it.
  */
-export const executeLoadImageWorkflow = async ({
-  image,
+export const executeLoadMediaWorkflow = async ({
   isProjectActive,
+  media,
   notifications,
   openWorkflowEditor,
   t,
 }: {
-  image: GalleryImage;
   /** Re-checked after the fetch: a store-resident request must not land on another project's editor. */
   isProjectActive: () => boolean;
+  media: WorkflowMediaRef;
   notifications: Pick<WorkbenchCommands['notifications'], 'add'>;
   openWorkflowEditor: () => boolean;
   t: TFunction;
 }): Promise<void> => {
   const owner = captureAccountScope();
+  const suffix = media.kind === 'video' ? 'Video' : '';
 
   try {
-    const { workflow } = await galleryImages.workflow(image.imageName, owner.signal);
+    const { workflow } = await fetchEmbeddedWorkflow(media, owner.signal);
 
     assertAccountScopeCurrent(owner);
 
     if (!workflow) {
-      notifications.add({ kind: 'info', title: t('widgets.gallery.itemActions.loadWorkflow.missing') });
+      notifications.add({ kind: 'info', title: t(`widgets.gallery.itemActions.loadWorkflow.missing${suffix}`) });
       return;
     }
 
@@ -116,7 +138,7 @@ export const executeLoadImageWorkflow = async ({
 
     requestWorkflowDocumentLoad(
       raw,
-      t('widgets.gallery.itemActions.loadWorkflow.loadedLabel', { name: name || image.imageName })
+      t(`widgets.gallery.itemActions.loadWorkflow.loadedLabel${suffix}`, { name: name || media.name })
     );
   } catch (error) {
     if (!isAccountScopeCurrent(owner)) {
@@ -126,21 +148,10 @@ export const executeLoadImageWorkflow = async ({
     notifications.add({
       kind: 'error',
       message: toErrorMessage(error),
-      title: t('widgets.gallery.itemActions.loadWorkflow.failed'),
+      title: t(`widgets.gallery.itemActions.loadWorkflow.failed${suffix}`),
     });
   }
 };
-
-const imageMetadataRequests = new Map<string, { owner: AccountScope; promise: Promise<unknown> }>();
-
-registerAccountOwnedResource({
-  clear: () => {
-    imageMetadataRequests.clear();
-  },
-  name: 'image-recall-metadata',
-});
-
-const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 const loadImageMetadata = (imageName: string, owner: AccountScope): Promise<unknown> => {
   const cachedRequest = imageMetadataRequests.get(imageName);
@@ -302,11 +313,19 @@ export const executeImageRecall = async ({
       return false;
     }
 
-    if (result.fields.includes('referenceImages')) {
+    // An empty recalled list clears the current references; there is nothing to check for it.
+    if (result.fields.includes('referenceImages') && result.values.referenceImages.length > 0) {
       result.values.referenceImages = await filterAvailableReferenceImages(result.values.referenceImages, owner.signal);
       assertAccountScopeCurrent(owner);
 
+      // Every recorded reference was deleted: keep the current ones, fitted to the recalled model as an unrecorded list
+      // would be, rather than clearing them as if the record listed none.
       if (result.values.referenceImages.length === 0) {
+        result.values.referenceImages = getCompatibleReferenceImages(
+          currentGenerateValues.referenceImages,
+          result.values.model,
+          models
+        );
         result.fields = result.fields.filter((field) => field !== 'referenceImages');
       }
     }

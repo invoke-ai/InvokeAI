@@ -46,6 +46,7 @@ import {
   addEdge,
   addMetadata,
   addNode,
+  addOutputPostprocessors,
   createId,
   getActiveCompatibleLoras,
   toModelIdentifier,
@@ -630,6 +631,25 @@ const buildSD3Graph = (
   return graph;
 };
 
+/**
+ * The node's own default is `off`, so that preset sends nothing and the graph stays as it was. Scale and exponent
+ * only mean anything under `manual`; the other presets derive theirs from the image size.
+ */
+const getFluxDypeFields = (
+  settings: GenerateSettings
+): { dype_preset?: string; dype_scale?: number; dype_exponent?: number } => {
+  if (settings.fluxDypePreset === 'off') {
+    return {};
+  }
+
+  return {
+    dype_preset: settings.fluxDypePreset,
+    ...(settings.fluxDypePreset === 'manual'
+      ? { dype_exponent: settings.fluxDypeExponent, dype_scale: settings.fluxDypeScale }
+      : {}),
+  };
+};
+
 const buildFluxGraph = (
   settings: GenerateSettings,
   model: MainModelConfig,
@@ -666,6 +686,7 @@ const buildFluxGraph = (
   const posCond = addNode(graph, { id: 'pos_cond', type: 'flux_text_encoder' });
   const posCondCollect = addNode(graph, { id: 'pos_cond_collect', type: 'collect' });
   const denoiseSize = getDenoiseSize(settings, model);
+  const dype = getFluxDypeFields(settings);
   const denoise = addNode(graph, {
     denoising_end: 1,
     denoising_start: 0,
@@ -676,6 +697,7 @@ const buildFluxGraph = (
     scheduler,
     type: 'flux_denoise',
     width: denoiseSize.width,
+    ...dype,
   });
   const output = addDecodeOutput({
     denoise,
@@ -706,6 +728,9 @@ const buildFluxGraph = (
   addMetadata(graph, output, settings, model, 'flux_txt2img', projectSettings, {
     clip_embed_model: clipEmbedModel ?? undefined,
     guidance: settings.cfgScale,
+    ...dype,
+    // Recorded even when off, so recall can restore it over a preset the panel has since turned on.
+    dype_preset: settings.fluxDypePreset,
     scheduler,
     t5_encoder: t5EncoderModel ?? undefined,
     vae: vaeModel ?? undefined,
@@ -967,13 +992,20 @@ const buildQwenImageGraph = (
         'transformer',
       ])
     : modelLoader;
-  const posCond = addNode(graph, { id: 'pos_cond', type: 'qwen_image_text_encoder' });
-  const negCond = useCfg ? addNode(graph, { id: 'neg_cond', type: 'qwen_image_text_encoder' }) : null;
+  // The encoders default to `none`, so only an actual quantization choice reaches the graph.
+  const encoderQuantization =
+    settings.qwenImageEncoderQuantization === 'none' ? {} : { quantization: settings.qwenImageEncoderQuantization };
+  const posCond = addNode(graph, { id: 'pos_cond', type: 'qwen_image_text_encoder', ...encoderQuantization });
+  const negCond = useCfg
+    ? addNode(graph, { id: 'neg_cond', type: 'qwen_image_text_encoder', ...encoderQuantization })
+    : null;
   const qwenDenoiseSize = getDenoiseSize(settings, model);
   const denoise = addNode(graph, {
     cfg_scale: settings.cfgScale,
     height: qwenDenoiseSize.height,
     id: 'denoise_latents',
+    // Null keeps the node's dynamic shift; a value fixes the schedule (3 for the Lightning LoRAs).
+    ...(settings.qwenImageShift === null ? {} : { shift: settings.qwenImageShift }),
     steps: settings.steps,
     type: 'qwen_image_denoise',
     width: qwenDenoiseSize.width,
@@ -1047,7 +1079,9 @@ const buildQwenImageGraph = (
   }
   addMetadata(graph, output, settings, model, 'qwen_image_txt2img', projectSettings, {
     qwen_image_component_source: sourceModel,
+    qwen_image_quantization: settings.qwenImageEncoderQuantization,
     qwen_image_qwen_vl_encoder: settings.qwenVLEncoderModel ?? undefined,
+    qwen_image_shift: settings.qwenImageShift ?? 'auto',
     qwen_image_vae: vaeModel ?? undefined,
     scheduler: undefined,
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
@@ -1105,6 +1139,8 @@ const buildZImageGraph = (
     height: zImageDenoiseSize.height,
     id: 'denoise_latents',
     scheduler,
+    // Null keeps the node's size-derived shift.
+    ...(settings.zImageShift === null ? {} : { shift: settings.zImageShift }),
     steps: settings.steps,
     type: 'z_image_denoise',
     width: zImageDenoiseSize.width,
@@ -1125,7 +1161,21 @@ const buildZImageGraph = (
   addEdge(graph, loraSource, 'qwen3_encoder', posCond, 'qwen3_encoder');
   addEdge(graph, modelLoader, 'vae', denoise, 'vae');
   addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
-  addEdge(graph, posCond, 'conditioning', posCondCollect, 'item');
+  // Zero strength would be a no-op node, so it is left out like Krea-2's enhancer.
+  if (settings.zImageSeedVarianceEnabled && settings.zImageSeedVarianceStrength > 0) {
+    const seedVariance = addNode(graph, {
+      id: 'seed_variance_enhancer',
+      randomize_percent: settings.zImageSeedVarianceRandomizePercent,
+      strength: settings.zImageSeedVarianceStrength,
+      type: 'z_image_seed_variance_enhancer',
+    });
+
+    addEdge(graph, seed, 'value', seedVariance, 'seed');
+    addEdge(graph, posCond, 'conditioning', seedVariance, 'conditioning');
+    addEdge(graph, seedVariance, 'conditioning', posCondCollect, 'item');
+  } else {
+    addEdge(graph, posCond, 'conditioning', posCondCollect, 'item');
+  }
   addEdge(graph, posCondCollect, 'collection', denoise, 'positive_conditioning');
 
   if (negCond && negCondCollect) {
@@ -1141,6 +1191,10 @@ const buildZImageGraph = (
     qwen3_source: sourceModel,
     scheduler,
     vae: vaeModel ?? undefined,
+    z_image_seed_variance_enabled: settings.zImageSeedVarianceEnabled,
+    z_image_seed_variance_randomize_percent: settings.zImageSeedVarianceRandomizePercent,
+    z_image_seed_variance_strength: settings.zImageSeedVarianceStrength,
+    z_image_shift: settings.zImageShift ?? 'auto',
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
   });
 
@@ -1303,6 +1357,24 @@ const buildKrea2Graph = (
 
   addEdge(graph, seed, 'value', denoise, 'seed');
   addEdge(graph, denoise, 'latents', output, 'latents');
+  // Shared-KV reference attention takes exactly one reference; zero strength is a full bypass, so it is not run.
+  const styleReference = getEnabledReferenceImages(settings, 'krea2_reference_image').find(
+    (referenceImage) => referenceImage.config.styleStrength > 0
+  );
+  if (styleReference?.config.image) {
+    const styleReferenceNode = addNode(graph, {
+      // The reference's image tokens are appended to the target's, so both must be the same size.
+      height: settings.height,
+      id: 'krea2_style_reference',
+      image: toImageField(styleReference.config.image),
+      style_strength: styleReference.config.styleStrength,
+      type: 'krea2_style_reference',
+      width: settings.width,
+    });
+
+    addEdge(graph, modelLoader, 'vae', styleReferenceNode, 'vae');
+    addEdge(graph, styleReferenceNode, 'style_reference', denoise, 'style_reference');
+  }
   addMetadata(graph, output, settings, model, 'krea2_txt2img', projectSettings, {
     krea2_rebalance_enabled: settings.krea2RebalanceEnabled,
     krea2_rebalance_multiplier: settings.krea2RebalanceMultiplier,
@@ -1310,9 +1382,11 @@ const buildKrea2Graph = (
     krea2_seed_variance_enabled: settings.krea2SeedVarianceEnabled,
     krea2_seed_variance_randomize_percent: settings.krea2SeedVarianceRandomizePercent,
     krea2_seed_variance_strength: settings.krea2SeedVarianceStrength,
+    ...(styleReference ? { krea2_style_strength: styleReference.config.styleStrength } : {}),
     qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
     vae: vaeModel ?? undefined,
   });
+  addReferenceImageMetadata(graph, output, settings);
 
   return graph;
 };
@@ -1629,7 +1703,11 @@ export const compileGenerateGraph = (
       throw new Error(`${model.name} dimensions must be multiples of ${dimensionGrid}.`);
     }
 
-    return builder(settings, model, outputIsIntermediate, runtimeProjectSettings);
+    const graph = builder(settings, model, outputIsIntermediate, runtimeProjectSettings);
+    // External providers return finished images; the filters apply to every locally decoded family.
+    addOutputPostprocessors(graph, runtimeProjectSettings, outputIsIntermediate);
+
+    return graph;
   })();
 
   return {

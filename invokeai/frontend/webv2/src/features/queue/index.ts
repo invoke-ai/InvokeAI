@@ -40,6 +40,7 @@ export {
 } from './core/historySummary';
 export {
   BACKEND_SUBMITTABLE_SOURCE_IDS,
+  getQueueSourceResultSelection,
   isBackendSubmittableSourceId,
   shouldSubmitPendingQueueItem,
 } from './core/submissionRules';

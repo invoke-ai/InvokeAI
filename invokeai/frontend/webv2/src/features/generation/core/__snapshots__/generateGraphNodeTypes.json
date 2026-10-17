@@ -12,6 +12,8 @@
         "compel",
         "core_metadata",
         "denoise_latents",
+        "img_nsfw",
+        "img_watermark",
         "integer",
         "l2i",
         "main_model_loader",
@@ -30,6 +32,8 @@
         "compel",
         "core_metadata",
         "denoise_latents",
+        "img_nsfw",
+        "img_watermark",
         "integer",
         "l2i",
         "main_model_loader",
@@ -47,6 +51,8 @@
         "collect",
         "core_metadata",
         "denoise_latents",
+        "img_nsfw",
+        "img_watermark",
         "integer",
         "l2i",
         "noise",
@@ -64,6 +70,8 @@
       },
       "nodeTypes": [
         "core_metadata",
+        "img_nsfw",
+        "img_watermark",
         "integer",
         "sd3_denoise",
         "sd3_l2i",
@@ -92,6 +100,8 @@
         "flux_model_loader",
         "flux_text_encoder",
         "flux_vae_decode",
+        "img_nsfw",
+        "img_watermark",
         "integer",
         "string"
       ]
@@ -117,6 +127,8 @@
         "flux2_klein_model_loader",
         "flux2_klein_text_encoder",
         "flux2_vae_decode",
+        "img_nsfw",
+        "img_watermark",
         "integer",
         "string"
       ]
@@ -132,6 +144,8 @@
         "cogview4_model_loader",
         "cogview4_text_encoder",
         "core_metadata",
+        "img_nsfw",
+        "img_watermark",
         "integer",
         "string"
       ]
@@ -150,6 +164,8 @@
         "ernie_image_model_loader",
         "ernie_image_text_encoder",
         "ernie_image_vae_decode",
+        "img_nsfw",
+        "img_watermark",
         "integer",
         "string"
       ]
@@ -164,6 +180,8 @@
       },
       "nodeTypes": [
         "core_metadata",
+        "img_nsfw",
+        "img_watermark",
         "integer",
         "qwen_image_denoise",
         "qwen_image_l2i",
@@ -183,11 +201,14 @@
       "nodeTypes": [
         "collect",
         "core_metadata",
+        "img_nsfw",
+        "img_watermark",
         "integer",
         "string",
         "z_image_denoise",
         "z_image_l2i",
         "z_image_model_loader",
+        "z_image_seed_variance_enhancer",
         "z_image_text_encoder"
       ]
     },
@@ -207,6 +228,8 @@
         "ideogram4_l2i",
         "ideogram4_model_loader",
         "ideogram4_text_encoder",
+        "img_nsfw",
+        "img_watermark",
         "integer",
         "string"
       ]
@@ -222,9 +245,12 @@
       "nodeTypes": [
         "collect",
         "core_metadata",
+        "img_nsfw",
+        "img_watermark",
         "integer",
         "krea2_denoise",
         "krea2_model_loader",
+        "krea2_style_reference",
         "krea2_text_encoder",
         "qwen_image_l2i",
         "string"
@@ -240,6 +266,8 @@
       },
       "nodeTypes": [
         "core_metadata",
+        "img_nsfw",
+        "img_watermark",
         "integer",
         "qwen_image_2_1_denoise",
         "qwen_image_2_1_l2i",
@@ -258,6 +286,8 @@
       },
       "nodeTypes": [
         "core_metadata",
+        "img_nsfw",
+        "img_watermark",
         "integer",
         "string",
         "wan_denoise",
@@ -285,6 +315,8 @@
         "anima_text_encoder",
         "collect",
         "core_metadata",
+        "img_nsfw",
+        "img_watermark",
         "integer",
         "string"
       ]
@@ -341,13 +373,16 @@
       ],
       "literalInputs": {
         "is_intermediate": [
-          false
+          false,
+          true
         ],
         "use_cache": [
           false
         ]
       },
-      "outputs": []
+      "outputs": [
+        "image"
+      ]
     },
     "anima_model_loader": {
       "inputs": [],
@@ -446,13 +481,16 @@
       ],
       "literalInputs": {
         "is_intermediate": [
-          false
+          false,
+          true
         ],
         "use_cache": [
           false
         ]
       },
-      "outputs": []
+      "outputs": [
+        "image"
+      ]
     },
     "cogview4_model_loader": {
       "inputs": [],
@@ -543,6 +581,16 @@
         "clip_skip": [
           0
         ],
+        "dype_exponent": [
+          1
+        ],
+        "dype_preset": [
+          "manual",
+          "off"
+        ],
+        "dype_scale": [
+          3
+        ],
         "generation_mode": [
           "anima_txt2img",
           "cogview4_txt2img",
@@ -608,9 +656,20 @@
         "krea2_seed_variance_strength": [
           0.1
         ],
+        "krea2_style_strength": [
+          1
+        ],
         "mistral_encoder": [],
         "model": [],
+        "qwen_image_quantization": [
+          "nf4",
+          "none"
+        ],
         "qwen_image_qwen_vl_encoder": [],
+        "qwen_image_shift": [
+          "auto",
+          3
+        ],
         "qwen_image_vae": [],
         "qwen3_5_encoder": [],
         "qwen3_encoder": [],
@@ -619,6 +678,7 @@
         "rand_device": [
           "cpu"
         ],
+        "ref_images": [],
         "refiner_cfg_scale": [
           7.5
         ],
@@ -670,6 +730,21 @@
           1024,
           512,
           768
+        ],
+        "z_image_seed_variance_enabled": [
+          false,
+          true
+        ],
+        "z_image_seed_variance_randomize_percent": [
+          50
+        ],
+        "z_image_seed_variance_strength": [
+          0.1,
+          0.2
+        ],
+        "z_image_shift": [
+          "auto",
+          3
         ]
       },
       "outputs": [
@@ -815,13 +890,16 @@
       ],
       "literalInputs": {
         "is_intermediate": [
-          false
+          false,
+          true
         ],
         "use_cache": [
           false
         ]
       },
-      "outputs": []
+      "outputs": [
+        "image"
+      ]
     },
     "flux_denoise": {
       "inputs": [
@@ -836,6 +914,15 @@
         ],
         "denoising_start": [
           0
+        ],
+        "dype_exponent": [
+          1
+        ],
+        "dype_preset": [
+          "manual"
+        ],
+        "dype_scale": [
+          3
         ],
         "guidance": [
           3.5
@@ -912,13 +999,16 @@
       ],
       "literalInputs": {
         "is_intermediate": [
-          false
+          false,
+          true
         ],
         "use_cache": [
           false
         ]
       },
-      "outputs": []
+      "outputs": [
+        "image"
+      ]
     },
     "flux2_denoise": {
       "inputs": [
@@ -1049,13 +1139,16 @@
       ],
       "literalInputs": {
         "is_intermediate": [
-          false
+          false,
+          true
         ],
         "use_cache": [
           false
         ]
       },
-      "outputs": []
+      "outputs": [
+        "image"
+      ]
     },
     "ideogram4_caption_builder": {
       "inputs": [
@@ -1110,13 +1203,16 @@
       ],
       "literalInputs": {
         "is_intermediate": [
-          false
+          false,
+          true
         ],
         "use_cache": [
           false
         ]
       },
-      "outputs": []
+      "outputs": [
+        "image"
+      ]
     },
     "ideogram4_model_loader": {
       "inputs": [],
@@ -1156,6 +1252,37 @@
         "conditioning"
       ]
     },
+    "img_nsfw": {
+      "inputs": [
+        "image"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          false
+        ]
+      },
+      "outputs": [
+        "image"
+      ]
+    },
+    "img_watermark": {
+      "inputs": [
+        "image",
+        "metadata"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          false
+        ],
+        "use_cache": [
+          false
+        ]
+      },
+      "outputs": []
+    },
     "integer": {
       "inputs": [],
       "literalInputs": {
@@ -1174,6 +1301,7 @@
       "inputs": [
         "positive_conditioning",
         "seed",
+        "style_reference",
         "transformer"
       ],
       "literalInputs": {
@@ -1219,6 +1347,32 @@
         "vae"
       ]
     },
+    "krea2_style_reference": {
+      "inputs": [
+        "vae"
+      ],
+      "literalInputs": {
+        "height": [
+          1024
+        ],
+        "image": [],
+        "is_intermediate": [
+          true
+        ],
+        "style_strength": [
+          1
+        ],
+        "use_cache": [
+          true
+        ],
+        "width": [
+          1024
+        ]
+      },
+      "outputs": [
+        "style_reference"
+      ]
+    },
     "krea2_text_encoder": {
       "inputs": [
         "prompt",
@@ -1250,13 +1404,16 @@
           true
         ],
         "is_intermediate": [
-          false
+          false,
+          true
         ],
         "use_cache": [
           false
         ]
       },
-      "outputs": []
+      "outputs": [
+        "image"
+      ]
     },
     "main_model_loader": {
       "inputs": [],
@@ -1342,13 +1499,16 @@
       ],
       "literalInputs": {
         "is_intermediate": [
-          false
+          false,
+          true
         ],
         "use_cache": [
           false
         ]
       },
-      "outputs": []
+      "outputs": [
+        "image"
+      ]
     },
     "qwen_image_2_1_model_loader": {
       "inputs": [],
@@ -1403,6 +1563,9 @@
         "is_intermediate": [
           true
         ],
+        "shift": [
+          3
+        ],
         "steps": [
           40
         ],
@@ -1425,13 +1588,16 @@
       ],
       "literalInputs": {
         "is_intermediate": [
-          false
+          false,
+          true
         ],
         "use_cache": [
           false
         ]
       },
-      "outputs": []
+      "outputs": [
+        "image"
+      ]
     },
     "qwen_image_model_loader": {
       "inputs": [],
@@ -1460,6 +1626,9 @@
       "literalInputs": {
         "is_intermediate": [
           true
+        ],
+        "quantization": [
+          "nf4"
         ],
         "use_cache": [
           true
@@ -1514,13 +1683,16 @@
       ],
       "literalInputs": {
         "is_intermediate": [
-          false
+          false,
+          true
         ],
         "use_cache": [
           false
         ]
       },
-      "outputs": []
+      "outputs": [
+        "image"
+      ]
     },
     "sd3_model_loader": {
       "inputs": [],
@@ -1687,13 +1859,16 @@
       ],
       "literalInputs": {
         "is_intermediate": [
-          false
+          false,
+          true
         ],
         "use_cache": [
           false
         ]
       },
-      "outputs": []
+      "outputs": [
+        "image"
+      ]
     },
     "wan_model_loader": {
       "inputs": [],
@@ -1758,6 +1933,9 @@
         "scheduler": [
           "euler"
         ],
+        "shift": [
+          3
+        ],
         "steps": [
           9
         ],
@@ -1780,13 +1958,16 @@
       ],
       "literalInputs": {
         "is_intermediate": [
-          false
+          false,
+          true
         ],
         "use_cache": [
           false
         ]
       },
-      "outputs": []
+      "outputs": [
+        "image"
+      ]
     },
     "z_image_model_loader": {
       "inputs": [],
@@ -1806,6 +1987,29 @@
         "qwen3_encoder",
         "transformer",
         "vae"
+      ]
+    },
+    "z_image_seed_variance_enhancer": {
+      "inputs": [
+        "conditioning",
+        "seed"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "randomize_percent": [
+          50
+        ],
+        "strength": [
+          0.2
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "conditioning"
       ]
     },
     "z_image_text_encoder": {

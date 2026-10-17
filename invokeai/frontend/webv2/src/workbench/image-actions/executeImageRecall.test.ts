@@ -497,6 +497,49 @@ describe('executeImageRecall', () => {
     );
   });
 
+  it('keeps the current references when every recorded reference was deleted', async () => {
+    const { commands, setSettings } = createCommands();
+    const current = {
+      config: {
+        image: { original: { image: { height: 64, image_name: 'current.png', width: 64 } } },
+        model: null,
+        type: 'ip_adapter',
+      },
+      id: 'current',
+      isEnabled: true,
+    };
+
+    galleryApi.galleryImages.metadata.mockResolvedValue({
+      positive_prompt: 'recalled prompt',
+      ref_images: [
+        {
+          config: { image: { height: 64, image_name: 'deleted.png', width: 64 }, type: 'qwen_image_reference_image' },
+          id: 'deleted',
+          isEnabled: true,
+        },
+      ],
+    });
+    galleryApi.galleryImages.resolveMany.mockResolvedValue([]);
+
+    await executeImageRecall({
+      t,
+      commands,
+      generateValues: { modelKey: model.key, referenceImages: [current] },
+      image,
+      kind: 'all',
+      models: [model],
+      projectId: 'project-1',
+    });
+
+    expect(setSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        positivePrompt: 'recalled prompt',
+        referenceImages: [expect.objectContaining({ id: 'current' })],
+      }),
+      'project-1'
+    );
+  });
+
   it('does not reuse or commit image metadata from an expired account epoch', async () => {
     const oldCommands = createCommands();
     let resolveOldMetadata: ((value: unknown) => void) | undefined;

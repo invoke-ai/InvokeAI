@@ -7,24 +7,38 @@ export interface GalleryRealtimeBackend {
   onConnectionChange(handler: (status: BackendConnectionStatus) => void): () => void;
 }
 
+/** The fields of the backend's `queue_item_status_changed` payload that Gallery reads. */
+interface QueueItemStatusChangedPayload {
+  origin: string | null;
+  status: string;
+  user_id: string;
+}
+
 export interface GalleryRealtimeRuntime {
   dispose(): void;
   start(): void;
 }
 
 /**
- * Refresh external uploads and reconnects at least minIntervalMs apart. Coalesce pending events and guarantee a
- * trailing pass without repeatedly cancelling page fetches.
+ * Refresh external uploads, the session user's completions enqueued by other clients, and reconnects at least
+ * minIntervalMs apart. Coalesce pending events and guarantee a trailing pass without repeatedly cancelling page
+ * fetches.
  */
 export const createGalleryRealtimeRuntime = ({
   backend,
   coalesceMs = 250,
+  getSessionUserId,
   invalidate,
+  isClientQueueItemOrigin,
   minIntervalMs = 1000,
 }: {
   backend: GalleryRealtimeBackend;
   coalesceMs?: number;
+  /** Null when events cannot be attributed to a user (single-user servers tag every event `system`). */
+  getSessionUserId: () => string | null;
   invalidate: () => void | Promise<void>;
+  /** True for origins of items this client enqueues; Queue refreshes for those in the tab that tracks them. */
+  isClientQueueItemOrigin: (origin: string | null) => boolean;
   minIntervalMs?: number;
 }): GalleryRealtimeRuntime => {
   const owner = captureAccountScope();
@@ -53,6 +67,22 @@ export const createGalleryRealtimeRuntime = ({
     }, delay);
   };
 
+  const handleQueueItemStatusChanged = (event: QueueItemStatusChangedPayload): void => {
+    // Admins also receive other users' full events and everyone else's arrive redacted, so only the session user's
+    // completions can add to this gallery. Items this client enqueued are left to Queue, which refreshes only in the
+    // tab tracking the item: another tab or device of the same user is not refreshed for them. Known limitation,
+    // left intentionally: refreshing here too would double-refresh the enqueuing tab.
+    const sessionUserId = getSessionUserId();
+
+    if (
+      event.status === 'completed' &&
+      !isClientQueueItemOrigin(event.origin) &&
+      (sessionUserId === null || event.user_id === sessionUserId)
+    ) {
+      scheduleInvalidation();
+    }
+  };
+
   const start = (): void => {
     if (isStarted || !isAccountScopeCurrent(owner)) {
       return;
@@ -67,6 +97,7 @@ export const createGalleryRealtimeRuntime = ({
     detachers.push(
       backend.on('image_uploaded', scheduleInvalidation),
       backend.on('video_uploaded', scheduleInvalidation),
+      backend.on('queue_item_status_changed', handleQueueItemStatusChanged),
       backend.onConnectionChange((status) => {
         const isReconnect = previousStatus === 'disconnected' && status === 'connected';
 
