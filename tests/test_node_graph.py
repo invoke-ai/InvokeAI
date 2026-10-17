@@ -1449,6 +1449,29 @@ def test_graph_update_node_reconnects_source_feeding_collector_chain():
     graph.validate_self()
 
 
+def test_graph_validate_self_accepts_iterator_before_collectors_with_float_roots():
+    float_source = FloatInvocation(id="float", value=2.5)
+    downstream_collector = CollectInvocation(id="collector_y")
+    upstream_collector = CollectInvocation(id="collector_x")
+    first_iterate = IterateInvocation(id="iterate_1")
+    second_iterate = IterateInvocation(id="iterate_2")
+    # Keep iterators earlier in nodes order than the collectors, as in issue #9695.
+    graph = Graph(
+        nodes={
+            node.id: node
+            for node in (float_source, first_iterate, second_iterate, downstream_collector, upstream_collector)
+        },
+        edges=[
+            create_edge(float_source.id, "value", downstream_collector.id, "item"),
+            create_edge(downstream_collector.id, "collection", upstream_collector.id, "collection"),
+            create_edge(upstream_collector.id, "collection", first_iterate.id, "collection"),
+            create_edge(upstream_collector.id, "collection", second_iterate.id, "collection"),
+        ],
+    )
+
+    graph.validate_self()
+
+
 def test_graph_add_collection_input_revalidates_iterator_consumers():
     integer_source = IntegerInvocation(id="integer", value=1)
     float_collection = FloatCollectionInvocation(id="float_collection", collection=[2.5])
@@ -2743,6 +2766,7 @@ def test_nodes_must_return_invocation_output():
                 return "foo"
 
 
+@pytest.mark.platform_independent
 def test_nodes_must_return_invocation_output_under_optimized_python():
     result = subprocess.run(
         [

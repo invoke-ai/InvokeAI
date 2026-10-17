@@ -120,7 +120,13 @@ const fluxVae: VaeModelConfig = { base: 'flux', key: 'flux-vae', name: 'FLUX VAE
 const flux2Vae: VaeModelConfig = { base: 'flux2', key: 'flux2-vae', name: 'FLUX.2 VAE', type: 'vae' };
 const qwenImageVae: VaeModelConfig = { base: 'qwen-image', key: 'qwen-vae', name: 'Qwen VAE', type: 'vae' };
 const t5Encoder: ComponentModelConfig = { base: 'any', key: 't5', name: 'T5 Encoder', type: 't5_encoder' };
-const clipEmbed: ComponentModelConfig = { base: 'any', key: 'clip', name: 'CLIP Embed', type: 'clip_embed' };
+const clipEmbed: ComponentModelConfig = {
+  base: 'any',
+  key: 'clip',
+  name: 'CLIP Embed',
+  type: 'clip_embed',
+  variant: 'large',
+};
 const mistralEncoder: ComponentModelConfig = {
   base: 'any',
   key: 'mistral',
@@ -1032,6 +1038,70 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
     expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loader?.id);
     // The Wan encoder is fed straight from the model loader — Wan LoRAs do not touch it.
     expect(getEdge(graph, 'pos_cond', 'wan_t5_encoder')?.source.node_id).toBe('model_loader');
+  });
+});
+
+describe('Qwen-Image-2.1 graphs', () => {
+  const qwen21Diffusers: MainModelConfig = {
+    base: 'qwen-image-2-1',
+    format: 'diffusers',
+    key: 'qwen21-diffusers',
+    name: 'Qwen-Image-2.1',
+    type: 'main',
+    variant: 'qwen_image_21_base',
+  };
+  const qwen21Gguf: MainModelConfig = {
+    base: 'qwen-image-2-1',
+    format: 'gguf_quantized',
+    key: 'qwen21-gguf',
+    name: 'Qwen-Image-2.1 Q4_K_M',
+    type: 'main',
+    variant: 'qwen_image_21_base',
+  };
+  const qwen21Vae: VaeModelConfig = {
+    base: 'qwen-image-2-1',
+    key: 'qwen21-vae',
+    name: 'Qwen-Image-2.1 VAE',
+    type: 'vae',
+  };
+  const qwen3Vl8bEncoder: ComponentModelConfig = {
+    base: 'any',
+    key: 'qwen3-vl-8b',
+    name: 'Qwen3-VL 8B',
+    type: 'qwen3_vl_encoder',
+    variant: 'qwen3_vl_8b',
+  };
+
+  it('runs the negative prompt only with CFG above 1, wired through its own encoder', () => {
+    // Qwen-Image-2.1 is sampled without guidance by default; there the model takes no negative input.
+    const withoutCfg = compile(qwen21Diffusers, { cfgScale: 1 });
+
+    expect(withoutCfg.nodes.neg_cond).toBeUndefined();
+    expect(getEdge(withoutCfg, 'denoise_latents', 'negative_conditioning')).toBeUndefined();
+
+    const withCfg = compile(qwen21Diffusers, { cfgScale: 4 });
+
+    expect(withCfg.nodes.neg_cond?.type).toBe('qwen_image_2_1_text_encoder');
+    expect(getEdge(withCfg, 'denoise_latents', 'negative_conditioning')?.source.node_id).toBe('neg_cond');
+    expect(getEdge(withCfg, 'neg_cond', 'prompt')?.source.node_id).toBe('negative_prompt');
+    expect(getEdge(withCfg, 'neg_cond', 'qwen3_vl_encoder')?.source).toEqual({
+      field: 'qwen3_vl_encoder',
+      node_id: 'model_loader',
+    });
+    expect(withCfg.nodes.denoise_latents).toMatchObject({ cfg_scale: 4 });
+  });
+
+  it('requires the VAE and the encoder for a GGUF transformer, and passes them to the loader', () => {
+    expect(() => compile(qwen21Gguf, { qwen3VLEncoderModel: qwen3Vl8bEncoder })).toThrow(
+      'Generate needs a VAE for non-Diffusers Qwen-Image-2.1 models.'
+    );
+    expect(() => compile(qwen21Gguf, { vae: qwen21Vae })).toThrow(
+      'Generate needs a Qwen3-VL 8B Encoder for non-Diffusers Qwen-Image-2.1 models.'
+    );
+
+    const graph = compile(qwen21Gguf, { qwen3VLEncoderModel: qwen3Vl8bEncoder, vae: qwen21Vae });
+
+    expect(graph.nodes.model_loader).toMatchObject({ qwen3_vl_encoder_model: qwen3Vl8bEncoder, vae_model: qwen21Vae });
   });
 });
 

@@ -114,6 +114,13 @@ Invoke's open-source development is powered by our sponsors. If Invoke is valuab
 
 We very much thank the following sponsors:
 
+### Blacksmith
+
+[![Blacksmith](https://raw.githubusercontent.com/invoke-ai/InvokeAI/main/docs/src/content/docs/assets/blacksmith-logo.png)](https://www.blacksmith.sh/)
+
+Blacksmith provides InvokeAI with virtual machines for continuous
+integration and continuous deployment.
+
 ### Backers ($15/mo)
 
 * [apokolypsse](https://github.com/apokolypsse)
