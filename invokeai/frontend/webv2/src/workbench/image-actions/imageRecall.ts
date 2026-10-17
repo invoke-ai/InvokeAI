@@ -29,9 +29,17 @@ import {
   isMainModelConfig,
   isModelIdentifierConfig,
   isVaeCompatibleWithGenerateModel,
+  isFluxDypePreset,
+  isQwenImageEncoderQuantization,
   isValidKrea2RebalanceWeights,
+  MAX_FLUX_DYPE_EXPONENT,
+  MAX_FLUX_DYPE_SCALE,
   MAX_HIDIFFUSION_RATIO,
+  MAX_TIMESTEP_SHIFT,
+  MAX_ZIMAGE_SEED_VARIANCE_STRENGTH,
   MIN_HIDIFFUSION_T1_RATIO,
+  MIN_TIMESTEP_SHIFT,
+  MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
   normalizeReferenceImages,
 } from '@features/generation/settings';
 import { SEED_MAX } from '@platform/core/seed';
@@ -75,6 +83,7 @@ type RecalledField =
   | 'loras'
   | 'referenceImages'
   | 'krea2Rebalance'
+  | 'modelTuning'
   | 'animaInpaintAdapterWeight';
 
 export type ImageRecallSkipReason =
@@ -422,6 +431,113 @@ const hasKrea2Rebalance = (metadata: unknown, model: GenerateModelConfig | undef
   Object.keys(getMetadataKrea2Rebalance(metadata, model)).length > 0;
 
 /**
+ * Generation graphs stamp `generation_mode` and record what ran, so on such a record a missing list or switch means
+ * none or the node default. Other records that name a model, such as canvas saves, never record concepts or tuning.
+ */
+const isGenerationRecord = (metadata: unknown): boolean => getString(metadata, 'generation_mode') !== null;
+
+const getBoundedNumber = (metadata: unknown, key: string, min: number, max: number): number | null => {
+  const value = getNumber(metadata, key);
+
+  return value !== null && value >= min && value <= max ? value : null;
+};
+
+/**
+ * A recorded shift: `'auto'` (webv2) or `null` (legacy) for one the node derived, a number for an override.
+ * Undefined when the key is missing or holds something else.
+ */
+const getRecordedTimestepShift = (metadata: unknown, key: string): number | null | undefined => {
+  if (!isRecord(metadata) || !(key in metadata)) {
+    return undefined;
+  }
+
+  if (metadata[key] === null || metadata[key] === 'auto') {
+    return null;
+  }
+
+  return getBoundedNumber(metadata, key, MIN_TIMESTEP_SHIFT, MAX_TIMESTEP_SHIFT) ?? undefined;
+};
+
+/**
+ * Per-family tuning the graphs record under their own keys. Gated on the model recall settles on, since each
+ * setting only reaches that family's denoise or encoder nodes.
+ *
+ * A generation record of that same family that leaves a switch out ran the node's default: webv2 recorded no tuning
+ * before the panel offered it. Restoring the default there means a preset turned on since does not survive recall.
+ * Values that only matter while a switch is on (DyPE scale, variance strength) stay as they are when missing.
+ */
+const getMetadataModelTuning = (
+  metadata: unknown,
+  model: GenerateModelConfig | undefined
+): Partial<GenerateWidgetValues> => {
+  if (!model || model.type !== 'main' || !isRecord(metadata)) {
+    return {};
+  }
+
+  const recordsFamily = isGenerationRecord(metadata) && getRecord(metadata, 'model')?.base === model.base;
+  const recordedOrDefault = <T>(key: string, recorded: T | undefined, fallback: T): T | undefined =>
+    recorded !== undefined ? recorded : recordsFamily && !(key in metadata) ? fallback : undefined;
+
+  if (model.base === 'flux') {
+    const preset = recordedOrDefault(
+      'dype_preset',
+      isFluxDypePreset(metadata.dype_preset) ? metadata.dype_preset : undefined,
+      'off'
+    );
+    const scale = getBoundedNumber(metadata, 'dype_scale', 0, MAX_FLUX_DYPE_SCALE);
+    const exponent = getBoundedNumber(metadata, 'dype_exponent', 0, MAX_FLUX_DYPE_EXPONENT);
+
+    return {
+      ...(preset === undefined ? {} : { fluxDypePreset: preset }),
+      ...(scale === null ? {} : { fluxDypeScale: scale }),
+      ...(exponent === null ? {} : { fluxDypeExponent: exponent }),
+    };
+  }
+
+  if (model.base === 'z-image') {
+    const shift = recordedOrDefault('z_image_shift', getRecordedTimestepShift(metadata, 'z_image_shift'), null);
+    const enabled = recordedOrDefault(
+      'z_image_seed_variance_enabled',
+      getBoolean(metadata, 'z_image_seed_variance_enabled') ?? undefined,
+      false
+    );
+    const strength = getBoundedNumber(metadata, 'z_image_seed_variance_strength', 0, MAX_ZIMAGE_SEED_VARIANCE_STRENGTH);
+    const randomizePercent = getBoundedNumber(
+      metadata,
+      'z_image_seed_variance_randomize_percent',
+      MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
+      100
+    );
+
+    return {
+      ...(shift === undefined ? {} : { zImageShift: shift }),
+      ...(enabled === undefined ? {} : { zImageSeedVarianceEnabled: enabled }),
+      ...(strength === null ? {} : { zImageSeedVarianceStrength: strength }),
+      ...(randomizePercent === null ? {} : { zImageSeedVarianceRandomizePercent: randomizePercent }),
+    };
+  }
+
+  if (model.base === 'qwen-image') {
+    const shift = recordedOrDefault('qwen_image_shift', getRecordedTimestepShift(metadata, 'qwen_image_shift'), null);
+    const quantization = recordedOrDefault(
+      'qwen_image_quantization',
+      isQwenImageEncoderQuantization(metadata.qwen_image_quantization) ? metadata.qwen_image_quantization : undefined,
+      'none'
+    );
+
+    return {
+      ...(shift === undefined ? {} : { qwenImageShift: shift }),
+      ...(quantization === undefined ? {} : { qwenImageEncoderQuantization: quantization }),
+    };
+  }
+
+  return {};
+};
+
+const hasModelTuning = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
+  Object.keys(getMetadataModelTuning(metadata, model)).length > 0;
+
+/**
  * The canvas records the adapter's weight beside the adapter; only an Anima image can carry it. An out-of-range
  * weight is clamped rather than applied, which would block every inpaint until the user edits it.
  */
@@ -583,12 +699,6 @@ const resolveRecordedLora = (
   return matches.length > 1 ? 'ambiguous' : (matches[0] ?? null);
 };
 
-/**
- * Generation graphs stamp `generation_mode` and omit `loras` when no concept was active, so on such a record a
- * missing list means "none". Other records that name a model, such as canvas saves, never record concepts.
- */
-const isGenerationRecord = (metadata: unknown): boolean => getString(metadata, 'generation_mode') !== null;
-
 interface ConceptRecall {
   /** The concept list to apply, or null when the metadata says nothing reliable about concepts. */
   loras: GenerateLora[] | null;
@@ -748,6 +858,7 @@ export const getImageRecallCapabilities = ({
   const hasReferenceImages = getMetadataReferenceImages(metadata).length > 0;
   const hasModel = supportedMetadataModel !== null;
   const hasRebalance = hasKrea2Rebalance(metadata, clipSkipModel);
+  const hasTuning = hasModelTuning(metadata, clipSkipModel);
   const hasAdapterWeight = hasAnimaInpaintAdapterWeight(metadata, clipSkipModel);
   const hasConcepts =
     (getMetadataConcepts(metadata, models, clipSkipModel, supportedMetadataModel).loras?.length ?? 0) > 0;
@@ -764,6 +875,7 @@ export const getImageRecallCapabilities = ({
     hasReferenceImages ||
     hasConcepts ||
     hasRebalance ||
+    hasTuning ||
     hasAdapterWeight;
   const hasNonSeedMetadata =
     hasModel ||
@@ -777,6 +889,7 @@ export const getImageRecallCapabilities = ({
     hasReferenceImages ||
     hasConcepts ||
     hasRebalance ||
+    hasTuning ||
     hasAdapterWeight;
 
   return {
@@ -845,6 +958,14 @@ export const buildImageRecallSettings = ({
     if (Object.keys(rebalancePatch).length > 0) {
       values = { ...values, ...rebalancePatch };
       fields.push('krea2Rebalance');
+    }
+
+    const tuningPatch = getMetadataModelTuning(metadata, values.model);
+
+    // A same-family record always restores its switches, so only count the field when one actually changes.
+    if (Object.entries(tuningPatch).some(([key, value]) => values[key as keyof GenerateWidgetValues] !== value)) {
+      values = { ...values, ...tuningPatch };
+      fields.push('modelTuning');
     }
 
     const adapterWeightPatch = getMetadataAnimaInpaintAdapterWeight(metadata, values.model);
