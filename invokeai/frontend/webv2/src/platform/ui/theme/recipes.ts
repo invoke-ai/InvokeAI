@@ -749,7 +749,7 @@ export const checkboxSlotRecipe = defineSlotRecipe({
             '&[data-state=unchecked]:not([data-invalid])': {
               borderColor: 'color-mix(in oklab, {colors.border.emphasized}, {colors.fg})',
             },
-            '&:is([data-state=checked], [data-state=indeterminate])': {
+            '&:is([data-state=checked], [data-state=indeterminate]):not([data-invalid])': {
               bg: 'colorPalette.solid/90',
               borderColor: 'colorPalette.solid/90',
             },

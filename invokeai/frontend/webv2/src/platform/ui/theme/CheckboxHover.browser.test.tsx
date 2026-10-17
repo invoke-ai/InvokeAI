@@ -38,6 +38,8 @@ const SAMPLES = [
   { id: 'checked', checked: true, disabled: false, invalid: false },
   { id: 'disabled', checked: false, disabled: true, invalid: false },
   { id: 'invalid', checked: false, disabled: false, invalid: true },
+  { id: 'invalid-checked', checked: true, disabled: false, invalid: true },
+  { id: 'invalid-indeterminate', checked: 'indeterminate', disabled: false, invalid: true },
 ] as const;
 
 const renderCheckboxes = async () => {
@@ -129,7 +131,7 @@ describe('checkbox hover', () => {
     }
   }
 
-  it('shows the hover from the label, not on a disabled checkbox, and keeps an invalid one in error', async () => {
+  it('shows the hover from the label, not on a disabled checkbox', async () => {
     const { hoverLabel, hoverOutset, read } = await renderCheckboxes();
     const unchecked = read('unchecked');
     const disabled = read('disabled');
@@ -141,10 +143,18 @@ describe('checkbox hover', () => {
     expect(read('disabled')).toEqual(disabled);
     await hoverLabel('disabled');
     expect(read('disabled')).toEqual(disabled);
-
-    const invalid = read('invalid');
-
-    await hoverLabel('invalid');
-    expect(read('invalid')).toEqual(invalid);
   });
+
+  it.each(['invalid', 'invalid-checked', 'invalid-indeterminate'])(
+    'preserves the error appearance of %s when hovering the label or outset',
+    async (id) => {
+      const { hoverLabel, hoverOutset, read } = await renderCheckboxes();
+      const invalid = read(id);
+
+      await hoverLabel(id);
+      expect(read(id)).toEqual(invalid);
+      await hoverOutset(id);
+      expect(read(id)).toEqual(invalid);
+    }
+  );
 });
