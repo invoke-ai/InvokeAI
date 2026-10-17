@@ -11,6 +11,7 @@ import yaml
 from scripts.family_e2e.__main__ import UsageError, _resolve_run, main
 from scripts.family_e2e.records import RunInfo, load_run_info, write_run_info
 from scripts.family_e2e.runner import HEARTBEAT_FILE, now_iso, process_identity
+from tests.family_e2e.test_records import make_run_info
 
 REPO_ROOT = Path(__file__).parents[2]
 
@@ -115,6 +116,29 @@ def test_stop_kills_the_runner_tree_but_no_process_whose_pid_was_reused(tmp_path
         unrelated.kill()
         unrelated.wait()
         runner_process.wait()
+
+
+def test_stop_saves_the_calibration_store_its_killed_server_left(tmp_path: Path) -> None:
+    run_id = "20261017-000000-box"
+    run_dir = tmp_path / "data" / "runs" / run_id
+    run_dir.mkdir(parents=True)
+    write_run_info(
+        run_dir, make_run_info(run_id, profile="box", status="running").model_copy(update={"calibrate": True})
+    )
+    store_dir = tmp_path / "data" / "scratch-roots" / f"{run_id}-default" / "databases" / "working_memory"
+    store_dir.mkdir(parents=True)
+    store = b'{"schema_version": 1, "points": ["window"]}'
+    (store_dir / "0123456789abcdef.json").write_bytes(store)
+    (store_dir / "0123456789abcdef.json.lock").write_bytes(b"")
+
+    assert main(["stop", str(run_dir)]) == 0
+
+    info = load_run_info(run_dir)
+    assert [(e.lifetime, e.source, e.device_class_id, e.status) for e in info.calibration_exports] == [
+        (1, "store_file", "0123456789abcdef", None)
+    ]
+    assert (run_dir / info.calibration_exports[0].export).read_bytes() == store
+    assert not store_dir.exists()
 
 
 @pytest.mark.platform_independent

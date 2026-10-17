@@ -141,3 +141,37 @@ def test_a_declared_stand_in_line_is_not_fitted() -> None:
     )
     data = WorkingMemoryData(schema_version=1, coefficients=[entry], points=[])
     assert fitted_values([data]) == {}
+
+
+def test_points_that_cap_nothing_are_covered_but_do_not_choose_the_line() -> None:
+    """Rated on every point, the low reading at size 1 makes the edge through the origin win; rated on the capping
+    points, the flatter edge does, and it still covers the low reading."""
+    capping = [(2, 15), (4, 20)]
+    points = [*capping, (1, 4)]
+
+    assert upper_envelope(points) == (Fraction(15, 2), 0)
+    k, b = upper_envelope(points, capping)
+    assert (k, b) == (Fraction(5, 2), 10)
+    assert all(k * x + b >= y for x, y in points)
+
+
+def test_a_probe_point_raises_a_line_but_does_not_choose_it() -> None:
+    values = {"k_decode_bf16": 0.0, "b_decode_bf16": 0.0}
+    fresh = [_point("lender", "decode", 512, 1100), _point("lender", "decode", 1024, 4400)]
+
+    def fitted(*probes: MeasuredPoint) -> tuple[int, int]:
+        data = WorkingMemoryData(schema_version=1, coefficients=[_entry("lender", values)], points=[*fresh, *probes])
+        line = fitted_values([data])[("lender", 1, (("conv_backend", "cudnn"),))]
+        return line["k_decode_bf16"], line["b_decode_bf16"]
+
+    def probe(px: int, mib: int) -> MeasuredPoint:
+        return MeasuredPoint.model_validate(
+            _point("lender", "decode", px, mib).model_dump() | {"method": "probe_demand"}
+        )
+
+    shipped = shipped_pair([(512 * 512, 1100 * MIB), (1024 * 1024, 4400 * MIB)])
+    # Below the fresh points it changes nothing, even at a size they do not measure.
+    assert fitted(probe(512, 500), probe(768, 1000)) == shipped
+    # Above them it raises the line to cover it.
+    raised = fitted(probe(1024, 5000))
+    assert raised != shipped and raised[0] * 1024 * 1024 + raised[1] >= 5000 * MIB

@@ -86,6 +86,9 @@ def write_report(data_dir: Path, run_dir: Path) -> ReportResult:
     report_path = run_dir / REPORT_FILE
     summary_path = run_dir / SUMMARY_FILE
     notes = context.history.notes
+    if info.calibrate:
+        exports = ", ".join(export.export for export in info.calibration_exports) or "none saved"
+        notes = [f"Calibration run: time and VRAM are not rated. Store exports: {exports}.", *notes]
     write_bytes_atomic(report_path, _render_html(context, cases, notes).encode("utf-8"))
     write_bytes_atomic(summary_path, _render_summary(info, cases, notes).encode("utf-8"))
     return ReportResult(
@@ -141,7 +144,7 @@ class _History:
         """The latest earlier normal run with completed measured records of `case_key`."""
         for run_dir in self._candidates:
             run = self._load(run_dir)
-            if run is None:
+            if run is None or run.info.calibrate:
                 continue
             case_records = [r for r in run.records if r.case_key == case_key and r.arm == DEFAULT_ARM]
             records = [r for r in _final_records(case_records) if r.kind == "measure" and r.status == "completed"]

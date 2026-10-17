@@ -5,6 +5,9 @@ One server lifetime: preflight -> scratch root and server -> environment -> mode
 The GPU lock is held throughout and the report is written at the end. Every new server lifetime (a resumed run, or a
 restart after the server crashed in a step) skips steps that already have a final record and repeats the last
 warm-up of every case key with measures left, because the new server starts with a cold model cache.
+
+A calibration run also checks that the server can calibrate, submits each step through the working-memory calibrate
+route, and saves the lifetime's calibration store before the scratch root goes (`calibration.py`).
 """
 
 from __future__ import annotations
@@ -28,7 +31,7 @@ from typing import Any, BinaryIO, Protocol
 import psutil
 from PIL import Image
 
-from scripts.family_e2e import gpu_memory
+from scripts.family_e2e import calibration, gpu_memory
 from scripts.family_e2e.client import (
     ApiError,
     EventRecorder,
@@ -157,8 +160,12 @@ def _step_id(step: PlannedStep | Record) -> tuple[str, str, str, int]:
 
 
 def needs_retry(record: Record) -> bool:
-    return record.status == "completed" and any(
-        reason.startswith((FOREIGN_GPU_LOAD, FOREIGN_QUEUE_ITEM)) for reason in record.invalid_reasons
+    """Whether foreign load spoiled a completed run. A calibration step is not repeated: the server keeps every window
+    it measured, and the builder of shipped data takes the largest."""
+    return (
+        record.status == "completed"
+        and record.calibration is None
+        and any(reason.startswith((FOREIGN_GPU_LOAD, FOREIGN_QUEUE_ITEM)) for reason in record.invalid_reasons)
     )
 
 
@@ -383,8 +390,9 @@ def build_memory(
     )
 
 
-def new_run(manifest_path: Path, families: list[str], case_ids: list[str]) -> Path:
-    """Creates the run directory and its run.json with the expanded plan."""
+def new_run(manifest_path: Path, families: list[str], case_ids: list[str], calibrate: bool = False) -> Path:
+    """Creates the run directory and its run.json with the expanded plan. A calibration run submits its steps through
+    the working-memory calibrate route (`calibration.py`)."""
     manifest = load_manifest(manifest_path)
     cases = resolve_cases(manifest, families, case_ids)
     run_id = f"{datetime.now():%Y%m%d-%H%M%S}-{manifest.profile}"
@@ -406,6 +414,7 @@ def new_run(manifest_path: Path, families: list[str], case_ids: list[str]) -> Pa
         plan=plan_steps(cases, manifest.defaults.warmup, manifest.defaults.repeats),
         case_thresholds={case.case_key: case.thresholds for case in cases},
         graph_hashes={},
+        calibrate=calibrate,
     )
     write_run_info(run_dir, info)
     return run_dir
@@ -465,6 +474,10 @@ class _Session:
         self.server: ServerProcess | None = None
         self.step_label = "starting"
         self.last_beat = 0.0
+        # Per server lifetime: the device classes its calibration runs were created for, and whether their stores
+        # were saved through the export route.
+        self.device_class_ids: set[str] = set()
+        self.store_saved = False
         all_cases = {case.case_key: case for case in resolve_cases(manifest)}
         self.cases = {step.case_key: all_cases[step.case_key] for step in self.info.plan}
 
@@ -501,6 +514,7 @@ class _Session:
         """One server lifetime over `todo`. Returns True when the server crashed in a step."""
         root = scratch_root(self.manifest.data_dir, self.info.run_id, self.arm)
         log_path = self.run_dir / f"server-{self.arm}.log"
+        self.device_class_ids, self.store_saved = set(), False
         try:
             build_scratch_root(self.manifest.server.template_root, root, log_path, free_port())
             self.heartbeat("starting the server")
@@ -518,6 +532,11 @@ class _Session:
                 self.server = None
         finally:
             # stop() returns once the server tree has exited, so its database files are closed by now.
+            if self.info.calibrate and not self.store_saved:
+                try:
+                    calibration.save_store_files(self.run_dir, self.info, root)
+                except OSError:
+                    logger.exception("could not save the calibration store of %s", root)
             leftovers = remove_tree(root)
             if leftovers:
                 logger.warning("could not remove the scratch root %s: %s", root, ", ".join(leftovers))
@@ -529,6 +548,8 @@ class _Session:
         recorder.connect()
         try:
             runtime_config = self.record_environment(server, client)
+            if self.info.calibrate:
+                calibration.check_available(client)
             models = client.get("/api/v2/models/")["models"]
             capabilities = client.get("/api/v2/models/capabilities")
             configs = {model["key"]: model for model in models}
@@ -557,6 +578,9 @@ class _Session:
                         if not adapter_checked and record.status == "completed":
                             self.check_server_on_adapter(server)
                             adapter_checked = True
+            if self.device_class_ids:
+                calibration.save_exports(client, self.run_dir, self.info, self.device_class_ids)
+                self.store_saved = True
         finally:
             recorder.close()
 
@@ -807,7 +831,17 @@ class _Session:
             log_offset = server.log_size()
             mark = recorder.mark()
             t_enqueue = time.perf_counter()
-            item_id = client.enqueue(graph.batch)
+            if self.info.calibrate:
+                try:
+                    item_id, fields["calibration"] = calibration.submit(
+                        client, self.cases[step.case_key].spec.model, graph.batch
+                    )
+                except calibration.CaseRefused as e:
+                    fields.update(error=str(e), invalid_reasons=[str(e)])
+                    return Record(**fields)
+                self.device_class_ids.add(fields["calibration"].device_class_id)
+            else:
+                item_id = client.enqueue(graph.batch)
             fields["queue_item_id"] = item_id
             try:
                 item, t_done = wait_for_item(
@@ -862,6 +896,9 @@ class _Session:
         if foreign:
             reasons.append(f"{FOREIGN_GPU_LOAD}: {_describe(foreign)}")
         if any(r.startswith((FOREIGN_GPU_LOAD, FOREIGN_QUEUE_ITEM)) for r in reasons):
+            valid_timing = valid_memory = False
+        if self.info.calibrate:
+            reasons.append(calibration.PROBE_REASON)
             valid_timing = valid_memory = False
         fields.update(
             valid_timing=valid_timing, valid_memory=valid_memory, valid_psnr=valid_psnr, invalid_reasons=reasons

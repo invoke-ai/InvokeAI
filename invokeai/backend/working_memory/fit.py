@@ -7,7 +7,9 @@ size. Each carried pair is the upper envelope of the points it is resolved for (
 the estimator borrows -- when it is a single-sample, untiled operation of that pair (`in_fit` unless measured out of
 regime) with no weight growth. Tiled points bound their estimates but fit nothing: the tile term reuses the untiled
 pair. Nor does a point whose VAE an in-place cast grew (`upcast_weight_bytes`): its demand includes the growth, which
-the estimate prices as a term of its own.
+the estimate prices as a term of its own. A point that bounds its estimate from below only
+(`MeasuredPoint.holds_upper_bound`, a `probe_demand` window) is covered by the line and can raise it, but takes no part
+in choosing it: the fresh-process points cap a line.
 
 `tests/backend/working_memory/test_shipped_coefficients.py` holds every carried value that is not a declared stand-in
 to `fitted_values` of the shipped points, so a new point that moves a fit fails there with the value to ship.
@@ -16,7 +18,7 @@ to `fitted_values` of the shipped points, so a new point that moves a fit fails 
 import math
 from collections.abc import Iterable, Mapping, Sequence
 from fractions import Fraction
-from typing import Final
+from typing import Final, NamedTuple, Optional
 
 from invokeai.backend.working_memory.coefficients import CoefficientEntry, MeasuredPoint, WorkingMemoryData, find_entry
 
@@ -38,15 +40,25 @@ def entry_key(entry: CoefficientEntry | MeasuredPoint) -> EntryKey:
     return (entry.estimator, entry.version, tuple(sorted(entry.platform.items())))
 
 
-def upper_envelope(points: Sequence[tuple[int, int]]) -> tuple[Fraction, Fraction]:
+class FitPoint(NamedTuple):
+    pixels: int
+    bytes: int
+    caps: bool
+    """Whether the point takes part in choosing the line (`MeasuredPoint.holds_upper_bound`); every point is covered."""
+
+
+def upper_envelope(
+    points: Sequence[tuple[int, int]], capping: Optional[Sequence[tuple[int, int]]] = None
+) -> tuple[Fraction, Fraction]:
     """The line ``y = k * x + b`` on or above every ``(x, y)`` point, with ``b >= 0``, that over-reserves least.
 
     The candidates are the edges of the upper convex hull of the points and the origin: each such line lies on or
     above every point, and the origin keeps its intercept non-negative. Of those, the one whose largest ratio to the
     highest reading of a size is smallest wins, the steeper one on a tie, since it is the more conservative past the
     largest point. Only the highest reading counts: a lower one at a measured size is covered whatever the line, and
-    rating against it would tilt the line though no point lies above it. Raises unless the points span two sizes at
-    least `MIN_AREA_RATIO` apart.
+    rating against it would tilt the line though no point lies above it. With `capping`, a subset of the points, only
+    its readings rate the edges: the others are covered but cap nothing. Without any, all points rate them. Raises
+    unless the points span two sizes at least `MIN_AREA_RATIO` apart.
     """
     if not points or any(x <= 0 or y <= 0 for x, y in points):
         raise ValueError(f"an envelope needs points with positive sizes and bytes, got {list(points)}")
@@ -67,23 +79,26 @@ def upper_envelope(points: Sequence[tuple[int, int]]) -> tuple[Fraction, Fractio
             hull.pop()
         hull.append(point)
 
+    rated = {x: max(y for px, y in capping if px == x) for x in sorted({x for x, _ in capping})} if capping else highest
     best: tuple[Fraction, Fraction, Fraction] | None = None
     for (x0, y0), (x1, y1) in zip(hull, hull[1:], strict=False):
         k = Fraction(y1 - y0, x1 - x0)
         b = y0 - k * x0
         if k < 0:
             continue
-        worst = max((k * x + b) / y for x, y in highest.items())
+        worst = max((k * x + b) / y for x, y in rated.items())
         if best is None or (worst, -k) < (best[0], -best[1]):
             best = (worst, k, b)
     assert best is not None, "the edge from the origin always rises"
     return best[1], best[2]
 
 
-def shipped_pair(points: Sequence[tuple[int, int]]) -> tuple[int, int]:
+def shipped_pair(
+    points: Sequence[tuple[int, int]], capping: Optional[Sequence[tuple[int, int]]] = None
+) -> tuple[int, int]:
     """The slope and intercept to ship for these points: the envelope plus `SHIPPED_MARGIN`, the slope rounded up to
     a whole byte per pixel and the intercept to a whole MiB."""
-    k, b = upper_envelope(points)
+    k, b = upper_envelope(points, capping)
     margin = 1 + SHIPPED_MARGIN
     return math.ceil(k * margin), math.ceil(b * margin / _MIB) * _MIB
 
@@ -94,15 +109,15 @@ def _pairs(entry: CoefficientEntry) -> set[str]:
     return {name[2:] for name in names if name.startswith("k_") and f"b_{name[2:]}" in names}
 
 
-def fit_points(data: Iterable[WorkingMemoryData]) -> Mapping[tuple[EntryKey, str], list[tuple[int, int]]]:
-    """Per carried entry and line, the ``(pixels, bytes)`` points that line is fitted on.
+def fit_points(data: Iterable[WorkingMemoryData]) -> Mapping[tuple[EntryKey, str], list[FitPoint]]:
+    """Per carried entry and line, the points that line is fitted on.
 
     A point belongs to the entry its own estimator's entry resolves to on its platform, one `values_from` hop, and to
     the line its operation and dtype name. Lines no point measures are absent.
     """
     files = list(data)
     entries = [entry for file in files for entry in file.coefficients]
-    groups: dict[tuple[EntryKey, str], list[tuple[int, int]]] = {}
+    groups: dict[tuple[EntryKey, str], list[FitPoint]] = {}
     for point in (point for file in files for point in file.points):
         features = point.features
         if (
@@ -116,7 +131,8 @@ def fit_points(data: Iterable[WorkingMemoryData]) -> Mapping[tuple[EntryKey, str
         suffix = f"{features.get('operation')}_{features.get('dtype')}"
         if suffix in _pairs(owner):
             pixels = int(features["height"]) * int(features["width"])  # type: ignore[arg-type]
-            groups.setdefault((entry_key(owner), suffix), []).append((pixels, point.measured_bytes))
+            line = groups.setdefault((entry_key(owner), suffix), [])
+            line.append(FitPoint(pixels, point.measured_bytes, point.holds_upper_bound))
     return groups
 
 
@@ -143,8 +159,9 @@ def fitted_values(data: Iterable[WorkingMemoryData]) -> Mapping[EntryKey, Mappin
         for suffix in sorted(_pairs(entry)):
             if {f"k_{suffix}", f"b_{suffix}"} <= set(entry.stand_ins):
                 continue
+            line = groups.get((key, suffix), [])
             try:
-                k, b = shipped_pair(groups.get((key, suffix), []))
+                k, b = shipped_pair([(p.pixels, p.bytes) for p in line], [(p.pixels, p.bytes) for p in line if p.caps])
             except ValueError as e:
                 raise ValueError(f"{entry.estimator} on {entry.platform}, {suffix}: {e}") from e
             fitted.setdefault(key, {}).update({f"k_{suffix}": k, f"b_{suffix}": b})

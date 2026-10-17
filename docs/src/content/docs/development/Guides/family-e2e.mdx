@@ -34,7 +34,8 @@ It is a developer tool. Memory sampling uses WDDM, so it runs on Windows only fo
 <data_dir>/inputs/                          input images the manifest refers to
 <data_dir>/references/<profile>/<case_key>/ image.png, reference.json (written by `accept` only)
 <data_dir>/runs/<run_id>/                   run.json, records.jsonl, heartbeat.json, runner.log, server-default.log,
-                                            graphs/, images/, traces/<record_id>.csv.gz, report.html, summary.md
+                                            graphs/, images/, traces/<record_id>.csv.gz, report.html, summary.md,
+                                            calibration/ (calibration runs only)
 <data_dir>/scratch-roots/<run_id>-default/
 ```
 
@@ -66,9 +67,9 @@ Run the tool from the repository root with the checkout's environment, for examp
 
 | Command | What it does |
 | --- | --- |
-| `start --manifest M [--family F]… [--case ID]…` | Checks the GPU lock, the template's server, unfinished model installs and foreign GPU load. It then creates the run and starts its runner in the background, and prints the run id and paths. |
-| `status [RUN]` | Shows progress, the current step, the heartbeat age and whether the runner is alive. |
-| `stop [RUN]` | Kills the runner and its server, removes the run's scratch roots and marks the run stopped. |
+| `start --manifest M [--family F]… [--case ID]… [--calibrate]` | Checks the GPU lock, the template's server, unfinished model installs and foreign GPU load. It then creates the run and starts its runner in the background, and prints the run id and paths. `--calibrate` makes it a [calibration run](#working-memory-calibration). |
+| `status [RUN]` | Shows progress, the current step, the heartbeat age and whether the runner is alive, and for a calibration run the number of saved store exports. |
+| `stop [RUN]` | Kills the runner and its server, saves a calibration run's store from its scratch roots, removes them and marks the run stopped. |
 | `resume [RUN]` | Starts the runner of a stopped or crashed run again. |
 | `report [RUN]` | Writes `report.html` and `summary.md` again. |
 | `accept [RUN] [--case KEY]…` | Makes the run's measured results the references of its profile. Nothing else writes references. |
@@ -79,6 +80,34 @@ Run the tool from the repository root with the checkout's environment, for examp
 On Windows the background runner breaks away from the caller's job object, so a terminal or an agent harness that kills its job's processes does not end a long run. Where breakaway is refused, the runner is created through WMI. It then starts with the user's default environment instead of the caller's.
 
 A resumed run skips every step that already has a final record and keeps the measures of the earlier sessions. Its new server starts with a cold model cache, so each case size with measures left first repeats its last warm-up, once. The manifest, the graphs, and the server's commit and dirty flag must not have changed since the run started; further edits to an already dirty checkout cannot be detected.
+
+## Working-memory calibration
+
+`start --calibrate` measures what each model operation of the cases needs on this GPU. Like the rest of the tool it runs on Windows only. Every step compiles its graph as a normal run does, then submits it to `POST /api/v2/models/i/{model}/working_memory/calibrate` with the case's `model` key instead of `enqueue_batch`. The server runs it with its working-memory probe, which records a window per estimated model operation in its calibration store (see "Calibration runs" in the [model manager architecture](/development/architecture/model-manager/#calibration-runs)). Warm-ups and measures alike are submitted, and every window is kept.
+
+- **Before the steps.** The runner reads `GET /api/v2/models/working_memory/status`. With `available: false` (no GPU, several generation devices, an unusable store file) the run fails with the server's reason. The scratch server runs single-user, so the tool is an administrator.
+- **Refusals.** A 404 or 422 answer to a calibrate request (an unknown model, a graph the run cannot measure) gives that step an error record, and the run goes on. Any other error response ends the run with the server's detail, after its store was saved; fix the cause and `resume`.
+- **Records.** Each accepted step's record carries `calibration`: the calibration run id and the device class. The probe synchronizes and empties the allocator cache around every model operation, so time and VRAM are invalid with that reason; `status` shows it as a calibration marker rather than counting it, and images are still compared. A step foreign load spoiled is not repeated: the server keeps every window. `accept` refuses calibration runs, and reports of later runs do not compare against them.
+- **Exports.** Every server lifetime has its own scratch database and store, so the tool submits each attempt once and sends no retry key. When a lifetime's steps are done, the runner saves `calibration/<run_id>-<n>-<device_class_id>.json` (`GET /api/v2/models/working_memory/export`, byte for byte) and `calibration/<run_id>-<n>-status.json`; `n` counts the run's lifetimes. After a server crash, a runner failure or `stop`, the store file is copied from the scratch root instead, without a status. `run.json` lists them all under `calibration_exports`.
+
+On a machine the tool does not run on, an administrator takes the export of a server's own calibration runs from `GET /api/v2/models/working_memory/export?device_class_id=<id>`; `GET /api/v2/models/working_memory/status` lists the device class ids.
+
+### Building shipped data
+
+```
+uv run --no-sync python -m scripts.working_memory.build_shipped <data_dir>/runs/<run_id>/calibration [more exports or directories] [--write]
+```
+
+`scripts/working_memory/build_shipped.py` reads the exports and prints what it would change in `invokeai/backend/working_memory/data/`; `--write` writes it. A directory stands for the exports in it, in lifetime order. Then run `uv run --no-sync pytest tests/backend/working_memory`.
+
+- **Points.** Every valid, fit-eligible window with a positive demand becomes a `probe_demand` point. Per card, estimator, version, platform and features it takes the largest `demand_bytes` of all windows given: repetitions, lifetimes, and several runs or machines with the same card. A window given twice (the same store in two files) counts once. The provenance names the card, the torch and runtime versions, the calibration run, item and node of the largest window, and its export file. Each point line shows its windows' demands in the order they ran and the largest over the first (`[3 windows, MiB 1960, 1820, 1820; max/first 1.00]`).
+- **Fragmentation.** A point whose reserved bytes grew by 10% or more from its first window to its largest while the allocated bytes stayed within 2% gets a `warning: fragmentation?` line with both series. That is the allocator's cache growing around the same tensors in a long-running server, not the operation needing more.
+- **Platforms.** A point's platform is the one `platform_for` gives on the machine that measured it, derived from the export's device class and its environment's hard facts (`platform_for_environment`), whatever machine the builder runs on. It names the OS only where an entry for that platform names it. A window whose environment lacks a fact the platform is read from is left out and counted.
+- **Bounds.** `probe_demand` points bound their estimates from below only: the estimate must cover them, and they may raise a line, but they take no part in choosing it (`fit.upper_envelope`), and the 1.3x upper bound and `max_ratio` stay with the fresh-process points, because the cold first run after a server start is the worst case.
+- **Merge and fit.** A point joins the data file that declares the estimator's coefficients; where a `probe_demand` point of the same card, platform and features is there, the larger of the two stays. The carried values are then refitted with `fit.py`, and a stand-in line that an in-fit point now measures is fitted from then on. A refitted entry's provenance gets a note. Every moved line gets a `line` row: old and new slope and base, whether it was raised, and its new points.
+- **Refusals.** An export of another estimator version than the registered one, a window whose features the estimator cannot evaluate, a platform `MEASURED` does not list, and a line whose points span less than twice the pixels: exit code 2. Exit code 1, with nothing written:
+  - any point of the result breaks its bounds (`working_memory/bounds.py`, the rule the data test applies); the error lists them. A probe point that raises a line above what the fresh-process points of that line allow is refused this way;
+  - with `--write`, a line is raised on a point flagged as fragmentation, unless `--accept-fragmentation` is given.
 
 ## Validity
 
@@ -117,3 +146,4 @@ Database migrations of a newer `code_dir` run against the scratch database only.
   - img2img starts inside the schedule at a family-specific step, so the count is inferred. When steps are faster than 0.2 s that inference can be off by a factor, so the time per step is left empty.
 - Ideogram 4 ignores `steps`; its step count follows `settings.ideogram4Steps` or `settings.ideogram4SamplerPreset`. `img2img` and `controlnet` are not available for ERNIE-Image and Ideogram 4. Dynamic prompts, canvas rasterization, video and upscale graphs are not covered.
 - Linux memory sampling and A/B runs of two checkouts are not available yet.
+- A calibration run measures the windows of estimated model operations only, inside a running server: they are not a fresh process's first operation, as the `demand_peak` points are.

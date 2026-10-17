@@ -14,7 +14,7 @@ from dataclasses import asdict, dataclass
 from importlib.resources import files
 from importlib.resources.abc import Traversable
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Literal, Self
+from typing import TYPE_CHECKING, Final, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
 
@@ -69,27 +69,35 @@ class CoefficientEntry(_DataModel):
         return self
 
 
+LOWER_BOUND_ONLY_METHODS: Final = frozenset({"probe_demand"})
+"""Point methods that bound an estimate from below only (see `MeasuredPoint.holds_upper_bound`)."""
+
+
 class MeasuredPoint(_DataModel):
     """One measured operation. The estimate for its features must be at least `measured_bytes`, and where a fitted
-    term decides an in-fit point, at most 1.3 times that (or `max_ratio`). Measured with the model's weights already in
-    place, so `measured_bytes` is the operation's working memory alone."""
+    term decides an in-fit point that `holds_upper_bound`, at most 1.3 times that (or `max_ratio`). Measured with the
+    model's weights already in place, so `measured_bytes` is the operation's working memory alone."""
 
     estimator: str
     version: int
     platform: dict[str, str]
     features: dict[str, FeatureValue]
     measured_bytes: int
-    method: Literal["reserved_peak", "driver_peak", "demand_peak"]
-    """How `measured_bytes` was read, each as a peak over its value just before the operation, one fresh process per
-    point:
+    method: Literal["reserved_peak", "driver_peak", "demand_peak", "probe_demand"]
+    """How `measured_bytes` was read, each as a peak over its value just before the operation:
 
-    - ``reserved_peak``: the caching allocator's reserved bytes. Reserved rather than allocated, because reserved is
-      what the model cache's reservation has to cover.
+    - ``reserved_peak``: the caching allocator's reserved bytes, one fresh process per point. Reserved rather than
+      allocated, because reserved is what the model cache's reservation has to cover.
     - ``driver_peak``: the process's device usage as the driver reports it (Windows ``D3DKMT`` ``CurrentUsage``), the
-      larger of two runs.
-    - ``demand_peak``: the largest of the driver-level, the reserved and the allocated peak, the larger of two runs.
-      The driver-level figure is what reserved misses: on HIP the first operation of a process maps ~300 MiB beyond
-      ``max_memory_reserved``."""
+      larger of two runs, one fresh process per point.
+    - ``demand_peak``: the largest of the driver-level, the reserved and the allocated peak, the larger of two runs,
+      one fresh process per point. The driver-level figure is what reserved misses: on HIP the first operation of a
+      process maps ~300 MiB beyond ``max_memory_reserved``.
+    - ``probe_demand``: the working-memory probe's ``demand_bytes`` (`probe.MeasuredWindow`), the largest over the
+      valid, fit-eligible windows of calibration runs in a running server, warm-ups included.
+      `scripts/working_memory/build_shipped.py` builds these points from calibration store exports. A lower bound
+      only: a warm window in a running server can read well below the cold first run after a server start, which is
+      the worst case the reservation must cover, so it may raise a line but never caps one."""
     device: str
     provenance: str
     max_ratio: float | None = None
@@ -99,6 +107,17 @@ class MeasuredPoint(_DataModel):
     """False for a point measured in a regime its platform does not run, kept to check another term: CUDA with the
     math attention kernel forced, whose score matrix shares the forward with the convolutions. The fit leaves it out,
     and it gets the lower bound only."""
+
+    @model_validator(mode="after")
+    def _max_ratio_needs_an_upper_bound(self) -> Self:
+        if self.max_ratio is not None and not self.holds_upper_bound:
+            raise ValueError(f"a {self.method} point bounds its estimate from below only; it takes no max_ratio")
+        return self
+
+    @property
+    def holds_upper_bound(self) -> bool:
+        """Whether the point also bounds its estimate from above: a fresh-process peak, not a `probe_demand` window."""
+        return self.method not in LOWER_BOUND_ONLY_METHODS
 
 
 class WorkingMemoryData(_DataModel):

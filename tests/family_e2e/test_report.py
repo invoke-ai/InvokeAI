@@ -7,7 +7,7 @@ from typing import Any
 import numpy as np
 import pytest
 
-from scripts.family_e2e.records import Environment, Record, append_record, write_run_info
+from scripts.family_e2e.records import Environment, Record, append_record, load_run_info, write_run_info
 from scripts.family_e2e.references import accept
 from scripts.family_e2e.report import ReportResult, write_report
 from tests.family_e2e.test_records import make_environment, make_record, make_run_info, write_png
@@ -285,6 +285,22 @@ def test_previous_run_is_the_latest_earlier_one_of_the_profile_with_the_case(tmp
     report = result.report_html.read_text(encoding="utf-8")
     assert "20261001-000000-rtx4090" in report
     assert not any(run_id in report for run_id in ("20261002-", "20261004-"))
+
+
+def test_a_calibration_run_is_never_the_previous_run(tmp_path: Path) -> None:
+    """The probe changes time and VRAM, so a calibration run in between is passed over."""
+    current = "20261003-000000-rtx4090"
+    _write_run(tmp_path, "20261001-000000-rtx4090", _case_records("20261001-000000-rtx4090", totals=(20.0,) * 3))
+    calibration = _write_run(
+        tmp_path, "20261002-000000-rtx4090", _case_records("20261002-000000-rtx4090", totals=(5.0,) * 3)
+    )
+    write_run_info(calibration, load_run_info(calibration).model_copy(update={"calibrate": True}))
+    run_dir = _write_run(tmp_path, current, _case_records(current))
+
+    result = write_report(tmp_path, run_dir)
+
+    assert _summary(result)[CASE][4] == "**-50.0%**"
+    assert "20261002-000000-rtx4090" not in result.report_html.read_text(encoding="utf-8")
 
 
 def test_broken_inputs_of_one_case_do_not_hide_the_others(tmp_path: Path) -> None:

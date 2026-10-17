@@ -88,6 +88,13 @@ class Residency(_Model):
     percent: float
 
 
+class CalibrationSubmission(_Model):
+    """How a calibration run's step reached the server: the run the calibrate route created for it."""
+
+    run_id: str
+    device_class_id: str
+
+
 class Record(_Model):
     record_id: str
     """`<case_key>.<arm>.<kind>.<rep>.<attempt>`."""
@@ -121,6 +128,8 @@ class Record(_Model):
     valid_memory: bool
     valid_psnr: bool
     invalid_reasons: list[str]
+    calibration: CalibrationSubmission | None = None
+    """Set for a step of a calibration run that the server accepted."""
 
 
 class Environment(_Model):
@@ -158,6 +167,22 @@ class Thresholds(_Model):
     peak_tolerance_mb: float
 
 
+class CalibrationExport(_Model):
+    """A calibration store saved from one server lifetime of a calibration run."""
+
+    lifetime: int
+    """Counts the run's server lifetimes that saved a store, from 1. Each lifetime has its own scratch store."""
+    device_class_id: str
+    export: str
+    """calibration/<run_id>-<lifetime>-<device_class_id>.json: the store file byte for byte."""
+    status: str | None
+    """calibration/<run_id>-<lifetime>-status.json, the server's calibration status; None for a `store_file` copy."""
+    source: Literal["api", "store_file"]
+    """`api`: GET working_memory/export at the end of the lifetime. `store_file`: copied from the scratch root after the
+    server died or was stopped, which leaves no server to ask."""
+    saved_at: str
+
+
 class RunInfo(_Model):
     run_id: str
     profile: str
@@ -174,6 +199,9 @@ class RunInfo(_Model):
     """Keyed by case_key."""
     graph_hashes: dict[str, str]
     """Keyed by case_key."""
+    calibrate: bool = False
+    """Steps go through the working-memory calibrate route instead of enqueue_batch."""
+    calibration_exports: list[CalibrationExport] = []
 
 
 class Reference(_Model):
